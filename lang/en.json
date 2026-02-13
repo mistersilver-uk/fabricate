@@ -1,0 +1,86 @@
+{
+  "FABRICATE": {
+    "ModuleName": "Fabricate v2 - Universal Crafting",
+
+    "Settings": {
+      "Enabled": {
+        "Name": "Enable Crafting System",
+        "Hint": "Enable or disable the Fabricate crafting system globally."
+      },
+      "SimpleOnly": {
+        "Name": "Show Simple Recipes Only",
+        "Hint": "Hide advanced recipe features and show only simple ingredient-to-result recipes."
+      },
+      "AutoCraft": {
+        "Name": "Auto-Craft",
+        "Hint": "Automatically craft items without showing a confirmation dialog when you have all required materials."
+      }
+    },
+
+    "Recipe": {
+      "Name": "Recipe Name",
+      "Description": "Description",
+      "Category": "Category",
+      "Ingredients": "Ingredients",
+      "Catalysts": "Catalysts",
+      "Result": "Result",
+      "Process": "Crafting Process",
+
+      "Create": "Create Recipe",
+      "Edit": "Edit Recipe",
+      "Delete": "Delete Recipe",
+      "Duplicate": "Duplicate Recipe",
+      "Import": "Import Recipes",
+      "Export": "Export Recipes"
+    },
+
+    "Ingredient": {
+      "Item": "Specific Item",
+      "Tag": "Item Tag",
+      "Quantity": "Quantity",
+      "Tier": "Tier",
+      "ExtractEffects": "Extract Active Effects",
+      "Alternatives": "Alternative Ingredients"
+    },
+
+    "Catalyst": {
+      "Name": "Catalyst Name",
+      "Required": "Required",
+      "Equipped": "Must be Equipped",
+      "Inventory": "Must be in Inventory",
+      "Proximity": "Proximity Required",
+      "Degrades": "Degrades on Use",
+      "QualityBonus": "Affects Output Quality"
+    },
+
+    "Process": {
+      "Instant": "Instant",
+      "Time": "Time-Based",
+      "Skill": "Skill Check",
+      "Duration": "Duration",
+      "SkillName": "Skill",
+      "DC": "Difficulty Class"
+    },
+
+    "Craft": {
+      "Title": "Crafting",
+      "Available": "Available Recipes",
+      "CanCraft": "Can Craft",
+      "CannotCraft": "Cannot Craft",
+      "Missing": "Missing Items",
+      "Confirm": "Craft Item",
+      "Success": "Crafting Successful!",
+      "Failure": "Crafting Failed!",
+      "InProgress": "Crafting in Progress..."
+    },
+
+    "Error": {
+      "NoRecipe": "Recipe not found",
+      "NoActor": "No actor selected",
+      "MissingIngredients": "Missing required ingredients",
+      "MissingCatalysts": "Missing required catalysts",
+      "InvalidRecipe": "Invalid recipe configuration",
+      "CraftingFailed": "Crafting failed"
+    }
+  }
+}

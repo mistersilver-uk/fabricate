@@ -1,0 +1,199 @@
+<div class="fabricate-crafting-app">
+  <!-- Actor Selection Section -->
+  <section class="actor-selection-section">
+    <div class="crafting-actor-selector">
+      <label for="crafting-actor">Craft with:</label>
+      <select id="crafting-actor" name="craftingActor">
+        {{#each availableActors}}
+          <option value="{{id}}" {{#if selected}}selected{{/if}}>
+            {{name}}{{#if isAssignedCharacter}} ★{{/if}}
+          </option>
+        {{/each}}
+      </select>
+      <p class="hint">Results will be added to this actor's inventory</p>
+    </div>
+
+    <div class="component-sources-selector">
+      <label>Using components from:</label>
+      {{#if ownedActors.length}}
+        <div class="source-actor-list">
+          {{#each ownedActors}}
+            <label class="source-actor-checkbox">
+              <input
+                type="checkbox"
+                value="{{id}}"
+                {{#if selected}}checked{{/if}}
+                data-action="toggleSourceActor"
+              />
+              <span class="actor-name">{{name}}</span>
+            </label>
+          {{/each}}
+        </div>
+      {{else}}
+        <p class="no-actors-warning">
+          <i class="fas fa-exclamation-triangle"></i>
+          No owned actors available for component sources.
+        </p>
+      {{/if}}
+    </div>
+  </section>
+
+  <!-- Search and Filters Header -->
+  <header class="fabricate-header">
+    <div class="fabricate-search">
+      <input
+        type="text"
+        name="search"
+        placeholder="Search recipes..."
+        value="{{search}}"
+        data-action="search"
+      />
+      <i class="fas fa-search"></i>
+    </div>
+
+    <div class="fabricate-filters">
+      <button
+        type="button"
+        class="fabricate-filter-btn {{#if showOnlyAvailable}}active{{/if}}"
+        data-action="toggleAvailable"
+        title="Show only craftable recipes"
+      >
+        <i class="fas fa-check-circle"></i>
+        Craftable Only
+      </button>
+
+      <select name="category">
+        <option value="">All Categories</option>
+        {{#each categories}}
+        <option value="{{this}}" {{#if (eq ../selectedCategory this)}}selected{{/if}}>
+          {{this}}
+        </option>
+        {{/each}}
+      </select>
+    </div>
+  </header>
+
+  <!-- Recipe List -->
+  <div class="fabricate-recipe-list">
+    {{#unless hasComponentSources}}
+      <div class="fabricate-empty">
+        <i class="fas fa-info-circle"></i>
+        <p>Select at least one component source actor to see available recipes.</p>
+      </div>
+    {{else}}
+      {{#if recipes.length}}
+        {{#each recipes}}
+          <article class="fabricate-recipe-item {{#if canCraft}}can-craft{{else}}cannot-craft{{/if}}" data-recipe-id="{{id}}">
+            <div class="recipe-icon">
+              <img src="{{img}}" alt="{{name}}" />
+            </div>
+
+            <div class="recipe-info">
+              <h3 class="recipe-name">
+                {{name}}
+                {{#if hasMultipleSets}}
+                  <span class="badge">Multiple options</span>
+                {{/if}}
+              </h3>
+              <p class="recipe-description">{{description}}</p>
+
+              <div class="recipe-requirements">
+                {{#if ingredients.length}}
+                <div class="ingredient-list">
+                  <strong>Ingredients:</strong>
+                  {{#each ingredients}}
+                    <span class="ingredient-badge {{#if satisfied}}satisfied{{else}}unsatisfied{{/if}}">
+                      {{description}}
+                      <span class="quantity">({{have}}/{{need}})</span>
+                    </span>
+                  {{/each}}
+                </div>
+                {{/if}}
+
+                {{#if essences.length}}
+                <div class="essence-list">
+                  <strong>Essences:</strong>
+                  {{#each essences}}
+                    <span class="essence-badge {{#if satisfied}}satisfied{{else}}unsatisfied{{/if}}">
+                      {{type}}: {{need}}
+                    </span>
+                  {{/each}}
+                </div>
+                {{/if}}
+
+                {{#if catalysts.length}}
+                <div class="catalyst-list">
+                  <strong>Requires:</strong>
+                  {{#each catalysts}}
+                    <span class="catalyst-badge {{#if available}}have{{else}}need{{/if}}">
+                      <i class="fas fa-tools"></i> {{name}}
+                    </span>
+                  {{/each}}
+                </div>
+                {{/if}}
+              </div>
+
+              <div class="recipe-result">
+                <i class="fas fa-arrow-right"></i>
+                <strong>{{resultDescription}}</strong>
+              </div>
+            </div>
+
+            <div class="recipe-actions">
+              {{#if canCraft}}
+                <button
+                  type="button"
+                  class="craft-btn"
+                  data-action="craft"
+                  data-recipe-id="{{id}}"
+                  title="Craft this item"
+                >
+                  <i class="fas fa-hammer"></i>
+                  Craft
+                </button>
+              {{else}}
+                <button
+                  type="button"
+                  class="craft-btn disabled"
+                  disabled
+                  title="Missing required items"
+                >
+                  <i class="fas fa-ban"></i>
+                  Cannot Craft
+                </button>
+              {{/if}}
+
+              <button
+                type="button"
+                class="details-btn"
+                data-action="showDetails"
+                data-recipe-id="{{id}}"
+                title="Show recipe details"
+              >
+                <i class="fas fa-info-circle"></i>
+              </button>
+            </div>
+          </article>
+        {{/each}}
+      {{else}}
+        <div class="fabricate-empty">
+          <i class="fas fa-inbox"></i>
+          <p>No recipes found.</p>
+          {{#if search}}
+            <p class="hint">Try adjusting your search or filters.</p>
+          {{else}}
+            <p class="hint">The GM needs to create some recipes first.</p>
+          {{/if}}
+        </div>
+      {{/if}}
+    {{/unless}}
+  </div>
+
+  {{#if showPagination}}
+  <footer class="fabricate-footer">
+    <div class="pagination">
+      <span>Showing {{startIndex}}-{{endIndex}} of {{totalRecipes}} recipes</span>
+    </div>
+  </footer>
+  {{/if}}
+</div>

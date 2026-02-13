@@ -1,0 +1,125 @@
+<div class="fabricate-recipe-manager">
+  <header class="manager-header">
+    <div class="manager-search">
+      <input
+        type="text"
+        name="search"
+        placeholder="Search recipes..."
+        value="{{search}}"
+        data-action="search"
+      />
+      <i class="fas fa-search"></i>
+    </div>
+
+    <div class="manager-actions">
+      <button type="button" class="btn-create" data-action="createRecipe">
+        <i class="fas fa-plus"></i>
+        New Recipe
+      </button>
+
+      <button type="button" class="btn-import" data-action="importRecipes">
+        <i class="fas fa-file-import"></i>
+        Import
+      </button>
+
+      <button type="button" class="btn-export" data-action="exportRecipes">
+        <i class="fas fa-file-export"></i>
+        Export
+      </button>
+    </div>
+  </header>
+
+  <div class="manager-content">
+    <aside class="category-sidebar">
+      <h3>Categories</h3>
+      <ul class="category-list">
+        <li class="{{#unless selectedCategory}}active{{/unless}}">
+          <a href="#" data-action="filterCategory" data-category="">
+            <i class="fas fa-list"></i>
+            All Recipes
+            <span class="count">{{totalRecipes}}</span>
+          </a>
+        </li>
+        {{#each categories}}
+        <li class="{{#if (eq ../selectedCategory this.name)}}active{{/if}}">
+          <a href="#" data-action="filterCategory" data-category="{{this.name}}">
+            <i class="fas fa-folder"></i>
+            {{this.name}}
+            <span class="count">{{this.count}}</span>
+          </a>
+        </li>
+        {{/each}}
+      </ul>
+    </aside>
+
+    <main class="recipe-grid">
+      {{#if recipes.length}}
+        <table class="recipe-table">
+          <thead>
+            <tr>
+              <th class="col-name">Recipe Name</th>
+              <th class="col-category">Category</th>
+              <th class="col-type">Type</th>
+              <th class="col-ingredients">Ingredients</th>
+              <th class="col-enabled">Enabled</th>
+              <th class="col-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#each recipes}}
+            <tr class="recipe-row {{#unless enabled}}disabled{{/unless}}" data-recipe-id="{{id}}">
+              <td class="col-name">
+                <img src="{{img}}" alt="{{name}}" class="recipe-thumb" />
+                <span>{{name}}</span>
+              </td>
+              <td class="col-category">{{category}}</td>
+              <td class="col-type">
+                {{#if isSimple}}
+                  <span class="badge badge-simple">Simple</span>
+                {{else}}
+                  <span class="badge badge-advanced">Advanced</span>
+                {{/if}}
+              </td>
+              <td class="col-ingredients">
+                {{ingredients.length}} ingredient{{#unless (eq ingredients.length 1)}}s{{/unless}}
+                {{#if catalysts.length}}
+                  + {{catalysts.length}} catalyst{{#unless (eq catalysts.length 1)}}s{{/unless}}
+                {{/if}}
+              </td>
+              <td class="col-enabled">
+                <input
+                  type="checkbox"
+                  {{#if enabled}}checked{{/if}}
+                  data-action="toggleEnabled"
+                  data-recipe-id="{{id}}"
+                />
+              </td>
+              <td class="col-actions">
+                <button type="button" class="btn-icon" data-action="editRecipe" data-recipe-id="{{id}}" title="Edit">
+                  <i class="fas fa-edit"></i>
+                </button>
+                <button type="button" class="btn-icon" data-action="duplicateRecipe" data-recipe-id="{{id}}" title="Duplicate">
+                  <i class="fas fa-copy"></i>
+                </button>
+                <button type="button" class="btn-icon btn-danger" data-action="deleteRecipe" data-recipe-id="{{id}}" title="Delete">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </td>
+            </tr>
+            {{/each}}
+          </tbody>
+        </table>
+      {{else}}
+        <div class="fabricate-empty">
+          <i class="fas fa-inbox"></i>
+          <h3>No Recipes Yet</h3>
+          <p>Create your first recipe to get started.</p>
+          <button type="button" class="btn-primary" data-action="createRecipe">
+            <i class="fas fa-plus"></i>
+            Create Recipe
+          </button>
+        </div>
+      {{/if}}
+    </main>
+  </div>
+</div>

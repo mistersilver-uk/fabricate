@@ -1,0 +1,24 @@
+{
+  "name": "fabricate-v2",
+  "version": "0.1.0",
+  "description": "Universal crafting system for Foundry VTT - supports simple recipes, catalysts, variable outputs, and active effect transfer",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0",
+    "@league-of-foundry-developers/foundry-vtt-types": "^12.0.0"
+  },
+  "private": true,
+  "keywords": [
+    "foundryvtt",
+    "foundry-vtt",
+    "crafting",
+    "recipes",
+    "system-agnostic"
+  ],
+  "license": "MIT"
+}
