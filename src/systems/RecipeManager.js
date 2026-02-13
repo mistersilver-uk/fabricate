@@ -10,6 +10,17 @@ export class RecipeManager {
   }
 
   /**
+   * Ensure only GMs can mutate recipe state
+   * @param {string} action - Action name for error context
+   * @private
+   */
+  _assertGM(action) {
+    if (!game.user?.isGM) {
+      throw new Error(`GM permissions required: ${action}`);
+    }
+  }
+
+  /**
    * Initialize the recipe manager and load saved recipes
    */
   async initialize() {
@@ -40,6 +51,8 @@ export class RecipeManager {
    * @returns {Recipe}
    */
   async createRecipe(recipeData) {
+    this._assertGM('create recipe');
+
     const recipe = new Recipe(recipeData);
     const validation = recipe.validate();
 
@@ -61,6 +74,8 @@ export class RecipeManager {
    * @returns {Recipe}
    */
   async updateRecipe(recipeId, updates) {
+    this._assertGM('update recipe');
+
     const recipe = this.recipes.get(recipeId);
     if (!recipe) {
       throw new Error(`Recipe ${recipeId} not found`);
@@ -83,6 +98,8 @@ export class RecipeManager {
    * @param {string} recipeId - Recipe ID to delete
    */
   async deleteRecipe(recipeId) {
+    this._assertGM('delete recipe');
+
     const recipe = this.recipes.get(recipeId);
     if (!recipe) {
       throw new Error(`Recipe ${recipeId} not found`);
@@ -338,6 +355,8 @@ export class RecipeManager {
    * @param {boolean} overwrite - Whether to overwrite existing recipes
    */
   async importRecipes(recipesData, overwrite = false) {
+    this._assertGM('import recipes');
+
     let imported = 0;
     let skipped = 0;
 
@@ -370,6 +389,8 @@ export class RecipeManager {
    * @returns {Object[]}
    */
   exportRecipes(recipeIds = null) {
+    this._assertGM('export recipes');
+
     let recipes;
 
     if (recipeIds) {

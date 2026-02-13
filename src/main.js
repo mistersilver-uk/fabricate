@@ -4,6 +4,8 @@ import { Recipe } from './models/Recipe.js';
 import { Ingredient } from './models/Ingredient.js';
 import { Catalyst } from './models/Catalyst.js';
 import { CraftingApp } from './ui/CraftingApp.js';
+import { RecipeManagerApp } from './ui/RecipeManagerApp.js';
+import { RecipeEditorApp } from './ui/RecipeEditorApp.js';
 import { RecipeMigration } from './utils/RecipeMigration.js';
 
 /**
@@ -176,7 +178,8 @@ Hooks.once('init', async () => {
   // Register Handlebars partials
   await loadTemplates([
     'modules/fabricate-v2/templates/partials/ingredientRow.hbs',
-    'modules/fabricate-v2/templates/partials/catalystRow.hbs'
+    'modules/fabricate-v2/templates/partials/catalystRow.hbs',
+    'modules/fabricate-v2/templates/recipe-editor-v2.hbs'
   ]);
 
   // Register Handlebars helpers
@@ -193,7 +196,9 @@ Hooks.once('init', async () => {
     Catalyst,
     RecipeManager,
     CraftingEngine,
-    CraftingApp
+    CraftingApp,
+    RecipeManagerApp,
+    RecipeEditorApp
   };
 });
 
@@ -236,36 +241,6 @@ function addCraftButtonToItemsDirectory() {
     return;
   }
 
-  // Check if button already exists (check for hammer icon + "Craft Item" text)
-  const existingButton = Array.from(header.querySelectorAll('button.create-document')).find(btn =>
-    btn.textContent?.includes('Craft Item')
-  );
-  if (existingButton) {
-    console.log('Fabricate v2 | Craft button already exists');
-    return;
-  }
-
-  // Create the button matching Foundry's header button style
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'create-document';
-  button.dataset.tooltip = 'Craft Item';
-  button.setAttribute('aria-label', 'Craft Item');
-
-  const icon = document.createElement('i');
-  icon.className = 'fas fa-hammer';
-  button.appendChild(icon);
-
-  const label = document.createElement('span');
-  label.textContent = 'Craft Item';
-  button.appendChild(label);
-
-  button.addEventListener('click', (event) => {
-    event.preventDefault();
-    console.log('Fabricate v2 | Craft button clicked');
-    CraftingApp.show();
-  });
-
   // Find the header actions container (where Create Item button lives)
   let actionsContainer = header.querySelector('.header-actions, .action-buttons');
 
@@ -283,10 +258,64 @@ function addCraftButtonToItemsDirectory() {
     header.appendChild(actionsContainer);
   }
 
-  // Add button at the beginning (before Create Item button)
-  actionsContainer.insertBefore(button, actionsContainer.firstChild);
+  // Add craft button for all users
+  const craftExists = Array.from(actionsContainer.querySelectorAll('button.create-document'))
+    .some(btn =>
+      btn.dataset.fabricateAction === 'craft' ||
+      btn.textContent?.includes('Craft Item')
+    );
+  if (!craftExists) {
+    const craftButton = createHeaderButton('Craft Item', 'fas fa-hammer', 'craft', () => CraftingApp.show());
+    actionsContainer.insertBefore(craftButton, actionsContainer.firstChild);
+  }
 
-  console.log('Fabricate v2 | Craft button added to Items Directory in', actionsContainer.className);
+  // Add recipe manager button for GMs only
+  if (game.user?.isGM) {
+    const managerExists = Array.from(actionsContainer.querySelectorAll('button.create-document'))
+      .some(btn =>
+        btn.dataset.fabricateAction === 'manage' ||
+        btn.textContent?.includes('Manage Recipes')
+      );
+    if (!managerExists) {
+      const managerButton = createHeaderButton(
+        'Manage Recipes',
+        'fas fa-book',
+        'manage',
+        () => RecipeManagerApp.show()
+      );
+      actionsContainer.insertBefore(managerButton, actionsContainer.firstChild);
+    }
+  }
+
+  console.log('Fabricate v2 | Fabricate buttons updated in', actionsContainer.className);
+}
+
+/**
+ * Create a sidebar header button that matches Foundry style
+ * @private
+ */
+function createHeaderButton(labelText, iconClass, actionId, onClick) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'create-document';
+  button.dataset.tooltip = labelText;
+  button.dataset.fabricateAction = actionId;
+  button.setAttribute('aria-label', labelText);
+
+  const icon = document.createElement('i');
+  icon.className = iconClass;
+  button.appendChild(icon);
+
+  const label = document.createElement('span');
+  label.textContent = labelText;
+  button.appendChild(label);
+
+  button.addEventListener('click', (event) => {
+    event.preventDefault();
+    onClick();
+  });
+
+  return button;
 }
 
 // Also add button when Items directory is activated
@@ -390,6 +419,13 @@ globalThis.fabricate = {
   getAvailableRecipes: (actorOrActors) => {
     const actors = Array.isArray(actorOrActors) ? actorOrActors : [actorOrActors];
     return game.fabricate.getRecipeManager().getAvailableRecipes(actors.filter(Boolean));
+  },
+
+  /**
+   * Open GM recipe manager
+   */
+  openRecipeManager: () => {
+    return RecipeManagerApp.show();
   }
 };
 
