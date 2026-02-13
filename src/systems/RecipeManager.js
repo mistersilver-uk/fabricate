@@ -117,7 +117,7 @@ export class RecipeManager {
 
     // Filter by system
     if (filters.system) {
-      recipes = recipes.filter(r => r.system === 'all' || r.system === filters.system);
+      recipes = recipes.filter(r => (r.system || 'all') === 'all' || r.system === filters.system);
     }
 
     // Filter by enabled status
@@ -128,7 +128,7 @@ export class RecipeManager {
     // Filter by tags
     if (filters.tags && filters.tags.length > 0) {
       recipes = recipes.filter(r =>
-        filters.tags.some(tag => r.tags.includes(tag))
+        filters.tags.some(tag => (r.tags || []).includes(tag))
       );
     }
 
@@ -150,6 +150,10 @@ export class RecipeManager {
    * @returns {Recipe[]}
    */
   getAvailableRecipes(componentSourceActors) {
+    if (!Array.isArray(componentSourceActors)) {
+      componentSourceActors = componentSourceActors ? [componentSourceActors] : [];
+    }
+
     const recipes = this.getRecipes({ enabled: true });
     const available = [];
 
@@ -169,6 +173,18 @@ export class RecipeManager {
    * @returns {{canCraft: boolean, satisfiableSet: IngredientSet|null, missing: Object}}
    */
   canCraft(componentSourceActors, recipe) {
+    if (!Array.isArray(componentSourceActors)) {
+      componentSourceActors = componentSourceActors ? [componentSourceActors] : [];
+    }
+
+    if (!Array.isArray(componentSourceActors) || componentSourceActors.length === 0) {
+      return {
+        canCraft: false,
+        satisfiableSet: null,
+        missing: { ingredients: [], essences: [], catalysts: [] }
+      };
+    }
+
     // Aggregate all items from component source actors
     const availableItems = componentSourceActors.flatMap(actor =>
       Array.from(actor.items)
@@ -277,6 +293,8 @@ export class RecipeManager {
     const missing = [];
 
     for (const catalyst of catalysts) {
+      if (catalyst.required === false) continue;
+
       let found = false;
 
       for (const actor of actors) {

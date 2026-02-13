@@ -27,18 +27,18 @@ Fabricate v2 is a universal, system-agnostic crafting module for Foundry VTT tha
 
 ### Module Structure
 
-```
+```text
 fabricate-v2/
-├── src/
-│   ├── models/         # Data models (Recipe, Ingredient, Catalyst)
-│   ├── systems/        # Core systems (RecipeManager, CraftingEngine)
-│   ├── ui/             # User interface (CraftingApp, ActorSelectionDialog)
-│   ├── utils/          # Utilities (FormulaEvaluator)
-│   └── main.js         # Module entry point
-├── styles/             # CSS
-├── templates/          # Handlebars templates
-├── examples/           # Example macros
-└── spec/               # Specifications (this directory)
+|-- src/
+|   |-- models/         # Data models (Recipe, Ingredient, Catalyst)
+|   |-- systems/        # Core systems (RecipeManager, CraftingEngine)
+|   |-- ui/             # User interface (CraftingApp, ActorSelectionDialog)
+|   |-- utils/          # Utilities (FormulaEvaluator)
+|   `-- main.js         # Module entry point
+|-- styles/             # CSS
+|-- templates/          # Handlebars templates
+|-- examples/           # Example macros
+`-- spec/               # Specifications (this directory)
 ```
 
 ### Core Components
@@ -89,7 +89,7 @@ fabricate-v2/
 3. **Advanced Features**
    - Catalyst validation (non-consumable requirements)
    - Variable output calculation (formulas)
-   - Effect transfer (ingredients → result)
+  - Effect transfer (ingredients -> result)
    - Tag-based ingredient matching
 
 ## Foundry Integration

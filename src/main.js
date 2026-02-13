@@ -150,7 +150,19 @@ class FabricateV2 {
       }
     }
 
-    return await this.craftingEngine.craft(actor, recipe, options);
+    const componentSourceActors = Array.isArray(options.componentSourceActors)
+      ? options.componentSourceActors.filter(Boolean)
+      : [actor];
+
+    const ingredientSetId = options.ingredientSetId || null;
+
+    return await this.craftingEngine.craft(
+      actor,
+      componentSourceActors,
+      recipe,
+      ingredientSetId,
+      options
+    );
   }
 }
 
@@ -368,15 +380,16 @@ globalThis.fabricate = {
   /**
    * List all recipes
    */
-  listRecipes: () => {
-    return game.fabricate.getRecipeManager().getRecipes();
+  listRecipes: (filters = {}) => {
+    return game.fabricate.getRecipeManager().getRecipes(filters);
   },
 
   /**
    * Get recipes available to an actor
    */
-  getAvailableRecipes: (actor) => {
-    return game.fabricate.getRecipeManager().getAvailableRecipes(actor);
+  getAvailableRecipes: (actorOrActors) => {
+    const actors = Array.isArray(actorOrActors) ? actorOrActors : [actorOrActors];
+    return game.fabricate.getRecipeManager().getAvailableRecipes(actors.filter(Boolean));
   }
 };
 

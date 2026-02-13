@@ -1,7 +1,7 @@
 // Fabricate v2 Macro: Create Simple Recipe
 // Template for creating a basic recipe
 
-// ⚠️ EDIT THESE VALUES ⚠️
+// WARNING: EDIT THESE VALUES
 const RECIPE_NAME = 'Iron Sword';
 const INGREDIENT_1_UUID = 'Item.xxxxxxxxxxxxx'; // Replace with actual UUID
 const INGREDIENT_1_QTY = 2;
@@ -24,9 +24,9 @@ try {
     }
   );
 
-  console.log(`✅ Recipe created: ${recipe.name}`);
+  console.log(`[OK] Recipe created: ${recipe.name}`);
   ui.notifications.info(`Recipe "${recipe.name}" created successfully!`);
 } catch (err) {
-  console.error('❌ Error creating recipe:', err);
+  console.error('[X] Error creating recipe:', err);
   ui.notifications.error(`Failed to create recipe: ${err.message}`);
 }

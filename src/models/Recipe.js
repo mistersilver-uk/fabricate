@@ -1,6 +1,7 @@
 import { IngredientSet } from './IngredientSet.js';
 import { Catalyst } from './Catalyst.js';
 import { Result } from './Result.js';
+import { Ingredient } from './Ingredient.js';
 
 /**
  * Represents a crafting recipe
@@ -13,6 +14,8 @@ export class Recipe {
     this.description = data.description || '';
     this.img = data.img || 'icons/svg/item-bag.svg';
     this.category = data.category || 'general';
+    this.system = data.system || 'all';
+    this.tags = Array.isArray(data.tags) ? data.tags : [];
     this.enabled = data.enabled !== undefined ? data.enabled : true;
 
     // Input requirements (at least one set must be satisfied)
@@ -137,6 +140,8 @@ export class Recipe {
       description: this.description,
       img: this.img,
       category: this.category,
+      system: this.system,
+      tags: this.tags,
       enabled: this.enabled,
       ingredientSets: this.ingredientSets.map(s => s.toJSON()),
       catalysts: this.catalysts.map(c => c.toJSON()),
@@ -160,8 +165,6 @@ export class Recipe {
    * @returns {Recipe}
    */
   static createSimple(name, ingredients, result) {
-    const { Ingredient } = require('./Ingredient.js');
-
     return new Recipe({
       name,
       ingredientSets: [

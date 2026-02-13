@@ -114,6 +114,23 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
   }
 
   /**
+   * Accumulate essences from available items
+   * @private
+   */
+  _accumulateEssences(items) {
+    const accumulated = {};
+
+    for (const item of items) {
+      const itemEssences = item.getFlag('fabricate-v2', 'essences') || {};
+      for (const [essenceType, quantity] of Object.entries(itemEssences)) {
+        accumulated[essenceType] = (accumulated[essenceType] || 0) + quantity;
+      }
+    }
+
+    return accumulated;
+  }
+
+  /**
    * Prepare context data for the template
    */
   async _prepareContext(options) {
@@ -145,6 +162,11 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
     let recipes = recipeManager.getRecipes({
       enabled: true
     });
+    const showSimpleRecipesOnly = game.settings.get('fabricate-v2', 'showSimpleRecipesOnly');
+
+    if (showSimpleRecipesOnly) {
+      recipes = recipes.filter(r => r.isSimpleRecipe());
+    }
 
     // Apply search filter
     if (this.searchTerm) {
@@ -183,6 +205,7 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
       const availableItems = this.componentSourceActors.flatMap(actor =>
         Array.from(actor.items)
       );
+      const availableEssences = this._accumulateEssences(availableItems);
 
       return {
         id: recipe.id,
@@ -209,8 +232,8 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
         essences: Object.entries(displaySet.essences || {}).map(([type, qty]) => ({
           type,
           need: qty,
-          have: 0, // TODO: Calculate accumulated essences
-          satisfied: false
+          have: availableEssences[type] || 0,
+          satisfied: (availableEssences[type] || 0) >= qty
         })),
         catalysts: recipe.catalysts.map(cat => {
           let available = false;
@@ -231,7 +254,8 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
 
     // Get unique categories
     const allRecipes = recipeManager.getRecipes({ enabled: true });
-    const categories = [...new Set(allRecipes.map(r => r.category))].sort();
+    const visibleRecipes = showSimpleRecipesOnly ? allRecipes.filter(r => r.isSimpleRecipe()) : allRecipes;
+    const categories = [...new Set(visibleRecipes.map(r => r.category))].sort();
 
     return {
       ...context,
@@ -353,19 +377,21 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
       return;
     }
 
-    // Confirm before crafting
-    const confirmed = await Dialog.confirm({
-      title: `Craft ${recipe.name}?`,
-      content: `
-        <p>Are you sure you want to craft <strong>${recipe.name}</strong>?</p>
-        <p>This will consume the required ingredients from your selected source actors.</p>
-        <p>Results will be added to <strong>${this.craftingActor.name}</strong>.</p>
-      `,
-      yes: () => true,
-      no: () => false
-    });
+    const autoCraft = game.settings.get('fabricate-v2', 'autoCraft');
+    if (!autoCraft) {
+      const confirmed = await Dialog.confirm({
+        title: `Craft ${recipe.name}?`,
+        content: `
+          <p>Are you sure you want to craft <strong>${recipe.name}</strong>?</p>
+          <p>This will consume the required ingredients from your selected source actors.</p>
+          <p>Results will be added to <strong>${this.craftingActor.name}</strong>.</p>
+        `,
+        yes: () => true,
+        no: () => false
+      });
 
-    if (!confirmed) return;
+      if (!confirmed) return;
+    }
 
     // Attempt to craft
     const craftingEngine = game.fabricate.getCraftingEngine();
@@ -436,7 +462,7 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
           sum + (item.system.quantity || 1), 0
         );
         const satisfied = totalQty >= ing.quantity;
-        const icon = satisfied ? '✓' : '✗';
+        const icon = satisfied ? 'OK' : 'X';
         content += `<li>${icon} ${ing.getDescription()} (have ${totalQty})</li>`;
       }
 
@@ -464,7 +490,7 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
             break;
           }
         }
-        const icon = available ? '✓' : '✗';
+        const icon = available ? 'OK' : 'X';
         content += `<li>${icon} ${cat.name}</li>`;
       }
       content += `</ul>`;

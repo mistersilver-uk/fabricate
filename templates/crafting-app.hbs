@@ -6,7 +6,7 @@
       <select id="crafting-actor" name="craftingActor">
         {{#each availableActors}}
           <option value="{{id}}" {{#if selected}}selected{{/if}}>
-            {{name}}{{#if isAssignedCharacter}} ★{{/if}}
+            {{name}}{{#if isAssignedCharacter}} *{{/if}}
           </option>
         {{/each}}
       </select>

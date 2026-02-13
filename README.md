@@ -42,8 +42,8 @@ Works with any game system in Foundry VTT:
 5. Click "Craft" on any recipe you have materials for
 
 The crafting interface shows:
-- ✅ **Green border**: Recipes you can craft now
-- ❌ **Red border**: Missing required items
+- **[OK] Green border**: Recipes you can craft now
+- **[X] Red border**: Missing required items
 - **Search bar**: Find recipes by name
 - **Filters**: Show only craftable recipes, filter by category
 
@@ -92,8 +92,13 @@ const { Recipe, Ingredient, Catalyst } = game.fabricate.api;
 
 const recipe = new Recipe({
   name: 'Steel Blade',
-  ingredients: [
-    new Ingredient({ itemUuid: 'Item.steel', quantity: 3 })
+  ingredientSets: [
+    {
+      id: 'steel-input',
+      ingredients: [
+        new Ingredient({ itemUuid: 'Item.steel', quantity: 3 })
+      ]
+    }
   ],
   catalysts: [
     new Catalyst({
@@ -104,10 +109,13 @@ const recipe = new Recipe({
       degradeAmount: 1
     })
   ],
-  result: {
-    itemUuid: 'Item.steelBlade',
-    quantity: 1
-  }
+  results: [
+    {
+      id: 'steel-blade',
+      itemUuid: 'Item.steelBlade',
+      quantity: 1
+    }
+  ]
 });
 
 game.fabricate.getRecipeManager().createRecipe(recipe.toJSON());
@@ -118,24 +126,35 @@ game.fabricate.getRecipeManager().createRecipe(recipe.toJSON());
 Create items whose properties vary based on ingredients:
 
 ```javascript
+const { Recipe, Ingredient, IngredientSet, Result } = game.fabricate.api;
+
 const recipe = new Recipe({
   name: 'Magical Sword',
-  ingredients: [
-    new Ingredient({
-      tag: 'metal',
-      quantity: 2,
-      tier: null // Accept any tier
+  ingredientSets: [
+    new IngredientSet({
+      id: 'metal-input',
+      ingredients: [
+        new Ingredient({
+          tag: 'metal',
+          quantity: 2,
+          tier: null // Accept any tier
+        })
+      ],
+      resultMapping: ['magic-sword']
     })
   ],
-  result: {
-    baseItemUuid: 'Item.genericSword',
-    quantity: 1,
-    isVariable: true,
-    propertyFormulas: {
-      'system.damage.parts.0.0': '1d8 + ingredientTier', // Damage scales with ingredient tier
-      'system.weight': '3 - (ingredientTier * 0.5)' // Better materials = lighter
-    }
-  }
+  results: [
+    new Result({
+      id: 'magic-sword',
+      itemUuid: 'Item.genericSword',
+      quantity: 1,
+      propertyFormulas: {
+        'system.damage.parts.0.0': '1d8 + ingredientTier', // Damage scales with ingredient tier
+        'system.weight': '3 - (ingredientTier * 0.5)' // Better materials = lighter
+      }
+    })
+  ],
+  isVariable: true
 });
 ```
 
@@ -144,26 +163,35 @@ const recipe = new Recipe({
 Transfer magical properties from ingredients to the crafted item:
 
 ```javascript
+const { Recipe, Ingredient, Result } = game.fabricate.api;
+
 const recipe = new Recipe({
   name: 'Poisoned Blade',
-  ingredients: [
-    new Ingredient({
-      itemUuid: 'Item.sword',
+  ingredientSets: [
+    {
+      id: 'poisoned-blade-input',
+      ingredients: [
+        new Ingredient({
+          itemUuid: 'Item.sword',
+          quantity: 1
+        }),
+        new Ingredient({
+          itemUuid: 'Item.poison',
+          quantity: 1,
+          extractEffects: true, // Extract effects from this ingredient
+          effectFilter: 'poison' // Only extract effects with "poison" in the name
+        })
+      ]
+    }
+  ],
+  results: [
+    new Result({
+      id: 'poisoned-blade',
+      itemUuid: 'Item.poisonedSword',
       quantity: 1
-    }),
-    new Ingredient({
-      itemUuid: 'Item.poison',
-      quantity: 1,
-      extractEffects: true, // Extract effects from this ingredient
-      effectFilter: 'poison' // Only extract effects with "poison" in the name
     })
   ],
-  result: {
-    baseItemUuid: 'Item.sword',
-    quantity: 1,
-    transferEffects: true,
-    effectMergeStrategy: 'stack' // 'stack', 'override', 'max', 'sum'
-  }
+  transferEffects: true
 });
 ```
 
@@ -179,17 +207,25 @@ await item.setFlag('fabricate-v2', 'tier', 'common');
 // Then create recipes using tags
 const recipe = new Recipe({
   name: 'Any Metal Sword',
-  ingredients: [
-    new Ingredient({
-      tag: 'metal', // Matches any item with 'metal' tag
-      quantity: 2,
-      tier: 'common' // Optional: require specific tier
-    })
+  ingredientSets: [
+    {
+      id: 'tagged-metal-input',
+      ingredients: [
+        new Ingredient({
+          tag: 'metal', // Matches any item with 'metal' tag
+          quantity: 2,
+          tier: 'common' // Optional: require specific tier
+        })
+      ]
+    }
   ],
-  result: {
-    itemUuid: 'Item.sword',
-    quantity: 1
-  }
+  results: [
+    {
+      id: 'tagged-sword',
+      itemUuid: 'Item.sword',
+      quantity: 1
+    }
+  ]
 });
 ```
 
@@ -216,8 +252,8 @@ const ingredient = new Ingredient({
 // Access via global scope
 fabricate.createSimpleRecipe(name, ingredients, result)
 fabricate.craft(actor, recipeId, options)
-fabricate.listRecipes()
-fabricate.getAvailableRecipes(actor)
+fabricate.listRecipes(filters)
+fabricate.getAvailableRecipes(actorOrActors)
 
 // Access via game object
 game.fabricate.getRecipeManager()
@@ -228,7 +264,7 @@ game.fabricate.craft(actor, recipe, options)
 ### Classes
 
 ```javascript
-const { Recipe, Ingredient, Catalyst, RecipeManager, CraftingEngine } = game.fabricate.api;
+const { Recipe, IngredientSet, Ingredient, Result, Catalyst, RecipeManager, CraftingEngine } = game.fabricate.api;
 ```
 
 #### Recipe
@@ -237,23 +273,12 @@ const { Recipe, Ingredient, Catalyst, RecipeManager, CraftingEngine } = game.fab
 new Recipe({
   name: 'Recipe Name',
   description: 'Recipe description',
-  ingredients: [Ingredient, ...],
+  ingredientSets: [IngredientSet, ...],
   catalysts: [Catalyst, ...],
-  result: {
-    itemUuid: 'Item.xyz',
-    quantity: 1,
-    isVariable: false,
-    baseItemUuid: null,
-    propertyFormulas: {},
-    transferEffects: false,
-    effectMergeStrategy: 'stack'
-  },
-  process: {
-    type: 'instant', // 'instant', 'time', 'skill'
-    duration: 0,
-    skill: null,
-    dc: 10
-  },
+  results: [Result, ...],
+  isVariable: false,
+  transferEffects: false,
+  requiresAllSets: false,
   category: 'general',
   tags: [],
   enabled: true,
@@ -265,7 +290,6 @@ new Recipe({
 
 ```javascript
 new Ingredient({
-  itemId: null,
   itemUuid: null,
   quantity: 1,
   tag: null,
@@ -280,7 +304,6 @@ new Ingredient({
 
 ```javascript
 new Catalyst({
-  itemId: null,
   itemUuid: null,
   tag: null,
   name: 'Catalyst Name',
@@ -300,7 +323,7 @@ new Catalyst({
 ### Example 1: Simple Alchemy
 
 ```javascript
-// Health Potion: 2 Healing Herbs → 1 Health Potion
+// Health Potion: 2 Healing Herbs -> 1 Health Potion
 fabricate.createSimpleRecipe('Health Potion', [
   { itemUuid: 'Item.healingHerb', quantity: 2 }
 ], {
@@ -312,13 +335,18 @@ fabricate.createSimpleRecipe('Health Potion', [
 ### Example 2: Blacksmithing with Forge
 
 ```javascript
-const { Recipe, Ingredient, Catalyst } = game.fabricate.api;
+const { Recipe, Ingredient, Catalyst, Result } = game.fabricate.api;
 
 const recipe = new Recipe({
   name: 'Iron Sword',
-  ingredients: [
-    new Ingredient({ tag: 'metal:iron', quantity: 2 }),
-    new Ingredient({ tag: 'wood', quantity: 1 })
+  ingredientSets: [
+    {
+      id: 'iron-sword-input',
+      ingredients: [
+        new Ingredient({ tag: 'metal:iron', quantity: 2 }),
+        new Ingredient({ tag: 'wood', quantity: 1 })
+      ]
+    }
   ],
   catalysts: [
     new Catalyst({
@@ -327,15 +355,13 @@ const recipe = new Recipe({
       required: true
     })
   ],
-  result: {
-    itemUuid: 'Item.ironSword',
-    quantity: 1
-  },
-  process: {
-    type: 'skill',
-    skill: 'smith',
-    dc: 15
-  }
+  results: [
+    new Result({
+      id: 'iron-sword-result',
+      itemUuid: 'Item.ironSword',
+      quantity: 1
+    })
+  ]
 });
 
 await game.fabricate.getRecipeManager().createRecipe(recipe.toJSON());
@@ -344,47 +370,67 @@ await game.fabricate.getRecipeManager().createRecipe(recipe.toJSON());
 ### Example 3: Enchanted Item with Effect Transfer
 
 ```javascript
+const { Recipe, Ingredient, Result } = game.fabricate.api;
+
 const recipe = new Recipe({
   name: 'Flaming Sword',
-  ingredients: [
-    new Ingredient({ itemUuid: 'Item.sword', quantity: 1 }),
-    new Ingredient({
-      itemUuid: 'Item.fireGem',
-      quantity: 1,
-      extractEffects: true,
-      effectFilter: 'fire'
+  ingredientSets: [
+    {
+      id: 'flaming-sword-input',
+      ingredients: [
+        new Ingredient({ itemUuid: 'Item.sword', quantity: 1 }),
+        new Ingredient({
+          itemUuid: 'Item.fireGem',
+          quantity: 1,
+          extractEffects: true,
+          effectFilter: 'fire'
+        })
+      ]
+    }
+  ],
+  results: [
+    new Result({
+      id: 'flaming-sword-result',
+      itemUuid: 'Item.flamingSword',
+      quantity: 1
     })
   ],
-  result: {
-    baseItemUuid: 'Item.sword',
-    quantity: 1,
-    transferEffects: true,
-    effectMergeStrategy: 'stack'
-  }
+  transferEffects: true
 });
 ```
 
 ### Example 4: Quality-Based Output
 
 ```javascript
+const { Recipe, Ingredient, IngredientSet, Result } = game.fabricate.api;
+
 const recipe = new Recipe({
   name: 'Quality Blade',
-  ingredients: [
-    new Ingredient({
-      tag: 'metal',
-      quantity: 3
-      // No tier specified - accepts any tier
+  ingredientSets: [
+    new IngredientSet({
+      id: 'quality-blade-input',
+      ingredients: [
+        new Ingredient({
+          tag: 'metal',
+          quantity: 3
+          // No tier specified - accepts any tier
+        })
+      ],
+      resultMapping: ['quality-blade-result']
     })
   ],
-  result: {
-    baseItemUuid: 'Item.blade',
-    quantity: 1,
-    isVariable: true,
-    propertyFormulas: {
-      'system.damage.parts.0.0': '1d6 + Math.floor(ingredientTier)',
-      'system.price': '50 * ingredientTier'
-    }
-  }
+  results: [
+    new Result({
+      id: 'quality-blade-result',
+      itemUuid: 'Item.blade',
+      quantity: 1,
+      propertyFormulas: {
+        'system.damage.parts.0.0': '1d6 + Math.floor(ingredientTier)',
+        'system.price': '50 * ingredientTier'
+      }
+    })
+  ],
+  isVariable: true
 });
 ```
 
@@ -448,16 +494,17 @@ await game.fabricate.getRecipeManager().importRecipes(recipesData, false);
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/fabricate-v2/issues)
-- **Documentation**: [GitHub Wiki](https://github.com/yourusername/fabricate-v2/wiki)
+- **Issues**: [GitHub Issues](https://github.com/misterpotts/fabricate-v2/issues)
+- **Documentation**: [GitHub Wiki](https://github.com/misterpotts/fabricate-v2/wiki)
 
 ## License
 
-MIT License - See LICENSE file for details
+Licensed under the **Fabricate Community License v1.0** (`LicenseRef-Fabricate-Community-1.0`).
+Commercial use requires a separate commercial license. See `LICENSE`.
 
 ## Credits
 
-Created by [Your Name]
+Created by MisterPotts
 
 Inspired by the original Fabricate module by MisterPotts.
 
@@ -473,25 +520,25 @@ npm run dev      # Build and watch for changes
 
 ### Project Structure
 
-```
+```text
 fabricate-v2/
-├── src/
-│   ├── main.js                 # Module entry point
-│   ├── models/
-│   │   ├── Recipe.js          # Recipe data model
-│   │   ├── Ingredient.js      # Ingredient data model
-│   │   └── Catalyst.js        # Catalyst data model
-│   ├── systems/
-│   │   ├── RecipeManager.js   # Recipe CRUD operations
-│   │   └── CraftingEngine.js  # Crafting logic
-│   └── ui/                    # UI components (future)
-├── styles/
-│   └── fabricate.css          # Module styles
-├── lang/
-│   └── en.json               # Localization
-├── module.json               # Foundry manifest
-├── package.json              # NPM configuration
-└── vite.config.js            # Build configuration
+|-- src/
+|   |-- main.js                 # Module entry point
+|   |-- models/
+|   |   |-- Recipe.js           # Recipe data model
+|   |   |-- Ingredient.js       # Ingredient data model
+|   |   `-- Catalyst.js         # Catalyst data model
+|   |-- systems/
+|   |   |-- RecipeManager.js    # Recipe CRUD operations
+|   |   `-- CraftingEngine.js   # Crafting logic
+|   `-- ui/                     # UI components
+|-- styles/
+|   `-- fabricate.css           # Module styles
+|-- lang/
+|   `-- en.json                 # Localization
+|-- module.json                 # Foundry manifest
+|-- package.json                # NPM configuration
+`-- vite.config.js              # Build configuration
 ```
 
 ## Contributing

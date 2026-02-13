@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "authors": [
     {
-      "name": "Your Name"
+      "name": "MisterPotts"
     }
   ],
   "compatibility": {
@@ -26,10 +26,10 @@
       "path": "lang/en.json"
     }
   ],
-  "url": "https://github.com/yourusername/fabricate-v2",
-  "manifest": "https://github.com/yourusername/fabricate-v2/releases/latest/download/module.json",
-  "download": "https://github.com/yourusername/fabricate-v2/releases/latest/download/module.zip",
-  "license": "MIT",
-  "readme": "https://github.com/yourusername/fabricate-v2/blob/main/README.md",
-  "bugs": "https://github.com/yourusername/fabricate-v2/issues"
+  "url": "https://github.com/misterpotts/fabricate-v2",
+  "manifest": "https://github.com/misterpotts/fabricate-v2/releases/latest/download/module.json",
+  "download": "https://github.com/misterpotts/fabricate-v2/releases/latest/download/module.zip",
+  "license": "LicenseRef-Fabricate-Community-1.0",
+  "readme": "https://github.com/misterpotts/fabricate-v2/blob/main/README.md",
+  "bugs": "https://github.com/misterpotts/fabricate-v2/issues"
 }

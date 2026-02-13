@@ -1,4 +1,4 @@
-# Specification 005: UI Integration
+# Specification 003: UI Integration
 
 ## Purpose
 

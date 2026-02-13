@@ -44,10 +44,10 @@ if (!actor) {
             if (!canCraft.canCraft) {
               let msg = `Cannot craft ${recipe.name}:\n`;
               canCraft.missing.ingredients.forEach(m => {
-                msg += `• ${m.ingredient.getDescription()}: need ${m.need}, have ${m.have}\n`;
+                msg += `- ${m.ingredient.getDescription()}: need ${m.need}, have ${m.have}\n`;
               });
               canCraft.missing.catalysts.forEach(c => {
-                msg += `• Missing catalyst: ${c.name}\n`;
+                msg += `- Missing catalyst: ${c.name}\n`;
               });
               ui.notifications.error(msg);
               return;
@@ -61,7 +61,7 @@ if (!actor) {
                 user: game.user.id,
                 speaker: ChatMessage.getSpeaker({ actor }),
                 content: `<div class="fabricate-craft-success">
-                  <h3>✨ Crafting Success!</h3>
+                  <h3>Crafting Success!</h3>
                   <p><strong>${recipe.name}</strong> has been crafted.</p>
                   <p>${result.message}</p>
                 </div>`
