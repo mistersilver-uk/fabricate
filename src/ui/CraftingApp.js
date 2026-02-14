@@ -207,6 +207,8 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
       );
       const availableEssences = this._accumulateEssences(availableItems);
 
+      const displayCatalysts = recipeManager.getCatalystsForSet(recipe, displaySet);
+
       return {
         id: recipe.id,
         name: recipe.name,
@@ -217,7 +219,9 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
         hasMultipleSets: recipe.ingredientSets.length > 1,
         resultDescription: recipe.getResultDescription(),
         ingredients: displaySet.ingredients.map(ing => {
-          const matchingItems = availableItems.filter(item => ing.matches(item));
+          const matchingItems = availableItems.filter(item =>
+            recipeManager.ingredientMatchesItem(recipe, ing, item)
+          );
           const totalQty = matchingItems.reduce((sum, item) =>
             sum + (item.system.quantity || 1), 0
           );
@@ -235,10 +239,12 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
           have: availableEssences[type] || 0,
           satisfied: (availableEssences[type] || 0) >= qty
         })),
-        catalysts: recipe.catalysts.map(cat => {
+        catalysts: displayCatalysts.map(cat => {
           let available = false;
           for (const actor of this.componentSourceActors) {
-            const matchingItems = actor.items.filter(item => cat.matches(item));
+            const matchingItems = actor.items.filter(item =>
+              recipeManager.catalystMatchesItem(recipe, cat, item)
+            );
             if (matchingItems.length > 0) {
               available = true;
               break;
@@ -457,7 +463,9 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
         const availableItems = this.componentSourceActors.flatMap(actor =>
           Array.from(actor.items)
         );
-        const matchingItems = availableItems.filter(item => ing.matches(item));
+        const matchingItems = availableItems.filter(item =>
+          recipeManager.ingredientMatchesItem(recipe, ing, item)
+        );
         const totalQty = matchingItems.reduce((sum, item) =>
           sum + (item.system.quantity || 1), 0
         );
@@ -479,12 +487,16 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
     }
 
     // Catalysts
-    if (recipe.catalysts.length > 0) {
+    const detailSet = canCraftCheck.satisfiableSet || recipe.ingredientSets[0];
+    const detailCatalysts = recipeManager.getCatalystsForSet(recipe, detailSet);
+    if (detailCatalysts.length > 0) {
       content += `<h4>Catalysts (not consumed):</h4><ul>`;
-      for (const cat of recipe.catalysts) {
+      for (const cat of detailCatalysts) {
         let available = false;
         for (const actor of this.componentSourceActors) {
-          const matchingItems = actor.items.filter(item => cat.matches(item));
+          const matchingItems = actor.items.filter(item =>
+            recipeManager.catalystMatchesItem(recipe, cat, item)
+          );
           if (matchingItems.length > 0) {
             available = true;
             break;

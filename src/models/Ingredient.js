@@ -4,6 +4,9 @@
  */
 export class Ingredient {
   constructor(data = {}) {
+    // Managed item reference inside a crafting system
+    this.systemItemId = data.systemItemId || null;
+
     // Item matching by Foundry Source UUID (core.sourceId flag)
     this.itemUuid = data.itemUuid || null;
     this.quantity = data.quantity || 1;
@@ -53,8 +56,8 @@ export class Ingredient {
   validate() {
     const errors = [];
 
-    if (!this.itemUuid && !this.tag) {
-      errors.push('Ingredient must have either itemUuid or tag');
+    if (!this.systemItemId && !this.itemUuid && !this.tag) {
+      errors.push('Ingredient must have systemItemId, itemUuid, or tag');
     }
 
     if (typeof this.quantity !== 'number' || this.quantity <= 0) {
@@ -80,6 +83,9 @@ export class Ingredient {
    * @returns {string}
    */
   getDescription() {
+    if (this.systemItemId) {
+      return `${this.quantity}x managed item`;
+    }
     if (this.itemUuid) {
       return `${this.quantity}x specific item`;
     }
@@ -95,6 +101,7 @@ export class Ingredient {
 
   toJSON() {
     return {
+      systemItemId: this.systemItemId,
       itemUuid: this.itemUuid,
       quantity: this.quantity,
       tag: this.tag,

@@ -81,16 +81,22 @@ export class RecipeManager {
       throw new Error(`Recipe ${recipeId} not found`);
     }
 
-    Object.assign(recipe, updates);
-    const validation = recipe.validate();
+    const merged = {
+      ...recipe.toJSON(),
+      ...updates,
+      id: recipeId
+    };
+    const updatedRecipe = Recipe.fromJSON(merged);
+    const validation = updatedRecipe.validate();
 
     if (!validation.valid) {
       throw new Error(`Invalid recipe update: ${validation.errors.join(', ')}`);
     }
 
+    this.recipes.set(recipeId, updatedRecipe);
     await this.save();
-    ui.notifications.info(`Recipe "${recipe.name}" updated`);
-    return recipe;
+    ui.notifications.info(`Recipe "${updatedRecipe.name}" updated`);
+    return updatedRecipe;
   }
 
   /**
@@ -130,6 +136,11 @@ export class RecipeManager {
     // Filter by category
     if (filters.category) {
       recipes = recipes.filter(r => r.category === filters.category);
+    }
+
+    // Filter by crafting system
+    if (filters.craftingSystemId !== undefined) {
+      recipes = recipes.filter(r => r.craftingSystemId === filters.craftingSystemId);
     }
 
     // Filter by system
@@ -209,12 +220,13 @@ export class RecipeManager {
 
     // Check if ANY ingredient set can be satisfied
     for (const ingredientSet of recipe.ingredientSets) {
-      const missing = this._checkIngredientSet(ingredientSet, availableItems);
+      const missing = this._checkIngredientSet(recipe, ingredientSet, availableItems);
+      const catalystsForSet = this.getCatalystsForSet(recipe, ingredientSet);
 
       if (missing.ingredients.length === 0 && missing.essences.length === 0) {
         // This ingredient set is fully satisfied
         // Now check catalysts (catalysts are checked across all source actors)
-        const catalystMissing = this._checkCatalysts(recipe.catalysts, componentSourceActors);
+        const catalystMissing = this._checkCatalysts(recipe, catalystsForSet, componentSourceActors);
 
         if (catalystMissing.length === 0) {
           return {
@@ -237,8 +249,9 @@ export class RecipeManager {
     }
 
     // No ingredient set can be satisfied - return missing from first set
-    const firstSetMissing = this._checkIngredientSet(recipe.ingredientSets[0], availableItems);
-    const catalystMissing = this._checkCatalysts(recipe.catalysts, componentSourceActors);
+    const firstSetMissing = this._checkIngredientSet(recipe, recipe.ingredientSets[0], availableItems);
+    const firstSetCatalysts = this.getCatalystsForSet(recipe, recipe.ingredientSets[0]);
+    const catalystMissing = this._checkCatalysts(recipe, firstSetCatalysts, componentSourceActors);
 
     return {
       canCraft: false,
@@ -258,7 +271,7 @@ export class RecipeManager {
    * @returns {{ingredients: Array, essences: Array}}
    * @private
    */
-  _checkIngredientSet(ingredientSet, availableItems) {
+  _checkIngredientSet(recipe, ingredientSet, availableItems) {
     const missing = {
       ingredients: [],
       essences: []
@@ -266,7 +279,7 @@ export class RecipeManager {
 
     // Check ingredients
     for (const ingredient of ingredientSet.ingredients) {
-      const matchingItems = availableItems.filter(item => ingredient.matches(item));
+      const matchingItems = availableItems.filter(item => this.ingredientMatchesItem(recipe, ingredient, item));
       const totalQuantity = matchingItems.reduce((sum, item) =>
         sum + (item.system.quantity || 1), 0
       );
@@ -306,7 +319,7 @@ export class RecipeManager {
    * @returns {Array}
    * @private
    */
-  _checkCatalysts(catalysts, actors) {
+  _checkCatalysts(recipe, catalysts, actors) {
     const missing = [];
 
     for (const catalyst of catalysts) {
@@ -315,7 +328,7 @@ export class RecipeManager {
       let found = false;
 
       for (const actor of actors) {
-        const matchingItems = actor.items.filter(item => catalyst.matches(item));
+        const matchingItems = actor.items.filter(item => this._catalystMatchesItem(recipe, catalyst, item));
         if (matchingItems.length > 0) {
           found = true;
           break;
@@ -328,6 +341,84 @@ export class RecipeManager {
     }
 
     return missing;
+  }
+
+  /**
+   * Return catalysts that apply to the given ingredient set.
+   * Supports both legacy recipe-level catalysts and set-level catalysts.
+   * @private
+   */
+  getCatalystsForSet(recipe, ingredientSet) {
+    const setCatalysts = Array.isArray(ingredientSet?.catalysts) ? ingredientSet.catalysts : [];
+    const recipeCatalysts = Array.isArray(recipe?.catalysts) ? recipe.catalysts : [];
+    return [...recipeCatalysts, ...setCatalysts];
+  }
+
+  /**
+   * Check whether a concrete item satisfies a recipe ingredient
+   * @param {Recipe} recipe
+   * @param {Ingredient} ingredient
+   * @param {Item} item
+   * @returns {boolean}
+   */
+  ingredientMatchesItem(recipe, ingredient, item) {
+    if (ingredient.systemItemId) {
+      const managedItem = this._getSystemItem(recipe, ingredient.systemItemId);
+      if (!managedItem) return false;
+
+      const byUuid = managedItem.sourceUuid ? item.uuid === managedItem.sourceUuid : false;
+      const byName = !managedItem.sourceUuid && managedItem.name
+        ? item.name?.toLowerCase() === managedItem.name.toLowerCase()
+        : false;
+      if (!byUuid && !byName) return false;
+    } else if (!ingredient.matches(item)) {
+      return false;
+    }
+
+    if (ingredient.tier) {
+      const itemTier = item.getFlag('fabricate-v2', 'tier');
+      if (itemTier !== ingredient.tier) return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Check whether a concrete item satisfies a catalyst requirement
+   * @param {Recipe} recipe
+   * @param {Catalyst} catalyst
+   * @param {Item} item
+   * @returns {boolean}
+   */
+  catalystMatchesItem(recipe, catalyst, item) {
+    return this._catalystMatchesItem(recipe, catalyst, item);
+  }
+
+  /**
+   * Check whether a concrete item satisfies a catalyst requirement
+   * @private
+   */
+  _catalystMatchesItem(recipe, catalyst, item) {
+    if (catalyst.systemItemId) {
+      const managedItem = this._getSystemItem(recipe, catalyst.systemItemId);
+      if (!managedItem) return false;
+      if (managedItem.sourceUuid) return item.uuid === managedItem.sourceUuid;
+      return item.name?.toLowerCase() === (managedItem.name || '').toLowerCase();
+    }
+    return catalyst.matches(item);
+  }
+
+  /**
+   * Resolve a managed system item by ID for the given recipe
+   * @private
+   */
+  _getSystemItem(recipe, systemItemId) {
+    const systemId = recipe?.craftingSystemId;
+    if (!systemId || !systemItemId) return null;
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const system = systemManager?.getSystem(systemId);
+    if (!system) return null;
+    return system.items.find(item => item.id === systemItemId) || null;
   }
 
   /**

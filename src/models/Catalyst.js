@@ -4,6 +4,9 @@
  */
 export class Catalyst {
   constructor(data = {}) {
+    // Managed item reference inside a crafting system
+    this.systemItemId = data.systemItemId || null;
+
     // Catalyst identification by Foundry Source UUID (core.sourceId flag)
     this.itemUuid = data.itemUuid || null;
     this.tag = data.tag || null; // Tag-based matching (e.g., "tool:forge")
@@ -113,6 +116,7 @@ export class Catalyst {
 
   toJSON() {
     return {
+      systemItemId: this.systemItemId,
       itemUuid: this.itemUuid,
       tag: this.tag,
       name: this.name,

@@ -1,4 +1,5 @@
 import { Ingredient } from './Ingredient.js';
+import { Catalyst } from './Catalyst.js';
 
 /**
  * Represents a set of ingredients that can satisfy a recipe's input requirements
@@ -16,6 +17,11 @@ export class IngredientSet {
 
     // Required essences (accumulated from ingredients)
     this.essences = data.essences || {}; // { 'light': 2, 'fire': 1 }
+
+    // Catalysts for this specific ingredient set (non-consumable requirements)
+    this.catalysts = (data.catalysts || []).map(c =>
+      c instanceof Catalyst ? c : Catalyst.fromJSON(c)
+    );
 
     // Result IDs to produce when this set is used (for variable recipes)
     this.resultMapping = data.resultMapping || [];
@@ -44,6 +50,13 @@ export class IngredientSet {
     for (const [essenceType, quantity] of Object.entries(this.essences)) {
       if (typeof quantity !== 'number' || quantity <= 0) {
         errors.push(`Essence "${essenceType}" must have a positive quantity`);
+      }
+    }
+
+    // Validate catalysts
+    for (const catalyst of this.catalysts) {
+      if (!catalyst.itemUuid && !catalyst.systemItemId && !catalyst.tag) {
+        errors.push('Catalyst must have systemItemId, itemUuid, or tag');
       }
     }
 
@@ -110,12 +123,14 @@ export class IngredientSet {
    * @param {Item[]} availableItems - Items from actor(s)
    * @returns {Array<{item: Item, quantity: number, ingredient: Ingredient}>}
    */
-  matchIngredients(availableItems) {
+  matchIngredients(availableItems, matcher = null) {
     const consumptionPlan = [];
 
     for (const ingredient of this.ingredients) {
       let neededQuantity = ingredient.quantity;
-      const matchingItems = availableItems.filter(item => ingredient.matches(item));
+      const matchingItems = availableItems.filter(item =>
+        matcher ? matcher(ingredient, item) : ingredient.matches(item)
+      );
 
       for (const item of matchingItems) {
         if (neededQuantity <= 0) break;
@@ -142,6 +157,7 @@ export class IngredientSet {
       name: this.name,
       ingredients: this.ingredients.map(i => i.toJSON()),
       essences: this.essences,
+      catalysts: this.catalysts.map(c => c.toJSON()),
       resultMapping: this.resultMapping
     };
   }

@@ -667,22 +667,26 @@
   overflow: hidden;
 }
 
-.recipe-grid .fabricate-empty .btn-primary i {
-  position: static;
-  left: auto;
-  top: auto;
-  transform: none;
-  margin: 0;
-  padding: 0;
-  width: 14px;
-  height: 14px;
+.recipe-grid .fabricate-empty .btn-primary i,
+.fabricate-admin .fabricate-empty .btn-primary i {
+  position: static !important;
+  left: auto !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 12px !important;
+  height: 12px !important;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 14px;
-  font-size: 14px;
-  line-height: 1;
+  flex: 0 0 12px;
+  font-size: 12px !important;
+  line-height: 12px !important;
   vertical-align: middle;
+  overflow: visible;
 }
 
 /* ==========================================
@@ -691,6 +695,299 @@
 
 .fabricate.recipe-editor-app {
   height: 100%;
+}
+
+/* ==========================================
+   Crafting Admin (Systems/Items/Recipes/Rules)
+   ========================================== */
+
+.fabricate-admin {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.fabricate-admin .admin-header {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fabricate-admin .admin-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.fabricate-admin .admin-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.fabricate-admin .admin-tabs button.active {
+  background: var(--fabricate-primary);
+  color: #fff;
+  border-color: var(--fabricate-primary);
+}
+
+.fabricate-admin .admin-system-name {
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.fabricate-admin .admin-body {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 260px 1fr;
+}
+
+.fabricate-admin .admin-sidebar {
+  border-right: 1px solid rgba(0, 0, 0, 0.2);
+  padding: 10px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.fabricate-admin .admin-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.fabricate-admin .admin-sidebar-header h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.fabricate-admin .admin-sidebar-header button {
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.fabricate-admin .admin-system-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fabricate-admin .admin-system-list li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.fabricate-admin .admin-system-list li .system-link {
+  display: block;
+  padding: 6px 8px;
+  border-radius: 5px;
+  color: inherit;
+  background: rgba(0, 0, 0, 0.1);
+  border: 1px solid transparent;
+  text-align: left;
+  width: 100%;
+}
+
+.fabricate-admin .admin-system-list li.active .system-link {
+  background: var(--fabricate-primary);
+  color: #fff;
+}
+
+.fabricate-admin .system-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.fabricate-admin .system-meta-grid .span-2 {
+  grid-column: 1 / -1;
+}
+
+.fabricate-admin .system-config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 10px;
+}
+
+.fabricate-admin .config-block {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.14);
+  padding: 10px;
+}
+
+.fabricate-admin .config-block h4 {
+  margin: 0 0 8px 0;
+}
+
+.fabricate-admin .panel-toolbar.compact input {
+  min-width: 0;
+}
+
+.fabricate-admin .token-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 4px;
+}
+
+.fabricate-admin .token-list .token {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(120, 160, 255, 0.22);
+  border: 1px solid rgba(120, 160, 255, 0.35);
+}
+
+.fabricate-admin .token-list .token button {
+  width: 20px;
+  height: 20px;
+  border: 0;
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.fabricate-admin .admin-system-list li > button:not(.system-link) {
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.fabricate-admin .admin-system-list li.empty {
+  opacity: 0.7;
+  font-style: italic;
+}
+
+.fabricate-admin .admin-main {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.fabricate-admin .admin-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fabricate-admin .admin-panel > .fabricate-empty {
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px;
+}
+
+.fabricate-admin .panel-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.fabricate-admin .panel-toolbar input {
+  flex: 1;
+  min-width: 240px;
+}
+
+.fabricate-admin .panel-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 5px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.fabricate-admin .system-item-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.fabricate-admin .system-item-card {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.14);
+  padding: 8px;
+  display: grid;
+  grid-template-columns: 48px 1fr auto;
+  gap: 8px;
+  align-items: start;
+}
+
+.fabricate-admin .system-item-card img {
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.fabricate-admin .system-item-card .item-meta h4 {
+  margin: 0 0 2px 0;
+  font-size: 13px;
+}
+
+.fabricate-admin .system-item-card .item-meta p {
+  margin: 0 0 4px 0;
+  opacity: 0.85;
+  font-size: 12px;
+}
+
+.fabricate-admin .system-item-card .item-meta code,
+.fabricate-admin .system-item-card .item-meta .placeholder-src {
+  display: block;
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.fabricate-admin .system-item-card button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.fabricate-admin .admin-item-drop-zone {
+  margin: 4px 0 10px 0;
+}
+
+.fabricate-admin .drop-zone {
+  padding: 12px;
+  border: 2px dashed rgba(120, 160, 255, 0.45);
+  border-radius: 8px;
+  background: rgba(120, 160, 255, 0.08);
+  text-align: center;
+}
+
+.fabricate-admin .drop-zone.drop-active {
+  background: rgba(120, 160, 255, 0.2);
 }
 
 .fabricate-recipe-editor-v2 {
@@ -709,9 +1006,24 @@
 }
 
 .fabricate-recipe-editor-v2 .editor-scroll {
-  overflow-y: auto;
+  overflow: hidden;
   padding: 12px;
   min-height: 0;
+}
+
+.fabricate-recipe-editor-v2 .editor-layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 12px;
+  height: 100%;
+  min-height: 0;
+}
+
+.fabricate-recipe-editor-v2 .editor-main {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 6px;
 }
 
 .fabricate-recipe-editor-v2 .editor-grid {
@@ -734,6 +1046,12 @@
 .fabricate-recipe-editor-v2 .form-group select,
 .fabricate-recipe-editor-v2 .form-group textarea {
   width: 100%;
+}
+
+.fabricate-recipe-editor-v2 .form-group select {
+  height: 34px;
+  line-height: 34px;
+  padding: 4px 8px;
 }
 
 .fabricate-recipe-editor-v2 .editor-flags {
@@ -799,11 +1117,18 @@
 
 .fabricate-recipe-editor-v2 .ingredients-row {
   display: grid;
-  grid-template-columns: 1.4fr 1fr 80px 110px 74px 1fr 48px;
+  grid-template-columns: 1.8fr 1fr 80px 110px 48px;
   gap: 6px;
   padding: 8px;
   align-items: center;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.fabricate-recipe-editor-v2 .ingredients-row.drop-active .drop-slot,
+.fabricate-recipe-editor-v2 .result-selected-item.drop-active {
+  outline: 2px solid rgba(120, 160, 255, 0.8);
+  outline-offset: 1px;
+  background: rgba(120, 160, 255, 0.14);
 }
 
 .fabricate-recipe-editor-v2 .ingredients-row.header {
@@ -816,6 +1141,159 @@
 .fabricate-recipe-editor-v2 .ingredients-row input,
 .fabricate-recipe-editor-v2 .ingredients-row select {
   width: 100%;
+}
+
+.fabricate-recipe-editor-v2 .managed-item-cell {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 6px;
+  align-items: center;
+}
+
+.fabricate-recipe-editor-v2 .managed-item-cell.drop-slot {
+  border: 1px dashed rgba(120, 160, 255, 0.45);
+  border-radius: 6px;
+  padding: 4px;
+}
+
+.fabricate-recipe-editor-v2 .managed-item-cell img {
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.fabricate-recipe-editor-v2 .managed-item-meta {
+  min-width: 0;
+}
+
+.fabricate-recipe-editor-v2 .managed-item-meta span {
+  display: block;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fabricate-recipe-editor-v2 .inline-actions.compact {
+  display: flex;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.fabricate-recipe-editor-v2 .inline-actions.compact button {
+  padding: 2px 6px;
+  font-size: 11px;
+}
+
+.fabricate-recipe-editor-v2 .result-selected-item {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  margin-bottom: 10px;
+}
+
+.fabricate-recipe-editor-v2 .catalysts-block {
+  margin-top: 10px;
+}
+
+.fabricate-recipe-editor-v2 .carousel-header.small h4 {
+  margin: 0;
+}
+
+.fabricate-recipe-editor-v2 .catalyst-row {
+  grid-template-columns: 1.8fr 1fr 1fr 80px 48px;
+}
+
+.fabricate-recipe-editor-v2 .alt-ingredients-block {
+  margin-top: 10px;
+}
+
+.fabricate-recipe-editor-v2 .alt-row {
+  grid-template-columns: 1fr 80px 110px 48px;
+}
+
+.fabricate-recipe-editor-v2 .result-selected-item img {
+  width: 56px;
+  height: 56px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.fabricate-recipe-editor-v2 .result-selected-meta h4 {
+  margin: 0 0 6px 0;
+}
+
+.fabricate-recipe-editor-v2 .item-picker-panel {
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  padding-left: 10px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: sticky;
+  top: 0;
+  align-self: start;
+  max-height: 100%;
+  height: 100%;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.fabricate-recipe-editor-v2 .item-picker-panel h3 {
+  margin: 0;
+}
+
+.fabricate-recipe-editor-v2 .picker-grid {
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  padding-right: 4px;
+  flex: 1 1 auto;
+}
+
+.fabricate-recipe-editor-v2 .picker-card {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  grid-template-rows: auto auto;
+  gap: 4px 8px;
+  align-items: center;
+  text-align: left;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.12);
+  width: 100%;
+  min-height: 56px;
+  height: auto !important;
+  white-space: normal;
+  line-height: 1.2;
+  overflow: hidden;
+}
+
+.fabricate-recipe-editor-v2 .picker-card img {
+  width: 42px;
+  height: 42px;
+  border-radius: 4px;
+  object-fit: cover;
+  grid-row: 1 / 3;
+  position: static !important;
+}
+
+.fabricate-recipe-editor-v2 .picker-card span {
+  font-size: 13px;
+}
+
+.fabricate-recipe-editor-v2 .picker-card code {
+  font-size: 11px;
+  opacity: 0.75;
+  word-break: break-all;
 }
 
 .fabricate-recipe-editor-v2 .ingredients-row button {
@@ -841,6 +1319,19 @@
 }
 
 @media (max-width: 840px) {
+  .fabricate-recipe-editor-v2 .editor-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .fabricate-recipe-editor-v2 .item-picker-panel {
+    border-left: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    padding-left: 0;
+    padding-top: 10px;
+    position: static;
+    max-height: none;
+  }
+
   .fabricate-recipe-editor-v2 .editor-grid {
     grid-template-columns: 1fr;
   }

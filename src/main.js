@@ -1,5 +1,6 @@
 import { RecipeManager } from './systems/RecipeManager.js';
 import { CraftingEngine } from './systems/CraftingEngine.js';
+import { CraftingSystemManager } from './systems/CraftingSystemManager.js';
 import { Recipe } from './models/Recipe.js';
 import { Ingredient } from './models/Ingredient.js';
 import { Catalyst } from './models/Catalyst.js';
@@ -17,6 +18,7 @@ class FabricateV2 {
   constructor() {
     this.recipeManager = null;
     this.craftingEngine = null;
+    this.craftingSystemManager = null;
     this.ready = false;
   }
 
@@ -34,10 +36,12 @@ class FabricateV2 {
 
     // Create managers
     this.recipeManager = new RecipeManager();
+    this.craftingSystemManager = new CraftingSystemManager(this.recipeManager);
     this.craftingEngine = new CraftingEngine(this.recipeManager);
 
     // Initialize recipe manager
     await this.recipeManager.initialize();
+    await this.craftingSystemManager.initialize();
 
     this.ready = true;
     console.log('Fabricate v2 | Ready');
@@ -64,6 +68,15 @@ class FabricateV2 {
     // Store all recipes
     game.settings.register('fabricate-v2', 'recipes', {
       name: 'Recipes',
+      scope: 'world',
+      config: false,
+      type: Array,
+      default: []
+    });
+
+    // Store crafting systems and their managed item libraries
+    game.settings.register('fabricate-v2', 'craftingSystems', {
+      name: 'Crafting Systems',
       scope: 'world',
       config: false,
       type: Array,
@@ -117,6 +130,15 @@ class FabricateV2 {
       type: Array,
       default: []
     });
+
+    // Last selected crafting system in GM management UI
+    game.settings.register('fabricate-v2', 'lastManagedCraftingSystem', {
+      name: 'Last Managed Crafting System',
+      scope: 'client',
+      config: false,
+      type: String,
+      default: ''
+    });
   }
 
   /**
@@ -131,6 +153,13 @@ class FabricateV2 {
    */
   getCraftingEngine() {
     return this.craftingEngine;
+  }
+
+  /**
+   * Get the crafting system manager instance
+   */
+  getCraftingSystemManager() {
+    return this.craftingSystemManager;
   }
 
   /**
@@ -198,7 +227,8 @@ Hooks.once('init', async () => {
     CraftingEngine,
     CraftingApp,
     RecipeManagerApp,
-    RecipeEditorApp
+    RecipeEditorApp,
+    CraftingSystemManager
   };
 });
 
@@ -426,6 +456,13 @@ globalThis.fabricate = {
    */
   openRecipeManager: () => {
     return RecipeManagerApp.show();
+  },
+
+  /**
+   * List crafting systems
+   */
+  listCraftingSystems: () => {
+    return game.fabricate.getCraftingSystemManager().getSystems();
   }
 };
 

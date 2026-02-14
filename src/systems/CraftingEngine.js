@@ -86,7 +86,8 @@ export class CraftingEngine {
     }
 
     // Validate catalysts
-    const catalystValidation = await this._validateCatalysts(componentSourceActors, recipe);
+    const catalystsForSet = this.recipeManager.getCatalystsForSet(recipe, ingredientSet);
+    const catalystValidation = await this._validateCatalysts(componentSourceActors, recipe, catalystsForSet);
     if (!catalystValidation.valid) {
       return {
         success: false,
@@ -96,7 +97,7 @@ export class CraftingEngine {
     }
 
     // Consume ingredients from component source actors
-    const consumedItems = await this._consumeIngredients(componentSourceActors, ingredientSet);
+    const consumedItems = await this._consumeIngredients(componentSourceActors, ingredientSet, recipe);
 
     // Apply catalyst degradation
     await this._degradeCatalysts(catalystValidation.catalysts);
@@ -121,10 +122,10 @@ export class CraftingEngine {
    * Validate that all required catalysts are available and usable
    * @private
    */
-  async _validateCatalysts(actors, recipe) {
+  async _validateCatalysts(actors, recipe, catalysts = []) {
     const catalystItems = [];
 
-    for (const catalyst of recipe.catalysts) {
+    for (const catalyst of catalysts) {
       if (catalyst.required === false) continue;
 
       let found = false;
@@ -132,10 +133,13 @@ export class CraftingEngine {
 
       // Search across all component source actors
       for (const actor of actors) {
-        const validation = await catalyst.validate(actor);
-        if (validation.valid) {
+        const matching = actor.items.find(item => this.recipeManager.catalystMatchesItem(recipe, catalyst, item));
+        if (matching) {
+          // Keep legacy validation checks (equipped, durability) when possible.
+          const validation = await catalyst.validate(actor);
+          if (!validation.valid && !catalyst.systemItemId) continue;
           found = true;
-          catalystItem = validation.item;
+          catalystItem = matching;
           break;
         }
       }
@@ -154,7 +158,7 @@ export class CraftingEngine {
    * Consume ingredients from component source actors
    * @private
    */
-  async _consumeIngredients(componentSourceActors, ingredientSet) {
+  async _consumeIngredients(componentSourceActors, ingredientSet, recipe) {
     const consumedItems = [];
 
     // Aggregate all items from component source actors
@@ -163,7 +167,10 @@ export class CraftingEngine {
     );
 
     // Match ingredients to items
-    const consumptionPlan = ingredientSet.matchIngredients(availableItems);
+    const consumptionPlan = ingredientSet.matchIngredients(
+      availableItems,
+      (ingredient, item) => this.recipeManager.ingredientMatchesItem(recipe, ingredient, item)
+    );
 
     // Execute consumption
     for (const { item, quantity, ingredient } of consumptionPlan) {
@@ -242,20 +249,38 @@ export class CraftingEngine {
   async _createSingleResult(craftingActor, result, consumedItems, catalystItems, recipe) {
     // Get the source item
     let sourceItem;
+    let managedItem = null;
+    if (result.systemItemId && recipe.craftingSystemId) {
+      const systemManager = game.fabricate?.getCraftingSystemManager?.();
+      const system = systemManager?.getSystem(recipe.craftingSystemId);
+      managedItem = system?.items?.find(i => i.id === result.systemItemId) || null;
+      if (managedItem?.sourceUuid) {
+        sourceItem = await fromUuid(managedItem.sourceUuid);
+      }
+    }
+
     if (result.itemUuid) {
       sourceItem = await fromUuid(result.itemUuid);
     }
 
-    if (!sourceItem) {
-      console.error(`Fabricate v2 | Result item not found: ${result.itemUuid}`);
+    let itemData;
+    if (sourceItem) {
+      itemData = sourceItem.toObject();
+    } else if (managedItem) {
+      const fallbackType = craftingActor.items.contents[0]?.type || 'loot';
+      itemData = {
+        name: managedItem.name || 'Crafted Item',
+        img: managedItem.img || 'icons/svg/item-bag.svg',
+        type: fallbackType,
+        system: {}
+      };
+    } else {
+      console.error(`Fabricate v2 | Result item not found: ${result.itemUuid || result.systemItemId}`);
       return null;
     }
 
-    // Clone the source item
-    const itemData = sourceItem.toObject();
-
     // Set quantity
-    if (itemData.system.quantity !== undefined) {
+    if (itemData.system.quantity !== undefined || !sourceItem) {
       itemData.system.quantity = result.quantity;
     }
 

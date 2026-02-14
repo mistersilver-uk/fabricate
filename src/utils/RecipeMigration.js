@@ -35,8 +35,8 @@ export class RecipeMigration {
       // Convert old result object to new results array
       results: this._migrateResults(oldRecipeData),
 
-      // Convert old catalysts
-      catalysts: oldRecipeData.catalysts || [],
+      // Legacy catalysts are moved into the first ingredient set
+      catalysts: [],
 
       // Migrate behavior properties
       isVariable: oldRecipeData.isVariable || false,
@@ -80,13 +80,18 @@ export class RecipeMigration {
     });
 
     // Create a single ingredient set from old ingredients array
+    const migratedSet = {
+      id: foundry.utils.randomID(),
+      name: 'Default',
+      ingredients: migratedIngredients,
+      essences: oldRecipeData.essences || {},
+      catalysts: oldRecipeData.catalysts || [],
+      resultMapping: [] // Will be populated based on results
+    };
+
     return [
       {
-        id: foundry.utils.randomID(),
-        name: 'Default',
-        ingredients: migratedIngredients,
-        essences: oldRecipeData.essences || {},
-        resultMapping: [] // Will be populated based on results
+        ...migratedSet
       }
     ];
   }
@@ -136,6 +141,17 @@ export class RecipeMigration {
       try {
         // Check if already migrated
         if (recipeData.ingredientSets && recipeData.results) {
+          // Second-pass normalization: move legacy recipe-level catalysts into first ingredient set.
+          if ((recipeData.catalysts || []).length > 0 && (recipeData.ingredientSets || []).length > 0) {
+            const normalized = foundry.utils.deepClone(recipeData);
+            normalized.ingredientSets[0].catalysts = [
+              ...(normalized.ingredientSets[0].catalysts || []),
+              ...normalized.catalysts
+            ];
+            normalized.catalysts = [];
+            migrated++;
+            return normalized;
+          }
           skipped++;
           return recipeData;
         }
@@ -169,7 +185,7 @@ export class RecipeMigration {
     }
 
     return recipesData.some(recipe =>
-      !recipe.ingredientSets || !recipe.results
+      !recipe.ingredientSets || !recipe.results || (recipe.catalysts || []).length > 0
     );
   }
 }

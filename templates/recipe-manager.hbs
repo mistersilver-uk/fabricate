@@ -1,124 +1,254 @@
-<div class="fabricate-recipe-manager">
-  <header class="manager-header">
-    <div class="manager-search">
-      <input
-        type="text"
-        name="search"
-        placeholder="Search recipes..."
-        value="{{search}}"
-        data-action="search"
-      />
-      <i class="fas fa-search"></i>
-    </div>
-
-    <div class="manager-actions">
-      <button type="button" class="btn-create" data-action="createRecipe">
-        <i class="fas fa-plus"></i>
-        New Recipe
+<div class="fabricate-admin">
+  <header class="admin-header">
+    <nav class="admin-tabs">
+      <button type="button" class="{{#if (eq activeTab 'systems')}}active{{/if}}" data-action="setTab" data-tab="systems">
+        <i class="fas fa-layer-group"></i> Systems
       </button>
-
-      <button type="button" class="btn-import" data-action="importRecipes">
-        <i class="fas fa-file-import"></i>
-        Import
+      <button type="button" class="{{#if (eq activeTab 'items')}}active{{/if}}" data-action="setTab" data-tab="items">
+        <i class="fas fa-boxes"></i> Items
       </button>
-
-      <button type="button" class="btn-export" data-action="exportRecipes">
-        <i class="fas fa-file-export"></i>
-        Export
+      <button type="button" class="{{#if (eq activeTab 'recipes')}}active{{/if}}" data-action="setTab" data-tab="recipes">
+        <i class="fas fa-scroll"></i> Recipes
       </button>
+      <button type="button" class="{{#if (eq activeTab 'rules')}}active{{/if}}" data-action="setTab" data-tab="rules">
+        <i class="fas fa-sliders-h"></i> Rules
+      </button>
+    </nav>
+
+    <div class="admin-system-name">
+      {{#if hasSystem}}
+        <span>Selected: <strong>{{selectedSystemName}}</strong></span>
+      {{else}}
+        <span>No crafting systems yet</span>
+      {{/if}}
     </div>
   </header>
 
-  <div class="manager-content">
-    <aside class="category-sidebar">
-      <h3>Categories</h3>
-      <ul class="category-list">
-        <li class="{{#unless selectedCategory}}active{{/unless}}">
-          <a href="#" data-action="filterCategory" data-category="">
-            <i class="fas fa-list"></i>
-            All Recipes
-            <span class="count">{{totalRecipes}}</span>
-          </a>
-        </li>
-        {{#each categories}}
-        <li class="{{#if (eq ../selectedCategory this.name)}}active{{/if}}">
-          <a href="#" data-action="filterCategory" data-category="{{this.name}}">
-            <i class="fas fa-folder"></i>
-            {{this.name}}
-            <span class="count">{{this.count}}</span>
-          </a>
-        </li>
+  <div class="admin-body">
+    <aside class="admin-sidebar">
+      <div class="admin-sidebar-header">
+        <h3>Crafting Systems</h3>
+        <button type="button" data-action="createSystem" title="Create System"><i class="fas fa-plus"></i></button>
+      </div>
+      <ul class="admin-system-list">
+        {{#each systems}}
+          <li class="{{#if selected}}active{{/if}}">
+            <button type="button" class="system-link" data-action="selectSystem" data-system-id="{{id}}">{{name}}</button>
+            <button type="button" data-action="deleteSystem" data-system-id="{{id}}" title="Delete"><i class="fas fa-trash"></i></button>
+          </li>
+        {{else}}
+          <li class="empty">No systems created.</li>
         {{/each}}
       </ul>
     </aside>
 
-    <main class="recipe-grid">
-      {{#if recipes.length}}
-        <table class="recipe-table">
-          <thead>
-            <tr>
-              <th class="col-name">Recipe Name</th>
-              <th class="col-category">Category</th>
-              <th class="col-type">Type</th>
-              <th class="col-ingredients">Ingredients</th>
-              <th class="col-enabled">Enabled</th>
-              <th class="col-actions">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {{#each recipes}}
-            <tr class="recipe-row {{#unless enabled}}disabled{{/unless}}" data-recipe-id="{{id}}">
-              <td class="col-name">
-                <img src="{{img}}" alt="{{name}}" class="recipe-thumb" />
-                <span>{{name}}</span>
-              </td>
-              <td class="col-category">{{category}}</td>
-              <td class="col-type">
-                {{#if isSimple}}
-                  <span class="badge badge-simple">Simple</span>
-                {{else}}
-                  <span class="badge badge-advanced">Advanced</span>
-                {{/if}}
-              </td>
-              <td class="col-ingredients">
-                {{ingredients.length}} ingredient{{#unless (eq ingredients.length 1)}}s{{/unless}}
-                {{#if catalysts.length}}
-                  + {{catalysts.length}} catalyst{{#unless (eq catalysts.length 1)}}s{{/unless}}
-                {{/if}}
-              </td>
-              <td class="col-enabled">
-                <input
-                  type="checkbox"
-                  {{#if enabled}}checked{{/if}}
-                  data-action="toggleEnabled"
-                  data-recipe-id="{{id}}"
-                />
-              </td>
-              <td class="col-actions">
-                <button type="button" class="btn-icon" data-action="editRecipe" data-recipe-id="{{id}}" title="Edit">
-                  <i class="fas fa-edit"></i>
-                </button>
-                <button type="button" class="btn-icon" data-action="duplicateRecipe" data-recipe-id="{{id}}" title="Duplicate">
-                  <i class="fas fa-copy"></i>
-                </button>
-                <button type="button" class="btn-icon btn-danger" data-action="deleteRecipe" data-recipe-id="{{id}}" title="Delete">
-                  <i class="fas fa-trash"></i>
-                </button>
-              </td>
-            </tr>
-            {{/each}}
-          </tbody>
-        </table>
-      {{else}}
-        <div class="fabricate-empty">
-          <i class="fas fa-inbox"></i>
-          <h3>No Recipes Yet</h3>
-          <p>Create your first recipe to get started.</p>
-          <button type="button" class="btn-primary" data-action="createRecipe">
-            <i class="fas fa-plus"></i>
-             Create Recipe
-          </button>
-        </div>
+    <main class="admin-main">
+      {{#if (eq activeTab 'systems')}}
+        <section class="admin-panel">
+          {{#if hasSystem}}
+            <h3>Crafting System</h3>
+            <div class="system-meta-grid">
+              <div class="form-group">
+                <label>Name</label>
+                <input type="text" name="systemName" value="{{selectedSystem.name}}" />
+              </div>
+              <div class="form-group span-2">
+                <label>Description</label>
+                <textarea name="systemDescription" rows="3">{{selectedSystem.description}}</textarea>
+              </div>
+            </div>
+            <div class="inline-actions">
+              <button type="button" data-action="saveSystemDetails"><i class="fas fa-save"></i> Save Details</button>
+            </div>
+
+            <div class="system-config-grid">
+              <section class="config-block">
+                <h4>Recipe Categories</h4>
+                <div class="panel-toolbar compact">
+                  <input type="text" name="newSystemCategory" placeholder="e.g. Cooking" />
+                  <button type="button" data-action="addSystemCategory"><i class="fas fa-plus"></i> Add</button>
+                </div>
+                <div class="token-list">
+                  {{#each selectedSystem.categories}}
+                    <span class="token">{{this}} <button type="button" data-action="removeSystemCategory" data-category="{{this}}"><i class="fas fa-times"></i></button></span>
+                  {{else}}
+                    <p class="hint">No categories defined yet.</p>
+                  {{/each}}
+                </div>
+              </section>
+
+              <section class="config-block">
+                <h4>Tags</h4>
+                <div class="panel-toolbar compact">
+                  <input type="text" name="newSystemTag" placeholder="e.g. armour:leather" />
+                  <button type="button" data-action="addSystemTag"><i class="fas fa-plus"></i> Add</button>
+                </div>
+                <div class="token-list">
+                  {{#each selectedSystem.tags}}
+                    <span class="token">{{this}} <button type="button" data-action="removeSystemTag" data-tag="{{this}}"><i class="fas fa-times"></i></button></span>
+                  {{else}}
+                    <p class="hint">No tags defined yet.</p>
+                  {{/each}}
+                </div>
+              </section>
+
+              <section class="config-block">
+                <h4>Essences</h4>
+                <div class="panel-toolbar compact">
+                  <input type="text" name="newSystemEssence" placeholder="e.g. fire" />
+                  <button type="button" data-action="addSystemEssence"><i class="fas fa-plus"></i> Add</button>
+                </div>
+                <div class="token-list">
+                  {{#each selectedSystem.essences}}
+                    <span class="token">{{this}} <button type="button" data-action="removeSystemEssence" data-essence="{{this}}"><i class="fas fa-times"></i></button></span>
+                  {{else}}
+                    <p class="hint">No essences defined yet.</p>
+                  {{/each}}
+                </div>
+              </section>
+            </div>
+          {{else}}
+            <div class="fabricate-empty">
+              <i class="fas fa-layer-group"></i>
+              <h3>No Crafting System Selected</h3>
+              <p>Create a new system to configure categories, tags, essences, and rules.</p>
+            </div>
+          {{/if}}
+        </section>
+      {{/if}}
+
+      {{#if (eq activeTab 'items')}}
+        <section class="admin-panel">
+          <div class="panel-toolbar">
+            <input
+              type="text"
+              placeholder="Search system items..."
+              value="{{itemSearch}}"
+              data-action="itemSearch"
+              name="itemSearch"
+            />
+          </div>
+
+          {{#if hasSystem}}
+            <div class="drop-zone admin-item-drop-zone" data-drop-zone="system-item">
+              <i class="fas fa-download"></i>
+              Drag items from sidebar/compendiums here to add them to this crafting system.
+            </div>
+
+            <div class="system-item-grid">
+              {{#each systemItems}}
+                <article class="system-item-card">
+                  <img src="{{img}}" alt="{{name}}" />
+                  <div class="item-meta">
+                    <h4>{{name}}</h4>
+                    <p>{{tierLabel}}</p>
+                    {{#if sourceUuid}}
+                      <code>{{sourceUuid}}</code>
+                    {{else}}
+                      <span class="placeholder-src">No source UUID</span>
+                    {{/if}}
+                  </div>
+                  <button type="button" data-action="deleteSystemItem" data-item-id="{{id}}" title="Delete Item">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </article>
+              {{else}}
+                <div class="fabricate-empty">
+                  <i class="fas fa-inbox"></i>
+                  <h3>No Managed Items</h3>
+                  <p>Drag in world or compendium items to build this system's item library.</p>
+                </div>
+              {{/each}}
+            </div>
+          {{else}}
+            <div class="fabricate-empty">
+              <i class="fas fa-layer-group"></i>
+              <h3>No Crafting System Selected</h3>
+              <p>Create or select a crafting system to manage items.</p>
+            </div>
+          {{/if}}
+        </section>
+      {{/if}}
+
+      {{#if (eq activeTab 'recipes')}}
+        <section class="admin-panel">
+          <div class="panel-toolbar recipe-toolbar">
+            <input
+              type="text"
+              name="search"
+              placeholder="Search recipes..."
+              value="{{search}}"
+              data-action="search"
+            />
+            <button type="button" data-action="createRecipe"><i class="fas fa-plus"></i> New Recipe</button>
+            <button type="button" data-action="importRecipes"><i class="fas fa-file-import"></i> Import</button>
+            <button type="button" data-action="exportRecipes"><i class="fas fa-file-export"></i> Export</button>
+          </div>
+
+          {{#if recipes.length}}
+            <table class="recipe-table">
+              <thead>
+                <tr>
+                  <th>Recipe</th>
+                  <th>Category</th>
+                  <th>Type</th>
+                  <th>Components</th>
+                  <th>Enabled</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {{#each recipes}}
+                  <tr class="recipe-row {{#unless enabled}}disabled{{/unless}}" data-recipe-id="{{id}}">
+                    <td>
+                      <img src="{{img}}" alt="{{name}}" class="recipe-thumb" />
+                      <span>{{name}}</span>
+                    </td>
+                    <td>{{category}}</td>
+                    <td>
+                      {{#if isSimple}}
+                        <span class="badge badge-simple">Simple</span>
+                      {{else}}
+                        <span class="badge badge-advanced">Advanced</span>
+                      {{/if}}
+                    </td>
+                    <td>
+                      {{ingredients.length}} ingredient{{#unless (eq ingredients.length 1)}}s{{/unless}}
+                      {{#if catalysts.length}}
+                        + {{catalysts.length}} catalyst{{#unless (eq catalysts.length 1)}}s{{/unless}}
+                      {{/if}}
+                    </td>
+                    <td>
+                      <input type="checkbox" {{#if enabled}}checked{{/if}} data-action="toggleEnabled" data-recipe-id="{{id}}" />
+                    </td>
+                    <td>
+                      <button type="button" class="btn-icon" data-action="editRecipe" data-recipe-id="{{id}}" title="Edit"><i class="fas fa-edit"></i></button>
+                      <button type="button" class="btn-icon" data-action="duplicateRecipe" data-recipe-id="{{id}}" title="Duplicate"><i class="fas fa-copy"></i></button>
+                      <button type="button" class="btn-icon btn-danger" data-action="deleteRecipe" data-recipe-id="{{id}}" title="Delete"><i class="fas fa-trash"></i></button>
+                    </td>
+                  </tr>
+                {{/each}}
+              </tbody>
+            </table>
+          {{else}}
+            <div class="fabricate-empty">
+              <i class="fas fa-scroll"></i>
+              <h3>No Recipes Yet</h3>
+              <p>Create recipes for the selected crafting system.</p>
+              <button type="button" class="btn-primary" data-action="createRecipe">
+                <i class="fas fa-plus"></i> Create Recipe
+              </button>
+            </div>
+          {{/if}}
+        </section>
+      {{/if}}
+
+      {{#if (eq activeTab 'rules')}}
+        <section class="admin-panel">
+          <h3>Global Rules</h3>
+          <p>Difficulty and advanced system-wide rule editing will live here.</p>
+          <p>This first implementation pass focuses on systems, item libraries, and recipe scoping.</p>
+        </section>
       {{/if}}
     </main>
   </div>

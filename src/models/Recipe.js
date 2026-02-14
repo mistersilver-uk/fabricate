@@ -14,6 +14,7 @@ export class Recipe {
     this.description = data.description || '';
     this.img = data.img || 'icons/svg/item-bag.svg';
     this.category = data.category || 'general';
+    this.craftingSystemId = data.craftingSystemId || null;
     this.system = data.system || 'all';
     this.tags = Array.isArray(data.tags) ? data.tags : [];
     this.enabled = data.enabled !== undefined ? data.enabled : true;
@@ -23,10 +24,17 @@ export class Recipe {
       s instanceof IngredientSet ? s : IngredientSet.fromJSON(s)
     );
 
-    // Catalysts (non-consumable requirements)
-    this.catalysts = (data.catalysts || []).map(c =>
+    // Legacy recipe-level catalysts (migrated into the first ingredient set when possible)
+    this.catalysts = [];
+    const legacyCatalysts = (data.catalysts || []).map(c =>
       c instanceof Catalyst ? c : Catalyst.fromJSON(c)
     );
+    if (legacyCatalysts.length > 0 && this.ingredientSets.length > 0) {
+      const firstSet = this.ingredientSets[0];
+      firstSet.catalysts = [...(firstSet.catalysts || []), ...legacyCatalysts];
+    } else {
+      this.catalysts = legacyCatalysts;
+    }
 
     // Output (multiple items can be produced)
     this.results = (data.results || []).map(r =>
@@ -65,10 +73,12 @@ export class Recipe {
     // Single ingredient set with exact item matching (no tags)
     const hasSimpleIngredients =
       this.ingredientSets.length === 1 &&
-      this.ingredientSets[0].ingredients.every(ing => ing.itemUuid && !ing.tag) &&
+      this.ingredientSets[0].ingredients.every(ing => (ing.itemUuid || ing.systemItemId) && !ing.tag) &&
       Object.keys(this.ingredientSets[0].essences || {}).length === 0;
 
-    const hasNoCatalysts = this.catalysts.length === 0;
+    const hasNoCatalysts =
+      this.catalysts.length === 0 &&
+      this.ingredientSets.every(set => (set.catalysts?.length || 0) === 0);
     const hasNoVariableOutput = !this.isVariable;
     const hasNoEffectTransfer = !this.transferEffects;
 
@@ -140,11 +150,12 @@ export class Recipe {
       description: this.description,
       img: this.img,
       category: this.category,
+      craftingSystemId: this.craftingSystemId,
       system: this.system,
       tags: this.tags,
       enabled: this.enabled,
       ingredientSets: this.ingredientSets.map(s => s.toJSON()),
-      catalysts: this.catalysts.map(c => c.toJSON()),
+      catalysts: [],
       results: this.results.map(r => r.toJSON()),
       isVariable: this.isVariable,
       transferEffects: this.transferEffects,
