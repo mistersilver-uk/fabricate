@@ -23,6 +23,7 @@ export class Catalyst {
     this.degradesOnUse = data.degradesOnUse || false;
     this.degradeAmount = data.degradeAmount || 1;
     this.durabilityAttribute = data.durabilityAttribute || 'system.durability'; // Path to durability value
+    this.maxUses = Number.isFinite(Number(data.maxUses)) ? Number(data.maxUses) : null;
 
     // Quality affects output (optional)
     this.qualityBonus = data.qualityBonus || false;
@@ -62,6 +63,20 @@ export class Catalyst {
 
     const item = items[0];
 
+    return this.validateItem(item, scene);
+  }
+
+  /**
+   * Validate a specific catalyst item instance
+   * @param {Item} item - The catalyst item
+   * @param {Scene} scene - Optional scene for proximity checks
+   * @returns {{valid: boolean, message: string, item?: Item}}
+   */
+  async validateItem(item, scene = null) {
+    if (!item) {
+      return { valid: false, message: `Missing required catalyst: ${this.name}` };
+    }
+
     // Check if must be equipped
     if (this.mustBeEquipped) {
       const isEquipped = item.system.equipped === true;
@@ -78,6 +93,13 @@ export class Catalyst {
     }
 
     // Check durability if applicable
+    if (this.degradesOnUse && Number.isFinite(this.maxUses)) {
+      const used = await item.getFlag('fabricate-v2', 'catalystUses');
+      if (Number(used || 0) >= this.maxUses) {
+        return { valid: false, message: `${this.name} has no uses remaining` };
+      }
+    }
+
     if (this.degradesOnUse && this.durabilityAttribute) {
       const durability = foundry.utils.getProperty(item, this.durabilityAttribute);
       if (durability !== undefined && durability <= 0) {
@@ -93,7 +115,16 @@ export class Catalyst {
    * @param {Item} item - The catalyst item to degrade
    */
   async applyDegradation(item) {
-    if (!this.degradesOnUse || !this.durabilityAttribute) return;
+    if (!this.degradesOnUse) return;
+
+    if (Number.isFinite(this.maxUses)) {
+      const used = await item.getFlag('fabricate-v2', 'catalystUses');
+      const next = Number(used || 0) + 1;
+      await item.setFlag('fabricate-v2', 'catalystUses', next);
+      return;
+    }
+
+    if (!this.durabilityAttribute) return;
 
     const currentDurability = foundry.utils.getProperty(item, this.durabilityAttribute);
     if (currentDurability === undefined) return;
@@ -128,6 +159,7 @@ export class Catalyst {
       degradesOnUse: this.degradesOnUse,
       degradeAmount: this.degradeAmount,
       durabilityAttribute: this.durabilityAttribute,
+      maxUses: this.maxUses,
       qualityBonus: this.qualityBonus,
       qualityAttribute: this.qualityAttribute
     };

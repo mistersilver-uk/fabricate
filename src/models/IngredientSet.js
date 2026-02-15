@@ -55,8 +55,8 @@ export class IngredientSet {
 
     // Validate catalysts
     for (const catalyst of this.catalysts) {
-      if (!catalyst.itemUuid && !catalyst.systemItemId && !catalyst.tag) {
-        errors.push('Catalyst must have systemItemId, itemUuid, or tag');
+      if (!catalyst.itemUuid && !catalyst.systemItemId) {
+        errors.push('Catalyst must have systemItemId or itemUuid');
       }
     }
 

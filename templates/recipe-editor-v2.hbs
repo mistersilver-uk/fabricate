@@ -3,6 +3,17 @@
     <h2>{{#if isEdit}}Edit Recipe{{else}}New Recipe{{/if}}</h2>
   </header>
 
+  {{#if validationErrors.length}}
+    <div class="validation-banner">
+      <strong>Fix before saving:</strong>
+      <ul>
+        {{#each validationErrors}}
+          <li>{{this}}</li>
+        {{/each}}
+      </ul>
+    </div>
+  {{/if}}
+
   <section class="editor-scroll editor-layout">
     <div class="editor-main">
       <div class="editor-grid">
@@ -11,19 +22,21 @@
           <input name="name" type="text" value="{{recipe.name}}" required />
         </div>
 
-        <div class="form-group">
-          <label>Category</label>
-          {{#if availableCategories.length}}
-            <select name="category">
-              {{#each availableCategories}}
-                <option value="{{this}}" {{#if (eq ../recipe.category this)}}selected{{/if}}>{{this}}</option>
-              {{/each}}
-            </select>
-          {{else}}
-            <input name="category" type="text" value="{{recipe.category}}" placeholder="No system categories defined yet" />
-            <p class="hint">Define categories in Crafting Admin > Systems.</p>
-          {{/if}}
-        </div>
+        {{#if showCategories}}
+          <div class="form-group">
+            <label>Category</label>
+            {{#if availableCategories.length}}
+              <select name="category">
+                {{#each availableCategories}}
+                  <option value="{{this}}" {{#if (eq ../recipe.category this)}}selected{{/if}}>{{this}}</option>
+                {{/each}}
+              </select>
+            {{else}}
+              <input name="category" type="text" value="{{recipe.category}}" placeholder="No system categories defined yet" />
+              <p class="hint">Define categories in Crafting Admin > Systems.</p>
+            {{/if}}
+          </div>
+        {{/if}}
 
         <div class="form-group span-2">
           <label>Description</label>
@@ -35,15 +48,17 @@
           <input name="img" type="text" value="{{recipe.img}}" />
         </div>
 
-        <div class="form-group span-2">
-          <label>Tags (comma separated)</label>
-          <input name="tags" type="text" value="{{recipe.tagsText}}" list="fabricate-recipe-tags" />
-          {{#if availableTags.length}}
-            <p class="hint">Available system tags: {{#each availableTags}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}</p>
-          {{else}}
-            <p class="hint">No system tags defined yet. Add tags in Crafting Admin > Systems.</p>
-          {{/if}}
-        </div>
+        {{#if showTags}}
+          <div class="form-group span-2">
+            <label>Tags (comma separated)</label>
+            <input name="tags" type="text" value="{{recipe.tagsText}}" list="fabricate-recipe-tags" />
+            {{#if availableTags.length}}
+              <p class="hint">Available system tags: {{#each availableTags}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}</p>
+            {{else}}
+              <p class="hint">No system tags defined yet. Add tags in Crafting Admin > Systems.</p>
+            {{/if}}
+          </div>
+        {{/if}}
       </div>
 
       <div class="editor-flags">
@@ -70,10 +85,12 @@
         <div class="form-group">
           <label>Set Name</label>
           <input name="ingredientSet.name" type="text" value="{{ingredientSet.name}}" />
-          {{#if availableEssences.length}}
-            <p class="hint">Available system essences: {{#each availableEssences}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}</p>
-          {{else}}
-            <p class="hint">No essences defined yet. Add essences in Crafting Admin > Systems.</p>
+          {{#if showEssences}}
+            {{#if availableEssences.length}}
+              <p class="hint">Available system essences: {{#each availableEssences}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}</p>
+            {{else}}
+              <p class="hint">No essences defined yet. Add essences in Crafting Admin > Systems.</p>
+            {{/if}}
           {{/if}}
         </div>
 
@@ -83,56 +100,61 @@
             <span>Qty</span>
             <span></span>
           </div>
-          {{#each ingredientSet.itemIngredients}}
-            <div class="ingredients-row" data-drop-target="ingredient" data-index="{{rowIndex}}">
-              <div class="managed-item-cell drop-slot">
-                <img src="{{itemImg}}" alt="{{itemName}}" />
-                <div class="managed-item-meta">
-                  <span>{{itemName}}</span>
-                  <div class="inline-actions compact">
-                    <button type="button" data-action="clearIngredientSystemItem" data-index="{{rowIndex}}"><i class="fas fa-eraser"></i></button>
+          {{#if ingredientSet.itemIngredients.length}}
+            {{#each ingredientSet.itemIngredients}}
+              <div class="ingredients-row" data-drop-target="ingredient" data-index="{{rowIndex}}">
+                <div class="managed-item-cell drop-slot">
+                  <img src="{{itemImg}}" alt="{{itemName}}" />
+                  <div class="managed-item-meta">
+                    <span>{{itemName}}</span>
                   </div>
                 </div>
-              </div>
-              <input name="itemIngredients.{{rowIndex}}.quantity" type="number" min="1" value="{{quantity}}" />
-              <button type="button" data-action="removeIngredientRow" data-index="{{rowIndex}}" title="Remove"><i class="fas fa-trash"></i></button>
-            </div>
-          {{/each}}
-        </div>
-
-        <div class="inline-actions">
-          <button type="button" data-action="addIngredientRow"><i class="fas fa-plus"></i> Add Ingredient Row</button>
-        </div>
-
-        <div class="alt-ingredients-block">
-          <div class="carousel-header small">
-            <h4>Tag/Tier Requirements (alternatives to items)</h4>
-          </div>
-          <div class="ingredients-table alt-table" data-drop-target="tag-new">
-            <div class="ingredients-row header alt-header">
-              <span>Tag</span>
-              <span>Qty</span>
-              <span>Tier</span>
-              <span></span>
-            </div>
-            {{#each ingredientSet.tagIngredients}}
-              <div class="ingredients-row alt-row">
-                <input name="tagIngredients.{{rowIndex}}.tag" value="{{tag}}" placeholder="e.g. armour:leather" list="fabricate-system-tags" />
-                <input name="tagIngredients.{{rowIndex}}.quantity" type="number" min="1" value="{{quantity}}" />
-                <select name="tagIngredients.{{rowIndex}}.tier">
-                  <option value="" {{#unless tier}}selected{{/unless}}>Any</option>
-                  {{#each ../availableTiers}}
-                    <option value="{{this}}" {{#if (eq ../tier this)}}selected{{/if}}>{{this}}</option>
-                  {{/each}}
-                </select>
-                <button type="button" data-action="removeTagIngredientRow" data-index="{{rowIndex}}" title="Remove"><i class="fas fa-trash"></i></button>
+                <input name="itemIngredients.{{rowIndex}}.quantity" type="number" min="1" value="{{quantity}}" />
+                <button type="button" data-action="removeIngredientRow" data-index="{{rowIndex}}" title="Remove"><i class="fas fa-trash"></i></button>
               </div>
             {{/each}}
-          </div>
-          <div class="inline-actions">
-            <button type="button" data-action="addTagIngredientRow"><i class="fas fa-plus"></i> Add Tag Requirement</button>
-          </div>
+          {{else}}
+            <div class="ingredients-empty">
+              <p>Drop managed items here to add ingredients.</p>
+            </div>
+          {{/if}}
         </div>
+
+        {{#if showTags}}
+          <div class="alt-ingredients-block">
+            <div class="carousel-header small">
+              <h4>Tag Requirements (alternatives to items)</h4>
+            </div>
+            <div class="ingredients-table alt-table {{#unless showTiers}}no-tier{{/unless}}">
+              <div class="ingredients-row header alt-header">
+                <span>Tag</span>
+                <span>Qty</span>
+                {{#if showTiers}}
+                  <span>Tier</span>
+                {{/if}}
+                <span></span>
+              </div>
+              {{#each ingredientSet.tagIngredients}}
+                <div class="ingredients-row alt-row {{#unless ../showTiers}}no-tier{{/unless}}">
+                  <input name="tagIngredients.{{rowIndex}}.tag" value="{{tag}}" placeholder="e.g. armour:leather" list="fabricate-system-tags" />
+                  <input name="tagIngredients.{{rowIndex}}.quantity" type="number" min="1" value="{{quantity}}" />
+                  {{#if ../showTiers}}
+                    <select name="tagIngredients.{{rowIndex}}.tier">
+                      <option value="" {{#unless tier}}selected{{/unless}}>Any</option>
+                      {{#each ../availableTiers}}
+                        <option value="{{this}}" {{#if (eq ../tier this)}}selected{{/if}}>{{this}}</option>
+                      {{/each}}
+                    </select>
+                  {{/if}}
+                  <button type="button" data-action="removeTagIngredientRow" data-index="{{rowIndex}}" title="Remove"><i class="fas fa-trash"></i></button>
+                </div>
+              {{/each}}
+            </div>
+            <div class="inline-actions">
+              <button type="button" data-action="addTagIngredientRow"><i class="fas fa-plus"></i> Add Tag Requirement</button>
+            </div>
+          </div>
+        {{/if}}
 
         <div class="catalysts-block" data-drop-target="catalyst-new">
           <div class="carousel-header small">
@@ -141,35 +163,54 @@
           <div class="ingredients-table catalyst-table">
             <div class="ingredients-row header catalyst-header">
               <span>Managed Item</span>
-              <span>Name</span>
-              <span>Tag</span>
-              <span>Required</span>
+              <span>Degrades</span>
+              <span>Max Uses</span>
               <span></span>
             </div>
-            {{#each ingredientSet.catalysts}}
-              <div class="ingredients-row catalyst-row" data-drop-target="catalyst" data-index="{{rowIndex}}">
-                <div class="managed-item-cell drop-slot">
+            {{#if ingredientSet.catalysts.length}}
+              {{#each ingredientSet.catalysts}}
+                <div class="ingredients-row catalyst-row" data-drop-target="catalyst" data-index="{{rowIndex}}">
+                  <div class="managed-item-cell drop-slot">
                   <img src="{{itemImg}}" alt="{{itemName}}" />
                   <div class="managed-item-meta">
                     <span>{{itemName}}</span>
-                    <div class="inline-actions compact">
-                      <button type="button" data-action="clearCatalystSystemItem" data-index="{{rowIndex}}"><i class="fas fa-eraser"></i></button>
-                    </div>
                   </div>
                 </div>
-                <input name="catalysts.{{rowIndex}}.name" value="{{name}}" placeholder="Catalyst name" />
-                <input name="catalysts.{{rowIndex}}.tag" value="{{tag}}" placeholder="alternative tag" list="fabricate-system-tags" />
-                <label class="tiny-check">
-                  <input type="checkbox" name="catalysts.{{rowIndex}}.required" {{#if required}}checked{{/if}} />
-                </label>
-                <button type="button" data-action="removeCatalystRow" data-index="{{rowIndex}}" title="Remove"><i class="fas fa-trash"></i></button>
+                  <label class="tiny-check">
+                    <input type="checkbox" name="catalysts.{{rowIndex}}.degradesOnUse" {{#if degradesOnUse}}checked{{/if}} />
+                  </label>
+                  <input name="catalysts.{{rowIndex}}.maxUses" type="number" min="1" value="{{maxUses}}" placeholder="Unlimited" />
+                  <button type="button" data-action="removeCatalystRow" data-index="{{rowIndex}}" title="Remove"><i class="fas fa-trash"></i></button>
+                </div>
+              {{/each}}
+            {{else}}
+              <div class="ingredients-empty">
+                <p>Drop managed items here to add catalysts.</p>
               </div>
-            {{/each}}
-          </div>
-          <div class="inline-actions">
-            <button type="button" data-action="addCatalystRow"><i class="fas fa-plus"></i> Add Catalyst</button>
+            {{/if}}
           </div>
         </div>
+
+        {{#if recipe.isVariable}}
+          <div class="result-mapping-block">
+            <div class="carousel-header small">
+              <h4>Result Mapping (for this ingredient set)</h4>
+            </div>
+            {{#if resultOptions.length}}
+              <div class="mapping-grid">
+                {{#each resultOptions}}
+                  <label class="mapping-card">
+                    <input type="checkbox" name="resultMapping.{{id}}" {{#if selected}}checked{{/if}} />
+                    <img src="{{img}}" alt="{{name}}" />
+                    <span>{{name}}</span>
+                  </label>
+                {{/each}}
+              </div>
+            {{else}}
+              <p class="hint">Add results first, then map them to ingredient sets.</p>
+            {{/if}}
+          </div>
+        {{/if}}
       </section>
 
       <hr />
@@ -191,9 +232,6 @@
             <img src="{{resultSet.itemImg}}" alt="{{resultSet.itemName}}" />
             <div class="result-selected-meta">
               <h4>{{resultSet.itemName}}</h4>
-              <div class="inline-actions compact">
-                <button type="button" data-action="clearResultSystemItem"><i class="fas fa-eraser"></i></button>
-              </div>
             </div>
           </div>
 
@@ -243,16 +281,18 @@
           </div>
         {{/each}}
       </div>
-      <datalist id="fabricate-system-tags">
-        {{#each availableTags}}
-          <option value="{{this}}">
-        {{/each}}
-      </datalist>
-      <datalist id="fabricate-recipe-tags">
-        {{#each availableTags}}
-          <option value="{{this}}">
-        {{/each}}
-      </datalist>
+      {{#if showTags}}
+        <datalist id="fabricate-system-tags">
+          {{#each availableTags}}
+            <option value="{{this}}">
+          {{/each}}
+        </datalist>
+        <datalist id="fabricate-recipe-tags">
+          {{#each availableTags}}
+            <option value="{{this}}">
+          {{/each}}
+        </datalist>
+      {{/if}}
     </aside>
   </section>
 

@@ -1,3 +1,5 @@
+import { confirmDialog, renderDialog } from './foundryCompat.js';
+
 /**
  * Player Crafting Interface
  * Shows available recipes and allows players to craft items
@@ -385,7 +387,7 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
 
     const autoCraft = game.settings.get('fabricate-v2', 'autoCraft');
     if (!autoCraft) {
-      const confirmed = await Dialog.confirm({
+      const confirmed = await confirmDialog({
         title: `Craft ${recipe.name}?`,
         content: `
           <p>Are you sure you want to craft <strong>${recipe.name}</strong>?</p>
@@ -524,7 +526,7 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
 
     content += `</div>`;
 
-    new Dialog({
+    renderDialog({
       title: `Recipe: ${recipe.name}`,
       content,
       buttons: canCraftCheck.canCraft ? {
@@ -544,7 +546,7 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
         }
       },
       default: 'close'
-    }).render(true);
+    });
   }
 
   /**

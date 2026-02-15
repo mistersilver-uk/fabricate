@@ -276,6 +276,7 @@ export class RecipeManager {
       ingredients: [],
       essences: []
     };
+    const features = this._getSystemFeatures(recipe);
 
     // Check ingredients
     for (const ingredient of ingredientSet.ingredients) {
@@ -294,7 +295,7 @@ export class RecipeManager {
     }
 
     // Check essences
-    if (Object.keys(ingredientSet.essences || {}).length > 0) {
+    if (features.enableEssences && Object.keys(ingredientSet.essences || {}).length > 0) {
       const accumulatedEssences = this._accumulateEssences(availableItems);
 
       for (const [essenceType, requiredQty] of Object.entries(ingredientSet.essences)) {
@@ -362,6 +363,7 @@ export class RecipeManager {
    * @returns {boolean}
    */
   ingredientMatchesItem(recipe, ingredient, item) {
+    const features = this._getSystemFeatures(recipe);
     if (ingredient.systemItemId) {
       const managedItem = this._getSystemItem(recipe, ingredient.systemItemId);
       if (!managedItem) return false;
@@ -371,13 +373,8 @@ export class RecipeManager {
         ? item.name?.toLowerCase() === managedItem.name.toLowerCase()
         : false;
       if (!byUuid && !byName) return false;
-    } else if (!ingredient.matches(item)) {
+    } else if (!this._matchesIngredient(ingredient, item, features)) {
       return false;
-    }
-
-    if (ingredient.tier) {
-      const itemTier = item.getFlag('fabricate-v2', 'tier');
-      if (itemTier !== ingredient.tier) return false;
     }
 
     return true;
@@ -406,6 +403,42 @@ export class RecipeManager {
       return item.name?.toLowerCase() === (managedItem.name || '').toLowerCase();
     }
     return catalyst.matches(item);
+  }
+
+  _matchesIngredient(ingredient, item, features) {
+    if (ingredient.itemUuid && item.uuid === ingredient.itemUuid) return true;
+
+    if (ingredient.tag) {
+      if (!features.enableTags) return false;
+      const itemTags = item.getFlag('fabricate-v2', 'tags') || [];
+      if (!itemTags.includes(ingredient.tag)) return false;
+      if (ingredient.tier && features.enableTiers) {
+        const itemTier = item.getFlag('fabricate-v2', 'tier');
+        return itemTier === ingredient.tier;
+      }
+      return true;
+    }
+
+    if (Array.isArray(ingredient.alternatives) && ingredient.alternatives.length > 0) {
+      return ingredient.alternatives.some(alt => this._matchesIngredient(alt, item, features));
+    }
+
+    return false;
+  }
+
+  _getSystemFeatures(recipe) {
+    const systemId = recipe?.craftingSystemId;
+    if (!systemId) {
+      return { enableTags: false, enableTiers: false, enableEssences: false };
+    }
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const system = systemManager?.getSystem(systemId);
+    const advancedEnabled = system?.advancedOptionsEnabled !== false;
+    return {
+      enableTags: advancedEnabled && system?.enableTags === true,
+      enableTiers: advancedEnabled && system?.enableTiers === true,
+      enableEssences: advancedEnabled && system?.enableEssences === true
+    };
   }
 
   /**

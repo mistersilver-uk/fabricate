@@ -135,9 +135,8 @@ export class CraftingEngine {
       for (const actor of actors) {
         const matching = actor.items.find(item => this.recipeManager.catalystMatchesItem(recipe, catalyst, item));
         if (matching) {
-          // Keep legacy validation checks (equipped, durability) when possible.
-          const validation = await catalyst.validate(actor);
-          if (!validation.valid && !catalyst.systemItemId) continue;
+          const validation = await catalyst.validateItem(matching);
+          if (!validation.valid) continue;
           found = true;
           catalystItem = matching;
           break;
@@ -287,7 +286,7 @@ export class CraftingEngine {
     // Apply property formulas
     if (result.propertyFormulas && Object.keys(result.propertyFormulas).length > 0) {
       for (const [path, formula] of Object.entries(result.propertyFormulas)) {
-        const value = this._evaluateFormula(formula, consumedItems, catalystItems);
+        const value = this._evaluateFormula(formula, consumedItems, catalystItems, recipe);
         foundry.utils.setProperty(itemData, path, value);
       }
     }
@@ -343,11 +342,11 @@ export class CraftingEngine {
    * Evaluate a formula with context from ingredients and catalysts
    * @private
    */
-  _evaluateFormula(formula, consumedItems, catalystItems) {
+  _evaluateFormula(formula, consumedItems, catalystItems, recipe) {
     // Create context variables
     const context = {
       ingredientCount: consumedItems.length,
-      ingredientTier: this._getAverageIngredientTier(consumedItems),
+      ingredientTier: this._getAverageIngredientTier(consumedItems, recipe),
       catalystQuality: this._getAverageCatalystQuality(catalystItems)
     };
 
@@ -359,7 +358,15 @@ export class CraftingEngine {
    * Get average tier of consumed ingredients
    * @private
    */
-  _getAverageIngredientTier(consumedItems) {
+  _getAverageIngredientTier(consumedItems, recipe) {
+    const systemId = recipe?.craftingSystemId;
+    if (systemId) {
+      const systemManager = game.fabricate?.getCraftingSystemManager?.();
+      const system = systemManager?.getSystem(systemId);
+      const advancedEnabled = system?.advancedOptionsEnabled !== false;
+      const tiersEnabled = advancedEnabled && system?.enableTiers === true;
+      if (!tiersEnabled) return 1;
+    }
     const tierMap = { 'common': 1, 'uncommon': 2, 'rare': 3, 'legendary': 4 };
     let totalTier = 0;
     let count = 0;

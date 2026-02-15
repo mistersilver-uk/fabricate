@@ -66,7 +66,14 @@
             </div>
 
             {{#if selectedSystem.advancedOptionsEnabled}}
+            <div class="system-advanced-toggles">
+              <label><input type="checkbox" name="enableCategories" data-action="toggleFeature" data-feature="categories" {{#if selectedSystem.enableCategories}}checked{{/if}} /> Enable Categories</label>
+              <label><input type="checkbox" name="enableTags" data-action="toggleFeature" data-feature="tags" {{#if selectedSystem.enableTags}}checked{{/if}} /> Enable Tags</label>
+              <label><input type="checkbox" name="enableEssences" data-action="toggleFeature" data-feature="essences" {{#if selectedSystem.enableEssences}}checked{{/if}} /> Enable Essences</label>
+              <label><input type="checkbox" name="enableTiers" data-action="toggleFeature" data-feature="tiers" {{#if selectedSystem.enableTiers}}checked{{/if}} /> Enable Tiers</label>
+            </div>
             <div class="system-config-grid">
+              {{#if selectedSystem.enableCategories}}
               <section class="config-block">
                 <h4>Recipe Categories</h4>
                 <div class="panel-toolbar compact">
@@ -81,7 +88,9 @@
                   {{/each}}
                 </div>
               </section>
+              {{/if}}
 
+              {{#if selectedSystem.enableTags}}
               <section class="config-block">
                 <h4>Tags</h4>
                 <div class="panel-toolbar compact">
@@ -96,7 +105,9 @@
                   {{/each}}
                 </div>
               </section>
+              {{/if}}
 
+              {{#if selectedSystem.enableEssences}}
               <section class="config-block">
                 <h4>Essences</h4>
                 <div class="panel-toolbar compact">
@@ -111,7 +122,9 @@
                   {{/each}}
                 </div>
               </section>
+              {{/if}}
 
+              {{#if selectedSystem.enableTiers}}
               <section class="config-block">
                 <h4>Tiers</h4>
                 <div class="panel-toolbar compact">
@@ -126,6 +139,7 @@
                   {{/each}}
                 </div>
               </section>
+              {{/if}}
             </div>
             {{else}}
               <p class="hint">Advanced options are disabled for this system.</p>
@@ -161,19 +175,50 @@
             <div class="system-item-grid">
               {{#each systemItems}}
                 <article class="system-item-card">
-                  <img src="{{img}}" alt="{{name}}" />
+                  <div class="item-preview">
+                    <img src="{{img}}" alt="{{name}}" />
+                    <div class="item-replace-drop" data-drop-zone="system-item-replace" data-item-id="{{id}}" data-item-name="{{name}}">
+                      <i class="fas fa-exchange-alt"></i>
+                      Drop to replace source
+                    </div>
+                  </div>
                   <div class="item-meta">
                     <h4>{{name}}</h4>
-                    <p>{{tierLabel}}</p>
+                    {{#if showTiers}}
+                      <p>{{tierLabel}}</p>
+                    {{/if}}
+                    {{#if showTags}}
+                      <div class="item-tag-list">
+                        {{#each tags}}
+                          <span class="token">{{this}}</span>
+                        {{else}}
+                          <span class="hint">No tags</span>
+                        {{/each}}
+                      </div>
+                    {{/if}}
+                    {{#if showEssences}}
+                      <div class="item-essence-list">
+                        {{#each essences}}
+                          <span class="token">{{name}} {{quantity}}</span>
+                        {{else}}
+                          <span class="hint">No essences</span>
+                        {{/each}}
+                      </div>
+                    {{/if}}
                     {{#if sourceUuid}}
                       <code>{{sourceUuid}}</code>
                     {{else}}
                       <span class="placeholder-src">No source UUID</span>
                     {{/if}}
                   </div>
-                  <button type="button" data-action="deleteSystemItem" data-item-id="{{id}}" title="Delete Item">
-                    <i class="fas fa-trash"></i>
-                  </button>
+                  <div class="item-actions">
+                    <button type="button" data-action="editSystemItem" data-item-id="{{id}}" title="Edit Item">
+                      <i class="fas fa-edit"></i>
+                    </button>
+                    <button type="button" data-action="deleteSystemItem" data-item-id="{{id}}" title="Delete Item">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
                 </article>
               {{else}}
                 <div class="fabricate-empty">

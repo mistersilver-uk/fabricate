@@ -41,6 +41,10 @@ export class CraftingSystemManager {
       essences: Array.isArray(system.essences) ? system.essences : [],
       categories: Array.isArray(system.categories) ? system.categories : [],
       advancedOptionsEnabled: system.advancedOptionsEnabled !== false,
+      enableTags: system.enableTags === true,
+      enableEssences: system.enableEssences === true,
+      enableCategories: system.enableCategories === true,
+      enableTiers: system.enableTiers === true,
       items: Array.isArray(system.items) ? system.items.map(i => this._normalizeItem(i)) : []
     };
   }

@@ -1,4 +1,5 @@
 import { RecipeEditorApp } from './RecipeEditorApp.js';
+import { confirmDialog, getDragEventData, renderDialog } from './foundryCompat.js';
 
 /**
  * GM crafting administration UI
@@ -45,6 +46,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
       deleteSystemItem: this._onDeleteSystemItem,
       saveSystemDetails: this._onSaveSystemDetails,
       toggleAdvancedOptions: this._onToggleAdvancedOptions,
+      toggleFeature: this._onToggleFeature,
       addSystemTag: this._onAddSystemTag,
       removeSystemTag: this._onRemoveSystemTag,
       addSystemEssence: this._onAddSystemEssence,
@@ -52,7 +54,8 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
       addSystemCategory: this._onAddSystemCategory,
       removeSystemCategory: this._onRemoveSystemCategory,
       addSystemTier: this._onAddSystemTier,
-      removeSystemTier: this._onRemoveSystemTier
+      removeSystemTier: this._onRemoveSystemTier,
+      editSystemItem: this._onEditSystemItem
     }
   };
 
@@ -137,15 +140,32 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     const systems = systemManager.getSystems().map(s => ({
       ...s,
       advancedOptionsEnabled: s.advancedOptionsEnabled !== false,
+      enableTags: s.enableTags === true,
+      enableEssences: s.enableEssences === true,
+      enableCategories: s.enableCategories === true,
+      enableTiers: s.enableTiers === true,
       selected: s.id === this.selectedSystemId
     }));
     const selectedSystem = this._ensureSelectedSystem(systems);
+
+    const advancedEnabled = selectedSystem?.advancedOptionsEnabled !== false;
+    const showTags = advancedEnabled && selectedSystem?.enableTags === true;
+    const showEssences = advancedEnabled && selectedSystem?.enableEssences === true;
+    const showTiers = advancedEnabled && selectedSystem?.enableTiers === true;
 
     const itemCards = selectedSystem
       ? systemManager.getItems(selectedSystem.id, this.itemSearchTerm).map(item => ({
         ...item,
         img: item.img || 'icons/svg/item-bag.svg',
-        tierLabel: item.tier || 'No tier'
+        tierLabel: showTiers ? (item.tier || 'No tier') : null,
+        tags: showTags ? (item.tags || []) : [],
+        essences: showEssences ? Object.entries(item.essences || {}).map(([name, quantity]) => ({
+          name,
+          quantity
+        })) : [],
+        showTags,
+        showEssences,
+        showTiers
       }))
       : [];
 
@@ -159,7 +179,17 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
       selectedSystemId: this.selectedSystemId,
       selectedSystemName: selectedSystem?.name || '',
       selectedSystem: selectedSystem
-        ? { ...selectedSystem, advancedOptionsEnabled: selectedSystem.advancedOptionsEnabled !== false }
+        ? {
+          ...selectedSystem,
+          advancedOptionsEnabled: selectedSystem.advancedOptionsEnabled !== false,
+          enableTags: selectedSystem.enableTags === true,
+          enableEssences: selectedSystem.enableEssences === true,
+          enableCategories: selectedSystem.enableCategories === true,
+          enableTiers: selectedSystem.enableTiers === true,
+          showTags,
+          showEssences,
+          showTiers
+        }
         : null,
       itemSearch: this.itemSearchTerm,
       systemItems: itemCards,
@@ -206,19 +236,55 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
         await this.render();
       });
     }
+
+    const replaceZones = this.element.querySelectorAll('[data-drop-zone="system-item-replace"]');
+    for (const zone of replaceZones) {
+      zone.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        zone.classList.add('drop-active');
+      });
+      zone.addEventListener('dragleave', () => zone.classList.remove('drop-active'));
+      zone.addEventListener('drop', async (event) => {
+        event.preventDefault();
+        zone.classList.remove('drop-active');
+        if (!this.selectedSystemId) return;
+        const itemId = zone.dataset.itemId;
+        if (!itemId) return;
+        const uuid = this._extractDroppedUuid(event);
+        if (!uuid) {
+          ui.notifications.warn('Drop an Item document from sidebar or compendium.');
+          return;
+        }
+        let source = null;
+        try {
+          source = await fromUuid(uuid);
+        } catch (err) {
+          source = null;
+        }
+        const updates = {
+          sourceUuid: uuid,
+          name: source?.name || zone.dataset.itemName || 'Managed Item',
+          img: source?.img || 'icons/svg/item-bag.svg'
+        };
+        await game.fabricate.getCraftingSystemManager().updateItem(this.selectedSystemId, itemId, updates);
+        await this.render();
+      });
+    }
   }
 
   _extractDroppedUuid(event) {
-    try {
-      const data = TextEditor.getDragEventData(event);
-      if (data?.uuid) return data.uuid;
-      if (data?.pack && data?.id) return `Compendium.${data.pack}.${data.id}`;
-      return null;
-    } catch (err) {
-      const text = event.dataTransfer?.getData('text/plain') || '';
-      if (text.startsWith('Item.') || text.startsWith('Compendium.')) return text.trim();
-      return null;
-    }
+    const data = (() => {
+      try {
+        return getDragEventData(event);
+      } catch (err) {
+        return null;
+      }
+    })();
+    if (data?.uuid) return data.uuid;
+    if (data?.pack && data?.id) return `Compendium.${data.pack}.${data.id}`;
+    const text = event.dataTransfer?.getData('text/plain') || '';
+    if (text.startsWith('Item.') || text.startsWith('Compendium.')) return text.trim();
+    return null;
   }
 
   static async _onSetTab(event, target) {
@@ -261,7 +327,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     const system = game.fabricate.getCraftingSystemManager().getSystem(systemId);
     if (!system) return;
 
-    const confirmed = await Dialog.confirm({
+    const confirmed = await confirmDialog({
       title: `Delete ${system.name}?`,
       content: `<p>Delete crafting system <strong>${system.name}</strong>? Recipes linked to it will be disabled.</p>`,
       yes: () => true,
@@ -312,7 +378,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     const manager = game.fabricate.getRecipeManager();
     const recipe = manager.getRecipe(recipeId);
     if (!recipe) return;
-    const confirmed = await Dialog.confirm({
+    const confirmed = await confirmDialog({
       title: `Delete ${recipe.name}?`,
       content: `<p>Delete recipe <strong>${recipe.name}</strong>?</p>`,
       yes: () => true,
@@ -343,7 +409,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
       <p><label><input id="fabricate-import-overwrite" type="checkbox" /> Overwrite existing IDs</label></p>
     `;
 
-    new Dialog({
+    renderDialog({
       title: 'Import Recipes',
       content,
       buttons: {
@@ -363,7 +429,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
         },
         cancel: { label: 'Cancel' }
       }
-    }).render(true);
+    });
   }
 
   static async _onExportRecipes(event, target) {
@@ -387,7 +453,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     const system = game.fabricate.getCraftingSystemManager().getSystem(this.selectedSystemId);
     const item = system?.items.find(i => i.id === itemId);
     if (!item) return;
-    const confirmed = await Dialog.confirm({
+    const confirmed = await confirmDialog({
       title: `Delete ${item.name}?`,
       content: `<p>Delete managed item <strong>${item.name}</strong> and remove it from recipes in this system?</p>`,
       yes: () => true,
@@ -396,6 +462,110 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     if (!confirmed) return;
     await game.fabricate.getCraftingSystemManager().deleteItem(this.selectedSystemId, itemId);
     await this.render();
+  }
+
+  static async _onEditSystemItem(event, target) {
+    if (!this.constructor._requireGM()) return;
+    const itemId = target.dataset.itemId;
+    const system = this._selectedSystem();
+    if (!system || !itemId) return;
+    const item = system.items.find(i => i.id === itemId);
+    if (!item) return;
+
+    const advancedEnabled = system.advancedOptionsEnabled !== false;
+    const showTags = advancedEnabled && system.enableTags === true;
+    const showEssences = advancedEnabled && system.enableEssences === true;
+    const showTiers = advancedEnabled && system.enableTiers === true;
+
+    const tagOptions = (system.tags || []).map(tag => ({
+      tag,
+      checked: (item.tags || []).includes(tag)
+    }));
+
+    const essenceOptions = (system.essences || []).map(name => ({
+      name,
+      quantity: Number(item.essences?.[name] || 0)
+    }));
+
+    const tierOptions = (system.tiers || []).map(tier => ({
+      tier,
+      selected: item.tier === tier
+    }));
+
+    let content = '<form class="fabricate-item-editor">';
+    content += `<h3>${item.name}</h3>`;
+    content += '<p class="hint">Edit tags, tier, and essences for this managed item.</p>';
+
+    if (showTiers) {
+      content += '<div class="form-group"><label>Tier</label><select name="itemTier">';
+      content += '<option value="">No tier</option>';
+      for (const tier of tierOptions) {
+        content += `<option value="${tier.tier}" ${tier.selected ? 'selected' : ''}>${tier.tier}</option>`;
+      }
+      content += '</select></div>';
+    }
+
+    if (showTags) {
+      content += '<div class="form-group"><label>Tags</label>';
+      if (tagOptions.length) {
+        for (const opt of tagOptions) {
+          content += `<label class="checkbox-row"><input type="checkbox" name="itemTag" value="${opt.tag}" ${opt.checked ? 'checked' : ''} /> ${opt.tag}</label>`;
+        }
+      } else {
+        content += '<p class="hint">No tags defined in this system.</p>';
+      }
+      content += '</div>';
+    }
+
+    if (showEssences) {
+      content += '<div class="form-group"><label>Essences</label>';
+      if (essenceOptions.length) {
+        for (const opt of essenceOptions) {
+          content += `<label class="essence-row">${opt.name} <input type="number" name="essence.${opt.name}" min="0" value="${opt.quantity || ''}" /></label>`;
+        }
+      } else {
+        content += '<p class="hint">No essences defined in this system.</p>';
+      }
+      content += '</div>';
+    }
+
+    if (!showTags && !showEssences && !showTiers) {
+      content += '<p class="hint">Advanced options are disabled for this system.</p>';
+    }
+
+    content += '</form>';
+
+    renderDialog({
+      title: `Edit ${item.name}`,
+      content,
+      buttons: {
+        save: {
+          label: 'Save',
+          callback: async (html) => {
+            const updates = {};
+            if (showTiers) {
+              updates.tier = html.find('select[name="itemTier"]').val() || null;
+            }
+            if (showTags) {
+              updates.tags = html.find('input[name="itemTag"]:checked')
+                .map((_, el) => el.value)
+                .get();
+            }
+            if (showEssences) {
+              const essences = {};
+              for (const opt of essenceOptions) {
+                const value = Number(html.find(`input[name="essence.${opt.name}"]`).val() || 0);
+                if (value > 0) essences[opt.name] = value;
+              }
+              updates.essences = essences;
+            }
+            await game.fabricate.getCraftingSystemManager().updateItem(system.id, itemId, updates);
+            await this.render();
+          }
+        },
+        cancel: { label: 'Cancel' }
+      }
+    });
   }
 
   _nextSystemName() {
@@ -438,11 +608,29 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     await this.render();
   }
 
-  static async _onAddSystemTag() {
+  static async _onToggleFeature(event, target) {
     if (!this.constructor._requireGM()) return;
     const system = this._selectedSystem();
     if (!system) return;
     if (system.advancedOptionsEnabled === false) return;
+    const feature = target.dataset.feature;
+    const mapping = {
+      categories: 'enableCategories',
+      tags: 'enableTags',
+      essences: 'enableEssences',
+      tiers: 'enableTiers'
+    };
+    const key = mapping[feature];
+    if (!key) return;
+    await game.fabricate.getCraftingSystemManager().updateSystem(system.id, { [key]: target.checked });
+    await this.render();
+  }
+
+  static async _onAddSystemTag() {
+    if (!this.constructor._requireGM()) return;
+    const system = this._selectedSystem();
+    if (!system) return;
+    if (system.advancedOptionsEnabled === false || system.enableTags !== true) return;
     const value = this._readInput('newSystemTag').toLowerCase();
     if (!value) return;
     const tags = Array.from(new Set([...(system.tags || []), value]));
@@ -464,7 +652,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     if (!this.constructor._requireGM()) return;
     const system = this._selectedSystem();
     if (!system) return;
-    if (system.advancedOptionsEnabled === false) return;
+    if (system.advancedOptionsEnabled === false || system.enableEssences !== true) return;
     const value = this._readInput('newSystemEssence').toLowerCase();
     if (!value) return;
     const essences = Array.from(new Set([...(system.essences || []), value]));
@@ -486,7 +674,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     if (!this.constructor._requireGM()) return;
     const system = this._selectedSystem();
     if (!system) return;
-    if (system.advancedOptionsEnabled === false) return;
+    if (system.advancedOptionsEnabled === false || system.enableCategories !== true) return;
     const value = this._readInput('newSystemCategory');
     if (!value) return;
     const categories = Array.from(new Set([...(system.categories || []), value]));
@@ -498,7 +686,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     if (!this.constructor._requireGM()) return;
     const system = this._selectedSystem();
     if (!system) return;
-    if (system.advancedOptionsEnabled === false) return;
+    if (system.advancedOptionsEnabled === false || system.enableTiers !== true) return;
     const value = this._readInput('newSystemTier').toLowerCase();
     if (!value) return;
     const tiers = Array.from(new Set([...(system.tiers || []), value]));
