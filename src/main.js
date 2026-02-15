@@ -234,7 +234,6 @@ Hooks.once('init', async () => {
 
 // Hook into Foundry's ready event
 Hooks.once('ready', async () => {
-  console.log('Fabricate v2 | Ready Hook');
   await fabricate.initialize();
 
   // Notify users
@@ -242,11 +241,9 @@ Hooks.once('ready', async () => {
     ui.notifications.info('Fabricate v2 | Crafting system ready');
   }
 
-  // Add craft button to Items Directory after a short delay
-  setTimeout(() => {
-    console.log('Fabricate v2 | Attempting to add Craft button...');
-    addCraftButtonToItemsDirectory();
-  }, 100);
+  addModuleButtonsToItemsDirectory();
+
+  Hooks.callAll('fabricate.ready');
 });
 
 /**
@@ -258,16 +255,16 @@ Hooks.once('ready', async () => {
  * Add the Craft button to Items Directory header
  * Since sidebar is already rendered at module init, we inject directly
  */
-function addCraftButtonToItemsDirectory() {
+function addModuleButtonsToItemsDirectory() {
   const itemsDir = ui.items;
   if (!itemsDir?.element) {
-    console.log('Fabricate v2 | Items directory not found or not rendered');
+    console.error('Fabricate v2 | Items directory not found or not rendered');
     return;
   }
 
   const header = itemsDir.element.querySelector('.directory-header, header');
   if (!header) {
-    console.log('Fabricate v2 | Items directory header not found');
+    console.error('Fabricate v2 | Items directory header not found');
     return;
   }
 
@@ -351,13 +348,13 @@ function createHeaderButton(labelText, iconClass, actionId, onClick) {
 // Also add button when Items directory is activated
 Hooks.on('activateItemDirectory', (app) => {
   console.log('Fabricate v2 | activateItemDirectory hook fired');
-  addCraftButtonToItemsDirectory();
+  addModuleButtonsToItemsDirectory();
 });
 
 // Handle D&D 5e specific hook
 Hooks.on('activateItemDirectory5e', (app) => {
   console.log('Fabricate v2 | activateItemDirectory5e hook fired');
-  addCraftButtonToItemsDirectory();
+  addModuleButtonsToItemsDirectory();
 });
 
 // Chat command for quick crafting (for testing)
