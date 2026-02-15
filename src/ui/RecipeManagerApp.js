@@ -44,12 +44,15 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
       exportRecipes: this._onExportRecipes,
       deleteSystemItem: this._onDeleteSystemItem,
       saveSystemDetails: this._onSaveSystemDetails,
+      toggleAdvancedOptions: this._onToggleAdvancedOptions,
       addSystemTag: this._onAddSystemTag,
       removeSystemTag: this._onRemoveSystemTag,
       addSystemEssence: this._onAddSystemEssence,
       removeSystemEssence: this._onRemoveSystemEssence,
       addSystemCategory: this._onAddSystemCategory,
-      removeSystemCategory: this._onRemoveSystemCategory
+      removeSystemCategory: this._onRemoveSystemCategory,
+      addSystemTier: this._onAddSystemTier,
+      removeSystemTier: this._onRemoveSystemTier
     }
   };
 
@@ -133,6 +136,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     const systemManager = game.fabricate.getCraftingSystemManager();
     const systems = systemManager.getSystems().map(s => ({
       ...s,
+      advancedOptionsEnabled: s.advancedOptionsEnabled !== false,
       selected: s.id === this.selectedSystemId
     }));
     const selectedSystem = this._ensureSelectedSystem(systems);
@@ -154,7 +158,9 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
       systems,
       selectedSystemId: this.selectedSystemId,
       selectedSystemName: selectedSystem?.name || '',
-      selectedSystem,
+      selectedSystem: selectedSystem
+        ? { ...selectedSystem, advancedOptionsEnabled: selectedSystem.advancedOptionsEnabled !== false }
+        : null,
       itemSearch: this.itemSearchTerm,
       systemItems: itemCards,
       ...recipeContext
@@ -417,7 +423,18 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     if (!system) return;
     const name = this._readInput('systemName') || system.name;
     const description = this._readInput('systemDescription');
-    await game.fabricate.getCraftingSystemManager().updateSystem(system.id, { name, description });
+    const advancedOptionsEnabled = this.element?.querySelector('input[name="systemAdvancedEnabled"]')?.checked !== false;
+    await game.fabricate.getCraftingSystemManager().updateSystem(system.id, { name, description, advancedOptionsEnabled });
+    await this.render();
+  }
+
+  static async _onToggleAdvancedOptions(event, target) {
+    if (!this.constructor._requireGM()) return;
+    const system = this._selectedSystem();
+    if (!system) return;
+    await game.fabricate.getCraftingSystemManager().updateSystem(system.id, {
+      advancedOptionsEnabled: target.checked
+    });
     await this.render();
   }
 
@@ -425,6 +442,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     if (!this.constructor._requireGM()) return;
     const system = this._selectedSystem();
     if (!system) return;
+    if (system.advancedOptionsEnabled === false) return;
     const value = this._readInput('newSystemTag').toLowerCase();
     if (!value) return;
     const tags = Array.from(new Set([...(system.tags || []), value]));
@@ -446,6 +464,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     if (!this.constructor._requireGM()) return;
     const system = this._selectedSystem();
     if (!system) return;
+    if (system.advancedOptionsEnabled === false) return;
     const value = this._readInput('newSystemEssence').toLowerCase();
     if (!value) return;
     const essences = Array.from(new Set([...(system.essences || []), value]));
@@ -467,10 +486,33 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     if (!this.constructor._requireGM()) return;
     const system = this._selectedSystem();
     if (!system) return;
+    if (system.advancedOptionsEnabled === false) return;
     const value = this._readInput('newSystemCategory');
     if (!value) return;
     const categories = Array.from(new Set([...(system.categories || []), value]));
     await game.fabricate.getCraftingSystemManager().updateSystem(system.id, { categories });
+    await this.render();
+  }
+
+  static async _onAddSystemTier() {
+    if (!this.constructor._requireGM()) return;
+    const system = this._selectedSystem();
+    if (!system) return;
+    if (system.advancedOptionsEnabled === false) return;
+    const value = this._readInput('newSystemTier').toLowerCase();
+    if (!value) return;
+    const tiers = Array.from(new Set([...(system.tiers || []), value]));
+    await game.fabricate.getCraftingSystemManager().updateSystem(system.id, { tiers });
+    await this.render();
+  }
+
+  static async _onRemoveSystemTier(event, target) {
+    if (!this.constructor._requireGM()) return;
+    const system = this._selectedSystem();
+    if (!system) return;
+    const tier = target.dataset.tier;
+    const tiers = (system.tiers || []).filter(t => t !== tier);
+    await game.fabricate.getCraftingSystemManager().updateSystem(system.id, { tiers });
     await this.render();
   }
 

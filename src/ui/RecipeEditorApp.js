@@ -74,14 +74,7 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
 
     const legacyCatalysts = Array.isArray(data.catalysts) ? data.catalysts : [];
 
-    const results = (data.results || []).length > 0
-      ? data.results
-      : [{
-        id: foundry.utils.randomID(),
-        systemItemId: null,
-        quantity: 1,
-        propertyFormulas: {}
-      }];
+    const results = (data.results || []).length > 0 ? data.results : [];
 
     return {
       id: data.id || null,
@@ -184,15 +177,16 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
     const system = this.draft.craftingSystemId
       ? game.fabricate.getCraftingSystemManager().getSystem(this.draft.craftingSystemId)
       : null;
-    const categories = Array.isArray(system?.categories) ? system.categories : [];
-    const tags = Array.isArray(system?.tags) ? system.tags : [];
-    const essences = Array.isArray(system?.essences) ? system.essences : [];
-    const tiers = Array.isArray(system?.tiers) ? system.tiers : ['common', 'uncommon', 'rare', 'legendary'];
+    const advancedEnabled = system?.advancedOptionsEnabled !== false;
+    const categories = advancedEnabled && Array.isArray(system?.categories) ? system.categories : [];
+    const tags = advancedEnabled && Array.isArray(system?.tags) ? system.tags : [];
+    const essences = advancedEnabled && Array.isArray(system?.essences) ? system.essences : [];
+    const tiers = advancedEnabled && Array.isArray(system?.tiers) ? system.tiers : ['common', 'uncommon', 'rare', 'legendary'];
 
     const pickerItems = this._systemItems();
     const itemMap = new Map(pickerItems.map(i => [i.id, i]));
     const ingredientSet = this.draft.ingredientSets[this.activeIngredientSetIndex] || this.draft.ingredientSets[0];
-    const resultSet = this.draft.results[this.activeResultIndex] || this.draft.results[0];
+    const resultSet = this.draft.results[this.activeResultIndex] || null;
 
     return {
       ...context,
@@ -211,9 +205,10 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
         })),
         catalysts: this._decorateCatalystRows(ingredientSet, itemMap)
       },
-      resultSet: this._decorateResult(resultSet, itemMap),
+      resultSet: resultSet ? this._decorateResult(resultSet, itemMap) : null,
       ingredientSetIndex: this.activeIngredientSetIndex + 1,
-      resultIndex: this.activeResultIndex + 1,
+      resultIndex: this.draft.results.length ? this.activeResultIndex + 1 : 0,
+      resultIndexMinusOne: Math.max(0, this.activeResultIndex),
       ingredientSetCount: this.draft.ingredientSets.length,
       resultCount: this.draft.results.length,
       pickerItems: pickerItems.map(i => ({
@@ -314,6 +309,16 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
     if (type === 'ingredient-new') {
       const set = this.draft.ingredientSets[this.activeIngredientSetIndex];
       set.itemIngredients = Array.isArray(set.itemIngredients) ? set.itemIngredients : [];
+      const emptyIndex = set.itemIngredients.findIndex(ing => !ing.systemItemId);
+      if (emptyIndex >= 0) {
+        this._assignSystemItem('ingredient', emptyIndex, itemId);
+        return;
+      }
+      const existing = set.itemIngredients.findIndex(ing => ing.systemItemId === itemId);
+      if (existing >= 0) {
+        set.itemIngredients[existing].quantity += 1;
+        return;
+      }
       set.itemIngredients.push({ systemItemId: null, quantity: 1 });
       const rowIndex = set.itemIngredients.length - 1;
       this._assignSystemItem('ingredient', rowIndex, itemId);
@@ -331,7 +336,30 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
 
     if (type === 'result') {
       const result = this.draft.results[this.activeResultIndex];
-      if (result) result.systemItemId = itemId;
+      if (result) {
+        const existing = this.draft.results.findIndex(r => r.systemItemId === itemId);
+        if (existing >= 0 && existing !== this.activeResultIndex) {
+          this.activeResultIndex = existing;
+          return;
+        }
+        result.systemItemId = itemId;
+      }
+      return;
+    }
+
+    if (type === 'result-new') {
+      const existing = this.draft.results.findIndex(r => r.systemItemId === itemId);
+      if (existing >= 0) {
+        this.activeResultIndex = existing;
+        return;
+      }
+      this.draft.results.push({
+        id: foundry.utils.randomID(),
+        systemItemId: itemId,
+        quantity: 1,
+        propertyFormulas: {}
+      });
+      this.activeResultIndex = this.draft.results.length - 1;
       return;
     }
 
@@ -339,6 +367,11 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
       const set = this.draft.ingredientSets[this.activeIngredientSetIndex];
       const row = set?.catalysts?.[index];
       if (row) {
+        const existing = set.catalysts.findIndex(cat => cat.systemItemId === itemId);
+        if (existing >= 0 && existing !== index) {
+          set.catalysts.splice(index, 1);
+          return;
+        }
         row.systemItemId = itemId;
         row.tag = '';
         if (!row.name) row.name = 'Catalyst';
@@ -349,6 +382,11 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
     const set = this.draft.ingredientSets[this.activeIngredientSetIndex];
     const row = set?.itemIngredients?.[index];
     if (row) {
+      const existing = set.itemIngredients.findIndex(ing => ing.systemItemId === itemId);
+      if (existing >= 0 && existing !== index) {
+        set.itemIngredients.splice(index, 1);
+        return;
+      }
       row.systemItemId = itemId;
     }
   }
@@ -395,16 +433,18 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
     }
 
     const result = this.draft.results[this.activeResultIndex];
-    result.quantity = getNum('result.quantity', 1);
-    const formulas = get('result.propertyFormulas');
-    if (formulas) {
-      try {
-        result.propertyFormulas = JSON.parse(formulas);
-      } catch (err) {
-        // Preserve last good value while user types.
+    if (result) {
+      result.quantity = getNum(`results.${this.activeResultIndex}.quantity`, 1);
+      const formulas = get(`results.${this.activeResultIndex}.propertyFormulas`);
+      if (formulas) {
+        try {
+          result.propertyFormulas = JSON.parse(formulas);
+        } catch (err) {
+          // Preserve last good value while user types.
+        }
+      } else {
+        result.propertyFormulas = {};
       }
-    } else {
-      result.propertyFormulas = {};
     }
   }
 
@@ -574,12 +614,14 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
 
   static async _onPrevResultSet() {
     this._syncDraftFromForm();
+    if (this.draft.results.length === 0) return;
     this.activeResultIndex = (this.activeResultIndex - 1 + this.draft.results.length) % this.draft.results.length;
     await this.render();
   }
 
   static async _onNextResultSet() {
     this._syncDraftFromForm();
+    if (this.draft.results.length === 0) return;
     this.activeResultIndex = (this.activeResultIndex + 1) % this.draft.results.length;
     await this.render();
   }
@@ -619,6 +661,7 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
   static async _onClearResultSystemItem() {
     this._syncDraftFromForm();
     const result = this.draft.results[this.activeResultIndex];
+    if (!result) return;
     result.systemItemId = null;
     await this.render();
   }

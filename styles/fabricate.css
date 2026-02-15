@@ -810,8 +810,10 @@
 
 .fabricate-admin .system-meta-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 10px;
+  max-height: 100%;
+  overflow-y: auto;
 }
 
 .fabricate-admin .system-meta-grid .span-2 {

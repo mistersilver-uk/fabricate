@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Fabricate v2 is a universal, system-agnostic crafting module for Foundry VTT that allows Game Masters to define any crafting system for any tabletop RPG, and enables players to craft items in-game.
+Fabricate v2 is a system-agnostic crafting module for Foundry VTT that lets GMs define their own crafting systems (rules + data), curate the items those systems can use, and enables players to craft using those rules.
 
 ## Core Principles
 
@@ -10,12 +10,14 @@ Fabricate v2 is a universal, system-agnostic crafting module for Foundry VTT tha
 
 - Works with any game system (D&D 5e, Pathfinder, Savage Worlds, etc.)
 - No hardcoded system-specific logic
+- GMs decide how to compute checks and outcomes via formulas/macros
 - Prefer to use Foundry's core APIs and styles before creating custom elements
 
 ### Progressive Complexity
 
 - **Simple Mode**: Basic recipe definition (A + B = C)
-- **Advanced Mode**: Variable outputs, catalysts, essences, effect transfer, formulas
+- **Advanced Mode**: Variable outputs, catalysts, essences, tiers, tags, effect transfer, formulas
+- Advanced options are explicitly enabled per crafting system
 
 ### Player Accessible
 
@@ -45,12 +47,16 @@ fabricate-v2/
 
 **Data Models**
 
-- `Recipe` - Complete recipe definition
-- `Ingredient` - Required consumable components
-- `Catalyst` - Required non-consumable components
+- `CraftingSystem` - System-wide rules + configuration + item library
+- `SystemItem` - Curated item entry within a system
+- `Recipe` - Recipe definition scoped to a crafting system
+- `Ingredient` - Required consumable components (item or tag/tier alternative)
+- `Result` - Components produced when crafting
+- `Catalyst` - Required non-consumable components (item or tag alternative)
 
 **Systems**
 
+- `CraftingSystemManager` - Systems and managed item libraries
 - `RecipeManager` - Recipe CRUD and storage
 - `CraftingEngine` - Crafting execution
 
@@ -71,10 +77,14 @@ fabricate-v2/
 
 ## Data Flow
 
-1. **Recipe Definition** (GM)
-   - GM creates recipe via RecipeManager
-   - Recipe stored in world settings
-   - Recipe available to all players
+1. **Crafting System Definition** (GM)
+   - GM creates a crafting system
+   - Optional advanced options (tags/essences/categories/tiers) are enabled per system
+   - System items are curated from world/compendium drops
+2. **Recipe Definition** (GM)
+   - GM creates recipes scoped to a crafting system
+   - Ingredients/catalysts/results reference system items or tag/tier requirements
+   - Recipes stored in world settings and available to all players
 
 2. **Crafting** (Player)
    - Player clicks "Craft Item" button in Items sidebar
@@ -89,8 +99,8 @@ fabricate-v2/
 3. **Advanced Features**
    - Catalyst validation (non-consumable requirements)
    - Variable output calculation (formulas)
-  - Effect transfer (ingredients -> result)
-   - Tag-based ingredient matching
+   - Effect transfer (ingredients -> result)
+   - Tag/tier/essence matching (if enabled by system)
 
 ## Foundry Integration
 
@@ -103,6 +113,7 @@ fabricate-v2/
 ### Data Storage
 
 - Recipes stored in world settings (`fabricate-v2.recipes`)
+- Crafting systems stored in world settings (`fabricate-v2.craftingSystems`)
 - Item tags stored in item flags (`fabricate-v2.tags`)
 - Item tiers stored in item flags (`fabricate-v2.tier`)
 - Item essences stored in item flags (`fabricate-v2.essences`)
@@ -122,10 +133,9 @@ fabricate-v2/
 
 ## Future Considerations
 
-- Recipe categories and filtering
 - Skill checks and DC requirements
 - Crafting time and progress tracking
 - Batch crafting (multiple quantities)
 - Recipe discovery system
 - Crafting stations/locations
-- Component quality tiers affecting output
+- Deeper system rule configuration (formulas, difficulty model UI)

@@ -186,26 +186,33 @@
           </div>
         </div>
 
-        <div class="result-selected-item" data-drop-target="result">
-          <img src="{{resultSet.itemImg}}" alt="{{resultSet.itemName}}" />
-          <div class="result-selected-meta">
-            <h4>{{resultSet.itemName}}</h4>
-            <div class="inline-actions compact">
-              <button type="button" data-action="clearResultSystemItem"><i class="fas fa-eraser"></i></button>
+        {{#if resultSet}}
+          <div class="result-selected-item" data-drop-target="result">
+            <img src="{{resultSet.itemImg}}" alt="{{resultSet.itemName}}" />
+            <div class="result-selected-meta">
+              <h4>{{resultSet.itemName}}</h4>
+              <div class="inline-actions compact">
+                <button type="button" data-action="clearResultSystemItem"><i class="fas fa-eraser"></i></button>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="editor-grid">
-          <div class="form-group">
-            <label>Quantity</label>
-            <input name="result.quantity" type="number" min="1" value="{{resultSet.quantity}}" />
+          <div class="editor-grid">
+            <div class="form-group">
+              <label>Quantity</label>
+              <input name="results.{{resultIndexMinusOne}}.quantity" type="number" min="1" value="{{resultSet.quantity}}" />
+            </div>
+            <div class="form-group span-2">
+              <label>Property Formulas (JSON)</label>
+              <textarea name="results.{{resultIndexMinusOne}}.propertyFormulas" rows="3">{{json resultSet.propertyFormulas}}</textarea>
+            </div>
           </div>
-          <div class="form-group span-2">
-            <label>Property Formulas (JSON)</label>
-            <textarea name="result.propertyFormulas" rows="3">{{json resultSet.propertyFormulas}}</textarea>
+        {{else}}
+          <div class="fabricate-empty" data-drop-target="result-new">
+            <i class="fas fa-gift"></i>
+            <p>Drop an item here to add a result.</p>
           </div>
-        </div>
+        {{/if}}
       </section>
     </div>
 
