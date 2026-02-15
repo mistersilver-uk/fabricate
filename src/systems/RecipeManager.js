@@ -346,13 +346,10 @@ export class RecipeManager {
 
   /**
    * Return catalysts that apply to the given ingredient set.
-   * Supports both legacy recipe-level catalysts and set-level catalysts.
    * @private
    */
   getCatalystsForSet(recipe, ingredientSet) {
-    const setCatalysts = Array.isArray(ingredientSet?.catalysts) ? ingredientSet.catalysts : [];
-    const recipeCatalysts = Array.isArray(recipe?.catalysts) ? recipe.catalysts : [];
-    return [...recipeCatalysts, ...setCatalysts];
+    return Array.isArray(ingredientSet?.catalysts) ? ingredientSet.catalysts : [];
   }
 
   /**

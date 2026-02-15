@@ -73,8 +73,6 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
         resultMapping: []
       }];
 
-    const legacyCatalysts = Array.isArray(data.catalysts) ? data.catalysts : [];
-
     const results = (data.results || []).length > 0 ? data.results : [];
 
     return {
@@ -106,7 +104,7 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
             quantity: Number(ing.quantity || 1),
             tier: ing.tier || ''
           })),
-        catalysts: ((set.catalysts || []).length > 0 ? set.catalysts : (idx === 0 ? legacyCatalysts : [])).map(cat => ({
+        catalysts: (set.catalysts || []).map(cat => ({
           systemItemId: cat.systemItemId || null,
           degradesOnUse: cat.degradesOnUse === true,
           maxUses: Number.isFinite(Number(cat.maxUses)) ? Number(cat.maxUses) : null
@@ -120,7 +118,6 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
         quantity: Number(res.quantity || 1),
         propertyFormulas: res.propertyFormulas || {}
       })),
-      catalysts: [],
       metadata: data.metadata || undefined
     };
   }
@@ -568,7 +565,6 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
       enabled: this.draft.enabled,
       tags,
       ingredientSets,
-      catalysts: [],
       results,
       isVariable: this.draft.isVariable,
       transferEffects: this.draft.transferEffects,

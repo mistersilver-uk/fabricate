@@ -70,7 +70,7 @@ fabricate-v2/
 
 ## Technology Stack
 
-- **Foundry VTT**: v12 and v13 compatible
+- **Foundry VTT**: v13 minimum
 - **Build System**: Vite (ES modules)
 - **Templates**: Handlebars
 - **UI Framework**: Foundry ApplicationV2
@@ -108,7 +108,7 @@ fabricate-v2/
 
 - **Items Directory**: "Craft Item" button in header
 - **System Agnostic**: Direct DOM injection (works with any system)
-- **v12/v13 Compatible**: Handles both Application and ApplicationV2
+- **ApplicationV2**: Uses Foundry v13 ApplicationV2 APIs
 
 ### Data Storage
 
@@ -130,6 +130,7 @@ fabricate-v2/
 - **Module Version**: Semantic versioning (MAJOR.MINOR.PATCH)
 - **Foundry Compatibility**: Specified in module.json
 - **API Stability**: Public API (game.fabricate) follows semver
+- **Backwards Compatibility**: Not guaranteed before v2.0.0. v1.0.0 is skipped; backwards compatibility for world data and API is preserved from v2.0.0 onward.
 
 ## Future Considerations
 

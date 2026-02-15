@@ -20,17 +20,6 @@ export class CraftingEngine {
    * @returns {Promise<{success: boolean, results: Item[]|null, message: string}>}
    */
   async craft(craftingActor, componentSourceActors, recipe, ingredientSetId = null, options = {}) {
-    // Backward compatibility: craft(actor, recipe, options)
-    if (!Array.isArray(componentSourceActors)) {
-      const legacyOptions = recipe;
-      ingredientSetId = null;
-      recipe = componentSourceActors;
-      componentSourceActors = craftingActor ? [craftingActor] : [];
-      if (legacyOptions && typeof legacyOptions === 'object' && !Array.isArray(legacyOptions)) {
-        options = legacyOptions;
-      }
-    }
-
     // Validate inputs
     if (!craftingActor) {
       return {

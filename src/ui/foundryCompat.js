@@ -1,7 +1,4 @@
-export const TextEditorCompat = (() => {
-  const impl = foundry.applications?.ux?.TextEditor?.implementation;
-  return impl ?? globalThis.TextEditor ?? null;
-})();
+export const TextEditorCompat = foundry.applications?.ux?.TextEditor?.implementation ?? null;
 
 export function getDragEventData(event) {
   if (TextEditorCompat?.getDragEventData) {
@@ -12,21 +9,14 @@ export function getDragEventData(event) {
 
 export async function confirmDialog(options) {
   const DialogV2 = foundry.applications?.api?.DialogV2;
-  if (DialogV2?.confirm) {
-    return DialogV2.confirm(options);
-  }
-  const DialogLegacy = globalThis.Dialog;
-  if (DialogLegacy?.confirm) {
-    return DialogLegacy.confirm(options);
-  }
-  return false;
+  if (!DialogV2?.confirm) return false;
+  return DialogV2.confirm(options);
 }
 
 export function renderDialog(options) {
   const DialogV2 = foundry.applications?.api?.DialogV2;
-  const DialogClass = DialogV2 ?? globalThis.Dialog;
-  if (!DialogClass) return null;
-  const dialog = new DialogClass(options);
+  if (!DialogV2) return null;
+  const dialog = new DialogV2(options);
   dialog.render(true);
   return dialog;
 }

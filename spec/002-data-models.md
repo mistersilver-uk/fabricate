@@ -78,7 +78,6 @@ Represents a complete crafting recipe with inputs (ingredients, catalysts) and o
 
   // Input requirements (at least one set must be satisfied)
   ingredientSets: IngredientSet[], // Alternative ingredient combinations
-  catalysts: Catalyst[],           // Legacy; migrated into ingredient sets
 
   // Output (multiple items can be produced)
   results: Result[],               // Items to create

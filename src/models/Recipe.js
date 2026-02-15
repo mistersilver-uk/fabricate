@@ -1,5 +1,4 @@
 import { IngredientSet } from './IngredientSet.js';
-import { Catalyst } from './Catalyst.js';
 import { Result } from './Result.js';
 import { Ingredient } from './Ingredient.js';
 
@@ -23,18 +22,6 @@ export class Recipe {
     this.ingredientSets = (data.ingredientSets || []).map(s =>
       s instanceof IngredientSet ? s : IngredientSet.fromJSON(s)
     );
-
-    // Legacy recipe-level catalysts (migrated into the first ingredient set when possible)
-    this.catalysts = [];
-    const legacyCatalysts = (data.catalysts || []).map(c =>
-      c instanceof Catalyst ? c : Catalyst.fromJSON(c)
-    );
-    if (legacyCatalysts.length > 0 && this.ingredientSets.length > 0) {
-      const firstSet = this.ingredientSets[0];
-      firstSet.catalysts = [...(firstSet.catalysts || []), ...legacyCatalysts];
-    } else {
-      this.catalysts = legacyCatalysts;
-    }
 
     // Output (multiple items can be produced)
     this.results = (data.results || []).map(r =>
@@ -77,7 +64,6 @@ export class Recipe {
       Object.keys(this.ingredientSets[0].essences || {}).length === 0;
 
     const hasNoCatalysts =
-      this.catalysts.length === 0 &&
       this.ingredientSets.every(set => (set.catalysts?.length || 0) === 0);
     const hasNoVariableOutput = !this.isVariable;
     const hasNoEffectTransfer = !this.transferEffects;
@@ -155,7 +141,6 @@ export class Recipe {
       tags: this.tags,
       enabled: this.enabled,
       ingredientSets: this.ingredientSets.map(s => s.toJSON()),
-      catalysts: [],
       results: this.results.map(r => r.toJSON()),
       isVariable: this.isVariable,
       transferEffects: this.transferEffects,

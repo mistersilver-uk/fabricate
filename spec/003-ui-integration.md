@@ -84,5 +84,5 @@ Define how Fabricate v2 integrates with Foundry VTT's user interface in a system
 
 ## Compatibility
 
-- Foundry v12 and v13 (ApplicationV2)
+- Foundry v13 minimum (ApplicationV2)
 - Works across systems using Foundry core APIs

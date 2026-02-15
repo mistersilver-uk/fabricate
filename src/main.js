@@ -7,7 +7,6 @@ import { Catalyst } from './models/Catalyst.js';
 import { CraftingApp } from './ui/CraftingApp.js';
 import { RecipeManagerApp } from './ui/RecipeManagerApp.js';
 import { RecipeEditorApp } from './ui/RecipeEditorApp.js';
-import { RecipeMigration } from './utils/RecipeMigration.js';
 
 /**
  * Fabricate v2 - Universal Crafting System
@@ -31,9 +30,6 @@ class FabricateV2 {
     // Register settings
     this.registerSettings();
 
-    // Check for and perform migration if needed
-    await this.checkAndMigrate();
-
     // Create managers
     this.recipeManager = new RecipeManager();
     this.craftingSystemManager = new CraftingSystemManager(this.recipeManager);
@@ -45,20 +41,6 @@ class FabricateV2 {
 
     this.ready = true;
     console.log('Fabricate v2 | Ready');
-  }
-
-  /**
-   * Check if recipes need migration and perform if needed
-   */
-  async checkAndMigrate() {
-    const savedRecipes = game.settings.get('fabricate-v2', 'recipes') || [];
-
-    if (RecipeMigration.needsMigration(savedRecipes)) {
-      console.log('Fabricate v2 | Migration needed, starting...');
-      const migratedRecipes = RecipeMigration.migrateAll(savedRecipes);
-      await game.settings.set('fabricate-v2', 'recipes', migratedRecipes);
-      console.log('Fabricate v2 | Migration complete');
-    }
   }
 
   /**
