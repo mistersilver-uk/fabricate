@@ -1,30 +1,31 @@
-# Fabricate v2 Specifications
+# Fabricate Specifications
 
-This directory contains the technical specifications for Fabricate v2, a universal crafting system for Foundry VTT.
+This directory contains the authoritative design specifications for Fabricate.
 
-## Specification Structure
+Fabricate is a system-agnostic crafting module for Foundry VTT.
+The spec is intended to be implementable, testable, and stable enough to drive development without relying on “tribal knowledge”.
 
-Each specification file describes a feature area of the system:
+## Specification Index
 
-- **001-overview.md** - Project overview and architecture
-- **002-data-models.md** - Recipe, Ingredient, and Catalyst data structures
-- **003-ui-integration.md** - User interface and Foundry integration
+- **001-overview.md** — Project overview, goals, architecture, and storage model
+- **002-data-models.md** — Data models, validation rules, and macro contracts
+- **003-ui-integration.md** — UI integration points and user workflows
+- **004-resolution-modes.md** — Resolution-mode semantics (simple/mapped/tiered/progressive)
+- **005-recipes-and-steps.md** — Multi-step recipe process model and execution semantics
+- **006-requirements-time-and-currency.md** — System-agnostic time/currency requirements and providers
+- **007-destructive-changes-and-migrations.md** — Destructive operations and migration rules
 
 ## Specification-Driven Development
 
 We follow a spec-driven approach:
 
-1. **Specifications define behavior** - Features are specified before implementation
-2. **Code implements specs** - Implementation follows the specification
-3. **Specs are living documents** - Updated as features evolve
-4. **Specs guide testing** - Test scenarios derived from specifications
+- Implementations must conform to the spec.
+- Automated tests must validate the behaviour described in the spec.
+- Changes to behaviour must start life as spec changes.
 
-## Reading Specifications
+## Terminology
 
-Each specification includes:
-
-- **Purpose** - What the feature does and why it exists
-- **Requirements** - Functional and technical requirements
-- **Behavior** - Expected behavior and edge cases
-- **API** - Public interfaces and methods
-- **Examples** - Usage examples and common scenarios
+- **Crafting System**: A GM-configured “rule system” that owns feature toggles and core behaviour.
+- **Recipe**: A multi-step process within a crafting system.
+- **Step**: One stage of a recipe with its own requirements and results.
+- **Resolution Mode**: A crafting-system-level rule that controls how step results are selected.

@@ -2,45 +2,90 @@
 
 ## Purpose
 
-Define data structures for crafting systems, managed items, recipes, and macro-driven crafting behavior.
+Define the data models for Fabricate, including validation rules and macro contracts.
+All stored entities are JSON-serializable and must be safe to persist via `game.settings`.
 
 ## CraftingSystem
 
-### Purpose
-
-Represents a GM-defined crafting system with feature toggles, optional value catalogs, and managed items.
-
-### Properties
-
-```javascript
-{
+```js
+CraftingSystem = {
   id: string,
   name: string,
-  description: string,
-  enabled: boolean,
-  advancedOptionsEnabled: boolean,
+  description?: string,
+
+  // System-level invariant: all recipes must use this mode
+  resolutionMode: "simple" | "mapped" | "tiered" | "progressive",
 
   features: {
-    categories: boolean,        // Enables recipe category field/filtering
-    itemTags: boolean,          // Enables item-tag management (items tab only)
-    essences: boolean,          // Enables essence requirements on ingredient sets
-    complexRecipes: boolean,    // Enables multiple ingredient sets/results and routing
-    propertyMacros: boolean,    // Enables macro-based result property calculation
-    craftingChecks: boolean,    // Enables system-level crafting check macro
-    outcomeRouting: boolean     // Enables routing result groups by check outcome
+    essences: boolean,
+    propertyMacros: boolean,
+    effectTransfer: boolean,
   },
 
-  categories: string[],          // Optional recipe categories
-  itemTags: string[],            // Optional tags for item organization/search in Items tab
-  essences: EssenceDefinition[], // Allowed essence catalog
+  categories: string[],
+  itemTags: string[],
 
+  essences?: Record<string, EssenceDefinition>, // only if features.essences
+
+  // Managed items library
+  managedItems: SystemItem[],
+
+  // Check configuration (behaviour depends on resolutionMode)
   craftingCheck: {
-    mode: "passFail" | "tiered",
-    macroUuid: string | null,   // Macro to execute for crafting checks
-    outcomes: string[]          // Allowed outcomes (e.g. ["fail","pass"] or ["low","high"])
+    enabled: boolean,
+
+    // When enabled:
+    // - simple/mapped: typically "passFail" (optional)
+    // - tiered: "tiered" (required)
+    // - progressive: "progressive" (required)
+    mode: "passFail" | "tiered" | "progressive",
+    
+    // Macro that performs the check
+    macroUuid?: string,
+
+    // Universal: macro executed when a step fails due to check failure or contract failure
+    failureMacroUuid?: string,
+
+    // Universal: consumption behaviour on failure
+    consumption: {
+      consumeIngredientsOnFail: boolean,  // default true
+      consumeCatalystsOnFail: boolean,    // default false
+    },
+
+    // Tiered-only: declared outcomes; macro must return one of these in tiered mode
+    outcomes?: string[],
+
+    // Progressive-only: system-level progressive behaviour
+    progressive?: {
+      awardMode: "partial" | "equal" | "exceed",
+      allowPlayerReorder: boolean,        // default false
+    },
   },
 
-  items: SystemItem[]
+  // Optional step requirements: time/currency
+  requirements: {
+    // The specification for time requirements is still under development and will evolve over time with the implementation of Fabricate's time-based features
+    time: {
+      enabled: boolean, 
+      provider: "foundry" | "module" | "macro",
+      moduleId?: string,              // provider="module"
+      getTimeMacroUuid?: string,      // provider="macro"
+      advanceTimeMacroUuid?: string,  // provider="macro"
+    },
+
+    currency: {
+      enabled: boolean,
+      provider: "system" | "macro",
+
+      // provider="system"
+      systemAdapter?: "dnd5e" | "pf2e",
+
+      // provider="macro"
+      getCurrencyMacroUuid?: string,
+        decrementCurrencyMacroUuid?: string,
+        formatCurrencyMacroUuid?: string,
+    },
+  },
 }
 ```
 
@@ -53,11 +98,13 @@ Defines one essence type used by system items and recipe requirements.
 ### Properties
 
 ```javascript
-{
-  id: string,                     // Stable key used in quantity maps
-  name: string,                   // Display name
-  description: string,            // Help text shown in admin/editor/player UI
-  associatedSystemItemId: string | null // Optional managed item associated with this essence
+EssenceDefinition = {
+   id: string,            // key in the essences map
+   name: string,
+   description?: string,
+
+   // Optional: used for "raw essence" items and active effect transfer from essences to results
+   sourceItemUuid?: string,
 }
 ```
 
