@@ -12,7 +12,7 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
     this.recipe = recipe;
     this.craftingSystemId = options.craftingSystemId || recipe?.craftingSystemId || null;
     this.activeIngredientSetIndex = 0;
-    this.activeResultIndex = 0;
+    this.activeResultGroupIndex = 0;
     this.itemPickerSearch = '';
     this.draft = this._buildDraft(recipe);
   }
@@ -39,8 +39,6 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
       removeIngredientSet: this._onRemoveIngredientSet,
       addIngredientRow: this._onAddIngredientRow,
       removeIngredientRow: this._onRemoveIngredientRow,
-      addTagIngredientRow: this._onAddTagIngredientRow,
-      removeTagIngredientRow: this._onRemoveTagIngredientRow,
       addCatalystRow: this._onAddCatalystRow,
       removeCatalystRow: this._onRemoveCatalystRow,
       clearCatalystSystemItem: this._onClearCatalystSystemItem,
@@ -48,8 +46,9 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
       nextResultSet: this._onNextResultSet,
       addResultSet: this._onAddResultSet,
       removeResultSet: this._onRemoveResultSet,
+      addResultRow: this._onAddResultRow,
+      removeResultRow: this._onRemoveResultRow,
       clearIngredientSystemItem: this._onClearIngredientSystemItem,
-      clearResultSystemItem: this._onClearResultSystemItem,
       pickerSearch: this._onPickerSearch
     }
   };
@@ -73,7 +72,20 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
         resultMapping: []
       }];
 
-    const results = (data.results || []).length > 0 ? data.results : [];
+    const sourceGroups = (data.resultGroups || []).length > 0
+      ? data.resultGroups
+      : ((data.results || []).map((res, idx) => ({
+        id: res.id || foundry.utils.randomID(),
+        name: `Result Group ${idx + 1}`,
+        results: [res]
+      })));
+    if (sourceGroups.length === 0) {
+      sourceGroups.push({
+        id: foundry.utils.randomID(),
+        name: 'Result Group 1',
+        results: [this._newResultRow()]
+      });
+    }
 
     return {
       id: data.id || null,
@@ -87,22 +99,17 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
       isVariable: data.isVariable === true,
       transferEffects: data.transferEffects === true,
       requiresAllSets: data.requiresAllSets === true,
-      tagsText: Array.isArray(data.tags) ? data.tags.join(', ') : '',
+      outcomeRouting: data.outcomeRouting && typeof data.outcomeRouting === 'object'
+        ? { ...data.outcomeRouting }
+        : {},
       ingredientSets: ingredientSets.map((set, idx) => ({
         id: set.id || foundry.utils.randomID(),
         name: set.name || `Set ${idx + 1}`,
         itemIngredients: (set.ingredients || [])
-          .filter(ing => ing.systemItemId && !ing.tag)
+          .filter(ing => ing.systemItemId)
           .map(ing => ({
             systemItemId: ing.systemItemId || null,
             quantity: Number(ing.quantity || 1)
-          })),
-        tagIngredients: (set.ingredients || [])
-          .filter(ing => !ing.systemItemId && (ing.tag || ing.tier))
-          .map(ing => ({
-            tag: ing.tag || '',
-            quantity: Number(ing.quantity || 1),
-            tier: ing.tier || ''
           })),
         catalysts: (set.catalysts || []).map(cat => ({
           systemItemId: cat.systemItemId || null,
@@ -112,19 +119,89 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
         essences: set.essences || {},
         resultMapping: Array.isArray(set.resultMapping) ? set.resultMapping : []
       })),
-      results: results.map(res => ({
-        id: res.id || foundry.utils.randomID(),
-        systemItemId: res.systemItemId || null,
-        quantity: Number(res.quantity || 1),
-        propertyFormulas: res.propertyFormulas || {}
+      results: sourceGroups.map((group, idx) => ({
+        id: group.id || foundry.utils.randomID(),
+        name: group.name || `Result Group ${idx + 1}`,
+        results: Array.isArray(group.results) && group.results.length > 0
+          ? group.results.map((res, resIdx) => ({
+            id: res.id || foundry.utils.randomID(),
+            name: res.name || `Result ${resIdx + 1}`,
+            systemItemId: res.systemItemId || null,
+            quantity: Number(res.quantity || 1),
+            propertyMacroUuid: res.propertyMacroUuid || null
+          }))
+          : [this._newResultRow()]
       })),
       metadata: data.metadata || undefined
+    };
+  }
+
+  _newResultRow() {
+    return {
+      id: foundry.utils.randomID(),
+      name: '',
+      systemItemId: null,
+      quantity: 1,
+      propertyMacroUuid: null
     };
   }
 
   _systemItems() {
     if (!this.draft.craftingSystemId) return [];
     return game.fabricate.getCraftingSystemManager().getItems(this.draft.craftingSystemId, this.itemPickerSearch);
+  }
+
+  _getSystemFeatureState() {
+    const system = this.draft.craftingSystemId
+      ? game.fabricate.getCraftingSystemManager().getSystem(this.draft.craftingSystemId)
+      : null;
+    const advancedEnabled = system?.advancedOptionsEnabled !== false;
+    const features = system?.features || {};
+    return {
+      system,
+      showCategories: advancedEnabled && (features.categories === true || system?.enableCategories === true),
+      showEssences: advancedEnabled && (features.essences === true || system?.enableEssences === true),
+      showComplexRecipes: advancedEnabled && features.complexRecipes === true,
+      showPropertyMacros: advancedEnabled && features.propertyMacros === true,
+      showCraftingChecks: advancedEnabled && features.craftingChecks === true,
+      showOutcomeRouting: advancedEnabled && features.outcomeRouting === true,
+      craftingCheckOutcomes: Array.isArray(system?.craftingCheck?.outcomes) ? system.craftingCheck.outcomes : []
+    };
+  }
+
+  _enforceFeatureConstraints() {
+    const featureState = this._getSystemFeatureState();
+    if (!featureState.showComplexRecipes) {
+      this.draft.ingredientSets = [this.draft.ingredientSets[0] || {
+        id: foundry.utils.randomID(),
+        name: 'Set 1',
+        itemIngredients: [],
+        catalysts: [],
+        essences: {},
+        resultMapping: []
+      }];
+      const firstGroup = this.draft.results[0] || {
+        id: foundry.utils.randomID(),
+        name: 'Result Group 1',
+        results: [this._newResultRow()]
+      };
+      firstGroup.results = [firstGroup.results?.[0] || this._newResultRow()];
+      this.draft.results = [firstGroup];
+      this.activeIngredientSetIndex = 0;
+      this.activeResultGroupIndex = 0;
+      this.draft.isVariable = false;
+      this.draft.requiresAllSets = false;
+      for (const set of this.draft.ingredientSets) {
+        set.resultMapping = [];
+      }
+      this.draft.outcomeRouting = {};
+    }
+    if (!featureState.showEssences) {
+      for (const set of this.draft.ingredientSets) {
+        set.essences = {};
+      }
+    }
+    return featureState;
   }
 
   _decorateIngredientRows(set, itemMap) {
@@ -140,14 +217,17 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
     });
   }
 
-  _decorateResult(result, itemMap) {
-    const item = result.systemItemId ? itemMap.get(result.systemItemId) : null;
-    return {
-      ...result,
-      itemName: item?.name || 'No item selected',
-      itemImg: item?.img || 'icons/svg/item-bag.svg',
-      hasItem: !!item
-    };
+  _decorateResultRows(group, itemMap) {
+    return (group?.results || []).map((result, idx) => {
+      const item = result.systemItemId ? itemMap.get(result.systemItemId) : null;
+      return {
+        ...result,
+        rowIndex: idx,
+        itemName: item?.name || 'No item selected',
+        itemImg: item?.img || 'icons/svg/item-bag.svg',
+        hasItem: !!item
+      };
+    });
   }
 
   _decorateCatalystRows(set, itemMap) {
@@ -165,35 +245,51 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
 
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
-    const system = this.draft.craftingSystemId
-      ? game.fabricate.getCraftingSystemManager().getSystem(this.draft.craftingSystemId)
-      : null;
-    const advancedEnabled = system?.advancedOptionsEnabled !== false;
-    const showCategories = advancedEnabled && system?.enableCategories === true;
-    const showTags = advancedEnabled && system?.enableTags === true;
-    const showEssences = advancedEnabled && system?.enableEssences === true;
-    const showTiers = advancedEnabled && system?.enableTiers === true;
-    const categories = showCategories && Array.isArray(system?.categories) ? system.categories : [];
-    const tags = showTags && Array.isArray(system?.tags) ? system.tags : [];
-    const essences = showEssences && Array.isArray(system?.essences) ? system.essences : [];
-    const tiers = showTiers && Array.isArray(system?.tiers) ? system.tiers : [];
+    const featureState = this._enforceFeatureConstraints();
+    const categories = featureState.showCategories && Array.isArray(featureState.system?.categories)
+      ? featureState.system.categories
+      : [];
+    const essences = featureState.showEssences && Array.isArray(featureState.system?.essenceDefinitions)
+      ? featureState.system.essenceDefinitions
+      : [];
 
     const systemManager = game.fabricate.getCraftingSystemManager();
     const allItems = this.draft.craftingSystemId ? systemManager.getItems(this.draft.craftingSystemId) : [];
     const pickerItems = this._systemItems();
     const itemMap = new Map(allItems.map(i => [i.id, i]));
     const ingredientSet = this.draft.ingredientSets[this.activeIngredientSetIndex] || this.draft.ingredientSets[0];
-    const resultSet = this.draft.results[this.activeResultIndex] || null;
+    const resultGroup = this.draft.results[this.activeResultGroupIndex] || this.draft.results[0] || null;
 
-    const resultOptions = this.draft.results.map(res => {
-      const item = res.systemItemId ? itemMap.get(res.systemItemId) : null;
+    const resultOptions = this.draft.results.map(group => {
+      const firstResult = group?.results?.[0] || null;
+      const item = firstResult?.systemItemId ? itemMap.get(firstResult.systemItemId) : null;
       return {
-        id: res.id,
-        name: item?.name || 'Unassigned result',
+        id: group.id,
+        name: group.name || item?.name || 'Unassigned result group',
         img: item?.img || 'icons/svg/item-bag.svg',
-        selected: ingredientSet?.resultMapping?.includes(res.id)
+        selected: ingredientSet?.resultMapping?.includes(group.id)
       };
     });
+    const outcomeRoutingRows = (featureState.craftingCheckOutcomes || []).map(outcome => {
+      const selectedResultId = this.draft.outcomeRouting?.[outcome] || '';
+      return {
+        outcome,
+        selectedResultId,
+        options: resultOptions.map(opt => ({
+          id: opt.id,
+          name: opt.name,
+          selected: selectedResultId === opt.id
+        }))
+      };
+    });
+
+    const availablePropertyMacros = Array.from(game.macros?.contents || [])
+      .filter(m => (m.type || '').toLowerCase() === 'script')
+      .map(m => ({
+        uuid: m.uuid,
+        name: m.name
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
 
     const validation = (() => {
       try {
@@ -209,35 +305,38 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
       recipe: this.draft,
       isEdit: !!this.recipe,
       availableCategories: categories,
-      availableTags: tags,
       availableEssences: essences,
-      availableTiers: tiers,
-      showCategories,
-      showTags,
-      showEssences,
-      showTiers,
+      showCategories: featureState.showCategories,
+      showEssences: featureState.showEssences,
+      showComplexRecipes: featureState.showComplexRecipes,
+      showPropertyMacros: featureState.showPropertyMacros,
+      showCraftingChecks: featureState.showCraftingChecks,
+      showOutcomeRouting: featureState.showOutcomeRouting,
+      craftingCheckOutcomes: featureState.craftingCheckOutcomes,
       ingredientSet: {
         ...ingredientSet,
         itemIngredients: this._decorateIngredientRows(ingredientSet, itemMap),
-        tagIngredients: showTags ? (ingredientSet.tagIngredients || []).map((ing, idx) => ({
-          ...ing,
-          rowIndex: idx
-        })) : [],
         catalysts: this._decorateCatalystRows(ingredientSet, itemMap)
       },
-      resultSet: resultSet ? this._decorateResult(resultSet, itemMap) : null,
+      resultGroup: resultGroup
+        ? {
+          ...resultGroup,
+          results: this._decorateResultRows(resultGroup, itemMap)
+        }
+        : null,
       ingredientSetIndex: this.activeIngredientSetIndex + 1,
-      resultIndex: this.draft.results.length ? this.activeResultIndex + 1 : 0,
-      resultIndexMinusOne: Math.max(0, this.activeResultIndex),
+      resultGroupIndex: this.draft.results.length ? this.activeResultGroupIndex + 1 : 0,
       ingredientSetCount: this.draft.ingredientSets.length,
-      resultCount: this.draft.results.length,
+      resultGroupCount: this.draft.results.length,
       resultOptions,
+      outcomeRoutingRows,
       pickerItems: pickerItems.map(i => ({
         id: i.id,
         name: i.name,
         img: i.img || 'icons/svg/item-bag.svg',
         sourceUuid: i.sourceUuid || ''
       })),
+      availablePropertyMacros,
       pickerSearch: this.itemPickerSearch,
       validationErrors: validation.valid ? [] : validation.errors
     };
@@ -365,11 +464,14 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
     }
 
     if (type === 'result') {
-      const result = this.draft.results[this.activeResultIndex];
+      const group = this.draft.results[this.activeResultGroupIndex];
+      const result = group?.results?.[0];
       if (result) {
-        const existing = this.draft.results.findIndex(r => r.systemItemId === itemId);
-        if (existing >= 0 && existing !== this.activeResultIndex) {
-          this.activeResultIndex = existing;
+        const existing = this.draft.results.findIndex(g =>
+          (g.results || []).some(r => r.systemItemId === itemId)
+        );
+        if (existing >= 0 && existing !== this.activeResultGroupIndex) {
+          this.activeResultGroupIndex = existing;
           return;
         }
         result.systemItemId = itemId;
@@ -377,19 +479,61 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
       return;
     }
 
+    if (type === 'result-row') {
+      const group = this.draft.results[this.activeResultGroupIndex];
+      const row = group?.results?.[index];
+      if (!row) return;
+      row.systemItemId = itemId;
+      return;
+    }
+
     if (type === 'result-new') {
-      const existing = this.draft.results.findIndex(r => r.systemItemId === itemId);
+      const features = this._getSystemFeatureState();
+      const existing = this.draft.results.findIndex(g =>
+        (g.results || []).some(r => r.systemItemId === itemId)
+      );
       if (existing >= 0) {
-        this.activeResultIndex = existing;
+        this.activeResultGroupIndex = existing;
         return;
       }
-      this.draft.results.push({
-        id: foundry.utils.randomID(),
-        systemItemId: itemId,
-        quantity: 1,
-        propertyFormulas: {}
+      const currentGroup = this.draft.results[this.activeResultGroupIndex];
+      if (!features.showComplexRecipes) {
+        if (!this.draft.results[0]) {
+          this.draft.results[0] = {
+            id: foundry.utils.randomID(),
+            name: 'Result Group 1',
+            results: [{ ...this._newResultRow(), systemItemId: itemId }]
+          };
+        } else {
+          this.draft.results[0].results = [this.draft.results[0].results?.[0] || this._newResultRow()];
+          this.draft.results[0].results[0].systemItemId = itemId;
+        }
+        this.activeResultGroupIndex = 0;
+        return;
+      }
+      if (!currentGroup) return;
+      currentGroup.results = Array.isArray(currentGroup.results) ? currentGroup.results : [];
+      currentGroup.results.push({
+        ...this._newResultRow(),
+        systemItemId: itemId
       });
-      this.activeResultIndex = this.draft.results.length - 1;
+      return;
+    }
+
+    if (type === 'result-row-new') {
+      const features = this._getSystemFeatureState();
+      const group = this.draft.results[this.activeResultGroupIndex];
+      if (!group) return;
+      if (!features.showComplexRecipes) {
+        group.results = [group.results?.[0] || this._newResultRow()];
+        group.results[0].systemItemId = itemId;
+        return;
+      }
+      group.results = Array.isArray(group.results) ? group.results : [];
+      group.results.push({
+        ...this._newResultRow(),
+        systemItemId: itemId
+      });
       return;
     }
 
@@ -443,7 +587,6 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
     this.draft.isVariable = fd.get('isVariable') === 'on';
     this.draft.transferEffects = fd.get('transferEffects') === 'on';
     this.draft.requiresAllSets = fd.get('requiresAllSets') === 'on';
-    this.draft.tagsText = get('tags');
 
     const set = this.draft.ingredientSets[this.activeIngredientSetIndex];
     set.name = get('ingredientSet.name', set.name);
@@ -451,58 +594,56 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
     for (let i = 0; i < set.itemIngredients.length; i++) {
       set.itemIngredients[i].quantity = getNum(`itemIngredients.${i}.quantity`, 1);
     }
-    set.tagIngredients = Array.isArray(set.tagIngredients) ? set.tagIngredients : [];
-    for (let i = 0; i < set.tagIngredients.length; i++) {
-      set.tagIngredients[i].tag = get(`tagIngredients.${i}.tag`);
-      set.tagIngredients[i].quantity = getNum(`tagIngredients.${i}.quantity`, 1);
-      set.tagIngredients[i].tier = get(`tagIngredients.${i}.tier`);
-    }
     for (let i = 0; i < (set.catalysts || []).length; i++) {
       set.catalysts[i].degradesOnUse = fd.get(`catalysts.${i}.degradesOnUse`) === 'on';
       set.catalysts[i].maxUses = getOptionalNum(`catalysts.${i}.maxUses`);
     }
 
-    if (this.draft.isVariable) {
+    const features = this._enforceFeatureConstraints();
+    if (features.showComplexRecipes && this.draft.isVariable) {
       set.resultMapping = this.draft.results
         .filter(res => fd.get(`resultMapping.${res.id}`) === 'on')
         .map(res => res.id);
     } else {
+      this.draft.isVariable = false;
+      this.draft.requiresAllSets = false;
       for (const setEntry of this.draft.ingredientSets) {
         setEntry.resultMapping = [];
       }
     }
 
-    const result = this.draft.results[this.activeResultIndex];
-    if (result) {
-      result.quantity = getNum(`results.${this.activeResultIndex}.quantity`, 1);
-      const formulas = get(`results.${this.activeResultIndex}.propertyFormulas`);
-      if (formulas) {
-        try {
-          result.propertyFormulas = JSON.parse(formulas);
-        } catch (err) {
-          // Preserve last good value while user types.
-        }
-      } else {
-        result.propertyFormulas = {};
+    if (features.showComplexRecipes && features.showCraftingChecks && features.showOutcomeRouting) {
+      const routing = {};
+      for (const outcome of features.craftingCheckOutcomes || []) {
+        const value = get(`outcomeRouting.${outcome}`);
+        if (value) routing[outcome] = value;
+      }
+      this.draft.outcomeRouting = routing;
+    } else {
+      this.draft.outcomeRouting = {};
+    }
+
+    const resultGroup = this.draft.results[this.activeResultGroupIndex];
+    if (resultGroup) {
+      resultGroup.name = get('resultGroup.name', resultGroup.name || `Result Group ${this.activeResultGroupIndex + 1}`);
+      resultGroup.results = Array.isArray(resultGroup.results) ? resultGroup.results : [];
+      for (let i = 0; i < resultGroup.results.length; i++) {
+        resultGroup.results[i].quantity = getNum(`resultRows.${i}.quantity`, 1);
+        resultGroup.results[i].propertyMacroUuid = get(`resultRows.${i}.propertyMacroUuid`) || null;
       }
     }
   }
 
   _buildRecipePayload() {
-    const system = this.draft.craftingSystemId
-      ? game.fabricate.getCraftingSystemManager().getSystem(this.draft.craftingSystemId)
-      : null;
-    const advancedEnabled = system?.advancedOptionsEnabled !== false;
-    const enableTags = advancedEnabled && system?.enableTags === true;
-    const enableEssences = advancedEnabled && system?.enableEssences === true;
-    const enableCategories = advancedEnabled && system?.enableCategories === true;
-    const enableTiers = advancedEnabled && system?.enableTiers === true;
+    const features = this._enforceFeatureConstraints();
+    const enableEssences = features.showEssences;
+    const enableCategories = features.showCategories;
+    const enableComplexRecipes = features.showComplexRecipes;
+    const enablePropertyMacros = features.showPropertyMacros;
     const base = this.recipe ? this.recipe.toJSON() : {};
-    const tags = enableTags
-      ? this.draft.tagsText.split(',').map(t => t.trim()).filter(Boolean)
-      : [];
 
-    const ingredientSets = this.draft.ingredientSets.map((set, idx) => {
+    const sourceSets = enableComplexRecipes ? this.draft.ingredientSets : [this.draft.ingredientSets[0]];
+    const ingredientSets = sourceSets.map((set, idx) => {
       const items = (set.itemIngredients || [])
         .filter(ing => ing.systemItemId)
         .map(ing => ({
@@ -514,23 +655,10 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
           effectFilter: null
         }));
 
-      const tags = enableTags
-        ? (set.tagIngredients || [])
-          .filter(ing => ing.tag || (enableTiers && ing.tier))
-          .map(ing => ({
-            systemItemId: null,
-            tag: ing.tag || null,
-            quantity: Number(ing.quantity || 1),
-            tier: enableTiers ? (ing.tier || null) : null,
-            extractEffects: false,
-            effectFilter: null
-          }))
-        : [];
-
       return {
         id: set.id || foundry.utils.randomID(),
         name: set.name || `Set ${idx + 1}`,
-        ingredients: [...items, ...tags],
+        ingredients: items,
         catalysts: (set.catalysts || [])
           .filter(cat => cat.systemItemId)
           .map(cat => ({
@@ -543,16 +671,22 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
             maxUses: Number.isFinite(Number(cat.maxUses)) ? Number(cat.maxUses) : null
           })),
         essences: enableEssences ? (set.essences || {}) : {},
-        resultMapping: this.draft.isVariable ? (set.resultMapping || []) : []
+        resultMapping: (enableComplexRecipes && this.draft.isVariable) ? (set.resultMapping || []) : []
       };
     });
 
-    const results = this.draft.results.map(res => ({
-      id: res.id || foundry.utils.randomID(),
-      systemItemId: res.systemItemId || null,
-      quantity: Number(res.quantity || 1),
-      propertyFormulas: res.propertyFormulas || {}
+    const sourceGroups = enableComplexRecipes ? this.draft.results : [this.draft.results[0]];
+    const resultGroups = sourceGroups.filter(Boolean).map((group, groupIdx) => ({
+      id: group.id || foundry.utils.randomID(),
+      name: group.name || `Result Group ${groupIdx + 1}`,
+      results: (group.results || []).map((res, resIdx) => ({
+        id: res.id || `${group.id || foundry.utils.randomID()}-result-${resIdx + 1}`,
+        systemItemId: res.systemItemId || null,
+        quantity: Number(res.quantity || 1),
+        propertyMacroUuid: enablePropertyMacros ? (res.propertyMacroUuid || null) : null
+      }))
     }));
+    const flatResults = resultGroups.flatMap(group => group.results);
 
     return {
       ...base,
@@ -563,18 +697,25 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
       craftingSystemId: this.draft.craftingSystemId || this.craftingSystemId || null,
       system: 'all',
       enabled: this.draft.enabled,
-      tags,
+      tags: [],
       ingredientSets,
-      results,
-      isVariable: this.draft.isVariable,
+      resultGroups,
+      // Legacy alias retained while downstream UI migrates.
+      results: flatResults,
+      isVariable: enableComplexRecipes ? this.draft.isVariable : false,
       transferEffects: this.draft.transferEffects,
-      requiresAllSets: this.draft.requiresAllSets,
+      requiresAllSets: enableComplexRecipes ? this.draft.requiresAllSets : false,
+      outcomeRouting: (enableComplexRecipes && features.showCraftingChecks && features.showOutcomeRouting)
+        ? (this.draft.outcomeRouting || {})
+        : null,
       metadata: base.metadata || this.draft.metadata
     };
   }
 
   static async _onPrevIngredientSet() {
     this._syncDraftFromForm();
+    const features = this._getSystemFeatureState();
+    if (!features.showComplexRecipes) return;
     this.activeIngredientSetIndex =
       (this.activeIngredientSetIndex - 1 + this.draft.ingredientSets.length) % this.draft.ingredientSets.length;
     await this.render();
@@ -582,17 +723,20 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
 
   static async _onNextIngredientSet() {
     this._syncDraftFromForm();
+    const features = this._getSystemFeatureState();
+    if (!features.showComplexRecipes) return;
     this.activeIngredientSetIndex = (this.activeIngredientSetIndex + 1) % this.draft.ingredientSets.length;
     await this.render();
   }
 
   static async _onAddIngredientSet() {
     this._syncDraftFromForm();
+    const features = this._getSystemFeatureState();
+    if (!features.showComplexRecipes) return;
     this.draft.ingredientSets.push({
       id: foundry.utils.randomID(),
       name: `Set ${this.draft.ingredientSets.length + 1}`,
       itemIngredients: [],
-      tagIngredients: [],
       catalysts: [],
       essences: {},
       resultMapping: []
@@ -603,6 +747,8 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
 
   static async _onRemoveIngredientSet() {
     this._syncDraftFromForm();
+    const features = this._getSystemFeatureState();
+    if (!features.showComplexRecipes) return;
     if (this.draft.ingredientSets.length <= 1) {
       ui.notifications.warn('A recipe needs at least one ingredient set.');
       return;
@@ -617,14 +763,6 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
     const set = this.draft.ingredientSets[this.activeIngredientSetIndex];
     set.itemIngredients = Array.isArray(set.itemIngredients) ? set.itemIngredients : [];
     set.itemIngredients.push({ systemItemId: null, quantity: 1 });
-    await this.render();
-  }
-
-  static async _onAddTagIngredientRow() {
-    this._syncDraftFromForm();
-    const set = this.draft.ingredientSets[this.activeIngredientSetIndex];
-    set.tagIngredients = Array.isArray(set.tagIngredients) ? set.tagIngredients : [];
-    set.tagIngredients.push({ tag: '', quantity: 1, tier: '' });
     await this.render();
   }
 
@@ -654,49 +792,75 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
     await this.render();
   }
 
-  static async _onRemoveTagIngredientRow(event, target) {
-    this._syncDraftFromForm();
-    const idx = Number(target.dataset.index);
-    const set = this.draft.ingredientSets[this.activeIngredientSetIndex];
-    set.tagIngredients = Array.isArray(set.tagIngredients) ? set.tagIngredients : [];
-    set.tagIngredients.splice(idx, 1);
-    await this.render();
-  }
-
   static async _onPrevResultSet() {
     this._syncDraftFromForm();
+    const features = this._getSystemFeatureState();
+    if (!features.showComplexRecipes) return;
     if (this.draft.results.length === 0) return;
-    this.activeResultIndex = (this.activeResultIndex - 1 + this.draft.results.length) % this.draft.results.length;
+    this.activeResultGroupIndex = (this.activeResultGroupIndex - 1 + this.draft.results.length) % this.draft.results.length;
     await this.render();
   }
 
   static async _onNextResultSet() {
     this._syncDraftFromForm();
+    const features = this._getSystemFeatureState();
+    if (!features.showComplexRecipes) return;
     if (this.draft.results.length === 0) return;
-    this.activeResultIndex = (this.activeResultIndex + 1) % this.draft.results.length;
+    this.activeResultGroupIndex = (this.activeResultGroupIndex + 1) % this.draft.results.length;
     await this.render();
   }
 
   static async _onAddResultSet() {
     this._syncDraftFromForm();
+    const features = this._getSystemFeatureState();
+    if (!features.showComplexRecipes) return;
     this.draft.results.push({
       id: foundry.utils.randomID(),
-      systemItemId: null,
-      quantity: 1,
-      propertyFormulas: {}
+      name: `Result Group ${this.draft.results.length + 1}`,
+      results: [this._newResultRow()]
     });
-    this.activeResultIndex = this.draft.results.length - 1;
+    this.activeResultGroupIndex = this.draft.results.length - 1;
     await this.render();
   }
 
   static async _onRemoveResultSet() {
     this._syncDraftFromForm();
+    const features = this._getSystemFeatureState();
+    if (!features.showComplexRecipes) return;
     if (this.draft.results.length <= 1) {
-      ui.notifications.warn('A recipe needs at least one result.');
+      ui.notifications.warn('A recipe needs at least one result group.');
       return;
     }
-    this.draft.results.splice(this.activeResultIndex, 1);
-    this.activeResultIndex = Math.max(0, this.activeResultIndex - 1);
+    this.draft.results.splice(this.activeResultGroupIndex, 1);
+    this.activeResultGroupIndex = Math.max(0, this.activeResultGroupIndex - 1);
+    await this.render();
+  }
+
+  static async _onAddResultRow() {
+    this._syncDraftFromForm();
+    const features = this._getSystemFeatureState();
+    if (!features.showComplexRecipes) return;
+    const group = this.draft.results[this.activeResultGroupIndex];
+    if (!group) return;
+    group.results = Array.isArray(group.results) ? group.results : [];
+    group.results.push(this._newResultRow());
+    await this.render();
+  }
+
+  static async _onRemoveResultRow(event, target) {
+    this._syncDraftFromForm();
+    const features = this._getSystemFeatureState();
+    if (!features.showComplexRecipes) return;
+    const idx = Number(target.dataset.index || 0);
+    const group = this.draft.results[this.activeResultGroupIndex];
+    if (!group) return;
+    group.results = Array.isArray(group.results) ? group.results : [];
+    if (group.results.length <= 1) {
+      ui.notifications.warn('A result group needs at least one result.');
+      return;
+    }
+    if (!group.results[idx]) return;
+    group.results.splice(idx, 1);
     await this.render();
   }
 
@@ -706,14 +870,6 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
     const set = this.draft.ingredientSets[this.activeIngredientSetIndex];
     if (!set.itemIngredients?.[idx]) return;
     set.itemIngredients[idx].systemItemId = null;
-    await this.render();
-  }
-
-  static async _onClearResultSystemItem() {
-    this._syncDraftFromForm();
-    const result = this.draft.results[this.activeResultIndex];
-    if (!result) return;
-    result.systemItemId = null;
     await this.render();
   }
 

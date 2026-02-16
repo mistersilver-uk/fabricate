@@ -1,5 +1,5 @@
 import { Recipe } from '../models/Recipe.js';
-import { FormulaEvaluator } from '../utils/FormulaEvaluator.js';
+import { MacroExecutor } from '../utils/MacroExecutor.js';
 
 /**
  * Handles the actual crafting process
@@ -85,6 +85,21 @@ export class CraftingEngine {
       };
     }
 
+    // Run optional system-level crafting check before consuming ingredients.
+    const checkResult = await this._runCraftingCheck(
+      recipe,
+      craftingActor,
+      componentSourceActors,
+      ingredientSet
+    );
+    if (!checkResult.success) {
+      return {
+        success: false,
+        results: null,
+        message: checkResult.message || 'Crafting check failed'
+      };
+    }
+
     // Consume ingredients from component source actors
     const consumedItems = await this._consumeIngredients(componentSourceActors, ingredientSet, recipe);
 
@@ -97,7 +112,8 @@ export class CraftingEngine {
       recipe,
       ingredientSet,
       consumedItems,
-      catalystValidation.catalysts
+      catalystValidation.catalysts,
+      checkResult
     );
 
     return {
@@ -196,34 +212,46 @@ export class CraftingEngine {
    * Create the result items based on recipe configuration
    * @private
    */
-  async _createResultItems(craftingActor, recipe, ingredientSet, consumedItems, catalystItems) {
-    // Determine which results to create
-    let resultsToCreate;
+  async _createResultItems(craftingActor, recipe, ingredientSet, consumedItems, catalystItems, checkResult = null) {
+    // Determine which result groups to create.
+    let groupsToCreate;
+    const routedResultId = checkResult?.outcome && recipe?.outcomeRouting
+      ? recipe.outcomeRouting[checkResult.outcome]
+      : null;
+    const allGroups = Array.isArray(recipe.resultGroups) ? recipe.resultGroups : [];
 
-    if (recipe.isVariable && ingredientSet.resultMapping.length > 0) {
-      // Variable recipe: use ingredient set's result mapping
-      resultsToCreate = recipe.results.filter(r =>
-        ingredientSet.resultMapping.includes(r.id)
+    if (routedResultId) {
+      groupsToCreate = allGroups.filter(group => group.id === routedResultId);
+      if (groupsToCreate.length === 0) {
+        console.warn(`Fabricate v2 | Outcome routing target not found: ${routedResultId}`);
+      }
+    }
+
+    if ((!groupsToCreate || groupsToCreate.length === 0) && recipe.isVariable && ingredientSet.resultMapping.length > 0) {
+      // Variable recipe mapping accepts group IDs (canonical) and legacy result IDs.
+      groupsToCreate = allGroups.filter(group =>
+        ingredientSet.resultMapping.includes(group.id) ||
+        group.results.some(result => ingredientSet.resultMapping.includes(result.id))
       );
-    } else {
-      // Non-variable recipe: create all results
-      resultsToCreate = recipe.results;
+    } else if (!groupsToCreate || groupsToCreate.length === 0) {
+      groupsToCreate = allGroups;
     }
 
     const createdItems = [];
+    for (const group of groupsToCreate) {
+      for (const result of group.results || []) {
+        const resultItem = await this._createSingleResult(
+          craftingActor,
+          result,
+          consumedItems,
+          catalystItems,
+          recipe,
+          checkResult
+        );
 
-    // Create each result
-    for (const result of resultsToCreate) {
-      const resultItem = await this._createSingleResult(
-        craftingActor,
-        result,
-        consumedItems,
-        catalystItems,
-        recipe
-      );
-
-      if (resultItem) {
-        createdItems.push(resultItem);
+        if (resultItem) {
+          createdItems.push(resultItem);
+        }
       }
     }
 
@@ -234,7 +262,7 @@ export class CraftingEngine {
    * Create a single result item
    * @private
    */
-  async _createSingleResult(craftingActor, result, consumedItems, catalystItems, recipe) {
+  async _createSingleResult(craftingActor, result, consumedItems, catalystItems, recipe, checkResult = null) {
     // Get the source item
     let sourceItem;
     let managedItem = null;
@@ -272,10 +300,18 @@ export class CraftingEngine {
       itemData.system.quantity = result.quantity;
     }
 
-    // Apply property formulas
-    if (result.propertyFormulas && Object.keys(result.propertyFormulas).length > 0) {
-      for (const [path, formula] of Object.entries(result.propertyFormulas)) {
-        const value = this._evaluateFormula(formula, consumedItems, catalystItems, recipe);
+    // Apply macro-based property updates
+    const propertyUpdates = await this._runPropertyMacro(
+      result.propertyMacroUuid,
+      recipe,
+      craftingActor,
+      result,
+      consumedItems,
+      catalystItems,
+      checkResult
+    );
+    if (propertyUpdates && typeof propertyUpdates === 'object') {
+      for (const [path, value] of Object.entries(propertyUpdates)) {
         foundry.utils.setProperty(itemData, path, value);
       }
     }
@@ -327,62 +363,176 @@ export class CraftingEngine {
     await resultItem.createEmbeddedDocuments('ActiveEffect', effectsData);
   }
 
-  /**
-   * Evaluate a formula with context from ingredients and catalysts
-   * @private
-   */
-  _evaluateFormula(formula, consumedItems, catalystItems, recipe) {
-    // Create context variables
+  async _runCraftingCheck(recipe, craftingActor, componentSourceActors, ingredientSet) {
+    const systemId = recipe?.craftingSystemId;
+    if (!systemId) {
+      return { success: true, outcome: null, data: {} };
+    }
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const system = systemManager?.getSystem(systemId);
+    if (!system) {
+      return { success: true, outcome: null, data: {} };
+    }
+
+    const advancedEnabled = system.advancedOptionsEnabled !== false;
+    const features = system.features || {};
+    const checksEnabled = advancedEnabled && features.craftingChecks === true;
+    if (!checksEnabled) {
+      return { success: true, outcome: null, data: {} };
+    }
+
+    const config = system.craftingCheck || {};
+    if (!config.macroUuid) {
+      return { success: true, outcome: null, data: {} };
+    }
+
+    const ingredientPool = componentSourceActors.flatMap(actor =>
+      Array.from(actor.items).map(item => ({
+        actorId: actor.id,
+        actorName: actor.name,
+        item
+      }))
+    );
+    const resolvedEssences = this._accumulateEssencesFromItems(
+      ingredientPool.map(entry => entry.item)
+    );
+
+    let result;
+    try {
+      result = await MacroExecutor.run(config.macroUuid, {
+        recipe: recipe?.toJSON?.() || recipe,
+        craftingSystem: system,
+        craftingActor,
+        componentSourceActors,
+        ingredientPool,
+        candidateIngredientSet: ingredientSet,
+        resolvedEssences
+      });
+    } catch (err) {
+      console.error(`Fabricate v2 | Crafting check macro failed (${config.macroUuid})`, err);
+      return {
+        success: false,
+        outcome: null,
+        data: {},
+        message: `Crafting check macro failed: ${err.message || config.macroUuid}`
+      };
+    }
+
+    if (!result || typeof result !== 'object') {
+      return {
+        success: false,
+        outcome: null,
+        data: {},
+        message: 'Crafting check macro must return an object'
+      };
+    }
+
+    const outcome = result.outcome != null ? String(result.outcome) : null;
+    const allowed = Array.isArray(config.outcomes) ? config.outcomes : [];
+    if (outcome && allowed.length > 0 && !allowed.includes(outcome)) {
+      return {
+        success: false,
+        outcome,
+        data: result.data || {},
+        message: `Crafting check returned invalid outcome "${outcome}"`
+      };
+    }
+
+    const success = result.success !== false;
+    return {
+      success,
+      outcome,
+      data: result.data || {},
+      message: success ? null : (result.message || 'Crafting check failed')
+    };
+  }
+
+  async _runPropertyMacro(macroUuid, recipe, craftingActor, result, consumedItems, catalystItems, checkResult = null) {
+    if (!macroUuid) return null;
+
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const craftingSystem = recipe?.craftingSystemId ? systemManager?.getSystem(recipe.craftingSystemId) : null;
+    const advancedEnabled = craftingSystem?.advancedOptionsEnabled !== false;
+    const features = craftingSystem?.features || {};
+    const enabled = advancedEnabled && features.propertyMacros === true;
+    if (!enabled) return null;
+
+    const essenceContext = this._buildEssenceContext(consumedItems);
     const context = {
-      ingredientCount: consumedItems.length,
-      ingredientTier: this._getAverageIngredientTier(consumedItems, recipe),
-      catalystQuality: this._getAverageCatalystQuality(catalystItems)
+      recipe: recipe?.toJSON?.() || recipe,
+      craftingSystem,
+      craftingActor,
+      ingredientPool: consumedItems.map(({ item, quantity, ingredient }) => ({
+        item,
+        quantity,
+        ingredient
+      })),
+      resolvedIngredients: consumedItems.map(({ item, quantity, ingredient }) => ({
+        item,
+        quantity,
+        ingredient
+      })),
+      resolvedCatalysts: catalystItems.map(({ item, catalyst }) => ({
+        item,
+        catalyst
+      })),
+      resolvedEssences: essenceContext.resolvedEssences,
+      essenceSources: essenceContext.essenceSources,
+      checkResult,
+      result: result?.toJSON?.() || result
     };
 
-    // Use safe formula evaluator
-    return FormulaEvaluator.evaluate(formula, context);
+    try {
+      const updates = await MacroExecutor.run(macroUuid, context);
+      if (updates == null) return null;
+      if (typeof updates !== 'object' || Array.isArray(updates)) {
+        console.warn(`Fabricate v2 | Property macro ${macroUuid} did not return an object`);
+        return null;
+      }
+      return updates;
+    } catch (err) {
+      console.error(`Fabricate v2 | Property macro failed (${macroUuid})`, err);
+      ui.notifications.error(`Property macro failed: ${err.message || macroUuid}`);
+      return null;
+    }
   }
 
-  /**
-   * Get average tier of consumed ingredients
-   * @private
-   */
-  _getAverageIngredientTier(consumedItems, recipe) {
-    const systemId = recipe?.craftingSystemId;
-    if (systemId) {
-      const systemManager = game.fabricate?.getCraftingSystemManager?.();
-      const system = systemManager?.getSystem(systemId);
-      const advancedEnabled = system?.advancedOptionsEnabled !== false;
-      const tiersEnabled = advancedEnabled && system?.enableTiers === true;
-      if (!tiersEnabled) return 1;
-    }
-    const tierMap = { 'common': 1, 'uncommon': 2, 'rare': 3, 'legendary': 4 };
-    let totalTier = 0;
-    let count = 0;
+  _buildEssenceContext(consumedItems) {
+    const resolvedEssences = {};
+    const essenceSources = {};
 
-    for (const { item } of consumedItems) {
-      const tier = item.getFlag('fabricate-v2', 'tier') || 'common';
-      totalTier += tierMap[tier] || 1;
-      count++;
+    for (const { item, quantity } of consumedItems) {
+      const itemEssences = item.getFlag('fabricate-v2', 'essences') || {};
+      for (const [essenceId, perUnit] of Object.entries(itemEssences)) {
+        const value = Number(perUnit);
+        if (!Number.isFinite(value) || value <= 0) continue;
+        const total = value * (Number(quantity) || 1);
+        resolvedEssences[essenceId] = (resolvedEssences[essenceId] || 0) + total;
+        essenceSources[essenceId] = essenceSources[essenceId] || [];
+        essenceSources[essenceId].push({
+          itemId: item.id,
+          itemName: item.name,
+          quantityConsumed: quantity,
+          essencePerItem: value,
+          essenceTotal: total
+        });
+      }
     }
 
-    return count > 0 ? totalTier / count : 1;
+    return { resolvedEssences, essenceSources };
   }
 
-  /**
-   * Get average quality of catalysts used
-   * @private
-   */
-  _getAverageCatalystQuality(catalystItems) {
-    let totalQuality = 0;
-    let count = 0;
-
-    for (const { catalyst, item } of catalystItems) {
-      totalQuality += catalyst.getQualityBonus(item);
-      count++;
+  _accumulateEssencesFromItems(items) {
+    const resolved = {};
+    for (const item of items) {
+      const itemEssences = item.getFlag('fabricate-v2', 'essences') || {};
+      for (const [essenceId, qty] of Object.entries(itemEssences)) {
+        const value = Number(qty);
+        if (!Number.isFinite(value) || value <= 0) continue;
+        resolved[essenceId] = (resolved[essenceId] || 0) + value;
+      }
     }
-
-    return count > 0 ? totalQuality / count : 0;
+    return resolved;
   }
 
   /**

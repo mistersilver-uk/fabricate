@@ -54,7 +54,7 @@ export class RecipeManager {
     this._assertGM('create recipe');
 
     const recipe = new Recipe(recipeData);
-    const validation = recipe.validate();
+    const validation = this._validateRecipeForCreateOrUpdate(recipe);
 
     if (!validation.valid) {
       throw new Error(`Invalid recipe: ${validation.errors.join(', ')}`);
@@ -87,7 +87,7 @@ export class RecipeManager {
       id: recipeId
     };
     const updatedRecipe = Recipe.fromJSON(merged);
-    const validation = updatedRecipe.validate();
+    const validation = this._validateRecipeForCreateOrUpdate(updatedRecipe);
 
     if (!validation.valid) {
       throw new Error(`Invalid recipe update: ${validation.errors.join(', ')}`);
@@ -431,10 +431,12 @@ export class RecipeManager {
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(systemId);
     const advancedEnabled = system?.advancedOptionsEnabled !== false;
+    const features = system?.features || {};
     return {
-      enableTags: advancedEnabled && system?.enableTags === true,
-      enableTiers: advancedEnabled && system?.enableTiers === true,
-      enableEssences: advancedEnabled && system?.enableEssences === true
+      // Tags/tiers are no longer used for ingredient matching.
+      enableTags: false,
+      enableTiers: false,
+      enableEssences: advancedEnabled && (features.essences === true || system?.enableEssences === true)
     };
   }
 
@@ -483,7 +485,7 @@ export class RecipeManager {
 
     for (const recipeData of recipesData) {
       const recipe = Recipe.fromJSON(recipeData);
-      const validation = recipe.validate();
+      const validation = this._validateRecipeForCreateOrUpdate(recipe);
 
       if (!validation.valid) {
         console.warn(`Fabricate v2 | Skipping invalid recipe: ${recipe.name}`, validation.errors);
@@ -521,5 +523,71 @@ export class RecipeManager {
     }
 
     return recipes.map(r => r.toJSON());
+  }
+
+  /**
+   * Validate recipe core rules and system-specific essence references
+   * @param {Recipe} recipe
+   * @returns {{valid: boolean, errors: string[]}}
+   * @private
+   */
+  _validateRecipeForCreateOrUpdate(recipe) {
+    const baseValidation = recipe.validate();
+    const errors = [...(baseValidation.errors || [])];
+
+    const systemValidation = this._validateEssenceReferences(recipe);
+    errors.push(...systemValidation.errors);
+
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  }
+
+  /**
+   * Validate ingredient-set essence requirements against crafting system essence definitions.
+   * @param {Recipe} recipe
+   * @returns {{valid: boolean, errors: string[]}}
+   * @private
+   */
+  _validateEssenceReferences(recipe) {
+    const errors = [];
+    const systemId = recipe?.craftingSystemId;
+    if (!systemId) {
+      return { valid: true, errors };
+    }
+
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const system = systemManager?.getSystem(systemId);
+    if (!system) {
+      return { valid: true, errors };
+    }
+
+    const advancedEnabled = system.advancedOptionsEnabled !== false;
+    const features = system.features || {};
+    const essencesEnabled = advancedEnabled && (features.essences === true || system.enableEssences === true);
+    if (!essencesEnabled) {
+      return { valid: true, errors };
+    }
+
+    const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
+    const validEssenceIds = new Set(definitions.map(def => def.id));
+
+    for (const set of recipe.ingredientSets || []) {
+      for (const [essenceId, qty] of Object.entries(set.essences || {})) {
+        if (!validEssenceIds.has(essenceId)) {
+          errors.push(`Ingredient set "${set.name || set.id}" references unknown essence "${essenceId}"`);
+        }
+        const num = Number(qty);
+        if (!Number.isFinite(num) || num <= 0) {
+          errors.push(`Ingredient set "${set.name || set.id}" has invalid quantity for essence "${essenceId}"`);
+        }
+      }
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors
+    };
   }
 }

@@ -869,17 +869,66 @@
   gap: 10px;
 }
 
-.fabricate-admin .system-advanced-toggles {
+.fabricate-admin .feature-card-stack {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fabricate-admin .feature-card {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.14);
+  padding: 10px;
+  min-width: 0;
+}
+
+.fabricate-admin .feature-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 12px;
 }
 
-.fabricate-admin .system-advanced-toggles label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
+.fabricate-admin .feature-card-header h4 {
+  margin: 0 0 4px 0;
+}
+
+.fabricate-admin .feature-card-header .hint {
+  margin: 0;
+}
+
+.fabricate-admin .essence-definition-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.fabricate-admin .essence-definition-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.fabricate-admin .essence-definition-meta code {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.fabricate-admin .essence-definition-row button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.14);
 }
 
 .fabricate-admin .config-block {
@@ -1487,6 +1536,10 @@
   height: 36px;
   border-radius: 4px;
   object-fit: cover;
+}
+
+.fabricate-recipe-editor-v2 .result-row-macro {
+  padding: 0 8px 8px 8px;
 }
 
 .fabricate-item-editor .form-group {

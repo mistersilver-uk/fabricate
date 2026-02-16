@@ -2,40 +2,62 @@
 
 ## Purpose
 
-Define the data structures for crafting systems, managed items, recipes, ingredients, and catalysts that support both simple and advanced crafting scenarios.
+Define data structures for crafting systems, managed items, recipes, and macro-driven crafting behavior.
 
 ## CraftingSystem
 
 ### Purpose
 
-Represents a GM-defined crafting system containing rules, configuration, and the managed item library.
+Represents a GM-defined crafting system with feature toggles, optional value catalogs, and managed items.
 
 ### Properties
 
 ```javascript
 {
-  id: string,                    // Unique identifier
-  name: string,                  // Display name
-  description: string,           // System description
-  enabled: boolean,              // Whether this system is active
-  advancedOptionsEnabled: boolean, // Enables tags/essences/categories/tiers
+  id: string,
+  name: string,
+  description: string,
+  enabled: boolean,
+  advancedOptionsEnabled: boolean,
 
-  // System-wide configuration (only when advanced options are enabled)
-  categories: string[],          // Recipe categories (optional)
-  tags: string[],                // Allowed tags (optional)
-  essences: string[],            // Allowed essences (optional)
-  tiers: string[],               // Allowed tiers (optional)
-
-  // Difficulty model and rules (future UI)
-  difficulty: {
-    base: number,
-    tierWeight: number,
-    tagWeights: Object,
-    essenceWeights: Object
+  features: {
+    categories: boolean,        // Enables recipe category field/filtering
+    itemTags: boolean,          // Enables item-tag management (items tab only)
+    essences: boolean,          // Enables essence requirements on ingredient sets
+    complexRecipes: boolean,    // Enables multiple ingredient sets/results and routing
+    propertyMacros: boolean,    // Enables macro-based result property calculation
+    craftingChecks: boolean,    // Enables system-level crafting check macro
+    outcomeRouting: boolean     // Enables routing result groups by check outcome
   },
 
-  // Managed items
+  categories: string[],          // Optional recipe categories
+  itemTags: string[],            // Optional tags for item organization/search in Items tab
+  essences: EssenceDefinition[], // Allowed essence catalog
+
+  craftingCheck: {
+    mode: "passFail" | "tiered",
+    macroUuid: string | null,   // Macro to execute for crafting checks
+    outcomes: string[]          // Allowed outcomes (e.g. ["fail","pass"] or ["low","high"])
+  },
+
   items: SystemItem[]
+}
+```
+
+## EssenceDefinition
+
+### Purpose
+
+Defines one essence type used by system items and recipe requirements.
+
+### Properties
+
+```javascript
+{
+  id: string,                     // Stable key used in quantity maps
+  name: string,                   // Display name
+  description: string,            // Help text shown in admin/editor/player UI
+  associatedSystemItemId: string | null // Optional managed item associated with this essence
 }
 ```
 
@@ -43,19 +65,18 @@ Represents a GM-defined crafting system containing rules, configuration, and the
 
 ### Purpose
 
-Represents a curated item entry within a crafting system.
+Represents a curated item entry used by recipes.
 
 ### Properties
 
 ```javascript
 {
-  id: string,           // Unique identifier within the system
-  name: string,         // Display name
-  img: string,          // Image path
-  sourceUuid: string?,  // Optional Foundry Source UUID
-  tier: string?,        // Optional tier
-  tags: string[],       // Optional tags (system-defined)
-  essences: Object      // Optional essences (system-defined)
+  id: string,
+  name: string,
+  img: string,
+  sourceUuid: string | null,
+  tags: string[],               // For item categorization/sorting/search only
+  essences: { [essenceId: string]: number }
 }
 ```
 
@@ -63,31 +84,30 @@ Represents a curated item entry within a crafting system.
 
 ### Purpose
 
-Represents a complete crafting recipe with inputs (ingredients, catalysts) and output (result item or items).
+Represents a complete recipe with inputs and outputs, plus optional routing/check integration.
 
 ### Properties
 
 ```javascript
 {
-  id: string,                    // Unique identifier (UUID) for the recipe
-  name: string,                  // Display name
-  description: string,           // Recipe description
-  category: string,              // Optional category (from crafting system)
-  craftingSystemId: string,      // Owning crafting system
-  enabled: boolean,              // Whether recipe is active
+  id: string,
+  name: string,
+  description: string,
+  craftingSystemId: string,
+  enabled: boolean,
+  category: string | null,
 
-  // Input requirements (at least one set must be satisfied)
-  ingredientSets: IngredientSet[], // Alternative ingredient combinations
+  ingredientSets: IngredientSet[],
+  resultGroups: ResultGroup[],
 
-  // Output (multiple items can be produced)
-  results: Result[],               // Items to create
+  requiresAllSets: boolean,     // false => OR, true => AND
+  transferEffects: boolean,
 
-  // Recipe behavior
-  isVariable: boolean,             // Whether output varies based on inputs
-  transferEffects: boolean,        // Transfer effects from ingredients to results
-  requiresAllSets: boolean,        // false = OR logic, true = AND logic (default: false)
+  // Optional routing by check outcome (when enabled on system)
+  outcomeRouting: {
+    [outcome: string]: string   // outcome -> resultGroupId
+  } | null,
 
-  // Metadata
   metadata: {
     created: number,
     modified: number,
@@ -99,16 +119,19 @@ Represents a complete crafting recipe with inputs (ingredients, catalysts) and o
 
 ### Requirements
 
-1. Must have at least one ingredient set
-2. Must have at least one result
-3. Results must reference either `systemItemId` or `itemUuid`
-4. If `isVariable` is true, each ingredient set must have valid `resultMapping` IDs
+1. Must have at least one ingredient set.
+2. Must have at least one result group with at least one result.
+3. If system `features.complexRecipes` is `false`, recipe must use:
+   - exactly one ingredient set
+   - exactly one result group
+4. If `outcomeRouting` is used, all keys must exist in `CraftingSystem.craftingCheck.outcomes`.
+5. If `transferEffects` is true and `features.essences` is enabled, eligible essence-associated item effects are included in transfer.
 
 ## IngredientSet
 
 ### Purpose
 
-Represents a set of ingredients that can satisfy a recipe's input requirements. Multiple ingredient sets allow recipes to accept alternative combinations (e.g., "2xA OR 1xB + 1xC").
+Represents one required ingredient/catalyst bundle.
 
 ### Properties
 
@@ -116,12 +139,74 @@ Represents a set of ingredients that can satisfy a recipe's input requirements. 
 {
   id: string,
   name: string,
-  ingredients: Ingredient[],     // Item or tag/tier requirements
-  essences: {                    // Required essences (from ingredient properties)
-    [essenceType]: number
-  },
-  catalysts: Catalyst[],         // Catalysts required for this ingredient set
-  resultMapping: string[]        // Result IDs to produce when this set is used (for variable recipes)
+  ingredients: Ingredient[],
+  essences: { [essenceId: string]: number }, // Only when system features.essences is true
+  catalysts: Catalyst[]
+}
+```
+
+## Ingredient
+
+### Purpose
+
+Represents a required consumable managed item.
+
+### Properties
+
+```javascript
+{
+  systemItemId: string,         // Required
+  quantity: number,
+  extractEffects: boolean
+}
+```
+
+### Requirements
+
+1. `systemItemId` is required.
+2. `quantity` must be positive.
+3. Each `IngredientSet.essences` key must exist in `CraftingSystem.essences`.
+4. Essence quantity values in `IngredientSet.essences` and `SystemItem.essences` must be positive numbers.
+
+## Catalyst
+
+### Purpose
+
+Represents a required non-consumable managed item.
+
+### Properties
+
+```javascript
+{
+  systemItemId: string,         // Required
+  required: boolean,
+  mustBeEquipped: boolean,
+  mustBeInInventory: boolean,
+  proximityRequired: boolean,
+  proximityDistance: number,
+  degradesOnUse: boolean,
+  maxUses: number | null
+}
+```
+
+### Requirements
+
+1. `systemItemId` is required.
+2. If `degradesOnUse` is true, target item must support consumption/usage tracking.
+
+## ResultGroup
+
+### Purpose
+
+Groups one or more results so recipes can produce different output sets.
+
+### Properties
+
+```javascript
+{
+  id: string,
+  name: string,
+  results: Result[]
 }
 ```
 
@@ -129,96 +214,82 @@ Represents a set of ingredients that can satisfy a recipe's input requirements. 
 
 ### Purpose
 
-Represents an item produced by a recipe. Recipes can produce multiple different items.
+Represents one produced item.
 
 ### Properties
 
 ```javascript
 {
-  id: string,                    // Unique identifier within the recipe
-  systemItemId: string | null,   // Managed item reference
-  itemUuid: string | null,       // Foundry Source UUID (fallback)
-  quantity: number,              // Number of items created (default: 1)
-  propertyFormulas: {            // Dynamic property calculation
-    [propertyPath]: string
-  }
-}
-```
-
-### Requirements
-
-1. Must reference `systemItemId` or `itemUuid`
-2. `quantity` must be positive
-
-## Ingredient
-
-### Purpose
-
-Represents a required consumable component for crafting.
-
-### Properties
-
-```javascript
-{
-  systemItemId: string | null, // Managed item reference
-  itemUuid: string | null,     // Foundry Source UUID (fallback)
+  id: string,
+  systemItemId: string,         // Required managed item reference
   quantity: number,
-  tag: string | null,          // Tag for flexible matching (e.g., "armour:leather")
-  tier: string | null,         // Quality tier (e.g., "common")
-  alternatives: Ingredient[],  // Alternative ingredients
-  extractEffects: boolean
+
+  // Optional macro used to compute property updates for this result
+  propertyMacroUuid: string | null
 }
 ```
 
 ### Requirements
 
-1. At least one of `systemItemId`, `itemUuid`, or `tag` must be set
-2. `quantity` must be positive
+1. `systemItemId` is required.
+2. `quantity` must be positive.
+3. `propertyMacroUuid` may only be set when system `features.propertyMacros` is true.
 
-## Catalyst
+## Macro Contracts
 
-### Purpose
+### Crafting Check Macro Contract
 
-Represents a required non-consumable component (tools, workstations, etc.).
+Input context must include:
 
-### Properties
+- `recipe`
+- `craftingSystem`
+- `craftingActor`
+- `componentSourceActors`
+- `ingredientPool` (resolved/consumed and available ingredient metadata)
+- `candidateIngredientSet`
+- `resolvedEssences` (aggregated essence totals for selected ingredient pool)
+
+Return shape:
 
 ```javascript
 {
-  systemItemId: string | null, // Managed item reference
-  itemUuid: string | null,     // Foundry Source UUID (fallback)
-  tag: string | null,
-  required: boolean,
-  mustBeEquipped: boolean,
-  degradesOnUse: boolean,
-  degradeAmount: number
+  success: boolean,
+  outcome: string,              // Must be in craftingCheck.outcomes
+  data?: object                 // Optional payload passed to property macros
 }
 ```
 
-### Requirements
+### Property Macro Contract
 
-1. At least one of `systemItemId`, `itemUuid`, or `tag` must be set
-2. If `degradesOnUse`, item must have a quantity or uses system
+Input context must include:
 
-## Item Flags
+- `recipe`
+- `craftingSystem`
+- `craftingActor`
+- `ingredientPool`
+- `resolvedIngredients`
+- `resolvedCatalysts`
+- `resolvedEssences`
+- `essenceSources` (essenceId -> source item breakdown)
+- `checkResult` (output from crafting check macro, if enabled)
+- `result` (current result descriptor)
 
-### Tags Flag
-
-```javascript
-item.setFlag('fabricate-v2', 'tags', ['metal', 'ore', 'iron']);
-```
-
-### Tier Flag
-
-```javascript
-item.setFlag('fabricate-v2', 'tier', 'rare');
-```
-
-### Essences Flag
+Return shape:
 
 ```javascript
-item.setFlag('fabricate-v2', 'essences', {
-  'light': 2,
-  'fire': 1
-});
+{
+  [propertyPath: string]: any
+}
 ```
+
+Returned map is merged into created item data before document creation.
+
+## Essence Effect Transfer Rule
+
+When `recipe.transferEffects` is true and `features.essences` is enabled:
+
+1. Determine contributing essence IDs from resolved ingredients.
+2. For each contributing essence ID, if `associatedSystemItemId` exists and resolves, collect active effects from that associated item.
+3. Transfer those effects to result items via the standard effect-transfer pipeline.
+
+Effect transfer quantity scaling for essence-associated items is out of scope for this phase (transfer occurs once per contributing essence type).

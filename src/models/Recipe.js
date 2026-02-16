@@ -23,15 +23,17 @@ export class Recipe {
       s instanceof IngredientSet ? s : IngredientSet.fromJSON(s)
     );
 
-    // Output (multiple items can be produced)
-    this.results = (data.results || []).map(r =>
-      r instanceof Result ? r : Result.fromJSON(r)
-    );
+    // Output groups (canonical). Legacy flat `results` is still accepted and flattened for compatibility.
+    this.resultGroups = this._normalizeResultGroups(data);
+    this.results = this.resultGroups.flatMap(group => group.results);
 
     // Recipe behavior
     this.isVariable = data.isVariable !== undefined ? data.isVariable : false;
     this.transferEffects = data.transferEffects !== undefined ? data.transferEffects : false;
     this.requiresAllSets = data.requiresAllSets !== undefined ? data.requiresAllSets : false;
+    this.outcomeRouting = data.outcomeRouting && typeof data.outcomeRouting === 'object'
+      ? { ...data.outcomeRouting }
+      : null;
 
     // Metadata
     this.metadata = data.metadata || {
@@ -47,9 +49,11 @@ export class Recipe {
    * @returns {string}
    */
   getResultDescription() {
-    if (this.results.length === 0) return 'No result';
-    if (this.results.length === 1) return this.results[0].getDescription();
-    return `${this.results.length} items`;
+    if (this.resultGroups.length === 0) return 'No result';
+    if (this.resultGroups.length === 1 && this.resultGroups[0].results.length === 1) {
+      return this.resultGroups[0].results[0].getDescription();
+    }
+    return `${this.resultGroups.length} result groups`;
   }
 
   /**
@@ -94,31 +98,51 @@ export class Recipe {
     }
 
     // Result validation
-    if (this.results.length === 0) {
-      errors.push('Recipe must have at least one result');
+    if (this.resultGroups.length === 0) {
+      errors.push('Recipe must have at least one result group');
     }
 
+    const resultGroupIds = new Set();
     const resultIds = new Set();
-    for (const result of this.results) {
-      // Check for duplicate IDs
-      if (resultIds.has(result.id)) {
-        errors.push(`Duplicate result ID: ${result.id}`);
+    for (const group of this.resultGroups) {
+      if (resultGroupIds.has(group.id)) {
+        errors.push(`Duplicate result group ID: ${group.id}`);
       }
-      resultIds.add(result.id);
+      resultGroupIds.add(group.id);
+      if (!Array.isArray(group.results) || group.results.length === 0) {
+        errors.push(`Result group "${group.id}" must contain at least one result`);
+        continue;
+      }
 
-      const resultValidation = result.validate();
-      if (!resultValidation.valid) {
-        errors.push(`Result "${result.id}": ${resultValidation.errors.join(', ')}`);
+      for (const result of group.results) {
+        if (resultIds.has(result.id)) {
+          errors.push(`Duplicate result ID: ${result.id}`);
+        }
+        resultIds.add(result.id);
+
+        const resultValidation = result.validate();
+        if (!resultValidation.valid) {
+          errors.push(`Result "${result.id}": ${resultValidation.errors.join(', ')}`);
+        }
       }
     }
 
     // Variable recipe validation
     if (this.isVariable) {
       for (const ingredientSet of this.ingredientSets) {
-        for (const resultId of ingredientSet.resultMapping) {
-          if (!resultIds.has(resultId)) {
-            errors.push(`Ingredient set "${ingredientSet.name || ingredientSet.id}" references invalid result ID: ${resultId}`);
+        for (const mappingId of ingredientSet.resultMapping) {
+          const valid = resultGroupIds.has(mappingId) || resultIds.has(mappingId);
+          if (!valid) {
+            errors.push(`Ingredient set "${ingredientSet.name || ingredientSet.id}" references invalid result mapping ID: ${mappingId}`);
           }
+        }
+      }
+    }
+
+    if (this.outcomeRouting && typeof this.outcomeRouting === 'object') {
+      for (const [outcome, resultGroupId] of Object.entries(this.outcomeRouting)) {
+        if (resultGroupId && !resultGroupIds.has(resultGroupId)) {
+          errors.push(`Outcome routing "${outcome}" references invalid result group ID: ${resultGroupId}`);
         }
       }
     }
@@ -141,10 +165,17 @@ export class Recipe {
       tags: this.tags,
       enabled: this.enabled,
       ingredientSets: this.ingredientSets.map(s => s.toJSON()),
+      resultGroups: this.resultGroups.map(group => ({
+        id: group.id,
+        name: group.name,
+        results: group.results.map(r => r.toJSON())
+      })),
+      // Legacy alias retained for compatibility with older consumers.
       results: this.results.map(r => r.toJSON()),
       isVariable: this.isVariable,
       transferEffects: this.transferEffects,
       requiresAllSets: this.requiresAllSets,
+      outcomeRouting: this.outcomeRouting,
       metadata: this.metadata
     };
   }
@@ -172,15 +203,41 @@ export class Recipe {
           }))
         })
       ],
-      results: [
-        new Result({
+      resultGroups: [
+        {
           id: 'default',
-          itemUuid: result.itemUuid,
-          quantity: result.quantity || 1
-        })
+          name: 'Default',
+          results: [
+            new Result({
+              id: 'default-result',
+              itemUuid: result.itemUuid,
+              quantity: result.quantity || 1
+            })
+          ]
+        }
       ],
       isVariable: false,
       transferEffects: false
+    });
+  }
+
+  _normalizeResultGroups(data = {}) {
+    if (Array.isArray(data.resultGroups) && data.resultGroups.length > 0) {
+      return data.resultGroups.map((group, idx) => ({
+        id: group?.id || foundry.utils.randomID(),
+        name: group?.name || `Result Group ${idx + 1}`,
+        results: (group?.results || []).map(r => (r instanceof Result ? r : Result.fromJSON(r)))
+      }));
+    }
+
+    const legacyResults = Array.isArray(data.results) ? data.results : [];
+    return legacyResults.map((r, idx) => {
+      const result = r instanceof Result ? r : Result.fromJSON(r);
+      return {
+        id: result.id || foundry.utils.randomID(),
+        name: `Result Group ${idx + 1}`,
+        results: [result]
+      };
     });
   }
 }

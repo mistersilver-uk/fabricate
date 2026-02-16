@@ -15,9 +15,8 @@ export class Result {
     // Number of items created
     this.quantity = data.quantity || 1;
 
-    // Dynamic property calculation
-    // e.g., { "system.damage.parts": "1d6 + @tier" }
-    this.propertyFormulas = data.propertyFormulas || {};
+    // Macro-based property calculation
+    this.propertyMacroUuid = data.propertyMacroUuid || null;
   }
 
   /**
@@ -35,9 +34,8 @@ export class Result {
       errors.push('Result quantity must be a positive number');
     }
 
-    // Validate property formulas
-    if (this.propertyFormulas && typeof this.propertyFormulas !== 'object') {
-      errors.push('Property formulas must be an object');
+    if (this.propertyMacroUuid !== null && typeof this.propertyMacroUuid !== 'string') {
+      errors.push('Property macro UUID must be a string or null');
     }
 
     return {
@@ -60,7 +58,7 @@ export class Result {
       systemItemId: this.systemItemId,
       itemUuid: this.itemUuid,
       quantity: this.quantity,
-      propertyFormulas: this.propertyFormulas
+      propertyMacroUuid: this.propertyMacroUuid
     };
   }
 

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Fabricate v2 is a system-agnostic crafting module for Foundry VTT that lets GMs define their own crafting systems (rules + data), curate the items those systems can use, and enables players to craft using those rules.
+Fabricate v2 is a system-agnostic crafting module for Foundry VTT that lets GMs define crafting systems, curate managed item libraries, and provide players with clear crafting workflows.
 
 ## Core Principles
 
@@ -10,20 +10,20 @@ Fabricate v2 is a system-agnostic crafting module for Foundry VTT that lets GMs 
 
 - Works with any game system (D&D 5e, Pathfinder, Savage Worlds, etc.)
 - No hardcoded system-specific logic
-- GMs decide how to compute checks and outcomes via formulas/macros
-- Prefer to use Foundry's core APIs and styles before creating custom elements
+- GMs define outcome logic through configurable macros
+- Prefer Foundry core APIs/styles before custom UI
 
 ### Progressive Complexity
 
-- **Simple Mode**: Basic recipe definition (A + B = C)
-- **Advanced Mode**: Variable outputs, catalysts, essences, tiers, tags, effect transfer, formulas
-- Advanced options are explicitly enabled per crafting system
+- **Simple Recipes**: One ingredient set, one result path, minimal options
+- **Complex Recipes** (system toggle): Multiple ingredient sets, multiple results, variable/routed outcomes
+- Optional system features are explicitly enabled per crafting system
 
 ### Player Accessible
 
-- GMs define recipes
-- Players access crafting through UI
-- Clear feedback on requirements and results
+- GMs define systems and recipes
+- Players craft through a clear, constrained UI
+- Requirements/results are explained without exposing disabled features
 
 ## Architecture
 
@@ -32,111 +32,83 @@ Fabricate v2 is a system-agnostic crafting module for Foundry VTT that lets GMs 
 ```text
 fabricate-v2/
 |-- src/
-|   |-- models/         # Data models (Recipe, Ingredient, Catalyst)
-|   |-- systems/        # Core systems (RecipeManager, CraftingEngine)
-|   |-- ui/             # User interface (CraftingApp, ActorSelectionDialog)
-|   |-- utils/          # Utilities (FormulaEvaluator)
+|   |-- models/         # Data models (Recipe, IngredientSet, Result, Catalyst, CraftingSystem)
+|   |-- systems/        # Core systems (RecipeManager, CraftingEngine, CraftingSystemManager)
+|   |-- ui/             # User interfaces (CraftingApp, RecipeManagerApp, RecipeEditorApp)
+|   |-- utils/          # Utilities (macro execution helpers, validation helpers)
 |   `-- main.js         # Module entry point
 |-- styles/             # CSS
 |-- templates/          # Handlebars templates
 |-- examples/           # Example macros
-`-- spec/               # Specifications (this directory)
+`-- spec/               # Specifications
 ```
 
 ### Core Components
 
 **Data Models**
 
-- `CraftingSystem` - System-wide rules + configuration + item library
-- `SystemItem` - Curated item entry within a system
+- `CraftingSystem` - System-wide feature toggles, checks/outcomes config, managed item library
+- `EssenceDefinition` - System-defined essence catalog entry (name, description, optional associated item)
+- `SystemItem` - Curated item entry used by recipes
 - `Recipe` - Recipe definition scoped to a crafting system
-- `Ingredient` - Required consumable components (item or tag/tier alternative)
-- `Result` - Components produced when crafting
-- `Catalyst` - Required non-consumable components (item or tag alternative)
+- `IngredientSet` - One required ingredient/catalyst bundle
+- `Ingredient` - Required consumable managed item
+- `Catalyst` - Required non-consumable managed item
+- `Result` - Item produced by crafting
 
 **Systems**
 
-- `CraftingSystemManager` - Systems and managed item libraries
+- `CraftingSystemManager` - Crafting system CRUD and item-library management
 - `RecipeManager` - Recipe CRUD and storage
-- `CraftingEngine` - Crafting execution
+- `CraftingEngine` - Validation, checks, execution, result creation
 
 **UI**
 
-- `CraftingApp` - Main crafting interface with in-app actor selection
-
-**Utilities**
-
-- `FormulaEvaluator` - Safe mathematical expression evaluation
-
-## Technology Stack
-
-- **Foundry VTT**: v13 minimum
-- **Build System**: Vite (ES modules)
-- **Templates**: Handlebars
-- **UI Framework**: Foundry ApplicationV2
+- `CraftingApp` - Player crafting interface
+- `RecipeManagerApp` - GM system/item/recipe administration
+- `RecipeEditorApp` - GM recipe authoring
 
 ## Data Flow
 
-1. **Crafting System Definition** (GM)
-   - GM creates a crafting system
-   - Optional advanced options (tags/essences/categories/tiers) are enabled per system
-   - System items are curated from world/compendium drops
-2. **Recipe Definition** (GM)
-   - GM creates recipes scoped to a crafting system
-   - Ingredients/catalysts/results reference system items or tag/tier requirements
-   - Recipes stored in world settings and available to all players
-
-2. **Crafting** (Player)
-   - Player clicks "Craft Item" button in Items sidebar
-   - CraftingApp opens with smart defaults
-   - Player selects crafting actor (where results go)
-   - Player selects component source actors (where ingredients come from)
-   - Player views available recipes based on selected sources
-   - Player selects recipe and initiates craft
-   - CraftingEngine validates and executes
-   - Items consumed from source actors, new items added to crafting actor
-
-3. **Advanced Features**
-   - Catalyst validation (non-consumable requirements)
-   - Variable output calculation (formulas)
-   - Effect transfer (ingredients -> result)
-   - Tag/tier/essence matching (if enabled by system)
+1. **Crafting System Definition (GM)**
+   - GM creates a crafting system.
+   - GM enables optional features through vertical feature cards (categories, item tags, essences, complex recipes, property macros, crafting checks, outcome routing).
+   - GM configures allowed values where relevant (categories, item tags, essence definitions, check outcomes).
+   - GM curates managed items from world/compendium drops.
+2. **Recipe Definition (GM)**
+   - GM creates recipes scoped to one crafting system.
+   - Recipe editor only shows controls for enabled system features.
+   - If complex recipes are disabled, editor only permits first ingredient set and first result path.
+3. **Crafting (Player)**
+   - Player opens crafting UI, selects actors, selects recipe, crafts.
+   - Engine validates requirements, evaluates optional crafting check macro, and resolves outcome.
+   - Engine applies optional property-calculation macro(s) to produced results.
+   - Essence quantities can be satisfied by "raw essence" items in the ingredient pool (for example, vial/crystal variants with different amounts).
+   - If effect transfer is enabled, essence-associated item effects can be transferred to results.
+   - Items are consumed/retained per recipe rules and results are created.
 
 ## Foundry Integration
 
 ### UI Integration
 
-- **Items Directory**: "Craft Item" button in header
-- **System Agnostic**: Direct DOM injection (works with any system)
-- **ApplicationV2**: Uses Foundry v13 ApplicationV2 APIs
+- Items Directory: `Craft Item` button
+- GM admin via `Crafting Admin` application
+- ApplicationV2 APIs (Foundry v13+)
 
 ### Data Storage
 
-- Recipes stored in world settings (`fabricate-v2.recipes`)
-- Crafting systems stored in world settings (`fabricate-v2.craftingSystems`)
-- Item tags stored in item flags (`fabricate-v2.tags`)
-- Item tiers stored in item flags (`fabricate-v2.tier`)
-- Item essences stored in item flags (`fabricate-v2.essences`)
-- User preferences stored in client settings (`fabricate-v2.lastCraftingActor`, `fabricate-v2.lastComponentSources`)
+- Crafting systems: `fabricate-v2.craftingSystems`
+- Recipes: `fabricate-v2.recipes`
+- User prefs: `fabricate-v2.lastCraftingActor`, `fabricate-v2.lastComponentSources`, `fabricate-v2.lastManagedCraftingSystem`
 
 ### Permissions
 
-- GMs can create/edit/delete recipes
-- Players can view recipes and craft (if they have owned actors)
-- Respects Foundry's ownership system
+- GMs manage systems/items/recipes
+- Players craft using owned actors
+- Foundry ownership/permission model is respected
 
 ## Versioning
 
-- **Module Version**: Semantic versioning (MAJOR.MINOR.PATCH)
-- **Foundry Compatibility**: Specified in module.json
-- **API Stability**: Public API (game.fabricate) follows semver
-- **Backwards Compatibility**: Not guaranteed before v2.0.0. v1.0.0 is skipped; backwards compatibility for world data and API is preserved from v2.0.0 onward.
-
-## Future Considerations
-
-- Skill checks and DC requirements
-- Crafting time and progress tracking
-- Batch crafting (multiple quantities)
-- Recipe discovery system
-- Crafting stations/locations
-- Deeper system rule configuration (formulas, difficulty model UI)
+- Semantic versioning for module releases
+- Foundry compatibility declared in `module.json`
+- Backwards compatibility is not required before first stable release

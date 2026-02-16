@@ -58,7 +58,7 @@
               </div>
               <div class="form-group span-2">
                 <label class="checkbox-label"><input type="checkbox" name="systemAdvancedEnabled" data-action="toggleAdvancedOptions" {{#if selectedSystem.advancedOptionsEnabled}}checked{{/if}} /> Show advanced options</label>
-                <p class="hint">Advanced options let you define tags, essences, categories, and tiers. Use tags for item matching, essences for recipe requirements, and categories to group recipes.</p>
+                <p class="hint">Advanced options let you configure categories, item tags, essence definitions, complex recipe behavior, and macro-driven crafting logic.</p>
               </div>
             </div>
             <div class="inline-actions">
@@ -66,80 +66,148 @@
             </div>
 
             {{#if selectedSystem.advancedOptionsEnabled}}
-            <div class="system-advanced-toggles">
-              <label><input type="checkbox" name="enableCategories" data-action="toggleFeature" data-feature="categories" {{#if selectedSystem.enableCategories}}checked{{/if}} /> Enable Categories</label>
-              <label><input type="checkbox" name="enableTags" data-action="toggleFeature" data-feature="tags" {{#if selectedSystem.enableTags}}checked{{/if}} /> Enable Tags</label>
-              <label><input type="checkbox" name="enableEssences" data-action="toggleFeature" data-feature="essences" {{#if selectedSystem.enableEssences}}checked{{/if}} /> Enable Essences</label>
-              <label><input type="checkbox" name="enableTiers" data-action="toggleFeature" data-feature="tiers" {{#if selectedSystem.enableTiers}}checked{{/if}} /> Enable Tiers</label>
-            </div>
-            <div class="system-config-grid">
-              {{#if selectedSystem.enableCategories}}
-              <section class="config-block">
-                <h4>Recipe Categories</h4>
-                <div class="panel-toolbar compact">
-                  <input type="text" name="newSystemCategory" placeholder="e.g. Cooking" />
-                  <button type="button" data-action="addSystemCategory"><i class="fas fa-plus"></i> Add</button>
+            <div class="feature-card-stack">
+              <section class="feature-card">
+                <div class="feature-card-header">
+                  <div>
+                    <h4>Recipe Categories</h4>
+                    <p class="hint">Organize and filter recipes by category in admin and crafting views.</p>
+                  </div>
+                  <label class="checkbox-label"><input type="checkbox" data-action="toggleFeature" data-feature="categories" {{#if selectedSystem.enableCategories}}checked{{/if}} /> Enable</label>
                 </div>
-                <div class="token-list">
-                  {{#each selectedSystem.categories}}
-                    <span class="token">{{this}} <button type="button" data-action="removeSystemCategory" data-category="{{this}}"><i class="fas fa-times"></i></button></span>
-                  {{else}}
-                    <p class="hint">No categories defined yet.</p>
-                  {{/each}}
-                </div>
+                {{#if selectedSystem.enableCategories}}
+                  <div class="panel-toolbar compact">
+                    <input type="text" name="newSystemCategory" placeholder="e.g. Cooking" />
+                    <button type="button" data-action="addSystemCategory"><i class="fas fa-plus"></i> Add</button>
+                  </div>
+                  <div class="token-list">
+                    {{#each selectedSystem.categories}}
+                      <span class="token">{{this}} <button type="button" data-action="removeSystemCategory" data-category="{{this}}"><i class="fas fa-times"></i></button></span>
+                    {{else}}
+                      <p class="hint">No categories defined yet.</p>
+                    {{/each}}
+                  </div>
+                {{/if}}
               </section>
-              {{/if}}
 
-              {{#if selectedSystem.enableTags}}
-              <section class="config-block">
-                <h4>Tags</h4>
-                <div class="panel-toolbar compact">
-                  <input type="text" name="newSystemTag" placeholder="e.g. armour:leather" />
-                  <button type="button" data-action="addSystemTag"><i class="fas fa-plus"></i> Add</button>
+              <section class="feature-card">
+                <div class="feature-card-header">
+                  <div>
+                    <h4>Item Tags</h4>
+                    <p class="hint">Use tags for categorization, sorting, and search in managed items.</p>
+                  </div>
+                  <label class="checkbox-label"><input type="checkbox" data-action="toggleFeature" data-feature="itemTags" {{#if selectedSystem.enableTags}}checked{{/if}} /> Enable</label>
                 </div>
-                <div class="token-list">
-                  {{#each selectedSystem.tags}}
-                    <span class="token">{{this}} <button type="button" data-action="removeSystemTag" data-tag="{{this}}"><i class="fas fa-times"></i></button></span>
-                  {{else}}
-                    <p class="hint">No tags defined yet.</p>
-                  {{/each}}
-                </div>
+                {{#if selectedSystem.enableTags}}
+                  <div class="panel-toolbar compact">
+                    <input type="text" name="newSystemTag" placeholder="e.g. armour:leather" />
+                    <button type="button" data-action="addSystemTag"><i class="fas fa-plus"></i> Add</button>
+                  </div>
+                  <div class="token-list">
+                    {{#each selectedSystem.itemTags}}
+                      <span class="token">{{this}} <button type="button" data-action="removeSystemTag" data-tag="{{this}}"><i class="fas fa-times"></i></button></span>
+                    {{else}}
+                      <p class="hint">No item tags defined yet.</p>
+                    {{/each}}
+                  </div>
+                {{/if}}
               </section>
-              {{/if}}
 
-              {{#if selectedSystem.enableEssences}}
-              <section class="config-block">
-                <h4>Essences</h4>
-                <div class="panel-toolbar compact">
-                  <input type="text" name="newSystemEssence" placeholder="e.g. fire" />
-                  <button type="button" data-action="addSystemEssence"><i class="fas fa-plus"></i> Add</button>
+              <section class="feature-card">
+                <div class="feature-card-header">
+                  <div>
+                    <h4>Essences</h4>
+                    <p class="hint">Define essence types with descriptions and optional associated managed items.</p>
+                  </div>
+                  <label class="checkbox-label"><input type="checkbox" data-action="toggleFeature" data-feature="essences" {{#if selectedSystem.enableEssences}}checked{{/if}} /> Enable</label>
                 </div>
-                <div class="token-list">
-                  {{#each selectedSystem.essences}}
-                    <span class="token">{{this}} <button type="button" data-action="removeSystemEssence" data-essence="{{this}}"><i class="fas fa-times"></i></button></span>
-                  {{else}}
-                    <p class="hint">No essences defined yet.</p>
-                  {{/each}}
-                </div>
+                {{#if selectedSystem.enableEssences}}
+                  <div class="panel-toolbar compact">
+                    <input type="text" name="newSystemEssenceName" placeholder="Essence name (e.g. Water)" />
+                    <input type="text" name="newSystemEssenceDescription" placeholder="Description (optional)" />
+                    <select name="newSystemEssenceAssociatedItem">
+                      <option value="">No associated item</option>
+                      {{#each selectedSystem.managedItemOptions}}
+                        <option value="{{id}}">{{name}}</option>
+                      {{/each}}
+                    </select>
+                    <button type="button" data-action="addSystemEssenceDefinition"><i class="fas fa-plus"></i> Add</button>
+                  </div>
+                  <div class="essence-definition-list">
+                    {{#each selectedSystem.essenceDefinitions}}
+                      <article class="essence-definition-row">
+                        <div class="essence-definition-meta">
+                          <strong>{{name}}</strong>
+                          <code>{{id}}</code>
+                          {{#if description}}<p class="hint">{{description}}</p>{{/if}}
+                          {{#if associatedItemName}}
+                            <p class="hint">Associated item: {{associatedItemName}}</p>
+                          {{/if}}
+                        </div>
+                        <button type="button" data-action="removeSystemEssenceDefinition" data-essence-id="{{id}}" title="Remove Essence"><i class="fas fa-trash"></i></button>
+                      </article>
+                    {{else}}
+                      <p class="hint">No essence definitions yet.</p>
+                    {{/each}}
+                  </div>
+                {{/if}}
               </section>
-              {{/if}}
 
-              {{#if selectedSystem.enableTiers}}
-              <section class="config-block">
-                <h4>Tiers</h4>
-                <div class="panel-toolbar compact">
-                  <input type="text" name="newSystemTier" placeholder="e.g. common" />
-                  <button type="button" data-action="addSystemTier"><i class="fas fa-plus"></i> Add</button>
-                </div>
-                <div class="token-list">
-                  {{#each selectedSystem.tiers}}
-                    <span class="token">{{this}} <button type="button" data-action="removeSystemTier" data-tier="{{this}}"><i class="fas fa-times"></i></button></span>
-                  {{else}}
-                    <p class="hint">No tiers defined yet.</p>
-                  {{/each}}
+              <section class="feature-card">
+                <div class="feature-card-header">
+                  <div>
+                    <h4>Complex Recipes</h4>
+                    <p class="hint">Allow multiple ingredient sets, multiple result groups, and advanced routing controls.</p>
+                  </div>
+                  <label class="checkbox-label"><input type="checkbox" data-action="toggleFeature" data-feature="complexRecipes" {{#if selectedSystem.enableComplexRecipes}}checked{{/if}} /> Enable</label>
                 </div>
               </section>
-              {{/if}}
+
+              <section class="feature-card">
+                <div class="feature-card-header">
+                  <div>
+                    <h4>Property Calculation Macros</h4>
+                    <p class="hint">Use macros to compute result property updates from crafting context.</p>
+                  </div>
+                  <label class="checkbox-label"><input type="checkbox" data-action="toggleFeature" data-feature="propertyMacros" {{#if selectedSystem.enablePropertyMacros}}checked{{/if}} /> Enable</label>
+                </div>
+              </section>
+
+              <section class="feature-card">
+                <div class="feature-card-header">
+                  <div>
+                    <h4>Crafting Checks</h4>
+                    <p class="hint">Run a system-level check macro that returns pass/fail or named outcomes.</p>
+                  </div>
+                  <label class="checkbox-label"><input type="checkbox" data-action="toggleFeature" data-feature="craftingChecks" {{#if selectedSystem.enableCraftingChecks}}checked{{/if}} /> Enable</label>
+                </div>
+                {{#if selectedSystem.enableCraftingChecks}}
+                  <div class="panel-toolbar compact">
+                    <select name="craftingCheckMode">
+                      <option value="passFail" {{#if (eq selectedSystem.craftingCheckMode 'passFail')}}selected{{/if}}>Pass / Fail</option>
+                      <option value="tiered" {{#if (eq selectedSystem.craftingCheckMode 'tiered')}}selected{{/if}}>Tiered Outcomes</option>
+                    </select>
+                    <select name="craftingCheckMacroUuid">
+                      <option value="">No check macro</option>
+                      {{#each selectedSystem.availableScriptMacros}}
+                        <option value="{{uuid}}" {{#if (eq ../selectedSystem.craftingCheckMacroUuid uuid)}}selected{{/if}}>{{name}}</option>
+                      {{/each}}
+                    </select>
+                    <input type="text" name="craftingCheckOutcomes" value="{{selectedSystem.craftingCheckOutcomesText}}" placeholder="Outcomes (comma separated)" />
+                    <button type="button" data-action="saveCraftingCheckConfig"><i class="fas fa-save"></i> Save Check Config</button>
+                  </div>
+                {{/if}}
+              </section>
+
+              <section class="feature-card">
+                <div class="feature-card-header">
+                  <div>
+                    <h4>Outcome Routing</h4>
+                    <p class="hint">Map crafting-check outcomes to specific result groups when complex recipes are enabled.</p>
+                  </div>
+                  <label class="checkbox-label"><input type="checkbox" data-action="toggleFeature" data-feature="outcomeRouting" {{#if selectedSystem.enableOutcomeRouting}}checked{{/if}} /> Enable</label>
+                </div>
+              </section>
             </div>
             {{else}}
               <p class="hint">Advanced options are disabled for this system.</p>
@@ -184,9 +252,6 @@
                   </div>
                   <div class="item-meta">
                     <h4>{{name}}</h4>
-                    {{#if showTiers}}
-                      <p>{{tierLabel}}</p>
-                    {{/if}}
                     {{#if showTags}}
                       <div class="item-tag-list">
                         {{#each tags}}
