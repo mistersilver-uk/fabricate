@@ -14,12 +14,26 @@ CraftingSystem = {
   description?: string,
 
   // System-level invariant: all recipes must use this mode
+  // - `simple`: a recipe has 1 ingredient set and 1 result group. Crafting checks are optional pass/fail.
+  // - `mapped`: a recipe has 1 or more ingredient sets and 1 or more result groups.
+  // Each ingredient set can specify a result group.
+  // If none is specified the player chooses.
+  // Crafting checks are optional pass/fail.
+  // - `tiered`: a recipe has 1 or more ingredient sets and 1 or more result groups.
+  // Crafting checks are mandatory, and must return a valid outcome from the list of outcomes defined in the crafting check.
+  // Recipe defines outcome-to-result-group mappings.
+  // - `progressive`: a recipe has 1 ingredient set and 1 result group containing ordered results.
+  // In this mode, system items used as results must have a "difficulty" property (minimum value 1), which is otherwise ignored and not displayed.
+  // This difficulty value should be set on the item for consistency across recipes, but should be displayed in the recipe editor and crafting UI.  
+  // Crafting checks are mandatory and must return a numeric value.
+  // The check value is compared to result difficulties and check award mode to determine the final results.
   resolutionMode: "simple" | "mapped" | "tiered" | "progressive",
 
   features: {
     essences: boolean,
     propertyMacros: boolean,
     effectTransfer: boolean,
+    multiStepRecipes: boolean, // Allow recipes to have multiple sequential steps
   },
 
   categories: string[],
@@ -34,14 +48,14 @@ CraftingSystem = {
   craftingCheck: {
     enabled: boolean,
 
-    // When enabled:
-    // - simple/mapped: typically "passFail" (optional)
-    // - tiered: "tiered" (required)
-    // - progressive: "progressive" (required)
-    mode: "passFail" | "tiered" | "progressive",
-    
     // Macro that performs the check
+    // - simple/mapped: optional pass/fail check
+    // - tiered: required, must return an outcome from the outcomes list
+    // - progressive: required, must return a numeric value
     macroUuid?: string,
+
+    // Universal: macro executed after a successful step completes (after items consumed/created)
+    successMacroUuid?: string,
 
     // Universal: macro executed when a step fails due to check failure or contract failure
     failureMacroUuid?: string,
@@ -62,15 +76,96 @@ CraftingSystem = {
     },
   },
 
+  // Recipe visibility and knowledge configuration
+  recipeVisibility: {
+    // Base listing behaviour for recipes in this system:
+    // - "player": Recipes are only visible to specific players chosen by the GM, or to all players if no visibility is defined.
+    // - "knowledge": list only recipes the viewer can access
+    listMode: "player" | "knowledge",
+
+    // Knowledge gating options (optional, only used when listMode === "knowledge")
+    knowledge?: {
+      // How knowledge is obtained/validated
+      // - "item": Recipes must be linked to a recipe item to be craftable. That item must be in the crafting actor's inventory.
+      // - "learned": Recipes must be linked to a recipe item and learned by the crafting actor by using (optionally consuming) the recipe item.
+      // - "itemOrLearned": A hybrid of item and learned modes, where the recipe is visible if either the item is present or the recipe is learned by the actor.
+      mode: "item" | "learned" | "itemOrLearned",
+
+      // When mode includes "item":
+      item?: {
+        limitUses: boolean, // If true, the recipe item can only be used a limited number of times before it is consumed.
+        maxUses?: number, // Maximum number of times the item can be used to craft the recipe if limitUses is true.
+      },
+
+      // When mode includes "learned":
+      learn?: {
+        consumeOnLearn: boolean, // If true, consume the recipe item when learning. Default: true.
+      },
+    },
+  },
+
+  // Recipe visibility and knowledge configuration
+  recipeVisibility: {
+    // Base listing behaviour for recipes in this system:
+    // - "player": Recipes are only visible to specific players chosen by the GM, or to all players if no visibility is defined.
+    // - "knowledge": list only recipes the viewer can access
+    listMode: "player" | "knowledge",
+
+    // Knowledge gating options (optional, only used when listMode === "knowledge")
+    knowledge?: {
+      // How knowledge is obtained/validated
+      // - "item": Recipes must be linked to a recipe item to be craftable. That item must be in the crafting actor's inventory.
+      // - "learned": Recipes must be linked to a recipe item and learned by the crafting actor by using (optionally consuming) the recipe item.
+      // - "itemOrLearned": A hybrid of item and learned modes, where the recipe is visible if either the item is present or the recipe is learned by the actor.
+      mode: "item" | "learned" | "itemOrLearned",
+
+      // When mode includes "item":
+      item?: {
+        limitUses: boolean, // If true, the recipe item can only be used a limited number of times before it is consumed.
+        maxUses?: number, // Maximum number of times the item can be used to craft the recipe if limitUses is true.
+      },
+
+      // When mode includes "learned":
+      learn?: {
+        consumeOnLearn: boolean, // If true, consume the recipe item when learning. Default: true.
+      },
+    },
+  },
+
+  // Recipe visibility and knowledge configuration
+  recipeVisibility: {
+    // Base listing behaviour for recipes in this system:
+    // - "player": Recipes are only visible to specific players chosen by the GM, or to all players if no visibility is defined.
+    // - "knowledge": list only recipes the viewer can access
+    listMode: "player" | "knowledge",
+
+    // Knowledge gating options (optional, only used when listMode === "knowledge")
+    knowledge?: {
+      // How knowledge is obtained/validated
+      // - "item": Recipes must be linked to a recipe item to be craftable. That item must be in the crafting actor's inventory.
+      // - "learned": Recipes must be linked to a recipe item and learned by the crafting actor by using (optionally consuming) the recipe item.
+      // - "itemOrLearned": A hybrid of item and learned modes, where the recipe is visible if either the item is present or the recipe is learned by the actor.
+      mode: "item" | "learned" | "itemOrLearned",
+
+      // When mode includes "item":
+      item?: {
+        limitUses: boolean, // If true, the recipe item can only be used a limited number of times before it is consumed.
+        maxUses?: number, // Maximum number of times the item can be used to craft the recipe if limitUses is true.
+      },
+
+      // When mode includes "learned":
+      learn?: {
+        consumeOnLearn: boolean, // If true, consume the recipe item when learning. Default: true.
+      },
+    },
+  },
+
   // Optional step requirements: time/currency
   requirements: {
-    // The specification for time requirements is still under development and will evolve over time with the implementation of Fabricate's time-based features
     time: {
-      enabled: boolean, 
-      provider: "foundry" | "module" | "macro",
-      moduleId?: string,              // provider="module"
-      getTimeMacroUuid?: string,      // provider="macro"
-      advanceTimeMacroUuid?: string,  // provider="macro"
+      enabled: boolean, // default false
+      // For now, Fabricate will use `now + timeRequirement` to determine when a step finishes
+      // The `gameWorldTimeUpdated` hook will be used to update the step's completion status when the world time changes to equal or exceed the step's target time
     },
 
     currency: {
@@ -81,9 +176,9 @@ CraftingSystem = {
       systemAdapter?: "dnd5e" | "pf2e",
 
       // provider="macro"
-      getCurrencyMacroUuid?: string,
-        decrementCurrencyMacroUuid?: string,
-        formatCurrencyMacroUuid?: string,
+      checkCurrencyMacroUuid?: string, // (actor, requiredAmount) => boolean
+      decrementCurrencyMacroUuid?: string, // (actor, amount) => void
+      formatCurrencyMacroUuid?: string, // (amount) => string
     },
   },
 }
@@ -144,16 +239,35 @@ Represents a complete recipe with inputs and outputs, plus optional routing/chec
   enabled: boolean,
   category: string | null,
 
-  ingredientSets: IngredientSet[],
-  resultGroups: ResultGroup[],
+  // Multi-step recipes (if features.multiStepRecipes is enabled)
+  // If disabled, recipe has exactly one implicit step with these fields
+  steps?: Step[],
 
-  requiresAllSets: boolean,     // false => OR, true => AND
+  // Single-step recipe fields (used when features.multiStepRecipes is false)
+  ingredientSets?: IngredientSet[],
+  resultGroups?: ResultGroup[],
+  requiresAllSets?: boolean,     // false => OR, true => AND
+
+  // Effect transfer (when features.effectTransfer is enabled)
   transferEffects: boolean,
 
-  // Optional routing by check outcome (when enabled on system)
-  outcomeRouting: {
+  // Tiered mode: mapping from crafting check outcomes to result groups
+  // Only used when resolutionMode === "tiered"
+  outcomeRouting?: {
     [outcome: string]: string   // outcome -> resultGroupId
-  } | null,
+  },
+
+  // Recipe visibility (based on system recipeVisibility configuration)
+  visibility?: {
+    restricted: boolean, // If true, only allowedUserIds can see this recipe (default false)
+    allowedUserIds?: string[], // Foundry user IDs
+  },
+
+  // Optional linkage to a recipe item (used when system knowledge mode includes item)
+  linkedRecipeItemUuid?: string, // UUID for an Item (world item or compendium entry)
+
+  // Allows a GM to make visible recipes unusable by players
+  locked: boolean, // Default: false
 
   metadata: {
     created: number,
@@ -166,13 +280,17 @@ Represents a complete recipe with inputs and outputs, plus optional routing/chec
 
 ### Requirements
 
-1. Must have at least one ingredient set.
-2. Must have at least one result group with at least one result.
-3. If system `features.complexRecipes` is `false`, recipe must use:
-   - exactly one ingredient set
-   - exactly one result group
+1. Must have at least one ingredient set (or at least one step with ingredient sets).
+2. Must have at least one result group with at least one result (or at least one step with result groups).
+3. Resolution mode constraints:
+   - **simple**: exactly one ingredient set and exactly one result group
+   - **mapped**: one or more ingredient sets, each with optional resultGroupId; one or more result groups
+   - **tiered**: one or more ingredient sets; one or more result groups; outcomeRouting must map all craftingCheck.outcomes
+   - **progressive**: exactly one ingredient set and exactly one result group with ordered results
 4. If `outcomeRouting` is used, all keys must exist in `CraftingSystem.craftingCheck.outcomes`.
 5. If `transferEffects` is true and `features.essences` is enabled, eligible essence-associated item effects are included in transfer.
+6. If `visibility.restricted` is true, `visibility.allowedUserIds` must be provided.
+7. If system `recipeVisibility.knowledge` mode includes "item" or "learned", recipes should have `linkedRecipeItemUuid` set to be craftable by players.
 
 ## IngredientSet
 
@@ -227,10 +345,6 @@ Represents a required non-consumable managed item.
 {
   systemItemId: string,         // Required
   required: boolean,
-  mustBeEquipped: boolean,
-  mustBeInInventory: boolean,
-  proximityRequired: boolean,
-  proximityDistance: number,
   degradesOnUse: boolean,
   maxUses: number | null
 }
@@ -239,7 +353,7 @@ Represents a required non-consumable managed item.
 ### Requirements
 
 1. `systemItemId` is required.
-2. If `degradesOnUse` is true, target item must support consumption/usage tracking.
+2. If `degradesOnUse` is true, fabricate must track uses of the catalyst in item flags (there is no system-agnostic way to do this yet).
 
 ## ResultGroup
 
