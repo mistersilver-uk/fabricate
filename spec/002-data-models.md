@@ -125,62 +125,6 @@ CraftingSystem = {
     },
   },
 
-  // Recipe visibility and knowledge configuration
-  recipeVisibility: {
-    // Base listing behaviour for recipes in this system:
-    // - "player": Recipes are only visible to specific players chosen by the GM, or to all players if no visibility is defined.
-    // - "knowledge": list only recipes the viewer can access
-    listMode: "player" | "knowledge",
-
-    // Knowledge gating options (optional, only used when listMode === "knowledge")
-    knowledge?: {
-      // How knowledge is obtained/validated
-      // - "item": Recipes must be linked to a recipe item to be craftable. That item must be in the crafting actor's inventory.
-      // - "learned": Recipes must be linked to a recipe item and learned by the crafting actor by using (optionally consuming) the recipe item.
-      // - "itemOrLearned": A hybrid of item and learned modes, where the recipe is visible if either the item is present or the recipe is learned by the actor.
-      mode: "item" | "learned" | "itemOrLearned",
-
-      // When mode includes "item":
-      item?: {
-        limitUses: boolean, // If true, the recipe item can only be used a limited number of times before it is consumed.
-        maxUses?: number, // Maximum number of times the item can be used to craft the recipe if limitUses is true.
-      },
-
-      // When mode includes "learned":
-      learn?: {
-        consumeOnLearn: boolean, // If true, consume the recipe item when learning. Default: true.
-      },
-    },
-  },
-
-  // Recipe visibility and knowledge configuration
-  recipeVisibility: {
-    // Base listing behaviour for recipes in this system:
-    // - "player": Recipes are only visible to specific players chosen by the GM, or to all players if no visibility is defined.
-    // - "knowledge": list only recipes the viewer can access
-    listMode: "player" | "knowledge",
-
-    // Knowledge gating options (optional, only used when listMode === "knowledge")
-    knowledge?: {
-      // How knowledge is obtained/validated
-      // - "item": Recipes must be linked to a recipe item to be craftable. That item must be in the crafting actor's inventory.
-      // - "learned": Recipes must be linked to a recipe item and learned by the crafting actor by using (optionally consuming) the recipe item.
-      // - "itemOrLearned": A hybrid of item and learned modes, where the recipe is visible if either the item is present or the recipe is learned by the actor.
-      mode: "item" | "learned" | "itemOrLearned",
-
-      // When mode includes "item":
-      item?: {
-        limitUses: boolean, // If true, the recipe item can only be used a limited number of times before it is consumed.
-        maxUses?: number, // Maximum number of times the item can be used to craft the recipe if limitUses is true.
-      },
-
-      // When mode includes "learned":
-      learn?: {
-        consumeOnLearn: boolean, // If true, consume the recipe item when learning. Default: true.
-      },
-    },
-  },
-
   // Optional step requirements: time/currency
   requirements: {
     time: {
@@ -240,9 +184,16 @@ Represents a curated item entry used by recipes.
   img: string,
   sourceUuid: string | null,
   tags: string[],               // For item categorization/sorting/search only
-  essences: { [essenceId: string]: number }
+  essences: { [essenceId: string]: number },
+  difficulty?: number,          // Progressive mode only: cost in currency spending model (minimum 1)
 }
 ```
+
+### Requirements
+
+1. `difficulty` is only used when the crafting system `resolutionMode` is "progressive".
+2. If set, `difficulty` must be a positive integer (minimum value 1).
+3. The difficulty value represents the "cost" of the item in the progressive mode currency spending model.
 
 ## Recipe
 
@@ -450,6 +401,57 @@ Represents one produced item.
 1. `systemItemId` is required.
 2. `quantity` must be positive.
 3. `propertyMacroUuid` may only be set when system `features.propertyMacros` is true.
+
+## Actor Flags
+
+### Learned Recipes Flag
+
+Tracks which recipes an actor has learned (used when `recipeVisibility.knowledge` mode includes "learned").
+
+#### Purpose
+
+Stores a map of learned recipe IDs to learning metadata for each actor.
+
+#### Properties
+
+```javascript
+Actor.flags.fabricate.learnedRecipes = {
+  [recipeId: string]: {
+    learnedAt: number,        // Timestamp (milliseconds since epoch)
+    sourceItemUuid: string,   // UUID of the recipe item used to learn
+  }
+}
+```
+
+#### Requirements
+
+1. `recipeId` must reference a valid recipe in the crafting system.
+2. `learnedAt` must be a valid timestamp.
+3. `sourceItemUuid` should reference the item used to learn (may be null if item was consumed or deleted).
+
+## Item Flags
+
+### Recipe Item Usage Flag
+
+Tracks usage count for recipe items with limited uses (used when `knowledge.item.limitUses` is true).
+
+#### Purpose
+
+Stores the current usage count for a recipe item that has a usage limit.
+
+#### Properties
+
+```javascript
+Item.flags.fabricate.recipeItemUsage = {
+  timesUsed: number,  // Current usage count (starts at 0)
+}
+```
+
+#### Requirements
+
+1. `timesUsed` must be a non-negative integer.
+2. Maximum uses (`maxUses`) is defined in `CraftingSystem.recipeVisibility.knowledge.item.maxUses`, not stored per-item.
+3. When `timesUsed >= maxUses`, the item is considered exhausted and cannot be used for crafting.
 
 ## Macro Contracts
 

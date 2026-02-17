@@ -26,83 +26,34 @@ This spec is system-agnostic and must not assume any particular game system’s 
   - Learn-gated (must learn recipe, using a recipe item)
 - Ensure visibility is deterministic and explainable
 
-## Data Model Additions
+## Data Model
 
-### CraftingSystem Additions
+This specification uses the following data model fields defined in **002-data-models.md**:
 
-Add a `recipeVisibility` configuration to `CraftingSystem`:
+### CraftingSystem
 
-```js
-CraftingSystem.recipeVisibility = {
-  // Base listing behaviour for recipes in this system:
-  // - "player": Recipes are only visible to specific players chosen by the GM, or to all players if no visibility is defined.
-  // - "knowledge": list only recipes the viewer can access
-  listMode: "player" | "knowledge",
+- `recipeVisibility.listMode` - Controls how recipes are listed ("player" or "knowledge")
+- `recipeVisibility.knowledge.mode` - Knowledge gating mode ("item", "learned", "itemOrLearned")
+- `recipeVisibility.knowledge.item.limitUses` - Whether recipe items have limited uses
+- `recipeVisibility.knowledge.item.maxUses` - Maximum uses per recipe item
+- `recipeVisibility.knowledge.learn.consumeOnLearn` - Whether learning consumes the recipe item
 
-  // Knowledge gating options (optional)
-  knowledge: {
-    // How knowledge is obtained/validated
-    // - "item": Recipes must be linked to a recipe item to be craftable. That item must be in the crafting actor's inventory.
-    // - "learned": Recipes must be linked to a recipe item and learned by the crafting actor by using (optionally consuming) the recipe item.
-    // - "itemOrLearned": A hybrid of item and learned modes, where the recipe is visible if either the item is present or the recipe is learned by the actor.
-    mode: "item" | "learned" | "itemOrLearned",
+### Recipe
 
-    // When mode includes "item":
-    item: {
-      limitUses: boolean, // If true, the recipe item can only be used a limited number of times before it is consumed.
-      maxUses?: number, // Maximum number of times the item can be used to craft the recipe if limitUses is true.
-    },
+- `visibility.restricted` - Whether recipe is restricted to specific players (default: false)
+- `visibility.allowedUserIds` - List of Foundry user IDs allowed to view this recipe
+- `linkedRecipeItemUuid` - UUID of associated recipe item (world item or compendium entry)
+- `locked` - Whether recipe is locked by GM, preventing players from crafting (default: false)
 
-    // When mode includes "learn":
-    learn: {
-      consumeOnLearn: boolean, // If true, consume the recipe item when learning. Default: true.
-    },
-  },
-}
-```
+### Actor Flags
 
-### Recipe Additions
+- `Actor.flags.fabricate.learnedRecipes` - Map of recipe IDs to learning metadata (timestamp, source item UUID)
 
-Add a `visibility` object to each `Recipe`, a `linkedItemUuid`, and a `locked` flag:
+### Item Flags
 
-```js
-// Used when recipeVisibility.listMode == "player":
-Recipe.visibility = {
-  restricted: boolean, // If true, the recipe is only visible to the enumerated userIds. Default: false.
-  // Identifiers are Foundry user IDs.
-  allowedUserIds?: string[],
-},
-// Optional linkage to a recipe item (used when system knowledge mode includes item).
-// UUID for an Item (world item or compendium entry).
-Recipe.linkedRecipeItemUuid?: string,
+- `Item.flags.fabricate.recipeItemUsage.timesUsed` - Current usage count for recipe items with limited uses
 
-// Allows a GM to make visible recipes unusable by players.
-Recipe.locked: boolean, // Default: false.
-```
-
-### Actor Flag Additions
-
-For tracking learned recipes:
-
-```js
-// Actor flag namespace: flags.fabricate.learnedRecipes
-Actor.flags.fabricate.learnedRecipes = {
-  [recipeId: string]: {
-    learnedAt: number, // timestamp
-    sourceItemUuid: string, // the recipe item uuid used to learn
-  }
-}
-```
-
-For tracking recipe item usage:
-
-```js
-// If knowledge.item.limitUses is enabled, track usage on the item itself
-// Max usage is defined by knowledge.item.maxUses
-Item.flags.fabricate.recipeItemUsage = {
-  timesUsed: number
-}
-```
+See **002-data-models.md** for complete field definitions, validation rules, and requirements.
 
 ## Visibility Evaluation Algorithm
 

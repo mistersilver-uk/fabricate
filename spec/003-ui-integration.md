@@ -63,6 +63,7 @@ Fields shown depend on `resolutionMode`:
 - Universal:
     - Enable checks
     - Check Macro (macro drag and drop)
+    - Success Macro (macro drag and drop; optional)
     - Failure Macro (macro drag and drop; optional)
     - On Failure Consumption:
         - Consume ingredients on fail (default true)
@@ -124,9 +125,8 @@ These include:
 
 - Crafting Check (enable/disable, macro drag and drop)
     - Required for progressive and tiered resolution modes
+    - Success and Failure macros are configured in the Crafting Checks Card
 - Recipe Visibility (enable/configure)
-- On success Macro (enable/disable, macro drag and drop)
-- On failure Macro (enable/disable, macro drag and drop)
 
 ### Essences Tab
 
@@ -153,6 +153,7 @@ Capabilities:
 - Edit item (opens item editor)
     - If tags enabled: tag editor
     - If essences enabled: essence editor (essence name + amount)
+    - If progressive resolution mode: difficulty editor (numeric, minimum 1)
     - Drag and drop to change the associated game item
     - Remove the associated game item (makes the item invalid)
 
@@ -192,14 +193,17 @@ Recipe Editor is scoped to one crafting system.
 - Recipe base fields (name, description)
 - Category selector (only if enabled)
 - **Visibility & Locking** section (always shown; see below)
-- Step list (if enabled):
-    - Add step
-    - Remove step (must have ≥ 1 step)
-    - Reorder steps
-    - Edit step
-- If multi-step recipes are not enabled:
-    - Recipe Ingredient and Catalyst options editor
-    - Recipe Result options editor
+- If multi-step recipes enabled:
+    - Step list editor:
+        - Add step
+        - Remove step (must have ≥ 1 step)
+        - Reorder steps
+        - Edit step (opens Step Editor)
+    - Note: Recipe-level ingredient/result editors are NOT shown (steps contain these)
+- If multi-step recipes NOT enabled:
+    - Recipe has single implicit step
+    - Show recipe-level ingredient and catalyst editor
+    - Show recipe-level result editor (UI varies by resolution mode; see below)
 
 ### Visibility & Locking Section (per recipe)
 
@@ -262,13 +266,43 @@ Step Results editor UI depends on system resolution mode.
 
 ### Progressive Mode Step Results UI
 
-- Ordered list editor of progressive result entries:
-    - name
-    - threshold
-    - size (optional)
-    - result group selection
+- Single result group with ordered results list
+- For each result in order:
+    - System item selector (dropdown/picker)
+    - Item difficulty value (read-only badge, pulled from SystemItem.difficulty)
+    - Quantity
+- Drag to reorder results (changes crafting priority/order)
 - If system `allowPlayerReorder` is enabled:
-    - show an indicator that players can reorder entries during crafting
+    - Show indicator that players can reorder during crafting
+    - This affects which items they try to "purchase" first with their check value
+
+**Note**: In progressive mode, item difficulty values are set on the SystemItem itself (in Items Tab), not per-result. The recipe editor displays these values read-only for GM reference. GMs should ensure all items used in progressive recipes have difficulty values set.
+
+### Progressive Mode Player Experience
+
+When crafting in progressive mode, the player experience uses a "currency spending" model:
+
+**Before crafting:**
+- Recipe shows ordered list of possible results with their difficulty (cost)
+- If `allowPlayerReorder` is true, player can drag to reorder priorities
+- Total difficulty sum is displayed as reference
+
+**During crafting check:**
+- Player performs crafting check (via macro)
+- Check returns a numeric "currency" value
+
+**After check (result determination):**
+- System "purchases" items in order based on awardMode:
+  - **partial**: Get items sequentially; last item granted even with insufficient currency (partial credit)
+  - **equal**: Get items sequentially; must have enough remaining currency for each (≥ cost)
+  - **exceed**: Get items sequentially; must have MORE than cost (> cost, strictly greater)
+- Display which items were awarded and any remaining "currency"
+
+**Visual feedback:**
+- Show currency spending calculation step-by-step
+- Highlight awarded vs. not-awarded results with visual distinction
+- Explain why certain items weren't granted (e.g., "Not enough currency: had 7, needed 10")
+- Show final tally: "Spent 15 currency, received 2 items"
 
 ## Crafting App (Player)
 
@@ -311,34 +345,50 @@ Per recipe row, display:
 - Name
 - Category/tags (if enabled)
 - Status:
-    - **Available**
-    - **Locked**
-    - **Needs recipe item**
-    - **Not learned**
-    - **No remaining uses**
+    - **Available** (green check icon)
+    - **Locked** (padlock icon)
+    - **Needs recipe item: [Item Name]** (with item icon) - shows WHICH item is required
+    - **Not learned** (with "Learn Now" quick action if item is present)
+    - **No remaining uses: X/Y** (shows used count, e.g., "5/5 uses")
     - **Missing materials** (normal requirements; separate from visibility/knowledge)
 
 ### Recipe Detail View
 
-If a recipe is not craftable, show concise blocking reason(s).
+If a recipe is not craftable, show concise blocking reason(s) with actionable guidance.
+
+**Knowledge mode indicators:**
 
 If learning is applicable (knowledge mode includes learned):
 - Show **Learn Recipe** action when available
-- Indicate whether learning will consume the recipe item (`consumeOnLearn`)
-- Indicate whether the recipe item is present
+- Display clear message:
+  - If `consumeOnLearn === true`: "Learning this recipe will consume the recipe item"
+  - If `consumeOnLearn === false`: "Learning this recipe will keep the recipe item"
+- Show recipe item status:
+  - Present: "Recipe item '[Name]' found in inventory" (with icon)
+  - Missing: "Recipe item '[Name]' required to learn" (with icon)
 
-If item uses are applicable:
-- Show remaining uses for the matched recipe item instance.
+If item uses are applicable (knowledge mode includes item with limitUses):
+- Show remaining uses badge: "Uses: X / Y remaining"
+- If exhausted: "This recipe item has been fully used (X/Y uses)"
+- Visual indicator: progress bar or fraction display
 
 ### Learn Recipe Flow
 
 When the player clicks **Learn Recipe**:
+- If `consumeOnLearn === true`, show confirmation dialog:
+  - "Are you sure you want to learn this recipe? The recipe item will be consumed."
+  - Include item name and icon in dialog
 - Fabricate performs the learn operation defined in **006-recipe-visibility.md**
 - On success:
-    - show confirmation
-    - refresh the recipe list/detail state
+    - Show success notification: "Recipe '[Recipe Name]' learned successfully"
+    - If item consumed: "Recipe item '[Item Name]' has been consumed"
+    - If item kept: "Recipe item '[Item Name]' can still be used"
+    - Refresh the recipe list/detail state
 - On failure:
-    - show an actionable error message (missing item, insufficient permissions, etc.)
+    - Show actionable error message:
+      - Missing item: "Recipe item '[Item Name]' not found in inventory"
+      - Insufficient permissions: "You don't have permission to learn this recipe"
+      - Already learned: "You have already learned this recipe"
 
 ### Crafting Run Guardrails
 
