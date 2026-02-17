@@ -71,6 +71,27 @@ CraftingSystem = {
 
     // Progressive-only: system-level progressive behaviour
     progressive?: {
+      // Award mode uses a "currency spending" model where the check value is like currency.
+      // Items are ordered (by GM or optionally by player if allowPlayerReorder=true).
+      // Currency is "spent" sequentially on each item based on its difficulty value.
+      //
+      // Example: [Tooth (difficulty 5), Eye (difficulty 10), Tooth (difficulty 5)]
+      //
+      // - "partial": Spend currency on items in order. If you can't fully afford the next item,
+      //              you still get it with "partial credit" (leftover currency counts).
+      //   value=7  → Tooth (spend 5, leaving 2), Eye (costs 10 but partial credit applies) → Tooth + Eye
+      //   value=15 → Tooth (spend 5, leaving 10), Eye (spend 10, leaving 0), Tooth (can't afford) → Tooth + Eye
+      //
+      // - "equal": Spend currency on items in order. You must have enough remaining currency
+      //            to afford each item (remaining ≥ cost).
+      //   value=7  → Tooth (7≥5, spend 5 leaving 2), Eye (2<10, can't afford) → Tooth only
+      //   value=15 → Tooth (15≥5, spend 5 leaving 10), Eye (10≥10, spend 10 leaving 0), Tooth (0<5) → Tooth + Eye
+      //
+      // - "exceed": Spend currency on items in order. You must have MORE than the cost
+      //             (remaining > cost, strictly greater than).
+      //   value=7  → Tooth (7>5, spend 5 leaving 2), Eye (2≤10, can't afford) → Tooth only
+      //   value=15 → Tooth (15>5, spend 5 leaving 10), Eye (10≤10, can't afford) → Tooth only
+      //
       awardMode: "partial" | "equal" | "exceed",
       allowPlayerReorder: boolean,        // default false
     },
@@ -164,8 +185,9 @@ CraftingSystem = {
   requirements: {
     time: {
       enabled: boolean, // default false
-      // For now, Fabricate will use `now + timeRequirement` to determine when a step finishes
-      // The `gameWorldTimeUpdated` hook will be used to update the step's completion status when the world time changes to equal or exceed the step's target time
+      // For now, Fabricate will use `now + timeRequirement` to determine when a step finishes.
+      // Recipes with a time requirement will be marked as incomplete until the target time is reached.
+      // The `gameWorldTimeUpdated` hook will be used to update the step's completion status when the world time changes to equal or exceed the step's target time.
     },
 
     currency: {
@@ -292,6 +314,35 @@ Represents a complete recipe with inputs and outputs, plus optional routing/chec
 6. If `visibility.restricted` is true, `visibility.allowedUserIds` must be provided.
 7. If system `recipeVisibility.knowledge` mode includes "item" or "learned", recipes should have `linkedRecipeItemUuid` set to be craftable by players.
 
+## Step
+
+### Purpose
+
+Represents one step in a multi-step recipe (only used when features.multiStepRecipes is enabled).
+
+### Properties
+
+```javascript
+{
+  id: string,
+  name: string,
+  description?: string,
+
+  ingredientSets: IngredientSet[],
+  resultGroups: ResultGroup[],
+  requiresAllSets: boolean,     // false => OR, true => AND
+
+  // Optional step-level requirements (if enabled on system)
+  timeRequirement?: number,      // Time in seconds (if requirements.time.enabled)
+  currencyRequirement?: number,  // Currency cost (if requirements.currency.enabled)
+
+  // Tiered mode: step-level outcome routing (overrides recipe-level if present)
+  outcomeRouting?: {
+    [outcome: string]: string   // outcome -> resultGroupId
+  },
+}
+```
+
 ## IngredientSet
 
 ### Purpose
@@ -306,7 +357,11 @@ Represents one required ingredient/catalyst bundle.
   name: string,
   ingredients: Ingredient[],
   essences: { [essenceId: string]: number }, // Only when system features.essences is true
-  catalysts: Catalyst[]
+  catalysts: Catalyst[],
+
+  // Mapped mode: optional link to specific result group
+  // Only used when resolutionMode === "mapped"
+  resultGroupId?: string,
 }
 ```
 
@@ -409,13 +464,32 @@ Input context must include:
 - `ingredientPool` (resolved/consumed and available ingredient metadata)
 - `candidateIngredientSet`
 - `resolvedEssences` (aggregated essence totals for selected ingredient pool)
+- `step` (current step, if multi-step recipes are enabled)
 
-Return shape:
+Return shape depends on resolution mode:
 
+**Simple/Mapped mode (pass/fail):**
+```javascript
+{
+  success: boolean,
+  data?: object                 // Optional payload passed to property macros
+}
+```
+
+**Tiered mode:**
 ```javascript
 {
   success: boolean,
   outcome: string,              // Must be in craftingCheck.outcomes
+  data?: object                 // Optional payload passed to property macros
+}
+```
+
+**Progressive mode:**
+```javascript
+{
+  success: boolean,
+  value: number,                // Numeric check result compared against result difficulties
   data?: object                 // Optional payload passed to property macros
 }
 ```
@@ -434,6 +508,7 @@ Input context must include:
 - `essenceSources` (essenceId -> source item breakdown)
 - `checkResult` (output from crafting check macro, if enabled)
 - `result` (current result descriptor)
+- `step` (current step, if multi-step recipes are enabled)
 
 Return shape:
 
@@ -445,12 +520,104 @@ Return shape:
 
 Returned map is merged into created item data before document creation.
 
+### Success Macro Contract
+
+Executed after a step completes successfully (after items consumed and created).
+
+Input context must include:
+
+- `recipe`
+- `craftingSystem`
+- `craftingActor`
+- `componentSourceActors`
+- `step` (current step, if multi-step recipes are enabled)
+- `selectedIngredientSet`
+- `consumedIngredients` (items that were consumed)
+- `consumedCatalysts` (catalysts that were consumed/degraded, if any)
+- `createdResults` (items that were created)
+- `checkResult` (output from crafting check macro, if enabled)
+
+Return shape:
+
+```javascript
+{
+  // Optional: no return value required
+  // Macro can perform side effects (add buffs, XP, notifications, etc.)
+}
+```
+
+### Failure Macro Contract
+
+Executed when a step fails due to check failure or contract violation.
+
+Input context must include:
+
+- `recipe`
+- `craftingSystem`
+- `craftingActor`
+- `componentSourceActors`
+- `step` (current step, if multi-step recipes are enabled)
+- `selectedIngredientSet`
+- `failureReason` (string describing why the step failed)
+- `checkResult` (output from crafting check macro, if enabled and check was executed)
+- `consumedIngredients` (items consumed per consumption policy)
+- `consumedCatalysts` (catalysts consumed per consumption policy)
+
+Return shape:
+
+```javascript
+{
+  // Optional: no return value required
+  // Macro can perform side effects (damage, effects, notifications, etc.)
+}
+```
+
 ## Essence Effect Transfer Rule
 
 When `recipe.transferEffects` is true and `features.essences` is enabled:
 
 1. Determine contributing essence IDs from resolved ingredients.
-2. For each contributing essence ID, if `associatedSystemItemId` exists and resolves, collect active effects from that associated item.
+2. For each contributing essence ID, if `sourceItemUuid` exists in the EssenceDefinition and resolves, collect active effects from that associated item.
 3. Transfer those effects to result items via the standard effect-transfer pipeline.
 
 Effect transfer quantity scaling for essence-associated items is out of scope for this phase (transfer occurs once per contributing essence type).
+
+## Validation Rules by Resolution Mode
+
+### Simple Mode
+
+- Recipe must have exactly one ingredient set
+- Recipe must have exactly one result group
+- Crafting checks are optional
+- If enabled, check macro must return simple/mapped (pass/fail) shape
+
+### Mapped Mode
+
+- Recipe must have one or more ingredient sets
+- Recipe must have one or more result groups
+- Each ingredient set may have a `resultGroupId` linking to a specific result group
+- If no `resultGroupId` is specified, player chooses from available result groups
+- Crafting checks are optional
+- If enabled, check macro must return simple/mapped (pass/fail) shape
+
+### Tiered Mode
+
+- Recipe must have one or more ingredient sets
+- Recipe must have one or more result groups
+- Crafting checks are mandatory (`craftingCheck.enabled` must be true)
+- `craftingCheck.outcomes` must be defined with at least one outcome
+- `recipe.outcomeRouting` must map all outcomes to result group IDs
+- Check macro must return tiered shape with valid outcome string
+
+### Progressive Mode
+
+- Recipe must have exactly one ingredient set
+- Recipe must have exactly one result group
+- Result group must contain ordered results
+- Each result's associated SystemItem must have a difficulty value (minimum 1)
+- Difficulty represents the "cost" in the currency spending model
+- Crafting checks are mandatory (`craftingCheck.enabled` must be true)
+- `craftingCheck.progressive` configuration must be present
+- Check macro must return progressive shape with numeric value (the "currency" amount)
+- Results are awarded according to awardMode (partial/equal/exceed) using currency spending logic
+- If `allowPlayerReorder` is true, players can reorder results before crafting
