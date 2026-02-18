@@ -1,13 +1,16 @@
 import { Recipe } from '../models/Recipe.js';
 import { MacroExecutor } from '../utils/MacroExecutor.js';
+import { getFabricateFlag } from '../config/flags.js';
 
 /**
  * Handles the actual crafting process
  * Validates ingredients, consumes items, creates outputs
  */
 export class CraftingEngine {
-  constructor(recipeManager) {
+  constructor(recipeManager, craftingRunManager = null, resolutionModeService = null) {
     this.recipeManager = recipeManager;
+    this.craftingRunManager = craftingRunManager;
+    this.resolutionModeService = resolutionModeService;
   }
 
   /**
@@ -20,6 +23,7 @@ export class CraftingEngine {
    * @returns {Promise<{success: boolean, results: Item[]|null, message: string}>}
    */
   async craft(craftingActor, componentSourceActors, recipe, ingredientSetId = null, options = {}) {
+    const resolutionService = this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
     // Validate inputs
     if (!craftingActor) {
       return {
@@ -47,8 +51,92 @@ export class CraftingEngine {
       };
     }
 
-    // Check if recipe can be crafted
-    const canCraftCheck = this.recipeManager.canCraft(componentSourceActors, recipe);
+    const runManager = this.craftingRunManager || game.fabricate?.getCraftingRunManager?.();
+    let run = null;
+    if (runManager) {
+      run = options?.runId
+        ? runManager.getActiveRun(craftingActor, options.runId)
+        : runManager.findActiveRunForRecipe(craftingActor, recipe.id);
+      if (!run) {
+        run = await runManager.createRun(craftingActor, recipe, componentSourceActors, game.user?.id || null);
+      }
+    }
+
+    const visibilityService = game.fabricate?.getRecipeVisibilityService?.();
+    if (visibilityService) {
+      const guard = visibilityService.guardCraftStart({
+        viewer: game.user,
+        recipe,
+        craftingActor,
+        componentSourceActors
+      });
+      if (!guard.craftable) {
+        const reasonMap = {
+          'missing-system': 'Crafting system not found',
+          visibility: 'Recipe is not visible to this user',
+          knowledge: 'Missing recipe knowledge',
+          locked: 'Recipe is locked'
+        };
+        return {
+          success: false,
+          results: null,
+          message: reasonMap[guard.reason] || 'Crafting is blocked by recipe access rules'
+        };
+      }
+    }
+
+    const executionSteps = typeof recipe.getExecutionSteps === 'function'
+      ? recipe.getExecutionSteps()
+      : [{
+        id: 'implicit-step',
+        name: 'Step 1',
+        ingredientSets: recipe.ingredientSets || [],
+        resultGroups: recipe.resultGroups || [],
+        catalysts: recipe.catalysts || [],
+        timeRequirement: null,
+        outcomeRouting: recipe.outcomeRouting || null
+      }];
+
+    let stepIndex = Number(run?.currentStepIndex);
+    if (!Number.isFinite(stepIndex) || stepIndex < 0) stepIndex = 0;
+    const step = executionSteps[stepIndex];
+    if (!step) {
+      return {
+        success: false,
+        results: null,
+        message: 'No active crafting step available'
+      };
+    }
+    if (resolutionService) {
+      const modeValidation = resolutionService.validateRecipe(recipe);
+      if (!modeValidation.valid) {
+        return {
+          success: false,
+          results: null,
+          message: `Mode validation failed: ${modeValidation.errors.join(', ')}`
+        };
+      }
+    }
+
+    if (runManager && run && step.timeRequirement) {
+      run = await runManager.markStepWaitingForTime(craftingActor, run, stepIndex, step.timeRequirement);
+      const canProceed = runManager.canProceedTimeGate(run, stepIndex, Number(game.time?.worldTime || 0));
+      if (!canProceed) {
+        const gate = run.steps?.[stepIndex]?.timeGate;
+        const remaining = Math.max(0, Math.ceil(Number(gate?.availableAt || 0) - Number(game.time?.worldTime || 0)));
+        return {
+          success: false,
+          results: null,
+          message: `Step "${step.name || `Step ${stepIndex + 1}`}" is still in progress (${remaining}s remaining)`
+        };
+      }
+      run = await runManager.markStepInProgress(craftingActor, run, stepIndex);
+    }
+
+    const executionRecipe = this._buildStepRecipeView(recipe, step);
+
+    // Check if recipe step can be crafted
+    const canCraftCheck = this.recipeManager.canCraft(componentSourceActors, executionRecipe);
     if (!canCraftCheck.canCraft) {
       const missingMsg = this._formatMissingItems(canCraftCheck.missing);
       return {
@@ -61,7 +149,7 @@ export class CraftingEngine {
     // Determine which ingredient set to use
     let ingredientSet;
     if (ingredientSetId) {
-      ingredientSet = recipe.ingredientSets.find(s => s.id === ingredientSetId);
+      ingredientSet = executionRecipe.ingredientSets.find(s => s.id === ingredientSetId);
       if (!ingredientSet) {
         return {
           success: false,
@@ -75,8 +163,8 @@ export class CraftingEngine {
     }
 
     // Validate catalysts
-    const catalystsForSet = this.recipeManager.getCatalystsForSet(recipe, ingredientSet);
-    const catalystValidation = await this._validateCatalysts(componentSourceActors, recipe, catalystsForSet);
+    const catalystsForSet = this.recipeManager.getCatalystsForSet(executionRecipe, ingredientSet);
+    const catalystValidation = await this._validateCatalysts(componentSourceActors, executionRecipe, catalystsForSet);
     if (!catalystValidation.valid) {
       return {
         success: false,
@@ -85,23 +173,74 @@ export class CraftingEngine {
       };
     }
 
+    const currencyCheck = await this._checkCurrencyRequirement(craftingActor, recipe, step);
+    if (!currencyCheck.valid) {
+      return {
+        success: false,
+        results: null,
+        message: currencyCheck.message
+      };
+    }
+
     // Run optional system-level crafting check before consuming ingredients.
     const checkResult = await this._runCraftingCheck(
-      recipe,
+      executionRecipe,
       craftingActor,
       componentSourceActors,
-      ingredientSet
+      ingredientSet,
+      step
     );
     if (!checkResult.success) {
+      if (runManager && run) {
+        await runManager.completeStepFailure(craftingActor, run, stepIndex, checkResult.message || 'Crafting check failed', {
+          selectedIngredientSetId: ingredientSet.id,
+          lastCheckResult: {
+            success: false,
+            reason: checkResult.message || 'Crafting check failed',
+            outcome: checkResult.outcome ?? undefined,
+            value: checkResult.value ?? undefined,
+            data: checkResult.data || {}
+          }
+        });
+      }
       return {
         success: false,
         results: null,
         message: checkResult.message || 'Crafting check failed'
       };
     }
+    if (resolutionService && !resolutionService.validateCheckResult({ recipe: executionRecipe, checkResult })) {
+      const message = 'Crafting check result does not satisfy current resolution mode requirements';
+      if (runManager && run) {
+        await runManager.completeStepFailure(craftingActor, run, stepIndex, message, {
+          selectedIngredientSetId: ingredientSet.id,
+          lastCheckResult: {
+            success: false,
+            reason: message,
+            outcome: checkResult.outcome ?? undefined,
+            value: checkResult.value ?? undefined,
+            data: checkResult.data || {}
+          }
+        });
+      }
+      return {
+        success: false,
+        results: null,
+        message
+      };
+    }
+
+    const currencyDecrement = await this._decrementCurrencyRequirement(craftingActor, recipe, step);
+    if (!currencyDecrement.valid) {
+      return {
+        success: false,
+        results: null,
+        message: currencyDecrement.message
+      };
+    }
 
     // Consume ingredients from component source actors
-    const consumedItems = await this._consumeIngredients(componentSourceActors, ingredientSet, recipe);
+    const consumedItems = await this._consumeIngredients(componentSourceActors, ingredientSet, executionRecipe);
 
     // Apply catalyst degradation
     await this._degradeCatalysts(catalystValidation.catalysts);
@@ -109,17 +248,57 @@ export class CraftingEngine {
     // Create the result item(s)
     const resultItems = await this._createResultItems(
       craftingActor,
-      recipe,
+      executionRecipe,
+      step,
       ingredientSet,
       consumedItems,
       catalystValidation.catalysts,
-      checkResult
+      checkResult,
+      options?.resultGroupId || null
     );
+
+    if (runManager && run) {
+      run = await runManager.completeStepSuccess(craftingActor, run, stepIndex, {
+        selectedIngredientSetId: ingredientSet.id,
+        lastCheckResult: {
+          success: true,
+          reason: checkResult.message || 'Success',
+          outcome: checkResult.outcome ?? undefined,
+          value: checkResult.value ?? undefined,
+          data: checkResult.data || {}
+        },
+        consumedIngredients: consumedItems.map(({ item, quantity }) => ({
+          actorUuid: item.parent?.uuid || null,
+          itemUuid: item.uuid,
+          quantity
+        })),
+        usedCatalysts: catalystValidation.catalysts.map(({ item }) => ({
+          actorUuid: item.parent?.uuid || null,
+          itemUuid: item.uuid,
+          quantity: 1
+        })),
+        createdResults: (resultItems || []).map(item => ({
+          actorUuid: craftingActor.uuid,
+          itemUuid: item.uuid,
+          quantity: Number(item.system?.quantity || 1)
+        }))
+      });
+    }
+
+    if (visibilityService) {
+      await visibilityService.applyRecipeItemUseOnCraft({
+        recipe,
+        craftingActor,
+        componentSourceActors
+      });
+    }
 
     return {
       success: true,
       results: resultItems,
-      message: `Successfully crafted ${recipe.name}`
+      message: run?.status === 'succeeded'
+        ? `Successfully crafted ${recipe.name}`
+        : `Completed ${step.name || `step ${stepIndex + 1}`} for ${recipe.name}`
     };
   }
 
@@ -212,30 +391,22 @@ export class CraftingEngine {
    * Create the result items based on recipe configuration
    * @private
    */
-  async _createResultItems(craftingActor, recipe, ingredientSet, consumedItems, catalystItems, checkResult = null) {
-    // Determine which result groups to create.
-    let groupsToCreate;
-    const routedResultId = checkResult?.outcome && recipe?.outcomeRouting
-      ? recipe.outcomeRouting[checkResult.outcome]
-      : null;
-    const allGroups = Array.isArray(recipe.resultGroups) ? recipe.resultGroups : [];
+  async _createResultItems(craftingActor, recipe, step, ingredientSet, consumedItems, catalystItems, checkResult = null, selectedResultGroupId = null) {
+    const resolutionService = this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
+    const resolved = resolutionService
+      ? resolutionService.resolveResultGroups({
+        recipe,
+        step,
+        ingredientSet,
+        checkResult,
+        selectedResultGroupId
+      })
+      : {
+        groups: Array.isArray(step?.resultGroups) ? step.resultGroups : [],
+        meta: {}
+      };
 
-    if (routedResultId) {
-      groupsToCreate = allGroups.filter(group => group.id === routedResultId);
-      if (groupsToCreate.length === 0) {
-        console.warn(`Fabricate v2 | Outcome routing target not found: ${routedResultId}`);
-      }
-    }
-
-    if ((!groupsToCreate || groupsToCreate.length === 0) && recipe.isVariable && ingredientSet.resultMapping.length > 0) {
-      // Variable recipe mapping accepts group IDs (canonical) and legacy result IDs.
-      groupsToCreate = allGroups.filter(group =>
-        ingredientSet.resultMapping.includes(group.id) ||
-        group.results.some(result => ingredientSet.resultMapping.includes(result.id))
-      );
-    } else if (!groupsToCreate || groupsToCreate.length === 0) {
-      groupsToCreate = allGroups;
-    }
+    const groupsToCreate = Array.isArray(resolved?.groups) ? resolved.groups : [];
 
     const createdItems = [];
     for (const group of groupsToCreate) {
@@ -246,7 +417,11 @@ export class CraftingEngine {
           consumedItems,
           catalystItems,
           recipe,
-          checkResult
+          {
+            ...(checkResult || {}),
+            resolutionMeta: resolved?.meta || {}
+          },
+          step
         );
 
         if (resultItem) {
@@ -262,14 +437,15 @@ export class CraftingEngine {
    * Create a single result item
    * @private
    */
-  async _createSingleResult(craftingActor, result, consumedItems, catalystItems, recipe, checkResult = null) {
+  async _createSingleResult(craftingActor, result, consumedItems, catalystItems, recipe, checkResult = null, step = null) {
     // Get the source item
     let sourceItem;
     let managedItem = null;
     if (result.systemItemId && recipe.craftingSystemId) {
       const systemManager = game.fabricate?.getCraftingSystemManager?.();
       const system = systemManager?.getSystem(recipe.craftingSystemId);
-      managedItem = system?.items?.find(i => i.id === result.systemItemId) || null;
+      const managedItems = Array.isArray(system?.managedItems) ? system.managedItems : (system?.items || []);
+      managedItem = managedItems.find(i => i.id === result.systemItemId) || null;
       if (managedItem?.sourceUuid) {
         sourceItem = await fromUuid(managedItem.sourceUuid);
       }
@@ -308,7 +484,8 @@ export class CraftingEngine {
       result,
       consumedItems,
       catalystItems,
-      checkResult
+      checkResult,
+      step
     );
     if (propertyUpdates && typeof propertyUpdates === 'object') {
       for (const [path, value] of Object.entries(propertyUpdates)) {
@@ -363,27 +540,290 @@ export class CraftingEngine {
     await resultItem.createEmbeddedDocuments('ActiveEffect', effectsData);
   }
 
-  async _runCraftingCheck(recipe, craftingActor, componentSourceActors, ingredientSet) {
+  _getCurrencyRequirementConfig(recipe) {
+    const systemId = recipe?.craftingSystemId;
+    if (!systemId) return null;
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const system = systemManager?.getSystem(systemId);
+    if (!system) return null;
+
+    const advancedEnabled = system.advancedOptionsEnabled !== false;
+    const currency = system?.requirements?.currency || {};
+    return {
+      enabled: advancedEnabled && currency.enabled === true,
+      provider: currency.provider === 'system' ? 'system' : 'macro',
+      systemAdapter: currency.systemAdapter || null,
+      checkCurrencyMacroUuid: currency.checkCurrencyMacroUuid || null,
+      decrementCurrencyMacroUuid: currency.decrementCurrencyMacroUuid || null,
+      formatCurrencyMacroUuid: currency.formatCurrencyMacroUuid || null,
+      system
+    };
+  }
+
+  _getStepCurrencyRequirement(step) {
+    if (!step?.currencyRequirement || typeof step.currencyRequirement !== 'object') return null;
+    const unit = String(step.currencyRequirement.unit || '').trim();
+    const amount = Math.max(0, Number(step.currencyRequirement.amount || 0) || 0);
+    if (!unit || amount <= 0) return null;
+    return { unit, amount };
+  }
+
+  _getActorCurrencyBucket(actor, unit) {
+    const pool = actor?.system?.currency;
+    if (!pool || typeof pool !== 'object') return null;
+
+    const key = Object.keys(pool).find(k => String(k).toLowerCase() === String(unit).toLowerCase()) || unit;
+    const raw = pool[key];
+    if (raw == null) return null;
+
+    if (typeof raw === 'number' || typeof raw === 'string') {
+      const value = Number(raw);
+      if (!Number.isFinite(value)) return null;
+      return { key, value, path: `system.currency.${key}` };
+    }
+
+    if (typeof raw === 'object') {
+      const valueFromValue = Number(raw.value);
+      if (Number.isFinite(valueFromValue)) {
+        return { key, value: valueFromValue, path: `system.currency.${key}.value` };
+      }
+      const valueFromAmount = Number(raw.amount);
+      if (Number.isFinite(valueFromAmount)) {
+        return { key, value: valueFromAmount, path: `system.currency.${key}.amount` };
+      }
+    }
+
+    return null;
+  }
+
+  _normalizeCurrencyUnit(unit, adapter = null) {
+    const raw = String(unit || '').trim().toLowerCase();
+    if (!raw) return raw;
+    const aliases = {
+      copper: 'cp',
+      silver: 'sp',
+      electrum: 'ep',
+      gold: 'gp',
+      platinum: 'pp',
+      credits: 'credits',
+      credit: 'credits'
+    };
+    if (aliases[raw]) return aliases[raw];
+    if (['dnd5e', 'pf2e'].includes(adapter || '')) {
+      if (['cp', 'sp', 'ep', 'gp', 'pp'].includes(raw)) return raw;
+    }
+    return raw;
+  }
+
+  _getDnd5eCurrencyBucket(actor, unit) {
+    const normalizedUnit = this._normalizeCurrencyUnit(unit, 'dnd5e');
+    return this._getActorCurrencyBucket(actor, normalizedUnit);
+  }
+
+  _getPf2eCurrencyBucket(actor, unit) {
+    const normalizedUnit = this._normalizeCurrencyUnit(unit, 'pf2e');
+    const pool = actor?.system?.currency;
+    if (!pool || typeof pool !== 'object') {
+      return this._getActorCurrencyBucket(actor, normalizedUnit);
+    }
+
+    // PF2e usually stores denomination objects under system.currency (cp/sp/gp/pp).
+    const key = Object.keys(pool).find(k => String(k).toLowerCase() === normalizedUnit) || normalizedUnit;
+    const valuePath = `system.currency.${key}.value`;
+    const value = Number(foundry.utils.getProperty(actor, valuePath));
+    if (Number.isFinite(value)) {
+      return { key, value, path: valuePath };
+    }
+
+    return this._getActorCurrencyBucket(actor, normalizedUnit);
+  }
+
+  _getSystemCurrencyBucket(actor, requirement, config = {}) {
+    const adapter = String(config.systemAdapter || '').trim();
+    if (adapter === 'dnd5e') return this._getDnd5eCurrencyBucket(actor, requirement.unit);
+    if (adapter === 'pf2e') return this._getPf2eCurrencyBucket(actor, requirement.unit);
+    return this._getActorCurrencyBucket(actor, requirement.unit);
+  }
+
+  async _formatCurrencyRequirement(config, requirement, craftingActor, recipe, step) {
+    const fallback = `${requirement.amount} ${requirement.unit}`;
+    const macroUuid = config?.formatCurrencyMacroUuid;
+    if (!macroUuid) return fallback;
+    try {
+      const value = await MacroExecutor.run(macroUuid, {
+        craftingActor,
+        actor: craftingActor,
+        recipe: recipe?.toJSON?.() || recipe,
+        step,
+        requirement,
+        amount: requirement.amount,
+        unit: requirement.unit,
+        craftingSystem: config.system
+      });
+      if (typeof value === 'string' && value.trim()) return value.trim();
+      if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+    } catch (err) {
+      console.error(`Fabricate v2 | Currency format macro failed (${macroUuid})`, err);
+    }
+    return fallback;
+  }
+
+  async _checkCurrencyRequirement(craftingActor, recipe, step) {
+    const requirement = this._getStepCurrencyRequirement(step);
+    if (!requirement) return { valid: true };
+
+    const config = this._getCurrencyRequirementConfig(recipe);
+    if (!config?.enabled) return { valid: true };
+
+    const formatted = await this._formatCurrencyRequirement(config, requirement, craftingActor, recipe, step);
+
+    if (config.provider === 'macro') {
+      if (!config.checkCurrencyMacroUuid) {
+        return { valid: false, message: 'Currency requirement check macro is not configured.' };
+      }
+      try {
+        const result = await MacroExecutor.run(config.checkCurrencyMacroUuid, {
+          craftingActor,
+          actor: craftingActor,
+          recipe: recipe?.toJSON?.() || recipe,
+          step,
+          requirement,
+          amount: requirement.amount,
+          unit: requirement.unit,
+          requiredAmount: requirement.amount,
+          requiredUnit: requirement.unit,
+          craftingSystem: config.system
+        });
+        const allowed = typeof result === 'boolean'
+          ? result
+          : (result && typeof result === 'object'
+            ? (result.allowed !== false && result.success !== false && result.canAfford !== false)
+            : false);
+        if (!allowed) {
+          const message = (result && typeof result === 'object' && result.message)
+            ? String(result.message)
+            : `Insufficient currency. Requires ${formatted}.`;
+          return { valid: false, message };
+        }
+        return { valid: true };
+      } catch (err) {
+        console.error(`Fabricate v2 | Currency check macro failed (${config.checkCurrencyMacroUuid})`, err);
+        return { valid: false, message: `Currency check failed: ${err.message || config.checkCurrencyMacroUuid}` };
+      }
+    }
+
+    if (config.provider === 'system') {
+      const bucket = this._getSystemCurrencyBucket(craftingActor, requirement, config);
+      if (!bucket) {
+        return { valid: false, message: `Currency unit "${requirement.unit}" is not available on ${craftingActor.name}.` };
+      }
+      if (bucket.value < requirement.amount) {
+        return { valid: false, message: `Insufficient currency. Requires ${formatted}.` };
+      }
+      return { valid: true };
+    }
+
+    return { valid: false, message: 'Unsupported currency requirement provider.' };
+  }
+
+  async _decrementCurrencyRequirement(craftingActor, recipe, step) {
+    const requirement = this._getStepCurrencyRequirement(step);
+    if (!requirement) return { valid: true };
+
+    const config = this._getCurrencyRequirementConfig(recipe);
+    if (!config?.enabled) return { valid: true };
+
+    const formatted = await this._formatCurrencyRequirement(config, requirement, craftingActor, recipe, step);
+
+    if (config.provider === 'macro') {
+      if (!config.decrementCurrencyMacroUuid) {
+        return { valid: false, message: 'Currency decrement macro is not configured.' };
+      }
+      try {
+        const result = await MacroExecutor.run(config.decrementCurrencyMacroUuid, {
+          craftingActor,
+          actor: craftingActor,
+          recipe: recipe?.toJSON?.() || recipe,
+          step,
+          requirement,
+          amount: requirement.amount,
+          unit: requirement.unit,
+          craftingSystem: config.system
+        });
+        const ok = result === undefined || result === null
+          ? true
+          : (typeof result === 'boolean'
+            ? result
+            : (result && typeof result === 'object'
+              ? (result.success !== false && result.decremented !== false)
+              : false));
+        if (!ok) {
+          const message = (result && typeof result === 'object' && result.message)
+            ? String(result.message)
+            : `Could not spend currency. Requires ${formatted}.`;
+          return { valid: false, message };
+        }
+        return { valid: true };
+      } catch (err) {
+        console.error(`Fabricate v2 | Currency decrement macro failed (${config.decrementCurrencyMacroUuid})`, err);
+        return { valid: false, message: `Currency decrement failed: ${err.message || config.decrementCurrencyMacroUuid}` };
+      }
+    }
+
+    if (config.provider === 'system') {
+      const bucket = this._getSystemCurrencyBucket(craftingActor, requirement, config);
+      if (!bucket) {
+        return { valid: false, message: `Currency unit "${requirement.unit}" is not available on ${craftingActor.name}.` };
+      }
+      if (bucket.value < requirement.amount) {
+        return { valid: false, message: `Insufficient currency. Requires ${formatted}.` };
+      }
+      const next = Math.max(0, bucket.value - requirement.amount);
+      try {
+        await craftingActor.update({ [bucket.path]: next });
+      } catch (err) {
+        console.error('Fabricate v2 | Failed to decrement system currency', err);
+        return { valid: false, message: `Could not spend currency (${formatted}).` };
+      }
+      return { valid: true };
+    }
+
+    return { valid: false, message: 'Unsupported currency requirement provider.' };
+  }
+
+  async _runCraftingCheck(recipe, craftingActor, componentSourceActors, ingredientSet, step = null) {
+    const resolutionService = this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
     const systemId = recipe?.craftingSystemId;
     if (!systemId) {
-      return { success: true, outcome: null, data: {} };
+      return { success: true, outcome: null, value: null, data: {} };
     }
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(systemId);
     if (!system) {
-      return { success: true, outcome: null, data: {} };
+      return { success: true, outcome: null, value: null, data: {} };
     }
 
+    const mode = resolutionService?.getMode(recipe) || system?.resolutionMode || 'simple';
+    const checkRequired = mode === 'tiered' || mode === 'progressive';
     const advancedEnabled = system.advancedOptionsEnabled !== false;
     const features = system.features || {};
-    const checksEnabled = advancedEnabled && features.craftingChecks === true;
-    if (!checksEnabled) {
+    const checksEnabled = advancedEnabled && (features.craftingChecks === true || system?.craftingCheck?.enabled === true);
+    if (!checksEnabled && !checkRequired) {
       return { success: true, outcome: null, data: {} };
     }
 
     const config = system.craftingCheck || {};
     if (!config.macroUuid) {
-      return { success: true, outcome: null, data: {} };
+      if (checkRequired) {
+        return {
+          success: false,
+          outcome: null,
+          value: null,
+          data: {},
+          message: `${mode} mode requires a crafting check macro`
+        };
+      }
+      return { success: true, outcome: null, value: null, data: {} };
     }
 
     const ingredientPool = componentSourceActors.flatMap(actor =>
@@ -406,13 +846,15 @@ export class CraftingEngine {
         componentSourceActors,
         ingredientPool,
         candidateIngredientSet: ingredientSet,
-        resolvedEssences
+        resolvedEssences,
+        step
       });
     } catch (err) {
       console.error(`Fabricate v2 | Crafting check macro failed (${config.macroUuid})`, err);
       return {
         success: false,
         outcome: null,
+        value: null,
         data: {},
         message: `Crafting check macro failed: ${err.message || config.macroUuid}`
       };
@@ -422,17 +864,20 @@ export class CraftingEngine {
       return {
         success: false,
         outcome: null,
+        value: null,
         data: {},
         message: 'Crafting check macro must return an object'
       };
     }
 
     const outcome = result.outcome != null ? String(result.outcome) : null;
+    const value = Number.isFinite(Number(result.value)) ? Number(result.value) : null;
     const allowed = Array.isArray(config.outcomes) ? config.outcomes : [];
     if (outcome && allowed.length > 0 && !allowed.includes(outcome)) {
       return {
         success: false,
         outcome,
+        value,
         data: result.data || {},
         message: `Crafting check returned invalid outcome "${outcome}"`
       };
@@ -442,12 +887,13 @@ export class CraftingEngine {
     return {
       success,
       outcome,
+      value,
       data: result.data || {},
       message: success ? null : (result.message || 'Crafting check failed')
     };
   }
 
-  async _runPropertyMacro(macroUuid, recipe, craftingActor, result, consumedItems, catalystItems, checkResult = null) {
+  async _runPropertyMacro(macroUuid, recipe, craftingActor, result, consumedItems, catalystItems, checkResult = null, step = null) {
     if (!macroUuid) return null;
 
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
@@ -479,7 +925,8 @@ export class CraftingEngine {
       resolvedEssences: essenceContext.resolvedEssences,
       essenceSources: essenceContext.essenceSources,
       checkResult,
-      result: result?.toJSON?.() || result
+      result: result?.toJSON?.() || result,
+      step
     };
 
     try {
@@ -502,7 +949,7 @@ export class CraftingEngine {
     const essenceSources = {};
 
     for (const { item, quantity } of consumedItems) {
-      const itemEssences = item.getFlag('fabricate-v2', 'essences') || {};
+      const itemEssences = getFabricateFlag(item, 'essences', {});
       for (const [essenceId, perUnit] of Object.entries(itemEssences)) {
         const value = Number(perUnit);
         if (!Number.isFinite(value) || value <= 0) continue;
@@ -525,7 +972,7 @@ export class CraftingEngine {
   _accumulateEssencesFromItems(items) {
     const resolved = {};
     for (const item of items) {
-      const itemEssences = item.getFlag('fabricate-v2', 'essences') || {};
+      const itemEssences = getFabricateFlag(item, 'essences', {});
       for (const [essenceId, qty] of Object.entries(itemEssences)) {
         const value = Number(qty);
         if (!Number.isFinite(value) || value <= 0) continue;
@@ -543,7 +990,10 @@ export class CraftingEngine {
     const lines = [];
 
     for (const { ingredient, have, need } of missing.ingredients) {
-      lines.push(`${ingredient.getDescription()}: have ${have}, need ${need}`);
+      const description = typeof ingredient?.getDescription === 'function'
+        ? ingredient.getDescription()
+        : 'Ingredient';
+      lines.push(`${description}: have ${have}, need ${need}`);
     }
 
     for (const { type, have, need } of missing.essences) {
@@ -555,5 +1005,18 @@ export class CraftingEngine {
     }
 
     return lines.join('\n');
+  }
+
+  _buildStepRecipeView(recipe, step) {
+    return {
+      ...recipe,
+      ingredientSets: step?.ingredientSets || recipe.ingredientSets || [],
+      resultGroups: step?.resultGroups || recipe.resultGroups || [],
+      outcomeRouting: step?.outcomeRouting || recipe.outcomeRouting || null,
+      catalysts: [
+        ...(Array.isArray(recipe?.catalysts) ? recipe.catalysts : []),
+        ...(Array.isArray(step?.catalysts) ? step.catalysts : [])
+      ]
+    };
   }
 }

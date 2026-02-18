@@ -1,5 +1,7 @@
 import { Ingredient } from './Ingredient.js';
+import { IngredientGroup } from './IngredientGroup.js';
 import { Catalyst } from './Catalyst.js';
+import { getFabricateFlag } from '../config/flags.js';
 
 /**
  * Represents a set of ingredients that can satisfy a recipe's input requirements
@@ -10,10 +12,18 @@ export class IngredientSet {
     this.id = data.id || foundry.utils.randomID();
     this.name = data.name || '';
 
-    // Ingredients required for this set
-    this.ingredients = (data.ingredients || []).map(i =>
-      i instanceof Ingredient ? i : Ingredient.fromJSON(i)
+    // Ingredient groups: all groups required, one option satisfies each group.
+    const groups = Array.isArray(data.ingredientGroups) && data.ingredientGroups.length > 0
+      ? data.ingredientGroups
+      : this._legacyIngredientsToGroups(data.ingredients || []);
+    this.ingredientGroups = groups.map(group =>
+      group instanceof IngredientGroup ? group : IngredientGroup.fromJSON(group)
     );
+
+    // Legacy alias retained for older UI code paths.
+    this.ingredients = this.ingredientGroups
+      .map(group => group.options?.[0] || null)
+      .filter(Boolean);
 
     // Required essences (accumulated from ingredients)
     this.essences = data.essences || {}; // { 'light': 2, 'fire': 1 }
@@ -27,6 +37,14 @@ export class IngredientSet {
     this.resultMapping = data.resultMapping || [];
   }
 
+  _legacyIngredientsToGroups(ingredients = []) {
+    return (ingredients || []).map((ingredient, idx) => ({
+      id: foundry.utils.randomID(),
+      name: `Group ${idx + 1}`,
+      options: [ingredient]
+    }));
+  }
+
   /**
    * Validate that this ingredient set has all required data
    * @returns {{valid: boolean, errors: string[]}}
@@ -34,15 +52,15 @@ export class IngredientSet {
   validate() {
     const errors = [];
 
-    if (this.ingredients.length === 0 && Object.keys(this.essences).length === 0) {
-      errors.push('Ingredient set must have at least one ingredient or essence requirement');
+    if (this.ingredientGroups.length === 0 && Object.keys(this.essences).length === 0) {
+      errors.push('Ingredient set must have at least one ingredient group or essence requirement');
     }
 
-    // Validate all ingredients
-    for (const ingredient of this.ingredients) {
-      const ingredientValidation = ingredient.validate();
-      if (!ingredientValidation.valid) {
-        errors.push(`Invalid ingredient: ${ingredientValidation.errors.join(', ')}`);
+    // Validate ingredient groups/options
+    for (const group of this.ingredientGroups) {
+      const groupValidation = group.validate();
+      if (!groupValidation.valid) {
+        errors.push(`Ingredient group "${group.name || group.id}": ${groupValidation.errors.join(', ')}`);
       }
     }
 
@@ -72,17 +90,8 @@ export class IngredientSet {
    * @returns {boolean}
    */
   canBeCraftedWith(availableItems) {
-    // Check if all ingredients are satisfied
-    for (const ingredient of this.ingredients) {
-      const matchingItems = availableItems.filter(item => ingredient.matches(item));
-      const totalQuantity = matchingItems.reduce((sum, item) =>
-        sum + (item.system.quantity || 1), 0
-      );
-
-      if (totalQuantity < ingredient.quantity) {
-        return false;
-      }
-    }
+    const selection = this.resolveIngredientSelection(availableItems);
+    if (!selection.success) return false;
 
     // Check if all essence requirements are satisfied
     if (Object.keys(this.essences).length > 0) {
@@ -109,7 +118,7 @@ export class IngredientSet {
     const accumulated = {};
 
     for (const item of items) {
-      const itemEssences = item.getFlag('fabricate-v2', 'essences') || {};
+      const itemEssences = getFabricateFlag(item, 'essences', {});
       for (const [essenceType, quantity] of Object.entries(itemEssences)) {
         accumulated[essenceType] = (accumulated[essenceType] || 0) + quantity;
       }
@@ -124,37 +133,103 @@ export class IngredientSet {
    * @returns {Array<{item: Item, quantity: number, ingredient: Ingredient}>}
    */
   matchIngredients(availableItems, matcher = null) {
-    const consumptionPlan = [];
+    const selection = this.resolveIngredientSelection(availableItems, matcher);
+    return selection.success ? selection.plan : [];
+  }
 
-    for (const ingredient of this.ingredients) {
-      let neededQuantity = ingredient.quantity;
-      const matchingItems = availableItems.filter(item =>
-        matcher ? matcher(ingredient, item) : ingredient.matches(item)
-      );
+  resolveIngredientSelection(availableItems, matcher = null) {
+    const remaining = new Map();
+    for (const item of availableItems) {
+      remaining.set(this._itemKey(item), Number(item.system?.quantity || 1));
+    }
 
-      for (const item of matchingItems) {
-        if (neededQuantity <= 0) break;
+    const selectedIngredients = [];
+    const plan = [];
+    const missingGroups = [];
 
-        const itemQuantity = item.system.quantity || 1;
-        const toConsume = Math.min(neededQuantity, itemQuantity);
+    for (const group of this.ingredientGroups) {
+      let chosen = null;
+      let bestMissing = null;
 
-        consumptionPlan.push({
-          item,
-          quantity: toConsume,
-          ingredient
+      for (const option of group.options || []) {
+        const candidate = this._buildPlanForIngredient(option, availableItems, remaining, matcher);
+        if (candidate.ok) {
+          chosen = { option, plan: candidate.plan };
+          break;
+        }
+        if (!bestMissing || candidate.have > bestMissing.have) {
+          bestMissing = { ingredient: option, have: candidate.have, need: option.quantity };
+        }
+      }
+
+      if (!chosen) {
+        missingGroups.push({
+          group,
+          ...bestMissing
         });
+        continue;
+      }
 
-        neededQuantity -= toConsume;
+      selectedIngredients.push(chosen.option);
+      for (const entry of chosen.plan) {
+        plan.push(entry);
+        const key = this._itemKey(entry.item);
+        const next = (remaining.get(key) || 0) - entry.quantity;
+        remaining.set(key, Math.max(0, next));
       }
     }
 
-    return consumptionPlan;
+    return {
+      success: missingGroups.length === 0,
+      selectedIngredients,
+      plan,
+      missingGroups
+    };
+  }
+
+  _buildPlanForIngredient(ingredient, availableItems, remaining, matcher = null) {
+    let neededQuantity = ingredient.quantity;
+    const optionPlan = [];
+    let totalAvailable = 0;
+
+    const matchingItems = availableItems.filter(item =>
+      matcher ? matcher(ingredient, item) : ingredient.matches(item)
+    );
+
+    for (const item of matchingItems) {
+      const key = this._itemKey(item);
+      const availableQty = Number(remaining.get(key) || 0);
+      if (availableQty <= 0) continue;
+
+      totalAvailable += availableQty;
+      if (neededQuantity <= 0) continue;
+
+      const toConsume = Math.min(neededQuantity, availableQty);
+      optionPlan.push({
+        item,
+        quantity: toConsume,
+        ingredient
+      });
+      neededQuantity -= toConsume;
+    }
+
+    return {
+      ok: neededQuantity <= 0,
+      plan: optionPlan,
+      have: totalAvailable
+    };
+  }
+
+  _itemKey(item) {
+    return item.uuid || item.id;
   }
 
   toJSON() {
     return {
       id: this.id,
       name: this.name,
+      ingredientGroups: this.ingredientGroups.map(group => group.toJSON()),
+      // Legacy alias retained for compatibility with older consumers.
       ingredients: this.ingredients.map(i => i.toJSON()),
       essences: this.essences,
       catalysts: this.catalysts.map(c => c.toJSON()),

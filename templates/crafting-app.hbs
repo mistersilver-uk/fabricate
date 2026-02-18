@@ -38,6 +38,67 @@
     </div>
   </section>
 
+  {{#if hasCraftingActor}}
+    <section class="run-summary-section">
+      <div class="run-columns">
+        <div class="run-column">
+          <h4>In Progress</h4>
+          {{#if activeRuns.length}}
+            <ul class="run-list">
+              {{#each activeRuns}}
+                <li class="run-row">
+                  <strong>{{recipeName}}</strong>
+                  <span class="badge">{{statusLabel}}</span>
+                  {{#if stepLabel}}<span class="hint">{{stepLabel}}</span>{{/if}}
+                  <span class="run-row-actions">
+                    {{#if canContinue}}
+                      <button type="button" class="details-btn" data-action="craft" data-recipe-id="{{recipeId}}" data-run-id="{{id}}" title="Continue this run">
+                        <i class="fas fa-play"></i>
+                      </button>
+                    {{/if}}
+                    <button type="button" class="details-btn" data-action="showRunDetails" data-run-id="{{id}}" data-run-scope="active" title="Run details">
+                      <i class="fas fa-list"></i>
+                    </button>
+                    <button type="button" class="details-btn" data-action="restartRun" data-recipe-id="{{recipeId}}" data-run-id="{{id}}" title="Restart run">
+                      <i class="fas fa-rotate-left"></i>
+                    </button>
+                    {{#if canCancel}}
+                      <button type="button" class="details-btn" data-action="cancelRun" data-run-id="{{id}}" title="Cancel run">
+                        <i class="fas fa-stop"></i>
+                      </button>
+                    {{/if}}
+                  </span>
+                </li>
+              {{/each}}
+            </ul>
+          {{else}}
+            <p class="hint">No active crafting runs for this actor.</p>
+          {{/if}}
+        </div>
+        <div class="run-column">
+          <h4>Recent History</h4>
+          {{#if runHistory.length}}
+            <ul class="run-list">
+              {{#each runHistory}}
+                <li class="run-row">
+                  <strong>{{recipeName}}</strong>
+                  <span class="badge">{{statusLabel}}</span>
+                  <span class="run-row-actions">
+                    <button type="button" class="details-btn" data-action="showRunDetails" data-run-id="{{id}}" data-run-scope="history" title="Run details">
+                      <i class="fas fa-list"></i>
+                    </button>
+                  </span>
+                </li>
+              {{/each}}
+            </ul>
+          {{else}}
+            <p class="hint">No recent crafting history.</p>
+          {{/if}}
+        </div>
+      </div>
+    </section>
+  {{/if}}
+
   <!-- Search and Filters Header -->
   <header class="fabricate-header">
     <div class="fabricate-search">
@@ -91,11 +152,18 @@
             <div class="recipe-info">
               <h3 class="recipe-name">
                 {{name}}
+                <span class="badge">{{statusLabel}}</span>
                 {{#if hasMultipleSets}}
                   <span class="badge">Multiple options</span>
                 {{/if}}
+                {{#if hasMultipleActiveRuns}}
+                  <span class="badge">{{activeRunCount}} active runs</span>
+                {{/if}}
               </h3>
               <p class="recipe-description">{{description}}</p>
+              {{#if activeRunStepLabel}}
+                <p class="hint">Current run: {{activeRunStepLabel}}</p>
+              {{/if}}
 
               <div class="recipe-requirements">
                 {{#if ingredients.length}}
@@ -140,27 +208,52 @@
             </div>
 
             <div class="recipe-actions">
-              {{#if canCraft}}
+              {{#if allowCraftAction}}
                 <button
                   type="button"
                   class="craft-btn"
                   data-action="craft"
                   data-recipe-id="{{id}}"
-                  title="Craft this item"
+                  data-run-id="{{activeRunId}}"
+                  title="Craft this recipe"
                 >
                   <i class="fas fa-hammer"></i>
-                  Craft
+                  {{craftButtonLabel}}
                 </button>
               {{else}}
-                <button
-                  type="button"
-                  class="craft-btn disabled"
-                  disabled
-                  title="Missing required items"
-                >
-                  <i class="fas fa-ban"></i>
-                  Cannot Craft
-                </button>
+                {{#if activeRunId}}
+                  <button
+                    type="button"
+                    class="craft-btn disabled"
+                    disabled
+                    title="{{statusLabel}}"
+                  >
+                    <i class="fas fa-hourglass-half"></i>
+                    Waiting
+                  </button>
+                {{else}}
+                  <button
+                    type="button"
+                    class="craft-btn disabled"
+                    disabled
+                    title="{{statusLabel}}"
+                  >
+                    <i class="fas fa-ban"></i>
+                    Cannot Craft
+                  </button>
+                {{/if}}
+                {{#if canLearn}}
+                  <button
+                    type="button"
+                    class="craft-btn"
+                    data-action="learnRecipe"
+                    data-recipe-id="{{id}}"
+                    title="Learn this recipe"
+                  >
+                    <i class="fas fa-book-open"></i>
+                    Learn
+                  </button>
+                {{/if}}
               {{/if}}
 
               <button
@@ -172,6 +265,18 @@
               >
                 <i class="fas fa-info-circle"></i>
               </button>
+              {{#if activeRunId}}
+                <button
+                  type="button"
+                  class="details-btn"
+                  data-action="restartRun"
+                  data-recipe-id="{{id}}"
+                  data-run-id="{{activeRunId}}"
+                  title="Restart run from step 1"
+                >
+                  <i class="fas fa-rotate-left"></i>
+                </button>
+              {{/if}}
             </div>
           </article>
         {{/each}}

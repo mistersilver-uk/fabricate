@@ -1,6 +1,8 @@
 /**
  * Manages crafting systems and their item libraries
  */
+import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
+
 export class CraftingSystemManager {
   constructor(recipeManager) {
     this.recipeManager = recipeManager;
@@ -10,7 +12,7 @@ export class CraftingSystemManager {
 
   async initialize() {
     if (this.initialized) return;
-    const saved = game.settings.get('fabricate-v2', 'craftingSystems') || [];
+    const saved = getSetting(SETTING_KEYS.CRAFTING_SYSTEMS) || [];
     for (const system of saved) {
       const normalized = this._normalizeSystem(system);
       this.systems.set(normalized.id, normalized);
@@ -30,8 +32,9 @@ export class CraftingSystemManager {
       system.essenceDefinitions ?? system.essences
     );
     const essenceIds = new Set(essenceDefinitions.map(def => def.id));
-    const items = Array.isArray(system.items)
-      ? system.items.map(i => this._normalizeItem(i, essenceIds))
+    const rawManagedItems = Array.isArray(system.managedItems) ? system.managedItems : system.items;
+    const items = Array.isArray(rawManagedItems)
+      ? rawManagedItems.map(i => this._normalizeItem(i, essenceIds))
       : [];
     const itemIds = new Set(items.map(i => i.id));
 
@@ -45,6 +48,9 @@ export class CraftingSystemManager {
       name: system.name || 'New Crafting System',
       description: system.description || '',
       enabled: system.enabled !== false,
+      resolutionMode: ['simple', 'mapped', 'tiered', 'progressive'].includes(system.resolutionMode)
+        ? system.resolutionMode
+        : 'simple',
       difficulty: system.difficulty || {
         base: 10,
         tierWeight: 0,
@@ -55,6 +61,8 @@ export class CraftingSystemManager {
       // New spec-first shape
       features,
       itemTags: this._normalizeStringList(system.itemTags ?? system.tags),
+      recipeVisibility: this._normalizeRecipeVisibility(system.recipeVisibility),
+      requirements: this._normalizeRequirements(system.requirements),
       essenceDefinitions: resolvedEssenceDefinitions,
       craftingCheck: this._normalizeCraftingCheck(system.craftingCheck),
 
@@ -65,22 +73,32 @@ export class CraftingSystemManager {
       advancedOptionsEnabled: system.advancedOptionsEnabled !== false,
       enableTags: features.itemTags === true,
       enableEssences: features.essences === true,
-      enableCategories: features.categories === true,
+      enableCategories: features.recipeCategories === true,
+      enableMultiStepRecipes: features.multiStepRecipes === true,
       enableTiers: false,
       tiers: [],
-
-      items
+      items,
+      managedItems: items
     };
   }
 
   _normalizeFeatures(system = {}) {
     const features = system.features || {};
     const has = (k) => Object.prototype.hasOwnProperty.call(features, k);
+    const categoryEnabled = has('recipeCategories')
+      ? features.recipeCategories === true
+      : (has('categories') ? features.categories === true : system.enableCategories === true);
+    const multiStepEnabled = has('multiStepRecipes')
+      ? features.multiStepRecipes === true
+      : (has('complexRecipes') ? features.complexRecipes === true : false);
     return {
-      categories: has('categories') ? features.categories === true : system.enableCategories === true,
+      recipeCategories: categoryEnabled,
+      // Transitional alias
+      categories: categoryEnabled,
       itemTags: has('itemTags') ? features.itemTags === true : system.enableTags === true,
       essences: has('essences') ? features.essences === true : system.enableEssences === true,
       complexRecipes: has('complexRecipes') ? features.complexRecipes === true : false,
+      multiStepRecipes: multiStepEnabled,
       propertyMacros: has('propertyMacros') ? features.propertyMacros === true : false,
       craftingChecks: has('craftingChecks') ? features.craftingChecks === true : false,
       outcomeRouting: has('outcomeRouting') ? features.outcomeRouting === true : false
@@ -95,11 +113,67 @@ export class CraftingSystemManager {
       .filter(Boolean);
 
     return {
+      enabled: check?.enabled === true || !!check?.macroUuid,
       mode,
       macroUuid: check?.macroUuid || null,
+      successMacroUuid: check?.successMacroUuid || null,
+      failureMacroUuid: check?.failureMacroUuid || null,
+      consumption: {
+        consumeIngredientsOnFail: check?.consumption?.consumeIngredientsOnFail !== false,
+        consumeCatalystsOnFail: check?.consumption?.consumeCatalystsOnFail === true
+      },
+      progressive: {
+        awardMode: ['partial', 'equal', 'exceed'].includes(check?.progressive?.awardMode)
+          ? check.progressive.awardMode
+          : 'equal',
+        allowPlayerReorder: check?.progressive?.allowPlayerReorder === true
+      },
       outcomes: normalizedOutcomes.length > 0
         ? Array.from(new Set(normalizedOutcomes))
         : (mode === 'tiered' ? ['low', 'high'] : ['fail', 'pass'])
+    };
+  }
+
+  _normalizeRecipeVisibility(recipeVisibility = {}) {
+    const listMode = recipeVisibility?.listMode === 'knowledge' ? 'knowledge' : 'player';
+    const knowledge = recipeVisibility?.knowledge || {};
+    return {
+      listMode,
+      knowledge: {
+        mode: ['item', 'learned', 'itemOrLearned'].includes(knowledge?.mode)
+          ? knowledge.mode
+          : 'itemOrLearned',
+        item: {
+          limitUses: knowledge?.item?.limitUses === true,
+          maxUses: Number.isFinite(Number(knowledge?.item?.maxUses))
+            ? Number(knowledge.item.maxUses)
+            : undefined,
+          destroyWhenExhausted: knowledge?.item?.destroyWhenExhausted === true
+        },
+        learn: {
+          consumeOnLearn: knowledge?.learn?.consumeOnLearn !== false
+        }
+      }
+    };
+  }
+
+  _normalizeRequirements(requirements = {}) {
+    const time = requirements?.time || {};
+    const currency = requirements?.currency || {};
+    return {
+      time: {
+        enabled: time.enabled === true
+      },
+      currency: {
+        enabled: currency.enabled === true,
+        provider: currency.provider === 'system' ? 'system' : 'macro',
+        systemAdapter: ['dnd5e', 'pf2e'].includes(currency.systemAdapter)
+          ? currency.systemAdapter
+          : undefined,
+        checkCurrencyMacroUuid: currency.checkCurrencyMacroUuid || null,
+        decrementCurrencyMacroUuid: currency.decrementCurrencyMacroUuid || null,
+        formatCurrencyMacroUuid: currency.formatCurrencyMacroUuid || null
+      }
     };
   }
 
@@ -170,14 +244,18 @@ export class CraftingSystemManager {
   }
 
   _normalizeItem(item = {}, validEssenceIds = null) {
+    const difficulty = Number(item.difficulty);
     return {
       id: item.id || foundry.utils.randomID(),
       name: item.name || 'Unnamed Item',
       img: item.img || 'icons/svg/item-bag.svg',
-      sourceUuid: item.sourceUuid || null,
+      sourceItemUuid: item.sourceItemUuid || item.sourceUuid || null,
+      // Transitional alias for current UI/engine references.
+      sourceUuid: item.sourceUuid || item.sourceItemUuid || null,
       tier: item.tier || null,
       tags: Array.isArray(item.tags) ? item.tags : [],
-      essences: this._normalizeEssenceQuantities(item.essences, validEssenceIds)
+      essences: this._normalizeEssenceQuantities(item.essences, validEssenceIds),
+      difficulty: Number.isFinite(difficulty) && difficulty >= 1 ? Math.floor(difficulty) : undefined
     };
   }
 
@@ -201,7 +279,7 @@ export class CraftingSystemManager {
 
   async save() {
     const payload = Array.from(this.systems.values());
-    await game.settings.set('fabricate-v2', 'craftingSystems', payload);
+    await setSetting(SETTING_KEYS.CRAFTING_SYSTEMS, payload);
   }
 
   getSystems() {
@@ -227,9 +305,10 @@ export class CraftingSystemManager {
   getItems(systemId, search = '') {
     const system = this.getSystem(systemId);
     if (!system) return [];
-    if (!search) return [...system.items];
+    const managedItems = Array.isArray(system.managedItems) ? system.managedItems : (system.items || []);
+    if (!search) return [...managedItems];
     const q = search.toLowerCase();
-    return system.items.filter(item =>
+    return managedItems.filter(item =>
       item.name.toLowerCase().includes(q) ||
       (item.sourceUuid || '').toLowerCase().includes(q)
     );
@@ -250,6 +329,7 @@ export class CraftingSystemManager {
 
     const mergedFeatures = { ...(current.features || {}), ...(updates.features || {}) };
     if (Object.prototype.hasOwnProperty.call(updates, 'enableCategories')) {
+      mergedFeatures.recipeCategories = updates.enableCategories === true;
       mergedFeatures.categories = updates.enableCategories === true;
     }
     if (Object.prototype.hasOwnProperty.call(updates, 'enableTags')) {
@@ -257,6 +337,9 @@ export class CraftingSystemManager {
     }
     if (Object.prototype.hasOwnProperty.call(updates, 'enableEssences')) {
       mergedFeatures.essences = updates.enableEssences === true;
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'enableMultiStepRecipes')) {
+      mergedFeatures.multiStepRecipes = updates.enableMultiStepRecipes === true;
     }
 
     const mergedInput = {
@@ -283,17 +366,14 @@ export class CraftingSystemManager {
     if (!this.systems.has(systemId)) {
       throw new Error(`Crafting system not found: ${systemId}`);
     }
-    this.systems.delete(systemId);
 
-    // Disable or detach recipes that pointed to this crafting system.
-    const affected = this.recipeManager.getRecipes({}).filter(r => r.craftingSystemId === systemId);
+    // Delete recipes that belong to this crafting system.
+    const affected = this.recipeManager.getRecipes({ craftingSystemId: systemId });
     for (const recipe of affected) {
-      await this.recipeManager.updateRecipe(recipe.id, {
-        craftingSystemId: null,
-        enabled: false
-      });
+      await this.recipeManager.deleteRecipe(recipe.id);
     }
 
+    this.systems.delete(systemId);
     await this.save();
   }
 
@@ -351,9 +431,12 @@ export class CraftingSystemManager {
     this._assertGM('delete system item');
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
-    const before = system.items.length;
-    system.items = system.items.filter(i => i.id !== itemId);
-    if (system.items.length === before) return false;
+    const managedItems = Array.isArray(system.managedItems) ? system.managedItems : (system.items || []);
+    const before = managedItems.length;
+    const filteredItems = managedItems.filter(i => i.id !== itemId);
+    if (filteredItems.length === before) return false;
+    system.items = filteredItems;
+    system.managedItems = filteredItems;
 
     // Clear essence associated-item links that pointed to the deleted managed item.
     const essenceDefinitions = (system.essenceDefinitions || []).map(def => ({
@@ -370,10 +453,25 @@ export class CraftingSystemManager {
       updated.ingredientSets = (updated.ingredientSets || [])
         .map(set => ({
           ...set,
+          ingredientGroups: (set.ingredientGroups || []).map(group => ({
+            ...group,
+            options: (group.options || []).filter(ing =>
+              (ing.match?.type === 'systemItem' ? ing.match.systemItemId : ing.systemItemId) !== itemId
+            )
+          })).filter(group => (group.options || []).length > 0),
           ingredients: (set.ingredients || []).filter(ing => ing.systemItemId !== itemId),
           catalysts: (set.catalysts || []).filter(cat => cat.systemItemId !== itemId)
         }))
-        .filter(set => (set.ingredients?.length || 0) > 0 || Object.keys(set.essences || {}).length > 0);
+        .map(set => ({
+          ...set,
+          ingredients: (set.ingredientGroups || [])
+            .map(group => group.options?.[0] || null)
+            .filter(Boolean)
+        }))
+        .filter(set =>
+          (set.ingredientGroups?.length || set.ingredients?.length || 0) > 0 ||
+          Object.keys(set.essences || {}).length > 0
+        );
 
       updated.catalysts = (updated.catalysts || []).filter(cat => cat.systemItemId !== itemId);
       updated.resultGroups = (updated.resultGroups || [])

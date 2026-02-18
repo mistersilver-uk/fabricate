@@ -209,6 +209,51 @@
   padding: 0;
 }
 
+.run-summary-section {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.run-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.run-column h4 {
+  margin: 0 0 6px 0;
+  font-size: 13px;
+}
+
+.run-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.run-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+
+.run-row-actions {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 4px;
+}
+
+.run-row-actions .details-btn {
+  padding: 3px 8px;
+  font-size: 11px;
+}
+
 /* Header with search and filters */
 .fabricate-header {
   padding: 12px;
@@ -1359,6 +1404,60 @@
   text-overflow: ellipsis;
 }
 
+.fabricate-recipe-editor-v2 .ingredient-groups-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.fabricate-recipe-editor-v2 .ingredient-group-card {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.fabricate-recipe-editor-v2 .ingredient-group-drop {
+  margin-top: 8px;
+}
+
+.fabricate-recipe-editor-v2 .ingredient-option-row {
+  grid-template-columns: 140px 1fr 130px;
+}
+
+.fabricate-recipe-editor-v2 .ingredient-option-row .managed-item-cell {
+  min-height: 46px;
+}
+
+.fabricate-recipe-editor-v2 .ingredient-option-actions {
+  display: grid;
+  grid-template-columns: 1fr 30px 30px;
+  gap: 4px;
+  align-items: center;
+}
+
+.fabricate-recipe-editor-v2 .ingredient-option-actions button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+}
+
+.fabricate-recipe-editor-v2 .tag-placeholder-fields {
+  display: grid;
+  grid-template-columns: 1fr 110px;
+  gap: 6px;
+}
+
+.fabricate-recipe-editor-v2 .ingredient-option-divider {
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  padding: 4px 0;
+}
+
 .fabricate-recipe-editor-v2 .inline-actions.compact {
   display: flex;
   gap: 4px;
@@ -1600,6 +1699,14 @@
   }
 
   .fabricate-recipe-editor-v2 .ingredients-row {
+    grid-template-columns: 1fr;
+  }
+
+  .fabricate-recipe-editor-v2 .ingredient-option-row {
+    grid-template-columns: 1fr;
+  }
+
+  .fabricate-recipe-editor-v2 .tag-placeholder-fields {
     grid-template-columns: 1fr;
   }
 

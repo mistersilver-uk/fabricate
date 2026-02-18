@@ -1,5 +1,6 @@
 import { RecipeEditorApp } from './RecipeEditorApp.js';
 import { confirmDialog, getDragEventData, renderDialog } from './foundryCompat.js';
+import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 
 /**
  * GM crafting administration UI
@@ -13,7 +14,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     this.searchTerm = '';
     this.itemSearchTerm = '';
     this.selectedCategory = '';
-    this.selectedSystemId = game.settings.get('fabricate-v2', 'lastManagedCraftingSystem') || '';
+    this.selectedSystemId = getSetting(SETTING_KEYS.LAST_MANAGED_CRAFTING_SYSTEM) || '';
   }
 
   static DEFAULT_OPTIONS = {
@@ -54,6 +55,8 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
       addSystemCategory: this._onAddSystemCategory,
       removeSystemCategory: this._onRemoveSystemCategory,
       saveCraftingCheckConfig: this._onSaveCraftingCheckConfig,
+      toggleRequirement: this._onToggleRequirement,
+      saveCurrencyRequirementConfig: this._onSaveCurrencyRequirementConfig,
       editSystemItem: this._onEditSystemItem
     }
   };
@@ -85,6 +88,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
 
   _prepareRecipeContext(selectedSystem) {
     const manager = game.fabricate.getRecipeManager();
+    const showVisibilitySummary = (selectedSystem?.recipeVisibility?.listMode || 'player') === 'player';
     let recipes = selectedSystem
       ? manager.getRecipes({ craftingSystemId: selectedSystem.id })
       : [];
@@ -111,13 +115,26 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
       .sort((a, b) => a.name.localeCompare(b.name));
 
     const prepared = recipes.map(recipe => {
-      const ingredientCount = recipe.ingredientSets.reduce((sum, set) => sum + set.ingredients.length, 0);
+      const ingredientCount = recipe.ingredientSets.reduce((sum, set) => {
+        const groupCount = Array.isArray(set.ingredientGroups) && set.ingredientGroups.length > 0
+          ? set.ingredientGroups.reduce((groupSum, group) => groupSum + ((group.options || []).length || 0), 0)
+          : (set.ingredients || []).length;
+        return sum + groupCount;
+      }, 0);
       const catalystCount = recipe.ingredientSets.reduce((sum, set) => sum + (set.catalysts?.length || 0), 0);
       return {
         id: recipe.id,
         name: recipe.name,
         img: recipe.img,
         category: recipe.category,
+        visibilitySummary: (() => {
+          const visibility = recipe.visibility || {};
+          if (visibility.restricted !== true) return 'All players';
+          const allowed = Array.isArray(visibility.allowedUserIds) ? visibility.allowedUserIds : [];
+          if (allowed.length === 0) return 'Restricted (none selected)';
+          return `Restricted (${allowed.length})`;
+        })(),
+        locked: recipe.locked === true,
         enabled: recipe.enabled,
         isSimple: recipe.isSimpleRecipe(),
         ingredients: new Array(ingredientCount),
@@ -128,6 +145,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     return {
       search: this.searchTerm,
       selectedCategory: this.selectedCategory,
+      showVisibilitySummary,
       categories,
       recipes: prepared
     };
@@ -138,12 +156,14 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     const systemManager = game.fabricate.getCraftingSystemManager();
     const systems = systemManager.getSystems().map(s => ({
       ...s,
+      requirements: s.requirements || { time: { enabled: false }, currency: { enabled: false, provider: 'macro' } },
       features: s.features || {},
       advancedOptionsEnabled: s.advancedOptionsEnabled !== false,
-      enableTags: (s.features?.itemTags === true) || s.enableTags === true,
-      enableEssences: (s.features?.essences === true) || s.enableEssences === true,
-      enableCategories: (s.features?.categories === true) || s.enableCategories === true,
+      enableTags: s.features?.itemTags === true,
+      enableEssences: s.features?.essences === true,
+      enableCategories: s.features?.recipeCategories === true,
       enableComplexRecipes: s.features?.complexRecipes === true,
+      enableMultiStepRecipes: s.features?.multiStepRecipes === true,
       enablePropertyMacros: s.features?.propertyMacros === true,
       enableCraftingChecks: s.features?.craftingChecks === true,
       enableOutcomeRouting: s.features?.outcomeRouting === true,
@@ -198,11 +218,13 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
         ? {
           ...selectedSystem,
           features: selectedSystem.features || {},
+          requirements: selectedSystem.requirements || { time: { enabled: false }, currency: { enabled: false, provider: 'macro' } },
           advancedOptionsEnabled: selectedSystem.advancedOptionsEnabled !== false,
-          enableTags: (selectedSystem.features?.itemTags === true) || selectedSystem.enableTags === true,
-          enableEssences: (selectedSystem.features?.essences === true) || selectedSystem.enableEssences === true,
-          enableCategories: (selectedSystem.features?.categories === true) || selectedSystem.enableCategories === true,
+          enableTags: selectedSystem.features?.itemTags === true,
+          enableEssences: selectedSystem.features?.essences === true,
+          enableCategories: selectedSystem.features?.recipeCategories === true,
           enableComplexRecipes: selectedSystem.features?.complexRecipes === true,
+          enableMultiStepRecipes: selectedSystem.features?.multiStepRecipes === true,
           enablePropertyMacros: selectedSystem.features?.propertyMacros === true,
           enableCraftingChecks: selectedSystem.features?.craftingChecks === true,
           enableOutcomeRouting: selectedSystem.features?.outcomeRouting === true,
@@ -213,6 +235,13 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
           craftingCheckOutcomesText: Array.isArray(selectedSystem.craftingCheck?.outcomes)
             ? selectedSystem.craftingCheck.outcomes.join(', ')
             : '',
+          requirementsTimeEnabled: selectedSystem.requirements?.time?.enabled === true,
+          requirementsCurrencyEnabled: selectedSystem.requirements?.currency?.enabled === true,
+          currencyProvider: selectedSystem.requirements?.currency?.provider || 'macro',
+          currencySystemAdapter: selectedSystem.requirements?.currency?.systemAdapter || '',
+          checkCurrencyMacroUuid: selectedSystem.requirements?.currency?.checkCurrencyMacroUuid || '',
+          decrementCurrencyMacroUuid: selectedSystem.requirements?.currency?.decrementCurrencyMacroUuid || '',
+          formatCurrencyMacroUuid: selectedSystem.requirements?.currency?.formatCurrencyMacroUuid || '',
           availableScriptMacros,
           showTags,
           showEssences
@@ -332,7 +361,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
   static async _onSelectSystem(event, target) {
     event.preventDefault();
     this.selectedSystemId = target.dataset.systemId || '';
-    await game.settings.set('fabricate-v2', 'lastManagedCraftingSystem', this.selectedSystemId);
+    await setSetting(SETTING_KEYS.LAST_MANAGED_CRAFTING_SYSTEM, this.selectedSystemId);
     await this.render();
   }
 
@@ -343,7 +372,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     const system = await game.fabricate.getCraftingSystemManager().createSystem({ name, description });
     this.selectedSystemId = system.id;
     this.activeTab = 'systems';
-    await game.settings.set('fabricate-v2', 'lastManagedCraftingSystem', system.id);
+    await setSetting(SETTING_KEYS.LAST_MANAGED_CRAFTING_SYSTEM, system.id);
     await this.render();
   }
 
@@ -356,7 +385,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
 
     const confirmed = await confirmDialog({
       title: `Delete ${system.name}?`,
-      content: `<p>Delete crafting system <strong>${system.name}</strong>? Recipes linked to it will be disabled.</p>`,
+      content: `<p>Delete crafting system <strong>${system.name}</strong>? Recipes linked to it will be deleted.</p>`,
       yes: () => true,
       no: () => false
     });
@@ -365,7 +394,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     await game.fabricate.getCraftingSystemManager().deleteSystem(systemId);
     const remaining = game.fabricate.getCraftingSystemManager().getSystems();
     this.selectedSystemId = remaining[0]?.id || '';
-    await game.settings.set('fabricate-v2', 'lastManagedCraftingSystem', this.selectedSystemId || '');
+    await setSetting(SETTING_KEYS.LAST_MANAGED_CRAFTING_SYSTEM, this.selectedSystemId || '');
     await this.render();
   }
 
@@ -500,8 +529,8 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     if (!item) return;
 
     const advancedEnabled = system.advancedOptionsEnabled !== false;
-    const showTags = advancedEnabled && ((system.features?.itemTags === true) || system.enableTags === true);
-    const showEssences = advancedEnabled && ((system.features?.essences === true) || system.enableEssences === true);
+    const showTags = advancedEnabled && (system.features?.itemTags === true);
+    const showEssences = advancedEnabled && (system.features?.essences === true);
 
     const tagOptions = (system.itemTags || system.tags || []).map(tag => ({
       tag,
@@ -625,10 +654,11 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     if (system.advancedOptionsEnabled === false) return;
     const feature = target.dataset.feature;
     const mapping = {
-      categories: 'categories',
+      categories: 'recipeCategories',
       itemTags: 'itemTags',
       essences: 'essences',
       complexRecipes: 'complexRecipes',
+      multiStepRecipes: 'multiStepRecipes',
       propertyMacros: 'propertyMacros',
       craftingChecks: 'craftingChecks',
       outcomeRouting: 'outcomeRouting'
@@ -641,11 +671,63 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     await this.render();
   }
 
+  static async _onToggleRequirement(event, target) {
+    if (!this.constructor._requireGM()) return;
+    const system = this._selectedSystem();
+    if (!system) return;
+    if (system.advancedOptionsEnabled === false) return;
+    const requirement = String(target.dataset.requirement || '').trim();
+    if (!['time', 'currency'].includes(requirement)) return;
+
+    const requirements = foundry.utils.deepClone(system.requirements || {
+      time: { enabled: false },
+      currency: { enabled: false, provider: 'macro', systemAdapter: undefined }
+    });
+    requirements[requirement] = requirements[requirement] || {};
+    requirements[requirement].enabled = target.checked === true;
+    if (requirement === 'currency') {
+      requirements.currency.provider = requirements.currency.provider || 'macro';
+    }
+
+    await game.fabricate.getCraftingSystemManager().updateSystem(system.id, { requirements });
+    await this.render();
+  }
+
+  static async _onSaveCurrencyRequirementConfig() {
+    if (!this.constructor._requireGM()) return;
+    const system = this._selectedSystem();
+    if (!system) return;
+    if (system.advancedOptionsEnabled === false) return;
+
+    const provider = this._readInput('currencyProvider') === 'system' ? 'system' : 'macro';
+    const systemAdapter = this._readInput('currencySystemAdapter');
+    const checkCurrencyMacroUuid = this._readInput('checkCurrencyMacroUuid') || null;
+    const decrementCurrencyMacroUuid = this._readInput('decrementCurrencyMacroUuid') || null;
+    const formatCurrencyMacroUuid = this._readInput('formatCurrencyMacroUuid') || null;
+
+    const requirements = foundry.utils.deepClone(system.requirements || {
+      time: { enabled: false },
+      currency: { enabled: false, provider: 'macro', systemAdapter: undefined }
+    });
+    requirements.currency = {
+      ...(requirements.currency || {}),
+      enabled: requirements.currency?.enabled === true,
+      provider,
+      systemAdapter: provider === 'system' ? (['dnd5e', 'pf2e'].includes(systemAdapter) ? systemAdapter : undefined) : undefined,
+      checkCurrencyMacroUuid: provider === 'macro' ? checkCurrencyMacroUuid : null,
+      decrementCurrencyMacroUuid: provider === 'macro' ? decrementCurrencyMacroUuid : null,
+      formatCurrencyMacroUuid: provider === 'macro' ? formatCurrencyMacroUuid : null
+    };
+
+    await game.fabricate.getCraftingSystemManager().updateSystem(system.id, { requirements });
+    await this.render();
+  }
+
   static async _onAddSystemTag() {
     if (!this.constructor._requireGM()) return;
     const system = this._selectedSystem();
     if (!system) return;
-    const tagsEnabled = (system.features?.itemTags === true) || system.enableTags === true;
+    const tagsEnabled = system.features?.itemTags === true;
     if (system.advancedOptionsEnabled === false || !tagsEnabled) return;
     const value = this._readInput('newSystemTag').toLowerCase();
     if (!value) return;
@@ -709,7 +791,8 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     if (!this.constructor._requireGM()) return;
     const system = this._selectedSystem();
     if (!system) return;
-    const categoriesEnabled = (system.features?.categories === true) || system.enableCategories === true;
+    const categoriesEnabled =
+      system.features?.recipeCategories === true;
     if (system.advancedOptionsEnabled === false || !categoriesEnabled) return;
     const value = this._readInput('newSystemCategory');
     if (!value) return;

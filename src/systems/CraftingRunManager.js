@@ -1,0 +1,302 @@
+import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
+
+const HISTORY_LIMIT = 50;
+
+/**
+ * Manages actor-scoped crafting runs (active + history).
+ */
+export class CraftingRunManager {
+  _normalizeContainer(raw = {}) {
+    const active = raw?.active && typeof raw.active === 'object' ? { ...raw.active } : {};
+    const history = Array.isArray(raw?.history) ? [...raw.history] : [];
+    return { active, history };
+  }
+
+  _nowWorldTime() {
+    return Number(game.time?.worldTime || 0);
+  }
+
+  _durationToSeconds(timeRequirement = null) {
+    if (!timeRequirement || typeof timeRequirement !== 'object') return 0;
+    const minutes = Number(timeRequirement.minutes || 0);
+    const hours = Number(timeRequirement.hours || 0);
+    const days = Number(timeRequirement.days || 0);
+    const months = Number(timeRequirement.months || 0);
+    const years = Number(timeRequirement.years || 0);
+    const daySeconds = 24 * 60 * 60;
+
+    return Math.max(0,
+      (minutes * 60) +
+      (hours * 60 * 60) +
+      (days * daySeconds) +
+      (months * 30 * daySeconds) +
+      (years * 365 * daySeconds)
+    );
+  }
+
+  _buildStepStates(recipe) {
+    const steps = recipe.getExecutionSteps();
+    return steps.map((step, index) => ({
+      stepId: step.id || foundry.utils.randomID(),
+      stepName: step.name || `Step ${index + 1}`,
+      index,
+      status: index === 0 ? 'inProgress' : 'pending',
+      startedAt: index === 0 ? this._nowWorldTime() : undefined,
+      updatedAt: this._nowWorldTime(),
+      completedAt: undefined,
+      timeGate: undefined,
+      selectedIngredientSetId: undefined,
+      lastCheckResult: undefined,
+      consumedIngredients: [],
+      usedCatalysts: [],
+      createdResults: [],
+      failureReason: undefined
+    }));
+  }
+
+  async _persist(actor, container) {
+    await setFabricateFlag(actor, 'craftingRuns', container);
+  }
+
+  _getContainer(actor) {
+    return this._normalizeContainer(getFabricateFlag(actor, 'craftingRuns', null));
+  }
+
+  getActiveRuns(actor) {
+    const container = this._getContainer(actor);
+    return Object.values(container.active || {});
+  }
+
+  getActiveRun(actor, runId) {
+    const container = this._getContainer(actor);
+    return container.active?.[runId] || null;
+  }
+
+  getRunHistory(actor, limit = null) {
+    const container = this._getContainer(actor);
+    const history = Array.isArray(container.history) ? container.history : [];
+    if (!Number.isFinite(Number(limit)) || Number(limit) <= 0) return [...history];
+    return history.slice(0, Number(limit));
+  }
+
+  getRun(actor, runId) {
+    if (!runId) return null;
+    const container = this._getContainer(actor);
+    if (container.active?.[runId]) return container.active[runId];
+    return (container.history || []).find(run => run?.id === runId) || null;
+  }
+
+  findActiveRunForRecipe(actor, recipeId) {
+    const runs = this.getActiveRuns(actor);
+    return runs.find(run => run.recipeId === recipeId) || null;
+  }
+
+  async createRun(actor, recipe, componentSourceActors = [], userId = null) {
+    const container = this._getContainer(actor);
+    const runId = foundry.utils.randomID();
+    const stepStates = this._buildStepStates(recipe);
+    const run = {
+      id: runId,
+      actorUuid: actor.uuid,
+      userId: userId || game.user?.id || null,
+      craftingSystemId: recipe.craftingSystemId,
+      recipeId: recipe.id,
+      status: 'inProgress',
+      startedAt: this._nowWorldTime(),
+      updatedAt: this._nowWorldTime(),
+      finishedAt: undefined,
+      currentStepIndex: 0,
+      steps: stepStates,
+      componentSourceActorUuids: componentSourceActors.map(a => a.uuid)
+    };
+
+    container.active[runId] = run;
+    await this._persist(actor, container);
+    return run;
+  }
+
+  async updateRun(actor, run) {
+    const container = this._getContainer(actor);
+    if (!container.active[run.id]) return null;
+    run.updatedAt = this._nowWorldTime();
+    container.active[run.id] = run;
+    await this._persist(actor, container);
+    return run;
+  }
+
+  async markStepWaitingForTime(actor, run, stepIndex, timeRequirement) {
+    const seconds = this._durationToSeconds(timeRequirement);
+    if (seconds <= 0) return run;
+
+    const worldTime = this._nowWorldTime();
+    const step = run.steps?.[stepIndex];
+    if (!step) return run;
+    if (step.timeGate?.availableAt && worldTime < step.timeGate.availableAt) {
+      run.status = 'waitingTime';
+      step.status = 'waitingTime';
+      step.updatedAt = worldTime;
+      await this.updateRun(actor, run);
+      return run;
+    }
+
+    if (!step.timeGate) {
+      step.timeGate = {
+        requiredSeconds: seconds,
+        initiatedAt: worldTime,
+        availableAt: worldTime + seconds
+      };
+    }
+    run.status = 'waitingTime';
+    step.status = 'waitingTime';
+    step.updatedAt = worldTime;
+    await this.updateRun(actor, run);
+    return run;
+  }
+
+  canProceedTimeGate(run, stepIndex, worldTime = this._nowWorldTime()) {
+    const step = run.steps?.[stepIndex];
+    if (!step?.timeGate) return true;
+    return Number(worldTime) >= Number(step.timeGate.availableAt || 0);
+  }
+
+  async markStepInProgress(actor, run, stepIndex) {
+    const worldTime = this._nowWorldTime();
+    const step = run.steps?.[stepIndex];
+    if (!step) return run;
+    run.status = 'inProgress';
+    run.currentStepIndex = stepIndex;
+    step.status = 'inProgress';
+    step.startedAt = step.startedAt ?? worldTime;
+    step.updatedAt = worldTime;
+    await this.updateRun(actor, run);
+    return run;
+  }
+
+  async completeStepSuccess(actor, run, stepIndex, payload = {}) {
+    const worldTime = this._nowWorldTime();
+    const step = run.steps?.[stepIndex];
+    if (!step) return run;
+
+    step.status = 'succeeded';
+    step.updatedAt = worldTime;
+    step.completedAt = worldTime;
+    step.selectedIngredientSetId = payload.selectedIngredientSetId || step.selectedIngredientSetId;
+    step.lastCheckResult = payload.lastCheckResult || step.lastCheckResult;
+    step.consumedIngredients = payload.consumedIngredients || step.consumedIngredients || [];
+    step.usedCatalysts = payload.usedCatalysts || step.usedCatalysts || [];
+    step.createdResults = payload.createdResults || step.createdResults || [];
+
+    const nextIndex = stepIndex + 1;
+    if (nextIndex >= (run.steps?.length || 0)) {
+      return this.completeRun(actor, run, 'succeeded');
+    }
+
+    run.currentStepIndex = nextIndex;
+    run.status = 'inProgress';
+    const nextStep = run.steps[nextIndex];
+    if (nextStep) {
+      nextStep.status = 'inProgress';
+      nextStep.startedAt = nextStep.startedAt ?? worldTime;
+      nextStep.updatedAt = worldTime;
+    }
+    await this.updateRun(actor, run);
+    return run;
+  }
+
+  async completeStepFailure(actor, run, stepIndex, reason = 'Crafting check failed', payload = {}) {
+    const worldTime = this._nowWorldTime();
+    const step = run.steps?.[stepIndex];
+    if (!step) return run;
+
+    step.status = 'failed';
+    step.updatedAt = worldTime;
+    step.completedAt = worldTime;
+    step.failureReason = reason;
+    step.lastCheckResult = payload.lastCheckResult || step.lastCheckResult;
+    step.selectedIngredientSetId = payload.selectedIngredientSetId || step.selectedIngredientSetId;
+    step.consumedIngredients = payload.consumedIngredients || step.consumedIngredients || [];
+    step.usedCatalysts = payload.usedCatalysts || step.usedCatalysts || [];
+    step.createdResults = payload.createdResults || step.createdResults || [];
+
+    return this.completeRun(actor, run, 'failed');
+  }
+
+  async completeRun(actor, run, status = 'succeeded') {
+    const container = this._getContainer(actor);
+    if (!container.active?.[run.id]) return run;
+
+    run.status = status;
+    run.currentStepIndex = null;
+    run.updatedAt = this._nowWorldTime();
+    run.finishedAt = this._nowWorldTime();
+
+    delete container.active[run.id];
+    container.history.unshift(run);
+    if (container.history.length > HISTORY_LIMIT) {
+      container.history = container.history.slice(0, HISTORY_LIMIT);
+    }
+    await this._persist(actor, container);
+    return run;
+  }
+
+  async cancelRun(actor, runId) {
+    const run = this.getActiveRun(actor, runId);
+    if (!run) return null;
+    return this.completeRun(actor, run, 'cancelled');
+  }
+
+  async processWorldTime(worldTime = this._nowWorldTime()) {
+    for (const actor of game.actors || []) {
+      const container = this._getContainer(actor);
+      let dirty = false;
+
+      for (const run of Object.values(container.active || {})) {
+        if (run.status !== 'waitingTime') continue;
+        const idx = Number(run.currentStepIndex);
+        if (!Number.isFinite(idx)) continue;
+        const step = run.steps?.[idx];
+        if (!step?.timeGate) continue;
+        if (Number(worldTime) < Number(step.timeGate.availableAt || 0)) continue;
+
+        run.status = 'inProgress';
+        step.status = 'inProgress';
+        step.updatedAt = Number(worldTime);
+        run.updatedAt = Number(worldTime);
+        dirty = true;
+      }
+
+      if (dirty) {
+        await this._persist(actor, container);
+      }
+    }
+  }
+
+  async cleanupInvalidRuns(validRecipeIds = new Set(), validSystemIds = new Set()) {
+    for (const actor of game.actors || []) {
+      const container = this._getContainer(actor);
+      let dirty = false;
+
+      for (const [runId, run] of Object.entries(container.active || {})) {
+        const recipeValid = run?.recipeId && validRecipeIds.has(run.recipeId);
+        const systemValid = run?.craftingSystemId && validSystemIds.has(run.craftingSystemId);
+        if (recipeValid && systemValid) continue;
+        delete container.active[runId];
+        dirty = true;
+      }
+
+      const nextHistory = (container.history || []).filter(run => {
+        const recipeValid = run?.recipeId && validRecipeIds.has(run.recipeId);
+        const systemValid = run?.craftingSystemId && validSystemIds.has(run.craftingSystemId);
+        return recipeValid && systemValid;
+      });
+      if (nextHistory.length !== (container.history || []).length) {
+        container.history = nextHistory;
+        dirty = true;
+      }
+
+      if (dirty) {
+        await this._persist(actor, container);
+      }
+    }
+  }
+}

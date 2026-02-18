@@ -1,12 +1,17 @@
 import { RecipeManager } from './systems/RecipeManager.js';
 import { CraftingEngine } from './systems/CraftingEngine.js';
 import { CraftingSystemManager } from './systems/CraftingSystemManager.js';
+import { CraftingRunManager } from './systems/CraftingRunManager.js';
+import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
+import { ResolutionModeService } from './systems/ResolutionModeService.js';
 import { Recipe } from './models/Recipe.js';
 import { Ingredient } from './models/Ingredient.js';
+import { IngredientGroup } from './models/IngredientGroup.js';
 import { Catalyst } from './models/Catalyst.js';
 import { CraftingApp } from './ui/CraftingApp.js';
 import { RecipeManagerApp } from './ui/RecipeManagerApp.js';
 import { RecipeEditorApp } from './ui/RecipeEditorApp.js';
+import { registerFabricateSettings, migrateLegacySettings } from './config/settings.js';
 
 /**
  * Fabricate v2 - Universal Crafting System
@@ -18,6 +23,9 @@ class FabricateV2 {
     this.recipeManager = null;
     this.craftingEngine = null;
     this.craftingSystemManager = null;
+    this.craftingRunManager = null;
+    this.recipeVisibilityService = null;
+    this.resolutionModeService = null;
     this.ready = false;
   }
 
@@ -29,15 +37,27 @@ class FabricateV2 {
 
     // Register settings
     this.registerSettings();
+    await migrateLegacySettings();
 
     // Create managers
     this.recipeManager = new RecipeManager();
     this.craftingSystemManager = new CraftingSystemManager(this.recipeManager);
-    this.craftingEngine = new CraftingEngine(this.recipeManager);
+    this.craftingRunManager = new CraftingRunManager();
+    this.recipeVisibilityService = new RecipeVisibilityService(this.recipeManager, this.craftingSystemManager);
+    this.resolutionModeService = new ResolutionModeService(this.craftingSystemManager);
+    this.craftingEngine = new CraftingEngine(
+      this.recipeManager,
+      this.craftingRunManager,
+      this.resolutionModeService
+    );
 
     // Initialize recipe manager
     await this.recipeManager.initialize();
     await this.craftingSystemManager.initialize();
+    const validRecipes = new Set(this.recipeManager.getRecipes({}).map(r => r.id));
+    const validSystems = new Set(this.craftingSystemManager.getSystems().map(s => s.id));
+    await this.craftingRunManager.cleanupInvalidRuns(validRecipes, validSystems);
+    await this.recipeVisibilityService.cleanupLearnedRecipes(validRecipes);
 
     this.ready = true;
     console.log('Fabricate v2 | Ready');
@@ -47,80 +67,7 @@ class FabricateV2 {
    * Register module settings
    */
   registerSettings() {
-    // Store all recipes
-    game.settings.register('fabricate-v2', 'recipes', {
-      name: 'Recipes',
-      scope: 'world',
-      config: false,
-      type: Array,
-      default: []
-    });
-
-    // Store crafting systems and their managed item libraries
-    game.settings.register('fabricate-v2', 'craftingSystems', {
-      name: 'Crafting Systems',
-      scope: 'world',
-      config: false,
-      type: Array,
-      default: []
-    });
-
-    // Enable/disable module
-    game.settings.register('fabricate-v2', 'enabled', {
-      name: 'FABRICATE.Settings.Enabled.Name',
-      hint: 'FABRICATE.Settings.Enabled.Hint',
-      scope: 'world',
-      config: true,
-      type: Boolean,
-      default: true
-    });
-
-    // Show simple recipes only
-    game.settings.register('fabricate-v2', 'showSimpleRecipesOnly', {
-      name: 'FABRICATE.Settings.SimpleOnly.Name',
-      hint: 'FABRICATE.Settings.SimpleOnly.Hint',
-      scope: 'client',
-      config: true,
-      type: Boolean,
-      default: false
-    });
-
-    // Auto-craft on success (skip confirmation dialog)
-    game.settings.register('fabricate-v2', 'autoCraft', {
-      name: 'FABRICATE.Settings.AutoCraft.Name',
-      hint: 'FABRICATE.Settings.AutoCraft.Hint',
-      scope: 'client',
-      config: true,
-      type: Boolean,
-      default: false
-    });
-
-    // Last selected crafting actor (where results go)
-    game.settings.register('fabricate-v2', 'lastCraftingActor', {
-      name: 'Last Crafting Actor',
-      scope: 'client',
-      config: false,
-      type: String,
-      default: ''
-    });
-
-    // Last selected component source actors (where ingredients come from)
-    game.settings.register('fabricate-v2', 'lastComponentSources', {
-      name: 'Last Component Source Actors',
-      scope: 'client',
-      config: false,
-      type: Array,
-      default: []
-    });
-
-    // Last selected crafting system in GM management UI
-    game.settings.register('fabricate-v2', 'lastManagedCraftingSystem', {
-      name: 'Last Managed Crafting System',
-      scope: 'client',
-      config: false,
-      type: String,
-      default: ''
-    });
+    registerFabricateSettings();
   }
 
   /**
@@ -142,6 +89,24 @@ class FabricateV2 {
    */
   getCraftingSystemManager() {
     return this.craftingSystemManager;
+  }
+
+  /**
+   * Get the crafting run manager instance
+   */
+  getCraftingRunManager() {
+    return this.craftingRunManager;
+  }
+
+  /**
+   * Get the recipe visibility service instance
+   */
+  getRecipeVisibilityService() {
+    return this.recipeVisibilityService;
+  }
+
+  getResolutionModeService() {
+    return this.resolutionModeService;
   }
 
   /**
@@ -204,19 +169,24 @@ Hooks.once('init', async () => {
   game.fabricate.api = {
     Recipe,
     Ingredient,
+    IngredientGroup,
     Catalyst,
     RecipeManager,
     CraftingEngine,
     CraftingApp,
     RecipeManagerApp,
     RecipeEditorApp,
-    CraftingSystemManager
+    CraftingSystemManager,
+    CraftingRunManager,
+    RecipeVisibilityService,
+    ResolutionModeService
   };
 });
 
 // Hook into Foundry's ready event
 Hooks.once('ready', async () => {
   await fabricate.initialize();
+  await fabricate.getCraftingRunManager()?.processWorldTime?.();
 
   // Notify users
   if (game.user.isGM) {
@@ -226,6 +196,12 @@ Hooks.once('ready', async () => {
   addModuleButtonsToItemsDirectory();
 
   Hooks.callAll('fabricate.ready');
+});
+
+Hooks.on('updateWorldTime', (worldTime) => {
+  const manager = game.fabricate?.getCraftingRunManager?.();
+  if (!manager) return;
+  manager.processWorldTime(worldTime);
 });
 
 /**
@@ -283,11 +259,11 @@ function addModuleButtonsToItemsDirectory() {
     const managerExists = Array.from(actionsContainer.querySelectorAll('button.create-document'))
       .some(btn =>
         btn.dataset.fabricateAction === 'manage' ||
-        btn.textContent?.includes('Manage Recipes')
+        btn.textContent?.includes('Manage Crafting Systems')
       );
     if (!managerExists) {
       const managerButton = createHeaderButton(
-        'Manage Recipes',
+        'Manage Crafting Systems',
         'fas fa-book',
         'manage',
         () => RecipeManagerApp.show()

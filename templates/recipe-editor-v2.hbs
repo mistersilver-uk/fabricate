@@ -52,16 +52,118 @@
 
       <div class="editor-flags">
         <label><input type="checkbox" name="enabled" {{#if recipe.enabled}}checked{{/if}} /> Enabled</label>
-        {{#if showComplexRecipes}}
+        <label><input type="checkbox" name="locked" {{#if recipe.locked}}checked{{/if}} /> Locked</label>
+        {{#if showVariableOutputToggle}}
           <label><input type="checkbox" name="isVariable" {{#if recipe.isVariable}}checked{{/if}} /> Variable Output</label>
         {{/if}}
         <label><input type="checkbox" name="transferEffects" {{#if recipe.transferEffects}}checked{{/if}} /> Transfer Effects</label>
-        {{#if showComplexRecipes}}
-          <label><input type="checkbox" name="requiresAllSets" {{#if recipe.requiresAllSets}}checked{{/if}} /> Require All Ingredient Sets</label>
-        {{/if}}
       </div>
 
+      {{#if showRecipeVisibilityPlayer}}
+        <div class="editor-block">
+          <div class="carousel-header small">
+            <h4>Player Visibility</h4>
+          </div>
+          <label><input type="checkbox" name="visibility.restricted" {{#if recipe.visibility.restricted}}checked{{/if}} /> Restrict recipe visibility to specific users</label>
+          {{#if recipe.visibility.restricted}}
+            <div class="editor-grid">
+              {{#each availableUsers}}
+                <label>
+                  <input type="checkbox" name="visibility.allowedUserIds" value="{{id}}" {{#if selected}}checked{{/if}} />
+                  <span>{{name}}</span>
+                </label>
+              {{else}}
+                <p class="hint">No non-GM users available.</p>
+              {{/each}}
+            </div>
+          {{/if}}
+        </div>
+      {{/if}}
+
+      {{#if requiresLinkedRecipeItem}}
+        <div class="editor-block">
+          <div class="form-group">
+            <label>Linked Recipe Item UUID</label>
+            <input name="linkedRecipeItemUuid" type="text" value="{{recipe.linkedRecipeItemUuid}}" placeholder="Item.* or Compendium.* UUID" />
+            <p class="hint">Used for knowledge-mode item matching (UUID or flags.core.sourceId).</p>
+          </div>
+        </div>
+      {{/if}}
+
       <hr />
+
+      {{#if showMultiStepRecipes}}
+        <section class="editor-block">
+          <div class="carousel-header">
+            <h3>Crafting Steps</h3>
+            <div class="carousel-controls">
+              <button type="button" data-action="prevStep" title="Previous Step"><i class="fas fa-chevron-left"></i></button>
+              <span>Step {{activeStepIndex}} / {{stepCount}}</span>
+              <button type="button" data-action="nextStep" title="Next Step"><i class="fas fa-chevron-right"></i></button>
+              <button type="button" data-action="addStep" title="Add Step"><i class="fas fa-plus"></i></button>
+              <button type="button" data-action="removeStep" title="Remove Step"><i class="fas fa-trash"></i></button>
+            </div>
+          </div>
+
+          <div class="editor-grid">
+            <div class="form-group">
+              <label>Step Name</label>
+              <input name="step.name" type="text" value="{{activeStep.name}}" />
+            </div>
+
+            <div class="form-group span-2">
+              <label>Step Description</label>
+              <textarea name="step.description" rows="2">{{activeStep.description}}</textarea>
+            </div>
+          </div>
+
+          {{#if showTimeRequirements}}
+            <div class="carousel-header small">
+              <h4>Time Requirement</h4>
+            </div>
+            <div class="editor-grid">
+              <div class="form-group">
+                <label>Minutes</label>
+                <input name="step.timeRequirement.minutes" type="number" min="0" value="{{activeStep.timeRequirement.minutes}}" />
+              </div>
+              <div class="form-group">
+                <label>Hours</label>
+                <input name="step.timeRequirement.hours" type="number" min="0" value="{{activeStep.timeRequirement.hours}}" />
+              </div>
+              <div class="form-group">
+                <label>Days</label>
+                <input name="step.timeRequirement.days" type="number" min="0" value="{{activeStep.timeRequirement.days}}" />
+              </div>
+              <div class="form-group">
+                <label>Months</label>
+                <input name="step.timeRequirement.months" type="number" min="0" value="{{activeStep.timeRequirement.months}}" />
+              </div>
+              <div class="form-group">
+                <label>Years</label>
+                <input name="step.timeRequirement.years" type="number" min="0" value="{{activeStep.timeRequirement.years}}" />
+              </div>
+            </div>
+          {{/if}}
+
+          {{#if showCurrencyRequirements}}
+            <div class="carousel-header small">
+              <h4>Currency Requirement</h4>
+            </div>
+            <div class="editor-grid">
+              <div class="form-group">
+                <label>Currency Unit</label>
+                <input name="step.currencyRequirement.unit" type="text" value="{{activeStep.currencyRequirement.unit}}" placeholder="e.g. gp, credits" />
+              </div>
+              <div class="form-group">
+                <label>Amount</label>
+                <input name="step.currencyRequirement.amount" type="number" min="0" step="0.01" value="{{activeStep.currencyRequirement.amount}}" />
+              </div>
+            </div>
+          {{/if}}
+        </section>
+
+        <hr />
+      {{/if}}
 
       <section class="editor-block">
         <div class="carousel-header">
@@ -91,31 +193,95 @@
           {{/if}}
         </div>
 
-        <div class="ingredients-table" data-drop-target="ingredient-new">
-          <div class="ingredients-row header">
-            <span>Managed Item</span>
-            <span>Qty</span>
-            <span></span>
-          </div>
-          {{#if ingredientSet.itemIngredients.length}}
-            {{#each ingredientSet.itemIngredients}}
-              <div class="ingredients-row" data-drop-target="ingredient" data-index="{{rowIndex}}">
-                <div class="managed-item-cell drop-slot">
-                  <img src="{{itemImg}}" alt="{{itemName}}" />
-                  <div class="managed-item-meta">
-                    <span>{{itemName}}</span>
-                  </div>
-                </div>
-                <input name="itemIngredients.{{rowIndex}}.quantity" type="number" min="1" value="{{quantity}}" />
-                <button type="button" data-action="removeIngredientRow" data-index="{{rowIndex}}" title="Remove"><i class="fas fa-trash"></i></button>
-              </div>
-            {{/each}}
-          {{else}}
-            <div class="ingredients-empty">
-              <p>Drop managed items here to add ingredients.</p>
-            </div>
-          {{/if}}
+        <div class="inline-actions">
+          <button type="button" data-action="addIngredientGroup"><i class="fas fa-layer-group"></i> Add Ingredient Group</button>
         </div>
+        <div class="ingredients-empty ingredient-group-drop" data-drop-target="ingredient-new">
+          <p>Drop a managed item here to add a new ingredient group.</p>
+        </div>
+
+        <div class="ingredient-groups-list">
+          {{#each ingredientSet.ingredientGroups}}
+            <article class="ingredient-group-card">
+              <div class="carousel-header small">
+                <h4>Ingredient Group</h4>
+                <div class="carousel-controls">
+                  <button type="button" data-action="addIngredientOption" data-group-index="{{groupIndex}}" title="Add OR Option"><i class="fas fa-plus"></i></button>
+                  <button type="button" data-action="removeIngredientGroup" data-group-index="{{groupIndex}}" title="Remove Group"><i class="fas fa-trash"></i></button>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Group Name</label>
+                <input name="ingredientGroups.{{groupIndex}}.name" type="text" value="{{name}}" placeholder="e.g. Fruit Filling" />
+              </div>
+
+              <div class="ingredients-table">
+                <div class="ingredients-row header ingredient-option-row">
+                  <span>Match</span>
+                  <span>Requirement</span>
+                  <span>Qty / Actions</span>
+                </div>
+                {{#each options}}
+                  <div class="ingredients-row ingredient-option-row" data-drop-target="ingredient-option" data-group-index="{{../groupIndex}}" data-option-index="{{optionIndex}}">
+                    <select name="ingredientGroups.{{../groupIndex}}.options.{{optionIndex}}.matchType">
+                      <option value="systemItem" {{#if isSystemItem}}selected{{/if}}>Managed item</option>
+                      {{#if ../../showItemTags}}
+                        <option value="tags" {{#if isTagMatch}}selected{{/if}}>Tag placeholder</option>
+                      {{/if}}
+                    </select>
+
+                    {{#if isSystemItem}}
+                      <div class="managed-item-cell drop-slot">
+                        <img src="{{itemImg}}" alt="{{itemName}}" />
+                        <div class="managed-item-meta">
+                          <span>{{itemName}}</span>
+                        </div>
+                        <input type="hidden" name="ingredientGroups.{{../groupIndex}}.options.{{optionIndex}}.systemItemId" value="{{systemItemId}}" />
+                      </div>
+                    {{else}}
+                      <div class="tag-placeholder-fields">
+                        <input
+                          name="ingredientGroups.{{../groupIndex}}.options.{{optionIndex}}.tags"
+                          type="text"
+                          value="{{tagsText}}"
+                          placeholder="tag-1, tag-2"
+                          list="fabricate-item-tags"
+                        />
+                        <select name="ingredientGroups.{{../groupIndex}}.options.{{optionIndex}}.tagMatch">
+                          <option value="any" {{#if (eq tagMatch 'any')}}selected{{/if}}>Any tag</option>
+                          <option value="all" {{#if (eq tagMatch 'all')}}selected{{/if}}>All tags</option>
+                        </select>
+                        <input type="hidden" name="ingredientGroups.{{../groupIndex}}.options.{{optionIndex}}.systemItemId" value="{{systemItemId}}" />
+                      </div>
+                    {{/if}}
+
+                    <div class="ingredient-option-actions">
+                      <input name="ingredientGroups.{{../groupIndex}}.options.{{optionIndex}}.quantity" type="number" min="1" value="{{quantity}}" />
+                      {{#if isSystemItem}}
+                        <button type="button" data-action="clearIngredientSystemItem" data-group-index="{{../groupIndex}}" data-option-index="{{optionIndex}}" title="Clear Item"><i class="fas fa-eraser"></i></button>
+                      {{/if}}
+                      <button type="button" data-action="removeIngredientOption" data-group-index="{{../groupIndex}}" data-option-index="{{optionIndex}}" title="Remove Option"><i class="fas fa-trash"></i></button>
+                    </div>
+                  </div>
+                  {{#unless @last}}
+                    <div class="ingredient-option-divider">OR</div>
+                  {{/unless}}
+                {{/each}}
+              </div>
+            </article>
+          {{/each}}
+        </div>
+        {{#if showItemTags}}
+          {{#if availableItemTags.length}}
+            <datalist id="fabricate-item-tags">
+              {{#each availableItemTags}}
+                <option value="{{this}}"></option>
+              {{/each}}
+            </datalist>
+          {{/if}}
+          <p class="hint">Tag placeholders are enabled for this crafting system.</p>
+        {{/if}}
 
         <div class="catalysts-block" data-drop-target="catalyst-new">
           <div class="carousel-header small">
@@ -151,6 +317,27 @@
             {{/if}}
           </div>
         </div>
+
+        {{#if isMappedMode}}
+          <div class="result-mapping-block">
+            <div class="carousel-header small">
+              <h4>Mapped Result Group</h4>
+            </div>
+            {{#if resultOptions.length}}
+              <div class="form-group">
+                <label>Result group for this ingredient set</label>
+                <select name="ingredientSet.resultGroupId">
+                  <option value="">Default (first result group)</option>
+                  {{#each resultOptions}}
+                    <option value="{{id}}" {{#if mappedSelected}}selected{{/if}}>{{name}}</option>
+                  {{/each}}
+                </select>
+              </div>
+            {{else}}
+              <p class="hint">Add result groups first, then map this set.</p>
+            {{/if}}
+          </div>
+        {{/if}}
 
         {{#if showComplexRecipes}}
         {{#if recipe.isVariable}}

@@ -1,4 +1,6 @@
 import { confirmDialog, renderDialog } from './foundryCompat.js';
+import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
+import { getFabricateFlag } from '../config/flags.js';
 
 /**
  * Player Crafting Interface
@@ -20,6 +22,54 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
     this.showOnlyAvailable = true;
   }
 
+  _getSetting(key) {
+    return getSetting(key);
+  }
+
+  async _setSetting(key, value) {
+    return setSetting(key, value);
+  }
+
+  _getRecipeManager() {
+    return game.fabricate.getRecipeManager();
+  }
+
+  _getRecipeVisibilityService() {
+    return game.fabricate.getRecipeVisibilityService?.();
+  }
+
+  _getRunManager() {
+    return game.fabricate.getCraftingRunManager?.();
+  }
+
+  _getCraftingEngine() {
+    return game.fabricate.getCraftingEngine();
+  }
+
+  async _confirmDialog(options) {
+    return confirmDialog(options);
+  }
+
+  _renderDialog(options) {
+    return renderDialog(options);
+  }
+
+  _notifyInfo(message) {
+    ui.notifications.info(message);
+  }
+
+  _notifyWarn(message) {
+    ui.notifications.warn(message);
+  }
+
+  _notifyError(message) {
+    ui.notifications.error(message);
+  }
+
+  _createChatMessage(data) {
+    return ChatMessage.create(data);
+  }
+
   static DEFAULT_OPTIONS = {
     id: 'fabricate-crafting',
     classes: ['fabricate', 'crafting-app'],
@@ -38,7 +88,11 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
       search: this._onSearch,
       toggleAvailable: this._onToggleAvailable,
       craft: this._onCraft,
-      showDetails: this._onShowDetails
+      showDetails: this._onShowDetails,
+      learnRecipe: this._onLearnRecipe,
+      showRunDetails: this._onShowRunDetails,
+      cancelRun: this._onCancelRun,
+      restartRun: this._onRestartRun
     }
   };
 
@@ -54,7 +108,7 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
    */
   _getDefaultCraftingActor() {
     // 1. Try saved setting
-    const savedId = game.settings.get('fabricate-v2', 'lastCraftingActor');
+    const savedId = this._getSetting(SETTING_KEYS.LAST_CRAFTING_ACTOR);
     if (savedId) {
       const saved = game.actors.get(savedId);
       if (saved) return saved;
@@ -74,7 +128,7 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
    */
   _getDefaultComponentSources() {
     // 1. Try saved setting
-    const savedIds = game.settings.get('fabricate-v2', 'lastComponentSources') || [];
+    const savedIds = this._getSetting(SETTING_KEYS.LAST_COMPONENT_SOURCES) || [];
     if (savedIds.length > 0) {
       const actors = savedIds.map(id => game.actors.get(id)).filter(a => a);
       if (actors.length > 0) return actors;
@@ -123,7 +177,7 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
     const accumulated = {};
 
     for (const item of items) {
-      const itemEssences = item.getFlag('fabricate-v2', 'essences') || {};
+      const itemEssences = getFabricateFlag(item, 'essences', {});
       for (const [essenceType, quantity] of Object.entries(itemEssences)) {
         accumulated[essenceType] = (accumulated[essenceType] || 0) + quantity;
       }
@@ -132,12 +186,104 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
     return accumulated;
   }
 
+  _formatRemainingSeconds(seconds) {
+    const value = Math.max(0, Math.ceil(Number(seconds) || 0));
+    if (value < 60) return `${value}s`;
+    const minutes = Math.floor(value / 60);
+    const remainder = value % 60;
+    if (minutes < 60) return remainder > 0 ? `${minutes}m ${remainder}s` : `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    const min = minutes % 60;
+    return min > 0 ? `${hours}h ${min}m` : `${hours}h`;
+  }
+
+  _buildRunDisplay(run, recipeManager, worldTime = Number(game.time?.worldTime || 0), scope = 'active') {
+    const recipe = recipeManager.getRecipe(run.recipeId);
+    const recipeName = recipe?.name || 'Unknown Recipe';
+    const totalSteps = Array.isArray(run.steps) ? run.steps.length : 0;
+    const currentIndex = Number.isFinite(Number(run.currentStepIndex)) ? Number(run.currentStepIndex) : null;
+    const currentStep = currentIndex != null ? run.steps?.[currentIndex] : null;
+    const stepName = currentStep?.stepName || (currentIndex != null ? `Step ${currentIndex + 1}` : null);
+    const remainingSeconds = currentStep?.timeGate?.availableAt
+      ? Math.max(0, Math.ceil(Number(currentStep.timeGate.availableAt) - Number(worldTime)))
+      : 0;
+    const statusLabel = run.status === 'waitingTime'
+      ? (remainingSeconds > 0 ? `Waiting (${this._formatRemainingSeconds(remainingSeconds)})` : 'Ready to Continue')
+      : (run.status === 'inProgress'
+        ? 'In Progress'
+        : (run.status === 'succeeded' ? 'Succeeded' : (run.status === 'failed' ? 'Failed' : 'Cancelled')));
+
+    return {
+      id: run.id,
+      recipeId: run.recipeId,
+      recipeName,
+      status: run.status,
+      scope,
+      statusLabel,
+      stepLabel: stepName && totalSteps > 0
+        ? `${stepName} (${Math.min(totalSteps, (currentIndex ?? 0) + 1)}/${totalSteps})`
+        : null,
+      remainingSeconds,
+      isActive: scope === 'active',
+      canContinue: run.status !== 'waitingTime' || remainingSeconds <= 0,
+      canCancel: scope === 'active' && ['inProgress', 'waitingTime'].includes(run.status),
+      steps: Array.isArray(run.steps) ? run.steps : [],
+      currentStepIndex: currentIndex,
+      startedAt: run.startedAt,
+      finishedAt: run.finishedAt
+    };
+  }
+
+  _resolveRunEntry(runId, scope = 'active') {
+    if (!this.craftingActor || !runId) return null;
+    const runManager = this._getRunManager();
+    if (!runManager) return null;
+    if (scope === 'active') {
+      return runManager.getActiveRun(this.craftingActor, runId);
+    }
+    if (scope === 'history') {
+      return runManager.getRunHistory(this.craftingActor).find(run => run?.id === runId) || null;
+    }
+    return runManager.getRun(this.craftingActor, runId);
+  }
+
+  async _resolveRunEntityName(uuid, fallback = 'Unknown') {
+    if (!uuid) return fallback;
+    try {
+      const doc = await fromUuid(uuid);
+      return doc?.name || fallback;
+    } catch (err) {
+      return fallback;
+    }
+  }
+
+  async _formatRunIoEntries(entries = []) {
+    if (!Array.isArray(entries) || entries.length === 0) return 'none';
+    const maxEntries = 20;
+    const shown = entries.slice(0, maxEntries);
+    const lines = await Promise.all(shown.map(async (entry) => {
+      const qty = Number(entry?.quantity || 1) || 1;
+      const itemName = await this._resolveRunEntityName(entry?.itemUuid, entry?.itemUuid || 'Unknown item');
+      const actorName = await this._resolveRunEntityName(entry?.actorUuid, null);
+      return actorName
+        ? `${qty}x ${itemName} (${actorName})`
+        : `${qty}x ${itemName}`;
+    }));
+    if (entries.length > maxEntries) {
+      lines.push(`... +${entries.length - maxEntries} more`);
+    }
+    return lines.join('<br />');
+  }
+
   /**
    * Prepare context data for the template
    */
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
-    const recipeManager = game.fabricate.getRecipeManager();
+    const recipeManager = this._getRecipeManager();
+    const visibilityService = this._getRecipeVisibilityService();
+    const runManager = this._getRunManager();
+    const worldTime = Number(game.time?.worldTime || 0);
 
     // Prepare actor selection data
     const availableActors = this._getAvailableActors();
@@ -160,11 +306,40 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
     context.hasCraftingActor = !!this.craftingActor;
     context.hasComponentSources = this.componentSourceActors.length > 0;
 
+    const activeRunsRaw = (runManager && this.craftingActor)
+      ? runManager.getActiveRuns(this.craftingActor)
+      : [];
+    const activeRuns = activeRunsRaw
+      .map(run => this._buildRunDisplay(run, recipeManager, worldTime, 'active'))
+      .sort((a, b) => Number(b.startedAt || 0) - Number(a.startedAt || 0));
+    const activeRunsByRecipeId = new Map();
+    for (const run of activeRuns) {
+      const list = activeRunsByRecipeId.get(run.recipeId) || [];
+      list.push(run);
+      activeRunsByRecipeId.set(run.recipeId, list);
+    }
+    const historyRaw = (runManager && this.craftingActor)
+      ? runManager.getRunHistory(this.craftingActor, 10)
+      : [];
+    const runHistory = historyRaw
+      .map(run => this._buildRunDisplay(run, recipeManager, worldTime, 'history'));
+
     // Get all recipes
     let recipes = recipeManager.getRecipes({
       enabled: true
     });
-    const showSimpleRecipesOnly = game.settings.get('fabricate-v2', 'showSimpleRecipesOnly');
+
+    if (visibilityService && this.craftingActor) {
+      recipes = recipes.filter(recipe =>
+        visibilityService.evaluateRecipeAccess({
+          recipe,
+          viewer: game.user,
+          craftingActor: this.craftingActor,
+          componentSourceActors: this.componentSourceActors
+        }).visible
+      );
+    }
+    const showSimpleRecipesOnly = this._getSetting(SETTING_KEYS.SHOW_SIMPLE_RECIPES_ONLY);
 
     if (showSimpleRecipesOnly) {
       recipes = recipes.filter(r => r.isSimpleRecipe());
@@ -187,7 +362,18 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
     // Filter by availability if enabled and we have component sources
     if (this.showOnlyAvailable && this.componentSourceActors.length > 0) {
       recipes = recipes.filter(r =>
-        recipeManager.canCraft(this.componentSourceActors, r).canCraft
+        (() => {
+          const access = visibilityService
+            ? visibilityService.evaluateRecipeAccess({
+              recipe: r,
+              viewer: game.user,
+              craftingActor: this.craftingActor,
+              componentSourceActors: this.componentSourceActors
+            })
+            : { craftable: true };
+          if (!access.craftable) return false;
+          return recipeManager.canCraft(this.componentSourceActors, r).canCraft;
+        })()
       );
     }
 
@@ -201,6 +387,30 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
         canCraft = canCraftCheck.canCraft;
         satisfiableSet = canCraftCheck.satisfiableSet;
       }
+      const access = visibilityService
+        ? visibilityService.evaluateRecipeAccess({
+          recipe,
+          viewer: game.user,
+          craftingActor: this.craftingActor,
+          componentSourceActors: this.componentSourceActors
+        })
+        : { craftable: true, reason: 'ok' };
+      const craftable = access.craftable && canCraft;
+      const recipeRuns = activeRunsByRecipeId.get(recipe.id) || [];
+      const activeRun = recipeRuns[0] || null;
+      const allowCraftAction = activeRun ? activeRun.canContinue : craftable;
+      const statusLabel = !access.craftable
+        ? (access.reason === 'locked'
+          ? 'Locked'
+          : (access.reason === 'knowledge' ? 'Unknown' : 'Restricted'))
+        : (activeRun
+          ? activeRun.statusLabel
+          : (craftable ? 'Available' : 'Missing materials'));
+      const canLearn = access.reason === 'knowledge' &&
+        !!access.knowledge &&
+        access.knowledge.hasLearned !== true &&
+        Array.isArray(access.knowledge.matchedItems) &&
+        access.knowledge.matchedItems.length > 0;
 
       // Prepare ingredient set display (show first set or satisfiable set)
       const displaySet = satisfiableSet || recipe.ingredientSets[0];
@@ -217,24 +427,54 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
         description: recipe.description,
         img: recipe.img,
         category: recipe.category,
-        canCraft: canCraft,
+        canCraft: craftable,
+        allowCraftAction,
+        accessReason: access.reason,
+        statusLabel,
+        activeRunId: activeRun?.id || '',
+        activeRunCount: recipeRuns.length,
+        hasMultipleActiveRuns: recipeRuns.length > 1,
+        activeRunStatusLabel: activeRun?.statusLabel || null,
+        activeRunStepLabel: activeRun?.stepLabel || null,
+        activeRunRemainingSeconds: activeRun?.remainingSeconds || 0,
+        craftButtonLabel: activeRun
+          ? (activeRun.canContinue ? 'Continue' : 'Waiting')
+          : 'Craft',
+        canLearn,
         hasMultipleSets: recipe.ingredientSets.length > 1,
         resultDescription: recipe.getResultDescription(),
-        ingredients: displaySet.ingredients.map(ing => {
-          const matchingItems = availableItems.filter(item =>
-            recipeManager.ingredientMatchesItem(recipe, ing, item)
-          );
-          const totalQty = matchingItems.reduce((sum, item) =>
-            sum + (item.system.quantity || 1), 0
-          );
+        ingredients: (() => {
+          const groups = Array.isArray(displaySet.ingredientGroups) && displaySet.ingredientGroups.length > 0
+            ? displaySet.ingredientGroups
+            : (displaySet.ingredients || []).map(ingredient => ({ options: [ingredient] }));
 
-          return {
-            description: ing.getDescription(),
-            need: ing.quantity,
-            have: totalQty,
-            satisfied: totalQty >= ing.quantity
-          };
-        }),
+          return groups.map(group => {
+            const optionStates = (group.options || []).map(ing => {
+              const matchingItems = availableItems.filter(item =>
+                recipeManager.ingredientMatchesItem(recipe, ing, item)
+              );
+              const totalQty = matchingItems.reduce((sum, item) =>
+                sum + (item.system.quantity || 1), 0
+              );
+              return {
+                description: ing.getDescription(),
+                need: ing.quantity,
+                have: totalQty,
+                satisfied: totalQty >= ing.quantity
+              };
+            });
+
+            const satisfiedOption = optionStates.find(state => state.satisfied) || null;
+            const bestOption = satisfiedOption || [...optionStates]
+              .sort((a, b) => (b.have / Math.max(1, b.need)) - (a.have / Math.max(1, a.need)))[0];
+            return {
+              description: optionStates.map(state => state.description).join(' OR '),
+              need: bestOption?.need || 1,
+              have: bestOption?.have || 0,
+              satisfied: optionStates.some(state => state.satisfied)
+            };
+          });
+        })(),
         essences: Object.entries(displaySet.essences || {}).map(([type, qty]) => ({
           type,
           need: qty,
@@ -268,6 +508,8 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
     return {
       ...context,
       recipes: preparedRecipes,
+      activeRuns,
+      runHistory,
       categories,
       selectedCategory: this.selectedCategory,
       showOnlyAvailable: this.showOnlyAvailable,
@@ -303,7 +545,7 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
     this.craftingActor = game.actors.get(actorId);
 
     // Save selection
-    await game.settings.set('fabricate-v2', 'lastCraftingActor', actorId);
+    await this._setSetting(SETTING_KEYS.LAST_CRAFTING_ACTOR, actorId);
 
     // Re-render
     await this.render();
@@ -327,7 +569,7 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
     }
 
     // Save selections
-    await game.settings.set('fabricate-v2', 'lastComponentSources',
+    await this._setSetting(SETTING_KEYS.LAST_COMPONENT_SOURCES,
       this.componentSourceActors.map(a => a.id)
     );
 
@@ -366,28 +608,30 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
    */
   static async _onCraft(event, target) {
     const recipeId = target.dataset.recipeId;
-    const recipeManager = game.fabricate.getRecipeManager();
+    const runId = String(target.dataset.runId || '').trim() || null;
+    const skipConfirm = String(target.dataset.skipConfirm || '').trim().toLowerCase() === 'true';
+    const recipeManager = this._getRecipeManager();
     const recipe = recipeManager.getRecipe(recipeId);
 
     if (!recipe) {
-      ui.notifications.error('Recipe not found');
+      this._notifyError('Recipe not found');
       return;
     }
 
     // Validation
     if (!this.craftingActor) {
-      ui.notifications.error('Please select a crafting actor');
+      this._notifyError('Please select a crafting actor');
       return;
     }
 
     if (this.componentSourceActors.length === 0) {
-      ui.notifications.error('Please select at least one component source actor');
+      this._notifyError('Please select at least one component source actor');
       return;
     }
 
-    const autoCraft = game.settings.get('fabricate-v2', 'autoCraft');
-    if (!autoCraft) {
-      const confirmed = await confirmDialog({
+    const autoCraft = this._getSetting(SETTING_KEYS.AUTO_CRAFT);
+    if (!autoCraft && !skipConfirm) {
+      const confirmed = await this._confirmDialog({
         title: `Craft ${recipe.name}?`,
         content: `
           <p>Are you sure you want to craft <strong>${recipe.name}</strong>?</p>
@@ -402,18 +646,20 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
     }
 
     // Attempt to craft
-    const craftingEngine = game.fabricate.getCraftingEngine();
+    const craftingEngine = this._getCraftingEngine();
     const result = await craftingEngine.craft(
       this.craftingActor,
       this.componentSourceActors,
-      recipe
+      recipe,
+      null,
+      { runId }
     );
 
     if (result.success) {
-      ui.notifications.info(result.message);
+      this._notifyInfo(result.message);
 
       // Create chat message
-      ChatMessage.create({
+      this._createChatMessage({
         user: game.user.id,
         speaker: ChatMessage.getSpeaker({ actor: this.craftingActor }),
         content: `
@@ -428,8 +674,176 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
       // Re-render to update available recipes
       await this.render();
     } else {
-      ui.notifications.error(result.message);
+      this._notifyError(result.message);
     }
+  }
+
+  static async _onLearnRecipe(event, target) {
+    const recipeId = target.dataset.recipeId;
+    const recipeManager = this._getRecipeManager();
+    const visibilityService = this._getRecipeVisibilityService();
+    const recipe = recipeManager.getRecipe(recipeId);
+    if (!recipe || !visibilityService) return;
+
+    if (!this.craftingActor) {
+      this._notifyError('Please select a crafting actor');
+      return;
+    }
+
+    const result = await visibilityService.learnRecipe({
+      viewer: game.user,
+      recipe,
+      craftingActor: this.craftingActor,
+      componentSourceActors: this.componentSourceActors
+    });
+
+    if (result.success) {
+      this._notifyInfo(result.message);
+      await this.render();
+      return;
+    }
+    this._notifyWarn(result.message || 'Could not learn recipe');
+  }
+
+  static async _onShowRunDetails(event, target) {
+    const runId = String(target.dataset.runId || '').trim();
+    const runScope = String(target.dataset.runScope || 'active').trim();
+    if (!runId) return;
+    if (!this.craftingActor) {
+      this._notifyWarn('Select a crafting actor first.');
+      return;
+    }
+
+    const run = this._resolveRunEntry(runId, runScope);
+    if (!run) {
+      this._notifyWarn('Crafting run not found.');
+      return;
+    }
+
+    const recipeManager = this._getRecipeManager();
+    const worldTime = Number(game.time?.worldTime || 0);
+    const displayRun = this._buildRunDisplay(run, recipeManager, worldTime, runScope);
+
+    const stepRows = await Promise.all((displayRun.steps || []).map(async (step, idx) => {
+      const isCurrent = Number(displayRun.currentStepIndex) === idx;
+      const remaining = step?.timeGate?.availableAt
+        ? Math.max(0, Math.ceil(Number(step.timeGate.availableAt) - Number(worldTime)))
+        : 0;
+      const gateText = step?.timeGate
+        ? ` | time gate: ${remaining > 0 ? this._formatRemainingSeconds(remaining) : 'ready'}`
+        : '';
+      const checks = step?.lastCheckResult?.reason ? ` | check: ${step.lastCheckResult.reason}` : '';
+      const failure = step?.failureReason ? ` | failure: ${step.failureReason}` : '';
+      const consumedText = await this._formatRunIoEntries(step?.consumedIngredients || []);
+      const catalystsText = await this._formatRunIoEntries(step?.usedCatalysts || []);
+      const createdText = await this._formatRunIoEntries(step?.createdResults || []);
+      return `
+        <li${isCurrent ? ' class="current"' : ''}>
+          <strong>Step ${idx + 1}:</strong> ${step.stepName || `Step ${idx + 1}`} | ${step.status || 'pending'}${gateText}${checks}${failure}
+          <div class="hint"><strong>Consumed:</strong><br />${consumedText}</div>
+          <div class="hint"><strong>Catalysts:</strong><br />${catalystsText}</div>
+          <div class="hint"><strong>Created:</strong><br />${createdText}</div>
+        </li>
+      `;
+    }));
+    const stepsHtml = stepRows.join('');
+
+    const content = `
+      <div class="fabricate-run-details">
+        <h3>${displayRun.recipeName}</h3>
+        <p><strong>Status:</strong> ${displayRun.statusLabel}</p>
+        ${displayRun.stepLabel ? `<p><strong>Current:</strong> ${displayRun.stepLabel}</p>` : ''}
+        <p><strong>Started:</strong> ${displayRun.startedAt ?? '-'}</p>
+        <p><strong>Finished:</strong> ${displayRun.finishedAt ?? '-'}</p>
+        <h4>Steps</h4>
+        <ul>${stepsHtml || '<li>No step data</li>'}</ul>
+      </div>
+    `;
+
+    this._renderDialog({
+      title: `Run Details: ${displayRun.recipeName}`,
+      content,
+      buttons: {
+        close: {
+          icon: '<i class="fas fa-times"></i>',
+          label: 'Close'
+        }
+      },
+      default: 'close'
+    });
+  }
+
+  static async _onCancelRun(event, target) {
+    const runId = String(target.dataset.runId || '').trim();
+    if (!runId) return;
+    if (!this.craftingActor) {
+      this._notifyWarn('Select a crafting actor first.');
+      return;
+    }
+
+    const run = this._resolveRunEntry(runId, 'active');
+    if (!run) {
+      this._notifyWarn('Active crafting run not found.');
+      return;
+    }
+
+    const recipe = this._getRecipeManager().getRecipe(run.recipeId);
+    const confirmed = await this._confirmDialog({
+      title: 'Cancel Crafting Run?',
+      content: `<p>Cancel in-progress run for <strong>${recipe?.name || 'Unknown Recipe'}</strong>?</p>`,
+      yes: () => true,
+      no: () => false
+    });
+    if (!confirmed) return;
+
+    const runManager = this._getRunManager();
+    const cancelled = await runManager?.cancelRun?.(this.craftingActor, runId);
+    if (!cancelled) {
+      this._notifyError('Unable to cancel crafting run.');
+      return;
+    }
+    this._notifyInfo(`Cancelled crafting run for ${recipe?.name || 'recipe'}.`);
+    await this.render();
+  }
+
+  static async _onRestartRun(event, target) {
+    const recipeId = String(target.dataset.recipeId || '').trim();
+    const runId = String(target.dataset.runId || '').trim();
+    if (!recipeId || !runId) return;
+    if (!this.craftingActor) {
+      this._notifyWarn('Select a crafting actor first.');
+      return;
+    }
+
+    const run = this._resolveRunEntry(runId, 'active');
+    if (!run) {
+      this._notifyWarn('Active crafting run not found.');
+      return;
+    }
+    const recipe = this._getRecipeManager().getRecipe(recipeId);
+
+    const confirmed = await this._confirmDialog({
+      title: 'Restart Crafting Run?',
+      content: `<p>Cancel the current run for <strong>${recipe?.name || 'Unknown Recipe'}</strong> and start over from step 1?</p>`,
+      yes: () => true,
+      no: () => false
+    });
+    if (!confirmed) return;
+
+    const runManager = this._getRunManager();
+    const cancelled = await runManager?.cancelRun?.(this.craftingActor, runId);
+    if (!cancelled) {
+      this._notifyError('Unable to restart run because cancellation failed.');
+      return;
+    }
+
+    await this._onCraft(event, {
+      dataset: {
+        recipeId,
+        runId: '',
+        skipConfirm: 'true'
+      }
+    });
   }
 
   /**
@@ -437,7 +851,7 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
    */
   static async _onShowDetails(event, target) {
     const recipeId = target.dataset.recipeId;
-    const recipeManager = game.fabricate.getRecipeManager();
+    const recipeManager = this._getRecipeManager();
     const recipe = recipeManager.getRecipe(recipeId);
 
     if (!recipe) return;
@@ -461,19 +875,25 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
       content += `<h5>${setName}</h5><ul>`;
 
       // Ingredients
-      for (const ing of ingredientSet.ingredients) {
+      const groups = Array.isArray(ingredientSet.ingredientGroups) && ingredientSet.ingredientGroups.length > 0
+        ? ingredientSet.ingredientGroups
+        : (ingredientSet.ingredients || []).map(ingredient => ({ options: [ingredient] }));
+      for (const [groupIndex, group] of groups.entries()) {
         const availableItems = this.componentSourceActors.flatMap(actor =>
           Array.from(actor.items)
         );
-        const matchingItems = availableItems.filter(item =>
-          recipeManager.ingredientMatchesItem(recipe, ing, item)
-        );
-        const totalQty = matchingItems.reduce((sum, item) =>
-          sum + (item.system.quantity || 1), 0
-        );
-        const satisfied = totalQty >= ing.quantity;
-        const icon = satisfied ? 'OK' : 'X';
-        content += `<li>${icon} ${ing.getDescription()} (have ${totalQty})</li>`;
+        const optionParts = (group.options || []).map((ing) => {
+          const matchingItems = availableItems.filter(item =>
+            recipeManager.ingredientMatchesItem(recipe, ing, item)
+          );
+          const totalQty = matchingItems.reduce((sum, item) =>
+            sum + (item.system.quantity || 1), 0
+          );
+          const satisfied = totalQty >= ing.quantity;
+          const icon = satisfied ? 'OK' : 'X';
+          return `${icon} ${ing.getDescription()} (have ${totalQty}/${ing.quantity})`;
+        });
+        content += `<li><strong>Group ${groupIndex + 1}</strong>: ${optionParts.join(' OR ')}</li>`;
       }
 
       // Essences
@@ -526,7 +946,7 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
 
     content += `</div>`;
 
-    renderDialog({
+    this._renderDialog({
       title: `Recipe: ${recipe.name}`,
       content,
       buttons: canCraftCheck.canCraft ? {

@@ -166,6 +166,70 @@
               <section class="feature-card">
                 <div class="feature-card-header">
                   <div>
+                    <h4>Multi-Step Recipes</h4>
+                    <p class="hint">Allow recipes to define explicit ordered steps with per-step ingredient/result and time requirements.</p>
+                  </div>
+                  <label class="checkbox-label"><input type="checkbox" data-action="toggleFeature" data-feature="multiStepRecipes" {{#if selectedSystem.enableMultiStepRecipes}}checked{{/if}} /> Enable</label>
+                </div>
+              </section>
+
+              <section class="feature-card">
+                <div class="feature-card-header">
+                  <div>
+                    <h4>Time Requirements</h4>
+                    <p class="hint">Allow step-level crafting durations using minutes, hours, days, months, and years.</p>
+                  </div>
+                  <label class="checkbox-label"><input type="checkbox" data-action="toggleRequirement" data-requirement="time" {{#if selectedSystem.requirementsTimeEnabled}}checked{{/if}} /> Enable</label>
+                </div>
+              </section>
+
+              <section class="feature-card">
+                <div class="feature-card-header">
+                  <div>
+                    <h4>Currency Requirements</h4>
+                    <p class="hint">Allow steps to require currency, resolved via system adapter or macros.</p>
+                  </div>
+                  <label class="checkbox-label"><input type="checkbox" data-action="toggleRequirement" data-requirement="currency" {{#if selectedSystem.requirementsCurrencyEnabled}}checked{{/if}} /> Enable</label>
+                </div>
+                {{#if selectedSystem.requirementsCurrencyEnabled}}
+                  <div class="panel-toolbar compact">
+                    <select name="currencyProvider">
+                      <option value="macro" {{#if (eq selectedSystem.currencyProvider 'macro')}}selected{{/if}}>Macro provider</option>
+                      <option value="system" {{#if (eq selectedSystem.currencyProvider 'system')}}selected{{/if}}>System adapter</option>
+                    </select>
+                    <select name="currencySystemAdapter">
+                      <option value="">Select adapter</option>
+                      <option value="dnd5e" {{#if (eq selectedSystem.currencySystemAdapter 'dnd5e')}}selected{{/if}}>dnd5e</option>
+                      <option value="pf2e" {{#if (eq selectedSystem.currencySystemAdapter 'pf2e')}}selected{{/if}}>pf2e</option>
+                    </select>
+                  </div>
+                  <div class="panel-toolbar compact">
+                    <select name="checkCurrencyMacroUuid">
+                      <option value="">Check currency macro</option>
+                      {{#each selectedSystem.availableScriptMacros}}
+                        <option value="{{uuid}}" {{#if (eq ../selectedSystem.checkCurrencyMacroUuid uuid)}}selected{{/if}}>{{name}}</option>
+                      {{/each}}
+                    </select>
+                    <select name="decrementCurrencyMacroUuid">
+                      <option value="">Decrement currency macro</option>
+                      {{#each selectedSystem.availableScriptMacros}}
+                        <option value="{{uuid}}" {{#if (eq ../selectedSystem.decrementCurrencyMacroUuid uuid)}}selected{{/if}}>{{name}}</option>
+                      {{/each}}
+                    </select>
+                    <select name="formatCurrencyMacroUuid">
+                      <option value="">Format currency macro</option>
+                      {{#each selectedSystem.availableScriptMacros}}
+                        <option value="{{uuid}}" {{#if (eq ../selectedSystem.formatCurrencyMacroUuid uuid)}}selected{{/if}}>{{name}}</option>
+                      {{/each}}
+                    </select>
+                    <button type="button" data-action="saveCurrencyRequirementConfig"><i class="fas fa-save"></i> Save Currency Config</button>
+                  </div>
+                {{/if}}
+              </section>
+
+              <section class="feature-card">
+                <div class="feature-card-header">
+                  <div>
                     <h4>Property Calculation Macros</h4>
                     <p class="hint">Use macros to compute result property updates from crafting context.</p>
                   </div>
@@ -323,6 +387,10 @@
               <thead>
                 <tr>
                   <th>Recipe</th>
+                  <th>Locked</th>
+                  {{#if showVisibilitySummary}}
+                    <th>Visibility</th>
+                  {{/if}}
                   <th>Category</th>
                   <th>Type</th>
                   <th>Components</th>
@@ -337,6 +405,16 @@
                       <img src="{{img}}" alt="{{name}}" class="recipe-thumb" />
                       <span>{{name}}</span>
                     </td>
+                    <td>
+                      {{#if locked}}
+                        <span class="badge badge-advanced">Yes</span>
+                      {{else}}
+                        <span class="badge badge-simple">No</span>
+                      {{/if}}
+                    </td>
+                    {{#if ../showVisibilitySummary}}
+                      <td>{{visibilitySummary}}</td>
+                    {{/if}}
                     <td>{{category}}</td>
                     <td>
                       {{#if isSimple}}

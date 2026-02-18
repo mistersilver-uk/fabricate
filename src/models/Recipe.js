@@ -1,6 +1,7 @@
 import { IngredientSet } from './IngredientSet.js';
 import { Result } from './Result.js';
 import { Ingredient } from './Ingredient.js';
+import { Catalyst } from './Catalyst.js';
 
 /**
  * Represents a crafting recipe
@@ -17,20 +18,28 @@ export class Recipe {
     this.system = data.system || 'all';
     this.tags = Array.isArray(data.tags) ? data.tags : [];
     this.enabled = data.enabled !== undefined ? data.enabled : true;
+    this.locked = data.locked === true;
+    this.linkedRecipeItemUuid = data.linkedRecipeItemUuid || null;
+    this.visibility = this._normalizeVisibility(data.visibility);
 
     // Input requirements (at least one set must be satisfied)
     this.ingredientSets = (data.ingredientSets || []).map(s =>
       s instanceof IngredientSet ? s : IngredientSet.fromJSON(s)
     );
+    this.steps = Array.isArray(data.steps)
+      ? data.steps.map((step, idx) => this._normalizeStep(step, idx))
+      : [];
 
     // Output groups (canonical). Legacy flat `results` is still accepted and flattened for compatibility.
     this.resultGroups = this._normalizeResultGroups(data);
     this.results = this.resultGroups.flatMap(group => group.results);
+    this.catalysts = (data.catalysts || []).map(c =>
+      c instanceof Catalyst ? c : Catalyst.fromJSON(c)
+    );
 
     // Recipe behaviour
     this.isVariable = data.isVariable !== undefined ? data.isVariable : false;
     this.transferEffects = data.transferEffects !== undefined ? data.transferEffects : false;
-    this.requiresAllSets = data.requiresAllSets !== undefined ? data.requiresAllSets : false;
     this.outcomeRouting = data.outcomeRouting && typeof data.outcomeRouting === 'object'
       ? { ...data.outcomeRouting }
       : null;
@@ -62,10 +71,26 @@ export class Recipe {
    */
   isSimpleRecipe() {
     // Single ingredient set with exact item matching (no tags)
+    const firstSet = this.ingredientSets[0];
+    const groups = Array.isArray(firstSet?.ingredientGroups)
+      ? firstSet.ingredientGroups
+      : [];
     const hasSimpleIngredients =
       this.ingredientSets.length === 1 &&
-      this.ingredientSets[0].ingredients.every(ing => (ing.itemUuid || ing.systemItemId) && !ing.tag) &&
-      Object.keys(this.ingredientSets[0].essences || {}).length === 0;
+      groups.length > 0 &&
+      groups.every(group =>
+        Array.isArray(group.options) &&
+        group.options.length === 1 &&
+        !!group.options[0] &&
+        (
+          !!group.options[0].itemUuid ||
+          (group.options[0].match?.type === 'systemItem' && !!group.options[0].match?.systemItemId) ||
+          !!group.options[0].systemItemId
+        ) &&
+        !(group.options[0].match?.type === 'tags') &&
+        !group.options[0].tag
+      ) &&
+      Object.keys(firstSet?.essences || {}).length === 0;
 
     const hasNoCatalysts =
       this.ingredientSets.every(set => (set.catalysts?.length || 0) === 0);
@@ -86,14 +111,44 @@ export class Recipe {
     if (!this.name) errors.push('Recipe must have a name');
 
     // Ingredient set validation
-    if (this.ingredientSets.length === 0) {
-      errors.push('Recipe must have at least one ingredient set');
+    const hasSteps = this.steps.length > 0;
+    if (!hasSteps && this.ingredientSets.length === 0) {
+      errors.push('Recipe must have at least one ingredient set (or use explicit steps)');
     }
 
-    for (const ingredientSet of this.ingredientSets) {
-      const setValidation = ingredientSet.validate();
-      if (!setValidation.valid) {
-        errors.push(`Ingredient set "${ingredientSet.name || ingredientSet.id}": ${setValidation.errors.join(', ')}`);
+    if (hasSteps) {
+      for (const step of this.steps) {
+        if (!Array.isArray(step.ingredientSets) || step.ingredientSets.length === 0) {
+          errors.push(`Step "${step.name || step.id}" must include at least one ingredient set`);
+        }
+        if (!Array.isArray(step.resultGroups) || step.resultGroups.length === 0) {
+          errors.push(`Step "${step.name || step.id}" must include at least one result group`);
+        }
+        if (step.timeRequirement) {
+          for (const unit of ['minutes', 'hours', 'days', 'months', 'years']) {
+            const value = Number(step.timeRequirement?.[unit] || 0);
+            if (!Number.isFinite(value) || value < 0) {
+              errors.push(`Step "${step.name || step.id}" has invalid time requirement value for "${unit}"`);
+            }
+          }
+        }
+        if (step.currencyRequirement) {
+          const unit = String(step.currencyRequirement?.unit || '').trim();
+          const amount = Number(step.currencyRequirement?.amount || 0);
+          if (!unit) {
+            errors.push(`Step "${step.name || step.id}" has invalid currency requirement unit`);
+          }
+          if (!Number.isFinite(amount) || amount <= 0) {
+            errors.push(`Step "${step.name || step.id}" has invalid currency requirement amount`);
+          }
+        }
+      }
+    } else {
+      for (const ingredientSet of this.ingredientSets) {
+        const setValidation = ingredientSet.validate();
+        if (!setValidation.valid) {
+          errors.push(`Ingredient set "${ingredientSet.name || ingredientSet.id}": ${setValidation.errors.join(', ')}`);
+        }
       }
     }
 
@@ -164,17 +219,30 @@ export class Recipe {
       system: this.system,
       tags: this.tags,
       enabled: this.enabled,
+      locked: this.locked,
+      linkedRecipeItemUuid: this.linkedRecipeItemUuid,
+      visibility: this.visibility,
+      steps: this.steps.map(step => ({
+        ...step,
+        ingredientSets: (step.ingredientSets || []).map(set => set.toJSON ? set.toJSON() : set),
+        resultGroups: (step.resultGroups || []).map(group => ({
+          id: group.id,
+          name: group.name,
+          results: (group.results || []).map(result => result.toJSON ? result.toJSON() : result)
+        })),
+        catalysts: (step.catalysts || []).map(c => c.toJSON ? c.toJSON() : c)
+      })),
       ingredientSets: this.ingredientSets.map(s => s.toJSON()),
       resultGroups: this.resultGroups.map(group => ({
         id: group.id,
         name: group.name,
         results: group.results.map(r => r.toJSON())
       })),
+      catalysts: this.catalysts.map(c => c.toJSON()),
       // Legacy alias retained for compatibility with older consumers.
       results: this.results.map(r => r.toJSON()),
       isVariable: this.isVariable,
       transferEffects: this.transferEffects,
-      requiresAllSets: this.requiresAllSets,
       outcomeRouting: this.outcomeRouting,
       metadata: this.metadata
     };
@@ -197,9 +265,14 @@ export class Recipe {
       ingredientSets: [
         new IngredientSet({
           id: 'default',
-          ingredients: ingredients.map(ing => new Ingredient({
-            itemUuid: ing.itemUuid,
-            quantity: ing.quantity || 1
+          ingredientGroups: ingredients.map((ing, idx) => ({
+            id: `group-${idx + 1}`,
+            options: [
+              new Ingredient({
+                itemUuid: ing.itemUuid,
+                quantity: ing.quantity || 1
+              })
+            ]
           }))
         })
       ],
@@ -239,5 +312,71 @@ export class Recipe {
         results: [result]
       };
     });
+  }
+
+  _normalizeStep(step = {}, idx = 0) {
+    return {
+      id: step.id || foundry.utils.randomID(),
+      name: step.name || `Step ${idx + 1}`,
+      description: step.description || '',
+      ingredientSets: (step.ingredientSets || []).map(set =>
+        set instanceof IngredientSet ? set : IngredientSet.fromJSON(set)
+      ),
+      resultGroups: this._normalizeResultGroups(step),
+      catalysts: (step.catalysts || []).map(c =>
+        c instanceof Catalyst ? c : Catalyst.fromJSON(c)
+      ),
+      timeRequirement: this._normalizeTimeRequirement(step.timeRequirement),
+      currencyRequirement: this._normalizeCurrencyRequirement(step.currencyRequirement),
+      outcomeRouting: step.outcomeRouting && typeof step.outcomeRouting === 'object'
+        ? { ...step.outcomeRouting }
+        : null
+    };
+  }
+
+  _normalizeTimeRequirement(timeRequirement = null) {
+    if (!timeRequirement || typeof timeRequirement !== 'object') return null;
+    const normalized = {
+      minutes: Math.max(0, Number(timeRequirement.minutes || 0) || 0),
+      hours: Math.max(0, Number(timeRequirement.hours || 0) || 0),
+      days: Math.max(0, Number(timeRequirement.days || 0) || 0),
+      months: Math.max(0, Number(timeRequirement.months || 0) || 0),
+      years: Math.max(0, Number(timeRequirement.years || 0) || 0)
+    };
+    const total = normalized.minutes + normalized.hours + normalized.days + normalized.months + normalized.years;
+    return total > 0 ? normalized : null;
+  }
+
+  _normalizeCurrencyRequirement(currencyRequirement = null) {
+    if (!currencyRequirement || typeof currencyRequirement !== 'object') return null;
+    const unit = String(currencyRequirement.unit || '').trim();
+    const amount = Math.max(0, Number(currencyRequirement.amount || 0) || 0);
+    return (unit && amount > 0) ? { unit, amount } : null;
+  }
+
+  _normalizeVisibility(visibility) {
+    if (!visibility || typeof visibility !== 'object') return null;
+    return {
+      restricted: visibility.restricted === true,
+      allowedUserIds: Array.isArray(visibility.allowedUserIds) ? [...visibility.allowedUserIds] : []
+    };
+  }
+
+  getExecutionSteps() {
+    if (Array.isArray(this.steps) && this.steps.length > 0) {
+      return this.steps;
+    }
+
+    return [{
+      id: 'implicit-step',
+      name: 'Step 1',
+      description: '',
+      ingredientSets: this.ingredientSets,
+      resultGroups: this.resultGroups,
+      catalysts: this.catalysts || [],
+      timeRequirement: null,
+      currencyRequirement: null,
+      outcomeRouting: this.outcomeRouting || null
+    }];
   }
 }

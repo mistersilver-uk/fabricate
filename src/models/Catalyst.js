@@ -2,6 +2,8 @@
  * Represents a catalyst (non-consumable component) required for crafting
  * Examples: forge, alchemy lab, specific tools
  */
+import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
+
 export class Catalyst {
   constructor(data = {}) {
     // Managed item reference inside a crafting system
@@ -41,7 +43,7 @@ export class Catalyst {
 
     // Tag-based matching
     if (this.tag) {
-      const itemTags = item.getFlag('fabricate-v2', 'tags') || [];
+      const itemTags = getFabricateFlag(item, 'tags', []);
       return itemTags.includes(this.tag);
     }
 
@@ -94,7 +96,7 @@ export class Catalyst {
 
     // Check durability if applicable
     if (this.degradesOnUse && Number.isFinite(this.maxUses)) {
-      const used = await item.getFlag('fabricate-v2', 'catalystUses');
+      const used = getFabricateFlag(item, 'catalystUses', 0);
       if (Number(used || 0) >= this.maxUses) {
         return { valid: false, message: `${this.name} has no uses remaining` };
       }
@@ -118,9 +120,9 @@ export class Catalyst {
     if (!this.degradesOnUse) return;
 
     if (Number.isFinite(this.maxUses)) {
-      const used = await item.getFlag('fabricate-v2', 'catalystUses');
+      const used = getFabricateFlag(item, 'catalystUses', 0);
       const next = Number(used || 0) + 1;
-      await item.setFlag('fabricate-v2', 'catalystUses', next);
+      await setFabricateFlag(item, 'catalystUses', next);
       return;
     }
 

@@ -2,25 +2,65 @@
  * Represents an ingredient required for crafting
  * Supports both simple (exact item) and advanced (tag-based) matching
  */
+import { getFabricateFlag } from '../config/flags.js';
+
 export class Ingredient {
   constructor(data = {}) {
-    // Managed item reference inside a crafting system
-    this.systemItemId = data.systemItemId || null;
-
-    // Item matching by Foundry Source UUID (core.sourceId flag)
-    this.itemUuid = data.itemUuid || null;
     this.quantity = data.quantity || 1;
+    this.match = this._normalizeMatch(data);
 
-    // Advanced mode: tag-based matching
-    this.tag = data.tag || null; // e.g., "metal", "herb:healing"
+    // Legacy fields retained for compatibility with existing editor and imports.
+    this.systemItemId = this.match?.type === 'systemItem' ? (this.match.systemItemId || null) : null;
+    this.itemUuid = data.itemUuid || null;
+    this.tag = this.match?.type === 'tags' ? (this.match.tags?.[0] || null) : (data.tag || null);
+
     this.tier = data.tier || null; // e.g., "common", "rare", "legendary"
-
-    // Alternative ingredients (OR logic)
     this.alternatives = data.alternatives || []; // Array of Ingredient objects
 
     // Effect extraction settings
     this.extractEffects = data.extractEffects !== undefined ? data.extractEffects : false;
     this.effectFilter = data.effectFilter || null; // Regex or array of effect names to extract
+  }
+
+  _normalizeMatch(data = {}) {
+    const raw = data.match && typeof data.match === 'object' ? data.match : null;
+    if (raw) {
+      if (raw.type === 'tags') {
+        const tags = Array.isArray(raw.tags)
+          ? raw.tags.map(t => String(t || '').trim()).filter(Boolean)
+          : [];
+        return {
+          type: 'tags',
+          tags,
+          tagMatch: raw.tagMatch === 'all' ? 'all' : 'any'
+        };
+      }
+
+      return {
+        type: 'systemItem',
+        systemItemId: raw.systemItemId || data.systemItemId || null
+      };
+    }
+
+    if (data.systemItemId) {
+      return {
+        type: 'systemItem',
+        systemItemId: data.systemItemId
+      };
+    }
+
+    const tags = Array.isArray(data.tags)
+      ? data.tags.map(t => String(t || '').trim()).filter(Boolean)
+      : (data.tag ? [String(data.tag).trim()] : []);
+    if (tags.length > 0) {
+      return {
+        type: 'tags',
+        tags,
+        tagMatch: data.tagMatch === 'all' ? 'all' : 'any'
+      };
+    }
+
+    return null;
   }
 
   /**
@@ -32,17 +72,21 @@ export class Ingredient {
     // Exact match by UUID
     if (this.itemUuid && item.uuid === this.itemUuid) return true;
 
-    // Tag-based matching
-    if (this.tag) {
-      const itemTags = item.getFlag('fabricate-v2', 'tags') || [];
-      if (itemTags.includes(this.tag)) {
-        // Check tier if specified
-        if (this.tier) {
-          const itemTier = item.getFlag('fabricate-v2', 'tier');
-          return itemTier === this.tier;
-        }
-        return true;
+    if (this.match?.type === 'tags') {
+      const itemTags = getFabricateFlag(item, 'tags', []);
+      const requiredTags = this.match.tags || [];
+      const matched = this.match.tagMatch === 'all'
+        ? requiredTags.every(tag => itemTags.includes(tag))
+        : requiredTags.some(tag => itemTags.includes(tag));
+      if (!matched) {
+        return false;
       }
+
+      if (this.tier) {
+        const itemTier = getFabricateFlag(item, 'tier', null);
+        return itemTier === this.tier;
+      }
+      return true;
     }
 
     // Check alternatives
@@ -55,9 +99,15 @@ export class Ingredient {
    */
   validate() {
     const errors = [];
+    const hasSystemItemMatch = this.match?.type === 'systemItem' && !!this.match.systemItemId;
+    const hasTagMatch = this.match?.type === 'tags' && Array.isArray(this.match.tags) && this.match.tags.length > 0;
 
-    if (!this.systemItemId && !this.itemUuid && !this.tag) {
-      errors.push('Ingredient must have systemItemId, itemUuid, or tag');
+    if (!hasSystemItemMatch && !hasTagMatch && !this.itemUuid) {
+      errors.push('Ingredient must include a match rule or specific item UUID');
+    }
+
+    if (this.match?.type === 'tags' && (!Array.isArray(this.match.tags) || this.match.tags.length === 0)) {
+      errors.push('Tag-based ingredient match requires at least one tag');
     }
 
     if (typeof this.quantity !== 'number' || this.quantity <= 0) {
@@ -83,15 +133,16 @@ export class Ingredient {
    * @returns {string}
    */
   getDescription() {
-    if (this.systemItemId) {
+    if (this.match?.type === 'systemItem' && this.match.systemItemId) {
       return `${this.quantity}x managed item`;
     }
     if (this.itemUuid) {
       return `${this.quantity}x specific item`;
     }
-    if (this.tag) {
+    if (this.match?.type === 'tags' && Array.isArray(this.match.tags) && this.match.tags.length > 0) {
+      const joined = this.match.tags.join(this.match.tagMatch === 'all' ? ' & ' : ' | ');
       const tierStr = this.tier ? ` (${this.tier})` : '';
-      return `${this.quantity}x ${this.tag}${tierStr}`;
+      return `${this.quantity}x ${joined}${tierStr}`;
     }
     if (this.alternatives.length > 0) {
       return `${this.quantity}x (${this.alternatives.length} alternatives)`;
@@ -101,6 +152,7 @@ export class Ingredient {
 
   toJSON() {
     return {
+      match: this.match,
       systemItemId: this.systemItemId,
       itemUuid: this.itemUuid,
       quantity: this.quantity,

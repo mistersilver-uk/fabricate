@@ -1,4 +1,6 @@
 import { Recipe } from '../models/Recipe.js';
+import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
+import { getFabricateFlag } from '../config/flags.js';
 
 /**
  * Manages recipe storage, retrieval, and CRUD operations
@@ -27,7 +29,7 @@ export class RecipeManager {
     if (this.initialized) return;
 
     // Load recipes from game settings
-    const savedRecipes = game.settings.get('fabricate-v2', 'recipes') || [];
+    const savedRecipes = getSetting(SETTING_KEYS.RECIPES) || [];
     for (const recipeData of savedRecipes) {
       const recipe = Recipe.fromJSON(recipeData);
       this.recipes.set(recipe.id, recipe);
@@ -42,7 +44,7 @@ export class RecipeManager {
    */
   async save() {
     const recipesArray = Array.from(this.recipes.values()).map(r => r.toJSON());
-    await game.settings.set('fabricate-v2', 'recipes', recipesArray);
+    await setSetting(SETTING_KEYS.RECIPES, recipesArray);
   }
 
   /**
@@ -113,6 +115,7 @@ export class RecipeManager {
 
     this.recipes.delete(recipeId);
     await this.save();
+    await this._cleanupFlagsAfterRecipeMutation();
     ui.notifications.info(`Recipe "${recipe.name}" deleted`);
   }
 
@@ -277,19 +280,21 @@ export class RecipeManager {
       essences: []
     };
     const features = this._getSystemFeatures(recipe);
+    const selection = typeof ingredientSet.resolveIngredientSelection === 'function'
+      ? ingredientSet.resolveIngredientSelection(
+        availableItems,
+        (ingredient, item) => this.ingredientMatchesItem(recipe, ingredient, item)
+      )
+      : { success: true, missingGroups: [] };
 
-    // Check ingredients
-    for (const ingredient of ingredientSet.ingredients) {
-      const matchingItems = availableItems.filter(item => this.ingredientMatchesItem(recipe, ingredient, item));
-      const totalQuantity = matchingItems.reduce((sum, item) =>
-        sum + (item.system.quantity || 1), 0
-      );
-
-      if (totalQuantity < ingredient.quantity) {
+    if (!selection.success) {
+      for (const groupMissing of selection.missingGroups || []) {
+        const ingredient = groupMissing?.ingredient || groupMissing?.group?.options?.[0] || null;
+        if (!ingredient) continue;
         missing.ingredients.push({
           ingredient,
-          have: totalQuantity,
-          need: ingredient.quantity
+          have: Number(groupMissing.have || 0),
+          need: Number(groupMissing.need || ingredient.quantity || 1)
         });
       }
     }
@@ -349,7 +354,10 @@ export class RecipeManager {
    * @private
    */
   getCatalystsForSet(recipe, ingredientSet) {
-    return Array.isArray(ingredientSet?.catalysts) ? ingredientSet.catalysts : [];
+    return [
+      ...(Array.isArray(recipe?.catalysts) ? recipe.catalysts : []),
+      ...(Array.isArray(ingredientSet?.catalysts) ? ingredientSet.catalysts : [])
+    ];
   }
 
   /**
@@ -361,11 +369,19 @@ export class RecipeManager {
    */
   ingredientMatchesItem(recipe, ingredient, item) {
     const features = this._getSystemFeatures(recipe);
-    if (ingredient.systemItemId) {
-      const managedItem = this._getSystemItem(recipe, ingredient.systemItemId);
+    const match = ingredient.match || null;
+    const systemItemId = match?.type === 'systemItem'
+      ? (match.systemItemId || null)
+      : (ingredient.systemItemId || null);
+
+    if (systemItemId) {
+      const managedItem = this._getSystemItem(recipe, systemItemId);
       if (!managedItem) return false;
 
-      const byUuid = managedItem.sourceUuid ? item.uuid === managedItem.sourceUuid : false;
+      const sourceId = foundry.utils.getProperty(item, 'flags.core.sourceId');
+      const byUuid = managedItem.sourceUuid
+        ? (item.uuid === managedItem.sourceUuid || sourceId === managedItem.sourceUuid)
+        : false;
       const byName = !managedItem.sourceUuid && managedItem.name
         ? item.name?.toLowerCase() === managedItem.name.toLowerCase()
         : false;
@@ -396,7 +412,10 @@ export class RecipeManager {
     if (catalyst.systemItemId) {
       const managedItem = this._getSystemItem(recipe, catalyst.systemItemId);
       if (!managedItem) return false;
-      if (managedItem.sourceUuid) return item.uuid === managedItem.sourceUuid;
+      if (managedItem.sourceUuid) {
+        const sourceId = foundry.utils.getProperty(item, 'flags.core.sourceId');
+        return item.uuid === managedItem.sourceUuid || sourceId === managedItem.sourceUuid;
+      }
       return item.name?.toLowerCase() === (managedItem.name || '').toLowerCase();
     }
     return catalyst.matches(item);
@@ -405,12 +424,27 @@ export class RecipeManager {
   _matchesIngredient(ingredient, item, features) {
     if (ingredient.itemUuid && item.uuid === ingredient.itemUuid) return true;
 
+    if (ingredient.match?.type === 'tags') {
+      if (!features.enableTags) return false;
+      const requiredTags = Array.isArray(ingredient.match.tags) ? ingredient.match.tags : [];
+      const itemTags = getFabricateFlag(item, 'tags', []);
+      const matched = ingredient.match.tagMatch === 'all'
+        ? requiredTags.every(tag => itemTags.includes(tag))
+        : requiredTags.some(tag => itemTags.includes(tag));
+      if (!matched) return false;
+      if (ingredient.tier && features.enableTiers) {
+        const itemTier = getFabricateFlag(item, 'tier', null);
+        return itemTier === ingredient.tier;
+      }
+      return true;
+    }
+
     if (ingredient.tag) {
       if (!features.enableTags) return false;
-      const itemTags = item.getFlag('fabricate-v2', 'tags') || [];
+      const itemTags = getFabricateFlag(item, 'tags', []);
       if (!itemTags.includes(ingredient.tag)) return false;
       if (ingredient.tier && features.enableTiers) {
-        const itemTier = item.getFlag('fabricate-v2', 'tier');
+        const itemTier = getFabricateFlag(item, 'tier', null);
         return itemTier === ingredient.tier;
       }
       return true;
@@ -433,10 +467,9 @@ export class RecipeManager {
     const advancedEnabled = system?.advancedOptionsEnabled !== false;
     const features = system?.features || {};
     return {
-      // Tags/tiers are no longer used for ingredient matching.
-      enableTags: false,
+      enableTags: advancedEnabled && features.itemTags === true,
       enableTiers: false,
-      enableEssences: advancedEnabled && (features.essences === true || system?.enableEssences === true)
+      enableEssences: advancedEnabled && features.essences === true
     };
   }
 
@@ -450,7 +483,8 @@ export class RecipeManager {
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(systemId);
     if (!system) return null;
-    return system.items.find(item => item.id === systemItemId) || null;
+    const managedItems = Array.isArray(system.managedItems) ? system.managedItems : (system.items || []);
+    return managedItems.find(item => item.id === systemItemId) || null;
   }
 
   /**
@@ -463,7 +497,7 @@ export class RecipeManager {
     const accumulated = {};
 
     for (const item of items) {
-      const itemEssences = item.getFlag('fabricate-v2', 'essences') || {};
+      const itemEssences = getFabricateFlag(item, 'essences', {});
       for (const [essenceType, quantity] of Object.entries(itemEssences)) {
         accumulated[essenceType] = (accumulated[essenceType] || 0) + quantity;
       }
@@ -503,6 +537,7 @@ export class RecipeManager {
     }
 
     await this.save();
+    await this._cleanupFlagsAfterRecipeMutation();
     ui.notifications.info(`Imported ${imported} recipes (${skipped} skipped)`);
   }
 
@@ -537,6 +572,10 @@ export class RecipeManager {
 
     const systemValidation = this._validateEssenceReferences(recipe);
     errors.push(...systemValidation.errors);
+    const tagValidation = this._validateTagPlaceholders(recipe);
+    errors.push(...tagValidation.errors);
+    const modeValidation = this._validateResolutionMode(recipe);
+    errors.push(...modeValidation.errors);
 
     return {
       valid: errors.length === 0,
@@ -589,5 +628,92 @@ export class RecipeManager {
       valid: errors.length === 0,
       errors
     };
+  }
+
+  _validateResolutionMode(recipe) {
+    const modeService = game.fabricate?.getResolutionModeService?.();
+    if (!modeService) {
+      return { valid: true, errors: [] };
+    }
+    return modeService.validateRecipe(recipe);
+  }
+
+  _validateTagPlaceholders(recipe) {
+    const errors = [];
+    const systemId = recipe?.craftingSystemId;
+    if (!systemId) {
+      return { valid: true, errors };
+    }
+
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const system = systemManager?.getSystem(systemId);
+    if (!system) {
+      return { valid: true, errors };
+    }
+
+    const advancedEnabled = system.advancedOptionsEnabled !== false;
+    const features = system.features || {};
+    const itemTagsEnabled = advancedEnabled && features.itemTags === true;
+    const validTags = new Set([
+      ...((system.itemTags || []).map(tag => String(tag || '').trim())),
+      ...((system.tags || []).map(tag => String(tag || '').trim()))
+    ].filter(Boolean));
+
+    const steps = typeof recipe.getExecutionSteps === 'function'
+      ? recipe.getExecutionSteps()
+      : [{ id: 'implicit', ingredientSets: recipe.ingredientSets || [] }];
+    for (const step of steps) {
+      for (const ingredientSet of step.ingredientSets || []) {
+        const groups = Array.isArray(ingredientSet.ingredientGroups) && ingredientSet.ingredientGroups.length > 0
+          ? ingredientSet.ingredientGroups
+          : (ingredientSet.ingredients || []).map(ingredient => ({ options: [ingredient] }));
+
+        for (const group of groups) {
+          for (const option of group.options || []) {
+            const match = option.match || null;
+            const isTagPlaceholder = match?.type === 'tags';
+            if (!isTagPlaceholder) continue;
+            const tagIds = Array.isArray(match.tags) ? match.tags : [];
+
+            if (!itemTagsEnabled) {
+              errors.push(
+                `Ingredient group "${group.name || group.id}" uses tag placeholders but item tags are disabled for this crafting system`
+              );
+              continue;
+            }
+
+            for (const tagId of tagIds) {
+              const normalized = String(tagId || '').trim();
+              if (!normalized) continue;
+              if (validTags.has(normalized)) continue;
+              errors.push(
+                `Ingredient group "${group.name || group.id}" references unknown tag "${normalized}"`
+              );
+            }
+          }
+        }
+      }
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  }
+
+  async _cleanupFlagsAfterRecipeMutation() {
+    const runManager = game.fabricate?.getCraftingRunManager?.();
+    const visibilityService = game.fabricate?.getRecipeVisibilityService?.();
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    if (!runManager && !visibilityService) return;
+
+    const validRecipes = new Set(this.getRecipes({}).map(r => r.id));
+    const validSystems = new Set((systemManager?.getSystems?.() || []).map(s => s.id));
+    if (runManager) {
+      await runManager.cleanupInvalidRuns(validRecipes, validSystems);
+    }
+    if (visibilityService) {
+      await visibilityService.cleanupLearnedRecipes(validRecipes);
+    }
   }
 }
