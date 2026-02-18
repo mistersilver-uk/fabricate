@@ -27,7 +27,7 @@ export class Recipe {
     this.resultGroups = this._normalizeResultGroups(data);
     this.results = this.resultGroups.flatMap(group => group.results);
 
-    // Recipe behavior
+    // Recipe behaviour
     this.isVariable = data.isVariable !== undefined ? data.isVariable : false;
     this.transferEffects = data.transferEffects !== undefined ? data.transferEffects : false;
     this.requiresAllSets = data.requiresAllSets !== undefined ? data.requiresAllSets : false;

@@ -14,7 +14,8 @@
 
 ### Specifications
 
-All technical specifications are located in the `spec/` directory. These are living documents that define system behavior before implementation.
+All technical specifications are located in the `spec/` directory.
+These are living documents that define system behaviour before implementation.
 
 See `spec/README.md` for:
 
@@ -26,9 +27,9 @@ See `spec/README.md` for:
 
 We follow a **spec-driven approach** for development with Agents:
 
-- **Specifications define behavior** – Features are specified before implementation
+- **Specifications define behaviour** – Features are specified before implementation
 - **Code implements specs** – Implementation follows the specification
 - **Specs are living documents** - Updated as features evolve
 - **Specs guide testing** – Test scenarios are derived from specifications
 
-This ensures consistency, maintainability, and clear documentation of system behavior.
+This ensures consistency, maintainability, and clear documentation of system behaviour.

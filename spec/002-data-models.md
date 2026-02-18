@@ -196,7 +196,7 @@ Recipe = {
 
 ### Requirements
 
-1. Recipe must include at least one ingredient set and at least one result group, either at recipe level (single-step mode) or within steps (multi-step mode).
+1. Recipe must include at least one ingredient set and at least one result group, either at recipe level (single-step mode) or within steps (multistep mode).
 2. Resolution-mode constraints are defined in `004-resolution-modes.md`.
 3. If `outcomeRouting` is used, keys must exist in `CraftingSystem.craftingCheck.outcomes`.
 4. If `transferEffects` is true and essences are enabled, transfer behaviour follows `005-recipes-and-steps.md`.
@@ -243,7 +243,7 @@ RecipeItemMatchContext = {
 
 ### Purpose
 
-Represent one step in a multi-step recipe.
+Represent one step in a multistep recipe.
 
 ### Properties
 
@@ -378,7 +378,127 @@ Result = {
 2. `quantity` must be positive.
 3. `propertyMacroUuid` is only valid when `features.propertyMacros` is true.
 
+## CraftingRun
+
+### Purpose
+
+Represent one actor-scoped crafting execution instance, including resumable in-progress state and final outcome metadata for history.
+
+### Properties
+
+```js
+CraftingRun = {
+  id: string,
+  actorUuid: string,
+  userId: string, // initiating user
+
+  craftingSystemId: string,
+  recipeId: string,
+
+  status: "inProgress" | "waitingTime" | "succeeded" | "failed" | "cancelled",
+
+  startedAt: number,
+  updatedAt: number,
+  finishedAt?: number,
+
+  currentStepIndex: number | null,
+  steps: CraftingRunStepState[],
+
+  componentSourceActorUuids: string[],
+}
+```
+
+### Requirements
+
+1. `id` must be unique within `Actor.flags.fabricate.craftingRuns.active` and within the actor's history entries.
+2. `currentStepIndex` must be `null` for terminal statuses (`succeeded`, `failed`, `cancelled`).
+3. `status` must be `waitingTime` when progression is blocked only by elapsed time.
+4. `finishedAt` is required for terminal statuses and must be absent for non-terminal statuses.
+
+## CraftingRunStepState
+
+### Purpose
+
+Represent current and historical execution state for one recipe step within a crafting run.
+
+### Properties
+
+```js
+CraftingRunStepState = {
+  stepId: string,
+  stepName: string,
+  index: number,
+
+  status: "pending" | "inProgress" | "waitingTime" | "succeeded" | "failed",
+
+  startedAt?: number,
+  updatedAt: number,
+  completedAt?: number,
+
+  // Time gate tracking (for step.timeRequirement)
+  timeGate?: {
+    requiredSeconds: number,
+    availableAt: number, // timestamp when step can complete
+    initiatedAt: number, // timestamp when step began
+  },
+    
+  selectedIngredientSetId?: string,
+
+  lastCheckResult?: {
+    success: boolean,
+    reason: string,   // user-friendly text returned by the macro explaining the result 
+    outcome?: string, // tiered mode
+    value?: number,   // progressive mode
+    data?: object,
+  },
+
+  consumedIngredients?: Array<{
+    actorUuid: string,
+    systemItemId: string,
+    quantity: number,
+  }>,
+  usedCatalysts?: Array<{
+    actorUuid: string,
+    systemItemId: string,
+    quantity: number,
+  }>,
+  createdResults?: Array<{
+    actorUuid: string,
+    systemItemId: string,
+    quantity: number,
+  }>,
+}
+```
+
+### Requirements
+
+1. `index` must be contiguous and zero-based within a `CraftingRun.steps` array.
+2. `timeGate` is only valid when the corresponding recipe step has `timeRequirement`.
+3. `timeGate.availableAt` must be `> initiatedAt` when both are present.
+4. `completedAt` is required when `status` is `succeeded`, or `failed`.
+5. `lastCheckResult.outcome` is only valid in tiered mode; `lastCheckResult.value` is only valid in progressive mode.
+6. `failureReason` is required when `status` is `failed`.
+
 ## Actor Flags
+
+### Crafting Runs Flag
+
+```js
+Actor.flags.fabricate.craftingRuns = {
+  active: {
+    [runId: string]: CraftingRun,
+  },
+  history: CraftingRun[],
+}
+```
+
+Requirements:
+
+1. `active` contains only non-terminal runs (`inProgress` or `waitingTime`).
+2. `history` contains only terminal runs (`succeeded`, `failed`, `cancelled`).
+3. When a run reaches a terminal status, it must be removed from `active` and appended to `history`.
+4. History should be newest-first and capped by a configured or default limit.
+5. Deleting a recipe or crafting system should clean-up its associated crafting runs, both historical and in-progress.
 
 ### Learned Recipes Flag
 

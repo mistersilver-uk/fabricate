@@ -27,11 +27,11 @@ Fabricate supports:
 
 - GMs can start simple and enable features incrementally.
 - UI hides controls for disabled features.
-- Defaults should produce usable baseline behavior.
+- Defaults should produce usable baseline behaviour.
 
 ### Deterministic and Testable
 
-- Behavior is driven by explicit settings and contracts.
+- Behaviour is driven by explicit settings and contracts.
 - Inputs and outputs are validated.
 - Failures are surfaced clearly.
 - Automated tests protect against regressions.
@@ -41,7 +41,7 @@ Fabricate supports:
 1. Data layer
    - Stores crafting systems and recipes in world settings.
    - Stores user preferences in client settings.
-   - Optionally stores in-progress runs on actor flags.
+   - Stores actor-scoped crafting runs in actor flags (active and history).
 2. Engine layer
    - Validates requirements.
    - Resolves results by resolution mode.
@@ -77,7 +77,7 @@ Mode semantics and validation are defined in `004-resolution-modes.md`.
 
 ### Recipes and Steps
 
-Recipes can be implicit single-step or explicit multi-step.
+Recipes can be implicit single-step or explicit multistep.
 Execution lifecycle semantics are defined in `005-recipes-and-steps.md`.
 
 ### Recipe Visibility and Learning
@@ -112,7 +112,8 @@ Client:
 
 ### Actor Flags
 
-- `flags.fabricate.craftingRuns` for optional resumable runs
+- `flags.fabricate.craftingRuns.active` for resumable in-progress runs
+- `flags.fabricate.craftingRuns.history` for completed/failed/cancelled run history
 - `flags.fabricate.learnedRecipes` for learned recipe records
 
 Clean-up semantics for stale runs/learned records are defined in `007-destructive-changes-and-migrations.md`.

@@ -339,7 +339,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
   static async _onCreateSystem(event, target) {
     if (!this.constructor._requireGM()) return;
     const name = this._nextSystemName();
-    const description = 'Configure categories, item tags, essences, and crafting behavior for this system.';
+    const description = 'Configure categories, item tags, essences, and crafting behaviour for this system.';
     const system = await game.fabricate.getCraftingSystemManager().createSystem({ name, description });
     this.selectedSystemId = system.id;
     this.activeTab = 'systems';
