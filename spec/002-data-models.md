@@ -4,6 +4,7 @@
 
 Define Fabricate data models, persistence contracts, and macro contracts.
 All stored entities are JSON-serializable and safe to persist via `game.settings` and flags.
+All settings keys in this specification use the literal `fabricate.*` namespace.
 
 Behavioural semantics are defined in:
 
@@ -25,6 +26,8 @@ CraftingSystem = {
   resolutionMode: "simple" | "mapped" | "tiered" | "progressive",
 
   features: {
+    recipeCategories: boolean,
+    itemTags: boolean,
     essences: boolean,
     propertyMacros: boolean,
     effectTransfer: boolean,
@@ -99,6 +102,12 @@ CraftingSystem = {
   },
 }
 ```
+
+### Requirements
+
+1. If `features.recipeCategories` is false, `Recipe.category` is ignored at runtime.
+2. If `features.itemTags` is false, tag-based ingredient placeholders are invalid.
+3. `categories` and `itemTags` should be normalized to unique, trimmed strings.
 
 ## EssenceDefinition
 
@@ -258,8 +267,11 @@ Step = {
   catalysts: Catalyst[], // defines catalysts that apply to all ingredient sets in this step
 
   timeRequirement?: {
-    unit: "second" | "minute" | "hour" | "day" | "week" | "month",
-    amount: number,
+    minutes?: number,
+    hours?: number,
+    days?: number,
+    months?: number,
+    years?: number,
   },
   currencyRequirement?: {
       unit: string // varies by game system
@@ -273,6 +285,12 @@ Step = {
 }
 ```
 
+### Requirements
+
+1. `timeRequirement` is a duration declaration, not an absolute timestamp.
+2. If present, at least one of `minutes`, `hours`, `days`, `months`, `years` must be a positive number.
+3. Runtime execution normalises duration fields to a world-time target timestamp for gate evaluation.
+
 ## IngredientSet
 
 ### Purpose
@@ -285,7 +303,7 @@ Represent one ingredient/catalyst bundle.
 IngredientSet = {
   id: string,
   name: string,
-  ingredients: Ingredient[],
+  ingredientGroups: IngredientGroup[],
   essences: { [essenceId: string]: number },
   catalysts: Catalyst[],
 
@@ -293,6 +311,35 @@ IngredientSet = {
   resultGroupId?: string,
 }
 ```
+
+### Requirements
+
+1. `ingredientGroups` must contain at least one `IngredientGroup`.
+2. Ingredient-set evaluation is always OR-across-sets at recipe/step level.
+3. AND-across-ingredient-sets is not supported.
+
+## IngredientGroup
+
+### Purpose
+
+Represent one required ingredient slot where at least one option must be satisfied.
+
+### Properties
+
+```js
+IngredientGroup = {
+  id: string,
+  name?: string,
+  options: Ingredient[], // OR options; one option satisfies the group
+}
+```
+
+### Requirements
+
+1. `options` must contain at least one `Ingredient`.
+2. A group is satisfied when any one option is satisfied.
+3. All groups in an `IngredientSet` must be satisfied.
+4. OR-group semantics are always enabled and are not controlled by a feature toggle.
 
 ## Ingredient
 
@@ -304,16 +351,30 @@ Represent one consumable ingredient requirement.
 
 ```js
 Ingredient = {
-  systemItemId: string,
   quantity: number,
   extractEffects: boolean,
+
+  match: {
+    type: "systemItem" | "tags",
+
+    // type = "systemItem"
+    systemItemId?: string,
+
+    // type = "tags"
+    tags?: string[],
+    tagMatch?: "any" | "all", // default "any"
+  },
 }
 ```
 
 ### Requirements
 
-1. `systemItemId` is required.
-2. `quantity` must be positive.
+1. `quantity` must be positive.
+2. `match.type` is required.
+3. If `match.type === "systemItem"`, `match.systemItemId` is required.
+4. If `match.type === "tags"`, `match.tags` must contain one or more tag IDs.
+5. Tag IDs in `match.tags` must exist in `CraftingSystem.itemTags`.
+6. When `features.itemTags` is true, tag placeholder ingredients are valid in all resolution modes, including `simple`.
 
 ## Catalyst
 
@@ -454,19 +515,21 @@ CraftingRunStepState = {
 
   consumedIngredients?: Array<{
     actorUuid: string,
-    systemItemId: string,
+    itemUuid: string,
     quantity: number,
   }>,
   usedCatalysts?: Array<{
     actorUuid: string,
-    systemItemId: string,
+    itemUuid: string,
     quantity: number,
   }>,
   createdResults?: Array<{
     actorUuid: string,
-    systemItemId: string,
+    itemUuid: string,
     quantity: number,
   }>,
+
+  failureReason?: string,
 }
 ```
 
@@ -551,7 +614,7 @@ Requirements:
 
 1. `timesUsed` must be a non-negative integer.
 2. Usage is tracked per owned item instance.
-3. Maximum uses is configured in `Catalyst.maxUses` for each catalyst (on the recipe, step, or ingredient group).
+3. Maximum uses is configured in `Catalyst.maxUses` for each catalyst (on the recipe, step, or ingredient set).
 4. When `timesUsed >= maxUses`, the item is exhausted.
 5. If `destroyWhenExhausted` is true, the item is destroyed when exhausted.
 

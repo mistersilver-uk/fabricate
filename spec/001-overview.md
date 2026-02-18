@@ -97,6 +97,8 @@ Behaviour is defined in `006-recipe-visibility.md`.
 
 ### Settings
 
+All settings keys use the literal `fabricate.*` namespace.
+
 World:
 
 - `fabricate.craftingSystems`

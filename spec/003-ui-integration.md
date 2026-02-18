@@ -49,14 +49,14 @@ Changing resolution mode is destructive and must follow `007` confirmation/clean
 
 #### Feature Controls
 
-- Recipe categories
-- Item tags
-- Essences
-- Property macros
-- Effect transfer
-- Time requirements
-- Currency requirements
-- Multi-step recipes
+- Recipe categories toggle (`features.recipeCategories`)
+- Item tags toggle (`features.itemTags`)
+- Essences toggle (`features.essences`)
+- Property macros toggle (`features.propertyMacros`)
+- Effect transfer toggle (`features.effectTransfer`)
+- Time requirements toggle (`requirements.time.enabled`)
+- Currency requirements toggle (`requirements.currency.enabled`)
+- Multi-step recipes toggle (`features.multiStepRecipes`)
 
 #### Crafting Check Controls
 
@@ -176,7 +176,10 @@ Per step controls:
 Ingredient set editor supports:
 
 - Add/remove ingredient sets
-- Ingredients grid per set
+- Ingredient group editor per set:
+  - Add/remove groups
+  - Add/remove OR options within a group
+  - Item placeholder options that match one or more configured system tags
 - Catalysts grid per set
 - Essences per set (when enabled)
 
@@ -186,6 +189,7 @@ The UI must expose required data fields from `004`, but mode logic itself is def
 ### Simple UI
 
 - One ingredient set
+- Ingredient-group editor within that set (including OR options)
 - One result group editor
 
 ### Mapped UI
@@ -240,6 +244,8 @@ The UI must expose required data fields from `004`, but mode logic itself is def
 Before start/resume and before each step action, UI must invoke guard checks defined in `006`.
 
 ## Data Storage (UI-relevant)
+
+All keys below use the literal `fabricate.*` namespace.
 
 World settings:
 

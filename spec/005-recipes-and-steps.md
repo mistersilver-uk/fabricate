@@ -23,7 +23,12 @@ Each step can define:
 
 ## Ingredient and Catalyst Semantics
 
-- At least one ingredient set must be satisfied
+- A recipe/step is craftable when at least one `IngredientSet` is satisfied (OR across sets).
+- Within an `IngredientSet`, all `ingredientGroups` must be satisfied (AND across groups).
+- Within an `IngredientGroup`, any one option in `options` satisfies the group (OR within group).
+- AND-across-ingredient-sets is not supported.
+- OR groups are always enabled and are not feature-toggled.
+- Tag-placeholder ingredients (`Ingredient.match.type === "tags"`) are supported when `features.itemTags` is enabled, including simple recipes.
 - Catalysts are defined at the recipe level, step level, and inside each `IngredientSet.catalysts`.
 - Catalyst degradation/usage is tracked on owned item instances.
 
@@ -64,7 +69,8 @@ Each step can define:
 ## Time and Currency Requirements
 
 - If the system-level requirement toggle is disabled, step-level values are ignored.
-- `timeRequirement` is in seconds and uses world time.
+- `timeRequirement` stores duration fields (`minutes`, `hours`, `days`, `months`, `years`) to capture GM intent.
+- Runtime execution normalizes duration fields to a world-time target timestamp for gate checks.
 - A step with time gating is incomplete until world time reaches the target completion timestamp.
 - Fabricate listens to the `updateWorldTime` hook, and checks game time on startup, to mark recipes and steps with a time requirement as completed, and subsequently notify users.
 - Currency provider behaviour is configured by `CraftingSystem.requirements.currency`:
@@ -90,7 +96,10 @@ Transfer scaling by essence quantity is out of scope for this phase.
 ## Testing Requirements
 
 - Unit tests for single-step and multistep behaviour.
-- Unit tests for OR/AND ingredient set requirements.
+- Unit tests for ingredient set/group semantics:
+  - OR across ingredient sets
+  - AND across groups within a set
+  - OR within group options
 - Unit tests for tiered step-level routing override.
 - Unit tests for time/currency gate checks.
 - Integration tests for end-to-end multistep crafting, resume, and completion.

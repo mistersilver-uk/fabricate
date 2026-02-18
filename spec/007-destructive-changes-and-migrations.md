@@ -88,12 +88,13 @@ If a linked world/compendium item is deleted:
 
 On startup or world load:
 
-1. Validate crafting systems shape.
-2. Validate recipes shape and foreign keys.
-3. Run stale run clean-up.
-4. Run stale learned-recipe cleanup.
-5. Persist migrated data only when changes are detected.
-6. Check world time against in-progress crafting runs with a time requirement. Complete steps/recipes as appropriate and notify users owning the actor(s).
+1. Apply namespace or setting migrations if defined, and when needed.
+2. Validate crafting systems shape.
+3. Validate recipes shape and foreign keys.
+4. Run stale run clean-up.
+5. Run stale learned-recipe cleanup.
+6. Persist migrated data only when changes are detected.
+7. Check world time against in-progress crafting runs with a time requirement. Complete steps/recipes as appropriate and notify users owning the actor(s).
 
 ### Error Handling
 
