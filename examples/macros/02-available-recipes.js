@@ -1,4 +1,4 @@
-// Fabricate v2 Macro: Check Available Recipes
+// Fabricate Macro: Check Available Recipes
 // Shows recipes you can craft with current inventory
 
 const actor = game.user.character;
@@ -10,7 +10,7 @@ if (!actor) {
   const allRecipes = fabricate.listRecipes({ enabled: true });
 
   console.log('╔═══════════════════════════════════════════════════════╗');
-  console.log('║       FABRICATE v2 - AVAILABLE RECIPES                ║');
+  console.log('║       Fabricate - AVAILABLE RECIPES                ║');
   console.log('╚═══════════════════════════════════════════════════════╝');
   console.log(`\nCharacter: ${actor.name}`);
   console.log(`Can craft: ${available.length} / ${allRecipes.length} recipes\n`);
@@ -51,3 +51,4 @@ if (!actor) {
 
   ui.notifications.info(`Can craft ${available.length} recipes (check console F12)`);
 }
+

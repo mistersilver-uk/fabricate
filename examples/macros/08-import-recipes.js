@@ -1,4 +1,4 @@
-// Fabricate v2 Macro: Import Recipes
+// Fabricate Macro: Import Recipes
 // Import recipes from JSON
 
 // Paste your JSON here (between the backticks)
@@ -66,3 +66,4 @@ try {
   console.error('Failed to parse JSON:', err);
   ui.notifications.error('Invalid JSON format. Check console for details.');
 }
+

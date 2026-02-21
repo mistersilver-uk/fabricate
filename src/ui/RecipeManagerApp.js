@@ -1,5 +1,6 @@
 import { RecipeEditorApp } from './RecipeEditorApp.js';
 import { confirmDialog, getDragEventData, renderDialog } from './foundryCompat.js';
+import { getTemplatePath } from './templatePaths.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 
 /**
@@ -61,11 +62,13 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     }
   };
 
-  static PARTS = {
-    manager: {
-      template: 'modules/fabricate-v2/templates/recipe-manager.hbs'
-    }
-  };
+  static get PARTS() {
+    return {
+      manager: {
+        template: getTemplatePath('recipe-manager.hbs')
+      }
+    };
+  }
 
   static _requireGM() {
     if (!game.user.isGM) {
@@ -847,3 +850,4 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     return app;
   }
 }
+

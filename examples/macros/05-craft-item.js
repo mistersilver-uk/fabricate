@@ -1,4 +1,4 @@
-// Fabricate v2 Macro: Craft Item
+// Fabricate Macro: Craft Item
 // Select a recipe from a dialog and craft it
 
 const actor = game.user.character;
@@ -80,3 +80,4 @@ if (!actor) {
     }).render(true);
   }
 }
+

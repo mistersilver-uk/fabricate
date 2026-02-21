@@ -1,4 +1,4 @@
-// Fabricate v2 Macro: Tag Items
+// Fabricate Macro: Tag Items
 // Bulk tag items in your inventory for tag-based recipes
 
 const actor = game.user.character;
@@ -31,9 +31,9 @@ if (!actor) {
       }
 
       if (matches) {
-        await item.setFlag('fabricate-v2', 'tags', rule.tags);
+        await item.setFlag('fabricate', 'tags', rule.tags);
         if (rule.tier) {
-          await item.setFlag('fabricate-v2', 'tier', rule.tier);
+          await item.setFlag('fabricate', 'tier', rule.tier);
         }
         console.log(`✅ Tagged: ${item.name} → [${rule.tags.join(', ')}] ${rule.tier || ''}`);
         tagged++;
@@ -48,3 +48,4 @@ if (!actor) {
     ui.notifications.warn('No items matched the tagging rules. Update the rules in the macro.');
   }
 }
+

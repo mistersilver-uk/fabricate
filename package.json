@@ -1,5 +1,5 @@
 {
-  "name": "fabricate-v2",
+  "name": "fabricate",
   "version": "0.1.0",
   "description": "Universal crafting system for Foundry VTT - supports simple recipes, catalysts, variable outputs, and active effect transfer",
   "type": "module",
@@ -22,3 +22,4 @@
   ],
   "license": "LicenseRef-Fabricate-Community-1.0"
 }
+

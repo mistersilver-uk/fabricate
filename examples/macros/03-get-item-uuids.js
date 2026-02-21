@@ -1,4 +1,4 @@
-// Fabricate v2 Macro: Get Item UUIDs
+// Fabricate Macro: Get Item UUIDs
 // Lists all items in your inventory with their UUIDs
 
 const actor = game.user.character;
@@ -7,7 +7,7 @@ if (!actor) {
   ui.notifications.warn('Please select a character first');
 } else {
   console.log('╔═══════════════════════════════════════════════════════╗');
-  console.log('║         FABRICATE v2 - INVENTORY ITEM UUIDs           ║');
+  console.log('║         Fabricate - INVENTORY ITEM UUIDs           ║');
   console.log('╚═══════════════════════════════════════════════════════╝');
   console.log(`\nCharacter: ${actor.name}\n`);
 
@@ -16,8 +16,8 @@ if (!actor) {
   } else {
     actor.items.forEach((item, index) => {
       const qty = item.system.quantity || 1;
-      const tags = item.getFlag('fabricate-v2', 'tags') || [];
-      const tier = item.getFlag('fabricate-v2', 'tier') || 'none';
+      const tags = item.getFlag('fabricate', 'tags') || [];
+      const tier = item.getFlag('fabricate', 'tier') || 'none';
 
       console.log(`${item.name} (x${qty})`);
       console.log(`  UUID: ${item.uuid}`);
@@ -34,3 +34,4 @@ if (!actor) {
 
   ui.notifications.info(`Listed ${actor.items.size} items (check console F12)`);
 }
+

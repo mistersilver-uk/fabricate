@@ -1,6 +1,6 @@
 {
-  "id": "fabricate-v2",
-  "title": "Fabricate v2 - Universal Crafting System",
+  "id": "fabricate",
+  "title": "Fabricate - Universal Crafting System",
   "description": "A system-agnostic, flexible crafting module that supports simple recipes, catalysts, variable outputs, and active effect transfer for any tabletop RPG system.",
   "version": "0.1.0",
   "authors": [
@@ -26,10 +26,11 @@
       "path": "lang/en.json"
     }
   ],
-  "url": "https://github.com/misterpotts/fabricate-v2",
-  "manifest": "https://github.com/misterpotts/fabricate-v2/releases/latest/download/module.json",
-  "download": "https://github.com/misterpotts/fabricate-v2/releases/latest/download/module.zip",
+  "url": "https://github.com/misterpotts/fabricate",
+  "manifest": "https://github.com/misterpotts/fabricate/releases/latest/download/module.json",
+  "download": "https://github.com/misterpotts/fabricate/releases/latest/download/module.zip",
   "license": "LicenseRef-Fabricate-Community-1.0",
-  "readme": "https://github.com/misterpotts/fabricate-v2/blob/main/README.md",
-  "bugs": "https://github.com/misterpotts/fabricate-v2/issues"
+  "readme": "https://github.com/misterpotts/fabricate/blob/main/README.md",
+  "bugs": "https://github.com/misterpotts/fabricate/issues"
 }
+

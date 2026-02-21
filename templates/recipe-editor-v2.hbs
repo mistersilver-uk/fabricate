@@ -3,19 +3,19 @@
     <h2>{{#if isEdit}}Edit Recipe{{else}}New Recipe{{/if}}</h2>
   </header>
 
-  {{#if validationErrors.length}}
-    <div class="validation-banner">
-      <strong>Fix before saving:</strong>
-      <ul>
-        {{#each validationErrors}}
-          <li>{{this}}</li>
-        {{/each}}
-      </ul>
-    </div>
-  {{/if}}
-
   <section class="editor-scroll editor-layout">
     <div class="editor-main">
+      {{#if validationErrors.length}}
+        <div class="validation-banner">
+          <strong>Fix before saving:</strong>
+          <ul>
+            {{#each validationErrors}}
+              <li>{{this}}</li>
+            {{/each}}
+          </ul>
+        </div>
+      {{/if}}
+
       <div class="editor-grid">
         <div class="form-group">
           <label>Recipe Name *</label>

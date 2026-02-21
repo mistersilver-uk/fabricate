@@ -11,14 +11,15 @@ import { Catalyst } from './models/Catalyst.js';
 import { CraftingApp } from './ui/CraftingApp.js';
 import { RecipeManagerApp } from './ui/RecipeManagerApp.js';
 import { RecipeEditorApp } from './ui/RecipeEditorApp.js';
-import { registerFabricateSettings, migrateLegacySettings } from './config/settings.js';
+import { getPartialTemplatePath, getTemplatePath } from './ui/templatePaths.js';
+import { registerFabricateSettings } from './config/settings.js';
 
 /**
- * Fabricate v2 - Universal Crafting System
+ * Fabricate - Universal Crafting System
  * Main module entry point
  */
 
-class FabricateV2 {
+class Fabricate {
   constructor() {
     this.recipeManager = null;
     this.craftingEngine = null;
@@ -33,12 +34,10 @@ class FabricateV2 {
    * Initialize the module
    */
   async initialize() {
-    console.log('Fabricate v2 | Initializing...');
+    console.log('Fabricate | Initializing...');
 
     // Register settings
     this.registerSettings();
-    await migrateLegacySettings();
-
     // Create managers
     this.recipeManager = new RecipeManager();
     this.craftingSystemManager = new CraftingSystemManager(this.recipeManager);
@@ -60,7 +59,7 @@ class FabricateV2 {
     await this.recipeVisibilityService.cleanupLearnedRecipes(validRecipes);
 
     this.ready = true;
-    console.log('Fabricate v2 | Ready');
+    console.log('Fabricate | Ready');
   }
 
   /**
@@ -117,7 +116,7 @@ class FabricateV2 {
    */
   async craft(actor, recipe, options = {}) {
     if (!this.ready) {
-      throw new Error('Fabricate v2 not initialized');
+      throw new Error('Fabricate not initialized');
     }
 
     // Get recipe object if ID was provided
@@ -145,22 +144,11 @@ class FabricateV2 {
 }
 
 // Create global instance
-const fabricate = new FabricateV2();
+const fabricate = new Fabricate();
 
 // Hook into Foundry's initialization
 Hooks.once('init', async () => {
-  console.log('Fabricate v2 | Init Hook');
-
-  // Register Handlebars partials
-  await loadTemplates([
-    'modules/fabricate-v2/templates/partials/ingredientRow.hbs',
-    'modules/fabricate-v2/templates/partials/catalystRow.hbs',
-    'modules/fabricate-v2/templates/recipe-editor-v2.hbs'
-  ]);
-
-  // Register Handlebars helpers
-  Handlebars.registerHelper('eq', (a, b) => a === b);
-  Handlebars.registerHelper('json', (context) => JSON.stringify(context, null, 2));
+  console.log('Fabricate | Init Hook');
 
   // Make API available globally
   game.fabricate = fabricate;
@@ -181,6 +169,19 @@ Hooks.once('init', async () => {
     RecipeVisibilityService,
     ResolutionModeService
   };
+
+  try {
+    await loadTemplates([
+      getPartialTemplatePath('ingredientRow.hbs'),
+      getPartialTemplatePath('catalystRow.hbs'),
+      getTemplatePath('recipe-editor-v2.hbs')
+    ]);
+  } catch (err) {
+    console.error('Fabricate | Template preload failed', err);
+  }
+
+  Handlebars.registerHelper('eq', (a, b) => a === b);
+  Handlebars.registerHelper('json', (context) => JSON.stringify(context, null, 2));
 });
 
 // Hook into Foundry's ready event
@@ -190,7 +191,7 @@ Hooks.once('ready', async () => {
 
   // Notify users
   if (game.user.isGM) {
-    ui.notifications.info('Fabricate v2 | Crafting system ready');
+    ui.notifications.info('Fabricate | Crafting system ready');
   }
 
   addModuleButtonsToItemsDirectory();
@@ -216,13 +217,13 @@ Hooks.on('updateWorldTime', (worldTime) => {
 function addModuleButtonsToItemsDirectory() {
   const itemsDir = ui.items;
   if (!itemsDir?.element) {
-    console.error('Fabricate v2 | Items directory not found or not rendered');
+    console.error('Fabricate | Items directory not found or not rendered');
     return;
   }
 
   const header = itemsDir.element.querySelector('.directory-header, header');
   if (!header) {
-    console.error('Fabricate v2 | Items directory header not found');
+    console.error('Fabricate | Items directory header not found');
     return;
   }
 
@@ -230,13 +231,13 @@ function addModuleButtonsToItemsDirectory() {
   let actionsContainer = header.querySelector('.header-actions, .action-buttons');
 
   if (!actionsContainer) {
-    console.log('Fabricate v2 | No header-actions found, looking for alternative containers');
+    console.log('Fabricate | No header-actions found, looking for alternative containers');
     // Try alternative locations
     actionsContainer = header.querySelector('.directory-controls, .header-controls');
   }
 
   if (!actionsContainer) {
-    console.log('Fabricate v2 | No actions container found, creating one');
+    console.log('Fabricate | No actions container found, creating one');
     // Create container as last resort
     actionsContainer = document.createElement('div');
     actionsContainer.className = 'header-actions action-buttons flexrow';
@@ -272,7 +273,7 @@ function addModuleButtonsToItemsDirectory() {
     }
   }
 
-  console.log('Fabricate v2 | Fabricate buttons updated in', actionsContainer.className);
+  console.log('Fabricate | Fabricate buttons updated in', actionsContainer.className);
 }
 
 /**
@@ -305,13 +306,13 @@ function createHeaderButton(labelText, iconClass, actionId, onClick) {
 
 // Also add button when Items directory is activated
 Hooks.on('activateItemDirectory', (app) => {
-  console.log('Fabricate v2 | activateItemDirectory hook fired');
+  console.log('Fabricate | activateItemDirectory hook fired');
   addModuleButtonsToItemsDirectory();
 });
 
 // Handle D&D 5e specific hook
 Hooks.on('activateItemDirectory5e', (app) => {
-  console.log('Fabricate v2 | activateItemDirectory5e hook fired');
+  console.log('Fabricate | activateItemDirectory5e hook fired');
   addModuleButtonsToItemsDirectory();
 });
 
@@ -359,7 +360,7 @@ Hooks.on('chatMessage', (chatLog, message, chatData) => {
       }
     }).catch(err => {
       ui.notifications.error(err.message);
-      console.error('Fabricate v2 | Crafting error:', err);
+      console.error('Fabricate | Crafting error:', err);
     });
 
     return false; // Prevent the message from being sent to chat
@@ -422,3 +423,4 @@ globalThis.fabricate = {
 };
 
 export default fabricate;
+

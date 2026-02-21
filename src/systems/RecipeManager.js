@@ -36,7 +36,7 @@ export class RecipeManager {
     }
 
     this.initialized = true;
-    console.log(`Fabricate v2 | Loaded ${this.recipes.size} recipes`);
+    console.log(`Fabricate | Loaded ${this.recipes.size} recipes`);
   }
 
   /**
@@ -522,7 +522,7 @@ export class RecipeManager {
       const validation = this._validateRecipeForCreateOrUpdate(recipe);
 
       if (!validation.valid) {
-        console.warn(`Fabricate v2 | Skipping invalid recipe: ${recipe.name}`, validation.errors);
+        console.warn(`Fabricate | Skipping invalid recipe: ${recipe.name}`, validation.errors);
         skipped++;
         continue;
       }
@@ -717,3 +717,4 @@ export class RecipeManager {
     }
   }
 }
+

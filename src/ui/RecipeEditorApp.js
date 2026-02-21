@@ -1,5 +1,6 @@
 import { Recipe } from '../models/Recipe.js';
 import { getDragEventData } from './foundryCompat.js';
+import { getTemplatePath } from './templatePaths.js';
 
 /**
  * GM recipe editor with system-item picker grid
@@ -60,11 +61,13 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
     }
   };
 
-  static PARTS = {
-    editor: {
-      template: 'modules/fabricate-v2/templates/recipe-editor-v2.hbs'
-    }
-  };
+  static get PARTS() {
+    return {
+      editor: {
+        template: getTemplatePath('recipe-editor-v2.hbs')
+      }
+    };
+  }
 
   _buildDraft(recipe) {
     const data = recipe?.toJSON() || {};
@@ -639,6 +642,7 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
 
   _onRender(context, options) {
     super._onRender(context, options);
+    this._ensureScrollableLayout();
     this._bindFormSync();
     this._bindPickerDragDrop();
 
@@ -648,6 +652,41 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
         this.itemPickerSearch = event.target.value || '';
         await this.render();
       });
+    }
+  }
+
+  _ensureScrollableLayout() {
+    const host = this.element;
+    if (!host) return;
+
+    host.style.minHeight = '0';
+    host.style.display = 'flex';
+    host.style.flexDirection = 'column';
+    host.style.overflow = 'hidden';
+
+    const form = host.querySelector('form.fabricate-recipe-editor-v2');
+    if (!form) return;
+
+    form.style.minHeight = '0';
+    form.style.display = 'flex';
+    form.style.flexDirection = 'column';
+    form.style.overflow = 'hidden';
+
+    const header = form.querySelector('.editor-header');
+    if (header) header.style.flex = '0 0 auto';
+
+    const validationBanner = form.querySelector('.validation-banner');
+    if (validationBanner) validationBanner.style.flex = '0 0 auto';
+
+    const footer = form.querySelector('.editor-footer');
+    if (footer) footer.style.flex = '0 0 auto';
+
+    const scrollRegion = form.querySelector('.editor-scroll');
+    if (scrollRegion) {
+      scrollRegion.style.minHeight = '0';
+      scrollRegion.style.flex = '1 1 0';
+      scrollRegion.style.overflowX = 'hidden';
+      scrollRegion.style.overflowY = 'auto';
     }
   }
 
@@ -1571,7 +1610,7 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
         await this.options.parentApp.render();
       }
     } catch (err) {
-      console.error('Fabricate v2 | Recipe save failed', err);
+      console.error('Fabricate | Recipe save failed', err);
       ui.notifications.error(err.message || 'Failed to save recipe.');
     }
   }
@@ -1586,3 +1625,4 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
     return app;
   }
 }
+

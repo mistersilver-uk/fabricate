@@ -1,11 +1,11 @@
-# Fabricate v2 Quickstart
+# Fabricate Quickstart
 
 This is the fastest path to get crafting working in a Foundry world.
 
 ## 1. Install and Enable
 
 1. Install the module from its manifest URL.
-2. Enable **Fabricate v2** in your world.
+2. Enable **Fabricate** in your world.
 3. Reload the client.
 
 ## 2. Open Crafting UI
@@ -44,4 +44,5 @@ await fabricate.createSimpleRecipe(
 // Craft by recipe id for the current character
 await fabricate.craft(game.user.character, 'recipeId');
 ```
+
 

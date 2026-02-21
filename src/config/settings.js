@@ -1,5 +1,4 @@
 export const FABRICATE_SETTINGS_NAMESPACE = 'fabricate';
-export const LEGACY_SETTINGS_NAMESPACE = 'fabricate-v2';
 
 export const SETTING_KEYS = Object.freeze({
   RECIPES: 'recipes',
@@ -76,63 +75,11 @@ const BASE_DEFINITIONS = Object.freeze({
 
 const keys = Object.values(SETTING_KEYS);
 
-function valuesEqual(a, b) {
-  const deepEqual = foundry?.utils?.deepEqual;
-  if (typeof deepEqual === 'function') {
-    return deepEqual(a, b);
-  }
-  return JSON.stringify(a) === JSON.stringify(b);
-}
-
 export function registerFabricateSettings() {
   for (const key of keys) {
     const definition = BASE_DEFINITIONS[key];
     game.settings.register(FABRICATE_SETTINGS_NAMESPACE, key, definition);
   }
-
-  // Keep legacy keys registered for migration reads without showing duplicates.
-  for (const key of keys) {
-    const definition = BASE_DEFINITIONS[key];
-    game.settings.register(LEGACY_SETTINGS_NAMESPACE, key, {
-      ...definition,
-      config: false
-    });
-  }
-}
-
-export async function migrateLegacySettings() {
-  let migrated = 0;
-
-  for (const key of keys) {
-    const definition = BASE_DEFINITIONS[key];
-    if (definition.scope === 'world' && !game.user?.isGM) {
-      continue;
-    }
-
-    let currentValue;
-    let legacyValue;
-    try {
-      currentValue = game.settings.get(FABRICATE_SETTINGS_NAMESPACE, key);
-      legacyValue = game.settings.get(LEGACY_SETTINGS_NAMESPACE, key);
-    } catch (err) {
-      continue;
-    }
-
-    const isTargetUnset = valuesEqual(currentValue, definition.default);
-    const hasLegacyData = !valuesEqual(legacyValue, definition.default);
-    if (!isTargetUnset || !hasLegacyData) {
-      continue;
-    }
-
-    await game.settings.set(FABRICATE_SETTINGS_NAMESPACE, key, legacyValue);
-    migrated++;
-  }
-
-  if (migrated > 0) {
-    console.log(`Fabricate v2 | Migrated ${migrated} setting(s) from ${LEGACY_SETTINGS_NAMESPACE}.* to ${FABRICATE_SETTINGS_NAMESPACE}.*`);
-  }
-
-  return migrated;
 }
 
 export function getSetting(key) {
@@ -142,4 +89,3 @@ export function getSetting(key) {
 export async function setSetting(key, value) {
   return game.settings.set(FABRICATE_SETTINGS_NAMESPACE, key, value);
 }
-

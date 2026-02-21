@@ -1,4 +1,5 @@
 import { confirmDialog, renderDialog } from './foundryCompat.js';
+import { getTemplatePath } from './templatePaths.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { getFabricateFlag } from '../config/flags.js';
 
@@ -31,19 +32,19 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
   }
 
   _getRecipeManager() {
-    return game.fabricate.getRecipeManager();
+    return game?.fabricate?.getRecipeManager?.() || null;
   }
 
   _getRecipeVisibilityService() {
-    return game.fabricate.getRecipeVisibilityService?.();
+    return game?.fabricate?.getRecipeVisibilityService?.() || null;
   }
 
   _getRunManager() {
-    return game.fabricate.getCraftingRunManager?.();
+    return game?.fabricate?.getCraftingRunManager?.() || null;
   }
 
   _getCraftingEngine() {
-    return game.fabricate.getCraftingEngine();
+    return game?.fabricate?.getCraftingEngine?.() || null;
   }
 
   async _confirmDialog(options) {
@@ -96,11 +97,13 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
     }
   };
 
-  static PARTS = {
-    recipes: {
-      template: 'modules/fabricate-v2/templates/crafting-app.hbs'
-    }
-  };
+  static get PARTS() {
+    return {
+      recipes: {
+        template: getTemplatePath('crafting-app.hbs')
+      }
+    };
+  }
 
   /**
    * Get default crafting actor with smart fallbacks
@@ -284,6 +287,26 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
     const visibilityService = this._getRecipeVisibilityService();
     const runManager = this._getRunManager();
     const worldTime = Number(game.time?.worldTime || 0);
+
+    if (!recipeManager) {
+      console.error('Fabricate | CraftingApp rendered before Fabricate API was available.');
+      return {
+        ...context,
+        recipes: [],
+        activeRuns: [],
+        runHistory: [],
+        categories: [],
+        selectedCategory: this.selectedCategory,
+        showOnlyAvailable: this.showOnlyAvailable,
+        search: this.searchTerm,
+        totalRecipes: 0,
+        showPagination: false,
+        hasCraftingActor: !!this.craftingActor,
+        hasComponentSources: this.componentSourceActors.length > 0,
+        availableActors: [],
+        ownedActors: []
+      };
+    }
 
     // Prepare actor selection data
     const availableActors = this._getAvailableActors();
@@ -611,6 +634,10 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
     const runId = String(target.dataset.runId || '').trim() || null;
     const skipConfirm = String(target.dataset.skipConfirm || '').trim().toLowerCase() === 'true';
     const recipeManager = this._getRecipeManager();
+    if (!recipeManager) {
+      this._notifyError('Fabricate is still initializing. Please try again.');
+      return;
+    }
     const recipe = recipeManager.getRecipe(recipeId);
 
     if (!recipe) {
@@ -647,6 +674,10 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
 
     // Attempt to craft
     const craftingEngine = this._getCraftingEngine();
+    if (!craftingEngine) {
+      this._notifyError('Crafting engine is unavailable. Check module initialization.');
+      return;
+    }
     const result = await craftingEngine.craft(
       this.craftingActor,
       this.componentSourceActors,
@@ -681,6 +712,10 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
   static async _onLearnRecipe(event, target) {
     const recipeId = target.dataset.recipeId;
     const recipeManager = this._getRecipeManager();
+    if (!recipeManager) {
+      this._notifyError('Fabricate is still initializing. Please try again.');
+      return;
+    }
     const visibilityService = this._getRecipeVisibilityService();
     const recipe = recipeManager.getRecipe(recipeId);
     if (!recipe || !visibilityService) return;
@@ -721,6 +756,10 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
     }
 
     const recipeManager = this._getRecipeManager();
+    if (!recipeManager) {
+      this._notifyWarn('Fabricate is still initializing. Please try again.');
+      return;
+    }
     const worldTime = Number(game.time?.worldTime || 0);
     const displayRun = this._buildRunDisplay(run, recipeManager, worldTime, runScope);
 
@@ -787,7 +826,12 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
       return;
     }
 
-    const recipe = this._getRecipeManager().getRecipe(run.recipeId);
+    const recipeManager = this._getRecipeManager();
+    if (!recipeManager) {
+      this._notifyWarn('Fabricate is still initializing. Please try again.');
+      return;
+    }
+    const recipe = recipeManager.getRecipe(run.recipeId);
     const confirmed = await this._confirmDialog({
       title: 'Cancel Crafting Run?',
       content: `<p>Cancel in-progress run for <strong>${recipe?.name || 'Unknown Recipe'}</strong>?</p>`,
@@ -820,7 +864,12 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
       this._notifyWarn('Active crafting run not found.');
       return;
     }
-    const recipe = this._getRecipeManager().getRecipe(recipeId);
+    const recipeManager = this._getRecipeManager();
+    if (!recipeManager) {
+      this._notifyWarn('Fabricate is still initializing. Please try again.');
+      return;
+    }
+    const recipe = recipeManager.getRecipe(recipeId);
 
     const confirmed = await this._confirmDialog({
       title: 'Restart Crafting Run?',
@@ -852,6 +901,10 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
   static async _onShowDetails(event, target) {
     const recipeId = target.dataset.recipeId;
     const recipeManager = this._getRecipeManager();
+    if (!recipeManager) {
+      this._notifyWarn('Fabricate is still initializing. Please try again.');
+      return;
+    }
     const recipe = recipeManager.getRecipe(recipeId);
 
     if (!recipe) return;
@@ -978,3 +1031,4 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
     return app;
   }
 }
+

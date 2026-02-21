@@ -1,6 +1,6 @@
-# Fabricate v2 - Example Macros
+# Fabricate - Example Macros
 
-This folder contains ready-to-use macros for Fabricate v2.
+This folder contains ready-to-use macros for Fabricate.
 
 ## How to Use
 
@@ -99,3 +99,4 @@ Import recipes from JSON.
 ## Need More Help?
 
 See `QUICKSTART.md` in the main folder for detailed instructions.
+

@@ -1,28 +1,32 @@
 export const FABRICATE_FLAG_NAMESPACE = 'fabricate';
-export const LEGACY_FLAG_NAMESPACE = 'fabricate-v2';
+
+function normalizeFlagKey(key) {
+  const rawKey = String(key || '');
+  if (!rawKey) return 'fabricate';
+  return rawKey.startsWith('fabricate.') ? rawKey : `fabricate.${rawKey}`;
+}
 
 export function getFabricateFlag(document, key, defaultValue = null) {
   if (!document || typeof document.getFlag !== 'function') {
     return defaultValue;
   }
 
-  const current = document.getFlag(FABRICATE_FLAG_NAMESPACE, key);
-  if (current !== undefined && current !== null) {
-    return current;
+  try {
+    const value = document.getFlag(FABRICATE_FLAG_NAMESPACE, normalizeFlagKey(key));
+    return value !== undefined && value !== null ? value : defaultValue;
+  } catch (err) {
+    return defaultValue;
   }
-
-  const legacy = document.getFlag(LEGACY_FLAG_NAMESPACE, key);
-  if (legacy !== undefined && legacy !== null) {
-    return legacy;
-  }
-
-  return defaultValue;
 }
 
 export async function setFabricateFlag(document, key, value) {
   if (!document || typeof document.setFlag !== 'function') {
     return null;
   }
-  return document.setFlag(FABRICATE_FLAG_NAMESPACE, key, value);
-}
 
+  try {
+    return await document.setFlag(FABRICATE_FLAG_NAMESPACE, normalizeFlagKey(key), value);
+  } catch (err) {
+    return null;
+  }
+}

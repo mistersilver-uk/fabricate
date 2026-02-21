@@ -1,4 +1,4 @@
-// Fabricate v2 Macro: Export Recipes
+// Fabricate Macro: Export Recipes
 // Export all recipes as JSON (copies to clipboard)
 
 const recipes = game.fabricate.getRecipeManager().exportRecipes();
@@ -26,7 +26,8 @@ try {
 
 // Always log to console as backup
 console.log('╔═══════════════════════════════════════════════════════╗');
-console.log('║         FABRICATE v2 - EXPORTED RECIPES               ║');
+console.log('║         Fabricate - EXPORTED RECIPES               ║');
 console.log('╚═══════════════════════════════════════════════════════╝');
 console.log('\nCopy this JSON to share or backup your recipes:\n');
 console.log(json);
+

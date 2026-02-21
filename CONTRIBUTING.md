@@ -1,4 +1,4 @@
-# Contributing to Fabricate v2
+# Contributing to Fabricate
 
 ## Development Workflow
 
@@ -33,3 +33,4 @@ We follow a **spec-driven approach** for development with Agents:
 - **Specs guide testing** – Test scenarios are derived from specifications
 
 This ensures consistency, maintainability, and clear documentation of system behaviour.
+

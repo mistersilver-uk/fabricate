@@ -1,11 +1,11 @@
-# Fabricate v2 - Universal Crafting System
+# Fabricate - Universal Crafting System
 
 A system-agnostic, flexible crafting module for Foundry Virtual Tabletop that supports any tabletop RPG system and any crafting system you can imagine.
 
 ## Features
 
 ### Progressive Complexity
-Fabricate v2 is designed to scale from simple to complex:
+Fabricate is designed to scale from simple to complex:
 
 - **Simple Recipes**: Basic A + B = C crafting for straightforward systems
 - **Catalysts**: Non-consumable tools and workstations
@@ -26,7 +26,7 @@ Works with any game system in Foundry VTT:
 
 1. In Foundry VTT, go to **Add-on Modules**
 2. Click **Install Module**
-3. Search for "Fabricate v2" or paste the manifest URL
+3. Search for "Fabricate" or paste the manifest URL
 4. Click **Install**
 5. Enable the module in your world
 
@@ -201,8 +201,8 @@ Use tags for flexible ingredient matching:
 
 ```javascript
 // First, tag your items
-await item.setFlag('fabricate-v2', 'tags', ['metal', 'metal:iron']);
-await item.setFlag('fabricate-v2', 'tier', 'common');
+await item.setFlag('fabricate', 'tags', ['metal', 'metal:iron']);
+await item.setFlag('fabricate', 'tier', 'common');
 
 // Then create recipes using tags
 const recipe = new Recipe({
@@ -494,8 +494,8 @@ await game.fabricate.getRecipeManager().importRecipes(recipesData, false);
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/misterpotts/fabricate-v2/issues)
-- **Documentation**: [GitHub Wiki](https://github.com/misterpotts/fabricate-v2/wiki)
+- **Issues**: [GitHub Issues](https://github.com/misterpotts/fabricate/issues)
+- **Documentation**: [GitHub Wiki](https://github.com/misterpotts/fabricate/wiki)
 
 ## License
 
@@ -521,7 +521,7 @@ npm run dev      # Build and watch for changes
 ### Project Structure
 
 ```text
-fabricate-v2/
+fabricate/
 |-- src/
 |   |-- main.js                 # Module entry point
 |   |-- models/
@@ -544,3 +544,4 @@ fabricate-v2/
 ## Contributing
 
 Contributions are welcome! Please open an issue or pull request on GitHub.
+

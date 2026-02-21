@@ -467,7 +467,7 @@ export class CraftingEngine {
         system: {}
       };
     } else {
-      console.error(`Fabricate v2 | Result item not found: ${result.itemUuid || result.systemItemId}`);
+      console.error(`Fabricate | Result item not found: ${result.itemUuid || result.systemItemId}`);
       return null;
     }
 
@@ -663,7 +663,7 @@ export class CraftingEngine {
       if (typeof value === 'string' && value.trim()) return value.trim();
       if (typeof value === 'number' && Number.isFinite(value)) return String(value);
     } catch (err) {
-      console.error(`Fabricate v2 | Currency format macro failed (${macroUuid})`, err);
+      console.error(`Fabricate | Currency format macro failed (${macroUuid})`, err);
     }
     return fallback;
   }
@@ -707,7 +707,7 @@ export class CraftingEngine {
         }
         return { valid: true };
       } catch (err) {
-        console.error(`Fabricate v2 | Currency check macro failed (${config.checkCurrencyMacroUuid})`, err);
+        console.error(`Fabricate | Currency check macro failed (${config.checkCurrencyMacroUuid})`, err);
         return { valid: false, message: `Currency check failed: ${err.message || config.checkCurrencyMacroUuid}` };
       }
     }
@@ -765,7 +765,7 @@ export class CraftingEngine {
         }
         return { valid: true };
       } catch (err) {
-        console.error(`Fabricate v2 | Currency decrement macro failed (${config.decrementCurrencyMacroUuid})`, err);
+        console.error(`Fabricate | Currency decrement macro failed (${config.decrementCurrencyMacroUuid})`, err);
         return { valid: false, message: `Currency decrement failed: ${err.message || config.decrementCurrencyMacroUuid}` };
       }
     }
@@ -782,7 +782,7 @@ export class CraftingEngine {
       try {
         await craftingActor.update({ [bucket.path]: next });
       } catch (err) {
-        console.error('Fabricate v2 | Failed to decrement system currency', err);
+        console.error('Fabricate | Failed to decrement system currency', err);
         return { valid: false, message: `Could not spend currency (${formatted}).` };
       }
       return { valid: true };
@@ -850,7 +850,7 @@ export class CraftingEngine {
         step
       });
     } catch (err) {
-      console.error(`Fabricate v2 | Crafting check macro failed (${config.macroUuid})`, err);
+      console.error(`Fabricate | Crafting check macro failed (${config.macroUuid})`, err);
       return {
         success: false,
         outcome: null,
@@ -933,12 +933,12 @@ export class CraftingEngine {
       const updates = await MacroExecutor.run(macroUuid, context);
       if (updates == null) return null;
       if (typeof updates !== 'object' || Array.isArray(updates)) {
-        console.warn(`Fabricate v2 | Property macro ${macroUuid} did not return an object`);
+        console.warn(`Fabricate | Property macro ${macroUuid} did not return an object`);
         return null;
       }
       return updates;
     } catch (err) {
-      console.error(`Fabricate v2 | Property macro failed (${macroUuid})`, err);
+      console.error(`Fabricate | Property macro failed (${macroUuid})`, err);
       ui.notifications.error(`Property macro failed: ${err.message || macroUuid}`);
       return null;
     }
@@ -1020,3 +1020,4 @@ export class CraftingEngine {
     };
   }
 }
+

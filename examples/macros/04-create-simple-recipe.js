@@ -1,4 +1,4 @@
-// Fabricate v2 Macro: Create Simple Recipe
+// Fabricate Macro: Create Simple Recipe
 // Template for creating a basic recipe
 
 // WARNING: EDIT THESE VALUES
@@ -30,3 +30,4 @@ try {
   console.error('[X] Error creating recipe:', err);
   ui.notifications.error(`Failed to create recipe: ${err.message}`);
 }
+

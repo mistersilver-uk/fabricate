@@ -21,7 +21,7 @@ export class FormulaEvaluator {
       // Parse and evaluate the expression safely
       return this._parseExpression(expression);
     } catch (err) {
-      console.error('Fabricate v2 | Formula evaluation error:', err);
+      console.error('Fabricate | Formula evaluation error:', err);
       return 0;
     }
   }
@@ -186,3 +186,4 @@ export class FormulaEvaluator {
     return stack[0] || 0;
   }
 }
+

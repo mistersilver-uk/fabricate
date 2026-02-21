@@ -1,10 +1,10 @@
-// Fabricate v2 Macro: List All Recipes
+// Fabricate Macro: List All Recipes
 // Shows all available recipes in the console
 
 const recipes = fabricate.listRecipes();
 
 console.log('╔═══════════════════════════════════════════════════════╗');
-console.log('║           FABRICATE v2 - ALL RECIPES                 ║');
+console.log('║           Fabricate - ALL RECIPES                 ║');
 console.log('╚═══════════════════════════════════════════════════════╝');
 
 if (recipes.length === 0) {
@@ -25,3 +25,4 @@ if (recipes.length === 0) {
 
   ui.notifications.info(`Found ${recipes.length} recipes (check console F12)`);
 }
+
