@@ -202,11 +202,6 @@ Hooks.once('ready', async () => {
   await fabricate.initialize();
   await fabricate.getCraftingRunManager()?.processWorldTime?.();
 
-  // Notify users
-  if (game.user.isGM) {
-    ui.notifications.info('Fabricate | Crafting system ready');
-  }
-
   addModuleButtonsToItemsDirectory();
 
   Hooks.callAll('fabricate.ready');
