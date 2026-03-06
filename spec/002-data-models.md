@@ -84,16 +84,16 @@ CraftingSystem = {
   },
 
   recipeVisibility: {
-    listMode: "player" | "knowledge",
+    listMode: "global" | "player" | "knowledge",  // default "global"
 
-    // Optional when listMode === "knowledge"
+    // Required only when listMode === "knowledge"; ignored in "global" and "player" modes.
     knowledge?: {
       mode: "item" | "learned" | "itemOrLearned",
 
       item?: {
         limitUses: boolean,
         maxUses?: number,
-        destroyWhenExhausted?: boolean,  
+        destroyWhenExhausted?: boolean,
       },
 
       learn?: {
@@ -128,6 +128,12 @@ CraftingSystem = {
 1. If `features.recipeCategories` is false, `Recipe.category` is ignored at runtime.
 2. If `features.itemTags` is false, tag-based ingredient placeholders are invalid.
 3. `categories` and `itemTags` should be normalized to unique, trimmed strings.
+
+### Recipe Visibility Requirements
+
+1. `listMode` must be one of `"global"`, `"player"`, or `"knowledge"`. Invalid or missing values default to `"global"`.
+2. The `knowledge` sub-object is only meaningful when `listMode === "knowledge"`.
+3. When `listMode === "global"`, all enabled recipes are visible to all users without restriction or knowledge filtering.
 
 ## EssenceDefinition
 
@@ -536,12 +542,12 @@ CraftingRunStepState = {
     availableAt: number, // timestamp when step can complete
     initiatedAt: number, // timestamp when step began
   },
-    
+
   selectedIngredientSetId?: string,
 
   lastCheckResult?: {
     success: boolean,
-    reason: string,   // user-friendly text returned by the macro explaining the result 
+    reason: string,   // user-friendly text returned by the macro explaining the result
     outcome?: string, // tiered mode
     value?: number,   // progressive mode
     data?: object,

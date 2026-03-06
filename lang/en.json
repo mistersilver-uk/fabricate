@@ -74,6 +74,18 @@
       "InProgress": "Crafting in Progress..."
     },
 
+    "Chat": {
+      "CraftSuccess": "Crafting Successful",
+      "CraftFailure": "Crafting Failed",
+      "Actor": "Crafter",
+      "Recipe": "Recipe",
+      "Consumed": "Consumed",
+      "Catalysts": "Catalysts Used",
+      "Results": "Created",
+      "FailureReason": "Reason",
+      "ConsumedOnFailure": "Consumed on Failure"
+    },
+
     "Error": {
       "NoRecipe": "Recipe not found",
       "NoActor": "No actor selected",

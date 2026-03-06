@@ -47,6 +47,21 @@ function createAppHarness() {
   return app;
 }
 
+/**
+ * Build a standard empty evaluateCraftability result for mocks that don't
+ * need specific craftability state.
+ */
+function emptyEvaluation() {
+  return {
+    canCraft: false,
+    satisfiableSet: null,
+    missing: { ingredients: [], essences: [], catalysts: [] },
+    ingredientStates: [],
+    essenceStates: [],
+    catalystStates: []
+  };
+}
+
 test('CraftingApp._onCraft forwards runId and skips confirm when skipConfirm=true', async () => {
   const app = createAppHarness();
   let confirmCalls = 0;
@@ -230,6 +245,14 @@ test('CraftingApp._prepareContext groups active runs by recipe and prefers lates
     getRecipes: () => [recipeA, recipeB],
     getRecipe: (id) => ({ r1: recipeA, r2: recipeB }[id] || null),
     canCraft: () => ({ canCraft: true, satisfiableSet: recipeA.ingredientSets[0] }),
+    evaluateCraftability: () => ({
+      canCraft: true,
+      satisfiableSet: recipeA.ingredientSets[0],
+      missing: { ingredients: [], essences: [], catalysts: [] },
+      ingredientStates: [],
+      essenceStates: [],
+      catalystStates: []
+    }),
     getCatalystsForSet: () => [],
     ingredientMatchesItem: () => false,
     catalystMatchesItem: () => false
@@ -331,7 +354,9 @@ test('CraftingApp._prepareContext does not throw for multi-step recipe with empt
   app._getRecipeManager = () => ({
     getRecipes: () => [multiStepRecipe],
     getRecipe: () => multiStepRecipe,
-    // canCraft returns no satisfiableSet to exercise the empty-ingredientSets code path
+    // evaluateCraftability returns empty result for multi-step recipes with empty ingredientSets
+    evaluateCraftability: () => emptyEvaluation(),
+    // canCraft retained for backward compat; not called by _prepareContext after T-082 fix
     canCraft: () => ({ canCraft: false, satisfiableSet: null }),
     getCatalystsForSet: () => [],
     ingredientMatchesItem: () => false,
@@ -383,6 +408,9 @@ test('CraftingApp._onShowDetails does not throw and renders step ingredient sets
 
   app._getRecipeManager = () => ({
     getRecipe: () => multiStepRecipe,
+    // evaluateCraftability returns empty result for multi-step with empty top-level ingredientSets
+    evaluateCraftability: () => emptyEvaluation(),
+    // canCraft no longer called by _onShowDetails after T-082 fix
     canCraft: () => ({ canCraft: false, satisfiableSet: null }),
     getCatalystsForSet: () => [],
     ingredientMatchesItem: () => false,

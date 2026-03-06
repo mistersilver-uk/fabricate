@@ -244,6 +244,15 @@ export class CraftingEngine {
           consumedCatalysts: degradedCatalysts
         });
       }
+      await this._postCraftChatMessage({
+        success: false,
+        craftingActor,
+        recipe,
+        consumedIngredients: consumedOnFail,
+        catalysts: degradedCatalysts,
+        createdResults: [],
+        failureReason: checkResult.message || 'Crafting check failed'
+      });
       return {
         success: false,
         results: null,
@@ -305,6 +314,15 @@ export class CraftingEngine {
           consumedCatalysts: degradedCatalystsOnValidationFail
         });
       }
+      await this._postCraftChatMessage({
+        success: false,
+        craftingActor,
+        recipe,
+        consumedIngredients: consumedOnValidationFail,
+        catalysts: degradedCatalystsOnValidationFail,
+        createdResults: [],
+        failureReason: message
+      });
       return {
         success: false,
         results: null,
@@ -392,6 +410,15 @@ export class CraftingEngine {
         componentSourceActors
       });
     }
+
+    await this._postCraftChatMessage({
+      success: true,
+      craftingActor,
+      recipe,
+      consumedIngredients: consumedItems,
+      catalysts: catalystValidation.catalysts,
+      createdResults: resultItems
+    });
 
     return {
       success: true,
@@ -1049,6 +1076,98 @@ export class CraftingEngine {
       data: result.data || {},
       message: success ? null : (result.message || 'Crafting check failed')
     };
+  }
+
+
+  /**
+   * Post an automatic crafting summary chat message.
+   *
+   * Checks system.features.chatOutput; returns silently when the toggle is off or
+   * when the crafting system cannot be resolved.  Errors from ChatMessage.create
+   * are caught so they never propagate up the craft() call stack.
+   *
+   * @param {object}  params
+   * @param {boolean} params.success            - Whether the craft succeeded.
+   * @param {object}  params.craftingActor      - The actor performing the craft.
+   * @param {object}  params.recipe             - The recipe being crafted.
+   * @param {Array}   params.consumedIngredients - Array of { item, quantity } entries.
+   * @param {Array}   params.catalysts           - Array of { catalyst, item } entries.
+   * @param {Array}   params.createdResults      - Array of created Item documents (success only).
+   * @param {string}  [params.failureReason]     - Human-readable failure reason (failure only).
+   * @private
+   */
+  async _postCraftChatMessage({ success, craftingActor, recipe, consumedIngredients, catalysts, createdResults, failureReason }) {
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const system = systemManager?.getSystem(recipe?.craftingSystemId);
+    if (!system || system.features?.chatOutput !== true) return;
+
+    const loc = (key) => game.i18n?.localize?.(key) ?? key;
+
+    let content;
+    if (success) {
+      const lines = [`<h3>${loc('FABRICATE.Chat.CraftSuccess')}: ${recipe.name}</h3>`];
+      lines.push(`<p><strong>${loc('FABRICATE.Chat.Actor')}:</strong> ${craftingActor?.name || ''}</p>`);
+
+      if (createdResults && createdResults.length > 0) {
+        lines.push(`<p><strong>${loc('FABRICATE.Chat.Results')}</strong></p><ul>`);
+        for (const item of createdResults) {
+          const qty = Number(item?.system?.quantity || 1);
+          lines.push(`<li>${qty}x ${item?.name || ''}</li>`);
+        }
+        lines.push('</ul>');
+      }
+
+      if (consumedIngredients && consumedIngredients.length > 0) {
+        lines.push(`<p><strong>${loc('FABRICATE.Chat.Consumed')}</strong></p><ul>`);
+        for (const { item, quantity } of consumedIngredients) {
+          lines.push(`<li>${quantity}x ${item?.name || ''}</li>`);
+        }
+        lines.push('</ul>');
+      }
+
+      if (catalysts && catalysts.length > 0) {
+        lines.push(`<p><strong>${loc('FABRICATE.Chat.Catalysts')}</strong></p><ul>`);
+        for (const { item } of catalysts) {
+          lines.push(`<li>${item?.name || ''}</li>`);
+        }
+        lines.push('</ul>');
+      }
+
+      content = lines.join('\n');
+    } else {
+      const lines = [
+        `<h3>${loc('FABRICATE.Chat.CraftFailure')}: ${recipe.name}</h3>`,
+        `<p><strong>${loc('FABRICATE.Chat.Actor')}:</strong> ${craftingActor?.name || ''}</p>`,
+        `<p><strong>${loc('FABRICATE.Chat.FailureReason')}:</strong> ${failureReason || ''}</p>`
+      ];
+
+      const hasConsumed =
+        (consumedIngredients && consumedIngredients.length > 0) ||
+        (catalysts && catalysts.length > 0);
+
+      if (hasConsumed) {
+        lines.push(`<p><strong>${loc('FABRICATE.Chat.ConsumedOnFailure')}</strong></p><ul>`);
+        for (const { item, quantity } of (consumedIngredients || [])) {
+          lines.push(`<li>${quantity}x ${item?.name || ''}</li>`);
+        }
+        for (const { item } of (catalysts || [])) {
+          lines.push(`<li>${item?.name || ''}</li>`);
+        }
+        lines.push('</ul>');
+      }
+
+      content = lines.join('\n');
+    }
+
+    try {
+      await ChatMessage.create({
+        user: game.user?.id,
+        speaker: ChatMessage.getSpeaker({ actor: craftingActor }),
+        content
+      });
+    } catch (err) {
+      console.error('Fabricate | Failed to post crafting chat message:', err);
+    }
   }
 
   async _runPropertyMacro(macroUuid, recipe, craftingActor, result, consumedItems, catalystItems, checkResult = null, step = null) {

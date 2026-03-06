@@ -99,3 +99,4 @@ if (result.success) {
 - [Recipes]({% link recipes/index.md %}) -- ingredient sets, result groups, and all four resolution modes
 - [Macros & Examples]({% link macros/index.md %}) -- ready-to-use macros for common tasks
 - [API Reference]({% link api/index.md %}) -- full developer documentation
+- [Troubleshooting]({% link troubleshooting.md %}) -- solutions for common setup issues

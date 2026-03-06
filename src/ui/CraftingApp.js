@@ -382,34 +382,49 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
       recipes = recipes.filter(r => r.category === this.selectedCategory);
     }
 
-    // Filter by availability if enabled and we have component sources
+    // Evaluate craftability for all recipes using a single unified path.
+    // This evaluation is used for both the showOnlyAvailable filter and
+    // the per-recipe display data, ensuring the craftability badge, button
+    // state, and ingredient/essence/catalyst display states are always
+    // derived from the same computation (fixes T-082).
+    const evaluations = new Map();
+    for (const recipe of recipes) {
+      if (this.componentSourceActors.length > 0) {
+        evaluations.set(recipe.id, recipeManager.evaluateCraftability(this.componentSourceActors, recipe));
+      } else {
+        evaluations.set(recipe.id, {
+          canCraft: false,
+          satisfiableSet: null,
+          missing: { ingredients: [], essences: [], catalysts: [] },
+          ingredientStates: [],
+          essenceStates: [],
+          catalystStates: []
+        });
+      }
+    }
+
+    // Filter by availability if enabled and we have component sources.
+    // Uses the pre-computed evaluation so no second call to canCraft/evaluateCraftability.
     if (this.showOnlyAvailable && this.componentSourceActors.length > 0) {
-      recipes = recipes.filter(r =>
-        (() => {
-          const access = visibilityService
-            ? visibilityService.evaluateRecipeAccess({
-              recipe: r,
-              viewer: game.user,
-              craftingActor: this.craftingActor,
-              componentSourceActors: this.componentSourceActors
-            })
-            : { craftable: true };
-          if (!access.craftable) return false;
-          return recipeManager.canCraft(this.componentSourceActors, r).canCraft;
-        })()
-      );
+      recipes = recipes.filter(r => {
+        const access = visibilityService
+          ? visibilityService.evaluateRecipeAccess({
+            recipe: r,
+            viewer: game.user,
+            craftingActor: this.craftingActor,
+            componentSourceActors: this.componentSourceActors
+          })
+          : { craftable: true };
+        if (!access.craftable) return false;
+        return evaluations.get(r.id)?.canCraft === true;
+      });
     }
 
     // Prepare recipe data for display
     const preparedRecipes = recipes.map(recipe => {
-      let canCraft = false;
-      let satisfiableSet = null;
+      const evaluation = evaluations.get(recipe.id);
+      const canCraft = evaluation?.canCraft ?? false;
 
-      if (this.componentSourceActors.length > 0) {
-        const canCraftCheck = recipeManager.canCraft(this.componentSourceActors, recipe);
-        canCraft = canCraftCheck.canCraft;
-        satisfiableSet = canCraftCheck.satisfiableSet;
-      }
       const access = visibilityService
         ? visibilityService.evaluateRecipeAccess({
           recipe,
@@ -435,18 +450,6 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
         Array.isArray(access.knowledge.matchedItems) &&
         access.knowledge.matchedItems.length > 0;
 
-      // Prepare ingredient set display (show first set or satisfiable set)
-      const displaySet = satisfiableSet
-          || recipe.ingredientSets[0]
-          || recipe.steps?.[0]?.ingredientSets?.[0]
-          || { ingredientGroups: [], ingredients: [], essences: {}, catalysts: [] };
-      const availableItems = this.componentSourceActors.flatMap(actor =>
-        Array.from(actor.items)
-      );
-      const availableEssences = this._accumulateEssences(availableItems);
-
-      const displayCatalysts = recipeManager.getCatalystsForSet(recipe, displaySet);
-
       return {
         id: recipe.id,
         name: recipe.name,
@@ -471,60 +474,11 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
         // This is intentional — the multi-step set switcher UI is not shown for multi-step recipes.
         hasMultipleSets: recipe.ingredientSets.length > 1,
         resultDescription: recipe.getResultDescription(),
-        ingredients: (() => {
-          const groups = Array.isArray(displaySet.ingredientGroups) && displaySet.ingredientGroups.length > 0
-            ? displaySet.ingredientGroups
-            : (displaySet.ingredients || []).map(ingredient => ({ options: [ingredient] }));
-
-          return groups.map(group => {
-            const optionStates = (group.options || []).map(ing => {
-              const matchingItems = availableItems.filter(item =>
-                recipeManager.ingredientMatchesItem(recipe, ing, item)
-              );
-              const totalQty = matchingItems.reduce((sum, item) =>
-                sum + (item.system.quantity || 1), 0
-              );
-              return {
-                description: ing.getDescription(),
-                need: ing.quantity,
-                have: totalQty,
-                satisfied: totalQty >= ing.quantity
-              };
-            });
-
-            const satisfiedOption = optionStates.find(state => state.satisfied) || null;
-            const bestOption = satisfiedOption || [...optionStates]
-              .sort((a, b) => (b.have / Math.max(1, b.need)) - (a.have / Math.max(1, a.need)))[0];
-            return {
-              description: optionStates.map(state => state.description).join(' OR '),
-              need: bestOption?.need || 1,
-              have: bestOption?.have || 0,
-              satisfied: optionStates.some(state => state.satisfied)
-            };
-          });
-        })(),
-        essences: Object.entries(displaySet.essences || {}).map(([type, qty]) => ({
-          type,
-          need: qty,
-          have: availableEssences[type] || 0,
-          satisfied: (availableEssences[type] || 0) >= qty
-        })),
-        catalysts: displayCatalysts.map(cat => {
-          let available = false;
-          for (const actor of this.componentSourceActors) {
-            const matchingItems = actor.items.filter(item =>
-              recipeManager.catalystMatchesItem(recipe, cat, item)
-            );
-            if (matchingItems.length > 0) {
-              available = true;
-              break;
-            }
-          }
-          return {
-            name: cat.name,
-            available
-          };
-        })
+        // ingredientStates, essenceStates, catalystStates come from the unified evaluation.
+        // They are always consistent with canCraft (T-082 fix).
+        ingredients: evaluation?.ingredientStates ?? [],
+        essences: evaluation?.essenceStates ?? [],
+        catalysts: evaluation?.catalystStates ?? []
       };
     });
 
@@ -914,9 +868,19 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
 
     if (!recipe) return;
 
-    const canCraftCheck = this.componentSourceActors.length > 0
-      ? recipeManager.canCraft(this.componentSourceActors, recipe)
-      : { canCraft: false };
+    // Use the unified evaluation path for both craftability and display states.
+    // This ensures the "Craft Now" button and the ingredient status icons are
+    // always derived from the same computation (T-082 fix).
+    const evaluation = this.componentSourceActors.length > 0
+      ? recipeManager.evaluateCraftability(this.componentSourceActors, recipe)
+      : {
+        canCraft: false,
+        satisfiableSet: null,
+        missing: { ingredients: [], essences: [], catalysts: [] },
+        ingredientStates: [],
+        essenceStates: [],
+        catalystStates: []
+      };
 
     // Build detailed content
     let content = `
@@ -929,14 +893,21 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
 
     // Show all ingredient sets.
     // For multi-step recipes, top-level ingredientSets is empty; fall back to iterating steps.
-    const _renderIngredientSet = (ingredientSet, label, availableItems) => {
+    // The ingredient display within each set is rendered directly using the actor's items
+    // so the user can see per-set diagnostic detail. The "Craft Now" button craftability
+    // is controlled by evaluation.canCraft (unified path).
+    const _detailAvailableItems = this.componentSourceActors.flatMap(actor =>
+      Array.from(actor.items)
+    );
+
+    const _renderIngredientSet = (ingredientSet, label) => {
       content += `<h5>${label}</h5><ul>`;
       const groups = Array.isArray(ingredientSet.ingredientGroups) && ingredientSet.ingredientGroups.length > 0
         ? ingredientSet.ingredientGroups
         : (ingredientSet.ingredients || []).map(ingredient => ({ options: [ingredient] }));
       for (const [groupIndex, group] of groups.entries()) {
         const optionParts = (group.options || []).map((ing) => {
-          const matchingItems = availableItems.filter(item =>
+          const matchingItems = _detailAvailableItems.filter(item =>
             recipeManager.ingredientMatchesItem(recipe, ing, item)
           );
           const totalQty = matchingItems.reduce((sum, item) =>
@@ -958,46 +929,29 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
       content += `</ul>`;
     };
 
-    const _detailAvailableItems = this.componentSourceActors.flatMap(actor =>
-      Array.from(actor.items)
-    );
-
     if (recipe.ingredientSets.length > 0) {
       for (const [idx, ingredientSet] of recipe.ingredientSets.entries()) {
-        _renderIngredientSet(ingredientSet, ingredientSet.name || `Option ${idx + 1}`, _detailAvailableItems);
+        _renderIngredientSet(ingredientSet, ingredientSet.name || `Option ${idx + 1}`);
       }
     } else if (Array.isArray(recipe.steps) && recipe.steps.length > 0) {
       // Multi-step recipe: render ingredient sets from each step
       for (const [stepIdx, step] of recipe.steps.entries()) {
         for (const [setIdx, ingredientSet] of (step.ingredientSets || []).entries()) {
           const label = ingredientSet.name || `Step ${stepIdx + 1} — Option ${setIdx + 1}`;
-          _renderIngredientSet(ingredientSet, label, _detailAvailableItems);
+          _renderIngredientSet(ingredientSet, label);
         }
       }
     } else {
       content += `<p><em>No ingredient sets defined.</em></p>`;
     }
 
-    // Catalysts
-    const detailSet = canCraftCheck.satisfiableSet
-        || recipe.ingredientSets[0]
-        || recipe.steps?.[0]?.ingredientSets?.[0]
-        || { ingredientGroups: [], ingredients: [], essences: {}, catalysts: [] };
-    const detailCatalysts = recipeManager.getCatalystsForSet(recipe, detailSet);
+    // Catalysts — use states from the unified evaluation so presence/absence
+    // is determined by the same logic that controls canCraft.
+    const detailCatalysts = evaluation.catalystStates;
     if (detailCatalysts.length > 0) {
       content += `<h4>Catalysts (not consumed):</h4><ul>`;
       for (const cat of detailCatalysts) {
-        let available = false;
-        for (const actor of this.componentSourceActors) {
-          const matchingItems = actor.items.filter(item =>
-            recipeManager.catalystMatchesItem(recipe, cat, item)
-          );
-          if (matchingItems.length > 0) {
-            available = true;
-            break;
-          }
-        }
-        const icon = available ? 'OK' : 'X';
+        const icon = cat.available ? 'OK' : 'X';
         content += `<li>${icon} ${cat.name}</li>`;
       }
       content += `</ul>`;
@@ -1022,7 +976,7 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
     this._renderDialog({
       title: `Recipe: ${recipe.name}`,
       content,
-      buttons: canCraftCheck.canCraft ? {
+      buttons: evaluation.canCraft ? {
         craft: {
           icon: '<i class="fas fa-hammer"></i>',
           label: 'Craft Now',
@@ -1051,4 +1005,3 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
     return app;
   }
 }
-

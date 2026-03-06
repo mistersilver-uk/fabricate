@@ -115,7 +115,8 @@ export class CraftingSystemManager {
       craftingChecks: has('craftingChecks') ? features.craftingChecks === true : false,
       outcomeRouting: has('outcomeRouting') ? features.outcomeRouting === true : false,
       effectTransfer: has('effectTransfer') ? features.effectTransfer === true : false,
-      salvage: has('salvage') ? features.salvage === true : false
+      salvage: has('salvage') ? features.salvage === true : false,
+      chatOutput: has('chatOutput') ? features.chatOutput === true : true
     };
   }
 

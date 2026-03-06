@@ -79,11 +79,12 @@ Mode semantics are defined in `004`.
 
 #### Recipe Visibility Controls
 
-- `listMode` selector
-- `knowledge.mode` selector (when applicable)
-- `item.limitUses` and `item.maxUses` (when applicable)
-- `learn.consumeOnLearn` (when applicable)
+- `listMode` selector with options: `global`, `player`, `knowledge`
+- `knowledge.mode` selector (only shown when `listMode === "knowledge"`)
+- `item.limitUses` and `item.maxUses` (only shown when `listMode === "knowledge"` and item mode is active)
+- `learn.consumeOnLearn` (only shown when `listMode === "knowledge"` and learned mode is active)
 
+When `listMode === "global"`, no per-recipe player allow-list controls are shown.
 Visibility and learning semantics are defined in `006`.
 
 ### Items Tab
@@ -115,7 +116,7 @@ Columns:
 
 - Name
 - Locked
-- Visibility summary (player list mode only)
+- Visibility summary (player and knowledge list modes only; hidden in global mode)
 - Category (if enabled)
 - Step count (if multistep enabled)
 - Last modified (optional)
@@ -139,6 +140,11 @@ Scoped to a single crafting system.
 - Locked toggle
 
 ### Visibility Form
+
+If `listMode === "global"`:
+
+- No per-recipe visibility controls shown.
+- Restricted visibility toggle and allowed users multiselect are hidden.
 
 If `listMode === "player"`:
 

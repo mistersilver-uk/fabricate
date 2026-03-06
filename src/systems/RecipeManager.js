@@ -200,7 +200,267 @@ export class RecipeManager {
   }
 
   /**
-   * Check if a recipe can be crafted with items from the given component source actors
+   * Evaluate whether a recipe can be crafted, returning a single unified result
+   * that is the sole source of truth for both the craftability boolean and the
+   * per-ingredient/essence/catalyst display states.
+   *
+   * This eliminates the divergent computation paths that caused the false
+   * "Cannot Craft" status (T-082): previously canCraft() and the UI display loop
+   * each walked the items independently, leading to inconsistent results when
+   * shared items were involved.
+   *
+   * @param {Actor[]} componentSourceActors - Actors to pull ingredients from
+   * @param {Recipe} recipe - The recipe to evaluate
+   * @returns {{
+   *   canCraft: boolean,
+   *   satisfiableSet: IngredientSet|null,
+   *   missing: { ingredients: Array, essences: Array, catalysts: Array },
+   *   ingredientStates: Array<{ description: string, need: number, have: number, satisfied: boolean }>,
+   *   essenceStates: Array<{ type: string, need: number, have: number, satisfied: boolean }>,
+   *   catalystStates: Array<{ name: string, available: boolean }>
+   * }}
+   */
+  evaluateCraftability(componentSourceActors, recipe) {
+    if (!Array.isArray(componentSourceActors)) {
+      componentSourceActors = componentSourceActors ? [componentSourceActors] : [];
+    }
+
+    const emptyResult = {
+      canCraft: false,
+      satisfiableSet: null,
+      missing: { ingredients: [], essences: [], catalysts: [] },
+      ingredientStates: [],
+      essenceStates: [],
+      catalystStates: []
+    };
+
+    if (componentSourceActors.length === 0) {
+      return emptyResult;
+    }
+
+    // Guard against multi-step recipes where ingredientSets is empty.
+    if (recipe.ingredientSets.length === 0) {
+      return emptyResult;
+    }
+
+    // Aggregate all items from component source actors once.
+    const availableItems = componentSourceActors.flatMap(actor =>
+      Array.from(actor.items)
+    );
+
+    const features = this._getSystemFeatures(recipe);
+
+    // Attempt to find a satisfiable ingredient set.
+    // We capture both the satisfiable set (if any) and the first-set result for
+    // the fallback display path.
+    let satisfiableSet = null;
+    let satisfiableSetSelection = null;
+
+    // Also keep the first-set selection for the "unsatisfied" display fallback.
+    let firstSetSelection = null;
+    let firstSet = recipe.ingredientSets[0];
+
+    for (const ingredientSet of recipe.ingredientSets) {
+      const selection = typeof ingredientSet.resolveIngredientSelection === 'function'
+        ? ingredientSet.resolveIngredientSelection(
+          availableItems,
+          (ingredient, item) => this.ingredientMatchesItem(recipe, ingredient, item)
+        )
+        : { success: true, missingGroups: [], selectedIngredients: [], plan: [] };
+
+      // Track the first set's selection for the unsatisfied fallback display.
+      if (firstSetSelection === null) {
+        firstSetSelection = selection;
+      }
+
+      // Check essences for this set.
+      let essencesMet = true;
+      if (features.enableEssences && Object.keys(ingredientSet.essences || {}).length > 0) {
+        const accumulatedEssences = this._accumulateEssences(availableItems);
+        for (const [essenceType, requiredQty] of Object.entries(ingredientSet.essences)) {
+          if ((accumulatedEssences[essenceType] || 0) < requiredQty) {
+            essencesMet = false;
+            break;
+          }
+        }
+      }
+
+      if (selection.success && essencesMet) {
+        satisfiableSet = ingredientSet;
+        satisfiableSetSelection = selection;
+        break;
+      }
+    }
+
+    // Build catalyst states using the satisfiable set (or first set as fallback).
+    const displaySet = satisfiableSet || firstSet;
+    const catalystsForSet = this.getCatalystsForSet(recipe, displaySet);
+    const catalystStates = catalystsForSet.map(cat => {
+      let available = false;
+      for (const actor of componentSourceActors) {
+        const actorItems = Array.from(actor?.items ?? []);
+        if (actorItems.filter(item => this._catalystMatchesItem(recipe, cat, item)).length > 0) {
+          available = true;
+          break;
+        }
+      }
+      return { name: cat.name, available };
+    });
+    const missingCatalysts = catalystsForSet.filter((_cat, idx) => !catalystStates[idx].available);
+
+    // Final craftability: ingredients satisfied AND catalysts present.
+    const canCraft = satisfiableSet !== null && missingCatalysts.length === 0;
+
+    // Build ingredient display states from the selection result that matches
+    // the craftability decision — ensuring they are always consistent.
+    //
+    // If craftable: use satisfiableSetSelection (all groups satisfied).
+    // If not craftable: use firstSetSelection (shows what is missing from set 0).
+    const displaySelection = canCraft ? satisfiableSetSelection : firstSetSelection;
+    const displayIngredientSet = canCraft ? satisfiableSet : firstSet;
+
+    const ingredientStates = this._buildIngredientStates(
+      recipe, displayIngredientSet, displaySelection, availableItems
+    );
+
+    // Build essence states from the display set.
+    const essenceStates = this._buildEssenceStates(recipe, displayIngredientSet, availableItems, features);
+
+    // Build the missing object (for backward compatibility with canCraft() callers).
+    const missingIngredients = [];
+    for (const groupMissing of (displaySelection?.missingGroups || [])) {
+      const ingredient = groupMissing?.ingredient || groupMissing?.group?.options?.[0] || null;
+      if (!ingredient) continue;
+      missingIngredients.push({
+        ingredient,
+        have: Number(groupMissing.have || 0),
+        need: Number(groupMissing.need || ingredient.quantity || 1)
+      });
+    }
+    const missingEssences = essenceStates.filter(s => !s.satisfied).map(s => ({
+      type: s.type,
+      have: s.have,
+      need: s.need
+    }));
+
+    return {
+      canCraft,
+      satisfiableSet: canCraft ? satisfiableSet : null,
+      missing: {
+        ingredients: canCraft ? [] : missingIngredients,
+        essences: canCraft ? [] : missingEssences,
+        catalysts: missingCatalysts
+      },
+      ingredientStates,
+      essenceStates,
+      catalystStates
+    };
+  }
+
+  /**
+   * Derive per-group ingredient display states from a resolved selection result.
+   * The states are derived from the SAME selection result that determined craftability,
+   * so they are always consistent with the canCraft boolean.
+   *
+   * @param {Recipe} recipe
+   * @param {IngredientSet} ingredientSet
+   * @param {Object} selection - result from resolveIngredientSelection
+   * @param {Item[]} availableItems
+   * @returns {Array<{ description: string, need: number, have: number, satisfied: boolean }>}
+   * @private
+   */
+  _buildIngredientStates(recipe, ingredientSet, selection, availableItems) {
+    if (!ingredientSet) return [];
+
+    const groups = Array.isArray(ingredientSet.ingredientGroups) && ingredientSet.ingredientGroups.length > 0
+      ? ingredientSet.ingredientGroups
+      : (ingredientSet.ingredients || []).map(ingredient => ({ options: [ingredient] }));
+
+    // Build a set of missing group IDs for O(1) lookup.
+    const missingGroupIds = new Set(
+      (selection?.missingGroups || []).map(mg => mg?.group?.id).filter(Boolean)
+    );
+
+    return groups.map(group => {
+      const options = group.options || [];
+
+      // Check whether any option in this group is satisfied.
+      // We use the selectedIngredients from the selection to determine which option was chosen,
+      // then compute have/need from the actual available items using the same matcher.
+      //
+      // For missing groups, report the best-effort have/need from the missingGroups data.
+      const isMissing = missingGroupIds.has(group.id);
+
+      if (isMissing) {
+        // Find this group's missing data.
+        const missingEntry = (selection?.missingGroups || []).find(mg => mg?.group?.id === group.id);
+        const ingredient = missingEntry?.ingredient || options[0] || null;
+        const description = ingredient?.getDescription?.() || options.map(o => o?.getDescription?.() || '').join(' OR ');
+        return {
+          description,
+          need: Number(missingEntry?.need || ingredient?.quantity || 1),
+          have: Number(missingEntry?.have || 0),
+          satisfied: false
+        };
+      }
+
+      // This group is satisfied — find which option was selected.
+      // The selectedIngredients array holds the chosen option objects in group order.
+      // We match by position: selected options appear in the same order as groups
+      // (groups are iterated in order; selectedIngredients are appended in order).
+      //
+      // To avoid positional assumptions we instead compute have/need for each option
+      // using the availableItems (no remaining-quantity deduction here — we only need
+      // display values, and the group is already known to be satisfied).
+      const optionStates = options.map(ing => {
+        const matchingItems = availableItems.filter(item =>
+          this.ingredientMatchesItem(recipe, ing, item)
+        );
+        const totalQty = matchingItems.reduce((sum, item) => sum + (item.system?.quantity || 1), 0);
+        return {
+          description: ing.getDescription?.() || '',
+          need: ing.quantity,
+          have: totalQty,
+          satisfied: totalQty >= ing.quantity
+        };
+      });
+
+      const satisfiedOption = optionStates.find(s => s.satisfied) || optionStates[0];
+      return {
+        description: optionStates.map(s => s.description).join(' OR '),
+        need: satisfiedOption?.need || 1,
+        have: satisfiedOption?.have || 0,
+        satisfied: true
+      };
+    });
+  }
+
+  /**
+   * Build essence display states for the given ingredient set.
+   * @param {Recipe} recipe
+   * @param {IngredientSet} ingredientSet
+   * @param {Item[]} availableItems
+   * @param {{ enableEssences: boolean }} features
+   * @returns {Array<{ type: string, need: number, have: number, satisfied: boolean }>}
+   * @private
+   */
+  _buildEssenceStates(recipe, ingredientSet, availableItems, features) {
+    if (!ingredientSet || !features.enableEssences) return [];
+    const essences = ingredientSet.essences || {};
+    if (Object.keys(essences).length === 0) return [];
+
+    const accumulatedEssences = this._accumulateEssences(availableItems);
+    return Object.entries(essences).map(([type, need]) => {
+      const have = accumulatedEssences[type] || 0;
+      return { type, need, have, satisfied: have >= need };
+    });
+  }
+
+  /**
+   * Check if a recipe can be crafted with items from the given component source actors.
+   * This is a thin wrapper around evaluateCraftability() that returns only the
+   * backward-compatible subset: { canCraft, satisfiableSet, missing }.
+   *
    * @param {Actor[]} componentSourceActors - Actors to pull ingredients from
    * @param {Recipe} recipe - The recipe to check
    * @returns {{canCraft: boolean, satisfiableSet: IngredientSet|null, missing: Object}}
@@ -210,7 +470,7 @@ export class RecipeManager {
       componentSourceActors = componentSourceActors ? [componentSourceActors] : [];
     }
 
-    if (!Array.isArray(componentSourceActors) || componentSourceActors.length === 0) {
+    if (componentSourceActors.length === 0) {
       return {
         canCraft: false,
         satisfiableSet: null,
@@ -218,65 +478,8 @@ export class RecipeManager {
       };
     }
 
-    // Aggregate all items from component source actors
-    const availableItems = componentSourceActors.flatMap(actor =>
-      Array.from(actor.items)
-    );
-
-    // Check if ANY ingredient set can be satisfied
-    for (const ingredientSet of recipe.ingredientSets) {
-      const missing = this._checkIngredientSet(recipe, ingredientSet, availableItems);
-      const catalystsForSet = this.getCatalystsForSet(recipe, ingredientSet);
-
-      if (missing.ingredients.length === 0 && missing.essences.length === 0) {
-        // This ingredient set is fully satisfied
-        // Now check catalysts (catalysts are checked across all source actors)
-        const catalystMissing = this._checkCatalysts(recipe, catalystsForSet, componentSourceActors);
-
-        if (catalystMissing.length === 0) {
-          return {
-            canCraft: true,
-            satisfiableSet: ingredientSet,
-            missing: { ingredients: [], essences: [], catalysts: [] }
-          };
-        } else {
-          return {
-            canCraft: false,
-            satisfiableSet: null,
-            missing: {
-              ingredients: [],
-              essences: [],
-              catalysts: catalystMissing
-            }
-          };
-        }
-      }
-    }
-
-    // No ingredient set can be satisfied.
-    // Guard against multi-step recipes where ingredientSets is empty (sets live inside steps).
-    if (recipe.ingredientSets.length === 0) {
-      return {
-        canCraft: false,
-        satisfiableSet: null,
-        missing: { ingredients: [], essences: [], catalysts: [] }
-      };
-    }
-
-    // Return missing details from the first set so the UI can show what is lacking
-    const firstSetMissing = this._checkIngredientSet(recipe, recipe.ingredientSets[0], availableItems);
-    const firstSetCatalysts = this.getCatalystsForSet(recipe, recipe.ingredientSets[0]);
-    const catalystMissing = this._checkCatalysts(recipe, firstSetCatalysts, componentSourceActors);
-
-    return {
-      canCraft: false,
-      satisfiableSet: null,
-      missing: {
-        ingredients: firstSetMissing.ingredients,
-        essences: firstSetMissing.essences,
-        catalysts: catalystMissing
-      }
-    };
+    const { canCraft, satisfiableSet, missing } = this.evaluateCraftability(componentSourceActors, recipe);
+    return { canCraft, satisfiableSet, missing };
   }
 
   /**
@@ -344,7 +547,8 @@ export class RecipeManager {
       let found = false;
 
       for (const actor of actors) {
-        const matchingItems = actor.items.filter(item => this._catalystMatchesItem(recipe, catalyst, item));
+        const actorItems = Array.from(actor?.items ?? []);
+        const matchingItems = actorItems.filter(item => this._catalystMatchesItem(recipe, catalyst, item));
         if (matchingItems.length > 0) {
           found = true;
           break;
@@ -728,4 +932,3 @@ export class RecipeManager {
     }
   }
 }
-

@@ -56,7 +56,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
   6. Backward compatibility is preserved for existing macro-based systems.
 
 ### T-056 - Add Automatic Crafting Chat Output
-- Status: `todo`
+- Status: `done`
 - Description: Post automatic chat summaries for crafting attempts so results are visible to the table without requiring custom success/failure macros.
 - Acceptance Criteria:
   1. A system-level toggle controls automatic chat output and defaults to `enabled`.
@@ -146,7 +146,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
 ## Spec Alignment Tasks
 
 ### T-064 - Spec 002: Add `global` Recipe Visibility List Mode and Default
-- Status: `todo`
+- Status: `done`
 - Description: Update the data-model spec so `CraftingSystem.recipeVisibility.listMode` includes `global` and explicitly defaults to `global`. This aligns the spec with implemented normalization and UI behavior.
 - Acceptance Criteria:
   1. `spec/002-data-models.md` defines `listMode` as `"global" | "player" | "knowledge"`.
@@ -325,7 +325,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
   6. Terminology used in intros is consistent with field names and behavior described later in each page.
 
 ### T-081 - Create `docs/troubleshooting.md` for Common Failure Modes
-- Status: `todo`
+- Status: `done`
 - Description: Add a troubleshooting guide for predictable setup/runtime issues based on existing validation behavior and known support pain points. Provide symptom-first entries with concrete checks and links to corrective documentation.
 - Acceptance Criteria:
   1. A new `docs/troubleshooting.md` page exists with navigation/front matter and is linked from docs home and quickstart follow-up navigation.

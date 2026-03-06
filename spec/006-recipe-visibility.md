@@ -43,13 +43,16 @@ A candidate owned item matches `Recipe.linkedRecipeItemUuid` when either is true
 Given `viewer`, `craftingSystem`, optional `craftingActor`, optional `componentSourceActors`:
 
 1. Collect recipes in `craftingSystem`.
-2. If `listMode === "player"`:
+2. If `listMode === "global"`:
+   - GM sees all recipes.
+   - Non-GM sees all enabled recipes. No restriction or knowledge filtering is applied.
+3. If `listMode === "player"`:
    - GM sees all recipes.
    - Non-GM sees recipes where `visibility.restricted === false` or `allowedUserIds` includes viewer ID.
-3. If `listMode === "knowledge"`:
+4. If `listMode === "knowledge"`:
    - Evaluate knowledge access for each recipe.
    - Keep only recipes where access is granted.
-4. Keep locked recipes visible but not craftable for non-GMs.
+5. Keep locked recipes visible but not craftable for non-GMs.
 
 ### Crafting Guard Algorithm
 
@@ -156,7 +159,7 @@ If `linkedRecipeItemUuid` no longer resolves to a template:
 
 ## Testing Requirements
 
-- Unit tests for listing behaviour in `player` and `knowledge` list modes.
+- Unit tests for listing behaviour in `global`, `player`, and `knowledge` list modes.
 - Unit tests for matching by UUID and by `core.sourceId`.
 - Unit tests for limited-use exhaustion and deterministic matched-item selection.
 - Unit tests for learning with and without consume-on-learn.

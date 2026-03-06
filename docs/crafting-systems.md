@@ -27,7 +27,7 @@ Open the GM admin panel (**Manage Crafting Systems** in the Items sidebar) and c
 
 ### Feature Toggles
 
-Each system can independently enable or disable features. All features default to `false` and must be explicitly enabled by a GM.
+Each system can independently enable or disable features. Most features default to `false` and must be explicitly enabled by a GM. The exception is `chatOutput`, which defaults to `true`.
 
 | Feature | Default | Description |
 |:--------|:--------|:------------|
@@ -38,11 +38,44 @@ Each system can independently enable or disable features. All features default t
 | `effectTransfer` | `false` | Transfer active effects from essence source items to crafted results |
 | `multiStepRecipes` | `false` | Allow recipes with multiple sequential steps |
 | `salvage` | `false` | Allow components to be broken down into constituent parts |
+| `chatOutput` | `true` | Automatically post a chat message summarising crafting results after each craft action |
 
 Toggle features in the **Features** card on the System tab of the Crafting Admin panel. Each toggle takes effect immediately for all future crafting attempts in that system.
 
 {: .warning }
 > Changing the **resolution mode** is a destructive operation. All recipes in the system will be deleted because they may be invalid under the new mode. You will be asked to confirm.
+
+### Chat Output
+
+When `chatOutput` is enabled (the default), Fabricate automatically posts a chat message to the table after every craft action. This means your players can see crafting results without you needing to write custom success or failure macros.
+
+**Success messages** include:
+- Crafter name (the actor who performed the craft)
+- Recipe name
+- Items created, with quantities
+- Ingredients consumed, with quantities
+- Catalysts used
+
+**Failure messages** include:
+- Crafter name
+- Recipe name
+- Failure reason
+- Any ingredients or catalysts consumed as part of the failure policy
+
+Chat messages appear as if spoken by the crafting actor, using `ChatMessage.getSpeaker({ actor })`.
+
+**When chat output does not fire.** Chat messages are only posted for craft attempts that reach the engine's resolution step. Early validation failures — missing actor, missing ingredients, missing catalysts, invalid recipe configuration — do not post a chat message, because the craft never started.
+
+**Avoiding duplicate output.** If you have custom success or failure macros that already post chat results, disable `chatOutput` for that system to prevent double messages:
+
+```javascript
+Hooks.once('fabricate.ready', async () => {
+  const mgr = game.fabricate.getCraftingSystemManager();
+  await mgr.updateSystem('alchemy-system-id', {
+    features: { chatOutput: false }
+  });
+});
+```
 
 ### Crafting Checks
 
