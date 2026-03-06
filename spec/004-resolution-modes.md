@@ -75,13 +75,13 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
 
 - Exactly one ingredient set and one result group.
 - The result order is meaningful.
-- Each result references a `SystemItem` with `difficulty >= 1`.
+- Each result references a `Component` with `difficulty >= 1`.
 - Check is mandatory and returns numeric `value`.
 - Awarding evaluates ordered results using `awardMode`.
 
 ### Award Modes
 
-Let `remaining = check.value` and `cost = result.systemItem.difficulty`.
+Let `remaining = check.value` and `cost = result.component.difficulty`.
 
 - `equal`: award result when `remaining >= cost`; then `remaining -= cost`.
 - `exceed`: award result when `remaining > cost`; then `remaining -= cost`.
@@ -100,7 +100,7 @@ Let `remaining = check.value` and `cost = result.systemItem.difficulty`.
 - Exactly one `IngredientSet`.
 - Exactly one `ResultGroup`.
 - The result group contains ordered results.
-- Every referenced `SystemItem` has `difficulty >= 1`.
+- Every referenced `Component` has `difficulty >= 1`.
 - `CraftingSystem.craftingCheck.enabled` must be true.
 - `CraftingSystem.craftingCheck.progressive` must exist.
 - Check macro must return progressive check contract with numeric `value`.

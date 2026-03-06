@@ -32,6 +32,7 @@ CraftingSystem = {
     propertyMacros: boolean,
     effectTransfer: boolean,
     multiStepRecipes: boolean,
+    salvage: boolean, // default false
   },
 
   categories: string[],
@@ -40,7 +41,26 @@ CraftingSystem = {
   // Present only when features.essences is true.
   essences?: Record<string, EssenceDefinition>,
 
-  managedItems: SystemItem[],
+  components: Component[],
+
+  // Present only when features.salvage is true.
+  salvageResolutionMode: "simple" | "tiered" | "progressive",
+
+  salvageCraftingCheck: {
+    enabled: boolean,
+    macroUuid?: string,
+    successMacroUuid?: string,
+    failureMacroUuid?: string,
+    consumption: {
+      consumeComponentOnFail: boolean,  // default true
+      consumeCatalystsOnFail: boolean,  // default false
+    },
+    outcomes?: string[],               // tiered mode
+    progressive?: {
+      awardMode: "partial" | "equal" | "exceed",
+      allowPlayerReorder: boolean,
+    },
+  },
 
   craftingCheck: {
     enabled: boolean,
@@ -113,7 +133,7 @@ CraftingSystem = {
 
 ### Purpose
 
-Define one essence type used by system items and recipe requirements.
+Define one essence type used by components and recipe requirements.
 
 ### Properties
 
@@ -127,22 +147,32 @@ EssenceDefinition = {
 }
 ```
 
-## SystemItem
+## Component
 
 ### Purpose
 
-Represent one curated item entry available to recipes.
+Represent one curated item entry available to recipes and salvage operations.
 
 ### Properties
 
 ```js
-SystemItem = {
+Component = {
   id: string,
   name: string,
   sourceItemUuid: string | null,
   tags: string[],
   essences: { [essenceId: string]: number },
   difficulty?: number, // only used in progressive mode
+
+  salvage?: {
+    enabled: boolean,              // default false
+    ingredientQuantity: number,    // default 1
+    catalysts: Catalyst[],
+    resultGroups: ResultGroup[],
+    outcomeRouting?: { [outcome: string]: string },  // tiered only
+    timeRequirement?: TimeRequirement,
+    currencyRequirement?: CurrencyRequirement,
+  },
 }
 ```
 
@@ -151,6 +181,10 @@ SystemItem = {
 1. `difficulty` is only used in progressive mode.
 2. If set, `difficulty` must be an integer >= 1.
 3. Each essence key must exist in `CraftingSystem.essences` when essences are enabled.
+4. `salvage` is only valid when `CraftingSystem.features.salvage` is true.
+5. When `salvage.enabled` is true, `salvage.resultGroups` must contain at least one result group.
+6. `salvage.outcomeRouting` is only valid when `salvageResolutionMode` is `"tiered"`.
+7. `salvage.ingredientQuantity` must be a positive integer.
 
 ## Recipe
 
@@ -355,10 +389,10 @@ Ingredient = {
   extractEffects: boolean,
 
   match: {
-    type: "systemItem" | "tags",
+    type: "component" | "tags",
 
-    // type = "systemItem"
-    systemItemId?: string,
+    // type = "component"
+    componentId?: string,
 
     // type = "tags"
     tags?: string[],
@@ -371,7 +405,7 @@ Ingredient = {
 
 1. `quantity` must be positive.
 2. `match.type` is required.
-3. If `match.type === "systemItem"`, `match.systemItemId` is required.
+3. If `match.type === "component"`, `match.componentId` is required.
 4. If `match.type === "tags"`, `match.tags` must contain one or more tag IDs.
 5. Tag IDs in `match.tags` must exist in `CraftingSystem.itemTags`.
 6. When `features.itemTags` is true, tag placeholder ingredients are valid in all resolution modes, including `simple`.
@@ -386,7 +420,7 @@ Represent one non-consumable catalyst requirement.
 
 ```js
 Catalyst = {
-  systemItemId: string,
+  componentId: string,
   degradesOnUse: boolean,
   destroyWhenExhausted: boolean,
   maxUses: number | null,
@@ -397,7 +431,7 @@ Catalyst = {
 
 If present in the specification for a recipe, step, or ingredient set a catalyst is always required.
 
-1. `systemItemId` is required.
+1. `componentId` is required.
 2. If `degradesOnUse` is true, catalyst usage must be tracked on the owned item instance.
 
 ## ResultGroup
@@ -427,7 +461,7 @@ Represent one produced item.
 ```js
 Result = {
   id: string,
-  systemItemId: string,
+  componentId: string,
   quantity: number,
   propertyMacroUuid: string | null,
 }
@@ -435,7 +469,7 @@ Result = {
 
 ### Requirements
 
-1. `systemItemId` is required.
+1. `componentId` is required.
 2. `quantity` must be positive.
 3. `propertyMacroUuid` is only valid when `features.propertyMacros` is true.
 

@@ -1,173 +1,126 @@
 /**
- * Represents a catalyst (non-consumable component) required for crafting
- * Examples: forge, alchemy lab, specific tools
+ * Represents a catalyst (non-consumable component) required for crafting.
+ *
+ * Spec contract (002-data-models.md):
+ *   componentId:        string        - required managed item reference
+ *   degradesOnUse:      boolean       - whether usage is tracked on the owned item
+ *   destroyWhenExhausted: boolean     - destroy the item when timesUsed >= maxUses
+ *   maxUses:            number | null - null means unlimited
+ *
+ * Usage tracking is stored on the owned item instance via:
+ *   Item.flags.fabricate.catalystItemUsage = { timesUsed: number }
+ *
+ * Legacy fields removed in T-002:
+ *   mustBeEquipped, proximityRequired, qualityBonus, durabilityAttribute,
+ *   degradeAmount, proximityDistance, qualityAttribute, itemUuid, tag,
+ *   name, required, mustBeInInventory
  */
 import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
 
 export class Catalyst {
   constructor(data = {}) {
-    // Managed item reference inside a crafting system
-    this.systemItemId = data.systemItemId || null;
+    /** @type {string|null} Managed item reference inside a crafting system */
+    this.componentId = data.componentId || data.systemItemId || null;
 
-    // Catalyst identification by Foundry Source UUID (core.sourceId flag)
-    this.itemUuid = data.itemUuid || null;
-    this.tag = data.tag || null; // Tag-based matching (e.g., "tool:forge")
-    this.name = data.name || 'Unknown Catalyst';
+    /** @type {boolean} Whether catalyst usage is tracked per owned item instance */
+    this.degradesOnUse = data.degradesOnUse === true;
 
-    // Catalyst settings
-    this.required = data.required !== undefined ? data.required : true;
-    this.mustBeEquipped = data.mustBeEquipped || false;
-    this.mustBeInInventory = data.mustBeInInventory !== undefined ? data.mustBeInInventory : true;
-    this.proximityRequired = data.proximityRequired || false; // For placed items like forges
-    this.proximityDistance = data.proximityDistance || 5; // In grid units
+    /** @type {boolean} Destroy the owned item when timesUsed >= maxUses */
+    this.destroyWhenExhausted = data.destroyWhenExhausted === true;
 
-    // Durability (optional)
-    this.degradesOnUse = data.degradesOnUse || false;
-    this.degradeAmount = data.degradeAmount || 1;
-    this.durabilityAttribute = data.durabilityAttribute || 'system.durability'; // Path to durability value
-    this.maxUses = Number.isFinite(Number(data.maxUses)) ? Number(data.maxUses) : null;
-
-    // Quality affects output (optional)
-    this.qualityBonus = data.qualityBonus || false;
-    this.qualityAttribute = data.qualityAttribute || 'system.quality';
+    /** @type {number|null} Maximum uses before the catalyst is exhausted; null = unlimited */
+    this.maxUses = Number.isFinite(Number(data.maxUses)) && data.maxUses !== null
+      ? Number(data.maxUses)
+      : null;
   }
 
   /**
-   * Check if a given item matches this catalyst requirement
-   * @param {Item} item - The Foundry Item to check
-   * @returns {boolean}
+   * Validate the Catalyst against the spec contract.
+   * @returns {{ valid: boolean, errors: string[] }}
    */
-  matches(item) {
-    // Exact match by UUID
-    if (this.itemUuid && item.uuid === this.itemUuid) return true;
+  validate() {
+    const errors = [];
 
-    // Tag-based matching
-    if (this.tag) {
-      const itemTags = getFabricateFlag(item, 'tags', []);
-      return itemTags.includes(this.tag);
+    if (!this.componentId) {
+      errors.push('componentId is required');
     }
 
-    return false;
-  }
-
-  /**
-   * Validate that the catalyst is available for the given actor
-   * @param {Actor} actor - The actor attempting to craft
-   * @param {Scene} scene - The current scene (for proximity checks)
-   * @returns {{valid: boolean, message: string}}
-   */
-  async validate(actor, scene = null) {
-    const items = actor.items.filter(item => this.matches(item));
-
-    if (items.length === 0) {
-      return { valid: false, message: `Missing required catalyst: ${this.name}` };
-    }
-
-    const item = items[0];
-
-    return this.validateItem(item, scene);
-  }
-
-  /**
-   * Validate a specific catalyst item instance
-   * @param {Item} item - The catalyst item
-   * @param {Scene} scene - Optional scene for proximity checks
-   * @returns {{valid: boolean, message: string, item?: Item}}
-   */
-  async validateItem(item, scene = null) {
-    if (!item) {
-      return { valid: false, message: `Missing required catalyst: ${this.name}` };
-    }
-
-    // Check if must be equipped
-    if (this.mustBeEquipped) {
-      const isEquipped = item.system.equipped === true;
-      if (!isEquipped) {
-        return { valid: false, message: `${this.name} must be equipped` };
+    if (this.degradesOnUse) {
+      if (this.maxUses !== null && (!Number.isInteger(this.maxUses) || this.maxUses < 1)) {
+        errors.push('maxUses must be a positive integer or null when degradesOnUse is enabled');
       }
     }
 
-    // Check proximity for placed items
-    if (this.proximityRequired && scene) {
-      // This would need actual implementation based on Foundry's token system
-      // For now, we'll assume it's valid
-      // TODO: Implement proximity checking for placed catalyst items
-    }
-
-    // Check durability if applicable
-    if (this.degradesOnUse && Number.isFinite(this.maxUses)) {
-      const used = getFabricateFlag(item, 'catalystUses', 0);
-      if (Number(used || 0) >= this.maxUses) {
-        return { valid: false, message: `${this.name} has no uses remaining` };
-      }
-    }
-
-    if (this.degradesOnUse && this.durabilityAttribute) {
-      const durability = foundry.utils.getProperty(item, this.durabilityAttribute);
-      if (durability !== undefined && durability <= 0) {
-        return { valid: false, message: `${this.name} is broken and cannot be used` };
-      }
-    }
-
-    return { valid: true, item };
+    return { valid: errors.length === 0, errors };
   }
 
   /**
-   * Apply degradation to the catalyst after use
-   * @param {Item} item - The catalyst item to degrade
+   * Serialize to a plain JSON-safe object containing only spec-defined fields.
+   * Emits both componentId (primary) and systemItemId (transitional alias).
+   * @returns {{ componentId: string|null, systemItemId: string|null, degradesOnUse: boolean, destroyWhenExhausted: boolean, maxUses: number|null }}
+   */
+  toJSON() {
+    return {
+      componentId: this.componentId,
+      systemItemId: this.componentId,
+      degradesOnUse: this.degradesOnUse,
+      destroyWhenExhausted: this.destroyWhenExhausted,
+      maxUses: this.maxUses,
+    };
+  }
+
+  /**
+   * Deserialize from a plain object.
+   * Unrecognised (legacy) fields are silently ignored.
+   * @param {object} data
+   * @returns {Catalyst}
+   */
+  static fromJSON(data) {
+    return new Catalyst({
+      componentId: data.componentId || data.systemItemId,
+      degradesOnUse: data.degradesOnUse,
+      destroyWhenExhausted: data.destroyWhenExhausted,
+      maxUses: data.maxUses,
+    });
+  }
+
+  /**
+   * Apply degradation (increment timesUsed) to an owned catalyst item after use.
+   * Only acts when degradesOnUse is true.
+   *
+   * Legacy migration (T-006): If the spec-compliant `catalystItemUsage` flag is absent,
+   * checks for the legacy `catalystUses` flag (a bare number written before T-002).
+   * When found, the bare number is converted to `{ timesUsed: N }` and used as the
+   * starting point. The legacy flag is left in place; subsequent calls will find the
+   * new `catalystItemUsage` flag first and skip migration.
+   *
+   * Note on flag storage: `getFabricateFlag`/`setFabricateFlag` call
+   * `document.getFlag('fabricate', 'fabricate.<key>')` due to a pre-existing
+   * double-prefix in normalizeFlagKey. This is intentional for consistency.
+   *
+   * @param {Item} item - The owned Foundry Item instance
    */
   async applyDegradation(item) {
     if (!this.degradesOnUse) return;
 
-    if (Number.isFinite(this.maxUses)) {
-      const used = getFabricateFlag(item, 'catalystUses', 0);
-      const next = Number(used || 0) + 1;
-      await setFabricateFlag(item, 'catalystUses', next);
-      return;
+    // Read current usage from the spec-compliant flag key.
+    let usage = getFabricateFlag(item, 'catalystItemUsage', null);
+
+    // If absent, check for the legacy catalystUses flag (a bare number).
+    if (!usage) {
+      const legacyUses = getFabricateFlag(item, 'catalystUses', null);
+      if (legacyUses !== null && Number.isFinite(Number(legacyUses))) {
+        usage = { timesUsed: Math.max(0, Math.floor(Number(legacyUses))) };
+      } else {
+        usage = { timesUsed: 0 };
+      }
     }
 
-    if (!this.durabilityAttribute) return;
+    const timesUsed = Number(usage.timesUsed || 0) + 1;
+    await setFabricateFlag(item, 'catalystItemUsage', { timesUsed });
 
-    const currentDurability = foundry.utils.getProperty(item, this.durabilityAttribute);
-    if (currentDurability === undefined) return;
-
-    const newDurability = Math.max(0, currentDurability - this.degradeAmount);
-    await item.update({ [this.durabilityAttribute]: newDurability });
-  }
-
-  /**
-   * Get the quality bonus from this catalyst
-   * @param {Item} item - The catalyst item
-   * @returns {number}
-   */
-  getQualityBonus(item) {
-    if (!this.qualityBonus || !this.qualityAttribute) return 0;
-
-    const quality = foundry.utils.getProperty(item, this.qualityAttribute);
-    return quality || 0;
-  }
-
-  toJSON() {
-    return {
-      systemItemId: this.systemItemId,
-      itemUuid: this.itemUuid,
-      tag: this.tag,
-      name: this.name,
-      required: this.required,
-      mustBeEquipped: this.mustBeEquipped,
-      mustBeInInventory: this.mustBeInInventory,
-      proximityRequired: this.proximityRequired,
-      proximityDistance: this.proximityDistance,
-      degradesOnUse: this.degradesOnUse,
-      degradeAmount: this.degradeAmount,
-      durabilityAttribute: this.durabilityAttribute,
-      maxUses: this.maxUses,
-      qualityBonus: this.qualityBonus,
-      qualityAttribute: this.qualityAttribute
-    };
-  }
-
-  static fromJSON(data) {
-    return new Catalyst(data);
+    if (this.destroyWhenExhausted && this.maxUses !== null && timesUsed >= this.maxUses) {
+      await item.delete();
+    }
   }
 }

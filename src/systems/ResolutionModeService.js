@@ -82,10 +82,79 @@ export class ResolutionModeService {
           errors.push(`Step "${step.name || step.id}" requires ordered results in progressive mode`);
         }
         for (const result of results) {
-          const difficulty = this._getDifficulty(system, result?.systemItemId);
+          const difficulty = this._getDifficulty(system, result?.componentId || result?.systemItemId);
           if (!Number.isFinite(difficulty) || difficulty < 1) {
             errors.push(`Result "${result?.id || 'unknown'}" references system item without valid difficulty`);
           }
+        }
+      }
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  }
+
+  validateSalvage(component, system) {
+    const errors = [];
+
+    // Pre-checks: return early if there's nothing to validate
+    if (!component?.salvage || !system) return { valid: true, errors };
+
+    const mode = system.salvageResolutionMode || 'simple';
+    const componentLabel = component.name || component.id || 'unknown';
+
+    if (mode === 'mapped') {
+      errors.push('Mapped mode is not supported for salvage');
+      return { valid: false, errors };
+    }
+
+    const groups = Array.isArray(component.salvage.resultGroups) ? component.salvage.resultGroups : [];
+
+    if (mode === 'simple') {
+      if (groups.length !== 1) {
+        errors.push(`Salvage for "${componentLabel}" must have exactly 1 result group in simple mode`);
+      }
+    }
+
+    if (mode === 'tiered') {
+      const checkEnabled = system.salvageCraftingCheck?.enabled === true || !!system.salvageCraftingCheck?.macroUuid;
+      const outcomes = Array.isArray(system.salvageCraftingCheck?.outcomes) ? system.salvageCraftingCheck.outcomes : [];
+
+      if (!checkEnabled) errors.push('Tiered salvage mode requires crafting checks enabled');
+      if (outcomes.length === 0) errors.push('Tiered salvage mode requires at least one declared outcome');
+      if (groups.length < 1) errors.push(`Salvage for "${componentLabel}" must have at least 1 result group in tiered mode`);
+
+      const groupIds = new Set(groups.map(g => g.id));
+      const routing = component.salvage.outcomeRouting || {};
+      for (const outcome of outcomes) {
+        const target = routing[outcome];
+        if (!target || !groupIds.has(target)) {
+          errors.push(`Outcome "${outcome}" must map to a valid salvage result group for "${componentLabel}"`);
+        }
+      }
+    }
+
+    if (mode === 'progressive') {
+      const checkEnabled = system.salvageCraftingCheck?.enabled === true || !!system.salvageCraftingCheck?.macroUuid;
+
+      if (!checkEnabled) errors.push('Progressive salvage mode requires crafting checks enabled');
+      if (!system.salvageCraftingCheck?.progressive) {
+        errors.push('Progressive salvage mode requires salvageCraftingCheck.progressive configuration');
+      }
+      if (groups.length !== 1) {
+        errors.push(`Salvage for "${componentLabel}" must have exactly 1 result group in progressive mode`);
+      }
+
+      const results = groups?.[0]?.results || [];
+      if (results.length === 0) {
+        errors.push(`Salvage for "${componentLabel}" requires ordered results in progressive mode`);
+      }
+      for (const result of results) {
+        const difficulty = this._getDifficulty(system, result?.componentId || result?.systemItemId);
+        if (!Number.isFinite(difficulty) || difficulty < 1) {
+          errors.push(`Result "${result?.id || 'unknown'}" references component without valid difficulty for salvage on "${componentLabel}"`);
         }
       }
     }
@@ -153,7 +222,7 @@ export class ResolutionModeService {
       let remaining = value;
 
       for (const result of group.results || []) {
-        const cost = this._getDifficulty(system, result?.systemItemId);
+        const cost = this._getDifficulty(system, result?.componentId || result?.systemItemId);
         if (!Number.isFinite(cost) || cost < 1) continue;
 
         if (awardMode === 'exceed') {
@@ -217,12 +286,11 @@ export class ResolutionModeService {
     return true;
   }
 
-  _getDifficulty(system, systemItemId) {
-    if (!systemItemId) return null;
-    const managedItems = Array.isArray(system?.managedItems) ? system.managedItems : (system?.items || []);
-    const item = managedItems.find(entry => entry.id === systemItemId);
+  _getDifficulty(system, componentId) {
+    if (!componentId) return null;
+    const managedItems = Array.isArray(system?.components) ? system.components : (Array.isArray(system?.managedItems) ? system.managedItems : (system?.items || []));
+    const item = managedItems.find(entry => entry.id === componentId);
     const difficulty = Number(item?.difficulty);
     return Number.isFinite(difficulty) ? difficulty : null;
   }
 }
-

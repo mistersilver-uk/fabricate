@@ -1,0 +1,322 @@
+/**
+ * Tests for T-013: Startup Schema Migration Framework (MigrationRunner)
+ *
+ * Uses node:test + node:assert/strict.
+ * MigrationRunner accepts getSetting/setSetting as constructor args for full testability.
+ * No Foundry globals needed.
+ */
+import test from 'node:test';
+import assert from 'node:assert/strict';
+
+import { MigrationRunner } from '../src/migration/MigrationRunner.js';
+
+// ---------------------------------------------------------------------------
+// Test helpers
+// ---------------------------------------------------------------------------
+
+function makeSettings(initial = {}) {
+  const store = new Map(Object.entries({
+    recipes: [],
+    craftingSystems: [],
+    migrationVersion: '0.0.0',
+    ...initial
+  }));
+  const calls = { get: [], set: [] };
+
+  function getSetting(key) {
+    calls.get.push(key);
+    return store.get(key) ?? null;
+  }
+
+  async function setSetting(key, value) {
+    calls.set.push({ key, value });
+    store.set(key, value);
+    return value;
+  }
+
+  return { store, calls, getSetting, setSetting };
+}
+
+function makeRunner(overrides = {}) {
+  const settings = makeSettings(overrides.initial ?? {});
+  const runner = new MigrationRunner({
+    getSetting: settings.getSetting,
+    setSetting: settings.setSetting
+  });
+  return { runner, settings };
+}
+
+// ---------------------------------------------------------------------------
+// Group 1: Registry and ordering
+// ---------------------------------------------------------------------------
+
+test('migrations run in version order: componentId migration applied from 0.0.0', async () => {
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '0.0.0',
+      recipes: [{ catalysts: [{ systemItemId: 'forge' }] }],
+      craftingSystems: []
+    }
+  });
+
+  await runner.run();
+
+  const savedRecipes = settings.store.get('recipes');
+  assert.equal(savedRecipes[0].catalysts[0].componentId, 'forge');
+  assert.equal('systemItemId' in savedRecipes[0].catalysts[0], false);
+});
+
+test('only pending migrations run: skip all when migrationVersion is 0.1.0', async () => {
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '0.1.0',
+      recipes: [{ catalysts: [{ systemItemId: 'forge' }] }],
+      craftingSystems: []
+    }
+  });
+
+  await runner.run();
+
+  // recipes/systems should NOT be touched (all migrations already applied)
+  const setKeys = settings.calls.set.map(c => c.key);
+  assert.ok(!setKeys.includes('recipes'), 'recipes should not be persisted when no migrations are pending');
+  assert.ok(!setKeys.includes('craftingSystems'), 'craftingSystems should not be persisted when no migrations are pending');
+});
+
+test('no migrations pending returns without persisting anything', async () => {
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '99.0.0',
+      recipes: [{ id: 'r1' }],
+      craftingSystems: [{ id: 's1' }]
+    }
+  });
+
+  await runner.run();
+
+  assert.equal(settings.calls.set.length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// Group 2: Idempotency
+// ---------------------------------------------------------------------------
+
+test('running twice from 0.0.0 produces identical output', async () => {
+  const initial = {
+    migrationVersion: '0.0.0',
+    recipes: [{ catalysts: [{ systemItemId: 'x' }] }],
+    craftingSystems: []
+  };
+
+  const { runner: r1, settings: s1 } = makeRunner({ initial });
+  await r1.run();
+  const firstRecipes = JSON.stringify(s1.store.get('recipes'));
+
+  // Second run - start from 0.0.0 again (simulate re-run without version gate)
+  const { runner: r2, settings: s2 } = makeRunner({
+    initial: {
+      migrationVersion: '0.0.0',
+      recipes: JSON.parse(firstRecipes),
+      craftingSystems: []
+    }
+  });
+  await r2.run();
+  const secondRecipes = JSON.stringify(s2.store.get('recipes'));
+
+  assert.equal(firstRecipes, secondRecipes);
+});
+
+test('data already in target shape passes through unchanged', async () => {
+  const alreadyMigrated = [{ catalysts: [{ componentId: 'forge', degradesOnUse: false }] }];
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '0.0.0',
+      recipes: alreadyMigrated,
+      craftingSystems: []
+    }
+  });
+
+  await runner.run();
+
+  // migrationVersion should be updated, but recipes setSetting should NOT be called
+  const setKeys = settings.calls.set.map(c => c.key);
+  assert.ok(!setKeys.includes('recipes'), 'recipes should not be re-persisted when data is unchanged');
+});
+
+test('runner does not persist recipes/systems when data is identical after migration', async () => {
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '0.0.0',
+      recipes: [{ id: 'r1', catalysts: [{ componentId: 'c1' }] }],
+      craftingSystems: [{ id: 's1', components: [] }]
+    }
+  });
+
+  await runner.run();
+
+  const setKeys = settings.calls.set.map(c => c.key);
+  assert.ok(!setKeys.includes('recipes'));
+  assert.ok(!setKeys.includes('craftingSystems'));
+  // but migrationVersion should be updated
+  assert.ok(setKeys.includes('migrationVersion'));
+});
+
+// ---------------------------------------------------------------------------
+// Group 3: Corrupt record handling
+// ---------------------------------------------------------------------------
+
+test('null in recipes array is handled gracefully, valid entries still migrated', async () => {
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '0.0.0',
+      recipes: [null, { catalysts: [{ systemItemId: 'iron' }] }],
+      craftingSystems: []
+    }
+  });
+
+  await runner.run();
+
+  const recipes = settings.store.get('recipes');
+  assert.ok(Array.isArray(recipes));
+  // The non-null entry should be migrated
+  const validEntry = recipes.find(r => r !== null && typeof r === 'object');
+  assert.ok(validEntry, 'valid entry should remain');
+  if (validEntry) {
+    assert.equal(validEntry.catalysts[0].componentId, 'iron');
+  }
+});
+
+test('non-object in recipes array is skipped without crashing', async () => {
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '0.0.0',
+      recipes: [42, { catalysts: [{ systemItemId: 'x' }] }],
+      craftingSystems: []
+    }
+  });
+
+  await assert.doesNotReject(() => runner.run());
+
+  const recipes = settings.store.get('recipes');
+  assert.ok(Array.isArray(recipes));
+});
+
+test('null/undefined recipes setting handled gracefully', async () => {
+  const settings = makeSettings({ migrationVersion: '0.0.0', craftingSystems: [] });
+  // Override getSetting to return null for recipes
+  const originalGet = settings.getSetting;
+  const patchedGet = (key) => {
+    if (key === 'recipes') return null;
+    return originalGet(key);
+  };
+  const runner = new MigrationRunner({ getSetting: patchedGet, setSetting: settings.setSetting });
+
+  await assert.doesNotReject(() => runner.run());
+});
+
+// ---------------------------------------------------------------------------
+// Group 4: Integration
+// ---------------------------------------------------------------------------
+
+test('full run from 0.0.0 applies componentId migration correctly', async () => {
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '0.0.0',
+      recipes: [
+        {
+          catalysts: [{ systemItemId: 'cat-a' }],
+          resultGroups: [{ results: [{ systemItemId: 'result-a', quantity: 1 }] }],
+          ingredientSets: [
+            { ingredients: [{ match: { type: 'systemItem', systemItemId: 'ing-a' } }] }
+          ]
+        }
+      ],
+      craftingSystems: [{ managedItems: [{ id: 'comp-1' }] }]
+    }
+  });
+
+  await runner.run();
+
+  const recipes = settings.store.get('recipes');
+  const systems = settings.store.get('craftingSystems');
+
+  assert.equal(recipes[0].catalysts[0].componentId, 'cat-a');
+  assert.equal('systemItemId' in recipes[0].catalysts[0], false);
+  assert.equal(recipes[0].resultGroups[0].results[0].componentId, 'result-a');
+  assert.equal(recipes[0].ingredientSets[0].ingredients[0].match.componentId, 'ing-a');
+  assert.equal(recipes[0].ingredientSets[0].ingredients[0].match.type, 'component');
+  assert.ok(Array.isArray(systems[0].components));
+  assert.equal('managedItems' in systems[0], false);
+});
+
+test('full run from 0.1.0 skips componentId migration', async () => {
+  const originalData = [{ catalysts: [{ systemItemId: 'legacy' }] }];
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '0.1.0',
+      recipes: JSON.parse(JSON.stringify(originalData)),
+      craftingSystems: []
+    }
+  });
+
+  await runner.run();
+
+  // Data should be untouched since migration was already applied
+  const recipes = settings.store.get('recipes');
+  // setSetting for recipes should not have been called
+  const setKeys = settings.calls.set.map(c => c.key);
+  assert.ok(!setKeys.includes('recipes'));
+});
+
+test('migrationVersion setting is updated to 0.1.0 after successful run', async () => {
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '0.0.0',
+      recipes: [],
+      craftingSystems: []
+    }
+  });
+
+  await runner.run();
+
+  const versionCall = settings.calls.set.find(c => c.key === 'migrationVersion');
+  assert.ok(versionCall, 'migrationVersion should be persisted');
+  assert.equal(versionCall.value, '0.1.0');
+});
+
+// ---------------------------------------------------------------------------
+// Group 5: Persistence
+// ---------------------------------------------------------------------------
+
+test('changed data triggers setSetting for recipes and systems', async () => {
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '0.0.0',
+      recipes: [{ catalysts: [{ systemItemId: 'item-x' }] }],
+      craftingSystems: [{ managedItems: [{ id: 'comp-a' }] }]
+    }
+  });
+
+  await runner.run();
+
+  const setKeys = settings.calls.set.map(c => c.key);
+  assert.ok(setKeys.includes('recipes'), 'recipes should be persisted when changed');
+  assert.ok(setKeys.includes('craftingSystems'), 'craftingSystems should be persisted when changed');
+});
+
+test('unchanged data only triggers setSetting for migrationVersion', async () => {
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '0.0.0',
+      recipes: [{ id: 'r1', catalysts: [{ componentId: 'c1' }] }],
+      craftingSystems: [{ id: 's1', components: [] }]
+    }
+  });
+
+  await runner.run();
+
+  const setKeys = settings.calls.set.map(c => c.key);
+  assert.ok(!setKeys.includes('recipes'), 'recipes should NOT be persisted when unchanged');
+  assert.ok(!setKeys.includes('craftingSystems'), 'craftingSystems should NOT be persisted when unchanged');
+  assert.ok(setKeys.includes('migrationVersion'), 'migrationVersion should always be updated after migrations run');
+});

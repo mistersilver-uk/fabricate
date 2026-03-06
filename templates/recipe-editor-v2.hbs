@@ -59,6 +59,12 @@
         <label><input type="checkbox" name="transferEffects" {{#if recipe.transferEffects}}checked{{/if}} /> Transfer Effects</label>
       </div>
 
+      {{#if showRecipeVisibilityGlobal}}
+        <div class="editor-block">
+          <p class="hint">This system uses global visibility — all recipes are visible to all players. To control visibility per recipe, change the system's recipe visibility mode to Player-specific in the crafting admin.</p>
+        </div>
+      {{/if}}
+
       {{#if showRecipeVisibilityPlayer}}
         <div class="editor-block">
           <div class="carousel-header small">
@@ -81,12 +87,36 @@
       {{/if}}
 
       {{#if requiresLinkedRecipeItem}}
-        <div class="editor-block">
-          <div class="form-group">
-            <label>Linked Recipe Item UUID</label>
-            <input name="linkedRecipeItemUuid" type="text" value="{{recipe.linkedRecipeItemUuid}}" placeholder="Item.* or Compendium.* UUID" />
-            <p class="hint">Used for knowledge-mode item matching (UUID or flags.core.sourceId).</p>
+        <div class="editor-block linked-recipe-item-block">
+          <div class="carousel-header small">
+            <h4>Linked Recipe Item</h4>
           </div>
+
+          {{#if linkedRecipeItemResolved}}
+            <div class="linked-item-display">
+              <img src="{{linkedRecipeItemImg}}" alt="{{linkedRecipeItemName}}" />
+              <div class="linked-item-meta">
+                <span class="linked-item-name">{{linkedRecipeItemName}}</span>
+                <code class="linked-item-uuid">{{recipe.linkedRecipeItemUuid}}</code>
+              </div>
+              <button type="button" data-action="clearLinkedRecipeItem" title="Clear linked item"><i class="fas fa-times"></i></button>
+            </div>
+          {{else}}
+            <div class="form-group">
+              <label>Item UUID</label>
+              <input name="linkedRecipeItemUuid" type="text" value="{{recipe.linkedRecipeItemUuid}}" placeholder="Item.abcdef123456 or Compendium.world.pack.itemId" />
+            </div>
+            <div class="inline-actions">
+              <button type="button" data-action="browseLinkedRecipeItem"><i class="fas fa-search"></i> Browse Items</button>
+              <button type="button" data-action="createLinkedRecipeItem"><i class="fas fa-plus"></i> Create Recipe Item</button>
+            </div>
+          {{/if}}
+
+          <p class="hint">Players who own a copy of this item (matched by UUID or <code>flags.core.sourceId</code>) will gain access to this recipe under knowledge-mode visibility.</p>
+
+          {{#if linkedRecipeItemMissing}}
+            <p class="validation-warning"><i class="fas fa-exclamation-triangle"></i> Linked recipe item UUID is required for this crafting system's visibility mode.</p>
+          {{/if}}
         </div>
       {{/if}}
 
@@ -225,7 +255,7 @@
                 {{#each options}}
                   <div class="ingredients-row ingredient-option-row" data-drop-target="ingredient-option" data-group-index="{{../groupIndex}}" data-option-index="{{optionIndex}}">
                     <select name="ingredientGroups.{{../groupIndex}}.options.{{optionIndex}}.matchType">
-                      <option value="systemItem" {{#if isSystemItem}}selected{{/if}}>Managed item</option>
+                      <option value="component" {{#if isSystemItem}}selected{{/if}}>Managed item</option>
                       {{#if ../../showItemTags}}
                         <option value="tags" {{#if isTagMatch}}selected{{/if}}>Tag placeholder</option>
                       {{/if}}
@@ -237,7 +267,7 @@
                         <div class="managed-item-meta">
                           <span>{{itemName}}</span>
                         </div>
-                        <input type="hidden" name="ingredientGroups.{{../groupIndex}}.options.{{optionIndex}}.systemItemId" value="{{systemItemId}}" />
+                        <input type="hidden" name="ingredientGroups.{{../groupIndex}}.options.{{optionIndex}}.componentId" value="{{componentId}}" />
                       </div>
                     {{else}}
                       <div class="tag-placeholder-fields">
@@ -252,14 +282,14 @@
                           <option value="any" {{#if (eq tagMatch 'any')}}selected{{/if}}>Any tag</option>
                           <option value="all" {{#if (eq tagMatch 'all')}}selected{{/if}}>All tags</option>
                         </select>
-                        <input type="hidden" name="ingredientGroups.{{../groupIndex}}.options.{{optionIndex}}.systemItemId" value="{{systemItemId}}" />
+                        <input type="hidden" name="ingredientGroups.{{../groupIndex}}.options.{{optionIndex}}.componentId" value="{{componentId}}" />
                       </div>
                     {{/if}}
 
                     <div class="ingredient-option-actions">
                       <input name="ingredientGroups.{{../groupIndex}}.options.{{optionIndex}}.quantity" type="number" min="1" value="{{quantity}}" />
                       {{#if isSystemItem}}
-                        <button type="button" data-action="clearIngredientSystemItem" data-group-index="{{../groupIndex}}" data-option-index="{{optionIndex}}" title="Clear Item"><i class="fas fa-eraser"></i></button>
+                        <button type="button" data-action="clearIngredientComponent" data-group-index="{{../groupIndex}}" data-option-index="{{optionIndex}}" title="Clear Item"><i class="fas fa-eraser"></i></button>
                       {{/if}}
                       <button type="button" data-action="removeIngredientOption" data-group-index="{{../groupIndex}}" data-option-index="{{optionIndex}}" title="Remove Option"><i class="fas fa-trash"></i></button>
                     </div>
@@ -503,6 +533,6 @@
 
   <footer class="editor-footer">
     <button type="button" class="btn-cancel" data-action="cancel"><i class="fas fa-times"></i> Cancel</button>
-    <button type="submit" class="btn-save" data-action="saveRecipe"><i class="fas fa-save"></i> Save Recipe</button>
+    <button type="button" class="btn-save" data-action="saveRecipe"><i class="fas fa-save"></i> Save Recipe</button>
   </footer>
 </form>

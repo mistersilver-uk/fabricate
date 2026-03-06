@@ -6,7 +6,9 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite build --watch",
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "docs": "cd docs && bundle exec jekyll serve --livereload",
+    "docs:install": "cd docs && bundle install"
   },
   "devDependencies": {
     "vite": "^5.0.0",

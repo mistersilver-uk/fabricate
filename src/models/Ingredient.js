@@ -9,8 +9,13 @@ export class Ingredient {
     this.quantity = data.quantity || 1;
     this.match = this._normalizeMatch(data);
 
-    // Legacy fields retained for compatibility with existing editor and imports.
-    this.systemItemId = this.match?.type === 'systemItem' ? (this.match.systemItemId || null) : null;
+    // componentId: resolved from match object or bare data field
+    this.componentId = (this.match?.type === 'component')
+      ? (this.match.componentId || null) : null;
+
+    // Legacy transitional alias
+    this.systemItemId = this.componentId;
+
     this.itemUuid = data.itemUuid || null;
     this.tag = this.match?.type === 'tags' ? (this.match.tags?.[0] || null) : (data.tag || null);
 
@@ -36,16 +41,20 @@ export class Ingredient {
         };
       }
 
+      // Accept both 'component' (primary) and 'systemItem' (legacy fallback)
+      const componentId = raw.componentId || raw.systemItemId || data.componentId || data.systemItemId || null;
       return {
-        type: 'systemItem',
-        systemItemId: raw.systemItemId || data.systemItemId || null
+        type: 'component',
+        componentId
       };
     }
 
-    if (data.systemItemId) {
+    // Bare componentId or systemItemId field
+    const bareComponentId = data.componentId || data.systemItemId || null;
+    if (bareComponentId) {
       return {
-        type: 'systemItem',
-        systemItemId: data.systemItemId
+        type: 'component',
+        componentId: bareComponentId
       };
     }
 
@@ -99,10 +108,10 @@ export class Ingredient {
    */
   validate() {
     const errors = [];
-    const hasSystemItemMatch = this.match?.type === 'systemItem' && !!this.match.systemItemId;
+    const hasComponentMatch = this.match?.type === 'component' && !!this.match.componentId;
     const hasTagMatch = this.match?.type === 'tags' && Array.isArray(this.match.tags) && this.match.tags.length > 0;
 
-    if (!hasSystemItemMatch && !hasTagMatch && !this.itemUuid) {
+    if (!hasComponentMatch && !hasTagMatch && !this.itemUuid) {
       errors.push('Ingredient must include a match rule or specific item UUID');
     }
 
@@ -133,7 +142,7 @@ export class Ingredient {
    * @returns {string}
    */
   getDescription() {
-    if (this.match?.type === 'systemItem' && this.match.systemItemId) {
+    if (this.match?.type === 'component' && this.match.componentId) {
       return `${this.quantity}x managed item`;
     }
     if (this.itemUuid) {
@@ -153,7 +162,8 @@ export class Ingredient {
   toJSON() {
     return {
       match: this.match,
-      systemItemId: this.systemItemId,
+      componentId: this.componentId,
+      systemItemId: this.componentId,
       itemUuid: this.itemUuid,
       quantity: this.quantity,
       tag: this.tag,

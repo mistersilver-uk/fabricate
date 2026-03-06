@@ -285,3 +285,118 @@ test('CraftingApp._prepareContext groups active runs by recipe and prefers lates
   assert.equal(rowB.hasMultipleActiveRuns, false);
   assert.equal(rowB.craftButtonLabel, 'Craft');
 });
+
+test('CraftingApp._prepareContext does not throw for multi-step recipe with empty top-level ingredientSets', async () => {
+  const app = createAppHarness();
+  game.time.worldTime = 1000;
+  app.searchTerm = '';
+  app.selectedCategory = '';
+  app.showOnlyAvailable = false;
+
+  const sourceActor = {
+    id: 'a1',
+    name: 'Crafter',
+    items: []
+  };
+  app.craftingActor = sourceActor;
+  app.componentSourceActors = [sourceActor];
+  app._getAvailableActors = () => [sourceActor];
+  app._getOwnedActors = () => [sourceActor];
+  app._getSetting = () => false;
+  app._getRecipeVisibilityService = () => null;
+
+  // Multi-step recipe: top-level ingredientSets is empty; sets live in steps
+  const multiStepRecipe = {
+    id: 'r-multi',
+    name: 'Multi-Step Brew',
+    description: '',
+    img: 'icons/svg/item-bag.svg',
+    category: 'alchemy',
+    ingredientSets: [],
+    steps: [
+      {
+        ingredientSets: [
+          {
+            ingredientGroups: [{ options: [{ quantity: 2, getDescription: () => '2x Herb' }] }],
+            essences: {},
+            catalysts: []
+          }
+        ]
+      }
+    ],
+    getResultDescription: () => '1x Elixir',
+    isSimpleRecipe: () => false
+  };
+
+  app._getRecipeManager = () => ({
+    getRecipes: () => [multiStepRecipe],
+    getRecipe: () => multiStepRecipe,
+    // canCraft returns no satisfiableSet to exercise the empty-ingredientSets code path
+    canCraft: () => ({ canCraft: false, satisfiableSet: null }),
+    getCatalystsForSet: () => [],
+    ingredientMatchesItem: () => false,
+    catalystMatchesItem: () => false
+  });
+
+  app._getRunManager = () => ({
+    getActiveRuns: () => [],
+    getRunHistory: () => []
+  });
+
+  // Should not throw even though ingredientSets is empty
+  let context;
+  await assert.doesNotReject(async () => {
+    context = await CraftingApp.prototype._prepareContext.call(app, {});
+  });
+
+  const row = context.recipes.find(r => r.id === 'r-multi');
+  assert.ok(row, 'multi-step recipe row should be present in context');
+  // The fallback sentinel produces an empty ingredients list
+  assert.ok(Array.isArray(row.ingredients), 'ingredients should be an array');
+});
+test('CraftingApp._onShowDetails does not throw and renders step ingredient sets for multi-step recipe', async () => {
+  const app = createAppHarness();
+  // Override componentSourceActors to include items array (required by _onShowDetails rendering)
+  app.componentSourceActors = [{ id: 'a1', name: 'Crafter', items: [] }];
+
+  // Multi-step recipe: top-level ingredientSets is empty; sets live inside steps
+  const multiStepRecipe = {
+    id: 'r-multi',
+    name: 'Multi-Step Elixir',
+    description: 'A complex recipe',
+    ingredientSets: [],
+    steps: [
+      {
+        ingredientSets: [
+          {
+            name: 'Step 1 ingredients',
+            ingredientGroups: [{ options: [{ quantity: 1, getDescription: () => '1x Root' }] }],
+            essences: {},
+            catalysts: []
+          }
+        ]
+      }
+    ],
+    results: [{ quantity: 1 }],
+    isVariable: false
+  };
+
+  app._getRecipeManager = () => ({
+    getRecipe: () => multiStepRecipe,
+    canCraft: () => ({ canCraft: false, satisfiableSet: null }),
+    getCatalystsForSet: () => [],
+    ingredientMatchesItem: () => false,
+    catalystMatchesItem: () => false
+  });
+
+  let rendered = null;
+  app._renderDialog = (opts) => { rendered = opts; };
+
+  await assert.doesNotReject(async () => {
+    await CraftingApp._onShowDetails.call(app, {}, { dataset: { recipeId: 'r-multi' } });
+  }, 'should not throw for multi-step recipe with empty top-level ingredientSets');
+
+  assert.ok(rendered, 'dialog should have been rendered');
+  assert.match(rendered.content, /Step 1 ingredients/, 'step ingredient set label should appear in content');
+  assert.match(rendered.content, /Root/, 'ingredient description should appear in content');
+});

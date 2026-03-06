@@ -117,7 +117,7 @@
                 <div class="feature-card-header">
                   <div>
                     <h4>Essences</h4>
-                    <p class="hint">Define essence types with descriptions and optional associated managed items.</p>
+                    <p class="hint">Define essence types with descriptions and optional source items.</p>
                   </div>
                   <label class="checkbox-label"><input type="checkbox" data-action="toggleFeature" data-feature="essences" {{#if selectedSystem.enableEssences}}checked{{/if}} /> Enable</label>
                 </div>
@@ -125,8 +125,9 @@
                   <div class="panel-toolbar compact">
                     <input type="text" name="newSystemEssenceName" placeholder="Essence name (e.g. Water)" />
                     <input type="text" name="newSystemEssenceDescription" placeholder="Description (optional)" />
+                    <input type="text" name="newSystemEssenceIcon" placeholder="Icon class (e.g. fas fa-tint)" />
                     <select name="newSystemEssenceAssociatedItem">
-                      <option value="">No associated item</option>
+                      <option value="">No source item</option>
                       {{#each selectedSystem.managedItemOptions}}
                         <option value="{{id}}">{{name}}</option>
                       {{/each}}
@@ -137,11 +138,12 @@
                     {{#each selectedSystem.essenceDefinitions}}
                       <article class="essence-definition-row">
                         <div class="essence-definition-meta">
+                          <i class="{{#if icon}}{{icon}}{{else}}fas fa-mortar-pestle{{/if}}"></i>
                           <strong>{{name}}</strong>
                           <code>{{id}}</code>
                           {{#if description}}<p class="hint">{{description}}</p>{{/if}}
                           {{#if associatedItemName}}
-                            <p class="hint">Associated item: {{associatedItemName}}</p>
+                            <p class="hint">Source item: {{associatedItemName}}</p>
                           {{/if}}
                         </div>
                         <button type="button" data-action="removeSystemEssenceDefinition" data-essence-id="{{id}}" title="Remove Essence"><i class="fas fa-trash"></i></button>
@@ -272,6 +274,51 @@
                   <label class="checkbox-label"><input type="checkbox" data-action="toggleFeature" data-feature="outcomeRouting" {{#if selectedSystem.enableOutcomeRouting}}checked{{/if}} /> Enable</label>
                 </div>
               </section>
+
+              <section class="feature-card">
+                <div class="feature-card-header">
+                  <div>
+                    <h4>Effect Transfer</h4>
+                    <p class="hint">Transfer active effects from consumed ingredients to crafted result items.</p>
+                  </div>
+                  <label class="checkbox-label"><input type="checkbox" data-action="toggleFeature" data-feature="effectTransfer" {{#if selectedSystem.enableEffectTransfer}}checked{{/if}} /> Enable</label>
+                </div>
+              </section>
+
+              <section class="feature-card">
+                <div class="feature-card-header">
+                  <div>
+                    <h4>Recipe Visibility</h4>
+                    <p class="hint">Control which players can see recipes. Global makes all recipes visible to everyone. Player-specific allows per-recipe restrictions in the recipe editor. Knowledge-based requires players to have the recipe item or to have learned it.</p>
+                  </div>
+                </div>
+                <div class="panel-toolbar compact">
+                  <select name="recipeVisibilityListMode">
+                    <option value="global" {{#if (eq selectedSystem.recipeVisibilityListMode 'global')}}selected{{/if}}>Global (all recipes visible to all)</option>
+                    <option value="player" {{#if (eq selectedSystem.recipeVisibilityListMode 'player')}}selected{{/if}}>Player-specific (per-recipe restrictions)</option>
+                    <option value="knowledge" {{#if (eq selectedSystem.recipeVisibilityListMode 'knowledge')}}selected{{/if}}>Knowledge-based (item or learning)</option>
+                  </select>
+                  <button type="button" data-action="saveRecipeVisibilityConfig"><i class="fas fa-save"></i> Save Visibility Config</button>
+                </div>
+                {{#if selectedSystem.showRecipeVisibilityPlayerNote}}
+                  <p class="hint">Per-recipe visibility restrictions can be configured in each recipe's editor. Restricted recipes are hidden from all players by default unless specific users are allowed.</p>
+                {{/if}}
+                {{#if selectedSystem.showRecipeVisibilityKnowledgeOptions}}
+                  <div class="panel-toolbar compact">
+                    <select name="recipeVisibilityKnowledgeMode">
+                      <option value="item" {{#if (eq selectedSystem.recipeVisibilityKnowledgeMode 'item')}}selected{{/if}}>By item (must have recipe item)</option>
+                      <option value="learned" {{#if (eq selectedSystem.recipeVisibilityKnowledgeMode 'learned')}}selected{{/if}}>By learning (must have learnt recipe)</option>
+                      <option value="itemOrLearned" {{#if (eq selectedSystem.recipeVisibilityKnowledgeMode 'itemOrLearned')}}selected{{/if}}>Item or learning (either method)</option>
+                    </select>
+                  </div>
+                  {{#unless (eq selectedSystem.recipeVisibilityKnowledgeMode 'item')}}
+                    <label class="checkbox-label">
+                      <input type="checkbox" name="recipeVisibilityConsumeOnLearn" {{#if selectedSystem.recipeVisibilityConsumeOnLearn}}checked{{/if}} />
+                      Consume item on learn
+                    </label>
+                  {{/unless}}
+                {{/if}}
+              </section>
             </div>
             {{else}}
               <p class="hint">Advanced options are disabled for this system.</p>
@@ -305,7 +352,7 @@
             </div>
 
             <div class="system-item-grid">
-              {{#each systemItems}}
+              {{#each components}}
                 <article class="system-item-card">
                   <div class="item-preview">
                     <img src="{{img}}" alt="{{name}}" />
@@ -341,10 +388,10 @@
                     {{/if}}
                   </div>
                   <div class="item-actions">
-                    <button type="button" data-action="editSystemItem" data-item-id="{{id}}" title="Edit Item">
+                    <button type="button" data-action="editComponent" data-item-id="{{id}}" title="Edit Item">
                       <i class="fas fa-edit"></i>
                     </button>
-                    <button type="button" data-action="deleteSystemItem" data-item-id="{{id}}" title="Delete Item">
+                    <button type="button" data-action="deleteComponent" data-item-id="{{id}}" title="Delete Item">
                       <i class="fas fa-trash"></i>
                     </button>
                   </div>
@@ -400,10 +447,11 @@
               </thead>
               <tbody>
                 {{#each recipes}}
-                  <tr class="recipe-row {{#unless enabled}}disabled{{/unless}}" data-recipe-id="{{id}}">
+                  <tr class="recipe-row {{#unless enabled}}recipe-disabled{{/unless}}" data-recipe-id="{{id}}">
                     <td>
                       <img src="{{img}}" alt="{{name}}" class="recipe-thumb" />
                       <span>{{name}}</span>
+                      {{#unless enabled}}<span class="badge badge-disabled">Disabled</span>{{/unless}}
                     </td>
                     <td>
                       {{#if locked}}

@@ -7,7 +7,7 @@ export class Result {
     this.id = data.id || foundry.utils.randomID();
 
     // Managed item reference inside a crafting system
-    this.systemItemId = data.systemItemId || null;
+    this.componentId = data.componentId || data.systemItemId || null;
 
     // Foundry Source UUID (core.sourceId flag) of item to create
     this.itemUuid = data.itemUuid || null;
@@ -26,8 +26,8 @@ export class Result {
   validate() {
     const errors = [];
 
-    if (!this.itemUuid && !this.systemItemId) {
-      errors.push('Result must have systemItemId or itemUuid');
+    if (!this.itemUuid && !this.componentId) {
+      errors.push('Result must have componentId or itemUuid');
     }
 
     if (typeof this.quantity !== 'number' || this.quantity <= 0) {
@@ -55,7 +55,8 @@ export class Result {
   toJSON() {
     return {
       id: this.id,
-      systemItemId: this.systemItemId,
+      componentId: this.componentId,
+      systemItemId: this.componentId,
       itemUuid: this.itemUuid,
       quantity: this.quantity,
       propertyMacroUuid: this.propertyMacroUuid

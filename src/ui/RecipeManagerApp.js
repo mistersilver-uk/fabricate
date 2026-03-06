@@ -45,7 +45,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
       toggleEnabled: this._onToggleEnabled,
       importRecipes: this._onImportRecipes,
       exportRecipes: this._onExportRecipes,
-      deleteSystemItem: this._onDeleteSystemItem,
+      deleteComponent: this._onDeleteComponent,
       saveSystemDetails: this._onSaveSystemDetails,
       toggleAdvancedOptions: this._onToggleAdvancedOptions,
       toggleFeature: this._onToggleFeature,
@@ -58,7 +58,8 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
       saveCraftingCheckConfig: this._onSaveCraftingCheckConfig,
       toggleRequirement: this._onToggleRequirement,
       saveCurrencyRequirementConfig: this._onSaveCurrencyRequirementConfig,
-      editSystemItem: this._onEditSystemItem
+      editComponent: this._onEditComponent,
+      saveRecipeVisibilityConfig: this._onSaveRecipeVisibilityConfig
     }
   };
 
@@ -91,7 +92,8 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
 
   _prepareRecipeContext(selectedSystem) {
     const manager = game.fabricate.getRecipeManager();
-    const showVisibilitySummary = (selectedSystem?.recipeVisibility?.listMode || 'player') === 'player';
+    const listMode = selectedSystem?.recipeVisibility?.listMode || 'global';
+    const showVisibilitySummary = listMode === 'player';
     let recipes = selectedSystem
       ? manager.getRecipes({ craftingSystemId: selectedSystem.id })
       : [];
@@ -170,6 +172,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
       enablePropertyMacros: s.features?.propertyMacros === true,
       enableCraftingChecks: s.features?.craftingChecks === true,
       enableOutcomeRouting: s.features?.outcomeRouting === true,
+      enableEffectTransfer: s.features?.effectTransfer === true,
       selected: s.id === this.selectedSystemId
     }));
     const selectedSystem = this._ensureSelectedSystem(systems);
@@ -188,7 +191,8 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     const essenceDefinitions = Array.isArray(selectedSystem?.essenceDefinitions)
       ? selectedSystem.essenceDefinitions.map(def => ({
         ...def,
-        associatedItemName: managedItemOptions.find(opt => opt.id === def.associatedSystemItemId)?.name || null
+        // sourceItemUuid is authoritative; fall back to associatedSystemItemId for legacy data
+        associatedItemName: managedItemOptions.find(opt => opt.id === (def.sourceItemUuid || def.associatedSystemItemId))?.name || null
       }))
       : [];
     const essenceNameById = new Map(essenceDefinitions.map(def => [def.id, def.name]));
@@ -231,6 +235,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
           enablePropertyMacros: selectedSystem.features?.propertyMacros === true,
           enableCraftingChecks: selectedSystem.features?.craftingChecks === true,
           enableOutcomeRouting: selectedSystem.features?.outcomeRouting === true,
+          enableEffectTransfer: selectedSystem.features?.effectTransfer === true,
           essenceDefinitions,
           managedItemOptions,
           craftingCheckMode: selectedSystem.craftingCheck?.mode || 'passFail',
@@ -247,10 +252,16 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
           formatCurrencyMacroUuid: selectedSystem.requirements?.currency?.formatCurrencyMacroUuid || '',
           availableScriptMacros,
           showTags,
-          showEssences
+          showEssences,
+          recipeVisibilityListMode: selectedSystem.recipeVisibility?.listMode || 'global',
+          recipeVisibilityKnowledgeMode: selectedSystem.recipeVisibility?.knowledge?.mode || 'itemOrLearned',
+          recipeVisibilityConsumeOnLearn: selectedSystem.recipeVisibility?.knowledge?.learn?.consumeOnLearn !== false,
+          showRecipeVisibilityKnowledgeOptions: (selectedSystem.recipeVisibility?.listMode || 'global') === 'knowledge',
+          showRecipeVisibilityPlayerNote: (selectedSystem.recipeVisibility?.listMode || 'global') === 'player'
         }
         : null,
       itemSearch: this.itemSearchTerm,
+      components: itemCards,
       systemItems: itemCards,
       ...recipeContext
     };
@@ -505,7 +516,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     }
   }
 
-  static async _onDeleteSystemItem(event, target) {
+  static async _onDeleteComponent(event, target) {
     if (!this.constructor._requireGM()) return;
     const itemId = target.dataset.itemId;
     if (!itemId || !this.selectedSystemId) return;
@@ -523,7 +534,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     await this.render();
   }
 
-  static async _onEditSystemItem(event, target) {
+  static async _onEditComponent(event, target) {
     if (!this.constructor._requireGM()) return;
     const itemId = target.dataset.itemId;
     const system = this._selectedSystem();
@@ -664,7 +675,8 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
       multiStepRecipes: 'multiStepRecipes',
       propertyMacros: 'propertyMacros',
       craftingChecks: 'craftingChecks',
-      outcomeRouting: 'outcomeRouting'
+      outcomeRouting: 'outcomeRouting',
+      effectTransfer: 'effectTransfer'
     };
     const key = mapping[feature];
     if (!key) return;
@@ -758,12 +770,13 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
 
     const name = this._readInput('newSystemEssenceName');
     const description = this._readInput('newSystemEssenceDescription');
-    const associatedSystemItemId = this.element?.querySelector('[name="newSystemEssenceAssociatedItem"]')?.value || null;
+    const icon = this._readInput('newSystemEssenceIcon') || 'fas fa-mortar-pestle';
+    const sourceItemUuid = this.element?.querySelector('[name="newSystemEssenceAssociatedItem"]')?.value || null;
     if (!name) return;
 
     const existing = Array.isArray(system.essenceDefinitions)
       ? system.essenceDefinitions
-      : (Array.isArray(system.essences) ? system.essences.map(e => ({ id: e, name: e, description: '', associatedSystemItemId: null })) : []);
+      : (Array.isArray(system.essences) ? system.essences.map(e => ({ id: e, name: e, description: '', icon: 'fas fa-mortar-pestle', sourceItemUuid: null, associatedSystemItemId: null })) : []);
 
     const duplicate = existing.some(def => String(def.name || '').toLowerCase() === name.toLowerCase());
     if (duplicate) {
@@ -773,7 +786,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
 
     const essenceDefinitions = [
       ...existing,
-      { name, description, associatedSystemItemId: associatedSystemItemId || null }
+      { name, description, icon, sourceItemUuid: sourceItemUuid || null, associatedSystemItemId: sourceItemUuid || null }
     ];
     await game.fabricate.getCraftingSystemManager().updateSystem(system.id, { essenceDefinitions });
     await this.render();
@@ -840,6 +853,42 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     await this.render();
   }
 
+  static async _onSaveRecipeVisibilityConfig() {
+    if (!this.constructor._requireGM()) return;
+    const system = this._selectedSystem();
+    if (!system) return;
+
+    const listModeEl = this.element?.querySelector('[name="recipeVisibilityListMode"]');
+    const listMode = ['global', 'player', 'knowledge'].includes(listModeEl?.value)
+      ? listModeEl.value
+      : 'global';
+
+    const knowledgeModeEl = this.element?.querySelector('[name="recipeVisibilityKnowledgeMode"]');
+    const knowledgeMode = ['item', 'learned', 'itemOrLearned'].includes(knowledgeModeEl?.value)
+      ? knowledgeModeEl.value
+      : 'itemOrLearned';
+
+    const consumeOnLearnEl = this.element?.querySelector('[name="recipeVisibilityConsumeOnLearn"]');
+    const consumeOnLearn = consumeOnLearnEl ? consumeOnLearnEl.checked !== false : true;
+
+    const existing = system.recipeVisibility || {};
+    const recipeVisibility = {
+      ...existing,
+      listMode,
+      knowledge: {
+        ...(existing.knowledge || {}),
+        mode: knowledgeMode,
+        learn: {
+          ...(existing.knowledge?.learn || {}),
+          consumeOnLearn
+        }
+      }
+    };
+
+    await game.fabricate.getCraftingSystemManager().updateSystem(system.id, { recipeVisibility });
+    await this.render();
+  }
+
   static show() {
     if (!game.user.isGM) {
       ui.notifications.error('Only GMs can manage crafting systems.');
@@ -850,4 +899,3 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     return app;
   }
 }
-

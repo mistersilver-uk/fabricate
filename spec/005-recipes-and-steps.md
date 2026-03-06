@@ -93,6 +93,112 @@ Transfer scaling by essence quantity is out of scope for this phase.
 - Run records should include recipe ID, current step index, selected ingredient data, and time-gate state.
 - Runs must be cleaned up when recipe/system destructive operations invalidate them (see `007`).
 
+## Salvage Execution
+
+### Purpose
+
+Define the lifecycle and semantics for salvage operations — the inverse of crafting. Instead of combining ingredients into a result, salvage decomposes a single component into one or more results.
+
+### Prerequisites
+
+- `CraftingSystem.features.salvage` must be true.
+- `Component.salvage.enabled` must be true.
+- `CraftingSystem.salvageResolutionMode` must be one of: `"simple"`, `"tiered"`, `"progressive"`. Mapped mode is not supported for salvage.
+
+### Implicit Ingredient
+
+Salvage has a single implicit ingredient: `N × this component`, where `N = Component.salvage.ingredientQuantity`. The actor must own at least `N` instances of the component's source item.
+
+### Lifecycle
+
+Salvage is a single-step operation (no multi-step salvage):
+
+1. **Validate**: Confirm the actor owns sufficient quantity of the component and all required catalysts.
+2. **Check** (if `salvageCraftingCheck.enabled`): Execute the salvage crafting check macro.
+3. **Resolve**: Determine result group by `salvageResolutionMode` rules (same as recipe resolution per `004-resolution-modes.md`, but using salvage-specific settings).
+4. **Consume**: Remove `ingredientQuantity` instances of the component from the actor's inventory. Degrade/exhaust catalysts as applicable.
+5. **Create**: Create result items on the actor.
+
+### Resolution Mode Application
+
+- **Simple**: One result group. Optional pass/fail check. On success, produce the single result group.
+- **Tiered**: Check is mandatory. Check macro returns `outcome`. `Component.salvage.outcomeRouting` maps outcomes to result groups.
+- **Progressive**: One result group with ordered results. Check is mandatory. Check macro returns numeric `value`. Awards are evaluated using `salvageCraftingCheck.progressive.awardMode`.
+
+### Macro Contracts
+
+Salvage check macros receive the same contract shape as crafting check macros (see spec/002 Macro Contracts), with the following substitutions:
+
+- `recipe` is replaced by `component` (the component being salvaged).
+- `candidateIngredientSet` is replaced by `salvageInput` containing `{ componentId, quantity }`.
+- `step` is omitted (salvage is single-step).
+
+Success and failure macros follow the same contracts as crafting, substituting `component` for `recipe` and omitting `step`.
+
+### Failure Consumption Policy
+
+- `salvageCraftingCheck.consumption.consumeComponentOnFail`: if true (default), the component is consumed even on failure.
+- `salvageCraftingCheck.consumption.consumeCatalystsOnFail`: if false (default), catalysts are not degraded on failure.
+
+### SalvageRun Actor Flag
+
+Active and historical salvage runs are stored alongside crafting runs:
+
+```js
+Actor.flags.fabricate.salvageRuns = {
+  active: {
+    [runId: string]: SalvageRun,
+  },
+  history: SalvageRun[],
+}
+```
+
+```js
+SalvageRun = {
+  id: string,
+  actorUuid: string,
+  userId: string,
+  craftingSystemId: string,
+  componentId: string,
+
+  status: "inProgress" | "succeeded" | "failed" | "cancelled",
+
+  startedAt: number,
+  updatedAt: number,
+  finishedAt?: number,
+
+  lastCheckResult?: {
+    success: boolean,
+    reason: string,
+    outcome?: string, // tiered mode
+    value?: number,   // progressive mode
+    data?: object,
+  },
+
+  consumedComponents?: Array<{
+    actorUuid: string,
+    itemUuid: string,
+    quantity: number,
+  }>,
+  usedCatalysts?: Array<{
+    actorUuid: string,
+    itemUuid: string,
+    quantity: number,
+  }>,
+  createdResults?: Array<{
+    actorUuid: string,
+    itemUuid: string,
+    quantity: number,
+  }>,
+}
+```
+
+### Destructive Change Rules
+
+- **Mode change** (`salvageResolutionMode`): Disables any `Component.salvage` definitions that are invalid under the new mode (e.g., switching from tiered to simple invalidates salvage defs with outcome routing). Affected components have `salvage.enabled` set to false.
+- **Feature disable** (`features.salvage = false`): Cancels all active salvage runs. Salvage definitions on components are preserved but inert.
+- **Component deletion**: Cleans up any active salvage runs referencing the deleted component.
+
 ## Testing Requirements
 
 - Unit tests for single-step and multistep behaviour.
@@ -103,3 +209,6 @@ Transfer scaling by essence quantity is out of scope for this phase.
 - Unit tests for tiered step-level routing override.
 - Unit tests for time/currency gate checks.
 - Integration tests for end-to-end multistep crafting, resume, and completion.
+- Unit tests for salvage lifecycle (validate, check, resolve, consume, create).
+- Unit tests for salvage resolution modes (simple, tiered, progressive).
+- Unit tests for salvage destructive change handling.

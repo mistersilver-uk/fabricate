@@ -1,6 +1,6 @@
 import { Recipe } from '../models/Recipe.js';
 import { MacroExecutor } from '../utils/MacroExecutor.js';
-import { getFabricateFlag } from '../config/flags.js';
+import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
 
 /**
  * Handles the actual crafting process
@@ -191,6 +191,20 @@ export class CraftingEngine {
       step
     );
     if (!checkResult.success) {
+      const failurePolicy = this._getFailureConsumptionPolicy(executionRecipe);
+      let consumedOnFail = [];
+      let degradedCatalysts = [];
+      try {
+        if (failurePolicy.consumeIngredientsOnFail) {
+          consumedOnFail = await this._consumeIngredients(componentSourceActors, ingredientSet, executionRecipe);
+        }
+        if (failurePolicy.consumeCatalystsOnFail) {
+          await this._degradeCatalysts(catalystValidation.catalysts);
+          degradedCatalysts = catalystValidation.catalysts;
+        }
+      } catch (consumptionError) {
+        console.error('Fabricate | Error during failure-path consumption:', consumptionError);
+      }
       if (runManager && run) {
         await runManager.completeStepFailure(craftingActor, run, stepIndex, checkResult.message || 'Crafting check failed', {
           selectedIngredientSetId: ingredientSet.id,
@@ -200,7 +214,34 @@ export class CraftingEngine {
             outcome: checkResult.outcome ?? undefined,
             value: checkResult.value ?? undefined,
             data: checkResult.data || {}
-          }
+          },
+          consumedIngredients: consumedOnFail.map(({ item, quantity }) => ({
+            actorUuid: item.parent?.uuid || null,
+            itemUuid: item.uuid,
+            quantity
+          })),
+          usedCatalysts: degradedCatalysts.map(({ item }) => ({
+            actorUuid: item.parent?.uuid || null,
+            itemUuid: item.uuid,
+            quantity: 1
+          }))
+        });
+      }
+      // Execute failure macro (spec 002 Failure Macro Contract)
+      {
+        const _systemManager = game.fabricate?.getCraftingSystemManager?.();
+        const _craftingSystem = _systemManager?.getSystem(recipe.craftingSystemId);
+        await this._runFailureMacro(recipe, {
+          recipe: recipe?.toJSON?.() || recipe,
+          craftingSystem: _craftingSystem,
+          craftingActor,
+          componentSourceActors,
+          step,
+          selectedIngredientSet: ingredientSet,
+          failureReason: checkResult.message || 'Crafting check failed',
+          checkResult,
+          consumedIngredients: consumedOnFail,
+          consumedCatalysts: degradedCatalysts
         });
       }
       return {
@@ -211,6 +252,20 @@ export class CraftingEngine {
     }
     if (resolutionService && !resolutionService.validateCheckResult({ recipe: executionRecipe, checkResult })) {
       const message = 'Crafting check result does not satisfy current resolution mode requirements';
+      const validationFailurePolicy = this._getFailureConsumptionPolicy(executionRecipe);
+      let consumedOnValidationFail = [];
+      let degradedCatalystsOnValidationFail = [];
+      try {
+        if (validationFailurePolicy.consumeIngredientsOnFail) {
+          consumedOnValidationFail = await this._consumeIngredients(componentSourceActors, ingredientSet, executionRecipe);
+        }
+        if (validationFailurePolicy.consumeCatalystsOnFail) {
+          await this._degradeCatalysts(catalystValidation.catalysts);
+          degradedCatalystsOnValidationFail = catalystValidation.catalysts;
+        }
+      } catch (consumptionError) {
+        console.error('Fabricate | Error during failure-path consumption:', consumptionError);
+      }
       if (runManager && run) {
         await runManager.completeStepFailure(craftingActor, run, stepIndex, message, {
           selectedIngredientSetId: ingredientSet.id,
@@ -220,7 +275,34 @@ export class CraftingEngine {
             outcome: checkResult.outcome ?? undefined,
             value: checkResult.value ?? undefined,
             data: checkResult.data || {}
-          }
+          },
+          consumedIngredients: consumedOnValidationFail.map(({ item, quantity }) => ({
+            actorUuid: item.parent?.uuid || null,
+            itemUuid: item.uuid,
+            quantity
+          })),
+          usedCatalysts: degradedCatalystsOnValidationFail.map(({ item }) => ({
+            actorUuid: item.parent?.uuid || null,
+            itemUuid: item.uuid,
+            quantity: 1
+          }))
+        });
+      }
+      // Execute failure macro (spec 002 Failure Macro Contract)
+      {
+        const _systemManager = game.fabricate?.getCraftingSystemManager?.();
+        const _craftingSystem = _systemManager?.getSystem(recipe.craftingSystemId);
+        await this._runFailureMacro(recipe, {
+          recipe: recipe?.toJSON?.() || recipe,
+          craftingSystem: _craftingSystem,
+          craftingActor,
+          componentSourceActors,
+          step,
+          selectedIngredientSet: ingredientSet,
+          failureReason: message,
+          checkResult,
+          consumedIngredients: consumedOnValidationFail,
+          consumedCatalysts: degradedCatalystsOnValidationFail
         });
       }
       return {
@@ -285,6 +367,24 @@ export class CraftingEngine {
       });
     }
 
+    // Execute success macro (spec 002 Success Macro Contract)
+    {
+      const _systemManager = game.fabricate?.getCraftingSystemManager?.();
+      const _craftingSystem = _systemManager?.getSystem(recipe.craftingSystemId);
+      await this._runSuccessMacro(recipe, {
+        recipe: recipe?.toJSON?.() || recipe,
+        craftingSystem: _craftingSystem,
+        craftingActor,
+        componentSourceActors,
+        step,
+        selectedIngredientSet: ingredientSet,
+        consumedIngredients: consumedItems,
+        consumedCatalysts: catalystValidation.catalysts,
+        createdResults: resultItems || [],
+        checkResult
+      });
+    }
+
     if (visibilityService) {
       await visibilityService.applyRecipeItemUseOnCraft({
         recipe,
@@ -310,8 +410,6 @@ export class CraftingEngine {
     const catalystItems = [];
 
     for (const catalyst of catalysts) {
-      if (catalyst.required === false) continue;
-
       let found = false;
       let catalystItem = null;
 
@@ -319,8 +417,6 @@ export class CraftingEngine {
       for (const actor of actors) {
         const matching = actor.items.find(item => this.recipeManager.catalystMatchesItem(recipe, catalyst, item));
         if (matching) {
-          const validation = await catalyst.validateItem(matching);
-          if (!validation.valid) continue;
           found = true;
           catalystItem = matching;
           break;
@@ -328,7 +424,7 @@ export class CraftingEngine {
       }
 
       if (!found) {
-        return { valid: false, message: `Missing required catalyst: ${catalyst.name}` };
+        return { valid: false, message: `Missing required catalyst (componentId: ${catalyst.componentId || catalyst.systemItemId})` };
       }
 
       catalystItems.push({ catalyst, item: catalystItem });
@@ -441,11 +537,11 @@ export class CraftingEngine {
     // Get the source item
     let sourceItem;
     let managedItem = null;
-    if (result.systemItemId && recipe.craftingSystemId) {
+    if ((result.componentId || result.systemItemId) && recipe.craftingSystemId) {
       const systemManager = game.fabricate?.getCraftingSystemManager?.();
       const system = systemManager?.getSystem(recipe.craftingSystemId);
-      const managedItems = Array.isArray(system?.managedItems) ? system.managedItems : (system?.items || []);
-      managedItem = managedItems.find(i => i.id === result.systemItemId) || null;
+      const managedItems = Array.isArray(system?.components) ? system.components : (Array.isArray(system?.managedItems) ? system.managedItems : (system?.items || []));
+      managedItem = managedItems.find(i => i.id === (result.componentId || result.systemItemId)) || null;
       if (managedItem?.sourceUuid) {
         sourceItem = await fromUuid(managedItem.sourceUuid);
       }
@@ -467,7 +563,7 @@ export class CraftingEngine {
         system: {}
       };
     } else {
-      console.error(`Fabricate | Result item not found: ${result.itemUuid || result.systemItemId}`);
+      console.error(`Fabricate | Result item not found: ${result.itemUuid || result.componentId || result.systemItemId}`);
       return null;
     }
 
@@ -496,47 +592,60 @@ export class CraftingEngine {
     // Create the item in crafting actor's inventory
     const [createdItem] = await craftingActor.createEmbeddedDocuments('Item', [itemData]);
 
-    // Transfer active effects if configured
+    // Transfer active effects if configured (requires both recipe-level and system-level flags)
     if (recipe.transferEffects) {
-      await this._transferEffects(createdItem, consumedItems, recipe);
+      const systemManager = game.fabricate?.getCraftingSystemManager?.();
+      const system = systemManager?.getSystem(recipe.craftingSystemId);
+      if (system?.features?.effectTransfer === true) {
+        await this._transferEffects(createdItem, consumedItems, recipe);
+      }
     }
 
     return createdItem;
   }
 
   /**
-   * Transfer active effects from consumed items to the result item
+   * Transfer active effects from essence source items to the result item.
+   *
+   * Per spec 005 §"Effect Transfer Semantics":
+   *   1. Determine contributing essence IDs from resolved ingredients.
+   *   2. For each contributing essence, if EssenceDefinition.sourceItemUuid resolves,
+   *      collect active effects from that item.
+   *   3. Transfer collected effects to the result item via createEmbeddedDocuments.
+   *
+   * The old ingredient-level extractEffects / effectFilter path has been removed.
    * @private
    */
   async _transferEffects(resultItem, consumedItems, recipe) {
-    const effectsToTransfer = [];
+    // 1. Get the crafting system and verify essences are enabled
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const system = systemManager?.getSystem(recipe.craftingSystemId);
+    if (!system?.features?.essences) return;
 
-    // Extract effects from consumed items
-    for (const { item, quantity, ingredient } of consumedItems) {
-      if (!ingredient.extractEffects) continue;
+    // 2. Build essence context — resolvedEssences maps essenceId -> total quantity contributed
+    const { resolvedEssences } = this._buildEssenceContext(consumedItems);
+    const contributingEssenceIds = Object.keys(resolvedEssences);
+    if (contributingEssenceIds.length === 0) return;
 
-      const itemEffects = item.effects || [];
+    // 3. For each contributing essence, find its EssenceDefinition and resolve the source item
+    const essenceDefinitions = system.essenceDefinitions || [];
+    const effectsData = [];
 
+    for (const essenceId of contributingEssenceIds) {
+      const definition = essenceDefinitions.find(d => d.id === essenceId);
+      if (!definition?.sourceItemUuid) continue;
+
+      const sourceItem = await fromUuid(definition.sourceItemUuid);
+      if (!sourceItem) continue;
+
+      const itemEffects = sourceItem.effects || [];
       for (const effect of itemEffects) {
-        // Filter effects if needed
-        if (ingredient.effectFilter) {
-          const filterRegex = new RegExp(ingredient.effectFilter, 'i');
-          if (!filterRegex.test(effect.name)) continue;
-        }
-
-        effectsToTransfer.push({
-          effect: effect.toObject(),
-          quantity,
-          source: item
-        });
+        effectsData.push(effect.toObject());
       }
     }
 
-    if (effectsToTransfer.length === 0) return;
-
-    // Create effects on result item
-    // For simplicity, just add all effects (no merging strategy for now)
-    const effectsData = effectsToTransfer.map(e => e.effect);
+    // 4. Transfer all collected effects to the result item
+    if (effectsData.length === 0) return;
     await resultItem.createEmbeddedDocuments('ActiveEffect', effectsData);
   }
 
@@ -558,6 +667,55 @@ export class CraftingEngine {
       formatCurrencyMacroUuid: currency.formatCurrencyMacroUuid || null,
       system
     };
+  }
+
+  _getFailureConsumptionPolicy(recipe) {
+    const systemId = recipe?.craftingSystemId;
+    if (!systemId) {
+      return { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false };
+    }
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const system = systemManager?.getSystem(systemId);
+    if (!system) {
+      return { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false };
+    }
+    const consumption = system.craftingCheck?.consumption || {};
+    return {
+      consumeIngredientsOnFail: consumption.consumeIngredientsOnFail !== false,
+      consumeCatalystsOnFail: consumption.consumeCatalystsOnFail === true
+    };
+  }
+
+  _getSuccessFailureMacroUuids(recipe) {
+    const systemId = recipe?.craftingSystemId;
+    if (!systemId) return { successMacroUuid: null, failureMacroUuid: null };
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const system = systemManager?.getSystem(systemId);
+    if (!system) return { successMacroUuid: null, failureMacroUuid: null };
+    return {
+      successMacroUuid: system.craftingCheck?.successMacroUuid || null,
+      failureMacroUuid: system.craftingCheck?.failureMacroUuid || null
+    };
+  }
+
+  async _runSuccessMacro(recipe, context) {
+    const { successMacroUuid } = this._getSuccessFailureMacroUuids(recipe);
+    if (!successMacroUuid) return;
+    try {
+      await MacroExecutor.run(successMacroUuid, context);
+    } catch (err) {
+      console.error(`Fabricate | Success macro failed (${successMacroUuid}):`, err);
+    }
+  }
+
+  async _runFailureMacro(recipe, context) {
+    const { failureMacroUuid } = this._getSuccessFailureMacroUuids(recipe);
+    if (!failureMacroUuid) return;
+    try {
+      await MacroExecutor.run(failureMacroUuid, context);
+    } catch (err) {
+      console.error(`Fabricate | Failure macro failed (${failureMacroUuid}):`, err);
+    }
   }
 
   _getStepCurrencyRequirement(step) {
@@ -1001,7 +1159,7 @@ export class CraftingEngine {
     }
 
     for (const catalyst of missing.catalysts) {
-      lines.push(`${catalyst.name}: missing`);
+      lines.push(`Catalyst (componentId: ${catalyst.componentId || catalyst.systemItemId}): missing`);
     }
 
     return lines.join('\n');
@@ -1019,5 +1177,394 @@ export class CraftingEngine {
       ]
     };
   }
-}
 
+  /**
+   * Perform the salvage pipeline for a component.
+   *
+   * Resolves actor, system, and component from their IDs/UUIDs, then runs
+   * the full pipeline: validate -> ownership check -> catalyst check ->
+   * salvage check -> failure policy -> consume -> create results -> record run.
+   *
+   * @param {string} actorUuid - UUID of the actor performing salvage.
+   * @param {string} craftingSystemId - ID of the crafting system.
+   * @param {string} componentId - ID of the component to salvage.
+   * @param {Object} [options={}] - Optional overrides.
+   * @returns {Promise<{success: boolean, results: Item[]|null, message: string, salvageRun: object|null}>}
+   */
+  async salvage(actorUuid, craftingSystemId, componentId, options = {}) {
+    // 1. Resolve actor
+    const actor = await fromUuid(actorUuid);
+    if (!actor) {
+      return { success: false, results: null, message: 'Actor not found', salvageRun: null };
+    }
+
+    // 2. Resolve system and component
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const system = systemManager?.getSystem(craftingSystemId);
+    if (!system) {
+      return { success: false, results: null, message: `Crafting system "${craftingSystemId}" not found`, salvageRun: null };
+    }
+
+    const managedItems = Array.isArray(system.components) ? system.components
+      : (Array.isArray(system.managedItems) ? system.managedItems : []);
+    const component = managedItems.find(c => c.id === componentId) || null;
+    if (!component) {
+      return { success: false, results: null, message: `Component "${componentId}" not found in system`, salvageRun: null };
+    }
+
+    // 3. Validate salvage is enabled
+    if (!system.features?.salvage) {
+      return { success: false, results: null, message: 'Salvage feature is not enabled on this crafting system', salvageRun: null };
+    }
+    if (!component.salvage?.enabled) {
+      return { success: false, results: null, message: `Salvage is not enabled for component "${component.name || componentId}"`, salvageRun: null };
+    }
+
+    // 4. Validate salvage configuration via ResolutionModeService
+    const resolutionService = this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
+    if (resolutionService) {
+      const validation = resolutionService.validateSalvage(component, system);
+      if (!validation.valid) {
+        return {
+          success: false,
+          results: null,
+          message: `Invalid salvage configuration: ${validation.errors.join(', ')}`,
+          salvageRun: null
+        };
+      }
+    }
+
+    // 5. Check actor has enough of the component item
+    const ingredientQuantity = Number(component.salvage.ingredientQuantity) || 1;
+    const componentItems = this._findComponentItems(actor, component, system);
+    const totalAvailable = componentItems.reduce((sum, item) => sum + (Number(item.system?.quantity) || 1), 0);
+    if (totalAvailable < ingredientQuantity) {
+      return {
+        success: false,
+        results: null,
+        message: `Not enough "${component.name || componentId}" to salvage. Need ${ingredientQuantity}, have ${totalAvailable}`,
+        salvageRun: null
+      };
+    }
+
+    // 6. Validate salvage catalysts
+    const salvageCatalysts = Array.isArray(component.salvage.catalysts) ? component.salvage.catalysts : [];
+    // Build a minimal recipe-like object for catalyst matching
+    const syntheticRecipe = { craftingSystemId, components: managedItems };
+    const catalystValidation = await this._validateCatalysts([actor], syntheticRecipe, salvageCatalysts);
+    if (!catalystValidation.valid) {
+      return { success: false, results: null, message: catalystValidation.message, salvageRun: null };
+    }
+
+    const now = Number(game.time?.worldTime || 0);
+
+    // 7. Run salvage crafting check
+    const checkResult = await this._runSalvageCraftingCheck(component, system, actor, catalystValidation.catalysts);
+
+    const failurePolicy = this._getSalvageFailureConsumptionPolicy(system);
+
+    if (!checkResult.success) {
+      // Apply failure consumption policy
+      let consumedOnFail = [];
+      let degradedCatalysts = [];
+      try {
+        if (failurePolicy.consumeComponentOnFail) {
+          consumedOnFail = await this._consumeComponentItems(actor, componentItems, ingredientQuantity);
+        }
+        if (failurePolicy.consumeCatalystsOnFail) {
+          await this._degradeCatalysts(catalystValidation.catalysts);
+          degradedCatalysts = catalystValidation.catalysts;
+        }
+      } catch (err) {
+        console.error('Fabricate | Error during salvage failure-path consumption:', err);
+      }
+
+      const failedRun = await this._createSalvageRun(actor, {
+        actorUuid,
+        craftingSystemId,
+        componentId,
+        status: 'failed',
+        startedAt: now,
+        finishedAt: Number(game.time?.worldTime || 0),
+        consumedComponents: consumedOnFail.map(({ item }) => ({ itemUuid: item.uuid, quantity: 1 })),
+        usedCatalysts: degradedCatalysts.map(({ item, catalyst }) => ({
+          itemUuid: item.uuid,
+          componentId: catalyst.componentId || catalyst.systemItemId,
+          degraded: true
+        })),
+        createdResults: [],
+        checkResult: { success: false, outcome: checkResult.outcome, value: checkResult.value },
+        failureReason: checkResult.message || 'Salvage check failed'
+      });
+
+      return {
+        success: false,
+        results: null,
+        message: checkResult.message || 'Salvage check failed',
+        salvageRun: failedRun
+      };
+    }
+
+    // 8. Resolve which result groups to use
+    const resultGroups = this._resolveSalvageResultGroups(component, system, checkResult);
+
+    // 9. Consume component items
+    const consumedItems = await this._consumeComponentItems(actor, componentItems, ingredientQuantity);
+
+    // 10. Degrade catalysts
+    await this._degradeCatalysts(catalystValidation.catalysts);
+
+    // 11. Create result items (reuse _createSingleResult with a synthetic recipe view)
+    const salvageRecipeView = this._buildSalvageRecipeView(component, system);
+    const resultItems = [];
+    for (const group of resultGroups) {
+      for (const result of group.results || []) {
+        const created = await this._createSingleResult(
+          actor,
+          result,
+          consumedItems,
+          catalystValidation.catalysts,
+          salvageRecipeView,
+          checkResult,
+          null
+        );
+        if (created) resultItems.push(created);
+      }
+    }
+
+    // 12. Record successful salvage run
+    const succeededRun = await this._createSalvageRun(actor, {
+      actorUuid,
+      craftingSystemId,
+      componentId,
+      status: 'succeeded',
+      startedAt: now,
+      finishedAt: Number(game.time?.worldTime || 0),
+      consumedComponents: consumedItems.map(({ item }) => ({ itemUuid: item.uuid, quantity: 1 })),
+      usedCatalysts: catalystValidation.catalysts.map(({ item, catalyst }) => ({
+        itemUuid: item.uuid,
+        componentId: catalyst.componentId || catalyst.systemItemId,
+        degraded: true
+      })),
+      createdResults: resultItems.map(item => ({
+        itemUuid: item.uuid,
+        componentId: null,
+        quantity: Number(item.system?.quantity || 1)
+      })),
+      checkResult: { success: true, outcome: checkResult.outcome, value: checkResult.value },
+      failureReason: null
+    });
+
+    return {
+      success: true,
+      results: resultItems,
+      message: `Successfully salvaged ${component.name || componentId}`,
+      salvageRun: succeededRun
+    };
+  }
+
+  /**
+   * Find items on actor that match a managed component.
+   * Matches by sourceUuid (item.uuid or flags.core.sourceId) then falls back to name.
+   * @private
+   */
+  _findComponentItems(actor, component, system) {
+    const items = Array.from(actor.items);
+    if (component.sourceUuid) {
+      const byUuid = items.filter(item =>
+        item.uuid === component.sourceUuid ||
+        (item.flags?.core?.sourceId === component.sourceUuid)
+      );
+      if (byUuid.length > 0) return byUuid;
+    }
+    // Name fallback
+    const name = component.name;
+    if (name) {
+      return items.filter(item => item.name === name);
+    }
+    return [];
+  }
+
+  /**
+   * Consume a specific total quantity from component items on the actor.
+   * Deletes items when fully consumed, reduces quantity otherwise.
+   * Returns array of { item, quantity: consumed }.
+   * @private
+   */
+  async _consumeComponentItems(actor, items, quantity) {
+    const consumed = [];
+    let remaining = quantity;
+
+    for (const item of items) {
+      if (remaining <= 0) break;
+      const available = Number(item.system?.quantity) || 1;
+      const toConsume = Math.min(available, remaining);
+      consumed.push({ item, quantity: toConsume });
+      remaining -= toConsume;
+      if (toConsume >= available) {
+        await item.delete();
+      } else {
+        await item.update({ 'system.quantity': available - toConsume });
+      }
+    }
+
+    return consumed;
+  }
+
+  /**
+   * Get the salvage failure consumption policy from the system.
+   * Defaults: consumeComponentOnFail=true, consumeCatalystsOnFail=false.
+   * @private
+   */
+  _getSalvageFailureConsumptionPolicy(system) {
+    const consumption = system?.salvageCraftingCheck?.consumption || {};
+    return {
+      consumeComponentOnFail: consumption.consumeComponentOnFail !== false,
+      consumeCatalystsOnFail: consumption.consumeCatalystsOnFail === true
+    };
+  }
+
+  /**
+   * Resolve which salvage result groups to use based on mode and check result.
+   * @private
+   */
+  _resolveSalvageResultGroups(component, system, checkResult) {
+    const mode = system?.salvageResolutionMode || 'simple';
+    const allGroups = Array.isArray(component.salvage?.resultGroups) ? component.salvage.resultGroups : [];
+
+    if (mode === 'simple') {
+      return allGroups.slice(0, 1);
+    }
+
+    if (mode === 'tiered') {
+      const outcome = checkResult?.outcome != null ? String(checkResult.outcome) : null;
+      const routing = component.salvage?.outcomeRouting || {};
+      const routedId = outcome ? routing[outcome] : null;
+      if (!routedId) return [];
+      return allGroups.filter(g => g.id === routedId);
+    }
+
+    if (mode === 'progressive') {
+      const group = allGroups[0];
+      if (!group) return [];
+
+      const value = Number(checkResult?.value || 0);
+      const awardMode = system?.salvageCraftingCheck?.progressive?.awardMode || 'equal';
+      const awarded = [];
+      let remaining = value;
+
+      for (const result of group.results || []) {
+        const managedItems = Array.isArray(system?.components) ? system.components
+          : (Array.isArray(system?.managedItems) ? system.managedItems : []);
+        const managedItem = managedItems.find(e => e.id === (result.componentId || result.systemItemId));
+        const cost = Number(managedItem?.difficulty);
+        if (!Number.isFinite(cost) || cost < 1) continue;
+
+        if (awardMode === 'exceed') {
+          if (remaining > cost) { awarded.push(result); remaining -= cost; }
+          else break;
+          continue;
+        }
+        if (awardMode === 'partial') {
+          if (remaining >= cost) { awarded.push(result); remaining -= cost; continue; }
+          if (remaining > 0) { awarded.push(result); remaining = 0; }
+          break;
+        }
+        // equal (default)
+        if (remaining >= cost) { awarded.push(result); remaining -= cost; }
+        else break;
+      }
+
+      return [{ ...group, results: awarded }];
+    }
+
+    return allGroups;
+  }
+
+  /**
+   * Run the salvage crafting check macro when configured.
+   * @private
+   */
+  async _runSalvageCraftingCheck(component, system, actor, catalystItems) {
+    const check = system?.salvageCraftingCheck;
+    if (!check?.enabled && !check?.macroUuid) {
+      return { success: true, outcome: null, value: null, data: {} };
+    }
+    if (!check.macroUuid) {
+      return { success: true, outcome: null, value: null, data: {} };
+    }
+
+    let result;
+    try {
+      result = await MacroExecutor.run(check.macroUuid, {
+        component,
+        craftingSystem: system,
+        craftingActor: actor,
+        catalystItems
+      });
+    } catch (err) {
+      console.error(`Fabricate | Salvage check macro failed (${check.macroUuid})`, err);
+      return {
+        success: false,
+        outcome: null,
+        value: null,
+        data: {},
+        message: `Salvage check macro failed: ${err.message || check.macroUuid}`
+      };
+    }
+
+    if (!result || typeof result !== 'object') {
+      return { success: false, outcome: null, value: null, data: {}, message: 'Salvage check macro must return an object' };
+    }
+
+    const outcome = result.outcome != null ? String(result.outcome) : null;
+    const value = Number.isFinite(Number(result.value)) ? Number(result.value) : null;
+    const success = result.success !== false;
+    return {
+      success,
+      outcome,
+      value,
+      data: result.data || {},
+      message: success ? null : (result.message || 'Salvage check failed')
+    };
+  }
+
+  /**
+   * Build a minimal recipe-like view from a component's salvage data.
+   * Used as context for _createSingleResult.
+   * @private
+   */
+  _buildSalvageRecipeView(component, system) {
+    return {
+      id: component.id,
+      name: component.name,
+      craftingSystemId: system?.id,
+      resultGroups: component.salvage?.resultGroups || [],
+      outcomeRouting: component.salvage?.outcomeRouting || null,
+      ingredientSets: [],
+      transferEffects: false,
+      toJSON() { return { id: this.id, name: this.name }; }
+    };
+  }
+
+  /**
+   * Create and persist a SalvageRun record on the actor.
+   * History is capped at 50 entries.
+   * @private
+   */
+  async _createSalvageRun(actor, runData) {
+    const existing = getFabricateFlag(actor, 'salvageRuns', null) || { active: {}, history: [] };
+    const history = Array.isArray(existing.history) ? [...existing.history] : [];
+
+    const run = {
+      id: foundry.utils.randomID(),
+      ...runData
+    };
+
+    history.unshift(run);
+    if (history.length > 50) history.length = 50;
+
+    await setFabricateFlag(actor, 'salvageRuns', { ...existing, history });
+    return run;
+  }
+}

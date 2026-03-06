@@ -12,7 +12,9 @@ import { CraftingApp } from './ui/CraftingApp.js';
 import { RecipeManagerApp } from './ui/RecipeManagerApp.js';
 import { RecipeEditorApp } from './ui/RecipeEditorApp.js';
 import { getPartialTemplatePath, getTemplatePath } from './ui/templatePaths.js';
-import { registerFabricateSettings } from './config/settings.js';
+import { registerFabricateSettings, getSetting, setSetting } from './config/settings.js';
+import { MigrationRunner } from './migration/MigrationRunner.js';
+import { cleanupStalePreferences } from './config/preferencesCleanup.js';
 
 /**
  * Fabricate - Universal Crafting System
@@ -38,6 +40,8 @@ class Fabricate {
 
     // Register settings
     this.registerSettings();
+    // Run data migrations before managers load persisted data
+    await this._runMigrations();
     // Create managers
     this.recipeManager = new RecipeManager();
     this.craftingSystemManager = new CraftingSystemManager(this.recipeManager);
@@ -57,9 +61,18 @@ class Fabricate {
     const validSystems = new Set(this.craftingSystemManager.getSystems().map(s => s.id));
     await this.craftingRunManager.cleanupInvalidRuns(validRecipes, validSystems);
     await this.recipeVisibilityService.cleanupLearnedRecipes(validRecipes);
+    await cleanupStalePreferences(validSystems, validRecipes, getSetting, setSetting);
 
     this.ready = true;
     console.log('Fabricate | Ready');
+  }
+
+  /**
+   * Run versioned startup data migrations via MigrationRunner.
+   */
+  async _runMigrations() {
+    const runner = new MigrationRunner({ getSetting, setSetting });
+    await runner.run();
   }
 
   /**
@@ -423,4 +436,3 @@ globalThis.fabricate = {
 };
 
 export default fabricate;
-

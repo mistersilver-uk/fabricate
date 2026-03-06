@@ -35,6 +35,9 @@ export class IngredientSet {
 
     // Result IDs to produce when this set is used (for variable recipes)
     this.resultMapping = data.resultMapping || [];
+
+    // Mapped mode: direct routing to a specific result group.
+    this.resultGroupId = data.resultGroupId || null;
   }
 
   _legacyIngredientsToGroups(ingredients = []) {
@@ -73,8 +76,9 @@ export class IngredientSet {
 
     // Validate catalysts
     for (const catalyst of this.catalysts) {
-      if (!catalyst.itemUuid && !catalyst.systemItemId) {
-        errors.push('Catalyst must have systemItemId or itemUuid');
+      const catalystValidation = catalyst.validate();
+      if (!catalystValidation.valid) {
+        errors.push(...catalystValidation.errors.map(e => `Catalyst: ${e}`));
       }
     }
 
@@ -233,7 +237,8 @@ export class IngredientSet {
       ingredients: this.ingredients.map(i => i.toJSON()),
       essences: this.essences,
       catalysts: this.catalysts.map(c => c.toJSON()),
-      resultMapping: this.resultMapping
+      resultMapping: this.resultMapping,
+      resultGroupId: this.resultGroupId,
     };
   }
 

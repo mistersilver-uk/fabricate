@@ -98,5 +98,5 @@ Import recipes from JSON.
 
 ## Need More Help?
 
-See `QUICKSTART.md` in the main folder for detailed instructions.
+See `docs/quickstart.md` in the main folder for detailed instructions.
 

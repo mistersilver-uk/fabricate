@@ -1,0 +1,28 @@
+title: Fabricate
+description: A system-agnostic crafting module for Foundry Virtual Tabletop
+theme: just-the-docs
+
+url: https://misterpotts.github.io
+baseurl: /fabricate
+
+aux_links:
+  "GitHub":
+    - https://github.com/misterpotts/fabricate
+
+nav_sort: order
+
+color_scheme: dark
+
+callouts:
+  warning:
+    title: Warning
+    color: yellow
+  tip:
+    title: Tip
+    color: green
+  note:
+    title: Note
+    color: blue
+  gm:
+    title: GM Only
+    color: purple

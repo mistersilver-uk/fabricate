@@ -8,7 +8,9 @@ export const SETTING_KEYS = Object.freeze({
   AUTO_CRAFT: 'autoCraft',
   LAST_CRAFTING_ACTOR: 'lastCraftingActor',
   LAST_COMPONENT_SOURCES: 'lastComponentSources',
-  LAST_MANAGED_CRAFTING_SYSTEM: 'lastManagedCraftingSystem'
+  LAST_MANAGED_CRAFTING_SYSTEM: 'lastManagedCraftingSystem',
+  PROGRESSIVE_RESULT_ORDER: 'progressiveResultOrder',
+  MIGRATION_VERSION: 'migrationVersion'
 });
 
 const BASE_DEFINITIONS = Object.freeze({
@@ -70,6 +72,20 @@ const BASE_DEFINITIONS = Object.freeze({
     config: false,
     type: String,
     default: ''
+  },
+  [SETTING_KEYS.PROGRESSIVE_RESULT_ORDER]: {
+    name: 'Progressive Result Order Preferences',
+    scope: 'client',
+    config: false,
+    type: Object,
+    default: {}
+  },
+  [SETTING_KEYS.MIGRATION_VERSION]: {
+    name: 'Migration Version',
+    scope: 'world',
+    config: false,
+    type: String,
+    default: '0.0.0'
   }
 });
 

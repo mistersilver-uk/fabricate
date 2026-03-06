@@ -2,6 +2,7 @@
  * Manages crafting systems and their item libraries
  */
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
+import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
 
 export class CraftingSystemManager {
   constructor(recipeManager) {
@@ -32,16 +33,22 @@ export class CraftingSystemManager {
       system.essenceDefinitions ?? system.essences
     );
     const essenceIds = new Set(essenceDefinitions.map(def => def.id));
-    const rawManagedItems = Array.isArray(system.managedItems) ? system.managedItems : system.items;
+    const rawManagedItems = Array.isArray(system.components) ? system.components : (Array.isArray(system.managedItems) ? system.managedItems : system.items);
     const items = Array.isArray(rawManagedItems)
-      ? rawManagedItems.map(i => this._normalizeItem(i, essenceIds))
+      ? rawManagedItems.map(i => this._normalizeComponent(i, essenceIds, features.salvage))
       : [];
     const itemIds = new Set(items.map(i => i.id));
 
-    const resolvedEssenceDefinitions = essenceDefinitions.map(def => ({
-      ...def,
-      associatedSystemItemId: itemIds.has(def.associatedSystemItemId) ? def.associatedSystemItemId : null
-    }));
+    const resolvedEssenceDefinitions = essenceDefinitions.map(def => {
+      // sourceItemUuid is authoritative; associatedSystemItemId is the transitional alias.
+      // Resolve against the actual managed item IDs so stale UUIDs are cleared.
+      const resolvedItemId = itemIds.has(def.sourceItemUuid) ? def.sourceItemUuid : null;
+      return {
+        ...def,
+        sourceItemUuid: resolvedItemId,
+        associatedSystemItemId: resolvedItemId  // transitional alias kept in sync
+      };
+    });
 
     return {
       id: system.id || foundry.utils.randomID(),
@@ -65,6 +72,10 @@ export class CraftingSystemManager {
       requirements: this._normalizeRequirements(system.requirements),
       essenceDefinitions: resolvedEssenceDefinitions,
       craftingCheck: this._normalizeCraftingCheck(system.craftingCheck),
+      salvageResolutionMode: ['simple', 'tiered', 'progressive'].includes(system.salvageResolutionMode)
+        ? system.salvageResolutionMode
+        : 'simple',
+      salvageCraftingCheck: this._normalizeSalvageCraftingCheck(system.salvageCraftingCheck),
 
       // Transitional aliases for existing UI code paths
       categories: this._normalizeStringList(system.categories),
@@ -78,6 +89,7 @@ export class CraftingSystemManager {
       enableTiers: false,
       tiers: [],
       items,
+      components: items,
       managedItems: items
     };
   }
@@ -101,7 +113,9 @@ export class CraftingSystemManager {
       multiStepRecipes: multiStepEnabled,
       propertyMacros: has('propertyMacros') ? features.propertyMacros === true : false,
       craftingChecks: has('craftingChecks') ? features.craftingChecks === true : false,
-      outcomeRouting: has('outcomeRouting') ? features.outcomeRouting === true : false
+      outcomeRouting: has('outcomeRouting') ? features.outcomeRouting === true : false,
+      effectTransfer: has('effectTransfer') ? features.effectTransfer === true : false,
+      salvage: has('salvage') ? features.salvage === true : false
     };
   }
 
@@ -134,8 +148,38 @@ export class CraftingSystemManager {
     };
   }
 
+  _normalizeSalvageCraftingCheck(check = {}) {
+    if (!check || typeof check !== 'object') check = {};
+    const outcomes = Array.isArray(check.outcomes) ? check.outcomes : [];
+    const normalizedOutcomes = outcomes
+      .map(o => String(o || '').trim().toLowerCase())
+      .filter(Boolean);
+
+    return {
+      enabled: check.enabled === true || !!check.macroUuid,
+      macroUuid: check.macroUuid || null,
+      successMacroUuid: check.successMacroUuid || null,
+      failureMacroUuid: check.failureMacroUuid || null,
+      consumption: {
+        consumeComponentOnFail: check.consumption?.consumeComponentOnFail !== false,
+        consumeCatalystsOnFail: check.consumption?.consumeCatalystsOnFail === true
+      },
+      progressive: {
+        awardMode: ['partial', 'equal', 'exceed'].includes(check.progressive?.awardMode)
+          ? check.progressive.awardMode
+          : 'equal',
+        allowPlayerReorder: check.progressive?.allowPlayerReorder === true
+      },
+      outcomes: normalizedOutcomes.length > 0
+        ? Array.from(new Set(normalizedOutcomes))
+        : ['fail', 'pass']
+    };
+  }
+
   _normalizeRecipeVisibility(recipeVisibility = {}) {
-    const listMode = recipeVisibility?.listMode === 'knowledge' ? 'knowledge' : 'player';
+    const listMode = ['global', 'player', 'knowledge'].includes(recipeVisibility?.listMode)
+      ? recipeVisibility.listMode
+      : 'global';
     const knowledge = recipeVisibility?.knowledge || {};
     return {
       listMode,
@@ -206,7 +250,9 @@ export class CraftingSystemManager {
         id: this._uniqueKey(base, usedIds),
         name: base,
         description: '',
-        associatedSystemItemId: null
+        icon: 'fas fa-mortar-pestle',
+        sourceItemUuid: null,
+        associatedSystemItemId: null  // transitional alias
       };
     }
 
@@ -218,11 +264,15 @@ export class CraftingSystemManager {
     if (!seed) return null;
 
     const id = this._uniqueKey(seed, usedIds);
+    // sourceItemUuid is authoritative; fall back to associatedSystemItemId for legacy data.
+    const resolvedSourceItemUuid = entry.sourceItemUuid || entry.associatedSystemItemId || null;
     return {
       id,
       name: rawName || id,
       description: String(entry.description || '').trim(),
-      associatedSystemItemId: entry.associatedSystemItemId || null
+      icon: String(entry.icon || '').trim() || 'fas fa-mortar-pestle',
+      sourceItemUuid: resolvedSourceItemUuid,
+      associatedSystemItemId: resolvedSourceItemUuid  // transitional alias
     };
   }
 
@@ -243,7 +293,7 @@ export class CraftingSystemManager {
       .replace(/^-+|-+$/g, '');
   }
 
-  _normalizeItem(item = {}, validEssenceIds = null) {
+  _normalizeComponent(item = {}, validEssenceIds = null, salvageEnabled = false) {
     const difficulty = Number(item.difficulty);
     return {
       id: item.id || foundry.utils.randomID(),
@@ -255,7 +305,106 @@ export class CraftingSystemManager {
       tier: item.tier || null,
       tags: Array.isArray(item.tags) ? item.tags : [],
       essences: this._normalizeEssenceQuantities(item.essences, validEssenceIds),
-      difficulty: Number.isFinite(difficulty) && difficulty >= 1 ? Math.floor(difficulty) : undefined
+      difficulty: Number.isFinite(difficulty) && difficulty >= 1 ? Math.floor(difficulty) : undefined,
+      ...(salvageEnabled ? { salvage: this._normalizeSalvage(item.salvage) } : {})
+    };
+  }
+
+  _normalizeSalvage(salvage = {}) {
+    if (!salvage || typeof salvage !== 'object') {
+      return {
+        enabled: false,
+        ingredientQuantity: 1,
+        catalysts: [],
+        resultGroups: []
+      };
+    }
+
+    const rawQty = Number(salvage.ingredientQuantity);
+    const ingredientQuantity = Number.isFinite(rawQty) && rawQty >= 1
+      ? Math.floor(rawQty)
+      : 1;
+
+    return {
+      enabled: salvage.enabled === true,
+      ingredientQuantity,
+      catalysts: Array.isArray(salvage.catalysts)
+        ? salvage.catalysts.map(c => this._normalizeSalvageCatalyst(c)).filter(Boolean)
+        : [],
+      resultGroups: Array.isArray(salvage.resultGroups)
+        ? salvage.resultGroups.map(g => this._normalizeSalvageResultGroup(g)).filter(Boolean)
+        : [],
+      ...(salvage.outcomeRouting && typeof salvage.outcomeRouting === 'object'
+        ? { outcomeRouting: { ...salvage.outcomeRouting } }
+        : {}),
+      ...(salvage.timeRequirement && typeof salvage.timeRequirement === 'object'
+        ? { timeRequirement: this._normalizeTimeRequirement(salvage.timeRequirement) }
+        : {}),
+      ...(salvage.currencyRequirement && typeof salvage.currencyRequirement === 'object'
+        ? { currencyRequirement: this._normalizeCurrencyRequirement(salvage.currencyRequirement) }
+        : {})
+    };
+  }
+
+  _normalizeSalvageCatalyst(catalyst) {
+    if (!catalyst || typeof catalyst !== 'object') return null;
+    const compId = catalyst.componentId || catalyst.systemItemId;
+    if (!compId) return null;
+    return {
+      componentId: compId,
+      systemItemId: compId, // transitional alias
+      degradesOnUse: catalyst.degradesOnUse === true,
+      destroyWhenExhausted: catalyst.destroyWhenExhausted === true,
+      maxUses: Number.isFinite(Number(catalyst.maxUses)) && catalyst.maxUses !== null
+        ? Number(catalyst.maxUses)
+        : null
+    };
+  }
+
+  _normalizeSalvageResult(result) {
+    if (!result || typeof result !== 'object') return null;
+    const compId = result.componentId || result.systemItemId;
+    return {
+      id: result.id || foundry.utils.randomID(),
+      componentId: compId || null,
+      systemItemId: compId || null, // transitional alias
+      quantity: (Number.isFinite(Number(result.quantity)) && Number(result.quantity) >= 1)
+        ? Number(result.quantity)
+        : 1,
+      propertyMacroUuid: result.propertyMacroUuid || null
+    };
+  }
+
+  _normalizeSalvageResultGroup(group) {
+    if (!group || typeof group !== 'object') return null;
+    const results = Array.isArray(group.results)
+      ? group.results.map(r => this._normalizeSalvageResult(r)).filter(Boolean)
+      : [];
+    return {
+      id: group.id || foundry.utils.randomID(),
+      name: String(group.name || '').trim() || 'Result Group',
+      results
+    };
+  }
+
+  _normalizeTimeRequirement(time) {
+    if (!time || typeof time !== 'object') return {};
+    const result = {};
+    for (const key of ['minutes', 'hours', 'days', 'months', 'years']) {
+      const val = Number(time[key]);
+      if (Number.isFinite(val) && val > 0) {
+        result[key] = val;
+      }
+    }
+    return result;
+  }
+
+  _normalizeCurrencyRequirement(currency) {
+    if (!currency || typeof currency !== 'object') return {};
+    const amount = Number(currency.amount);
+    return {
+      unit: String(currency.unit || '').trim() || 'gp',
+      amount: Number.isFinite(amount) && amount > 0 ? amount : 0
     };
   }
 
@@ -305,7 +454,7 @@ export class CraftingSystemManager {
   getItems(systemId, search = '') {
     const system = this.getSystem(systemId);
     if (!system) return [];
-    const managedItems = Array.isArray(system.managedItems) ? system.managedItems : (system.items || []);
+    const managedItems = Array.isArray(system.components) ? system.components : (Array.isArray(system.managedItems) ? system.managedItems : (system.items || []));
     if (!search) return [...managedItems];
     const q = search.toLowerCase();
     return managedItems.filter(item =>
@@ -356,6 +505,24 @@ export class CraftingSystemManager {
     };
 
     const merged = this._normalizeSystem(mergedInput);
+
+    // Path 1: Mode change -- disable invalid salvage configs
+    const oldMode = current.salvageResolutionMode || 'simple';
+    const disabledComponents = this._disableInvalidSalvageConfigs(merged, oldMode);
+    if (disabledComponents.length > 0) {
+      const names = disabledComponents.join(', ');
+      ui?.notifications?.warn?.(
+        `Fabricate | Salvage disabled for ${disabledComponents.length} component(s) incompatible with new mode: ${names}`
+      );
+    }
+
+    // Path 2: Feature disable -- clean up salvage run history
+    const oldSalvageEnabled = current.features?.salvage === true;
+    const newSalvageEnabled = merged.features?.salvage === true;
+    if (oldSalvageEnabled && !newSalvageEnabled) {
+      await this._cleanupSalvageRunsForSystem(systemId);
+    }
+
     this.systems.set(systemId, merged);
     await this.save();
     return merged;
@@ -382,7 +549,7 @@ export class CraftingSystemManager {
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
     const validEssenceIds = new Set((system.essenceDefinitions || []).map(def => def.id));
-    const item = this._normalizeItem(data, validEssenceIds);
+    const item = this._normalizeComponent(data, validEssenceIds, system.features?.salvage === true);
     system.items.push(item);
     await this.save();
     return item;
@@ -404,11 +571,11 @@ export class CraftingSystemManager {
     }
 
     const validEssenceIds = new Set((system.essenceDefinitions || []).map(def => def.id));
-    const item = this._normalizeItem({
+    const item = this._normalizeComponent({
       name: source?.name || itemUuid.split('.').pop() || 'Imported Item',
       img: source?.img || 'icons/svg/item-bag.svg',
       sourceUuid: itemUuid
-    }, validEssenceIds);
+    }, validEssenceIds, system.features?.salvage === true);
 
     system.items.push(item);
     await this.save();
@@ -422,7 +589,11 @@ export class CraftingSystemManager {
     const idx = system.items.findIndex(i => i.id === itemId);
     if (idx < 0) throw new Error(`System item not found: ${itemId}`);
     const validEssenceIds = new Set((system.essenceDefinitions || []).map(def => def.id));
-    system.items[idx] = this._normalizeItem({ ...system.items[idx], ...updates, id: itemId }, validEssenceIds);
+    system.items[idx] = this._normalizeComponent(
+      { ...system.items[idx], ...updates, id: itemId },
+      validEssenceIds,
+      system.features?.salvage === true
+    );
     await this.save();
     return system.items[idx];
   }
@@ -431,16 +602,18 @@ export class CraftingSystemManager {
     this._assertGM('delete system item');
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
-    const managedItems = Array.isArray(system.managedItems) ? system.managedItems : (system.items || []);
+    const managedItems = Array.isArray(system.components) ? system.components : (Array.isArray(system.managedItems) ? system.managedItems : (system.items || []));
     const before = managedItems.length;
     const filteredItems = managedItems.filter(i => i.id !== itemId);
     if (filteredItems.length === before) return false;
     system.items = filteredItems;
+    system.components = filteredItems;
     system.managedItems = filteredItems;
 
-    // Clear essence associated-item links that pointed to the deleted managed item.
+    // Clear essence source-item links that pointed to the deleted managed item.
     const essenceDefinitions = (system.essenceDefinitions || []).map(def => ({
       ...def,
+      sourceItemUuid: def.sourceItemUuid === itemId ? null : def.sourceItemUuid,
       associatedSystemItemId: def.associatedSystemItemId === itemId ? null : def.associatedSystemItemId
     }));
     system.essenceDefinitions = essenceDefinitions;
@@ -456,11 +629,11 @@ export class CraftingSystemManager {
           ingredientGroups: (set.ingredientGroups || []).map(group => ({
             ...group,
             options: (group.options || []).filter(ing =>
-              (ing.match?.type === 'systemItem' ? ing.match.systemItemId : ing.systemItemId) !== itemId
+              ((ing.match?.type === 'component' || ing.match?.type === 'systemItem') ? (ing.match.componentId || ing.match.systemItemId) : (ing.componentId || ing.systemItemId)) !== itemId
             )
           })).filter(group => (group.options || []).length > 0),
-          ingredients: (set.ingredients || []).filter(ing => ing.systemItemId !== itemId),
-          catalysts: (set.catalysts || []).filter(cat => cat.systemItemId !== itemId)
+          ingredients: (set.ingredients || []).filter(ing => (ing.componentId || ing.systemItemId) !== itemId),
+          catalysts: (set.catalysts || []).filter(cat => (cat.componentId || cat.systemItemId) !== itemId)
         }))
         .map(set => ({
           ...set,
@@ -473,14 +646,14 @@ export class CraftingSystemManager {
           Object.keys(set.essences || {}).length > 0
         );
 
-      updated.catalysts = (updated.catalysts || []).filter(cat => cat.systemItemId !== itemId);
+      updated.catalysts = (updated.catalysts || []).filter(cat => (cat.componentId || cat.systemItemId) !== itemId);
       updated.resultGroups = (updated.resultGroups || [])
         .map(group => ({
           ...group,
-          results: (group.results || []).filter(res => res.systemItemId !== itemId)
+          results: (group.results || []).filter(res => (res.componentId || res.systemItemId) !== itemId)
         }))
         .filter(group => (group.results || []).length > 0);
-      updated.results = (updated.results || []).filter(res => res.systemItemId !== itemId);
+      updated.results = (updated.results || []).filter(res => (res.componentId || res.systemItemId) !== itemId);
 
       const hasResults = (updated.resultGroups?.length || 0) > 0 || (updated.results?.length || 0) > 0;
       if (updated.ingredientSets.length === 0 || !hasResults) {
@@ -490,7 +663,80 @@ export class CraftingSystemManager {
       await this.recipeManager.updateRecipe(recipe.id, updated);
     }
 
+    // Clean up salvage runs referencing the deleted component
+    await this._cleanupSalvageRunsForComponent(itemId);
+
     await this.save();
     return true;
+  }
+
+  /**
+   * Returns the ResolutionModeService instance from game.fabricate, or null.
+   * @returns {object|null}
+   */
+  _getResolutionModeService() {
+    return game.fabricate?.getResolutionModeService?.() || null;
+  }
+
+  /**
+   * For each component with salvage.enabled=true, validate it against the new mode
+   * using ResolutionModeService. Disable any that are invalid and return their names.
+   * Mutates system.components in-place.
+   * @param {object} system - Normalised system object (post-update)
+   * @param {string} oldMode - The previous salvageResolutionMode
+   * @returns {string[]} Names of disabled components
+   */
+  _disableInvalidSalvageConfigs(system, oldMode) {
+    if (!system.features?.salvage) return [];
+    if (system.salvageResolutionMode === oldMode) return [];
+
+    const resolutionService = this._getResolutionModeService();
+    if (!resolutionService) return [];
+
+    const disabled = [];
+    const items = Array.isArray(system.components) ? system.components : [];
+    for (const item of items) {
+      if (!item.salvage?.enabled) continue;
+      const validation = resolutionService.validateSalvage(item, system);
+      if (!validation.valid) {
+        item.salvage.enabled = false;
+        disabled.push(item.name || item.id);
+      }
+    }
+    return disabled;
+  }
+
+  /**
+   * Remove salvage run history entries for a given system from all actors' flags.
+   * Called when features.salvage is set to false.
+   * @param {string} systemId
+   */
+  async _cleanupSalvageRunsForSystem(systemId) {
+    for (const actor of game.actors || []) {
+      const existing = getFabricateFlag(actor, 'salvageRuns', null);
+      if (!existing) continue;
+      const history = Array.isArray(existing.history) ? existing.history : [];
+      const filtered = history.filter(r => r.craftingSystemId !== systemId);
+      if (filtered.length !== history.length) {
+        await setFabricateFlag(actor, 'salvageRuns', { ...existing, history: filtered });
+      }
+    }
+  }
+
+  /**
+   * Remove salvage run history entries referencing a deleted component from all actors' flags.
+   * Called when a component is deleted.
+   * @param {string} componentId
+   */
+  async _cleanupSalvageRunsForComponent(componentId) {
+    for (const actor of game.actors || []) {
+      const existing = getFabricateFlag(actor, 'salvageRuns', null);
+      if (!existing) continue;
+      const history = Array.isArray(existing.history) ? existing.history : [];
+      const filtered = history.filter(r => r.componentId !== componentId);
+      if (filtered.length !== history.length) {
+        await setFabricateFlag(actor, 'salvageRuns', { ...existing, history: filtered });
+      }
+    }
   }
 }

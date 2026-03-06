@@ -4,23 +4,16 @@ A system-agnostic, flexible crafting module for Foundry Virtual Tabletop that su
 
 ## Features
 
-### Progressive Complexity
-Fabricate is designed to scale from simple to complex:
-
-- **Simple Recipes**: Basic A + B = C crafting for straightforward systems
-- **Catalysts**: Non-consumable tools and workstations
-- **Variable Outputs**: Item properties that vary based on ingredients used
-- **Active Effect Transfer**: Effects from ingredients transfer to crafted items
-- **Tag-Based Ingredients**: Flexible matching (e.g., "any metal" instead of "iron")
-- **Quality Tiers**: Ingredient quality affects output quality
-
-### System Agnostic
-Works with any game system in Foundry VTT:
-- D&D 5e
-- Pathfinder 2e
-- Savage Worlds
-- Custom systems
-- And more!
+- **Crafting Systems** — Define independent crafting systems, each with their own managed items, essences, and feature toggles.
+- **Recipes** — Simple or multi-step recipes with ingredient sets, catalysts, and result groups.
+- **Resolution Modes** — Simple, mapped, tiered, and progressive crafting modes.
+- **Visibility and Knowledge** — Control which recipes players can see via player lists or knowledge-based discovery.
+- **Essences** — Tag items with abstract essences for flexible ingredient matching.
+- **Catalysts** — Non-consumable tools and workstations with optional usage tracking.
+- **Active Effect Transfer** — Transfer effects from ingredients to crafted items.
+- **Macro Integration** — Hook into success and failure outcomes with custom macros.
+- **Time and Currency Requirements** — Optional time or currency costs per crafting system.
+- **Salvage** — Break down managed items into components.
 
 ## Installation
 
@@ -32,470 +25,150 @@ Works with any game system in Foundry VTT:
 
 ## Quick Start
 
-### Using the Crafting Interface
+See [docs/quickstart.md](docs/quickstart.md) for a step-by-step guide.
 
-**For Players:**
-1. Open the **Items** sidebar (left side of Foundry)
-2. Click the **Craft Item** button (hammer icon)
-3. Select which actor will craft
-4. Browse available recipes
-5. Click "Craft" on any recipe you have materials for
+## Documentation
 
-The crafting interface shows:
-- **[OK] Green border**: Recipes you can craft now
-- **[X] Red border**: Missing required items
-- **Search bar**: Find recipes by name
-- **Filters**: Show only craftable recipes, filter by category
-
-### Creating Recipes (For GMs)
-
-**Option 1: Using Macros (Easiest)**
-
-Use the provided macros in `examples/macros/`:
-- `04-create-simple-recipe.js` - Template for basic recipes
-- See `QUICKSTART.md` for detailed instructions
-
-**Option 2: Via Console**
-
-```javascript
-// Create a simple Iron Sword recipe
-fabricate.createSimpleRecipe('Iron Sword', [
-  { itemUuid: 'Item.abc123', quantity: 2 }, // 2 Iron Ingots
-  { itemUuid: 'Item.def456', quantity: 1 }  // 1 Wood
-], {
-  itemUuid: 'Item.ghi789', // Iron Sword
-  quantity: 1
-});
-```
-
-### Crafting an Item
-
-Players can craft using the **Craft** button on their character sheet, or via chat command:
-
-```
-/craft Iron Sword
-```
-
-Or via macro:
-```javascript
-fabricate.craft(game.user.character, 'recipeId');
-```
-
-## Advanced Features
-
-### Catalysts (Non-Consumable Tools)
-
-Catalysts are items required for crafting but not consumed:
-
-```javascript
-const { Recipe, Ingredient, Catalyst } = game.fabricate.api;
-
-const recipe = new Recipe({
-  name: 'Steel Blade',
-  ingredientSets: [
-    {
-      id: 'steel-input',
-      ingredients: [
-        new Ingredient({ itemUuid: 'Item.steel', quantity: 3 })
-      ]
-    }
-  ],
-  catalysts: [
-    new Catalyst({
-      name: 'Forge',
-      tag: 'tool:forge',
-      required: true,
-      degradesOnUse: true,
-      degradeAmount: 1
-    })
-  ],
-  results: [
-    {
-      id: 'steel-blade',
-      itemUuid: 'Item.steelBlade',
-      quantity: 1
-    }
-  ]
-});
-
-game.fabricate.getRecipeManager().createRecipe(recipe.toJSON());
-```
-
-### Variable Outputs
-
-Create items whose properties vary based on ingredients:
-
-```javascript
-const { Recipe, Ingredient, IngredientSet, Result } = game.fabricate.api;
-
-const recipe = new Recipe({
-  name: 'Magical Sword',
-  ingredientSets: [
-    new IngredientSet({
-      id: 'metal-input',
-      ingredients: [
-        new Ingredient({
-          tag: 'metal',
-          quantity: 2,
-          tier: null // Accept any tier
-        })
-      ],
-      resultMapping: ['magic-sword']
-    })
-  ],
-  results: [
-    new Result({
-      id: 'magic-sword',
-      itemUuid: 'Item.genericSword',
-      quantity: 1,
-      propertyFormulas: {
-        'system.damage.parts.0.0': '1d8 + ingredientTier', // Damage scales with ingredient tier
-        'system.weight': '3 - (ingredientTier * 0.5)' // Better materials = lighter
-      }
-    })
-  ],
-  isVariable: true
-});
-```
-
-### Active Effect Transfer
-
-Transfer magical properties from ingredients to the crafted item:
-
-```javascript
-const { Recipe, Ingredient, Result } = game.fabricate.api;
-
-const recipe = new Recipe({
-  name: 'Poisoned Blade',
-  ingredientSets: [
-    {
-      id: 'poisoned-blade-input',
-      ingredients: [
-        new Ingredient({
-          itemUuid: 'Item.sword',
-          quantity: 1
-        }),
-        new Ingredient({
-          itemUuid: 'Item.poison',
-          quantity: 1,
-          extractEffects: true, // Extract effects from this ingredient
-          effectFilter: 'poison' // Only extract effects with "poison" in the name
-        })
-      ]
-    }
-  ],
-  results: [
-    new Result({
-      id: 'poisoned-blade',
-      itemUuid: 'Item.poisonedSword',
-      quantity: 1
-    })
-  ],
-  transferEffects: true
-});
-```
-
-### Tag-Based Ingredients
-
-Use tags for flexible ingredient matching:
-
-```javascript
-// First, tag your items
-await item.setFlag('fabricate', 'tags', ['metal', 'metal:iron']);
-await item.setFlag('fabricate', 'tier', 'common');
-
-// Then create recipes using tags
-const recipe = new Recipe({
-  name: 'Any Metal Sword',
-  ingredientSets: [
-    {
-      id: 'tagged-metal-input',
-      ingredients: [
-        new Ingredient({
-          tag: 'metal', // Matches any item with 'metal' tag
-          quantity: 2,
-          tier: 'common' // Optional: require specific tier
-        })
-      ]
-    }
-  ],
-  results: [
-    {
-      id: 'tagged-sword',
-      itemUuid: 'Item.sword',
-      quantity: 1
-    }
-  ]
-});
-```
-
-### Alternative Ingredients
-
-Allow multiple options for an ingredient:
-
-```javascript
-const ingredient = new Ingredient({
-  tag: 'wood',
-  quantity: 1,
-  alternatives: [
-    new Ingredient({ itemUuid: 'Item.oak', quantity: 1 }),
-    new Ingredient({ itemUuid: 'Item.pine', quantity: 2 }) // Takes 2 pine instead of 1 oak
-  ]
-});
-```
+Full API reference and user guides are available in the [docs site](docs/).
 
 ## API Reference
 
-### Global API
+The module exposes `game.fabricate` after the `ready` hook. Constructors and data shapes are available via `game.fabricate.api`.
 
-```javascript
-// Access via global scope
-fabricate.createSimpleRecipe(name, ingredients, result)
-fabricate.craft(actor, recipeId, options)
-fabricate.listRecipes(filters)
-fabricate.getAvailableRecipes(actorOrActors)
+### Crafting Systems
 
-// Access via game object
-game.fabricate.getRecipeManager()
-game.fabricate.getCraftingEngine()
-game.fabricate.craft(actor, recipe, options)
-```
+```js
+// List all crafting systems
+const systems = game.fabricate.getCraftingSystemManager().getSystems();
 
-### Classes
-
-```javascript
-const { Recipe, IngredientSet, Ingredient, Result, Catalyst, RecipeManager, CraftingEngine } = game.fabricate.api;
-```
-
-#### Recipe
-
-```javascript
-new Recipe({
-  name: 'Recipe Name',
-  description: 'Recipe description',
-  ingredientSets: [IngredientSet, ...],
-  catalysts: [Catalyst, ...],
-  results: [Result, ...],
-  isVariable: false,
-  transferEffects: false,
-  requiresAllSets: false,
-  category: 'general',
-  tags: [],
-  enabled: true,
-  system: 'all'
-})
-```
-
-#### Ingredient
-
-```javascript
-new Ingredient({
-  itemUuid: null,
-  quantity: 1,
-  tag: null,
-  tier: null,
-  alternatives: [],
-  extractEffects: false,
-  effectFilter: null
-})
-```
-
-#### Catalyst
-
-```javascript
-new Catalyst({
-  itemUuid: null,
-  tag: null,
-  name: 'Catalyst Name',
-  required: true,
-  mustBeEquipped: false,
-  mustBeInInventory: true,
-  degradesOnUse: false,
-  degradeAmount: 1,
-  durabilityAttribute: 'system.durability',
-  qualityBonus: false,
-  qualityAttribute: 'system.quality'
-})
-```
-
-## Examples
-
-### Example 1: Simple Alchemy
-
-```javascript
-// Health Potion: 2 Healing Herbs -> 1 Health Potion
-fabricate.createSimpleRecipe('Health Potion', [
-  { itemUuid: 'Item.healingHerb', quantity: 2 }
-], {
-  itemUuid: 'Item.healthPotion',
-  quantity: 1
+// Create a crafting system (GM only)
+const system = await game.fabricate.getCraftingSystemManager().createSystem({
+  name: 'Blacksmithing',
+  resolutionMode: 'simple', // 'simple' | 'mapped' | 'tiered' | 'progressive'
+  features: {
+    essences: false,
+    multiStepRecipes: false,
+    effectTransfer: false,
+    salvage: false
+  }
 });
 ```
 
-### Example 2: Blacksmithing with Forge
+### Recipes
 
-```javascript
-const { Recipe, Ingredient, Catalyst, Result } = game.fabricate.api;
+Recipes reference managed items by `componentId`:
 
-const recipe = new Recipe({
+```js
+const recipe = new game.fabricate.api.Recipe({
   name: 'Iron Sword',
+  craftingSystemId: system.id,
   ingredientSets: [
     {
-      id: 'iron-sword-input',
       ingredients: [
-        new Ingredient({ tag: 'metal:iron', quantity: 2 }),
-        new Ingredient({ tag: 'wood', quantity: 1 })
+        { componentId: 'iron-ingot-id', quantity: 2 },
+        { componentId: 'wood-id', quantity: 1 }
+      ],
+      catalysts: [
+        { componentId: 'anvil-id', degradesOnUse: false }
       ]
     }
   ],
-  catalysts: [
-    new Catalyst({
-      name: 'Blacksmith Forge',
-      tag: 'tool:forge',
-      required: true
-    })
-  ],
-  results: [
-    new Result({
-      id: 'iron-sword-result',
-      itemUuid: 'Item.ironSword',
-      quantity: 1
-    })
+  resultGroups: [
+    {
+      results: [
+        { componentId: 'iron-sword-id', quantity: 1 }
+      ]
+    }
   ]
 });
 
 await game.fabricate.getRecipeManager().createRecipe(recipe.toJSON());
 ```
 
-### Example 3: Enchanted Item with Effect Transfer
+### Crafting
 
-```javascript
-const { Recipe, Ingredient, Result } = game.fabricate.api;
+```js
+// Craft a recipe for an actor
+const result = await game.fabricate.craft(actor, recipeId);
 
-const recipe = new Recipe({
-  name: 'Flaming Sword',
-  ingredientSets: [
-    {
-      id: 'flaming-sword-input',
-      ingredients: [
-        new Ingredient({ itemUuid: 'Item.sword', quantity: 1 }),
-        new Ingredient({
-          itemUuid: 'Item.fireGem',
-          quantity: 1,
-          extractEffects: true,
-          effectFilter: 'fire'
-        })
-      ]
-    }
-  ],
-  results: [
-    new Result({
-      id: 'flaming-sword-result',
-      itemUuid: 'Item.flamingSword',
-      quantity: 1
-    })
-  ],
-  transferEffects: true
+if (result.success) {
+  console.log(`Crafting succeeded: ${result.message}`);
+} else {
+  console.log(`Crafting failed: ${result.message}`);
+}
+
+// With component source actors (e.g. a shared party loot actor)
+const result = await game.fabricate.craft(actor, recipeId, {
+  componentSourceActors: [actor, partyLootActor]
 });
 ```
 
-### Example 4: Quality-Based Output
+### Macro Helpers
 
-```javascript
-const { Recipe, Ingredient, IngredientSet, Result } = game.fabricate.api;
+The following are available as `globalThis.fabricate` for use in macros:
 
-const recipe = new Recipe({
-  name: 'Quality Blade',
-  ingredientSets: [
-    new IngredientSet({
-      id: 'quality-blade-input',
-      ingredients: [
-        new Ingredient({
-          tag: 'metal',
-          quantity: 3
-          // No tier specified - accepts any tier
-        })
-      ],
-      resultMapping: ['quality-blade-result']
-    })
-  ],
-  results: [
-    new Result({
-      id: 'quality-blade-result',
-      itemUuid: 'Item.blade',
-      quantity: 1,
-      propertyFormulas: {
-        'system.damage.parts.0.0': '1d6 + Math.floor(ingredientTier)',
-        'system.price': '50 * ingredientTier'
-      }
-    })
-  ],
-  isVariable: true
-});
+```js
+fabricate.listRecipes();                        // List all recipes
+fabricate.craft(game.user.character, 'id');     // Craft a recipe
+fabricate.openRecipeManager();                  // Open GM recipe manager
+fabricate.listCraftingSystems();                // List crafting systems
 ```
 
-## Formula System
+## Data Models
 
-Formulas use a safe expression parser that supports mathematical operations without using `eval()`.
+### Ingredient
 
-**Supported Features:**
-- Basic math operators: `+`, `-`, `*`, `/`, `()`
-- Dice notation: `1d6`, `2d8`, `3d10`
-- Math functions: `Math.floor()`, `Math.ceil()`, `Math.round()`
-- Context variables: `ingredientCount`, `ingredientTier`, `catalystQuality`
-
-**Context Variables:**
-- `ingredientCount` - Number of ingredients consumed
-- `ingredientTier` - Average tier of ingredients (common=1, uncommon=2, rare=3, legendary=4)
-- `catalystQuality` - Average quality bonus from catalysts
-
-**Example formulas:**
-- `1d8 + ingredientTier`
-- `10 * ingredientCount`
-- `100 + (ingredientTier * catalystQuality)`
-- `Math.floor(1d6 + ingredientTier / 2)`
-- `2d6 * catalystQuality`
-
-## Import/Export
-
-### Export Recipes
-```javascript
-const recipes = game.fabricate.getRecipeManager().exportRecipes();
-const json = JSON.stringify(recipes, null, 2);
-// Save to file or share
+```js
+{ componentId: string, quantity: number }
 ```
 
-### Import Recipes
-```javascript
-const recipesData = JSON.parse(jsonString);
-await game.fabricate.getRecipeManager().importRecipes(recipesData, false);
+### Catalyst
+
+```js
+{ componentId: string, degradesOnUse: boolean, maxUses: number|null, destroyWhenExhausted: boolean }
 ```
 
-## Settings
+### Result
 
-- **Enable Crafting System**: Enable/disable the module globally
-- **Show Simple Recipes Only**: Hide advanced features in the UI
-- **Auto-Craft**: Skip confirmation dialogs when crafting
+```js
+{ componentId: string, quantity: number }
+```
 
-## Roadmap
+### Crafting System shape
 
-- [ ] Visual recipe editor UI
-- [ ] Player crafting interface
-- [ ] Time-based crafting with progress tracking
-- [ ] Multi-step recipes (craft A, then use A to craft B)
-- [ ] Recipe discovery/learning system
-- [ ] Compendium packs with example recipes
-- [ ] Safe formula parser (replace eval)
-- [ ] Skill check integration for various systems
-- [ ] Crafting stations (placed items as catalysts)
-- [ ] Batch crafting
-- [ ] Recipe categories and filtering
-- [ ] Permissions system (who can craft what)
+```js
+{
+  id: string,
+  name: string,
+  resolutionMode: 'simple' | 'mapped' | 'tiered' | 'progressive',
+  features: {
+    essences: boolean,
+    multiStepRecipes: boolean,
+    effectTransfer: boolean,
+    salvage: boolean,
+    itemTags: boolean,
+    recipeCategories: boolean,
+    craftingChecks: boolean
+  },
+  recipeVisibility: {
+    listMode: 'global' | 'player' | 'knowledge'
+  }
+}
+```
+
+## Development
+
+```bash
+npm install
+npm test         # Run test suite
+npm run build    # Vite build to /dist
+```
+
+See [AGENTS.md](AGENTS.md) for contributor and agent guidelines.
 
 ## Support
 
 - **Issues**: [GitHub Issues](https://github.com/misterpotts/fabricate/issues)
-- **Documentation**: [GitHub Wiki](https://github.com/misterpotts/fabricate/wiki)
 
 ## License
 
@@ -504,44 +177,4 @@ Commercial use requires a separate commercial license. See `LICENSE`.
 
 ## Credits
 
-Created by MisterPotts
-
-Inspired by the original Fabricate module by MisterPotts.
-
-## Development
-
-### Building
-
-```bash
-npm install
-npm run build    # Build once
-npm run dev      # Build and watch for changes
-```
-
-### Project Structure
-
-```text
-fabricate/
-|-- src/
-|   |-- main.js                 # Module entry point
-|   |-- models/
-|   |   |-- Recipe.js           # Recipe data model
-|   |   |-- Ingredient.js       # Ingredient data model
-|   |   `-- Catalyst.js         # Catalyst data model
-|   |-- systems/
-|   |   |-- RecipeManager.js    # Recipe CRUD operations
-|   |   `-- CraftingEngine.js   # Crafting logic
-|   `-- ui/                     # UI components
-|-- styles/
-|   `-- fabricate.css           # Module styles
-|-- lang/
-|   `-- en.json                 # Localization
-|-- module.json                 # Foundry manifest
-|-- package.json                # NPM configuration
-`-- vite.config.js              # Build configuration
-```
-
-## Contributing
-
-Contributions are welcome! Please open an issue or pull request on GitHub.
-
+Created by MisterPotts.

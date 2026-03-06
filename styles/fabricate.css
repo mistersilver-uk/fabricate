@@ -646,8 +646,17 @@
   font-size: 13px;
 }
 
-.recipe-row.disabled {
+.recipe-row.recipe-disabled {
   opacity: 0.5;
+}
+.badge-disabled {
+  background: #999;
+  color: white;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: 6px;
+  vertical-align: middle;
 }
 
 .recipe-thumb {

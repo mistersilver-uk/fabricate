@@ -64,6 +64,7 @@ export class RecipeManager {
 
     this.recipes.set(recipe.id, recipe);
     await this.save();
+    console.debug(`Fabricate | Created recipe "${recipe.name}" (${recipe.id})`);
 
     ui.notifications.info(`Recipe "${recipe.name}" created`);
     return recipe;
@@ -97,6 +98,7 @@ export class RecipeManager {
 
     this.recipes.set(recipeId, updatedRecipe);
     await this.save();
+    console.debug(`Fabricate | Updated recipe "${updatedRecipe.name}" (${updatedRecipe.id})`);
     ui.notifications.info(`Recipe "${updatedRecipe.name}" updated`);
     return updatedRecipe;
   }
@@ -251,7 +253,17 @@ export class RecipeManager {
       }
     }
 
-    // No ingredient set can be satisfied - return missing from first set
+    // No ingredient set can be satisfied.
+    // Guard against multi-step recipes where ingredientSets is empty (sets live inside steps).
+    if (recipe.ingredientSets.length === 0) {
+      return {
+        canCraft: false,
+        satisfiableSet: null,
+        missing: { ingredients: [], essences: [], catalysts: [] }
+      };
+    }
+
+    // Return missing details from the first set so the UI can show what is lacking
     const firstSetMissing = this._checkIngredientSet(recipe, recipe.ingredientSets[0], availableItems);
     const firstSetCatalysts = this.getCatalystsForSet(recipe, recipe.ingredientSets[0]);
     const catalystMissing = this._checkCatalysts(recipe, firstSetCatalysts, componentSourceActors);
@@ -329,8 +341,6 @@ export class RecipeManager {
     const missing = [];
 
     for (const catalyst of catalysts) {
-      if (catalyst.required === false) continue;
-
       let found = false;
 
       for (const actor of actors) {
@@ -370,12 +380,12 @@ export class RecipeManager {
   ingredientMatchesItem(recipe, ingredient, item) {
     const features = this._getSystemFeatures(recipe);
     const match = ingredient.match || null;
-    const systemItemId = match?.type === 'systemItem'
-      ? (match.systemItemId || null)
-      : (ingredient.systemItemId || null);
+    const componentId = (match?.type === 'component' || match?.type === 'systemItem')
+      ? (match.componentId || match.systemItemId || null)
+      : (ingredient.componentId || ingredient.systemItemId || null);
 
-    if (systemItemId) {
-      const managedItem = this._getSystemItem(recipe, systemItemId);
+    if (componentId) {
+      const managedItem = this._getComponent(recipe, componentId);
       if (!managedItem) return false;
 
       const sourceId = foundry.utils.getProperty(item, 'flags.core.sourceId');
@@ -409,8 +419,8 @@ export class RecipeManager {
    * @private
    */
   _catalystMatchesItem(recipe, catalyst, item) {
-    if (catalyst.systemItemId) {
-      const managedItem = this._getSystemItem(recipe, catalyst.systemItemId);
+    if (catalyst.componentId || catalyst.systemItemId) {
+      const managedItem = this._getComponent(recipe, catalyst.componentId || catalyst.systemItemId);
       if (!managedItem) return false;
       if (managedItem.sourceUuid) {
         const sourceId = foundry.utils.getProperty(item, 'flags.core.sourceId');
@@ -418,7 +428,8 @@ export class RecipeManager {
       }
       return item.name?.toLowerCase() === (managedItem.name || '').toLowerCase();
     }
-    return catalyst.matches(item);
+    // No componentId means catalyst cannot be matched; treat as no match.
+    return false;
   }
 
   _matchesIngredient(ingredient, item, features) {
@@ -477,14 +488,14 @@ export class RecipeManager {
    * Resolve a managed system item by ID for the given recipe
    * @private
    */
-  _getSystemItem(recipe, systemItemId) {
+  _getComponent(recipe, componentId) {
     const systemId = recipe?.craftingSystemId;
-    if (!systemId || !systemItemId) return null;
+    if (!systemId || !componentId) return null;
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(systemId);
     if (!system) return null;
-    const managedItems = Array.isArray(system.managedItems) ? system.managedItems : (system.items || []);
-    return managedItems.find(item => item.id === systemItemId) || null;
+    const managedItems = Array.isArray(system.components) ? system.components : (Array.isArray(system.managedItems) ? system.managedItems : (system.items || []));
+    return managedItems.find(item => item.id === componentId) || null;
   }
 
   /**

@@ -436,7 +436,10 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
         access.knowledge.matchedItems.length > 0;
 
       // Prepare ingredient set display (show first set or satisfiable set)
-      const displaySet = satisfiableSet || recipe.ingredientSets[0];
+      const displaySet = satisfiableSet
+          || recipe.ingredientSets[0]
+          || recipe.steps?.[0]?.ingredientSets?.[0]
+          || { ingredientGroups: [], ingredients: [], essences: {}, catalysts: [] };
       const availableItems = this.componentSourceActors.flatMap(actor =>
         Array.from(actor.items)
       );
@@ -464,6 +467,8 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
           ? (activeRun.canContinue ? 'Continue' : 'Waiting')
           : 'Craft',
         canLearn,
+        // NOTE: For multi-step recipes, ingredientSets is empty, so hasMultipleSets is always false.
+        // This is intentional — the multi-step set switcher UI is not shown for multi-step recipes.
         hasMultipleSets: recipe.ingredientSets.length > 1,
         resultDescription: recipe.getResultDescription(),
         ingredients: (() => {
@@ -922,19 +927,14 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
         <h4>Ingredient Sets:</h4>
     `;
 
-    // Show all ingredient sets
-    for (const [idx, ingredientSet] of recipe.ingredientSets.entries()) {
-      const setName = ingredientSet.name || `Option ${idx + 1}`;
-      content += `<h5>${setName}</h5><ul>`;
-
-      // Ingredients
+    // Show all ingredient sets.
+    // For multi-step recipes, top-level ingredientSets is empty; fall back to iterating steps.
+    const _renderIngredientSet = (ingredientSet, label, availableItems) => {
+      content += `<h5>${label}</h5><ul>`;
       const groups = Array.isArray(ingredientSet.ingredientGroups) && ingredientSet.ingredientGroups.length > 0
         ? ingredientSet.ingredientGroups
         : (ingredientSet.ingredients || []).map(ingredient => ({ options: [ingredient] }));
       for (const [groupIndex, group] of groups.entries()) {
-        const availableItems = this.componentSourceActors.flatMap(actor =>
-          Array.from(actor.items)
-        );
         const optionParts = (group.options || []).map((ing) => {
           const matchingItems = availableItems.filter(item =>
             recipeManager.ingredientMatchesItem(recipe, ing, item)
@@ -948,8 +948,6 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
         });
         content += `<li><strong>Group ${groupIndex + 1}</strong>: ${optionParts.join(' OR ')}</li>`;
       }
-
-      // Essences
       if (Object.keys(ingredientSet.essences || {}).length > 0) {
         content += `<li>Essences:`;
         for (const [type, qty] of Object.entries(ingredientSet.essences)) {
@@ -957,12 +955,34 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
         }
         content += `</li>`;
       }
-
       content += `</ul>`;
+    };
+
+    const _detailAvailableItems = this.componentSourceActors.flatMap(actor =>
+      Array.from(actor.items)
+    );
+
+    if (recipe.ingredientSets.length > 0) {
+      for (const [idx, ingredientSet] of recipe.ingredientSets.entries()) {
+        _renderIngredientSet(ingredientSet, ingredientSet.name || `Option ${idx + 1}`, _detailAvailableItems);
+      }
+    } else if (Array.isArray(recipe.steps) && recipe.steps.length > 0) {
+      // Multi-step recipe: render ingredient sets from each step
+      for (const [stepIdx, step] of recipe.steps.entries()) {
+        for (const [setIdx, ingredientSet] of (step.ingredientSets || []).entries()) {
+          const label = ingredientSet.name || `Step ${stepIdx + 1} — Option ${setIdx + 1}`;
+          _renderIngredientSet(ingredientSet, label, _detailAvailableItems);
+        }
+      }
+    } else {
+      content += `<p><em>No ingredient sets defined.</em></p>`;
     }
 
     // Catalysts
-    const detailSet = canCraftCheck.satisfiableSet || recipe.ingredientSets[0];
+    const detailSet = canCraftCheck.satisfiableSet
+        || recipe.ingredientSets[0]
+        || recipe.steps?.[0]?.ingredientSets?.[0]
+        || { ingredientGroups: [], ingredients: [], essences: {}, catalysts: [] };
     const detailCatalysts = recipeManager.getCatalystsForSet(recipe, detailSet);
     if (detailCatalysts.length > 0) {
       content += `<h4>Catalysts (not consumed):</h4><ul>`;

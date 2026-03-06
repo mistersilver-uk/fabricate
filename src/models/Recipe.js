@@ -84,8 +84,8 @@ export class Recipe {
         !!group.options[0] &&
         (
           !!group.options[0].itemUuid ||
-          (group.options[0].match?.type === 'systemItem' && !!group.options[0].match?.systemItemId) ||
-          !!group.options[0].systemItemId
+          ((group.options[0].match?.type === 'component' || group.options[0].match?.type === 'systemItem') && !!(group.options[0].match?.componentId || group.options[0].match?.systemItemId)) ||
+          !!(group.options[0].componentId || group.options[0].systemItemId)
         ) &&
         !(group.options[0].match?.type === 'tags') &&
         !group.options[0].tag
