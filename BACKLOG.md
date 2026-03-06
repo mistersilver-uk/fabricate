@@ -35,7 +35,8 @@ Purpose: keep agent work explicit, reviewable, and testable.
 ## Competitive Analysis Gap Tasks
 
 ### T-054 - Ship Starter Content Pack and Check Macro Templates
-- Status: `todo`
+- Status: `blocked`
+- Blocked by: Needs an item compendium for the starter pack.
 - Description: Add a starter content package that reduces time-to-first-craft for new GMs. Include at least one ready-to-use crafting system with sample components/recipes plus copy-paste check macro templates for common systems and a generic fallback.
 - Acceptance Criteria:
   1. A starter data pack is available from inside the module (importable JSON or compendium content) with at least one complete system and at least 10 recipes.
@@ -43,6 +44,8 @@ Purpose: keep agent work explicit, reviewable, and testable.
   3. At least two check macro templates are included and documented: one `dnd5e`-specific and one system-agnostic fallback.
   4. A smoke test verifies a fresh world can import the pack and successfully craft at least one recipe end-to-end without manual data authoring.
   5. User docs explain where starter content lives, how to import it, and how to adapt templates for custom systems.
+  6. A compendium for the starter pack is available and included with the module.
+  7. All components referenced in the starter pack are included in the module's compendium, and vice-versa.
 
 ### T-055 - Add Built-In Roll/Check UI (No Macro Required)
 - Status: `todo`
