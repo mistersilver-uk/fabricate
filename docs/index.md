@@ -27,6 +27,9 @@ Fabricate lets GMs define crafting systems with recipes, ingredients, catalysts,
 | **Macro Integration** | Customise crafting checks, property generation, and success/failure hooks |
 | **Troubleshooting** | Diagnose common setup and runtime issues |
 
+{: .tip }
+> Use the **search bar** in the sidebar to quickly find settings, configuration options, and macro examples across the documentation.
+
 ## Quick example
 
 Create a simple recipe with a Foundry macro:

@@ -159,7 +159,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
   5. No conflicting enum/default statements remain anywhere in `spec/`.
 
 ### T-065 - Spec 002/006: Define Empty `allowedUserIds` Semantics for Restricted Recipes
-- Status: `todo`
+- Status: `done`
 - Description: Clarify that `visibility.restricted=true` with an empty `allowedUserIds` list is valid and hides the recipe from all non-GM users, rather than being treated as a validation error.
 - Acceptance Criteria:
   1. `spec/002-data-models.md` removes/updates any rule that requires non-empty `allowedUserIds` when restricted.
@@ -284,7 +284,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
   6. The main docs home page includes an entry point to the new how-to section for non-linear, task-driven learning.
 
 ### T-077 - Add "What's Next?" Learning-Path Navigation to Concept Pages
-- Status: `todo`
+- Status: `done`
 - Description: Add explicit continuation links at the end of core concept pages so readers can follow a guided learning path instead of returning to sidebar navigation after each page.
 - Acceptance Criteria:
   1. `docs/catalysts.md` ends with a "What's next?" section linking to `docs/recipes/index.md` and `docs/api/crafting-engine.md`.
@@ -295,7 +295,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
   6. Manual link verification confirms all new "What's next?" links resolve to existing pages/anchors.
 
 ### T-078 - Enable and Tune Just the Docs Search
-- Status: `todo`
+- Status: `done`
 - Description: Configure Just the Docs built-in search so users can quickly locate settings and behaviors without manually scanning long pages. Apply the recommended search configuration in `_config.yml` and verify results quality on key terms.
 - Acceptance Criteria:
   1. `docs/_config.yml` enables search and includes the configured options for heading depth, preview count, preview context windows, and tokenizer separator.

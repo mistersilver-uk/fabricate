@@ -100,3 +100,10 @@ If crafting checks are enabled on the system, simple mode uses pass/fail:
 - **Fail**: behaviour depends on your consumption-on-failure settings
 
 The crafting check macro must return `{ success: true/false }`. See [Macros]({% link macros/index.md %}) for the contract.
+
+---
+
+## What's next?
+
+- [Mapped Mode]({% link recipes/mapped.md %}) -- ingredient choices determine which result is produced.
+- [Macros & Examples]({% link macros/index.md %}) -- crafting check macro contracts and ready-to-use examples.

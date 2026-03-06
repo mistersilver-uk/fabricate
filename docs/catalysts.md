@@ -112,3 +112,10 @@ Fabricate performs this migration on-read inside `applyDegradation()`:
 No manual migration step is required. Owned items with the old flag will continue to work correctly, and their usage history is preserved.
 
 **Note:** If both the old and new flags happen to be present on the same item (for example, from a partial previous migration), the new `catalystItemUsage.timesUsed` value always takes precedence.
+
+---
+
+## What's next?
+
+- [Recipes overview]({% link recipes/index.md %}) -- learn how catalysts fit into recipe definitions and resolution modes.
+- [Crafting Engine API]({% link api/crafting-engine.md %}) -- programmatic control over crafting runs and catalyst validation.

@@ -92,3 +92,10 @@ Mapped mode is ideal when:
 - The same crafting process can produce different outputs depending on materials
 - You want player agency in choosing outcomes through ingredient selection
 - Different material quality should produce different results
+
+---
+
+## What's next?
+
+- [Tiered Mode]({% link recipes/tiered.md %}) -- skill checks determine result quality through named outcomes.
+- [Macros & Examples]({% link macros/index.md %}) -- crafting check macro contracts and ready-to-use examples.

@@ -47,12 +47,23 @@ Given `viewer`, `craftingSystem`, optional `craftingActor`, optional `componentS
    - GM sees all recipes.
    - Non-GM sees all enabled recipes. No restriction or knowledge filtering is applied.
 3. If `listMode === "player"`:
-   - GM sees all recipes.
-   - Non-GM sees recipes where `visibility.restricted === false` or `allowedUserIds` includes viewer ID.
+   - GM sees all recipes, including restricted recipes with empty allow-lists.
+   - Non-GM sees recipes where `visibility.restricted === false`, or where `allowedUserIds` includes the viewer's user ID.
+   - When `visibility.restricted === true` and `allowedUserIds` is empty, no non-GM user can see the recipe.
 4. If `listMode === "knowledge"`:
    - Evaluate knowledge access for each recipe.
    - Keep only recipes where access is granted.
 5. Keep locked recipes visible but not craftable for non-GMs.
+
+### Restricted Visibility Examples
+
+| `restricted` | `allowedUserIds` | GM sees? | Player "abc" sees? | Notes                                                                            |
+|--------------|------------------|----------|--------------------|----------------------------------------------------------------------------------|
+| `false`      | (any)            | Yes      | Yes                | Unrestricted; allow-list ignored                                                 |
+| `true`       | `["abc", "def"]` | Yes      | Yes                | Player is in allow-list                                                          |
+| `true`       | `["def"]`        | Yes      | No                 | Player is not in allow-list                                                      |
+| `true`       | `[]`             | Yes      | No                 | Valid config: hidden from all non-GM users                                       |
+| `true`       | missing/null     | Yes      | No                 | Invalid shape: treated as validation error at save time; runtime treats as empty |
 
 ### Crafting Guard Algorithm
 
@@ -163,4 +174,5 @@ If `linkedRecipeItemUuid` no longer resolves to a template:
 - Unit tests for matching by UUID and by `core.sourceId`.
 - Unit tests for limited-use exhaustion and deterministic matched-item selection.
 - Unit tests for learning with and without consume-on-learn.
+- Unit tests for restricted recipes with empty `allowedUserIds` confirming GM access and non-GM denial.
 - Integration tests for full craft guard re-check on start, resume, and step execution.

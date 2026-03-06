@@ -140,17 +140,20 @@ export class RecipeVisibilityService {
       return { visible: false, craftable: false, reason: 'missing-system' };
     }
 
-    const listMode = system?.recipeVisibility?.listMode || 'player';
+    const listMode = system?.recipeVisibility?.listMode || 'global';
     let visible = false;
     let knowledge = null;
 
     if (viewer?.isGM) {
       visible = true;
+    } else if (listMode === 'knowledge') {
+      knowledge = this.evaluateKnowledgeAccess({ recipe, viewer, craftingActor, componentSourceActors });
+      visible = knowledge.granted;
     } else if (listMode === 'player') {
       visible = this._isRecipeVisibleByPlayerListMode(recipe, viewer);
     } else {
-      knowledge = this.evaluateKnowledgeAccess({ recipe, viewer, craftingActor, componentSourceActors });
-      visible = knowledge.granted;
+      // Global mode: all enabled recipes are visible to all players.
+      visible = true;
     }
 
     if (!visible) {

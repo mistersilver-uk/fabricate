@@ -155,3 +155,11 @@ Before starting, resuming, or advancing a crafting run, Fabricate re-evaluates:
 3. Does the user still have knowledge access? (if applicable)
 
 If any guard fails, the action is blocked with a notification explaining why.
+
+---
+
+## What's next?
+
+- [Recipes overview]({% link recipes/index.md %}) -- create and edit recipes, including visibility configuration in the recipe editor.
+- [Crafting Systems]({% link crafting-systems.md %}) -- configure system-level visibility settings and feature toggles.
+- [Macros & Examples]({% link macros/index.md %}) -- automate visibility and knowledge workflows with macros.

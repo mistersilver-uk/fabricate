@@ -226,7 +226,7 @@ Recipe = {
 
   visibility?: {
     restricted: boolean,
-    allowedUserIds?: string[],
+    allowedUserIds?: string[],  // Required when restricted is true. Empty array = hidden from all non-GM users.
   },
 
   // Canonical recipe-item template reference (world or compendium UUID)
@@ -249,9 +249,17 @@ Recipe = {
 2. Resolution-mode constraints are defined in `004-resolution-modes.md`.
 3. If `outcomeRouting` is used, keys must exist in `CraftingSystem.craftingCheck.outcomes`.
 4. If `transferEffects` is true and essences are enabled, transfer behaviour follows `005-recipes-and-steps.md`.
-5. If `visibility.restricted` is true, `visibility.allowedUserIds` is required.
+5. If `visibility.restricted` is true, `visibility.allowedUserIds` must be present as an array. An empty array is valid and means no non-GM user may see the recipe.
 6. If knowledge mode includes item matching or learning, `linkedRecipeItemUuid` should be configured for player craftability.
 7. If `linkedRecipeItemUuid` is configured and does not resolve, validation must warn.
+
+### Validation Guidance
+
+Shape validation (invalid):
+- `visibility.restricted` is `true` but `allowedUserIds` is missing, `null`, or not an array.
+
+Valid-but-hidden configuration:
+- `visibility.restricted` is `true` and `allowedUserIds` is `[]`. The recipe is hidden from all non-GM users. GM can still view and manage the recipe.
 
 ## Recipe Item Identity
 

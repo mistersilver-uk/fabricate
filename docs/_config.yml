@@ -11,6 +11,16 @@ aux_links:
 
 nav_sort: order
 
+search_enabled: true
+search:
+  heading_level: 3
+  previews: 3
+  preview_words_before: 5
+  preview_words_after: 10
+  tokenizer_separator: /[\s/]+/
+  rel_url: true
+  button: false
+
 color_scheme: dark
 
 callouts:

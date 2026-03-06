@@ -371,3 +371,314 @@ Test cases:
 npm run build   # Verify no compilation errors
 npm test        # Run all tests including new ones
 ```
+
+## T-078 Plan - Enable and Tune Just the Docs Search
+
+### Overview
+
+Configure Just the Docs built-in search in `docs/_config.yml` so users can quickly find settings, behaviors, and configuration options. Add a brief note to the docs home page so readers know search is available.
+
+### Changes Required
+
+#### 1. `docs/_config.yml` -- Enable and tune search
+
+Add the following block after the existing `nav_sort: order` line:
+
+```yaml
+search_enabled: true
+search:
+  heading_level: 3
+  previews: 3
+  preview_words_before: 5
+  preview_words_after: 10
+  tokenizer_separator: /[\s/]+/
+  rel_url: true
+  button: false
+```
+
+**Rationale for values:**
+- `heading_level: 3` -- Index down to `###` headings, which is where most configuration fields and settings are documented (e.g., `consumeIngredientsOnFail`, `salvageCraftingCheck`). Going deeper would add noise.
+- `previews: 3` -- Show 3 preview snippets per result so users can distinguish similarly named settings across different pages.
+- `preview_words_before: 5` and `preview_words_after: 10` -- Provide enough surrounding context in each preview to understand the setting's purpose without needing to click through.
+- `tokenizer_separator: /[\s/]+/` -- Default Just the Docs separator; splits on whitespace and slashes so camelCase terms like `consumeIngredientsOnFail` are indexed as a whole token.
+- `rel_url: true` -- Use relative URLs for search results (works with `baseurl` config).
+- `button: false` -- Use the default inline search bar in the sidebar rather than a separate button.
+
+#### 2. `docs/index.md` -- Add search guidance note
+
+Add a short tip callout after the "What can Fabricate do?" table and before the "Quick example" section:
+
+```markdown
+{: .tip }
+> Use the **search bar** in the sidebar to quickly find settings, configuration options, and macro examples across the documentation.
+```
+
+### File Change Summary
+
+| File | Action |
+|------|--------|
+| `docs/_config.yml` | Add `search_enabled: true` and `search:` configuration block |
+| `docs/index.md` | Add search tip callout after feature table |
+
+### Acceptance Criteria Mapping
+
+| AC | How addressed |
+|----|---------------|
+| AC1: `_config.yml` enables search with configured options | `search_enabled: true` plus `search:` block with heading_level, previews, preview_words_before/after, tokenizer_separator |
+| AC2: Generated site displays search UI and returns results | `search_enabled: true` activates Just the Docs Lunr-based search in sidebar |
+| AC3: Representative terms return relevant results | `heading_level: 3` indexes `###` headings where settings are documented; camelCase terms indexed as whole tokens |
+| AC4: Previews include enough context | `previews: 3` with `preview_words_before: 5` and `preview_words_after: 10` |
+| AC5: No existing config broken | Only additive changes; existing theme, callouts, nav, sass settings untouched |
+| AC6: Brief note added to docs home | Tip callout in `docs/index.md` mentioning sidebar search bar |
+
+### Constraints
+
+- Only modify `docs/_config.yml`, `docs/index.md`, and `CHANGELOG.md`.
+- Do NOT touch spec files or docs concept page footers.
+
+## T-065 Plan - Define Empty allowedUserIds Semantics for Restricted Recipes
+
+### Overview
+
+Clarify across specs 002 and 006 that `visibility.restricted = true` with an empty `allowedUserIds` array is a valid configuration that hides the recipe from all non-GM users. Currently spec 002 requirement 5 says `allowedUserIds` is "required" when restricted, which is ambiguous about whether the array must be non-empty. This task makes the semantics explicit.
+
+### Changes Required
+
+#### 1. spec/002-data-models.md
+
+**Line 252 (Recipe requirement 5)** -- Replace:
+```
+5. If `visibility.restricted` is true, `visibility.allowedUserIds` is required.
+```
+With:
+```
+5. If `visibility.restricted` is true, `visibility.allowedUserIds` must be present as an array. An empty array is valid and means no non-GM user may see the recipe.
+```
+
+**After line 229 (visibility property block)** -- Add an inline comment to the `allowedUserIds` field:
+```js
+  visibility?: {
+    restricted: boolean,
+    allowedUserIds?: string[],  // Required when restricted is true. Empty array = hidden from all non-GM users.
+  },
+```
+
+**After the Recipe Requirements section (after line 254)** -- Add a new "Validation Guidance" subsection:
+```
+### Validation Guidance
+
+Shape validation (invalid):
+- `visibility.restricted` is `true` but `allowedUserIds` is missing, `null`, or not an array.
+
+Valid-but-hidden configuration:
+- `visibility.restricted` is `true` and `allowedUserIds` is `[]`. The recipe is hidden from all non-GM users. GM can still view and manage the recipe.
+```
+
+#### 2. spec/006-recipe-visibility.md
+
+**Lines 49-51 (player mode listing)** -- Expand the player-mode branch to explicitly address the empty case and GM behavior:
+```
+3. If `listMode === "player"`:
+   - GM sees all recipes, including restricted recipes with empty allow-lists.
+   - Non-GM sees recipes where `visibility.restricted === false`, or where `allowedUserIds` includes the viewer's user ID.
+   - When `visibility.restricted === true` and `allowedUserIds` is empty, no non-GM user can see the recipe.
+```
+
+**After line 55 (after step 5 "Keep locked recipes...")** -- Add a new subsection "Restricted Visibility Examples":
+```
+### Restricted Visibility Examples
+
+| `restricted` | `allowedUserIds` | GM sees? | Player "abc" sees? | Notes |
+|---|---|---|---|---|
+| `false` | (any) | Yes | Yes | Unrestricted; allow-list ignored |
+| `true` | `["abc", "def"]` | Yes | Yes | Player is in allow-list |
+| `true` | `["def"]` | Yes | No | Player is not in allow-list |
+| `true` | `[]` | Yes | No | Valid config: hidden from all non-GM users |
+| `true` | missing/null | Yes | No | Invalid shape: treated as validation error at save time; runtime treats as empty |
+```
+
+**Lines 162-166 (Testing Requirements)** -- Add a test requirement:
+```
+- Unit tests for restricted recipes with empty `allowedUserIds` confirming GM access and non-GM denial.
+```
+
+### File Change Summary
+
+| File | Action |
+|------|--------|
+| `spec/002-data-models.md` | Update requirement 5 wording; add inline comment on `allowedUserIds`; add validation guidance subsection |
+| `spec/006-recipe-visibility.md` | Expand player-mode listing for empty allow-list and GM; add restricted visibility examples table; add test requirement |
+
+### Acceptance Criteria Mapping
+
+| AC | How addressed |
+|----|---------------|
+| AC1: spec 002 removes/updates non-empty requirement | Requirement 5 reworded to explicitly allow empty array |
+| AC2: spec 006 documents empty allowedUserIds evaluation | Player-mode branch expanded with empty-list bullet |
+| AC3: GM visibility explicit | Both specs state GM can view/manage restricted recipes regardless of allow-list |
+| AC4: Validation guidance distinguishes invalid shape from valid-but-hidden | New "Validation Guidance" subsection in spec 002 |
+| AC5: Example with restricted+empty case | Examples table in spec 006 includes `restricted=true, allowedUserIds=[]` row |
+
+### Constraints
+
+- Only modify `spec/002-data-models.md` and `spec/006-recipe-visibility.md`.
+- Do NOT touch `src/`, `docs/_config.yml`, or concept pages.
+
+## T-077 Plan - Add "What's Next?" Learning-Path Navigation to Concept Pages
+
+### Overview
+
+Add "What's next?" continuation sections to the end of concept docs pages so readers follow a guided learning path. Each section uses a consistent format: an `---` horizontal rule, a `## What's next?` heading, and a short bulleted list of links ordered by most-likely-next-page first.
+
+### Link Target Verification
+
+All target pages exist in `docs/`:
+- `docs/recipes/index.md` -- exists
+- `docs/api/crafting-engine.md` -- exists
+- `docs/crafting-systems.md` -- exists (effect transfer content lives here)
+- `docs/recipes/simple.md` -- exists
+- `docs/recipes/mapped.md` -- exists
+- `docs/recipes/tiered.md` -- exists
+- `docs/recipes/progressive.md` -- exists
+- `docs/recipes/multi-step.md` -- exists
+- `docs/macros/index.md` -- exists
+- `docs/macros/examples.md` -- exists
+- `docs/visibility.md` -- exists
+- `docs/essences.md` -- exists
+- `docs/api/recipe-manager.md` -- exists
+
+Note: There is no standalone `docs/effect-transfer.md` page yet (that is T-075 work). For essences, link to the effect transfer section within `docs/crafting-systems.md` and to the recipe editor docs.
+
+### Changes Required
+
+#### 1. `docs/catalysts.md` -- append "What's next?" section
+
+After the Legacy Migration section (end of file, line 115), append:
+
+```markdown
+
+---
+
+## What's next?
+
+- [Recipes overview]({% link recipes/index.md %}) -- learn how catalysts fit into recipe definitions and resolution modes.
+- [Crafting Engine API]({% link api/crafting-engine.md %}) -- programmatic control over crafting runs and catalyst validation.
+```
+
+Rationale: Catalysts are recipe components, so recipes overview is the natural next step. The engine API covers catalyst validation programmatically.
+
+#### 2. `docs/essences.md` -- append "What's next?" section
+
+After the Managing Essences section (end of file, line 81), append:
+
+```markdown
+
+---
+
+## What's next?
+
+- [Crafting Systems -- Effect Transfer]({% link crafting-systems.md %}) -- configure the effect transfer pipeline that uses essence source items.
+- [Recipes overview]({% link recipes/index.md %}) -- see how essence requirements work inside ingredient sets.
+- [Recipe Manager API]({% link api/recipe-manager.md %}) -- create and manage recipes with essence-based ingredients programmatically.
+```
+
+Rationale: Effect transfer is the primary advanced use of essences. Recipes overview shows how essences plug into ingredient sets. The recipe manager API covers programmatic recipe creation.
+
+#### 3. `docs/visibility.md` -- append "What's next?" section
+
+After the Crafting Guards section (end of file, line 158), append:
+
+```markdown
+
+---
+
+## What's next?
+
+- [Recipes overview]({% link recipes/index.md %}) -- create and edit recipes, including visibility configuration in the recipe editor.
+- [Crafting Systems]({% link crafting-systems.md %}) -- configure system-level visibility settings and feature toggles.
+- [Macros & Examples]({% link macros/index.md %}) -- automate visibility and knowledge workflows with macros.
+```
+
+Rationale: After understanding visibility, users typically want to configure it in recipes or at the system level.
+
+#### 4. `docs/recipes/simple.md` -- append "What's next?" section
+
+After the "With an Optional Check" section (end of file, line 103), append:
+
+```markdown
+
+---
+
+## What's next?
+
+- [Mapped Mode]({% link recipes/mapped.md %}) -- ingredient choices determine which result is produced.
+- [Macros & Examples]({% link macros/index.md %}) -- crafting check macro contracts and ready-to-use examples.
+```
+
+#### 5. `docs/recipes/mapped.md` -- append "What's next?" section
+
+After the "When to Use Mapped Mode" section (end of file, line 95), append:
+
+```markdown
+
+---
+
+## What's next?
+
+- [Tiered Mode]({% link recipes/tiered.md %}) -- skill checks determine result quality through named outcomes.
+- [Macros & Examples]({% link macros/index.md %}) -- crafting check macro contracts and ready-to-use examples.
+```
+
+#### 6. `docs/recipes/tiered.md` -- append "What's next?" section
+
+After the "When to Use Tiered Mode" section (end of file, line 128), append:
+
+```markdown
+
+---
+
+## What's next?
+
+- [Progressive Mode]({% link recipes/progressive.md %}) -- check values are spent to buy results in difficulty order.
+- [Macros & Examples]({% link macros/index.md %}) -- crafting check macro contracts and ready-to-use examples.
+- [Multi-Step Recipes]({% link recipes/multi-step.md %}) -- chain multiple steps with per-step outcome routing.
+```
+
+#### 7. `docs/recipes/progressive.md` -- append "What's next?" section
+
+After the "When to Use Progressive Mode" section (end of file, line 113), append:
+
+```markdown
+
+---
+
+## What's next?
+
+- [Multi-Step Recipes]({% link recipes/multi-step.md %}) -- combine multiple steps into a single recipe workflow.
+- [Macros & Examples]({% link macros/index.md %}) -- crafting check macro contracts and ready-to-use examples.
+- [Recipes overview]({% link recipes/index.md %}) -- compare all resolution modes side by side.
+```
+
+### Formatting Rules
+
+- Every "What's next?" section starts with `---` (horizontal rule) followed by `## What's next?`.
+- Each link is a bullet point with format: `[Page Title]({% link path %}) -- short description.`
+- Links are ordered: next most-likely page first.
+- Descriptions use lowercase after the dash and end with a period.
+- Maximum 3 links per section to avoid overwhelming the reader.
+
+### Acceptance Criteria Mapping
+
+| AC | How addressed |
+|----|---------------|
+| AC1: catalysts.md ends with What's next? | Links to recipes/index.md and api/crafting-engine.md |
+| AC2: essences.md ends with What's next? | Links to crafting-systems.md (effect transfer) and recipe-related docs |
+| AC3: visibility.md ends with What's next? | Links to recipes, crafting systems, and macros |
+| AC4: All four recipe mode pages have What's next? | Each links to next mode page and macros/index.md |
+| AC5: Consistent formatting and intentional ordering | All sections use identical heading/format; most-likely page first |
+| AC6: All links resolve to existing pages | Verified all targets exist in docs/ tree |
+
+### Constraints
+
+- Only modify docs/ concept pages listed above.
+- Do NOT touch spec/, src/, docs/_config.yml, or any non-docs files.

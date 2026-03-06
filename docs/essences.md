@@ -78,3 +78,11 @@ Essence definitions are configured from the **Systems** tab of the GM admin, ins
 The icon field accepts any FontAwesome class string (e.g. `fas fa-fire`, `fas fa-snowflake`). If you leave it blank, the default `fas fa-mortar-pestle` icon is used.
 
 The source item dropdown lists managed items already added to this crafting system. Selecting one links the essence to that item for effect transfer purposes. The label in the UI reads **Source item**.
+
+---
+
+## What's next?
+
+- [Crafting Systems -- Effect Transfer]({% link crafting-systems.md %}) -- configure the effect transfer pipeline that uses essence source items.
+- [Recipes overview]({% link recipes/index.md %}) -- see how essence requirements work inside ingredient sets.
+- [Recipe Manager API]({% link api/recipe-manager.md %}) -- create and manage recipes with essence-based ingredients programmatically.

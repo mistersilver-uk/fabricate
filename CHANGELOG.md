@@ -85,6 +85,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Documentation
 
+- Added "What's next?" learning-path navigation sections to concept pages: catalysts, essences, visibility, and all four recipe mode pages (simple, mapped, tiered, progressive). Each section links to the next most-likely page and related macro/API docs. (T-077)
 - Added `docs/troubleshooting.md` with symptom-first entries for five common failure modes: missing recipes in the crafting app, crafting check macro not running, catalysts not degrading, effect transfer not applying, and salvage configuration rejection. Includes a "before filing an issue" diagnostic checklist.
 - Linked troubleshooting guide from docs home page and quickstart "What's next?" section.
 - Documented `features.chatOutput` toggle in `docs/crafting-systems.md`: added row to the Feature Toggles table, updated the intro note to reflect the `true` default, and added a dedicated "Chat Output" subsection covering success/failure message content, the no-fire conditions for early validation failures, and the API example for disabling per-system. (T-056)
+- Enabled Just the Docs built-in search in `docs/_config.yml` with tuned settings: heading depth 3, 3 preview snippets per result, and 5/10 word context windows. Added a search-availability tip to the docs home page. (T-078)
+
+### Spec Changes
+
+- Clarified that `visibility.restricted = true` with an empty `allowedUserIds` array is a valid configuration that hides the recipe from all non-GM users (`spec/002-data-models.md`, `spec/006-recipe-visibility.md`). (T-065)
+- Added validation guidance distinguishing invalid shape (missing/null `allowedUserIds`) from valid-but-hidden configuration (empty array). (T-065)
+- Added restricted visibility examples table to `spec/006-recipe-visibility.md` showing expected GM and player visibility outcomes. (T-065)
+- Added testing requirement for empty `allowedUserIds` coverage. (T-065)

@@ -110,3 +110,11 @@ Progressive mode is ideal when:
 - Higher skill checks should yield more or better results
 - You want a "spend your roll" mechanic
 - Crafting should feel like a graduated outcome, not just pass/fail
+
+---
+
+## What's next?
+
+- [Multi-Step Recipes]({% link recipes/multi-step.md %}) -- combine multiple steps into a single recipe workflow.
+- [Macros & Examples]({% link macros/index.md %}) -- crafting check macro contracts and ready-to-use examples.
+- [Recipes overview]({% link recipes/index.md %}) -- compare all resolution modes side by side.

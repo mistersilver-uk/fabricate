@@ -247,6 +247,44 @@ test('AC1.5 - player mode: getVisibleRecipes filters recipes based on player vis
   assert.equal(results[0].recipe.id, 'recipe-open');
 });
 
+test('AC1.6 - global mode: non-GM can see and craft recipe without knowledge access', () => {
+  const system = buildMockSystem({ recipeVisibility: { listMode: 'global' } });
+  const recipe = buildMockRecipe({
+    visibility: { restricted: true, allowedUserIds: [] },
+    linkedRecipeItemUuid: 'missing-recipe-item-uuid'
+  });
+  const viewer = { isGM: false, id: 'user-1' };
+  const craftingActor = new FakeActor({ id: 'actor-1', items: [] });
+  const service = buildService({ system });
+
+  const result = service.evaluateRecipeAccess({ recipe, viewer, craftingActor });
+
+  assert.equal(result.visible, true);
+  assert.equal(result.craftable, true);
+  assert.equal(result.reason, 'ok');
+});
+
+test('AC1.7 - missing listMode defaults to global visibility behaviour', () => {
+  const system = buildMockSystem({
+    recipeVisibility: {
+      listMode: undefined
+    }
+  });
+  const recipe = buildMockRecipe({
+    visibility: { restricted: true, allowedUserIds: [] },
+    linkedRecipeItemUuid: 'missing-recipe-item-uuid'
+  });
+  const viewer = { isGM: false, id: 'user-1' };
+  const craftingActor = new FakeActor({ id: 'actor-1', items: [] });
+  const service = buildService({ system });
+
+  const result = service.evaluateRecipeAccess({ recipe, viewer, craftingActor });
+
+  assert.equal(result.visible, true);
+  assert.equal(result.craftable, true);
+  assert.equal(result.reason, 'ok');
+});
+
 // ---------------------------------------------------------------------------
 // AC2 — Knowledge mode access evaluation
 // ---------------------------------------------------------------------------

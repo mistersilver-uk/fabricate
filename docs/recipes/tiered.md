@@ -125,3 +125,11 @@ Tiered mode is ideal when:
 - Result quality should depend on a skill check
 - You want distinct named outcomes (not just pass/fail)
 - Different outcomes should produce fundamentally different items
+
+---
+
+## What's next?
+
+- [Progressive Mode]({% link recipes/progressive.md %}) -- check values are spent to buy results in difficulty order.
+- [Macros & Examples]({% link macros/index.md %}) -- crafting check macro contracts and ready-to-use examples.
+- [Multi-Step Recipes]({% link recipes/multi-step.md %}) -- chain multiple steps with per-step outcome routing.
