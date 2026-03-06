@@ -26,3 +26,10 @@ callouts:
   gm:
     title: GM Only
     color: purple
+
+sass:
+  quiet_deps: true
+  silence_deprecations:
+    - import
+    - global-builtin
+    - color-functions
