@@ -244,3 +244,93 @@ Purpose: keep agent work explicit, reviewable, and testable.
   3. Spec states whether the limit is fixed or configurable, with default value documented.
   4. Cross-reference to actor-flag shape remains consistent with spec 002/005 definitions.
   5. Testing requirements include limit-boundary behavior and ordering assertions.
+
+## Documentation Recommendation Tasks
+
+### T-074 - Add Screenshots and GIFs Across Core Documentation
+- Status: `todo`
+- Description: Add high-value visual walkthrough media to core docs pages so first-time GMs can follow UI workflows without relying on dense text. Create and embed the exact captures identified in recommendation D1, store them in `docs/images/`, and keep assets optimized for docs-site performance.
+- Acceptance Criteria:
+  1. `docs/images/` contains all seven required assets with descriptive filenames: quickstart system creation GIF, quickstart managed-items drag/drop GIF, recipe editor screenshot, crafting app status-badges screenshot, visibility mode-switching GIF, essences card screenshot, and multi-step run-progress screenshot.
+  2. Required embeds are present in the intended pages and sections: `docs/quickstart.md` (step 2 and step 3), `docs/recipes/index.md` (recipe editor and crafting app sections), `docs/visibility.md` (visibility mode section), `docs/essences.md` (feature card section), and `docs/recipes/multi-step.md` (run progress section).
+  3. Every image/GIF embed includes meaningful alt text describing the UI state and user action shown.
+  4. GIF files are optimized to <= 2 MB each, cropped to the relevant panel, and reduced to a frame rate suitable for docs playback.
+  5. All image paths resolve correctly in the built docs site with no broken media links.
+  6. A short contributor note is added in docs guidance describing where media files live and optimization constraints for new captures.
+
+### T-075 - Split `crafting-systems.md` Into Focused Topic Pages
+- Status: `todo`
+- Description: Reduce cognitive load by decomposing the current monolithic `docs/crafting-systems.md` page into focused pages for checks, effect transfer, and salvage while keeping the base system setup page concise. Preserve all current guidance and examples while improving navigation and discoverability.
+- Acceptance Criteria:
+  1. New pages are created with valid front matter and nav placement: `docs/crafting-checks.md`, `docs/effect-transfer.md`, and `docs/salvage.md`.
+  2. `docs/crafting-systems.md` is narrowed to system creation/settings, feature toggles, managed items, and requirements only.
+  3. Crafting-check configuration and worked examples are moved from `docs/crafting-systems.md` into `docs/crafting-checks.md`.
+  4. Effect-transfer content (including triple-flag pipeline and worked example) is moved into `docs/effect-transfer.md`.
+  5. Salvage resolution and `salvageCraftingCheck` guidance are moved into `docs/salvage.md`.
+  6. Internal links and sidebar navigation are updated so all moved sections remain reachable and no stale anchors remain.
+
+### T-076 - Add Task-Oriented `docs/how-to/` Documentation Section
+- Status: `todo`
+- Description: Add a task-first documentation section for users who need direct answers to practical goals. Create concise "How do I...?" pages that point to full references without duplicating entire concept pages.
+- Acceptance Criteria:
+  1. A new `docs/how-to/` section exists with an index/landing page linked from docs navigation.
+  2. Six pages are added for the recommended tasks: skill-check recipes, recipe discovery during play, degrading tools/catalysts, effect transfer setup, crafting from shared party storage, and recipe import/export workflows.
+  3. Each how-to page includes four consistent blocks: problem statement, one-paragraph answer, minimal UI/code steps, and links to deeper reference pages.
+  4. Each page is intentionally concise and answer-first (targeting short-form guidance rather than full conceptual treatment).
+  5. All cross-links to existing pages/macros are valid and point to current file paths.
+  6. The main docs home page includes an entry point to the new how-to section for non-linear, task-driven learning.
+
+### T-077 - Add "What's Next?" Learning-Path Navigation to Concept Pages
+- Status: `todo`
+- Description: Add explicit continuation links at the end of core concept pages so readers can follow a guided learning path instead of returning to sidebar navigation after each page.
+- Acceptance Criteria:
+  1. `docs/catalysts.md` ends with a "What's next?" section linking to `docs/recipes/index.md` and `docs/api/crafting-engine.md`.
+  2. `docs/essences.md` ends with a "What's next?" section linking to effect transfer docs and recipe-editor-related docs.
+  3. `docs/visibility.md` ends with a "What's next?" section linking to recipe editing/visibility configuration and crafting-app experience docs.
+  4. `docs/recipes/simple.md`, `docs/recipes/mapped.md`, `docs/recipes/tiered.md`, and `docs/recipes/progressive.md` each include "What's next?" links to the next mode page and relevant macro-contract guidance.
+  5. Added links are ordered intentionally (next most-likely page first) and use consistent section headings/formatting.
+  6. Manual link verification confirms all new "What's next?" links resolve to existing pages/anchors.
+
+### T-078 - Enable and Tune Just the Docs Search
+- Status: `todo`
+- Description: Configure Just the Docs built-in search so users can quickly locate settings and behaviors without manually scanning long pages. Apply the recommended search configuration in `_config.yml` and verify results quality on key terms.
+- Acceptance Criteria:
+  1. `docs/_config.yml` enables search and includes the configured options for heading depth, preview count, preview context windows, and tokenizer separator.
+  2. The generated docs site displays the search UI in navigation and returns results while typing.
+  3. Search returns relevant results for representative terms from current docs (for example: `consumeIngredientsOnFail`, `knowledge`, `salvageCraftingCheck`).
+  4. Search previews include enough context to distinguish similarly named settings.
+  5. No existing docs-site configuration is broken by the search changes.
+  6. A brief note is added to docs home/usage guidance so readers know search is available.
+
+### T-079 - Make `visibility.md` the Single Canonical Visibility Guide
+- Status: `todo`
+- Description: Eliminate duplicated visibility guidance by reducing non-canonical pages to short link-outs and concentrating authoritative behavior details in `docs/visibility.md`. This prevents documentation drift as visibility features evolve.
+- Acceptance Criteria:
+  1. The long visibility section in `docs/crafting-systems.md` is replaced with a short summary and a direct link to `docs/visibility.md`.
+  2. `docs/visibility.md` contains the full and authoritative explanation of list modes, knowledge options, linked recipe items, and learn flow behavior.
+  3. Duplicate mode-by-mode visibility explanations are removed from non-canonical docs pages unless strictly necessary for a brief contextual reference.
+  4. Where visibility is mentioned elsewhere, wording clearly signals `docs/visibility.md` as the canonical source.
+  5. Cross-links are updated so readers land on `docs/visibility.md` for detailed configuration.
+  6. A docs-content audit confirms there are no conflicting visibility instructions across pages after the cleanup.
+
+### T-080 - Add Narrative Introductions Before Configuration Tables
+- Status: `todo`
+- Description: Improve accessibility for first-time readers by adding short scenario-driven intros before the first configuration table in core concept pages. Use concrete crafting examples to explain "why this exists" before presenting field-level configuration details.
+- Acceptance Criteria:
+  1. `docs/essences.md`, `docs/catalysts.md`, and `docs/visibility.md` each include a 3-5 sentence narrative introduction before their first configuration table.
+  2. Each intro uses concrete in-world examples (items, crafting situations, player outcomes) rather than abstract terminology alone.
+  3. Existing configuration tables remain accurate and are preserved below the new conceptual lead-in.
+  4. Intro language is audience-appropriate for GMs and avoids assuming API-level familiarity.
+  5. Each intro links or transitions cleanly into a deeper section or worked example on the same page.
+  6. Terminology used in intros is consistent with field names and behavior described later in each page.
+
+### T-081 - Create `docs/troubleshooting.md` for Common Failure Modes
+- Status: `todo`
+- Description: Add a troubleshooting guide for predictable setup/runtime issues based on existing validation behavior and known support pain points. Provide symptom-first entries with concrete checks and links to corrective documentation.
+- Acceptance Criteria:
+  1. A new `docs/troubleshooting.md` page exists with navigation/front matter and is linked from docs home and quickstart follow-up navigation.
+  2. The guide includes entries for the recommended failure modes: missing recipes in app, crafting check macro not running, catalysts not degrading/tracking, effect transfer not applying, and salvage configuration rejection.
+  3. Each troubleshooting entry follows a consistent structure: symptom, likely causes, step-by-step checks, and links to the authoritative docs page.
+  4. Troubleshooting checks align with current validation logic and documented contracts (including mode-specific macro return shapes where relevant).
+  5. The page references the correct feature prerequisites/flags for effect transfer and visibility behavior.
+  6. At least one quick diagnostic checklist is provided for "before filing an issue" to reduce repeated support questions.
