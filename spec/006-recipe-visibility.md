@@ -69,10 +69,12 @@ Given `viewer`, `craftingSystem`, optional `craftingActor`, optional `componentS
 
 Before starting/resuming a run and before each step:
 
-1. Re-run listing visibility checks.
-2. For non-GM users, reject locked recipes.
-3. If in knowledge mode, re-run knowledge access evaluation.
-4. Reject execution when any guard fails.
+1. Re-run listing visibility checks for the active `listMode`.
+2. For non-GM users, reject locked recipes regardless of list mode.
+3. If `listMode === "global"`, no additional filtering beyond step 2. Non-GM users may craft any unlocked, enabled recipe.
+4. If `listMode === "player"`, re-run restricted visibility checks. Reject if the viewer is not in `allowedUserIds` for a restricted recipe.
+5. If `listMode === "knowledge"`, re-run knowledge access evaluation. Reject if knowledge access is denied.
+6. Reject execution when any guard fails.
 
 ## Knowledge Access Evaluation
 
@@ -141,13 +143,29 @@ Actor.flags.fabricate.learnedRecipes[recipe.id] = {
 
 ### Drag-and-Drop Learn
 
-If implemented, a dropped item matches recipes by:
+Dropping a recipe item onto a crafting actor is a required learning pathway. The module must register a drop handler that triggers recipe learning when a valid recipe item is dropped onto an actor sheet.
 
-- `droppedItem.uuid === recipe.linkedRecipeItemUuid`, or
-- `droppedItem.flags.core.sourceId === recipe.linkedRecipeItemUuid`.
+#### Matching Rules
 
-If multiple recipes match, the actor learns all matched recipes.
-A recipe item used by multiple recipes is functionally a "recipe book", with many entries.
+A dropped item matches a recipe when either condition is true:
+
+1. `droppedItem.uuid === recipe.linkedRecipeItemUuid`
+2. `droppedItem.flags.core.sourceId === recipe.linkedRecipeItemUuid`
+
+Both UUID identity and `core.sourceId` ancestry must be evaluated. A match on either is sufficient.
+
+#### Multi-Recipe Matching
+
+When a single dropped item matches multiple recipes, the actor learns all matched recipes in a single operation. A recipe item linked to multiple recipes functions as a "recipe book" -- one drop teaches every recipe it is linked to.
+
+#### Notifications
+
+After a drag-and-drop learn operation completes, the module must provide user feedback:
+
+- **Success**: Display a notification listing the recipe(s) learned and the actor that learned them.
+- **Partial success**: When some recipes were already learned, notify only for newly learned recipes. If all matched recipes were already learned, notify the user that nothing new was learned.
+- **No match**: When the dropped item does not match any recipe, no learn operation occurs and no notification is shown (the drop is silently ignored for learning purposes).
+- **Precondition failure**: When the knowledge mode does not support learning (i.e., mode is `item` only), no learn operation occurs and no notification is shown.
 
 ## Edge Cases
 
@@ -176,3 +194,6 @@ If `linkedRecipeItemUuid` no longer resolves to a template:
 - Unit tests for learning with and without consume-on-learn.
 - Unit tests for restricted recipes with empty `allowedUserIds` confirming GM access and non-GM denial.
 - Integration tests for full craft guard re-check on start, resume, and step execution.
+- Integration tests for drag-and-drop learn: single-recipe match, multi-recipe match, already-learned skip, and no-match silent ignore.
+- Integration tests for drag-and-drop learn notifications: success message content, partial-success filtering, and no-notification on zero matches.
+- Integration tests for drag-and-drop learn with `core.sourceId` matching (item duplicated from compendium).

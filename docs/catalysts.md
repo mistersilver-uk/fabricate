@@ -10,14 +10,16 @@ Catalysts are items required for crafting but **not consumed**. They represent t
 
 ---
 
+Imagine a blacksmith who needs an anvil and hammer to forge a blade, or an alchemist who brews potions in a cauldron. These tools are essential to the craft, but they are not used up in the process -- the cauldron is still there after the potion is bottled. In Fabricate, a **catalyst** models exactly this: an item that must be present for crafting to succeed but is not consumed when the recipe completes. Catalysts can optionally degrade over time, tracking how many times a tool has been used and even destroying it once it wears out. The [properties table below](#catalyst-properties) describes every field available when you define a catalyst inside a recipe.
+
 ## Catalyst Properties
 
 | Property | Type | Default | Description |
 |:---------|:-----|:--------|:------------|
 | `componentId` | `string` | *required* | ID of the managed component in the crafting system |
 | `degradesOnUse` | `boolean` | `false` | Track usage count on the owned item instance |
-| `destroyWhenExhausted` | `boolean` | `false` | Delete the item when `timesUsed >= maxUses` |
-| `maxUses` | `number\|null` | `null` | Maximum uses before exhaustion. `null` means unlimited |
+| `destroyWhenExhausted` | `boolean` | `false` | Delete the item when exhausted. Only has effect when `degradesOnUse` is `true` and `maxUses` is a positive integer |
+| `maxUses` | `number\|null` | `null` | Maximum uses before exhaustion. Only applies when `degradesOnUse` is `true`. `null` means unlimited uses (but still tracks count). Ignored entirely when `degradesOnUse` is `false` |
 
 {: .note }
 > The field was previously named `systemItemId`. Use `componentId` for all new recipes.
@@ -32,7 +34,9 @@ Item.flags.fabricate.catalystItemUsage = {
 }
 ```
 
-When `destroyWhenExhausted` is `true` and `timesUsed >= maxUses`, the owned item is deleted from the player's inventory.
+When `degradesOnUse` is `false`, usage flags are **not written or evaluated** at all. The `maxUses` and `destroyWhenExhausted` fields have no effect in this case.
+
+When `destroyWhenExhausted` is `true`, `degradesOnUse` is `true`, and `maxUses` is a positive integer, the owned item is deleted from the player's inventory once `timesUsed >= maxUses`.
 
 ## Example: Blacksmith's Forge
 
@@ -72,6 +76,9 @@ const toolkit = new Catalyst({
   degradesOnUse: false
 });
 ```
+
+{: .note }
+> When `degradesOnUse` is `false`, the values of `maxUses` and `destroyWhenExhausted` are irrelevant -- they are ignored at both validation time and runtime. No usage flags are written to the item.
 
 ## Adding Catalysts to Recipes
 

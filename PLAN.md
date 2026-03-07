@@ -682,3 +682,95 @@ After the "When to Use Progressive Mode" section (end of file, line 113), append
 
 - Only modify docs/ concept pages listed above.
 - Do NOT touch spec/, src/, docs/_config.yml, or any non-docs files.
+
+## T-070 Plan - Clarify Multi-Step Recipes with Empty Top-Level Sets
+
+### Overview
+
+The current spec (`spec/005-recipes-and-steps.md`) does not explicitly address what happens when an explicit multi-step recipe has empty or absent recipe-level `ingredientSets` and `resultGroups`. The implementation already handles this partially -- `getExecutionSteps()` delegates to step-level data, and validation allows empty recipe-level `ingredientSets` when steps exist -- but recipe-level `resultGroups` are still unconditionally required by validation (a bug relative to the intended design).
+
+The spec needs four additions: (1) explicit permission for empty recipe-level sets in multi-step recipes, (2) step-level resolution precedence, (3) distinct validation contracts, (4) UI rendering expectations, and (5) regression testing requirements.
+
+### Changes Required
+
+#### 1. New section after "Recipe Structure" (after line 12): "Multi-Step Recipe Field Precedence"
+
+Insert the following after line 12 (after the `features.multiStepRecipes` bullets):
+
+```markdown
+### Multi-Step Recipe Field Precedence
+
+When `features.multiStepRecipes === true` and `recipe.steps.length > 0`, the recipe is an **explicit multi-step recipe**. The following rules apply:
+
+- Recipe-level `ingredientSets` and `resultGroups` MAY be empty arrays or absent entirely.
+- Runtime resolution MUST use the active step's fields: `ingredientSets`, `resultGroups`, `catalysts`, `timeRequirement`, `currencyRequirement`, and `outcomeRouting`.
+- Recipe-level fields serve as fallback ONLY for implicit single-step recipes (where `steps` is empty and the recipe-level fields form one implicit step).
+- Step-level fields always take priority. Recipe-level fields are never merged into or combined with step-level fields.
+- Recipe-level `catalysts` defined outside any step are additive: they apply to every step in addition to each step's own catalysts.
+```
+
+#### 2. New section after the precedence section: "Validation Contracts"
+
+Insert:
+
+```markdown
+### Validation Contracts
+
+Validation rules differ between single-step and explicit multi-step recipes:
+
+**Single-step (implicit) contract** (`steps` is empty):
+- Recipe-level `ingredientSets` MUST have at least one entry.
+- Recipe-level `resultGroups` MUST have at least one entry.
+- Recipe-level fields define the single implicit step.
+
+**Explicit multi-step contract** (`steps.length > 0`):
+- `steps` array MUST have at least one entry.
+- Each step MUST have at least one `ingredientSet` with at least one `ingredientGroup`.
+- Each step MUST have at least one `resultGroup` with at least one result.
+- Recipe-level `ingredientSets` and `resultGroups` are NOT validated and MAY be empty or absent.
+- Recipe-level `resultGroups` requirement is waived when explicit steps are present.
+```
+
+#### 3. New section: "UI Rendering for Multi-Step Recipes"
+
+Insert before the existing "Testing Requirements" section:
+
+```markdown
+### UI Rendering for Multi-Step Recipes
+
+When recipe-level `ingredientSets` or `resultGroups` are empty:
+
+- The recipe detail/summary view MUST NOT render empty ingredient or result sections. If recipe-level sets are absent, display the active step's sets or a step overview instead.
+- Recipe list views SHOULD derive summary information (e.g., total ingredient count, result count) from the aggregate of all steps when recipe-level sets are empty.
+- The recipe editor for multi-step recipes MUST present step-level editing controls and MUST NOT require recipe-level `ingredientSets` or `resultGroups` to be populated.
+- Step navigation and status indicators MUST remain functional regardless of whether recipe-level sets are populated.
+```
+
+#### 4. Extend the "Testing Requirements" section (after line 213)
+
+Add the following bullet points to the existing testing requirements list:
+
+```markdown
+- Unit tests for validation accepting empty recipe-level `ingredientSets` and `resultGroups` when explicit steps are present.
+- Unit tests for validation rejecting empty step-level `ingredientSets` or `resultGroups` within explicit steps.
+- Unit tests for `getExecutionSteps()` returning step-level data and ignoring empty recipe-level fields for multi-step recipes.
+- Regression test: an explicit multi-step recipe with empty recipe-level sets and fully populated steps passes validation and crafts successfully end-to-end.
+- UI render tests: recipe detail view does not render empty sections when recipe-level sets are absent and steps are present.
+```
+
+### File Change Summary
+
+| File | Action |
+|------|--------|
+| `spec/005-recipes-and-steps.md` | Add 4 new sections/subsections as described above |
+| `BACKLOG.md` | Mark T-070 as `done` (after review passes) |
+
+### Acceptance Criteria Mapping
+
+| AC | How addressed |
+|----|---------------|
+| AC1: Spec permits empty/absent recipe-level sets for multi-step | "Multi-Step Recipe Field Precedence" section explicitly states MAY be empty |
+| AC2: Active-step resolution precedence defined | Precedence section: step-level always takes priority, never merged |
+| AC3: Validation rules distinguish single-step from multi-step | "Validation Contracts" section with two distinct contract blocks |
+| AC4: UI expectations for empty recipe-level sets | "UI Rendering for Multi-Step Recipes" section covers detail, list, and editor views |
+| AC5: Testing requirements include regression coverage | Five new test requirement bullets added to Testing Requirements |

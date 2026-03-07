@@ -11,6 +11,8 @@ nav_order: 6
 
 Essences are abstract properties that can be assigned to managed items. They provide a flexible way to categorise ingredients beyond simple tags -- an item might contain "2 units of Fire essence and 1 unit of Arcane essence".
 
+Consider a Dragon Scale that radiates heat and hums with faint magical energy, or a Frost Crystal that chills anything it touches. Rather than treating these as unrelated ingredients, essences let you tag each item with the *qualities* it carries -- three units of Fire and one of Arcane on the scale, four units of Frost on the crystal. When a recipe calls for "at least 3 Fire and 2 Arcane", players can mix and match any combination of items whose essence totals meet the threshold, opening up creative flexibility at the crafting table. Essences can also drive automatic [effect transfer](#effect-transfer-via-essences), so a sword forged from fire-heavy ingredients inherits flame-related properties. Below you will find the fields that [define an essence](#defining-essences) and how to [assign essence quantities](#assigning-essences-to-items) to your managed items.
+
 ---
 
 ## Defining Essences

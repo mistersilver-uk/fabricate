@@ -447,6 +447,25 @@ If present in the specification for a recipe, step, or ingredient set a catalyst
 
 1. `componentId` is required.
 2. If `degradesOnUse` is true, catalyst usage must be tracked on the owned item instance.
+3. `maxUses` validation is scoped to `degradesOnUse === true`:
+   - When `degradesOnUse` is true and `maxUses` is not null, `maxUses` must be a positive integer (>= 1).
+   - When `degradesOnUse` is true and `maxUses` is null, the catalyst degrades but has unlimited uses.
+   - When `degradesOnUse` is false, `maxUses` is ignored for validation purposes and has no runtime effect.
+4. `destroyWhenExhausted` only has runtime effect when `degradesOnUse` is true and `maxUses` is a positive integer.
+
+### Testing Requirements
+
+Unit tests must cover the full `degradesOnUse` x `maxUses` validation matrix:
+
+| `degradesOnUse` | `maxUses`        | Expected validity |
+|-----------------|------------------|-------------------|
+| `false`         | `null`           | valid             |
+| `false`         | positive integer | valid (ignored)   |
+| `false`         | `0` or negative  | valid (ignored)   |
+| `true`          | `null`           | valid (unlimited) |
+| `true`          | positive integer | valid             |
+| `true`          | `0` or negative  | invalid           |
+| `true`          | non-integer      | invalid           |
 
 ## ResultGroup
 
@@ -662,9 +681,10 @@ Requirements:
 
 1. `timesUsed` must be a non-negative integer.
 2. Usage is tracked per owned item instance.
-3. Maximum uses is configured in `Catalyst.maxUses` for each catalyst (on the recipe, step, or ingredient set).
-4. When `timesUsed >= maxUses`, the item is exhausted.
+3. Maximum uses is configured in `Catalyst.maxUses` for each catalyst (on the recipe, step, or ingredient set). Usage tracking and exhaustion only apply when `degradesOnUse` is true.
+4. When `degradesOnUse` is true and `maxUses` is not null: the item is exhausted when `timesUsed >= maxUses`.
 5. If `destroyWhenExhausted` is true, the item is destroyed when exhausted.
+6. When `degradesOnUse` is false, catalyst item usage flags are not written or evaluated.
 
 ## Macro Contracts
 
@@ -769,3 +789,70 @@ Return: optional side effects only.
 - Recipe and step execution semantics: `005-recipes-and-steps.md`
 - Recipe visibility and learning semantics: `006-recipe-visibility.md`
 - Destructive changes and clean-up semantics: `007-destructive-changes-and-migrations.md`
+
+## Canonical-Write and Legacy-Read Compatibility Policy
+
+### Policy Statement
+
+- All new persisted data MUST be written using canonical field names only.
+- Read paths (constructors, normalization) MAY accept legacy aliases for backward compatibility during migration windows.
+- Legacy aliases in write output (`toJSON`) are transitional and scheduled for removal once migration coverage is confirmed.
+- New persisted data must not emit legacy keys except for explicitly documented transitional aliases listed in this section.
+
+### Canonical Fields
+
+The following canonical field names must be used in all new writes:
+
+| Model | Canonical Field | Description |
+|-------|----------------|-------------|
+| Catalyst | `componentId` | Managed item reference |
+| Ingredient | `match.type = "component"` | Match type for component-based ingredients |
+| Ingredient | `match.componentId` | Component reference inside match object |
+| Result | `componentId` | Produced item component reference |
+| CraftingSystem | `components` | Array of managed item entries |
+| IngredientSet | `ingredientGroups` | Array of ingredient group objects |
+| Recipe | `resultGroups` | Array of result group objects |
+| EssenceDefinition | `sourceItemUuid` | Template item reference |
+| Component | `sourceItemUuid` | Template item reference |
+| CraftingSystem | `itemTags` | Array of tag strings |
+| Item flag | `catalystItemUsage.timesUsed` | Catalyst usage tracking |
+
+### Legacy Read Aliases
+
+The following legacy aliases are accepted by constructors and normalization functions and are normalized to their canonical counterparts on read:
+
+| Legacy Alias | Canonical Form | Context | Normalization |
+|-------------|---------------|---------|---------------|
+| `systemItemId` | `componentId` | Catalyst, Ingredient, Result | Constructor reads `systemItemId` as fallback; normalized to `componentId` |
+| `match.type = "systemItem"` | `match.type = "component"` | Ingredient.match | Constructor and migration rewrite type to `"component"` |
+| `match.systemItemId` | `match.componentId` | Ingredient.match | Constructor reads as fallback for `componentId` |
+| `managedItems` | `components` | CraftingSystem | Normalization and migration rename to `components` |
+| `ingredients` (flat array) | `ingredientGroups` | IngredientSet | Constructor wraps each ingredient into a single-option group |
+| `results` (flat array) | `resultGroups` | Recipe | Constructor wraps into a single result group |
+| `associatedSystemItemId` | `sourceItemUuid` | EssenceDefinition, Component | Constructor reads as fallback for `sourceItemUuid` |
+| `tags` | `itemTags` | CraftingSystem | Normalization reads `tags` as fallback for `itemTags` |
+| `catalystUses` (bare number) | `catalystItemUsage.timesUsed` | Item flag | Runtime reads legacy flag and converts to `{ timesUsed }` shape |
+| `sourceUuid` | `sourceItemUuid` | Component | Normalization reads as fallback |
+
+### Transitional Write Aliases (Scheduled for Removal)
+
+The following aliases are currently emitted in `toJSON()` / normalization output alongside their canonical counterparts. These are transitional and will be removed in a future version once all dependent UI code paths have been updated:
+
+- `systemItemId` (emitted alongside `componentId` in Catalyst, Ingredient, Result)
+- `ingredients` (emitted alongside `ingredientGroups` in IngredientSet)
+- `results` (emitted alongside `resultGroups` in Recipe)
+- `associatedSystemItemId` (emitted alongside `sourceItemUuid` in EssenceDefinition, Component)
+- `tags` (emitted alongside `itemTags` in CraftingSystem normalization)
+- `sourceUuid` (emitted alongside `sourceItemUuid` in Component normalization)
+- UI convenience aliases (`enableTags`, `enableEssences`, `enableCategories`, `enableMultiStepRecipes`, `advancedOptionsEnabled`)
+
+These transitional aliases exist solely for UI code paths that have not yet been updated. They do not represent the canonical data contract and must not be relied upon by new code.
+
+### Testing Requirements
+
+Tests must include:
+
+- Backward-compatible read tests: constructing models from legacy-only data (e.g., `systemItemId` without `componentId`) must produce correct canonical state.
+- Canonical-write assertions: `toJSON()` output must include all canonical fields with correct values.
+- Migration idempotency: running the `migrateComponentId` migration on already-migrated data must produce identical output.
+- Round-trip integrity: `Model.fromJSON(model.toJSON())` must preserve all canonical fields.

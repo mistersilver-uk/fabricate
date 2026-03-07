@@ -11,6 +11,32 @@ This spec does not redefine mode semantics; mode-specific resolution is defined 
 - If `features.multiStepRecipes === false`, a recipe behaves as one implicit step backed by recipe-level fields.
 - If `features.multiStepRecipes === true`, a recipe has explicit ordered `steps` and must keep at least one step.
 
+### Multi-Step Recipe Field Precedence
+
+When `features.multiStepRecipes === true` and `recipe.steps.length > 0`, the recipe is an **explicit multi-step recipe**. The following rules apply:
+
+- Recipe-level `ingredientSets` and `resultGroups` MAY be empty arrays or absent entirely.
+- Runtime resolution MUST use the active step's fields: `ingredientSets`, `resultGroups`, `catalysts`, `timeRequirement`, `currencyRequirement`, and `outcomeRouting`.
+- Recipe-level fields serve as fallback ONLY for implicit single-step recipes (where `steps` is empty and the recipe-level fields form one implicit step).
+- Step-level fields always take priority. Recipe-level fields are never merged into or combined with step-level fields.
+- Recipe-level `catalysts` defined outside any step are additive: they apply to every step in addition to each step's own catalysts.
+
+### Validation Contracts
+
+Validation rules differ between single-step and explicit multi-step recipes:
+
+**Single-step (implicit) contract** (`steps` is empty):
+- Recipe-level `ingredientSets` MUST have at least one entry.
+- Recipe-level `resultGroups` MUST have at least one entry.
+- Recipe-level fields define the single implicit step.
+
+**Explicit multi-step contract** (`steps.length > 0`):
+- `steps` array MUST have at least one entry.
+- Each step MUST have at least one `ingredientSet` with at least one `ingredientGroup`.
+- Each step MUST have at least one `resultGroup` with at least one result.
+- Recipe-level `ingredientSets` and `resultGroups` are NOT validated and MAY be empty or absent.
+- Recipe-level `resultGroups` requirement is waived when explicit steps are present.
+
 ## Step Structure
 
 Each step can define:
@@ -92,6 +118,26 @@ Transfer scaling by essence quantity is out of scope for this phase.
 - In-progress runs may be stored under `Actor.flags.fabricate.craftingRuns`.
 - Run records should include recipe ID, current step index, selected ingredient data, and time-gate state.
 - Runs must be cleaned up when recipe/system destructive operations invalidate them (see `007`).
+
+## Run-History Retention
+
+The actor-flag shape for `craftingRuns` and `salvageRuns` is defined in `002-data-models.md`.
+
+### Retention Limit
+
+- Both `craftingRuns.history` and `salvageRuns.history` are capped at a maximum of **50** entries per actor.
+- The limit is a fixed module constant, not user-configurable.
+- The default value is **50**.
+
+### Ordering
+
+- History arrays are ordered **most-recent-first** (newest entry at index 0).
+- When a run reaches a terminal status (`succeeded`, `failed`, or `cancelled`), it is removed from `active` and prepended to `history`.
+
+### Truncation Behaviour
+
+- After prepending a new entry, if `history.length` exceeds the retention limit, the array is truncated to the limit length by discarding the oldest entries (those at the highest indices).
+- Truncation is applied immediately on every terminal-state transition; no deferred cleanup.
 
 ## Salvage Execution
 
@@ -199,6 +245,15 @@ SalvageRun = {
 - **Feature disable** (`features.salvage = false`): Cancels all active salvage runs. Salvage definitions on components are preserved but inert.
 - **Component deletion**: Cleans up any active salvage runs referencing the deleted component.
 
+## UI Rendering for Multi-Step Recipes
+
+When recipe-level `ingredientSets` or `resultGroups` are empty:
+
+- The recipe detail/summary view MUST NOT render empty ingredient or result sections. If recipe-level sets are absent, display the active step's sets or a step overview instead.
+- Recipe list views SHOULD derive summary information (e.g., total ingredient count, result count) from the aggregate of all steps when recipe-level sets are empty.
+- The recipe editor for multi-step recipes MUST present step-level editing controls and MUST NOT require recipe-level `ingredientSets` or `resultGroups` to be populated.
+- Step navigation and status indicators MUST remain functional regardless of whether recipe-level sets are populated.
+
 ## Testing Requirements
 
 - Unit tests for single-step and multistep behaviour.
@@ -212,3 +267,11 @@ SalvageRun = {
 - Unit tests for salvage lifecycle (validate, check, resolve, consume, create).
 - Unit tests for salvage resolution modes (simple, tiered, progressive).
 - Unit tests for salvage destructive change handling.
+- Unit tests for validation accepting empty recipe-level `ingredientSets` and `resultGroups` when explicit steps are present.
+- Unit tests for validation rejecting empty step-level `ingredientSets` or `resultGroups` within explicit steps.
+- Unit tests for `getExecutionSteps()` returning step-level data and ignoring empty recipe-level fields for multi-step recipes.
+- Regression test: an explicit multi-step recipe with empty recipe-level sets and fully populated steps passes validation and crafts successfully end-to-end.
+- UI render tests: recipe detail view does not render empty sections when recipe-level sets are absent and steps are present.
+- Unit tests for run-history ordering: the newest terminal run appears at index 0 in `history`.
+- Unit tests for retention-limit boundary: inserting the 51st entry causes the oldest entry to be discarded, and `history.length` never exceeds 50.
+- Unit tests confirming truncation applies identically to both `craftingRuns.history` and `salvageRuns.history`.

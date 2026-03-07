@@ -169,7 +169,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
   5. Spec examples include one restricted+empty case with expected visibility outcome.
 
 ### T-066 - Spec 006: Add Explicit `global` Branch to Listing Algorithm and Tests
-- Status: `todo`
+- Status: `done`
 - Description: Extend visibility behavior spec to include first-class `global` list-mode semantics and corresponding testing requirements.
 - Acceptance Criteria:
   1. `spec/006-recipe-visibility.md` listing algorithm includes a `listMode === "global"` branch.
@@ -179,7 +179,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
   5. No residual text implies only 2 list modes in spec 006.
 
 ### T-067 - Spec 006: Make Drag-and-Drop Learning a Required Behavior
-- Status: `todo`
+- Status: `done`
 - Description: Convert drag-and-drop recipe learning from optional language to required behavior, including matching rules, multi-match learning, and user feedback expectations.
 - Acceptance Criteria:
   1. `spec/006-recipe-visibility.md` removes conditional wording (`if implemented`) for drag-and-drop learn.
@@ -189,7 +189,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
   5. Testing requirements include integration tests for drag-and-drop learn flow.
 
 ### T-068 - Spec 003: Update Visibility UI Contract for `global|player|knowledge`
-- Status: `todo`
+- Status: `done`
 - Description: Update UI integration spec to reflect three visibility list modes and mode-specific control visibility in both system editor and recipe editor flows.
 - Acceptance Criteria:
   1. `spec/003-ui-integration.md` defines list-mode selector options as `global`, `player`, `knowledge`.
@@ -199,7 +199,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
   5. No stale UI text remains that assumes only `player|knowledge`.
 
 ### T-069 - Spec 002: Clarify Catalyst `maxUses` Validation Rules
-- Status: `todo`
+- Status: `done`
 - Description: Record the implemented catalyst validation rule: `maxUses` constraints are enforced only when `degradesOnUse` is enabled; otherwise `maxUses` may be null/ignored for validity.
 - Acceptance Criteria:
   1. `spec/002-data-models.md` catalyst requirements explicitly scope `maxUses` validation to `degradesOnUse === true`.
@@ -209,7 +209,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
   5. Testing requirements mention coverage for the full `degradesOnUse × maxUses` matrix.
 
 ### T-070 - Spec 005: Clarify Multi-Step Recipes with Empty Top-Level Sets
-- Status: `todo`
+- Status: `done`
 - Description: Document that explicit multi-step recipes may have empty or absent top-level `ingredientSets/resultGroups`, and runtime/UI must resolve step-level sets without error.
 - Acceptance Criteria:
   1. `spec/005-recipes-and-steps.md` explicitly permits empty/absent recipe-level sets for explicit multi-step recipes.
@@ -219,7 +219,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
   5. Testing requirements include regression coverage for this shape.
 
 ### T-071 - Spec 007: Document Startup Migration Framework and `migrationVersion`
-- Status: `todo`
+- Status: `done`
 - Description: Update migration spec to reflect the implemented versioned migration runner, including `fabricate.migrationVersion`, ordered pending migrations, continue-on-error behavior, and write-on-change persistence.
 - Acceptance Criteria:
   1. `spec/007-destructive-changes-and-migrations.md` documents `fabricate.migrationVersion` as migration state storage.
@@ -229,7 +229,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
   5. Testing requirements include idempotency and partial-failure progression behavior.
 
 ### T-072 - Spec 002/007: Add Canonical-Write and Legacy-Read Compatibility Policy
-- Status: `todo`
+- Status: `done`
 - Description: Formalize compatibility policy during migration windows: reads may accept legacy aliases, but writes must emit canonical fields. Document alias mappings and retirement expectations.
 - Acceptance Criteria:
   1. Spec defines canonical-write policy for current model fields (`componentId`, `components`, `match.type="component"`).
@@ -239,7 +239,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
   5. Testing requirements include backward-compat read tests and canonical-write assertions.
 
 ### T-073 - Spec 005: Define Run-History Retention Limits as Contract
-- Status: `todo`
+- Status: `done`
 - Description: Turn current run-history truncation behavior into explicit specification so retention and ordering are stable, testable, and not accidental implementation details.
 - Acceptance Criteria:
   1. `spec/005-recipes-and-steps.md` defines maximum retained history length for `craftingRuns.history` and `salvageRuns.history`.
@@ -317,7 +317,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
   6. A docs-content audit confirms there are no conflicting visibility instructions across pages after the cleanup.
 
 ### T-080 - Add Narrative Introductions Before Configuration Tables
-- Status: `todo`
+- Status: `done`
 - Description: Improve accessibility for first-time readers by adding short scenario-driven intros before the first configuration table in core concept pages. Use concrete crafting examples to explain "why this exists" before presenting field-level configuration details.
 - Acceptance Criteria:
   1. `docs/essences.md`, `docs/catalysts.md`, and `docs/visibility.md` each include a 3-5 sentence narrative introduction before their first configuration table.

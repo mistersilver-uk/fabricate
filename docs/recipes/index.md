@@ -23,12 +23,15 @@ Every recipe has:
 | `enabled` | Whether the recipe can be crafted |
 | `locked` | Prevents non-GM users from crafting |
 | `craftingSystemId` | The system this recipe belongs to |
-| `ingredientSets` | One or more sets of required ingredients |
-| `resultGroups` | One or more groups of produced items |
-| `catalysts` | Non-consumable tools required for crafting |
+| `ingredientSets` | One or more sets of required ingredients (single-step recipes only; multi-step recipes define these per step) |
+| `resultGroups` | One or more groups of produced items (single-step recipes only; multi-step recipes define these per step) |
+| `catalysts` | Non-consumable tools required for crafting; for multi-step recipes, recipe-level catalysts apply to every step |
 | `transferEffects` | Whether to copy active effects from ingredients to results |
 | `visibility` | Access control (restricted, allowedUserIds) |
 | `linkedRecipeItemUuid` | Item that teaches this recipe (for knowledge mode). In the recipe editor you can browse for an existing item, paste a UUID directly, or use **Create Recipe Item** to generate a new world item automatically. |
+
+{: .note }
+> For multi-step recipes (when `multiStepRecipes` is enabled and the recipe has a `steps` array), `ingredientSets` and `resultGroups` are defined on each individual step, not on the recipe itself. Recipe-level `ingredientSets` and `resultGroups` are not required and may be empty. See [Multi-Step Recipes]({% link recipes/multi-step.md %}) for details.
 
 ## Enabling and Disabling Recipes
 

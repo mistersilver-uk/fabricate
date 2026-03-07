@@ -10,6 +10,8 @@ Fabricate supports three approaches to controlling which recipes players can see
 
 ---
 
+Picture a campaign where novice adventurers know only basic recipes -- a healing salve and a simple torch -- while a master artificer has unlocked legendary weapon blueprints through months of questing. Fabricate's visibility system lets you control exactly this: which recipes each player can see and when new ones become available. You might make every recipe visible from the start for a casual game, hand-pick recipes per player for tighter narrative control, or gate discovery behind owning an in-world "recipe scroll" that a player finds in a dragon's hoard. The [list modes below](#list-modes) walk through each approach, starting with the three modes you can set on a crafting system.
+
 ## List Modes
 
 Set `recipeVisibility.listMode` on your crafting system — either through the **Recipe Visibility** card in the Crafting Admin panel or via the API — to choose the approach.
@@ -138,7 +140,31 @@ You configure `consumeOnLearn` in the **Recipe Visibility** card on the System t
 
 ### Drag-and-Drop Learning
 
-Players can drag an item onto the crafting app to learn all recipes that match it. This works well for "recipe book" items that teach multiple recipes.
+Dragging a recipe item onto a crafting actor's sheet is a required learning pathway. Fabricate registers a drop handler on all actor sheets: when a valid recipe item is dropped onto an actor, it triggers recipe learning automatically — no button click required.
+
+#### How Matching Works for Dropped Items
+
+A dropped item is matched against all recipes in the crafting system. A recipe matches when either condition is true:
+
+1. The dropped item's UUID equals `recipe.linkedRecipeItemUuid`
+2. The dropped item's `flags.core.sourceId` equals `recipe.linkedRecipeItemUuid`
+
+Both UUID identity and `core.sourceId` ancestry are always evaluated. A match on either is sufficient. This means items dragged directly from the world and items originally copied from a compendium are both recognised.
+
+#### Recipe Book Items
+
+A single dropped item can match more than one recipe. When this happens, the actor learns every matched recipe in a single operation. This makes it straightforward to create "recipe book" items — one Alchemist's Compendium, for example, might unlock Healing Salve, Antitoxin, and Smokestick all at once.
+
+#### Notifications
+
+After a drag-and-drop learn attempt, Fabricate always tells the player what happened:
+
+| Outcome | Notification shown |
+|:--------|:-------------------|
+| **Success** | Lists each recipe learned and the actor that learned them. |
+| **Partial success** | When some matched recipes were already known, only the newly learned recipes are listed. If all matches were already known, the player is notified that nothing new was learned. |
+| **No match** | The drop is silently ignored for learning purposes. No notification is shown. The item is still added to the actor's inventory as normal. |
+| **Precondition failure** | When the system's knowledge mode does not support learning (i.e., mode is `item` only), no learn operation occurs and no notification is shown. |
 
 ## Locked Recipes
 
