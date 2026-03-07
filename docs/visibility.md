@@ -184,6 +184,37 @@ Before starting, resuming, or advancing a crafting run, Fabricate re-evaluates:
 
 If any guard fails, the action is blocked with a notification explaining why.
 
+## Configuring via the API
+
+You can set visibility programmatically through the `CraftingSystemManager`:
+
+```javascript
+// Switch an Alchemy system to player-specific visibility
+Hooks.once('fabricate.ready', async () => {
+  const mgr = game.fabricate.getCraftingSystemManager();
+  await mgr.updateSystem('alchemy-system-id', {
+    recipeVisibility: { listMode: 'player' }
+  });
+});
+```
+
+```javascript
+// Switch to knowledge mode: players must own a recipe scroll to see the recipe,
+// and the scroll is consumed when they learn it.
+Hooks.once('fabricate.ready', async () => {
+  const mgr = game.fabricate.getCraftingSystemManager();
+  await mgr.updateSystem('alchemy-system-id', {
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: {
+        mode: 'itemOrLearned',
+        learn: { consumeOnLearn: true }
+      }
+    }
+  });
+});
+```
+
 ---
 
 ## What's next?

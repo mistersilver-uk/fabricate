@@ -1,0 +1,31 @@
+---
+layout: default
+title: Effect Transfer
+parent: How-To Guides
+nav_order: 4
+---
+
+# Effect Transfer
+
+## Problem
+
+How do I make active effects from ingredients automatically transfer to crafted items?
+
+## Short answer
+
+Enable both the **essences** and **effectTransfer** feature toggles on the system, configure essence definitions with source items that carry the desired active effects, and set `transferEffects: true` on each recipe that should inherit those effects.
+
+## Steps
+
+1. In the Crafting Admin panel, enable the **Essences** and **Effect Transfer** feature toggles for your system.
+2. Under advanced options, define your essences (e.g. "Fire", "Frost") in the Essences card.
+3. For each essence, set a **Source Item** -- this is the managed item whose active effects represent that essence.
+4. Assign essence quantities to your managed ingredient items (e.g. Dragon Scale = 3 Fire, 1 Arcane).
+5. In the recipe editor, enable **Transfer Effects** on recipes that should inherit effects from their ingredients' essences.
+6. When a player crafts, the engine collects active effects from the source items of all contributing essences and applies them to the created result.
+
+## Learn more
+
+- [Crafting Systems -- Effect Transfer]({% link crafting-systems.md %}#effect-transfer)
+- [Essences]({% link essences.md %})
+- [Essences -- Effect Transfer via Essences]({% link essences.md %}#effect-transfer-via-essences)

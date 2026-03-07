@@ -26,6 +26,7 @@ Fabricate lets GMs define crafting systems with recipes, ingredients, catalysts,
 | **Effect Transfer** | Transfer active effects from ingredients to crafted items |
 | **Macro Integration** | Customise crafting checks, property generation, and success/failure hooks |
 | **Troubleshooting** | Diagnose common setup and runtime issues |
+| **How-To Guides** | Quick answers to common crafting tasks |
 
 {: .tip }
 > Use the **search bar** in the sidebar to quickly find settings, configuration options, and macro examples across the documentation.
@@ -53,3 +54,7 @@ Head to [Quickstart]({% link quickstart.md %}) for installation and your first r
 ## Having trouble?
 
 Check the [Troubleshooting]({% link troubleshooting.md %}) guide for solutions to common issues.
+
+## How-to guides
+
+Need a quick answer? The [How-To Guides]({% link how-to/index.md %}) cover common tasks like adding skill checks, setting up recipe discovery, and importing recipes.

@@ -205,78 +205,15 @@ Hooks.once('fabricate.ready', async () => {
 
 Recipe visibility controls which players can see and access recipes in the crafting app. You configure this per crafting system in the **Recipe Visibility** feature card on the System tab of the Crafting Admin panel.
 
-#### List Modes
+Fabricate supports three list modes:
 
-| `listMode` value | Default | Description |
-|:----------------|:--------|:------------|
-| `"global"` | Yes | All recipes are visible to all users. No per-recipe restrictions apply. |
-| `"player"` | No | All recipes are visible by default, but a GM can restrict individual recipes to a named list of players via the recipe editor. |
-| `"knowledge"` | No | Recipes are only visible to players who possess the recipe item or have learned the recipe. Sub-options control exactly how knowledge is evaluated. |
+| `listMode` value | Description |
+|:----------------|:------------|
+| `"global"` (default) | All recipes visible to all users |
+| `"player"` | GM restricts individual recipes to named players |
+| `"knowledge"` | Recipes discovered through gameplay via recipe items or learning |
 
-{: .note }
-> The default `listMode` for new systems (and for existing systems that have never had an explicit value saved) is `"global"`. If you created systems before this setting existed, they will now default to global visibility — all players can see all recipes. Switch to `"player"` or `"knowledge"` if you want access control.
-
-**Changing the list mode is non-destructive.** Your recipes and their per-recipe `visibility` data are never deleted when you switch modes. The knowledge sub-options (`mode`, `consumeOnLearn`) are also preserved so you can switch back to knowledge mode without reconfiguring.
-
-#### Global Mode
-
-All recipes in the system are visible to all players. The recipe editor does not show any visibility controls because they have no effect in this mode. Use this for systems where discovery is not part of the design.
-
-#### Player Mode
-
-All recipes are visible to all players by default. A GM can restrict a specific recipe to a named set of players by enabling "Restrict visibility to specific users" in the recipe editor and selecting the allowed users.
-
-- GMs always see all recipes regardless of restrictions.
-- A recipe can be restricted with an empty user list (`allowedUserIds: []`). This hides it from all players — useful while you are building out a recipe before assigning it to anyone.
-- The recipe list in the Crafting Admin panel shows a **Visibility** column summarising how many players each recipe is restricted to.
-
-See [Visibility & Knowledge]({% link visibility.md %}) for full details on the player-mode access model.
-
-#### Knowledge Mode
-
-Recipes are hidden until a player's character earns access. Access can come from owning a recipe item, learning the recipe, or both — depending on the knowledge sub-options you configure.
-
-Knowledge mode sub-options are shown in the **Recipe Visibility** card when `listMode` is set to `"knowledge"`:
-
-| Sub-option | Field | Default | Description |
-|:-----------|:------|:--------|:------------|
-| Knowledge source | `recipeVisibility.knowledge.mode` | `"itemOrLearned"` | How a player gains access: `"item"` (must own the recipe item), `"learned"` (must have explicitly learned it), or `"itemOrLearned"` (either condition). |
-| Consume on learn | `recipeVisibility.knowledge.learn.consumeOnLearn` | `true` | Whether the recipe item is deleted from the player's inventory when they learn the recipe. Only relevant when `mode` is `"learned"` or `"itemOrLearned"`. |
-
-**Saving knowledge sub-options.** Adjust the dropdowns and checkbox in the Recipe Visibility card, then click **Save Visibility Settings**. The knowledge sub-options are only shown in the card when `listMode` is `"knowledge"`.
-
-See [Visibility & Knowledge]({% link visibility.md %}) for the full knowledge access model including recipe items, limited uses, and the learn flow.
-
-#### Configuring via the API
-
-You can also set visibility programmatically:
-
-```javascript
-// Switch an Alchemy system to player-specific visibility
-Hooks.once('fabricate.ready', async () => {
-  const mgr = game.fabricate.getCraftingSystemManager();
-  await mgr.updateSystem('alchemy-system-id', {
-    recipeVisibility: { listMode: 'player' }
-  });
-});
-```
-
-```javascript
-// Switch to knowledge mode: players must own a recipe scroll to see the recipe,
-// and the scroll is consumed when they learn it.
-Hooks.once('fabricate.ready', async () => {
-  const mgr = game.fabricate.getCraftingSystemManager();
-  await mgr.updateSystem('alchemy-system-id', {
-    recipeVisibility: {
-      listMode: 'knowledge',
-      knowledge: {
-        mode: 'itemOrLearned',
-        learn: { consumeOnLearn: true }
-      }
-    }
-  });
-});
-```
+For full details on each mode, knowledge sub-options, recipe items, the learn flow, and API configuration examples, see [Visibility & Knowledge]({% link visibility.md %}).
 
 ---
 

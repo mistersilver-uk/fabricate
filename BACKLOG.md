@@ -28,6 +28,8 @@ Purpose: keep agent work explicit, reviewable, and testable.
   1. <verifiable outcome>
   2. <verifiable outcome>
   3. <verifiable outcome>
+- Error (if any):
+- Resolution: 
 ```
 
 ## Tasks
@@ -125,15 +127,8 @@ Purpose: keep agent work explicit, reviewable, and testable.
   6. Unit tests cover teaser rendering, unlock transitions, and permission boundaries.
 
 ### T-062 - Publish Item Piles Integration Guides and Macros
-- Status: `todo`
-- Description: Provide first-class documentation and ready-to-use macro examples for integrating Fabricate with Item Piles workflows.
-- Acceptance Criteria:
-  1. Docs include a step-by-step guide for using Item Piles merchants as ingredient vendors.
-  2. Docs include a guide for Item Piles currency integration with Fabricate currency requirements.
-  3. Docs include a guide for combining Item Piles flows with time-gated crafting.
-  4. At least three copy-paste macro examples are provided, validated against current API names.
-  5. All integration docs live under `docs/` and are linked from the main docs index.
-  6. Manual verification checklist confirms examples run without edits other than IDs/UUIDs.
+- Status: `reverted`
+- Description: ~~Provide first-class documentation and ready-to-use macro examples for integrating Fabricate with Item Piles workflows.~~ Reverted — macro-based integration guides do not meet the bar for a real integration. See T-086 for the replacement spec requirement.
 
 ### T-063 - Add Gathering/Harvesting Workflow
 - Status: `todo`
@@ -273,7 +268,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
   6. Internal links and sidebar navigation are updated so all moved sections remain reachable and no stale anchors remain.
 
 ### T-076 - Add Task-Oriented `docs/how-to/` Documentation Section
-- Status: `todo`
+- Status: `done`
 - Description: Add a task-first documentation section for users who need direct answers to practical goals. Create concise "How do I...?" pages that point to full references without duplicating entire concept pages.
 - Acceptance Criteria:
   1. A new `docs/how-to/` section exists with an index/landing page linked from docs navigation.
@@ -306,7 +301,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
   6. A brief note is added to docs home/usage guidance so readers know search is available.
 
 ### T-079 - Make `visibility.md` the Single Canonical Visibility Guide
-- Status: `todo`
+- Status: `done`
 - Description: Eliminate duplicated visibility guidance by reducing non-canonical pages to short link-outs and concentrating authoritative behavior details in `docs/visibility.md`. This prevents documentation drift as visibility features evolve.
 - Acceptance Criteria:
   1. The long visibility section in `docs/crafting-systems.md` is replaced with a short summary and a direct link to `docs/visibility.md`.
@@ -337,3 +332,19 @@ Purpose: keep agent work explicit, reviewable, and testable.
   4. Troubleshooting checks align with current validation logic and documented contracts (including mode-specific macro return shapes where relevant).
   5. The page references the correct feature prerequisites/flags for effect transfer and visibility behavior.
   6. At least one quick diagnostic checklist is provided for "before filing an issue" to reduce repeated support questions.
+
+## Integration Tasks
+
+### T-086 - Implement Automated Item Piles Integration
+- Status: `todo`
+- Description: Build a first-class automated integration with Item Piles per `spec/008-integrations.md`. The integration must detect Item Piles, use its public API, and require zero user-authored macros. Covers currency costs as crafting requirements, merchant stock as ingredient sources, and container contents as crafting-station inventory.
+- Acceptance Criteria:
+  1. A system-level feature toggle `features.itemPiles` controls the integration and defaults to `false`.
+  2. Fabricate detects Item Piles at startup and hides/disables the toggle when the module is absent.
+  3. Currency costs are defined as a recipe requirement field and deducted automatically on successful craft via the Item Piles API.
+  4. Merchant actor stock is queryable as an ingredient source without user macros.
+  5. Item Piles container contents are readable as crafting-station inventory for multi-step recipes.
+  6. All data exchange uses the Item Piles public API (`game.itempiles.API`), not internal flags or direct document manipulation.
+  7. Unit tests mock the Item Piles API and cover: module-absent, toggle-off, and toggle-on happy paths.
+  8. A minimum compatible Item Piles version is documented and enforced at runtime.
+  9. No user-authored macros or scripts are required at any point in the workflow.
