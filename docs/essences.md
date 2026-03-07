@@ -85,6 +85,6 @@ The source item dropdown lists managed items already added to this crafting syst
 
 ## What's next?
 
-- [Crafting Systems -- Effect Transfer]({% link crafting-systems.md %}) -- configure the effect transfer pipeline that uses essence source items.
+- [Effect Transfer]({% link effect-transfer.md %}) -- configure the effect transfer pipeline that uses essence source items.
 - [Recipes overview]({% link recipes/index.md %}) -- see how essence requirements work inside ingredient sets.
 - [Recipe Manager API]({% link api/recipe-manager.md %}) -- create and manage recipes with essence-based ingredients programmatically.

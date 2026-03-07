@@ -29,7 +29,7 @@ export class ResolutionModeService {
 
     const mode = this.getMode(recipe);
     const steps = this.getExecutionSteps(recipe);
-    const checkEnabled = system?.craftingCheck?.enabled === true || !!system?.craftingCheck?.macroUuid;
+    const checkEnabled = system?.craftingCheck?.enabled === true || !!system?.craftingCheck?.macroUuid || system?.craftingCheck?.checkSource === 'builtIn';
     const outcomes = Array.isArray(system?.craftingCheck?.outcomes) ? system.craftingCheck.outcomes : [];
 
     for (const step of steps) {

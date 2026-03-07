@@ -56,7 +56,7 @@ This guide covers common issues GMs and players encounter when setting up or usi
    - **Tiered:** `{ success: boolean, outcome: string }` (outcome must match a declared outcome label)
    - **Progressive:** `{ success: boolean, value: number }` (value must be a finite number)
 
-**See also:** [Macros & Examples]({% link macros/index.md %}) -- crafting check macro contract and return shapes; [Crafting Systems]({% link crafting-systems.md %}) -- crafting check configuration.
+**See also:** [Macros & Examples]({% link macros/index.md %}) -- crafting check macro contract and return shapes; [Crafting Checks]({% link crafting-checks.md %}) -- crafting check configuration.
 
 ---
 
@@ -81,7 +81,7 @@ This guide covers common issues GMs and players encounter when setting up or usi
 5. If catalysts should degrade even on a failed check, open the system settings and check `craftingCheck.consumption.consumeCatalystsOnFail`. Set it to `true` if needed.
 6. Verify the catalyst configuration uses `componentId`, not the legacy `systemItemId`.
 
-**See also:** [Catalysts]({% link catalysts.md %}) -- catalyst properties, usage tracking, and exhaustion; [Crafting Systems]({% link crafting-systems.md %}) -- consumption on failure settings.
+**See also:** [Catalysts]({% link catalysts.md %}) -- catalyst properties, usage tracking, and exhaustion; [Crafting Checks]({% link crafting-checks.md %}#consumption-on-failure) -- consumption on failure settings.
 
 ---
 
@@ -114,7 +114,7 @@ Additional causes:
 5. Check the managed items used as ingredients in the recipe. Do they have non-zero essence quantities assigned for the relevant essence?
 6. Open the browser console (F12) and attempt a craft. Effect transfer issues are logged as `Fabricate |` messages.
 
-**See also:** [Crafting Systems]({% link crafting-systems.md %}) -- effect transfer configuration and the triple-flag pipeline; [Essences]({% link essences.md %}) -- essence definitions and source items.
+**See also:** [Effect Transfer]({% link effect-transfer.md %}) -- effect transfer configuration and the triple-flag pipeline; [Essences]({% link essences.md %}) -- essence definitions and source items.
 
 ---
 
@@ -147,7 +147,7 @@ Additional causes:
 5. Is `salvage.enabled` set to `true` on the component you are trying to salvage?
 6. Is the `salvage` feature toggle enabled on the crafting system?
 
-**See also:** [Crafting Systems]({% link crafting-systems.md %}) -- salvage configuration, salvage resolution modes, and salvage crafting checks.
+**See also:** [Salvage]({% link salvage.md %}) -- salvage configuration, salvage resolution modes, and salvage crafting checks.
 
 ---
 

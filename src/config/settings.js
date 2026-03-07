@@ -10,7 +10,9 @@ export const SETTING_KEYS = Object.freeze({
   LAST_COMPONENT_SOURCES: 'lastComponentSources',
   LAST_MANAGED_CRAFTING_SYSTEM: 'lastManagedCraftingSystem',
   PROGRESSIVE_RESULT_ORDER: 'progressiveResultOrder',
-  MIGRATION_VERSION: 'migrationVersion'
+  MIGRATION_VERSION: 'migrationVersion',
+  FAVOURITE_RECIPES: 'favouriteRecipes',
+  RECENTLY_CRAFTED: 'recentlyCrafted'
 });
 
 const BASE_DEFINITIONS = Object.freeze({
@@ -86,6 +88,20 @@ const BASE_DEFINITIONS = Object.freeze({
     config: false,
     type: String,
     default: '0.0.0'
+  },
+  [SETTING_KEYS.FAVOURITE_RECIPES]: {
+    name: 'Favourite Recipes',
+    scope: 'client',
+    config: false,
+    type: Array,
+    default: []
+  },
+  [SETTING_KEYS.RECENTLY_CRAFTED]: {
+    name: 'Recently Crafted Recipes',
+    scope: 'client',
+    config: false,
+    type: Array,
+    default: []
   }
 });
 

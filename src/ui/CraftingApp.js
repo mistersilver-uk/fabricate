@@ -3,6 +3,8 @@ import { getTemplatePath } from './templatePaths.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { getFabricateFlag } from '../config/flags.js';
 
+const RECENTLY_CRAFTED_MAX = 10;
+
 /**
  * Player Crafting Interface
  * Shows available recipes and allows players to craft items
@@ -71,6 +73,36 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
     return ChatMessage.create(data);
   }
 
+  // --- Favourites helpers ---
+
+  _getFavourites() {
+    return this._getSetting(SETTING_KEYS.FAVOURITE_RECIPES) || [];
+  }
+
+  async _setFavourites(ids) {
+    return this._setSetting(SETTING_KEYS.FAVOURITE_RECIPES, ids);
+  }
+
+  // --- Recently crafted helpers ---
+
+  _getRecentlyCrafted() {
+    return this._getSetting(SETTING_KEYS.RECENTLY_CRAFTED) || [];
+  }
+
+  async _setRecentlyCrafted(entries) {
+    return this._setSetting(SETTING_KEYS.RECENTLY_CRAFTED, entries);
+  }
+
+  async _trackRecentCraft(recipeId) {
+    const existing = this._getRecentlyCrafted();
+    const newEntry = { recipeId, timestamp: Date.now() };
+    // Prepend and deduplicate by recipeId (keep most recent)
+    const deduped = [newEntry, ...existing.filter(e => e.recipeId !== recipeId)];
+    // Cap at max
+    const capped = deduped.slice(0, RECENTLY_CRAFTED_MAX);
+    await this._setRecentlyCrafted(capped);
+  }
+
   static DEFAULT_OPTIONS = {
     id: 'fabricate-crafting',
     classes: ['fabricate', 'crafting-app'],
@@ -93,7 +125,8 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
       learnRecipe: this._onLearnRecipe,
       showRunDetails: this._onShowRunDetails,
       cancelRun: this._onCancelRun,
-      restartRun: this._onRestartRun
+      restartRun: this._onRestartRun,
+      toggleFavourite: this._onToggleFavourite
     }
   };
 
@@ -304,7 +337,9 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
         hasCraftingActor: !!this.craftingActor,
         hasComponentSources: this.componentSourceActors.length > 0,
         availableActors: [],
-        ownedActors: []
+        ownedActors: [],
+        favouriteRecipes: [],
+        recentRecipes: []
       };
     }
 
@@ -420,6 +455,10 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
       });
     }
 
+    // Load favourites and recents for context enrichment
+    const favouriteIds = this._getFavourites();
+    const recentEntries = this._getRecentlyCrafted();
+
     // Prepare recipe data for display
     const preparedRecipes = recipes.map(recipe => {
       const evaluation = evaluations.get(recipe.id);
@@ -478,9 +517,27 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
         // They are always consistent with canCraft (T-082 fix).
         ingredients: evaluation?.ingredientStates ?? [],
         essences: evaluation?.essenceStates ?? [],
-        catalysts: evaluation?.catalystStates ?? []
+        catalysts: evaluation?.catalystStates ?? [],
+        isFavourite: favouriteIds.includes(recipe.id)
       };
     });
+
+    // Build a lookup map for quick access
+    const preparedById = new Map(preparedRecipes.map(r => [r.id, r]));
+
+    // Build favouriteRecipes: filter to those in favouriteIds, preserving insertion order
+    const favouriteRecipes = favouriteIds
+      .map(id => preparedById.get(id))
+      .filter(Boolean);
+
+    // Build recentRecipes: map recentEntries to prepared recipes, filter out missing/invisible
+    const recentRecipes = recentEntries
+      .map(entry => {
+        const recipe = preparedById.get(entry.recipeId);
+        if (!recipe) return null;
+        return { ...recipe, craftedAt: entry.timestamp };
+      })
+      .filter(Boolean);
 
     // Get unique categories
     const allRecipes = recipeManager.getRecipes({ enabled: true });
@@ -497,7 +554,9 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
       showOnlyAvailable: this.showOnlyAvailable,
       search: this.searchTerm,
       totalRecipes: preparedRecipes.length,
-      showPagination: false
+      showPagination: false,
+      favouriteRecipes,
+      recentRecipes
     };
   }
 
@@ -586,6 +645,22 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
   }
 
   /**
+   * Toggle a recipe's favourite status
+   */
+  static async _onToggleFavourite(event, target) {
+    const recipeId = target.dataset.recipeId;
+    if (!recipeId) return;
+
+    const current = this._getFavourites();
+    const updated = current.includes(recipeId)
+      ? current.filter(id => id !== recipeId)
+      : [...current, recipeId];
+
+    await this._setFavourites(updated);
+    await this.render();
+  }
+
+  /**
    * Craft an item
    */
   static async _onCraft(event, target) {
@@ -660,6 +735,9 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
           </div>
         `
       });
+
+      // Track this craft in recently crafted
+      await this._trackRecentCraft(recipeId);
 
       // Re-render to update available recipes
       await this.render();

@@ -1,5 +1,6 @@
 import { Recipe } from '../models/Recipe.js';
 import { MacroExecutor } from '../utils/MacroExecutor.js';
+import { CraftingCheckAdapterRegistry } from './CraftingCheckAdapter.js';
 import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
 
 /**
@@ -998,6 +999,43 @@ export class CraftingEngine {
     }
 
     const config = system.craftingCheck || {};
+    const checkSource = config.checkSource || 'macro';
+
+    if (checkSource === 'builtIn') {
+      const gameSystemId = typeof game !== 'undefined' ? game.system?.id : null;
+      const adapter = CraftingCheckAdapterRegistry.get(gameSystemId);
+      if (!adapter) {
+        return {
+          success: false,
+          outcome: null,
+          value: null,
+          data: {},
+          message: 'No system adapter available for built-in checks. Switch to macro mode or install a compatible game system.'
+        };
+      }
+      let adapterResult;
+      try {
+        adapterResult = await adapter.executeCheck(craftingActor, config.builtIn || {});
+      } catch (err) {
+        console.error('Fabricate | Built-in crafting check failed', err);
+        return {
+          success: false,
+          outcome: null,
+          value: null,
+          data: {},
+          message: `Built-in crafting check failed: ${err.message}`
+        };
+      }
+      const success = adapterResult.success !== false;
+      return {
+        success,
+        outcome: adapterResult.outcome ?? null,
+        value: adapterResult.value ?? null,
+        data: adapterResult.data || {},
+        message: success ? null : (adapterResult.message || 'Built-in crafting check failed')
+      };
+    }
+
     if (!config.macroUuid) {
       if (checkRequired) {
         return {

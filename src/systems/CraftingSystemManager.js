@@ -127,12 +127,17 @@ export class CraftingSystemManager {
       .map(o => String(o || '').trim().toLowerCase())
       .filter(Boolean);
 
+    const checkSource = check?.checkSource === 'builtIn' ? 'builtIn' : 'macro';
+    const builtIn = this._normalizeBuiltInCheck(check?.builtIn);
+
     return {
-      enabled: check?.enabled === true || !!check?.macroUuid,
+      enabled: check?.enabled === true || !!check?.macroUuid || checkSource === 'builtIn',
       mode,
       macroUuid: check?.macroUuid || null,
       successMacroUuid: check?.successMacroUuid || null,
       failureMacroUuid: check?.failureMacroUuid || null,
+      checkSource,
+      builtIn,
       consumption: {
         consumeIngredientsOnFail: check?.consumption?.consumeIngredientsOnFail !== false,
         consumeCatalystsOnFail: check?.consumption?.consumeCatalystsOnFail === true
@@ -146,6 +151,18 @@ export class CraftingSystemManager {
       outcomes: normalizedOutcomes.length > 0
         ? Array.from(new Set(normalizedOutcomes))
         : (mode === 'tiered' ? ['low', 'high'] : ['fail', 'pass'])
+    };
+  }
+
+  _normalizeBuiltInCheck(config = {}) {
+    const dc = Number(config?.dc);
+    return {
+      ability: String(config?.ability || '').trim().toLowerCase(),
+      skill: String(config?.skill || '').trim().toLowerCase(),
+      dc: Number.isFinite(dc) && dc >= 1 ? Math.floor(dc) : 15,
+      advantage: ['advantage', 'disadvantage', 'normal'].includes(config?.advantage)
+        ? config.advantage
+        : 'normal'
     };
   }
 

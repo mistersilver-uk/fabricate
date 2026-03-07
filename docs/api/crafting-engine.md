@@ -36,19 +36,91 @@ When `craft()` is called, the engine:
 1. **Validates ingredients** -- checks all groups in the selected ingredient set are satisfiable
 2. **Validates catalysts** -- checks all required catalysts are present in the source actors' inventories
 3. **Validates essences** -- if essences are enabled, checks essence requirements
-4. **Runs crafting check** -- if enabled, executes the check macro and interprets the result per the resolution mode
-5. **Applies failure consumption policy** -- if the check fails, consumes ingredients and/or degrades catalysts according to `craftingCheck.consumption` settings. By default, ingredients are consumed (`consumeIngredientsOnFail: true`) and catalysts are not degraded (`consumeCatalystsOnFail: false`). See [Consumption on Failure]({% link crafting-systems.md %}#consumption-on-failure).
+4. **Runs crafting check** -- if enabled, executes the check (built-in or macro) and interprets the result per the resolution mode. See [Crafting Checks]({% link crafting-checks.md %}) for both modes.
+5. **Applies failure consumption policy** -- if the check fails, consumes ingredients and/or degrades catalysts according to `craftingCheck.consumption` settings. By default, ingredients are consumed (`consumeIngredientsOnFail: true`) and catalysts are not degraded (`consumeCatalystsOnFail: false`). See [Consumption on Failure]({% link crafting-checks.md %}#consumption-on-failure).
 6. **Runs failure macro** -- if the check failed (step 4) or check-result validation failed (step 5), calls `system.craftingCheck.failureMacroUuid` with the failure context. See [Failure Macro]({% link macros/index.md %}#failure-macro). Macro errors are caught and logged; they do not affect the returned result.
 7. **Resolves result groups** -- determines which result group(s) to create based on mode and check result
 8. **Consumes ingredients** -- removes consumed items from source actors
 9. **Degrades catalysts** -- increments usage on catalyst items (if `degradesOnUse`)
 10. **Creates results** -- creates new items on the crafting actor
 11. **Applies property macros** -- if enabled, runs property macros on created items
-12. **Transfers effects** -- if `system.features.essences`, `system.features.effectTransfer`, and `recipe.transferEffects` are all `true`, collects active effects from the `sourceItemUuid` of each contributing essence definition and copies them to the result item. See [Effect Transfer]({% link crafting-systems.md %}#effect-transfer).
+12. **Transfers effects** -- if `system.features.essences`, `system.features.effectTransfer`, and `recipe.transferEffects` are all `true`, collects active effects from the `sourceItemUuid` of each contributing essence definition and copies them to the result item. See [Effect Transfer]({% link effect-transfer.md %}).
 13. **Runs success macro** -- calls `system.craftingCheck.successMacroUuid` with the full success context. See [Success Macro]({% link macros/index.md %}#success-macro). Macro errors are caught and logged; the crafting result is still returned as a success.
 
 {: .note }
-> Steps 5–6 only execute when the crafting check macro returns a failure result or check-result validation fails. Pre-check failures (missing ingredients, missing catalysts, invalid recipe, missing actor) return immediately without consuming anything and without calling either macro.
+> Steps 5–6 only execute when the crafting check returns a failure result or check-result validation fails. Pre-check failures (missing ingredients, missing catalysts, invalid recipe, missing actor) return immediately without consuming anything and without calling either macro.
+
+---
+
+## Crafting Check Execution
+
+Step 4 of the pipeline dispatches to one of two execution paths based on `system.craftingCheck.checkSource`.
+
+### Built-In Check Branch (`checkSource: "builtIn"`)
+
+When `checkSource` is `"builtIn"`, the engine looks up a `CraftingCheckAdapter` for the current game system via `CraftingCheckAdapterRegistry`. The adapter calls the game system's native dice API (`actor.rollSkill()` or `actor.rollAbilityCheck()` for D&D 5e) using the fields in `system.craftingCheck.builtIn`.
+
+**If no adapter is registered** for the current game system, the engine returns immediately with `success: false` and the message:
+
+> No system adapter available for built-in checks. Switch to macro mode or install a compatible game system.
+
+Nothing is consumed and no macros are called in that case.
+
+**If the adapter throws**, the engine catches the error, logs it with `Fabricate | Built-in crafting check failed`, and returns `success: false`. The failure consumption policy (step 5) then applies.
+
+The `builtIn` configuration object:
+
+| Field | Type | Default | Description |
+|:------|:-----|:--------|:------------|
+| `ability` | `string` | `""` | Ability key (e.g. `"int"`, `"wis"`) |
+| `skill` | `string` | `""` | Skill key (e.g. `"arc"`, `"nat"`). Takes precedence over `ability` when set. |
+| `dc` | `number` | `15` | Difficulty class. Roll total must meet or exceed this value to succeed. |
+| `advantage` | `string` | `"normal"` | `"advantage"`, `"disadvantage"`, or `"normal"` |
+
+### Macro Check Branch (`checkSource: "macro"`)
+
+When `checkSource` is `"macro"` (the default), the engine executes the macro at `system.craftingCheck.macroUuid`. If no `macroUuid` is configured and the resolution mode requires a check (tiered or progressive), the engine returns `success: false`.
+
+See [Macros]({% link macros/index.md %}) for the full macro contract and context shape.
+
+---
+
+## CraftingCheckAdapter Interface
+
+The adapter layer allows any game system to support built-in checks. A built-in D&D 5e adapter (`Dnd5eCraftingCheckAdapter`) is registered automatically when the `dnd5e` game system is active.
+
+Custom adapters must implement three methods:
+
+```javascript
+class MyCraftingCheckAdapter extends CraftingCheckAdapter {
+  constructor() { super('my-system-id'); }
+
+  /** @returns {Array<{key: string, label: string}>} */
+  getAbilities() { /* ... */ }
+
+  /** @returns {Array<{key: string, label: string}>} */
+  getSkills() { /* ... */ }
+
+  /**
+   * @param {Actor} actor
+   * @param {{ ability: string, skill: string, dc: number, advantage: string }} config
+   * @returns {Promise<{ success: boolean, outcome: string|null, value: number|null, data: object }>}
+   */
+  async executeCheck(actor, config) { /* ... */ }
+}
+```
+
+Register a custom adapter during module initialisation:
+
+```javascript
+Hooks.once('fabricate.ready', () => {
+  CraftingCheckAdapterRegistry.register('my-system-id', MyCraftingCheckAdapter);
+});
+```
+
+See [Registering a Custom Adapter]({% link crafting-checks.md %}#registering-a-custom-adapter) for a worked example.
+
+---
 
 ### Success and Failure Macros
 

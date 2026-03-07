@@ -50,7 +50,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
   7. All components referenced in the starter pack are included in the module's compendium, and vice-versa.
 
 ### T-055 - Add Built-In Roll/Check UI (No Macro Required)
-- Status: `todo`
+- Status: `done`
 - Description: Implement a built-in crafting-check mode so GMs can configure skill checks through UI fields instead of writing JavaScript macros. Keep macro mode available for advanced users.
 - Acceptance Criteria:
   1. Crafting-system settings expose check mode selection: `builtIn` or `macro`.
@@ -83,7 +83,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
   6. Unit tests validate graph construction logic for linear chains, branching graphs, and cyclic data.
 
 ### T-058 - Add Favourites and Recently Crafted Lists
-- Status: `todo`
+- Status: `done`
 - Description: Improve player UX by letting users pin favourite recipes and quickly access recently crafted ones.
 - Acceptance Criteria:
   1. Players can toggle favourite status for a recipe in the crafting UI.
@@ -105,7 +105,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
   6. Unit tests verify aggregation math, actor-source switching, and empty-list behavior.
 
 ### T-060 - Redesign Recipe Editor UX for Complex Recipes
-- Status: `todo`
+- Status: `done`
 - Description: Replace high-friction paginated editing for ingredient/result groups with a layout optimized for mapped/tiered recipes containing many options.
 - Acceptance Criteria:
   1. Recipe editor supports viewing and editing multiple ingredient sets/result groups without forced carousel pagination.
@@ -257,7 +257,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
   6. A short contributor note is added in docs guidance describing where media files live and optimization constraints for new captures.
 
 ### T-075 - Split `crafting-systems.md` Into Focused Topic Pages
-- Status: `todo`
+- Status: `done`
 - Description: Reduce cognitive load by decomposing the current monolithic `docs/crafting-systems.md` page into focused pages for checks, effect transfer, and salvage while keeping the base system setup page concise. Preserve all current guidance and examples while improving navigation and discoverability.
 - Acceptance Criteria:
   1. New pages are created with valid front matter and nav placement: `docs/crafting-checks.md`, `docs/effect-transfer.md`, and `docs/salvage.md`.

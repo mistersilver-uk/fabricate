@@ -142,6 +142,55 @@
         <p>Select at least one component source actor to see available recipes.</p>
       </div>
     {{else}}
+
+      <!-- Favourites quick-access section -->
+      {{#if favouriteRecipes.length}}
+        <div class="fabricate-quick-section favourites-section">
+          <h4><i class="fas fa-star"></i> Favourites</h4>
+          <div class="quick-recipe-list">
+            {{#each favouriteRecipes}}
+              <div class="quick-recipe-item" data-recipe-id="{{id}}">
+                <img src="{{img}}" alt="{{name}}" class="quick-recipe-icon" />
+                <span class="quick-recipe-name">{{name}}</span>
+                <span class="badge">{{statusLabel}}</span>
+                {{#if allowCraftAction}}
+                  <button type="button" class="craft-btn" data-action="craft" data-recipe-id="{{id}}" data-run-id="{{activeRunId}}">
+                    <i class="fas fa-hammer"></i> {{craftButtonLabel}}
+                  </button>
+                {{/if}}
+                <button type="button" class="details-btn favourite-btn is-favourite" data-action="toggleFavourite" data-recipe-id="{{id}}" title="Remove from favourites">
+                  <i class="fas fa-star"></i>
+                </button>
+              </div>
+            {{/each}}
+          </div>
+        </div>
+      {{/if}}
+
+      <!-- Recently Crafted quick-access section -->
+      {{#if recentRecipes.length}}
+        <div class="fabricate-quick-section recent-section">
+          <h4><i class="fas fa-clock"></i> Recently Crafted</h4>
+          <div class="quick-recipe-list">
+            {{#each recentRecipes}}
+              <div class="quick-recipe-item" data-recipe-id="{{id}}">
+                <img src="{{img}}" alt="{{name}}" class="quick-recipe-icon" />
+                <span class="quick-recipe-name">{{name}}</span>
+                <span class="badge">{{statusLabel}}</span>
+                {{#if allowCraftAction}}
+                  <button type="button" class="craft-btn" data-action="craft" data-recipe-id="{{id}}" data-run-id="{{activeRunId}}">
+                    <i class="fas fa-hammer"></i> {{craftButtonLabel}}
+                  </button>
+                {{/if}}
+                <button type="button" class="details-btn" data-action="showDetails" data-recipe-id="{{id}}" title="Show recipe details">
+                  <i class="fas fa-info-circle"></i>
+                </button>
+              </div>
+            {{/each}}
+          </div>
+        </div>
+      {{/if}}
+
       {{#if recipes.length}}
         {{#each recipes}}
           <article class="fabricate-recipe-item {{#if canCraft}}can-craft{{else}}cannot-craft{{/if}}" data-recipe-id="{{id}}">
@@ -255,6 +304,16 @@
                   </button>
                 {{/if}}
               {{/if}}
+
+              <button
+                type="button"
+                class="details-btn favourite-btn {{#if isFavourite}}is-favourite{{/if}}"
+                data-action="toggleFavourite"
+                data-recipe-id="{{id}}"
+                title="{{#if isFavourite}}Remove from favourites{{else}}Add to favourites{{/if}}"
+              >
+                <i class="fas fa-star"></i>
+              </button>
 
               <button
                 type="button"

@@ -25,7 +25,7 @@ Switch the crafting system to **tiered** or **progressive** resolution mode, wri
 
 ## Learn more
 
-- [Crafting Systems -- Crafting Checks]({% link crafting-systems.md %}#crafting-checks)
+- [Crafting Checks]({% link crafting-checks.md %})
 - [Tiered Mode]({% link recipes/tiered.md %})
 - [Progressive Mode]({% link recipes/progressive.md %})
 - [Macros -- Crafting Check contract]({% link macros/index.md %}#crafting-check-macro)

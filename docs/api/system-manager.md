@@ -45,9 +45,9 @@ The `features` object controls which optional behaviours are active. Every key d
 | `itemTags` | `boolean` | `false` | Tag-based ingredient matching |
 | `essences` | `boolean` | `false` | Enable the essences system |
 | `propertyMacros` | `boolean` | `false` | Allow result property macros |
-| `effectTransfer` | `boolean` | `false` | Copy active effects from ingredients to crafted results. Also requires `recipe.transferEffects: true` on each recipe. See [Effect Transfer]({% link crafting-systems.md %}#effect-transfer). |
+| `effectTransfer` | `boolean` | `false` | Copy active effects from ingredients to crafted results. Also requires `recipe.transferEffects: true` on each recipe. See [Effect Transfer]({% link effect-transfer.md %}). |
 | `multiStepRecipes` | `boolean` | `false` | Multi-step recipes |
-| `salvage` | `boolean` | `false` | Allow components to be broken down into constituent parts. When `true`, each normalised component gains a `salvage` sub-object. See [Salvage]({% link crafting-systems.md %}#salvage). |
+| `salvage` | `boolean` | `false` | Allow components to be broken down into constituent parts. When `true`, each normalised component gains a `salvage` sub-object. See [Salvage]({% link salvage.md %}). |
 
 ```javascript
 const mgr = game.fabricate.getCraftingSystemManager();
@@ -100,6 +100,61 @@ The returned system object also includes the following top-level salvage fields,
 | `progressive.awardMode` | `string` | `"equal"` | Progressive award mode: `"equal"`, `"exceed"`, or `"partial"` |
 | `progressive.allowPlayerReorder` | `boolean` | `false` | Allow players to reorder pending progressive results |
 | `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for tiered routing |
+
+The `craftingCheck` field is always present on the returned system object. It controls how skill/ability checks gate recipe outcomes in tiered and progressive modes.
+
+`craftingCheck` shape:
+
+| Field | Type | Default | Description |
+|:------|:-----|:--------|:------------|
+| `enabled` | `boolean` | `false` | Whether the crafting check is active. Automatically `true` when `macroUuid` is set or `checkSource` is `"builtIn"`. |
+| `checkSource` | `string` | `"macro"` | How the check is executed. `"macro"` runs the macro at `macroUuid`; `"builtIn"` uses the game system adapter. See [Crafting Checks]({% link crafting-checks.md %}). |
+| `macroUuid` | `string\|null` | `null` | UUID of the check macro. Only used when `checkSource` is `"macro"`. |
+| `successMacroUuid` | `string\|null` | `null` | UUID of the macro called after a successful crafting step. |
+| `failureMacroUuid` | `string\|null` | `null` | UUID of the macro called after a failed crafting step. |
+| `builtIn.ability` | `string` | `""` | Ability key for the built-in check (e.g. `"int"`, `"wis"`). Used when `checkSource` is `"builtIn"`. |
+| `builtIn.skill` | `string` | `""` | Skill key for the built-in check (e.g. `"arc"`, `"nat"`). Takes precedence over `ability` when set. |
+| `builtIn.dc` | `number` | `15` | Difficulty class for the built-in check. Must be a positive integer; invalid values fall back to `15`. |
+| `builtIn.advantage` | `string` | `"normal"` | `"advantage"`, `"disadvantage"`, or `"normal"`. |
+| `consumption.consumeIngredientsOnFail` | `boolean` | `true` | Remove ingredients from inventory when the check fails. |
+| `consumption.consumeCatalystsOnFail` | `boolean` | `false` | Degrade catalysts when the check fails. |
+| `progressive.awardMode` | `string` | `"equal"` | Progressive award mode: `"equal"`, `"exceed"`, or `"partial"`. |
+| `progressive.allowPlayerReorder` | `boolean` | `false` | Allow players to reorder pending progressive results. |
+| `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for tiered routing. |
+
+**Example: built-in check on D&D 5e.** Configure a tiered alchemy system to use an Intelligence (Arcana) check, DC 18, without writing a macro:
+
+```javascript
+Hooks.once('fabricate.ready', async () => {
+  const mgr = game.fabricate.getCraftingSystemManager();
+  await mgr.updateSystem('alchemy-system-id', {
+    resolutionMode: 'tiered',
+    craftingCheck: {
+      checkSource: 'builtIn',
+      builtIn: {
+        ability: 'int',
+        skill: 'arc',
+        dc: 18,
+        advantage: 'normal'
+      },
+      outcomes: ['fail', 'pass']
+    }
+  });
+});
+```
+
+**Example: macro-based check (existing behaviour).** If you already have a check macro and want to keep using it, no changes are needed — `checkSource` defaults to `"macro"`:
+
+```javascript
+Hooks.once('fabricate.ready', async () => {
+  const mgr = game.fabricate.getCraftingSystemManager();
+  await mgr.updateSystem('alchemy-system-id', {
+    craftingCheck: {
+      macroUuid: 'Macro.my-alchemy-check-uuid'
+    }
+  });
+});
+```
 
 ### updateSystem(systemId, updates)
 
@@ -201,7 +256,7 @@ Updates a managed item's properties (tags, essences, difficulty, salvage). GM on
 
 **Returns:** `Promise<object>`
 
-When `features.salvage` is enabled on the system, you can set the `salvage` sub-object here. The shape is normalised on write — see [Component Salvage Configuration]({% link crafting-systems.md %}#component-salvage-configuration) for the full field reference.
+When `features.salvage` is enabled on the system, you can set the `salvage` sub-object here. The shape is normalised on write — see [Component Salvage Configuration]({% link salvage.md %}#component-salvage-configuration) for the full field reference.
 
 ```javascript
 // Configure salvage for a Dragon Scale component
@@ -283,6 +338,14 @@ if (ess) {
 ## Internal Normalisation Helpers
 
 These methods are called automatically by `createSystem`, `updateSystem`, `createItem`, `addItemFromUuid`, and `updateItem`. You do not call them directly, but understanding them helps when inspecting or migrating stored data.
+
+### _normalizeCraftingCheck(check)
+
+Normalises the `craftingCheck` object on a crafting system. Applies defaults for all fields including `checkSource` (defaults to `"macro"`), `builtIn` (via `_normalizeBuiltInCheck`), `consumption`, `progressive`, and `outcomes`. `enabled` is automatically set to `true` when `macroUuid` is provided or `checkSource` is `"builtIn"`.
+
+### _normalizeBuiltInCheck(config)
+
+Normalises the `craftingCheck.builtIn` sub-object. Coerces `ability` and `skill` to lowercase trimmed strings. Validates `dc` as a positive finite integer (defaults to `15`). Validates `advantage` against the enum `["advantage", "disadvantage", "normal"]` (defaults to `"normal"`).
 
 ### _normalizeSalvage(salvage)
 

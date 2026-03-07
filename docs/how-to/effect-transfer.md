@@ -26,6 +26,6 @@ Enable both the **essences** and **effectTransfer** feature toggles on the syste
 
 ## Learn more
 
-- [Crafting Systems -- Effect Transfer]({% link crafting-systems.md %}#effect-transfer)
+- [Effect Transfer]({% link effect-transfer.md %})
 - [Essences]({% link essences.md %})
 - [Essences -- Effect Transfer via Essences]({% link essences.md %}#effect-transfer-via-essences)
