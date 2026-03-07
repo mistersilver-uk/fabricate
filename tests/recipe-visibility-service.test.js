@@ -111,11 +111,15 @@ class FakeDocument {
 // ---------------------------------------------------------------------------
 
 class FakeItem extends FakeDocument {
-  constructor({ uuid = 'item-uuid', sourceId = null, flagsArg = {} } = {}) {
+  constructor({ uuid = 'item-uuid', sourceId = null, compendiumSource = null, flagsArg = {} } = {}) {
     super(flagsArg);
     this.uuid = uuid;
-    // flags.core.sourceId is read by _isMatchingRecipeItem via foundry.utils.getProperty
+    // flags.core.sourceId is read by _isMatchingRecipeItem via the legacy fallback path
     this.flags = sourceId ? { core: { sourceId } } : {};
+    // _stats.compendiumSource is the Foundry v12+ canonical field
+    if (compendiumSource) {
+      this._stats = { compendiumSource };
+    }
     this.deleted = false;
   }
 
@@ -829,4 +833,31 @@ test('AC7.4 - cleanupLearnedRecipes removes stale entries and retains valid ones
   } finally {
     globalThis.game.actors = originalActors;
   }
+});
+
+// ---------------------------------------------------------------------------
+// AC3 (T-087) — Recipe item matching via _stats.compendiumSource
+// ---------------------------------------------------------------------------
+
+test('AC3.5 - _isMatchingRecipeItem returns true when _stats.compendiumSource matches linkedRecipeItemUuid', () => {
+  const service = buildService();
+  const recipe = buildMockRecipe({ linkedRecipeItemUuid: 'Compendium.world.items.abc' });
+  // Item has a different uuid but its compendiumSource matches the linked UUID
+  const item = new FakeItem({
+    uuid: 'world-item-uuid',
+    compendiumSource: 'Compendium.world.items.abc'
+  });
+
+  assert.equal(service._isMatchingRecipeItem(recipe, item), true);
+});
+
+test('AC3.6 - _isMatchingRecipeItem returns false when _stats.compendiumSource does not match', () => {
+  const service = buildService();
+  const recipe = buildMockRecipe({ linkedRecipeItemUuid: 'Compendium.world.items.abc' });
+  const item = new FakeItem({
+    uuid: 'world-item-uuid',
+    compendiumSource: 'Compendium.world.items.different'
+  });
+
+  assert.equal(service._isMatchingRecipeItem(recipe, item), false);
 });

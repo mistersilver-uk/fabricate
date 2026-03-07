@@ -24,17 +24,35 @@ From `002-data-models.md`:
 - `Recipe.linkedRecipeItemUuid`
 - `Recipe.locked`
 - `Actor.flags.fabricate.learnedRecipes`
-- `Item.flags.core.sourceId`
+- `Item._stats.compendiumSource` (Foundry v12+, primary source UUID field)
+- `Item.flags.core.sourceId` (Foundry v11 and earlier, legacy fallback)
 - `Item.flags.fabricate.recipeItemUsage.timesUsed`
+
+## Source UUID Resolution
+
+Foundry v12 changed how the origin of a compendium-derived item is recorded. On v12 and later the canonical field is `_stats.compendiumSource`; on v11 and earlier it was `flags.core.sourceId`. Both fields serve the same purpose: they record the UUID of the compendium document from which a world or actor-owned copy was created.
+
+**All matching logic in this spec that previously referred to `flags.core.sourceId` now uses a shared source-UUID resolver** defined as follows:
+
+```
+resolveSourceUuid(item):
+  return item._stats?.compendiumSource
+      ?? item.flags?.core?.sourceId
+      ?? null
+```
+
+The resolver reads `_stats.compendiumSource` first. If that field is absent or nullish, it falls back to `flags.core.sourceId`. If neither field is present, it returns `null`.
+
+Every matching rule in this spec that compares an item's source identity to a stored UUID must invoke the resolver rather than reading either field directly. This ensures consistent behaviour across Foundry versions.
 
 ## Recipe Item Matching
 
-A candidate owned item matches `Recipe.linkedRecipeItemUuid` when either is true:
+A candidate owned item matches `Recipe.linkedRecipeItemUuid` when any of the following is true:
 
 1. `candidate.uuid === linkedRecipeItemUuid`
-2. `candidate.flags.core.sourceId === linkedRecipeItemUuid`
+2. `resolveSourceUuid(candidate) === linkedRecipeItemUuid`
 
-`core.sourceId` is treated as the canonical identity link across duplicated copies.
+The second condition covers compendium-derived copies. On Foundry v12+, `_stats.compendiumSource` carries this value; on v11, `flags.core.sourceId` carries it. The resolver handles both transparently.
 
 ## Visibility Evaluation
 
@@ -93,7 +111,7 @@ Algorithm:
 3. Compute `hasMatchedItem`:
    - If `linkedRecipeItemUuid` missing: false.
    - Else, gather candidate items from crafting actor plus component sources (if allowed).
-   - Keep candidates matching by UUID or `core.sourceId`.
+   - Keep candidates matching by UUID or `resolveSourceUuid(candidate)`.
    - If limited uses are enabled, keep only non-exhausted candidates.
 4. Evaluate by mode:
    - `item`: grant if `hasMatchedItem`.
@@ -184,12 +202,12 @@ When `dragDropEnabled === true`, dropping a matched recipe item onto an actor mu
 
 #### Matching Rules
 
-A dropped item matches a recipe when either condition is true:
+A dropped item matches a recipe when any of the following is true:
 
 1. `droppedItem.uuid === recipe.linkedRecipeItemUuid`
-2. `droppedItem.flags.core.sourceId === recipe.linkedRecipeItemUuid`
+2. `resolveSourceUuid(droppedItem) === recipe.linkedRecipeItemUuid`
 
-Both UUID identity and `core.sourceId` ancestry must be evaluated. A match on either is sufficient.
+`resolveSourceUuid` reads `_stats.compendiumSource` first (Foundry v12+), then falls back to `flags.core.sourceId` (Foundry v11 and earlier). A match on any condition is sufficient.
 
 #### Multi-Recipe Matching
 
@@ -228,7 +246,7 @@ If `linkedRecipeItemUuid` no longer resolves to a template:
 
 - Keep the stored UUID.
 - Warn in admin/editor UI.
-- Matching may still succeed via owned item `core.sourceId`.
+- Matching may still succeed via `resolveSourceUuid` on owned items.
 
 ### Recipe Deletion
 
@@ -242,15 +260,17 @@ If `linkedRecipeItemUuid` no longer resolves to a template:
 ## Testing Requirements
 
 - Unit tests for listing behaviour in `global`, `player`, and `knowledge` list modes.
-- Unit tests for matching by UUID and by `core.sourceId`.
+- Unit tests for matching by UUID and by `resolveSourceUuid` — covering both `_stats.compendiumSource` (v12+) and `flags.core.sourceId` (legacy fallback) independently.
 - Unit tests for limited-use exhaustion and deterministic matched-item selection.
 - Unit tests for learning with and without consume-on-learn.
 - Unit tests for restricted recipes with empty `allowedUserIds` confirming GM access and non-GM denial.
 - Integration tests for full craft guard re-check on start, resume, and step execution.
 - Integration tests for drag-and-drop learn when `dragDropEnabled === true`: single-recipe match, multi-recipe match, already-learned skip, and no-match silent ignore.
 - Integration tests for drag-and-drop learn notifications: success message content, partial-success filtering, and no-notification on zero matches.
-- Integration tests for drag-and-drop learn with `core.sourceId` matching (item duplicated from compendium).
+- Integration tests for drag-and-drop learn with `_stats.compendiumSource` matching (item duplicated from compendium on Foundry v12+).
+- Integration tests for drag-and-drop learn with `flags.core.sourceId` matching (item duplicated from compendium on Foundry v11, legacy path).
 - Integration tests for consume-on-learn in drop flow: item is removed when required by matched recipe settings.
 - Integration tests for actor resolution and permissions: ignore drop when target actor cannot be resolved or user lacks write permission.
 - Integration tests for recipe-scope filtering: only knowledge-mode recipes with learn-capable modes are evaluated during drop.
 - Integration tests for `dragDropEnabled === false`: drops do not auto-learn and item-sheet manual learn flow is available instead.
+- Integration tests for "Craftable only" filter: recipes are included when actor inventory satisfies requirements via `_stats.compendiumSource`, `flags.core.sourceId`, or direct UUID match.

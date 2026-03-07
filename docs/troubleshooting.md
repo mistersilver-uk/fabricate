@@ -151,6 +151,38 @@ Additional causes:
 
 ---
 
+### Recipe Appears Uncraftable Despite Owning Recipe Item or Components
+
+**Symptom:** A recipe shows as "Cannot craft" or is excluded from the "Craftable only" filter even though the player's actor owns a copy of the linked recipe item and all required components. This is most common after upgrading to Foundry v12 or after importing items from a compendium.
+
+**Likely causes:**
+
+- On Foundry v12+, the compendium source UUID of an item is stored in `_stats.compendiumSource`. Older versions of Fabricate only checked `flags.core.sourceId` (the Foundry v11 field). If the module has not been updated to use the new field, owned copies of compendium items will not match, even though the items are correct.
+- The owned item was created on Foundry v11 and later migrated. Items that were never re-imported from the compendium after upgrading to v12 may only have `flags.core.sourceId` set and no `_stats.compendiumSource`. The source UUID resolver handles this with a fallback, but very old items may have neither field populated if the compendium link was never established.
+- The linked recipe item UUID stored on the recipe (`linkedRecipeItemUuid`) points to the compendium entry, but the owned item's source fields do not match because the item was duplicated from a world item rather than dragged directly from the compendium.
+
+**Step-by-step checks:**
+
+1. Open the browser console (F12) and locate the owned recipe item or component on the actor's sheet. Run the following to inspect the source fields:
+   ```javascript
+   const actor = game.actors.getName("Aldric the Alchemist"); // replace with actor name
+   const item = actor.items.getName("Healing Salve Recipe");  // replace with item name
+   console.log("uuid:", item.uuid);
+   console.log("_stats.compendiumSource:", item._stats?.compendiumSource);
+   console.log("flags.core.sourceId:", item.flags?.core?.sourceId);
+   ```
+2. Compare the output with the `linkedRecipeItemUuid` stored on the recipe. Open the Crafting Admin panel, find the recipe, open the editor, and check the **Linked Recipe Item** field. The UUID shown there must match either `_stats.compendiumSource` or `flags.core.sourceId` on the owned item.
+3. If neither source field on the owned item matches the linked UUID, the item was not created from the correct compendium entry. Delete the owned copy and re-import it by dragging it directly from the compendium browser to the actor's sheet.
+4. If the owned item was created on Foundry v11 and only has `flags.core.sourceId`, check that Fabricate is running version 0.9.0 or later, which added the `_stats.compendiumSource`-first resolver with `flags.core.sourceId` as a legacy fallback. Older versions of Fabricate do not read `_stats.compendiumSource`.
+5. If the issue only affects the **"Craftable only"** filter and not recipe visibility, verify that the component matching paths are also using the source UUID resolver. Open the browser console and look for `Fabricate | Cannot resolve component` warnings when attempting to craft.
+6. After confirming the source fields are correct, reload the Foundry page (F5) and re-open the crafting app. Source UUID resolution is evaluated live on each visibility check, so a reload is sufficient -- no data migration is required.
+
+**Expected behaviour after the fix:** A player who owns an actor-copy of a compendium item will have that item recognised by Fabricate's recipe matching, regardless of whether the Foundry version that created the copy stored the source UUID in `_stats.compendiumSource` (v12+) or `flags.core.sourceId` (v11). The "Craftable only" filter will include the recipe once all required items are matched.
+
+**See also:** [Visibility & Knowledge]({% link visibility.md %}#how-matching-works) -- source UUID matching rules and Foundry v12+ behaviour; [Recipes]({% link recipes/index.md %}) -- linking recipe items in the editor.
+
+---
+
 ## Before filing an issue
 
 If the steps above do not resolve your problem, work through this checklist before opening a bug report:

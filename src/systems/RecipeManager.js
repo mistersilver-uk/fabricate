@@ -1,6 +1,7 @@
 import { Recipe } from '../models/Recipe.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { getFabricateFlag } from '../config/flags.js';
+import { getSourceUuid } from '../utils/sourceUuid.js';
 
 /**
  * Manages recipe storage, retrieval, and CRUD operations
@@ -592,7 +593,7 @@ export class RecipeManager {
       const managedItem = this._getComponent(recipe, componentId);
       if (!managedItem) return false;
 
-      const sourceId = foundry.utils.getProperty(item, 'flags.core.sourceId');
+      const sourceId = getSourceUuid(item);
       const byUuid = managedItem.sourceUuid
         ? (item.uuid === managedItem.sourceUuid || sourceId === managedItem.sourceUuid)
         : false;
@@ -627,7 +628,7 @@ export class RecipeManager {
       const managedItem = this._getComponent(recipe, catalyst.componentId || catalyst.systemItemId);
       if (!managedItem) return false;
       if (managedItem.sourceUuid) {
-        const sourceId = foundry.utils.getProperty(item, 'flags.core.sourceId');
+        const sourceId = getSourceUuid(item);
         return item.uuid === managedItem.sourceUuid || sourceId === managedItem.sourceUuid;
       }
       return item.name?.toLowerCase() === (managedItem.name || '').toLowerCase();

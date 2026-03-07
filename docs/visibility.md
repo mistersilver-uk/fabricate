@@ -76,12 +76,15 @@ If a linked item UUID is required by the system's visibility mode but has not be
 
 ### How Matching Works
 
-An owned item matches a recipe's `linkedRecipeItemUuid` when either:
+An owned item matches a recipe's `linkedRecipeItemUuid` when any of the following is true:
 
 1. The owned item's UUID exactly equals `linkedRecipeItemUuid`
-2. The owned item's `flags.core.sourceId` equals `linkedRecipeItemUuid`
+2. The owned item's `_stats.compendiumSource` equals `linkedRecipeItemUuid` (Foundry v12+)
+3. The owned item's `flags.core.sourceId` equals `linkedRecipeItemUuid` (Foundry v11 and earlier, legacy fallback)
 
-The `sourceId` matching is important because when items are dragged from compendiums to character sheets, Foundry creates a new item with a new UUID but preserves the original UUID as `sourceId`.
+When an item is dragged from a compendium to a character sheet, Foundry creates a copy with a new UUID and records the original compendium UUID as the item's source. On Foundry v12 and later this is stored in `_stats.compendiumSource`; on earlier versions it was stored in `flags.core.sourceId`. Fabricate reads both fields so that recipe scrolls work correctly regardless of which Foundry version created the owned copy.
+
+> **Foundry v12+ note:** If a player owns a recipe scroll that was duplicated from a compendium but the recipe still shows as unknown, check that the item's `_stats.compendiumSource` field matches the `linkedRecipeItemUuid` stored on the recipe. Open the browser console and inspect `item._stats.compendiumSource` alongside `item.flags?.core?.sourceId`. If only the legacy `sourceId` field is populated (for example, on an item created on Foundry v11 that was not re-imported), the legacy fallback will still match correctly. If neither field matches, re-import the recipe item from the compendium.
 
 ### Limited Uses
 
@@ -146,12 +149,13 @@ Only actor-bound drop targets are considered for learning. If the drop target ca
 
 #### How Matching Works for Dropped Items
 
-A dropped item is matched against all recipes in the crafting system. A recipe matches when either condition is true:
+A dropped item is matched against all recipes in the crafting system. A recipe matches when any of the following is true:
 
 1. The dropped item's UUID equals `recipe.linkedRecipeItemUuid`
-2. The dropped item's `flags.core.sourceId` equals `recipe.linkedRecipeItemUuid`
+2. The dropped item's `_stats.compendiumSource` equals `recipe.linkedRecipeItemUuid` (Foundry v12+)
+3. The dropped item's `flags.core.sourceId` equals `recipe.linkedRecipeItemUuid` (Foundry v11 and earlier, legacy fallback)
 
-Both UUID identity and `core.sourceId` ancestry are always evaluated. A match on either is sufficient. This means items dragged directly from the world and items originally copied from a compendium are both recognised.
+All three fields are always evaluated. A match on any one is sufficient. This means items dragged directly from the world and items originally copied from a compendium are both recognised, across all supported Foundry versions.
 
 #### Recipe Book Items
 

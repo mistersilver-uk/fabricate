@@ -3,6 +3,7 @@ import { ItemPilesIntegration } from '../integrations/ItemPilesIntegration.js';
 import { MacroExecutor } from '../utils/MacroExecutor.js';
 import { CraftingCheckAdapterRegistry } from './CraftingCheckAdapter.js';
 import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
+import { getSourceUuid } from '../utils/sourceUuid.js';
 
 /**
  * Handles the actual crafting process
@@ -1598,7 +1599,7 @@ export class CraftingEngine {
     if (component.sourceUuid) {
       const byUuid = items.filter(item =>
         item.uuid === component.sourceUuid ||
-        (item.flags?.core?.sourceId === component.sourceUuid)
+        (getSourceUuid(item) === component.sourceUuid)
       );
       if (byUuid.length > 0) return byUuid;
     }

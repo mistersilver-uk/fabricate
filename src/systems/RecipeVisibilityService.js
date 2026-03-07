@@ -1,4 +1,5 @@
 import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
+import { getSourceUuid } from '../utils/sourceUuid.js';
 
 /**
  * Visibility, knowledge access, and learn-state service.
@@ -24,7 +25,7 @@ export class RecipeVisibilityService {
   _isMatchingRecipeItem(recipe, item) {
     const linked = recipe?.linkedRecipeItemUuid;
     if (!linked || !item) return false;
-    const sourceId = foundry.utils.getProperty(item, 'flags.core.sourceId');
+    const sourceId = getSourceUuid(item);
     return item.uuid === linked || sourceId === linked;
   }
 
