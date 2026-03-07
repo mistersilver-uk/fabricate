@@ -83,9 +83,20 @@ Mode semantics are defined in `004`.
 - `knowledge.mode` selector (only shown when `listMode === "knowledge"`)
 - `item.limitUses` and `item.maxUses` (only shown when `listMode === "knowledge"` and item mode is active)
 - `learn.consumeOnLearn` (only shown when `listMode === "knowledge"` and learned mode is active)
+- `learn.dragDropEnabled` (only shown when `listMode === "knowledge"` and learned mode is active)
 
 When `listMode === "global"`, no per-recipe player allow-list controls are shown.
 Visibility and learning semantics are defined in `006`.
+
+### Item Sheets
+
+For actor-owned items, Fabricate may add item sheet header controls tied to recipe learning.
+
+- When `learn.dragDropEnabled === false` and knowledge mode supports learning, show a header icon/button to manually learn matching recipes from that owned item.
+- The manual learn control is shown only when the current user can update the owning actor and at least one matched recipe is learnable.
+- Clicking the control opens a confirmation prompt before learning.
+- On confirmation, run the learning flow from `006`, including `consumeOnLearn` behavior and item removal when required.
+- If `learn.dragDropEnabled === true`, the manual header learn control is hidden by default.
 
 ### Items Tab
 
@@ -244,6 +255,7 @@ The UI must expose required data fields from `004`, but mode logic itself is def
 - Confirmation dialogue when learn consumes item.
 - Success/failure notifications with actionable reasons.
 - Refresh list/detail state after completion.
+- The same learning flow must be invocable from the item sheet header learn control when drag-and-drop learning is disabled.
 
 ### Run Guardrails
 

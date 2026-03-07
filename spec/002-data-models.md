@@ -98,6 +98,7 @@ CraftingSystem = {
 
       learn?: {
         consumeOnLearn: boolean, // default true
+        dragDropEnabled: boolean, // default true; controls actor-drop auto-learn behaviour
       },
     },
   },
@@ -134,6 +135,8 @@ CraftingSystem = {
 1. `listMode` must be one of `"global"`, `"player"`, or `"knowledge"`. Invalid or missing values default to `"global"`.
 2. The `knowledge` sub-object is only meaningful when `listMode === "knowledge"`.
 3. When `listMode === "global"`, all enabled recipes are visible to all users without restriction or knowledge filtering.
+4. `knowledge.learn.dragDropEnabled` controls automatic learning from actor item drops when knowledge learning is enabled; default is `true`.
+5. If `knowledge.learn.dragDropEnabled` is `false`, automatic actor-drop learning is disabled and manual learn UI affordances must be used.
 
 ## EssenceDefinition
 
@@ -626,7 +629,7 @@ Requirements:
 
 1. `active` contains only non-terminal runs (`inProgress` or `waitingTime`).
 2. `history` contains only terminal runs (`succeeded`, `failed`, `cancelled`).
-3. When a run reaches a terminal status, it must be removed from `active` and appended to `history`.
+3. When a run reaches a terminal status, it must be removed from `active` and prepended to `history`.
 4. History should be newest-first and capped by a configured or default limit.
 5. Deleting a recipe or crafting system should clean-up its associated crafting runs, both historical and in-progress.
 
@@ -794,10 +797,11 @@ Return: optional side effects only.
 
 ### Policy Statement
 
-- All new persisted data MUST be written using canonical field names only.
+- Canonical field names are the authoritative contract for all new model and migration design.
 - Read paths (constructors, normalization) MAY accept legacy aliases for backward compatibility during migration windows.
 - Legacy aliases in write output (`toJSON`) are transitional and scheduled for removal once migration coverage is confirmed.
-- New persisted data must not emit legacy keys except for explicitly documented transitional aliases listed in this section.
+- Runtime writers MAY temporarily dual-emit documented transitional aliases during compatibility windows.
+- No new legacy aliases may be introduced unless explicitly added to this policy section with a removal plan.
 
 ### Canonical Fields
 

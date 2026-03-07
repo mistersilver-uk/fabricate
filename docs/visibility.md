@@ -142,6 +142,8 @@ You configure `consumeOnLearn` in the **Recipe Visibility** card on the System t
 
 Dragging a recipe item onto a crafting actor's sheet is a required learning pathway. Fabricate registers a drop handler on all actor sheets: when a valid recipe item is dropped onto an actor, it triggers recipe learning automatically — no button click required.
 
+Only actor-bound drop targets are considered for learning. If the drop target cannot be resolved to an actor, or the current user lacks permission to update that actor, the learning path is skipped silently.
+
 #### How Matching Works for Dropped Items
 
 A dropped item is matched against all recipes in the crafting system. A recipe matches when either condition is true:
@@ -157,7 +159,7 @@ A single dropped item can match more than one recipe. When this happens, the act
 
 #### Notifications
 
-After a drag-and-drop learn attempt, Fabricate always tells the player what happened:
+After a drag-and-drop learn attempt, Fabricate shows notifications for successful outcomes and stays silent for ignored outcomes:
 
 | Outcome | Notification shown |
 |:--------|:-------------------|

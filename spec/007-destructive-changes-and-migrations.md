@@ -90,6 +90,7 @@ If a linked world/compendium item is deleted:
 - Migrations are registered in an ordered array (`MIGRATIONS`), each entry containing: `version` (semver string), `label` (human-readable description), and a `migrate(data)` function.
 - Each migration receives a `{ recipes, systems }` data payload and returns the transformed payload.
 - Migrations must be idempotent -- running the same migration twice on the same data must produce identical output.
+- Migration metadata SHOULD include a `downgradeTo` (Fabricate module version string) used for GM recovery guidance when migration aborts.
 
 ### Startup Migration Flow
 
@@ -100,26 +101,54 @@ On module initialization:
 3. Sort pending migrations by ascending semver order.
 4. If no pending migrations exist, exit early (no data reads or writes).
 5. Read current `fabricate.recipes` and `fabricate.craftingSystems` settings.
-6. Snapshot the original data (JSON serialization) for change detection.
+6. Snapshot the original data (JSON serialization) as rollback baseline.
 7. Execute each pending migration sequentially, passing the accumulated data payload.
-8. After all migrations complete, compare final data against the original snapshot.
-9. Persist `fabricate.recipes` only if recipes changed.
-10. Persist `fabricate.craftingSystems` only if systems changed.
-11. Update `fabricate.migrationVersion` to the highest version among executed migrations.
-12. Log a summary of how many migrations ran.
+8. Before each migration, capture a per-migration checkpoint of the last known-good transformed payload.
+9. If an unusable-document migration error is detected, stop immediately, restore the last known-good checkpoint, and mark the migration pass as aborted.
+10. If the pass is aborted:
+    - Persist no migrated recipe/system data.
+    - Do not update `fabricate.migrationVersion`.
+    - Emit GM-facing recovery guidance in console (see "Migration Abort Recovery Guidance").
+    - Present a GM decision prompt, defaulting to `Keep existing data`.
+11. If the pass completes successfully, compare final data against the original snapshot.
+12. Persist `fabricate.recipes` only if recipes changed.
+13. Persist `fabricate.craftingSystems` only if systems changed.
+14. Update `fabricate.migrationVersion` to the highest version among successfully executed migrations.
+15. Log a summary of how many migrations ran.
 
 ### Per-Migration Error Handling
 
 - If an individual migration throws an error, log a warning with the migration label and error message: `Fabricate | Migration "<label>" failed: <message>`.
-- The migration runner continues executing remaining pending migrations.
-- Failed migrations do not advance the `highestVersion` tracker; they will be re-attempted on subsequent startups until they succeed or are removed from the registry.
-- If migration cannot safely continue (e.g., corrupt base data prevents reading), abort with an explicit GM-facing error.
+- If the error indicates unusable migrated documents (for example: invalid required fields after transform, unresolved hard references that violate spec invariants, or malformed macro references required for execution), migration is **fatal** for the current startup pass.
+- On fatal migration error, the runner must abort immediately and roll back to the last known-good transformed checkpoint in memory.
+- The runner must not persist partially migrated data from an aborted pass.
+- `migrationVersion` must remain unchanged when a pass aborts.
+- Non-fatal warnings may be logged, but they must not mutate persisted data unless the migration pass completes.
+
+### Migration Abort Recovery Guidance
+
+When a migration pass aborts, Fabricate must provide explicit GM guidance:
+
+1. Print a clear console header: `Fabricate | Migration aborted. Existing data has been kept unchanged.`
+2. Print a recommended downgrade target version (`downgradeTo`) so the GM can continue using existing data without immediate manual remediation.
+3. Print explicit, per-document fix instructions for each failure:
+   - document type (`recipe` or `craftingSystem`)
+   - document ID/name
+   - exact validation or transform error
+   - required fix action
+4. When applicable, include macro-oriented remediation suggestions in console output (for example, suggested macro payload shape or required return keys).
+5. Show a GM prompt with choices:
+   - `Keep existing data` (default)
+   - `I will manually fix or delete failed documents, then retry migration`
+6. If the GM keeps existing data, no additional migration writes occur during that startup session.
+7. If the GM opts to fix/delete and retry, retry is explicit and user-initiated (never automatic in the same aborted pass).
 
 ### Write-on-Change Persistence
 
 - Data is persisted only when the JSON-serialized output differs from the pre-migration snapshot.
 - This avoids unnecessary setting writes that would trigger Foundry change hooks and potential re-renders.
-- `migrationVersion` is always updated after a migration pass, regardless of whether data changed.
+- On successful migration passes, `migrationVersion` is updated to the highest successfully executed migration version even when data is unchanged.
+- On aborted migration passes, `migrationVersion` is unchanged.
 
 ### Versioning
 
@@ -131,9 +160,10 @@ On module initialization:
 The migration framework supports the canonical-write / legacy-read compatibility policy defined in `002-data-models.md § Canonical-Write and Legacy-Read Compatibility Policy`.
 
 - Migrations MUST rewrite legacy field names to their canonical equivalents (e.g., `systemItemId` -> `componentId`, `managedItems` -> `components`).
-- After migration, persisted data must contain only canonical keys. Legacy keys must be deleted from persisted data by the migration.
+- Migration output payloads SHOULD be canonical-first and SHOULD remove retired legacy keys where safe.
 - Runtime constructors and normalization functions continue to accept legacy aliases as read fallbacks to handle data that has not yet been migrated (e.g., data from external imports, manual JSON edits, or worlds that skipped a migration version).
-- Transitional write aliases (dual-emit in `toJSON()`) are a temporary measure for UI compatibility. They are NOT part of the migration contract and do not affect persisted data integrity because migrations operate on raw persisted JSON, not on `toJSON()` output.
+- Transitional write aliases (dual-emit in `toJSON()`) are temporary compatibility outputs for runtime writers and UI paths. They are deprecated and must not be introduced for new fields.
+- During the transitional window, persisted settings MAY still include documented transitional aliases when written by runtime managers. This does not invalidate migration correctness.
 - Each migration entry in the registry should document which legacy aliases it retires from persisted data.
 - Cross-reference: full alias tables are maintained in `002-data-models.md § Canonical-Write and Legacy-Read Compatibility Policy`.
 
@@ -141,7 +171,10 @@ The migration framework supports the canonical-write / legacy-read compatibility
 
 - Unit tests for each destructive operation clean-up path.
 - Unit tests for idempotent migration behaviour: running a migration twice on the same data produces identical results.
-- Unit tests for partial-failure progression: when one migration fails, subsequent migrations still execute and `migrationVersion` advances.
+- Unit tests for fatal migration abort: unusable-document failure aborts the pass, no partial data is persisted, and `migrationVersion` remains unchanged.
+- Unit tests for rollback behaviour: data after abort equals the last known-good checkpoint.
+- Unit tests for GM guidance output: console output includes downgrade recommendation and explicit per-document remediation steps.
+- Unit tests for GM prompt defaults: `Keep existing data` is pre-selected/default.
 - Unit tests for write-on-change: verify no setting writes occur when data is unchanged.
 - Unit tests for pending migration selection: only migrations newer than `migrationVersion` are selected, ordered by ascending semver.
 - Integration tests for mode changes, recipe deletion, and startup migration.

@@ -141,9 +141,46 @@ Actor.flags.fabricate.learnedRecipes[recipe.id] = {
 3. If `consumeOnLearn === true`, consume selected item.
 4. Return the updated access state.
 
-### Drag-and-Drop Learn
+### Drag-and-Drop Learn Configuration
 
-Dropping a recipe item onto a crafting actor is a required learning pathway. The module must register a drop handler that triggers recipe learning when a valid recipe item is dropped onto an actor sheet.
+Automatic actor-drop learning is controlled by `recipeVisibility.knowledge.learn.dragDropEnabled`.
+
+- Default is `true`.
+- The setting is only meaningful when `listMode === "knowledge"` and `knowledge.mode` is `learned` or `itemOrLearned`.
+- If disabled, actor item drops must not trigger recipe learning and manual learning UI is required.
+
+#### Allowed Hook Triggers
+
+Automatic learning from actor item drops may be implemented using:
+
+- `createItem` (preferred)
+- `preCreateItem`
+- `dropActorSheetData`
+
+`createItem` is preferred because it runs against the created owned item instance and keeps consume-on-learn behaviour deterministic. Regardless of hook choice, runtime behaviour must match this specification.
+
+### Drag-and-Drop Learn (When Enabled)
+
+When `dragDropEnabled === true`, dropping a matched recipe item onto an actor must immediately attempt learning for that actor.
+
+#### Supported Drop Targets
+
+- Actor sheet drop zones for owned items are in scope and must be handled.
+- Actor-bound crafting UI drop targets (if present) must follow the same matching and notification contract.
+- Non-actor targets are out of scope for learning and must be ignored.
+
+#### Actor Resolution and Permission
+
+- The drop handler must resolve exactly one target actor from the drop context.
+- Learning is only attempted when the current user has ownership permission to mutate that actor's flags/inventory.
+- If actor resolution fails or permission is insufficient, no learn operation occurs and no notification is shown.
+
+#### Recipe Scope for Drop Evaluation
+
+- Evaluate only enabled recipes whose crafting system visibility mode is `knowledge`.
+- Learning-by-drop is only valid when `knowledge.mode` is `learned` or `itemOrLearned`.
+- Systems in `global` or `player` list mode are not evaluated for drag-and-drop learning.
+- In multi-system worlds, all eligible knowledge-mode recipes are considered, and matching is based solely on linked recipe item identity rules below.
 
 #### Matching Rules
 
@@ -158,6 +195,12 @@ Both UUID identity and `core.sourceId` ancestry must be evaluated. A match on ei
 
 When a single dropped item matches multiple recipes, the actor learns all matched recipes in a single operation. A recipe item linked to multiple recipes functions as a "recipe book" -- one drop teaches every recipe it is linked to.
 
+Learning is applied per matched recipe independently:
+
+- Already-learned recipes are skipped.
+- New learn entries are written only for recipes that pass preconditions.
+- `consumeOnLearn` is evaluated for each newly learned recipe. If any learned recipe requires consumption, the dropped owned item must be removed by the end of the operation.
+
 #### Notifications
 
 After a drag-and-drop learn operation completes, the module must provide user feedback:
@@ -166,6 +209,16 @@ After a drag-and-drop learn operation completes, the module must provide user fe
 - **Partial success**: When some recipes were already learned, notify only for newly learned recipes. If all matched recipes were already learned, notify the user that nothing new was learned.
 - **No match**: When the dropped item does not match any recipe, no learn operation occurs and no notification is shown (the drop is silently ignored for learning purposes).
 - **Precondition failure**: When the knowledge mode does not support learning (i.e., mode is `item` only), no learn operation occurs and no notification is shown.
+
+### Manual Learn Path (When Disabled)
+
+When `dragDropEnabled === false`:
+
+- Drops must never trigger auto-learning from `createItem`, `preCreateItem`, or `dropActorSheetData`.
+- The actor still receives the dropped item through normal Foundry item-drop behaviour.
+- The manual learning affordance is an item-sheet header learn icon/button, as specified in `003-ui-integration.md`.
+- Clicking the manual learn action prompts the user to confirm learning for the owning actor and, on confirmation, runs the same learning operation used by drag-and-drop.
+- The manual path must apply `consumeOnLearn` and remove the item when required.
 
 ## Edge Cases
 
@@ -194,6 +247,10 @@ If `linkedRecipeItemUuid` no longer resolves to a template:
 - Unit tests for learning with and without consume-on-learn.
 - Unit tests for restricted recipes with empty `allowedUserIds` confirming GM access and non-GM denial.
 - Integration tests for full craft guard re-check on start, resume, and step execution.
-- Integration tests for drag-and-drop learn: single-recipe match, multi-recipe match, already-learned skip, and no-match silent ignore.
+- Integration tests for drag-and-drop learn when `dragDropEnabled === true`: single-recipe match, multi-recipe match, already-learned skip, and no-match silent ignore.
 - Integration tests for drag-and-drop learn notifications: success message content, partial-success filtering, and no-notification on zero matches.
 - Integration tests for drag-and-drop learn with `core.sourceId` matching (item duplicated from compendium).
+- Integration tests for consume-on-learn in drop flow: item is removed when required by matched recipe settings.
+- Integration tests for actor resolution and permissions: ignore drop when target actor cannot be resolved or user lacks write permission.
+- Integration tests for recipe-scope filtering: only knowledge-mode recipes with learn-capable modes are evaluated during drop.
+- Integration tests for `dragDropEnabled === false`: drops do not auto-learn and item-sheet manual learn flow is available instead.
