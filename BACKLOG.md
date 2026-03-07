@@ -29,7 +29,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
   2. <verifiable outcome>
   3. <verifiable outcome>
 - Error (if any):
-- Resolution: 
+- Resolution:
 ```
 
 ## Tasks
@@ -37,9 +37,8 @@ Purpose: keep agent work explicit, reviewable, and testable.
 ## Competitive Analysis Gap Tasks
 
 ### T-054 - Ship Starter Content Pack and Check Macro Templates
-- Status: `blocked`
-- Blocked by: Needs an item compendium for the starter pack.
-- Description: Add a starter content package that reduces time-to-first-craft for new GMs. Include at least one ready-to-use crafting system with sample components/recipes plus copy-paste check macro templates for common systems and a generic fallback.
+- Status: `done`
+- Description: Implement alchemist's supplies as a starter content pack for 5e. Use `reference/Alchemist's Suuplies.pdf` for the behavioural specification, and `packs/alchemists-supplies-v16.db` as the compendium pack for source items to embed in Fabricate.
 - Acceptance Criteria:
   1. A starter data pack is available from inside the module (importable JSON or compendium content) with at least one complete system and at least 10 recipes.
   2. The starter pack includes required managed components, categories, and visibility settings so recipes are immediately craftable after import.
@@ -336,7 +335,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
 ## Integration Tasks
 
 ### T-086 - Implement Automated Item Piles Integration
-- Status: `todo`
+- Status: `done`
 - Description: Build a first-class automated integration with Item Piles per `spec/008-integrations.md`. The integration must detect Item Piles, use its public API, and require zero user-authored macros. Covers currency costs as crafting requirements, merchant stock as ingredient sources, and container contents as crafting-station inventory.
 - Acceptance Criteria:
   1. A system-level feature toggle `features.itemPiles` controls the integration and defaults to `false`.
@@ -348,3 +347,19 @@ Purpose: keep agent work explicit, reviewable, and testable.
   7. Unit tests mock the Item Piles API and cover: module-absent, toggle-off, and toggle-on happy paths.
   8. A minimum compatible Item Piles version is documented and enforced at runtime.
   9. No user-authored macros or scripts are required at any point in the workflow.
+- Resolution: Implemented in `src/integrations/ItemPilesIntegration.js` with 43 unit tests. CraftingEngine, Recipe, CraftingSystemManager, and main.js updated. All 534 tests pass.
+
+## Defect Tasks
+
+### T-087 - Fix Recipe Matching on Foundry v12+ (`_stats.compendiumSource` vs `core.sourceId`)
+- Status: `todo`
+- Description: Diagnose and fix false "Cannot craft" and "Craftable only" filtering failures caused by deprecated `core.sourceId` matching. On Foundry v12+, recipe/item/component matching must use `_stats.compendiumSource` as the primary source UUID with legacy fallback support so linked recipe items and managed components resolve correctly.
+- Acceptance Criteria:
+  1. Root-cause is documented in code comments and/or task notes: craftability visibility currently fails when matching logic only reads `flags.core.sourceId`, causing `RecipeVisibilityService.evaluateRecipeAccess(...)` to return non-craftable for actors that do own matching items via `_stats.compendiumSource`.
+  2. A shared source-UUID resolver is implemented (or equivalent centralized helper) that reads `_stats.compendiumSource` first, then falls back to legacy `flags.core.sourceId` for backward compatibility.
+  3. Recipe-knowledge matching is updated to use the shared resolver in `src/systems/RecipeVisibilityService.js` so knowledge-gated recipes are correctly visible/craftable and no longer incorrectly filtered out by "Craftable only".
+  4. Ingredient/catalyst/component matching paths that still depend on `flags.core.sourceId` are updated to use the same resolver (including `src/systems/RecipeManager.js` and `src/systems/CraftingEngine.js`) so behavior is consistent across crafting and salvage flows.
+  5. Tests are added/updated to cover both modern and legacy item provenance fields: matching succeeds for `_stats.compendiumSource`, still succeeds for legacy `flags.core.sourceId`, and "Craftable only" includes recipes when actor inventory satisfies requirements.
+  6. Documentation is updated to reflect Foundry v12+ behavior: replace/augment references to `core.sourceId` with `_stats.compendiumSource` + legacy fallback in the relevant docs/spec pages (`docs/visibility.md`, `spec/006-recipe-visibility.md`, and any related references).
+  7. `docs/troubleshooting.md` includes a symptom entry for "recipe appears uncraftable despite owning recipe item/components" with a check for compendium source UUID linkage and expected behavior after the fix.
+  8. Verification notes include at least one manual reproduction using an actor-owned copy created from compendium/world source where recipe becomes craftable and remains visible when "Craftable only" is enabled.

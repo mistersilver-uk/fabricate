@@ -1,4 +1,5 @@
 import { Recipe } from '../models/Recipe.js';
+import { ItemPilesIntegration } from '../integrations/ItemPilesIntegration.js';
 import { MacroExecutor } from '../utils/MacroExecutor.js';
 import { CraftingCheckAdapterRegistry } from './CraftingCheckAdapter.js';
 import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
@@ -8,10 +9,11 @@ import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
  * Validates ingredients, consumes items, creates outputs
  */
 export class CraftingEngine {
-  constructor(recipeManager, craftingRunManager = null, resolutionModeService = null) {
+  constructor(recipeManager, craftingRunManager = null, resolutionModeService = null, itemPilesIntegration = null) {
     this.recipeManager = recipeManager;
     this.craftingRunManager = craftingRunManager;
     this.resolutionModeService = resolutionModeService;
+    this.itemPilesIntegration = itemPilesIntegration;
   }
 
   /**
@@ -183,6 +185,15 @@ export class CraftingEngine {
       };
     }
 
+    const itemPilesAffordCheck = await this._checkItemPilesCurrencyCost(craftingActor, recipe);
+    if (!itemPilesAffordCheck.valid) {
+      return {
+        success: false,
+        results: null,
+        message: itemPilesAffordCheck.message
+      };
+    }
+
     // Run optional system-level crafting check before consuming ingredients.
     const checkResult = await this._runCraftingCheck(
       executionRecipe,
@@ -345,6 +356,10 @@ export class CraftingEngine {
 
     // Apply catalyst degradation
     await this._degradeCatalysts(catalystValidation.catalysts);
+
+    // Deduct Item Piles currency cost after ingredients are consumed to avoid
+    // losing currency if ingredient consumption throws.
+    await this._deductItemPilesCurrencyCost(craftingActor, recipe);
 
     // Create the result item(s)
     const resultItems = await this._createResultItems(
@@ -852,6 +867,59 @@ export class CraftingEngine {
       console.error(`Fabricate | Currency format macro failed (${macroUuid})`, err);
     }
     return fallback;
+  }
+
+  /**
+   * Check Item Piles currency cost on a recipe, if the integration is enabled.
+   * @private
+   */
+  async _checkItemPilesCurrencyCost(craftingActor, recipe) {
+    const cost = recipe?.currencyCost;
+    if (!cost?.currencies?.length) return { valid: true };
+
+    const integration = this.itemPilesIntegration || game.fabricate?.getItemPilesIntegration?.();
+    if (!integration) return { valid: true };
+
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const system = systemManager?.getSystem(recipe?.craftingSystemId);
+    if (!integration.isEnabled(system)) return { valid: true };
+
+    try {
+      const affordable = await integration.canAfford(craftingActor, cost.currencies);
+      if (!affordable) {
+        return {
+          valid: false,
+          message: 'Insufficient currency (Item Piles). Cannot afford recipe cost.'
+        };
+      }
+      return { valid: true };
+    } catch (err) {
+      console.error('Fabricate | Item Piles canAfford error', err);
+      return { valid: false, message: 'Item Piles currency check failed: ' + err.message };
+    }
+  }
+
+  /**
+   * Deduct Item Piles currency cost from actor after a successful craft.
+   * Errors are logged but do not throw, to avoid losing crafting results.
+   * @private
+   */
+  async _deductItemPilesCurrencyCost(craftingActor, recipe) {
+    const cost = recipe?.currencyCost;
+    if (!cost?.currencies?.length) return;
+
+    const integration = this.itemPilesIntegration || game.fabricate?.getItemPilesIntegration?.();
+    if (!integration) return;
+
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const system = systemManager?.getSystem(recipe?.craftingSystemId);
+    if (!integration.isEnabled(system)) return;
+
+    try {
+      await integration.deductCurrency(craftingActor, cost.currencies);
+    } catch (err) {
+      console.error('Fabricate | Item Piles deductCurrency error', err);
+    }
   }
 
   async _checkCurrencyRequirement(craftingActor, recipe, step) {

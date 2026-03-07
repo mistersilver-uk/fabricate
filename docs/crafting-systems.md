@@ -39,6 +39,7 @@ Each system can independently enable or disable features. Most features default 
 | `multiStepRecipes` | `false` | Allow recipes with multiple sequential steps |
 | `salvage` | `false` | Allow components to be broken down into constituent parts |
 | `chatOutput` | `true` | Automatically post a chat message summarising crafting results after each craft action |
+| `itemPiles` | `false` | Enable the Item Piles integration: currency costs, merchant stock, and container inventory. Requires Item Piles v3.1.0 or later. |
 
 Toggle features in the **Features** card on the System tab of the Crafting Admin panel. Each toggle takes effect immediately for all future crafting attempts in that system.
 
@@ -84,6 +85,16 @@ If your system uses tiered or progressive mode, you must configure a crafting ch
 ### Effect Transfer
 
 When both the essences and effectTransfer features are enabled, Fabricate can copy active effects from essence source items to crafted results. See [Effect Transfer]({% link effect-transfer.md %}) for the triple-flag pipeline, API configuration, and worked examples.
+
+### Item Piles
+
+When `itemPiles` is enabled and Item Piles v3.1.0 or later is installed, Fabricate connects to Item Piles to support:
+
+- **Currency costs** on recipes — checked before crafting begins, deducted automatically on success.
+- **Merchant stock** as an ingredient source — read merchant actor inventories via `getMerchantItems()`.
+- **Container contents** as crafting-station inventory — read container actors via `getContainerContents()`.
+
+No macros are required. See [Item Piles Integration]({% link item-piles.md %}) for setup steps, currency cost configuration, and worked examples.
 
 ### Recipe Visibility
 
@@ -176,3 +187,4 @@ Time gates are checked:
 Currency can be handled by:
 - **System adapter** -- uses the game system's built-in currency (e.g. D&D 5e gold)
 - **Custom macro** -- a macro that checks and deducts currency however you define it
+- **Item Piles** -- when `features.itemPiles` is enabled, currency costs defined on recipes are checked and deducted automatically via the Item Piles API. See [Item Piles Integration]({% link item-piles.md %}).

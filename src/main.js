@@ -14,7 +14,9 @@ import { RecipeEditorApp } from './ui/RecipeEditorApp.js';
 import { getPartialTemplatePath, getTemplatePath } from './ui/templatePaths.js';
 import { registerFabricateSettings, getSetting, setSetting } from './config/settings.js';
 import { MigrationRunner } from './migration/MigrationRunner.js';
+import { ItemPilesIntegration } from './integrations/ItemPilesIntegration.js';
 import { cleanupStalePreferences } from './config/preferencesCleanup.js';
+import { importStarterPack } from './starter/importStarterPack.js';
 
 /**
  * Fabricate - Universal Crafting System
@@ -29,6 +31,7 @@ class Fabricate {
     this.craftingRunManager = null;
     this.recipeVisibilityService = null;
     this.resolutionModeService = null;
+    this.itemPilesIntegration = null;
     this.ready = false;
   }
 
@@ -48,10 +51,13 @@ class Fabricate {
     this.craftingRunManager = new CraftingRunManager();
     this.recipeVisibilityService = new RecipeVisibilityService(this.recipeManager, this.craftingSystemManager);
     this.resolutionModeService = new ResolutionModeService(this.craftingSystemManager);
+    this.itemPilesIntegration = new ItemPilesIntegration();
+    this.itemPilesIntegration.detect();
     this.craftingEngine = new CraftingEngine(
       this.recipeManager,
       this.craftingRunManager,
-      this.resolutionModeService
+      this.resolutionModeService,
+      this.itemPilesIntegration
     );
 
     // Initialize recipe manager
@@ -121,6 +127,10 @@ class Fabricate {
     return this.resolutionModeService;
   }
 
+  getItemPilesIntegration() {
+    return this.itemPilesIntegration;
+  }
+
   /**
    * Quick craft helper - craft a recipe for an actor
    * @param {Actor} actor - The actor performing the craft
@@ -180,7 +190,9 @@ Hooks.once('init', async () => {
     CraftingSystemManager,
     CraftingRunManager,
     RecipeVisibilityService,
-    ResolutionModeService
+    ResolutionModeService,
+    ItemPilesIntegration,
+    importStarterPack
   };
 
   try {
@@ -427,6 +439,10 @@ globalThis.fabricate = {
    */
   listCraftingSystems: () => {
     return game.fabricate.getCraftingSystemManager().getSystems();
+  },
+
+  importStarterPack: async (packId) => {
+    return importStarterPack(packId);
   }
 };
 

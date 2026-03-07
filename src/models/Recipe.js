@@ -43,6 +43,7 @@ export class Recipe {
     this.outcomeRouting = data.outcomeRouting && typeof data.outcomeRouting === 'object'
       ? { ...data.outcomeRouting }
       : null;
+    this.currencyCost = this._normalizeCurrencyCost(data.currencyCost);
 
     // Metadata
     this.metadata = data.metadata || {
@@ -244,6 +245,7 @@ export class Recipe {
       isVariable: this.isVariable,
       transferEffects: this.transferEffects,
       outcomeRouting: this.outcomeRouting,
+      currencyCost: this.currencyCost,
       metadata: this.metadata
     };
   }
@@ -328,6 +330,7 @@ export class Recipe {
       ),
       timeRequirement: this._normalizeTimeRequirement(step.timeRequirement),
       currencyRequirement: this._normalizeCurrencyRequirement(step.currencyRequirement),
+      currencyCost: this._normalizeCurrencyCost(step.currencyCost),
       outcomeRouting: step.outcomeRouting && typeof step.outcomeRouting === 'object'
         ? { ...step.outcomeRouting }
         : null
@@ -352,6 +355,18 @@ export class Recipe {
     const unit = String(currencyRequirement.unit || '').trim();
     const amount = Math.max(0, Number(currencyRequirement.amount || 0) || 0);
     return (unit && amount > 0) ? { unit, amount } : null;
+  }
+
+  _normalizeCurrencyCost(cost) {
+    if (!cost || typeof cost !== 'object') return null;
+    const currencies = Array.isArray(cost.currencies) ? cost.currencies : [];
+    const normalized = currencies
+      .map(c => ({
+        abbreviation: String(c.abbreviation || '').trim(),
+        amount: Math.max(0, Number(c.amount) || 0)
+      }))
+      .filter(c => c.abbreviation && c.amount > 0);
+    return normalized.length > 0 ? { currencies: normalized } : null;
   }
 
   _normalizeVisibility(visibility) {

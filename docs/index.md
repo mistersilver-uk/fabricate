@@ -24,6 +24,7 @@ Fabricate lets GMs define crafting systems with recipes, ingredients, catalysts,
 | **Essences** | Abstract properties on items for flexible ingredient matching |
 | **Visibility & Knowledge** | Control which recipes players can see and learn |
 | **Effect Transfer** | Transfer active effects from ingredients to crafted items |
+| **Item Piles Integration** | Currency costs, merchant stock, and container inventory via Item Piles |
 | **Macro Integration** | Customise crafting checks, property generation, and success/failure hooks |
 | **Troubleshooting** | Diagnose common setup and runtime issues |
 | **How-To Guides** | Quick answers to common crafting tasks |

@@ -116,7 +116,8 @@ export class CraftingSystemManager {
       outcomeRouting: has('outcomeRouting') ? features.outcomeRouting === true : false,
       effectTransfer: has('effectTransfer') ? features.effectTransfer === true : false,
       salvage: has('salvage') ? features.salvage === true : false,
-      chatOutput: has('chatOutput') ? features.chatOutput === true : true
+      chatOutput: has('chatOutput') ? features.chatOutput === true : true,
+      itemPiles: has('itemPiles') ? features.itemPiles === true : false
     };
   }
 
