@@ -3,6 +3,10 @@ import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { getFabricateFlag } from '../config/flags.js';
 import { getSourceUuid } from '../utils/sourceUuid.js';
 
+const DEFAULT_RECIPE_IMG = 'icons/svg/item-bag.svg';
+const FALLBACK_RECIPE_IMG = 'icons/sundries/documents/document-bound-white-tan.webp';
+const FALLBACK_COMPONENT_IMG = 'icons/svg/item-bag.svg';
+
 /**
  * Manages recipe storage, retrieval, and CRUD operations
  */
@@ -305,7 +309,8 @@ export class RecipeManager {
           break;
         }
       }
-      return { name: cat.name, available };
+      const name = this.resolveComponentName(recipe, cat.componentId || cat.systemItemId);
+      return { name, available };
     });
     const missingCatalysts = catalystsForSet.filter((_cat, idx) => !catalystStates[idx].available);
 
@@ -396,7 +401,8 @@ export class RecipeManager {
         // Find this group's missing data.
         const missingEntry = (selection?.missingGroups || []).find(mg => mg?.group?.id === group.id);
         const ingredient = missingEntry?.ingredient || options[0] || null;
-        const description = ingredient?.getDescription?.() || options.map(o => o?.getDescription?.() || '').join(' OR ');
+        const description = this._resolveIngredientDescription(recipe, ingredient)
+          || options.map(o => this._resolveIngredientDescription(recipe, o) || '').join(' OR ');
         return {
           description,
           need: Number(missingEntry?.need || ingredient?.quantity || 1),
@@ -419,7 +425,7 @@ export class RecipeManager {
         );
         const totalQty = matchingItems.reduce((sum, item) => sum + (item.system?.quantity || 1), 0);
         return {
-          description: ing.getDescription?.() || '',
+          description: this._resolveIngredientDescription(recipe, ing) || '',
           need: ing.quantity,
           have: totalQty,
           satisfied: totalQty >= ing.quantity
@@ -434,6 +440,25 @@ export class RecipeManager {
         satisfied: true
       };
     });
+  }
+
+  /**
+   * Resolve a human-readable description for an ingredient, using the resolved
+   * component name instead of generic "managed item" text.
+   *
+   * @param {Recipe} recipe
+   * @param {Ingredient|null} ingredient
+   * @returns {string}
+   * @private
+   */
+  _resolveIngredientDescription(recipe, ingredient) {
+    if (!ingredient) return '';
+    const match = ingredient.match || null;
+    if (match?.type === 'component' && match.componentId) {
+      const name = this.resolveComponentName(recipe, match.componentId);
+      return `${ingredient.quantity || 1}x ${name}`;
+    }
+    return ingredient.getDescription?.() || '';
   }
 
   /**
@@ -701,6 +726,117 @@ export class RecipeManager {
     if (!system) return null;
     const managedItems = Array.isArray(system.components) ? system.components : (Array.isArray(system.managedItems) ? system.managedItems : (system.items || []));
     return managedItems.find(item => item.id === componentId) || null;
+  }
+
+  /**
+   * Resolve the display name for a managed component.
+   * Precedence: component.name (synchronous, no async needed for name-only).
+   * Falls back to localized "Unknown Component" if the component is not found.
+   *
+   * @param {Recipe} recipe
+   * @param {string|null} componentId
+   * @returns {string}
+   */
+  resolveComponentName(recipe, componentId) {
+    if (!componentId) return game.i18n?.localize?.('FABRICATE.Labels.UnknownComponent') || 'Unknown Component';
+    const component = this._getComponent(recipe, componentId);
+    if (!component) return game.i18n?.localize?.('FABRICATE.Labels.UnknownComponent') || 'Unknown Component';
+    return component.name || game.i18n?.localize?.('FABRICATE.Labels.UnknownComponent') || 'Unknown Component';
+  }
+
+  /**
+   * Resolve the display name for a managed component, resolving sourceUuid via fromUuid()
+   * when the component has one. Falls back gracefully on broken references.
+   *
+   * @param {Recipe} recipe
+   * @param {string|null} componentId
+   * @returns {Promise<string>}
+   */
+  async resolveComponentNameAsync(recipe, componentId) {
+    if (!componentId) return game.i18n?.localize?.('FABRICATE.Labels.UnknownComponent') || 'Unknown Component';
+    const component = this._getComponent(recipe, componentId);
+    if (!component) return game.i18n?.localize?.('FABRICATE.Labels.UnknownComponent') || 'Unknown Component';
+    if (component.sourceUuid && typeof fromUuid === 'function') {
+      try {
+        const item = await fromUuid(component.sourceUuid);
+        if (item?.name) return item.name;
+      } catch {
+        // Broken reference — fall through to component.name
+      }
+    }
+    return component.name || game.i18n?.localize?.('FABRICATE.Labels.UnknownComponent') || 'Unknown Component';
+  }
+
+  /**
+   * Resolve the icon image for a managed component.
+   * Returns component.img if available, falls back to FALLBACK_COMPONENT_IMG.
+   *
+   * @param {Recipe} recipe
+   * @param {string|null} componentId
+   * @returns {string}
+   */
+  resolveComponentImg(recipe, componentId) {
+    if (!componentId) return FALLBACK_COMPONENT_IMG;
+    const component = this._getComponent(recipe, componentId);
+    if (!component) return FALLBACK_COMPONENT_IMG;
+    return component.img || FALLBACK_COMPONENT_IMG;
+  }
+
+  /**
+   * Resolve a result description using the component name.
+   *
+   * @param {Recipe} recipe
+   * @param {string|null} componentId
+   * @param {number} quantity
+   * @returns {string}
+   */
+  resolveResultDescription(recipe, componentId, quantity = 1) {
+    const name = this.resolveComponentName(recipe, componentId);
+    return `${quantity}x ${name}`;
+  }
+
+  /**
+   * Resolve the icon for a recipe (synchronous).
+   * If the recipe has a non-default img, return it as-is.
+   * Otherwise returns the recipe img (which may be the default bag icon).
+   * For async resolution including linked item fallback, use resolveRecipeIconAsync().
+   *
+   * @param {Recipe} recipe
+   * @returns {string}
+   */
+  resolveRecipeIcon(recipe) {
+    const img = recipe?.img || DEFAULT_RECIPE_IMG;
+    if (img && img !== DEFAULT_RECIPE_IMG) return img;
+    // Synchronous path cannot resolve linkedRecipeItemUuid — return FALLBACK_RECIPE_IMG
+    // if there might be a linked item, to signal that async resolution is needed.
+    // But since this is a sync API, we just return what we have.
+    return img === DEFAULT_RECIPE_IMG ? FALLBACK_RECIPE_IMG : img;
+  }
+
+  /**
+   * Resolve the icon for a recipe with full fallback chain (async).
+   * Precedence:
+   * 1. recipe.img if it is set AND is not the default bag icon
+   * 2. linkedRecipeItemUuid → resolved item.img
+   * 3. FALLBACK_RECIPE_IMG
+   *
+   * @param {Recipe} recipe
+   * @returns {Promise<string>}
+   */
+  async resolveRecipeIconAsync(recipe) {
+    const img = recipe?.img || DEFAULT_RECIPE_IMG;
+    if (img && img !== DEFAULT_RECIPE_IMG) return img;
+
+    if (recipe?.linkedRecipeItemUuid && typeof fromUuid === 'function') {
+      try {
+        const item = await fromUuid(recipe.linkedRecipeItemUuid);
+        if (item?.img) return item.img;
+      } catch {
+        // Broken reference — fall through
+      }
+    }
+
+    return FALLBACK_RECIPE_IMG;
   }
 
   /**

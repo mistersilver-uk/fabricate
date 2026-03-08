@@ -1,6 +1,6 @@
 import { RecipeEditorApp } from './RecipeEditorApp.js';
+import { getRecipeEditorAppClass } from './appFactory.js';
 import { confirmDialog, getDragEventData, renderDialog } from './foundryCompat.js';
-import { getTemplatePath } from './templatePaths.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 
 /**
@@ -66,7 +66,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
   static get PARTS() {
     return {
       manager: {
-        template: getTemplatePath('recipe-manager.hbs')
+        template: 'modules/fabricate/templates/recipe-manager.hbs'
       }
     };
   }
@@ -418,7 +418,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
       ui.notifications.warn('Create or select a crafting system first.');
       return;
     }
-    RecipeEditorApp.show(null, this, this.selectedSystemId);
+    getRecipeEditorAppClass().show(null, this, this.selectedSystemId);
   }
 
   static async _onEditRecipe(event, target) {
@@ -426,7 +426,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     const recipeId = target.dataset.recipeId;
     const recipe = game.fabricate.getRecipeManager().getRecipe(recipeId);
     if (!recipe) return;
-    RecipeEditorApp.show(recipe, this, recipe.craftingSystemId || this.selectedSystemId);
+    getRecipeEditorAppClass().show(recipe, this, recipe.craftingSystemId || this.selectedSystemId);
   }
 
   static async _onDuplicateRecipe(event, target) {
@@ -889,6 +889,9 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     await this.render();
   }
 
+  // Callers outside this class should use getRecipeManagerAppClass().show() from appFactory.js
+  // to get the correct class for the active UI engine.
+  // TODO T-129: once the Svelte variant exists, this method must not hardcode new RecipeManagerApp().
   static show() {
     if (!game.user.isGM) {
       ui.notifications.error('Only GMs can manage crafting systems.');

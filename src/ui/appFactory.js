@@ -1,0 +1,39 @@
+// Registry for Svelte app classes — populated via register*() calls
+// from side-effect imports in main.js. This avoids a static import
+// chain that requires the Svelte compiler in Node test environments.
+let _svelteCraftingApp = null;
+let _svelteRecipeManagerApp = null;
+let _svelteRecipeEditorApp = null;
+
+export function registerSvelteCraftingApp(cls) {
+  _svelteCraftingApp = cls;
+}
+
+export function registerSvelteRecipeManagerApp(cls) {
+  _svelteRecipeManagerApp = cls;
+}
+
+export function registerSvelteRecipeEditorApp(cls) {
+  _svelteRecipeEditorApp = cls;
+}
+
+export function getCraftingAppClass() {
+  if (!_svelteCraftingApp) {
+    throw new Error('Fabricate | SvelteCraftingApp not registered. Ensure SvelteCraftingApp.svelte.js is imported.');
+  }
+  return _svelteCraftingApp;
+}
+
+export function getRecipeManagerAppClass() {
+  if (!_svelteRecipeManagerApp) {
+    throw new Error('Fabricate | SvelteRecipeManagerApp not registered. Ensure SvelteRecipeManagerApp.svelte.js is imported.');
+  }
+  return _svelteRecipeManagerApp;
+}
+
+export function getRecipeEditorAppClass() {
+  if (!_svelteRecipeEditorApp) {
+    throw new Error('Fabricate | SvelteRecipeEditorApp not registered. Ensure SvelteRecipeEditorApp.svelte.js is imported.');
+  }
+  return _svelteRecipeEditorApp;
+}

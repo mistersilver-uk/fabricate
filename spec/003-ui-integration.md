@@ -43,7 +43,7 @@ Display list + detail editor for crafting systems.
 
 - Name
 - Description
-- Resolution mode
+- Resolution mode (`simple`, `routed`, `progressive`, `cauldron`)
 
 Changing resolution mode is destructive and must follow `007` confirmation/cleanup rules.
 
@@ -65,7 +65,7 @@ Changing resolution mode is destructive and must follow `007` confirmation/clean
 - Success macro
 - Failure macro
 - Failure consumption policy
-- Tiered outcomes editor (tiered only)
+- Optional routed outcomes reference list (for GM guidance only; not a routing map)
 - Progressive settings (`awardMode`, `allowPlayerReorder`) (progressive only)
 
 Mode semantics are defined in `004`.
@@ -209,15 +209,29 @@ The UI must expose required data fields from `004`, but mode logic itself is def
 - Ingredient-group editor within that set (including OR options)
 - One result group editor
 
-### Mapped UI
+### Routed UI
 
-- Ingredient sets can map to result groups via `resultGroupId`
-- Result group editors for referenced groups
+- Result selection provider selector:
+  - `ingredientSet`
+  - `macroOutcome`
+  - `rollTableOutcome`
+- `ingredientSet` provider UI:
+  - Ingredient sets map to result groups via `resultGroupId`.
+  - Validation enforces deterministic mapping for all satisfiable sets.
+- `macroOutcome` provider UI:
+  - Optional per-recipe macro override field.
+  - Helper text states macro returns `{ outcome, description? }`.
+  - Outcome routes by normalized match to `ResultGroup.name` (not by explicit mapping table).
+- `rollTableOutcome` provider UI:
+  - Roll table picker (`rollTableUuid`).
+  - Helper text states drawn result name routes by normalized match to `ResultGroup.name`.
+- Validation and helper copy must reserve failure/miss keywords and forbid them as result-group names.
 
-### Tiered UI
+### Cauldron Recipe UI (GM Editor)
 
-- Outcome-to-result-group routing editor
-- Warn and require remap when outcomes list changes
+- Uses the same provider selector as routed mode.
+- Shows cauldron-only signature collision diagnostics spanning all recipes in the system.
+- Save remains blocked until all collisions are resolved.
 
 ### Progressive UI
 
@@ -244,11 +258,25 @@ The UI must expose required data fields from `004`, but mode logic itself is def
   - Exhausted recipe item uses
   - Missing materials
 
+When system mode is `cauldron`, this list is replaced by the cauldron attempt panel for non-GM users.
+
 ### Recipe Detail
 
 - Show blocking reasons when not craftable.
 - Show learn action when applicable.
 - Show consume-on-learn warning text when applicable.
+
+### Cauldron Panel (Player)
+
+- Shown when `CraftingSystem.resolutionMode === "cauldron"`.
+- Replaces recipe browse-to-craft flow for non-GM users.
+- Provides:
+  - ingredient selection area
+  - submit attempt action
+  - specific attempt feedback message
+- Must not leak hidden recipe metadata on invalid combinations or failed attempts.
+- No-signature attempts are shown as failed attempts with specific feedback and ingredient consumption.
+- If a matched attempt cannot route to a valid result group, show a misconfiguration error state (GM fix required) rather than a normal player-failure outcome.
 
 ### Learn Flow
 

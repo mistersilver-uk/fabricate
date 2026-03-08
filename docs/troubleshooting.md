@@ -179,7 +179,88 @@ Additional causes:
 
 **Expected behaviour after the fix:** A player who owns an actor-copy of a compendium item will have that item recognised by Fabricate's recipe matching, regardless of whether the Foundry version that created the copy stored the source UUID in `_stats.compendiumSource` (v12+) or `flags.core.sourceId` (v11). The "Craftable only" filter will include the recipe once all required items are matched.
 
+**Manual verification steps (for maintainers confirming the fix):**
+
+1. Open a Foundry v12+ world with Fabricate installed and at least one knowledge-mode crafting system configured.
+2. Find the recipe's linked item in the compendium browser and drag it directly onto an actor's sheet. This creates an owned copy whose `_stats.compendiumSource` is set to the compendium item's UUID.
+3. Open the crafting app for that actor. The recipe should now appear in the recipe list and show as craftable (assuming all required components are also present).
+4. Enable the **Craftable only** filter in the crafting app. The recipe must remain visible -- if it disappears, the `_stats.compendiumSource` matching path is not working.
+5. Repeat steps 2--4 using an item that was originally created on Foundry v11 (i.e., one that has `flags.core.sourceId` but not `_stats.compendiumSource`). The recipe must also remain craftable and visible under the filter, confirming the legacy fallback path.
+
 **See also:** [Visibility & Knowledge]({% link visibility.md %}#how-matching-works) -- source UUID matching rules and Foundry v12+ behaviour; [Recipes]({% link recipes/index.md %}) -- linking recipe items in the editor.
+
+---
+
+### Crafting App Fails to Open (`each_key_duplicate` Error)
+
+**Symptom:** Clicking **Craft Item** from the Items sidebar does nothing, or the Crafting App opens briefly then closes. The browser console (F12) shows a Svelte error similar to:
+
+```
+each_key_duplicate
+```
+
+or:
+
+```
+Error: Cannot have duplicate keys in an each block
+```
+
+**Cause:**
+
+This error was caused by two related bugs in the Crafting App's run display logic:
+
+1. If the actor's stored crafting run data contained duplicate run IDs (for example, after a data-corruption event or a race condition that wrote the same run twice), the `RunSummary` component received multiple runs with the same `id`. Svelte's `{#each}` block requires unique keys and throws immediately when it encounters duplicates.
+2. Even without corrupted data, runs from the active-runs list and runs from the run-history list shared the same key space. A run ID that appeared in both lists (e.g., a run that was simultaneously active and in history during a transition) caused a cross-list key collision.
+
+**Fix:** This is resolved in the current version. `craftingStore.js` now deduplicates `activeRuns` and `runHistory` independently using a Set before passing them to the component. The `RunSummary` component also uses composite keys (`active-${run.id}` and `history-${run.id}`) so the two lists can never collide even if a run ID appears in both.
+
+**If you are still seeing this error after updating:**
+
+1. Open the browser console (F12) and run the following to inspect your actor's stored run data:
+   ```javascript
+   const actor = game.actors.getName("Aldric the Alchemist"); // replace with actor name
+   const runs = actor.getFlag("fabricate", "craftingRuns") || {};
+   console.log("active:", runs.active);
+   console.log("history:", runs.history);
+   ```
+2. If the output shows the same run ID appearing more than once in `active` or `history`, the stored data is corrupted. You can clear the runs for this actor with:
+   ```javascript
+   await actor.unsetFlag("fabricate", "craftingRuns");
+   ```
+   This removes all run history for the actor. Recipes and crafting systems are not affected.
+3. Reload the page (F5) and re-open the Crafting App.
+
+**See also:** [Quickstart]({% link quickstart.md %}) -- opening the Crafting App for the first time.
+
+---
+
+### Completed Simple Craft Still Shows as In-Progress
+
+**Symptom:** After a single-step (simple) craft completes successfully or fails, the Crafting App still shows the recipe as in-progress. Reloading the page clears the stale state, but it reappears on the next craft.
+
+**Cause:**
+
+This was caused by a race between `CraftingRunManager` writing the completed run to Foundry actor flags and the Crafting App reading the run list back from those flags. Because Foundry flag writes are asynchronous and not immediately visible to subsequent synchronous reads in the same client, the UI received stale data and continued to show the run as active.
+
+**Fix:** This is resolved in the current version. `CraftingRunManager` now maintains an in-memory cache keyed by actor ID. `_persist()` writes to both the cache and Foundry flags at the same time, so any subsequent `_getContainer()` call in the same session returns the committed state immediately without waiting for the flag round-trip.
+
+**If you are still seeing this after updating:**
+
+1. Open the browser console (F12) and inspect the actor's stored run data:
+   ```javascript
+   const actor = game.actors.getName("Aldric the Alchemist"); // replace with actor name
+   const runs = actor.getFlag("fabricate", "craftingRuns") || {};
+   console.log("active:", runs.active);
+   console.log("history:", runs.history);
+   ```
+2. If the completed run appears in `active` rather than `history`, the flag was not written correctly. Clear it with:
+   ```javascript
+   await actor.unsetFlag("fabricate", "craftingRuns");
+   ```
+   This removes all run history for the actor. Recipes and crafting systems are not affected.
+3. If your code calls `CraftingRunManager` methods directly and writes to actor flags externally, call `runMgr.invalidateCache(actor.id)` after your write so the manager re-reads from flags on the next access.
+
+**See also:** [CraftingRunManager API]({% link api/run-manager.md %}) -- `invalidateCache()` reference.
 
 ---
 

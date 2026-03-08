@@ -2,23 +2,23 @@
 
 ## Purpose
 
-Define the semantics and validation rules for crafting-system resolution modes.
+Define semantics and validation rules for crafting-system resolution modes.
 A crafting system has exactly one mode, and every recipe/step in that system must conform to it.
 
 ## Mode Invariant
 
 - `CraftingSystem.resolutionMode` is system-wide.
-- Recipes cannot mix modes inside one crafting system.
+- Recipes cannot mix resolution modes inside one crafting system.
 - Mode changes are destructive and governed by `007-destructive-changes-and-migrations.md`.
 
 ## Mode Matrix
 
-| Mode          | Ingredient Sets | Result Groups               | Check Requirement | Routing Basis          |
-|---------------|-----------------|-----------------------------|-------------------|------------------------|
-| `simple`      | exactly 1       | exactly 1                   | optional          | single result group    |
-| `mapped`      | one or more     | one or more                 | optional          | ingredient set mapping |
-| `tiered`      | one or more     | one or more                 | required          | check outcome mapping  |
-| `progressive` | exactly 1       | exactly 1 (ordered results) | required          | numeric value spending |
+| Mode          | Ingredient Sets | Result Groups               | Check Requirement                       | Routing Basis                           |
+|---------------|-----------------|-----------------------------|-----------------------------------------|-----------------------------------------|
+| `simple`      | exactly 1       | exactly 1                   | optional                                | single result group                     |
+| `routed`      | one or more     | one or more                 | provider-dependent                      | recipe `resultSelection.provider`       |
+| `progressive` | exactly 1       | exactly 1 (ordered results) | required                                | numeric value spending                  |
+| `cauldron`    | one or more     | one or more                 | provider-dependent                      | recipe `resultSelection.provider`       |
 
 ## Simple Mode
 
@@ -32,42 +32,51 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
 
 - Exactly one `IngredientSet`.
 - Exactly one `ResultGroup`.
-- If check enabled, macro must return simple/mapped check contract.
+- If checks are enabled, macro must return the simple contract from `002-data-models.md`.
 
-## Mapped Mode
+## Routed Mode
 
 ### Semantics
 
 - Multiple ingredient sets and result groups are allowed.
-- `IngredientSet.resultGroupId` may force a result group.
-- If no mapped group is set for the chosen set, player chooses a result group.
-- Optional pass/fail crafting check.
+- Result-group resolution is recipe-level via `Recipe.resultSelection.provider`.
+- Supported providers:
+  - `ingredientSet`
+  - `macroOutcome`
+  - `rollTableOutcome`
+
+### Provider: `ingredientSet`
+
+- Routing uses `IngredientSet.resultGroupId`.
+- If there is only one result group, explicit mapping may be omitted.
+- If there are multiple result groups, every satisfiable ingredient set must resolve to exactly one group.
+
+### Provider: `macroOutcome`
+
+- A crafting check macro is required (`Recipe.resultSelection.macroUuid` or system fallback).
+- Macro return contract is object-based: `{ success, outcome, description? }`.
+- `outcome` is trim-normalized and case-insensitive.
+- Resolution rules:
+  1. If `outcome` is a fail keyword (`fail`, `failed`, `failure`, `f`), execution takes failure path.
+  2. If `outcome` is a miss keyword (`miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`), execution takes non-producing fail/miss path.
+  3. Otherwise, `outcome` must match exactly one `ResultGroup.name` under the same normalization.
+  4. If no result-group name matches, execution aborts with crafting-system misconfiguration error (not a player failure outcome).
+
+### Provider: `rollTableOutcome`
+
+- `Recipe.resultSelection.rollTableUuid` is required.
+- Engine draws exactly once per attempt.
+- Drawn result `name` is trim-normalized and case-insensitive, then interpreted with the same reserved-keyword and result-group-name rules as `macroOutcome`.
+- If no result-group name matches and no reserved keyword applies, execution aborts with crafting-system misconfiguration error (not a player failure outcome).
 
 ### Validation
 
 - At least one `IngredientSet`.
 - At least one `ResultGroup`.
-- If `resultGroupId` is set, it must reference an existing result group.
-- If check enabled, macro must return simple/mapped check contract.
-
-## Tiered Mode
-
-### Semantics
-
-- Check is mandatory.
-- Check macro returns `outcome`.
-- Routing maps an outcome to a result group:
-  - Step-level `Step.outcomeRouting` if present.
-  - Otherwise, recipe-level `Recipe.outcomeRouting`.
-
-### Validation
-
-- At least one `IngredientSet`.
-- At least one `ResultGroup`.
-- `CraftingSystem.craftingCheck.enabled` must be true.
-- `CraftingSystem.craftingCheck.outcomes` must exist and be non-empty.
-- Every declared outcome must map to a valid result group in active routing.
-- Check macro must return a tiered check result matching the defined contract.
+- `resultSelection.provider` must be one of the three supported values.
+- Provider-specific required fields must be present.
+- `ResultGroup.name` values must be unique under trim-normalized, case-insensitive comparison.
+- `ResultGroup.name` may not be any reserved fail/miss keyword.
 
 ## Progressive Mode
 
@@ -105,8 +114,40 @@ Let `remaining = check.value` and `cost = result.component.difficulty`.
 - `CraftingSystem.craftingCheck.progressive` must exist.
 - Check macro must return progressive check contract with numeric `value`.
 
+## Cauldron Mode
+
+### Semantics
+
+- Player submits ingredient combinations directly instead of selecting a visible recipe.
+- Recipes remain hidden by default for non-GM users.
+- Result-group selection uses recipe-level providers (`ingredientSet`, `macroOutcome`, `rollTableOutcome`) with the same provider contracts as routed mode.
+- Multi-step recipes are not supported.
+- `consumeOnFail` defaults to true for failed attempts.
+
+### Signature Resolution
+
+- Matching is based on satisfiable signatures from ingredient groups/options.
+- Signature overlap is invalid across all recipes in the system.
+- No-signature-match is treated as a failed attempt:
+  - player sees a specific failure message,
+  - submitted ingredients are consumed.
+- If a signature matches but routed outcome/name cannot resolve to a valid `ResultGroup`, treat as crafting-system misconfiguration error:
+  - abort without applying player-failure consumption,
+  - return actionable diagnostics for GM correction.
+
+### Validation
+
+- `features.multiStepRecipes` must be false.
+- All recipes must satisfy cauldron-wide signature uniqueness invariants.
+- Any signature collision blocks save/import operations system-wide until resolved.
+
 ## Testing Requirements
 
 - Unit tests per mode for cardinality and routing validation.
+- Unit tests for provider-specific routed behavior (`ingredientSet`, `macroOutcome`, `rollTableOutcome`).
+- Unit tests for reserved fail/miss keyword handling and result-group name matching normalization.
 - Unit tests for progressive award modes (`partial`, `equal`, `exceed`).
-- Integration tests validating mode-specific behaviour in full crafting flow.
+- Integration tests validating mode-specific behavior in full crafting flow.
+- Integration tests for cauldron no-signature failure behavior (failure message + ingredient consumption).
+- Integration tests for cauldron routing-mismatch misconfiguration behavior (error + no player-failure consumption).
+- Integration tests for cauldron uniqueness blocking semantics in save/import workflows.

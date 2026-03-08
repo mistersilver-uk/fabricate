@@ -6,6 +6,10 @@ const HISTORY_LIMIT = 50;
  * Manages actor-scoped crafting runs (active + history).
  */
 export class CraftingRunManager {
+  constructor() {
+    this._cache = new Map(); // actorId -> container
+  }
+
   _normalizeContainer(raw = {}) {
     const active = raw?.active && typeof raw.active === 'object' ? { ...raw.active } : {};
     const history = Array.isArray(raw?.history) ? [...raw.history] : [];
@@ -55,10 +59,22 @@ export class CraftingRunManager {
   }
 
   async _persist(actor, container) {
+    this._cache.set(actor.id, container);
     await setFabricateFlag(actor, 'craftingRuns', container);
   }
 
+  invalidateCache(actorId = null) {
+    if (actorId) {
+      this._cache.delete(actorId);
+    } else {
+      this._cache.clear();
+    }
+  }
+
   _getContainer(actor) {
+    if (this._cache.has(actor.id)) {
+      return this._cache.get(actor.id);
+    }
     return this._normalizeContainer(getFabricateFlag(actor, 'craftingRuns', null));
   }
 

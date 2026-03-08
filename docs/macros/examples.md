@@ -41,6 +41,7 @@ const actor = game.user.character;
 if (!actor) {
   ui.notifications.warn('Please select a character first');
 } else {
+  const rm = game.fabricate.getRecipeManager();
   const available = fabricate.getAvailableRecipes(actor);
   const all = fabricate.listRecipes({ enabled: true });
 
@@ -54,10 +55,11 @@ if (!actor) {
   // Show missing items for unavailable recipes
   const unavailable = all.filter(r => !available.includes(r));
   unavailable.forEach(recipe => {
-    const check = game.fabricate.getRecipeManager().canCraft(actor, recipe);
+    const check = rm.canCraft(actor, recipe);
     console.log(`\n  Cannot craft: ${recipe.name}`);
     check.missing.ingredients.forEach(m => {
-      console.log(`    - ${m.ingredient.getDescription()}: need ${m.need}, have ${m.have}`);
+      const name = rm.resolveComponentName(recipe, m.ingredient.match?.componentId);
+      console.log(`    - ${name}: need ${m.need}, have ${m.have}`);
     });
   });
 
@@ -138,11 +140,12 @@ if (!actor) {
           callback: async (html) => {
             const recipeId = html.find('#recipe-select').val();
             const result = await fabricate.craft(actor, recipeId);
+            // Fabricate automatically posts a chat message summarising the result
+            // (controlled by the system's chatOutput feature toggle).
+            // Use ui.notifications here only for inline feedback, not ChatMessage.create(),
+            // to avoid a duplicate chat card.
             if (result.success) {
-              ChatMessage.create({
-                speaker: ChatMessage.getSpeaker({ actor }),
-                content: `<h3>Crafting Success!</h3><p>${result.message}</p>`
-              });
+              ui.notifications.info(result.message);
             } else {
               ui.notifications.error(result.message);
             }

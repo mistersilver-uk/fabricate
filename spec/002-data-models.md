@@ -23,7 +23,7 @@ CraftingSystem = {
 
   // System-level invariant for all recipes in this crafting system.
   // Mode semantics and validation are defined in 004.
-  resolutionMode: "simple" | "mapped" | "tiered" | "progressive",
+  resolutionMode: "simple" | "routed" | "progressive" | "cauldron",
 
   features: {
     recipeCategories: boolean,
@@ -73,7 +73,7 @@ CraftingSystem = {
       consumeCatalystsOnFail: boolean,   // default false
     },
 
-    // Tiered mode
+    // Routed mode (macroOutcome provider may return one of these, optional)
     outcomes?: string[],
 
     // Progressive mode
@@ -103,6 +103,13 @@ CraftingSystem = {
     },
   },
 
+  // Present only when resolutionMode === "cauldron".
+  cauldron?: {
+    learnOnCraft: boolean, // default false
+    consumeOnFail: boolean, // default true
+    showAttemptHistoryToPlayers: boolean, // default true
+  },
+
   requirements: {
     time: {
       enabled: boolean, // default false
@@ -129,6 +136,10 @@ CraftingSystem = {
 1. If `features.recipeCategories` is false, `Recipe.category` is ignored at runtime.
 2. If `features.itemTags` is false, tag-based ingredient placeholders are invalid.
 3. `categories` and `itemTags` should be normalized to unique, trimmed strings.
+4. `resolutionMode` must be one of `"simple"`, `"routed"`, `"progressive"`, or `"cauldron"`.
+5. If `resolutionMode === "cauldron"`:
+   - `features.multiStepRecipes` must be `false`.
+   - `cauldron` config must be present; missing values use defaults (`learnOnCraft: false`, `consumeOnFail: true`, `showAttemptHistoryToPlayers: true`).
 
 ### Recipe Visibility Requirements
 
@@ -222,9 +233,16 @@ Recipe = {
   transferEffects: boolean,
   catalysts: Catalyst[], // defines catalysts that apply to all ingredient groups across all steps in a recipe
 
-  // Tiered routing
-  outcomeRouting?: {
-    [outcome: string]: string, // outcome -> resultGroupId
+  // Routed/cauldron result-group selection
+  resultSelection?: {
+    provider: "ingredientSet" | "macroOutcome" | "rollTableOutcome",
+
+    // provider = "macroOutcome"
+    // If present, overrides CraftingSystem.craftingCheck.macroUuid for this recipe.
+    macroUuid?: string,
+
+    // provider = "rollTableOutcome"
+    rollTableUuid?: string,
   },
 
   visibility?: {
@@ -250,11 +268,19 @@ Recipe = {
 
 1. Recipe must include at least one ingredient set and at least one result group, either at recipe level (single-step mode) or within steps (multistep mode).
 2. Resolution-mode constraints are defined in `004-resolution-modes.md`.
-3. If `outcomeRouting` is used, keys must exist in `CraftingSystem.craftingCheck.outcomes`.
-4. If `transferEffects` is true and essences are enabled, transfer behaviour follows `005-recipes-and-steps.md`.
-5. If `visibility.restricted` is true, `visibility.allowedUserIds` must be present as an array. An empty array is valid and means no non-GM user may see the recipe.
-6. If knowledge mode includes item matching or learning, `linkedRecipeItemUuid` should be configured for player craftability.
-7. If `linkedRecipeItemUuid` is configured and does not resolve, validation must warn.
+3. `resultSelection.provider` is required when `CraftingSystem.resolutionMode` is `routed` or `cauldron`.
+4. `resultSelection.provider` value constraints:
+   - `ingredientSet`: each `IngredientSet` must resolve deterministically to exactly one `ResultGroup` (via `IngredientSet.resultGroupId`, or implicitly when only one result group exists).
+   - `macroOutcome`: a check macro must be resolvable (`Recipe.resultSelection.macroUuid` or fallback to `CraftingSystem.craftingCheck.macroUuid`).
+   - `rollTableOutcome`: `Recipe.resultSelection.rollTableUuid` is required.
+5. `ResultGroup.name` values must be unique per recipe under trim-normalized, case-insensitive comparison.
+6. `ResultGroup.name` values may not be reserved routing keywords under trim-normalized, case-insensitive comparison:
+   - fail keywords: `fail`, `failed`, `failure`, `f`
+   - miss keywords: `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`
+7. If `transferEffects` is true and essences are enabled, transfer behaviour follows `005-recipes-and-steps.md`.
+8. If `visibility.restricted` is true, `visibility.allowedUserIds` must be present as an array. An empty array is valid and means no non-GM user may see the recipe.
+9. If knowledge mode includes item matching or learning, `linkedRecipeItemUuid` should be configured for player craftability.
+10. If `linkedRecipeItemUuid` is configured and does not resolve, validation must warn.
 
 ### Validation Guidance
 
@@ -280,10 +306,11 @@ Define matching between a recipe's linked template and owned inventory items.
 A candidate owned item matches when either condition is true:
 
 1. `ownedItem.uuid === recipe.linkedRecipeItemUuid`
-2. `ownedItem.flags.core.sourceId === recipe.linkedRecipeItemUuid`
+2. `ownedItem._stats.compendiumSource === recipe.linkedRecipeItemUuid`
+3. `ownedItem.flags.core.sourceId === recipe.linkedRecipeItemUuid` (legacy fallback)
 
-`core.sourceId` is expected to propagate across duplication chains.
-Any modules that do not follow this pattern when creating items will break Fabricate's item identification logic.
+Foundry v12+ uses `_stats.compendiumSource`; Foundry v11 and earlier used `flags.core.sourceId`.
+Runtime implementations should call the shared source UUID resolver defined in `006-recipe-visibility.md`.
 
 ### Match Context Contract
 
@@ -328,11 +355,6 @@ Step = {
       unit: string // varies by game system
       amount: number,
   },
-
-  // Tiered routing override
-  outcomeRouting?: {
-    [outcome: string]: string,
-  },
 }
 ```
 
@@ -358,7 +380,7 @@ IngredientSet = {
   essences: { [essenceId: string]: number },
   catalysts: Catalyst[],
 
-  // Mapped mode
+  // Routed/cauldron: used when resultSelection.provider === "ingredientSet"
   resultGroupId?: string,
 }
 ```
@@ -426,6 +448,28 @@ Ingredient = {
 4. If `match.type === "tags"`, `match.tags` must contain one or more tag IDs.
 5. Tag IDs in `match.tags` must exist in `CraftingSystem.itemTags`.
 6. When `features.itemTags` is true, tag placeholder ingredients are valid in all resolution modes, including `simple`.
+
+## Cauldron Signature Uniqueness (Validation Contract)
+
+### Purpose
+
+Define the save/import invariant that guarantees deterministic ingredient-signature resolution in cauldron mode.
+
+### Contract
+
+1. Applies only when `CraftingSystem.resolutionMode === "cauldron"`.
+2. Scope is all recipes in the crafting system.
+3. Signature overlap is based on satisfiable ingredient assignments, not just textual equality.
+4. Matching expansion must include:
+   - direct component matches (`match.type === "component"`)
+   - tag matches (`match.type === "tags"`) expanded against current system components/tags.
+5. Ingredient groups may resolve to the same component ID when inventory quantity is sufficient to satisfy the aggregate quantity across those groups.
+6. Any overlapping satisfiable signatures between ingredient sets in the same system are invalid.
+7. Save is blocked for any collision in the system, including when editing an unrelated recipe.
+8. Import behavior is partial:
+   - non-conflicting recipes are imported,
+   - conflicting recipes are rejected,
+   - one aggregated conflict report is returned at completion.
 
 ## Catalyst
 
@@ -578,7 +622,7 @@ CraftingRunStepState = {
   lastCheckResult?: {
     success: boolean,
     reason: string,   // user-friendly text returned by the macro explaining the result
-    outcome?: string, // tiered mode
+    outcome?: string, // routed/cauldron macroOutcome mode
     value?: number,   // progressive mode
     data?: object,
   },
@@ -609,7 +653,7 @@ CraftingRunStepState = {
 2. `timeGate` is only valid when the corresponding recipe step has `timeRequirement`.
 3. `timeGate.availableAt` must be `> initiatedAt` when both are present.
 4. `completedAt` is required when `status` is `succeeded`, or `failed`.
-5. `lastCheckResult.outcome` is only valid in tiered mode; `lastCheckResult.value` is only valid in progressive mode.
+5. `lastCheckResult.outcome` is only valid in routed/cauldron when provider is `macroOutcome`; `lastCheckResult.value` is only valid in progressive mode.
 6. `failureReason` is required when `status` is `failed`.
 
 ## Actor Flags
@@ -706,23 +750,36 @@ Input context must include:
 
 Return by mode:
 
-- Simple or mapped
+- Simple, routed (`ingredientSet`), routed (`rollTableOutcome`), and cauldron with non-macro routing
 
 ```js
-{ success: boolean, data?: object }
+{ success: boolean, description?: string, data?: object }
 ```
 
-- Tiered
+- Routed (`macroOutcome`) and cauldron (`macroOutcome`)
 
 ```js
-{ success: boolean, outcome: string, data?: object }
+{ success: boolean, outcome: string, description?: string, data?: object }
 ```
 
 - Progressive
 
 ```js
-{ success: boolean, value: number, data?: object }
+{ success: boolean, value: number, description?: string, data?: object }
 ```
+
+Normalization and interpretation rules for `outcome` in routed/cauldron `macroOutcome`:
+
+1. `outcome` is required and must be interpreted using trim-normalized, case-insensitive comparison.
+2. Preferred reserved keywords:
+   - `fail` (failed craft outcome)
+   - `miss` (non-producing craft outcome)
+3. Accepted synonyms (same normalization rules):
+   - fail-family: `fail`, `failed`, `failure`, `f`
+   - miss-family: `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`
+4. If normalized `outcome` matches a reserved keyword, it does not route to a result group.
+5. Otherwise, `outcome` must equal a `ResultGroup.name` for the active recipe under the same normalization rules.
+6. If a non-reserved `outcome` does not match any `ResultGroup.name`, classify as crafting-system misconfiguration error.
 
 ### Property Macro Contract
 

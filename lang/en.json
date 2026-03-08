@@ -1,7 +1,6 @@
 {
   "FABRICATE": {
     "ModuleName": "Fabricate - Universal Crafting",
-
     "Settings": {
       "Enabled": {
         "Name": "Enable Crafting System",
@@ -16,7 +15,66 @@
         "Hint": "Automatically craft items without showing a confirmation dialog when you have all required materials."
       }
     },
-
+    "Search": {
+      "Placeholder": "Search recipes...",
+      "Label": "Search"
+    },
+    "Filter": {
+      "CraftableOnly": "Craftable Only",
+      "AllCategories": "All Categories"
+    },
+    "ActorSelector": {
+      "CraftWith": "Craft with:",
+      "ResultHint": "Results will be added to this actor's inventory",
+      "AssignedMarker": "*"
+    },
+    "SourceActorPicker": {
+      "Label": "Using components from:",
+      "NoActors": "No owned actors available for component sources."
+    },
+    "RecipeList": {
+      "Count": "{count} recipes",
+      "NoRecipes": "No recipes found.",
+      "AdjustFilters": "Try adjusting your search or filters.",
+      "GMNeeded": "The GM needs to create some recipes first."
+    },
+    "RecipeCard": {
+      "MultipleOptions": "Multiple options",
+      "ActiveRunCount": "{count} active runs",
+      "CurrentRun": "Current run",
+      "Ingredients": "Ingredients",
+      "Essences": "Essences",
+      "Requires": "Requires",
+      "CraftTitle": "Craft this recipe",
+      "Waiting": "Waiting",
+      "CannotCraft": "Cannot Craft",
+      "LearnTitle": "Learn this recipe",
+      "Learn": "Learn",
+      "RemoveFavourite": "Remove from favourites",
+      "AddFavourite": "Add to favourites",
+      "ShowDetails": "Show recipe details",
+      "RestartRun": "Restart run from step 1"
+    },
+    "FavouritesSection": {
+      "Title": "Favourites",
+      "RemoveFavourite": "Remove from favourites"
+    },
+    "RecentsSection": {
+      "Title": "Recently Crafted"
+    },
+    "Pagination": {
+      "Showing": "Showing {start}-{end} of {total} recipes"
+    },
+    "RunSummary": {
+      "InProgress": "In Progress",
+      "RecentHistory": "Recent History",
+      "NoActiveRuns": "No active crafting runs for this actor.",
+      "NoRecentHistory": "No recent crafting history.",
+      "ContinueRun": "Continue this run",
+      "RunDetails": "Run details",
+      "RestartRun": "Restart run",
+      "CancelRun": "Cancel run"
+    },
     "Recipe": {
       "Name": "Recipe Name",
       "Description": "Description",
@@ -25,7 +83,6 @@
       "Catalysts": "Catalysts",
       "Result": "Result",
       "Process": "Crafting Process",
-
       "Create": "Create Recipe",
       "Edit": "Edit Recipe",
       "Delete": "Delete Recipe",
@@ -33,7 +90,6 @@
       "Import": "Import Recipes",
       "Export": "Export Recipes"
     },
-
     "Ingredient": {
       "Item": "Specific Item",
       "Tag": "Item Tag",
@@ -42,7 +98,6 @@
       "ExtractEffects": "Extract Active Effects",
       "Alternatives": "Alternative Ingredients"
     },
-
     "Catalyst": {
       "Name": "Catalyst Name",
       "Required": "Required",
@@ -52,7 +107,6 @@
       "Degrades": "Degrades on Use",
       "QualityBonus": "Affects Output Quality"
     },
-
     "Process": {
       "Instant": "Instant",
       "Time": "Time-Based",
@@ -61,7 +115,6 @@
       "SkillName": "Skill",
       "DC": "Difficulty Class"
     },
-
     "Craft": {
       "Title": "Crafting",
       "Available": "Available Recipes",
@@ -73,7 +126,6 @@
       "Failure": "Crafting Failed!",
       "InProgress": "Crafting in Progress..."
     },
-
     "Chat": {
       "CraftSuccess": "Crafting Successful",
       "CraftFailure": "Crafting Failed",
@@ -85,7 +137,326 @@
       "FailureReason": "Reason",
       "ConsumedOnFailure": "Consumed on Failure"
     },
-
+    "Admin": {
+      "Title": "Crafting Admin",
+      "Selected": "Selected:",
+      "NoSystemsYet": "No crafting systems yet",
+      "Tabs": {
+        "Systems": "Systems",
+        "Items": "Components",
+        "Recipes": "Recipes",
+        "Rules": "Rules"
+      },
+      "Sidebar": {
+        "Title": "Crafting Systems",
+        "CreateSystem": "Create System",
+        "DeleteSystem": "Delete",
+        "Empty": "No systems created."
+      },
+      "SystemSettings": {
+        "Title": "Crafting System",
+        "NoSystemSelected": "No Crafting System Selected",
+        "NoSystemSelectedHint": "Create a new system to configure categories, tags, essences, and rules.",
+        "Name": "Name",
+        "Description": "Description",
+        "AdvancedOptions": "Show advanced options",
+        "AdvancedOptionsHint": "Advanced options let you configure categories, item tags, essence definitions, complex recipe behaviour, and macro-driven crafting logic.",
+        "AdvancedDisabled": "Advanced options are disabled for this system.",
+        "SaveDetails": "Save Details"
+      },
+      "Features": {
+        "Enable": "Enable",
+        "Categories": {
+          "Title": "Recipe Categories",
+          "Hint": "Organize and filter recipes by category in admin and crafting views.",
+          "Placeholder": "e.g. Cooking",
+          "Add": "Add",
+          "Empty": "No categories defined yet."
+        },
+        "ItemTags": {
+          "Title": "Item Tags",
+          "Hint": "Use tags for categorization, sorting, and search in managed items.",
+          "Placeholder": "e.g. armour:leather",
+          "Add": "Add",
+          "Empty": "No item tags defined yet."
+        },
+        "Essences": {
+          "Title": "Essences",
+          "Hint": "Define essence types with descriptions and optional source items.",
+          "NamePlaceholder": "Essence name (e.g. Water)",
+          "DescPlaceholder": "Description (optional)",
+          "IconPlaceholder": "Icon class (e.g. fas fa-tint)",
+          "NoSourceItem": "No source item",
+          "Add": "Add",
+          "Empty": "No essence definitions yet.",
+          "SourceItem": "Source item:",
+          "Remove": "Remove Essence"
+        },
+        "ComplexRecipes": {
+          "Title": "Complex Recipes",
+          "Hint": "Allow multiple ingredient sets, multiple result groups, and advanced routing controls."
+        },
+        "MultiStepRecipes": {
+          "Title": "Multi-Step Recipes",
+          "Hint": "Allow recipes to define explicit ordered steps with per-step ingredient/result and time requirements."
+        },
+        "TimeRequirements": {
+          "Title": "Time Requirements",
+          "Hint": "Allow step-level crafting durations using minutes, hours, days, months, and years."
+        },
+        "CurrencyRequirements": {
+          "Title": "Currency Requirements",
+          "Hint": "Allow steps to require currency, resolved via system adapter or macros.",
+          "MacroProvider": "Macro provider",
+          "SystemAdapter": "System adapter",
+          "SelectAdapter": "Select adapter",
+          "CheckMacro": "Check currency macro",
+          "DecrementMacro": "Decrement currency macro",
+          "FormatMacro": "Format currency macro",
+          "SaveConfig": "Save Currency Config"
+        },
+        "PropertyMacros": {
+          "Title": "Property Calculation Macros",
+          "Hint": "Use macros to compute result property updates from crafting context."
+        },
+        "CraftingChecks": {
+          "Title": "Crafting Checks",
+          "Hint": "Run a system-level check macro that returns pass/fail or named outcomes.",
+          "PassFail": "Pass / Fail",
+          "TieredOutcomes": "Tiered Outcomes",
+          "NoCheckMacro": "No check macro",
+          "OutcomesPlaceholder": "Outcomes (comma separated)",
+          "SaveConfig": "Save Check Config"
+        },
+        "OutcomeRouting": {
+          "Title": "Outcome Routing",
+          "Hint": "Map crafting-check outcomes to specific result groups when complex recipes are enabled."
+        },
+        "EffectTransfer": {
+          "Title": "Effect Transfer",
+          "Hint": "Transfer active effects from consumed ingredients to crafted result items."
+        },
+        "RecipeVisibility": {
+          "Title": "Recipe Visibility",
+          "Hint": "Control which players can see recipes.",
+          "Global": "Global (all recipes visible to all)",
+          "PlayerSpecific": "Player-specific (per-recipe restrictions)",
+          "KnowledgeBased": "Knowledge-based (item or learning)",
+          "SaveConfig": "Save Visibility Config",
+          "PlayerNote": "Per-recipe visibility restrictions can be configured in each recipe's editor. Restricted recipes are hidden from all players by default unless specific users are allowed.",
+          "KnowledgeByItem": "By item (must have recipe item)",
+          "KnowledgeByLearning": "By learning (must have learnt recipe)",
+          "KnowledgeByEither": "Item or learning (either method)",
+          "ConsumeOnLearn": "Consume item on learn"
+        }
+      },
+      "Items": {
+        "SearchPlaceholder": "Search components...",
+        "DropZoneLabel": "Drag items from sidebar/compendiums here to add them to this crafting system.",
+        "DropToReplace": "Drop to replace source",
+        "NoManagedItems": "No Managed Items",
+        "NoManagedItemsHint": "Drag in world or compendium items to build this system's item library.",
+        "NoSystemHint": "Create or select a crafting system to manage items.",
+        "NoTags": "No tags",
+        "NoEssences": "No essences",
+        "NoSourceUuid": "No source UUID",
+        "EditItem": "Edit Item",
+        "DeleteItem": "Delete Item"
+      },
+      "Recipes": {
+        "SearchPlaceholder": "Search recipes...",
+        "NewRecipe": "New Recipe",
+        "Import": "Import",
+        "Export": "Export",
+        "NoRecipes": "No Recipes Yet",
+        "NoRecipesHint": "Create recipes for the selected crafting system.",
+        "CreateRecipe": "Create Recipe",
+        "ColRecipe": "Recipe",
+        "ColLocked": "Locked",
+        "ColVisibility": "Visibility",
+        "ColCategory": "Category",
+        "ColType": "Type",
+        "ColComponents": "Components",
+        "ColEnabled": "Enabled",
+        "ColActions": "Actions",
+        "Disabled": "Disabled",
+        "LockedYes": "Yes",
+        "LockedNo": "No",
+        "Simple": "Simple",
+        "Advanced": "Advanced",
+        "Ingredient": "ingredient",
+        "Ingredients": "ingredients",
+        "Catalyst": "catalyst",
+        "Catalysts": "catalysts",
+        "Edit": "Edit",
+        "Duplicate": "Duplicate",
+        "Delete": "Delete"
+      },
+      "Rules": {
+        "Title": "Global Rules",
+        "Placeholder": "Difficulty and advanced system-wide rule editing will live here.",
+        "PlaceholderDetail": "This first implementation pass focuses on systems, item libraries, and recipe scoping."
+      }
+    },
+    "Editor": {
+      "Header": {
+        "NewRecipe": "New Recipe",
+        "EditRecipe": "Edit Recipe"
+      },
+      "BasicInfo": {
+        "NameLabel": "Recipe Name *",
+        "DescriptionLabel": "Description",
+        "CategoryLabel": "Category",
+        "ImageLabel": "Image",
+        "CategoryPlaceholder": "No system categories defined yet",
+        "CategoryHint": "Define categories in Crafting Admin > Systems."
+      },
+      "Flags": {
+        "Enabled": "Enabled",
+        "Locked": "Locked",
+        "VariableOutput": "Variable Output",
+        "TransferEffects": "Transfer Effects"
+      },
+      "Validation": {
+        "FixBeforeSaving": "Fix before saving:"
+      },
+      "Visibility": {
+        "GlobalHint": "This system uses global visibility — all recipes are visible to all players. To control visibility per recipe, change the system's recipe visibility mode to Player-specific in the crafting admin.",
+        "PlayerVisibilityTitle": "Player Visibility",
+        "RestrictLabel": "Restrict recipe visibility to specific users",
+        "NoNonGmUsers": "No non-GM users available."
+      },
+      "LinkedItem": {
+        "SectionTitle": "Linked Recipe Item",
+        "UuidLabel": "Item UUID",
+        "UuidPlaceholder": "Item.abcdef123456 or Compendium.world.pack.itemId",
+        "BrowseButton": "Browse Items",
+        "CreateButton": "Create Recipe Item",
+        "ClearButton": "Clear linked item",
+        "KnowledgeHint": "Players who own a copy of this item (matched by UUID or flags.core.sourceId) will gain access to this recipe under knowledge-mode visibility.",
+        "MissingWarning": "Linked recipe item UUID is required for this crafting system's visibility mode."
+      },
+      "Steps": {
+        "SectionTitle": "Crafting Steps",
+        "StepOf": "Step {current} / {total}",
+        "PrevStep": "Previous Step",
+        "NextStep": "Next Step",
+        "AddStep": "Add Step",
+        "RemoveStep": "Remove Step",
+        "StepNameLabel": "Step Name",
+        "StepDescriptionLabel": "Step Description",
+        "TimeRequirementTitle": "Time Requirement",
+        "MinutesLabel": "Minutes",
+        "HoursLabel": "Hours",
+        "DaysLabel": "Days",
+        "MonthsLabel": "Months",
+        "YearsLabel": "Years",
+        "CurrencyRequirementTitle": "Currency Requirement",
+        "CurrencyUnitLabel": "Currency Unit",
+        "CurrencyUnitPlaceholder": "e.g. gp, credits",
+        "CurrencyAmountLabel": "Amount"
+      },
+      "IngredientSets": {
+        "SectionTitle": "Ingredient Sets",
+        "AddSet": "Add Set",
+        "RemoveSet": "Remove Set",
+        "MoveUp": "Move Up",
+        "MoveDown": "Move Down",
+        "SetNameLabel": "Set Name",
+        "PanelSummary": "{groups} groups, {catalysts} catalysts",
+        "AddGroup": "Add Ingredient Group",
+        "RemoveGroup": "Remove Group",
+        "GroupTitle": "Ingredient Group",
+        "DropNewIngredient": "Drop a managed item here to add a new ingredient group.",
+        "EssencesAvailable": "Available system essences:",
+        "NoEssencesDefined": "No essences defined yet. Add essences in Crafting Admin > Systems.",
+        "TagPlaceholdersEnabled": "Tag placeholders are enabled for this crafting system."
+      },
+      "IngredientOptions": {
+        "MatchTypeLabel": "Match",
+        "RequirementLabel": "Requirement",
+        "QtyActionsLabel": "Qty / Actions",
+        "MatchManaged": "Managed item",
+        "MatchTag": "Tag",
+        "TagTextPlaceholder": "tag-1, tag-2",
+        "TagMatchAny": "Any tag",
+        "TagMatchAll": "All tags",
+        "QuantityLabel": "Quantity",
+        "AddOption": "Add OR Option",
+        "RemoveOption": "Remove Option",
+        "ClearComponent": "Clear Item",
+        "NoItemSelected": "No item selected",
+        "OrSeparator": "OR"
+      },
+      "Catalysts": {
+        "SectionTitle": "Catalysts (for this ingredient set)",
+        "AddCatalyst": "Add Catalyst",
+        "ManagedItemHeader": "Managed Item",
+        "DegradeHeader": "Degrades",
+        "MaxUsesHeader": "Max Uses",
+        "MaxUsesPlaceholder": "Unlimited",
+        "RemoveCatalyst": "Remove",
+        "EmptyState": "Drop managed items here to add catalysts."
+      },
+      "ResultGroups": {
+        "SectionTitle": "Result Groups",
+        "AddGroup": "Add Group",
+        "RemoveGroup": "Remove Group",
+        "MoveUp": "Move Up",
+        "MoveDown": "Move Down",
+        "GroupNameLabel": "Group Name",
+        "PanelSummary": "{count} results",
+        "ManagedItemHeader": "Managed Item",
+        "QtyHeader": "Qty",
+        "AddResult": "Add Result",
+        "RemoveResult": "Remove",
+        "PropertyMacroLabel": "Property Macro",
+        "NoPropertyMacro": "No property macro",
+        "EmptyState": "Drop managed items here to add results."
+      },
+      "ResultSelection": {
+        "MappedResultGroupLabel": "Mapped Result Group",
+        "ResultGroupForSet": "Result group for this ingredient set",
+        "DefaultFirstGroup": "Default (first result group)",
+        "AddGroupsFirst": "Add result groups first, then map this set.",
+        "VariableMappingTitle": "Result Group Mapping (for this ingredient set)",
+        "AddGroupsFirstVariable": "Add result groups first, then map them to ingredient sets."
+      },
+      "OutcomeRouting": {
+        "SectionTitle": "Outcome Routing",
+        "Hint": "Route check outcomes to a specific result group. Leave blank to use default recipe output.",
+        "DefaultOutput": "Default output"
+      },
+      "ItemPicker": {
+        "SectionTitle": "Components",
+        "SearchPlaceholder": "Search managed items...",
+        "EmptyState": "No managed items in this system.",
+        "EmptyHint": "Add items in the Crafting Admin Components tab."
+      },
+      "Footer": {
+        "Save": "Save Recipe",
+        "Cancel": "Cancel"
+      },
+      "Notifications": {
+        "SaveSuccess": "Recipe saved successfully.",
+        "ValidationFailurePrefix": "Cannot save recipe:",
+        "MinOneStep": "A recipe needs at least one step.",
+        "MinOneIngredientSet": "A recipe needs at least one ingredient set.",
+        "MinOneIngredientGroup": "An ingredient set needs at least one ingredient group.",
+        "MinOneIngredientOption": "An ingredient group needs at least one option.",
+        "MinOneResultGroup": "A recipe needs at least one result group.",
+        "MinOneResult": "A result group needs at least one result.",
+        "LinkedItemAlreadySet": "A linked recipe item UUID is already set. Clear it first to create a new one.",
+        "LinkedItemCreated": "Created world item \"{name}\" and linked it to this recipe.",
+        "LinkedItemCreateFailed": "Failed to create recipe item. Check console for details.",
+        "SaveFailedNotGm": "Only GMs can manage recipes.",
+        "SaveFailedNoSystem": "Recipe must belong to a crafting system.",
+        "SaveFailed": "Failed to save recipe."
+      }
+    },
+    "DropZone": {
+      "DefaultLabel": "Drop items here"
+    },
     "Error": {
       "NoRecipe": "Recipe not found",
       "NoActor": "No actor selected",
@@ -93,7 +464,11 @@
       "MissingCatalysts": "Missing required catalysts",
       "InvalidRecipe": "Invalid recipe configuration",
       "CraftingFailed": "Crafting failed"
+    },
+    "Labels": {
+      "UnknownComponent": "Unknown Component",
+      "UnknownCatalyst": "Unknown Tool",
+      "UnknownItem": "Unknown Item"
     }
   }
 }
-

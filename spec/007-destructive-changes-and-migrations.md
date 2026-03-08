@@ -57,7 +57,24 @@ If a linked world/compendium item is deleted:
 
 - Keep `linkedRecipeItemUuid` unchanged.
 - Warn in the recipe editor.
-- Runtime matching may still succeed via `core.sourceId` on owned copies.
+- Runtime matching may still succeed via source UUID resolution (`_stats.compendiumSource`, legacy fallback `flags.core.sourceId`) on owned copies.
+
+### Import Recipes into Crafting System
+
+On recipe import:
+
+1. Import is partial by design:
+   - non-conflicting recipes are imported,
+   - conflicting recipes are rejected.
+2. If target system mode is `cauldron`, signature uniqueness collisions are treated as conflicts.
+3. The import operation must emit one aggregated conflict report at completion.
+
+### Cauldron Uniqueness Revalidation
+
+For systems in `cauldron` mode:
+
+1. Signature uniqueness is validated across all recipes in the system.
+2. Any detected collision blocks saves globally until resolved, including saves from unrelated recipe edits.
 
 ## Clean-up Rules
 
@@ -167,6 +184,24 @@ The migration framework supports the canonical-write / legacy-read compatibility
 - Each migration entry in the registry should document which legacy aliases it retires from persisted data.
 - Cross-reference: full alias tables are maintained in `002-data-models.md § Canonical-Write and Legacy-Read Compatibility Policy`.
 
+### Resolution-Model Migration (Pre-Release)
+
+The pre-release migration path removes legacy crafting modes `mapped` and `tiered`.
+
+1. System migration:
+   - `mapped` -> `routed`
+   - `tiered` -> `routed`
+2. Recipe migration:
+   - legacy mapped recipes -> `resultSelection.provider = "ingredientSet"`
+   - legacy tiered recipes -> `resultSelection.provider = "macroOutcome"`
+3. Mode and recipe migration is best-effort with hard cleanup on invalid documents:
+   - recipes that cannot be migrated are deleted,
+   - cascading cleanup is applied immediately (runs, learned flags, UI prefs, and stale references),
+   - migration logs JSON for removed objects to console.
+4. Provider-switch behavior:
+   - when provider is changed, stale provider-specific config from the previous provider is cleared.
+5. Because this is pre-release, legacy-mode compatibility shims are not retained.
+
 ## Testing Requirements
 
 - Unit tests for each destructive operation clean-up path.
@@ -177,4 +212,9 @@ The migration framework supports the canonical-write / legacy-read compatibility
 - Unit tests for GM prompt defaults: `Keep existing data` is pre-selected/default.
 - Unit tests for write-on-change: verify no setting writes occur when data is unchanged.
 - Unit tests for pending migration selection: only migrations newer than `migrationVersion` are selected, ordered by ascending semver.
+- Unit tests for pre-release mode migration (`mapped`/`tiered` -> `routed`) and provider assignment.
+- Unit tests for unmigratable recipe deletion with cascade cleanup and JSON logging output.
+- Unit tests for provider-switch stale-config cleanup.
+- Unit tests for partial import conflict handling and aggregated conflict reporting.
+- Unit tests for cauldron global save blocking when any system collision exists.
 - Integration tests for mode changes, recipe deletion, and startup migration.

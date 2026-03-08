@@ -1,5 +1,4 @@
 import { confirmDialog, renderDialog } from './foundryCompat.js';
-import { getTemplatePath } from './templatePaths.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { getFabricateFlag } from '../config/flags.js';
 
@@ -133,7 +132,7 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
   static get PARTS() {
     return {
       recipes: {
-        template: getTemplatePath('crafting-app.hbs')
+        template: 'modules/fabricate/templates/crafting-app.hbs'
       }
     };
   }
@@ -368,6 +367,7 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
       ? runManager.getActiveRuns(this.craftingActor)
       : [];
     const activeRuns = activeRunsRaw
+      .filter(run => ['inProgress', 'waitingTime'].includes(run.status))
       .map(run => this._buildRunDisplay(run, recipeManager, worldTime, 'active'))
       .sort((a, b) => Number(b.startedAt || 0) - Number(a.startedAt || 0));
     const activeRunsByRecipeId = new Map();
@@ -723,19 +723,6 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
     if (result.success) {
       this._notifyInfo(result.message);
 
-      // Create chat message
-      this._createChatMessage({
-        user: game.user.id,
-        speaker: ChatMessage.getSpeaker({ actor: this.craftingActor }),
-        content: `
-          <div class="fabricate-craft-success">
-            <h3><i class="fas fa-hammer"></i> Crafting Success!</h3>
-            <p><strong>${recipe.name}</strong> has been crafted.</p>
-            <p>Results added to ${this.craftingActor.name}'s inventory.</p>
-          </div>
-        `
-      });
-
       // Track this craft in recently crafted
       await this._trackRecentCraft(recipeId);
 
@@ -1075,7 +1062,9 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
   }
 
   /**
-   * Static method to show the crafting app
+   * Static method to show the crafting app.
+   * Callers outside this class should use getCraftingAppClass().show() from appFactory.js
+   * to get the correct class for the active UI engine.
    */
   static async show() {
     const app = new CraftingApp();

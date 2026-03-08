@@ -1,0 +1,1214 @@
+/**
+ * Tests for editorStore factory (T-140)
+ * Uses node:test + node:assert/strict
+ */
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { get } from 'svelte/store';
+
+// ---------------------------------------------------------------------------
+// Mock helpers
+// ---------------------------------------------------------------------------
+
+let idCounter = 0;
+
+function mockServices(overrides = {}) {
+  return {
+    randomID: () => `id-${++idCounter}`,
+    getSystem: () => null,
+    getItems: () => [],
+    saveRecipe: async () => {},
+    onClose: () => {},
+    notify: () => {},
+    ...overrides
+  };
+}
+
+function complexRecipeServices(overrides = {}) {
+  return mockServices({
+    getSystem: () => ({
+      advancedOptionsEnabled: true,
+      features: { complexRecipes: true }
+    }),
+    ...overrides
+  });
+}
+
+function multiStepServices(overrides = {}) {
+  return mockServices({
+    getSystem: () => ({
+      advancedOptionsEnabled: true,
+      features: { complexRecipes: true, multiStepRecipes: true }
+    }),
+    ...overrides
+  });
+}
+
+function makeRecipe(overrides = {}) {
+  const base = {
+    id: overrides.id || `recipe-${++idCounter}`,
+    name: overrides.name || 'Test Recipe',
+    description: overrides.description || '',
+    img: overrides.img || 'icons/svg/item-bag.svg',
+    category: overrides.category || 'general',
+    craftingSystemId: overrides.craftingSystemId || 'sys1',
+    enabled: overrides.enabled !== undefined ? overrides.enabled : true,
+    locked: overrides.locked || false,
+    linkedRecipeItemUuid: overrides.linkedRecipeItemUuid || '',
+    visibility: overrides.visibility || { restricted: false, allowedUserIds: [] },
+    isVariable: overrides.isVariable || false,
+    transferEffects: overrides.transferEffects || false,
+    outcomeRouting: overrides.outcomeRouting || {},
+    ingredientSets: overrides.ingredientSets || [],
+    resultGroups: overrides.resultGroups || [],
+    results: overrides.results || [],
+    steps: overrides.steps || [],
+    metadata: overrides.metadata || undefined,
+    ...overrides
+  };
+  base.toJSON = () => ({ ...base });
+  return base;
+}
+
+// ---------------------------------------------------------------------------
+// Import the store factory
+// ---------------------------------------------------------------------------
+
+const { createEditorStore } = await import('../../src/ui/svelte/stores/editorStore.js');
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe('createEditorStore', () => {
+
+  // -------------------------------------------------------------------------
+  // 1. Draft initialization
+  // -------------------------------------------------------------------------
+
+  describe('draft initialization', () => {
+    it('new recipe draft has empty name and defaults', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      const d = get(store.draft);
+      assert.equal(d.name, '');
+      assert.equal(d.description, '');
+      assert.equal(d.category, 'general');
+      assert.equal(d.enabled, true);
+      assert.equal(d.locked, false);
+    });
+
+    it('new recipe draft has null id', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      const d = get(store.draft);
+      assert.equal(d.id, null);
+    });
+
+    it('new recipe draft is assigned the craftingSystemId from options', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys-abc' });
+      const d = get(store.draft);
+      assert.equal(d.craftingSystemId, 'sys-abc');
+    });
+
+    it('new recipe draft has one default ingredient set', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      const d = get(store.draft);
+      assert.ok(Array.isArray(d.ingredientSets));
+      assert.equal(d.ingredientSets.length, 1);
+    });
+
+    it('new recipe draft ingredient set has one default ingredient group', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      const d = get(store.draft);
+      const groups = d.ingredientSets[0].ingredientGroups;
+      assert.ok(Array.isArray(groups));
+      assert.equal(groups.length, 1);
+    });
+
+    it('new recipe draft has one default result group', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      const d = get(store.draft);
+      assert.ok(Array.isArray(d.results));
+      assert.equal(d.results.length, 1);
+    });
+
+    it('new recipe draft result group has one default result row', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      const d = get(store.draft);
+      const rows = d.results[0].results;
+      assert.ok(Array.isArray(rows));
+      assert.equal(rows.length, 1);
+    });
+
+    it('existing recipe populates draft fields', () => {
+      const svc = mockServices();
+      const recipe = makeRecipe({ name: 'My Potion', description: 'Heals 10hp', category: 'potions' });
+      const store = createEditorStore(svc, { recipe });
+      const d = get(store.draft);
+      assert.equal(d.name, 'My Potion');
+      assert.equal(d.description, 'Heals 10hp');
+      assert.equal(d.category, 'potions');
+    });
+
+    it('existing recipe preserves id', () => {
+      const svc = mockServices();
+      const recipe = makeRecipe({ id: 'recipe-123' });
+      const store = createEditorStore(svc, { recipe });
+      const d = get(store.draft);
+      assert.equal(d.id, 'recipe-123');
+    });
+
+    it('existing recipe preserves craftingSystemId', () => {
+      const svc = mockServices();
+      const recipe = makeRecipe({ craftingSystemId: 'sys-xyz' });
+      const store = createEditorStore(svc, { recipe });
+      const d = get(store.draft);
+      assert.equal(d.craftingSystemId, 'sys-xyz');
+    });
+
+    it('existing recipe preserves enabled and locked flags', () => {
+      const svc = mockServices();
+      const recipe = makeRecipe({ enabled: false, locked: true });
+      const store = createEditorStore(svc, { recipe });
+      const d = get(store.draft);
+      assert.equal(d.enabled, false);
+      assert.equal(d.locked, true);
+    });
+
+    it('existing recipe preserves linkedRecipeItemUuid', () => {
+      const svc = mockServices();
+      const recipe = makeRecipe({ linkedRecipeItemUuid: 'uuid-abc-123' });
+      const store = createEditorStore(svc, { recipe });
+      const d = get(store.draft);
+      assert.equal(d.linkedRecipeItemUuid, 'uuid-abc-123');
+    });
+
+    it('existing recipe preserves visibility settings', () => {
+      const svc = mockServices();
+      const recipe = makeRecipe({
+        visibility: { restricted: true, allowedUserIds: ['user1', 'user2'] }
+      });
+      const store = createEditorStore(svc, { recipe });
+      const d = get(store.draft);
+      assert.equal(d.visibility.restricted, true);
+      assert.deepEqual(d.visibility.allowedUserIds, ['user1', 'user2']);
+    });
+
+    it('existing recipe with toJSON method uses toJSON output', () => {
+      const svc = mockServices();
+      const recipe = {
+        toJSON: () => ({ id: 'from-json', name: 'From JSON', craftingSystemId: 'sys1' })
+      };
+      const store = createEditorStore(svc, { recipe });
+      const d = get(store.draft);
+      assert.equal(d.id, 'from-json');
+      assert.equal(d.name, 'From JSON');
+    });
+
+    it('options.craftingSystemId takes precedence over recipe.craftingSystemId when no recipe', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys-option' });
+      const d = get(store.draft);
+      assert.equal(d.craftingSystemId, 'sys-option');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 2. setField
+  // -------------------------------------------------------------------------
+
+  describe('setField', () => {
+    it('setField updates name', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setField('name', 'Elixir of Health');
+      assert.equal(get(store.draft).name, 'Elixir of Health');
+    });
+
+    it('setField updates description', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setField('description', 'A powerful elixir');
+      assert.equal(get(store.draft).description, 'A powerful elixir');
+    });
+
+    it('setField updates category', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setField('category', 'alchemy');
+      assert.equal(get(store.draft).category, 'alchemy');
+    });
+
+    it('setField updates enabled', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setField('enabled', false);
+      assert.equal(get(store.draft).enabled, false);
+    });
+
+    it('setField updates locked', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setField('locked', true);
+      assert.equal(get(store.draft).locked, true);
+    });
+
+    it('setField updates img', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setField('img', 'icons/svg/potion.svg');
+      assert.equal(get(store.draft).img, 'icons/svg/potion.svg');
+    });
+
+    it('setField updates isVariable', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setField('isVariable', true);
+      assert.equal(get(store.draft).isVariable, true);
+    });
+
+    it('setField updates transferEffects', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setField('transferEffects', true);
+      assert.equal(get(store.draft).transferEffects, true);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 3. Step navigation
+  // -------------------------------------------------------------------------
+
+  describe('step navigation', () => {
+    it('addStep appends a new step to draft.steps', () => {
+      const svc = multiStepServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.addStep();
+      store.addStep();
+      const d = get(store.draft);
+      assert.ok(Array.isArray(d.steps));
+      assert.ok(d.steps.length >= 2);
+    });
+
+    it('addStep moves activeStepIndex to the new step', () => {
+      const svc = multiStepServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.addStep();
+      store.addStep();
+      const idx = get(store.activeStepIndex);
+      const d = get(store.draft);
+      assert.equal(idx, d.steps.length - 1);
+    });
+
+    it('nextStep advances activeStepIndex', () => {
+      const svc = multiStepServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.addStep();
+      store.addStep();
+      store.activeStepIndex.set(0);
+      store.nextStep();
+      assert.ok(get(store.activeStepIndex) > 0);
+    });
+
+    it('nextStep wraps around to first step from last', () => {
+      const svc = multiStepServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.addStep();
+      store.addStep();
+      const d = get(store.draft);
+      store.activeStepIndex.set(d.steps.length - 1);
+      store.nextStep();
+      assert.equal(get(store.activeStepIndex), 0);
+    });
+
+    it('prevStep wraps around to last step from first', () => {
+      const svc = multiStepServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.addStep();
+      store.addStep();
+      store.activeStepIndex.set(0);
+      store.prevStep();
+      const d = get(store.draft);
+      assert.equal(get(store.activeStepIndex), d.steps.length - 1);
+    });
+
+    it('prevStep moves to previous step', () => {
+      const svc = multiStepServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.addStep();
+      store.addStep();
+      store.activeStepIndex.set(2);
+      store.prevStep();
+      assert.equal(get(store.activeStepIndex), 1);
+    });
+
+    it('removeStep removes the current step', () => {
+      const svc = multiStepServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.addStep();
+      store.addStep();
+      const beforeCount = get(store.draft).steps.length;
+      store.activeStepIndex.set(0);
+      store.removeStep();
+      assert.equal(get(store.draft).steps.length, beforeCount - 1);
+    });
+
+    it('removeStep does not remove last remaining step', () => {
+      const svc = multiStepServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      // Only 1 step after initialization (auto-created on first access)
+      store.addStep();
+      const d = get(store.draft);
+      // Remove all but one
+      while (d.steps.length > 1) {
+        store.activeStepIndex.set(0);
+        store.removeStep();
+      }
+      const beforeCount = get(store.draft).steps.length;
+      store.removeStep();
+      assert.equal(get(store.draft).steps.length, beforeCount);
+    });
+
+    it('prevStep does nothing when multiStepRecipes is disabled', () => {
+      const svc = mockServices(); // no multiStepRecipes
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.activeStepIndex.set(0);
+      store.prevStep();
+      assert.equal(get(store.activeStepIndex), 0);
+    });
+
+    it('nextStep does nothing when multiStepRecipes is disabled', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.activeStepIndex.set(0);
+      store.nextStep();
+      assert.equal(get(store.activeStepIndex), 0);
+    });
+
+    it('addStep does nothing when multiStepRecipes is disabled', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.addStep();
+      assert.equal(get(store.draft).steps.length, 0);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 4. Ingredient set CRUD
+  // -------------------------------------------------------------------------
+
+  describe('ingredient set CRUD', () => {
+    it('addIngredientSet adds a new ingredient set when complexRecipes is enabled', () => {
+      const svc = complexRecipeServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      const before = get(store.draft).ingredientSets.length;
+      store.addIngredientSet();
+      assert.equal(get(store.draft).ingredientSets.length, before + 1);
+    });
+
+    it('addIngredientSet does nothing when complexRecipes is disabled', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      const before = get(store.draft).ingredientSets.length;
+      store.addIngredientSet();
+      assert.equal(get(store.draft).ingredientSets.length, before);
+    });
+
+    it('removeIngredientSet removes set at given index', () => {
+      const svc = complexRecipeServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.addIngredientSet();
+      const before = get(store.draft).ingredientSets.length;
+      store.removeIngredientSet(0);
+      assert.equal(get(store.draft).ingredientSets.length, before - 1);
+    });
+
+    it('removeIngredientSet does not remove last ingredient set', () => {
+      const svc = complexRecipeServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      // ensure only one set
+      const d = get(store.draft);
+      assert.equal(d.ingredientSets.length, 1);
+      store.removeIngredientSet(0);
+      assert.equal(get(store.draft).ingredientSets.length, 1);
+    });
+
+    it('removeIngredientSet does nothing when complexRecipes is disabled', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      const before = get(store.draft).ingredientSets.length;
+      store.removeIngredientSet(0);
+      assert.equal(get(store.draft).ingredientSets.length, before);
+    });
+
+    it('moveIngredientSetUp swaps set with the one above', () => {
+      const svc = complexRecipeServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.addIngredientSet();
+      const sets = get(store.draft).ingredientSets;
+      const firstId = sets[0].id;
+      const secondId = sets[1].id;
+      store.moveIngredientSetUp(1);
+      const after = get(store.draft).ingredientSets;
+      assert.equal(after[0].id, secondId);
+      assert.equal(after[1].id, firstId);
+    });
+
+    it('moveIngredientSetDown swaps set with the one below', () => {
+      const svc = complexRecipeServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.addIngredientSet();
+      const sets = get(store.draft).ingredientSets;
+      const firstId = sets[0].id;
+      const secondId = sets[1].id;
+      store.moveIngredientSetDown(0);
+      const after = get(store.draft).ingredientSets;
+      assert.equal(after[0].id, secondId);
+      assert.equal(after[1].id, firstId);
+    });
+
+    it('moveIngredientSetUp does nothing for the first set', () => {
+      const svc = complexRecipeServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.addIngredientSet();
+      const before = get(store.draft).ingredientSets.map(s => s.id);
+      store.moveIngredientSetUp(0);
+      const after = get(store.draft).ingredientSets.map(s => s.id);
+      assert.deepEqual(after, before);
+    });
+
+    it('moveIngredientSetDown does nothing for the last set', () => {
+      const svc = complexRecipeServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.addIngredientSet();
+      const d = get(store.draft);
+      const lastIdx = d.ingredientSets.length - 1;
+      const before = d.ingredientSets.map(s => s.id);
+      store.moveIngredientSetDown(lastIdx);
+      const after = get(store.draft).ingredientSets.map(s => s.id);
+      assert.deepEqual(after, before);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 5. Ingredient group CRUD
+  // -------------------------------------------------------------------------
+
+  describe('ingredient group CRUD', () => {
+    it('addIngredientGroup adds a group to the specified set', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      const before = get(store.draft).ingredientSets[0].ingredientGroups.length;
+      store.addIngredientGroup(0);
+      assert.equal(get(store.draft).ingredientSets[0].ingredientGroups.length, before + 1);
+    });
+
+    it('removeIngredientGroup removes a group from the specified set', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.addIngredientGroup(0);
+      const before = get(store.draft).ingredientSets[0].ingredientGroups.length;
+      store.removeIngredientGroup(0, 0);
+      assert.equal(get(store.draft).ingredientSets[0].ingredientGroups.length, before - 1);
+    });
+
+    it('removeIngredientGroup preserves minimum 1 group per set', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      assert.equal(get(store.draft).ingredientSets[0].ingredientGroups.length, 1);
+      store.removeIngredientGroup(0, 0);
+      assert.equal(get(store.draft).ingredientSets[0].ingredientGroups.length, 1);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 6. Ingredient option CRUD
+  // -------------------------------------------------------------------------
+
+  describe('ingredient option CRUD', () => {
+    it('addIngredientOption adds a new option to the group', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      const before = get(store.draft).ingredientSets[0].ingredientGroups[0].options.length;
+      store.addIngredientOption(0, 0);
+      assert.equal(get(store.draft).ingredientSets[0].ingredientGroups[0].options.length, before + 1);
+    });
+
+    it('removeIngredientOption removes an option from the group', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.addIngredientOption(0, 0);
+      const before = get(store.draft).ingredientSets[0].ingredientGroups[0].options.length;
+      store.removeIngredientOption(0, 0, 0);
+      assert.equal(get(store.draft).ingredientSets[0].ingredientGroups[0].options.length, before - 1);
+    });
+
+    it('removeIngredientOption preserves minimum 1 option per group', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      assert.equal(get(store.draft).ingredientSets[0].ingredientGroups[0].options.length, 1);
+      store.removeIngredientOption(0, 0, 0);
+      assert.equal(get(store.draft).ingredientSets[0].ingredientGroups[0].options.length, 1);
+    });
+
+    it('clearIngredientComponent clears the componentId on an option', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.assignIngredientItem(0, 0, 0, 'item-abc');
+      assert.equal(get(store.draft).ingredientSets[0].ingredientGroups[0].options[0].componentId, 'item-abc');
+      store.clearIngredientComponent(0, 0, 0);
+      assert.equal(get(store.draft).ingredientSets[0].ingredientGroups[0].options[0].componentId, null);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 7. Catalyst CRUD
+  // -------------------------------------------------------------------------
+
+  describe('catalyst CRUD', () => {
+    it('addCatalystRow adds a new catalyst entry to the set', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      const before = get(store.draft).ingredientSets[0].catalysts.length;
+      store.addCatalystRow(0);
+      assert.equal(get(store.draft).ingredientSets[0].catalysts.length, before + 1);
+    });
+
+    it('new catalyst row has null componentId', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.addCatalystRow(0);
+      const cat = get(store.draft).ingredientSets[0].catalysts[0];
+      assert.equal(cat.componentId, null);
+    });
+
+    it('removeCatalystRow removes a catalyst from the set', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.addCatalystRow(0);
+      store.addCatalystRow(0);
+      const before = get(store.draft).ingredientSets[0].catalysts.length;
+      store.removeCatalystRow(0, 0);
+      assert.equal(get(store.draft).ingredientSets[0].catalysts.length, before - 1);
+    });
+
+    it('clearCatalystComponent clears componentId on a catalyst', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.addCatalystRow(0);
+      store.assignCatalystItem(0, 0, 'item-catalyst-1');
+      assert.equal(get(store.draft).ingredientSets[0].catalysts[0].componentId, 'item-catalyst-1');
+      store.clearCatalystComponent(0, 0);
+      assert.equal(get(store.draft).ingredientSets[0].catalysts[0].componentId, null);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 8. Result group CRUD
+  // -------------------------------------------------------------------------
+
+  describe('result group CRUD', () => {
+    it('addResultGroup adds a new result group when complexRecipes is enabled', () => {
+      const svc = complexRecipeServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      const before = get(store.draft).results.length;
+      store.addResultGroup();
+      assert.equal(get(store.draft).results.length, before + 1);
+    });
+
+    it('addResultGroup does nothing when complexRecipes is disabled', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      const before = get(store.draft).results.length;
+      store.addResultGroup();
+      assert.equal(get(store.draft).results.length, before);
+    });
+
+    it('removeResultGroup removes a result group', () => {
+      const svc = complexRecipeServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.addResultGroup();
+      const before = get(store.draft).results.length;
+      store.removeResultGroup(0);
+      assert.equal(get(store.draft).results.length, before - 1);
+    });
+
+    it('removeResultGroup preserves minimum 1 result group', () => {
+      const svc = complexRecipeServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      assert.equal(get(store.draft).results.length, 1);
+      store.removeResultGroup(0);
+      assert.equal(get(store.draft).results.length, 1);
+    });
+
+    it('removeResultGroup does nothing when complexRecipes is disabled', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      const before = get(store.draft).results.length;
+      store.removeResultGroup(0);
+      assert.equal(get(store.draft).results.length, before);
+    });
+
+    it('moveResultGroupUp swaps result group with the one above', () => {
+      const svc = complexRecipeServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.addResultGroup();
+      const groups = get(store.draft).results;
+      const firstId = groups[0].id;
+      const secondId = groups[1].id;
+      store.moveResultGroupUp(1);
+      const after = get(store.draft).results;
+      assert.equal(after[0].id, secondId);
+      assert.equal(after[1].id, firstId);
+    });
+
+    it('moveResultGroupDown swaps result group with the one below', () => {
+      const svc = complexRecipeServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.addResultGroup();
+      const groups = get(store.draft).results;
+      const firstId = groups[0].id;
+      const secondId = groups[1].id;
+      store.moveResultGroupDown(0);
+      const after = get(store.draft).results;
+      assert.equal(after[0].id, secondId);
+      assert.equal(after[1].id, firstId);
+    });
+
+    it('moveResultGroupUp does nothing for the first result group', () => {
+      const svc = complexRecipeServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.addResultGroup();
+      const before = get(store.draft).results.map(g => g.id);
+      store.moveResultGroupUp(0);
+      const after = get(store.draft).results.map(g => g.id);
+      assert.deepEqual(after, before);
+    });
+
+    it('moveResultGroupDown does nothing for the last result group', () => {
+      const svc = complexRecipeServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.addResultGroup();
+      const d = get(store.draft);
+      const lastIdx = d.results.length - 1;
+      const before = d.results.map(g => g.id);
+      store.moveResultGroupDown(lastIdx);
+      const after = get(store.draft).results.map(g => g.id);
+      assert.deepEqual(after, before);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 9. Result row CRUD
+  // -------------------------------------------------------------------------
+
+  describe('result row CRUD', () => {
+    it('addResultRow adds a new result row to the group', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      const before = get(store.draft).results[0].results.length;
+      store.addResultRow(0);
+      assert.equal(get(store.draft).results[0].results.length, before + 1);
+    });
+
+    it('new result row has null componentId', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.addResultRow(0);
+      const row = get(store.draft).results[0].results[1];
+      assert.equal(row.componentId, null);
+    });
+
+    it('removeResultRow removes a result row from the group', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.addResultRow(0);
+      const before = get(store.draft).results[0].results.length;
+      store.removeResultRow(0, 0);
+      assert.equal(get(store.draft).results[0].results.length, before - 1);
+    });
+
+    it('removeResultRow preserves minimum 1 result row per group', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      assert.equal(get(store.draft).results[0].results.length, 1);
+      store.removeResultRow(0, 0);
+      assert.equal(get(store.draft).results[0].results.length, 1);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 10. Item assignment
+  // -------------------------------------------------------------------------
+
+  describe('item assignment', () => {
+    it('assignIngredientItem sets componentId on the target option', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.assignIngredientItem(0, 0, 0, 'item-sword');
+      const option = get(store.draft).ingredientSets[0].ingredientGroups[0].options[0];
+      assert.equal(option.componentId, 'item-sword');
+    });
+
+    it('assignIngredientItem sets matchType to component', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.assignIngredientItem(0, 0, 0, 'item-sword');
+      const option = get(store.draft).ingredientSets[0].ingredientGroups[0].options[0];
+      assert.equal(option.matchType, 'component');
+    });
+
+    it('assignCatalystItem sets componentId on the target catalyst', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.addCatalystRow(0);
+      store.assignCatalystItem(0, 0, 'item-mortar');
+      const cat = get(store.draft).ingredientSets[0].catalysts[0];
+      assert.equal(cat.componentId, 'item-mortar');
+    });
+
+    it('assignResultItem sets componentId on the target result row', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.assignResultItem(0, 0, 'item-potion');
+      const row = get(store.draft).results[0].results[0];
+      assert.equal(row.componentId, 'item-potion');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 11. Panel collapse
+  // -------------------------------------------------------------------------
+
+  describe('panel collapse', () => {
+    it('togglePanel adds a panel id to collapsedPanels', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.togglePanel('panel-1');
+      assert.ok(get(store.collapsedPanels).has('panel-1'));
+    });
+
+    it('togglePanel removes a panel id that is already collapsed', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.togglePanel('panel-1');
+      store.togglePanel('panel-1');
+      assert.ok(!get(store.collapsedPanels).has('panel-1'));
+    });
+
+    it('togglePanel tracks multiple panels independently', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.togglePanel('panel-a');
+      store.togglePanel('panel-b');
+      const panels = get(store.collapsedPanels);
+      assert.ok(panels.has('panel-a'));
+      assert.ok(panels.has('panel-b'));
+    });
+
+    it('collapsedPanels starts empty', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      assert.equal(get(store.collapsedPanels).size, 0);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 12. Picker search
+  // -------------------------------------------------------------------------
+
+  describe('picker search', () => {
+    it('setPickerSearch updates pickerSearch store', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setPickerSearch('iron ore');
+      assert.equal(get(store.pickerSearch), 'iron ore');
+    });
+
+    it('setPickerSearch with falsy value resets to empty string', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setPickerSearch('iron ore');
+      store.setPickerSearch(null);
+      assert.equal(get(store.pickerSearch), '');
+    });
+
+    it('pickerItems uses getItems service with craftingSystemId and search term', () => {
+      const calls = [];
+      const svc = mockServices({
+        getItems: (systemId, search) => { calls.push({ systemId, search }); return []; }
+      });
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setPickerSearch('herbs');
+      // Access pickerItems to trigger derived
+      get(store.pickerItems);
+      assert.ok(calls.some(c => c.systemId === 'sys1'));
+    });
+
+    it('pickerSearch initializes to empty string', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      assert.equal(get(store.pickerSearch), '');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 13. Linked recipe item
+  // -------------------------------------------------------------------------
+
+  describe('linked recipe item', () => {
+    it('setLinkedRecipeItemUuid sets the linkedRecipeItemUuid on the draft', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setLinkedRecipeItemUuid('uuid-linked-123');
+      assert.equal(get(store.draft).linkedRecipeItemUuid, 'uuid-linked-123');
+    });
+
+    it('setLinkedRecipeItemUuid with falsy value sets empty string', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setLinkedRecipeItemUuid('uuid-linked-123');
+      store.setLinkedRecipeItemUuid(null);
+      assert.equal(get(store.draft).linkedRecipeItemUuid, '');
+    });
+
+    it('clearLinkedRecipeItem clears the linkedRecipeItemUuid', () => {
+      const svc = mockServices();
+      const recipe = makeRecipe({ linkedRecipeItemUuid: 'uuid-linked-abc' });
+      const store = createEditorStore(svc, { recipe });
+      store.clearLinkedRecipeItem();
+      assert.equal(get(store.draft).linkedRecipeItemUuid, '');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 14. Validation
+  // -------------------------------------------------------------------------
+
+  describe('validation', () => {
+    it('validationErrors includes error when name is empty', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      const errors = get(store.validationErrors);
+      assert.ok(errors.some(e => e.message.toLowerCase().includes('name')));
+    });
+
+    it('validationErrors is empty when name is present and no items assigned', () => {
+      // Note: empty groups are only validated when they have no content
+      // but the validation fires — test with name set to see name error gone
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setField('name', 'Valid Recipe');
+      const errors = get(store.validationErrors);
+      const nameErrors = errors.filter(e => e.message.toLowerCase().includes('name'));
+      assert.equal(nameErrors.length, 0);
+    });
+
+    it('validationErrors includes error when linkedRecipeItemUuid is required but missing', () => {
+      const svc = mockServices({
+        getSystem: () => ({
+          advancedOptionsEnabled: true,
+          features: {},
+          recipeVisibility: { listMode: 'knowledge', knowledge: { mode: 'itemOrLearned' } }
+        })
+      });
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setField('name', 'Test Recipe');
+      const errors = get(store.validationErrors);
+      assert.ok(errors.some(e => e.message.toLowerCase().includes('linked recipe item')));
+    });
+
+    it('validationErrors does not require linkedRecipeItemUuid for global visibility', () => {
+      const svc = mockServices({
+        getSystem: () => ({
+          advancedOptionsEnabled: true,
+          features: {},
+          recipeVisibility: { listMode: 'global' }
+        })
+      });
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setField('name', 'Test Recipe');
+      const errors = get(store.validationErrors);
+      const linkedErrors = errors.filter(e => e.message.toLowerCase().includes('linked'));
+      assert.equal(linkedErrors.length, 0);
+    });
+
+    it('validationErrors includes error for empty ingredient group', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setField('name', 'Test Recipe');
+      const errors = get(store.validationErrors);
+      assert.ok(errors.some(e => e.message.toLowerCase().includes('ingredient group')));
+    });
+
+    it('validationErrors includes error for empty result group', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setField('name', 'Test Recipe');
+      const errors = get(store.validationErrors);
+      assert.ok(errors.some(e => e.message.toLowerCase().includes('result group')));
+    });
+
+    it('validationErrors is empty when recipe has name, ingredient assigned, and result assigned', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setField('name', 'Complete Recipe');
+      store.assignIngredientItem(0, 0, 0, 'item-ingredient');
+      store.assignResultItem(0, 0, 'item-result');
+      const errors = get(store.validationErrors);
+      assert.equal(errors.length, 0);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 15. Save
+  // -------------------------------------------------------------------------
+
+  describe('saveRecipe', () => {
+    it('saveRecipe calls services.saveRecipe with payload when valid', async () => {
+      let savedPayload = null;
+      const svc = mockServices({
+        saveRecipe: async (payload) => { savedPayload = payload; }
+      });
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setField('name', 'Valid Recipe');
+      store.assignIngredientItem(0, 0, 0, 'item-ingredient');
+      store.assignResultItem(0, 0, 'item-result');
+      const result = await store.saveRecipe();
+      assert.equal(result.success, true);
+      assert.ok(savedPayload !== null);
+      assert.equal(savedPayload.name, 'Valid Recipe');
+    });
+
+    it('saveRecipe passes recipe id as second argument for existing recipe', async () => {
+      let savedId = undefined;
+      const svc = mockServices({
+        saveRecipe: async (payload, id) => { savedId = id; }
+      });
+      const recipe = makeRecipe({ id: 'existing-id', name: 'Existing' });
+      const store = createEditorStore(svc, { recipe });
+      store.assignIngredientItem(0, 0, 0, 'item-ingredient');
+      store.assignResultItem(0, 0, 'item-result');
+      await store.saveRecipe();
+      assert.equal(savedId, 'existing-id');
+    });
+
+    it('saveRecipe returns errors when validation fails', async () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      // name is empty — validation will fail
+      const result = await store.saveRecipe();
+      assert.equal(result.success, false);
+      assert.ok(Array.isArray(result.errors));
+      assert.ok(result.errors.length > 0);
+    });
+
+    it('saveRecipe does not call services.saveRecipe when validation fails', async () => {
+      let saveCallCount = 0;
+      const svc = mockServices({
+        saveRecipe: async () => { saveCallCount++; }
+      });
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      await store.saveRecipe();
+      assert.equal(saveCallCount, 0);
+    });
+
+    it('saveRecipe calls notify with error message when validation fails', async () => {
+      const notifyCalls = [];
+      const svc = mockServices({
+        notify: (...args) => { notifyCalls.push(args); }
+      });
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      await store.saveRecipe();
+      assert.ok(notifyCalls.some(c => c[0] === 'error'));
+    });
+
+    it('saveRecipe returns failure when services.saveRecipe throws', async () => {
+      const svc = mockServices({
+        saveRecipe: async () => { throw new Error('Network error'); }
+      });
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setField('name', 'Valid Recipe');
+      store.assignIngredientItem(0, 0, 0, 'item-ingredient');
+      store.assignResultItem(0, 0, 'item-result');
+      const result = await store.saveRecipe();
+      assert.equal(result.success, false);
+      assert.ok(result.errors[0].message.includes('Network error'));
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 16. Cancel
+  // -------------------------------------------------------------------------
+
+  describe('cancel', () => {
+    it('cancel calls services.onClose', () => {
+      let called = false;
+      const svc = mockServices({ onClose: () => { called = true; } });
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.cancel();
+      assert.ok(called);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 17. Feature state derived store
+  // -------------------------------------------------------------------------
+
+  describe('featureState derived store', () => {
+    it('featureState.showComplexRecipes is false when system has no features', () => {
+      const svc = mockServices({ getSystem: () => null });
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      assert.equal(get(store.featureState).showComplexRecipes, false);
+    });
+
+    it('featureState.showComplexRecipes is true when system has complexRecipes feature', () => {
+      const svc = complexRecipeServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      assert.equal(get(store.featureState).showComplexRecipes, true);
+    });
+
+    it('featureState.showMultiStepRecipes is true when system has multiStepRecipes feature', () => {
+      const svc = multiStepServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      assert.equal(get(store.featureState).showMultiStepRecipes, true);
+    });
+
+    it('featureState.showMultiStepRecipes is false without the feature', () => {
+      const svc = complexRecipeServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      assert.equal(get(store.featureState).showMultiStepRecipes, false);
+    });
+
+    it('featureState.showCategories is true when recipeCategories feature is enabled', () => {
+      const svc = mockServices({
+        getSystem: () => ({
+          advancedOptionsEnabled: true,
+          features: { recipeCategories: true }
+        })
+      });
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      assert.equal(get(store.featureState).showCategories, true);
+    });
+
+    it('featureState.showCategories is false when advancedOptionsEnabled is false', () => {
+      const svc = mockServices({
+        getSystem: () => ({
+          advancedOptionsEnabled: false,
+          features: { recipeCategories: true }
+        })
+      });
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      assert.equal(get(store.featureState).showCategories, false);
+    });
+
+    it('featureState.requiresLinkedRecipeItem is true when listMode is knowledge and mode is itemOrLearned', () => {
+      const svc = mockServices({
+        getSystem: () => ({
+          advancedOptionsEnabled: true,
+          features: {},
+          recipeVisibility: { listMode: 'knowledge', knowledge: { mode: 'itemOrLearned' } }
+        })
+      });
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      assert.equal(get(store.featureState).requiresLinkedRecipeItem, true);
+    });
+
+    it('featureState.requiresLinkedRecipeItem is false for global listMode', () => {
+      const svc = mockServices({
+        getSystem: () => ({
+          advancedOptionsEnabled: true,
+          features: {},
+          recipeVisibility: { listMode: 'global' }
+        })
+      });
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      assert.equal(get(store.featureState).requiresLinkedRecipeItem, false);
+    });
+
+    it('featureState.showTimeRequirements reflects system time requirement config', () => {
+      const svc = mockServices({
+        getSystem: () => ({
+          advancedOptionsEnabled: true,
+          features: {},
+          requirements: { time: { enabled: true } }
+        })
+      });
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      assert.equal(get(store.featureState).showTimeRequirements, true);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 18. isNewRecipe
+  // -------------------------------------------------------------------------
+
+  describe('isNewRecipe', () => {
+    it('isNewRecipe is true for a new recipe (no id)', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      assert.equal(get(store.isNewRecipe), true);
+    });
+
+    it('isNewRecipe is false for an existing recipe with an id', () => {
+      const svc = mockServices();
+      const recipe = makeRecipe({ id: 'existing-id' });
+      const store = createEditorStore(svc, { recipe });
+      assert.equal(get(store.isNewRecipe), false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 19. Multiple instances — state isolation
+  // -------------------------------------------------------------------------
+
+  describe('multiple instances', () => {
+    it('two stores do not share draft state', () => {
+      const svc1 = mockServices();
+      const svc2 = mockServices();
+      const store1 = createEditorStore(svc1, { craftingSystemId: 'sys1' });
+      const store2 = createEditorStore(svc2, { craftingSystemId: 'sys2' });
+      store1.setField('name', 'Recipe A');
+      store2.setField('name', 'Recipe B');
+      assert.equal(get(store1.draft).name, 'Recipe A');
+      assert.equal(get(store2.draft).name, 'Recipe B');
+    });
+
+    it('two stores do not share collapsedPanels state', () => {
+      const svc1 = mockServices();
+      const svc2 = mockServices();
+      const store1 = createEditorStore(svc1, { craftingSystemId: 'sys1' });
+      const store2 = createEditorStore(svc2, { craftingSystemId: 'sys1' });
+      store1.togglePanel('panel-x');
+      assert.ok(get(store1.collapsedPanels).has('panel-x'));
+      assert.ok(!get(store2.collapsedPanels).has('panel-x'));
+    });
+
+    it('two stores do not share pickerSearch state', () => {
+      const svc1 = mockServices();
+      const svc2 = mockServices();
+      const store1 = createEditorStore(svc1, { craftingSystemId: 'sys1' });
+      const store2 = createEditorStore(svc2, { craftingSystemId: 'sys1' });
+      store1.setPickerSearch('iron');
+      assert.equal(get(store1.pickerSearch), 'iron');
+      assert.equal(get(store2.pickerSearch), '');
+    });
+
+    it('mutations to ingredient sets in one store do not affect the other', () => {
+      const svc1 = complexRecipeServices();
+      const svc2 = complexRecipeServices();
+      const store1 = createEditorStore(svc1, { craftingSystemId: 'sys1' });
+      const store2 = createEditorStore(svc2, { craftingSystemId: 'sys1' });
+      const before2 = get(store2.draft).ingredientSets.length;
+      store1.addIngredientSet();
+      assert.equal(get(store2.draft).ingredientSets.length, before2);
+    });
+  });
+
+});

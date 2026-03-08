@@ -6,13 +6,16 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite build --watch",
-    "test": "node --test tests/*.test.js",
+    "test": "node --test tests/*.test.js tests/stores/*.test.js tests/components/*.test.js tests/actions/*.test.js",
     "docs": "cd docs && bundle exec jekyll serve --livereload",
     "docs:install": "cd docs && bundle install"
   },
   "devDependencies": {
     "vite": "^5.0.0",
-    "@league-of-foundry-developers/foundry-vtt-types": "^12.0.0"
+    "@league-of-foundry-developers/foundry-vtt-types": "^12.0.0",
+    "svelte": "^5.0.0",
+    "@sveltejs/vite-plugin-svelte": "^4.0.0",
+    "happy-dom": "^16.0.0"
   },
   "private": true,
   "keywords": [
@@ -24,4 +27,3 @@
   ],
   "license": "LicenseRef-Fabricate-Community-1.0"
 }
-

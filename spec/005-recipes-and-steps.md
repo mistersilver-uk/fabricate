@@ -16,7 +16,7 @@ This spec does not redefine mode semantics; mode-specific resolution is defined 
 When `features.multiStepRecipes === true` and `recipe.steps.length > 0`, the recipe is an **explicit multi-step recipe**. The following rules apply:
 
 - Recipe-level `ingredientSets` and `resultGroups` MAY be empty arrays or absent entirely.
-- Runtime resolution MUST use the active step's fields: `ingredientSets`, `resultGroups`, `catalysts`, `timeRequirement`, `currencyRequirement`, and `outcomeRouting`.
+- Runtime resolution MUST use the active step's fields: `ingredientSets`, `resultGroups`, `catalysts`, `timeRequirement`, and `currencyRequirement`.
 - Recipe-level fields serve as fallback ONLY for implicit single-step recipes (where `steps` is empty and the recipe-level fields form one implicit step).
 - Step-level fields always take priority. Recipe-level fields are never merged into or combined with step-level fields.
 - Recipe-level `catalysts` defined outside any step are additive: they apply to every step in addition to each step's own catalysts.
@@ -45,7 +45,6 @@ Each step can define:
 - `resultGroups`
 - optional `timeRequirement`
 - optional `currencyRequirement`
-- optional `outcomeRouting` (tiered override)
 
 ## Ingredient and Catalyst Semantics
 
@@ -76,7 +75,6 @@ Each step can define:
 
 1. If checks are enabled, execute the provided crafting check macro.
 2. Resolve result group by active mode rules in `004-resolution-modes.md`.
-3. For tiered mode, use step-level routing if present; otherwise recipe-level routing.
 
 ### Apply Effects
 
@@ -91,6 +89,41 @@ Each step can define:
 - On step success, advance to the next step.
 - When the last step succeeds, mark run complete and clean up run state.
 - On step failure, mark run failed and clean up run state.
+
+## Cauldron Execution Lifecycle
+
+Applies only when `CraftingSystem.resolutionMode === "cauldron"`.
+
+### Preconditions
+
+1. `features.multiStepRecipes` must be `false`.
+2. Candidate recipes must satisfy cauldron signature uniqueness invariants from `002` and `004`.
+
+### Attempt Flow
+
+1. Collect submitted ingredients from actor/component sources.
+2. Resolve a unique matching signature.
+3. If no signature matches:
+   - return user-facing failure message,
+   - consume submitted ingredients,
+   - record the attempt as failed run history.
+4. If signature matches:
+   - resolve the target recipe + ingredient set,
+   - execute provider-specific routing (`ingredientSet`, `macroOutcome`, or `rollTableOutcome`),
+   - if routed output does not resolve to a valid result group, abort with crafting-system misconfiguration error and do not apply player-failure consumption,
+   - if routing returns fail/miss, apply cauldron failure policy (`consumeOnFail`, default true),
+   - on success, consume inputs and create outputs normally.
+5. Learn flow:
+   - recipes are learned only on successful completion,
+   - learning runs only when `cauldron.learnOnCraft === true`.
+6. Visibility flow:
+   - when `learnOnCraft === false`, recipes remain hidden to non-GM users.
+
+### History Recording
+
+1. Completed crafts and failed attempts are recorded.
+2. Failed attempts include no-signature failures and failed checks.
+3. Player history visibility is controlled by `cauldron.showAttemptHistoryToPlayers`.
 
 ## Time and Currency Requirements
 
@@ -261,9 +294,14 @@ When recipe-level `ingredientSets` or `resultGroups` are empty:
   - OR across ingredient sets
   - AND across groups within a set
   - OR within group options
-- Unit tests for tiered step-level routing override.
+- Unit tests for routed provider resolution (`ingredientSet`, `macroOutcome`, `rollTableOutcome`).
 - Unit tests for time/currency gate checks.
 - Integration tests for end-to-end multistep crafting, resume, and completion.
+- Unit tests for cauldron no-signature handling (failure + ingredient consumption + history entry).
+- Unit tests for cauldron routing-mismatch handling (misconfiguration error + no player-failure consumption).
+- Unit tests for cauldron failure consumption defaults and overrides.
+- Unit tests for no-multi-step enforcement in cauldron mode.
+- Integration tests for cauldron learn-on-success visibility behavior.
 - Unit tests for salvage lifecycle (validate, check, resolve, consume, create).
 - Unit tests for salvage resolution modes (simple, tiered, progressive).
 - Unit tests for salvage destructive change handling.

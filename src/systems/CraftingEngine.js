@@ -1591,7 +1591,9 @@ export class CraftingEngine {
 
   /**
    * Find items on actor that match a managed component.
-   * Matches by sourceUuid (item.uuid or flags.core.sourceId) then falls back to name.
+   * Resolves source UUID via getSourceUuid() — checks _stats.compendiumSource first (Foundry v12+),
+   * then falls back to flags.core.sourceId (Foundry v11 and earlier). Falls back to name match
+   * when no sourceUuid is set on the component.
    * @private
    */
   _findComponentItems(actor, component, system) {

@@ -143,6 +143,26 @@ Processes time gates for all actors. Called automatically on `updateWorldTime` h
 
 ## Cleanup
 
+### invalidateCache(actorId)
+
+Evicts the in-memory run cache for one actor, or clears the entire cache when called with no argument.
+
+After a completed run is written to Foundry actor flags there is normally no need to call this method — `_persist()` keeps the cache and flags in sync automatically. Use `invalidateCache` only when external code has written directly to an actor's `fabricate.craftingRuns` flag and you want `CraftingRunManager` to re-read from flags on the next access.
+
+| Parameter | Type | Description |
+|:----------|:-----|:------------|
+| `actorId` | `string \| null` | The actor ID to evict. Omit or pass `null` to clear all cached entries. |
+
+**Returns:** `void`
+
+```javascript
+Hooks.on('fabricate.ready', () => {
+  const runMgr = game.fabricate.getCraftingRunManager();
+  // Force re-read from flags for one actor after an external write
+  runMgr.invalidateCache(actor.id);
+});
+```
+
 ### cleanupInvalidRuns(validRecipeIds, validSystemIds)
 
 Removes run records that reference deleted recipes or systems.

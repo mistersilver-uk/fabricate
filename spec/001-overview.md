@@ -7,7 +7,7 @@ It enables GMs to define crafting systems, curate managed item libraries, and pr
 
 Fabricate supports:
 
-- GM-defined crafting systems and recipes with various resolution modes
+- GM-defined crafting systems and recipes with explicit resolution modes
 - Configurable recipe visibility and knowledge gating
 - Multi-step crafting processes
 - Optional crafting check macros
@@ -57,21 +57,22 @@ Fabricate supports:
 
 A crafting system defines:
 
-- one system-wide resolution mode
+- one system-wide resolution mode (`simple`, `routed`, `progressive`, `cauldron`)
 - optional feature toggles
 - check behaviour and macros
 - failure/success hooks
 - requirement providers (time/currency)
 - recipe visibility mode
+- recipe-level routed result selection providers (`ingredientSet`, `macroOutcome`, `rollTableOutcome`) when mode is `routed` or `cauldron`
 
 Changing resolution mode is destructive and governed by `007-destructive-changes-and-migrations.md`.
 
 ### Resolution Modes
 
 - `simple`
-- `mapped`
-- `tiered`
+- `routed`
 - `progressive`
+- `cauldron`
 
 Mode semantics and validation are defined in `004-resolution-modes.md`.
 
@@ -83,7 +84,7 @@ Execution lifecycle semantics are defined in `005-recipes-and-steps.md`.
 ### Recipe Visibility and Learning
 
 Visibility and craftability are determined by per-system visibility settings and per-recipe settings.
-Item-based knowledge matching is identity-based and supports both direct UUID matches and `flags.core.sourceId` matches.
+Item-based knowledge matching is identity-based and supports direct UUID plus source UUID matching (`_stats.compendiumSource` with legacy `flags.core.sourceId` fallback).
 Behaviour is defined in `006-recipe-visibility.md`.
 
 ## Data Flow

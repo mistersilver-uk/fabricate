@@ -1,6 +1,5 @@
 import { Recipe } from '../models/Recipe.js';
 import { getDragEventData } from './foundryCompat.js';
-import { getTemplatePath } from './templatePaths.js';
 
 /**
  * GM recipe editor with system-item picker grid
@@ -76,7 +75,7 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
   static get PARTS() {
     return {
       editor: {
-        template: getTemplatePath('recipe-editor-v2.hbs')
+        template: 'modules/fabricate/templates/recipe-editor-v2.hbs'
       }
     };
   }
@@ -1901,6 +1900,9 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
     this.close();
   }
 
+  // Callers outside this class should use getRecipeEditorAppClass().show() from appFactory.js
+  // to get the correct class for the active UI engine.
+  // TODO T-150: once the Svelte variant exists, this method must not hardcode new RecipeEditorApp().
   static show(recipe = null, parentApp = null, craftingSystemId = null) {
     const app = new RecipeEditorApp(recipe, { parentApp, craftingSystemId });
     app.render(true);

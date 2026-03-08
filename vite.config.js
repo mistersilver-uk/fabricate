@@ -1,7 +1,9 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
+import { svelte } from '@sveltejs/vite-plugin-svelte';
 
 export default defineConfig({
+  plugins: [svelte({ compilerOptions: { css: 'injected' } })],
   build: {
     outDir: 'dist',
     emptyOutDir: true,

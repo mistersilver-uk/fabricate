@@ -8,15 +8,15 @@ import { Recipe } from './models/Recipe.js';
 import { Ingredient } from './models/Ingredient.js';
 import { IngredientGroup } from './models/IngredientGroup.js';
 import { Catalyst } from './models/Catalyst.js';
-import { CraftingApp } from './ui/CraftingApp.js';
-import { RecipeManagerApp } from './ui/RecipeManagerApp.js';
-import { RecipeEditorApp } from './ui/RecipeEditorApp.js';
-import { getPartialTemplatePath, getTemplatePath } from './ui/templatePaths.js';
+import { getCraftingAppClass, getRecipeManagerAppClass, getRecipeEditorAppClass } from './ui/appFactory.js';
 import { registerFabricateSettings, getSetting, setSetting } from './config/settings.js';
 import { MigrationRunner } from './migration/MigrationRunner.js';
 import { ItemPilesIntegration } from './integrations/ItemPilesIntegration.js';
 import { cleanupStalePreferences } from './config/preferencesCleanup.js';
 import { importStarterPack } from './starter/importStarterPack.js';
+import './ui/SvelteCraftingApp.svelte.js';
+import './ui/SvelteRecipeManagerApp.svelte.js';
+import './ui/SvelteRecipeEditorApp.svelte.js';
 
 /**
  * Fabricate - Universal Crafting System
@@ -184,9 +184,9 @@ Hooks.once('init', async () => {
     Catalyst,
     RecipeManager,
     CraftingEngine,
-    CraftingApp,
-    RecipeManagerApp,
-    RecipeEditorApp,
+    getCraftingAppClass,
+    getRecipeManagerAppClass,
+    getRecipeEditorAppClass,
     CraftingSystemManager,
     CraftingRunManager,
     RecipeVisibilityService,
@@ -195,18 +195,6 @@ Hooks.once('init', async () => {
     importStarterPack
   };
 
-  try {
-    await loadTemplates([
-      getPartialTemplatePath('ingredientRow.hbs'),
-      getPartialTemplatePath('catalystRow.hbs'),
-      getTemplatePath('recipe-editor-v2.hbs')
-    ]);
-  } catch (err) {
-    console.error('Fabricate | Template preload failed', err);
-  }
-
-  Handlebars.registerHelper('eq', (a, b) => a === b);
-  Handlebars.registerHelper('json', (context) => JSON.stringify(context, null, 2));
 });
 
 // Hook into Foundry's ready event
@@ -271,7 +259,7 @@ function addModuleButtonsToItemsDirectory() {
       btn.textContent?.includes('Craft Item')
     );
   if (!craftExists) {
-    const craftButton = createHeaderButton('Craft Item', 'fas fa-hammer', 'craft', () => CraftingApp.show());
+    const craftButton = createHeaderButton('Craft Item', 'fas fa-hammer', 'craft', () => getCraftingAppClass().show());
     actionsContainer.insertBefore(craftButton, actionsContainer.firstChild);
   }
 
@@ -287,7 +275,7 @@ function addModuleButtonsToItemsDirectory() {
         'Manage Crafting Systems',
         'fas fa-book',
         'manage',
-        () => RecipeManagerApp.show()
+        () => getRecipeManagerAppClass().show()
       );
       actionsContainer.insertBefore(managerButton, actionsContainer.firstChild);
     }
@@ -366,17 +354,9 @@ Hooks.on('chatMessage', (chatLog, message, chatData) => {
     // Attempt to craft
     fabricate.craft(actor, recipe).then(result => {
       if (result.success) {
-        ChatMessage.create({
-          user: game.user.id,
-          speaker: ChatMessage.getSpeaker({ actor }),
-          content: `<strong>Crafting Success!</strong><br>${result.message}`
-        });
+        ui.notifications.info(result.message);
       } else {
-        ChatMessage.create({
-          user: game.user.id,
-          speaker: ChatMessage.getSpeaker({ actor }),
-          content: `<strong>Crafting Failed!</strong><br>${result.message}`
-        });
+        ui.notifications.error(result.message);
       }
     }).catch(err => {
       ui.notifications.error(err.message);
@@ -431,7 +411,7 @@ globalThis.fabricate = {
    * Open GM recipe manager
    */
   openRecipeManager: () => {
-    return RecipeManagerApp.show();
+    return getRecipeManagerAppClass().show();
   },
 
   /**
