@@ -643,6 +643,9 @@ describe('createAdminStore', () => {
       await store.addEssence('Fire', 'Burning essence', 'fas fa-fire', null);
       assert.ok(savedEssences !== null);
       assert.ok(savedEssences.some(e => e.name === 'Fire'));
+      const newEssence = savedEssences.find(e => e.name === 'Fire');
+      assert.ok(newEssence.id, 'new essence should have an id');
+      assert.equal(typeof newEssence.id, 'string');
     });
 
     it('addEssence rejects duplicate name', async () => {
@@ -706,6 +709,33 @@ describe('createAdminStore', () => {
       assert.ok(savedEssences !== null);
       assert.ok(!savedEssences.some(e => e.id === 'ess1'));
       assert.ok(savedEssences.some(e => e.id === 'ess2'));
+    });
+    it('addEssence followed by removeEssence round-trips correctly', async () => {
+      let lastSavedEssences = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) sys.essenceDefinitions = [];
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => {
+          if (updates.essenceDefinitions) {
+            lastSavedEssences = updates.essenceDefinitions;
+            const s = origManager.getSystem(id);
+            if (s) s.essenceDefinitions = updates.essenceDefinitions;
+          }
+          await origManager.updateSystem(id, updates);
+        }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.addEssence('Fire', 'Burning', 'fas fa-fire', null);
+      assert.ok(lastSavedEssences !== null);
+      const addedEssence = lastSavedEssences.find(e => e.name === 'Fire');
+      assert.ok(addedEssence, 'essence should exist after add');
+      assert.ok(addedEssence.id, 'essence should have an id');
+      await store.removeEssence(addedEssence.id);
+      assert.ok(!lastSavedEssences.some(e => e.id === addedEssence.id), 'essence should be removed after removeEssence');
     });
   });
 
@@ -1023,6 +1053,42 @@ describe('createAdminStore', () => {
   });
 
   // -------------------------------------------------------------------------
+  // 12b. Teaser config
+  // -------------------------------------------------------------------------
+
+  describe('teaser config', () => {
+    it('saveTeaserConfig persists teaser config via updateSystem', async () => {
+      let updateArgs = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const teaserConfig = { enabled: true, discoveryMode: 'fragments', fragments: [{ id: 'f1', name: 'Shard', progressValue: 50 }] };
+      await store.saveTeaserConfig(teaserConfig);
+      assert.ok(updateArgs !== null);
+      assert.deepStrictEqual(updateArgs.updates.teaserConfig, teaserConfig);
+    });
+
+    it('viewState includes teaserConfig from selected system', async () => {
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.teaserConfig = { enabled: true, discoveryMode: 'threshold', fragments: [] };
+      }
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const vs = get(store.viewState);
+      assert.equal(vs.selectedSystem.teaserConfig.enabled, true);
+      assert.equal(vs.selectedSystem.teaserConfig.discoveryMode, 'threshold');
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // 13. State isolation
   // -------------------------------------------------------------------------
 
@@ -1057,7 +1123,7 @@ describe('createAdminStore', () => {
         'addCategory', 'removeCategory',
         'addTag', 'removeTag',
         'addEssence', 'removeEssence',
-        'saveCraftingCheckConfig', 'saveCurrencyConfig', 'saveVisibilityConfig',
+        'saveCraftingCheckConfig', 'saveCurrencyConfig', 'saveVisibilityConfig', 'saveTeaserConfig',
         'createRecipe', 'deleteRecipe', 'duplicateRecipe', 'toggleRecipeEnabled',
         'importRecipes', 'exportRecipes',
         'deleteComponent',

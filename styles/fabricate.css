@@ -1497,3 +1497,96 @@
   padding: 0.1rem 0.4rem;
   cursor: pointer;
 }
+
+/* =========================================================================
+   Alchemy Submit Panel
+   ========================================================================= */
+
+.fabricate-alchemy-panel {
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  margin: 0.5rem 0;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.alchemy-title {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.alchemy-drop-area {
+  margin-bottom: 0.5rem;
+}
+
+.alchemy-ingredient-list {
+  list-style: none;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.alchemy-ingredient-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.alchemy-ingredient-img {
+  width: 24px;
+  height: 24px;
+  border: none;
+  object-fit: cover;
+}
+
+.alchemy-ingredient-name {
+  flex: 1;
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alchemy-remove-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #999;
+  padding: 2px 4px;
+  font-size: 0.8rem;
+}
+
+.alchemy-remove-btn:hover {
+  color: var(--fabricate-danger, #dc3545);
+}
+
+.alchemy-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.alchemy-submit-btn {
+  flex: 1;
+}
+
+.alchemy-clear-btn {
+  background: none;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
+  cursor: pointer;
+  padding: 4px 8px;
+  color: #999;
+}
+
+.alchemy-clear-btn:hover {
+  color: var(--fabricate-danger, #dc3545);
+  border-color: var(--fabricate-danger, #dc3545);
+}

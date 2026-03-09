@@ -83,7 +83,7 @@
           onExportRecipes={store.exportRecipes}
         />
       {:else if $activeTab === 'rules'}
-        <RulesTab />
+        <RulesTab system={$viewState.selectedSystem} onUpdateTeaserConfig={store.saveTeaserConfig} />
       {:else if $activeTab === 'graph'}
         <RecipeGraphTab
           graphData={$viewState.graphData}

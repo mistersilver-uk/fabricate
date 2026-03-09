@@ -405,9 +405,9 @@ export function createCraftingStore(services) {
   const showOnlyAvailable = writable(true);
   const showFavouritesOnly = writable(false);
 
-  // --- Cauldron state ---
-  const isCauldronMode = writable(false);
-  const cauldronItems = writable([]);
+  // --- Alchemy state ---
+  const isAlchemyMode = writable(false);
+  const alchemyItems = writable([]);
 
   // --- Shopping list state ---
   const shoppingList = writable([]);  // [{ recipeId, quantity }]
@@ -437,12 +437,12 @@ export function createCraftingStore(services) {
       return;
     }
 
-    // Detect cauldron mode from the active crafting system
+    // Detect alchemy mode from the active crafting system
     const craftingSystemManager = services.getCraftingSystemManager?.();
     if (craftingSystemManager) {
       const activeSystems = craftingSystemManager.getSystems?.() || [];
-      const activeSystem = activeSystems[0] || null;
-      isCauldronMode.set(activeSystem?.resolutionMode === 'cauldron');
+      const activeSystem = activeSystems.find(s => s.resolutionMode === 'alchemy') || null;
+      isAlchemyMode.set(!!activeSystem);
     }
 
     const computed = _buildPreparedRecipes(
@@ -699,20 +699,20 @@ export function createCraftingStore(services) {
     await craft(recipeId, { skipConfirm: true, runId: null });
   }
 
-  function addCauldronItem(item) {
+  function addAlchemyItem(item) {
     if (!item) return;
-    cauldronItems.update(items => [...items, item]);
+    alchemyItems.update(items => [...items, item]);
   }
 
-  function removeCauldronItem(index) {
-    cauldronItems.update(items => items.filter((_, i) => i !== index));
+  function removeAlchemyItem(index) {
+    alchemyItems.update(items => items.filter((_, i) => i !== index));
   }
 
-  function clearCauldronItems() {
-    cauldronItems.set([]);
+  function clearAlchemyItems() {
+    alchemyItems.set([]);
   }
 
-  async function submitCauldronAttempt() {
+  async function submitAlchemyAttempt() {
     const craftingEngine = services.getCraftingEngine();
     if (!craftingEngine) {
       services.notify.error('Crafting engine is unavailable. Check module initialization.');
@@ -731,9 +731,9 @@ export function createCraftingStore(services) {
       return;
     }
 
-    const items = get(cauldronItems);
+    const items = get(alchemyItems);
     if (items.length === 0) {
-      services.notify.warn('Add some ingredients to the cauldron first');
+      services.notify.warn('Add some alchemy ingredients first');
       return;
     }
 
@@ -741,7 +741,7 @@ export function createCraftingStore(services) {
     const activeSystems = craftingSystemManager?.getSystems?.() || [];
     const activeSystem = activeSystems[0] || null;
 
-    const result = await craftingEngine.craftCauldron(actor, sources, items, {
+    const result = await craftingEngine.craftAlchemy(actor, sources, items, {
       craftingSystemId: activeSystem?.id
     });
 
@@ -753,11 +753,11 @@ export function createCraftingStore(services) {
       services.notify.error(result.message);
     }
 
-    clearCauldronItems();
+    clearAlchemyItems();
     await refresh();
   }
 
-  function addToShoppingList(recipeId) {
+  async function addToShoppingList(recipeId) {
     shoppingList.update(list => {
       const existing = list.find(e => e.recipeId === recipeId);
       if (existing) {
@@ -768,17 +768,17 @@ export function createCraftingStore(services) {
       return [...list, { recipeId, quantity: 1 }];
     });
     shoppingListExpanded.set(true);
-    refresh();
+    await refresh();
   }
 
-  function removeFromShoppingList(recipeId) {
+  async function removeFromShoppingList(recipeId) {
     shoppingList.update(list => list.filter(e => e.recipeId !== recipeId));
-    refresh();
+    await refresh();
   }
 
-  function setShoppingListQuantity(recipeId, quantity) {
+  async function setShoppingListQuantity(recipeId, quantity) {
     if (quantity <= 0) {
-      removeFromShoppingList(recipeId);
+      await removeFromShoppingList(recipeId);
       return;
     }
     shoppingList.update(list =>
@@ -786,12 +786,12 @@ export function createCraftingStore(services) {
         e.recipeId === recipeId ? { ...e, quantity } : e
       )
     );
-    refresh();
+    await refresh();
   }
 
-  function clearShoppingList() {
+  async function clearShoppingList() {
     shoppingList.set([]);
-    refresh();
+    await refresh();
   }
 
   function toggleShoppingListExpanded() {
@@ -815,9 +815,9 @@ export function createCraftingStore(services) {
     showFavouritesOnly,
     // Computed state
     viewState,
-    // Cauldron state
-    isCauldronMode,
-    cauldronItems,
+    // Alchemy state
+    isAlchemyMode,
+    alchemyItems,
     // Actions
     selectActor,
     toggleSourceActor,
@@ -832,11 +832,11 @@ export function createCraftingStore(services) {
     restartRun,
     refresh,
     destroy,
-    // Cauldron actions
-    addCauldronItem,
-    removeCauldronItem,
-    clearCauldronItems,
-    submitCauldronAttempt,
+    // Alchemy actions
+    addAlchemyItem,
+    removeAlchemyItem,
+    clearAlchemyItems,
+    submitAlchemyAttempt,
     // Shopping list stores
     shoppingList,
     shoppingListExpanded,

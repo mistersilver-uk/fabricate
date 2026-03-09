@@ -1,10 +1,11 @@
 /**
- * Tests for T-099: Cauldron Crafting Resolution Mode
+ * Tests for T-099 / T-189: Alchemy (formerly Cauldron) Crafting Resolution Mode
  * Covers:
- *   - CraftingSystemManager: cauldron resolutionMode acceptance + config normalization
- *   - ResolutionModeService: cauldron validation + result resolution
- *   - RecipeVisibilityService: cauldron visibility rules + learnRecipeOnCraft
- *   - CraftingEngine.craftCauldron: signature matching, no-match, success, misconfiguration
+ *   - CraftingSystemManager: alchemy resolutionMode acceptance + config normalization
+ *   - CraftingSystemManager: legacy 'cauldron' normalizes to 'alchemy' (T-189 regression)
+ *   - ResolutionModeService: alchemy validation + result resolution
+ *   - RecipeVisibilityService: alchemy visibility rules + learnRecipeOnCraft
+ *   - CraftingEngine.craftAlchemy: signature matching, no-match, success, misconfiguration
  */
 
 import test from 'node:test';
@@ -79,11 +80,11 @@ class FakeDocument {
 // Helper builders
 // ---------------------------------------------------------------------------
 
-function buildCauldronSystem(overrides = {}) {
+function buildAlchemySystem(overrides = {}) {
   return {
-    id: 'cauldron-sys',
-    resolutionMode: 'cauldron',
-    cauldron: { learnOnCraft: true, consumeOnFail: true, showAttemptHistoryToPlayers: false },
+    id: 'alchemy-sys',
+    resolutionMode: 'alchemy',
+    alchemy: { learnOnCraft: true, consumeOnFail: true, showAttemptHistoryToPlayers: false },
     recipeVisibility: { listMode: 'global' },
     craftingCheck: { enabled: false, macroUuid: null, outcomes: [] },
     features: { multiStepRecipes: false },
@@ -116,7 +117,7 @@ function buildRecipe(id, ingredientSets, resultGroups = [], overrides = {}) {
   return {
     id,
     name: id,
-    craftingSystemId: 'cauldron-sys',
+    craftingSystemId: 'alchemy-sys',
     enabled: true,
     ingredientSets,
     resultGroups,
@@ -144,53 +145,93 @@ function buildVisibilityService(system, recipes = []) {
 }
 
 // ============================================================================
-// CraftingSystemManager: cauldron normalization
+// CraftingSystemManager: alchemy normalization
 // ============================================================================
 
-test('CraftingSystemManager accepts cauldron as a valid resolutionMode', () => {
+test('CraftingSystemManager accepts alchemy as a valid resolutionMode', () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
-  const system = manager._normalizeSystem({ resolutionMode: 'cauldron' });
-  assert.equal(system.resolutionMode, 'cauldron');
+  const system = manager._normalizeSystem({ resolutionMode: 'alchemy' });
+  assert.equal(system.resolutionMode, 'alchemy');
 });
 
-test('CraftingSystemManager normalizes cauldron config with defaults', () => {
+test('CraftingSystemManager normalizes alchemy config with defaults', () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
-  const system = manager._normalizeSystem({ resolutionMode: 'cauldron', cauldron: {} });
-  assert.ok(system.cauldron, 'cauldron config should be set');
-  assert.equal(system.cauldron.learnOnCraft, false);
-  assert.equal(system.cauldron.consumeOnFail, true);
-  assert.equal(system.cauldron.showAttemptHistoryToPlayers, true);
+  // Pass legacy 'cauldron' key to test the fallback path (system.alchemy ?? system.cauldron)
+  const system = manager._normalizeSystem({ resolutionMode: 'alchemy', cauldron: {} });
+  assert.ok(system.alchemy, 'alchemy config should be set');
+  assert.equal(system.alchemy.learnOnCraft, false);
+  assert.equal(system.alchemy.consumeOnFail, true);
+  assert.equal(system.alchemy.showAttemptHistoryToPlayers, true);
 });
 
-test('CraftingSystemManager respects explicit cauldron config values', () => {
+test('CraftingSystemManager respects explicit alchemy config values', () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
   const system = manager._normalizeSystem({
-    resolutionMode: 'cauldron',
-    cauldron: { learnOnCraft: true, consumeOnFail: false, showAttemptHistoryToPlayers: false }
+    resolutionMode: 'alchemy',
+    alchemy: { learnOnCraft: true, consumeOnFail: false, showAttemptHistoryToPlayers: false }
   });
-  assert.equal(system.cauldron.learnOnCraft, true);
-  assert.equal(system.cauldron.consumeOnFail, false);
-  assert.equal(system.cauldron.showAttemptHistoryToPlayers, false);
+  assert.equal(system.alchemy.learnOnCraft, true);
+  assert.equal(system.alchemy.consumeOnFail, false);
+  assert.equal(system.alchemy.showAttemptHistoryToPlayers, false);
 });
 
-test('CraftingSystemManager sets cauldron to null for non-cauldron modes', () => {
+test('CraftingSystemManager sets alchemy to null for non-alchemy modes', () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
   const system = manager._normalizeSystem({ resolutionMode: 'simple' });
-  assert.equal(system.cauldron, null);
+  assert.equal(system.alchemy, null);
 });
 
-test('CraftingSystemManager defaults unknown resolutionMode to simple (not cauldron)', () => {
+test('CraftingSystemManager defaults unknown resolutionMode to simple (not alchemy)', () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
   const system = manager._normalizeSystem({ resolutionMode: 'unknown-mode' });
   assert.equal(system.resolutionMode, 'simple');
 });
 
 // ============================================================================
-// ResolutionModeService: cauldron validation
+// CraftingSystemManager: T-189 legacy 'cauldron' -> 'alchemy' normalization
 // ============================================================================
 
-test('ResolutionModeService.validateRecipe: cauldron recipe with no ingredient sets is invalid', () => {
-  const system = buildCauldronSystem();
+test('CraftingSystemManager normalizes legacy cauldron resolutionMode to alchemy', () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+  const system = manager._normalizeSystem({ resolutionMode: 'cauldron' });
+  assert.equal(system.resolutionMode, 'alchemy', 'legacy cauldron should be normalized to alchemy');
+});
+
+test('CraftingSystemManager preserves alchemy config when normalizing legacy cauldron to alchemy', () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+  const system = manager._normalizeSystem({
+    resolutionMode: 'cauldron',
+    cauldron: { learnOnCraft: true, consumeOnFail: false, showAttemptHistoryToPlayers: false }
+  });
+  assert.equal(system.resolutionMode, 'alchemy');
+  assert.ok(system.alchemy, 'alchemy config should be carried over');
+  assert.equal(system.alchemy.learnOnCraft, true);
+  assert.equal(system.alchemy.consumeOnFail, false);
+});
+
+test('CraftingSystemManager: loading persisted data with cauldron mode produces alchemy mode', () => {
+  // Regression test: simulates loading a JSON-persisted crafting system that still has
+  // resolutionMode: 'cauldron' from before T-189. On normalization it must become 'alchemy'.
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+  const legacyPersistedData = {
+    id: 'legacy-sys',
+    name: 'Legacy Alchemist System',
+    resolutionMode: 'cauldron',  // old persisted value
+    cauldron: { learnOnCraft: true, consumeOnFail: true, showAttemptHistoryToPlayers: true }
+  };
+  const system = manager._normalizeSystem(legacyPersistedData);
+  assert.equal(system.resolutionMode, 'alchemy',
+    'persisted cauldron value must be mapped to alchemy on load');
+  assert.ok(system.alchemy, 'alchemy sub-config must still be populated');
+  assert.equal(system.alchemy.learnOnCraft, true);
+});
+
+// ============================================================================
+// ResolutionModeService: alchemy validation
+// ============================================================================
+
+test('ResolutionModeService.validateRecipe: alchemy recipe with no ingredient sets is invalid', () => {
+  const system = buildAlchemySystem();
   const service = buildResolutionService(system);
   const recipe = buildRecipe('r1', [], [{ id: 'rg1', name: 'group1', results: [] }], {
     resultSelection: { provider: 'ingredientSet' }
@@ -200,8 +241,8 @@ test('ResolutionModeService.validateRecipe: cauldron recipe with no ingredient s
   assert.ok(result.errors.some(e => e.includes('ingredient set')));
 });
 
-test('ResolutionModeService.validateRecipe: cauldron recipe with no result groups is invalid', () => {
-  const system = buildCauldronSystem();
+test('ResolutionModeService.validateRecipe: alchemy recipe with no result groups is invalid', () => {
+  const system = buildAlchemySystem();
   const service = buildResolutionService(system);
   const recipe = buildRecipe('r1', [buildIngredientSet([buildIngredientGroup('c1')])], [], {
     resultSelection: { provider: 'ingredientSet' }
@@ -211,8 +252,8 @@ test('ResolutionModeService.validateRecipe: cauldron recipe with no result group
   assert.ok(result.errors.some(e => e.includes('result group')));
 });
 
-test('ResolutionModeService.validateRecipe: cauldron recipe with no provider is invalid', () => {
-  const system = buildCauldronSystem();
+test('ResolutionModeService.validateRecipe: alchemy recipe with no provider is invalid', () => {
+  const system = buildAlchemySystem();
   const service = buildResolutionService(system);
   const recipe = buildRecipe(
     'r1',
@@ -224,8 +265,8 @@ test('ResolutionModeService.validateRecipe: cauldron recipe with no provider is 
   assert.ok(result.errors.some(e => e.includes('provider')));
 });
 
-test('ResolutionModeService.validateRecipe: cauldron recipe with invalid provider is invalid', () => {
-  const system = buildCauldronSystem();
+test('ResolutionModeService.validateRecipe: alchemy recipe with invalid provider is invalid', () => {
+  const system = buildAlchemySystem();
   const service = buildResolutionService(system);
   const recipe = buildRecipe(
     'r1',
@@ -238,8 +279,8 @@ test('ResolutionModeService.validateRecipe: cauldron recipe with invalid provide
   assert.ok(result.errors.some(e => e.includes('provider')));
 });
 
-test('ResolutionModeService.validateRecipe: cauldron recipe with rollTableOutcome but no UUID is invalid', () => {
-  const system = buildCauldronSystem();
+test('ResolutionModeService.validateRecipe: alchemy recipe with rollTableOutcome but no UUID is invalid', () => {
+  const system = buildAlchemySystem();
   const service = buildResolutionService(system);
   const recipe = buildRecipe(
     'r1',
@@ -252,8 +293,8 @@ test('ResolutionModeService.validateRecipe: cauldron recipe with rollTableOutcom
   assert.ok(result.errors.some(e => e.includes('UUID')));
 });
 
-test('ResolutionModeService.validateRecipe: valid cauldron recipe with ingredientSet provider passes', () => {
-  const system = buildCauldronSystem();
+test('ResolutionModeService.validateRecipe: valid alchemy recipe with ingredientSet provider passes', () => {
+  const system = buildAlchemySystem();
   const service = buildResolutionService(system);
   const recipe = buildRecipe(
     'r1',
@@ -266,8 +307,8 @@ test('ResolutionModeService.validateRecipe: valid cauldron recipe with ingredien
   assert.equal(result.errors.length, 0);
 });
 
-test('ResolutionModeService.validateRecipe: cauldron recipe with explicit steps fails validation', () => {
-  const system = buildCauldronSystem();
+test('ResolutionModeService.validateRecipe: alchemy recipe with explicit steps fails validation', () => {
+  const system = buildAlchemySystem();
   const service = buildResolutionService(system);
   // Recipe whose getExecutionSteps() returns a named step (not the implicit-step fallback)
   const explicitStep = { id: 'explicit-step-1', name: 'Step One', ingredientGroups: [], resultGroups: [] };
@@ -286,17 +327,17 @@ test('ResolutionModeService.validateRecipe: cauldron recipe with explicit steps 
 });
 
 // ============================================================================
-// ResolutionModeService: cauldron resolveResultGroups
+// ResolutionModeService: alchemy resolveResultGroups
 // ============================================================================
 
-test('resolveResultGroups: cauldron + ingredientSet provider returns mapped group', () => {
-  const system = buildCauldronSystem();
+test('resolveResultGroups: alchemy + ingredientSet provider returns mapped group', () => {
+  const system = buildAlchemySystem();
   const service = buildResolutionService(system);
   const allGroups = [
     { id: 'rg1', name: 'Group1', results: [] },
     { id: 'rg2', name: 'Group2', results: [] }
   ];
-  const recipe = { craftingSystemId: 'cauldron-sys', resultSelection: { provider: 'ingredientSet' } };
+  const recipe = { craftingSystemId: 'alchemy-sys', resultSelection: { provider: 'ingredientSet' } };
   const ingredientSet = { resultGroupId: 'rg2' };
   const step = { resultGroups: allGroups };
 
@@ -305,14 +346,14 @@ test('resolveResultGroups: cauldron + ingredientSet provider returns mapped grou
   assert.equal(result.groups[0].id, 'rg2');
 });
 
-test('resolveResultGroups: cauldron + ingredientSet provider falls back to first group when no mapping', () => {
-  const system = buildCauldronSystem();
+test('resolveResultGroups: alchemy + ingredientSet provider falls back to first group when no mapping', () => {
+  const system = buildAlchemySystem();
   const service = buildResolutionService(system);
   const allGroups = [
     { id: 'rg1', name: 'Group1', results: [] },
     { id: 'rg2', name: 'Group2', results: [] }
   ];
-  const recipe = { craftingSystemId: 'cauldron-sys', resultSelection: { provider: 'ingredientSet' } };
+  const recipe = { craftingSystemId: 'alchemy-sys', resultSelection: { provider: 'ingredientSet' } };
   const step = { resultGroups: allGroups };
 
   const result = service.resolveResultGroups({ recipe, step, ingredientSet: {} });
@@ -320,14 +361,14 @@ test('resolveResultGroups: cauldron + ingredientSet provider falls back to first
   assert.equal(result.groups[0].id, 'rg1');
 });
 
-test('resolveResultGroups: cauldron + macroOutcome provider returns matched group', () => {
-  const system = buildCauldronSystem();
+test('resolveResultGroups: alchemy + macroOutcome provider returns matched group', () => {
+  const system = buildAlchemySystem();
   const service = buildResolutionService(system);
   const allGroups = [
     { id: 'rg1', name: 'success', results: [] },
     { id: 'rg2', name: 'partial', results: [] }
   ];
-  const recipe = { craftingSystemId: 'cauldron-sys', resultSelection: { provider: 'macroOutcome' } };
+  const recipe = { craftingSystemId: 'alchemy-sys', resultSelection: { provider: 'macroOutcome' } };
   const step = { resultGroups: allGroups };
 
   const result = service.resolveResultGroups({ recipe, step, checkResult: { outcome: 'success' }, ingredientSet: {} });
@@ -335,11 +376,11 @@ test('resolveResultGroups: cauldron + macroOutcome provider returns matched grou
   assert.equal(result.groups[0].id, 'rg1');
 });
 
-test('resolveResultGroups: cauldron + macroOutcome returns empty groups on fail keyword', () => {
-  const system = buildCauldronSystem();
+test('resolveResultGroups: alchemy + macroOutcome returns empty groups on fail keyword', () => {
+  const system = buildAlchemySystem();
   const service = buildResolutionService(system);
   const allGroups = [{ id: 'rg1', name: 'success', results: [] }];
-  const recipe = { craftingSystemId: 'cauldron-sys', resultSelection: { provider: 'macroOutcome' } };
+  const recipe = { craftingSystemId: 'alchemy-sys', resultSelection: { provider: 'macroOutcome' } };
   const step = { resultGroups: allGroups };
 
   const result = service.resolveResultGroups({ recipe, step, checkResult: { outcome: 'fail' }, ingredientSet: {} });
@@ -347,11 +388,11 @@ test('resolveResultGroups: cauldron + macroOutcome returns empty groups on fail 
   assert.equal(result.meta.disposition, 'fail');
 });
 
-test('resolveResultGroups: cauldron + macroOutcome returns empty groups on miss keyword', () => {
-  const system = buildCauldronSystem();
+test('resolveResultGroups: alchemy + macroOutcome returns empty groups on miss keyword', () => {
+  const system = buildAlchemySystem();
   const service = buildResolutionService(system);
   const allGroups = [{ id: 'rg1', name: 'success', results: [] }];
-  const recipe = { craftingSystemId: 'cauldron-sys', resultSelection: { provider: 'macroOutcome' } };
+  const recipe = { craftingSystemId: 'alchemy-sys', resultSelection: { provider: 'macroOutcome' } };
   const step = { resultGroups: allGroups };
 
   const result = service.resolveResultGroups({ recipe, step, checkResult: { outcome: 'miss' }, ingredientSet: {} });
@@ -359,11 +400,11 @@ test('resolveResultGroups: cauldron + macroOutcome returns empty groups on miss 
   assert.equal(result.meta.disposition, 'miss');
 });
 
-test('resolveResultGroups: cauldron + macroOutcome returns misconfiguration on no match', () => {
-  const system = buildCauldronSystem();
+test('resolveResultGroups: alchemy + macroOutcome returns misconfiguration on no match', () => {
+  const system = buildAlchemySystem();
   const service = buildResolutionService(system);
   const allGroups = [{ id: 'rg1', name: 'success', results: [] }];
-  const recipe = { craftingSystemId: 'cauldron-sys', resultSelection: { provider: 'macroOutcome' } };
+  const recipe = { craftingSystemId: 'alchemy-sys', resultSelection: { provider: 'macroOutcome' } };
   const step = { resultGroups: allGroups };
 
   const result = service.resolveResultGroups({ recipe, step, checkResult: { outcome: 'nonexistent' }, ingredientSet: {} });
@@ -372,11 +413,11 @@ test('resolveResultGroups: cauldron + macroOutcome returns misconfiguration on n
 });
 
 // ============================================================================
-// RecipeVisibilityService: cauldron visibility
+// RecipeVisibilityService: alchemy visibility
 // ============================================================================
 
-test('RecipeVisibilityService: GM sees all cauldron recipes', () => {
-  const system = buildCauldronSystem({ cauldron: { learnOnCraft: false, consumeOnFail: true } });
+test('RecipeVisibilityService: GM sees all alchemy recipes', () => {
+  const system = buildAlchemySystem({ alchemy: { learnOnCraft: false, consumeOnFail: true } });
   const service = buildVisibilityService(system);
   const recipe = buildRecipe('r1', [], []);
 
@@ -389,8 +430,8 @@ test('RecipeVisibilityService: GM sees all cauldron recipes', () => {
   assert.equal(result.craftable, true);
 });
 
-test('RecipeVisibilityService: non-GM sees no recipes in cauldron mode when learnOnCraft=false', () => {
-  const system = buildCauldronSystem({ cauldron: { learnOnCraft: false, consumeOnFail: true } });
+test('RecipeVisibilityService: non-GM sees no recipes in alchemy mode when learnOnCraft=false', () => {
+  const system = buildAlchemySystem({ alchemy: { learnOnCraft: false, consumeOnFail: true } });
   const service = buildVisibilityService(system);
   const recipe = buildRecipe('r1', [], []);
 
@@ -401,11 +442,11 @@ test('RecipeVisibilityService: non-GM sees no recipes in cauldron mode when lear
     craftingActor: actor
   });
   assert.equal(result.visible, false);
-  assert.equal(result.reason, 'cauldron-hidden');
+  assert.equal(result.reason, 'alchemy-hidden');
 });
 
 test('RecipeVisibilityService: non-GM sees learned recipe when learnOnCraft=true', () => {
-  const system = buildCauldronSystem({ cauldron: { learnOnCraft: true, consumeOnFail: true } });
+  const system = buildAlchemySystem({ alchemy: { learnOnCraft: true, consumeOnFail: true } });
   const service = buildVisibilityService(system);
   const recipe = buildRecipe('r1', [], []);
 
@@ -418,11 +459,11 @@ test('RecipeVisibilityService: non-GM sees learned recipe when learnOnCraft=true
     craftingActor: actor
   });
   assert.equal(result.visible, true);
-  assert.equal(result.reason, 'cauldron-learned');
+  assert.equal(result.reason, 'alchemy-learned');
 });
 
 test('RecipeVisibilityService: non-GM does NOT see un-learned recipe when learnOnCraft=true', () => {
-  const system = buildCauldronSystem({ cauldron: { learnOnCraft: true, consumeOnFail: true } });
+  const system = buildAlchemySystem({ alchemy: { learnOnCraft: true, consumeOnFail: true } });
   const service = buildVisibilityService(system);
   const recipe = buildRecipe('r1', [], []);
 
@@ -433,11 +474,11 @@ test('RecipeVisibilityService: non-GM does NOT see un-learned recipe when learnO
     craftingActor: actor
   });
   assert.equal(result.visible, false);
-  assert.equal(result.reason, 'cauldron-not-learned');
+  assert.equal(result.reason, 'alchemy-not-learned');
 });
 
 test('RecipeVisibilityService.learnRecipeOnCraft: adds recipe to actor learned map', async () => {
-  const system = buildCauldronSystem({ cauldron: { learnOnCraft: true, consumeOnFail: true } });
+  const system = buildAlchemySystem({ alchemy: { learnOnCraft: true, consumeOnFail: true } });
   const service = buildVisibilityService(system);
   const recipe = buildRecipe('r1', [], []);
 
@@ -450,7 +491,7 @@ test('RecipeVisibilityService.learnRecipeOnCraft: adds recipe to actor learned m
 });
 
 test('RecipeVisibilityService.learnRecipeOnCraft: no-op when learnOnCraft=false', async () => {
-  const system = buildCauldronSystem({ cauldron: { learnOnCraft: false, consumeOnFail: true } });
+  const system = buildAlchemySystem({ alchemy: { learnOnCraft: false, consumeOnFail: true } });
   const service = buildVisibilityService(system);
   const recipe = buildRecipe('r1', [], []);
 
@@ -461,7 +502,7 @@ test('RecipeVisibilityService.learnRecipeOnCraft: no-op when learnOnCraft=false'
   assert.equal(learnedMap['r1'], undefined);
 });
 
-test('RecipeVisibilityService.learnRecipeOnCraft: no-op for non-cauldron systems', async () => {
+test('RecipeVisibilityService.learnRecipeOnCraft: no-op for non-alchemy systems', async () => {
   const system = { id: 'simple-sys', resolutionMode: 'simple' };
   const service = buildVisibilityService(system);
   const recipe = { ...buildRecipe('r1', [], []), craftingSystemId: 'simple-sys' };
@@ -474,7 +515,7 @@ test('RecipeVisibilityService.learnRecipeOnCraft: no-op for non-cauldron systems
 });
 
 test('RecipeVisibilityService.learnRecipeOnCraft: no-op if already learned', async () => {
-  const system = buildCauldronSystem({ cauldron: { learnOnCraft: true, consumeOnFail: true } });
+  const system = buildAlchemySystem({ alchemy: { learnOnCraft: true, consumeOnFail: true } });
   const service = buildVisibilityService(system);
   const recipe = buildRecipe('r1', [], []);
 
@@ -487,10 +528,10 @@ test('RecipeVisibilityService.learnRecipeOnCraft: no-op if already learned', asy
 });
 
 // ============================================================================
-// SignatureValidator: cauldron signature matching
+// SignatureValidator: alchemy signature matching
 // ============================================================================
 
-test('SignatureValidator.computeSignature returns groups for cauldron ingredient sets', () => {
+test('SignatureValidator.computeSignature returns groups for alchemy ingredient sets', () => {
   const components = [buildComponent('c1', 'Item.abc'), buildComponent('c2', 'Item.def')];
   const validator = new SignatureValidator({
     getSystem: () => null,

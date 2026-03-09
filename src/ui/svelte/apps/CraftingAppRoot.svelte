@@ -8,7 +8,7 @@
   import RecipeList from './RecipeList.svelte';
   import RunSummary from './RunSummary.svelte';
   import RecentsSection from './RecentsSection.svelte';
-  import CauldronSubmitPanel from './CauldronSubmitPanel.svelte';
+  import AlchemySubmitPanel from './AlchemySubmitPanel.svelte';
   import ShoppingListPanel from './ShoppingListPanel.svelte';
 
   let { store, services = null } = $props();
@@ -28,7 +28,7 @@
   // svelte-ignore state_referenced_locally
   const showFavouritesOnly = store.showFavouritesOnly;
   // svelte-ignore state_referenced_locally
-  const isCauldronMode = store.isCauldronMode;
+  const isAlchemyMode = store.isAlchemyMode;
   // svelte-ignore state_referenced_locally
   const shoppingList = store.shoppingList;
   // svelte-ignore state_referenced_locally
@@ -52,8 +52,14 @@
       buttons: [{ action: 'close', label: localize('FABRICATE.RecipeCard.ShowDetails'), default: true }]
     });
   }
-</script>
+  let enrichedShoppingEntries = $derived(
+    ($shoppingList || []).map(entry => {
+      const recipe = ($viewState.recipes || []).find(r => r.id === entry.recipeId);
+      return { ...entry, recipeName: recipe?.name || entry.recipeId };
+    })
+  );
 
+</script>
 <div class="fabricate-crafting-app">
   <!-- Actor Selection Section -->
   <section class="actor-selection-section">
@@ -79,7 +85,7 @@
 
   <ShoppingListPanel
     shoppingListData={$viewState.shoppingListData}
-    shoppingListEntries={$shoppingList}
+    shoppingListEntries={enrichedShoppingEntries}
     expanded={$shoppingListExpanded}
     onToggleExpanded={store.toggleShoppingListExpanded}
     onRemoveRecipe={store.removeFromShoppingList}
@@ -105,9 +111,9 @@
     />
   </header>
 
-  <!-- Recipe List / Cauldron Panel -->
-  {#if $isCauldronMode}
-    <CauldronSubmitPanel {store} />
+  <!-- Recipe List / Alchemy Panel -->
+  {#if $isAlchemyMode}
+    <AlchemySubmitPanel {store} />
   {:else}
     <div class="fabricate-recipe-list">
       {#if !$viewState.hasComponentSources}

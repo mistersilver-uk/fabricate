@@ -175,19 +175,19 @@ export class ResolutionModeService {
       }
     }
 
-    if (mode === 'cauldron') {
-      // Cauldron recipes cannot have explicit multi-step configuration
+    if (mode === 'alchemy') {
+      // Alchemy recipes cannot have explicit multi-step configuration
       const setsTop = Array.isArray(recipe.ingredientSets) ? recipe.ingredientSets : [];
       const groupsTop = Array.isArray(recipe.resultGroups) ? recipe.resultGroups : [];
-      if (setsTop.length < 1) errors.push('Cauldron recipe must have at least 1 ingredient set');
-      if (groupsTop.length < 1) errors.push('Cauldron recipe must have at least 1 result group');
+      if (setsTop.length < 1) errors.push('Alchemy recipe must have at least 1 ingredient set');
+      if (groupsTop.length < 1) errors.push('Alchemy recipe must have at least 1 result group');
       // No explicit steps allowed
       const explicitSteps = typeof recipe.getExecutionSteps === 'function' ? recipe.getExecutionSteps() : [];
       const hasExplicitSteps = explicitSteps.length > 1 || (explicitSteps.length === 1 && explicitSteps[0]?.id !== 'implicit-step');
-      if (hasExplicitSteps) errors.push('Cauldron recipe must not have explicit steps');
+      if (hasExplicitSteps) errors.push('Alchemy recipe must not have explicit steps');
       const provider = this.getProvider(recipe);
       if (!provider) {
-        errors.push('Cauldron recipe requires resultSelection.provider');
+        errors.push('Alchemy recipe requires resultSelection.provider');
       } else if (!['ingredientSet', 'macroOutcome', 'rollTableOutcome'].includes(provider)) {
         errors.push('Invalid result selection provider: ' + provider);
       }
@@ -380,7 +380,7 @@ export class ResolutionModeService {
       };
     }
 
-    if (mode === 'cauldron') {
+    if (mode === 'alchemy') {
       const provider = this.getProvider(recipe);
       if (provider === 'ingredientSet') {
         const mappedId = ingredientSet?.resultGroupId || null;

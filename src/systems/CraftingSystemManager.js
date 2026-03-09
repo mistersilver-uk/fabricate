@@ -55,9 +55,10 @@ export class CraftingSystemManager {
       name: system.name || 'New Crafting System',
       description: system.description || '',
       enabled: system.enabled !== false,
-      resolutionMode: ['simple', 'mapped', 'tiered', 'progressive', 'cauldron'].includes(system.resolutionMode)
-        ? system.resolutionMode
-        : 'simple',
+      resolutionMode: (function _normalizeResolutionMode(raw) {
+        if (raw === 'cauldron') return 'alchemy'; // T-189: legacy alias
+        return ['simple', 'mapped', 'tiered', 'progressive', 'alchemy'].includes(raw) ? raw : 'simple';
+      })(system.resolutionMode),
       difficulty: system.difficulty || {
         base: 10,
         tierWeight: 0,
@@ -76,7 +77,7 @@ export class CraftingSystemManager {
         ? system.salvageResolutionMode
         : 'simple',
       salvageCraftingCheck: this._normalizeSalvageCraftingCheck(system.salvageCraftingCheck),
-      cauldron: this._normalizeCauldronConfig(system.cauldron, system.resolutionMode),
+      alchemy: this._normalizeAlchemyConfig(system.alchemy ?? system.cauldron, system.resolutionMode),
       teaserConfig: this._normalizeTeaserConfig(system.teaserConfig),
 
       // Transitional aliases for existing UI code paths
@@ -460,8 +461,11 @@ export class CraftingSystemManager {
     };
   }
 
-  _normalizeCauldronConfig(config, resolutionMode) {
-    if (resolutionMode !== 'cauldron') return null;
+  // Normalise the alchemy sub-config for alchemy-mode systems.
+  // Accepts both 'alchemy' (canonical) and 'cauldron' (T-189 legacy alias) so that persisted
+  // data written before the rename continues to produce a valid config object on load.
+  _normalizeAlchemyConfig(config, resolutionMode) {
+    if (resolutionMode !== 'alchemy' && resolutionMode !== 'cauldron') return null; // T-189: accept both
     const c = config && typeof config === 'object' ? config : {};
     return {
       learnOnCraft: c.learnOnCraft === true,

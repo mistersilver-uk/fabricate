@@ -19,7 +19,7 @@
   let dragStart = $state({ x: 0, y: 0 });
 
   let filteredGraph = $derived(
-    filterGraph(graphData, { category: selectedCategory, searchTerm })
+    filterGraph(graphData, { category: selectedCategory })
   );
 
   function handleMouseDown(e) {

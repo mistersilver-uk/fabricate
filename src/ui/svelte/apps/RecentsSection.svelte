@@ -11,7 +11,7 @@
     <div class="quick-recipe-list">
       {#each recipes as recipe (recipe.id)}
         <div class="quick-recipe-item" data-recipe-id={recipe.id}>
-          <img src={recipe.img} alt={recipe.name} class="quick-recipe-icon" />
+          <img src={recipe.img || 'icons/svg/item-bag.svg'} alt={recipe.name} class="quick-recipe-icon" />
           <span class="quick-recipe-name">{recipe.name}</span>
           <span class="badge">{recipe.statusLabel}</span>
           {#if recipe.allowCraftAction}

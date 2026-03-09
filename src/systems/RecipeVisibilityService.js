@@ -277,20 +277,20 @@ export class RecipeVisibilityService {
       return { visible: false, craftable: false, reason: 'missing-system' };
     }
 
-    // Cauldron mode: recipes hidden from non-GM by default
-    if (system?.resolutionMode === 'cauldron') {
+    // Alchemy mode: recipes hidden from non-GM by default
+    if (system?.resolutionMode === 'alchemy') {
       if (viewer?.isGM) {
         return { visible: true, craftable: true, reason: 'ok', knowledge: null };
       }
-      const cauldronCfg = system?.cauldron || {};
-      if (cauldronCfg.learnOnCraft !== true) {
-        return { visible: false, craftable: false, reason: 'cauldron-hidden', knowledge: null };
+      const alchemyCfg = system?.alchemy || {};
+      if (alchemyCfg.learnOnCraft !== true) {
+        return { visible: false, craftable: false, reason: 'alchemy-hidden', knowledge: null };
       }
       const learnedMap = this._getLearnedMap(craftingActor);
       if (learnedMap?.[recipe.id]) {
-        return { visible: true, craftable: true, reason: 'cauldron-learned', knowledge: null };
+        return { visible: true, craftable: true, reason: 'alchemy-learned', knowledge: null };
       }
-      return { visible: false, craftable: false, reason: 'cauldron-not-learned', knowledge: null };
+      return { visible: false, craftable: false, reason: 'alchemy-not-learned', knowledge: null };
     }
 
     const listMode = system?.recipeVisibility?.listMode || 'global';
@@ -423,8 +423,8 @@ export class RecipeVisibilityService {
 
   async learnRecipeOnCraft(recipe, craftingActor) {
     const system = this._getCraftingSystem(recipe);
-    if (!system || system.resolutionMode !== 'cauldron') return;
-    if (system.cauldron?.learnOnCraft !== true) return;
+    if (!system || system.resolutionMode !== 'alchemy') return;
+    if (system.alchemy?.learnOnCraft !== true) return;
     const learnedMap = this._getLearnedMap(craftingActor);
     if (learnedMap?.[recipe.id]) return;
     const next = {

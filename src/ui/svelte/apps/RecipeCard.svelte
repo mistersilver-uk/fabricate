@@ -31,7 +31,7 @@
   {/if}
 
   <div class="recipe-icon">
-    <img src={recipe.img} alt={recipe.name} />
+    <img src={recipe.img || 'icons/svg/item-bag.svg'} alt={recipe.name} />
   </div>
 
   <div class="recipe-info">

@@ -492,8 +492,8 @@
       "InvalidRecipe": "Invalid recipe configuration",
       "CraftingFailed": "Crafting failed"
     },
-    "Cauldron": {
-      "Title": "Cauldron",
+    "Alchemy": {
+      "Title": "Alchemy",
       "SubmitAttempt": "Submit Attempt",
       "DropIngredients": "Drop ingredients here to attempt crafting",
       "NoMatch": "The combination didn't produce anything",

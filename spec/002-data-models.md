@@ -23,7 +23,7 @@ CraftingSystem = {
 
   // System-level invariant for all recipes in this crafting system.
   // Mode semantics and validation are defined in 004.
-  resolutionMode: "simple" | "routed" | "progressive" | "cauldron",
+  resolutionMode: "simple" | "routed" | "progressive" | "alchemy",
 
   features: {
     recipeCategories: boolean,
@@ -103,8 +103,8 @@ CraftingSystem = {
     },
   },
 
-  // Present only when resolutionMode === "cauldron".
-  cauldron?: {
+  // Present only when resolutionMode === "alchemy".
+  alchemy?: {
     learnOnCraft: boolean, // default false
     consumeOnFail: boolean, // default true
     showAttemptHistoryToPlayers: boolean, // default true
@@ -136,10 +136,10 @@ CraftingSystem = {
 1. If `features.recipeCategories` is false, `Recipe.category` is ignored at runtime.
 2. If `features.itemTags` is false, tag-based ingredient placeholders are invalid.
 3. `categories` and `itemTags` should be normalized to unique, trimmed strings.
-4. `resolutionMode` must be one of `"simple"`, `"routed"`, `"progressive"`, or `"cauldron"`.
-5. If `resolutionMode === "cauldron"`:
+4. `resolutionMode` must be one of `"simple"`, `"routed"`, `"progressive"`, or `"alchemy"`.
+5. If `resolutionMode === "alchemy"`:
    - `features.multiStepRecipes` must be `false`.
-   - `cauldron` config must be present; missing values use defaults (`learnOnCraft: false`, `consumeOnFail: true`, `showAttemptHistoryToPlayers: true`).
+   - `alchemy` config must be present; missing values use defaults (`learnOnCraft: false`, `consumeOnFail: true`, `showAttemptHistoryToPlayers: true`).
 
 ### Recipe Visibility Requirements
 
@@ -233,7 +233,7 @@ Recipe = {
   transferEffects: boolean,
   catalysts: Catalyst[], // defines catalysts that apply to all ingredient groups across all steps in a recipe
 
-  // Routed/cauldron result-group selection
+  // Routed/alchemy result-group selection
   resultSelection?: {
     provider: "ingredientSet" | "macroOutcome" | "rollTableOutcome",
 
@@ -268,7 +268,7 @@ Recipe = {
 
 1. Recipe must include at least one ingredient set and at least one result group, either at recipe level (single-step mode) or within steps (multistep mode).
 2. Resolution-mode constraints are defined in `004-resolution-modes.md`.
-3. `resultSelection.provider` is required when `CraftingSystem.resolutionMode` is `routed` or `cauldron`.
+3. `resultSelection.provider` is required when `CraftingSystem.resolutionMode` is `routed` or `alchemy`.
 4. `resultSelection.provider` value constraints:
    - `ingredientSet`: each `IngredientSet` must resolve deterministically to exactly one `ResultGroup` (via `IngredientSet.resultGroupId`, or implicitly when only one result group exists).
    - `macroOutcome`: a check macro must be resolvable (`Recipe.resultSelection.macroUuid` or fallback to `CraftingSystem.craftingCheck.macroUuid`).
@@ -380,7 +380,7 @@ IngredientSet = {
   essences: { [essenceId: string]: number },
   catalysts: Catalyst[],
 
-  // Routed/cauldron: used when resultSelection.provider === "ingredientSet"
+  // Routed/alchemy: used when resultSelection.provider === "ingredientSet"
   resultGroupId?: string,
 }
 ```
@@ -449,15 +449,15 @@ Ingredient = {
 5. Tag IDs in `match.tags` must exist in `CraftingSystem.itemTags`.
 6. When `features.itemTags` is true, tag placeholder ingredients are valid in all resolution modes, including `simple`.
 
-## Cauldron Signature Uniqueness (Validation Contract)
+## Alchemy Signature Uniqueness (Validation Contract)
 
 ### Purpose
 
-Define the save/import invariant that guarantees deterministic ingredient-signature resolution in cauldron mode.
+Define the save/import invariant that guarantees deterministic ingredient-signature resolution in alchemy mode.
 
 ### Contract
 
-1. Applies only when `CraftingSystem.resolutionMode === "cauldron"`.
+1. Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
 2. Scope is all recipes in the crafting system.
 3. Signature overlap is based on satisfiable ingredient assignments, not just textual equality.
 4. Matching expansion must include:
@@ -622,7 +622,7 @@ CraftingRunStepState = {
   lastCheckResult?: {
     success: boolean,
     reason: string,   // user-friendly text returned by the macro explaining the result
-    outcome?: string, // routed/cauldron macroOutcome mode
+    outcome?: string, // routed/alchemy macroOutcome mode
     value?: number,   // progressive mode
     data?: object,
   },
@@ -653,7 +653,7 @@ CraftingRunStepState = {
 2. `timeGate` is only valid when the corresponding recipe step has `timeRequirement`.
 3. `timeGate.availableAt` must be `> initiatedAt` when both are present.
 4. `completedAt` is required when `status` is `succeeded`, or `failed`.
-5. `lastCheckResult.outcome` is only valid in routed/cauldron when provider is `macroOutcome`; `lastCheckResult.value` is only valid in progressive mode.
+5. `lastCheckResult.outcome` is only valid in routed/alchemy when provider is `macroOutcome`; `lastCheckResult.value` is only valid in progressive mode.
 6. `failureReason` is required when `status` is `failed`.
 
 ## Actor Flags
@@ -750,13 +750,13 @@ Input context must include:
 
 Return by mode:
 
-- Simple, routed (`ingredientSet`), routed (`rollTableOutcome`), and cauldron with non-macro routing
+- Simple, routed (`ingredientSet`), routed (`rollTableOutcome`), and alchemy with non-macro routing
 
 ```js
 { success: boolean, description?: string, data?: object }
 ```
 
-- Routed (`macroOutcome`) and cauldron (`macroOutcome`)
+- Routed (`macroOutcome`) and alchemy (`macroOutcome`)
 
 ```js
 { success: boolean, outcome: string, description?: string, data?: object }
@@ -768,7 +768,7 @@ Return by mode:
 { success: boolean, value: number, description?: string, data?: object }
 ```
 
-Normalization and interpretation rules for `outcome` in routed/cauldron `macroOutcome`:
+Normalization and interpretation rules for `outcome` in routed/alchemy `macroOutcome`:
 
 1. `outcome` is required and must be interpreted using trim-normalized, case-insensitive comparison.
 2. Preferred reserved keywords:

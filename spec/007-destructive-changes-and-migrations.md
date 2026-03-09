@@ -66,12 +66,12 @@ On recipe import:
 1. Import is partial by design:
    - non-conflicting recipes are imported,
    - conflicting recipes are rejected.
-2. If target system mode is `cauldron`, signature uniqueness collisions are treated as conflicts.
+2. If target system mode is `alchemy`, signature uniqueness collisions are treated as conflicts.
 3. The import operation must emit one aggregated conflict report at completion.
 
-### Cauldron Uniqueness Revalidation
+### Alchemy Uniqueness Revalidation
 
-For systems in `cauldron` mode:
+For systems in `alchemy` mode:
 
 1. Signature uniqueness is validated across all recipes in the system.
 2. Any detected collision blocks saves globally until resolved, including saves from unrelated recipe edits.
@@ -216,5 +216,5 @@ The pre-release migration path removes legacy crafting modes `mapped` and `tiere
 - Unit tests for unmigratable recipe deletion with cascade cleanup and JSON logging output.
 - Unit tests for provider-switch stale-config cleanup.
 - Unit tests for partial import conflict handling and aggregated conflict reporting.
-- Unit tests for cauldron global save blocking when any system collision exists.
+- Unit tests for alchemy global save blocking when any system collision exists.
 - Integration tests for mode changes, recipe deletion, and startup migration.

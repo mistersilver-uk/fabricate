@@ -104,7 +104,7 @@ The resolution mode determines how ingredients map to results:
 | [Simple]({% link recipes/simple.md %}) | 1 | 1 | Optional | Basic A + B = C crafting |
 | [Routed]({% link recipes/routed.md %}) | 1+ | 1+ | Provider-dependent | Ingredient choice or skill check selects the result |
 | [Progressive]({% link recipes/progressive.md %}) | 1 | 1 (ordered) | **Yes** | Skill check value "buys" results in order |
-| [Cauldron]({% link recipes/cauldron.md %}) | 1+ | 1+ | No | Players experiment with unknown ingredients; recipe names are hidden |
+| [Alchemy]({% link recipes/alchemy.md %}) | 1+ | 1+ | No | Players experiment with unknown ingredients; recipe names are hidden |
 
 ### Routed Mode Providers
 

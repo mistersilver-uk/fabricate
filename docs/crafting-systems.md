@@ -23,7 +23,7 @@ Open the GM admin panel (**Manage Crafting Systems** in the Items sidebar) and c
 |:--------|:------------|
 | **Name** | Display name shown in the UI |
 | **Description** | Optional flavour text |
-| **Resolution Mode** | How recipes produce results: `simple`, `routed`, `progressive`, or `cauldron`. See [Resolution Modes]({% link recipes/index.md %}#resolution-modes) |
+| **Resolution Mode** | How recipes produce results: `simple`, `routed`, `progressive`, or `alchemy`. See [Resolution Modes]({% link recipes/index.md %}#resolution-modes) |
 
 ### Feature Toggles
 
@@ -110,9 +110,9 @@ Fabricate supports three list modes:
 
 For full details on each mode, knowledge sub-options, recipe items, the learn flow, and API configuration examples, see [Visibility & Knowledge]({% link visibility.md %}).
 
-### Cauldron Mode
+### Alchemy Mode
 
-Cauldron mode is a special resolution mode where recipe names and ingredient lists are hidden from players. Players drag items into the Crafting App's Cauldron panel and submit them; Fabricate matches the combination against known recipe signatures. Set the resolution mode of a system to `cauldron` to enable this. See [Cauldron Mode]({% link recipes/cauldron.md %}) for configuration, signature matching, consume-on-fail, and learn-on-craft options.
+Alchemy mode is a special resolution mode where recipe names and ingredient lists are hidden from players. Players drag items into the Crafting App's Alchemy panel and submit them; Fabricate matches the combination against known recipe signatures. Set the resolution mode of a system to `alchemy` to enable this. See [Alchemy Mode]({% link recipes/alchemy.md %}) for configuration, signature matching, consume-on-fail, and learn-on-craft options.
 
 ---
 

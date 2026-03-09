@@ -1,6 +1,6 @@
 /**
- * Tests for T-099: craftingStore cauldron mode
- * Covers isCauldronMode detection, cauldron item management, and submitCauldronAttempt.
+ * Tests for T-099: craftingStore alchemy mode
+ * Covers isAlchemyMode detection, alchemy item management, and submitAlchemyAttempt.
  */
 
 import test from 'node:test';
@@ -33,12 +33,12 @@ function makeItem(id) {
   return { id, uuid: `Item.${id}`, name: `Item-${id}`, img: 'icon.png' };
 }
 
-function makeCauldronSystem(id = 'cauldron-sys') {
-  return { id, resolutionMode: 'cauldron', cauldron: { learnOnCraft: true, consumeOnFail: true } };
+function makeAlchemySystem(id = 'alchemy-sys') {
+  return { id, resolutionMode: 'alchemy', alchemy: { learnOnCraft: true, consumeOnFail: true } };
 }
 
 function makeSimpleSystem(id = 'simple-sys') {
-  return { id, resolutionMode: 'simple', cauldron: null };
+  return { id, resolutionMode: 'simple', alchemy: null };
 }
 
 function createMockServices(overrides = {}) {
@@ -92,16 +92,16 @@ function createMockServices(overrides = {}) {
 }
 
 // ============================================================================
-// isCauldronMode detection
+// isAlchemyMode detection
 // ============================================================================
 
-test('isCauldronMode is false when no craftingSystemManager provided', () => {
+test('isAlchemyMode is false when no craftingSystemManager provided', () => {
   const services = createMockServices({ getCraftingSystemManager: () => null });
   const store = createCraftingStore(services);
-  assert.equal(get(store.isCauldronMode), false);
+  assert.equal(get(store.isAlchemyMode), false);
 });
 
-test('isCauldronMode is false when active system is simple mode', async () => {
+test('isAlchemyMode is false when active system is simple mode', async () => {
   const simpleSystem = makeSimpleSystem();
   const services = createMockServices({
     getCraftingSystemManager: () => ({
@@ -110,117 +110,117 @@ test('isCauldronMode is false when active system is simple mode', async () => {
   });
   const store = createCraftingStore(services);
   await store.refresh();
-  assert.equal(get(store.isCauldronMode), false);
+  assert.equal(get(store.isAlchemyMode), false);
 });
 
-test('isCauldronMode is true when active system is cauldron mode', async () => {
-  const cauldronSystem = makeCauldronSystem();
+test('isAlchemyMode is true when active system is alchemy mode', async () => {
+  const alchemySystem = makeAlchemySystem();
   const services = createMockServices({
     getCraftingSystemManager: () => ({
-      getSystems: () => [cauldronSystem]
+      getSystems: () => [alchemySystem]
     })
   });
   const store = createCraftingStore(services);
   await store.refresh();
-  assert.equal(get(store.isCauldronMode), true);
+  assert.equal(get(store.isAlchemyMode), true);
 });
 
 // ============================================================================
-// Cauldron item management
+// Alchemy item management
 // ============================================================================
 
-test('addCauldronItem appends item to cauldronItems store', () => {
+test('addAlchemyItem appends item to alchemyItems store', () => {
   const services = createMockServices();
   const store = createCraftingStore(services);
 
   const item = makeItem('i1');
-  store.addCauldronItem(item);
+  store.addAlchemyItem(item);
 
-  const items = get(store.cauldronItems);
+  const items = get(store.alchemyItems);
   assert.equal(items.length, 1);
   assert.equal(items[0].id, 'i1');
 });
 
-test('addCauldronItem ignores null/undefined', () => {
+test('addAlchemyItem ignores null/undefined', () => {
   const services = createMockServices();
   const store = createCraftingStore(services);
 
-  store.addCauldronItem(null);
-  store.addCauldronItem(undefined);
+  store.addAlchemyItem(null);
+  store.addAlchemyItem(undefined);
 
-  const items = get(store.cauldronItems);
+  const items = get(store.alchemyItems);
   assert.equal(items.length, 0);
 });
 
-test('removeCauldronItem removes item at given index', () => {
+test('removeAlchemyItem removes item at given index', () => {
   const services = createMockServices();
   const store = createCraftingStore(services);
 
-  store.addCauldronItem(makeItem('i1'));
-  store.addCauldronItem(makeItem('i2'));
-  store.addCauldronItem(makeItem('i3'));
+  store.addAlchemyItem(makeItem('i1'));
+  store.addAlchemyItem(makeItem('i2'));
+  store.addAlchemyItem(makeItem('i3'));
 
-  store.removeCauldronItem(1); // remove i2
+  store.removeAlchemyItem(1); // remove i2
 
-  const items = get(store.cauldronItems);
+  const items = get(store.alchemyItems);
   assert.equal(items.length, 2);
   assert.equal(items[0].id, 'i1');
   assert.equal(items[1].id, 'i3');
 });
 
-test('clearCauldronItems empties the store', () => {
+test('clearAlchemyItems empties the store', () => {
   const services = createMockServices();
   const store = createCraftingStore(services);
 
-  store.addCauldronItem(makeItem('i1'));
-  store.addCauldronItem(makeItem('i2'));
+  store.addAlchemyItem(makeItem('i1'));
+  store.addAlchemyItem(makeItem('i2'));
 
-  store.clearCauldronItems();
+  store.clearAlchemyItems();
 
-  assert.equal(get(store.cauldronItems).length, 0);
+  assert.equal(get(store.alchemyItems).length, 0);
 });
 
 // ============================================================================
-// submitCauldronAttempt
+// submitAlchemyAttempt
 // ============================================================================
 
-test('submitCauldronAttempt notifies error when no crafting engine', async () => {
+test('submitAlchemyAttempt notifies error when no crafting engine', async () => {
   const messages = [];
   const services = createMockServices({
     getCraftingEngine: () => null,
     getCraftingSystemManager: () => ({
-      getSystems: () => [makeCauldronSystem()]
+      getSystems: () => [makeAlchemySystem()]
     }),
     notify: { info: () => {}, warn: () => {}, error: (m) => messages.push(m) }
   });
   const store = createCraftingStore(services);
-  store.addCauldronItem(makeItem('i1'));
+  store.addAlchemyItem(makeItem('i1'));
 
-  await store.submitCauldronAttempt();
+  await store.submitAlchemyAttempt();
 
   assert.ok(messages.some(m => m.includes('engine') || m.includes('unavailable')));
 });
 
-test('submitCauldronAttempt notifies warn when no items submitted', async () => {
+test('submitAlchemyAttempt notifies warn when no items submitted', async () => {
   const warns = [];
   const services = createMockServices({
-    getCraftingEngine: () => ({ craftCauldron: async () => ({ success: false }) }),
+    getCraftingEngine: () => ({ craftAlchemy: async () => ({ success: false }) }),
     getCraftingSystemManager: () => ({
-      getSystems: () => [makeCauldronSystem()]
+      getSystems: () => [makeAlchemySystem()]
     }),
     notify: { info: () => {}, warn: (m) => warns.push(m), error: () => {} }
   });
   const store = createCraftingStore(services);
   // No items added
 
-  await store.submitCauldronAttempt();
+  await store.submitAlchemyAttempt();
 
   assert.ok(warns.length > 0, 'should warn about empty ingredients');
 });
 
-test('submitCauldronAttempt calls craftCauldron with submitted items', async () => {
+test('submitAlchemyAttempt calls craftAlchemy with submitted items', async () => {
   let capturedArgs = null;
-  const cauldronSystem = makeCauldronSystem();
+  const alchemySystem = makeAlchemySystem();
 
   const services = createMockServices({
     getOwnedActors: () => [makeActor('a1', 'Alice')],
@@ -230,13 +230,13 @@ test('submitCauldronAttempt calls craftCauldron with submitted items', async () 
       return null;
     },
     getCraftingEngine: () => ({
-      craftCauldron: async (actor, sources, items, opts) => {
+      craftAlchemy: async (actor, sources, items, opts) => {
         capturedArgs = { actor, sources, items, opts };
         return { success: true, message: 'Crafted!' };
       }
     }),
     getCraftingSystemManager: () => ({
-      getSystems: () => [cauldronSystem]
+      getSystems: () => [alchemySystem]
     })
   });
 
@@ -244,18 +244,18 @@ test('submitCauldronAttempt calls craftCauldron with submitted items', async () 
   await store.refresh(); // ensure actor is resolved
 
   const item = makeItem('i1');
-  store.addCauldronItem(item);
+  store.addAlchemyItem(item);
 
-  await store.submitCauldronAttempt();
+  await store.submitAlchemyAttempt();
 
-  assert.ok(capturedArgs, 'craftCauldron should have been called');
+  assert.ok(capturedArgs, 'craftAlchemy should have been called');
   assert.equal(capturedArgs.items.length, 1);
   assert.equal(capturedArgs.items[0].id, 'i1');
-  assert.equal(capturedArgs.opts.craftingSystemId, 'cauldron-sys');
+  assert.equal(capturedArgs.opts.craftingSystemId, 'alchemy-sys');
 });
 
-test('submitCauldronAttempt clears cauldron items after attempt', async () => {
-  const cauldronSystem = makeCauldronSystem();
+test('submitAlchemyAttempt clears alchemy items after attempt', async () => {
+  const alchemySystem = makeAlchemySystem();
   const services = createMockServices({
     getOwnedActors: () => [makeActor('a1', 'Alice')],
     getAvailableActors: () => [makeActor('a1', 'Alice')],
@@ -264,10 +264,10 @@ test('submitCauldronAttempt clears cauldron items after attempt', async () => {
       return null;
     },
     getCraftingEngine: () => ({
-      craftCauldron: async () => ({ success: false, message: 'No match', disposition: 'no-match' })
+      craftAlchemy: async () => ({ success: false, message: 'No match', disposition: 'no-match' })
     }),
     getCraftingSystemManager: () => ({
-      getSystems: () => [cauldronSystem]
+      getSystems: () => [alchemySystem]
     }),
     notify: { info: () => {}, warn: () => {}, error: () => {} }
   });
@@ -275,26 +275,26 @@ test('submitCauldronAttempt clears cauldron items after attempt', async () => {
   const store = createCraftingStore(services);
   await store.refresh();
 
-  store.addCauldronItem(makeItem('i1'));
-  store.addCauldronItem(makeItem('i2'));
+  store.addAlchemyItem(makeItem('i1'));
+  store.addAlchemyItem(makeItem('i2'));
 
-  await store.submitCauldronAttempt();
+  await store.submitAlchemyAttempt();
 
-  assert.equal(get(store.cauldronItems).length, 0, 'cauldron items should be cleared after attempt');
+  assert.equal(get(store.alchemyItems).length, 0, 'alchemy items should be cleared after attempt');
 });
 
 // ============================================================================
-// Store shape — new exports present
+// Store shape -- new exports present
 // ============================================================================
 
-test('createCraftingStore exports cauldron-related stores and actions', () => {
+test('createCraftingStore exports alchemy-related stores and actions', () => {
   const services = createMockServices();
   const store = createCraftingStore(services);
 
-  assert.ok('isCauldronMode' in store, 'isCauldronMode should be exported');
-  assert.ok('cauldronItems' in store, 'cauldronItems should be exported');
-  assert.ok('addCauldronItem' in store, 'addCauldronItem should be exported');
-  assert.ok('removeCauldronItem' in store, 'removeCauldronItem should be exported');
-  assert.ok('clearCauldronItems' in store, 'clearCauldronItems should be exported');
-  assert.ok('submitCauldronAttempt' in store, 'submitCauldronAttempt should be exported');
+  assert.ok('isAlchemyMode' in store, 'isAlchemyMode should be exported');
+  assert.ok('alchemyItems' in store, 'alchemyItems should be exported');
+  assert.ok('addAlchemyItem' in store, 'addAlchemyItem should be exported');
+  assert.ok('removeAlchemyItem' in store, 'removeAlchemyItem should be exported');
+  assert.ok('clearAlchemyItems' in store, 'clearAlchemyItems should be exported');
+  assert.ok('submitAlchemyAttempt' in store, 'submitAlchemyAttempt should be exported');
 });

@@ -49,8 +49,43 @@ export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
         getRecipeEditorAppClass().show(recipe, this, systemId);
       },
       renderImportDialog: async (systemId) => {
-        // Delegate to existing import flow on the HBS app
-        // TODO: build Svelte import dialog
+        if (!systemId) {
+          ui.notifications.warn('Create or select a crafting system first.');
+          return;
+        }
+        const DialogV2 = foundry.applications?.api?.DialogV2;
+        if (!DialogV2) {
+          ui.notifications.warn('Dialog API not available.');
+          return;
+        }
+        const formContent = `
+          <p>Paste recipe JSON array. Imported recipes will be assigned to the selected system.</p>
+          <textarea name="importJson" rows="12" style="width:100%;"></textarea>
+          <p><label><input type="checkbox" name="overwrite" /> Overwrite existing IDs</label></p>
+        `;
+        const result = await DialogV2.prompt({
+          window: { title: 'Import Recipes' },
+          content: formContent,
+          ok: {
+            label: 'Import',
+            callback: (event, button, dialog) => {
+              const raw = button.form?.elements?.importJson?.value || '';
+              const overwrite = button.form?.elements?.overwrite?.checked || false;
+              return { raw, overwrite };
+            }
+          },
+          rejectClose: false
+        });
+        if (result) {
+          try {
+            const data = JSON.parse(result.raw).map(r => ({ ...r, craftingSystemId: systemId }));
+            await game.fabricate.getRecipeManager().importRecipes(data, result.overwrite);
+            await this._adminStore.refresh();
+            ui.notifications.info(`Imported ${data.length} recipe(s).`);
+          } catch (err) {
+            ui.notifications.error(`Import failed: ${err.message}`);
+          }
+        }
       },
       copyToClipboard: async (text) => {
         if (foundry?.utils?.copyPlainText) {
@@ -89,8 +124,102 @@ export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
           if (!recipe) return;
           getRecipeEditorAppClass().show(recipe, this, recipe.craftingSystemId);
         },
-        onEditComponent: (itemId) => {
-          // TODO: build Svelte item editor dialog
+        onEditComponent: async (itemId) => {
+          const systemManager = game.fabricate.getCraftingSystemManager();
+          const systemId = this._adminStore.selectedSystemId
+            ? /** @type {string} */ (/** @type {any} */ (this._adminStore.selectedSystemId).get?.() ?? '')
+            : '';
+          if (!systemId || !itemId) return;
+          const system = systemManager.getSystem(systemId);
+          if (!system) return;
+          const item = (system.items || []).find(i => i.id === itemId);
+          if (!item) return;
+
+          const advancedEnabled = system.advancedOptionsEnabled !== false;
+          const showTags = advancedEnabled && system.features?.itemTags === true;
+          const showEssences = advancedEnabled && system.features?.essences === true;
+
+          const tagOptions = (system.itemTags || system.tags || []).map(tag => ({
+            tag,
+            checked: (item.tags || []).includes(tag)
+          }));
+
+          const essenceOptions = (system.essenceDefinitions || []).map(def => ({
+            id: def.id,
+            name: def.name,
+            quantity: Number(item.essences?.[def.id] || 0)
+          }));
+
+          let formContent = '<form class="fabricate-item-editor">';
+          formContent += `<h3>${item.name}</h3>`;
+          formContent += '<p class="hint">Edit tags and essences for this managed item.</p>';
+
+          if (showTags) {
+            formContent += '<div class="form-group"><label>Tags</label>';
+            if (tagOptions.length) {
+              for (const opt of tagOptions) {
+                formContent += `<label class="checkbox-row"><input type="checkbox" name="itemTag" value="${opt.tag}" ${opt.checked ? 'checked' : ''} /> ${opt.tag}</label>`;
+              }
+            } else {
+              formContent += '<p class="hint">No tags defined in this system.</p>';
+            }
+            formContent += '</div>';
+          }
+
+          if (showEssences) {
+            formContent += '<div class="form-group"><label>Essences</label>';
+            if (essenceOptions.length) {
+              for (const opt of essenceOptions) {
+                formContent += `<label class="essence-row">${opt.name} <input type="number" name="essence.${opt.id}" min="0" value="${opt.quantity || ''}" /></label>`;
+              }
+            } else {
+              formContent += '<p class="hint">No essences defined in this system.</p>';
+            }
+            formContent += '</div>';
+          }
+
+          if (!showTags && !showEssences) {
+            formContent += '<p class="hint">Advanced options are disabled for this system.</p>';
+          }
+          formContent += '</form>';
+
+          const DialogV2 = foundry.applications?.api?.DialogV2;
+          if (!DialogV2) {
+            ui.notifications.warn('Dialog API not available.');
+            return;
+          }
+
+          const result = await DialogV2.prompt({
+            window: { title: `Edit ${item.name}` },
+            content: formContent,
+            ok: {
+              label: 'Save',
+              callback: (event, button, dialog) => {
+                const updates = {};
+                if (showTags) {
+                  updates.tags = Array.from(
+                    button.form?.querySelectorAll('input[name="itemTag"]:checked') || []
+                  ).map(el => el.value);
+                }
+                if (showEssences) {
+                  const essences = {};
+                  for (const opt of essenceOptions) {
+                    const input = button.form?.querySelector(`input[name="essence.${opt.id}"]`);
+                    const value = Number(input?.value || 0);
+                    if (value > 0) essences[opt.id] = value;
+                  }
+                  updates.essences = essences;
+                }
+                return updates;
+              }
+            },
+            rejectClose: false
+          });
+
+          if (result) {
+            await systemManager.updateItem(systemId, itemId, result);
+            await this._adminStore.refresh();
+          }
         }
       }
     };

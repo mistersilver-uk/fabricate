@@ -2,6 +2,7 @@ import SvelteApplicationMixin from './svelte/SvelteApplicationMixin.svelte.js';
 import RecipeEditorRoot from './svelte/apps/editor/RecipeEditorRoot.svelte';
 import { createEditorStore } from './svelte/stores/editorStore.js';
 import { registerSvelteRecipeEditorApp } from './appFactory.js';
+import { get } from 'svelte/store';
 
 export class SvelteRecipeEditorApp extends SvelteApplicationMixin(
   foundry.applications.api.ApplicationV2
@@ -73,19 +74,21 @@ export class SvelteRecipeEditorApp extends SvelteApplicationMixin(
         return system?.itemTags || [];
       },
       browseLinkedItem: async () => {
-        const uuid = await new Promise((resolve) => {
-          new Dialog({
-            title: 'Select Linked Recipe Item',
-            content: '<div class="form-group"><label>Item UUID</label><input type="text" name="uuid" placeholder="Paste or type item UUID" /></div>',
-            buttons: {
-              ok: {
-                label: 'Confirm',
-                callback: (html) => resolve(html.find('[name=uuid]').val()?.trim() || '')
-              },
-              cancel: { label: 'Cancel', callback: () => resolve('') }
-            },
-            default: 'ok'
-          }).render(true);
+        const DialogV2 = foundry.applications?.api?.DialogV2;
+        if (!DialogV2) {
+          ui.notifications.warn('Dialog API not available.');
+          return;
+        }
+        const uuid = await DialogV2.prompt({
+          window: { title: 'Select Linked Recipe Item' },
+          content: '<div class="form-group"><label>Item UUID</label><input type="text" name="uuid" placeholder="Paste or type item UUID" /></div>',
+          ok: {
+            label: 'Confirm',
+            callback: (event, button, dialog) => {
+              return button.form?.elements?.uuid?.value?.trim() || '';
+            }
+          },
+          rejectClose: false
         });
         if (uuid) {
           this._editorStore.setLinkedRecipeItemUuid(uuid);
@@ -94,7 +97,7 @@ export class SvelteRecipeEditorApp extends SvelteApplicationMixin(
       createLinkedItem: async () => {
         const store = this._editorStore;
         const draft = store.draft;
-        const draftVal = draft.subscribe ? (() => { let v; draft.subscribe(d => v = d)(); return v; })() : {};
+        const draftVal = draft.subscribe ? get(draft) : {};
         if (draftVal.linkedRecipeItemUuid) {
           ui.notifications.warn('A linked recipe item UUID is already set. Clear it first to create a new one.');
           return;
@@ -132,6 +135,7 @@ export class SvelteRecipeEditorApp extends SvelteApplicationMixin(
   }
 
   async close(options) {
+    this._editorStore?.destroy?.();
     this._editorStore = null;
     this._services = null;
     return super.close(options);

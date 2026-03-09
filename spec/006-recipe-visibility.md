@@ -61,12 +61,12 @@ The second condition covers compendium-derived copies. On Foundry v12+, `_stats.
 Given `viewer`, `craftingSystem`, optional `craftingActor`, optional `componentSourceActors`:
 
 1. Collect recipes in `craftingSystem`.
-2. If `craftingSystem.resolutionMode === "cauldron"`:
+2. If `craftingSystem.resolutionMode === "alchemy"`:
    - GM sees all recipes.
    - Non-GM handling:
-     - if `craftingSystem.cauldron.learnOnCraft !== true`: return no recipe listings.
-     - if `craftingSystem.cauldron.learnOnCraft === true`: return only enabled recipes learned by the actor.
-   - Skip non-cauldron list-mode branches below.
+     - if `craftingSystem.alchemy.learnOnCraft !== true`: return no recipe listings.
+     - if `craftingSystem.alchemy.learnOnCraft === true`: return only enabled recipes learned by the actor.
+   - Skip non-alchemy list-mode branches below.
 3. If `listMode === "global"`:
    - GM sees all recipes.
    - Non-GM sees all enabled recipes. No restriction or knowledge filtering is applied.
@@ -93,7 +93,7 @@ Given `viewer`, `craftingSystem`, optional `craftingActor`, optional `componentS
 
 Before starting/resuming a run and before each step:
 
-1. If `craftingSystem.resolutionMode === "cauldron"`:
+1. If `craftingSystem.resolutionMode === "alchemy"`:
    - attempts are validated by submitted ingredients, not by selecting from listed recipes.
    - no-signature attempts are treated as failed attempts with specific failure feedback and ingredient consumption.
    - non-GM users cannot bypass visibility by directly targeting hidden recipe IDs.
@@ -104,17 +104,17 @@ Before starting/resuming a run and before each step:
 6. If `listMode === "knowledge"`, re-run knowledge access evaluation. Reject if knowledge access is denied.
 7. Reject execution when any guard fails.
 
-## Cauldron Visibility and Learning
+## Alchemy Visibility and Learning
 
-Applies only when `CraftingSystem.resolutionMode === "cauldron"`.
+Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
 
 1. Recipe lists are hidden from non-GM users by default.
 2. Learned visibility behavior:
-   - if `cauldron.learnOnCraft === true`, a recipe may become visible only after successful craft completion and learning.
-   - if `cauldron.learnOnCraft !== true`, recipes remain hidden to non-GM users.
+   - if `alchemy.learnOnCraft === true`, a recipe may become visible only after successful craft completion and learning.
+   - if `alchemy.learnOnCraft !== true`, recipes remain hidden to non-GM users.
 3. Learning is never granted by failed attempts.
 4. No-signature attempts are treated as failed attempts (not misconfiguration errors).
-5. If a matched cauldron attempt cannot route to a valid result group, classify as crafting-system misconfiguration error (GM-fix required), not a player-failure outcome.
+5. If a matched alchemy attempt cannot route to a valid result group, classify as crafting-system misconfiguration error (GM-fix required), not a player-failure outcome.
 
 ## Knowledge Access Evaluation
 
@@ -187,7 +187,7 @@ Automatic actor-drop learning is controlled by `recipeVisibility.knowledge.learn
 
 - Default is `true`.
 - The setting is only meaningful when `listMode === "knowledge"` and `knowledge.mode` is `learned` or `itemOrLearned`.
-- If disabled, actor item drops must not trigger recipe learning and manual learning UI is required.
+- If disabled, actor item drops must not trigger recipe learning and manual learning UI affordances must be used.
 
 #### Allowed Hook Triggers
 
@@ -286,9 +286,9 @@ If `linkedRecipeItemUuid` no longer resolves to a template:
 - Unit tests for limited-use exhaustion and deterministic matched-item selection.
 - Unit tests for learning with and without consume-on-learn.
 - Unit tests for restricted recipes with empty `allowedUserIds` confirming GM access and non-GM denial.
-- Unit tests for cauldron listing rules: hidden-by-default for non-GM, learned-only visibility when `learnOnCraft === true`, always-hidden when `learnOnCraft !== true`.
-- Unit tests for cauldron no-signature attempts: specific failure feedback, failed-attempt classification, and ingredient consumption behavior.
-- Unit tests for cauldron routing mismatches: misconfiguration classification and non-application of player-failure consumption.
+- Unit tests for alchemy listing rules: hidden-by-default for non-GM, learned-only visibility when `learnOnCraft === true`, always-hidden when `learnOnCraft !== true`.
+- Unit tests for alchemy no-signature attempts: specific failure feedback, failed-attempt classification, and ingredient consumption behavior.
+- Unit tests for alchemy routing mismatches: misconfiguration classification and non-application of player-failure consumption.
 - Integration tests for full craft guard re-check on start, resume, and step execution.
 - Integration tests for drag-and-drop learn when `dragDropEnabled === true`: single-recipe match, multi-recipe match, already-learned skip, and no-match silent ignore.
 - Integration tests for drag-and-drop learn notifications: success message content, partial-success filtering, and no-notification on zero matches.

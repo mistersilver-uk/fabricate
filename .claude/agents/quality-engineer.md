@@ -1,7 +1,14 @@
 ---
 name: quality-engineer
 description: Scans Fabricate for potential bugs, edge cases, testing gaps, and unreliable UI/style behavior, then files actionable defect tasks in BACKLOG.md.
-tools: Read, Write, Bash, Glob, Grep
+tools:
+  - Read
+  - Write
+  - Bash
+  - Glob
+  - Grep
+  - WebSearch
+  - WebFetch
 model: sonnet
 permissionMode: acceptEdits
 ---

@@ -43,7 +43,7 @@ Display list + detail editor for crafting systems.
 
 - Name
 - Description
-- Resolution mode (`simple`, `routed`, `progressive`, `cauldron`)
+- Resolution mode (`simple`, `routed`, `progressive`, `alchemy`)
 
 Changing resolution mode is destructive and must follow `007` confirmation/cleanup rules.
 
@@ -227,10 +227,10 @@ The UI must expose required data fields from `004`, but mode logic itself is def
   - Helper text states drawn result name routes by normalized match to `ResultGroup.name`.
 - Validation and helper copy must reserve failure/miss keywords and forbid them as result-group names.
 
-### Cauldron Recipe UI (GM Editor)
+### Alchemy Recipe UI (GM Editor)
 
 - Uses the same provider selector as routed mode.
-- Shows cauldron-only signature collision diagnostics spanning all recipes in the system.
+- Shows alchemy-only signature collision diagnostics spanning all recipes in the system.
 - Save remains blocked until all collisions are resolved.
 
 ### Progressive UI
@@ -258,7 +258,7 @@ The UI must expose required data fields from `004`, but mode logic itself is def
   - Exhausted recipe item uses
   - Missing materials
 
-When system mode is `cauldron`, this list is replaced by the cauldron attempt panel for non-GM users.
+When system mode is `alchemy`, this list is replaced by the alchemy attempt panel for non-GM users.
 
 ### Recipe Detail
 
@@ -266,9 +266,9 @@ When system mode is `cauldron`, this list is replaced by the cauldron attempt pa
 - Show learn action when applicable.
 - Show consume-on-learn warning text when applicable.
 
-### Cauldron Panel (Player)
+### Alchemy Panel (Player)
 
-- Shown when `CraftingSystem.resolutionMode === "cauldron"`.
+- Shown when `CraftingSystem.resolutionMode === "alchemy"`.
 - Replaces recipe browse-to-craft flow for non-GM users.
 - Provides:
   - ingredient selection area

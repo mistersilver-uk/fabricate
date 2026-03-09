@@ -180,6 +180,7 @@ function _buildSelectedSystemViewData(selectedSystem, managedItemOptions, essenc
     },
 
     recipeVisibility: selectedSystem.recipeVisibility || {},
+    teaserConfig: selectedSystem.teaserConfig || { enabled: false, discoveryMode: 'threshold', fragments: [] },
     showRecipeVisibilityKnowledgeOptions,
     showRecipeVisibilityPlayerNote,
 
@@ -502,6 +503,7 @@ export function createAdminStore(services) {
     const essenceDefinitions = [
       ...existing,
       {
+        id: crypto.randomUUID(),
         name: name.trim(),
         description: description || '',
         icon: icon || 'fas fa-mortar-pestle',
@@ -585,6 +587,14 @@ export function createAdminStore(services) {
     };
 
     await systemManager.updateSystem(sysId, { recipeVisibility });
+    await refresh();
+  }
+
+  async function saveTeaserConfig(teaserConfig) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    await systemManager.updateSystem(sysId, { teaserConfig });
     await refresh();
   }
 
@@ -720,6 +730,7 @@ export function createAdminStore(services) {
     saveCraftingCheckConfig,
     saveCurrencyConfig,
     saveVisibilityConfig,
+    saveTeaserConfig,
     createRecipe,
     deleteRecipe,
     duplicateRecipe,

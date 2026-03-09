@@ -18,7 +18,7 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
 | `simple`      | exactly 1       | exactly 1                   | optional                                | single result group                     |
 | `routed`      | one or more     | one or more                 | provider-dependent                      | recipe `resultSelection.provider`       |
 | `progressive` | exactly 1       | exactly 1 (ordered results) | required                                | numeric value spending                  |
-| `cauldron`    | one or more     | one or more                 | provider-dependent                      | recipe `resultSelection.provider`       |
+| `alchemy`     | one or more     | one or more                 | provider-dependent                      | recipe `resultSelection.provider`       |
 
 ## Simple Mode
 
@@ -114,7 +114,7 @@ Let `remaining = check.value` and `cost = result.component.difficulty`.
 - `CraftingSystem.craftingCheck.progressive` must exist.
 - Check macro must return progressive check contract with numeric `value`.
 
-## Cauldron Mode
+## Alchemy Mode
 
 ### Semantics
 
@@ -138,7 +138,7 @@ Let `remaining = check.value` and `cost = result.component.difficulty`.
 ### Validation
 
 - `features.multiStepRecipes` must be false.
-- All recipes must satisfy cauldron-wide signature uniqueness invariants.
+- All recipes must satisfy alchemy-wide signature uniqueness invariants.
 - Any signature collision blocks save/import operations system-wide until resolved.
 
 ## Testing Requirements
@@ -148,6 +148,6 @@ Let `remaining = check.value` and `cost = result.component.difficulty`.
 - Unit tests for reserved fail/miss keyword handling and result-group name matching normalization.
 - Unit tests for progressive award modes (`partial`, `equal`, `exceed`).
 - Integration tests validating mode-specific behavior in full crafting flow.
-- Integration tests for cauldron no-signature failure behavior (failure message + ingredient consumption).
-- Integration tests for cauldron routing-mismatch misconfiguration behavior (error + no player-failure consumption).
-- Integration tests for cauldron uniqueness blocking semantics in save/import workflows.
+- Integration tests for alchemy no-signature failure behavior (failure message + ingredient consumption).
+- Integration tests for alchemy routing-mismatch misconfiguration behavior (error + no player-failure consumption).
+- Integration tests for alchemy uniqueness blocking semantics in save/import workflows.

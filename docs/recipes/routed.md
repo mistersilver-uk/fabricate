@@ -31,9 +31,9 @@ A FoundryVTT roll table is drawn once per crafting attempt, and the drawn result
 
 If the drawn result name does not match any reserved keyword and does not match any result group name, the engine aborts with a crafting-system misconfiguration error.
 
-## Example: Mysterious Cauldron
+## Example: Random Potion Brewing
 
-An alchemy system where brewing a potion draws from a random table to determine which potion is produced:
+A routed system where brewing a potion draws from a roll table to determine which potion is produced:
 
 | Roll Table Result | Result Group | Output |
 |:------------------|:-------------|:-------|

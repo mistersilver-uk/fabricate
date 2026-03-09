@@ -427,7 +427,7 @@ export class CraftingEngine {
         craftingActor,
         componentSourceActors
       });
-      if (options?.isCauldronAttempt === true) {
+      if (options?.isAlchemyAttempt === true) {
         await visibilityService.learnRecipeOnCraft(recipe, craftingActor);
       }
     }
@@ -452,14 +452,27 @@ export class CraftingEngine {
   }
 
   /**
-   * Attempt to craft using the cauldron discovery mode.
-   * Submitted items are matched against recipe signatures; the recipe is hidden from the player.
-   * @param {Actor} craftingActor
-   * @param {Actor[]} componentSourceActors
-   * @param {object[]} submittedItems - Items dragged in by the player (with at minimum { uuid, name })
-   * @param {object} options - { craftingSystemId, signatureValidator? }
+   * Attempt to craft using the alchemy discovery mode.
+   *
+   * Submitted items are matched against the component signatures of all enabled recipes in the
+   * crafting system. The recipe names and ingredient lists are hidden from players; they discover
+   * recipes by experimentation. This method requires the crafting system to have
+   * `resolutionMode: 'alchemy'`.
+   *
+   * @param {Actor} craftingActor - The actor that will receive crafted results.
+   * @param {Actor[]} componentSourceActors - The actors whose inventories are checked for submitted items.
+   * @param {object[]} submittedItems - Items dragged in by the player. Each must include at minimum
+   *   `{ uuid, name }` so signature matching and consumption can identify them.
+   * @param {object} options - Additional options.
+   * @param {string} [options.craftingSystemId] - ID of the crafting system to match against.
+   * @param {object} [options.signatureValidator] - Optional override for the {@link SignatureValidator}
+   *   instance. Defaults to a fresh instance using the system's component list.
+   * @returns {Promise<{success: boolean, results: Item[]|null, message: string, disposition: string}>}
+   *   Returns `disposition: 'no-match'` when no recipe signature matches the submitted items.
+   *   Returns `disposition: 'error'` for configuration or validation failures.
+   *   On success, delegates to {@link CraftingEngine#craft} and returns its result.
    */
-  async craftCauldron(craftingActor, componentSourceActors, submittedItems, options = {}) {
+  async craftAlchemy(craftingActor, componentSourceActors, submittedItems, options = {}) {
     if (!craftingActor) {
       return { success: false, results: null, message: 'No crafting actor selected', disposition: 'error' };
     }
@@ -473,8 +486,8 @@ export class CraftingEngine {
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const systemId = options.craftingSystemId;
     const system = systemManager?.getSystem(systemId);
-    if (!system || system.resolutionMode !== 'cauldron') {
-      return { success: false, results: null, message: 'No cauldron-mode crafting system found', disposition: 'error' };
+    if (!system || system.resolutionMode !== 'alchemy') {
+      return { success: false, results: null, message: 'No alchemy-mode crafting system found', disposition: 'error' };
     }
 
     const recipeManager = this.recipeManager || game.fabricate?.getRecipeManager?.();
@@ -490,19 +503,19 @@ export class CraftingEngine {
 
     const components = Array.isArray(system.components) ? system.components : (Array.isArray(system.managedItems) ? system.managedItems : (system.items || []));
     const recipes = systemRecipes;
-    const matchResult = this._matchCauldronSignature(submittedItems, recipes, components, signatureValidator);
+    const matchResult = this._matchAlchemySignature(submittedItems, recipes, components, signatureValidator);
 
-    const cauldronCfg = system.cauldron || {};
-    const shouldConsume = cauldronCfg.consumeOnFail !== false;
+    const alchemyCfg = system.alchemy || {};
+    const shouldConsume = alchemyCfg.consumeOnFail !== false;
 
     if (!matchResult.matched) {
       if (shouldConsume) {
-        await this._consumeSubmittedCauldronItems(componentSourceActors, submittedItems);
+        await this._consumeSubmittedAlchemyItems(componentSourceActors, submittedItems);
       }
       return {
         success: false,
         results: null,
-        message: 'FABRICATE.Cauldron.NoMatch',
+        message: 'FABRICATE.Alchemy.NoMatch',
         disposition: 'no-match',
         consumed: shouldConsume
       };
@@ -512,7 +525,7 @@ export class CraftingEngine {
     const ingredientSetId = matchResult.ingredientSetId;
     return this.craft(craftingActor, componentSourceActors, recipe, ingredientSetId, {
       ...options,
-      isCauldronAttempt: true
+      isAlchemyAttempt: true
     });
   }
 
@@ -521,7 +534,7 @@ export class CraftingEngine {
    * Returns { matched: true, recipe, ingredientSetId } or { matched: false }.
    * @private
    */
-  _matchCauldronSignature(submittedItems, recipes, components, signatureValidator) {
+  _matchAlchemySignature(submittedItems, recipes, components, signatureValidator) {
     const submittedUuids = new Set(
       submittedItems.map(item => item.uuid || item.sourceUuid).filter(Boolean)
     );
@@ -553,11 +566,11 @@ export class CraftingEngine {
   }
 
   /**
-   * Consume submitted cauldron items (no-match failure path).
+   * Consume submitted alchemy items (no-match failure path).
    * Best-effort: removes items by UUID from component source actors.
    * @private
    */
-  async _consumeSubmittedCauldronItems(componentSourceActors, submittedItems) {
+  async _consumeSubmittedAlchemyItems(componentSourceActors, submittedItems) {
     const submittedUuids = new Set(
       submittedItems.map(i => i.uuid).filter(Boolean)
     );
@@ -572,7 +585,7 @@ export class CraftingEngine {
               await item.update({ 'system.quantity': qty - 1 });
             }
           } catch (e) {
-            console.error('Fabricate | Cauldron: failed to consume item', item.uuid, e);
+            console.error('Fabricate | Alchemy: failed to consume item', item.uuid, e);
           }
         }
       }

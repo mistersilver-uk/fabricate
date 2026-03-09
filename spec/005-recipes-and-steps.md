@@ -90,14 +90,14 @@ Each step can define:
 - When the last step succeeds, mark run complete and clean up run state.
 - On step failure, mark run failed and clean up run state.
 
-## Cauldron Execution Lifecycle
+## Alchemy Execution Lifecycle
 
-Applies only when `CraftingSystem.resolutionMode === "cauldron"`.
+Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
 
 ### Preconditions
 
 1. `features.multiStepRecipes` must be `false`.
-2. Candidate recipes must satisfy cauldron signature uniqueness invariants from `002` and `004`.
+2. Candidate recipes must satisfy alchemy signature uniqueness invariants from `002` and `004`.
 
 ### Attempt Flow
 
@@ -111,11 +111,11 @@ Applies only when `CraftingSystem.resolutionMode === "cauldron"`.
    - resolve the target recipe + ingredient set,
    - execute provider-specific routing (`ingredientSet`, `macroOutcome`, or `rollTableOutcome`),
    - if routed output does not resolve to a valid result group, abort with crafting-system misconfiguration error and do not apply player-failure consumption,
-   - if routing returns fail/miss, apply cauldron failure policy (`consumeOnFail`, default true),
+   - if routing returns fail/miss, apply alchemy failure policy (`consumeOnFail`, default true),
    - on success, consume inputs and create outputs normally.
 5. Learn flow:
    - recipes are learned only on successful completion,
-   - learning runs only when `cauldron.learnOnCraft === true`.
+   - learning runs only when `alchemy.learnOnCraft === true`.
 6. Visibility flow:
    - when `learnOnCraft === false`, recipes remain hidden to non-GM users.
 
@@ -123,7 +123,7 @@ Applies only when `CraftingSystem.resolutionMode === "cauldron"`.
 
 1. Completed crafts and failed attempts are recorded.
 2. Failed attempts include no-signature failures and failed checks.
-3. Player history visibility is controlled by `cauldron.showAttemptHistoryToPlayers`.
+3. Player history visibility is controlled by `alchemy.showAttemptHistoryToPlayers`.
 
 ## Time and Currency Requirements
 
@@ -297,11 +297,11 @@ When recipe-level `ingredientSets` or `resultGroups` are empty:
 - Unit tests for routed provider resolution (`ingredientSet`, `macroOutcome`, `rollTableOutcome`).
 - Unit tests for time/currency gate checks.
 - Integration tests for end-to-end multistep crafting, resume, and completion.
-- Unit tests for cauldron no-signature handling (failure + ingredient consumption + history entry).
-- Unit tests for cauldron routing-mismatch handling (misconfiguration error + no player-failure consumption).
-- Unit tests for cauldron failure consumption defaults and overrides.
-- Unit tests for no-multi-step enforcement in cauldron mode.
-- Integration tests for cauldron learn-on-success visibility behavior.
+- Unit tests for alchemy no-signature handling (failure + ingredient consumption + history entry).
+- Unit tests for alchemy routing-mismatch handling (misconfiguration error + no player-failure consumption).
+- Unit tests for alchemy failure consumption defaults and overrides.
+- Unit tests for no-multi-step enforcement in alchemy mode.
+- Integration tests for alchemy learn-on-success visibility behavior.
 - Unit tests for salvage lifecycle (validate, check, resolve, consume, create).
 - Unit tests for salvage resolution modes (simple, tiered, progressive).
 - Unit tests for salvage destructive change handling.

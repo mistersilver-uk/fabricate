@@ -65,7 +65,7 @@
         <ul class="shopping-list-entries">
           {#each shoppingListEntries as entry (entry.recipeId)}
             <li class="shopping-list-entry">
-              <span class="entry-name">{entry.recipeId}</span>
+              <span class="entry-name">{entry.recipeName || entry.recipeId}</span>
               <div class="entry-quantity-controls">
                 <button
                   type="button"
