@@ -445,7 +445,7 @@ export class RecipeManager {
 
   /**
    * Resolve a human-readable description for an ingredient, using the resolved
-   * component name instead of generic "managed item" text.
+   * component name instead of generic "component" text.
    *
    * @param {Recipe} recipe
    * @param {Ingredient|null} ingredient
@@ -729,7 +729,7 @@ export class RecipeManager {
   }
 
   /**
-   * Resolve a managed system item by ID for the given recipe
+   * Resolve a component by ID for the given recipe
    * @private
    */
   _getComponent(recipe, componentId) {

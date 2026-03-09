@@ -37,8 +37,8 @@
     try {
       const raw = event.dataTransfer.getData('text/plain');
       const data = JSON.parse(raw);
-      if (data.type === 'systemItem' && data.systemItemId) {
-        onDropResult?.(groupIndex, resultIndex, data.systemItemId);
+      if (data.type === 'component' && data.componentId) {
+        onDropResult?.(groupIndex, resultIndex, data.componentId);
       }
     } catch { /* ignore */ }
   }
@@ -48,9 +48,9 @@
     try {
       const raw = event.dataTransfer.getData('text/plain');
       const data = JSON.parse(raw);
-      if (data.type === 'systemItem' && data.systemItemId) {
+      if (data.type === 'component' && data.componentId) {
         onAddResult?.(groupIndex);
-        onDropResult?.(groupIndex, (group?.results || []).length, data.systemItemId);
+        onDropResult?.(groupIndex, (group?.results || []).length, data.componentId);
       }
     } catch { /* ignore */ }
   }

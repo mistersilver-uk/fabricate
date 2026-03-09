@@ -215,7 +215,7 @@ export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
 
           let formContent = '<form class="fabricate-item-editor">';
           formContent += `<h3>${item.name}</h3>`;
-          formContent += '<p class="hint">Edit tags and essences for this managed item.</p>';
+          formContent += '<p class="hint">Edit tags and essences for this component.</p>';
 
           if (showTags) {
             formContent += '<div class="form-group"><label>Tags</label>';

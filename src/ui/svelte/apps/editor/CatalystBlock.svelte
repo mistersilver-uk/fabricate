@@ -23,8 +23,8 @@
     try {
       const raw = event.dataTransfer.getData('text/plain');
       const data = JSON.parse(raw);
-      if (data.type === 'systemItem' && data.systemItemId) {
-        onDrop?.(setIndex, catalystIndex, data.systemItemId);
+      if (data.type === 'component' && data.componentId) {
+        onDrop?.(setIndex, catalystIndex, data.componentId);
       }
     } catch { /* ignore */ }
   }
@@ -34,10 +34,10 @@
     try {
       const raw = event.dataTransfer.getData('text/plain');
       const data = JSON.parse(raw);
-      if (data.type === 'systemItem' && data.systemItemId) {
+      if (data.type === 'component' && data.componentId) {
         onAdd?.(setIndex);
         // Assign to the newly created catalyst (last index)
-        onDrop?.(setIndex, catalysts.length, data.systemItemId);
+        onDrop?.(setIndex, catalysts.length, data.componentId);
       }
     } catch { /* ignore */ }
   }

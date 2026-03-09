@@ -143,7 +143,7 @@ export class Ingredient {
    */
   getDescription() {
     if (this.match?.type === 'component' && this.match.componentId) {
-      return `${this.quantity}x managed item`;
+      return `${this.quantity}x component`;
     }
     if (this.itemUuid) {
       return `${this.quantity}x specific item`;

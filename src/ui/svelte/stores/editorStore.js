@@ -588,7 +588,7 @@ function _buildRecipePayload(draft, featureState, services) {
  * @param {Object} services - Injected dependencies
  * @param {Function} services.randomID - Generate unique IDs
  * @param {Function} services.getSystem - Get a crafting system by ID
- * @param {Function} services.getItems - Get system items for picker
+ * @param {Function} services.getItems - Get components for picker
  * @param {Function} services.saveRecipe - Persist recipe (create or update)
  * @param {Function} services.onClose - Callback when editor closes
  * @param {Function} [services.notify] - Show notifications
@@ -984,7 +984,7 @@ export function createEditorStore(services, options = {}) {
 
   // --- Item assignment (from drag-and-drop) ---
 
-  function assignIngredientItem(setIndex, groupIndex, optionIndex, systemItemId) {
+  function assignIngredientItem(setIndex, groupIndex, optionIndex, componentId) {
     updateDraft(d => {
       const $features = _getSystemFeatureState(d, services);
       const containers = _getActiveDraftContainers(d, $features, get(activeStepIndex), services);
@@ -992,29 +992,29 @@ export function createEditorStore(services, options = {}) {
       if (!set) return;
       const option = set.ingredientGroups?.[Number(groupIndex)]?.options?.[Number(optionIndex)];
       if (option) {
-        option.componentId = systemItemId;
+        option.componentId = componentId;
         option.matchType = 'component';
       }
     });
   }
 
-  function assignCatalystItem(setIndex, catalystIndex, systemItemId) {
+  function assignCatalystItem(setIndex, catalystIndex, componentId) {
     updateDraft(d => {
       const $features = _getSystemFeatureState(d, services);
       const containers = _getActiveDraftContainers(d, $features, get(activeStepIndex), services);
       const set = containers.ingredientSets[Number(setIndex)] || containers.ingredientSets[0];
       if (!set?.catalysts?.[Number(catalystIndex)]) return;
-      set.catalysts[Number(catalystIndex)].componentId = systemItemId;
+      set.catalysts[Number(catalystIndex)].componentId = componentId;
     });
   }
 
-  function assignResultItem(groupIndex, resultIndex, systemItemId) {
+  function assignResultItem(groupIndex, resultIndex, componentId) {
     updateDraft(d => {
       const $features = _getSystemFeatureState(d, services);
       const containers = _getActiveDraftContainers(d, $features, get(activeStepIndex), services);
       const group = containers.results[Number(groupIndex)] || containers.results[0];
       if (!group?.results?.[Number(resultIndex)]) return;
-      group.results[Number(resultIndex)].componentId = systemItemId;
+      group.results[Number(resultIndex)].componentId = componentId;
     });
   }
 

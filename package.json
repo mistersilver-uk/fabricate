@@ -4,11 +4,15 @@
   "description": "Universal crafting system for Foundry VTT - supports simple recipes, catalysts, variable outputs, and active effect transfer",
   "type": "module",
   "scripts": {
-    "build": "vite build",
+    "build": "node scripts/release.js --no-zip",
     "dev": "vite build --watch",
     "test": "node --test tests/*.test.js tests/stores/*.test.js tests/components/*.test.js tests/actions/*.test.js",
-    "release": "node scripts/release.js",
-    "release:build": "node scripts/release.js --no-zip",
+    "test:foundry:install": "playwright install chromium",
+    "test:foundry:up": "node scripts/foundry-test-up.mjs",
+    "test:foundry:run": "node scripts/foundry-test-run.mjs",
+    "test:foundry:down": "node scripts/foundry-test-down.mjs",
+    "test:foundry": "node scripts/foundry-test.mjs",
+    "release:build": "node scripts/release.js",
     "release:validate": "node scripts/release.js --validate-only",
     "docs": "cd docs && bundle exec jekyll serve --livereload",
     "docs:install": "cd docs && bundle install"
@@ -18,7 +22,8 @@
     "@league-of-foundry-developers/foundry-vtt-types": "^12.0.0",
     "svelte": "^5.0.0",
     "@sveltejs/vite-plugin-svelte": "^4.0.0",
-    "happy-dom": "^16.0.0"
+    "happy-dom": "^16.0.0",
+    "playwright": "^1.53.2"
   },
   "private": true,
   "keywords": [

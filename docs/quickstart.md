@@ -37,12 +37,12 @@ Open the **Items** sidebar on the left side of Foundry. You'll see two new heade
 5. Enable any features you want (categories, essences, multi-step, etc.)
 6. Save
 
-## Step 3: Add Managed Items
+## Step 3: Add Components
 
-Fabricate recipes reference *managed items* -- items curated into your crafting system's library. This decouples recipes from specific world items.
+Fabricate recipes reference *components* -- items curated into your crafting system's library. This decouples recipes from specific world items.
 
 1. In the GM admin, switch to the **Items** tab
-2. Drag items from the Items sidebar or a compendium into the managed items list
+2. Drag items from the Items sidebar or a compendium into the components list
 3. Each item gets a `componentId` that recipes use to reference it
 
 ## Step 4: Create a Recipe
@@ -51,8 +51,8 @@ Fabricate recipes reference *managed items* -- items curated into your crafting 
 2. Click **Create Recipe**
 3. Fill in:
    - **Name**: "Healing Potion"
-   - **Ingredient Set**: add an ingredient group, then add options referencing your managed herbs and vials
-   - **Result Group**: add a result referencing your managed Healing Potion item
+   - **Ingredient Set**: add an ingredient group, then add options referencing your components for herbs and vials
+   - **Result Group**: add a result referencing your Healing Potion component
 4. Save
 
 ### Or use a macro

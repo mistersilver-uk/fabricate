@@ -6,7 +6,7 @@ nav_order: 3
 
 # Crafting Systems
 
-A **crafting system** is a self-contained configuration that groups together managed items, essences, recipes, and rules. You can have multiple crafting systems in a single world -- for example, "Alchemy", "Blacksmithing", and "Enchanting" could each be their own system with different rules.
+A **crafting system** is a self-contained configuration that groups together components, essences, recipes, and rules. You can have multiple crafting systems in a single world -- for example, "Alchemy", "Blacksmithing", and "Enchanting" could each be their own system with different rules.
 
 ---
 
@@ -149,24 +149,24 @@ The cleanup is **idempotent**: if no stale entries exist, nothing is written to 
 
 ---
 
-## Managed Items
+## Components
 
-Managed items are the building blocks of recipes. Instead of referencing world items directly by UUID, recipes reference managed items by their `componentId`. This means:
+Components are the building blocks of recipes. Instead of referencing world items directly by UUID, recipes reference components by their `componentId`. This means:
 
 - Recipes work regardless of which specific world item instances exist
-- Multiple world items can satisfy the same managed item reference
+- Multiple world items can satisfy the same component reference
 - You can reorganise your item compendiums without breaking recipes
 
 {: .note }
 > The identifier field was previously called `systemItemId`. Use `componentId` for all new recipes and macros.
 
-### Adding Managed Items
+### Adding Components
 
 Open the **Items** tab of the GM admin panel. You can add items one at a time or import an entire compendium pack at once.
 
 #### Single-item drop
 
-Drag any Item document from the **Items sidebar** or from an open **compendium browser** and drop it onto the managed items list. Fabricate resolves the item's UUID regardless of whether the drag data includes an explicit `uuid` field or the `pack`/`id` pair that Foundry uses for compendium item drags — both shapes are handled automatically.
+Drag any Item document from the **Items sidebar** or from an open **compendium browser** and drop it onto the components list. Fabricate resolves the item's UUID regardless of whether the drag data includes an explicit `uuid` field or the `pack`/`id` pair that Foundry uses for compendium item drags — both shapes are handled automatically.
 
 1. Open the Items sidebar or the compendium browser
 2. Drag the item onto the **Items** tab drop zone in the Crafting Admin panel
@@ -230,12 +230,12 @@ Hooks.once('fabricate.ready', async () => {
 
 See [CraftingSystemManager API]({% link api/system-manager.md %}#additemsfrompack) for the full method reference.
 
-### Managed Item Properties
+### Component Properties
 
 | Property | Description |
 |:---------|:------------|
 | `name` | Display name |
-| `sourceItemUuid` | The Foundry item this managed item represents |
+| `sourceItemUuid` | The Foundry Item document this component represents |
 | `tags` | Array of string tags (when `itemTags` feature is enabled) |
 | `essences` | Map of essence ID to quantity (when `essences` feature is enabled) |
 | `difficulty` | Numeric difficulty rating (used by progressive mode) |

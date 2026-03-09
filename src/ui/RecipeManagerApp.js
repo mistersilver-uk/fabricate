@@ -337,7 +337,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
         }
         const updates = {
           sourceUuid: uuid,
-          name: source?.name || zone.dataset.itemName || 'Managed Item',
+          name: source?.name || zone.dataset.itemName || 'Component',
           img: source?.img || 'icons/svg/item-bag.svg'
         };
         await game.fabricate.getCraftingSystemManager().updateItem(this.selectedSystemId, itemId, updates);
@@ -529,7 +529,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     if (!item) return;
     const confirmed = await confirmDialog({
       title: `Delete ${item.name}?`,
-      content: `<p>Delete managed item <strong>${item.name}</strong> and remove it from recipes in this system?</p>`,
+      content: `<p>Delete component <strong>${item.name}</strong> and remove it from recipes in this system?</p>`,
       yes: () => true,
       no: () => false
     });
@@ -563,7 +563,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
 
     let content = '<form class="fabricate-item-editor">';
     content += `<h3>${item.name}</h3>`;
-    content += '<p class="hint">Edit tags and essences for this managed item.</p>';
+    content += '<p class="hint">Edit tags and essences for this component.</p>';
 
     if (showTags) {
       content += '<div class="form-group"><label>Tags</label>';

@@ -57,12 +57,12 @@
     try {
       const raw = event.dataTransfer.getData('text/plain');
       const data = JSON.parse(raw);
-      if (data.type === 'systemItem' && data.systemItemId) {
+      if (data.type === 'component' && data.componentId) {
         // Dropping on the set panel adds a new group with this item
         onAddGroup?.(setIndex);
         // Then assign item to the last group's first option
         const groups = set?.ingredientGroups || [];
-        onDropIngredient?.(setIndex, groups.length, 0, data.systemItemId);
+        onDropIngredient?.(setIndex, groups.length, 0, data.componentId);
       }
     } catch { /* ignore */ }
   }

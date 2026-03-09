@@ -111,7 +111,7 @@ Additional causes:
 2. Open the recipe in the recipe editor. Is **Transfer Effects** checked?
 3. In the system settings, open the **Essences** feature card. Does each essence definition have a **Source item** selected?
 4. Open the source item linked to the essence definition. Does it have active effects defined? (Check the item sheet's Effects tab.)
-5. Check the managed items used as ingredients in the recipe. Do they have non-zero essence quantities assigned for the relevant essence?
+5. Check the components used as ingredients in the recipe. Do they have non-zero essence quantities assigned for the relevant essence?
 6. Open the browser console (F12) and attempt a craft. Effect transfer issues are logged as `Fabricate |` messages.
 
 **See also:** [Effect Transfer]({% link effect-transfer.md %}) -- effect transfer configuration and the triple-flag pipeline; [Essences]({% link essences.md %}) -- essence definitions and source items.
@@ -131,7 +131,7 @@ Additional causes:
   - The component's `salvage.outcomeRouting` maps every declared outcome to an existing result group ID in `salvage.resultGroups`
 - **Progressive salvage mode** requires:
   - `salvageCraftingCheck.progressive` configuration is present
-  - All result components have a valid positive `difficulty` value on their managed item definition
+  - All result components have a valid positive `difficulty` value on their component definition
 - **Simple salvage mode** requires exactly 1 result group per component. Having 0 or 2+ result groups is rejected.
 - The component's `salvage.enabled` is `false`.
 
@@ -143,7 +143,7 @@ Additional causes:
    - Are `salvageCraftingCheck.outcomes` defined (e.g. `["critical", "pass", "fail"]`)?
    - Does the component's `salvage.outcomeRouting` map every declared outcome to an existing result group ID?
 3. For **simple** mode: does the component have exactly one salvage result group?
-4. For **progressive** mode: does each result component reference a managed item with a valid positive `difficulty` value?
+4. For **progressive** mode: does each result component reference a component with a valid positive `difficulty` value?
 5. Is `salvage.enabled` set to `true` on the component you are trying to salvage?
 6. Is the `salvage` feature toggle enabled on the crafting system?
 
@@ -270,7 +270,7 @@ This was caused by a race between `CraftingRunManager` writing the completed run
 
 **Cause:**
 
-Fabricate only accepts Item documents as crafting components. When the dropped entity is an Actor, JournalEntry, Scene, or any other non-Item document type, Fabricate rejects it with a warning. Actors in particular cannot be managed items because they represent characters, not inventory objects.
+Fabricate only accepts Item documents as crafting components. When the dropped entity is an Actor, JournalEntry, Scene, or any other non-Item document type, Fabricate rejects it with a warning. Actors in particular cannot be components because they represent characters, not inventory objects.
 
 Folder drops are a special case: Fabricate expands the folder and imports any Item documents it contains. If the folder holds no Items — for example, it contains only Actors — a notification says so and nothing is written.
 
@@ -289,7 +289,7 @@ Folder drops are a special case: Fabricate expands the folder and imports any It
 3. If you dropped a compendium pack header and received no items, verify the compendium type. Only **Items** compendiums contain importable components; **Actor** or **Journal Entry** compendiums are silently filtered.
 4. Open the browser console (F12) and look for `Fabricate |` prefixed messages for additional detail.
 
-**See also:** [Crafting Systems]({% link crafting-systems.md %}#adding-managed-items) — adding managed items via drag-and-drop.
+**See also:** [Crafting Systems]({% link crafting-systems.md %}#adding-components) — adding components via drag-and-drop.
 
 ---
 
@@ -323,7 +323,7 @@ The same fix is applied to `foundryCompat.js` (the legacy Handlebars path). In a
    Then drag an item onto the page. The console should print a JSON object like `{"type":"Item","uuid":"Item.abc123"}`. If it prints an empty string, the drag source is not sending standard Foundry drag data.
 5. If the above confirms valid drag data but drops still fail, update Fabricate to the latest version which includes the `text/plain` fallback.
 
-**See also:** [Crafting Systems]({% link crafting-systems.md %}#adding-managed-items) -- adding managed items via drag-and-drop.
+**See also:** [Crafting Systems]({% link crafting-systems.md %}#adding-components) -- adding components via drag-and-drop.
 
 ---
 
@@ -334,7 +334,7 @@ If the steps above do not resolve your problem, work through this checklist befo
 1. Is the Fabricate module enabled in the world? (Setup > Add-on Modules > Fabricate should be checked.)
 2. Is Fabricate initialising? Open the browser console (F12) and run: `Hooks.once('fabricate.ready', () => console.log('Fabricate is ready'))`. If the message does not appear after a reload, the module may not be loading.
 3. Is the crafting system saved without errors? Open the Crafting Admin panel and check for red validation warnings.
-4. Are managed items properly linked? Each managed item should have a valid `sourceItemUuid` pointing to an existing world or compendium item.
+4. Are components properly linked? Each component should have a valid `sourceItemUuid` pointing to an existing world or compendium item.
 5. Does the recipe pass validation? Open the recipe in the editor and click Save. Check for validation error messages.
 6. Is the correct actor selected in the crafting app? The crafting app uses the selected actor for ingredient checks and result delivery.
 7. Are component source actors configured? If ingredients should come from multiple actors, make sure they are all selected in the crafting app.

@@ -670,7 +670,7 @@ export function createAdminStore(services) {
 
     const confirmed = await services.confirmDialog({
       title: `Delete ${item.name}?`,
-      content: `<p>Delete managed item <strong>${item.name}</strong> and remove it from recipes in this system?</p>`,
+      content: `<p>Delete component <strong>${item.name}</strong> and remove it from recipes in this system?</p>`,
       yes: () => true,
       no: () => false
     });

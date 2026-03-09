@@ -1,3 +1,34 @@
+# PLAN: Foundry Live Smoke Harness (Agentic Feedback)
+
+## Dependency Rationale
+
+Add `playwright` as a dev dependency to enable a real browser smoke test against a running Foundry instance.  
+Reason: existing tests mock Foundry globals and do not validate real ApplicationV2 rendering, sidebar button wiring, or runtime console failures in a live client session.
+
+## Scope
+
+1. Add npm scripts:
+   - `test:foundry:up`
+   - `test:foundry:run`
+   - `test:foundry:down`
+   - `test:foundry`
+2. Add Docker Compose harness for local disposable Foundry execution.
+3. Add a Playwright smoke test runner that:
+   - logs into Foundry,
+   - verifies Fabricate module is active,
+   - clicks `Craft Item` from Items sidebar,
+   - asserts Crafting App opens,
+   - fails on captured runtime errors.
+4. Persist machine-readable feedback (`summary.json`) and debugging artifacts (screenshots, browser console log).
+
+## Guardrails
+
+1. Do not mutate containers manually; recreate disposable test environment.
+2. Keep the smoke scope intentionally small and deterministic.
+3. Keep existing fast unit tests as the default quality gate; Foundry smoke is additional integration coverage.
+
+---
+
 # PLAN: Compendium & Item Drop-Import Defects
 
 ## Source Spec

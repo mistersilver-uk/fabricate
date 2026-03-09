@@ -364,7 +364,7 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
     return containers;
   }
 
-  _systemItems() {
+  _getComponents() {
     if (!this.draft.craftingSystemId) return [];
     return game.fabricate.getCraftingSystemManager().getItems(this.draft.craftingSystemId, this.itemPickerSearch);
   }
@@ -541,7 +541,7 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
 
     const systemManager = game.fabricate.getCraftingSystemManager();
     const allItems = this.draft.craftingSystemId ? systemManager.getItems(this.draft.craftingSystemId) : [];
-    const pickerItems = this._systemItems();
+    const pickerItems = this._getComponents();
     const itemMap = new Map(allItems.map(i => [i.id, i]));
     const containers = this._getActiveDraftContainers(featureState);
     const ingredientSets = containers.ingredientSets;
@@ -794,7 +794,7 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
       target.addEventListener('drop', async (event) => {
         event.preventDefault();
         target.classList.remove('drop-active');
-        const itemId = await this._resolveSystemItemIdFromDrop(event);
+        const itemId = await this._resolveComponentIdFromDrop(event);
         if (!itemId) return;
 
         this._syncDraftFromForm();
@@ -803,7 +803,7 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
         const setIndex = target.dataset.setIndex !== undefined ? Number(target.dataset.setIndex) : null;
         const groupIndex = Number(target.dataset.groupIndex);
         const optionIndex = Number(target.dataset.optionIndex);
-        this._assignSystemItem(dropType, itemId, {
+        this._assignComponent(dropType, itemId, {
           index,
           setIndex: Number.isFinite(setIndex) ? setIndex : null,
           groupIndex: Number.isFinite(groupIndex) ? groupIndex : null,
@@ -814,7 +814,7 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
     }
   }
 
-  async _resolveSystemItemIdFromDrop(event) {
+  async _resolveComponentIdFromDrop(event) {
     const raw = event.dataTransfer?.getData('text/plain');
     if (!raw) return null;
     try {
@@ -848,7 +848,7 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
     }
   }
 
-  _assignSystemItem(type, itemId, meta = {}) {
+  _assignComponent(type, itemId, meta = {}) {
     const index = Number(meta.index || 0);
     const groupIndex = Number.isFinite(Number(meta.groupIndex)) ? Number(meta.groupIndex) : null;
     const optionIndex = Number.isFinite(Number(meta.optionIndex)) ? Number(meta.optionIndex) : null;
@@ -881,7 +881,7 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
       group.options = Array.isArray(group.options) ? group.options : [];
       group.options.push(this._newIngredientOption({}));
       const newOptionIndex = group.options.length - 1;
-      this._assignSystemItem('ingredient-option', itemId, {
+      this._assignComponent('ingredient-option', itemId, {
         setIndex,
         groupIndex: groupIndex ?? 0,
         optionIndex: newOptionIndex
@@ -907,7 +907,7 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
 
     // Legacy drop target compatibility.
     if (type === 'ingredient') {
-      this._assignSystemItem('ingredient-option', itemId, {
+      this._assignComponent('ingredient-option', itemId, {
         setIndex,
         groupIndex: 0,
         optionIndex: index
@@ -921,7 +921,7 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
       set.catalysts = Array.isArray(set.catalysts) ? set.catalysts : [];
       set.catalysts.push({ componentId: null, degradesOnUse: false, maxUses: null });
       const rowIndex = set.catalysts.length - 1;
-      this._assignSystemItem('catalyst', itemId, { setIndex, index: rowIndex });
+      this._assignComponent('catalyst', itemId, { setIndex, index: rowIndex });
       return;
     }
 

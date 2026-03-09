@@ -142,8 +142,8 @@
     });
   }
 
-  function handleDropCatalyst(setIndex, catalystIndex, systemItemId) {
-    store.assignCatalystItem(setIndex, catalystIndex, systemItemId);
+  function handleDropCatalyst(setIndex, catalystIndex, componentId) {
+    store.assignCatalystItem(setIndex, catalystIndex, componentId);
   }
 
   function handleUpdateStep(field, value) {

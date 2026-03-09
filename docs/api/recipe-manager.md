@@ -112,7 +112,7 @@ The `missing` object contains:
 - `missing.catalysts` -- array of missing catalyst objects
 - `missing.essences` -- array of `{ essenceId, need, have }`
 
-Use `resolveComponentName(recipe, ingredient.match.componentId)` to get a human-readable component name from a missing ingredient entry. `ingredient.getDescription()` returns generic text such as "managed item" or "specific item" for component-type ingredients and is not suitable for display.
+Use `resolveComponentName(recipe, ingredient.match.componentId)` to get a human-readable component name from a missing ingredient entry. `ingredient.getDescription()` returns generic text describing the ingredient match type (e.g. "component" or "specific item") and is not suitable for display.
 
 ```javascript
 const rm = game.fabricate.getRecipeManager();

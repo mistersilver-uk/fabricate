@@ -19,8 +19,8 @@ Enable both the **essences** and **effectTransfer** feature toggles on the syste
 
 1. In the Crafting Admin panel, enable the **Essences** and **Effect Transfer** feature toggles for your system.
 2. Under advanced options, define your essences (e.g. "Fire", "Frost") in the Essences card.
-3. For each essence, set a **Source Item** -- this is the managed item whose active effects represent that essence.
-4. Assign essence quantities to your managed ingredient items (e.g. Dragon Scale = 3 Fire, 1 Arcane).
+3. For each essence, set a **Source Item** -- this is the component whose active effects represent that essence.
+4. Assign essence quantities to your ingredient components (e.g. Dragon Scale = 3 Fire, 1 Arcane).
 5. In the recipe editor, enable **Transfer Effects** on recipes that should inherit effects from their ingredients' essences.
 6. When a player crafts, the engine collects active effects from the source items of all contributing essences and applies them to the created result.
 

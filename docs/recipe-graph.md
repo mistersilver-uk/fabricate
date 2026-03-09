@@ -94,4 +94,4 @@ This makes it easy to see that players need to do the two harvesting/crushing re
 
 - [Crafting Systems]({% link crafting-systems.md %}) — system configuration and feature toggles
 - [Recipes]({% link recipes/index.md %}) — recipe structure, ingredients, and resolution modes
-- [Components (Managed Items)]({% link crafting-systems.md %}#components) — how components are added to a system
+- [Components]({% link crafting-systems.md %}#components) — how components are added to a system

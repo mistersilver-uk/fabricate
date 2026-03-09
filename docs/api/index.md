@@ -34,7 +34,7 @@ Hooks.on('fabricate.ready', () => {
 ```javascript
 game.fabricate.getRecipeManager()          // Recipe CRUD and queries
 game.fabricate.getCraftingEngine()          // Execute crafting
-game.fabricate.getCraftingSystemManager()   // System and managed item CRUD
+game.fabricate.getCraftingSystemManager()   // System and component CRUD
 game.fabricate.getCraftingRunManager()      // Multi-step run management
 game.fabricate.getRecipeVisibilityService() // Visibility and knowledge
 game.fabricate.getResolutionModeService()   // Mode validation and resolution

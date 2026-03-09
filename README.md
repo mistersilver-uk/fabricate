@@ -164,6 +164,41 @@ npm test         # Run test suite
 npm run build    # Vite build to /dist
 ```
 
+### Live Foundry Smoke Test
+
+Fabricate now includes a minimal end-to-end smoke harness against a real Foundry instance.
+
+```bash
+# 1) Install browser binary once
+npm run test:foundry:install
+
+# 2) Configure env vars (copy and edit)
+cp .env.foundry.example .env.foundry
+set -a && source .env.foundry && set +a
+
+# 3) Run end-to-end flow (build -> container up -> smoke run -> container down)
+npm run test:foundry
+```
+
+Available commands:
+
+```bash
+npm run test:foundry:up
+npm run test:foundry:run
+npm run test:foundry:down
+```
+
+`test:foundry:run` writes feedback artifacts to `test-results/foundry/`:
+
+- `summary.json` (machine-readable pass/fail + error details)
+- `browser.log` (captured browser console + page errors)
+- `smoke-pass.png` or `smoke-fail.png`
+
+Notes:
+
+- The smoke test assumes the world at `FOUNDRY_ENTRY_PATH` has Fabricate enabled.
+- If your Foundry setup requires different Docker env vars or image settings, update `docker-compose.foundry.yml`.
+
 See [AGENTS.md](AGENTS.md) for contributor and agent guidelines.
 
 ## Support

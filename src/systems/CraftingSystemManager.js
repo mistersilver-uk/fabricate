@@ -41,7 +41,7 @@ export class CraftingSystemManager {
 
     const resolvedEssenceDefinitions = essenceDefinitions.map(def => {
       // sourceItemUuid is authoritative; associatedSystemItemId is the transitional alias.
-      // Resolve against the actual managed item IDs so stale UUIDs are cleared.
+      // Resolve against the actual component IDs so stale UUIDs are cleared.
       const resolvedItemId = itemIds.has(def.sourceItemUuid) ? def.sourceItemUuid : null;
       return {
         ...def,
@@ -611,7 +611,7 @@ export class CraftingSystemManager {
   }
 
   async createItem(systemId, data = {}) {
-    this._assertGM('create system item');
+    this._assertGM('create component');
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
     const validEssenceIds = new Set((system.essenceDefinitions || []).map(def => def.id));
@@ -622,7 +622,7 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Find an existing managed item in the system that matches the given UUID via:
+   * Find an existing component in the system that matches the given UUID via:
    *   - exact sourceUuid / sourceItemUuid match (returns matchType 'exact')
    *   - UUID appears in the item's fallbackItemIds (returns matchType 'source')
    *
@@ -663,7 +663,7 @@ export class CraftingSystemManager {
    * @returns {Promise<{ item: object, action: 'added'|'updated'|'skipped' }>}
    */
   async addItemFromUuid(systemId, itemUuid) {
-    this._assertGM('add system item from uuid');
+    this._assertGM('add component from uuid');
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
 
@@ -767,11 +767,11 @@ export class CraftingSystemManager {
   }
 
   async updateItem(systemId, itemId, updates = {}) {
-    this._assertGM('update system item');
+    this._assertGM('update component');
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
     const idx = system.items.findIndex(i => i.id === itemId);
-    if (idx < 0) throw new Error(`System item not found: ${itemId}`);
+    if (idx < 0) throw new Error(`Component not found: ${itemId}`);
     const validEssenceIds = new Set((system.essenceDefinitions || []).map(def => def.id));
     system.items[idx] = this._normalizeComponent(
       { ...system.items[idx], ...updates, id: itemId },
@@ -783,7 +783,7 @@ export class CraftingSystemManager {
   }
 
   async deleteItem(systemId, itemId) {
-    this._assertGM('delete system item');
+    this._assertGM('delete component');
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
     const managedItems = Array.isArray(system.components) ? system.components : (Array.isArray(system.managedItems) ? system.managedItems : (system.items || []));
@@ -794,7 +794,7 @@ export class CraftingSystemManager {
     system.components = filteredItems;
     system.managedItems = filteredItems;
 
-    // Clear essence source-item links that pointed to the deleted managed item.
+    // Clear essence source-item links that pointed to the deleted component.
     const essenceDefinitions = (system.essenceDefinitions || []).map(def => ({
       ...def,
       sourceItemUuid: def.sourceItemUuid === itemId ? null : def.sourceItemUuid,

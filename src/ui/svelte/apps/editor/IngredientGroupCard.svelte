@@ -30,8 +30,8 @@
     try {
       const raw = event.dataTransfer.getData('text/plain');
       const data = JSON.parse(raw);
-      if (data.type === 'systemItem' && data.systemItemId) {
-        onDropIngredient?.(setIndex, groupIndex, optionIndex, data.systemItemId);
+      if (data.type === 'component' && data.componentId) {
+        onDropIngredient?.(setIndex, groupIndex, optionIndex, data.componentId);
       }
     } catch { /* ignore non-JSON drops */ }
   }

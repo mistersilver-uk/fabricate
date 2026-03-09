@@ -18,7 +18,7 @@ If any one of these flags is `false`, no effect transfer occurs. This design let
 
 **How the pipeline works.** When all three flags are set, the engine:
 
-1. Determines which essence IDs were contributed by the resolved ingredients (using the `essences` flag values stored on each managed item).
+1. Determines which essence IDs were contributed by the resolved ingredients (using the `essences` flag values stored on each component).
 2. For each contributing essence, looks up its `EssenceDefinition` in `system.essenceDefinitions`.
 3. If the definition has a `sourceItemUuid`, resolves that item via `fromUuid()`.
 4. Collects all active effects from the resolved source item.

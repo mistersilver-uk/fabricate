@@ -571,7 +571,7 @@ test('progressive mode — difficulty < 1 on a result → invalid', () => {
 
   assert.equal(result.valid, false);
   assert.ok(
-    result.errors.some((e) => /difficulty|system item/i.test(e)),
+    result.errors.some((e) => /difficulty|system item|component/i.test(e)),
     `expected error about invalid difficulty, got: ${JSON.stringify(result.errors)}`
   );
 });
@@ -586,7 +586,7 @@ test('progressive mode — difficulty = 0 → invalid', () => {
 
   assert.equal(result.valid, false);
   assert.ok(
-    result.errors.some((e) => /difficulty|system item/i.test(e)),
+    result.errors.some((e) => /difficulty|system item|component/i.test(e)),
     `expected error about difficulty = 0, got: ${JSON.stringify(result.errors)}`
   );
 });
@@ -676,7 +676,7 @@ test('progressive mode — result componentId not found in managedItems → inva
   assert.equal(result.valid, false);
   assert.ok(
     result.errors.some((e) => /result-1|difficulty|system item/i.test(e)),
-    `expected error about missing system item difficulty, got: ${JSON.stringify(result.errors)}`
+    `expected error about missing component difficulty, got: ${JSON.stringify(result.errors)}`
   );
 });
 

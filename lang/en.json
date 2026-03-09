@@ -117,7 +117,7 @@
       "Available": "Available Recipes",
       "CanCraft": "Can Craft",
       "CannotCraft": "Cannot Craft",
-      "Missing": "Missing Items",
+      "Missing": "Missing Components",
       "Confirm": "Craft Item",
       "Success": "Crafting Successful!",
       "Failure": "Crafting Failed!",
@@ -179,7 +179,7 @@
         },
         "ItemTags": {
           "Title": "Item Tags",
-          "Hint": "Use tags for categorization, sorting, and search in managed items.",
+          "Hint": "Use tags for categorization, sorting, and search in components.",
           "Placeholder": "e.g. armour:leather",
           "Add": "Add",
           "Empty": "No item tags defined yet."
@@ -258,9 +258,9 @@
         "SearchPlaceholder": "Search components...",
         "DropZoneLabel": "Drag items from sidebar/compendiums here to add them to this crafting system.",
         "DropToReplace": "Drop to replace source",
-        "NoManagedItems": "No Managed Items",
+        "NoManagedItems": "No Components",
         "NoManagedItemsHint": "Drag in world or compendium items to build this system's item library.",
-        "NoSystemHint": "Create or select a crafting system to manage items.",
+        "NoSystemHint": "Create or select a crafting system to manage components.",
         "NoTags": "No tags",
         "NoEssences": "No essences",
         "NoSourceUuid": "No source UUID",
@@ -378,7 +378,7 @@
         "AddGroup": "Add Ingredient Group",
         "RemoveGroup": "Remove Group",
         "GroupTitle": "Ingredient Group",
-        "DropNewIngredient": "Drop a managed item here to add a new ingredient group.",
+        "DropNewIngredient": "Drop a component here to add a new ingredient group.",
         "EssencesAvailable": "Available system essences:",
         "NoEssencesDefined": "No essences defined yet. Add essences in Crafting Admin > Systems.",
         "TagPlaceholdersEnabled": "Tag placeholders are enabled for this crafting system."
@@ -387,7 +387,7 @@
         "MatchTypeLabel": "Match",
         "RequirementLabel": "Requirement",
         "QtyActionsLabel": "Qty / Actions",
-        "MatchManaged": "Managed item",
+        "MatchManaged": "Component",
         "MatchTag": "Tag",
         "TagTextPlaceholder": "tag-1, tag-2",
         "TagMatchAny": "Any tag",
@@ -402,12 +402,12 @@
       "Catalysts": {
         "SectionTitle": "Catalysts (for this ingredient set)",
         "AddCatalyst": "Add Catalyst",
-        "ManagedItemHeader": "Managed Item",
+        "ManagedItemHeader": "Component",
         "DegradeHeader": "Degrades",
         "MaxUsesHeader": "Max Uses",
         "MaxUsesPlaceholder": "Unlimited",
         "RemoveCatalyst": "Remove",
-        "EmptyState": "Drop managed items here to add catalysts."
+        "EmptyState": "Drop components here to add catalysts."
       },
       "ResultGroups": {
         "SectionTitle": "Result Groups",
@@ -417,13 +417,13 @@
         "MoveDown": "Move Down",
         "GroupNameLabel": "Group Name",
         "PanelSummary": "{count} results",
-        "ManagedItemHeader": "Managed Item",
+        "ManagedItemHeader": "Component",
         "QtyHeader": "Qty",
         "AddResult": "Add Result",
         "RemoveResult": "Remove",
         "PropertyMacroLabel": "Property Macro",
         "NoPropertyMacro": "No property macro",
-        "EmptyState": "Drop managed items here to add results."
+        "EmptyState": "Drop components here to add results."
       },
       "ResultSelection": {
         "MappedResultGroupLabel": "Mapped Result Group",
@@ -447,8 +447,8 @@
       },
       "ItemPicker": {
         "SectionTitle": "Components",
-        "SearchPlaceholder": "Search managed items...",
-        "EmptyState": "No managed items in this system.",
+        "SearchPlaceholder": "Search components...",
+        "EmptyState": "No components in this system.",
         "EmptyHint": "Add items in the Crafting Admin Components tab."
       },
       "Footer": {

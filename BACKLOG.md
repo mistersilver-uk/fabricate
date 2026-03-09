@@ -1548,3 +1548,79 @@ Findings from comprehensive domain model audit: spec compliance, naming fidelity
   6. Legacy apps (RecipeManagerApp, RecipeEditorApp) have try/catch protection.
   7. New `resolveDropData(data)` export in dropUtils.js returns `{ uuid, type }`.
 - Resolution: Added `resolveDropData` to dropUtils.js. Added type guard in CraftingSystemManager.addItemFromUuid. Added folder expansion, Actor rejection, and non-Item rejection in SvelteRecipeManagerApp.svelte.js onDropItem. Wrapped legacy callers in try/catch. Added i18n keys: ItemUpdated, BulkImportUpdated, DropNotAnItem, FolderImportSummary, FolderEmpty. Tests cover all paths. Reviewed and approved.
+
+## Terminology Audit Tasks (2026-03-09)
+
+Scan source: full audit of `lang/en.json`, `docs/**/*.md`, `src/**/*.js`, `src/**/*.svelte`, and `CHANGELOG.md` for legacy "Managed Item", "managed item", "managedItem", "system item", "System Item", and "systemItem" occurrences where the domain term "Component" (a curated item registered in a crafting system) is correct. Scope rule: references to Foundry Item documents themselves (e.g. `sourceItemUuid`, `addItemFromUuid`, `fromUuid`) are intentional and out of scope.
+
+---
+
+### T-301 - Terminology: Replace legacy "managed item" strings in `lang/en.json`
+
+- Status: `done`
+- Description: Ten user-facing i18n string *values* in `lang/en.json` still use "managed item" or "Managed Item" to describe a component registered in a crafting system, despite T-096 renaming the Admin tab label and search placeholder. GMs and players see these strings in the recipe editor ingredient/catalyst/result panels, the Items tab empty state, and the item-picker. Inconsistent labelling confuses users who see "Component" in some places and "Managed Item" in others.
+- Acceptance Criteria:
+  1. All string *values* (not keys) in `lang/en.json` that describe a crafting system component as "managed item" or "Managed Item" are updated to use "component" or "Component". Specific targets:
+     - `FABRICATE.Admin.Features.ItemTags.Hint` (line 182): "managed items" → "components"
+     - `FABRICATE.Admin.Items.NoManagedItems` (line 261): "No Managed Items" → "No Components"
+     - `FABRICATE.Admin.Items.NoManagedItemsHint` (line 262): "item library" → "component library"
+     - `FABRICATE.Admin.Items.NoSystemHint` (line 263): "manage items" → "manage components"
+     - `FABRICATE.Editor.IngredientSets.DropNewIngredient` (line 381): "managed item" → "component"
+     - `FABRICATE.Editor.IngredientOptions.MatchManaged` (line 390): "Managed item" → "Component"
+     - `FABRICATE.Editor.Catalysts.ManagedItemHeader` (line 405): "Managed Item" → "Component"
+     - `FABRICATE.Editor.Catalysts.EmptyState` (line 410): "managed items" → "components"
+     - `FABRICATE.Editor.ResultGroups.ManagedItemHeader` (line 420): "Managed Item" → "Component"
+     - `FABRICATE.Editor.ResultGroups.EmptyState` (line 426): "managed items" → "components"
+     - `FABRICATE.Editor.ItemPicker.SearchPlaceholder` (line 450): "managed items" → "components"
+     - `FABRICATE.Editor.ItemPicker.EmptyState` (line 451): "managed items" → "components"
+  2. All i18n *keys* (e.g. `NoManagedItems`, `ManagedItemHeader`) are left unchanged for backward compatibility with any external translations. Only the string values are changed.
+  3. A regression test or manual review confirms no UI surface still shows "Managed Item" or "managed item" in a context where "Component" is the correct domain term.
+  4. `FABRICATE.Craft.Missing` (line 120): "Missing Items" is reviewed and updated to "Missing Components" if the string refers to missing crafting components rather than generic Foundry Items.
+
+---
+
+### T-302 - Terminology: Replace "Managed Items" with "Components" in public documentation
+
+- Status: `done`
+- Description: All public-facing documentation in `docs/` uses the legacy term "Managed Items" as a section heading and throughout body text. The canonical domain term for these objects is "Component" (established in T-096 and spec/002). GMs reading the docs encounter a different vocabulary from the UI, creating friction and confusion. This is a HIGH severity user-facing problem: documentation is often the first place new GMs look to understand Fabricate.
+- Acceptance Criteria:
+  1. `docs/crafting-systems.md`: Replace the `## Managed Items` section heading (line 152) with `## Components`. Update all "managed items" body text in this section to "components". The anchor link `#managed-items` used in `docs/recipe-graph.md:97` must be updated or a Jekyll redirect alias added.
+  2. `docs/quickstart.md`: Replace `## Step 3: Add Managed Items` (line 40) with `## Step 3: Add Components`. Update body text on lines 42 and 45 to use "components".
+  3. `docs/api/system-manager.md`: Replace `## Managed Item Methods` section heading (line 212) with `## Component Methods`. Update all "managed item" body text in this section (lines 216, 225, 229, 270, 307, 341) to use "component" or "managed component" where the Foundry Item sense must be distinguished.
+  4. `docs/essences.md`: Replace "managed items" with "components" in body text (lines 12, 14, 30, 43, 82). Line 28's "by its system item ID" is updated to "by its component ID".
+  5. `docs/troubleshooting.md`: Replace "managed items" with "components" in body text (lines 114, 134, 146, 273, 292, 326, 337).
+  6. `docs/api/recipe-manager.md:115`: Replace "managed item" with "component" in the description of `getDescription()` generic text.
+  7. `docs/how-to/degrading-tools.md`: Replace "managed item" (lines 20, 21) with "component".
+  8. `docs/recipe-graph.md:97`: Update the anchor link text from "Components (Managed Items)" to "Components" and fix the target anchor if it changed under AC1.
+  9. No existing links to renamed anchors are broken; either redirect aliases or direct updates are applied.
+  10. A peer review confirms no other doc page uses "managed item" to describe a crafting system component.
+
+---
+
+### T-303 - Terminology: Replace legacy "managed item" / "system item" / `systemItem` references in `src/`
+
+- Status: `done`
+- Description: Multiple locations in `src/` use legacy terminology for a crafting system component in JSDoc comments, error messages, dialog strings, variable names, and drag-data protocol keys. These range from HIGH-severity user-visible error messages to LOW-severity internal variable names. Collectively they slow down maintenance and create mismatch between what developers read in code and the domain model. This task consolidates cleanup into a single coordinated change to avoid partial-rename drift.
+- Acceptance Criteria:
+  1. **User-visible error messages (HIGH):**
+     - `src/systems/ResolutionModeService.js:172`: error string `"references system item without valid difficulty"` → `"references component without valid difficulty"`.
+     - `src/systems/CraftingSystemManager.js:614,666,770,786`: `_assertGM` action strings `'create system item'`, `'add system item from uuid'`, `'update system item'`, `'delete system item'` → `'create component'`, `'add component from uuid'`, `'update component'`, `'delete component'`.
+     - `src/systems/CraftingSystemManager.js:774`: `throw new Error(\`System item not found: ${itemId}\`)` → `"Component not found: ..."`.
+  2. **User-visible dialog strings (HIGH):**
+     - `src/ui/RecipeManagerApp.js:340`: fallback name `'Managed Item'` → `'Component'`.
+     - `src/ui/RecipeManagerApp.js:532`: dialog content `"Delete managed item <strong>..."` → `"Delete component <strong>..."`.
+     - `src/ui/RecipeManagerApp.js:566`: hint text `"Edit tags and essences for this managed item."` → `"Edit tags and essences for this component."`.
+     - `src/ui/svelte/stores/adminStore.js:673`: dialog content `"Delete managed item <strong>..."` → `"Delete component <strong>..."`.
+  3. **`Ingredient.getDescription()` runtime string (HIGH):** `src/models/Ingredient.js:146`: `return \`${this.quantity}x managed item\`` → `return \`${this.quantity}x component\``. This string should not be shown to users directly per `docs/api/recipe-manager.md:115`, but updating it ensures any accidental display is consistent.
+  4. **JSDoc comments (MEDIUM):**
+     - `src/systems/RecipeManager.js:448`: comment "generic 'managed item' text" → "generic 'component' text".
+     - `src/systems/RecipeManager.js:732`: JSDoc "Resolve a managed system item by ID" → "Resolve a component by ID".
+     - `src/ui/svelte/stores/editorStore.js:591`: JSDoc `services.getItems - Get system items for picker` → `Get components for picker`.
+  5. **Internal drag-data protocol keys (MEDIUM):** The drag payload emitted by `src/ui/svelte/apps/editor/ItemPickerGrid.svelte:9-10` uses `type: 'systemItem'` and `systemItemId`. All five consumers (`ResultGroupPanel.svelte`, `CatalystBlock.svelte`, `IngredientSetPanel.svelte`, `IngredientGroupCard.svelte`, and `RecipeEditorApp.js`) check `data.type === 'systemItem'` and read `data.systemItemId`. Rename the protocol to `type: 'component'` and `componentId` across all six files in a single atomic change to avoid a broken intermediate state.
+  6. **Internal method and variable names (LOW):**
+     - `src/ui/RecipeEditorApp.js:367`: `_systemItems()` method → `_getComponents()` (or `_components()`). Update the two call sites at lines 544 and 369.
+     - `src/ui/RecipeEditorApp.js:817,851`: `_resolveSystemItemIdFromDrop()` → `_resolveComponentIdFromDrop()`, `_assignSystemItem()` → `_assignComponent()`. Update all call sites.
+     - `src/ui/svelte/stores/editorStore.js:987,1001,1011`: parameter names `systemItemId` in `assignIngredientItem`, `assignCatalystItem`, `assignResultItem` → `componentId`.
+     - `src/ui/svelte/apps/editor/RecipeEditorRoot.svelte:145-146`: parameter `systemItemId` in `handleDropCatalyst` → `componentId`.
+  7. A regression test confirms the drag-drop workflow (drop from ItemPickerGrid onto IngredientGroupCard, CatalystBlock, and ResultGroupPanel) still works end-to-end after the protocol key rename in AC5.
+  8. No behavioral change for any existing test; all tests continue to pass.

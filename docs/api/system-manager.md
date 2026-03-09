@@ -7,7 +7,7 @@ nav_order: 3
 
 # CraftingSystemManager
 
-Manages crafting system configurations and their managed item libraries.
+Manages crafting system configurations and their component libraries.
 
 **Access:** `game.fabricate.getCraftingSystemManager()`
 
@@ -209,11 +209,11 @@ Deletes a system and all its recipes. GM only.
 
 ---
 
-## Managed Item Methods
+## Component Methods
 
 ### getItems(systemId, search)
 
-Returns managed items for a system, optionally filtered by search text.
+Returns components for a system, optionally filtered by search text.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
@@ -222,11 +222,11 @@ Returns managed items for a system, optionally filtered by search text.
 
 **Returns:** `object[]`
 
-The system object exposes managed items under two equivalent properties: `components` (primary) and `managedItems` (transitional alias). Both always refer to the same array.
+The system object exposes components under two equivalent properties: `components` (primary) and `managedItems` (transitional alias). Both always refer to the same array.
 
 ### addItemFromUuid(systemId, itemUuid)
 
-Adds a single Foundry item to the system as a managed item. GM only.
+Adds a single Foundry Item document to the system as a component. GM only.
 
 Returns a result object that indicates whether the item was newly created, updated, or already up to date, so callers can show appropriate notifications.
 
@@ -243,7 +243,7 @@ The method uses a two-level source-chain lookup before creating a new component:
 
 **Returns:** `Promise<{ item: object, action: 'added' | 'updated' | 'skipped' }>`
 
-- `item` — the managed component object (new or existing).
+- `item` — the component object (new or existing).
 - `action` — `"added"` if a new component was created, `"updated"` if an existing component's name or image was refreshed, `"skipped"` if the item was already registered and already up to date.
 
 **Throws:** `Error` if the system ID is not found, or if the UUID resolves to a non-Item document (such as an Actor or JournalEntry).
@@ -267,7 +267,7 @@ Hooks.once('fabricate.ready', async () => {
 
 ### addItemsFromPack(systemId, packId)
 
-Imports all Item documents from a compendium pack into the system as managed items. GM only.
+Imports all Item documents from a compendium pack into the system as components. GM only.
 
 Each item is processed via `addItemFromUuid()`, so the same source-chain deduplication rules apply: items already registered and up to date are skipped, items whose metadata has changed are updated, and new items are added.
 
@@ -304,12 +304,12 @@ Hooks.once('fabricate.ready', async () => {
 
 ### updateItem(systemId, itemId, updates)
 
-Updates a managed item's properties (tags, essences, difficulty, salvage). GM only.
+Updates a component's properties (tags, essences, difficulty, salvage). GM only.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
 | `systemId` | `string` | System ID |
-| `itemId` | `string` | Managed component ID |
+| `itemId` | `string` | Component ID |
 | `updates` | `object` | Partial item data |
 
 **Returns:** `Promise<object>`
@@ -338,9 +338,9 @@ Hooks.once('fabricate.ready', async () => {
 
 ### deleteItem(systemId, itemId)
 
-Removes a managed item from the system. GM only.
+Removes a component from the system. GM only.
 
-When an item is deleted, any essence definitions that had their `sourceItemUuid` pointing to that item are automatically updated: `sourceItemUuid` is set to `null`.
+When a component is deleted, any essence definitions that had their `sourceItemUuid` pointing to that item are automatically updated: `sourceItemUuid` is set to `null`.
 
 **Returns:** `Promise<boolean>`
 
@@ -362,7 +362,7 @@ Each returned object has the following shape:
 | `name` | `string` | Display name |
 | `description` | `string` | Flavour text (may be empty) |
 | `icon` | `string` | FontAwesome class string. Always a non-empty string; defaults to `fas fa-mortar-pestle`. |
-| `sourceItemUuid` | `string\|null` | Authoritative field. Component ID of the managed item linked to this essence, or `null`. |
+| `sourceItemUuid` | `string\|null` | Authoritative field. The `componentId` of the component linked to this essence, or `null`. |
 
 ```javascript
 const mgr = game.fabricate.getCraftingSystemManager();

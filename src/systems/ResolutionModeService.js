@@ -169,7 +169,7 @@ export class ResolutionModeService {
         for (const result of results) {
           const difficulty = this._getDifficulty(system, result?.componentId || result?.systemItemId);
           if (!Number.isFinite(difficulty) || difficulty < 1) {
-            errors.push(`Result "${result?.id || 'unknown'}" references system item without valid difficulty`);
+            errors.push(`Result "${result?.id || 'unknown'}" references component without valid difficulty`);
           }
         }
       }

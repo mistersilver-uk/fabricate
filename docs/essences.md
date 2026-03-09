@@ -9,9 +9,9 @@ nav_order: 6
 {: .gm }
 > Requires the `essences` feature to be enabled on the crafting system.
 
-Essences are abstract properties that can be assigned to managed items. They provide a flexible way to categorise ingredients beyond simple tags -- an item might contain "2 units of Fire essence and 1 unit of Arcane essence".
+Essences are abstract properties that can be assigned to components. They provide a flexible way to categorise ingredients beyond simple tags -- an item might contain "2 units of Fire essence and 1 unit of Arcane essence".
 
-Consider a Dragon Scale that radiates heat and hums with faint magical energy, or a Frost Crystal that chills anything it touches. Rather than treating these as unrelated ingredients, essences let you tag each item with the *qualities* it carries -- three units of Fire and one of Arcane on the scale, four units of Frost on the crystal. When a recipe calls for "at least 3 Fire and 2 Arcane", players can mix and match any combination of items whose essence totals meet the threshold, opening up creative flexibility at the crafting table. Essences can also drive automatic [effect transfer](#effect-transfer-via-essences), so a sword forged from fire-heavy ingredients inherits flame-related properties. Below you will find the fields that [define an essence](#defining-essences) and how to [assign essence quantities](#assigning-essences-to-items) to your managed items.
+Consider a Dragon Scale that radiates heat and hums with faint magical energy, or a Frost Crystal that chills anything it touches. Rather than treating these as unrelated ingredients, essences let you tag each component with the *qualities* it carries -- three units of Fire and one of Arcane on the scale, four units of Frost on the crystal. When a recipe calls for "at least 3 Fire and 2 Arcane", players can mix and match any combination of components whose essence totals meet the threshold, opening up creative flexibility at the crafting table. Essences can also drive automatic [effect transfer](#effect-transfer-via-essences), so a sword forged from fire-heavy ingredients inherits flame-related properties. Below you will find the fields that [define an essence](#defining-essences) and how to [assign essence quantities](#assigning-essences-to-items) to your components.
 
 ---
 
@@ -25,9 +25,9 @@ Essences are defined at the crafting system level. Each essence definition has t
 | `name` | `string` | Display name (e.g. "Fire", "Arcane", "Nature") |
 | `icon` | `string` | FontAwesome icon class. Defaults to `fas fa-mortar-pestle`. Empty or whitespace values also fall back to the default. |
 | `description` | `string` | Flavour text |
-| `sourceItemUuid` | `string\|null` | The authoritative field. UUID of the managed item (by its system item ID) whose active effects represent this essence. `null` if not linked. |
+| `sourceItemUuid` | `string\|null` | The authoritative field. UUID of the component (by its `componentId`) whose active effects represent this essence. `null` if not linked. |
 
-When Fabricate normalises an essence definition it resolves `sourceItemUuid` against the system's current managed item IDs. If the referenced item no longer exists, `sourceItemUuid` is set to `null`.
+When Fabricate normalises an essence definition it resolves `sourceItemUuid` against the system's current component IDs. If the referenced component no longer exists, `sourceItemUuid` is set to `null`.
 
 ### Example Essences
 
@@ -40,7 +40,7 @@ When Fabricate normalises an essence definition it resolves `sourceItemUuid` aga
 
 ## Assigning Essences to Items
 
-In the **Items** tab of the GM admin, each managed item can have essences assigned with quantities:
+In the **Items** tab of the GM admin, each component can have essences assigned with quantities:
 
 | Item | Fire | Frost | Arcane |
 |:-----|:-----|:------|:-------|
@@ -79,7 +79,7 @@ Essence definitions are configured from the **Systems** tab of the GM admin, ins
 
 The icon field accepts any FontAwesome class string (e.g. `fas fa-fire`, `fas fa-snowflake`). If you leave it blank, the default `fas fa-mortar-pestle` icon is used.
 
-The source item dropdown lists managed items already added to this crafting system. Selecting one links the essence to that item for effect transfer purposes. The label in the UI reads **Source item**.
+The source item dropdown lists components already added to this crafting system. Selecting one links the essence to that component for effect transfer purposes. The label in the UI reads **Source item**.
 
 ---
 

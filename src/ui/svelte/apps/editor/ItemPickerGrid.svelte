@@ -6,8 +6,8 @@
 
   function handleDragStart(event, item) {
     event.dataTransfer.setData('text/plain', JSON.stringify({
-      type: 'systemItem',
-      systemItemId: item.id
+      type: 'component',
+      componentId: item.id
     }));
     event.dataTransfer.effectAllowed = 'copy';
     onDragStart?.(event, item);
