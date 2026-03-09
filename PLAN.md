@@ -1,345 +1,396 @@
-# PLAN: Foundry Live Smoke Harness (Agentic Feedback)
+# Implementation Plan: CI/CD Pipeline — Foundry Integration Tests, Conventional Commits, Semantic Release
 
-## Dependency Rationale
+## Overview
 
-Add `playwright` as a dev dependency to enable a real browser smoke test against a running Foundry instance.  
-Reason: existing tests mock Foundry globals and do not validate real ApplicationV2 rendering, sidebar button wiring, or runtime console failures in a live client session.
+Add 5 new capabilities to Fabricate's CI/CD:
 
-## Scope
+1. **Conventional commit enforcement** on every PR
+2. **Foundry VTT integration test infrastructure** (Docker + Playwright scripts)
+3. **Foundry integration test workflow** (manually triggerable, reusable as release gate)
+4. **Release workflow** (manual trigger, semantic-release for versioning + tagging)
+5. **Team A UX audit** updated with live Foundry + Playwright MCP
 
-1. Add npm scripts:
-   - `test:foundry:up`
-   - `test:foundry:run`
-   - `test:foundry:down`
-   - `test:foundry`
-2. Add Docker Compose harness for local disposable Foundry execution.
-3. Add a Playwright smoke test runner that:
-   - logs into Foundry,
-   - verifies Fabricate module is active,
-   - clicks `Craft Item` from Items sidebar,
-   - asserts Crafting App opens,
-   - fails on captured runtime errors.
-4. Persist machine-readable feedback (`summary.json`) and debugging artifacts (screenshots, browser console log).
+## Deliverable 1: Conventional Commits
 
-## Guardrails
+### Files to create/modify
 
-1. Do not mutate containers manually; recreate disposable test environment.
-2. Keep the smoke scope intentionally small and deterministic.
-3. Keep existing fast unit tests as the default quality gate; Foundry smoke is additional integration coverage.
+- **Create `.github/workflows/commitlint.yml`** — validates PR title follows conventional commits
+- **Create `commitlint.config.js`** — commitlint configuration
+- **Modify `package.json`** — add `@commitlint/cli`, `@commitlint/config-conventional` as devDependencies
+- **Modify `.claude/agents/implementer.md`** — add conventional commit rule
+- **Modify `.claude/agents/orchestrator.md`** — add conventional commit rule
+- **Modify `.github/workflows/team-b-backlog.yml`** — update commit message format
 
----
-
-# PLAN: Compendium & Item Drop-Import Defects
-
-## Source Spec
-
-`TASK-SPEC-DROP-DEFECTS.md` -- two defects to fix.
-
-## Defect 1 -- Source-ID-aware overwrite on compendium item drop
-
-### Problem Summary
-
-`addItemFromUuid` checks only for an exact `sourceUuid` match. It does not detect
-when the dropped compendium UUID is the *source* of an existing world-item component.
-Example: existing component has `sourceUuid = "Compendium.world.pack.Item.234"`;
-dropping that same compendium UUID again should overwrite name/img, retain the
-component `id`, and push the old `sourceUuid` into `fallbackItemIds`.
-
-## Defect 2 -- Reject non-Item entity types on drop
-
-### Problem Summary
-
-`onDropItem` and `resolveDropUuid` accept any drag data without checking entity
-type. Actors, JournalEntries, Scenes, etc. are silently accepted. Folder drops
-should expand to contained Items.
-
----
-
-## Implementation Steps
-
-### Step 1: Add i18n keys (lang/en.json)
-
-Add the following keys under `FABRICATE.Admin.Items`:
-
-| Key | Value |
-|-----|-------|
-| `ItemUpdated` | `"Updated existing item: {name}."` |
-| `BulkImportUpdated` | `"Imported {added} new, updated {updated}, skipped {skipped} of {total} items."` |
-| `DropNotAnItem` | `"Only Item documents can be added as crafting components. Dropped: {type}."` |
-| `FolderImportSummary` | `"Imported {added} items from folder \"{name}\"."` |
-| `FolderEmpty` | `"Folder \"{name}\" contains no Item documents."` |
-
-Note: The existing `BulkImportSummary` key is kept for backward compatibility
-but the new `BulkImportUpdated` key replaces it in the bulk-import path (which
-now tracks `updated` separately).
-
-**File:** `/home/matthew/WebstormProjects/fabricate-v2/lang/en.json`
-
----
-
-### Step 2: Update `resolveDropUuid` to return type info (dropUtils.js)
-
-**File:** `/home/matthew/WebstormProjects/fabricate-v2/src/ui/svelte/util/dropUtils.js`
-
-Add a new export `resolveDropData(data)` alongside the existing `resolveDropUuid`.
-Keep `resolveDropUuid` unchanged for backward compatibility.
+### Conventional commit format for agents
 
 ```
-resolveDropData(data) -> { uuid: string|null, type: string|null }
+<type>(#<issue>): <description>
+
+Types: feat, fix, docs, chore, refactor, test, style, perf
 ```
 
-- `type` is taken from `data.type` (Foundry populates this as `"Item"`, `"Actor"`,
-  `"Folder"`, `"Compendium"`, etc.).
-- `uuid` is resolved the same way as `resolveDropUuid`.
-- For `data.type === 'Folder'`, uuid is null (folders have no UUID in Foundry);
-  return `{ uuid: null, type: 'Folder', folderId: data.id, folderDocumentType: data.documentType }`.
+### commitlint.yml workflow
 
----
+```yaml
+name: Commit Lint
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Validate PR title
+        run: echo "${{ github.event.pull_request.title }}" | npx commitlint
+      - name: Validate commits
+        run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }}
+```
 
-### Step 3: Update `addItemFromUuid` with source-ID-aware overwrite (CraftingSystemManager.js)
+### commitlint.config.js
 
-**File:** `/home/matthew/WebstormProjects/fabricate-v2/src/systems/CraftingSystemManager.js`
-
-Change `addItemFromUuid(systemId, itemUuid)` to return
-`{ item, action: 'added'|'updated'|'skipped' }`:
-
-1. **Exact match** (current logic): `system.items.find(i => i.sourceUuid === itemUuid || i.sourceItemUuid === itemUuid)`.
-   - If found, return `{ item: existing, action: 'skipped' }`.
-
-2. **Source-ID match** (new logic): check if any existing item's `sourceUuid`
-   equals the dropped UUID OR if the dropped UUID appears in any item's
-   `fallbackItemIds`. This catches the case where a world item was created
-   from this compendium entry.
-   - If found:
-     a. Resolve the dropped UUID via `fromUuid` to get fresh name/img.
-     b. Overwrite `name` and `img` on the existing item.
-     c. If the existing item's `sourceUuid` differs from `itemUuid`, push the
-        old `sourceUuid` into `fallbackItemIds` (deduplicated).
-     d. Update `sourceUuid` and `sourceItemUuid` to `itemUuid`.
-     e. Save and return `{ item: updated, action: 'updated' }`.
-
-3. **No match** (current new-item logic): resolve, create, save, return
-   `{ item: newItem, action: 'added' }`.
-
-4. **Document type guard**: after `fromUuid`, if `source.documentName` exists
-   and is not `'Item'`, throw an error
-   `"Cannot add non-Item document (${source.documentName}) as a crafting component"`.
-
-Also add a private helper `_findExistingBySourceChain(system, uuid)` that
-encapsulates the matching logic for both exact and source-ID match. Returns
-`{ item, matchType: 'exact'|'source' }` or `null`.
-
----
-
-### Step 4: Update `addItemsFromPack` to track `updated` count (CraftingSystemManager.js)
-
-**File:** `/home/matthew/WebstormProjects/fabricate-v2/src/systems/CraftingSystemManager.js`
-
-Change return type to `{ added, updated, skipped, total }`:
-
-- Delegate to `addItemFromUuid` for each item (it now returns `{ item, action }`).
-- Increment `added`, `updated`, or `skipped` based on `action`.
-- Remove the inline deduplication check (it is now inside `addItemFromUuid`).
-
----
-
-### Step 5: Update callers of `addItemFromUuid` that use the return value
-
-Three callers access the return value of `addItemFromUuid`:
-
-#### 5a: `SvelteRecipeManagerApp.svelte.js` (line 137)
-
-**File:** `/home/matthew/WebstormProjects/fabricate-v2/src/ui/SvelteRecipeManagerApp.svelte.js`
-
-Current code does not use the return value (just awaits). No change needed for
-the return value, but add entity type guard and folder expansion (see Step 5c).
-
-#### 5b: `RecipeEditorApp.js` (line 842)
-
-**File:** `/home/matthew/WebstormProjects/fabricate-v2/src/ui/RecipeEditorApp.js`
-
-Current code:
 ```js
-const systemItem = await game.fabricate.getCraftingSystemManager().addItemFromUuid(...);
-return systemItem?.id || null;
+export default {
+  extends: ['@commitlint/config-conventional'],
+};
 ```
-
-Must change to:
-```js
-const result = await game.fabricate.getCraftingSystemManager().addItemFromUuid(...);
-return result?.item?.id || null;
-```
-
-#### 5c: `RecipeManagerApp.js` (line 305)
-
-**File:** `/home/matthew/WebstormProjects/fabricate-v2/src/ui/RecipeManagerApp.js`
-
-Current code does not use the return value (just awaits). No change needed.
-
-#### 5d: `onDropItem` in SvelteRecipeManagerApp -- entity type guard and folder expansion
-
-**File:** `/home/matthew/WebstormProjects/fabricate-v2/src/ui/SvelteRecipeManagerApp.svelte.js`
-
-1. **Import** `resolveDropData` from dropUtils.js (keep existing `resolveDropUuid` import
-   if still used elsewhere, or replace).
-
-2. **Add entity type guard** at the top of `onDropItem`:
-   - Use `resolveDropData(data)` to get `{ uuid, type }`.
-   - If `type === 'Folder'`: handle folder expansion (see below).
-   - If `type === 'Compendium'` and no uuid: existing bulk import path (no change).
-   - If `type` is not `'Item'` and not null/undefined: show warning notification
-     using `FABRICATE.Admin.Items.DropNotAnItem` with `{ type }` and return early.
-   - Otherwise: proceed with single-item import as before.
-
-3. **Folder expansion branch**:
-   - Get the folder via `game.folders.get(data.id)` (Foundry API).
-   - Filter `folder.contents` to Item documents only (check `documentName === 'Item'`
-     or check `folder.type === 'Item'` which is the Foundry v13 convention).
-   - If no Items, show info notification using `FABRICATE.Admin.Items.FolderEmpty`.
-   - Otherwise, iterate and call `systemManager.addItemFromUuid(systemId, item.uuid)`
-     for each.
-   - Show summary notification using `FABRICATE.Admin.Items.FolderImportSummary`.
-
-4. **Updated notification for single-item overwrite**:
-   - `addItemFromUuid` now returns `{ item, action }`.
-   - If `action === 'updated'`, show info notification using
-     `FABRICATE.Admin.Items.ItemUpdated`.
-
-5. **Updated notification for bulk pack import**:
-   - Use new `BulkImportUpdated` i18n key with `{ added, updated, skipped, total }`.
 
 ---
 
-### Step 6: Write tests (tests/compendium-drop.test.js)
+## Deliverable 2: Foundry Integration Test Infrastructure
 
-**File:** `/home/matthew/WebstormProjects/fabricate-v2/tests/compendium-drop.test.js`
+### Files to create
 
-Add the following new test cases (append to existing file):
+- **`docker-compose.foundry.yml`** — Docker Compose for Foundry container
+- **`.env.foundry.example`** — env template
+- **`scripts/foundry-test-up.mjs`** — start container + wait for health
+- **`scripts/foundry-test-run.mjs`** — Playwright smoke tests against running Foundry
+- **`scripts/foundry-test-down.mjs`** — teardown container
+- **`scripts/foundry-test.mjs`** — orchestrator: build → up → run → down
+- **`test-fixtures/worlds/fabricate-test/world.json`** — minimal test world
 
-#### Defect 1 tests (source-ID-aware overwrite):
+### docker-compose.foundry.yml
 
-1. `addItemFromUuid -- exact duplicate returns { item, action: 'skipped' }`
-   - System has item with `sourceUuid: "Compendium.world.pack.item-a"`.
-   - Drop same UUID.
-   - Assert: result.action is `'skipped'`, result.item is the existing item, no duplicates.
+```yaml
+services:
+  foundry:
+    image: felddy/foundryvtt:13
+    ports:
+      - "30000:30000"
+    environment:
+      FOUNDRY_USERNAME: ${FOUNDRY_USERNAME}
+      FOUNDRY_PASSWORD: ${FOUNDRY_PASSWORD}
+      FOUNDRY_LICENSE_KEY: ${FOUNDRY_LICENSE_KEY}
+      FOUNDRY_ADMIN_KEY: test-admin-key
+      FOUNDRY_WORLD: fabricate-test
+      CONTAINER_CACHE: /data/container_cache
+      TZ: UTC
+    volumes:
+      - foundry-data:/data
+      - ./dist:/data/Data/modules/fabricate:ro
+      - ./test-fixtures/worlds/fabricate-test:/data/Data/worlds/fabricate-test
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:30000"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      start_period: 30s
+volumes:
+  foundry-data:
+```
 
-2. `addItemFromUuid -- new item returns { item, action: 'added' }`
-   - System is empty.
-   - Drop a UUID with mock `fromUuid` returning name/img.
-   - Assert: result.action is `'added'`, result.item has correct name/img/sourceUuid.
+### world.json (test fixture)
 
-3. `addItemFromUuid -- overwrites when dropped UUID matches existing sourceUuid (source-chain match)`
-   - System has item with `sourceUuid: "Compendium.world.pack.item-a"`, id: `"comp-1"`.
-   - Mock `fromUuid` for same UUID returns updated name/img.
-   - Note: this is the exact-match path so it should skip, not overwrite. Test verifies
-     the exact-match takes priority.
+Minimal world targeting Foundry v13 with Fabricate dependency, no game system required for smoke tests. Passwordless Gamemaster user.
 
-4. `addItemFromUuid -- overwrites when existing item's sourceUuid references dropped UUID via fallbackItemIds`
-   - System has item with `sourceUuid: "Item.world-123"`, `fallbackItemIds: ["Compendium.world.pack.item-a"]`.
-   - Drop `"Compendium.world.pack.item-a"`.
-   - Mock `fromUuid` returns updated name/img.
-   - Assert: same component id retained, name/img updated, old sourceUuid pushed to
-     fallbackItemIds, result.action is `'updated'`.
+```json
+{
+  "id": "fabricate-test",
+  "title": "Fabricate Test World",
+  "system": "dnd5e",
+  "coreVersion": "13",
+  "systemVersion": "4",
+  "description": "Automated test world for Fabricate CI",
+  "modules": [
+    { "id": "fabricate", "active": true }
+  ]
+}
+```
 
-5. `addItemFromUuid -- fallbackItemIds accumulates without duplicates`
-   - Start with item having fallbackItemIds `["old-uuid-1"]`.
-   - Trigger source-chain overwrite that pushes `sourceUuid` to fallbackItemIds.
-   - Assert: fallbackItemIds contains both old and new entries, no duplicates.
+Note: The actual user data (passwordless GM) is configured on first launch. The test scripts must handle the initial join screen by selecting the Gamemaster user.
 
-6. `addItemsFromPack -- returns { added, updated, skipped, total }`
-   - System has one item matching a pack entry by exact sourceUuid.
-   - Pack has 3 items.
-   - Assert: result has all four fields, `updated` field exists.
+### foundry-test-up.mjs
 
-7. `addItemFromUuid -- rejects non-Item document type`
-   - Mock `fromUuid` returns `{ documentName: 'Actor', name: 'Bob' }`.
-   - Assert: throws error containing "non-Item" or "Actor".
+1. Check for required env vars (FOUNDRY_USERNAME, FOUNDRY_PASSWORD, FOUNDRY_LICENSE_KEY) — read from `.env.foundry` locally or process.env in CI
+2. Run `docker compose -f docker-compose.foundry.yml up -d`
+3. Poll `http://localhost:30000` every 2s until 200 response (max 120s)
+4. Verify world is accessible by checking response contains expected content
+5. Exit 0 on success, 1 on timeout
 
-#### Defect 2 tests (entity type handling):
+### foundry-test-run.mjs
 
-8. `resolveDropData -- Item type returns uuid and type`
-   - Input: `{ type: 'Item', uuid: 'Item.abc123' }`.
-   - Assert: `{ uuid: 'Item.abc123', type: 'Item' }`.
+Uses Playwright (already a devDependency) to:
 
-9. `resolveDropData -- Actor type returns uuid and type`
-   - Input: `{ type: 'Actor', uuid: 'Actor.123' }`.
-   - Assert: `{ uuid: 'Actor.123', type: 'Actor' }`.
+1. Launch chromium headless
+2. Navigate to `http://localhost:30000/join`
+3. Wait for join screen to render
+4. Click the Gamemaster user select option
+5. Click "Join Game Session" button (no password)
+6. Wait for `game.ready` by polling `page.evaluate(() => typeof game !== 'undefined' && game.ready)`
+7. Run smoke checks:
+   - `game.modules.get('fabricate')?.active === true`
+   - `typeof game.fabricate?.api !== 'undefined'`
+8. Run UI checks (screenshot each at 1920x1080, 1366x768, 800x600):
+   - Open crafting app: `game.fabricate.api.getCraftingAppClass().show()`
+   - Screenshot → `test-results/foundry/screenshots/crafting-app-{width}.png`
+   - Open recipe manager: `game.fabricate.api.getRecipeManagerAppClass().show()`
+   - Screenshot → `test-results/foundry/screenshots/recipe-manager-{width}.png`
+9. Collect console errors during the session
+10. Write `test-results/foundry/summary.json` with pass/fail + check results
+11. Exit 0 if all checks pass, 1 if any fail
 
-10. `resolveDropData -- Folder type returns folderId and folderDocumentType`
-    - Input: `{ type: 'Folder', id: 'folder1', documentType: 'Item' }`.
-    - Assert: includes `folderId: 'folder1'`, `type: 'Folder'`.
+### foundry-test-down.mjs
 
-11. `resolveDropData -- null input returns nulls`
-    - Assert: `{ uuid: null, type: null }`.
+1. Run `docker compose -f docker-compose.foundry.yml down -v`
+2. Clean up any temp state
 
-12. `onDropItem integration -- Actor drop shows warning and does not call addItemFromUuid`
-    - Build mock onDropItem with type checking.
-    - Pass `{ type: 'Actor', uuid: 'Actor.123' }`.
-    - Assert: warn called with DropNotAnItem key, addItemFromUuid not called.
+### foundry-test.mjs (orchestrator)
 
-13. `onDropItem integration -- Folder with Items imports each`
-    - Mock `game.folders.get` returning folder with 2 Item contents.
-    - Assert: addItemFromUuid called twice, info notification shown.
-
-14. `onDropItem integration -- Folder with no Items shows info notification`
-    - Mock empty folder.
-    - Assert: info notification shown, addItemFromUuid not called.
-
-#### Update existing tests:
-
-15. Update existing `addItemsFromPack` tests to account for new return shape
-    (add `updated: 0` to expected results where applicable).
+1. Run `npm run build` (ensures dist/ is fresh)
+2. Run `node scripts/foundry-test-up.mjs`
+3. Run `node scripts/foundry-test-run.mjs`
+4. Always run `node scripts/foundry-test-down.mjs` (even on failure)
+5. Exit with the run script's exit code
 
 ---
 
-## Risk Mitigation
+## Deliverable 3: Foundry Integration Test Workflow
 
-- `resolveDropUuid` is kept unchanged; new `resolveDropData` is additive. No
-  existing code breaks.
+### File to create: `.github/workflows/foundry-integration.yml`
 
-- `addItemFromUuid` return type changes from bare item to `{ item, action }`.
-  This is a breaking internal API change. All call sites have been audited:
-  - `SvelteRecipeManagerApp.svelte.js:137` -- does not use return value (safe)
-  - `RecipeManagerApp.js:305` -- does not use return value (safe)
-  - `RecipeEditorApp.js:842` -- uses `systemItem?.id`, must change to `result?.item?.id`
-  - `addItemsFromPack` internal call -- updated in Step 4
-  - `tests/recipe-editor-accordion.test.js:92` -- mock returns `null`, callers
-    use `?.id` so `null?.item?.id` is still safe via optional chaining
+Manually triggerable. Also callable as a reusable workflow (for the release gate).
 
-- `addItemsFromPack` return type gains `updated` field. Existing callers
-  destructure `{ added, skipped, total }` -- adding `updated` is additive.
+```yaml
+name: Foundry Integration Tests
 
-- Existing tests for `addItemsFromPack` assert on `result.added`, `result.skipped`,
-  `result.total`. These values should not change for existing test scenarios since
-  exact-match items are still `'skipped'`. But tests must be verified.
+on:
+  workflow_dispatch:
+  workflow_call:
 
-## Files Modified (Summary)
+permissions:
+  contents: read
 
-| File | Change |
-|------|--------|
-| `lang/en.json` | 5 new i18n keys |
-| `src/ui/svelte/util/dropUtils.js` | Add `resolveDropData` export |
-| `src/systems/CraftingSystemManager.js` | `addItemFromUuid` overwrite + type guard; `addItemsFromPack` updated return; `_findExistingBySourceChain` helper |
-| `src/ui/SvelteRecipeManagerApp.svelte.js` | Entity type guard, folder expansion, updated notifications |
-| `src/ui/RecipeEditorApp.js` | Update `addItemFromUuid` return value access (line 842-843) |
-| `tests/compendium-drop.test.js` | 14 new test cases + updates to existing tests |
+jobs:
+  foundry-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install chromium --with-deps
+      - name: Start Foundry
+        env:
+          FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
+          FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
+          FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}
+        run: node scripts/foundry-test-up.mjs
+      - name: Run integration tests
+        run: node scripts/foundry-test-run.mjs
+      - name: Stop Foundry
+        if: always()
+        run: node scripts/foundry-test-down.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: foundry-test-results
+          path: test-results/foundry/
+```
 
-## Execution Order
+---
 
-1. i18n keys in `lang/en.json` (no risk, no dependencies)
-2. `resolveDropData` in `dropUtils.js` (additive, no breakage)
-3. `_findExistingBySourceChain` helper in `CraftingSystemManager.js`
-4. `addItemFromUuid` rewrite with overwrite logic + type guard + new return shape
-5. `addItemsFromPack` updated to use new return shape
-6. `RecipeEditorApp.js` line 842 -- update return value access
-7. `SvelteRecipeManagerApp.svelte.js` -- entity type guard, folder expansion, notifications
-8. Tests -- write all new test cases, update existing ones
-9. `npm test` -- verify all pass
-10. `npm run build` -- verify clean build
+## Deliverable 4: Release Workflow
 
-## Verification
+### Files to create/modify
 
-- `npm test` -- all existing + new tests pass (target: 0 failures)
-- `npm run build` -- clean build, no errors
-- Manual smoke test (if Foundry available): drop Actor, drop Folder, drop
-  compendium item that already exists as world item, drop JournalEntry
+- **Create `.github/workflows/release.yml`** — manually triggered release workflow
+- **Create `.releaserc.json`** — semantic-release configuration
+- **Modify `package.json`** — add `semantic-release` + plugins as devDependencies
+- **Modify `scripts/release.js`** — add `--version` flag to accept version from CLI
+
+### .releaserc.json
+
+```json
+{
+  "branches": ["main"],
+  "plugins": [
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/release-notes-generator",
+    [
+      "@semantic-release/npm",
+      { "npmPublish": false }
+    ],
+    [
+      "@semantic-release/exec",
+      {
+        "prepareCmd": "node scripts/release.js --version ${nextRelease.version}"
+      }
+    ],
+    [
+      "@semantic-release/github",
+      {
+        "assets": [
+          { "path": "dist/fabricate-v*.zip", "label": "Module package" },
+          { "path": "dist/module.json", "label": "Module manifest" }
+        ]
+      }
+    ],
+    [
+      "@semantic-release/git",
+      {
+        "assets": ["package.json", "module.json"],
+        "message": "chore(release): ${nextRelease.version}\n\n${nextRelease.notes}"
+      }
+    ]
+  ]
+}
+```
+
+### release.yml
+
+```yaml
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (no publish)"
+        required: false
+        default: "false"
+        type: choice
+        options: ["true", "false"]
+
+permissions:
+  contents: write
+  issues: read
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+  integration-tests:
+    needs: unit-tests
+    uses: ./.github/workflows/foundry-integration.yml
+    secrets: inherit
+
+  release:
+    needs: integration-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - name: Semantic Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            npx semantic-release --dry-run
+          else
+            npx semantic-release
+          fi
+```
+
+### release.js modification
+
+Add `--version <ver>` flag that:
+1. Writes the version to `package.json` and `module.json` before building
+2. Uses that version in the zip filename (`fabricate-v<ver>.zip`)
+
+---
+
+## Deliverable 5: Team A UX Audit with Foundry + Playwright MCP
+
+### Modify `.github/workflows/team-a-research.yml`
+
+Replace the `ux-audit` job with a version that:
+1. Builds Fabricate (`npm run build`)
+2. Starts Foundry container with the built module mounted
+3. Waits for Foundry to be healthy
+4. Installs Playwright browsers
+5. Runs Claude Code Action with Playwright MCP configured
+6. Agent navigates to Foundry, logs in, opens crafting UIs, takes screenshots, analyses
+7. Tears down Foundry on completion (always)
+
+Uses docker compose approach (not GHA `services:`) because `services:` doesn't support workspace bind mounts.
+
+---
+
+## Agent configuration updates summary
+
+### implementer.md changes
+- Add rule: "Use conventional commits: `<type>(#<issue>): <description>`"
+- Fix test runner reference: "node:test" not "Jest"
+
+### orchestrator.md changes
+- Add rule: "All commits must follow conventional commit format"
+
+### team-b-backlog.yml changes
+- Update commit message format to follow conventional commits properly
+
+---
+
+## Implementation order
+
+1. Conventional commits (commitlint config + workflow + agent updates)
+2. Foundry test infrastructure (docker-compose + scripts + world fixture)
+3. Foundry integration workflow
+4. Release workflow (semantic-release config + release.yml + release.js update)
+5. Team A UX audit update
+
+## Files changed (complete list)
+
+### New files
+- `.github/workflows/commitlint.yml`
+- `.github/workflows/foundry-integration.yml`
+- `.github/workflows/release.yml`
+- `commitlint.config.js`
+- `.releaserc.json`
+- `docker-compose.foundry.yml`
+- `.env.foundry.example`
+- `scripts/foundry-test-up.mjs`
+- `scripts/foundry-test-run.mjs`
+- `scripts/foundry-test-down.mjs`
+- `scripts/foundry-test.mjs`
+- `test-fixtures/worlds/fabricate-test/world.json`
+
+### Modified files
+- `package.json` (devDependencies: commitlint, semantic-release + plugins)
+- `scripts/release.js` (add --version flag)
+- `.claude/agents/implementer.md` (conventional commits rule, fix test runner name)
+- `.claude/agents/orchestrator.md` (conventional commits rule)
+- `.github/workflows/team-a-research.yml` (ux-audit job with Foundry + Playwright)
+- `.github/workflows/team-b-backlog.yml` (conventional commit message format)

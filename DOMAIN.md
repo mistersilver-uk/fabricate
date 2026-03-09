@@ -4,50 +4,50 @@
 
 ### Core Entities
 
-| Term | Definition | Aliases (flag for elimination) | Code Mapping | Spec Reference |
-|------|-----------|-------------------------------|-------------|----------------|
-| **Crafting System** | A self-contained configuration defining resolution mode, feature toggles, components, and rules. All recipes belong to exactly one crafting system. | — | `CraftingSystemManager.systems` (Map), normalized object | spec/001, spec/002 |
-| **Recipe** | A specification for transforming inputs (ingredients, catalysts) into outputs (results). Belongs to exactly one crafting system. | — | `Recipe` class (`src/models/Recipe.js`), `RecipeManager` | spec/002, spec/005 |
-| **Component** | A curated item entry in a crafting system's library. References a Foundry Item via `sourceItemUuid`. Used as the unit of reference for ingredients, catalysts, and results. | `managed item` (UI legacy), `system item` (UI legacy, mostly eliminated by T-096), `item` (ambiguous — Foundry Item vs Fabricate Component) | `_normalizeComponent()` in `CraftingSystemManager`; triple-aliased on system object as `items`, `components`, `managedItems` | spec/002 |
-| **Ingredient** | A consumable input requirement within an ingredient group. Matched by component ID or tags. | — | `Ingredient` class (`src/models/Ingredient.js`) | spec/002 |
-| **Ingredient Group** | A set of OR-alternative ingredient options. All groups in an ingredient set must be satisfied (AND). | — | `IngredientGroup` class (`src/models/IngredientGroup.js`) | spec/002 |
-| **Ingredient Set** | A complete bundle of ingredient groups, essence requirements, and catalysts. Sets are OR-alternatives at the recipe/step level. | — | `IngredientSet` class (`src/models/IngredientSet.js`) | spec/002 |
-| **Catalyst** | A non-consumable tool/reagent required for crafting. May degrade with use. | — | `Catalyst` class (`src/models/Catalyst.js`) | spec/002 |
-| **Result** | A single produced item output. References a component. | — | `Result` class (`src/models/Result.js`) | spec/002 |
-| **Result Group** | A named collection of results. In routed/alchemy modes, the routing target. | — | Plain object `{ id, name, results[] }` | spec/002 |
-| **Step** | One phase of a multi-step recipe, with its own ingredients, results, and optional time/currency requirements. | — | Plain object in recipe `steps[]` | spec/002, spec/005 |
-| **Crafting Run** | An actor-scoped execution instance tracking a recipe craft in progress or completed. | `run` | `CraftingRunManager` | spec/002, spec/005 |
-| **Salvage Run** | An actor-scoped execution instance for decomposing a component into results. | — | Referenced in `CraftingEngine`, `CraftingSystemManager` | spec/005 |
+| Term                 | Definition                                                                                                                                                                  | Aliases (flag for elimination)                                                                                                              | Code Mapping                                                                                                                 | Spec Reference     |
+|----------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|--------------------|
+| **Crafting System**  | A self-contained configuration defining resolution mode, feature toggles, components, and rules. All recipes belong to exactly one crafting system.                         | —                                                                                                                                           | `CraftingSystemManager.systems` (Map), normalized object                                                                     | spec/001, spec/002 |
+| **Recipe**           | A specification for transforming inputs (ingredients, catalysts) into outputs (results). Belongs to exactly one crafting system.                                            | —                                                                                                                                           | `Recipe` class (`src/models/Recipe.js`), `RecipeManager`                                                                     | spec/002, spec/005 |
+| **Component**        | A curated item entry in a crafting system's library. References a Foundry Item via `sourceItemUuid`. Used as the unit of reference for ingredients, catalysts, and results. | `managed item` (UI legacy), `system item` (UI legacy, mostly eliminated by T-096), `item` (ambiguous — Foundry Item vs Fabricate Component) | `_normalizeComponent()` in `CraftingSystemManager`; triple-aliased on system object as `items`, `components`, `managedItems` | spec/002           |
+| **Ingredient**       | A consumable input requirement within an ingredient group. Matched by component ID or tags.                                                                                 | —                                                                                                                                           | `Ingredient` class (`src/models/Ingredient.js`)                                                                              | spec/002           |
+| **Ingredient Group** | A set of OR-alternative ingredient options. All groups in an ingredient set must be satisfied (AND).                                                                        | —                                                                                                                                           | `IngredientGroup` class (`src/models/IngredientGroup.js`)                                                                    | spec/002           |
+| **Ingredient Set**   | A complete bundle of ingredient groups, essence requirements, and catalysts. Sets are OR-alternatives at the recipe/step level.                                             | —                                                                                                                                           | `IngredientSet` class (`src/models/IngredientSet.js`)                                                                        | spec/002           |
+| **Catalyst**         | A non-consumable tool/reagent required for crafting. May degrade with use.                                                                                                  | —                                                                                                                                           | `Catalyst` class (`src/models/Catalyst.js`)                                                                                  | spec/002           |
+| **Result**           | A single produced item output. References a component.                                                                                                                      | —                                                                                                                                           | `Result` class (`src/models/Result.js`)                                                                                      | spec/002           |
+| **Result Group**     | A named collection of results. In routed/alchemy modes, the routing target.                                                                                                 | —                                                                                                                                           | Plain object `{ id, name, results[] }`                                                                                       | spec/002           |
+| **Step**             | One phase of a multi-step recipe, with its own ingredients, results, and optional time/currency requirements.                                                               | —                                                                                                                                           | Plain object in recipe `steps[]`                                                                                             | spec/002, spec/005 |
+| **Crafting Run**     | An actor-scoped execution instance tracking a recipe craft in progress or completed.                                                                                        | `run`                                                                                                                                       | `CraftingRunManager`                                                                                                         | spec/002, spec/005 |
+| **Salvage Run**      | An actor-scoped execution instance for decomposing a component into results.                                                                                                | —                                                                                                                                           | Referenced in `CraftingEngine`, `CraftingSystemManager`                                                                      | spec/005           |
 
 ### Resolution Modes
 
-| Term | Definition | Code Mapping | Spec Reference |
-|------|-----------|-------------|----------------|
-| **Simple** | One ingredient set, one result group, optional pass/fail check. | `resolutionMode: 'simple'` | spec/004 |
-| **Routed** | Multiple sets/groups with recipe-level result selection provider (`ingredientSet`, `macroOutcome`, `rollTableOutcome`). | `resolutionMode: 'routed'` | spec/004 |
-| **Progressive** | One set, one ordered result group. Mandatory numeric check distributes results by difficulty cost. | `resolutionMode: 'progressive'` | spec/004 |
-| **Alchemy** | Discovery-based mode where players submit ingredients blindly. Hidden recipes, signature matching, optional learn-on-craft. | `resolutionMode: 'alchemy'` | spec/004 |
+| Term            | Definition                                                                                                                  | Code Mapping                    | Spec Reference |
+|-----------------|-----------------------------------------------------------------------------------------------------------------------------|---------------------------------|----------------|
+| **Simple**      | One ingredient set, one result group, optional pass/fail check.                                                             | `resolutionMode: 'simple'`      | spec/004       |
+| **Routed**      | Multiple sets/groups with recipe-level result selection provider (`ingredientSet`, `macroOutcome`, `rollTableOutcome`).     | `resolutionMode: 'routed'`      | spec/004       |
+| **Progressive** | One set, one ordered result group. Mandatory numeric check distributes results by difficulty cost.                          | `resolutionMode: 'progressive'` | spec/004       |
+| **Alchemy**     | Discovery-based mode where players submit ingredients blindly. Hidden recipes, signature matching, optional learn-on-craft. | `resolutionMode: 'alchemy'`     | spec/004       |
 
 ### Visibility and Knowledge
 
-| Term | Definition | Code Mapping | Spec Reference |
-|------|-----------|-------------|----------------|
-| **List Mode** | System-wide visibility strategy: `global`, `player`, `knowledge`, or `teaser`. | `recipeVisibility.listMode` | spec/002, spec/006 |
-| **Knowledge Mode** | Sub-strategy within `knowledge` list mode: `item`, `learned`, `itemOrLearned`. | `recipeVisibility.knowledge.mode` | spec/002, spec/006 |
-| **Learned Recipe** | A recipe an actor has learned, stored in actor flags. | `Actor.flags.fabricate.learnedRecipes` | spec/006 |
-| **Recipe Item** | A Foundry Item linked to a recipe via `linkedRecipeItemUuid`. Ownership grants knowledge access. | `Recipe.linkedRecipeItemUuid` | spec/002, spec/006 |
-| **Source UUID** | The compendium origin of an owned item. Resolved via `_stats.compendiumSource` (v12+) or `flags.core.sourceId` (legacy). | `getSourceUuid()` in `src/utils/sourceUuid.js` | spec/006 |
-| **Teaser** | An undocumented-in-spec visibility mode where recipes are partially revealed based on discovery progress. | `listMode: 'teaser'`, `teaserConfig`, `Recipe.teaser` | (missing from spec — T-173) |
+| Term               | Definition                                                                                                               | Code Mapping                                          | Spec Reference              |
+|--------------------|--------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------|-----------------------------|
+| **List Mode**      | System-wide visibility strategy: `global`, `player`, `knowledge`, or `teaser`.                                           | `recipeVisibility.listMode`                           | spec/002, spec/006          |
+| **Knowledge Mode** | Sub-strategy within `knowledge` list mode: `item`, `learned`, `itemOrLearned`.                                           | `recipeVisibility.knowledge.mode`                     | spec/002, spec/006          |
+| **Learned Recipe** | A recipe an actor has learned, stored in actor flags.                                                                    | `Actor.flags.fabricate.learnedRecipes`                | spec/006                    |
+| **Recipe Item**    | A Foundry Item linked to a recipe via `linkedRecipeItemUuid`. Ownership grants knowledge access.                         | `Recipe.linkedRecipeItemUuid`                         | spec/002, spec/006          |
+| **Source UUID**    | The compendium origin of an owned item. Resolved via `_stats.compendiumSource` (v12+) or `flags.core.sourceId` (legacy). | `getSourceUuid()` in `src/utils/sourceUuid.js`        | spec/006                    |
+| **Teaser**         | An undocumented-in-spec visibility mode where recipes are partially revealed based on discovery progress.                | `listMode: 'teaser'`, `teaserConfig`, `Recipe.teaser` | (missing from spec — T-173) |
 
 ### Supplementary Concepts
 
-| Term | Definition | Code Mapping | Spec Reference |
-|------|-----------|-------------|----------------|
-| **Essence** | An abstract quality (e.g., "Fire", "Water") attached to components. Optional feature. | `EssenceDefinition`, `essences` on components/sets | spec/002 |
-| **Signature** | The satisfiable ingredient pattern of an ingredient set, used for alchemy matching and uniqueness validation. | `SignatureValidator` | spec/002, spec/004 |
-| **Result Selection Provider** | The mechanism by which a routed/alchemy recipe determines which result group to produce: `ingredientSet`, `macroOutcome`, or `rollTableOutcome`. | `Recipe.resultSelection.provider` | spec/002, spec/004 |
-| **Shopping List** | A session-scoped aggregation of materials needed for queued recipes. Not persisted. | `shoppingListAggregator.js`, `craftingStore` shopping actions | (missing from spec — T-175) |
-| **Fragment** | A discovery token for teaser mode. Linked to an item; collecting it advances discovery progress. | `FragmentDiscoveryHook`, `TeaserFragment` | (missing from spec — T-187) |
+| Term                          | Definition                                                                                                                                       | Code Mapping                                                  | Spec Reference              |
+|-------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------|-----------------------------|
+| **Essence**                   | An abstract quality (e.g., "Fire", "Water") attached to components. Optional feature.                                                            | `EssenceDefinition`, `essences` on components/sets            | spec/002                    |
+| **Signature**                 | The satisfiable ingredient pattern of an ingredient set, used for alchemy matching and uniqueness validation.                                    | `SignatureValidator`                                          | spec/002, spec/004          |
+| **Result Selection Provider** | The mechanism by which a routed/alchemy recipe determines which result group to produce: `ingredientSet`, `macroOutcome`, or `rollTableOutcome`. | `Recipe.resultSelection.provider`                             | spec/002, spec/004          |
+| **Shopping List**             | A session-scoped aggregation of materials needed for queued recipes. Not persisted.                                                              | `shoppingListAggregator.js`, `craftingStore` shopping actions | (missing from spec — T-175) |
+| **Fragment**                  | A discovery token for teaser mode. Linked to an item; collecting it advances discovery progress.                                                 | `FragmentDiscoveryHook`, `TeaserFragment`                     | (missing from spec — T-187) |
 
 ## Concept Taxonomy
 
@@ -294,15 +294,15 @@ stateDiagram-v2
 - **Fabricate v1:** The predecessor. Key learning: the v1 "Essence" system was unique but underused. v2's progressive complexity principle (start simple, add features) was a response to v1's all-or-nothing complexity.
 
 ### Naming Patterns Across Systems
-| Fabricate Term | D&D 5e | PF2e | FFXIV | Common Alternative |
-|---------------|--------|------|-------|-------------------|
-| Component | Material | Material | Material/Crystal | Material, Resource |
-| Recipe | — | Formula | Recipe | Recipe, Blueprint, Schematic |
-| Ingredient | Component | Ingredient | Material | Ingredient, Input |
-| Catalyst | Tool | Tool | — | Tool, Equipment |
-| Result | Product | Output | Item | Product, Output |
-| Crafting System | — | — | Crafting Class | — |
-| Essence | — | — | Aspect/Crystal | Property, Aspect |
-| Alchemy | — | — | — | Discovery, Experimentation |
+| Fabricate Term  | D&D 5e    | PF2e       | FFXIV            | Common Alternative           |
+|-----------------|-----------|------------|------------------|------------------------------|
+| Component       | Material  | Material   | Material/Crystal | Material, Resource           |
+| Recipe          | —         | Formula    | Recipe           | Recipe, Blueprint, Schematic |
+| Ingredient      | Component | Ingredient | Material         | Ingredient, Input            |
+| Catalyst        | Tool      | Tool       | —                | Tool, Equipment              |
+| Result          | Product   | Output     | Item             | Product, Output              |
+| Crafting System | —         | —          | Crafting Class   | —                            |
+| Essence         | —         | —          | Aspect/Crystal   | Property, Aspect             |
+| Alchemy         | —         | —          | —                | Discovery, Experimentation   |
 
 **Observation:** Fabricate's "Component" (curated item library entry) and "Ingredient" (recipe input requirement) are well-differentiated in the spec but frequently confused in code comments and UI, where "component" sometimes means "Foundry component source actor" (as in `componentSourceActors`). The term "Component" collides with Svelte components and Foundry's own component terminology.

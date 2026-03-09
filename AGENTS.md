@@ -2,7 +2,7 @@
 
 ## Project
 
-System-agnostic FoundryVTT crafting module. TypeScript + Svelte + Vite + Jest.
+System-agnostic FoundryVTT crafting module. JavaScript + Svelte + Vite + Jest.
 
 ## Build & Test
 
@@ -21,16 +21,6 @@ System-agnostic FoundryVTT crafting module. TypeScript + Svelte + Vite + Jest.
 - Branch per task: `agent/TASK-description`
 - Commits: `feat:`, `fix:`, `test:`, `refactor:`, `ci:` prefixes
 - Never commit directly to main. Always open a PR from a branch.
-
-## Codex Governance
-
-- Prefer `.codex/run-codex-pipeline.sh run` for a single task.
-- Use `.codex/run-codex-pipeline.sh run-many` only when tasks are independent.
-- If pipeline stage status is `BLOCKED` or review loop cap is exceeded, stop and request human input.
-- Before opening a PR, validate artifacts locally:
-  - `./.codex/validate-codex-run.sh single current`
-  - or `./.codex/validate-codex-run.sh multi current-multi`
-- PRs must include Codex evidence fields in `.github/pull_request_template.md`.
 
 ## FoundryVTT Notes
 
