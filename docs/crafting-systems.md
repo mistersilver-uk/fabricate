@@ -23,7 +23,7 @@ Open the GM admin panel (**Manage Crafting Systems** in the Items sidebar) and c
 |:--------|:------------|
 | **Name** | Display name shown in the UI |
 | **Description** | Optional flavour text |
-| **Resolution Mode** | How recipes produce results. See [Resolution Modes]({% link recipes/index.md %}#resolution-modes) |
+| **Resolution Mode** | How recipes produce results: `simple`, `routed`, `progressive`, or `cauldron`. See [Resolution Modes]({% link recipes/index.md %}#resolution-modes) |
 
 ### Feature Toggles
 
@@ -80,7 +80,7 @@ Hooks.once('fabricate.ready', async () => {
 
 ### Crafting Checks
 
-If your system uses tiered or progressive mode, you must configure a crafting check to gate outcomes on a player roll. See [Crafting Checks]({% link crafting-checks.md %}) for configuration fields, consumption-on-failure policies, and worked examples.
+If your system uses routed mode with the `macroOutcome` provider, or progressive mode, you must configure a crafting check to gate outcomes on a player roll. See [Crafting Checks]({% link crafting-checks.md %}) for configuration fields, consumption-on-failure policies, and worked examples.
 
 ### Effect Transfer
 
@@ -109,6 +109,18 @@ Fabricate supports three list modes:
 | `"knowledge"` | Recipes discovered through gameplay via recipe items or learning |
 
 For full details on each mode, knowledge sub-options, recipe items, the learn flow, and API configuration examples, see [Visibility & Knowledge]({% link visibility.md %}).
+
+### Cauldron Mode
+
+Cauldron mode is a special resolution mode where recipe names and ingredient lists are hidden from players. Players drag items into the Crafting App's Cauldron panel and submit them; Fabricate matches the combination against known recipe signatures. Set the resolution mode of a system to `cauldron` to enable this. See [Cauldron Mode]({% link recipes/cauldron.md %}) for configuration, signature matching, consume-on-fail, and learn-on-craft options.
+
+---
+
+## Graph Visualization
+
+Open the **Graph** tab in the Crafting Admin panel to see a visual map of how your recipes are connected through shared components. An arrow from Recipe A to Recipe B means that Recipe A produces a component that Recipe B consumes. The graph supports pan, zoom, search, and category filtering.
+
+See [Recipe Graph]({% link recipe-graph.md %}) for a full guide including how to read the layout, cycle detection, and filtering.
 
 ---
 

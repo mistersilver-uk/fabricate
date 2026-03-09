@@ -55,7 +55,7 @@ export class CraftingSystemManager {
       name: system.name || 'New Crafting System',
       description: system.description || '',
       enabled: system.enabled !== false,
-      resolutionMode: ['simple', 'mapped', 'tiered', 'progressive'].includes(system.resolutionMode)
+      resolutionMode: ['simple', 'mapped', 'tiered', 'progressive', 'cauldron'].includes(system.resolutionMode)
         ? system.resolutionMode
         : 'simple',
       difficulty: system.difficulty || {
@@ -76,6 +76,8 @@ export class CraftingSystemManager {
         ? system.salvageResolutionMode
         : 'simple',
       salvageCraftingCheck: this._normalizeSalvageCraftingCheck(system.salvageCraftingCheck),
+      cauldron: this._normalizeCauldronConfig(system.cauldron, system.resolutionMode),
+      teaserConfig: this._normalizeTeaserConfig(system.teaserConfig),
 
       // Transitional aliases for existing UI code paths
       categories: this._normalizeStringList(system.categories),
@@ -196,7 +198,7 @@ export class CraftingSystemManager {
   }
 
   _normalizeRecipeVisibility(recipeVisibility = {}) {
-    const listMode = ['global', 'player', 'knowledge'].includes(recipeVisibility?.listMode)
+    const listMode = ['global', 'player', 'knowledge', 'teaser'].includes(recipeVisibility?.listMode)
       ? recipeVisibility.listMode
       : 'global';
     const knowledge = recipeVisibility?.knowledge || {};
@@ -217,6 +219,34 @@ export class CraftingSystemManager {
           consumeOnLearn: knowledge?.learn?.consumeOnLearn !== false
         }
       }
+    };
+  }
+
+  _normalizeTeaserConfig(config = {}) {
+    if (!config || typeof config !== 'object') {
+      return { enabled: false, discoveryMode: 'threshold', fragments: [] };
+    }
+    return {
+      enabled: config.enabled === true,
+      discoveryMode: ['threshold', 'fragments', 'both'].includes(config.discoveryMode)
+        ? config.discoveryMode
+        : 'threshold',
+      fragments: Array.isArray(config.fragments)
+        ? config.fragments.map(f => this._normalizeTeaserFragment(f)).filter(Boolean)
+        : []
+    };
+  }
+
+  _normalizeTeaserFragment(fragment = {}) {
+    if (!fragment || typeof fragment !== 'object') return null;
+    const id = String(fragment.id || '').trim();
+    if (!id) return null;
+    return {
+      id,
+      name: String(fragment.name || '').trim() || 'Fragment',
+      linkedItemUuid: fragment.linkedItemUuid || null,
+      recipeIds: Array.isArray(fragment.recipeIds) ? fragment.recipeIds.filter(id => typeof id === 'string') : [],
+      progressValue: Math.min(100, Math.max(0, Number(fragment.progressValue) || 0))
     };
   }
 
@@ -321,6 +351,9 @@ export class CraftingSystemManager {
       sourceItemUuid: item.sourceItemUuid || item.sourceUuid || null,
       // Transitional alias for current UI/engine references.
       sourceUuid: item.sourceUuid || item.sourceItemUuid || null,
+      fallbackItemIds: Array.isArray(item.fallbackItemIds)
+        ? item.fallbackItemIds.filter(id => typeof id === 'string' && id.trim())
+        : [],
       tier: item.tier || null,
       tags: Array.isArray(item.tags) ? item.tags : [],
       essences: this._normalizeEssenceQuantities(item.essences, validEssenceIds),
@@ -424,6 +457,16 @@ export class CraftingSystemManager {
     return {
       unit: String(currency.unit || '').trim() || 'gp',
       amount: Number.isFinite(amount) && amount > 0 ? amount : 0
+    };
+  }
+
+  _normalizeCauldronConfig(config, resolutionMode) {
+    if (resolutionMode !== 'cauldron') return null;
+    const c = config && typeof config === 'object' ? config : {};
+    return {
+      learnOnCraft: c.learnOnCraft === true,
+      consumeOnFail: c.consumeOnFail !== false,
+      showAttemptHistoryToPlayers: c.showAttemptHistoryToPlayers !== false
     };
   }
 

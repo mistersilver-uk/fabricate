@@ -43,8 +43,9 @@
 
   <div class="step-fields">
     <div class="field-row">
-      <label>{localize('FABRICATE.Editor.Steps.StepNameLabel')}</label>
+      <label for="fab-step-name">{localize('FABRICATE.Editor.Steps.StepNameLabel')}</label>
       <input
+        id="fab-step-name"
         type="text"
         value={stepName}
         oninput={(e) => onUpdateStep?.('name', e.target.value)}
@@ -52,8 +53,9 @@
       />
     </div>
     <div class="field-row">
-      <label>{localize('FABRICATE.Editor.Steps.StepDescriptionLabel')}</label>
+      <label for="fab-step-description">{localize('FABRICATE.Editor.Steps.StepDescriptionLabel')}</label>
       <textarea
+        id="fab-step-description"
         value={stepDescription}
         oninput={(e) => onUpdateStep?.('description', e.target.value)}
         rows="2"
@@ -67,8 +69,9 @@
       <div class="time-grid">
         {#each timeUnits as unit}
           <div class="time-field">
-            <label>{localize(`FABRICATE.Editor.Steps.${unit.charAt(0).toUpperCase() + unit.slice(1)}Label`)}</label>
+            <label for="fab-step-time-{unit}">{localize(`FABRICATE.Editor.Steps.${unit.charAt(0).toUpperCase() + unit.slice(1)}Label`)}</label>
             <input
+              id="fab-step-time-{unit}"
               type="number"
               min="0"
               value={timeRequirement?.[unit] || 0}
@@ -85,16 +88,18 @@
       <h4>{localize('FABRICATE.Editor.Steps.CurrencyRequirementTitle')}</h4>
       <div class="currency-grid">
         <div class="field-row">
-          <label>{localize('FABRICATE.Editor.Steps.CurrencyUnitLabel')}</label>
+          <label for="fab-step-currency-unit">{localize('FABRICATE.Editor.Steps.CurrencyUnitLabel')}</label>
           <input
+            id="fab-step-currency-unit"
             type="text"
             value={currencyRequirement?.unit || ''}
             oninput={(e) => onUpdateStep?.('currencyRequirement.unit', e.target.value)}
           />
         </div>
         <div class="field-row">
-          <label>{localize('FABRICATE.Editor.Steps.CurrencyAmountLabel')}</label>
+          <label for="fab-step-currency-amount">{localize('FABRICATE.Editor.Steps.CurrencyAmountLabel')}</label>
           <input
+            id="fab-step-currency-amount"
             type="number"
             min="0"
             value={currencyRequirement?.amount || 0}

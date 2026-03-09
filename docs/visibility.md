@@ -6,11 +6,11 @@ nav_order: 7
 
 # Visibility & Knowledge
 
-Fabricate supports three approaches to controlling which recipes players can see and craft: **global**, **player lists**, and **knowledge gating**. The approach is configured per crafting system via the `listMode` setting.
+Fabricate supports four approaches to controlling which recipes players can see and craft: **global**, **player lists**, **knowledge gating**, and **teaser mode**. The approach is configured per crafting system via the `listMode` setting.
 
 ---
 
-Picture a campaign where novice adventurers know only basic recipes -- a healing salve and a simple torch -- while a master artificer has unlocked legendary weapon blueprints through months of questing. Fabricate's visibility system lets you control exactly this: which recipes each player can see and when new ones become available. You might make every recipe visible from the start for a casual game, hand-pick recipes per player for tighter narrative control, or gate discovery behind owning an in-world "recipe scroll" that a player finds in a dragon's hoard. The [list modes below](#list-modes) walk through each approach, starting with the three modes you can set on a crafting system.
+Picture a campaign where novice adventurers know only basic recipes -- a healing salve and a simple torch -- while a master artificer has unlocked legendary weapon blueprints through months of questing. Fabricate's visibility system lets you control exactly this: which recipes each player can see and when new ones become available. You might make every recipe visible from the start for a casual game, hand-pick recipes per player for tighter narrative control, or gate discovery behind owning an in-world "recipe scroll" that a player finds in a dragon's hoard. The [list modes below](#list-modes) walk through each approach, starting with the four modes you can set on a crafting system.
 
 ## List Modes
 
@@ -48,6 +48,17 @@ Recipes are discovered through gameplay.
 - Knowledge can come from **owning a recipe item**, **learning the recipe**, or **both**, depending on your `knowledge.mode` setting.
 - Encourages exploration and discovery.
 - The restriction UI in the recipe editor is hidden in this mode because access is always evaluated through the knowledge model, not an allow-list.
+
+### Teaser Mode (`listMode: "teaser"`)
+
+Recipes are partially visible to players before they are discovered. Players can see that a recipe exists — its name, category, and an optional teaser description — but hidden fields (ingredients, results, or description) are concealed until the player accumulates enough discovery progress.
+
+- Each recipe defines which fields to hide and a `revealThreshold` (the amount of discovery progress required to fully unlock it).
+- Progress accumulates via **fragments** (items linked to a UUID that grant progress automatically on acquisition) or **manual GM assignment**, or both.
+- A progress bar in the Crafting App shows each player how close they are to unlocking a teaser recipe.
+- When progress meets the threshold the recipe transitions to fully visible and craftable.
+
+See [Teaser Mode]({% link visibility-teaser.md %}) for full configuration details.
 
 ## Knowledge Modes
 
@@ -223,6 +234,7 @@ Hooks.once('fabricate.ready', async () => {
 
 ## What's next?
 
+- [Teaser Mode]({% link visibility-teaser.md %}) -- reveal recipes gradually with fragment-based or threshold-based discovery.
 - [Recipes overview]({% link recipes/index.md %}) -- create and edit recipes, including visibility configuration in the recipe editor.
 - [Crafting Systems]({% link crafting-systems.md %}) -- configure system-level visibility settings and feature toggles.
 - [Macros & Examples]({% link macros/index.md %}) -- automate visibility and knowledge workflows with macros.

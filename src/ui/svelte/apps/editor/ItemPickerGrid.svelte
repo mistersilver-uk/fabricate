@@ -19,9 +19,8 @@
 </script>
 
 <aside class="item-picker-panel">
-  <h3 class="picker-heading">{localize('FABRICATE.Editor.ItemPicker.SectionTitle')}</h3>
-
-  <div class="picker-search-sticky">
+  <div class="picker-sticky-header">
+    <h3 class="picker-heading">{localize('FABRICATE.Editor.ItemPicker.SectionTitle')}</h3>
     <input
       type="text"
       class="picker-search"
@@ -57,23 +56,25 @@
     display: flex;
     flex-direction: column;
     height: 100%;
-    overflow: hidden;
+    overflow-y: auto;
     border-left: 1px solid var(--color-border-light, #ccc);
-    padding: 8px;
+    padding: 0;
     min-width: 200px;
+    max-width: 280px;
   }
 
-  .picker-heading {
-    margin: 0 0 8px;
-    font-size: 1rem;
-  }
-
-  .picker-search-sticky {
+  .picker-sticky-header {
     position: sticky;
     top: 0;
     z-index: 5;
-    background: inherit;
-    padding-bottom: 8px;
+    background: var(--color-bg-option, #fff);
+    padding: 8px;
+    border-bottom: 1px solid var(--color-border-light, #ccc);
+  }
+
+  .picker-heading {
+    margin: 0 0 6px;
+    font-size: 1rem;
   }
 
   .picker-search {
@@ -85,8 +86,7 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
     gap: 6px;
-    overflow-y: auto;
-    flex: 1;
+    padding: 8px;
   }
 
   .picker-card {
@@ -99,6 +99,9 @@
     cursor: grab;
     overflow: hidden;
     text-align: center;
+    box-sizing: border-box;
+    max-width: 100%;
+    min-width: 0;
   }
 
   .picker-card:hover {
@@ -113,9 +116,14 @@
 
   .picker-card-name {
     font-size: 0.75rem;
-    word-break: break-word;
     line-height: 1.2;
     max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
   }
 
   .picker-empty {

@@ -99,9 +99,9 @@ The returned system object also includes the following top-level salvage fields,
 | `consumption.consumeCatalystsOnFail` | `boolean` | `false` | Degrade salvage catalysts even when the check fails |
 | `progressive.awardMode` | `string` | `"equal"` | Progressive award mode: `"equal"`, `"exceed"`, or `"partial"` |
 | `progressive.allowPlayerReorder` | `boolean` | `false` | Allow players to reorder pending progressive results |
-| `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for tiered routing |
+| `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for routed macroOutcome routing |
 
-The `craftingCheck` field is always present on the returned system object. It controls how skill/ability checks gate recipe outcomes in tiered and progressive modes.
+The `craftingCheck` field is always present on the returned system object. It controls how skill/ability checks gate recipe outcomes in routed macroOutcome and progressive modes.
 
 `craftingCheck` shape:
 
@@ -120,7 +120,7 @@ The `craftingCheck` field is always present on the returned system object. It co
 | `consumption.consumeCatalystsOnFail` | `boolean` | `false` | Degrade catalysts when the check fails. |
 | `progressive.awardMode` | `string` | `"equal"` | Progressive award mode: `"equal"`, `"exceed"`, or `"partial"`. |
 | `progressive.allowPlayerReorder` | `boolean` | `false` | Allow players to reorder pending progressive results. |
-| `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for tiered routing. |
+| `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for routed macroOutcome routing. |
 
 **Example: built-in check on D&D 5e.** Configure a tiered alchemy system to use an Intelligence (Arcana) check, DC 18, without writing a macro:
 

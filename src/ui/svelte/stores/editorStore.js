@@ -217,6 +217,9 @@ function _buildDraft(recipe, craftingSystemId, services) {
     outcomeRouting: data.outcomeRouting && typeof data.outcomeRouting === 'object'
       ? { ...data.outcomeRouting }
       : {},
+    resultSelection: data.resultSelection && typeof data.resultSelection === 'object'
+      ? { ...data.resultSelection }
+      : null,
     ingredientSets: draftIngredientSets,
     results: draftResults,
     steps: draftSteps,
@@ -372,6 +375,16 @@ function _validateDraft(draft, featureState, services) {
         message: `Result group "${group.name}" has no items assigned`,
         panelId: group.id,
         fieldSelector: `[data-group-id="${group.id}"]`
+      });
+    }
+  }
+
+  // Validate rollTableOutcome resultSelection
+  if (draft.resultSelection?.provider === 'rollTableOutcome') {
+    if (!draft.resultSelection.rollTableUuid) {
+      errors.push({
+        message: 'Roll table UUID is required when using the Roll Table outcome provider',
+        fieldSelector: '[name="rollTableUuid"]'
       });
     }
   }
@@ -560,6 +573,7 @@ function _buildRecipePayload(draft, featureState, services) {
     isVariable: enableComplexRecipes ? draft.isVariable : false,
     transferEffects: draft.transferEffects,
     outcomeRouting: topLevelOutcomeRouting,
+    resultSelection: draft.resultSelection || null,
     metadata: draft.metadata
   };
 }
@@ -1020,6 +1034,22 @@ export function createEditorStore(services, options = {}) {
     updateDraft(d => { d.linkedRecipeItemUuid = uuid || ''; });
   }
 
+  // --- Result selection (rollTableOutcome provider) ---
+
+  function setResultSelection(provider, config = {}) {
+    updateDraft(d => {
+      if (!provider) {
+        d.resultSelection = null;
+        return;
+      }
+      d.resultSelection = {
+        provider: String(provider),
+        rollTableUuid: config?.rollTableUuid || null,
+        macroUuid: config?.macroUuid || null
+      };
+    });
+  }
+
   // --- Save / Cancel ---
 
   async function saveRecipe() {
@@ -1117,6 +1147,9 @@ export function createEditorStore(services, options = {}) {
     // Linked recipe item
     clearLinkedRecipeItem,
     setLinkedRecipeItemUuid,
+
+    // Result selection
+    setResultSelection,
 
     // Save / Cancel
     saveRecipe,

@@ -6,6 +6,7 @@
  * isolated set of writable() instances.
  */
 import { writable, get } from 'svelte/store';
+import { aggregateShoppingList } from '../util/shoppingListAggregator.js';
 
 const RECENTLY_CRAFTED_MAX = 10;
 
@@ -144,7 +145,8 @@ function _buildPreparedRecipes(
   componentSourceActors,
   searchTerm,
   selectedCategory,
-  showOnlyAvailable
+  showOnlyAvailable,
+  showFavouritesOnly
 ) {
   const recipeManager = services.getRecipeManager();
   const visibilityService = services.getRecipeVisibilityService();
@@ -264,13 +266,19 @@ function _buildPreparedRecipes(
           componentSourceActors
         })
         : { craftable: true };
+      if (access.reason === 'teaser') return true;
       if (!access.craftable) return false;
       return evaluations.get(r.id)?.canCraft === true;
     });
   }
 
-  // --- Favourites & recents ---
+  // --- Favourites-only filter ---
   const favouriteIds = services.getSetting('favouriteRecipes') || [];
+  if (showFavouritesOnly) {
+    recipes = recipes.filter(r => favouriteIds.includes(r.id));
+  }
+
+  // --- Recents ---
   const recentEntries = services.getSetting('recentlyCrafted') || [];
 
   // --- Prepare display data ---
@@ -286,6 +294,9 @@ function _buildPreparedRecipes(
         componentSourceActors
       })
       : { craftable: true, reason: 'ok' };
+    const teaserState = access.teaserState || null;
+    const isTeaser = teaserState?.isTeaser === true;
+    const teaserHiddenFields = teaserState?.hiddenFields ?? [];
     const craftable = access.craftable && canCraft;
     const recipeRuns = activeRunsByRecipeId.get(recipe.id) || [];
     const activeRun = recipeRuns[0] || null;
@@ -306,7 +317,7 @@ function _buildPreparedRecipes(
     return {
       id: recipe.id,
       name: recipe.name,
-      description: recipe.description,
+      description: isTeaser && teaserHiddenFields.includes('description') ? (teaserState.teaserDescription || 'FABRICATE.Teaser.HiddenDescription') : recipe.description,
       img: recipe.img,
       category: recipe.category,
       canCraft: craftable,
@@ -324,11 +335,15 @@ function _buildPreparedRecipes(
         : 'Craft',
       canLearn,
       hasMultipleSets: recipe.ingredientSets.length > 1,
-      resultDescription: recipe.getResultDescription(),
-      ingredients: evaluation?.ingredientStates ?? [],
-      essences: evaluation?.essenceStates ?? [],
-      catalysts: evaluation?.catalystStates ?? [],
-      isFavourite: favouriteIds.includes(recipe.id)
+      resultDescription: isTeaser && teaserHiddenFields.includes('results') ? 'FABRICATE.Teaser.HiddenResults' : recipe.getResultDescription(),
+      ingredients: isTeaser && teaserHiddenFields.includes('ingredients') ? [] : (evaluation?.ingredientStates ?? []),
+      essences: isTeaser && teaserHiddenFields.includes('essences') ? [] : (evaluation?.essenceStates ?? []),
+      catalysts: isTeaser && teaserHiddenFields.includes('catalysts') ? [] : (evaluation?.catalystStates ?? []),
+      isFavourite: favouriteIds.includes(recipe.id),
+      isTeaser,
+      teaserProgress: teaserState?.progress ?? 0,
+      teaserHiddenFields,
+      teaserDescription: teaserState?.teaserDescription ?? ''
     };
   });
 
@@ -388,6 +403,15 @@ export function createCraftingStore(services) {
   const searchTerm = writable('');
   const selectedCategory = writable('');
   const showOnlyAvailable = writable(true);
+  const showFavouritesOnly = writable(false);
+
+  // --- Cauldron state ---
+  const isCauldronMode = writable(false);
+  const cauldronItems = writable([]);
+
+  // --- Shopping list state ---
+  const shoppingList = writable([]);  // [{ recipeId, quantity }]
+  const shoppingListExpanded = writable(false);
 
   // --- Computed state ---
   const viewState = writable({
@@ -413,20 +437,40 @@ export function createCraftingStore(services) {
       return;
     }
 
+    // Detect cauldron mode from the active crafting system
+    const craftingSystemManager = services.getCraftingSystemManager?.();
+    if (craftingSystemManager) {
+      const activeSystems = craftingSystemManager.getSystems?.() || [];
+      const activeSystem = activeSystems[0] || null;
+      isCauldronMode.set(activeSystem?.resolutionMode === 'cauldron');
+    }
+
     const computed = _buildPreparedRecipes(
       services,
       get(craftingActor),
       get(componentSourceActors),
       get(searchTerm),
       get(selectedCategory),
-      get(showOnlyAvailable)
+      get(showOnlyAvailable),
+      get(showFavouritesOnly)
     );
+
+    const currentShoppingList = get(shoppingList);
+    let shoppingListData = null;
+    if (currentShoppingList.length > 0) {
+      shoppingListData = aggregateShoppingList(
+        currentShoppingList,
+        recipeManager,
+        get(componentSourceActors)
+      );
+    }
 
     viewState.set({
       ...computed,
       selectedCategory: get(selectedCategory),
       showOnlyAvailable: get(showOnlyAvailable),
-      search: get(searchTerm)
+      search: get(searchTerm),
+      shoppingListData
     });
   }
 
@@ -473,6 +517,11 @@ export function createCraftingStore(services) {
 
   async function toggleAvailable() {
     showOnlyAvailable.update(v => !v);
+    await refresh();
+  }
+
+  async function toggleFavouritesOnly() {
+    showFavouritesOnly.update(v => !v);
     await refresh();
   }
 
@@ -650,6 +699,105 @@ export function createCraftingStore(services) {
     await craft(recipeId, { skipConfirm: true, runId: null });
   }
 
+  function addCauldronItem(item) {
+    if (!item) return;
+    cauldronItems.update(items => [...items, item]);
+  }
+
+  function removeCauldronItem(index) {
+    cauldronItems.update(items => items.filter((_, i) => i !== index));
+  }
+
+  function clearCauldronItems() {
+    cauldronItems.set([]);
+  }
+
+  async function submitCauldronAttempt() {
+    const craftingEngine = services.getCraftingEngine();
+    if (!craftingEngine) {
+      services.notify.error('Crafting engine is unavailable. Check module initialization.');
+      return;
+    }
+
+    const actor = get(craftingActor);
+    if (!actor) {
+      services.notify.error('Please select a crafting actor');
+      return;
+    }
+
+    const sources = get(componentSourceActors);
+    if (sources.length === 0) {
+      services.notify.error('Please select at least one component source actor');
+      return;
+    }
+
+    const items = get(cauldronItems);
+    if (items.length === 0) {
+      services.notify.warn('Add some ingredients to the cauldron first');
+      return;
+    }
+
+    const craftingSystemManager = services.getCraftingSystemManager?.();
+    const activeSystems = craftingSystemManager?.getSystems?.() || [];
+    const activeSystem = activeSystems[0] || null;
+
+    const result = await craftingEngine.craftCauldron(actor, sources, items, {
+      craftingSystemId: activeSystem?.id
+    });
+
+    if (result.success) {
+      services.notify.info(result.message);
+    } else if (result.disposition === 'no-match') {
+      services.notify.warn("The combination didn't produce anything");
+    } else {
+      services.notify.error(result.message);
+    }
+
+    clearCauldronItems();
+    await refresh();
+  }
+
+  function addToShoppingList(recipeId) {
+    shoppingList.update(list => {
+      const existing = list.find(e => e.recipeId === recipeId);
+      if (existing) {
+        return list.map(e =>
+          e.recipeId === recipeId ? { ...e, quantity: e.quantity + 1 } : e
+        );
+      }
+      return [...list, { recipeId, quantity: 1 }];
+    });
+    shoppingListExpanded.set(true);
+    refresh();
+  }
+
+  function removeFromShoppingList(recipeId) {
+    shoppingList.update(list => list.filter(e => e.recipeId !== recipeId));
+    refresh();
+  }
+
+  function setShoppingListQuantity(recipeId, quantity) {
+    if (quantity <= 0) {
+      removeFromShoppingList(recipeId);
+      return;
+    }
+    shoppingList.update(list =>
+      list.map(e =>
+        e.recipeId === recipeId ? { ...e, quantity } : e
+      )
+    );
+    refresh();
+  }
+
+  function clearShoppingList() {
+    shoppingList.set([]);
+    refresh();
+  }
+
+  function toggleShoppingListExpanded() {
+    shoppingListExpanded.update(v => !v);
+  }
+
   function destroy() {
     // No-op for now — hook cleanup would go here
   }
@@ -664,20 +812,39 @@ export function createCraftingStore(services) {
     searchTerm,
     selectedCategory,
     showOnlyAvailable,
+    showFavouritesOnly,
     // Computed state
     viewState,
+    // Cauldron state
+    isCauldronMode,
+    cauldronItems,
     // Actions
     selectActor,
     toggleSourceActor,
     setSearch,
     setCategory,
     toggleAvailable,
+    toggleFavouritesOnly,
     toggleFavourite,
     craft,
     learnRecipe,
     cancelRun,
     restartRun,
     refresh,
-    destroy
+    destroy,
+    // Cauldron actions
+    addCauldronItem,
+    removeCauldronItem,
+    clearCauldronItems,
+    submitCauldronAttempt,
+    // Shopping list stores
+    shoppingList,
+    shoppingListExpanded,
+    // Shopping list actions
+    addToShoppingList,
+    removeFromShoppingList,
+    setShoppingListQuantity,
+    clearShoppingList,
+    toggleShoppingListExpanded
   };
 }

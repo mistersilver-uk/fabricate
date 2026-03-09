@@ -29,6 +29,7 @@ Every recipe has:
 | `transferEffects` | Whether to copy active effects from ingredients to results |
 | `visibility` | Access control (restricted, allowedUserIds) |
 | `linkedRecipeItemUuid` | Item that teaches this recipe (for knowledge mode). In the recipe editor you can browse for an existing item, paste a UUID directly, or use **Create Recipe Item** to generate a new world item automatically. |
+| `resultSelection` | How a result group is chosen in routed mode. Contains `provider` (`"ingredientSet"`, `"macroOutcome"`, or `"rollTableOutcome"`) and provider-specific fields. |
 
 {: .note }
 > For multi-step recipes (when `multiStepRecipes` is enabled and the recipe has a `steps` array), `ingredientSets` and `resultGroups` are defined on each individual step, not on the recipe itself. Recipe-level `ingredientSets` and `resultGroups` are not required and may be empty. See [Multi-Step Recipes]({% link recipes/multi-step.md %}) for details.
@@ -101,9 +102,22 @@ The resolution mode determines how ingredients map to results:
 | Mode | Sets | Result Groups | Check Required | Use When |
 |:-----|:-----|:--------------|:---------------|:---------|
 | [Simple]({% link recipes/simple.md %}) | 1 | 1 | Optional | Basic A + B = C crafting |
-| [Mapped]({% link recipes/mapped.md %}) | 1+ | 1+ | Optional | Different inputs produce different outputs |
-| [Tiered]({% link recipes/tiered.md %}) | 1+ | 1+ | **Yes** | Skill check determines quality of result |
+| [Routed]({% link recipes/routed.md %}) | 1+ | 1+ | Provider-dependent | Ingredient choice or skill check selects the result |
 | [Progressive]({% link recipes/progressive.md %}) | 1 | 1 (ordered) | **Yes** | Skill check value "buys" results in order |
+| [Cauldron]({% link recipes/cauldron.md %}) | 1+ | 1+ | No | Players experiment with unknown ingredients; recipe names are hidden |
+
+### Routed Mode Providers
+
+In routed mode, the `resultSelection.provider` field on a recipe controls how the result group is chosen:
+
+| Provider | Check Required | How it works |
+|:---------|:---------------|:-------------|
+| `ingredientSet` | No | The player's chosen ingredient set determines the result via `IngredientSet.resultGroupId` |
+| `macroOutcome` | **Yes** | A crafting check macro returns a named `outcome`; the engine matches it to a result group by name |
+| `rollTableOutcome` | No | The engine draws from a roll table; the drawn result name is matched to a result group |
+
+{: .note }
+> The legacy `mapped` and `tiered` resolution modes are automatically normalised to routed mode on load. `mapped` becomes `routed` + `ingredientSet` provider; `tiered` becomes `routed` + `macroOutcome` provider. No manual migration is required.
 
 ## Multi-Step Recipes
 

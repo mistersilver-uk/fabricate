@@ -22,8 +22,11 @@
   }
 
   // Crafting check state
+  // svelte-ignore state_referenced_locally
   let checkMode = $state(selectedSystem?.craftingCheck?.mode ?? 'passFail');
+  // svelte-ignore state_referenced_locally
   let checkMacroUuid = $state(selectedSystem?.craftingCheck?.macroUuid ?? '');
+  // svelte-ignore state_referenced_locally
   let checkOutcomes = $state(selectedSystem?.craftingCheck?.outcomesText ?? '');
 
   $effect(() => {

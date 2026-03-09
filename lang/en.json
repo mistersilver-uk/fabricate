@@ -21,6 +21,7 @@
     },
     "Filter": {
       "CraftableOnly": "Craftable Only",
+      "FavouritesOnly": "Favourites only",
       "AllCategories": "All Categories"
     },
     "ActorSelector": {
@@ -54,10 +55,6 @@
       "AddFavourite": "Add to favourites",
       "ShowDetails": "Show recipe details",
       "RestartRun": "Restart run from step 1"
-    },
-    "FavouritesSection": {
-      "Title": "Favourites",
-      "RemoveFavourite": "Remove from favourites"
     },
     "RecentsSection": {
       "Title": "Recently Crafted"
@@ -135,17 +132,24 @@
       "Catalysts": "Catalysts Used",
       "Results": "Created",
       "FailureReason": "Reason",
-      "ConsumedOnFailure": "Consumed on Failure"
+      "ConsumedOnFailure": "Consumed on Failure",
+      "RollTableResult": "Roll Table Result"
     },
     "Admin": {
       "Title": "Crafting Admin",
       "Selected": "Selected:",
       "NoSystemsYet": "No crafting systems yet",
+      "Actors": {
+        "Name": "Actor",
+        "None": "No actors available."
+      },
+      "Actions": "Actions",
       "Tabs": {
         "Systems": "Systems",
         "Items": "Components",
         "Recipes": "Recipes",
-        "Rules": "Rules"
+        "Rules": "Rules",
+        "Graph": "Graph"
       },
       "Sidebar": {
         "Title": "Crafting Systems",
@@ -318,10 +322,11 @@
         "TransferEffects": "Transfer Effects"
       },
       "Validation": {
-        "FixBeforeSaving": "Fix before saving:"
+        "FixBeforeSaving": "Fix before saving:",
+        "NameRequired": "Recipe name is required."
       },
       "Visibility": {
-        "GlobalHint": "This system uses global visibility — all recipes are visible to all players. To control visibility per recipe, change the system's recipe visibility mode to Player-specific in the crafting admin.",
+        "GlobalHint": "This system uses global visibility \u2014 all recipes are visible to all players. To control visibility per recipe, change the system's recipe visibility mode to Player-specific in the crafting admin.",
         "PlayerVisibilityTitle": "Player Visibility",
         "RestrictLabel": "Restrict recipe visibility to specific users",
         "NoNonGmUsers": "No non-GM users available."
@@ -420,7 +425,14 @@
         "DefaultFirstGroup": "Default (first result group)",
         "AddGroupsFirst": "Add result groups first, then map this set.",
         "VariableMappingTitle": "Result Group Mapping (for this ingredient set)",
-        "AddGroupsFirstVariable": "Add result groups first, then map them to ingredient sets."
+        "AddGroupsFirstVariable": "Add result groups first, then map them to ingredient sets.",
+        "ProviderLabel": "Result Selection Provider",
+        "ProviderIngredientSet": "Ingredient Set Mapping",
+        "ProviderMacroOutcome": "Macro Outcome",
+        "ProviderRollTable": "Roll Table Outcome",
+        "RollTableUuid": "Roll Table UUID",
+        "RollTableHint": "Drawn result names are matched to Result Group names (case-insensitive). Use reserved fail/miss keywords in the roll table for failure outcomes.",
+        "RollTableMissing": "Roll table UUID is required for this provider."
       },
       "OutcomeRouting": {
         "SectionTitle": "Outcome Routing",
@@ -457,6 +469,21 @@
     "DropZone": {
       "DefaultLabel": "Drop items here"
     },
+    "Import": {
+      "Title": "Import Crafting System",
+      "SummaryTitle": "Import Summary",
+      "SystemCreated": "Crafting system \u201c{name}\u201d created.",
+      "SystemUpdated": "Crafting system \u201c{name}\u201d updated.",
+      "SystemSkipped": "Crafting system \u201c{name}\u201d skipped (already exists).",
+      "ComponentsRemapped": "{count} component(s) remapped to world items.",
+      "ComponentsUnresolved": "{count} component(s) have unresolved source items.",
+      "RecipesImported": "{imported} of {total} recipe(s) imported.",
+      "RecipesSkipped": "{count} recipe(s) skipped (already exist).",
+      "CollisionsDetected": "{count} collision(s) detected.",
+      "DropPackJson": "Drop a pack JSON file or paste pack data",
+      "Overwrite": "Overwrite existing data",
+      "RetainFallbacks": "Retain existing fallback IDs"
+    },
     "Error": {
       "NoRecipe": "Recipe not found",
       "NoActor": "No actor selected",
@@ -465,10 +492,71 @@
       "InvalidRecipe": "Invalid recipe configuration",
       "CraftingFailed": "Crafting failed"
     },
+    "Cauldron": {
+      "Title": "Cauldron",
+      "SubmitAttempt": "Submit Attempt",
+      "DropIngredients": "Drop ingredients here to attempt crafting",
+      "NoMatch": "The combination didn't produce anything",
+      "Consumed": "Ingredients were consumed in the attempt",
+      "LearnedRecipe": "You discovered a new recipe!",
+      "MisconfigError": "Crafting system error \u2014 contact your GM"
+    },
     "Labels": {
       "UnknownComponent": "Unknown Component",
       "UnknownCatalyst": "Unknown Tool",
       "UnknownItem": "Unknown Item"
+    },
+    "ShoppingList": {
+      "Title": "Shopping List",
+      "TitleCount": "Shopping List ({count})",
+      "AddToList": "Add to shopping list",
+      "RemoveFromList": "Remove from shopping list",
+      "ClearAll": "Clear shopping list",
+      "Empty": "No recipes added to shopping list",
+      "Material": "Material",
+      "Need": "Need",
+      "Have": "Have",
+      "Missing": "Missing",
+      "AllSatisfied": "All materials available",
+      "MissingCount": "{count} material(s) still needed",
+      "Essences": "Essences",
+      "Catalysts": "Required Tools"
+    },
+    "Teaser": {
+      "Title": "Teaser Mode",
+      "Enable": "Enable Teaser Mode",
+      "DiscoveryMode": "Discovery Mode",
+      "ModeThreshold": "Threshold (GM sets progress)",
+      "ModeFragments": "Fragments (item-based discovery)",
+      "ModeBoth": "Both (threshold + fragments)",
+      "Fragments": "Fragments",
+      "FragmentName": "New Fragment",
+      "LinkedItem": "Linked Item",
+      "TargetRecipes": "Target Recipes",
+      "ProgressValue": "Progress Value",
+      "AddFragment": "Add Fragment",
+      "RemoveFragment": "Remove Fragment",
+      "HiddenDescription": "You have not yet discovered this recipe...",
+      "HiddenResults": "???",
+      "Progress": "Discovery Progress",
+      "ProgressLabel": "{progress}% Discovered",
+      "FullyDiscovered": "Fully Discovered",
+      "SetProgress": "Set Discovery Progress",
+      "ResetProgress": "Reset Progress",
+      "GrantDiscovery": "Grant Full Discovery",
+      "FragmentDiscovered": "Fragment discovered: {name}",
+      "RecipeUnlocked": "Recipe unlocked: {name}"
+    },
+    "Graph": {
+      "EdgeNormal": "Produces input for",
+      "EdgeCycle": "Cyclic dependency",
+      "NoRecipes": "No recipes in this system",
+      "NoConnections": "No recipe connections found",
+      "NodeCount": "{count} recipes",
+      "EdgeCount": "{count} connections",
+      "SearchPlaceholder": "Search recipes...",
+      "AllCategories": "All Categories",
+      "ResetView": "Reset View"
     }
   }
 }

@@ -8,7 +8,8 @@
     onLearnRecipe,
     onToggleFavourite,
     onShowDetails,
-    onRestartRun
+    onRestartRun,
+    onAddToShoppingList
   } = $props();
 </script>
 
@@ -16,8 +17,19 @@
   class="fabricate-recipe-item"
   class:can-craft={recipe.canCraft}
   class:cannot-craft={!recipe.canCraft}
+  class:is-teaser={recipe.isTeaser}
   data-recipe-id={recipe.id}
 >
+  {#if recipe.isTeaser}
+    <div class="teaser-overlay">
+      <i class="fas fa-lock teaser-lock-icon"></i>
+      <div class="teaser-progress-bar">
+        <div class="teaser-progress-fill" style="width: {recipe.teaserProgress}%"></div>
+      </div>
+      <span class="teaser-progress-label">{recipe.teaserProgress}%</span>
+    </div>
+  {/if}
+
   <div class="recipe-icon">
     <img src={recipe.img} alt={recipe.name} />
   </div>
@@ -137,6 +149,15 @@
         </button>
       {/if}
     {/if}
+
+    <button
+      type="button"
+      class="details-btn shopping-btn"
+      onclick={() => onAddToShoppingList?.(recipe.id)}
+      title={localize('FABRICATE.ShoppingList.AddToList')}
+    >
+      <i class="fas fa-cart-plus"></i>
+    </button>
 
     <button
       type="button"

@@ -8,9 +8,11 @@
     ingredientSets = [],
     resultGroups = [],
     outcomeRouting = {},
+    resultSelection = null,
     onUpdateOutcomeRouting,
     onUpdateIngredientSetMapping,
-    onUpdateIsVariable
+    onUpdateIsVariable,
+    onUpdateResultSelection
   } = $props();
 
   const showProvider = $derived(
@@ -19,13 +21,32 @@
   );
 
   const outcomes = $derived(featureState.craftingCheckOutcomes || []);
+
+  const currentProvider = $derived(resultSelection?.provider || null);
+  const showProviderSelector = $derived(featureState.showComplexRecipes === true);
 </script>
 
 {#if showProvider}
   <div class="result-selection-section">
     <h4>{localize('FABRICATE.Editor.ResultSelection.MappedResultGroupLabel')}</h4>
 
-    {#if featureState.showComplexRecipes && !featureState.isMappedMode}
+    {#if showProviderSelector}
+      <div class="provider-selector">
+        <label for="result-provider-select">{localize('FABRICATE.Editor.ResultSelection.ProviderLabel')}</label>
+        <select
+          id="result-provider-select"
+          value={currentProvider || ''}
+          onchange={(e) => onUpdateResultSelection?.(e.target.value || null, {})}
+        >
+          <option value="">{localize('FABRICATE.Editor.ResultSelection.DefaultFirstGroup')}</option>
+          <option value="ingredientSet">{localize('FABRICATE.Editor.ResultSelection.ProviderIngredientSet')}</option>
+          <option value="macroOutcome">{localize('FABRICATE.Editor.ResultSelection.ProviderMacroOutcome')}</option>
+          <option value="rollTableOutcome">{localize('FABRICATE.Editor.ResultSelection.ProviderRollTable')}</option>
+        </select>
+      </div>
+    {/if}
+
+    {#if !currentProvider && featureState.showComplexRecipes && !featureState.isMappedMode}
       <label class="checkbox-label">
         <input
           type="checkbox"
@@ -36,7 +57,7 @@
       </label>
     {/if}
 
-    {#if featureState.isMappedMode}
+    {#if featureState.isMappedMode && currentProvider !== 'rollTableOutcome' && currentProvider !== 'macroOutcome'}
       <div class="mapping-section">
         <p class="hint">{localize('FABRICATE.Editor.ResultSelection.ResultGroupForSet')}</p>
         {#each ingredientSets as set, setIdx}
@@ -56,7 +77,7 @@
       </div>
     {/if}
 
-    {#if featureState.showOutcomeRouting && featureState.showCraftingChecks && outcomes.length > 0}
+    {#if featureState.showOutcomeRouting && featureState.showCraftingChecks && outcomes.length > 0 && currentProvider !== 'rollTableOutcome'}
       <div class="outcome-routing-section">
         <h5>{localize('FABRICATE.Editor.OutcomeRouting.SectionTitle')}</h5>
         <p class="hint">{localize('FABRICATE.Editor.OutcomeRouting.Hint')}</p>
@@ -76,6 +97,21 @@
         {/each}
       </div>
     {/if}
+
+    {#if currentProvider === 'rollTableOutcome'}
+      <div class="roll-table-section">
+        <label for="roll-table-uuid-input">{localize('FABRICATE.Editor.ResultSelection.RollTableUuid')}</label>
+        <input
+          id="roll-table-uuid-input"
+          type="text"
+          name="rollTableUuid"
+          value={resultSelection?.rollTableUuid || ''}
+          placeholder="RollTable.xxxxxxxxxxxx"
+          oninput={(e) => onUpdateResultSelection?.('rollTableOutcome', { rollTableUuid: e.target.value || null })}
+        />
+        <p class="hint">{localize('FABRICATE.Editor.ResultSelection.RollTableHint')}</p>
+      </div>
+    {/if}
   </div>
 {/if}
 
@@ -89,6 +125,17 @@
 
   .result-selection-section h4 {
     margin: 0 0 8px;
+  }
+
+  .provider-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .provider-selector select {
+    flex: 1;
   }
 
   .checkbox-label {
@@ -107,12 +154,24 @@
   }
 
   .mapping-section,
-  .outcome-routing-section {
+  .outcome-routing-section,
+  .roll-table-section {
     margin-top: 8px;
   }
 
   .outcome-routing-section h5 {
     margin: 0 0 4px;
+  }
+
+  .roll-table-section label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 4px;
+  }
+
+  .roll-table-section input[type="text"] {
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .mapping-row {

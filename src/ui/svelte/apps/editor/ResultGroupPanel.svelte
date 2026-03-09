@@ -16,6 +16,7 @@
     onMoveDown,
     onRemoveGroup,
     onUpdateGroupName,
+    hasError = false,
     onAddResult,
     onRemoveResult,
     onDropResult,
@@ -24,6 +25,7 @@
 
   const panelId = $derived(group?.id || `result-${groupIndex}`);
   const resultCount = $derived((group?.results || []).length);
+  const groupNameId = $derived(`fab-group-name-${panelId}`);
 
   function resolveItem(componentId) {
     if (!componentId) return null;
@@ -61,8 +63,8 @@
 
 <section
   class="accordion-panel result-group-panel"
+  class:group-error={hasError}
   data-panel-id={panelId}
-  role="region"
   aria-label={group?.name || `Result Group ${groupIndex + 1}`}
 >
   <header class="accordion-header" role="button" tabindex="0"
@@ -81,6 +83,8 @@
     </span>
 
     {#if showComplexRecipes}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
       <div class="panel-actions" onclick={(e) => e.stopPropagation()}>
         <button type="button" disabled={groupIndex === 0} onclick={() => onMoveUp?.(groupIndex)}
           title={localize('FABRICATE.Editor.ResultGroups.MoveUp')}>
@@ -102,8 +106,9 @@
     <div class="accordion-body" id="panel-body-{panelId}">
       {#if showComplexRecipes}
         <div class="group-name-row">
-          <label>{localize('FABRICATE.Editor.ResultGroups.GroupNameLabel')}</label>
+          <label for={groupNameId}>{localize('FABRICATE.Editor.ResultGroups.GroupNameLabel')}</label>
           <input
+            id={groupNameId}
             type="text"
             value={group?.name || ''}
             oninput={(e) => onUpdateGroupName?.(groupIndex, e.target.value)}
@@ -171,6 +176,7 @@
           </tbody>
         </table>
       {:else}
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="results-empty" ondrop={handleNewDrop} ondragover={handleDragOver}>
           <i class="fas fa-download"></i>
           {localize('FABRICATE.Editor.ResultGroups.EmptyState')}
@@ -183,6 +189,7 @@
         </button>
       </div>
 
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div class="drop-zone-area" ondrop={handleNewDrop} ondragover={handleDragOver}>
         <i class="fas fa-download"></i>
         {localize('FABRICATE.Editor.ResultGroups.EmptyState')}
@@ -196,6 +203,11 @@
     border: 1px solid var(--color-border-light, #ccc);
     border-radius: 4px;
     margin-bottom: 8px;
+  }
+
+  .group-error {
+    border-color: var(--color-border-error, #dc3545);
+    box-shadow: 0 0 0 1px var(--color-border-error, #dc3545);
   }
 
   .accordion-header {

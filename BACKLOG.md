@@ -38,7 +38,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
 ## Competitive Analysis Gap Tasks
 
 ### T-057 - Implement Recipe Tree/Graph Visualization
-- Status: `todo`
+- Status: `done`
 - Description: Add a visual progression view that shows recipe relationships so players and GMs can understand crafting paths beyond a flat list.
 - Acceptance Criteria:
   1. Crafting UI provides a tree/graph view for a selected crafting system.
@@ -47,9 +47,10 @@ Purpose: keep agent work explicit, reviewable, and testable.
   4. Cycles and disconnected subgraphs are handled safely without runtime errors.
   5. Filtering by category and search term is supported in graph view.
   6. Unit tests validate graph construction logic for linear chains, branching graphs, and cyclic data.
+- Resolution: Added "Graph" tab to RecipeManagerApp with `recipeGraphBuilder.js` (pure-function graph construction, Sugiyama-style layered layout, DFS cycle detection, category/search filtering) and `RecipeGraphTab.svelte` (SVG edges + HTML node overlays, pan/zoom, category filter, search, cycle edge dashed styling). Edges derived from recipe output componentIds matching downstream recipe input componentIds. Nodes clickable to navigate to recipe editor. Disconnected subgraphs laid out side by side. adminStore gains lazy graph computation and setGraphSearch action. 7 new localization keys. 31 new tests (22 builder, 4 store, 5 component), 1218 total passing. Reviewed and approved (1 round). Minor cosmetic CSS selector issue noted (non-blocking).
 
 ### T-059 - Add Shopping List and Missing-Materials Summary
-- Status: `todo`
+- Status: `done`
 - Description: Provide a consolidated planning view showing which materials are still needed for one or more target recipes.
 - Acceptance Criteria:
   1. Users can add/remove recipes to a shopping list from recipe browse/detail UI.
@@ -58,17 +59,22 @@ Purpose: keep agent work explicit, reviewable, and testable.
   4. Duplicate component requirements from multiple recipes are merged correctly.
   5. List updates reactively when selected actors or recipe quantities change.
   6. Unit tests verify aggregation math, actor-source switching, and empty-list behavior.
+- Resolution: Added `shoppingListAggregator.js` pure function that multiplies ingredient needs by recipe quantity, deduplicates by componentId (priority: componentId > itemUuid > description), and computes have/need/missing per material. `ShoppingListPanel.svelte` collapsible panel with quantity controls, materials table with color-coded status, clear/remove actions. Cart button on `RecipeCard` adds to list. `craftingStore` gains 5 shopping list actions with reactive refresh. Session-scoped (clears on app close). 40 new tests (15 aggregator, 14 store, 11 component), 1261 total passing. Minor: recipe entries display raw IDs instead of names (cosmetic, non-blocking). Reviewed and approved (1 round).
 
 ### T-061 - Implement Partial Recipe Discovery / Teaser Mode
-- Status: `todo`
+- Status: `done`
 - Description: Add an optional visibility mode where undiscovered recipes can appear as partial teasers, revealing identity/progress while hiding full requirements until discovery conditions are met.
 - Acceptance Criteria:
   1. Systems can enable/disable teaser mode independently of existing visibility modes.
   2. Teaser recipes display limited metadata (e.g., name/category) while hiding configurable fields (ingredients/results/details).
   3. Discovery progress is tracked per actor/user and supports threshold-based unlocks.
-  4. Fully discovered recipes automatically transition from teaser to normal visibility.
-  5. Existing visibility modes (`global`, `player`, `knowledge`) continue to work unchanged when teaser mode is off.
-  6. Unit tests cover teaser rendering, unlock transitions, and permission boundaries.
+  4. GMs can manually configure visibility progress per user like in player mode.
+  5. Alternatively, GM's can create a list of parts/fragments associated with in-game items that allow the players to learn part of a recipe if they haven't already learned that fragment yet.
+  6. For both modes, players can see their progress towards unlocking/learning recipes.
+  7. Fully discovered recipes automatically transition from teaser to normal visibility.
+  8. Existing visibility modes (`global`, `player`, `knowledge`) continue to work unchanged when teaser mode is off.
+  9. Unit tests cover teaser rendering, unlock transitions, and permission boundaries.
+- Resolution: Added `teaser` as fourth listMode. Recipe model gains `teaser` field with `hiddenFields`, `revealThreshold`, `teaserDescription`. System-level `teaserConfig` with `enabled`, `discoveryMode` (threshold/fragments/both), and fragment definitions linked to item UUIDs. `RecipeVisibilityService` gains teaser visibility branch with `_evaluateTeaserAccess()`, `discoverFragment()`, `setDiscoveryProgress()`, `getDiscoveryProgressForActor()`. `FragmentDiscoveryHook` hooks into Foundry `createItem` for automatic fragment discovery. `TeaserProgressEditor.svelte` for GM per-actor progress management. `craftingStore` masks recipe fields based on teaser state. `RecipeCard` shows progress bar overlay and teaser styling. `RulesTab` gains full teaser config section with fragment editor. Manual + fragment progress additive. 43 new tests (12 normalization, 17 visibility, 6 fragment hook, 4 store, 4 component), 1053 total passing. Reviewed and approved (1 round).
 
 ### T-063 - Add Gathering/Harvesting Workflow
 - Status: `todo`
@@ -87,7 +93,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
   10. Unit/integration tests cover access-scope gating, resolution-mode validation, time-requirement handling, attempt-limit enforcement/reset behavior, simple success, failed check, and invalid configuration paths.
 
 ### T-088 - Implement `rollTableOutcome` Provider in Unified Routed Resolution
-- Status: `todo`
+- Status: `done`
 - Dependencies: `T-165`, `T-166`
 - Description: Implement recipe-level `resultSelection.provider = "rollTableOutcome"` in the unified mapped+tiered routed model so GMs can drive result-group selection from a Foundry roll table instead of only explicit mapping or macro outcomes.
 - Acceptance Criteria:
@@ -98,9 +104,10 @@ Purpose: keep agent work explicit, reviewable, and testable.
   5. Chat/audit output records provider type and rolled value/result used for routing.
   6. Backward compatibility is preserved for legacy tiered macro-routing data through migration/normalization.
   7. Unit/integration tests cover happy path, invalid table reference, unmapped result handling, and regression safety for other providers.
+- Resolution: Added `resultSelection` field to Recipe model with `_normalizeResultSelection()` for legacy migration. `ResolutionModeService.resolveByRollTable()` draws from Foundry roll table exactly once, matches drawn result name to ResultGroup.name (case-insensitive, trimmed). Reserved fail keywords (fail*, miss*, nothing, none, whiff*) handled. Validation blocks save on missing UUID, duplicate group names, reserved keywords as group names. Chat output displays drawn result. Editor UI has provider selector with roll table UUID input. 39+ new tests, 1148 total passing. Reviewed and approved (2 rounds).
 
 ### T-097 - Add Compendium Import with UUID Override and Fallback Item IDs
-- Status: `todo`
+- Status: `done`
 - Description: Allow crafting systems to be imported from compendiums with robust item-link remapping so imported recipes/components remain recognized across worlds and content variants.
 - Acceptance Criteria:
   1. Crafting system manager supports importing crafting data from one or more selected compendium packs (at minimum components and recipes).
@@ -111,9 +118,10 @@ Purpose: keep agent work explicit, reviewable, and testable.
   6. Import summary reports remapped links, retained fallback IDs, unresolved links, and any collisions requiring GM review.
   7. Matching logic used by crafting/visibility paths is updated (or shared) to honor primary UUID + fallback ID resolution consistently.
   8. Unit/integration tests cover: successful import, source+name UUID override, fallback-ID retention across re-import, unresolved-link reporting, and no regression to legacy UUID-only workflows.
+- Resolution: Created `CompendiumImporter` service with `importFromPackData()`, `_remapComponentUuids()` (exact→source+name→unresolved precedence), `_findBySourceAndName()`, structured import summary (remapped/retained/unresolved/collisions). Added `fallbackItemIds` array to component normalization in CraftingSystemManager. Updated `ingredientMatchesItem()` and `_catalystMatchesItem()` in RecipeManager with fallback ID check between primary UUID and name match. Options: overwriteExisting, retainFallbackIds, additionalFallbackIds, targetPackIds. Wired into `game.fabricate.importFromPack()` and `game.fabricate.api.CompendiumImporter`. 12 new localization keys. 16 new tests (11 importer, 5 fallback matching), 615 total passing. Reviewed and approved (1 round).
 
 ### T-098 - Add Local Release Build Action for Dist-Ready Module Packaging
-- Status: `todo`
+- Status: `done`
 - Description: Create a local release build action that assembles a fully runnable module inside `dist/` (code, styles, packs, manifests, and required assets), rewrites a release-ready `module.json` from the root source manifest, and produces a shareable preview zip from that `dist/` output as the baseline for future GitHub Actions automation.
 - Acceptance Criteria:
   1. A single local command/action (e.g. npm script or release script) builds release artifacts into `dist/` from a clean workspace.
@@ -124,9 +132,10 @@ Purpose: keep agent work explicit, reviewable, and testable.
   6. Zip naming/versioning follows a documented preview convention suitable for patron sharing (for example, includes module version + preview marker).
   7. A validation step verifies the packaged output can be symlinked and loaded by Foundry as a module without manual file copying.
   8. Documentation describes local release workflow and explicitly notes this action is the foundation for GitHub Actions automated release jobs.
+- Resolution: Created `scripts/release.js` with exported utilities (`rewriteModuleJson`, `getRequiredFiles`, `validateDist`) and main build logic: clean dist/, vite build, copy static assets (styles, lang, packs, LICENSE, README), rewrite module.json for dist/-root execution, create preview zip. Three npm scripts: `npm run release` (full), `npm run release:build` (no zip), `npm run release:validate` (validate only). Deterministic manifest rewrite rules documented in JSDoc. Zip naming: `fabricate-v${version}-preview.zip`. Node.js built-ins only, no new dependencies. 22 new tests, 599 total passing. Reviewed and approved (1 round).
 
 ### T-099 - Implement Cauldron Crafting Resolution Mode
-- Status: `todo`
+- Status: `done`
 - Dependencies: `T-165`, `T-166`, `T-167`
 - Description: Implement `cauldron` as a discovery-focused resolution mode where players submit ingredient combinations without browsing recipes, and routing uses the unified recipe-level provider model (`ingredientSet`, `macroOutcome`, `rollTableOutcome`) with hidden-recipe behavior and optional learn-on-craft visibility.
 - Acceptance Criteria:
@@ -138,9 +147,10 @@ Purpose: keep agent work explicit, reviewable, and testable.
   6. Result-group selection in cauldron uses recipe-level providers: `ingredientSet`, `macroOutcome`, `rollTableOutcome`.
   7. Failure feedback is clear but non-leaking (no hidden recipe metadata disclosure).
   8. Unit/integration tests cover discovery flow, consume-on-fail default, no-multi-step enforcement, learn-on-craft visibility behavior, and provider-specific routing.
+- Resolution: Added `cauldron` resolution mode to CraftingSystemManager with `_normalizeCauldronConfig()` defaults. CraftingEngine gains `craftCauldron()` entry point with `_matchCauldronSignature()` using SignatureValidator for deterministic ingredient matching and `_consumeSubmittedCauldronItems()` with configurable consume-on-fail (default true). ResolutionModeService validates cauldron recipes (single-step only, ≥1 set/group, valid provider) and dispatches cauldron resolution branch. RecipeVisibilityService adds cauldron visibility (GM sees all, non-GM hidden/learned only) with `learnRecipeOnCraft()` and `hasLearnedRecipe()`. CraftingStore adds `isCauldronMode`, cauldron item management, and `submitCauldronAttempt`. New CauldronSubmitPanel.svelte component with drop zone and ingredient list. 39 new tests (27 engine, 12 store), 1187 total passing. Reviewed and approved (2 rounds).
 
 ### T-166 - Unify Mapped and Tiered into Routed Result Selection
-- Status: `todo`
+- Status: `done`
 - Dependencies: `T-165`
 - Description: Replace split mapped/tiered resolution branching with a unified routed model where each recipe selects result-group routing via `resultSelection.provider` (`ingredientSet`, `macroOutcome`, `rollTableOutcome`), so behavior changes occur at recipe level instead of requiring global destructive mode changes.
 - Acceptance Criteria:
@@ -151,9 +161,10 @@ Purpose: keep agent work explicit, reviewable, and testable.
   5. Recipe-level provider changes are validated and surfaced as recipe-scoped destructive/configuration warnings where required.
   6. Runtime and tests no longer depend on separate mapped vs tiered branching for result-group selection logic.
   7. Unit/integration tests cover provider selection, migration correctness, and backward-compatibility read paths.
+- Resolution: Unified mapped/tiered into single `routed` mode with recipe-level `resultSelection.provider`. Recipe model gains `resultSelection` field with `_normalizeResultSelection()` migration (mapped→ingredientSet, tiered→macroOutcome). `ResolutionModeService.resolveResultGroups()` dispatches on provider in single routed branch. Reserved fail keywords handled with case-insensitive normalization. `CraftingSystemManager` normalizes legacy mode strings on read. Editor UI rebuilt with provider selector. Legacy backward-compat branches retained for non-normalized data. 40 new tests, 1012 total passing. Reviewed and approved (1 round).
 
 ### T-167 - Implement Overlapping Signature Uniqueness Validation (Components + Tags)
-- Status: `todo`
+- Status: `done`
 - Dependencies: `T-165`, `T-166`
 - Description: Implement global uniqueness validation for satisfiable ingredient signatures across all recipes and ingredient groups in a crafting system, including tag-based matching expansion, and block save/import on collisions.
 - Acceptance Criteria:
@@ -163,6 +174,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
   4. Revalidation runs when relevant recipe, component, or tag definitions change so new overlaps cannot persist silently.
   5. Collision diagnostics are surfaced in GM UI (recipe editor/manager) and API validation responses.
   6. Unit/integration tests cover component-vs-component overlap, component-vs-tag overlap, tag-vs-tag overlap, and no-false-positive scenarios.
+- Resolution: Created `SignatureValidator` class with ingredient expansion (component and tag-type with any/all), group expansion (union of options), signature computation, and conservative union-intersection overlap detection. Integrated into `RecipeManager._validateRecipeForCreateOrUpdate()` to block save on collisions with diagnostic messages. Exposed via `game.fabricate.api.SignatureValidator`. Mode-agnostic (works across all modes, not just cauldron). 16 new tests covering all overlap scenarios. 1107 tests pass. Reviewed and approved (1 round).
 
 ## Spec Alignment Tasks
 
@@ -180,7 +192,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
   8. `T-063` explicitly references this task as a prerequisite dependency and implementation does not proceed until this task is `done`.
 
 ### T-165 - Spec Update: Unified Routed Mode and Cauldron Crafting
-- Status: `todo`
+- Status: `done`
 - Description: Update the formal spec to remove legacy `mapped`/`tiered`, adopt `simple|progressive|routed|cauldron`, define recipe-level `resultSelection.provider` (`ingredientSet`, `macroOutcome`, `rollTableOutcome`) for routed/cauldron, and lock cauldron discovery/visibility/consumption semantics.
 - Acceptance Criteria:
   1. `spec/001-overview.md` is updated to include the unified routed direction and `cauldron` mode.
@@ -202,6 +214,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
   8. Cauldron uniqueness scope is all recipes in-system, blocks all saves when collisions exist, and import is partial with one aggregated conflict report.
   9. Unmigratable legacy recipes are deleted with cascade cleanup; removed objects are logged to console as JSON.
   10. If a matched cauldron attempt cannot route to a valid result-group value, classify as crafting-system misconfiguration error (GM-fix required).
+- Resolution: All spec files were already fully updated prior to this task review. All 8 ACs and all 10 decision log items verified present across spec/001, spec/002, spec/004, spec/005, spec/006, and spec/007. No changes needed.
 
 ## Documentation Recommendation Tasks
 
@@ -235,7 +248,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
 - Resolution: Already fully implemented prior to this task review. Shared resolver `getSourceUuid()` in `src/utils/sourceUuid.js` reads `_stats.compendiumSource` first with `flags.core.sourceId` fallback. Used by RecipeVisibilityService, RecipeManager, and CraftingEngine. 50 tests passing across 3 test files. Docs updated in visibility.md, spec/006, and troubleshooting.md. All 8 ACs verified.
 
 ### T-089 - Fix Favourites Layout and Filtering UX in Crafting App
-- Status: `todo`
+- Status: `done`
 - Description: Fix the crafting app favourites presentation so favourited recipes do not render as oversized cards ahead of the normal recipe list. Favourites must be exposed via a dedicated UX pattern (separate tab, distinct section, or explicit `Show favourites only` toggle) that keeps browse layout stable.
 - Acceptance Criteria:
   1. Repro is documented from current UI state here `FAVOURITES` appears before the standard list with oversized icon rendering that disrupts list layout.
@@ -245,6 +258,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
   5. Existing favourite state persistence and toggle behavior remain unchanged.
   6. UI tests cover: default list rendering without oversized favourites, switching into favourites view/filter, and returning to full list without layout regressions.
   7. Manual verification notes include before/after screenshots at the same window size confirming stable layout and readable favourites UX.
+- Resolution: Replaced standalone `FavouritesSection` component with a "Favourites only" toggle filter in `FilterBar`. Added `showFavouritesOnly` writable and `toggleFavouritesOnly` action to craftingStore. Favourited recipes now render using normal `RecipeCard` layout when filter is active. `FavouritesSection.svelte` deleted. FilterBar star toggle matches "Craftable only" button pattern. 6 new store tests, FilterBar tests added, FavouritesSection tests removed. 972 tests pass. Reviewed and approved (2 rounds).
 
 ### T-090 - Fix Recipe Display Labels and Icon Fallbacks in Crafting UI
 - Status: `done`
@@ -288,7 +302,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
 - Resolution: Sticky search via `position: sticky` on `.admin-panel > .panel-toolbar`. Replace-source zone converted to absolute-positioned overlay on item image (opacity-based reveal on hover/drag-active, icon-only with tooltip). `use:dragDrop` action wired to per-card overlay with `onReplaceSource` threaded through RecipeManagerRoot. Fixed pre-existing bug: both `onDropItem` and `onReplaceSource` now use `get()` from svelte/store instead of broken `.get?.()`. 8 new tests. 970 tests pass. Reviewed and approved (2 rounds).
 
 ### T-095 - Fix Recipe Editor Error Visibility, Items Panel Pinning, and Card Overflow
-- Status: `todo`
+- Status: `done`
 - Dependencies: `T-096`
 - Description: Fix recipe editor usability issues where validation feedback is lost above the fold, the system-items search control scrolls out of view, and system-item cards overflow/align poorly in the side panel.
 - Acceptance Criteria:
@@ -300,6 +314,7 @@ Purpose: keep agent work explicit, reviewable, and testable.
   6. System-item cards are constrained to the container width with centered/aligned content, no horizontal overflow, and consistent spacing at supported window sizes.
   7. UI tests cover sticky error summary behavior, inline validation rendering, sticky system-items search during scroll, and no-overflow card layout in the recipe editor.
   8. Manual verification notes include before/after screenshots at the same window size confirming persistent error visibility, pinned search, and corrected card layout.
+- Resolution: Three fixes: (1) Field-level inline error indicators added to recipe name input, ingredient group cards (`IngredientGroupCard`), and result group panels (`ResultGroupPanel`) via `hasError` props and `field-error`/`group-error` CSS classes. Click-to-scroll guarded to only expand collapsed panels. (2) Components panel search pinned via `.picker-sticky-header` wrapper with `position: sticky; top: 0`, panel changed to `overflow-y: auto`. (3) Card overflow fixed with `box-sizing: border-box; max-width: 100%; min-width: 0` and `-webkit-line-clamp: 2` on card names. 48 new tests (24 validation, 21 picker, 3 togglePanel guard). 1091 tests pass. Reviewed and approved (2 rounds).
 
 ### T-096 - Global UI Terminology Refactor: `System Items` -> `Components`
 - Status: `done`
@@ -323,6 +338,178 @@ Purpose: keep agent work explicit, reviewable, and testable.
   5. Component/store tests cover duplicate-key-prone datasets and confirm rendering succeeds without throwing.
   6. Manual verification confirms no `each_key_duplicate` or `Failed to render Application "fabricate-crafting"` errors in console when opening from sidebar header.
 - Resolution: Fixed with two-layer defense: (1) store-level deduplication in `_buildPreparedRecipes` filters duplicate run IDs via Set before data reaches components, (2) composite `{#each}` keys (`active-${run.id}` / `history-${run.id}`) in `RunSummary.svelte` prevent cross-list key collisions. 9 new tests added (4 store, 5 component). All 1013 tests pass. Reviewed and approved.
+
+## Post-Implementation Spec Update Tasks
+
+Quality-engineer review identified 20 spec gaps across 4 completed features (T-097, T-057, T-059, T-061). Organized by spec file.
+
+### spec/002-data-models.md
+
+### T-169 - Spec: Add `fallbackItemIds` to Component Data Model
+- Status: `todo`
+- Description: `Component.fallbackItemIds` is used in runtime matching (RecipeManager) and populated during compendium import (CompendiumImporter), but has no definition in spec/002-data-models.md.
+- Acceptance Criteria:
+  1. `spec/002` Component properties block includes `fallbackItemIds: string[]` with description stating these are alternate item UUIDs accepted as matches when `sourceItemUuid` does not resolve.
+  2. A requirements entry clarifies fallback IDs are tried in order after `sourceItemUuid` matching fails, using the same source-UUID resolver.
+  3. A note states `fallbackItemIds` must never contain the same value as `sourceItemUuid` (de-duplication required).
+
+### T-170 - Spec: Document `__SYSTEM_ID__` Placeholder in Recipe Pack Data
+- Status: `todo`
+- Description: CompendiumImporter resolves `craftingSystemId: "__SYSTEM_ID__"` to the imported system's ID. This placeholder convention is absent from spec/002 Recipe section.
+- Acceptance Criteria:
+  1. `spec/002` Recipe requirements section documents that `craftingSystemId` may be `"__SYSTEM_ID__"` in pack data only; replaced at import time with the system's actual ID.
+  2. A note states `"__SYSTEM_ID__"` is not valid in saved/persisted recipe data — it is a pack-bundle-only authoring convention.
+
+### T-171 - Spec: Document `CraftingSystem.teaserConfig` Data Model
+- Status: `todo`
+- Description: `CraftingSystem.teaserConfig` and `TeaserFragment` are implemented but absent from spec/002.
+- Acceptance Criteria:
+  1. `spec/002` CraftingSystem schema includes `teaserConfig` with shape: `{ enabled: boolean, discoveryMode: "threshold" | "fragments" | "both", fragments: TeaserFragment[] }`.
+  2. `TeaserFragment` model defined with fields: `id`, `name`, `linkedItemUuid`, `recipeIds[]`, `progressValue` (0-100).
+  3. Requirements state when `teaserConfig` is active and what each `discoveryMode` value means.
+
+### T-172 - Spec: Document `Recipe.teaser` Field
+- Status: `todo`
+- Description: `Recipe.teaser` field is implemented but absent from spec/002.
+- Acceptance Criteria:
+  1. `spec/002` Recipe schema includes `teaser` with shape: `{ enabled: boolean, hiddenFields: string[], revealThreshold: number, teaserDescription: string }`.
+  2. `hiddenFields` valid values enumerated: `"ingredients"`, `"results"`, `"description"`, `"catalysts"`, `"essences"`.
+  3. Default normalization (when `teaser` absent from stored data) is specified.
+
+### T-173 - Spec: Add `teaser` to `listMode` Enum
+- Status: `todo`
+- Description: Implementation accepts `listMode: "teaser"` but spec/002 only lists `"global" | "player" | "knowledge"`. Both spec/002 and spec/006 must be updated.
+- Acceptance Criteria:
+  1. `spec/002` `recipeVisibility.listMode` type includes `"teaser"`.
+  2. `spec/006` listing algorithm includes a `listMode === "teaser"` branch describing visibility-always/craftability-gated semantics.
+  3. A requirements entry documents that when `listMode === "teaser"`, `teaserConfig` at system level governs field visibility and discovery conditions.
+
+### T-174 - Spec: Document `Actor.flags.fabricate.discoveryProgress` Flag
+- Status: `todo`
+- Description: Discovery progress per actor is stored in flags but undocumented in spec/002 Actor Flags section.
+- Acceptance Criteria:
+  1. `spec/002` Actor Flags section includes `discoveryProgress` with schema: `{ [recipeId]: { progress: number, fragments: string[], discoveredAt: number|null, manuallySet: boolean } }`.
+  2. Requirements state: `progress` is 0-100, `fragments` contains discovered TeaserFragment IDs, `discoveredAt` is timestamp set when threshold reached.
+  3. Cleanup policy on recipe deletion is specified.
+
+### T-175 - Spec: Add ShoppingList Data Model
+- Status: `todo`
+- Description: Shopping list aggregation model is fully implemented but entirely absent from spec/002.
+- Acceptance Criteria:
+  1. `spec/002` gains a ShoppingList section defining `ShoppingListEntry` (`{ recipeId, quantity }`) and `AggregatedShoppingList` (`{ ingredients[], essences[], catalysts[], allSatisfied, totalRecipes, totalQuantity }`).
+  2. `AggregatedIngredient` shape defined with `componentId`, `description`, `totalNeed`, `have`, `missing`, `satisfied`.
+  3. Deduplication key priority documented: componentId > itemUuid > description.
+  4. `have` uses shared inventory (latest evaluation value, not summed across recipes).
+  5. Session-scoped persistence boundary stated explicitly.
+
+### T-176 - Spec: Clarify Shopping List `have` Aggregation Semantics
+- Status: `todo`
+- Description: The "latest evaluation wins" strategy for `have` in ingredient merging is correct but counter-intuitive and undocumented.
+- Acceptance Criteria:
+  1. ShoppingList requirements in spec/002 state: `have` reflects shared inventory from the latest recipe evaluation pass, not summed across recipes.
+  2. Quantity multiplication applies to ingredients and essences but NOT catalysts.
+  3. When `componentSourceActors` is empty, all `have` values are 0 and evaluation is skipped.
+
+### spec/003-ui-integration.md
+
+### T-177 - Spec: Document `importFromPackData` API Contract
+- Status: `todo`
+- Description: spec/003 describes compendium import in two vague sentences. The implementation has a fully defined API with options, phased execution, and structured summary return.
+- Acceptance Criteria:
+  1. `spec/003` gains a Compendium Import subsection documenting: pack data shape requirement, named options (`overwriteExisting`, `retainFallbackIds`, `additionalFallbackIds`, `targetPackIds`), early-exit behaviour.
+  2. Structured import summary shape documented: `{ system, components: { remapped[], retained[], unresolved[] }, recipes: { imported, skipped, errors[] }, collisions[] }`.
+  3. UUID remapping precedence documented: exact match → source+name match → unresolved.
+
+### T-178 - Spec: Document `targetPackIds` Filter Option
+- Status: `todo`
+- Description: The `targetPackIds` option restricts UUID search to specific Foundry compendium packs but is undocumented.
+- Acceptance Criteria:
+  1. `spec/003` Compendium Import section states `targetPackIds` is an optional array of Foundry compendium collection IDs.
+  2. When empty/omitted, all Item-type packs are searched. When non-empty, search is restricted to those packs.
+
+### T-179 - Spec: Add Graph Tab UI Section
+- Status: `todo`
+- Description: The Recipe Graph tab in RecipeManagerApp is entirely absent from spec/003.
+- Acceptance Criteria:
+  1. `spec/003` GM Crafting Admin tab list includes "Graph".
+  2. New Graph Tab section documents: toolbar controls (search, category filter, zoom), graph viewport (pan/zoom), node display (icon, name, category), click-to-edit navigation, edge rendering (solid vs dashed for cycles), legend, empty state, stats display.
+  3. Lazy computation contract stated: graph data computed only when Graph tab is active.
+  4. Filter contract stated: category and search applied client-side, no re-layout on filter.
+
+### T-180 - Spec: Add Shopping List Panel UI Section
+- Status: `todo`
+- Description: Shopping list panel in CraftingApp is entirely absent from spec/003.
+- Acceptance Criteria:
+  1. `spec/003` Crafting App (Player) section gains a Shopping List Panel subsection.
+  2. Documents: entry point (cart button on RecipeCard), panel header with count badge, recipe entry list with quantity controls, materials table (Need/Have/Missing columns), essences/catalysts sections, summary footer.
+  3. Reactivity triggers documented: actor source change, quantity change, add/remove.
+  4. Constraints documented: not available in cauldron mode, teaser-hidden ingredients excluded.
+
+### T-181 - Spec: Document Non-Persisted Session State
+- Status: `todo`
+- Description: Shopping list is session-scoped (not persisted) but this boundary is not stated in spec/003.
+- Acceptance Criteria:
+  1. `spec/003` Data Storage section includes a Non-Persisted Session State note listing: shopping list entries, shopping list panel expanded/collapsed state.
+  2. States that implementors must not persist shopping list to `game.settings` or flags.
+
+### T-182 - Spec: Document Teaser Mode UI Flows
+- Status: `todo`
+- Description: GM teaser config UI (TeaserProgressEditor, RulesTab teaser section) and player-facing teaser display are absent from spec/003.
+- Acceptance Criteria:
+  1. `spec/003` Systems Tab section documents teaser config controls: enable toggle, discovery mode selector, fragment list editor.
+  2. GM progress management dialog documented: per-actor progress table, manual progress input, Reset action, Grant Discovery action.
+  3. Player-facing teaser recipe display documented: hidden fields not rendered, teaserDescription shown, progress indicator, craft action disabled until discovered.
+
+### T-183 - Spec: Clarify Graph Filter Ownership (Store vs Component)
+- Status: `todo`
+- Description: Current implementation applies search filter in both adminStore and RecipeGraphTab component, creating ambiguity about which tier owns each filter dimension.
+- Acceptance Criteria:
+  1. `spec/003` Graph Tab section explicitly states filter ownership: search and category are client-side (component-level) over pre-computed graph.
+  2. Graph layout computed once per system selection, not re-triggered by filtering.
+  3. Any duplicate filter application in store is noted as implementation detail to clean up.
+
+### spec/005-recipes-and-steps.md
+
+### T-184 - Spec: Add Recipe Dependency Graph Semantics
+- Status: `todo`
+- Description: Graph edge derivation rules, node/edge shapes, cycle handling, and layout algorithm are implemented but absent from spec/005.
+- Acceptance Criteria:
+  1. `spec/005` gains a Recipe Dependency Graph Semantics section defining: edge derivation rule (output componentId of recipe A matches input componentId of recipe B), self-loop exclusion.
+  2. Node shape and edge shape defined with all fields.
+  3. Cycle handling documented: DFS back-edge detection, cycle edges excluded from layer assignment, rendered with dashed stroke.
+  4. Disconnected subgraph layout documented: side-by-side with gap.
+  5. Sugiyama-style layout algorithm described with constants (LAYER_SPACING, NODE_SPACING, NODE_WIDTH, NODE_HEIGHT).
+
+### T-185 - Spec: Add Graph Construction Testing Requirements
+- Status: `todo`
+- Description: Testing requirements for graph builder are absent from spec/005.
+- Acceptance Criteria:
+  1. `spec/005` Testing Requirements section includes: empty recipe list, single isolated recipe, linear chain, branching graph, disconnected components, self-loop exclusion, cycle detection, layout assignment, filter preservation.
+
+### spec/006-recipe-visibility.md
+
+### T-186 - Spec: Document Teaser Visibility Evaluation Rules
+- Status: `todo`
+- Description: `RecipeVisibilityService._evaluateTeaserAccess` implements a full evaluation algorithm but spec/006 has no teaser mode section.
+- Acceptance Criteria:
+  1. `spec/006` gains a Teaser Mode section with evaluation algorithm: `effectiveProgress = stored.progress + sum(fragment progressValues)`, craftability gated on `effectiveProgress >= revealThreshold` OR `discoveredAt != null`.
+  2. `teaserState` payload shape specified: `{ isTeaser, progress, hiddenFields, teaserDescription }`.
+  3. GM bypass documented: GM always sees fully revealed recipes in teaser mode.
+
+### T-187 - Spec: Document Fragment Auto-Discovery Hook
+- Status: `todo`
+- Description: `FragmentDiscoveryHook` automatically discovers fragments on `createItem` but this is absent from spec/006.
+- Acceptance Criteria:
+  1. `spec/006` gains a Fragment Auto-Discovery section: trigger (`createItem` when item UUID matches fragment), scope conditions (`teaserConfig.enabled` AND `discoveryMode ∈ ["fragments", "both"]`), idempotency contract, auto-transition on threshold reached.
+  2. Testing requirements include idempotency and auto-transition tests.
+
+### Shopping List Testing
+
+### T-188 - Spec: Add Shopping List Testing Requirements
+- Status: `todo`
+- Description: Testing requirements for shopping list edge cases (teaser interaction, deleted recipes, quantity multiplication scope) are unspecified.
+- Acceptance Criteria:
+  1. Spec documents testing requirements: empty/non-empty componentSourceActors, deleted recipe handling (silently skipped), teaser-hidden ingredients excluded, quantity multiplication applies to ingredients/essences but not catalysts.
 
 ## Svelte Migration Tasks
 

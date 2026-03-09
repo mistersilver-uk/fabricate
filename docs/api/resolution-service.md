@@ -19,7 +19,16 @@ Validates recipes against their resolution mode rules and resolves which result 
 
 Returns the resolution mode for a recipe (derived from its crafting system).
 
-**Returns:** `string` -- `"simple"`, `"mapped"`, `"tiered"`, or `"progressive"`
+**Returns:** `string` -- `"simple"`, `"routed"`, or `"progressive"`
+
+{: .note }
+> The legacy modes `"mapped"` and `"tiered"` are normalised to `"routed"` on load. `getMode()` always returns `"routed"` for recipes that were previously `"mapped"` or `"tiered"`.
+
+### getProvider(recipe)
+
+Returns the result-selection provider for a routed recipe.
+
+**Returns:** `string` -- `"ingredientSet"`, `"macroOutcome"`, or `"rollTableOutcome"`, or `null` for non-routed recipes.
 
 ### validateRecipe(recipe)
 
@@ -28,11 +37,13 @@ Validates that a recipe's structure is valid for its resolution mode.
 **Returns:** `{ valid: boolean, errors: string[] }`
 
 ```javascript
-const svc = game.fabricate.getResolutionModeService();
-const result = svc.validateRecipe(myRecipe);
-if (!result.valid) {
-  result.errors.forEach(e => console.warn(e));
-}
+Hooks.once('fabricate.ready', () => {
+  const svc = game.fabricate.getResolutionModeService();
+  const result = svc.validateRecipe(myRecipe);
+  if (!result.valid) {
+    result.errors.forEach(e => console.warn(e));
+  }
+});
 ```
 
 **Validation rules by mode:**
@@ -40,8 +51,9 @@ if (!result.valid) {
 | Mode | Rules |
 |:-----|:------|
 | Simple | Exactly 1 ingredient set, exactly 1 result group |
-| Mapped | 1+ ingredient sets, 1+ result groups, `resultGroupId` references are valid |
-| Tiered | 1+ ingredient sets, 1+ result groups, checks enabled, outcomes non-empty, valid routing |
+| Routed (`ingredientSet`) | 1+ ingredient sets, 1+ result groups, `resultGroupId` references are valid; result group names must be unique (case-insensitive) |
+| Routed (`macroOutcome`) | 1+ ingredient sets, 1+ result groups, checks enabled, `resultSelection.macroUuid` present or system fallback set, result group names are unique and do not use reserved keywords |
+| Routed (`rollTableOutcome`) | 1+ ingredient sets, 1+ result groups, `resultSelection.rollTableUuid` present, result group names are unique and do not use reserved keywords |
 | Progressive | Exactly 1 ingredient set, exactly 1 result group, checks enabled, progressive config exists, all result difficulties >= 1 |
 
 ### validateSalvage(component, system)
@@ -95,6 +107,7 @@ Hooks.once('fabricate.ready', () => {
 ### resolveResultGroups(params)
 
 Determines which result groups to create based on the resolution mode and crafting check result.
+For routed recipes, dispatches on `recipe.resultSelection.provider`.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
@@ -102,7 +115,7 @@ Determines which result groups to create based on the resolution mode and crafti
 | `params.step` | `object` | The current step |
 | `params.ingredientSet` | `IngredientSet` | The selected ingredient set |
 | `params.checkResult` | `object` | The crafting check result |
-| `params.selectedResultGroupId` | `string` | Player-selected result group (mapped mode) |
+| `params.selectedResultGroupId` | `string` | Player-selected result group (routed `ingredientSet` provider only) |
 
 **Returns:** `{ groups: object[], meta: object }`
 

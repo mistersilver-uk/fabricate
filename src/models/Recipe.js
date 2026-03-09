@@ -43,7 +43,9 @@ export class Recipe {
     this.outcomeRouting = data.outcomeRouting && typeof data.outcomeRouting === 'object'
       ? { ...data.outcomeRouting }
       : null;
+    this.resultSelection = this._normalizeResultSelection(data.resultSelection);
     this.currencyCost = this._normalizeCurrencyCost(data.currencyCost);
+    this.teaser = this._normalizeTeaser(data.teaser);
 
     // Metadata
     this.metadata = data.metadata || {
@@ -203,6 +205,28 @@ export class Recipe {
       }
     }
 
+    // rollTableOutcome provider validation
+    if (this.resultSelection?.provider === 'rollTableOutcome') {
+      if (!this.resultSelection.rollTableUuid) {
+        errors.push('rollTableOutcome provider requires a roll table UUID');
+      }
+
+      // Validate ResultGroup name uniqueness (case-insensitive) and reserved keywords
+      const FAIL_KEYWORDS = new Set(['fail', 'failed', 'failure', 'f']);
+      const MISS_KEYWORDS = new Set(['miss', 'missed', 'm', 'nothing', 'none', 'whiff', 'whiffed']);
+      const seenNames = new Map();
+      for (const group of this.resultGroups) {
+        const normalized = String(group.name || '').trim().toLowerCase();
+        if (seenNames.has(normalized)) {
+          errors.push(`Duplicate result group name "${group.name}" (case-insensitive) — rollTableOutcome requires unique names`);
+        }
+        seenNames.set(normalized, group.id);
+        if (FAIL_KEYWORDS.has(normalized) || MISS_KEYWORDS.has(normalized)) {
+          errors.push(`Result group name "${group.name}" conflicts with reserved routing keyword`);
+        }
+      }
+    }
+
     return {
       valid: errors.length === 0,
       errors
@@ -245,7 +269,9 @@ export class Recipe {
       isVariable: this.isVariable,
       transferEffects: this.transferEffects,
       outcomeRouting: this.outcomeRouting,
+      resultSelection: this.resultSelection,
       currencyCost: this.currencyCost,
+      teaser: this.teaser,
       metadata: this.metadata
     };
   }
@@ -294,6 +320,18 @@ export class Recipe {
       isVariable: false,
       transferEffects: false
     });
+  }
+
+  _normalizeResultSelection(resultSelection) {
+    if (!resultSelection || typeof resultSelection !== 'object') return null;
+    const VALID_PROVIDERS = ['ingredientSet', 'macroOutcome', 'rollTableOutcome'];
+    const provider = String(resultSelection.provider || '').trim();
+    if (!VALID_PROVIDERS.includes(provider)) return null;
+    return {
+      provider,
+      macroUuid: resultSelection.macroUuid || null,
+      rollTableUuid: resultSelection.rollTableUuid || null
+    };
   }
 
   _normalizeResultGroups(data = {}) {
@@ -367,6 +405,26 @@ export class Recipe {
       }))
       .filter(c => c.abbreviation && c.amount > 0);
     return normalized.length > 0 ? { currencies: normalized } : null;
+  }
+
+  _normalizeTeaser(teaser) {
+    if (!teaser || typeof teaser !== 'object') {
+      return {
+        enabled: true,
+        hiddenFields: ['ingredients', 'results', 'description'],
+        revealThreshold: 100,
+        teaserDescription: ''
+      };
+    }
+    const VALID_FIELDS = ['ingredients', 'results', 'description', 'catalysts', 'essences'];
+    return {
+      enabled: teaser.enabled !== false,
+      hiddenFields: Array.isArray(teaser.hiddenFields)
+        ? teaser.hiddenFields.filter(f => VALID_FIELDS.includes(f))
+        : ['ingredients', 'results', 'description'],
+      revealThreshold: Math.min(100, Math.max(0, Number(teaser.revealThreshold) || 100)),
+      teaserDescription: String(teaser.teaserDescription || '').trim()
+    };
   }
 
   _normalizeVisibility(visibility) {

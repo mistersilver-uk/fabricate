@@ -16,10 +16,95 @@ export class ResolutionModeService {
     return system?.resolutionMode || 'simple';
   }
 
+  getProvider(recipe) {
+    return recipe?.resultSelection?.provider || null;
+  }
+
   getExecutionSteps(recipe) {
     return typeof recipe?.getExecutionSteps === 'function'
       ? recipe.getExecutionSteps()
       : [];
+  }
+
+  // ---------------------------------------------------------------------------
+  // Name normalization helpers for rollTableOutcome
+  // ---------------------------------------------------------------------------
+
+  _normalizeName(name) {
+    return String(name || '').trim().toLowerCase();
+  }
+
+  _isFailKeyword(name) {
+    const normalized = this._normalizeName(name);
+    return ['fail', 'failed', 'failure', 'f'].includes(normalized);
+  }
+
+  _isMissKeyword(name) {
+    const normalized = this._normalizeName(name);
+    return ['miss', 'missed', 'm', 'nothing', 'none', 'whiff', 'whiffed'].includes(normalized);
+  }
+
+  // ---------------------------------------------------------------------------
+  // rollTableOutcome resolution
+  // ---------------------------------------------------------------------------
+
+  async resolveByRollTable(recipe, step, allGroups) {
+    const tableUuid = recipe?.resultSelection?.rollTableUuid;
+    if (!tableUuid) {
+      return { groups: [], meta: { error: 'No roll table UUID configured' } };
+    }
+
+    const table = await fromUuid(tableUuid);
+    if (!table || typeof table.draw !== 'function') {
+      return { groups: [], meta: { error: `Roll table not found: ${tableUuid}` } };
+    }
+
+    let drawResult;
+    try {
+      drawResult = await table.draw({ displayChat: false });
+    } catch (err) {
+      return { groups: [], meta: { error: `Roll table draw failed: ${err.message}` } };
+    }
+
+    const results = drawResult?.results || [];
+    if (results.length === 0) {
+      return { groups: [], meta: { error: 'Roll table draw returned no results' } };
+    }
+
+    const drawnName = results[0]?.text || results[0]?.name || '';
+    const normalized = this._normalizeName(drawnName);
+
+    if (this._isFailKeyword(normalized)) {
+      return {
+        groups: [],
+        meta: { drawnName, normalized, disposition: 'fail' }
+      };
+    }
+
+    if (this._isMissKeyword(normalized)) {
+      return {
+        groups: [],
+        meta: { drawnName, normalized, disposition: 'miss' }
+      };
+    }
+
+    const matched = (allGroups || []).filter(g => this._normalizeName(g.name) === normalized);
+    if (matched.length === 0) {
+      return {
+        groups: [],
+        meta: {
+          drawnName,
+          normalized,
+          disposition: 'misconfiguration',
+          error: `No result group matches drawn name "${drawnName}"`
+        }
+      };
+    }
+
+    return {
+      groups: matched.slice(0, 1),
+      meta: { drawnName, normalized, disposition: 'success', matchedGroupId: matched[0].id }
+    };
   }
 
   validateRecipe(recipe) {
@@ -87,6 +172,27 @@ export class ResolutionModeService {
             errors.push(`Result "${result?.id || 'unknown'}" references system item without valid difficulty`);
           }
         }
+      }
+    }
+
+    if (mode === 'cauldron') {
+      // Cauldron recipes cannot have explicit multi-step configuration
+      const setsTop = Array.isArray(recipe.ingredientSets) ? recipe.ingredientSets : [];
+      const groupsTop = Array.isArray(recipe.resultGroups) ? recipe.resultGroups : [];
+      if (setsTop.length < 1) errors.push('Cauldron recipe must have at least 1 ingredient set');
+      if (groupsTop.length < 1) errors.push('Cauldron recipe must have at least 1 result group');
+      // No explicit steps allowed
+      const explicitSteps = typeof recipe.getExecutionSteps === 'function' ? recipe.getExecutionSteps() : [];
+      const hasExplicitSteps = explicitSteps.length > 1 || (explicitSteps.length === 1 && explicitSteps[0]?.id !== 'implicit-step');
+      if (hasExplicitSteps) errors.push('Cauldron recipe must not have explicit steps');
+      const provider = this.getProvider(recipe);
+      if (!provider) {
+        errors.push('Cauldron recipe requires resultSelection.provider');
+      } else if (!['ingredientSet', 'macroOutcome', 'rollTableOutcome'].includes(provider)) {
+        errors.push('Invalid result selection provider: ' + provider);
+      }
+      if (provider === 'rollTableOutcome' && !recipe?.resultSelection?.rollTableUuid) {
+        errors.push('rollTableOutcome provider requires a roll table UUID');
       }
     }
 
@@ -165,7 +271,12 @@ export class ResolutionModeService {
     };
   }
 
-  resolveResultGroups({ recipe, step, ingredientSet, checkResult, selectedResultGroupId = null }) {
+  resolveResultGroups({ recipe, step, ingredientSet, checkResult, selectedResultGroupId = null, rollTableResult = null }) {
+    // If a rollTableResult was pre-resolved (for rollTableOutcome provider), use it directly
+    if (rollTableResult) {
+      return rollTableResult;
+    }
+
     const system = this.getSystem(recipe);
     const mode = this.getMode(recipe);
     const allGroups = Array.isArray(step?.resultGroups) && step.resultGroups.length > 0
@@ -267,6 +378,33 @@ export class ResolutionModeService {
           remaining
         }
       };
+    }
+
+    if (mode === 'cauldron') {
+      const provider = this.getProvider(recipe);
+      if (provider === 'ingredientSet') {
+        const mappedId = ingredientSet?.resultGroupId || null;
+        if (mappedId) {
+          return { groups: allGroups.filter(g => g.id === mappedId), meta: {} };
+        }
+        return { groups: allGroups.slice(0, 1), meta: {} };
+      }
+      if (provider === 'macroOutcome') {
+        const outcome = checkResult?.outcome != null ? String(checkResult.outcome) : null;
+        const normalized = this._normalizeName(outcome);
+        if (this._isFailKeyword(normalized)) {
+          return { groups: [], meta: { outcome, disposition: 'fail' } };
+        }
+        if (this._isMissKeyword(normalized)) {
+          return { groups: [], meta: { outcome, disposition: 'miss' } };
+        }
+        const matched = allGroups.filter(g => this._normalizeName(g.name) === normalized);
+        if (matched.length === 0) {
+          return { groups: [], meta: { outcome, disposition: 'misconfiguration', error: `No result group matches outcome "${outcome}"` } };
+        }
+        return { groups: matched.slice(0, 1), meta: { outcome, disposition: 'success' } };
+      }
+      return { groups: allGroups.slice(0, 1), meta: {} };
     }
 
     return {

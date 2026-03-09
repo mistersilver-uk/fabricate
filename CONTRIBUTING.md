@@ -34,6 +34,79 @@ We follow a **spec-driven approach** for development with Agents:
 
 This ensures consistency, maintainability, and clear documentation of system behaviour.
 
+## Release Workflow
+
+Fabricate uses a local release build script to assemble the final module distribution before publishing.
+
+### npm Scripts
+
+| Script | Command | What it does |
+|:-------|:--------|:-------------|
+| `release` | `npm run release` | Full build: clean `dist/`, run Vite, copy assets, write `dist/module.json`, zip, validate |
+| `release:build` | `npm run release:build` | Same as `release` but skips the zip step — useful in CI environments |
+| `release:validate` | `npm run release:validate` | Validate an existing `dist/` without rebuilding |
+
+All three scripts are implemented in `scripts/release.js`, which exports three utility functions used by both the script and its tests:
+
+- **`rewriteModuleJson(manifest)`** — produces a `dist/`-ready manifest: strips the `dist/` prefix from `esmodules` paths and strips the `.db` suffix from pack paths.
+- **`getRequiredFiles(manifest)`** — returns the list of files that must be present in `dist/` based on the rewritten manifest.
+- **`validateDist(distDir, srcManifest)`** — checks that all required files exist and that `dist/module.json` is valid JSON.
+
+### Building a Release
+
+```bash
+# Standard release (build + zip)
+npm run release
+
+# Build only, no zip (e.g. for CI artifact upload)
+npm run release:build
+
+# Validate dist/ without rebuilding
+npm run release:validate
+```
+
+The script exits with code 1 if validation fails and prints a list of missing files or parse errors.
+
+### Testing the Build in FoundryVTT
+
+After running `npm run release:build`, you can test the unzipped build by symlinking `dist/` into your local FoundryVTT module directory:
+
+```bash
+# Linux / macOS
+ln -s "$(pwd)/dist" ~/.local/share/FoundryVTT/Data/modules/fabricate
+
+# Windows (run as Administrator in PowerShell)
+New-Item -ItemType SymbolicLink -Path "$env:LOCALAPPDATA\FoundryVTT\Data\modules\fabricate" -Target "$(pwd)\dist"
+```
+
+After symlinking, launch FoundryVTT and enable the module in a test world. Validate that the symlink is correct by checking that Foundry reports the module version matching your local `package.json`.
+
+To remove the symlink when you are done:
+
+```bash
+# Linux / macOS
+rm ~/.local/share/FoundryVTT/Data/modules/fabricate
+
+# Windows
+Remove-Item "$env:LOCALAPPDATA\FoundryVTT\Data\modules\fabricate"
+```
+
+### Release Script CI Usage
+
+The `--no-zip` flag (`npm run release:build`) is designed for use in GitHub Actions:
+
+```yaml
+- uses: actions/setup-node@v4
+  with:
+    node-version: '20'
+- run: npm ci
+- run: npm run release:build
+- uses: actions/upload-artifact@v4
+  with:
+    name: fabricate-dist
+    path: dist/
+```
+
 ## UI Architecture (Svelte)
 
 Fabricate's UI is built with **Svelte 5** (runes mode). All components use `$props()`, `$state`, `$derived`, `$effect`, and `onclick`/`onchange` event attributes.
@@ -88,4 +161,3 @@ The `use:dragDrop` action (`src/ui/svelte/actions/dragDrop.js`) integrates with 
 - Component-scoped `<style>` blocks handle per-component styles.
 - `styles/fabricate.css` contains shared/global rules (layout, admin panel, design tokens).
 - Foundry core CSS classes (`flexrow`, `flexcol`) are used where appropriate.
-

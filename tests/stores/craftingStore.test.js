@@ -154,6 +154,7 @@ describe('createCraftingStore', () => {
         'selectedCategory', 'showOnlyAvailable', 'viewState',
         'selectActor', 'toggleSourceActor', 'setSearch', 'setCategory',
         'toggleAvailable', 'toggleFavourite', 'craft', 'learnRecipe',
+        'showFavouritesOnly', 'toggleFavouritesOnly',
         'cancelRun', 'restartRun', 'refresh', 'destroy'
       ];
 
@@ -1059,6 +1060,104 @@ describe('createCraftingStore', () => {
       assert.equal(vs.runHistory[0].canCancel, false, 'history runs should have canCancel:false');
       assert.ok('recipeName' in vs.runHistory[0], 'history run should have recipeName field');
       assert.ok('statusLabel' in vs.runHistory[0], 'history run should have statusLabel field');
+    });
+  });
+
+  // --- showFavouritesOnly / toggleFavouritesOnly ---
+
+  describe('showFavouritesOnly', () => {
+    it('defaults showFavouritesOnly to false', () => {
+      const services = createMockServices();
+      const store = createCraftingStore(services);
+      const val = get(store.showFavouritesOnly);
+      assert.equal(val, false, 'showFavouritesOnly should default to false');
+    });
+
+    it('toggleFavouritesOnly flips showFavouritesOnly from false to true', async () => {
+      const services = createMockServices();
+      const store = createCraftingStore(services);
+      assert.equal(get(store.showFavouritesOnly), false);
+      await store.toggleFavouritesOnly();
+      assert.equal(get(store.showFavouritesOnly), true);
+    });
+
+    it('toggleFavouritesOnly flips showFavouritesOnly from true to false', async () => {
+      const services = createMockServices();
+      const store = createCraftingStore(services);
+      store.showFavouritesOnly.set(true);
+      await store.toggleFavouritesOnly();
+      assert.equal(get(store.showFavouritesOnly), false);
+    });
+
+    it('when showFavouritesOnly=true, only recipes in favouriteRecipes setting appear', async () => {
+      const recipe1 = makeRecipe('r1', 'Healing Potion');
+      const recipe2 = makeRecipe('r2', 'Strength Potion');
+      const services = createMockServices({
+        getSetting: (key) => {
+          if (key === 'favouriteRecipes') return ['r1'];
+          return null;
+        },
+        getRecipeManager: () => ({
+          getRecipes: () => [recipe1, recipe2],
+          getRecipe: (id) => [recipe1, recipe2].find(r => r.id === id) || null,
+          evaluateCraftability: () => ({ canCraft: true, satisfiableSet: {}, missing: { ingredients: [], essences: [], catalysts: [] }, ingredientStates: [], essenceStates: [], catalystStates: [] })
+        })
+      });
+      const store = createCraftingStore(services);
+      store.showFavouritesOnly.set(true);
+      await store.refresh();
+      const vs = get(store.viewState);
+      assert.ok(vs.recipes.some(r => r.id === 'r1'), 'favourite r1 should appear');
+      assert.ok(!vs.recipes.some(r => r.id === 'r2'), 'non-favourite r2 should be filtered out');
+    });
+
+    it('when showFavouritesOnly=false, all visible recipes appear regardless of favourite status', async () => {
+      const recipe1 = makeRecipe('r1', 'Healing Potion');
+      const recipe2 = makeRecipe('r2', 'Strength Potion');
+      const services = createMockServices({
+        getSetting: (key) => {
+          if (key === 'favouriteRecipes') return ['r1'];
+          return null;
+        },
+        getRecipeManager: () => ({
+          getRecipes: () => [recipe1, recipe2],
+          getRecipe: (id) => [recipe1, recipe2].find(r => r.id === id) || null,
+          evaluateCraftability: () => ({ canCraft: true, satisfiableSet: {}, missing: { ingredients: [], essences: [], catalysts: [] }, ingredientStates: [], essenceStates: [], catalystStates: [] })
+        })
+      });
+      const store = createCraftingStore(services);
+      store.showFavouritesOnly.set(false);
+      await store.refresh();
+      const vs = get(store.viewState);
+      assert.ok(vs.recipes.some(r => r.id === 'r1'), 'r1 should appear');
+      assert.ok(vs.recipes.some(r => r.id === 'r2'), 'r2 should also appear when not filtering');
+    });
+
+    it('toggleFavouritesOnly calls refresh and updates viewState.recipes', async () => {
+      const recipe1 = makeRecipe('r1', 'Healing Potion');
+      const recipe2 = makeRecipe('r2', 'Strength Potion');
+      const services = createMockServices({
+        getSetting: (key) => {
+          if (key === 'favouriteRecipes') return ['r1'];
+          return null;
+        },
+        getRecipeManager: () => ({
+          getRecipes: () => [recipe1, recipe2],
+          getRecipe: (id) => [recipe1, recipe2].find(r => r.id === id) || null,
+          evaluateCraftability: () => ({ canCraft: true, satisfiableSet: {}, missing: { ingredients: [], essences: [], catalysts: [] }, ingredientStates: [], essenceStates: [], catalystStates: [] })
+        })
+      });
+      const store = createCraftingStore(services);
+      // Both should appear initially
+      await store.refresh();
+      assert.equal(get(store.viewState).recipes.length, 2);
+      // Toggle on - only r1 should appear
+      await store.toggleFavouritesOnly();
+      assert.equal(get(store.viewState).recipes.length, 1);
+      assert.equal(get(store.viewState).recipes[0].id, 'r1');
+      // Toggle off - both should appear again
+      await store.toggleFavouritesOnly();
+      assert.equal(get(store.viewState).recipes.length, 2);
     });
   });
 

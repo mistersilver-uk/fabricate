@@ -135,15 +135,172 @@ export class RecipeVisibilityService {
     };
   }
 
+
+  _getDiscoveryProgress(actor, recipeId) {
+    const all = getFabricateFlag(actor, 'discoveryProgress', {});
+    const entry = all?.[recipeId];
+    if (!entry || typeof entry !== 'object') {
+      return { progress: 0, fragments: [], discoveredAt: null, manuallySet: false };
+    }
+    return {
+      progress: Number(entry.progress || 0),
+      fragments: Array.isArray(entry.fragments) ? entry.fragments : [],
+      discoveredAt: entry.discoveredAt || null,
+      manuallySet: entry.manuallySet === true
+    };
+  }
+
+  _computeEffectiveProgress(actor, recipeId, system) {
+    const stored = this._getDiscoveryProgress(actor, recipeId);
+    const fragments = system?.teaserConfig?.fragments || [];
+    let fragmentProgress = 0;
+    for (const frag of fragments) {
+      if (!Array.isArray(frag.recipeIds) || !frag.recipeIds.includes(recipeId)) continue;
+      if (stored.fragments.includes(frag.id)) {
+        fragmentProgress += Number(frag.progressValue || 0);
+      }
+    }
+    return Math.min(100, stored.progress + fragmentProgress);
+  }
+
+  _evaluateTeaserAccess({ recipe, viewer, craftingActor, system }) {
+    // GM sees everything fully
+    if (viewer?.isGM) {
+      return { visible: true, craftable: true, reason: 'ok' };
+    }
+
+    // Recipe opts out of teaser mode — fully visible
+    if (recipe?.teaser?.enabled === false) {
+      return { visible: true, craftable: true, reason: 'ok' };
+    }
+
+    const progress = this._computeEffectiveProgress(craftingActor, recipe.id, system);
+    const threshold = recipe?.teaser?.revealThreshold ?? 100;
+    const hiddenFields = recipe?.teaser?.hiddenFields ?? ['ingredients', 'results', 'description'];
+    const teaserDescription = recipe?.teaser?.teaserDescription ?? '';
+
+    const stored = this._getDiscoveryProgress(craftingActor, recipe.id);
+    const isDiscovered = stored.discoveredAt !== null || progress >= threshold;
+
+    if (isDiscovered) {
+      return {
+        visible: true,
+        craftable: true,
+        reason: 'teaser-discovered'
+      };
+    }
+
+    return {
+      visible: true,
+      craftable: false,
+      reason: 'teaser',
+      teaserState: {
+        isTeaser: true,
+        progress,
+        hiddenFields,
+        teaserDescription
+      }
+    };
+  }
+
+  async discoverFragment(actor, fragmentId, system) {
+    const fragments = system?.teaserConfig?.fragments || [];
+    const fragment = fragments.find(f => f.id === fragmentId);
+    if (!fragment) return;
+
+    const all = getFabricateFlag(actor, 'discoveryProgress', {});
+    const updated = { ...all };
+
+    for (const recipeId of (fragment.recipeIds || [])) {
+      const entry = updated[recipeId] || { progress: 0, fragments: [], discoveredAt: null, manuallySet: false };
+
+      // Idempotent — skip if already discovered this fragment
+      if (entry.fragments.includes(fragmentId)) continue;
+
+      const newFragments = [...entry.fragments, fragmentId];
+      const newProgress = entry.progress; // manual progress unchanged
+
+      // Compute total including all fragment contributions
+      let totalFragmentProgress = 0;
+      for (const frag of fragments) {
+        if (!frag.recipeIds?.includes(recipeId)) continue;
+        if (newFragments.includes(frag.id)) {
+          totalFragmentProgress += Number(frag.progressValue || 0);
+        }
+      }
+      const effectiveProgress = Math.min(100, newProgress + totalFragmentProgress);
+
+      // Check if this discovery causes auto-transition
+      let discoveredAt = entry.discoveredAt;
+      if (!discoveredAt) {
+        const recipe = this.recipeManager.getRecipe?.(recipeId);
+        const threshold = recipe?.teaser?.revealThreshold ?? 100;
+        if (effectiveProgress >= threshold) {
+          discoveredAt = Date.now();
+        }
+      }
+
+      updated[recipeId] = {
+        ...entry,
+        fragments: newFragments,
+        discoveredAt
+      };
+    }
+
+    await setFabricateFlag(actor, 'discoveryProgress', updated);
+  }
+
+  async setDiscoveryProgress(actor, recipeId, progress) {
+    const all = getFabricateFlag(actor, 'discoveryProgress', {});
+    const entry = all?.[recipeId] || { progress: 0, fragments: [], discoveredAt: null, manuallySet: false };
+    const clampedProgress = Math.min(100, Math.max(0, Number(progress) || 0));
+
+    const updated = {
+      ...all,
+      [recipeId]: {
+        ...entry,
+        progress: clampedProgress,
+        manuallySet: true
+      }
+    };
+
+    await setFabricateFlag(actor, 'discoveryProgress', updated);
+  }
+
+  getDiscoveryProgressForActor(actor, systemId) {
+    return getFabricateFlag(actor, 'discoveryProgress', {}) || {};
+  }
+
   evaluateRecipeAccess({ recipe, viewer, craftingActor, componentSourceActors = [] }) {
     const system = this._getCraftingSystem(recipe);
     if (!system) {
       return { visible: false, craftable: false, reason: 'missing-system' };
     }
 
+    // Cauldron mode: recipes hidden from non-GM by default
+    if (system?.resolutionMode === 'cauldron') {
+      if (viewer?.isGM) {
+        return { visible: true, craftable: true, reason: 'ok', knowledge: null };
+      }
+      const cauldronCfg = system?.cauldron || {};
+      if (cauldronCfg.learnOnCraft !== true) {
+        return { visible: false, craftable: false, reason: 'cauldron-hidden', knowledge: null };
+      }
+      const learnedMap = this._getLearnedMap(craftingActor);
+      if (learnedMap?.[recipe.id]) {
+        return { visible: true, craftable: true, reason: 'cauldron-learned', knowledge: null };
+      }
+      return { visible: false, craftable: false, reason: 'cauldron-not-learned', knowledge: null };
+    }
+
     const listMode = system?.recipeVisibility?.listMode || 'global';
     let visible = false;
     let knowledge = null;
+
+    // Teaser mode: handled separately
+    if (listMode === 'teaser') {
+      return this._evaluateTeaserAccess({ recipe, viewer, craftingActor, system });
+    }
 
     if (viewer?.isGM) {
       visible = true;
@@ -262,6 +419,22 @@ export class RecipeVisibilityService {
     if (exhausted && knowledge?.item?.destroyWhenExhausted === true) {
       await selected.item.delete();
     }
+  }
+
+  async learnRecipeOnCraft(recipe, craftingActor) {
+    const system = this._getCraftingSystem(recipe);
+    if (!system || system.resolutionMode !== 'cauldron') return;
+    if (system.cauldron?.learnOnCraft !== true) return;
+    const learnedMap = this._getLearnedMap(craftingActor);
+    if (learnedMap?.[recipe.id]) return;
+    const next = {
+      ...learnedMap,
+      [recipe.id]: {
+        learnedAt: Date.now(),
+        sourceItemUuid: null
+      }
+    };
+    await this._setLearnedMap(craftingActor, next);
   }
 
   async cleanupLearnedRecipes(validRecipeIds = new Set()) {

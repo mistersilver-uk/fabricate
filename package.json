@@ -7,6 +7,9 @@
     "build": "vite build",
     "dev": "vite build --watch",
     "test": "node --test tests/*.test.js tests/stores/*.test.js tests/components/*.test.js tests/actions/*.test.js",
+    "release": "node scripts/release.js",
+    "release:build": "node scripts/release.js --no-zip",
+    "release:validate": "node scripts/release.js --validate-only",
     "docs": "cd docs && bundle exec jekyll serve --livereload",
     "docs:install": "cd docs && bundle install"
   },

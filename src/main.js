@@ -1,9 +1,11 @@
 import { RecipeManager } from './systems/RecipeManager.js';
+import { CompendiumImporter } from './systems/CompendiumImporter.js';
 import { CraftingEngine } from './systems/CraftingEngine.js';
 import { CraftingSystemManager } from './systems/CraftingSystemManager.js';
 import { CraftingRunManager } from './systems/CraftingRunManager.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { ResolutionModeService } from './systems/ResolutionModeService.js';
+import { SignatureValidator } from './systems/SignatureValidator.js';
 import { Recipe } from './models/Recipe.js';
 import { Ingredient } from './models/Ingredient.js';
 import { IngredientGroup } from './models/IngredientGroup.js';
@@ -14,6 +16,7 @@ import { MigrationRunner } from './migration/MigrationRunner.js';
 import { ItemPilesIntegration } from './integrations/ItemPilesIntegration.js';
 import { cleanupStalePreferences } from './config/preferencesCleanup.js';
 import { importStarterPack } from './starter/importStarterPack.js';
+import { registerFragmentDiscoveryHook } from './systems/FragmentDiscoveryHook.js';
 import './ui/SvelteCraftingApp.svelte.js';
 import './ui/SvelteRecipeManagerApp.svelte.js';
 import './ui/SvelteRecipeEditorApp.svelte.js';
@@ -32,6 +35,7 @@ class Fabricate {
     this.recipeVisibilityService = null;
     this.resolutionModeService = null;
     this.itemPilesIntegration = null;
+    this.compendiumImporter = null;
     this.ready = false;
   }
 
@@ -53,6 +57,7 @@ class Fabricate {
     this.resolutionModeService = new ResolutionModeService(this.craftingSystemManager);
     this.itemPilesIntegration = new ItemPilesIntegration();
     this.itemPilesIntegration.detect();
+    this.compendiumImporter = new CompendiumImporter(this.craftingSystemManager, this.recipeManager);
     this.craftingEngine = new CraftingEngine(
       this.recipeManager,
       this.craftingRunManager,
@@ -68,6 +73,8 @@ class Fabricate {
     await this.craftingRunManager.cleanupInvalidRuns(validRecipes, validSystems);
     await this.recipeVisibilityService.cleanupLearnedRecipes(validRecipes);
     await cleanupStalePreferences(validSystems, validRecipes, getSetting, setSetting);
+
+    registerFragmentDiscoveryHook(this.craftingSystemManager, this.recipeVisibilityService);
 
     this.ready = true;
     console.log('Fabricate | Ready');
@@ -131,6 +138,10 @@ class Fabricate {
     return this.itemPilesIntegration;
   }
 
+  getCompendiumImporter() {
+    return this.compendiumImporter;
+  }
+
   /**
    * Quick craft helper - craft a recipe for an actor
    * @param {Actor} actor - The actor performing the craft
@@ -191,9 +202,15 @@ Hooks.once('init', async () => {
     CraftingRunManager,
     RecipeVisibilityService,
     ResolutionModeService,
+    SignatureValidator,
     ItemPilesIntegration,
-    importStarterPack
+    importStarterPack,
+    CompendiumImporter
   };
+
+  game.fabricate.importFromPack = (packData, options) =>
+    fabricate.compendiumImporter?.importFromPackData(packData, options);
+  game.fabricate.getCompendiumImporter = () => fabricate.compendiumImporter;
 
 });
 

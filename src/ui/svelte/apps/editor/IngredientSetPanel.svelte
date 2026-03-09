@@ -28,6 +28,7 @@
     onDropIngredient,
     onUpdateOption,
     onUpdateGroupName,
+    validationErrors = [],
     // Catalyst actions (passed through)
     onAddCatalyst,
     onRemoveCatalyst,
@@ -41,6 +42,15 @@
     (set?.ingredientGroups || []).reduce((sum, g) => sum + (g.options?.length || 0), 0)
   );
   const catalystCount = $derived((set?.catalysts || []).length);
+  const errorGroupIds = $derived(
+    new Set(validationErrors
+      .filter(e => e.panelId === (set?.id) && e.fieldSelector)
+      .map(e => {
+        const match = e.fieldSelector.match(/data-group-id="([^"]+)"/);
+        return match?.[1];
+      })
+      .filter(Boolean))
+  );
 
   function handleDrop(event) {
     event.preventDefault();
@@ -61,12 +71,13 @@
     event.preventDefault();
     event.dataTransfer.dropEffect = 'copy';
   }
+
+  const setNameId = $derived(`fab-set-name-${panelId}`);
 </script>
 
 <section
   class="accordion-panel ingredient-set-panel"
   data-panel-id={panelId}
-  role="region"
   aria-label={set?.name || `Set ${setIndex + 1}`}
 >
   <header class="accordion-header" role="button" tabindex="0"
@@ -88,6 +99,8 @@
     </span>
 
     {#if showComplexRecipes}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
       <div class="panel-actions" onclick={(e) => e.stopPropagation()}>
         <button type="button" disabled={setIndex === 0} onclick={() => onMoveUp?.(setIndex)}
           title={localize('FABRICATE.Editor.IngredientSets.MoveUp')}>
@@ -109,8 +122,9 @@
     <div class="accordion-body" id="panel-body-{panelId}">
       {#if showComplexRecipes}
         <div class="set-name-row">
-          <label>{localize('FABRICATE.Editor.IngredientSets.SetNameLabel')}</label>
+          <label for={setNameId}>{localize('FABRICATE.Editor.IngredientSets.SetNameLabel')}</label>
           <input
+            id={setNameId}
             type="text"
             value={set?.name || ''}
             oninput={(e) => onUpdateSetName?.(setIndex, e.target.value)}
@@ -127,6 +141,7 @@
           {showItemTags}
           {showComplexRecipes}
           {allTags}
+          hasError={errorGroupIds.has(group.id)}
           {onAddOption}
           {onRemoveOption}
           {onRemoveGroup}
@@ -141,6 +156,7 @@
         <i class="fas fa-plus"></i> {localize('FABRICATE.Editor.IngredientSets.AddGroup')}
       </button>
 
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div class="drop-zone-area" ondrop={handleDrop} ondragover={handleDragOver}>
         <i class="fas fa-download"></i>
         {localize('FABRICATE.Editor.IngredientSets.DropNewIngredient')}

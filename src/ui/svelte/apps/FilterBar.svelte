@@ -5,6 +5,8 @@
   let {
     showCraftableOnly = false,
     onToggleCraftable,
+    showFavouritesOnly = false,
+    onToggleFavourites,
     categories = [], // Pre-localized display strings (not i18n keys)
     selectedCategory = '',
     onCategoryChange
@@ -12,6 +14,10 @@
 
   function handleToggle() {
     onToggleCraftable?.();
+  }
+
+  function handleToggleFavourites() {
+    onToggleFavourites?.();
   }
 
   function handleCategoryChange(event) {
@@ -29,6 +35,17 @@
   >
     <i class="fas fa-check-circle"></i>
     {localize('FABRICATE.Filter.CraftableOnly')}
+  </button>
+
+  <button
+    type="button"
+    class="fabricate-filter-btn"
+    class:active={showFavouritesOnly}
+    onclick={handleToggleFavourites}
+    title={localize('FABRICATE.Filter.FavouritesOnly')}
+  >
+    <i class="fas fa-star"></i>
+    {localize('FABRICATE.Filter.FavouritesOnly')}
   </button>
 
   <select

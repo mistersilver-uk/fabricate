@@ -46,6 +46,7 @@ export class SvelteCraftingApp extends SvelteApplicationMixin(
       getRecipeVisibilityService: () => game?.fabricate?.getRecipeVisibilityService?.() ?? null,
       getCraftingRunManager: () => game?.fabricate?.getCraftingRunManager?.() ?? null,
       getCraftingEngine: () => game?.fabricate?.getCraftingEngine?.() ?? null,
+      getCraftingSystemManager: () => game?.fabricate?.getCraftingSystemManager?.() ?? null,
       getGameUser: () => game.user,
       getAvailableActors: () => game.actors.filter(a =>
         a.type !== 'group' && a.type !== 'npc' &&

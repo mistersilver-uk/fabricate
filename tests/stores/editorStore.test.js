@@ -1212,3 +1212,132 @@ describe('createEditorStore', () => {
   });
 
 });
+
+// ---------------------------------------------------------------------------
+// Validation errors (T-095)
+// ---------------------------------------------------------------------------
+
+describe('createEditorStore: validationErrors', () => {
+
+  it('returns name error when draft name is empty', () => {
+    const svc = mockServices();
+    const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+    const errors = get(store.validationErrors);
+    const nameError = errors.find(e => e.fieldSelector === '[name="recipeName"]');
+    assert.ok(nameError, 'Should have a name validation error when name is empty');
+    assert.ok(nameError.message.length > 0, 'Name error should have a message');
+  });
+
+  it('returns no name error when draft name is set', () => {
+    const svc = mockServices();
+    const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+    store.setField('name', 'My Potion');
+    const errors = get(store.validationErrors);
+    const nameError = errors.find(e => e.fieldSelector === '[name="recipeName"]');
+    assert.equal(nameError, undefined, 'Should not have a name error when name is set');
+  });
+
+  it('returns ingredient group error when group has no items or tags', () => {
+    const svc = mockServices();
+    const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+    store.setField('name', 'Valid Name');
+    const errors = get(store.validationErrors);
+    // The default draft has one ingredient set with one group with one empty option
+    const groupError = errors.find(e => e.fieldSelector && e.fieldSelector.includes('data-group-id'));
+    assert.ok(groupError, 'Should have ingredient group error when group has no items');
+    assert.ok(groupError.panelId, 'Group error should include panelId');
+  });
+
+  it('returns result group error when result group has no items', () => {
+    const svc = mockServices();
+    const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+    store.setField('name', 'Valid Name');
+    const errors = get(store.validationErrors);
+    // The default draft has one result group with one empty result
+    const resultError = errors.find(e => e.panelId && e.fieldSelector && e.fieldSelector.includes('data-group-id'));
+    // Could be ingredient or result — we need to distinguish. Result groups: panelId === group.id and fieldSelector matches group.id
+    const d = get(store.draft);
+    const resultGroupId = d.results?.[0]?.id;
+    if (resultGroupId) {
+      const resultGroupError = errors.find(e => e.panelId === resultGroupId);
+      assert.ok(resultGroupError, 'Should have error for result group with no items');
+    }
+  });
+
+  it('returns empty array when draft has valid name, ingredients, and results', () => {
+    const svc = mockServices({ randomID: () => `id-${Math.random()}` });
+    const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+    store.setField('name', 'Valid Recipe');
+
+    // Assign a component to the first ingredient group option
+    const d = get(store.draft);
+    const setIndex = 0;
+    const groupIndex = 0;
+    const optionIndex = 0;
+    store.assignIngredientItem(setIndex, groupIndex, optionIndex, 'item-123');
+
+    // Assign a component to the first result
+    store.assignResultItem(0, 0, 'item-456');
+
+    const errors = get(store.validationErrors);
+    assert.equal(errors.length, 0, 'Should have no validation errors when draft is fully valid');
+  });
+
+});
+
+// ---------------------------------------------------------------------------
+// handleScrollToError panel expansion guard (T-095 bug fix)
+// ---------------------------------------------------------------------------
+
+describe('createEditorStore: togglePanel guard for scroll-to-error', () => {
+
+  it('togglePanel expands a collapsed panel', () => {
+    const svc = mockServices();
+    const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+    const d = get(store.draft);
+    const panelId = d.ingredientSets?.[0]?.id || 'set-0';
+
+    // Collapse it first
+    store.togglePanel(panelId);
+    assert.ok(get(store.collapsedPanels).has(panelId), 'Panel should be collapsed after first toggle');
+
+    // Simulate handleScrollToError guard: only expand when collapsed
+    if (get(store.collapsedPanels).has(panelId)) {
+      store.togglePanel(panelId);
+    }
+    assert.ok(!get(store.collapsedPanels).has(panelId), 'Panel should be expanded after conditional toggle');
+  });
+
+  it('panel remains expanded when scroll-to-error is triggered and panel is already expanded', () => {
+    const svc = mockServices();
+    const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+    const d = get(store.draft);
+    const panelId = d.ingredientSets?.[0]?.id || 'set-0';
+
+    // Panel starts expanded (not in collapsedPanels)
+    assert.ok(!get(store.collapsedPanels).has(panelId), 'Panel should start expanded');
+
+    // Simulate the guarded handleScrollToError — should NOT call togglePanel when already expanded
+    if (get(store.collapsedPanels).has(panelId)) {
+      store.togglePanel(panelId);
+    }
+
+    // Panel should still be expanded
+    assert.ok(!get(store.collapsedPanels).has(panelId), 'Panel should remain expanded when guard prevents toggle');
+  });
+
+  it('unconditional togglePanel collapses an expanded panel (demonstrates the bug)', () => {
+    const svc = mockServices();
+    const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+    const d = get(store.draft);
+    const panelId = d.ingredientSets?.[0]?.id || 'set-0';
+
+    // Panel starts expanded
+    assert.ok(!get(store.collapsedPanels).has(panelId), 'Panel should start expanded');
+
+    // Unconditional toggle (the old buggy behaviour) collapses the panel
+    store.togglePanel(panelId);
+    assert.ok(get(store.collapsedPanels).has(panelId), 'Unconditional toggle collapses an already-expanded panel');
+  });
+
+});

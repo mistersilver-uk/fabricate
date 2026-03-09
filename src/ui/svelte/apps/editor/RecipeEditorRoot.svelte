@@ -11,6 +11,7 @@
 
   let { store, services = {} } = $props();
 
+  // svelte-ignore state_referenced_locally
   const {
     draft,
     activeStepIndex,
@@ -54,9 +55,22 @@
   const ingredientSets = $derived($activeContainers?.ingredientSets || []);
   const resultGroups = $derived($activeContainers?.results || []);
 
+  // Field-level error helpers
+  const errorFieldSelectors = $derived(
+    new Set(($validationErrors || []).map(e => e.fieldSelector).filter(Boolean))
+  );
+
+  function hasFieldError(selector) {
+    return errorFieldSelectors.has(selector);
+  }
+
+  const errorPanelIds = $derived(
+    new Set(($validationErrors || []).map(e => e.panelId).filter(Boolean))
+  );
+
   function handleScrollToError(error) {
-    if (error.panelId) {
-      store.togglePanel(error.panelId); // ensure expanded
+    if (error.panelId && $collapsedPanels.has(error.panelId)) {
+      store.togglePanel(error.panelId); // only expand if currently collapsed
     }
     if (error.fieldSelector) {
       // Give DOM time to update after panel expand
@@ -194,7 +208,11 @@
               oninput={(e) => store.setField('name', e.target.value)}
               placeholder={localize('FABRICATE.Recipe.Name')}
               required
+              class:field-error={hasFieldError('[name="recipeName"]')}
             />
+            {#if hasFieldError('[name="recipeName"]')}
+              <span class="inline-error">{localize('FABRICATE.Editor.Validation.NameRequired')}</span>
+            {/if}
           </div>
 
           {#if $featureState.showCategories}
@@ -336,6 +354,7 @@
             showComplexRecipes={$featureState.showComplexRecipes}
             showItemTags={$featureState.showItemTags}
             {allTags}
+            validationErrors={$validationErrors}
             onTogglePanel={(id) => store.togglePanel(id)}
             onMoveUp={(idx) => store.moveIngredientSetUp(idx)}
             onMoveDown={(idx) => store.moveIngredientSetDown(idx)}
@@ -378,6 +397,7 @@
             {itemMap}
             showComplexRecipes={$featureState.showComplexRecipes}
             showPropertyMacros={$featureState.showPropertyMacros}
+            hasError={errorPanelIds.has(group.id)}
             onTogglePanel={(id) => store.togglePanel(id)}
             onMoveUp={(idx) => store.moveResultGroupUp(idx)}
             onMoveDown={(idx) => store.moveResultGroupDown(idx)}
@@ -537,5 +557,16 @@
   .save-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  .field-error {
+    border-color: var(--color-border-error, #dc3545) !important;
+    box-shadow: 0 0 0 1px var(--color-border-error, #dc3545);
+  }
+
+  .inline-error {
+    color: var(--color-text-error, #dc3545);
+    font-size: 0.8rem;
+    margin-top: 2px;
   }
 </style>

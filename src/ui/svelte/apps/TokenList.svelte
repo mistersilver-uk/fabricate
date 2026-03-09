@@ -20,13 +20,13 @@
 
 <div class="panel-toolbar compact">
   <input type="text" bind:value={newValue} {placeholder} onkeydown={handleKeydown} />
-  <button type="button" onclick={handleAdd}><i class="fas fa-plus"></i></button>
+  <button type="button" onclick={handleAdd} aria-label="Add"><i class="fas fa-plus"></i></button>
 </div>
 <div class="token-list">
   {#each items as item}
     <span class="token">
       {item}
-      <button type="button" onclick={() => onRemove(item)}><i class="fas fa-times"></i></button>
+      <button type="button" onclick={() => onRemove(item)} aria-label="Remove {item}"><i class="fas fa-times"></i></button>
     </span>
   {:else}
     <p class="hint">{emptyText}</p>

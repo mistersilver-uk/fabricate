@@ -59,6 +59,7 @@ const {
   Catalyst, Result,
   RecipeManager, CraftingEngine, CraftingSystemManager,
   CraftingRunManager, RecipeVisibilityService, ResolutionModeService,
+  SignatureValidator,
   CraftingApp, RecipeManagerApp, RecipeEditorApp
 } = game.fabricate.api;
 ```

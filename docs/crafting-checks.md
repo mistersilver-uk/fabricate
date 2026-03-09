@@ -6,7 +6,7 @@ nav_order: 3.1
 
 # Crafting Checks
 
-Crafting checks let you gate recipe outcomes on a player roll. When a crafting system uses tiered or progressive resolution mode, a check is required to determine which result the crafter receives. Configure the check at the system level — each attempt runs the check automatically, before any materials are consumed.
+Crafting checks let you gate recipe outcomes on a player roll. When a crafting system uses routed mode with the `macroOutcome` provider, or progressive resolution mode, a check is required to determine which result the crafter receives. Configure the check at the system level — each attempt runs the check automatically, before any materials are consumed.
 
 ---
 
@@ -85,7 +85,7 @@ When both `ability` and `skill` are set, `skill` takes precedence and Fabricate 
 
 ### Example: D&D 5e Arcana Check
 
-This configures a tiered alchemy system that requires an Intelligence (Arcana) check against DC 15 to produce the better result:
+This configures an alchemy system using the `macroOutcome` provider that requires an Intelligence (Arcana) check against DC 15 to determine the result:
 
 ```javascript
 Hooks.once('fabricate.ready', async () => {
@@ -129,7 +129,7 @@ Hooks.once('fabricate.ready', async () => {
 
 ## Macro Check Mode
 
-If your system uses tiered or progressive mode and you need custom dice logic — for example a pool roll, a contested check, or a game system Fabricate does not yet have a built-in adapter for — use `checkSource: "macro"` (the default):
+If your system uses routed mode with the `macroOutcome` provider, or progressive mode, and you need custom dice logic — for example a pool roll, a contested check, or a game system Fabricate does not yet have a built-in adapter for — use `checkSource: "macro"` (the default):
 
 | Setting | Description |
 |:--------|:------------|
@@ -231,7 +231,7 @@ The `executeCheck()` return shape:
 | Field | Type | Description |
 |:------|:-----|:------------|
 | `success` | `boolean` | Whether the check passed |
-| `outcome` | `string \| null` | Named outcome label (e.g. `"pass"`, `"fail"`) for tiered routing |
+| `outcome` | `string \| null` | Named outcome label matched case-insensitively to a result group name (routed `macroOutcome` provider) |
 | `value` | `number \| null` | Numeric roll total, used by progressive mode to award results by difficulty |
 | `data` | `object` | Arbitrary extra data passed through to success/failure macros |
 
@@ -244,4 +244,4 @@ The `executeCheck()` return shape:
 - [Crafting Systems]({% link crafting-systems.md %}) -- configure resolution mode, feature toggles, and system-level settings.
 - [Salvage]({% link salvage.md %}) -- configure salvage checks, which use a separate check pipeline to gate salvage outcomes.
 - [Macros]({% link macros/index.md %}) -- write check macros and hook into success and failure callbacks.
-- [Recipes]({% link recipes/index.md %}) -- understand tiered and progressive resolution modes that require a crafting check.
+- [Recipes]({% link recipes/index.md %}) -- understand routed and progressive resolution modes that require a crafting check.

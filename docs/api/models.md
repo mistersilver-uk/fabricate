@@ -39,10 +39,17 @@ new Recipe({
   resultGroups,          // object[]
   catalysts,             // Catalyst[]
   transferEffects,       // boolean (default false)
-  outcomeRouting,        // object (tiered mode)
+  resultSelection: {     // object (routed mode only)
+    provider,            // "ingredientSet" | "macroOutcome" | "rollTableOutcome"
+    macroUuid,           // string | null (macroOutcome provider)
+    rollTableUuid        // string | null (rollTableOutcome provider)
+  },
   metadata               // object (created, modified, author, version)
 })
 ```
+
+{: .note }
+> The legacy `outcomeRouting` field and the `mapped`/`tiered` modes have been replaced by `resultSelection` with a `provider` field. Legacy recipes are automatically normalised on load. Use `resultSelection` for all new routed recipes.
 
 **Key methods:**
 
@@ -67,7 +74,7 @@ IngredientSet.fromJSON({
   ingredientGroups,  // IngredientGroup[] -- all must be satisfied (AND)
   essences,          // { [essenceId]: quantity }
   catalysts,         // Catalyst[]
-  resultGroupId      // string | null (mapped mode routing)
+  resultGroupId      // string | null (routed ingredientSet provider routing)
 })
 ```
 

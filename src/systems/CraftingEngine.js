@@ -4,6 +4,7 @@ import { MacroExecutor } from '../utils/MacroExecutor.js';
 import { CraftingCheckAdapterRegistry } from './CraftingCheckAdapter.js';
 import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
 import { getSourceUuid } from '../utils/sourceUuid.js';
+import { SignatureValidator } from './SignatureValidator.js';
 
 /**
  * Handles the actual crafting process
@@ -363,7 +364,7 @@ export class CraftingEngine {
     await this._deductItemPilesCurrencyCost(craftingActor, recipe);
 
     // Create the result item(s)
-    const resultItems = await this._createResultItems(
+    const { items: resultItems, rollTableMeta } = await this._createResultItems(
       craftingActor,
       executionRecipe,
       step,
@@ -426,6 +427,9 @@ export class CraftingEngine {
         craftingActor,
         componentSourceActors
       });
+      if (options?.isCauldronAttempt === true) {
+        await visibilityService.learnRecipeOnCraft(recipe, craftingActor);
+      }
     }
 
     await this._postCraftChatMessage({
@@ -434,7 +438,8 @@ export class CraftingEngine {
       recipe,
       consumedIngredients: consumedItems,
       catalysts: catalystValidation.catalysts,
-      createdResults: resultItems
+      createdResults: resultItems,
+      rollTableMeta
     });
 
     return {
@@ -444,6 +449,134 @@ export class CraftingEngine {
         ? `Successfully crafted ${recipe.name}`
         : `Completed ${step.name || `step ${stepIndex + 1}`} for ${recipe.name}`
     };
+  }
+
+  /**
+   * Attempt to craft using the cauldron discovery mode.
+   * Submitted items are matched against recipe signatures; the recipe is hidden from the player.
+   * @param {Actor} craftingActor
+   * @param {Actor[]} componentSourceActors
+   * @param {object[]} submittedItems - Items dragged in by the player (with at minimum { uuid, name })
+   * @param {object} options - { craftingSystemId, signatureValidator? }
+   */
+  async craftCauldron(craftingActor, componentSourceActors, submittedItems, options = {}) {
+    if (!craftingActor) {
+      return { success: false, results: null, message: 'No crafting actor selected', disposition: 'error' };
+    }
+    if (!componentSourceActors?.length) {
+      return { success: false, results: null, message: 'No component source actors selected', disposition: 'error' };
+    }
+    if (!submittedItems?.length) {
+      return { success: false, results: null, message: 'No ingredients submitted', disposition: 'error' };
+    }
+
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const systemId = options.craftingSystemId;
+    const system = systemManager?.getSystem(systemId);
+    if (!system || system.resolutionMode !== 'cauldron') {
+      return { success: false, results: null, message: 'No cauldron-mode crafting system found', disposition: 'error' };
+    }
+
+    const recipeManager = this.recipeManager || game.fabricate?.getRecipeManager?.();
+    const systemRecipes = recipeManager ? recipeManager.getRecipes({ craftingSystemId: systemId, enabled: true }) : [];
+    const signatureValidator = options.signatureValidator || new SignatureValidator({
+      getSystem: (id) => systemManager.getSystem(id),
+      getRecipesForSystem: (id) => (recipeManager ? recipeManager.getRecipes({ craftingSystemId: id, enabled: true }) : []),
+      getComponentsForSystem: (id) => {
+        const sys = systemManager.getSystem(id);
+        return Array.isArray(sys?.components) ? sys.components : (Array.isArray(sys?.managedItems) ? sys.managedItems : (sys?.items || []));
+      }
+    });
+
+    const components = Array.isArray(system.components) ? system.components : (Array.isArray(system.managedItems) ? system.managedItems : (system.items || []));
+    const recipes = systemRecipes;
+    const matchResult = this._matchCauldronSignature(submittedItems, recipes, components, signatureValidator);
+
+    const cauldronCfg = system.cauldron || {};
+    const shouldConsume = cauldronCfg.consumeOnFail !== false;
+
+    if (!matchResult.matched) {
+      if (shouldConsume) {
+        await this._consumeSubmittedCauldronItems(componentSourceActors, submittedItems);
+      }
+      return {
+        success: false,
+        results: null,
+        message: 'FABRICATE.Cauldron.NoMatch',
+        disposition: 'no-match',
+        consumed: shouldConsume
+      };
+    }
+
+    const recipe = matchResult.recipe;
+    const ingredientSetId = matchResult.ingredientSetId;
+    return this.craft(craftingActor, componentSourceActors, recipe, ingredientSetId, {
+      ...options,
+      isCauldronAttempt: true
+    });
+  }
+
+  /**
+   * Match submitted item UUIDs against all recipe signatures in the system.
+   * Returns { matched: true, recipe, ingredientSetId } or { matched: false }.
+   * @private
+   */
+  _matchCauldronSignature(submittedItems, recipes, components, signatureValidator) {
+    const submittedUuids = new Set(
+      submittedItems.map(item => item.uuid || item.sourceUuid).filter(Boolean)
+    );
+
+    for (const recipe of recipes) {
+      if (!recipe.enabled) continue;
+      const ingredientSets = Array.isArray(recipe.ingredientSets) ? recipe.ingredientSets : [];
+      for (const set of ingredientSets) {
+        const signature = signatureValidator.computeSignature(set, components);
+        if (signature.length === 0) continue;
+
+        // For each group in the signature, at least one submitted item must match
+        const allGroupsSatisfied = signature.every(groupComponentIds => {
+          for (const componentId of groupComponentIds) {
+            const comp = components.find(c => c.id === componentId);
+            if (!comp) continue;
+            const compSourceUuid = comp.sourceItemUuid || comp.sourceUuid;
+            if (compSourceUuid && submittedUuids.has(compSourceUuid)) return true;
+          }
+          return false;
+        });
+
+        if (allGroupsSatisfied) {
+          return { matched: true, recipe, ingredientSetId: set.id };
+        }
+      }
+    }
+    return { matched: false };
+  }
+
+  /**
+   * Consume submitted cauldron items (no-match failure path).
+   * Best-effort: removes items by UUID from component source actors.
+   * @private
+   */
+  async _consumeSubmittedCauldronItems(componentSourceActors, submittedItems) {
+    const submittedUuids = new Set(
+      submittedItems.map(i => i.uuid).filter(Boolean)
+    );
+    for (const actor of componentSourceActors) {
+      for (const item of Array.from(actor.items || [])) {
+        if (submittedUuids.has(item.uuid)) {
+          try {
+            const qty = Number(item.system?.quantity ?? 1);
+            if (qty <= 1) {
+              await item.delete();
+            } else {
+              await item.update({ 'system.quantity': qty - 1 });
+            }
+          } catch (e) {
+            console.error('Fabricate | Cauldron: failed to consume item', item.uuid, e);
+          }
+        }
+      }
+    }
   }
 
   /**
@@ -533,13 +666,32 @@ export class CraftingEngine {
    */
   async _createResultItems(craftingActor, recipe, step, ingredientSet, consumedItems, catalystItems, checkResult = null, selectedResultGroupId = null) {
     const resolutionService = this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
+
+    // Pre-resolve rollTableOutcome before calling resolveResultGroups
+    let rollTableResult = null;
+    if (recipe?.resultSelection?.provider === 'rollTableOutcome' && resolutionService) {
+      const allGroups = Array.isArray(step?.resultGroups) && step.resultGroups.length > 0
+        ? step.resultGroups
+        : (Array.isArray(recipe?.resultGroups) ? recipe.resultGroups : []);
+      rollTableResult = await resolutionService.resolveByRollTable(recipe, step, allGroups);
+      if (rollTableResult.meta?.error && !rollTableResult.meta?.disposition) {
+        console.error(`Fabricate | rollTableOutcome error: ${rollTableResult.meta.error}`);
+        return { items: [], rollTableMeta: { error: rollTableResult.meta.error, disposition: 'error' } };
+      }
+      if (rollTableResult.meta?.disposition === 'misconfiguration') {
+        console.error(`Fabricate | rollTableOutcome misconfiguration: ${rollTableResult.meta.error}`);
+        return { items: [], rollTableMeta: { error: rollTableResult.meta.error, disposition: 'misconfiguration' } };
+      }
+    }
+
     const resolved = resolutionService
       ? resolutionService.resolveResultGroups({
         recipe,
         step,
         ingredientSet,
         checkResult,
-        selectedResultGroupId
+        selectedResultGroupId,
+        rollTableResult
       })
       : {
         groups: Array.isArray(step?.resultGroups) ? step.resultGroups : [],
@@ -570,7 +722,7 @@ export class CraftingEngine {
       }
     }
 
-    return createdItems;
+    return { items: createdItems, rollTableMeta: rollTableResult?.meta || null };
   }
 
   /**
@@ -1203,7 +1355,7 @@ export class CraftingEngine {
    * @param {string}  [params.failureReason]     - Human-readable failure reason (failure only).
    * @private
    */
-  async _postCraftChatMessage({ success, craftingActor, recipe, consumedIngredients, catalysts, createdResults, failureReason }) {
+  async _postCraftChatMessage({ success, craftingActor, recipe, consumedIngredients, catalysts, createdResults, failureReason, rollTableMeta = null }) {
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(recipe?.craftingSystemId);
     if (!system || system.features?.chatOutput !== true) return;
@@ -1214,6 +1366,10 @@ export class CraftingEngine {
     if (success) {
       const lines = [`<h3>${loc('FABRICATE.Chat.CraftSuccess')}: ${recipe.name}</h3>`];
       lines.push(`<p><strong>${loc('FABRICATE.Chat.Actor')}:</strong> ${craftingActor?.name || ''}</p>`);
+
+      if (rollTableMeta?.drawnName) {
+        lines.push(`<p><strong>${loc('FABRICATE.Chat.RollTableResult') || 'Roll Table Result'}:</strong> ${rollTableMeta.drawnName}</p>`);
+      }
 
       if (createdResults && createdResults.length > 0) {
         lines.push(`<p><strong>${loc('FABRICATE.Chat.Results')}</strong></p><ul>`);

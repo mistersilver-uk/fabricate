@@ -901,3 +901,599 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ==========================================
+   Recipe Graph Tab Styles (T-057)
+   ========================================== */
+
+.recipe-graph-tab {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.graph-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  background: rgba(0, 0, 0, 0.03);
+  flex-shrink: 0;
+}
+
+.graph-search {
+  flex: 1;
+  min-width: 120px;
+  padding: 4px 8px;
+  font-size: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.graph-category-filter {
+  padding: 4px 6px;
+  font-size: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.graph-zoom-btn,
+.graph-reset-btn {
+  padding: 3px 8px;
+  font-size: 13px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.graph-zoom-btn:hover,
+.graph-reset-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.graph-viewport {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  cursor: grab;
+  background: var(--color-bg-option, #f5f4f2);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+  margin: 0 10px;
+  min-height: 300px;
+}
+
+.graph-viewport:active {
+  cursor: grabbing;
+}
+
+.graph-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: top left;
+}
+
+.graph-edges {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.graph-edge {
+  stroke-width: 1.5;
+  transition: stroke 0.15s;
+}
+
+.graph-edge.cycle-edge {
+  stroke-dasharray: 6 3;
+  stroke: var(--fabricate-warning, #f0ad4e);
+}
+
+.graph-edge.cycle-edge + defs marker polygon {
+  fill: var(--fabricate-warning, #f0ad4e);
+}
+
+.graph-node {
+  position: absolute;
+  width: 180px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--color-bg-sheet, #fff);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  text-align: left;
+  font-size: 12px;
+  transition: border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+  box-sizing: border-box;
+}
+
+.graph-node:hover {
+  border-color: var(--fabricate-primary, #4a90e2);
+  box-shadow: 0 3px 8px rgba(74, 144, 226, 0.25);
+  transform: scale(1.03);
+  z-index: 10;
+}
+
+.node-icon {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  object-fit: cover;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.node-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.node-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+.node-category {
+  font-size: 10px;
+  color: var(--color-text-light-primary, #888);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.graph-empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--color-text-light-primary, #888);
+  font-style: italic;
+}
+
+.graph-legend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 10px;
+  font-size: 11px;
+  color: var(--color-text-light-primary, #888);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legend-line {
+  display: inline-block;
+  width: 24px;
+  height: 2px;
+  background: var(--color-border-dark, #888);
+}
+
+.legend-line.dashed {
+  background: none;
+  border-top: 2px dashed var(--fabricate-warning, #f0ad4e);
+}
+
+.legend-stats {
+  margin-left: auto;
+}
+
+/* =========================================================================
+   Shopping List Panel (T-059)
+   ========================================================================= */
+
+.shopping-list-panel {
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  background: var(--color-bg-option, rgba(255, 255, 255, 0.04));
+  margin: 6px 0;
+  flex-shrink: 0;
+}
+
+.shopping-list-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+}
+
+.shopping-list-toggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-light-heading, #444);
+  padding: 2px 0;
+  text-align: left;
+}
+
+.shopping-list-toggle:hover {
+  color: var(--color-text-hyperlink, #4b6fa5);
+}
+
+.toggle-icon {
+  margin-left: auto;
+}
+
+.shopping-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--fabricate-success, #28a745);
+  color: #fff;
+}
+
+.shopping-badge.unsatisfied {
+  background: var(--fabricate-warning, #f0ad4e);
+  color: #333;
+}
+
+.shopping-list-clear {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-light-secondary, #888);
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.shopping-list-clear:hover {
+  color: var(--fabricate-danger, #dc3545);
+}
+
+.shopping-list-body {
+  padding: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.shopping-list-empty {
+  text-align: center;
+  font-style: italic;
+  color: var(--color-text-light-secondary, #888);
+  margin: 0;
+}
+
+/* Entry list */
+.shopping-list-entries {
+  list-style: none;
+  margin: 0 0 8px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.shopping-list-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.entry-name {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entry-quantity-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.qty-btn {
+  background: none;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  padding: 0;
+  color: var(--color-text-light-primary, #444);
+}
+
+.qty-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.qty-value {
+  min-width: 20px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.entry-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-light-secondary, #888);
+  padding: 2px;
+  border-radius: 3px;
+  font-size: 10px;
+}
+
+.entry-remove:hover {
+  color: var(--fabricate-danger, #dc3545);
+}
+
+/* Materials table */
+.shopping-list-materials {
+  margin-bottom: 8px;
+}
+
+.shopping-list-materials table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.shopping-list-materials th {
+  text-align: left;
+  padding: 3px 6px;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  color: var(--color-text-light-secondary, #777);
+}
+
+.shopping-list-materials td {
+  padding: 3px 6px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.shopping-list-materials .qty-col {
+  text-align: center;
+  width: 40px;
+}
+
+.shopping-list-materials .material-name {
+  font-weight: 500;
+}
+
+.shopping-list-materials tr.satisfied td {
+  color: var(--fabricate-success, #28a745);
+}
+
+.shopping-list-materials tr.unsatisfied td {
+  color: var(--fabricate-warning, #c0541e);
+}
+
+.shopping-list-materials .missing-col {
+  font-weight: 700;
+}
+
+/* Essences & catalysts */
+.shopping-list-essences,
+.shopping-list-catalysts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+  font-size: 11px;
+}
+
+/* Summary footer */
+.shopping-list-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fabricate-warning, #c0541e);
+  background: rgba(240, 100, 30, 0.08);
+}
+
+.shopping-list-summary.all-satisfied {
+  color: var(--fabricate-success, #28a745);
+  background: rgba(40, 167, 69, 0.08);
+}
+
+/* Shopping cart button on RecipeCard */
+.shopping-btn {
+  color: var(--color-text-light-secondary, #888);
+}
+
+.shopping-btn:hover {
+  color: var(--fabricate-primary, #4b6fa5);
+}
+
+/* ─── Teaser Mode ──────────────────────────────────────────────────────────── */
+
+.fabricate-recipe-item.is-teaser {
+  opacity: 0.75;
+  position: relative;
+}
+
+.teaser-overlay {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.teaser-lock-icon {
+  font-size: 1rem;
+  color: var(--color-text-dark-secondary, #4b4a44);
+  opacity: 0.7;
+}
+
+.teaser-progress-bar {
+  width: 80px;
+  height: 6px;
+  background: var(--color-border-light-tertiary, #c9c7b8);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.teaser-progress-fill {
+  height: 100%;
+  background: var(--color-border-highlight, #782e22);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.teaser-progress-label {
+  font-size: 0.7rem;
+  color: var(--color-text-dark-secondary, #4b4a44);
+  font-style: italic;
+}
+
+/* Teaser config section in Rules tab */
+.teaser-config-section {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border-light-tertiary, #c9c7b8);
+  border-radius: 4px;
+  background: var(--color-bg-option, #f0ece0);
+}
+
+.teaser-config-section h4 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+/* Fragment list editor */
+.fragment-list {
+  margin-top: 0.75rem;
+}
+
+.fragment-list h5 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+}
+
+.fragment-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid var(--color-border-light-tertiary, #c9c7b8);
+}
+
+.fragment-name {
+  flex: 1;
+  font-size: 0.85rem;
+}
+
+.fragment-uuid {
+  flex: 2;
+  font-size: 0.75rem;
+  color: var(--color-text-dark-secondary, #4b4a44);
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fragment-progress {
+  font-size: 0.85rem;
+  font-weight: bold;
+  min-width: 3rem;
+  text-align: right;
+}
+
+.fragment-remove-btn {
+  background: none;
+  border: none;
+  color: var(--color-border-highlight, #782e22);
+  cursor: pointer;
+  padding: 0 0.25rem;
+}
+
+.add-fragment-btn {
+  margin-top: 0.5rem;
+}
+
+/* Teaser progress editor dialog */
+.teaser-progress-editor {
+  padding: 1rem;
+}
+
+.teaser-progress-editor .editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.teaser-progress-editor .progress-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.teaser-progress-editor .progress-table th,
+.teaser-progress-editor .progress-table td {
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--color-border-light-tertiary, #c9c7b8);
+  text-align: left;
+}
+
+.teaser-progress-editor .fully-discovered {
+  color: var(--color-level-success, #43a047);
+  font-style: italic;
+}
+
+.teaser-progress-editor .action-btns {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.teaser-progress-editor .action-btn {
+  background: none;
+  border: 1px solid var(--color-border-light-primary, #7a7971);
+  border-radius: 3px;
+  padding: 0.1rem 0.4rem;
+  cursor: pointer;
+}

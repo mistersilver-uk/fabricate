@@ -6,17 +6,21 @@
   import ItemsTab from './ItemsTab.svelte';
   import RecipesTab from './RecipesTab.svelte';
   import RulesTab from './RulesTab.svelte';
+  import RecipeGraphTab from './RecipeGraphTab.svelte';
 
   let { store, services = null } = $props();
 
+  // svelte-ignore state_referenced_locally
   const activeTab = store.activeTab;
+  // svelte-ignore state_referenced_locally
   const viewState = store.viewState;
 
   const tabs = [
     { id: 'systems', icon: 'fas fa-layer-group', label: 'FABRICATE.Admin.Tabs.Systems' },
     { id: 'items', icon: 'fas fa-boxes', label: 'FABRICATE.Admin.Tabs.Items' },
     { id: 'recipes', icon: 'fas fa-scroll', label: 'FABRICATE.Admin.Tabs.Recipes' },
-    { id: 'rules', icon: 'fas fa-sliders-h', label: 'FABRICATE.Admin.Tabs.Rules' }
+    { id: 'rules', icon: 'fas fa-sliders-h', label: 'FABRICATE.Admin.Tabs.Rules' },
+    { id: 'graph', icon: 'fas fa-project-diagram', label: 'FABRICATE.Admin.Tabs.Graph' }
   ];
 </script>
 
@@ -80,6 +84,14 @@
         />
       {:else if $activeTab === 'rules'}
         <RulesTab />
+      {:else if $activeTab === 'graph'}
+        <RecipeGraphTab
+          graphData={$viewState.graphData}
+          categories={$viewState.recipeCategories}
+          searchTerm={$viewState.graphSearchTerm || ''}
+          onSearch={store.setGraphSearch}
+          onNodeClick={(recipeId) => services?.onEditRecipe?.(recipeId)}
+        />
       {/if}
     </main>
   </div>

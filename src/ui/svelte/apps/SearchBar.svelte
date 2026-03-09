@@ -4,8 +4,10 @@
 
   let { value = '', onSearch, placeholder = '', debounceMs = 300 } = $props();
 
+  // svelte-ignore state_referenced_locally
   let internalValue = $state(value);
   let timer = null;
+  // svelte-ignore state_referenced_locally
   let lastExternalValue = value;
 
   // Sync from parent when value prop changes externally (guard against overwriting buffered input)

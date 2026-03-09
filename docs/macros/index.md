@@ -143,7 +143,7 @@ Called when a step fails due to a crafting check failure or a check-result valid
 **When the failure macro runs:**
 
 - After a crafting check macro returns `{ success: false }`.
-- After a successful check result fails resolution-mode validation (e.g. the outcome value does not satisfy the current progressive or tiered mode requirements).
+- After a successful check result fails resolution-mode validation (e.g. the outcome value does not satisfy the current progressive mode requirements or routed macroOutcome provider).
 
 Pre-check failures (missing ingredients, missing catalysts, invalid recipe, missing actor) return immediately **without** calling the failure macro.
 

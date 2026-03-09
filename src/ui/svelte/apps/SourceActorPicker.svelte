@@ -13,7 +13,7 @@
 </script>
 
 <div class="component-sources-selector">
-  <label>{localize('FABRICATE.SourceActorPicker.Label')}</label>
+  <p class="sources-label">{localize('FABRICATE.SourceActorPicker.Label')}</p>
   {#if ownedActors.length > 0}
     <div class="source-actor-list">
       {#each ownedActors as actor}

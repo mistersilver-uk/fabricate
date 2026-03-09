@@ -5,7 +5,9 @@
 
   let { selectedSystem = null, store } = $props();
 
+  // svelte-ignore state_referenced_locally
   let nameValue = $state(selectedSystem?.name ?? '');
+  // svelte-ignore state_referenced_locally
   let descriptionValue = $state(selectedSystem?.description ?? '');
 
   $effect(() => {
@@ -23,12 +25,12 @@
     <h3>{localize('FABRICATE.Admin.SystemSettings.Title')}</h3>
     <div class="system-meta-grid">
       <div class="form-group span-2">
-        <label>{localize('FABRICATE.Admin.SystemSettings.Name')}</label>
-        <input type="text" bind:value={nameValue} />
+        <label for="fab-system-name">{localize('FABRICATE.Admin.SystemSettings.Name')}</label>
+        <input id="fab-system-name" type="text" bind:value={nameValue} />
       </div>
       <div class="form-group span-2">
-        <label>{localize('FABRICATE.Admin.SystemSettings.Description')}</label>
-        <textarea rows="4" bind:value={descriptionValue}></textarea>
+        <label for="fab-system-description">{localize('FABRICATE.Admin.SystemSettings.Description')}</label>
+        <textarea id="fab-system-description" rows="4" bind:value={descriptionValue}></textarea>
       </div>
       <div class="form-group span-2">
         <label class="checkbox-label">

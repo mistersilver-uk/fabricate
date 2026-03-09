@@ -6,6 +6,7 @@
  * isolated set of writable() instances.
  */
 import { writable, get } from 'svelte/store';
+import { buildRecipeGraph, layoutGraph, filterGraph } from '../util/recipeGraphBuilder.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -204,6 +205,7 @@ export function createAdminStore(services) {
   const activeTab = writable('systems');
   const recipeSearch = writable('');
   const itemSearch = writable('');
+  const graphSearch = writable('');
 
   // --- Computed state ---
   const viewState = writable({
@@ -216,7 +218,9 @@ export function createAdminStore(services) {
     recipeCategories: [],
     showVisibilitySummary: false,
     recipeSearchTerm: '',
-    itemSearchTerm: ''
+    itemSearchTerm: '',
+    graphData: { nodes: [], edges: [], width: 0, height: 0 },
+    graphSearchTerm: ''
   });
 
   // --- refresh ---
@@ -298,6 +302,16 @@ export function createAdminStore(services) {
       );
     }
 
+    // --- Graph data (lazy, computed only when graph tab is active) ---
+    let graphData = { nodes: [], edges: [], width: 0, height: 0 };
+    if (get(activeTab) === 'graph' && selectedSystem) {
+      const allRecipes = recipeManager.getRecipes({ craftingSystemId: selectedSystem.id });
+      const components = selectedSystem.items || [];
+      const rawGraph = buildRecipeGraph(allRecipes, components);
+      const layoutResult = layoutGraph(rawGraph);
+      graphData = filterGraph(layoutResult, { searchTerm: get(graphSearch) });
+    }
+
     viewState.set({
       systems: systemList,
       hasSystem: !!selectedSystem,
@@ -308,7 +322,9 @@ export function createAdminStore(services) {
       recipeCategories: recipeListData.recipeCategories,
       showVisibilitySummary: recipeListData.showVisibilitySummary,
       recipeSearchTerm: get(recipeSearch),
-      itemSearchTerm: get(itemSearch)
+      itemSearchTerm: get(itemSearch),
+      graphData,
+      graphSearchTerm: get(graphSearch)
     });
   }
 
@@ -666,6 +682,11 @@ export function createAdminStore(services) {
     await refresh();
   }
 
+  async function setGraphSearch(term) {
+    graphSearch.set(term);
+    await refresh();
+  }
+
   function destroy() {
     // No-op for now — hook cleanup would go here
   }
@@ -708,6 +729,7 @@ export function createAdminStore(services) {
     deleteComponent,
     setRecipeSearch,
     setItemSearch,
+    setGraphSearch,
     refresh,
     destroy
   };

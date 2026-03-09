@@ -10,6 +10,7 @@
     showItemTags = false,
     showComplexRecipes = false,
     allTags = [],
+    hasError = false,
     onAddOption,
     onRemoveOption,
     onRemoveGroup,
@@ -41,7 +42,7 @@
   }
 </script>
 
-<div class="ingredient-group-card" data-group-id={group.id}>
+<div class="ingredient-group-card" class:group-error={hasError} data-group-id={group.id}>
   <div class="group-header">
     <input
       type="text"
@@ -117,6 +118,7 @@
               </div>
             {:else}
               {@const item = resolveItem(option.componentId)}
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
               <div class="item-cell" ondrop={(e) => handleDrop(e, optionIndex)} ondragover={handleDragOver}>
                 {#if item}
                   <img src={item.img || 'icons/svg/item-bag.svg'} alt={item.name} class="item-thumb" />
@@ -172,6 +174,11 @@
     border-radius: 4px;
     padding: 8px;
     margin-bottom: 8px;
+  }
+
+  .group-error {
+    border-color: var(--color-border-error, #dc3545);
+    box-shadow: 0 0 0 1px var(--color-border-error, #dc3545);
   }
 
   .group-header {

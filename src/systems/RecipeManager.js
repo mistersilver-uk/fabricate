@@ -2,6 +2,7 @@ import { Recipe } from '../models/Recipe.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { getFabricateFlag } from '../config/flags.js';
 import { getSourceUuid } from '../utils/sourceUuid.js';
+import { SignatureValidator } from './SignatureValidator.js';
 
 const DEFAULT_RECIPE_IMG = 'icons/svg/item-bag.svg';
 const FALLBACK_RECIPE_IMG = 'icons/sundries/documents/document-bound-white-tan.webp';
@@ -622,6 +623,15 @@ export class RecipeManager {
       const byUuid = managedItem.sourceUuid
         ? (item.uuid === managedItem.sourceUuid || sourceId === managedItem.sourceUuid)
         : false;
+      if (byUuid) return true;
+
+      // Fallback ID match (T-097)
+      const fallbacks = managedItem.fallbackItemIds || [];
+      if (fallbacks.length > 0) {
+        const byFallback = fallbacks.some(fid => item.uuid === fid || sourceId === fid);
+        if (byFallback) return true;
+      }
+
       const byName = !managedItem.sourceUuid && managedItem.name
         ? item.name?.toLowerCase() === managedItem.name.toLowerCase()
         : false;
@@ -654,7 +664,11 @@ export class RecipeManager {
       if (!managedItem) return false;
       if (managedItem.sourceUuid) {
         const sourceId = getSourceUuid(item);
-        return item.uuid === managedItem.sourceUuid || sourceId === managedItem.sourceUuid;
+        if (item.uuid === managedItem.sourceUuid || sourceId === managedItem.sourceUuid) return true;
+        // Fallback ID match (T-097)
+        const fallbacks = managedItem.fallbackItemIds || [];
+        if (fallbacks.some(fid => item.uuid === fid || sourceId === fid)) return true;
+        return false;
       }
       return item.name?.toLowerCase() === (managedItem.name || '').toLowerCase();
     }
@@ -928,11 +942,45 @@ export class RecipeManager {
     errors.push(...tagValidation.errors);
     const modeValidation = this._validateResolutionMode(recipe);
     errors.push(...modeValidation.errors);
+    const signatureValidation = this._validateSignatures(recipe);
+    errors.push(...signatureValidation.errors);
 
     return {
       valid: errors.length === 0,
       errors
     };
+  }
+
+  /**
+   * Validate that this recipe's ingredient signatures do not overlap with other recipes
+   * in the same crafting system. Warns GMs of ambiguous crafting scenarios.
+   * @param {Recipe} recipe
+   * @returns {{valid: boolean, errors: string[]}}
+   * @private
+   */
+  _validateSignatures(recipe) {
+    const systemId = recipe?.craftingSystemId;
+    if (!systemId) return { valid: true, errors: [] };
+
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    if (!systemManager) return { valid: true, errors: [] };
+
+    const csm = {
+      getSystem: (id) => systemManager.getSystem(id),
+      getRecipesForSystem: (id) => this.getRecipes({ craftingSystemId: id }),
+      getComponentsForSystem: (id) => {
+        const system = systemManager.getSystem(id);
+        if (!system) return [];
+        return Array.isArray(system.components) ? system.components
+          : (Array.isArray(system.managedItems) ? system.managedItems
+          : (system.items || []));
+      }
+    };
+
+    const validator = new SignatureValidator(csm);
+    const result = validator.validateRecipe(recipe, systemId);
+    const errors = result.conflicts.map(c => c.message);
+    return { valid: errors.length === 0, errors };
   }
 
   /**

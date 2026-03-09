@@ -112,6 +112,7 @@
       </tbody>
     </table>
   {:else}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="catalyst-empty" ondrop={handleNewDrop} ondragover={handleDragOver}>
       <i class="fas fa-flask"></i>
       {localize('FABRICATE.Editor.Catalysts.EmptyState')}

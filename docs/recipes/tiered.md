@@ -1,13 +1,16 @@
 ---
 layout: default
-title: Tiered Mode
+title: Routed Mode (Macro Outcome)
 parent: Recipes
 nav_order: 3
 ---
 
-# Tiered Mode
+# Routed Mode — Macro Outcome Provider
 
-A crafting check macro returns a named **outcome**, and the outcome determines which result group is produced.
+{: .note }
+> This page documents the `macroOutcome` provider for routed mode, which replaces the legacy `tiered` resolution mode. Existing `tiered` recipes are automatically normalised to `routed` + `macroOutcome` provider on load.
+
+A crafting check macro returns a named **outcome**, and the outcome determines which result group is produced. The outcome is matched case-insensitively against result group names.
 
 ---
 
@@ -15,9 +18,21 @@ A crafting check macro returns a named **outcome**, and the outcome determines w
 
 - **One or more** ingredient sets
 - **One or more** result groups
-- Crafting check is **required**
+- `resultSelection.provider` must be `"macroOutcome"`
+- Crafting check is **required** (`resultSelection.macroUuid` or system fallback)
 - The check macro must return `{ success: true, outcome: "outcomeName" }` or `{ success: false }`
-- An `outcomeRouting` map connects outcome names to result group IDs
+- The `outcome` value is trim-normalised and compared case-insensitively against result group names
+- Result group names must be unique under case-insensitive comparison
+- Result group names may not use reserved fail/miss keywords (`fail`, `failed`, `failure`, `f`, `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`)
+
+### Reserved Keywords
+
+| Keyword | Behaviour |
+|:--------|:----------|
+| `fail`, `failed`, `failure`, `f` | The craft takes the failure path |
+| `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed` | The craft produces nothing (non-producing failure) |
+
+If the macro returns an outcome that does not match any reserved keyword and does not match any result group name, the engine aborts with a crafting-system misconfiguration error rather than treating it as a player failure.
 
 ## Example: Weapon Forging
 
@@ -29,19 +44,9 @@ A blacksmithing recipe where the quality of the result depends on a skill check:
 | "standard" | 1x Longsword |
 | "flawed" | 1x Bent Blade (junk) |
 
-### Outcome Routing
-
-```javascript
-outcomeRouting: {
-  "masterwork": "masterwork-result",
-  "standard": "standard-result",
-  "flawed": "flawed-result"
-}
-```
-
 ### The Check Macro
 
-Your crafting check macro receives context about the recipe and actors, and must return an outcome:
+Your crafting check macro receives context about the recipe and actors, and must return a named outcome:
 
 ```javascript
 // Crafting check macro for tiered weapon forging
@@ -70,58 +75,59 @@ if (total >= 25) {
 ### Creating the Recipe
 
 ```javascript
-const { Recipe, IngredientSet } = game.fabricate.api;
+Hooks.once('fabricate.ready', async () => {
+  const { Recipe, IngredientSet } = game.fabricate.api;
 
-const recipe = new Recipe({
-  name: 'Forge Longsword',
-  craftingSystemId: 'blacksmithing-system-id',
-  ingredientSets: [
-    IngredientSet.fromJSON({
-      id: 'sword-materials',
-      name: 'Sword Materials',
-      ingredientGroups: [
-        {
-          id: 'metal', name: 'Metal',
-          options: [{ quantity: 3, match: { type: 'component', componentId: 'steel-ingot-id' } }]
-        },
-        {
-          id: 'handle', name: 'Handle',
-          options: [{ quantity: 1, match: { type: 'component', componentId: 'leather-wrap-id' } }]
-        }
-      ]
-    })
-  ],
-  resultGroups: [
-    {
-      id: 'masterwork-result', name: 'Masterwork',
-      results: [{ id: 'mw-sword', componentId: 'masterwork-longsword-id', quantity: 1 }]
+  const recipe = new Recipe({
+    name: 'Forge Longsword',
+    craftingSystemId: 'blacksmithing-system-id',
+    resultSelection: {
+      provider: 'macroOutcome',
+      macroUuid: 'Macro.your-check-macro-uuid'  // or omit to use the system fallback
     },
-    {
-      id: 'standard-result', name: 'Standard',
-      results: [{ id: 'std-sword', componentId: 'longsword-id', quantity: 1 }]
-    },
-    {
-      id: 'flawed-result', name: 'Flawed',
-      results: [{ id: 'junk', componentId: 'bent-blade-id', quantity: 1 }]
-    }
-  ],
-  outcomeRouting: {
-    "masterwork": "masterwork-result",
-    "standard": "standard-result",
-    "flawed": "flawed-result"
-  }
+    ingredientSets: [
+      IngredientSet.fromJSON({
+        id: 'sword-materials',
+        name: 'Sword Materials',
+        ingredientGroups: [
+          {
+            id: 'metal', name: 'Metal',
+            options: [{ quantity: 3, match: { type: 'component', componentId: 'steel-ingot-id' } }]
+          },
+          {
+            id: 'handle', name: 'Handle',
+            options: [{ quantity: 1, match: { type: 'component', componentId: 'leather-wrap-id' } }]
+          }
+        ]
+      })
+    ],
+    resultGroups: [
+      {
+        id: 'masterwork-result', name: 'Masterwork',
+        results: [{ id: 'mw-sword', componentId: 'masterwork-longsword-id', quantity: 1 }]
+      },
+      {
+        id: 'standard-result', name: 'Standard',
+        results: [{ id: 'std-sword', componentId: 'longsword-id', quantity: 1 }]
+      },
+      {
+        id: 'flawed-result', name: 'Flawed',
+        results: [{ id: 'junk', componentId: 'bent-blade-id', quantity: 1 }]
+      }
+    ]
+  });
+
+  await game.fabricate.getRecipeManager().createRecipe(recipe.toJSON());
 });
-
-await game.fabricate.getRecipeManager().createRecipe(recipe.toJSON());
 ```
 
 ## Step-Level Routing Overrides
 
-In multi-step recipes, individual steps can override the recipe-level `outcomeRouting`. The engine checks `step.outcomeRouting` first, then falls back to `recipe.outcomeRouting`.
+In multi-step recipes, individual steps can override the recipe-level `resultSelection`. The engine checks `step.resultSelection` first, then falls back to `recipe.resultSelection`.
 
-## When to Use Tiered Mode
+## When to Use the Macro Outcome Provider
 
-Tiered mode is ideal when:
+The `macroOutcome` provider is ideal when:
 - Result quality should depend on a skill check
 - You want distinct named outcomes (not just pass/fail)
 - Different outcomes should produce fundamentally different items

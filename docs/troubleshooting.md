@@ -36,24 +36,24 @@ This guide covers common issues GMs and players encounter when setting up or usi
 
 ### Crafting Check Macro Not Running
 
-**Symptom:** The crafting check macro never fires. Recipes resolve immediately with no skill check, even though tiered or progressive mode is configured.
+**Symptom:** The crafting check macro never fires. Recipes resolve immediately with no skill check, even though routed mode (macroOutcome provider) or progressive mode is configured.
 
 **Likely causes:**
 
 - `craftingCheck.enabled` is `false` and no `macroUuid` is set. The engine skips the check entirely when both are absent.
 - `craftingCheck.macroUuid` is `null` or points to a macro that has been deleted.
-- The resolution mode is `simple` or `mapped`. In these modes, crafting checks are **optional** -- the check runs if configured but is not required for success.
-- The macro returns a value that does not match the expected shape for the current mode. Tiered mode requires `{ success, outcome }` where `outcome` is a non-empty string. Progressive mode requires `{ success, value }` where `value` is a finite number.
+- The resolution mode is `simple`, or routed with the `ingredientSet` or `rollTableOutcome` provider. In these configurations, crafting checks are **optional** -- the check runs if configured but is not required for success.
+- The macro returns a value that does not match the expected shape for the current mode. Routed macroOutcome provider requires `{ success, outcome }` where `outcome` is a non-empty string. Progressive mode requires `{ success, value }` where `value` is a finite number.
 
 **Step-by-step checks:**
 
 1. Open the Crafting Admin panel, go to the **Systems** tab, and check the **Crafting Checks** section. Is `craftingCheck.enabled` turned on?
 2. Is `craftingCheck.macroUuid` populated? Open Foundry's macro directory and confirm the macro with that UUID still exists.
-3. Check the system's **Resolution Mode**. If it is **Tiered** or **Progressive**, a crafting check is required -- the engine will report a validation error if one is missing. If it is **Simple** or **Mapped**, the check is optional and will silently not run if unconfigured.
+3. Check the system's **Resolution Mode**. If the resolution mode is **Routed** with the `macroOutcome` provider, or **Progressive**, a crafting check is required -- the engine will report a validation error if one is missing. For **Simple** mode or routed with `ingredientSet`/`rollTableOutcome` providers, the check is optional and will silently not run if unconfigured.
 4. Open the browser console (F12), attempt a craft, and look for `Fabricate |` prefixed error or warning messages about macro execution.
 5. Verify the macro's return shape matches the mode:
-   - **Simple / Mapped:** `{ success: boolean }`
-   - **Tiered:** `{ success: boolean, outcome: string }` (outcome must match a declared outcome label)
+   - **Simple / Routed (ingredientSet or rollTableOutcome):** `{ success: boolean }`
+   - **Routed (macroOutcome):** `{ success: boolean, outcome: string }` (outcome is matched case-insensitively to a result group name)
    - **Progressive:** `{ success: boolean, value: number }` (value must be a finite number)
 
 **See also:** [Macros & Examples]({% link macros/index.md %}) -- crafting check macro contract and return shapes; [Crafting Checks]({% link crafting-checks.md %}) -- crafting check configuration.

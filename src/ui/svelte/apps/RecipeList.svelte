@@ -10,7 +10,8 @@
     onLearnRecipe,
     onToggleFavourite,
     onShowDetails,
-    onRestartRun
+    onRestartRun,
+    onAddToShoppingList
   } = $props();
 </script>
 
@@ -23,6 +24,7 @@
       {onToggleFavourite}
       {onShowDetails}
       {onRestartRun}
+      {onAddToShoppingList}
     />
   {/each}
 {:else}

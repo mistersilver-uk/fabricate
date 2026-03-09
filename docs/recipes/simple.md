@@ -105,5 +105,5 @@ The crafting check macro must return `{ success: true/false }`. See [Macros]({% 
 
 ## What's next?
 
-- [Mapped Mode]({% link recipes/mapped.md %}) -- ingredient choices determine which result is produced.
+- [Routed Mode (Ingredient Set)]({% link recipes/mapped.md %}) -- ingredient choices determine which result is produced.
 - [Macros & Examples]({% link macros/index.md %}) -- crafting check macro contracts and ready-to-use examples.
