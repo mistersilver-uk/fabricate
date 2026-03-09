@@ -171,18 +171,24 @@ jobs:
             - Do NOT close the issue — the PR will reference it.
             - Do NOT merge anything.
 
+      - name: Validate before push
+        run: |
+          if git diff --cached --quiet && git diff --quiet; then
+            echo "No changes to push."
+            echo "HAS_CHANGES=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          echo "HAS_CHANGES=true" >> "$GITHUB_ENV"
+
+          echo "Running tests to verify implementation is complete…"
+          npm test
+          npm run build
+
       - name: Push and create PR
+        if: env.HAS_CHANGES == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if git diff --cached --quiet && git diff --quiet; then
-            echo "No changes to commit."
-            gh issue edit "${{ needs.pick-task.outputs.issue_number }}" \
-              --repo "${{ github.repository }}" \
-              --remove-label in-progress
-            exit 0
-          fi
-
           git push origin "$BRANCH"
 
           gh pr create \
@@ -216,11 +222,27 @@ jobs:
           EOF
           )"
 
-      - name: Remove in-progress on failure
-        if: failure()
+      - name: Remove in-progress when no changes
+        if: env.HAS_CHANGES == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh issue edit "${{ needs.pick-task.outputs.issue_number }}" \
             --repo "${{ github.repository }}" \
             --remove-label in-progress
+
+      - name: Cleanup on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Remove in-progress label so the issue is eligible next run
+          gh issue edit "${{ needs.pick-task.outputs.issue_number }}" \
+            --repo "${{ github.repository }}" \
+            --remove-label in-progress
+
+          # Delete remote branch if it was pushed
+          if git ls-remote --heads origin "$BRANCH" | grep -q .; then
+            git push origin --delete "$BRANCH"
+            echo "Deleted remote branch $BRANCH"
+          fi
