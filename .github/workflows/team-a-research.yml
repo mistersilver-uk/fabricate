@@ -28,7 +28,10 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: "--model claude-opus-4-6 --max-turns 30"
+          claude_args: >-
+            --model claude-opus-4-6
+            --max-turns 30
+            --allowedTools "Bash(gh:*),Bash(git:*),Bash(ls:*),Bash(cat:*),Edit,Write,Read,Glob,Grep,WebSearch,WebFetch"
           prompt: |
             You are the domain-expert agent for Fabricate. Read your agent
             definition at .claude/agents/domain-expert.md and follow it exactly.
@@ -76,7 +79,10 @@ jobs:
           FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: "--model claude-opus-4-6 --max-turns 40"
+          claude_args: >-
+            --model claude-opus-4-6
+            --max-turns 40
+            --allowedTools "Bash(npm run:*),Bash(npm test:*),Bash(gh:*),Bash(git:*),Bash(ls:*),Bash(cat:*),Edit,Write,Read,Glob,Grep"
           prompt: |
             You are the ux-designer agent for Fabricate. Read your agent
             definition at .claude/agents/ux-designer.md and follow it exactly.
@@ -129,7 +135,10 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: "--model claude-sonnet-4-6 --max-turns 30"
+          claude_args: >-
+            --model claude-sonnet-4-6
+            --max-turns 30
+            --allowedTools "Bash(npm test:*),Bash(npm run:*),Bash(gh:*),Bash(git:*),Bash(ls:*),Bash(cat:*),Edit,Write,Read,Glob,Grep"
           prompt: |
             You are the quality-engineer agent for Fabricate. Read your agent
             definition at .claude/agents/quality-engineer.md and follow it exactly.
@@ -158,7 +167,10 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: "--model claude-opus-4-6 --max-turns 30"
+          claude_args: >-
+            --model claude-opus-4-6
+            --max-turns 30
+            --allowedTools "Bash(gh:*),Bash(git:*),Bash(ls:*),Bash(cat:*),Edit,Write,Read,Glob,Grep,WebSearch,WebFetch"
           prompt: |
             You are the competitive-analyst agent for Fabricate. Read your agent
             definition at .claude/agents/competitive-analyst.md and follow it exactly.
@@ -193,7 +205,10 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: "--model claude-sonnet-4-6 --max-turns 15"
+          claude_args: >-
+            --model claude-sonnet-4-6
+            --max-turns 15
+            --allowedTools "Bash(gh:*),Bash(git:*),Bash(ls:*),Bash(cat:*),Read,Glob,Grep"
           prompt: |
             Check if there are any uncommitted changes to DOMAIN.md,
             COMPETITIVE_ANALYSIS.md, docs/, or spec/ files from the research phases.
