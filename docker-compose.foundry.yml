@@ -29,11 +29,14 @@ services:
       FOUNDRY_PASSWORD: "${FOUNDRY_PASSWORD}"
       FOUNDRY_ADMIN_KEY: "fabricate-test-admin"
       CONTAINER_PRESERVE_CONFIG: "true"
+      FOUNDRY_WORLD: "fabricate-smoke"
     volumes:
       # Mount built module into the Foundry modules directory
       - ./dist:/home/foundry/data/Data/modules/fabricate:ro
       # Mount test world fixture
       - ./.foundry-e2e/worlds/fabricate-smoke:/home/foundry/data/Data/worlds/fabricate-smoke:ro
+      # Mount pre-downloaded game system (fetched by scripts/foundry-fetch-systems.mjs)
+      - ./.foundry-e2e/systems/dnd5e:/home/foundry/data/Data/systems/dnd5e:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:30000/api/status"]
       interval: 10s

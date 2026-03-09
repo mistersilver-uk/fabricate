@@ -7,5 +7,7 @@ dist/
 # Foundry e2e: ignore runtime data but track world fixtures
 .foundry-e2e/worlds/*/data/
 .foundry-e2e/worlds/*/backups/
+# Downloaded game systems (fetched by scripts/foundry-fetch-systems.mjs)
+.foundry-e2e/systems/
 test-results/
 .env.foundry

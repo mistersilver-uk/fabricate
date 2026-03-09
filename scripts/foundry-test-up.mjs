@@ -54,6 +54,14 @@ async function main() {
 
   process.stdout.write('Starting Foundry test harness...\n');
 
+  // Ensure game systems are downloaded
+  process.stdout.write('Fetching game systems...\n');
+  execSync(`"${process.execPath}" "${join(__dirname, 'foundry-fetch-systems.mjs')}"`, {
+    cwd: ROOT,
+    stdio: 'inherit',
+    env: process.env
+  });
+
   // Pull latest image silently
   process.stdout.write('Pulling Docker image felddy/foundryvtt:release...\n');
   execSync('docker compose -f docker-compose.foundry.yml pull --quiet', {
