@@ -172,15 +172,23 @@ Drag any Item document from the **Items sidebar** or from an open **compendium b
 2. Drag the item onto the **Items** tab drop zone in the Crafting Admin panel
 3. The item appears in the list with a generated `componentId` and its `sourceItemUuid` linked to the compendium entry
 
-If the drop data cannot be resolved to a valid Item UUID — for example, when dropping a non-item document type — a notification is shown and nothing is imported.
+If the item is already registered in the system and its name and image are current, the drop is silently ignored. If the item is already registered but its name or image has changed (for example after the compendium item was updated), Fabricate overwrites the stored metadata and shows a notification.
+
+If the dropped document is an Actor, JournalEntry, Scene, or any other non-Item type, a warning notification is shown and nothing is imported. If the drag data cannot be resolved to any UUID, the same warning is shown.
 
 #### Bulk compendium pack drop
 
 To import all Item documents from a compendium pack at once, drag the **compendium pack header** (the title row in the compendium directory sidebar, not an individual entry within it) onto the drop zone. Fabricate enumerates every Item document in the pack and adds each one.
 
-- Items already present in the system by `sourceItemUuid` are skipped automatically (deduplication).
-- A summary notification reports how many items were added and how many were skipped as duplicates.
+- Items not yet in the system are added as new components.
+- Items already registered whose name or image has changed are updated automatically.
+- Items already registered and already up to date are skipped.
+- A summary notification reports how many items were added, updated, and skipped.
 - Non-item document types in the pack (Actors, JournalEntries, etc.) are ignored.
+
+#### Folder drop
+
+Drag a **world folder** containing Item documents onto the drop zone to import every Item in that folder. Fabricate expands the folder, applies the same source-chain deduplication logic as single-item drops, and shows a summary notification with the number of items added. If the folder contains no Item documents, a notification says so and nothing is written.
 
 {: .note }
 > Bulk pack import requires that Foundry emits a compendium-type drag event from the pack header row. If your Foundry version does not support this drag shape, use single-item drops or the `addItemsFromPack()` API method instead.
@@ -193,10 +201,14 @@ Both import paths are also available programmatically:
 // Single item from a compendium
 Hooks.once('fabricate.ready', async () => {
   const mgr = game.fabricate.getCraftingSystemManager();
-  await mgr.addItemFromUuid(
+  const result = await mgr.addItemFromUuid(
     'blacksmithing-system-id',
-    'Compendium.dnd5e.items.moonpetalHerb123'
+    'Compendium.dnd5e.items.ironIngot456'
   );
+  // result.action is 'added', 'updated', or 'skipped'
+  if (result.action !== 'skipped') {
+    console.log(`${result.action}: ${result.item.name}`);
+  }
 });
 ```
 
@@ -208,7 +220,11 @@ Hooks.once('fabricate.ready', async () => {
     'blacksmithing-system-id',
     'dnd5e.items'
   );
-  console.log(`Added ${result.added}, skipped ${result.skipped} duplicates`);
+  // result now includes an 'updated' count alongside added/skipped/total
+  console.log(
+    `Added ${result.added}, updated ${result.updated}, ` +
+    `skipped ${result.skipped} of ${result.total}`
+  );
 });
 ```
 

@@ -228,26 +228,40 @@ The system object exposes managed items under two equivalent properties: `compon
 
 Adds a single Foundry item to the system as a managed item. GM only.
 
-If an item with the same `sourceUuid` is already registered in the system, the existing entry is returned immediately and no duplicate is created.
+Returns a result object that indicates whether the item was newly created, updated, or already up to date, so callers can show appropriate notifications.
+
+The method uses a two-level source-chain lookup before creating a new component:
+
+1. **Exact match** — the dropped UUID already matches the recorded `sourceUuid` or `sourceItemUuid` on an existing component. If the source item's name or image has changed, the stored metadata is overwritten and `action` is `"updated"`. If metadata is already current, `action` is `"skipped"`.
+2. **Fallback-chain match** — the dropped UUID appears in the component's `fallbackItemIds` (recorded when a compendium item moves). The old `sourceUuid` is pushed into `fallbackItemIds` before the new UUID is written; `action` is `"updated"`.
+3. **No match** — a new component is created; `action` is `"added"`.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
 | `systemId` | `string` | System ID |
 | `itemUuid` | `string` | UUID of the Foundry item to add. Accepts both world item UUIDs (`Item.abc123`) and compendium item UUIDs (`Compendium.pack.id.itemId`). |
 
-**Returns:** `Promise<object>` — the newly created or already-existing managed item.
+**Returns:** `Promise<{ item: object, action: 'added' | 'updated' | 'skipped' }>`
 
-**Throws:** `Error` if the system ID is not found.
+- `item` — the managed component object (new or existing).
+- `action` — `"added"` if a new component was created, `"updated"` if an existing component's name or image was refreshed, `"skipped"` if the item was already registered and already up to date.
+
+**Throws:** `Error` if the system ID is not found, or if the UUID resolves to a non-Item document (such as an Actor or JournalEntry).
 
 ```javascript
 Hooks.once('fabricate.ready', async () => {
   const mgr = game.fabricate.getCraftingSystemManager();
-  // Add an item from a compendium to the crafting system
-  const item = await mgr.addItemFromUuid(
+  const result = await mgr.addItemFromUuid(
     'alchemy-system-id',
     'Compendium.dnd5e.items.moonpetalHerb123'
   );
-  console.log(`Added: ${item.name} (componentId: ${item.id})`);
+  if (result.action === 'added') {
+    console.log(`Added: ${result.item.name} (componentId: ${result.item.id})`);
+  } else if (result.action === 'updated') {
+    console.log(`Updated metadata for: ${result.item.name}`);
+  } else {
+    console.log(`Already registered: ${result.item.name} — no changes needed.`);
+  }
 });
 ```
 
@@ -255,17 +269,18 @@ Hooks.once('fabricate.ready', async () => {
 
 Imports all Item documents from a compendium pack into the system as managed items. GM only.
 
-Items already present in the system by `sourceUuid` are skipped. Non-item document types in the pack (Actors, JournalEntries, etc.) are ignored.
+Each item is processed via `addItemFromUuid()`, so the same source-chain deduplication rules apply: items already registered and up to date are skipped, items whose metadata has changed are updated, and new items are added.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
 | `systemId` | `string` | System ID |
 | `packId` | `string` | Compendium pack identifier in `"scope.name"` format (e.g. `"dnd5e.items"`) |
 
-**Returns:** `Promise<{ added: number, skipped: number, total: number }>`
+**Returns:** `Promise<{ added: number, updated: number, skipped: number, total: number }>`
 
-- `added` — number of items successfully imported on this call.
-- `skipped` — number of items already present in the system (by `sourceUuid`) and therefore not re-imported.
+- `added` — number of items created as new components on this call.
+- `updated` — number of items already registered whose name or image was refreshed from the source.
+- `skipped` — number of items already registered and already up to date; no changes written.
 - `total` — total number of Item documents found in the pack.
 
 **Throws:** `Error` if the system ID or pack ID is not found.
@@ -278,8 +293,8 @@ Hooks.once('fabricate.ready', async () => {
     'world.herbs-and-reagents'
   );
   console.log(
-    `Imported ${result.added} of ${result.total} items ` +
-    `(${result.skipped} duplicates skipped).`
+    `Imported ${result.added} new, updated ${result.updated}, ` +
+    `skipped ${result.skipped} of ${result.total} items.`
   );
 });
 ```
