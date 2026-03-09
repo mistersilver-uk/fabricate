@@ -172,11 +172,13 @@ Fabricate now includes a minimal end-to-end smoke harness against a real Foundry
 # 1) Install browser binary once
 npm run test:foundry:install
 
-# 2) Configure env vars (copy and edit)
-cp .env.foundry.example .env.foundry
-set -a && source .env.foundry && set +a
+# 2) Export Foundry credentials in your shell (do not commit credentials)
+export FOUNDRY_USERNAME='your-foundry-account'
+export FOUNDRY_PASSWORD='your-foundry-password'
+# Optional: select a specific purchased license key
+# export FOUNDRY_LICENSE_KEY='1'
 
-# 3) Run end-to-end flow (build -> container up -> smoke run -> container down)
+# 3) Run end-to-end flow (up -> smoke run -> down)
 npm run test:foundry
 ```
 
@@ -188,15 +190,16 @@ npm run test:foundry:run
 npm run test:foundry:down
 ```
 
-`test:foundry:run` writes feedback artifacts to `test-results/foundry/`:
+`test:foundry:run` writes feedback artifacts to `test-results/`:
 
 - `summary.json` (machine-readable pass/fail + error details)
-- `browser.log` (captured browser console + page errors)
-- `smoke-pass.png` or `smoke-fail.png`
+- `console.log` (captured browser console + page errors)
+- `screenshot-*.png` (key checkpoints and failure capture)
 
 Notes:
 
-- The smoke test assumes the world at `FOUNDRY_ENTRY_PATH` has Fabricate enabled.
+- The smoke test handles first-run `/license` in-browser by checking "I agree" and clicking `AGREE`.
+- In GitHub Actions ephemeral runners, store `FOUNDRY_USERNAME` and `FOUNDRY_PASSWORD` as repository secrets.
 - If your Foundry setup requires different Docker env vars or image settings, update `docker-compose.foundry.yml`.
 
 See [AGENTS.md](AGENTS.md) for contributor and agent guidelines.

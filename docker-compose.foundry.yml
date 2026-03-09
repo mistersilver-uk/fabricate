@@ -18,8 +18,6 @@
 # under /home/foundry/data/Data/. The container manages its own data state
 # ephemerally (no named volume) since this is a disposable CI environment.
 
-version: "3.8"
-
 services:
   foundry:
     image: felddy/foundryvtt:release

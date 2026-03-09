@@ -29,6 +29,8 @@ jobs:
     env:
       FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
       FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
+      FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}
+      FOUNDRY_TELEMETRY: "false"
       FOUNDRY_ADMIN_KEY: fabricate-test-admin
       FOUNDRY_URL: http://localhost:30000
 

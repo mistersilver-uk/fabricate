@@ -4,13 +4,14 @@
  * Playwright smoke test that verifies Fabricate loads correctly in a live
  * Foundry VTT instance:
  *
- *   1. Opens the Foundry setup / login page.
- *   2. Logs in as admin.
- *   3. Launches the fabricate-smoke world.
- *   4. Confirms the Fabricate module is active (game.modules check via console).
- *   5. Clicks "Craft Item" in the Items sidebar.
- *   6. Asserts the Crafting App opens (checks for a landmark heading).
- *   7. Fails if any runtime console errors were captured.
+ *   1. Opens the Foundry setup page.
+ *   2. Accepts the first-run license page if shown.
+ *   3. Logs in as admin.
+ *   4. Launches the fabricate-smoke world.
+ *   5. Confirms the Fabricate module is active (game.modules check via console).
+ *   6. Clicks "Craft Item" in the Items sidebar.
+ *   7. Asserts the Crafting App opens (checks for a landmark heading).
+ *   8. Fails if any runtime console errors were captured.
  *
  * Artifacts written to test-results/:
  *   summary.json          — machine-readable pass/fail + error list
@@ -42,6 +43,65 @@ const consoleErrors = [];
 /** @type {string[]} */
 const consoleLog = [];
 
+/**
+ * Safely parse a page pathname.
+ * @param {string} rawUrl
+ * @returns {string}
+ */
+function getPathname(rawUrl) {
+  try {
+    return new URL(rawUrl).pathname;
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Accept first-run license if Foundry redirects to /license.
+ * Safe to call on every run; no-op when license page is not present.
+ * @param {import('playwright').Page} page
+ * @param {{ steps: Array<Record<string, boolean | string>> }} results
+ */
+async function acceptLicenseIfPresent(page, results) {
+  if (getPathname(page.url()) !== '/license') {
+    results.steps.push({ step: 'license-check', passed: true, skipped: true });
+    return;
+  }
+
+  process.stdout.write('License agreement detected. Accepting terms...\n');
+  await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-01-license.png') });
+
+  const checkboxCandidates = page.locator(
+    'input[name="agree"], input[id*="agree" i], input[type="checkbox"]'
+  );
+  if (await checkboxCandidates.count() === 0) {
+    throw new Error('License page detected, but agreement checkbox was not found.');
+  }
+
+  const checkbox = checkboxCandidates.first();
+  await checkbox.waitFor({ state: 'visible', timeout: 10_000 });
+  if (!(await checkbox.isChecked())) {
+    await checkbox.check();
+  }
+
+  const agreeButtonCandidates = page.locator(
+    'button:has-text("AGREE"), button:has-text("Agree"), button:has-text("I Agree")'
+  );
+  if (await agreeButtonCandidates.count() === 0) {
+    throw new Error('License page detected, but AGREE button was not found.');
+  }
+
+  const agreeButton = agreeButtonCandidates.first();
+  await agreeButton.waitFor({ state: 'visible', timeout: 10_000 });
+  await Promise.all([
+    page.waitForURL(/\/setup(?:\?.*)?$/, { timeout: 20_000 }),
+    agreeButton.click()
+  ]);
+
+  await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-01a-license-accepted.png') });
+  results.steps.push({ step: 'license-accepted', passed: true });
+}
+
 async function main() {
   await mkdir(RESULTS_DIR, { recursive: true });
 
@@ -72,16 +132,18 @@ async function main() {
   };
 
   try {
-    // ── Step 1: Navigate to setup page ──────────────────────────────────────
+    // ── Step 1: Navigate to setup page and handle first-run license ─────────
     await page.goto(`${FOUNDRY_URL}/setup`, { waitUntil: 'networkidle' });
-    await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-01-setup.png') });
     results.steps.push({ step: 'navigate-setup', passed: true });
+    await acceptLicenseIfPresent(page, results);
+    await page.waitForURL(/\/setup(?:\?.*)?$/, { timeout: 15_000 });
+    await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-01-setup.png') });
 
     // ── Step 2: Enter admin key ──────────────────────────────────────────────
     const adminInput = page.locator('input[name="adminKey"], input[type="password"]').first();
     await adminInput.fill(ADMIN_KEY);
     await page.keyboard.press('Enter');
-    await page.waitForURL(`${FOUNDRY_URL}/setup`, { timeout: 15_000 });
+    await page.waitForURL(/\/setup(?:\?.*)?$/, { timeout: 15_000 });
     await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-02-authenticated.png') });
     results.steps.push({ step: 'admin-auth', passed: true });
 
