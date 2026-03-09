@@ -1,0 +1,16 @@
+{
+  "id": "fabricate-smoke",
+  "title": "Fabricate Smoke Test World",
+  "description": "Minimal world fixture used by the Fabricate integration smoke test harness.",
+  "system": "dnd5e",
+  "coreVersion": "13.0.0",
+  "systemVersion": "4.0.0",
+  "modules": [
+    "fabricate"
+  ],
+  "background": "",
+  "nextSession": null,
+  "resetKeys": false,
+  "safeMode": false,
+  "joinTheme": "default"
+}

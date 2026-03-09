@@ -49,29 +49,62 @@ jobs:
   # ── Phase 2: UX Designer ─────────────────────────────────────────────
   ux-audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npm run test:foundry:install
+
+      - name: Build module
+        run: npm run build
+
       - uses: anthropics/claude-code-action@v1
+        env:
+          FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
+          FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: "--model claude-opus-4-6 --max-turns 30"
+          claude_args: "--model claude-opus-4-6 --max-turns 40"
           prompt: |
             You are the ux-designer agent for Fabricate. Read your agent
             definition at .claude/agents/ux-designer.md and follow it exactly.
 
+            You have access to Playwright (already installed: `npm run test:foundry:install`
+            has been run) and a built module in dist/. The Foundry credentials are
+            in environment variables FOUNDRY_USERNAME and FOUNDRY_PASSWORD.
+
             Your task:
-            1. Read spec/003-ui-integration.md and all Svelte components.
-            2. Audit components against the spec, design principles, and
-               accessibility standards (WCAG AA).
-            3. For each actionable finding, create a GitHub Issue with the `triage`
+            1. Read spec/003-ui-integration.md and all Svelte components in
+               src/ui/svelte/ to understand the current UI structure.
+            2. Run the Foundry smoke harness to capture live screenshots:
+               ```
+               npm run test:foundry:up
+               npm run test:foundry:run
+               npm run test:foundry:down
+               ```
+               Review the screenshots in test-results/ to audit the real rendered UI.
+            3. Audit components against the spec, design principles, and
+               accessibility standards (WCAG AA). Consider both static code review
+               and the live screenshots.
+            4. For each actionable finding, create a GitHub Issue with the `triage`
                label using `gh issue create --label ux --label triage`.
-            4. NEVER remove the `triage` label from any issue. Only humans may do that.
-            5. Before creating an issue, search existing issues to avoid duplicates:
+            5. NEVER remove the `triage` label from any issue. Only humans may do that.
+            6. Before creating an issue, search existing issues to avoid duplicates:
                `gh issue list --state open --label ux --json number,title --limit 100`
+            7. If the smoke test fails (e.g. Foundry credentials are not set),
+               fall back to static code review only and note this in each issue.
 
             Output a summary of findings and issues created.
 

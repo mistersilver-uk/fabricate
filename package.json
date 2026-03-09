@@ -7,7 +7,7 @@
     "build": "node scripts/release.js --no-zip",
     "dev": "vite build --watch",
     "test": "node --test tests/*.test.js tests/stores/*.test.js tests/components/*.test.js tests/actions/*.test.js",
-    "test:foundry:install": "playwright install chromium",
+    "test:foundry:install": "playwright install chromium --with-deps",
     "test:foundry:up": "node scripts/foundry-test-up.mjs",
     "test:foundry:run": "node scripts/foundry-test-run.mjs",
     "test:foundry:down": "node scripts/foundry-test-down.mjs",
@@ -18,12 +18,18 @@
     "docs:install": "cd docs && bundle install"
   },
   "devDependencies": {
-    "vite": "^5.0.0",
+    "@commitlint/cli": "^20.4.3",
+    "@commitlint/config-conventional": "^20.4.3",
     "@league-of-foundry-developers/foundry-vtt-types": "^12.0.0",
-    "svelte": "^5.0.0",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/exec": "^7.1.0",
+    "@semantic-release/git": "^10.0.1",
     "@sveltejs/vite-plugin-svelte": "^4.0.0",
     "happy-dom": "^16.0.0",
-    "playwright": "^1.53.2"
+    "playwright": "^1.53.2",
+    "semantic-release": "^25.0.3",
+    "svelte": "^5.0.0",
+    "vite": "^5.0.0"
   },
   "private": true,
   "keywords": [

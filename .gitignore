@@ -4,5 +4,8 @@ dist/
 .DS_Store
 .vscode/
 *.zip
-.foundry-e2e/
+# Foundry e2e: ignore runtime data but track world fixtures
+.foundry-e2e/worlds/*/data/
+.foundry-e2e/worlds/*/backups/
 test-results/
+.env.foundry

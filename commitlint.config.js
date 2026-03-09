@@ -1,0 +1,52 @@
+/**
+ * Commitlint configuration for Fabricate.
+ *
+ * Enforces the Conventional Commits format with issue-number scope:
+ *   <type>(#<issue>): <description>
+ *
+ * Examples:
+ *   feat(#42): add cauldron mode
+ *   fix(#99): correct crafting ingredient deduplication
+ *   chore: update devDependencies
+ *
+ * The scope is optional for chore/docs/ci/style/refactor/test commits;
+ * issue-scoped format is required for feat/fix/perf commits.
+ */
+
+export default {
+  extends: ['@commitlint/config-conventional'],
+  rules: {
+    // Allow scope in format (#<number>) for issue-linked commits
+    'scope-case': [2, 'always', 'lower-case'],
+    // Enforce max header length of 100 chars
+    'header-max-length': [2, 'always', 100],
+    // Disallow a body with only a blank line (clean formatting)
+    'body-leading-blank': [1, 'always'],
+    // Disallow footer with only a blank line
+    'footer-leading-blank': [1, 'always'],
+    // Allowed commit types
+    'type-enum': [
+      2,
+      'always',
+      [
+        'feat',   // new feature
+        'fix',    // bug fix
+        'docs',   // documentation only
+        'style',  // formatting, no logic change
+        'refactor', // code change that is neither fix nor feature
+        'perf',   // performance improvement
+        'test',   // adding or fixing tests
+        'build',  // build system or external dependencies
+        'ci',     // CI/CD configuration
+        'chore',  // other changes that don't modify src or tests
+        'revert'  // revert a previous commit
+      ]
+    ]
+  },
+  // Custom plugin to parse (#<issue>) as a valid scope
+  parserPreset: {
+    parserOpts: {
+      issuePrefixes: ['#']
+    }
+  }
+};

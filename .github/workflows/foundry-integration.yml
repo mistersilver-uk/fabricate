@@ -1,0 +1,93 @@
+name: "Foundry Integration Smoke Test"
+
+on:
+  workflow_call:                  # Reusable workflow (called by release.yml)
+  workflow_dispatch:              # Manual trigger (allows testing on demand)
+  schedule:
+    - cron: '0 4 * * 1'          # Weekly: Monday 04:00 UTC (nightly cadence)
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'scripts/**'
+      - 'module.json'
+      - 'docker-compose.foundry.yml'
+
+concurrency:
+  group: foundry-integration
+  cancel-in-progress: false       # Never cancel a running smoke test mid-flight
+
+permissions:
+  contents: read
+  issues: write                   # Allow opening issues on failure
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20           # Full pipeline: up + smoke + down
+    env:
+      FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
+      FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
+      FOUNDRY_ADMIN_KEY: fabricate-test-admin
+      FOUNDRY_URL: http://localhost:30000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npm run test:foundry:install
+
+      - name: Build module
+        run: npm run build
+
+      - name: Run smoke test (up → run → down)
+        run: npm run test:foundry
+
+      - name: Upload test artifacts
+        if: always()              # Upload even on failure for debugging
+        uses: actions/upload-artifact@v4
+        with:
+          name: foundry-smoke-results-${{ github.run_number }}
+          path: test-results/
+          retention-days: 14
+
+      - name: Open GitHub issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          EXISTING=$(gh issue list \
+            --repo "${{ github.repository }}" \
+            --state open \
+            --label "foundry-smoke-failure" \
+            --json number \
+            --limit 1 \
+            | jq -r '.[0].number // empty')
+
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" \
+              --repo "${{ github.repository }}" \
+              --body "Smoke test failed again in run [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})."
+          else
+            gh issue create \
+              --repo "${{ github.repository }}" \
+              --title "Foundry smoke test failing (run #${{ github.run_number }})" \
+              --label "defect,foundry-smoke-failure,triage" \
+              --body "The Foundry integration smoke test failed.
+
+              **Run:** [${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+              **Branch:** \`${{ github.ref_name }}\`
+              **Commit:** \`${{ github.sha }}\`
+
+              Check the \`foundry-smoke-results\` artifact for screenshots and \`summary.json\`."
+          fi

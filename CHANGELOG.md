@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### CI/CD
+
+- Added Conventional Commits enforcement: commitlint.config.js configures @commitlint/config-conventional with an issue-scoped format. A new conventional-commits.yml workflow validates all commits on a PR and the PR title itself. Agent config files and team-b-backlog.yml have been updated with explicit commit format rules.
+- Added Foundry VTT integration smoke-test harness: docker-compose.foundry.yml launches a disposable felddy/foundryvtt container; four new scripts (foundry-test-up.mjs, foundry-test-run.mjs, foundry-test-down.mjs, foundry-test.mjs) orchestrate start, Playwright smoke test, and teardown. Artifacts (summary.json, screenshots, console log) are written to test-results/.
+- Added foundry-integration.yml GitHub Actions workflow that triggers on push to main, weekly schedule, and workflow_dispatch. On failure, opens a GitHub Issue with the foundry-smoke-failure label.
+- Added semantic-release pipeline: release.config.js drives version bumping, CHANGELOG updates, module.json version injection, and GitHub Release creation. A new release.yml workflow runs semantic-release on every push to main. scripts/release.js gains a --version flag for version injection.
+- Updated team-a-research.yml UX audit job to install Playwright and run the Foundry smoke harness for live screenshot capture before UX review.
+- Added .env.foundry to .gitignore to prevent accidental credential commits.
+
 ### Fixed
 
 - Saving a new recipe no longer creates a duplicate entry or shows two success notifications. The recipe editor save button was changed from `type="submit"` to `type="button"`, preventing the form from firing both a submit event and the click handler simultaneously. (T-036)

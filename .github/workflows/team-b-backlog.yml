@@ -151,8 +151,20 @@ jobs:
             - Append a CHANGELOG.md entry referencing #${{ needs.pick-task.outputs.issue_number }}
 
             ## Final: Commit
-            Stage all changes and commit with message:
-            "feat(#${{ needs.pick-task.outputs.issue_number }}): <short description>"
+            Stage all changes and commit following Conventional Commits format:
+            `<type>(#${{ needs.pick-task.outputs.issue_number }}): <short description>`
+
+            Choose the type based on the nature of the change:
+            - `feat` — new feature or behaviour
+            - `fix` — bug fix
+            - `docs` — documentation only
+            - `refactor` — code restructure, no behaviour change
+            - `test` — tests only
+            - `chore` — maintenance, dependencies, tooling
+
+            Example: `feat(#${{ needs.pick-task.outputs.issue_number }}): add cauldron mode`
+
+            After committing, validate with: `npx commitlint --from HEAD~1 --to HEAD --verbose`
 
             IMPORTANT RULES:
             - NEVER remove the `triage` label from any issue.

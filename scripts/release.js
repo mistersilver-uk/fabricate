@@ -6,6 +6,7 @@
  *   node scripts/release.js              # build + zip
  *   node scripts/release.js --no-zip    # build without zip
  *   node scripts/release.js --validate-only  # validate existing dist/
+ *   node scripts/release.js --version 1.2.3  # inject version into module.json, then build
  *
  * Future GitHub Actions note:
  *   This script is designed to be usable directly in a GitHub Actions workflow:
@@ -13,6 +14,10 @@
  *     - run: node scripts/release.js --no-zip
  *   The --no-zip flag avoids the zip dependency issue in CI; Actions can use
  *   upload-artifact or a dedicated zip step instead.
+ *
+ *   Semantic-release passes --version <tag> via release.config.js prepareCmd.
+ *   The script updates module.json on disk before building so the dist/module.json
+ *   contains the correct version string.
  */
 
 import { readFile, writeFile, mkdir, rm, cp, access, stat } from 'node:fs/promises';
@@ -144,16 +149,41 @@ async function copyIfExists(src, dest) {
   return false;
 }
 
+/**
+ * Parse --version <value> from argv.
+ * Returns the version string, or null if not provided.
+ *
+ * @param {string[]} args
+ * @returns {string|null}
+ */
+function parseVersionFlag(args) {
+  const idx = args.indexOf('--version');
+  if (idx !== -1 && args[idx + 1]) {
+    return args[idx + 1];
+  }
+  return null;
+}
+
 async function main() {
-  const flags = new Set(argv.slice(2));
+  const args = argv.slice(2);
+  const flags = new Set(args);
   const noZip = flags.has('--no-zip');
   const validateOnly = flags.has('--validate-only');
+  const versionOverride = parseVersionFlag(args);
 
   const distDir = join(ROOT, 'dist');
   const manifestPath = join(ROOT, 'module.json');
 
   const manifestRaw = await readFile(manifestPath, 'utf8');
-  const manifest = JSON.parse(manifestRaw);
+  let manifest = JSON.parse(manifestRaw);
+
+  // --version: update module.json on disk before building
+  if (versionOverride) {
+    console.log(`Injecting version ${versionOverride} into module.json...`);
+    manifest = { ...manifest, version: versionOverride };
+    await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+  }
+
   const { version } = manifest;
 
   if (validateOnly) {
@@ -217,9 +247,9 @@ async function main() {
   const distManifest = rewriteModuleJson(manifest);
   await writeFile(join(distDir, 'module.json'), JSON.stringify(distManifest, null, 2));
 
-  // 5. Create preview zip (unless --no-zip)
+  // 5. Create release zip (unless --no-zip)
   if (!noZip) {
-    const zipName = `fabricate-v${version}-preview.zip`;
+    const zipName = `fabricate-v${version}.zip`;
     console.log(`Creating ${zipName}...`);
     execSync(`zip -r "${zipName}" . --exclude "*.zip"`, { cwd: distDir, stdio: 'inherit' });
     console.log(`Created dist/${zipName}`);

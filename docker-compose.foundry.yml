@@ -1,0 +1,45 @@
+# Docker Compose harness for disposable Foundry VTT smoke-test environment.
+#
+# Usage:
+#   npm run test:foundry:up      # start containers
+#   npm run test:foundry:run     # run Playwright smoke test
+#   npm run test:foundry:down    # stop and remove containers
+#   npm run test:foundry         # up + run + down (CI mode)
+#
+# Prerequisites:
+#   - Set FOUNDRY_USERNAME and FOUNDRY_PASSWORD in .env.foundry (local)
+#     or as GitHub secrets FOUNDRY_USERNAME / FOUNDRY_PASSWORD (CI).
+#   - The Fabricate module dist/ must already be built before starting.
+#
+# The Foundry image is felddy/foundryvtt — a well-known community image that
+# handles license activation automatically via credentials.
+#
+# Note on volumes: bind mounts for modules and worlds overlay specific paths
+# under /home/foundry/data/Data/. The container manages its own data state
+# ephemerally (no named volume) since this is a disposable CI environment.
+
+version: "3.8"
+
+services:
+  foundry:
+    image: felddy/foundryvtt:release
+    container_name: fabricate-foundry-test
+    ports:
+      - "30000:30000"
+    environment:
+      FOUNDRY_USERNAME: "${FOUNDRY_USERNAME}"
+      FOUNDRY_PASSWORD: "${FOUNDRY_PASSWORD}"
+      FOUNDRY_ADMIN_KEY: "fabricate-test-admin"
+      CONTAINER_PRESERVE_CONFIG: "true"
+    volumes:
+      # Mount built module into the Foundry modules directory
+      - ./dist:/home/foundry/data/Data/modules/fabricate:ro
+      # Mount test world fixture
+      - ./.foundry-e2e/worlds/fabricate-smoke:/home/foundry/data/Data/worlds/fabricate-smoke:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:30000/api/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    restart: "no"

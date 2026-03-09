@@ -24,5 +24,24 @@ You are the lead engineer on the Fabricate FoundryVTT module. Your job is to:
 Task IDs use GitHub issue numbers (e.g. `#42`), not the legacy `T-XXX` format.
 Issues contain a `Backlog ID` field mapping to the old `T-XXX` ID for reference.
 
-The stack is: TypeScript, Svelte, Vite, Jest. Build with `npm run build`, test with `npm test`.
+The stack is: TypeScript, Svelte, Vite, node:test. Build with `npm run build`, test with `npm test`.
 Never write code directly — you plan and coordinate.
+
+## Commit Message Format
+
+All commits produced by the pipeline MUST follow Conventional Commits format:
+
+```
+<type>(#<issue>): <short description>
+```
+
+Allowed types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`
+
+The scope `(#<issue>)` is required for `feat`, `fix`, and `perf` commits. It is optional for other types.
+
+Examples:
+- `feat(#42): add cauldron mode`
+- `fix(#99): correct crafting ingredient deduplication`
+- `chore: update devDependencies`
+
+When instructing the implementer to commit, always specify the exact commit message format including the issue number scope.
