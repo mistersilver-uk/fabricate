@@ -1,0 +1,214 @@
+name: "Team B: Backlog Processing"
+
+on:
+  schedule:
+    - cron: '0 */1 * * *'          # Every 1 hour
+  workflow_dispatch:               # Manual trigger
+    inputs:
+      issue_number:
+        description: "Specific issue number to work on (optional)"
+        required: false
+        type: string
+
+concurrency:
+  group: team-b-backlog
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+
+jobs:
+  pick-task:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      issue_number: ${{ steps.select.outputs.issue_number }}
+      issue_title: ${{ steps.select.outputs.issue_title }}
+    steps:
+      - name: Select highest-priority issue
+        id: select
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -n "${{ inputs.issue_number }}" ]; then
+            NUMBER="${{ inputs.issue_number }}"
+            TITLE=$(gh issue view "$NUMBER" --repo "${{ github.repository }}" --json title -q .title)
+          else
+            # Find the oldest open issue that:
+            #   - does NOT have the 'triage' label (humans haven't approved it yet)
+            #   - does NOT have the 'in-progress' label (not already being worked)
+            #   - IS open
+            # gh sorts by created date ascending by default (oldest first = highest priority)
+            ISSUE_JSON=$(gh issue list \
+              --repo "${{ github.repository }}" \
+              --state open \
+              --json number,title,labels \
+              --limit 50 \
+              | jq -r '[.[] | select(
+                  (.labels | map(.name) | contains(["triage"]) | not) and
+                  (.labels | map(.name) | contains(["in-progress"]) | not)
+                )] | first // empty')
+
+            if [ -z "$ISSUE_JSON" ] || [ "$ISSUE_JSON" = "null" ]; then
+              echo "No eligible issues found."
+              echo "issue_number=" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            NUMBER=$(echo "$ISSUE_JSON" | jq -r '.number')
+            TITLE=$(echo "$ISSUE_JSON" | jq -r '.title')
+          fi
+
+          echo "issue_number=$NUMBER" >> "$GITHUB_OUTPUT"
+          echo "issue_title=$TITLE" >> "$GITHUB_OUTPUT"
+          echo "Selected issue #$NUMBER: $TITLE"
+
+  implement:
+    needs: pick-task
+    if: needs.pick-task.outputs.issue_number != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Mark issue in-progress
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue edit "${{ needs.pick-task.outputs.issue_number }}" \
+            --repo "${{ github.repository }}" \
+            --add-label in-progress
+
+      - name: Create working branch
+        run: |
+          BRANCH="agent/issue-${{ needs.pick-task.outputs.issue_number }}"
+          git checkout -b "$BRANCH"
+          echo "BRANCH=$BRANCH" >> "$GITHUB_ENV"
+
+      - name: Plan and implement
+        id: implement
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: "--model claude-sonnet-4-6 --max-turns 40"
+          prompt: |
+            You are running the Team B pipeline for Fabricate. You have four
+            agent roles available. Read the agent definitions in .claude/agents/
+            to understand each role's responsibilities.
+
+            You are working on issue #${{ needs.pick-task.outputs.issue_number }}:
+            "${{ needs.pick-task.outputs.issue_title }}"
+
+            Read the full issue details:
+            ```
+            gh issue view ${{ needs.pick-task.outputs.issue_number }}
+            ```
+
+            Execute this pipeline:
+
+            ## Step 1: Orchestrator (Plan)
+            Read the issue acceptance criteria. Analyze task complexity.
+            Write a brief implementation plan. Identify files to change and
+            tests to write.
+
+            ## Step 2: Implementer (Build)
+            Follow the implementer agent rules from .claude/agents/implementer.md:
+            - Write tests BEFORE implementation (TDD)
+            - Run `npm test` after every logical change
+            - Run `npm run build` to confirm clean compilation
+            - Keep changes focused — one task at a time
+            - Follow existing codebase patterns
+
+            ## Step 3: Reviewer (Validate)
+            Follow the reviewer agent checklist from .claude/agents/reviewer.md:
+            - TypeScript types are correct
+            - Tests exist and are meaningful
+            - Svelte components follow existing patterns
+            - FoundryVTT API usage is correct
+            - No console.log in production code
+            - `npm test` passes and `npm run build` compiles cleanly
+
+            If review finds issues, fix them before proceeding.
+
+            ## Step 4: Docs Writer (Document)
+            Follow the docs-writer agent rules from .claude/agents/docs-writer.md:
+            - Update JSDoc on modified source files
+            - Update relevant docs/ pages if behavior changed
+            - Append a CHANGELOG.md entry referencing #${{ needs.pick-task.outputs.issue_number }}
+
+            ## Final: Commit
+            Stage all changes and commit with message:
+            "feat(#${{ needs.pick-task.outputs.issue_number }}): <short description>"
+
+            IMPORTANT RULES:
+            - NEVER remove the `triage` label from any issue.
+            - Do NOT close the issue — the PR will reference it.
+            - Do NOT merge anything.
+
+      - name: Push and create PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --cached --quiet && git diff --quiet; then
+            echo "No changes to commit."
+            gh issue edit "${{ needs.pick-task.outputs.issue_number }}" \
+              --repo "${{ github.repository }}" \
+              --remove-label in-progress
+            exit 0
+          fi
+
+          git push origin "$BRANCH"
+
+          gh pr create \
+            --repo "${{ github.repository }}" \
+            --head "$BRANCH" \
+            --title "#${{ needs.pick-task.outputs.issue_number }} — ${{ needs.pick-task.outputs.issue_title }}" \
+            --label agent-created \
+            --body "$(cat <<'EOF'
+          ## Summary
+
+          Automated implementation for #${{ needs.pick-task.outputs.issue_number }}.
+
+          ## Pipeline
+
+          - [x] Orchestrator: planned
+          - [x] Implementer: built
+          - [x] Reviewer: validated
+          - [x] Docs Writer: documented
+
+          ## Test plan
+
+          - [ ] Review code changes
+          - [ ] Verify tests pass: `npm test`
+          - [ ] Verify build: `npm run build`
+          - [ ] Manual verification if applicable
+
+          Closes #${{ needs.pick-task.outputs.issue_number }}
+
+          ---
+          Generated by Team B automated pipeline
+          EOF
+          )"
+
+      - name: Remove in-progress on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue edit "${{ needs.pick-task.outputs.issue_number }}" \
+            --repo "${{ github.repository }}" \
+            --remove-label in-progress

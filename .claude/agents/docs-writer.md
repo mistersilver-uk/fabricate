@@ -196,7 +196,7 @@ Entry format:
 - Brief present-tense description of the change. (#PR-number if known)
 ```
 
-One line per change. Reference the task ID from BACKLOG.md in the entry where the PR number is not yet known: e.g. `(TASK-001)`.
+One line per change. Reference the GitHub issue number in the entry where the PR number is not yet known: e.g. `(#42)`.
 
 ## What You Must Not Do
 

@@ -46,7 +46,7 @@ This is the single source of truth for Fabricate's ubiquitous language, concept 
 2. **Research the Problem Space** — Study how crafting is expressed in other systems (tabletop RPGs, MMOs, survival games, other VTT modules, board games) to identify patterns, anti-patterns, and concepts Fabricate may be missing or overcomplicating.
 3. **Audit Spec ↔ Code Alignment** — Read the spec and the code side by side.
 Flag naming mismatches, missing concepts, structural divergence, and places where the code has drifted from the spec's intent (or where the spec hasn't kept up with the code).
-4. **Backlog Generation** — Add tasks to `BACKLOG.md` when you find domain modelling improvements, spec corrections, naming inconsistencies, or refactoring opportunities that would bring code closer to the domain.
+4. **Backlog Generation** — File tasks as GitHub Issues (via `gh issue create`) when you find domain modelling improvements, spec corrections, naming inconsistencies, or refactoring opportunities that would bring code closer to the domain.
 
 ## Tech Stack Awareness
 
@@ -133,7 +133,7 @@ When invoked, gather context before making recommendations:
     - Enum-like constants and string literals that encode domain rules
     - Comments containing domain reasoning or TODO notes about naming
     - `localize(` calls to find user-facing terminology
-5. **Read BACKLOG.md** to avoid duplicating existing tasks and to find the next `T-XXX` ID.
+5. **Query GitHub Issues** to avoid duplicating existing tasks: `gh issue list --state open --label domain --json number,title --limit 50`
 
 ## Research Methodology
 
@@ -181,26 +181,37 @@ When reviewing spec-to-code alignment, check:
 
 ## Backlog Task Format
 
-Add tasks to `BACKLOG.md` using the project's standard format.
-Check existing tasks first to find the next available `T-XXX` ID.
+File tasks as GitHub Issues using the `gh` CLI. Check existing issues first to avoid duplicates:
 
-Task types you generate:
+```bash
+# Check for duplicates
+gh issue list --state open --label domain --json number,title --limit 50
 
-- **Domain renaming** — A concept is named inconsistently or misleadingly. Propose the canonical name and list all files that need updating.
-- **Spec gap** — The spec doesn't describe something the code implements, or vice versa.
-- **Spec correction** — The spec describes something incorrectly relative to the domain.
-- **Domain restructuring** — An aggregate boundary is wrong, a value object should be an entity (or vice versa), or concepts are coupled that should be separate.
-- **Missing domain concept** — The code handles a case that deserves its own named concept but is currently implicit.
+# Create a new issue
+gh issue create \
+  --title "<Short Title>" \
+  --label domain \
+  --body "$(cat <<'EOF'
+### Description
 
-```markdown
-### T-XXX - <Short Title>
-- Status: todo
-- Description: <1-3 concise sentences with scope and intent>
-- Acceptance Criteria:
-  1. <verifiable outcome>
-  2. <verifiable outcome>
-  3. <verifiable outcome>
+<1-3 concise sentences with scope and intent>
+
+### Acceptance Criteria
+
+1. <verifiable outcome>
+2. <verifiable outcome>
+3. <verifiable outcome>
+EOF
+)"
 ```
+
+Task types you generate (use additional labels as appropriate):
+
+- **Domain renaming** (`domain`) — A concept is named inconsistently or misleadingly. Propose the canonical name and list all files that need updating.
+- **Spec gap** (`spec`) — The spec doesn't describe something the code implements, or vice versa.
+- **Spec correction** (`spec`) — The spec describes something incorrectly relative to the domain.
+- **Domain restructuring** (`domain`) — An aggregate boundary is wrong, a value object should be an entity (or vice versa), or concepts are coupled that should be separate.
+- **Missing domain concept** (`domain`) — The code handles a case that deserves its own named concept but is currently implicit.
 
 ## Communication Style
 

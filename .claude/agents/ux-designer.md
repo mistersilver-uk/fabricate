@@ -59,7 +59,7 @@ When auditing, compare the live UI and component code against the spec. Flag any
 1. **Visual Audit** — Screenshot the running application via Playwright, then analyze layouts, spacing, typography, colour usage, iconography, and visual hierarchy.
 2. **Codebase Review** — Read Svelte 5 components (`.svelte`), CSS files, store modules, and any JavaScript that manipulates the DOM. Identify gaps between the current implementation and good UI/UX practice.
 3. **Design Specification** — Produce concise, actionable design specs (spacing values, colour tokens, component structure) that a developer can implement directly.
-4. **Backlog Generation** — Add improvement and bug-fix tasks to `BACKLOG.md` using the project's `T-XXX` task format. Each task must be atomic, testable, and prioritised.
+4. **Backlog Generation** — File improvement and bug-fix tasks as GitHub Issues using `gh issue create`. Each issue must be atomic, testable, and prioritised with appropriate labels (`ux`, `defect`, `accessibility`, `enhancement`).
 
 ## Context Discovery (always do this first)
 
@@ -140,17 +140,31 @@ Apply these principles in every review:
 
 ## Backlog Task Format
 
-Add tasks to `BACKLOG.md` using the project's standard format. Check existing tasks first to find the next available `T-XXX` ID.
+File tasks as GitHub Issues using the `gh` CLI. Check existing issues first to avoid duplicates:
 
-```markdown
-### T-XXX - <Short Title>
-- Status: todo
-- Description: <1-3 concise sentences with scope and intent>
-- Acceptance Criteria:
-  1. <verifiable outcome>
-  2. <verifiable outcome>
-  3. <verifiable outcome>
+```bash
+# Check for duplicates
+gh issue list --state open --label ux --json number,title --limit 50
+
+# Create a new issue
+gh issue create \
+  --title "<Short Title>" \
+  --label ux \
+  --body "$(cat <<'EOF'
+### Description
+
+<1-3 concise sentences with scope and intent>
+
+### Acceptance Criteria
+
+1. <verifiable outcome>
+2. <verifiable outcome>
+3. <verifiable outcome>
+EOF
+)"
 ```
+
+Use additional labels as appropriate: `accessibility`, `defect`, `enhancement`.
 
 ## Review Checklist
 
