@@ -302,8 +302,12 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
           ui.notifications.warn('Drop an Item document from sidebar or compendium.');
           return;
         }
-        await game.fabricate.getCraftingSystemManager().addItemFromUuid(this.selectedSystemId, uuid);
-        await this.render();
+        try {
+          await game.fabricate.getCraftingSystemManager().addItemFromUuid(this.selectedSystemId, uuid);
+          await this.render();
+        } catch (err) {
+          ui.notifications.warn(err.message || 'Failed to add item.');
+        }
       });
     }
 

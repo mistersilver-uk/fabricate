@@ -162,3 +162,43 @@ test('getDragEventData without TextEditor returns null', () => {
   const result = getDragEventData({});
   assert.equal(result, null);
 });
+
+test('getDragEventData without TextEditor falls back to text/plain JSON', () => {
+  delete globalThis.foundry;
+  const payload = { type: 'Item', uuid: 'Item.abc123' };
+  const fakeEvent = {
+    dataTransfer: { getData: (type) => type === 'text/plain' ? JSON.stringify(payload) : '' }
+  };
+  const result = getDragEventData(fakeEvent);
+  assert.deepEqual(result, payload);
+});
+
+test('getDragEventData without TextEditor returns null for invalid JSON in text/plain', () => {
+  delete globalThis.foundry;
+  const fakeEvent = {
+    dataTransfer: { getData: (type) => type === 'text/plain' ? 'not-valid-json' : '' }
+  };
+  const result = getDragEventData(fakeEvent);
+  assert.equal(result, null);
+});
+
+test('getDragEventData without TextEditor returns null when dataTransfer is absent', () => {
+  delete globalThis.foundry;
+  const result = getDragEventData({ dataTransfer: null });
+  assert.equal(result, null);
+});
+
+test('getDragEventData without TextEditor returns null when text/plain is empty', () => {
+  delete globalThis.foundry;
+  const fakeEvent = {
+    dataTransfer: { getData: () => '' }
+  };
+  const result = getDragEventData(fakeEvent);
+  assert.equal(result, null);
+});
+
+test('getDragEventData without TextEditor returns null when event is null', () => {
+  delete globalThis.foundry;
+  const result = getDragEventData(null);
+  assert.equal(result, null);
+});

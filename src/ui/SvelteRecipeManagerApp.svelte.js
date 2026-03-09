@@ -4,6 +4,9 @@ import { createAdminStore } from './svelte/stores/adminStore.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { confirmDialog } from './foundryCompat.js';
 import { getRecipeEditorAppClass, registerSvelteRecipeManagerApp } from './appFactory.js';
+import { get } from 'svelte/store';
+import { resolveDropUuid, resolveDropData } from './svelte/util/dropUtils.js';
+import { localize } from './svelte/util/foundryBridge.js';
 
 export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
   foundry.applications.api.ApplicationV2
@@ -106,17 +109,79 @@ export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
       store: this._adminStore,
       services: {
         onDropItem: async (data) => {
-          const uuid = data?.uuid;
-          if (!uuid) {
-            ui.notifications.warn('Drop an Item document from sidebar or compendium.');
+          const systemManager = game.fabricate.getCraftingSystemManager();
+          const systemId = get(this._adminStore.selectedSystemId) || '';
+
+          // Phase 2: Bulk compendium pack drop
+          // Foundry v13 shape: { type: "Compendium", collection: "world.pack-name" }
+          if (data?.type === 'Compendium' && data?.collection && !data?.uuid) {
+            const packId = data.collection;
+            if (!packId || !systemId) return;
+            const result = await systemManager.addItemsFromPack(systemId, packId);
+            ui.notifications.info(localize('FABRICATE.Admin.Items.BulkImportUpdated', {
+              added: result.added,
+              updated: result.updated,
+              skipped: result.skipped,
+              total: result.total
+            }));
+            await this._adminStore.refresh();
             return;
           }
-          const systemManager = game.fabricate.getCraftingSystemManager();
-          const systemId = this._adminStore.selectedSystemId
-            ? /** @type {string} */ (/** @type {any} */ (this._adminStore.selectedSystemId).get?.() ?? '')
-            : '';
+
+          // Folder drop: expand to contained Items
+          if (data?.type === 'Folder') {
+            if (!systemId) return;
+            const folder = game.folders?.get(data.id);
+            if (!folder) return;
+            // folder.contents contains the documents in the folder
+            const folderItems = (folder.contents || []).filter(
+              d => d.documentName === 'Item'
+            );
+            if (folderItems.length === 0) {
+              ui.notifications.info(localize('FABRICATE.Admin.Items.FolderEmpty', {
+                name: folder.name || data.id
+              }));
+              return;
+            }
+            let added = 0;
+            let updated = 0;
+            let skipped = 0;
+            for (const folderItem of folderItems) {
+              const result = await systemManager.addItemFromUuid(systemId, folderItem.uuid);
+              if (result.action === 'added') added++;
+              else if (result.action === 'updated') updated++;
+              else skipped++;
+            }
+            ui.notifications.info(localize('FABRICATE.Admin.Items.FolderImportSummary', {
+              added,
+              name: folder.name || data.id
+            }));
+            await this._adminStore.refresh();
+            return;
+          }
+
+          // Entity type guard: reject Actor and other non-Item types
+          const dropInfo = resolveDropData(data);
+          if (dropInfo.type && dropInfo.type !== 'Item' && dropInfo.type !== 'Compendium') {
+            ui.notifications.warn(localize('FABRICATE.Admin.Items.DropNotAnItem', {
+              type: dropInfo.type
+            }));
+            return;
+          }
+
+          // Single item drop (world sidebar or compendium item)
+          const uuid = resolveDropUuid(data);
+          if (!uuid) {
+            ui.notifications.warn(localize('FABRICATE.Admin.Items.DropInvalidItem'));
+            return;
+          }
           if (!systemId) return;
-          await systemManager.addItemFromUuid(systemId, uuid);
+          const singleResult = await systemManager.addItemFromUuid(systemId, uuid);
+          if (singleResult.action === 'updated') {
+            ui.notifications.info(localize('FABRICATE.Admin.Items.ItemUpdated', {
+              name: singleResult.item.name
+            }));
+          }
           await this._adminStore.refresh();
         },
         onEditRecipe: (recipeId) => {
@@ -126,9 +191,7 @@ export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
         },
         onEditComponent: async (itemId) => {
           const systemManager = game.fabricate.getCraftingSystemManager();
-          const systemId = this._adminStore.selectedSystemId
-            ? /** @type {string} */ (/** @type {any} */ (this._adminStore.selectedSystemId).get?.() ?? '')
-            : '';
+          const systemId = get(this._adminStore.selectedSystemId) || '';
           if (!systemId || !itemId) return;
           const system = systemManager.getSystem(systemId);
           if (!system) return;

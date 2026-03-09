@@ -1112,12 +1112,13 @@ Findings from a full spec-vs-implementation, domain-logic, store, and test-cover
 
 ### T-262 - Defect: `addItemFromUuid` deduplication checks `sourceUuid` but `_normalizeComponent` writes to `sourceItemUuid`
 
-- Status: `todo`
+- Status: `done`
 - Description: `CraftingSystemManager.addItemFromUuid()` (line 629) checks `system.items.find(i => i.sourceUuid === itemUuid)` to detect duplicates. `_normalizeComponent()` (line 352-353) writes `sourceItemUuid` as the canonical field and `sourceUuid` as a transitional alias — both initially populated. However, after a round-trip through `updateSystem()`, the `sourceUuid` alias may not always survive normalization cleanly, so the deduplication check could fail and add the same item twice. Also, the check uses `sourceUuid` while the intent is to deduplicate on `sourceItemUuid`.
 - Acceptance Criteria:
   1. `addItemFromUuid` deduplication checks `sourceItemUuid` (canonical) first, then falls back to `sourceUuid` for legacy items.
   2. A unit test adds the same UUID twice and confirms only one item is created.
   3. A unit test adds an item from a legacy-serialized system (only `sourceUuid` present) and confirms deduplication still works.
+- Resolution: Fixed as part of T-299/T-300 drop-import defect work. `_findExistingBySourceChain` now checks `sourceUuid`, `sourceItemUuid`, and `fallbackItemIds`. Tests cover all deduplication paths.
 
 ---
 
@@ -1473,3 +1474,77 @@ Findings from comprehensive domain model audit: spec compliance, naming fidelity
   1. `FABRICATE.Admin.Rules.Placeholder` and `PlaceholderDetail` are either removed or replaced with user-facing descriptions of the teaser/rules configuration.
   2. The Rules tab renders functional UI labels, not developer placeholder text.
 
+## Compendium Drop Fix Tasks (2026-03-09)
+
+### T-294 - Fix: Compendium item drops rejected by Recipe Manager Items tab
+- Status: `done`
+- Description: Dropping a single item from a compendium into the Items tab drop zone showed "Drop an Item document from sidebar or compendium" because `onDropItem` only checked `data.uuid`. Compendium items provide `{ pack, id }` instead. Extracted `resolveDropUuid(data)` helper that constructs `Compendium.${pack}.${id}` as fallback. Replaced hardcoded warning with i18n key.
+- Acceptance Criteria:
+  1. Dropping a single item from a compendium into the Items tab adds it to the system.
+  2. Dropping a single item from the world sidebar still works.
+  3. Invalid drops show a localized warning message.
+  4. `resolveDropUuid` is unit tested for all drag data shapes.
+- Resolution: Created `src/ui/svelte/util/dropUtils.js` with `resolveDropUuid()`. Updated `SvelteRecipeManagerApp.svelte.js` to use it. Added `FABRICATE.Admin.Items.DropInvalidItem` i18n key. 15 tests in `tests/compendium-drop.test.js`. Reviewed and approved.
+
+### T-295 - Feature: Bulk compendium pack import via drag-and-drop
+- Status: `done`
+- Description: Dropping an entire compendium pack onto the Items tab drop zone now bulk-imports all Item documents from that pack with deduplication by sourceUuid/sourceItemUuid. Added `addItemsFromPack(systemId, packId)` to CraftingSystemManager. Shows summary notification with added/skipped/total counts. Satisfies spec/003 requirement: "Provide GM action to import all items from a compendium into a crafting system."
+- Acceptance Criteria:
+  1. Dropping a compendium pack onto the Items tab imports all Item documents from that pack.
+  2. Items already in the system (by sourceUuid/sourceItemUuid) are skipped.
+  3. Non-Item documents in the pack are filtered out.
+  4. Summary notification shows added/skipped/total counts.
+  5. Unit tests cover deduplication, non-Item filtering, and empty pack cases.
+- Resolution: Added `addItemsFromPack()` to CraftingSystemManager. Updated `onDropItem` to detect `{ type: 'Compendium', id: packId }` drops. Added `FABRICATE.Admin.Items.BulkImportSummary` i18n key. Reviewed and approved with note that pack-drag detection shape needs live Foundry v12 verification.
+
+### T-296 - Verify bulk compendium drop detection against live Foundry v13
+- Status: `done`
+- Description: The Phase 2 bulk import initially detected pack drops via `data?.id` but Foundry v13 uses `{ type: "Compendium", collection: "world.pack-name" }`. Updated detection to use `data?.collection` instead.
+- Acceptance Criteria:
+  1. Log the actual drag event data when dropping a compendium pack header in Foundry v13.
+  2. Update the detection condition in `SvelteRecipeManagerApp.svelte.js` if the actual shape differs.
+  3. Confirm bulk import works end-to-end in a live Foundry instance.
+- Resolution: User provided actual Foundry v13 drag data shape. Updated detection from `data?.id` to `data?.collection` in `SvelteRecipeManagerApp.svelte.js:117`. Added 2 tests for detection logic. 17/17 tests pass.
+
+### T-297 - UX: Show feedback when item dropped with no system selected
+- Status: `todo`
+- Description: When a valid UUID is resolved from a drop but no crafting system is selected, the `onDropItem` handler returns silently with no user feedback. The user gets no indication they need to select a system first.
+- Acceptance Criteria:
+  1. When no system is selected, dropping an item shows a localized warning prompting the user to select a system.
+  2. New i18n key added for the message.
+
+### T-298 - Fix: getDragEventData returns null when Foundry TextEditor API unavailable
+- Status: `done`
+- Description: `getDragEventData` in both `foundryBridge.js` and `foundryCompat.js` only tried the Foundry v13 API path (`foundry.applications.ux.TextEditor.implementation.getDragEventData`). When that path didn't exist, it returned `null`, causing the `dragDrop.js` action to silently skip all drop callbacks. ALL drops (sidebar items, compendium items, compendium packs) failed silently. Additionally, `foundryCompat.js` evaluated the API path eagerly at module load time, permanently caching `null` if loaded before Foundry populated the path.
+- Acceptance Criteria:
+  1. `getDragEventData` in `foundryBridge.js` tries Foundry v13 API first, then falls back to `JSON.parse(event.dataTransfer.getData('text/plain'))`.
+  2. `getDragEventData` in `foundryCompat.js` applies the same fallback and evaluates the API path lazily at call time.
+  3. Both paths use `globalThis.foundry` (not bare `foundry`) for consistency and ESM safety.
+  4. Null/missing event, absent dataTransfer, empty text/plain, and invalid JSON all return `null` without throwing.
+  5. Tests cover all fallback edge cases.
+- Resolution: Added text/plain JSON parse fallback to both `foundryBridge.js` and `foundryCompat.js`. Changed `foundryCompat.js` from eager to lazy API evaluation. Fixed bare `foundry` to `globalThis.foundry`. Added 5 new tests in `tests/foundry-bridge.test.js`. 38/38 tests pass. Reviewed and approved after fixing one defect (bare `foundry` reference).
+
+### T-299 - Defect: Source-ID-aware overwrite on compendium item drop
+- Status: `done`
+- Description: When a compendium item is dropped (single, replace-source, or bulk pack import), `addItemFromUuid` only checked for exact `sourceUuid` match and skipped if found. It did not overwrite metadata (name/img) from freshly resolved compendium data, nor preserve old source IDs as fallbacks.
+- Acceptance Criteria:
+  1. Dropping a compendium item whose UUID matches an existing component's `sourceUuid` overwrites name/img but keeps the component `id`.
+  2. The old `sourceUuid` (if changed) is appended to `fallbackItemIds`.
+  3. Exact match with identical metadata returns `'skipped'`; differing metadata returns `'updated'`.
+  4. `addItemFromUuid` returns `{ item, action }` where action is `'added'`, `'updated'`, or `'skipped'`.
+  5. `addItemsFromPack` returns `{ added, updated, skipped, total }`.
+  6. Tests cover overwrite, fallback preservation, and null-fromUuid fallback paths.
+- Resolution: Added `_findExistingBySourceChain` helper to CraftingSystemManager. Rewrote `addItemFromUuid` and `addItemsFromPack` return shapes. Updated callers in RecipeManagerApp.js (try/catch), RecipeEditorApp.js (try/catch + result.item.id), and SvelteRecipeManagerApp.svelte.js (notifications). 33 tests in compendium-drop.test.js, all 1384 tests pass. Reviewed and approved.
+
+### T-300 - Defect: Non-Item entity types accepted on drop (Actors, Folders, etc.)
+- Status: `done`
+- Description: The drop handler accepted any Foundry drag data without checking entity type. Actors could be added as crafting components (invalid). Folders containing items were not expanded. Other non-Item document types were silently accepted.
+- Acceptance Criteria:
+  1. Dropping an Actor shows a localised warning and does not add it.
+  2. Dropping a Folder containing Items imports each Item.
+  3. Dropping a Folder containing no Items shows an informational notification.
+  4. Dropping non-Item documents (JournalEntry, Scene, etc.) shows a warning.
+  5. `addItemFromUuid` throws if `fromUuid` resolves to a non-Item document.
+  6. Legacy apps (RecipeManagerApp, RecipeEditorApp) have try/catch protection.
+  7. New `resolveDropData(data)` export in dropUtils.js returns `{ uuid, type }`.
+- Resolution: Added `resolveDropData` to dropUtils.js. Added type guard in CraftingSystemManager.addItemFromUuid. Added folder expansion, Actor rejection, and non-Item rejection in SvelteRecipeManagerApp.svelte.js onDropItem. Wrapped legacy callers in try/catch. Added i18n keys: ItemUpdated, BulkImportUpdated, DropNotAnItem, FolderImportSummary, FolderEmpty. Tests cover all paths. Reviewed and approved.

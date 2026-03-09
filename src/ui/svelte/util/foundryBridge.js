@@ -79,7 +79,19 @@ export function notifyError(msg) {
 }
 
 export function getDragEventData(event) {
+  // Strategy 1: Foundry v13+ API
   const impl = globalThis.foundry?.applications?.ux?.TextEditor?.implementation;
-  if (!impl?.getDragEventData) return null;
-  return impl.getDragEventData(event);
+  if (impl?.getDragEventData) {
+    return impl.getDragEventData(event);
+  }
+
+  // Strategy 2: Parse text/plain from dataTransfer (universal Foundry format)
+  try {
+    const raw = event?.dataTransfer?.getData?.('text/plain');
+    if (raw) return JSON.parse(raw);
+  } catch (_) {
+    // Not valid JSON -- fall through
+  }
+
+  return null;
 }

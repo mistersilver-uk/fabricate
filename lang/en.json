@@ -265,7 +265,13 @@
         "NoEssences": "No essences",
         "NoSourceUuid": "No source UUID",
         "EditItem": "Edit Item",
-        "DeleteItem": "Delete Item"
+        "DeleteItem": "Delete Item",
+        "DropInvalidItem": "Drop an Item document from sidebar or compendium.",
+        "ItemUpdated": "Updated existing item: {name}.",
+        "BulkImportUpdated": "Imported {added} new, updated {updated}, skipped {skipped} of {total} items.",
+        "DropNotAnItem": "Only Item documents can be added as crafting components. Dropped: {type}.",
+        "FolderImportSummary": "Imported {added} items from folder \"{name}\".",
+        "FolderEmpty": "Folder \"{name}\" contains no Item documents."
       },
       "Recipes": {
         "SearchPlaceholder": "Search recipes...",

@@ -839,8 +839,13 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
         return null;
       })();
     if (!uuid || !this.draft.craftingSystemId) return null;
-    const systemItem = await game.fabricate.getCraftingSystemManager().addItemFromUuid(this.draft.craftingSystemId, uuid);
-    return systemItem?.id || null;
+    try {
+      const result = await game.fabricate.getCraftingSystemManager().addItemFromUuid(this.draft.craftingSystemId, uuid);
+      return result?.item?.id || null;
+    } catch (err) {
+      ui.notifications.warn(err.message || 'Failed to add item.');
+      return null;
+    }
   }
 
   _assignSystemItem(type, itemId, meta = {}) {

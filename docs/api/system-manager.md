@@ -226,23 +226,66 @@ The system object exposes managed items under two equivalent properties: `compon
 
 ### addItemFromUuid(systemId, itemUuid)
 
-Adds a Foundry item to the system as a managed item. GM only.
+Adds a single Foundry item to the system as a managed item. GM only.
+
+If an item with the same `sourceUuid` is already registered in the system, the existing entry is returned immediately and no duplicate is created.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
 | `systemId` | `string` | System ID |
-| `itemUuid` | `string` | UUID of the Foundry item to add |
+| `itemUuid` | `string` | UUID of the Foundry item to add. Accepts both world item UUIDs (`Item.abc123`) and compendium item UUIDs (`Compendium.pack.id.itemId`). |
 
-**Returns:** `Promise<object>`
+**Returns:** `Promise<object>` — the newly created or already-existing managed item.
+
+**Throws:** `Error` if the system ID is not found.
 
 ```javascript
-// Add an item from a compendium to the crafting system
-const item = await mgr.addItemFromUuid(
-  'alchemy-system-id',
-  'Compendium.world.items.moonpetalHerb123'
-);
-console.log(`Added: ${item.name} (componentId: ${item.id})`);
+Hooks.once('fabricate.ready', async () => {
+  const mgr = game.fabricate.getCraftingSystemManager();
+  // Add an item from a compendium to the crafting system
+  const item = await mgr.addItemFromUuid(
+    'alchemy-system-id',
+    'Compendium.dnd5e.items.moonpetalHerb123'
+  );
+  console.log(`Added: ${item.name} (componentId: ${item.id})`);
+});
 ```
+
+### addItemsFromPack(systemId, packId)
+
+Imports all Item documents from a compendium pack into the system as managed items. GM only.
+
+Items already present in the system by `sourceUuid` are skipped. Non-item document types in the pack (Actors, JournalEntries, etc.) are ignored.
+
+| Parameter | Type | Description |
+|:----------|:-----|:------------|
+| `systemId` | `string` | System ID |
+| `packId` | `string` | Compendium pack identifier in `"scope.name"` format (e.g. `"dnd5e.items"`) |
+
+**Returns:** `Promise<{ added: number, skipped: number, total: number }>`
+
+- `added` — number of items successfully imported on this call.
+- `skipped` — number of items already present in the system (by `sourceUuid`) and therefore not re-imported.
+- `total` — total number of Item documents found in the pack.
+
+**Throws:** `Error` if the system ID or pack ID is not found.
+
+```javascript
+Hooks.once('fabricate.ready', async () => {
+  const mgr = game.fabricate.getCraftingSystemManager();
+  const result = await mgr.addItemsFromPack(
+    'herbalism-system-id',
+    'world.herbs-and-reagents'
+  );
+  console.log(
+    `Imported ${result.added} of ${result.total} items ` +
+    `(${result.skipped} duplicates skipped).`
+  );
+});
+```
+
+{: .note }
+> You can also trigger bulk import from the UI by dragging a compendium pack header onto the **Items** tab drop zone in the Crafting Admin panel. The same deduplication logic applies. See [Bulk compendium pack drop]({% link crafting-systems.md %}#bulk-compendium-pack-drop) for details.
 
 ### updateItem(systemId, itemId, updates)
 
@@ -337,7 +380,7 @@ if (ess) {
 
 ## Internal Normalisation Helpers
 
-These methods are called automatically by `createSystem`, `updateSystem`, `createItem`, `addItemFromUuid`, and `updateItem`. You do not call them directly, but understanding them helps when inspecting or migrating stored data.
+These methods are called automatically by `createSystem`, `updateSystem`, `createItem`, `addItemFromUuid`, `addItemsFromPack`, and `updateItem`. You do not call them directly, but understanding them helps when inspecting or migrating stored data.
 
 ### _normalizeCraftingCheck(check)
 

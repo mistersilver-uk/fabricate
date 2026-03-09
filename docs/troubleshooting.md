@@ -264,6 +264,40 @@ This was caused by a race between `CraftingRunManager` writing the completed run
 
 ---
 
+### Dropping Items onto the Recipe Manager or Crafting App Does Nothing
+
+**Symptom:** Dragging an item from the sidebar or a compendium and dropping it onto a Fabricate drop zone (such as the Items tab in the Recipe Manager) produces no result. The item is not added, no error or notification appears from Fabricate, and in some cases Foundry displays its own "Drop an Item document from sidebar or compendium." message.
+
+**Cause:**
+
+Fabricate's Svelte UI reads drag data using `foundry.applications.ux.TextEditor.implementation.getDragEventData`. In some Foundry versions and environments this API path is absent at the time of the drop, causing Fabricate's drag handler to receive `null` and silently skip the drop callback entirely. Control returns to Foundry's own ApplicationV2 drop handler, which produces the generic error message.
+
+**Fix:** This is resolved in the current version. `getDragEventData` in `foundryBridge.js` now uses a two-strategy approach:
+
+1. If `foundry.applications.ux.TextEditor.implementation.getDragEventData` is available, it is used as before.
+2. Otherwise, the drag data is read directly from `event.dataTransfer.getData('text/plain')` and parsed as JSON. This is the universal drag data format used by Foundry across all versions.
+
+The same fix is applied to `foundryCompat.js` (the legacy Handlebars path). In addition, `foundryCompat.js` now evaluates the `TextEditor` API path at the moment of each drop rather than once at module load time, so it correctly handles cases where the API becomes available after the module first imports.
+
+**If you are still seeing silent drop failures after updating:**
+
+1. Open the browser console (F12) and attempt a drag-and-drop. Look for any `Fabricate |` prefixed error messages.
+2. Confirm the drag source is a world item or compendium item. Fabricate drop zones only accept Item documents; other document types (Actors, Journal Entries, etc.) are rejected.
+3. If you are dragging from a compendium, confirm the compendium is not locked or from a module that restricts programmatic access.
+4. Run the following in the browser console to verify the drag data format. First, add a temporary drop listener to the body:
+   ```javascript
+   document.body.addEventListener('drop', e => {
+     e.preventDefault();
+     console.log('text/plain:', e.dataTransfer.getData('text/plain'));
+   }, { once: true });
+   ```
+   Then drag an item onto the page. The console should print a JSON object like `{"type":"Item","uuid":"Item.abc123"}`. If it prints an empty string, the drag source is not sending standard Foundry drag data.
+5. If the above confirms valid drag data but drops still fail, update Fabricate to the latest version which includes the `text/plain` fallback.
+
+**See also:** [Crafting Systems]({% link crafting-systems.md %}#adding-managed-items) -- adding managed items via drag-and-drop.
+
+---
+
 ## Before filing an issue
 
 If the steps above do not resolve your problem, work through this checklist before opening a bug report:

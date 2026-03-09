@@ -1,9 +1,18 @@
-export const TextEditorCompat = foundry.applications?.ux?.TextEditor?.implementation ?? null;
-
 export function getDragEventData(event) {
-  if (TextEditorCompat?.getDragEventData) {
-    return TextEditorCompat.getDragEventData(event);
+  // Strategy 1: Foundry v13+ API (evaluated at call time, not module load time)
+  const impl = globalThis.foundry?.applications?.ux?.TextEditor?.implementation;
+  if (impl?.getDragEventData) {
+    return impl.getDragEventData(event);
   }
+
+  // Strategy 2: Parse text/plain from dataTransfer (universal Foundry format)
+  try {
+    const raw = event?.dataTransfer?.getData?.('text/plain');
+    if (raw) return JSON.parse(raw);
+  } catch (_) {
+    // Not valid JSON -- fall through
+  }
+
   return null;
 }
 

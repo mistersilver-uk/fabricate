@@ -162,11 +162,57 @@ Managed items are the building blocks of recipes. Instead of referencing world i
 
 ### Adding Managed Items
 
-In the **Items** tab of the GM admin:
+Open the **Items** tab of the GM admin panel. You can add items one at a time or import an entire compendium pack at once.
 
-1. Drag items from the Items sidebar or a compendium into the list
-2. Each item gets a unique `componentId` and is linked to its source via `sourceItemUuid`
-3. Optionally add tags, essences, and difficulty ratings
+#### Single-item drop
+
+Drag any Item document from the **Items sidebar** or from an open **compendium browser** and drop it onto the managed items list. Fabricate resolves the item's UUID regardless of whether the drag data includes an explicit `uuid` field or the `pack`/`id` pair that Foundry uses for compendium item drags — both shapes are handled automatically.
+
+1. Open the Items sidebar or the compendium browser
+2. Drag the item onto the **Items** tab drop zone in the Crafting Admin panel
+3. The item appears in the list with a generated `componentId` and its `sourceItemUuid` linked to the compendium entry
+
+If the drop data cannot be resolved to a valid Item UUID — for example, when dropping a non-item document type — a notification is shown and nothing is imported.
+
+#### Bulk compendium pack drop
+
+To import all Item documents from a compendium pack at once, drag the **compendium pack header** (the title row in the compendium directory sidebar, not an individual entry within it) onto the drop zone. Fabricate enumerates every Item document in the pack and adds each one.
+
+- Items already present in the system by `sourceItemUuid` are skipped automatically (deduplication).
+- A summary notification reports how many items were added and how many were skipped as duplicates.
+- Non-item document types in the pack (Actors, JournalEntries, etc.) are ignored.
+
+{: .note }
+> Bulk pack import requires that Foundry emits a compendium-type drag event from the pack header row. If your Foundry version does not support this drag shape, use single-item drops or the `addItemsFromPack()` API method instead.
+
+#### Via the API
+
+Both import paths are also available programmatically:
+
+```javascript
+// Single item from a compendium
+Hooks.once('fabricate.ready', async () => {
+  const mgr = game.fabricate.getCraftingSystemManager();
+  await mgr.addItemFromUuid(
+    'blacksmithing-system-id',
+    'Compendium.dnd5e.items.moonpetalHerb123'
+  );
+});
+```
+
+```javascript
+// Bulk import of an entire compendium pack
+Hooks.once('fabricate.ready', async () => {
+  const mgr = game.fabricate.getCraftingSystemManager();
+  const result = await mgr.addItemsFromPack(
+    'blacksmithing-system-id',
+    'dnd5e.items'
+  );
+  console.log(`Added ${result.added}, skipped ${result.skipped} duplicates`);
+});
+```
+
+See [CraftingSystemManager API]({% link api/system-manager.md %}#additemsfrompack) for the full method reference.
 
 ### Managed Item Properties
 

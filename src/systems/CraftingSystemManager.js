@@ -621,14 +621,55 @@ export class CraftingSystemManager {
     return item;
   }
 
+  /**
+   * Find an existing managed item in the system that matches the given UUID via:
+   *   - exact sourceUuid / sourceItemUuid match (returns matchType 'exact')
+   *   - UUID appears in the item's fallbackItemIds (returns matchType 'source')
+   *
+   * @param {object} system - Normalised system object
+   * @param {string} uuid   - The UUID to search for
+   * @returns {{ item: object, matchType: 'exact'|'source' }|null}
+   */
+  _findExistingBySourceChain(system, uuid) {
+    // Exact match: the dropped UUID is already the recorded sourceUuid or sourceItemUuid
+    const exactMatch = system.items.find(i =>
+      i.sourceUuid === uuid || i.sourceItemUuid === uuid
+    );
+    if (exactMatch) return { item: exactMatch, matchType: 'exact' };
+
+    // Source-chain match: the dropped UUID appears in the item's fallbackItemIds
+    const fallbackMatch = system.items.find(i =>
+      Array.isArray(i.fallbackItemIds) && i.fallbackItemIds.includes(uuid)
+    );
+    if (fallbackMatch) return { item: fallbackMatch, matchType: 'source' };
+
+    return null;
+  }
+
+  /**
+   * Add a crafting-system component from a Foundry item UUID.
+   * Returns { item, action } where action is 'added', 'updated', or 'skipped'.
+   *
+   * - 'skipped': exact UUID already registered as sourceUuid/sourceItemUuid AND
+   *              the source metadata (name/img) is already up-to-date (or source
+   *              doesn't resolve).
+   * - 'updated': exact UUID match but name/img differs from fresh source resolution;
+   *              OR UUID found via fallbackItemIds (source-chain match) with
+   *              name/img refreshed and old sourceUuid pushed into fallbackItemIds.
+   * - 'added':   no match found; new component created.
+   *
+   * @param {string} systemId
+   * @param {string} itemUuid
+   * @returns {Promise<{ item: object, action: 'added'|'updated'|'skipped' }>}
+   */
   async addItemFromUuid(systemId, itemUuid) {
     this._assertGM('add system item from uuid');
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
 
-    const existing = system.items.find(i => i.sourceUuid === itemUuid);
-    if (existing) return existing;
+    const match = this._findExistingBySourceChain(system, itemUuid);
 
+    // Resolve the source document (needed for type guard and name/img refresh in all paths)
     let source = null;
     try {
       source = await fromUuid(itemUuid);
@@ -636,6 +677,50 @@ export class CraftingSystemManager {
       source = null;
     }
 
+    // Document type guard: reject non-Item documents
+    if (source && source.documentName && source.documentName !== 'Item') {
+      throw new Error(
+        `Cannot add non-Item document (${source.documentName}) as a crafting component`
+      );
+    }
+
+    if (match?.matchType === 'exact') {
+      // Exact match: overwrite name/img if the source resolved with different metadata;
+      // skip if already up-to-date or source doesn't resolve.
+      const existing = match.item;
+      if (source && (source.name !== existing.name || source.img !== existing.img)) {
+        existing.name = source.name;
+        existing.img = source.img;
+        await this.save();
+        return { item: existing, action: 'updated' };
+      }
+      return { item: existing, action: 'skipped' };
+    }
+
+    if (match?.matchType === 'source') {
+      // Overwrite path: update name/img, push old sourceUuid into fallbackItemIds
+      const existing = match.item;
+      const oldSourceUuid = existing.sourceUuid;
+
+      existing.name = source?.name || existing.name;
+      existing.img = source?.img || existing.img;
+
+      // Accumulate fallbackItemIds without duplicates
+      const fallbacks = Array.isArray(existing.fallbackItemIds)
+        ? [...existing.fallbackItemIds]
+        : [];
+      if (oldSourceUuid && oldSourceUuid !== itemUuid && !fallbacks.includes(oldSourceUuid)) {
+        fallbacks.push(oldSourceUuid);
+      }
+      existing.fallbackItemIds = fallbacks;
+      existing.sourceUuid = itemUuid;
+      existing.sourceItemUuid = itemUuid;
+
+      await this.save();
+      return { item: existing, action: 'updated' };
+    }
+
+    // No match: create new component
     const validEssenceIds = new Set((system.essenceDefinitions || []).map(def => def.id));
     const item = this._normalizeComponent({
       name: source?.name || itemUuid.split('.').pop() || 'Imported Item',
@@ -645,7 +730,40 @@ export class CraftingSystemManager {
 
     system.items.push(item);
     await this.save();
-    return item;
+    return { item, action: 'added' };
+  }
+
+  /**
+   * Bulk-import all Item documents from a Foundry compendium pack into a crafting system.
+   * Delegates to addItemFromUuid which now returns { item, action }.
+   *
+   * @param {string} systemId  - The crafting system to add items to
+   * @param {string} packId    - The compendium pack identifier (e.g. "dnd5e.items")
+   * @returns {Promise<{added: number, updated: number, skipped: number, total: number}>}
+   */
+  async addItemsFromPack(systemId, packId) {
+    this._assertGM('bulk import from compendium');
+    const system = this.getSystem(systemId);
+    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
+
+    const pack = game.packs.get(packId);
+    if (!pack) throw new Error(`Compendium pack not found: ${packId}`);
+
+    const documents = await pack.getDocuments();
+    const items = documents.filter(d => d.documentName === 'Item');
+
+    let added = 0;
+    let updated = 0;
+    let skipped = 0;
+    for (const item of items) {
+      const uuid = `Compendium.${packId}.${item.id}`;
+      const result = await this.addItemFromUuid(systemId, uuid);
+      if (result.action === 'added') added++;
+      else if (result.action === 'updated') updated++;
+      else skipped++;
+    }
+
+    return { added, updated, skipped, total: items.length };
   }
 
   async updateItem(systemId, itemId, updates = {}) {
