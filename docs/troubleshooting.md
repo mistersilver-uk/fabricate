@@ -264,6 +264,35 @@ This was caused by a race between `CraftingRunManager` writing the completed run
 
 ---
 
+### Dropping an Actor, Folder, or Non-Item Document onto the Items Tab Shows a Warning
+
+**Symptom:** Dragging something onto the **Items** tab drop zone in the Crafting Admin panel produces a warning notification such as "Only Item documents can be added as crafting components" or "Folder contains no Item documents", and nothing is added.
+
+**Cause:**
+
+Fabricate only accepts Item documents as crafting components. When the dropped entity is an Actor, JournalEntry, Scene, or any other non-Item document type, Fabricate rejects it with a warning. Actors in particular cannot be managed items because they represent characters, not inventory objects.
+
+Folder drops are a special case: Fabricate expands the folder and imports any Item documents it contains. If the folder holds no Items — for example, it contains only Actors — a notification says so and nothing is written.
+
+**What each notification means:**
+
+| Notification | Meaning |
+|:-------------|:--------|
+| "Only Item documents can be added as crafting components. Dropped: Actor." | You dragged a character or NPC sheet onto the drop zone. Use an Item from the sidebar or a compendium instead. |
+| "Folder contains no Item documents." | The folder you dropped holds no Items — it may contain Actors, JournalEntries, or other document types. |
+| "Drop an Item document from sidebar or compendium." | The drag data could not be resolved to any UUID. This can happen when dragging something that does not emit standard Foundry drag data. |
+
+**Step-by-step checks:**
+
+1. Confirm the drag source is an **Item** document (check the Items sidebar or open an items compendium). Fabricate does not accept Actors, Journal Entries, Scenes, Roll Tables, or Macros as components.
+2. If you want to import everything in a folder, make sure the folder contains Item documents. Open the folder in the sidebar and check the document icons — Item documents show the items bag icon, not the actor or journal icon.
+3. If you dropped a compendium pack header and received no items, verify the compendium type. Only **Items** compendiums contain importable components; **Actor** or **Journal Entry** compendiums are silently filtered.
+4. Open the browser console (F12) and look for `Fabricate |` prefixed messages for additional detail.
+
+**See also:** [Crafting Systems]({% link crafting-systems.md %}#adding-managed-items) — adding managed items via drag-and-drop.
+
+---
+
 ### Dropping Items onto the Recipe Manager or Crafting App Does Nothing
 
 **Symptom:** Dragging an item from the sidebar or a compendium and dropping it onto a Fabricate drop zone (such as the Items tab in the Recipe Manager) produces no result. The item is not added, no error or notification appears from Fabricate, and in some cases Foundry displays its own "Drop an Item document from sidebar or compendium." message.
