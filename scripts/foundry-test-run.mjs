@@ -201,12 +201,24 @@ async function main() {
   });
   const page = await context.newPage();
 
+  // Known non-Fabricate error patterns to ignore
+  const ignoredErrorPatterns = [
+    /Failed to load resource/i,
+    /404 \(Not Found\)/i,
+    /favicon/i,
+    /the server responded with a status of/i
+  ];
+
   // Capture all console output
   page.on('console', msg => {
     const entry = `[${msg.type()}] ${msg.text()}`;
     consoleLog.push(entry);
     if (msg.type() === 'error') {
-      consoleErrors.push(msg.text());
+      const text = msg.text();
+      const isIgnored = ignoredErrorPatterns.some(p => p.test(text));
+      if (!isIgnored) {
+        consoleErrors.push(text);
+      }
     }
   });
 
@@ -234,34 +246,44 @@ async function main() {
     // Handle admin auth page (/auth → /setup)
     await authenticateIfRequired(page, results);
 
-    await page.waitForURL(/\/setup(?:\?.*)?$/, { timeout: 15_000 });
+    // If the world is already running, Foundry redirects straight to /join or /game
+    const postAuthPath = getPathname(page.url());
+    const worldAlreadyRunning = postAuthPath === '/join' || postAuthPath === '/game';
 
-    // Dismiss first-run dialogs (telemetry, tours) that overlay the setup page
-    await dismissFirstRunDialogs(page, results);
+    if (!worldAlreadyRunning) {
+      await page.waitForURL(/\/setup(?:\?.*)?$/, { timeout: 15_000 });
 
-    await screenshot(page, 'setup-ready');
-    results.steps.push({ step: 'setup-ready', passed: true });
+      // Dismiss first-run dialogs (telemetry, tours) that overlay the setup page
+      await dismissFirstRunDialogs(page, results);
 
-    // ── Step 2: Launch world ─────────────────────────────────────────────────
-    // Navigate to the Worlds tab via JavaScript (Foundry V13 setup page)
-    await page.evaluate(() => {
-      // Foundry V13 uses ApplicationV2 tabs — switch to worlds tab
-      const tab = document.querySelector('#setup-packages-header [data-tab="worlds"]');
-      if (tab) tab.click();
-    });
-    await page.waitForTimeout(2_000);
-    await screenshot(page, 'worlds-tab');
+      await screenshot(page, 'setup-ready');
+      results.steps.push({ step: 'setup-ready', passed: true });
 
-    // Click the Launch World button (visible on hover in Foundry V13)
-    const worldCard = page.locator(`[data-package-id="${WORLD_ID}"]`);
-    await worldCard.hover();
-    const launchBtn = worldCard.locator('[data-action="worldLaunch"]');
-    await launchBtn.waitFor({ state: 'visible', timeout: 5_000 });
-    await launchBtn.click();
-    // After launch, Foundry navigates to /join (player selection) or /game
-    await page.waitForURL(/\/(join|game)/, { timeout: 60_000 });
-    await screenshot(page, 'world-launching');
-    results.steps.push({ step: 'launch-world', passed: true });
+      // ── Step 2: Launch world ───────────────────────────────────────────────
+      // Navigate to the Worlds tab via JavaScript (Foundry V13 setup page)
+      await page.evaluate(() => {
+        // Foundry V13 uses ApplicationV2 tabs — switch to worlds tab
+        const tab = document.querySelector('#setup-packages-header [data-tab="worlds"]');
+        if (tab) tab.click();
+      });
+      await page.waitForTimeout(2_000);
+      await screenshot(page, 'worlds-tab');
+
+      // Click the Launch World button (visible on hover in Foundry V13)
+      const worldCard = page.locator(`[data-package-id="${WORLD_ID}"]`);
+      await worldCard.hover();
+      const launchBtn = worldCard.locator('[data-action="worldLaunch"]');
+      await launchBtn.waitFor({ state: 'visible', timeout: 5_000 });
+      await launchBtn.click();
+      // After launch, Foundry navigates to /join (player selection) or /game
+      await page.waitForURL(/\/(join|game)/, { timeout: 60_000 });
+      await screenshot(page, 'world-launching');
+      results.steps.push({ step: 'launch-world', passed: true });
+    } else {
+      process.stdout.write('World already running, skipping setup/launch.\n');
+      results.steps.push({ step: 'setup-ready', passed: true, skipped: true });
+      results.steps.push({ step: 'launch-world', passed: true, skipped: true });
+    }
 
     // If on /join, select Gamemaster and join the session
     if (getPathname(page.url()) === '/join') {
@@ -339,91 +361,108 @@ async function main() {
     process.stdout.write('Phase B: Creating test actors and items...\n');
     try {
       const createdDocs = await page.evaluate(async () => {
-        // Create world-level items
+        // Clean up any stale test data from previous runs
+        const staleActors = game.actors.contents.filter(a =>
+          a.name === 'Alara the Alchemist' || a.name === 'Brom the Blacksmith'
+        );
+        if (staleActors.length > 0) {
+          console.log(`Cleaning ${staleActors.length} stale test actors`);
+          await Actor.deleteDocuments(staleActors.map(a => a.id));
+        }
+        const staleItems = game.items.contents.filter(i =>
+          ['Iron Ore', 'Mystic Herb', 'Dragon Scale', 'Empty Vial',
+           'Iron Sword', 'Healing Potion', 'Dragon Scale Armor'].includes(i.name)
+        );
+        if (staleItems.length > 0) {
+          console.log(`Cleaning ${staleItems.length} stale test items`);
+          await Item.deleteDocuments(staleItems.map(i => i.id));
+        }
+
+        // Discover valid document types — try multiple Foundry API locations
+        // V13: game.documentTypes.Item, V12: game.system.documentTypes.Item
+        const rawItemTypes = game.documentTypes?.Item
+          ?? game.system?.documentTypes?.Item
+          ?? game.system?.template?.Item?.types
+          ?? [];
+        const rawActorTypes = game.documentTypes?.Actor
+          ?? game.system?.documentTypes?.Actor
+          ?? game.system?.template?.Actor?.types
+          ?? [];
+        const itemTypes = Array.from(rawItemTypes);
+        const actorTypes = Array.from(rawActorTypes);
+        console.log('Available item types:', JSON.stringify(itemTypes));
+        console.log('Available actor types:', JSON.stringify(actorTypes));
+
+        // Use 'loot' for all items — safest common type across D&D 5e versions
+        const itemType = itemTypes.includes('loot') ? 'loot' : itemTypes[0] || 'loot';
+        const actorType = actorTypes.includes('character') ? 'character' : actorTypes[0] || 'character';
+
+        // Create world-level items (all as loot — type doesn't matter for crafting)
         const itemData = [
-          { name: 'Iron Ore', type: 'loot', img: 'icons/svg/item-bag.svg' },
-          { name: 'Mystic Herb', type: 'loot', img: 'icons/svg/item-bag.svg' },
-          { name: 'Dragon Scale', type: 'loot', img: 'icons/svg/item-bag.svg' },
-          { name: 'Empty Vial', type: 'loot', img: 'icons/svg/item-bag.svg' },
-          { name: 'Iron Sword', type: 'weapon', img: 'icons/svg/sword.svg' },
-          { name: 'Healing Potion', type: 'consumable', img: 'icons/svg/potion.svg' },
-          { name: 'Dragon Scale Armor', type: 'equipment', img: 'icons/svg/shield.svg' }
+          { name: 'Iron Ore', type: itemType, img: 'icons/svg/item-bag.svg' },
+          { name: 'Mystic Herb', type: itemType, img: 'icons/svg/item-bag.svg' },
+          { name: 'Dragon Scale', type: itemType, img: 'icons/svg/item-bag.svg' },
+          { name: 'Empty Vial', type: itemType, img: 'icons/svg/item-bag.svg' },
+          { name: 'Iron Sword', type: itemType, img: 'icons/svg/item-bag.svg' },
+          { name: 'Healing Potion', type: itemType, img: 'icons/svg/item-bag.svg' },
+          { name: 'Dragon Scale Armor', type: itemType, img: 'icons/svg/item-bag.svg' }
         ];
 
-        // Check what item types the system supports; fall back to available types
-        // Foundry V13 returns a Set, not an Array, so convert to Array first
-        const rawItemTypes = game.system?.documentTypes?.Item;
-        const systemItemTypes = rawItemTypes
-          ? Array.from(rawItemTypes)
-          : [];
-        const resolveType = (preferred) => {
-          if (systemItemTypes.includes(preferred)) return preferred;
-          // Common fallbacks across game systems
-          for (const fallback of ['item', 'loot', 'gear', 'equipment', 'base']) {
-            if (systemItemTypes.includes(fallback)) return fallback;
-          }
-          return systemItemTypes[0] || 'item';
-        };
+        const items = await Item.createDocuments(itemData);
+        console.log(`Created ${items.length} items:`, items.map(i => `${i.name} (${i.type})`).join(', '));
 
-        const resolvedItemData = itemData.map(d => ({
-          ...d,
-          type: resolveType(d.type)
-        }));
-
-        const items = await Item.createDocuments(resolvedItemData);
         const itemIds = items.map(i => i.id);
         const itemsByName = {};
         for (const item of items) {
           itemsByName[item.name] = { id: item.id, uuid: item.uuid };
         }
 
-        // Create actors (documentTypes may be a Set in Foundry V13)
-        const rawActorTypes = game.system?.documentTypes?.Actor;
-        const actorTypes = rawActorTypes ? Array.from(rawActorTypes) : [];
-        const actorType = actorTypes.includes('character') ? 'character'
-          : actorTypes[0] || 'character';
-
+        // Create actors
         const actors = await Actor.createDocuments([
           { name: 'Alara the Alchemist', type: actorType, img: 'icons/svg/mystery-man.svg' },
           { name: 'Brom the Blacksmith', type: actorType, img: 'icons/svg/combat.svg' }
         ]);
+        console.log(`Created ${actors.length} actors:`, actors.map(a => a.name).join(', '));
         const actorIds = actors.map(a => a.id);
 
         const alara = actors.find(a => a.name === 'Alara the Alchemist');
         const brom = actors.find(a => a.name === 'Brom the Blacksmith');
 
-        // Build inventory items from world items for embedding
-        const makeEmbedded = (worldItem, qty) => {
-          const copies = [];
-          for (let i = 0; i < qty; i++) {
-            copies.push({ name: worldItem.name, type: worldItem.type, img: worldItem.img });
-          }
-          return copies;
+        // Build inventory copies from world items
+        // Include flags.core.sourceId so the crafting engine can match
+        // embedded items back to world-level component UUIDs
+        const byName = (name) => {
+          const item = items.find(i => i.name === name);
+          if (!item) throw new Error(`Item "${name}" not found in created items`);
+          return item;
         };
-
-        const mysticHerb = items.find(i => i.name === 'Mystic Herb');
-        const emptyVial = items.find(i => i.name === 'Empty Vial');
-        const dragonScale = items.find(i => i.name === 'Dragon Scale');
-        const ironOre = items.find(i => i.name === 'Iron Ore');
+        const copies = (item, qty) =>
+          Array.from({ length: qty }, () => ({
+            name: item.name,
+            type: item.type,
+            img: item.img,
+            flags: { core: { sourceId: item.uuid } }
+          }));
 
         // Alara gets: 3x Mystic Herb, 2x Empty Vial, 1x Dragon Scale
         await alara.createEmbeddedDocuments('Item', [
-          ...makeEmbedded(mysticHerb, 3),
-          ...makeEmbedded(emptyVial, 2),
-          ...makeEmbedded(dragonScale, 1)
+          ...copies(byName('Mystic Herb'), 3),
+          ...copies(byName('Empty Vial'), 2),
+          ...copies(byName('Dragon Scale'), 1)
         ]);
 
         // Brom gets: 3x Iron Ore, 1x Dragon Scale
         await brom.createEmbeddedDocuments('Item', [
-          ...makeEmbedded(ironOre, 3),
-          ...makeEmbedded(dragonScale, 1)
+          ...copies(byName('Iron Ore'), 3),
+          ...copies(byName('Dragon Scale'), 1)
         ]);
 
-        return { itemIds, actorIds, itemsByName };
+        return { itemIds, actorIds, alaraId: alara.id, bromId: brom.id, itemsByName };
       });
 
       cleanup.itemIds = createdDocs.itemIds;
       cleanup.actorIds = createdDocs.actorIds;
+      cleanup.alaraId = createdDocs.alaraId;
 
       // Screenshot the Items sidebar
       const itemsTab = page.locator('[data-tab="items"]').first();
@@ -623,17 +662,25 @@ async function main() {
           }
         }
 
-        // Close the Recipe Manager
+        // Close all open application windows (try both V1 and V2 APIs)
         await page.evaluate(() => {
-          // Close all open Fabricate admin windows
-          for (const [, app] of Object.entries(ui.windows)) {
-            if (app.constructor?.name?.includes('RecipeManager') ||
-                app.element?.querySelector?.('.fabricate-admin') ||
-                app.element?.classList?.contains?.('fabricate-admin')) {
-              app.close();
+          // V1 ApplicationV1 windows
+          if (ui.windows) {
+            for (const [, app] of Object.entries(ui.windows)) {
+              try { app.close(); } catch { /* ignore */ }
             }
           }
+          // V2 ApplicationV2 windows — close via DOM
+          document.querySelectorAll('.application .header-button.close, .application .close').forEach(btn => {
+            try { btn.click(); } catch { /* ignore */ }
+          });
         });
+        await page.waitForTimeout(1_500);
+        // Also click any remaining close buttons via Playwright
+        const closeButtons = page.locator('.application .header-button.close');
+        for (let i = 0; i < await closeButtons.count(); i++) {
+          try { await closeButtons.nth(i).click({ timeout: 2_000 }); } catch { /* ignore */ }
+        }
         await page.waitForTimeout(500);
 
         results.steps.push({ step: 'screenshot-recipe-manager', passed: true });
@@ -646,14 +693,10 @@ async function main() {
       // ── Phase E: Craft an item ──────────────────────────────────────────────
       process.stdout.write('Phase E: Crafting a Healing Potion...\n');
       try {
-        // Open the Crafting App via the Items sidebar button
-        const itemsTab = page.locator('[data-tab="items"]').first();
-        await itemsTab.click();
-        await page.waitForTimeout(1_000);
-
-        const craftBtn = page.locator('[data-fabricate-action="craft"], button:has-text("Craft Item")').first();
-        await craftBtn.waitFor({ state: 'visible', timeout: 10_000 });
-        await craftBtn.click();
+        // Open Crafting App programmatically (avoids viewport/overlay issues)
+        await page.evaluate(() => {
+          document.querySelector('[data-fabricate-action="craft"]')?.click();
+        });
         await page.waitForTimeout(2_000);
 
         // Verify the crafting app opened
@@ -665,9 +708,11 @@ async function main() {
         process.stdout.write('Crafting App opened successfully.\n');
 
         // Attempt to craft via the API
-        const craftResult = await page.evaluate(async (recipeId) => {
-          const alara = game.actors.contents.find(a => a.name === 'Alara the Alchemist');
-          if (!alara) throw new Error('Alara the Alchemist not found');
+        const craftResult = await page.evaluate(async ({ recipeId, alaraId }) => {
+          const alara = game.actors.get(alaraId);
+          if (!alara) throw new Error(`Actor ${alaraId} not found`);
+
+          console.log(`Crafting with ${alara.name} (${alara.id}), ${alara.items.size} items in inventory`);
 
           const rm = game.fabricate.getRecipeManager();
           const recipe = rm.getRecipe(recipeId);
@@ -685,7 +730,7 @@ async function main() {
             message: result.message,
             potionInInventory
           };
-        }, craftingSetup.healingPotionRecipeId);
+        }, { recipeId: craftingSetup.healingPotionRecipeId, alaraId: cleanup.alaraId });
 
         if (!craftResult.success) {
           process.stderr.write(`Craft returned failure: ${craftResult.message}\n`);
@@ -700,18 +745,18 @@ async function main() {
         await screenshot(page, 'post-craft');
 
         // Open Alara's sheet to show the crafted item
-        await page.evaluate(async () => {
-          const alara = game.actors.contents.find(a => a.name === 'Alara the Alchemist');
+        await page.evaluate(async (alaraId) => {
+          const alara = game.actors.get(alaraId);
           if (alara) await alara.sheet.render(true);
-        });
+        }, cleanup.alaraId);
         await page.waitForTimeout(1_500);
         await screenshot(page, 'alara-post-craft-inventory');
 
         // Close the sheet
-        await page.evaluate(() => {
-          const alara = game.actors.contents.find(a => a.name === 'Alara the Alchemist');
+        await page.evaluate((alaraId) => {
+          const alara = game.actors.get(alaraId);
           if (alara) alara.sheet.close();
-        });
+        }, cleanup.alaraId);
 
         results.steps.push({ step: 'craft-item-phase', passed: true });
         process.stdout.write('Phase E complete.\n');
