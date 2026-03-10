@@ -271,7 +271,8 @@
         "BulkImportUpdated": "Imported {added} new, updated {updated}, skipped {skipped} of {total} items.",
         "DropNotAnItem": "Only Item documents can be added as crafting components. Dropped: {type}.",
         "FolderImportSummary": "Imported {added} items from folder \"{name}\".",
-        "FolderEmpty": "Folder \"{name}\" contains no Item documents."
+        "FolderEmpty": "Folder \"{name}\" contains no Item documents.",
+        "DropNoSystemSelected": "Select a crafting system first before dropping items."
       },
       "Recipes": {
         "SearchPlaceholder": "Search recipes...",

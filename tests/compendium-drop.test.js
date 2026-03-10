@@ -593,7 +593,10 @@ function buildFullOnDropItem({ systemId, systemManager, notifyWarn, notifyInfo, 
   return async (data) => {
     // Bulk compendium pack drop
     if (data?.type === 'Compendium' && data?.collection && !data?.uuid) {
-      if (!systemId) return;
+      if (!systemId) {
+        notifyWarn('DropNoSystemSelected');
+        return;
+      }
       const result = await systemManager.addItemsFromPack(systemId, data.collection);
       notifyInfo('BulkImportUpdated', result);
       return;
@@ -601,7 +604,10 @@ function buildFullOnDropItem({ systemId, systemManager, notifyWarn, notifyInfo, 
 
     // Folder drop
     if (data?.type === 'Folder') {
-      if (!systemId) return;
+      if (!systemId) {
+        notifyWarn('DropNoSystemSelected');
+        return;
+      }
       const folder = folders?.get(data.id);
       if (!folder) return;
       const folderItems = (folder.contents || []).filter(d => d.documentName === 'Item');
@@ -633,6 +639,10 @@ function buildFullOnDropItem({ systemId, systemManager, notifyWarn, notifyInfo, 
     const uuid = resolveDropUuid(data);
     if (!uuid) {
       notifyWarn('DropInvalidItem');
+      return;
+    }
+    if (!systemId) {
+      notifyWarn('DropNoSystemSelected');
       return;
     }
     await systemManager.addItemFromUuid(systemId, uuid);
@@ -737,4 +747,84 @@ test('onDropItem integration — Folder with no Items shows info notification an
   assert.equal(infos.length, 1);
   assert.equal(infos[0].key, 'FolderEmpty');
   assert.equal(infos[0].params.name, 'Empty Folder');
+});
+
+// ---------------------------------------------------------------------------
+// T-297: DropNoSystemSelected — warn when no system is selected
+// ---------------------------------------------------------------------------
+
+test('onDropItem integration — single item drop with no system selected shows DropNoSystemSelected warning', async () => {
+  const addCalls = [];
+  const warnings = [];
+
+  const mgr = {
+    addItemFromUuid: async (...args) => { addCalls.push(args); return { item: {}, action: 'added' }; },
+    addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0 })
+  };
+
+  const handler = buildFullOnDropItem({
+    systemId: '',
+    systemManager: mgr,
+    notifyWarn: (key) => { warnings.push(key); },
+    notifyInfo: () => {},
+    folders: new Map()
+  });
+
+  await handler({ uuid: 'Item.some-item' });
+
+  assert.equal(addCalls.length, 0, 'addItemFromUuid should not be called');
+  assert.equal(warnings.length, 1);
+  assert.equal(warnings[0], 'DropNoSystemSelected');
+});
+
+test('onDropItem integration — folder drop with no system selected shows DropNoSystemSelected warning', async () => {
+  const addCalls = [];
+  const warnings = [];
+
+  const mgr = {
+    addItemFromUuid: async (...args) => { addCalls.push(args); return { item: {}, action: 'added' }; },
+    addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0 })
+  };
+
+  const folders = new Map([
+    ['folder1', { name: 'My Folder', contents: [{ documentName: 'Item', uuid: 'Item.item-x' }] }]
+  ]);
+
+  const handler = buildFullOnDropItem({
+    systemId: '',
+    systemManager: mgr,
+    notifyWarn: (key) => { warnings.push(key); },
+    notifyInfo: () => {},
+    folders
+  });
+
+  await handler({ type: 'Folder', id: 'folder1', documentType: 'Item' });
+
+  assert.equal(addCalls.length, 0, 'addItemFromUuid should not be called');
+  assert.equal(warnings.length, 1);
+  assert.equal(warnings[0], 'DropNoSystemSelected');
+});
+
+test('onDropItem integration — compendium pack drop with no system selected shows DropNoSystemSelected warning', async () => {
+  const addCalls = [];
+  const warnings = [];
+
+  const mgr = {
+    addItemFromUuid: async (...args) => { addCalls.push(args); return { item: {}, action: 'added' }; },
+    addItemsFromPack: async (...args) => { addCalls.push(args); return { added: 0, updated: 0, skipped: 0, total: 0 }; }
+  };
+
+  const handler = buildFullOnDropItem({
+    systemId: '',
+    systemManager: mgr,
+    notifyWarn: (key) => { warnings.push(key); },
+    notifyInfo: () => {},
+    folders: new Map()
+  });
+
+  await handler({ type: 'Compendium', collection: 'world.my-pack' });
+
+  assert.equal(addCalls.length, 0, 'addItemsFromPack should not be called');
+  assert.equal(warnings.length, 1);
+  assert.equal(warnings[0], 'DropNoSystemSelected');
 });
