@@ -354,6 +354,15 @@ async function main() {
     // Wait for Fabricate to be fully ready
     await page.waitForFunction(() => game.fabricate?.ready === true, { timeout: 15_000 });
 
+    // Dismiss any overlay that might block sidebar clicks (Game Paused banner, tours, dialogs)
+    await page.evaluate(() => {
+      // Unpause the game if paused (the "Game Paused" overlay blocks all sidebar clicks)
+      if (game.paused) game.togglePause(false);
+      // Dismiss any active tour
+      if (typeof Tour !== 'undefined' && Tour.activeTour) Tour.activeTour.exit();
+    });
+    await page.waitForTimeout(500);
+
     // ── Phase B: Create test actors & items ─────────────────────────────────
     process.stdout.write('Phase B: Creating test actors and items...\n');
     try {
@@ -479,9 +488,9 @@ async function main() {
       cleanup.actorIds = createdDocs.actorIds;
       cleanup.alaraId = createdDocs.alaraId;
 
-      // Screenshot the Items sidebar
-      const itemsTab = page.locator('[data-tab="items"]').first();
-      await itemsTab.click();
+      // Screenshot the Items sidebar (force: true bypasses overlays like "Game Paused")
+      const itemsTab = page.locator('#sidebar [data-tab="items"]').first();
+      await itemsTab.click({ force: true });
       await page.waitForTimeout(1_000);
       await screenshot(page, 'items-sidebar');
 
