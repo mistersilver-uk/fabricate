@@ -116,7 +116,10 @@ export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
           // Foundry v13 shape: { type: "Compendium", collection: "world.pack-name" }
           if (data?.type === 'Compendium' && data?.collection && !data?.uuid) {
             const packId = data.collection;
-            if (!packId || !systemId) return;
+            if (!packId || !systemId) {
+              if (!systemId) ui.notifications.warn(localize('FABRICATE.Admin.Items.DropNoSystemSelected'));
+              return;
+            }
             const result = await systemManager.addItemsFromPack(systemId, packId);
             ui.notifications.info(localize('FABRICATE.Admin.Items.BulkImportUpdated', {
               added: result.added,
@@ -130,7 +133,10 @@ export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
 
           // Folder drop: expand to contained Items
           if (data?.type === 'Folder') {
-            if (!systemId) return;
+            if (!systemId) {
+              ui.notifications.warn(localize('FABRICATE.Admin.Items.DropNoSystemSelected'));
+              return;
+            }
             const folder = game.folders?.get(data.id);
             if (!folder) return;
             // folder.contents contains the documents in the folder
@@ -175,7 +181,10 @@ export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
             ui.notifications.warn(localize('FABRICATE.Admin.Items.DropInvalidItem'));
             return;
           }
-          if (!systemId) return;
+          if (!systemId) {
+            ui.notifications.warn(localize('FABRICATE.Admin.Items.DropNoSystemSelected'));
+            return;
+          }
           const singleResult = await systemManager.addItemFromUuid(systemId, uuid);
           if (singleResult.action === 'updated') {
             ui.notifications.info(localize('FABRICATE.Admin.Items.ItemUpdated', {
