@@ -487,14 +487,17 @@ async function main() {
       cleanup.itemIds = createdDocs.itemIds;
       cleanup.actorIds = createdDocs.actorIds;
       cleanup.alaraId = createdDocs.alaraId;
+      process.stdout.write(`  Created ${createdDocs.itemIds.length} items and ${createdDocs.actorIds.length} actors with inventories.\n`);
 
       // Screenshot the Items sidebar (force: true bypasses overlays like "Game Paused")
       const itemsTab = page.locator('#sidebar [data-tab="items"]').first();
       await itemsTab.click({ force: true });
       await page.waitForTimeout(1_000);
       await screenshot(page, 'items-sidebar');
+      process.stdout.write('  Screenshotted Items sidebar.\n');
 
       // Screenshot each actor sheet (inventory tab)
+      process.stdout.write('  Opening actor sheets for screenshots...\n');
       for (const actorId of createdDocs.actorIds) {
         const actorName = await page.evaluate(async (id) => {
           const actor = game.actors.get(id);
@@ -541,6 +544,7 @@ async function main() {
           await page.waitForTimeout(500);
         }
         await screenshot(page, `actor-sheet-${actorName.replace(/\s+/g, '-').toLowerCase()}`);
+        process.stdout.write(`  Screenshotted ${actorName} sheet.\n`);
         // Close the sheet
         await page.evaluate((id) => {
           const actor = game.actors.get(id);
@@ -685,6 +689,7 @@ async function main() {
 
       cleanup.systemId = craftingSetup.systemId;
       cleanup.recipeIds = craftingSetup.recipeIds;
+      process.stdout.write(`  Created crafting system and ${craftingSetup.recipeIds.length} recipes.\n`);
 
       results.steps.push({ step: 'create-crafting-system', passed: true });
       process.stdout.write(`Phase C complete: System "${craftingSetup.systemId}" with ${craftingSetup.recipeIds.length} recipes.\n`);
@@ -703,6 +708,7 @@ async function main() {
         await page.waitForTimeout(2_000);
 
         // Wait for the Recipe Manager to be visible
+        process.stdout.write('  Waiting for Recipe Manager to render...\n');
         const adminApp = page.locator('.fabricate-admin, .recipe-manager').first();
         await adminApp.waitFor({ state: 'visible', timeout: 10_000 });
 
@@ -715,6 +721,7 @@ async function main() {
         }
 
         await screenshot(page, 'recipe-manager-default');
+        process.stdout.write('  Screenshotted Recipe Manager default view.\n');
 
         // Click through tabs using button text (Svelte tabs have no data-tab attributes)
         // Tab labels from lang/en.json: Systems, Components, Recipes, Rules, Graph
@@ -732,6 +739,7 @@ async function main() {
               await tab.click();
               await page.waitForTimeout(1_000);
               await screenshot(page, `recipe-manager-${slug}`);
+              process.stdout.write(`  Screenshotted Recipe Manager "${label}" tab.\n`);
             }
           } catch {
             // Tab may not exist in this version
@@ -759,6 +767,7 @@ async function main() {
         }
         await page.waitForTimeout(500);
 
+        process.stdout.write('  Closing Recipe Manager windows...\n');
         results.steps.push({ step: 'screenshot-recipe-manager', passed: true });
         process.stdout.write('Phase D complete: Recipe Manager screenshotted.\n');
       } catch (err) {
@@ -776,14 +785,16 @@ async function main() {
         await page.waitForTimeout(2_000);
 
         // Verify the crafting app opened
+        process.stdout.write('  Waiting for Crafting App to render...\n');
         const craftingApp = page.locator('.crafting-app, [data-appid] .window-title:has-text("Craft")').first();
         await craftingApp.waitFor({ state: 'visible', timeout: 10_000 });
         await screenshot(page, 'crafting-app-opened');
 
         results.steps.push({ step: 'open-crafting-app', passed: true });
-        process.stdout.write('Crafting App opened successfully.\n');
+        process.stdout.write('  Crafting App opened and screenshotted.\n');
 
         // Attempt to craft via the API
+        process.stdout.write('  Executing craft: Brew Healing Potion...\n');
         const craftResult = await page.evaluate(async ({ recipeId, alaraId }) => {
           const alara = game.actors.get(alaraId);
           if (!alara) throw new Error(`Actor ${alaraId} not found`);
@@ -819,8 +830,10 @@ async function main() {
 
         await page.waitForTimeout(1_000);
         await screenshot(page, 'post-craft');
+        process.stdout.write('  Screenshotted post-craft state.\n');
 
         // Open Alara's sheet to show the crafted item (inventory tab)
+        process.stdout.write('  Opening Alara\'s inventory to verify crafted item...\n');
         await page.evaluate(async (alaraId) => {
           const alara = game.actors.get(alaraId);
           if (alara) await alara.sheet.render(true);
@@ -838,6 +851,7 @@ async function main() {
         }, cleanup.alaraId);
         await page.waitForTimeout(500);
         await screenshot(page, 'alara-post-craft-inventory');
+        process.stdout.write('  Screenshotted Alara\'s post-craft inventory.\n');
 
         // Close the sheet
         await page.evaluate((alaraId) => {
@@ -882,6 +896,7 @@ async function main() {
     await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-failure.png') }).catch(() => {});
   } finally {
     // ── Phase F: Cleanup created documents ────────────────────────────────
+    process.stdout.write('Phase F: Cleaning up test data...\n');
     try {
       await page.evaluate(async (cleanupData) => {
         // Delete recipes
