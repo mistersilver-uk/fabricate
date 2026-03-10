@@ -70,6 +70,24 @@ async function main() {
     env: process.env
   });
 
+  // Set container UID/GID to match the host user so bind-mounted volumes are writable.
+  // On GitHub Actions ubuntu-latest the runner UID is 1001; locally it varies.
+  if (!process.env.FOUNDRY_UID) {
+    try {
+      process.env.FOUNDRY_UID = execSync('id -u', { encoding: 'utf8' }).trim();
+    } catch {
+      process.env.FOUNDRY_UID = '1000';
+    }
+  }
+  if (!process.env.FOUNDRY_GID) {
+    try {
+      process.env.FOUNDRY_GID = execSync('id -g', { encoding: 'utf8' }).trim();
+    } catch {
+      process.env.FOUNDRY_GID = '1000';
+    }
+  }
+  process.stdout.write(`Container UID/GID: ${process.env.FOUNDRY_UID}:${process.env.FOUNDRY_GID}\n`);
+
   // Pull latest image silently
   process.stdout.write('Pulling Docker image felddy/foundryvtt:release...\n');
   execSync('docker compose -f docker-compose.foundry.yml pull --quiet', {
