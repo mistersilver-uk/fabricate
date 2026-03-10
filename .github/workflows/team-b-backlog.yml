@@ -127,8 +127,17 @@ jobs:
 
             ## Step 1: Orchestrator (Plan)
             Read the issue acceptance criteria. Analyze task complexity.
-            Write a brief implementation plan. Identify files to change and
-            tests to write.
+
+            Before planning, search the codebase to locate relevant files:
+            - Use Grep to find keywords from the issue (class names, function
+              names, UI labels, error messages) across src/ and test/
+            - Use Glob to find related files by pattern (e.g. **/*Recipe*,
+              **/*crafting*)
+            - Read the files you find to understand the existing code structure
+
+            Then write a brief implementation plan that lists the specific
+            files to change and tests to write, with line-number references
+            where possible.
 
             ## Step 2: Implementer (Build)
             Follow the implementer agent rules from .claude/agents/implementer.md:
