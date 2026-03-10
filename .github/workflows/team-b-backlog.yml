@@ -81,7 +81,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -154,6 +154,11 @@ jobs:
             locate relevant files. Read those files. Decide what to change.
             For simple tasks (e.g. removing a line, renaming a key), skip
             writing a PLAN.md — just proceed to implementation.
+
+            **Important:** FoundryVTT i18n keys use nested JSON. A dot-path
+            like `FABRICATE.Foo.Bar` maps to `{ "FABRICATE": { "Foo": { "Bar": ... } } }`
+            in `lang/en.json`. When searching for i18n keys, search for the
+            leaf key name (e.g. `"Bar"`) rather than the dot-path.
 
             ### 2. Implement
             Follow the rules in /tmp/claude-context/implementer.md.
