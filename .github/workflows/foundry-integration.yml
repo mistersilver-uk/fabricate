@@ -23,8 +23,10 @@ on:
       - 'docker-compose.foundry.yml'
 
 concurrency:
-  group: foundry-integration
-  cancel-in-progress: false       # Never cancel a running smoke test mid-flight
+  # Scope to PR number on pull_request, or ref on push/schedule/dispatch.
+  # This prevents PRs from queuing behind each other or behind main pushes.
+  group: foundry-integration-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true        # Cancel stale runs when a new push arrives
 
 permissions:
   contents: read
@@ -34,6 +36,10 @@ jobs:
   smoke-test:
     runs-on: ubuntu-latest
     timeout-minutes: 20           # Full pipeline: up + smoke + down
+    # Skip on fork PRs where Foundry credentials are unavailable
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     env:
       FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
       FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
@@ -45,26 +51,38 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check Foundry credentials
+        run: |
+          if [ -z "$FOUNDRY_USERNAME" ] || [ -z "$FOUNDRY_PASSWORD" ]; then
+            echo "::warning::Foundry credentials not available. Skipping smoke test."
+            echo "SKIP_SMOKE=true" >> "$GITHUB_ENV"
+          fi
+
       - name: Setup Node.js
+        if: env.SKIP_SMOKE != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
       - name: Install dependencies
+        if: env.SKIP_SMOKE != 'true'
         run: npm ci
 
       - name: Install Playwright Chromium
+        if: env.SKIP_SMOKE != 'true'
         run: npm run test:foundry:install
 
       - name: Build module
+        if: env.SKIP_SMOKE != 'true'
         run: npm run build
 
       - name: Run smoke test (up → run → down)
+        if: env.SKIP_SMOKE != 'true'
         run: npm run test:foundry
 
       - name: Upload test artifacts
-        if: always()              # Upload even on failure for debugging
+        if: always() && env.SKIP_SMOKE != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: foundry-smoke-results-${{ github.run_number }}
@@ -72,7 +90,7 @@ jobs:
           retention-days: 14
 
       - name: Open GitHub issue on failure
-        if: failure()
+        if: failure() && env.SKIP_SMOKE != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

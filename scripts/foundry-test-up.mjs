@@ -70,23 +70,25 @@ async function main() {
     env: process.env
   });
 
-  // Set container UID/GID to match the host user so bind-mounted volumes are writable.
-  // On GitHub Actions ubuntu-latest the runner UID is 1001; locally it varies.
-  if (!process.env.FOUNDRY_UID) {
+  // Set container user to match the host user so bind-mounted volumes are writable.
+  // The v13 felddy/foundryvtt image runs as 1000:1000 by default and no longer
+  // supports FOUNDRY_UID/FOUNDRY_GID. We use Docker's native `user:` directive
+  // via FOUNDRY_HOST_UID/FOUNDRY_HOST_GID env vars in docker-compose.foundry.yml.
+  if (!process.env.FOUNDRY_HOST_UID) {
     try {
-      process.env.FOUNDRY_UID = execSync('id -u', { encoding: 'utf8' }).trim();
+      process.env.FOUNDRY_HOST_UID = execSync('id -u', { encoding: 'utf8' }).trim();
     } catch {
-      process.env.FOUNDRY_UID = '1000';
+      process.env.FOUNDRY_HOST_UID = '1000';
     }
   }
-  if (!process.env.FOUNDRY_GID) {
+  if (!process.env.FOUNDRY_HOST_GID) {
     try {
-      process.env.FOUNDRY_GID = execSync('id -g', { encoding: 'utf8' }).trim();
+      process.env.FOUNDRY_HOST_GID = execSync('id -g', { encoding: 'utf8' }).trim();
     } catch {
-      process.env.FOUNDRY_GID = '1000';
+      process.env.FOUNDRY_HOST_GID = '1000';
     }
   }
-  process.stdout.write(`Container UID/GID: ${process.env.FOUNDRY_UID}:${process.env.FOUNDRY_GID}\n`);
+  process.stdout.write(`Container user: ${process.env.FOUNDRY_HOST_UID}:${process.env.FOUNDRY_HOST_GID}\n`);
 
   // Pull latest image silently
   process.stdout.write('Pulling Docker image felddy/foundryvtt:release...\n');
