@@ -15,6 +15,45 @@ permissions:
   issues: write
   id-token: write
 
+# ── Shared issue template ──────────────────────────────────────────────
+# All agents use this format so issues are consistent and Team B-ready.
+# Defined here as a YAML anchor, referenced in each phase prompt.
+env:
+  ISSUE_TEMPLATE: |
+    Every issue you create MUST use this exact body format (GitHub-flavoured
+    markdown). Do NOT deviate from this structure:
+
+    ```
+    ### Description
+
+    <1-3 paragraphs explaining what is wrong or what should change.
+    Include file paths with line numbers (e.g. `src/Foo.ts:42`) where relevant.
+    Explain WHY this matters — what breaks, what is inconsistent, or what
+    user-facing problem it causes.>
+
+    ### Acceptance Criteria
+
+    1. <Specific, testable criterion — an implementer must be able to read
+       this and know exactly what "done" looks like.>
+    2. <Another criterion.>
+    3. ...
+
+    ### Suggested Files
+
+    - `path/to/file.ts` — <brief note on what to change>
+    - `path/to/test.js` — <brief note on what to test>
+    ```
+
+    Rules for issue creation:
+    - Title: concise, starts with the affected symbol or area in backticks
+      e.g. "`updateSystem` does not trigger signature revalidation"
+    - Labels: always include `triage` plus the category label(s)
+    - Acceptance criteria MUST be specific enough for an automated agent to
+      implement without asking follow-up questions
+    - NEVER remove the `triage` label from any issue — only humans do that
+    - Before creating an issue, search existing issues to avoid duplicates:
+      `gh issue list --state open --json number,title --limit 100`
+
 jobs:
   # ── Phase 1: Domain Expert ───────────────────────────────────────────
   domain-audit:
@@ -25,6 +64,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Prepare context
+        run: |
+          mkdir -p /tmp/claude-context
+          cp .claude/agents/domain-expert.md /tmp/claude-context/agent.md
+
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -34,18 +78,22 @@ jobs:
             --allowedTools "Bash,Edit,Write,Read,Glob,Grep,WebSearch,WebFetch"
           prompt: |
             You are the domain-expert agent for Fabricate. Read your agent
-            definition at .claude/agents/domain-expert.md and follow it exactly.
+            definition from /tmp/claude-context/agent.md and follow it exactly.
 
-            Your task:
+            ## Issue Template
+
+            ${{ env.ISSUE_TEMPLATE }}
+
+            ## Task
+
             1. Read DOMAIN.md and all spec/ files for current state.
             2. Audit spec-vs-code alignment for naming, structure, and lifecycle.
             3. UPDATE (do not overwrite) DOMAIN.md with any new findings — append
                to existing sections, update stale entries, add new open questions.
-            4. For each actionable finding, create a GitHub Issue with the `triage`
-               label using `gh issue create --label domain --label triage`.
-            5. NEVER remove the `triage` label from any issue. Only humans may do that.
-            6. Before creating an issue, search existing issues to avoid duplicates:
-               `gh issue list --state open --label domain --json number,title --limit 100`
+            4. For each actionable finding, create a GitHub Issue using the
+               template above with labels: `domain`, `triage`.
+               Add `spec` label too if the finding involves spec changes.
+               Add `i18n` label if it involves i18n key changes.
 
             Output a summary of findings and issues created.
 
@@ -73,6 +121,11 @@ jobs:
       - name: Build module
         run: npm run build
 
+      - name: Prepare context
+        run: |
+          mkdir -p /tmp/claude-context
+          cp .claude/agents/ux-designer.md /tmp/claude-context/agent.md
+
       - uses: anthropics/claude-code-action@v1
         env:
           FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
@@ -85,13 +138,18 @@ jobs:
             --allowedTools "Bash,Edit,Write,Read,Glob,Grep"
           prompt: |
             You are the ux-designer agent for Fabricate. Read your agent
-            definition at .claude/agents/ux-designer.md and follow it exactly.
+            definition from /tmp/claude-context/agent.md and follow it exactly.
 
             You have access to Playwright (already installed: `npm run test:foundry:install`
             has been run) and a built module in dist/. The Foundry credentials are
             in environment variables FOUNDRY_USERNAME and FOUNDRY_PASSWORD.
 
-            Your task:
+            ## Issue Template
+
+            ${{ env.ISSUE_TEMPLATE }}
+
+            ## Task
+
             1. Read spec/003-ui-integration.md and all Svelte components in
                src/ui/svelte/ to understand the current UI structure.
             2. Run the Foundry smoke harness to capture live screenshots:
@@ -110,16 +168,13 @@ jobs:
                  with the "Arcane Forge" system selected
                - Crafting App with craftable recipes listed
                - Post-craft inventory showing consumed ingredients and crafted output
-               Read .claude/agents/ux-designer.md for the full screenshot catalog table.
+               Read /tmp/claude-context/agent.md for the full screenshot catalog table.
             4. Audit components against the spec, design principles, and
                accessibility standards (WCAG AA). Consider both static code review
                and the live screenshots.
-            5. For each actionable finding, create a GitHub Issue with the `triage`
-               label using `gh issue create --label ux --label triage`.
-            6. NEVER remove the `triage` label from any issue. Only humans may do that.
-            7. Before creating an issue, search existing issues to avoid duplicates:
-               `gh issue list --state open --label ux --json number,title --limit 100`
-            8. If the smoke test fails (e.g. Foundry credentials are not set),
+            5. For each actionable finding, create a GitHub Issue using the
+               template above with labels: `ux`, `triage`.
+            6. If the smoke test fails (e.g. Foundry credentials are not set),
                fall back to static code review only and note this in each issue.
 
             Output a summary of findings and issues created.
@@ -142,6 +197,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Prepare context
+        run: |
+          mkdir -p /tmp/claude-context
+          cp .claude/agents/quality-engineer.md /tmp/claude-context/agent.md
+
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -151,17 +211,21 @@ jobs:
             --allowedTools "Bash,Edit,Write,Read,Glob,Grep"
           prompt: |
             You are the quality-engineer agent for Fabricate. Read your agent
-            definition at .claude/agents/quality-engineer.md and follow it exactly.
+            definition from /tmp/claude-context/agent.md and follow it exactly.
 
-            Your task:
+            ## Issue Template
+
+            ${{ env.ISSUE_TEMPLATE }}
+
+            ## Task
+
             1. Run `npm test` and `npm run build` to check current state.
             2. Scan src/, tests/, and styles/ for defects, edge cases, and test gaps.
-            3. For each validated finding, create a GitHub Issue with the `triage`
-               label using `gh issue create --label <type> --label triage`
-               where <type> is `defect`, `test-gap`, or `enhancement`.
-            4. NEVER remove the `triage` label from any issue. Only humans may do that.
-            5. Before creating an issue, search existing issues to avoid duplicates:
-               `gh issue list --state open --json number,title --limit 100`
+            3. For each validated finding, create a GitHub Issue using the
+               template above with labels: `triage` plus one of:
+               - `defect` — confirmed bug or incorrect behaviour
+               - `test-gap` — missing or insufficient test coverage
+               - `enhancement` — improvement opportunity
 
             Output a summary of findings and issues created.
 
@@ -174,6 +238,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Prepare context
+        run: |
+          mkdir -p /tmp/claude-context
+          cp .claude/agents/competitive-analyst.md /tmp/claude-context/agent.md
+
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -183,9 +252,14 @@ jobs:
             --allowedTools "Bash,Edit,Write,Read,Glob,Grep,WebSearch,WebFetch"
           prompt: |
             You are the competitive-analyst agent for Fabricate. Read your agent
-            definition at .claude/agents/competitive-analyst.md and follow it exactly.
+            definition from /tmp/claude-context/agent.md and follow it exactly.
 
-            Your task:
+            ## Issue Template
+
+            ${{ env.ISSUE_TEMPLATE }}
+
+            ## Task
+
             1. Read the existing COMPETITIVE_ANALYSIS.md (if it exists).
             2. Read Fabricate's docs/, spec/, src/ui/svelte/, and CHANGELOG.md
                to understand current capabilities.
@@ -193,11 +267,8 @@ jobs:
             4. UPDATE (do not overwrite) COMPETITIVE_ANALYSIS.md with new findings.
                Add a dated changelog entry at the top noting what changed.
             5. For each actionable recommendation that implies a concrete code or
-               feature change, create a GitHub Issue with the `triage` label using
-               `gh issue create --label enhancement --label triage`.
-            6. NEVER remove the `triage` label from any issue. Only humans may do that.
-            7. Before creating an issue, search existing issues to avoid duplicates:
-               `gh issue list --state open --json number,title --limit 100`
+               feature change, create a GitHub Issue using the template above
+               with labels: `enhancement`, `triage`.
 
             Output a summary of findings, report updates, and issues created.
 
