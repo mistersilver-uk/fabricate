@@ -351,7 +351,11 @@ async function main() {
         ];
 
         // Check what item types the system supports; fall back to available types
-        const systemItemTypes = game.system?.documentTypes?.Item || [];
+        // Foundry V13 returns a Set, not an Array, so convert to Array first
+        const rawItemTypes = game.system?.documentTypes?.Item;
+        const systemItemTypes = rawItemTypes
+          ? Array.from(rawItemTypes)
+          : [];
         const resolveType = (preferred) => {
           if (systemItemTypes.includes(preferred)) return preferred;
           // Common fallbacks across game systems
@@ -373,8 +377,9 @@ async function main() {
           itemsByName[item.name] = { id: item.id, uuid: item.uuid };
         }
 
-        // Create actors
-        const actorTypes = game.system?.documentTypes?.Actor || [];
+        // Create actors (documentTypes may be a Set in Foundry V13)
+        const rawActorTypes = game.system?.documentTypes?.Actor;
+        const actorTypes = rawActorTypes ? Array.from(rawActorTypes) : [];
         const actorType = actorTypes.includes('character') ? 'character'
           : actorTypes[0] || 'character';
 
@@ -450,7 +455,15 @@ async function main() {
       process.stderr.write(`Phase B failed: ${err.message}\n`);
     }
 
+    // Guard: Phases C–E depend on Phase B having created items
+    const phaseBPassed = results.steps.some(s => s.step === 'create-actors-items' && s.passed);
+    if (!phaseBPassed) {
+      process.stderr.write('Skipping Phases C–E: Phase B did not complete.\n');
+      results.steps.push({ step: 'create-crafting-system', passed: false, error: 'Skipped: Phase B failed' });
+    }
+
     // ── Phase C: Create crafting system & recipes ────────────────────────────
+    if (phaseBPassed) {
     process.stdout.write('Phase C: Creating crafting system and recipes...\n');
     try {
       const craftingSetup = await page.evaluate(async () => {
@@ -712,8 +725,15 @@ async function main() {
       results.steps.push({ step: 'create-crafting-system', passed: false, error: err.message });
       process.stderr.write(`Phase C failed: ${err.message}\n`);
     }
+    } // end if (phaseBPassed)
 
-    // ── Final: Check for runtime errors ────────────────────────────────────
+    // ── Final: Check for step failures and runtime errors ──────────────────
+    const failedSteps = results.steps.filter(s => s.passed === false);
+    if (failedSteps.length > 0) {
+      const summary = failedSteps.map(s => `${s.step}: ${s.error || 'failed'}`).join('; ');
+      throw new Error(`${failedSteps.length} step(s) failed: ${summary}`);
+    }
+
     if (consoleErrors.length > 0) {
       results.errors = consoleErrors;
       throw new Error(`${consoleErrors.length} runtime console error(s) captured.`);
