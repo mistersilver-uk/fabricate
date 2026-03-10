@@ -243,7 +243,7 @@ jobs:
         run: |
           gh issue edit "${{ needs.pick-task.outputs.issue_number }}" \
             --repo "${{ github.repository }}" \
-            --remove-label in-progress
+            --remove-label in-progress \
             --add-label agent-failed
           gh issue comment "${{ needs.pick-task.outputs.issue_number }}" \
             --repo "${{ github.repository }}" \
