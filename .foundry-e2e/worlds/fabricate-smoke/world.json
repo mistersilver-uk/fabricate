@@ -9,9 +9,6 @@
     "minimum": "13",
     "verified": "13"
   },
-  "modules": [
-    "fabricate"
-  ],
   "background": "",
   "nextSession": null,
   "resetKeys": false,

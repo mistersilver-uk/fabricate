@@ -9,5 +9,9 @@ dist/
 .foundry-e2e/worlds/*/backups/
 # Downloaded game systems (fetched by scripts/foundry-fetch-systems.mjs)
 .foundry-e2e/systems/
+# Foundry installation cache (avoids re-downloading)
+.foundry-e2e/cache/
+# Assembled data directory for Docker mount (contains symlinks)
+.foundry-e2e/data/
 test-results/
 .env.foundry

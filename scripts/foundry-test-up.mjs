@@ -62,6 +62,14 @@ async function main() {
     env: process.env
   });
 
+  // Assemble the data directory with symlinks
+  process.stdout.write('Setting up data directory...\n');
+  execSync(`"${process.execPath}" "${join(__dirname, 'foundry-setup-data.mjs')}"`, {
+    cwd: ROOT,
+    stdio: 'inherit',
+    env: process.env
+  });
+
   // Pull latest image silently
   process.stdout.write('Pulling Docker image felddy/foundryvtt:release...\n');
   execSync('docker compose -f docker-compose.foundry.yml pull --quiet', {

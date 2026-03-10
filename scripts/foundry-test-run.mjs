@@ -226,50 +226,94 @@ async function main() {
     await page.waitForTimeout(2_000);
     await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-02a-worlds-tab.png') });
 
-    // Click the "Launch World" button for our smoke world
-    const launchBtn = page.locator(`[data-package="${WORLD_ID}"] button, [data-world="${WORLD_ID}"] button, button[data-action="launchWorld"]`).first();
-    try {
-      await launchBtn.waitFor({ state: 'visible', timeout: 10_000 });
-      await launchBtn.click();
-    } catch {
-      // If no launch button visible, try launching via Foundry API
-      process.stdout.write('Launch button not found. Attempting API launch...\n');
-      await page.evaluate((worldId) => {
-        return Setup.worlds.get(worldId)?.launch?.()
-          ?? fetch('/api/launch', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ world: worldId })
-          });
-      }, WORLD_ID);
-    }
-    await page.waitForURL(`${FOUNDRY_URL}/game`, { timeout: 60_000 });
-    await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-03-world-loaded.png') });
+    // Click the Launch World button (visible on hover in Foundry V13)
+    const worldCard = page.locator(`[data-package-id="${WORLD_ID}"]`);
+    await worldCard.hover();
+    const launchBtn = worldCard.locator('[data-action="worldLaunch"]');
+    await launchBtn.waitFor({ state: 'visible', timeout: 5_000 });
+    await launchBtn.click();
+    // After launch, Foundry navigates to /join (player selection) or /game
+    await page.waitForURL(/\/(join|game)/, { timeout: 60_000 });
+    await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-03-world-launching.png') });
     results.steps.push({ step: 'launch-world', passed: true });
+
+    // If on /join, select Gamemaster and join the session
+    if (getPathname(page.url()) === '/join') {
+      process.stdout.write('Join page detected. Joining as Gamemaster...\n');
+
+      // Select the Gamemaster user — try select element first, then Foundry V13 widgets
+      const selectEl = page.locator('select[name="userid"]');
+      if (await selectEl.count() > 0) {
+        await selectEl.selectOption({ label: 'Gamemaster' });
+      } else {
+        // Foundry V13 may use a custom user picker — select via API
+        await page.evaluate(() => {
+          const gm = document.querySelector('[data-user-id]');
+          if (gm) gm.click();
+        });
+      }
+
+      // Click the Join Game Session button
+      const joinBtn = page.locator('button:has-text("Join Game Session"), button[name="join"], button[type="submit"]').first();
+      await joinBtn.waitFor({ state: 'visible', timeout: 10_000 });
+
+      await Promise.all([
+        page.waitForURL(/\/game/, { timeout: 60_000, waitUntil: 'load' }),
+        joinBtn.click()
+      ]);
+      results.steps.push({ step: 'join-session', passed: true });
+    }
+
+    await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-03-world-loaded.png') });
 
     // Wait for Foundry canvas to be ready
     await page.waitForFunction(() => typeof game !== 'undefined' && game.ready, { timeout: 30_000 });
 
-    // ── Step 4: Verify Fabricate module is active ────────────────────────────
+    // ── Step 3: Verify/activate Fabricate module ─────────────────────────────
     const fabricateActive = await page.evaluate(() => {
       return game.modules.get('fabricate')?.active === true;
     });
+
     if (!fabricateActive) {
-      throw new Error('Fabricate module is not active in this world.');
+      process.stdout.write('Fabricate module not active. Activating via Module Management...\n');
+      // Enable the module through Foundry's settings API, then reload
+      await page.evaluate(async () => {
+        const moduleSettings = game.settings.get('core', 'moduleConfiguration') || {};
+        moduleSettings['fabricate'] = true;
+        await game.settings.set('core', 'moduleConfiguration', moduleSettings);
+      });
+      // Reload the page to apply module activation
+      await page.reload({ waitUntil: 'load', timeout: 60_000 });
+      // Re-join if redirected to /join
+      if (getPathname(page.url()) === '/join') {
+        const joinBtn = page.locator('button:has-text("Join Game Session"), button[name="join"], button[type="submit"]').first();
+        await joinBtn.waitFor({ state: 'visible', timeout: 10_000 });
+        await Promise.all([
+          page.waitForURL(/\/game/, { timeout: 60_000, waitUntil: 'load' }),
+          joinBtn.click()
+        ]);
+      }
+      await page.waitForFunction(() => typeof game !== 'undefined' && game.ready, { timeout: 30_000 });
+
+      const nowActive = await page.evaluate(() => game.modules.get('fabricate')?.active === true);
+      if (!nowActive) {
+        throw new Error('Fabricate module could not be activated.');
+      }
+      results.steps.push({ step: 'module-activated', passed: true });
+      process.stdout.write('Fabricate module activated and loaded.\n');
+    } else {
+      results.steps.push({ step: 'module-active', passed: true });
+      process.stdout.write('Fabricate module is active.\n');
     }
-    results.steps.push({ step: 'module-active', passed: true });
-    process.stdout.write('Fabricate module is active.\n');
 
-    // ── Step 5: Click "Craft Item" in Items sidebar ──────────────────────────
-    // Open the Items sidebar tab
-    const itemsTab = page.locator('#sidebar-tabs [data-tab="items"], .item[data-tab="items"]');
+    // ── Step 5: Click "Craft Item" button injected by Fabricate ───────────────
+    // Open the Items sidebar tab first (the Craft button is in its header)
+    const itemsTab = page.locator('[data-tab="items"]').first();
     await itemsTab.click();
-    // Wait for the Items sidebar panel to be visible before looking for Craft button
-    await page.waitForSelector('#items, [data-tab="items"].active', { state: 'visible', timeout: 5_000 });
+    await page.waitForTimeout(1_000);
 
-    // Click the Craft Item header button injected by Fabricate
-    const craftBtn = page.locator('button[data-action="craft-item"], .craft-item-button').first();
-    await craftBtn.waitFor({ state: 'visible', timeout: 5_000 });
+    const craftBtn = page.locator('[data-fabricate-action="craft"], button:has-text("Craft Item")').first();
+    await craftBtn.waitFor({ state: 'visible', timeout: 10_000 });
     await craftBtn.click();
     await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-04-crafting-app.png') });
     results.steps.push({ step: 'open-crafting-app', passed: true });
