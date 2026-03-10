@@ -55,8 +55,14 @@ env:
       `gh issue list --state open --json number,title --limit 100`
 
 jobs:
+  # ── Smoke Test (gate for all agents) ────────────────────────────────
+  smoke-test:
+    uses: ./.github/workflows/foundry-integration.yml
+    secrets: inherit
+
   # ── Phase 1: Domain Expert ───────────────────────────────────────────
   domain-audit:
+    needs: [smoke-test]
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -99,6 +105,7 @@ jobs:
 
   # ── Phase 2: UX Designer ─────────────────────────────────────────────
   ux-audit:
+    needs: [smoke-test]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -106,20 +113,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Download smoke test screenshots
+        uses: actions/download-artifact@v4
         with:
-          node-version: 20
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Playwright Chromium
-        run: npm run test:foundry:install
-
-      - name: Build module
-        run: npm run build
+          name: foundry-smoke-results-${{ github.run_number }}
+          path: test-results/
+        continue-on-error: true
 
       - name: Prepare context
         run: |
@@ -127,9 +126,6 @@ jobs:
           cp .claude/agents/ux-designer.md /tmp/claude-context/agent.md
 
       - uses: anthropics/claude-code-action@v1
-        env:
-          FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
-          FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: >-
@@ -140,9 +136,9 @@ jobs:
             You are the ux-designer agent for Fabricate. Read your agent
             definition from /tmp/claude-context/agent.md and follow it exactly.
 
-            You have access to Playwright (already installed: `npm run test:foundry:install`
-            has been run) and a built module in dist/. The Foundry credentials are
-            in environment variables FOUNDRY_USERNAME and FOUNDRY_PASSWORD.
+            The smoke test screenshots have been downloaded to test-results/
+            from the preceding smoke-test job. Do NOT run the smoke harness
+            yourself — use the existing screenshots.
 
             ## Issue Template
 
@@ -152,13 +148,7 @@ jobs:
 
             1. Read spec/003-ui-integration.md and all Svelte components in
                src/ui/svelte/ to understand the current UI structure.
-            2. Run the Foundry smoke harness to capture live screenshots:
-               ```
-               npm run test:foundry:up
-               npm run test:foundry:run
-               npm run test:foundry:down
-               ```
-            3. Review the screenshots in test-results/ to audit the real rendered UI.
+            2. Review the screenshots in test-results/ to audit the real rendered UI.
                The smoke test populates realistic test data (2 actors with inventories,
                a crafting system with 7 components and 3 recipes, post-craft state)
                and produces 13 labeled screenshots covering every major UI surface:
@@ -169,18 +159,19 @@ jobs:
                - Crafting App with craftable recipes listed
                - Post-craft inventory showing consumed ingredients and crafted output
                Read /tmp/claude-context/agent.md for the full screenshot catalog table.
-            4. Audit components against the spec, design principles, and
+            3. Audit components against the spec, design principles, and
                accessibility standards (WCAG AA). Consider both static code review
                and the live screenshots.
-            5. For each actionable finding, create a GitHub Issue using the
+            4. For each actionable finding, create a GitHub Issue using the
                template above with labels: `ux`, `triage`.
-            6. If the smoke test fails (e.g. Foundry credentials are not set),
-               fall back to static code review only and note this in each issue.
+            5. If no screenshots are available in test-results/, fall back to
+               static code review only and note this in each issue.
 
             Output a summary of findings and issues created.
 
   # ── Phase 3: Quality Engineer ────────────────────────────────────────
   quality-scan:
+    needs: [smoke-test]
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -231,6 +222,7 @@ jobs:
 
   # ── Phase 4: Competitive Analyst ─────────────────────────────────────
   competitive-analysis:
+    needs: [smoke-test]
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:

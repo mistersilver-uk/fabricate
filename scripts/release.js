@@ -245,6 +245,15 @@ async function main() {
   // 4. Generate dist/module.json
   console.log('Writing dist/module.json...');
   const distManifest = rewriteModuleJson(manifest);
+
+  // Pin manifest and download URLs to the specific version tag
+  if (versionOverride) {
+    const tag = `v${versionOverride}`;
+    const baseUrl = `https://github.com/misterpotts/fabricate/releases/download/${tag}`;
+    distManifest.manifest = `${baseUrl}/module.json`;
+    distManifest.download = `${baseUrl}/fabricate-${tag}.zip`;
+  }
+
   await writeFile(join(distDir, 'module.json'), JSON.stringify(distManifest, null, 2));
 
   // 5. Create release zip (unless --no-zip)

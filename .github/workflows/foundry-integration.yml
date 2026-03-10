@@ -1,32 +1,12 @@
 name: "Foundry Integration Smoke Test"
 
 on:
-  workflow_call:                  # Reusable workflow (called by release.yml)
+  workflow_call:                  # Reusable workflow (called by release-candidate.yml, team-a-research.yml)
   workflow_dispatch:              # Manual trigger (allows testing on demand)
-  schedule:
-    - cron: '0 4 * * 1'          # Weekly: Monday 04:00 UTC (nightly cadence)
-  push:
-    branches:
-      - main
-    paths:
-      - 'src/**'
-      - 'scripts/**'
-      - 'module.json'
-      - 'docker-compose.foundry.yml'
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'src/**'
-      - 'scripts/**'
-      - 'module.json'
-      - 'docker-compose.foundry.yml'
 
 concurrency:
-  # Scope to PR number on pull_request, or ref on push/schedule/dispatch.
-  # This prevents PRs from queuing behind each other or behind main pushes.
-  group: foundry-integration-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true        # Cancel stale runs when a new push arrives
+  group: foundry-integration-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -36,10 +16,6 @@ jobs:
   smoke-test:
     runs-on: ubuntu-latest
     timeout-minutes: 20           # Full pipeline: up + smoke + down
-    # Skip on fork PRs where Foundry credentials are unavailable
-    if: >-
-      github.event_name != 'pull_request' ||
-      github.event.pull_request.head.repo.full_name == github.repository
     env:
       FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
       FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}

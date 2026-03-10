@@ -1,14 +1,16 @@
-name: Release
+name: "Release Candidate"
 
 on:
-  workflow_dispatch:
-    inputs:
-      dry_run:
-        description: "Dry run (no publish)"
-        required: false
-        default: "false"
-        type: choice
-        options: ["true", "false"]
+  push:
+    branches:
+      - main
+
+# Skip when semantic-release commits CHANGELOG back
+# (commit message contains [skip ci])
+
+concurrency:
+  group: release-candidate-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -16,6 +18,7 @@ permissions:
 
 jobs:
   unit-tests:
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -28,20 +31,19 @@ jobs:
       - run: npm test
       - run: npm run build
 
-  integration-tests:
+  smoke-test:
     needs: unit-tests
     uses: ./.github/workflows/foundry-integration.yml
     secrets: inherit
 
-  release:
-    needs: integration-tests
+  release-candidate:
+    needs: smoke-test
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -50,9 +52,4 @@ jobs:
       - name: Semantic Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if [ "${{ inputs.dry_run }}" = "true" ]; then
-            npx semantic-release --dry-run
-          else
-            npx semantic-release
-          fi
+        run: npx semantic-release

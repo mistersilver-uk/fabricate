@@ -1,6 +1,6 @@
 {
   "name": "fabricate",
-  "version": "0.1.0",
+  "version": "0.0.0-development",
   "description": "Universal crafting system for Foundry VTT - supports simple recipes, catalysts, variable outputs, and active effect transfer",
   "type": "module",
   "scripts": {

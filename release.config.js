@@ -20,7 +20,7 @@
  */
 
 export default {
-  branches: ['main'],
+  branches: [{ name: 'main', prerelease: 'rc', channel: 'next' }],
 
   plugins: [
     // 1. Analyse commits to determine version bump
@@ -79,11 +79,11 @@ export default {
       }
     ],
 
-    // 5. Commit updated CHANGELOG.md and module.json back to main
+    // 5. Commit updated CHANGELOG.md back to main
     [
       '@semantic-release/git',
       {
-        assets: ['CHANGELOG.md', 'module.json'],
+        assets: ['CHANGELOG.md'],
         message: 'chore(release): ${nextRelease.version} [skip ci]'
       }
     ],
