@@ -32,12 +32,12 @@
 
 | Term               | Definition                                                                                                               | Code Mapping                                          | Spec Reference              |
 |--------------------|--------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------|-----------------------------|
-| **List Mode**      | System-wide visibility strategy: `global`, `player`, `knowledge`, or `teaser`.                                           | `recipeVisibility.listMode`                           | spec/002, spec/006          |
+| **List Mode**      | System-wide visibility strategy: `global`, `player`, or `knowledge`. `teaser` is a removed value — replaced by `discoveryMode` (a separate feature). | `recipeVisibility.listMode`                           | spec/002, spec/006          |
 | **Knowledge Mode** | Sub-strategy within `knowledge` list mode: `item`, `learned`, `itemOrLearned`.                                           | `recipeVisibility.knowledge.mode`                     | spec/002, spec/006          |
 | **Learned Recipe** | A recipe an actor has learned, stored in actor flags.                                                                    | `Actor.flags.fabricate.learnedRecipes`                | spec/006                    |
 | **Recipe Item**    | A Foundry Item linked to a recipe via `linkedRecipeItemUuid`. Ownership grants knowledge access.                         | `Recipe.linkedRecipeItemUuid`                         | spec/002, spec/006          |
 | **Source UUID**    | The compendium origin of an owned item. Resolved via `_stats.compendiumSource` (v12+) or `flags.core.sourceId` (legacy). | `getSourceUuid()` in `src/utils/sourceUuid.js`        | spec/006                    |
-| **Teaser**         | An undocumented-in-spec visibility mode where recipes are partially revealed based on discovery progress.                | `listMode: 'teaser'`, `teaserConfig`, `Recipe.teaser` | (missing from spec — T-173) |
+| ~~**Teaser**~~     | Removed term. Replaced by `discoveryMode` (feature) and `RecipeFragment` (entity). Legacy code references: `listMode: 'teaser'`, `teaserConfig`, `Recipe.teaser`. | Eliminate all references. | (was missing from spec — T-173) |
 
 ### Supplementary Concepts
 
@@ -47,7 +47,8 @@
 | **Signature**                 | The satisfiable ingredient pattern of an ingredient set, used for alchemy matching and uniqueness validation.                                    | `SignatureValidator`                                          | spec/002, spec/004          |
 | **Result Selection Provider** | The mechanism by which a routed/alchemy recipe determines which result group to produce: `ingredientSet`, `macroOutcome`, or `rollTableOutcome`. | `Recipe.resultSelection.provider`                             | spec/002, spec/004          |
 | **Shopping List**             | A session-scoped aggregation of materials needed for queued recipes. Not persisted.                                                              | `shoppingListAggregator.js`, `craftingStore` shopping actions | (missing from spec — T-175) |
-| **Fragment**                  | A discovery token for teaser mode. Linked to an item; collecting it advances discovery progress.                                                 | `FragmentDiscoveryHook`, `TeaserFragment`                     | (missing from spec — T-187) |
+| **RecipeFragment**            | A Foundry Item designated as a piece of recipe knowledge. When an actor acquires a RecipeFragment, their discovery progress toward the linked recipe advances. Collecting enough fragments unlocks the recipe under `discoveryMode`. Replaces legacy name `TeaserFragment`. | `RecipeFragmentHook` (rename from `FragmentDiscoveryHook`), `TeaserFragment` (legacy — eliminate) | spec/006 (to be written) |
+| **Discovery Mode**            | A recipe visibility feature (separate from `listMode`) where recipes are hidden until an actor accumulates sufficient RecipeFragments. Replaces `listMode: "teaser"` and `teaserConfig`. Canonical field: `discoveryMode` on the crafting system. | `discoveryMode`, `discoveryProgress` on actor flags (rename from `teaserConfig`, `Recipe.teaser`) | spec/006 (to be written) |
 
 ## Concept Taxonomy
 
@@ -74,9 +75,12 @@ Crafting System
 │   └── Salvage definition
 ├── Essence Definitions
 ├── Recipe Visibility Configuration
-│   ├── List Mode
-│   ├── Knowledge Mode
-│   └── Teaser Configuration (not in spec)
+│   ├── List Mode (global | player | knowledge)
+│   └── Knowledge Mode
+├── Discovery Mode Configuration (separate from listMode — spec/006 to be written)
+│   ├── enabled flag
+│   ├── per-recipe fragment threshold
+│   └── RecipeFragment item UUID mappings
 ├── Crafting Check Configuration
 ├── Salvage Check Configuration
 ├── Requirements (time, currency)
@@ -86,13 +90,12 @@ Recipe
 ├── Identity (id, name, description, category)
 ├── Lifecycle flags (enabled, locked)
 ├── Ingredient Sets → Ingredient Groups → Ingredients (OR options)
-├── Result Groups → Results
+├── Result Groups → Results (multiple result groups always permitted)
 ├── Catalysts (recipe-level, step-level, set-level)
 ├── Steps (multi-step mode)
 ├── Result Selection (provider + config)
 ├── Visibility (restricted, allowedUserIds)
 ├── Linked Recipe Item UUID
-├── Teaser config (not in spec)
 └── Metadata
 
 Crafting Run
@@ -104,7 +107,7 @@ Actor Flags
 ├── learnedRecipes
 ├── craftingRuns (active + history)
 ├── salvageRuns (active + history)
-└── discoveryProgress (teaser, not in spec)
+└── discoveryProgress (per-recipe fragment accumulation — spec/006 to be written)
 ```
 
 ## Aggregate Map
@@ -235,41 +238,68 @@ stateDiagram-v2
 
 ## Open Questions
 
-### OQ-1: `Component` vs `Item` — triple-alias on system object
-- **Tension:** The normalized system object exposes the same array as `system.items`, `system.components`, and `system.managedItems`. Code uses all three interchangeably. `CraftingSystemManager` internally uses `system.items` (619, 629, 646, 655, 675) while the spec calls them "components". The UI was renamed in T-096 but the data layer still uses `items`.
-- **Options:** (a) Collapse to `components` everywhere and remove `items`/`managedItems` aliases. (b) Keep `items` as the internal field and `components` as spec/UI term.
-- **Recommendation:** Option (a) — the spec's canonical term is `Component` (spec/002). The field should be `components` in the data object; `items` and `managedItems` should become legacy read aliases only.
+### ~~OQ-1: `Component` vs `Item` — triple-alias on system object~~ CLOSED
 
-### OQ-2: `complexRecipes` feature flag — not in spec
-- **Tension:** `features.complexRecipes` is a UI-only gate that controls visibility of multiple ingredient sets, multiple result groups, and `ResultSelectionProvider`. It is not in the spec. It gates controls that are *required* for `routed` and `alchemy` modes (T-229), meaning a GM setting up a routed system but not enabling "Complex Recipes" cannot configure result selection.
-- **Options:** (a) Remove the flag and derive visibility from resolution mode. (b) Add it to the spec as a UI-layer affordance. (c) Rename to something clearer like `features.advancedRecipeEditor`.
-- **Recommendation:** Option (a) — the resolution mode already determines which controls are needed.
+**Decision (2026-03-10):** `components` is the canonical field name on the system data object. `items` and `managedItems` become legacy read-only aliases and must not be used in new code. Tracked in Issue #101.
 
-### OQ-3: `chatOutput`, `craftingChecks`, `outcomeRouting` feature flags — not in spec
-- **Tension:** These are implemented feature toggles but absent from spec/002's `features` block. `craftingChecks` overlaps with `craftingCheck.enabled` (the check configuration object).
-- **Options:** (a) Add them to spec. (b) Remove them if they are derivable from other config.
-- **Recommendation:** `chatOutput` should be in the spec (it controls a user-visible behavior). `craftingChecks` and `outcomeRouting` should be removed and derived from `craftingCheck.enabled` and `resolutionMode` respectively.
+### ~~OQ-2: `complexRecipes` feature flag — not in spec~~ CLOSED
 
-### OQ-4: `tier` field on Component — orphaned
-- **Tension:** `_normalizeComponent` preserves `tier: item.tier || null` but the spec defines no `tier` field on Component. The legacy tiered mode was removed in T-166. This is dead data.
-- **Options:** (a) Remove `tier` from component normalization. (b) Repurpose for progressive difficulty.
-- **Recommendation:** Option (a) — `difficulty` already serves the progressive purpose.
+**Decision (2026-03-10):** Remove `features.complexRecipes` entirely. Replace it with two explicit, mode-derived rules:
 
-### OQ-5: `difficulty` object on CraftingSystem — orphaned
-- **Tension:** `_normalizeSystem` creates `difficulty: { base: 10, tierWeight: 0, tagWeights: {}, essenceWeights: {} }` but the spec defines no system-level `difficulty` object. Component-level `difficulty` is for progressive mode. This system-level object appears to be dead legacy code.
-- **Options:** (a) Remove it. (b) Spec it if it serves the built-in check adapter.
-- **Recommendation:** Investigate whether `CraftingCheckAdapter` uses it; if not, remove.
+1. **Multiple result groups** — permitted for all recipes regardless of resolution mode, to support "pick one reward" and similar patterns. The UI always shows result group controls.
+2. **Multiple ingredient sets (groups)** — permitted only when resolution mode is `routed` or `alchemy`. The UI shows ingredient set controls only when those modes are active.
 
-### OQ-6: `mapped` and `tiered` still accepted at runtime normalization
-- **Tension:** Already tracked as T-259. `_normalizeResolutionMode` accepts `mapped` and `tiered` as valid modes instead of mapping them to `routed`.
+There is no persistent flag. Control visibility is derived from resolution mode at render time. The spec and UI must make the distinction between these two rules explicit. Tracked in Issue #102.
 
-### OQ-7: Salvage — spec-complete but partially implemented
-- **Tension:** Spec/005 defines full salvage lifecycle including `SalvageRun`, `salvageResolutionMode`, and salvage check macros. `CraftingSystemManager` normalizes salvage config but `CraftingEngine` has only partial salvage support. `SalvageRun` actor flags are defined in spec but no `SalvageRunManager` exists.
-- **Options:** (a) Implement fully. (b) Remove from spec until ready. (c) Mark as "future" in spec.
-- **Recommendation:** Mark salvage as future/incomplete in spec; implementation is too partial to consider it a supported feature.
+### ~~OQ-3: `chatOutput`, `craftingChecks`, `outcomeRouting` feature flags — not in spec~~ CLOSED
 
-### OQ-8: Teaser mode — fully implemented but unspecced
-- **Tension:** Teaser mode (`listMode: "teaser"`, `teaserConfig`, `Recipe.teaser`, `discoveryProgress`, `FragmentDiscoveryHook`) is fully implemented and wired end-to-end but entirely absent from spec/002, spec/003, and spec/006. Multiple backlog tasks (T-171 through T-174, T-182, T-186, T-187) track the spec gaps. Until the spec is updated, an implementor reading the spec would not know teaser exists and could write validators that destroy teaser data (T-270).
+**Decision (2026-03-10):**
+
+- **`chatOutput`** — Remove from per-crafting-system `features`. Promote to a module-level setting (registered in Foundry module settings), defaulting to `true`. It is not part of the crafting system data model and must not appear in spec/002. A new section in the spec (or spec/001) should document module-level settings.
+- **`craftingChecks`** — Remove entirely. `craftingCheck.enabled` on the check configuration object is the sole source of truth for whether checks are active.
+- **`outcomeRouting`** — Remove entirely. Derive from `resolutionMode`: outcome routing is only meaningful when mode is `routed` or `alchemy`.
+
+Tracked in Issue #106.
+
+### ~~OQ-4: `tier` field on Component — orphaned~~ CLOSED
+
+**Decision (2026-03-10):** Remove `tier` from `_normalizeComponent` entirely. It is dead data — the tiered mode was removed in T-166 and `difficulty` already serves the progressive mode purpose. Tracked in Issue #103.
+
+### ~~OQ-5: `difficulty` object on CraftingSystem — orphaned~~ CLOSED
+
+**Decision (2026-03-10):** Remove the system-level `difficulty` object (`{ base, tierWeight, tagWeights, essenceWeights }`) from `_normalizeSystem` entirely. Code audit confirms it is written once (line 62, `CraftingSystemManager.js`) and never read — `CraftingCheckAdapter`, `CraftingEngine`, and `ResolutionModeService` all read `difficulty` from component/item objects only. Tracked in Issue #104.
+
+### ~~OQ-6: `mapped` and `tiered` still accepted at runtime normalization~~ CLOSED
+
+**Decision (2026-03-10):**
+
+- **Migration:** Both `"tiered"` and `"mapped"` must be migrated to `"routed"` via a formal data migration that rewrites the stored `resolutionMode` value. Runtime normalization must not silently shim them. Rationale: `tiered` selected exactly one result group based on a check outcome (single selection semantics), which matches `routed` — not `progressive`, which awards all results *up to and including* the outcome level (cumulative semantics). `mapped` was the direct predecessor to `routed` and shares identical semantics.
+- **Normalization:** After migration, `_normalizeResolutionMode` must throw an error on any unrecognised mode string. There is no silent fallback. The four valid values are `"simple"`, `"routed"`, `"progressive"`, and `"alchemy"`.
+
+Tracked as T-259.
+
+### ~~OQ-7: Salvage — spec-complete but partially implemented~~ CLOSED
+
+**Decision (2026-03-10):** Implement salvage fully to match the spec. Deliverables:
+
+1. `SalvageRunManager` — a full execution lifecycle manager parallel to `CraftingRunManager`.
+2. Complete salvage execution paths in `CraftingEngine`.
+3. `salvageResolutionMode` references updated — `"tiered"` is not a valid mode (per OQ-6); valid salvage modes must align with the four canonical resolution modes.
+4. Actor flags for `salvageRuns` (active + history) wired end-to-end.
+
+The spec (spec/005) remains authoritative for the salvage lifecycle. Tracked in Issue #110.
+
+### ~~OQ-8: Teaser mode — fully implemented but unspecced~~ CLOSED
+
+**Decision (2026-03-10):**
+
+- **Spec placement:** Document in spec/006 (recipe visibility). No new spec file.
+- **Architecture:** `discoveryMode` is promoted out of `listMode`. It becomes its own top-level feature with its own configuration block on the crafting system. `listMode: "teaser"` is a removed value; the four valid `listMode` values remain `global`, `player`, `knowledge`, and the fourth (TBD — teaser was the fourth; this may reduce listMode to three values if discovery mode is fully separate).
+- **Rename — feature:** `teaser` → `discoveryMode`. All references to `teaserConfig`, `Recipe.teaser`, and `listMode: "teaser"` must be updated.
+- **Rename — entity:** `TeaserFragment` → `RecipeFragment`. A `RecipeFragment` is a Foundry Item that, when acquired by an actor, advances that actor's discovery progress toward a specific recipe. `RecipeFragment` emphasises that the fragment is a piece of a recipe's knowledge, not merely a teaser. `FragmentDiscoveryHook` should be renamed to `RecipeFragmentHook` or similar.
+- **Domain entity:** `RecipeFragment` is a first-class entry in the Ubiquitous Language (see table update below).
+
+Tracked via T-171 through T-174, T-182, T-186, T-187, T-270.
 
 ## Research Notes
 
