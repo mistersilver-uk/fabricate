@@ -235,6 +235,7 @@ jobs:
           gh issue edit "${{ needs.pick-task.outputs.issue_number }}" \
             --repo "${{ github.repository }}" \
             --remove-label in-progress
+            --add-label agent-failed
           gh issue comment "${{ needs.pick-task.outputs.issue_number }}" \
             --repo "${{ github.repository }}" \
             --body "Agent completed pipeline but produced no code changes. Returning to backlog for review."

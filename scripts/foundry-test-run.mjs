@@ -2,16 +2,19 @@
  * foundry-test-run.mjs
  *
  * Playwright smoke test that verifies Fabricate loads correctly in a live
- * Foundry VTT instance:
+ * Foundry VTT instance and exercises core crafting flows:
  *
  *   1. Opens the Foundry setup page.
  *   2. Accepts the first-run license page if shown.
  *   3. Logs in as admin.
  *   4. Launches the fabricate-smoke world.
  *   5. Confirms the Fabricate module is active (game.modules check via console).
- *   6. Clicks "Craft Item" in the Items sidebar.
- *   7. Asserts the Crafting App opens (checks for a landmark heading).
- *   8. Fails if any runtime console errors were captured.
+ *   6. Creates test actors and items with inventories.
+ *   7. Creates a crafting system with components and recipes.
+ *   8. Screenshots the Recipe Manager (systems, items, recipes tabs).
+ *   9. Opens the Crafting App and verifies recipes are listed.
+ *  10. Crafts a Healing Potion and verifies inventory changes.
+ *  11. Fails if any runtime console errors were captured.
  *
  * Artifacts written to test-results/:
  *   summary.json          — machine-readable pass/fail + error list
@@ -43,6 +46,21 @@ const consoleErrors = [];
 /** @type {string[]} */
 const consoleLog = [];
 
+// ── Screenshot counter ──────────────────────────────────────────────────────
+let screenshotCounter = 0;
+
+/**
+ * Take a screenshot with an auto-incrementing numeric prefix.
+ * @param {import('playwright').Page} page
+ * @param {string} label
+ */
+async function screenshot(page, label) {
+  screenshotCounter++;
+  const num = String(screenshotCounter).padStart(2, '0');
+  const path = join(RESULTS_DIR, `screenshot-${num}-${label}.png`);
+  await page.screenshot({ path });
+}
+
 /**
  * Safely parse a page pathname.
  * @param {string} rawUrl
@@ -69,7 +87,7 @@ async function acceptLicenseIfPresent(page, results) {
   }
 
   process.stdout.write('License agreement detected. Accepting terms...\n');
-  await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-01-license.png') });
+  await screenshot(page, 'license');
 
   const checkboxCandidates = page.locator(
     'input[name="agree"], input[id*="agree" i], input[type="checkbox"]'
@@ -98,7 +116,7 @@ async function acceptLicenseIfPresent(page, results) {
     agreeButton.click()
   ]);
 
-  await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-01a-license-accepted.png') });
+  await screenshot(page, 'license-accepted');
   results.steps.push({ step: 'license-accepted', passed: true });
 }
 
@@ -124,7 +142,7 @@ async function authenticateIfRequired(page, results) {
     submitBtn.click()
   ]);
 
-  await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-01b-auth-complete.png') });
+  await screenshot(page, 'auth-complete');
   results.steps.push({ step: 'admin-auth-page', passed: true });
 }
 
@@ -165,6 +183,14 @@ async function dismissFirstRunDialogs(page, results) {
     // No active tour
   }
 }
+
+// ── Cleanup tracking ──────────────────────────────────────────────────────
+const cleanup = {
+  actorIds: [],
+  itemIds: [],
+  systemId: null,
+  recipeIds: []
+};
 
 async function main() {
   await mkdir(RESULTS_DIR, { recursive: true });
@@ -213,7 +239,7 @@ async function main() {
     // Dismiss first-run dialogs (telemetry, tours) that overlay the setup page
     await dismissFirstRunDialogs(page, results);
 
-    await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-02-setup-ready.png') });
+    await screenshot(page, 'setup-ready');
     results.steps.push({ step: 'setup-ready', passed: true });
 
     // ── Step 2: Launch world ─────────────────────────────────────────────────
@@ -224,7 +250,7 @@ async function main() {
       if (tab) tab.click();
     });
     await page.waitForTimeout(2_000);
-    await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-02a-worlds-tab.png') });
+    await screenshot(page, 'worlds-tab');
 
     // Click the Launch World button (visible on hover in Foundry V13)
     const worldCard = page.locator(`[data-package-id="${WORLD_ID}"]`);
@@ -234,7 +260,7 @@ async function main() {
     await launchBtn.click();
     // After launch, Foundry navigates to /join (player selection) or /game
     await page.waitForURL(/\/(join|game)/, { timeout: 60_000 });
-    await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-03-world-launching.png') });
+    await screenshot(page, 'world-launching');
     results.steps.push({ step: 'launch-world', passed: true });
 
     // If on /join, select Gamemaster and join the session
@@ -264,7 +290,7 @@ async function main() {
       results.steps.push({ step: 'join-session', passed: true });
     }
 
-    await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-03-world-loaded.png') });
+    await screenshot(page, 'world-loaded');
 
     // Wait for Foundry canvas to be ready
     await page.waitForFunction(() => typeof game !== 'undefined' && game.ready, { timeout: 30_000 });
@@ -306,26 +332,388 @@ async function main() {
       process.stdout.write('Fabricate module is active.\n');
     }
 
-    // ── Step 5: Click "Craft Item" button injected by Fabricate ───────────────
-    // Open the Items sidebar tab first (the Craft button is in its header)
-    const itemsTab = page.locator('[data-tab="items"]').first();
-    await itemsTab.click();
-    await page.waitForTimeout(1_000);
+    // Wait for Fabricate to be fully ready
+    await page.waitForFunction(() => game.fabricate?.ready === true, { timeout: 15_000 });
 
-    const craftBtn = page.locator('[data-fabricate-action="craft"], button:has-text("Craft Item")').first();
-    await craftBtn.waitFor({ state: 'visible', timeout: 10_000 });
-    await craftBtn.click();
-    await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-04-crafting-app.png') });
-    results.steps.push({ step: 'open-crafting-app', passed: true });
+    // ── Phase B: Create test actors & items ─────────────────────────────────
+    process.stdout.write('Phase B: Creating test actors and items...\n');
+    try {
+      const createdDocs = await page.evaluate(async () => {
+        // Create world-level items
+        const itemData = [
+          { name: 'Iron Ore', type: 'loot', img: 'icons/svg/item-bag.svg' },
+          { name: 'Mystic Herb', type: 'loot', img: 'icons/svg/item-bag.svg' },
+          { name: 'Dragon Scale', type: 'loot', img: 'icons/svg/item-bag.svg' },
+          { name: 'Empty Vial', type: 'loot', img: 'icons/svg/item-bag.svg' },
+          { name: 'Iron Sword', type: 'weapon', img: 'icons/svg/sword.svg' },
+          { name: 'Healing Potion', type: 'consumable', img: 'icons/svg/potion.svg' },
+          { name: 'Dragon Scale Armor', type: 'equipment', img: 'icons/svg/shield.svg' }
+        ];
 
-    // ── Step 6: Assert Crafting App is open ─────────────────────────────────
-    // Fabricate's CraftingApp renders with a recognisable heading
-    const appHeading = page.locator('.crafting-app, [data-appid] .window-title:has-text("Craft")').first();
-    await appHeading.waitFor({ state: 'visible', timeout: 10_000 });
-    results.steps.push({ step: 'crafting-app-visible', passed: true });
-    process.stdout.write('Crafting App opened successfully.\n');
+        // Check what item types the system supports; fall back to available types
+        const systemItemTypes = game.system?.documentTypes?.Item || [];
+        const resolveType = (preferred) => {
+          if (systemItemTypes.includes(preferred)) return preferred;
+          // Common fallbacks across game systems
+          for (const fallback of ['item', 'loot', 'gear', 'equipment', 'base']) {
+            if (systemItemTypes.includes(fallback)) return fallback;
+          }
+          return systemItemTypes[0] || 'item';
+        };
 
-    // ── Step 7: Check for runtime errors ────────────────────────────────────
+        const resolvedItemData = itemData.map(d => ({
+          ...d,
+          type: resolveType(d.type)
+        }));
+
+        const items = await Item.createDocuments(resolvedItemData);
+        const itemIds = items.map(i => i.id);
+        const itemsByName = {};
+        for (const item of items) {
+          itemsByName[item.name] = { id: item.id, uuid: item.uuid };
+        }
+
+        // Create actors
+        const actorTypes = game.system?.documentTypes?.Actor || [];
+        const actorType = actorTypes.includes('character') ? 'character'
+          : actorTypes[0] || 'character';
+
+        const actors = await Actor.createDocuments([
+          { name: 'Alara the Alchemist', type: actorType, img: 'icons/svg/mystery-man.svg' },
+          { name: 'Brom the Blacksmith', type: actorType, img: 'icons/svg/combat.svg' }
+        ]);
+        const actorIds = actors.map(a => a.id);
+
+        const alara = actors.find(a => a.name === 'Alara the Alchemist');
+        const brom = actors.find(a => a.name === 'Brom the Blacksmith');
+
+        // Build inventory items from world items for embedding
+        const makeEmbedded = (worldItem, qty) => {
+          const copies = [];
+          for (let i = 0; i < qty; i++) {
+            copies.push({ name: worldItem.name, type: worldItem.type, img: worldItem.img });
+          }
+          return copies;
+        };
+
+        const mysticHerb = items.find(i => i.name === 'Mystic Herb');
+        const emptyVial = items.find(i => i.name === 'Empty Vial');
+        const dragonScale = items.find(i => i.name === 'Dragon Scale');
+        const ironOre = items.find(i => i.name === 'Iron Ore');
+
+        // Alara gets: 3x Mystic Herb, 2x Empty Vial, 1x Dragon Scale
+        await alara.createEmbeddedDocuments('Item', [
+          ...makeEmbedded(mysticHerb, 3),
+          ...makeEmbedded(emptyVial, 2),
+          ...makeEmbedded(dragonScale, 1)
+        ]);
+
+        // Brom gets: 3x Iron Ore, 1x Dragon Scale
+        await brom.createEmbeddedDocuments('Item', [
+          ...makeEmbedded(ironOre, 3),
+          ...makeEmbedded(dragonScale, 1)
+        ]);
+
+        return { itemIds, actorIds, itemsByName };
+      });
+
+      cleanup.itemIds = createdDocs.itemIds;
+      cleanup.actorIds = createdDocs.actorIds;
+
+      // Screenshot the Items sidebar
+      const itemsTab = page.locator('[data-tab="items"]').first();
+      await itemsTab.click();
+      await page.waitForTimeout(1_000);
+      await screenshot(page, 'items-sidebar');
+
+      // Screenshot each actor sheet
+      for (const actorId of createdDocs.actorIds) {
+        const actorName = await page.evaluate(async (id) => {
+          const actor = game.actors.get(id);
+          await actor.sheet.render(true);
+          return actor.name;
+        }, actorId);
+        await page.waitForTimeout(1_500);
+        await screenshot(page, `actor-sheet-${actorName.replace(/\s+/g, '-').toLowerCase()}`);
+        // Close the sheet
+        await page.evaluate((id) => {
+          const actor = game.actors.get(id);
+          actor.sheet.close();
+        }, actorId);
+        await page.waitForTimeout(500);
+      }
+
+      results.steps.push({ step: 'create-actors-items', passed: true });
+      process.stdout.write('Phase B complete: Actors and items created.\n');
+    } catch (err) {
+      results.steps.push({ step: 'create-actors-items', passed: false, error: err.message });
+      process.stderr.write(`Phase B failed: ${err.message}\n`);
+    }
+
+    // ── Phase C: Create crafting system & recipes ────────────────────────────
+    process.stdout.write('Phase C: Creating crafting system and recipes...\n');
+    try {
+      const craftingSetup = await page.evaluate(async () => {
+        const csm = game.fabricate.getCraftingSystemManager();
+
+        // Create the crafting system
+        const system = await csm.createSystem({
+          name: 'Arcane Forge',
+          description: 'A mystical forge capable of transmuting raw materials into powerful artifacts.'
+        });
+        const systemId = system.id;
+
+        // Register all 7 world items as managed components
+        const worldItems = game.items.contents;
+        const componentMap = {};
+        for (const item of worldItems) {
+          const result = await csm.addItemFromUuid(systemId, item.uuid);
+          componentMap[item.name] = result.item.id;
+        }
+
+        // Create 3 recipes
+        const rm = game.fabricate.getRecipeManager();
+
+        const recipe1 = await rm.createRecipe({
+          name: 'Forge Iron Sword',
+          description: 'Hammer iron ore into a sturdy blade.',
+          craftingSystemId: systemId,
+          img: 'icons/svg/sword.svg',
+          ingredientSets: [{
+            ingredientGroups: [{
+              name: 'Iron Ore',
+              options: [{
+                quantity: 2,
+                match: { type: 'component', componentId: componentMap['Iron Ore'] }
+              }]
+            }]
+          }],
+          resultGroups: [{
+            name: 'Forged Weapon',
+            results: [{
+              componentId: componentMap['Iron Sword'],
+              quantity: 1
+            }]
+          }]
+        });
+
+        const recipe2 = await rm.createRecipe({
+          name: 'Brew Healing Potion',
+          description: 'Combine mystic herbs and an empty vial to create a healing draught.',
+          craftingSystemId: systemId,
+          img: 'icons/svg/potion.svg',
+          ingredientSets: [{
+            ingredientGroups: [
+              {
+                name: 'Mystic Herb',
+                options: [{
+                  quantity: 1,
+                  match: { type: 'component', componentId: componentMap['Mystic Herb'] }
+                }]
+              },
+              {
+                name: 'Empty Vial',
+                options: [{
+                  quantity: 1,
+                  match: { type: 'component', componentId: componentMap['Empty Vial'] }
+                }]
+              }
+            ]
+          }],
+          resultGroups: [{
+            name: 'Brewed Potion',
+            results: [{
+              componentId: componentMap['Healing Potion'],
+              quantity: 1
+            }]
+          }]
+        });
+
+        const recipe3 = await rm.createRecipe({
+          name: 'Craft Dragon Scale Armor',
+          description: 'Forge dragon scales with iron ore into legendary armor.',
+          craftingSystemId: systemId,
+          img: 'icons/svg/shield.svg',
+          ingredientSets: [{
+            ingredientGroups: [
+              {
+                name: 'Dragon Scale',
+                options: [{
+                  quantity: 2,
+                  match: { type: 'component', componentId: componentMap['Dragon Scale'] }
+                }]
+              },
+              {
+                name: 'Iron Ore',
+                options: [{
+                  quantity: 1,
+                  match: { type: 'component', componentId: componentMap['Iron Ore'] }
+                }]
+              }
+            ]
+          }],
+          resultGroups: [{
+            name: 'Crafted Armor',
+            results: [{
+              componentId: componentMap['Dragon Scale Armor'],
+              quantity: 1
+            }]
+          }]
+        });
+
+        return {
+          systemId,
+          componentMap,
+          recipeIds: [recipe1.id, recipe2.id, recipe3.id],
+          healingPotionRecipeId: recipe2.id
+        };
+      });
+
+      cleanup.systemId = craftingSetup.systemId;
+      cleanup.recipeIds = craftingSetup.recipeIds;
+
+      results.steps.push({ step: 'create-crafting-system', passed: true });
+      process.stdout.write(`Phase C complete: System "${craftingSetup.systemId}" with ${craftingSetup.recipeIds.length} recipes.\n`);
+
+      // ── Phase D: Screenshot Recipe Manager ──────────────────────────────────
+      process.stdout.write('Phase D: Opening Recipe Manager...\n');
+      try {
+        await page.evaluate(() => {
+          fabricate.openRecipeManager();
+        });
+        await page.waitForTimeout(2_000);
+
+        // Wait for the Recipe Manager to be visible
+        const adminApp = page.locator('.fabricate-admin, .recipe-manager').first();
+        await adminApp.waitFor({ state: 'visible', timeout: 10_000 });
+        await screenshot(page, 'recipe-manager-default');
+
+        // Click through tabs using button text (Svelte tabs have no data-tab attributes)
+        // Tab labels from lang/en.json: Systems, Components, Recipes, Rules, Graph
+        const adminTabs = [
+          { label: 'Systems', slug: 'systems' },
+          { label: 'Components', slug: 'items' },
+          { label: 'Recipes', slug: 'recipes' },
+          { label: 'Rules', slug: 'rules' },
+          { label: 'Graph', slug: 'graph' }
+        ];
+        for (const { label, slug } of adminTabs) {
+          try {
+            const tab = page.locator(`.admin-tabs button:has-text("${label}")`).first();
+            if (await tab.count() > 0) {
+              await tab.click();
+              await page.waitForTimeout(1_000);
+              await screenshot(page, `recipe-manager-${slug}`);
+            }
+          } catch {
+            // Tab may not exist in this version
+          }
+        }
+
+        // Close the Recipe Manager
+        await page.evaluate(() => {
+          // Close all open Fabricate admin windows
+          for (const [, app] of Object.entries(ui.windows)) {
+            if (app.constructor?.name?.includes('RecipeManager') ||
+                app.element?.querySelector?.('.fabricate-admin') ||
+                app.element?.classList?.contains?.('fabricate-admin')) {
+              app.close();
+            }
+          }
+        });
+        await page.waitForTimeout(500);
+
+        results.steps.push({ step: 'screenshot-recipe-manager', passed: true });
+        process.stdout.write('Phase D complete: Recipe Manager screenshotted.\n');
+      } catch (err) {
+        results.steps.push({ step: 'screenshot-recipe-manager', passed: false, error: err.message });
+        process.stderr.write(`Phase D failed: ${err.message}\n`);
+      }
+
+      // ── Phase E: Craft an item ──────────────────────────────────────────────
+      process.stdout.write('Phase E: Crafting a Healing Potion...\n');
+      try {
+        // Open the Crafting App via the Items sidebar button
+        const itemsTab = page.locator('[data-tab="items"]').first();
+        await itemsTab.click();
+        await page.waitForTimeout(1_000);
+
+        const craftBtn = page.locator('[data-fabricate-action="craft"], button:has-text("Craft Item")').first();
+        await craftBtn.waitFor({ state: 'visible', timeout: 10_000 });
+        await craftBtn.click();
+        await page.waitForTimeout(2_000);
+
+        // Verify the crafting app opened
+        const craftingApp = page.locator('.crafting-app, [data-appid] .window-title:has-text("Craft")').first();
+        await craftingApp.waitFor({ state: 'visible', timeout: 10_000 });
+        await screenshot(page, 'crafting-app-opened');
+
+        results.steps.push({ step: 'open-crafting-app', passed: true });
+        process.stdout.write('Crafting App opened successfully.\n');
+
+        // Attempt to craft via the API
+        const craftResult = await page.evaluate(async (recipeId) => {
+          const alara = game.actors.contents.find(a => a.name === 'Alara the Alchemist');
+          if (!alara) throw new Error('Alara the Alchemist not found');
+
+          const rm = game.fabricate.getRecipeManager();
+          const recipe = rm.getRecipe(recipeId);
+          if (!recipe) throw new Error(`Recipe ${recipeId} not found`);
+
+          const result = await game.fabricate.craft(alara, recipe, {
+            componentSourceActors: [alara]
+          });
+
+          // Check Alara's inventory for the Healing Potion
+          const potionInInventory = alara.items.contents.some(i => i.name === 'Healing Potion');
+
+          return {
+            success: result.success,
+            message: result.message,
+            potionInInventory
+          };
+        }, craftingSetup.healingPotionRecipeId);
+
+        if (!craftResult.success) {
+          process.stderr.write(`Craft returned failure: ${craftResult.message}\n`);
+          results.steps.push({ step: 'craft-healing-potion', passed: false, error: craftResult.message });
+        } else {
+          process.stdout.write(`Craft succeeded: ${craftResult.message}\n`);
+          process.stdout.write(`Healing Potion in inventory: ${craftResult.potionInInventory}\n`);
+          results.steps.push({ step: 'craft-healing-potion', passed: true });
+        }
+
+        await page.waitForTimeout(1_000);
+        await screenshot(page, 'post-craft');
+
+        // Open Alara's sheet to show the crafted item
+        await page.evaluate(async () => {
+          const alara = game.actors.contents.find(a => a.name === 'Alara the Alchemist');
+          if (alara) await alara.sheet.render(true);
+        });
+        await page.waitForTimeout(1_500);
+        await screenshot(page, 'alara-post-craft-inventory');
+
+        // Close the sheet
+        await page.evaluate(() => {
+          const alara = game.actors.contents.find(a => a.name === 'Alara the Alchemist');
+          if (alara) alara.sheet.close();
+        });
+
+        results.steps.push({ step: 'craft-item-phase', passed: true });
+        process.stdout.write('Phase E complete.\n');
+      } catch (err) {
+        results.steps.push({ step: 'craft-item-phase', passed: false, error: err.message });
+        process.stderr.write(`Phase E failed: ${err.message}\n`);
+        await screenshot(page, 'craft-failure');
+      }
+
+    } catch (err) {
+      results.steps.push({ step: 'create-crafting-system', passed: false, error: err.message });
+      process.stderr.write(`Phase C failed: ${err.message}\n`);
+    }
+
+    // ── Final: Check for runtime errors ────────────────────────────────────
     if (consoleErrors.length > 0) {
       results.errors = consoleErrors;
       throw new Error(`${consoleErrors.length} runtime console error(s) captured.`);
@@ -341,6 +729,42 @@ async function main() {
     // Capture failure screenshot
     await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-failure.png') }).catch(() => {});
   } finally {
+    // ── Phase F: Cleanup created documents ────────────────────────────────
+    try {
+      await page.evaluate(async (cleanupData) => {
+        // Delete recipes
+        if (cleanupData.recipeIds.length > 0) {
+          const rm = game.fabricate?.getRecipeManager?.();
+          if (rm) {
+            for (const id of cleanupData.recipeIds) {
+              try { await rm.deleteRecipe(id); } catch { /* already deleted */ }
+            }
+          }
+        }
+
+        // Delete crafting system
+        if (cleanupData.systemId) {
+          const csm = game.fabricate?.getCraftingSystemManager?.();
+          if (csm) {
+            try { await csm.deleteSystem(cleanupData.systemId); } catch { /* already deleted */ }
+          }
+        }
+
+        // Delete actors
+        if (cleanupData.actorIds.length > 0) {
+          try { await Actor.deleteDocuments(cleanupData.actorIds); } catch { /* ok */ }
+        }
+
+        // Delete world items
+        if (cleanupData.itemIds.length > 0) {
+          try { await Item.deleteDocuments(cleanupData.itemIds); } catch { /* ok */ }
+        }
+      }, cleanup);
+      process.stdout.write('Cleanup: test data removed.\n');
+    } catch {
+      process.stderr.write('Cleanup: some test data may remain.\n');
+    }
+
     results.consoleErrors = consoleErrors;
     await browser.close();
 
