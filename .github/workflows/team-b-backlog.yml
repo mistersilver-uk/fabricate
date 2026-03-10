@@ -87,6 +87,22 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Prepare context for Claude
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/claude-context
+
+          # Fetch issue body so Claude doesn't spend a turn on gh issue view
+          gh issue view "${{ needs.pick-task.outputs.issue_number }}" \
+            --repo "${{ github.repository }}" \
+            --json body -q .body > /tmp/claude-context/issue-body.txt
+
+          # Pre-read agent definitions so Claude doesn't spend turns reading them
+          for agent in orchestrator implementer reviewer docs-writer; do
+            cp ".claude/agents/${agent}.md" "/tmp/claude-context/${agent}.md"
+          done
+
       - name: Mark issue in-progress
         env:
           GH_TOKEN: ${{ github.token }}
@@ -108,79 +124,60 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: >-
             --model claude-sonnet-4-6
-            --max-turns 50
+            --max-turns 75
             --allowedTools "Bash,Edit,Write,Read,Glob,Grep,Agent"
           prompt: |
-            You are running the Team B pipeline for Fabricate. You have four
-            agent roles available. Read the agent definitions in .claude/agents/
-            to understand each role's responsibilities.
+            You are running the Team B pipeline for Fabricate, a FoundryVTT
+            crafting module. Stack: TypeScript, Svelte 5, Vite, node:test.
 
-            You are working on issue #${{ needs.pick-task.outputs.issue_number }}:
-            "${{ needs.pick-task.outputs.issue_title }}"
+            ## Context (pre-loaded — read these files FIRST, in parallel)
 
-            Read the full issue details:
-            ```
-            gh issue view ${{ needs.pick-task.outputs.issue_number }}
-            ```
+            All context has been pre-loaded to /tmp/claude-context/ to save
+            you tool calls. Read ALL of these files in a single parallel
+            tool call before doing anything else:
 
-            Execute this pipeline:
+            - /tmp/claude-context/issue-body.txt — the full issue body
+            - /tmp/claude-context/orchestrator.md — planning rules
+            - /tmp/claude-context/implementer.md — implementation rules
+            - /tmp/claude-context/reviewer.md — review checklist
+            - /tmp/claude-context/docs-writer.md — documentation rules
 
-            ## Step 1: Orchestrator (Plan)
-            Read the issue acceptance criteria. Analyze task complexity.
+            ## Issue #${{ needs.pick-task.outputs.issue_number }}: ${{ needs.pick-task.outputs.issue_title }}
 
-            Before planning, search the codebase to locate relevant files:
-            - Use Grep to find keywords from the issue (class names, function
-              names, UI labels, error messages) across src/ and test/
-            - Use Glob to find related files by pattern (e.g. **/*Recipe*,
-              **/*crafting*)
-            - Read the files you find to understand the existing code structure
+            ## Pipeline
 
-            Then write a brief implementation plan that lists the specific
-            files to change and tests to write, with line-number references
-            where possible.
+            Work through these phases. Be efficient — use parallel tool calls
+            where possible, skip unnecessary steps for simple tasks.
 
-            ## Step 2: Implementer (Build)
-            Follow the implementer agent rules from .claude/agents/implementer.md:
-            - Write tests BEFORE implementation (TDD)
-            - Run `npm test` after every logical change
-            - Run `npm run build` to confirm clean compilation
-            - Keep changes focused — one task at a time
-            - Follow existing codebase patterns
+            ### 1. Plan
+            Search the codebase (Grep/Glob) for keywords from the issue to
+            locate relevant files. Read those files. Decide what to change.
+            For simple tasks (e.g. removing a line, renaming a key), skip
+            writing a PLAN.md — just proceed to implementation.
 
-            ## Step 3: Reviewer (Validate)
-            Follow the reviewer agent checklist from .claude/agents/reviewer.md:
-            - TypeScript types are correct
-            - Tests exist and are meaningful
-            - Svelte components follow existing patterns
-            - FoundryVTT API usage is correct
-            - No console.log in production code
-            - `npm test` passes and `npm run build` compiles cleanly
+            ### 2. Implement
+            Follow the rules in /tmp/claude-context/implementer.md.
+            For trivial removals or config-only changes, a test confirming
+            the removal is sufficient — full TDD is not required.
 
-            If review finds issues, fix them before proceeding.
+            ### 3. Validate
+            Follow the checklist in /tmp/claude-context/reviewer.md.
+            Run `npm test` and `npm run build` ONCE after all changes are
+            complete. Fix any issues found.
 
-            ## Step 4: Docs Writer (Document)
-            Follow the docs-writer agent rules from .claude/agents/docs-writer.md:
-            - Update JSDoc on modified source files
-            - Update relevant docs/ pages if behavior changed
-            - Append a CHANGELOG.md entry referencing #${{ needs.pick-task.outputs.issue_number }}
+            ### 4. Document
+            Follow the rules in /tmp/claude-context/docs-writer.md.
+            At minimum, update CHANGELOG.md with an entry referencing
+            #${{ needs.pick-task.outputs.issue_number }}.
 
-            ## Final: Commit
-            Stage all changes and commit following Conventional Commits format:
+            ### 5. Commit
+            Stage all changes and commit:
             `<type>(#${{ needs.pick-task.outputs.issue_number }}): <short description>`
 
-            Choose the type based on the nature of the change:
-            - `feat` — new feature or behaviour
-            - `fix` — bug fix
-            - `docs` — documentation only
-            - `refactor` — code restructure, no behaviour change
-            - `test` — tests only
-            - `chore` — maintenance, dependencies, tooling
+            Types: feat, fix, docs, refactor, test, chore
+            Validate: `npx commitlint --from HEAD~1 --to HEAD --verbose`
 
-            Example: `feat(#${{ needs.pick-task.outputs.issue_number }}): add cauldron mode`
-
-            After committing, validate with: `npx commitlint --from HEAD~1 --to HEAD --verbose`
-
-            IMPORTANT RULES:
+            ## Rules
             - NEVER remove the `triage` label from any issue.
             - Do NOT close the issue — the PR will reference it.
             - Do NOT merge anything.
