@@ -31,6 +31,12 @@ function main() {
     mkdirSync(join(DATA_DIR, sub), { recursive: true });
   }
 
+  // Create the container cache directory so Docker doesn't create it as root.
+  // The v13 felddy/foundryvtt image runs as the host user (via `user:` in
+  // docker-compose) and needs write access to both /data and /data/container_cache.
+  const cacheDir = join(ROOT, '.foundry-e2e', 'cache');
+  mkdirSync(cacheDir, { recursive: true });
+
   // Copy built module into data/Data/modules/fabricate/
   const moduleDest = join(DATA_DIR, 'modules', 'fabricate');
   if (existsSync(DIST_DIR)) {
