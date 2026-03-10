@@ -20,7 +20,10 @@
  */
 
 export default {
-  branches: [{ name: 'main', prerelease: 'rc', channel: 'next' }],
+  branches: [
+    'release',
+    { name: 'main', prerelease: 'rc', channel: 'next' }
+  ],
 
   plugins: [
     // 1. Analyse commits to determine version bump
