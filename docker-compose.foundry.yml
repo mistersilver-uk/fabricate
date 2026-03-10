@@ -14,9 +14,10 @@
 # The Foundry image is felddy/foundryvtt — a well-known community image that
 # handles license activation automatically via credentials.
 #
-# Note on volumes: bind mounts for modules and worlds overlay specific paths
-# under /home/foundry/data/Data/. The container manages its own data state
-# ephemerally (no named volume) since this is a disposable CI environment.
+# Note on volumes: a named volume (foundry-data) persists the Foundry VTT
+# installation between runs to avoid re-downloading and hitting rate limits.
+# Bind mounts overlay specific paths under /home/foundry/data/Data/ for the
+# module, world fixture, and game system.
 
 services:
   foundry:
@@ -31,10 +32,12 @@ services:
       CONTAINER_PRESERVE_CONFIG: "true"
       FOUNDRY_WORLD: "fabricate-smoke"
     volumes:
+      # Persist Foundry installation between runs to avoid re-downloading (rate limits)
+      - foundry-data:/home/foundry/data
       # Mount built module into the Foundry modules directory
       - ./dist:/home/foundry/data/Data/modules/fabricate:ro
-      # Mount test world fixture
-      - ./.foundry-e2e/worlds/fabricate-smoke:/home/foundry/data/Data/worlds/fabricate-smoke:ro
+      # Mount test world fixture (writable — Foundry creates db files on launch)
+      - ./.foundry-e2e/worlds/fabricate-smoke:/home/foundry/data/Data/worlds/fabricate-smoke
       # Mount pre-downloaded game system (fetched by scripts/foundry-fetch-systems.mjs)
       - ./.foundry-e2e/systems/dnd5e:/home/foundry/data/Data/systems/dnd5e:ro
     healthcheck:
@@ -44,3 +47,6 @@ services:
       retries: 12
       start_period: 60s
     restart: "no"
+
+volumes:
+  foundry-data:

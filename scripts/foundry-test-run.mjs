@@ -94,7 +94,7 @@ async function acceptLicenseIfPresent(page, results) {
   const agreeButton = agreeButtonCandidates.first();
   await agreeButton.waitFor({ state: 'visible', timeout: 10_000 });
   await Promise.all([
-    page.waitForURL(/\/setup(?:\?.*)?$/, { timeout: 20_000 }),
+    page.waitForURL(/\/(setup|auth)(?:\?.*)?$/, { timeout: 20_000 }),
     agreeButton.click()
   ]);
 
@@ -102,11 +102,77 @@ async function acceptLicenseIfPresent(page, results) {
   results.steps.push({ step: 'license-accepted', passed: true });
 }
 
+/**
+ * Enter admin key on /auth page if present.
+ * After successful auth, Foundry redirects to /setup.
+ * @param {import('playwright').Page} page
+ * @param {{ steps: Array<Record<string, boolean | string>> }} results
+ */
+async function authenticateIfRequired(page, results) {
+  if (getPathname(page.url()) !== '/auth') {
+    return;
+  }
+
+  process.stdout.write('Admin auth page detected. Entering admin key...\n');
+  const adminInput = page.locator('input[name="adminKey"], input[name="password"], input[type="password"]').first();
+  await adminInput.waitFor({ state: 'visible', timeout: 10_000 });
+  await adminInput.fill(ADMIN_KEY);
+
+  const submitBtn = page.locator('button[type="submit"], button:has-text("Submit"), button:has-text("Log In")').first();
+  await Promise.all([
+    page.waitForURL(/\/setup(?:\?.*)?$/, { timeout: 20_000 }),
+    submitBtn.click()
+  ]);
+
+  await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-01b-auth-complete.png') });
+  results.steps.push({ step: 'admin-auth-page', passed: true });
+}
+
+/**
+ * Dismiss first-run overlay dialogs on the setup page:
+ * telemetry consent, backup tour, etc.
+ * @param {import('playwright').Page} page
+ * @param {{ steps: Array<Record<string, boolean | string>> }} results
+ */
+async function dismissFirstRunDialogs(page, results) {
+  // 1. Telemetry / usage sharing dialog
+  try {
+    const declineSharing = page.locator('button:has-text("Decline Sharing")');
+    await declineSharing.waitFor({ state: 'visible', timeout: 10_000 });
+    process.stdout.write('Telemetry dialog detected. Declining...\n');
+    await declineSharing.click();
+    await declineSharing.waitFor({ state: 'hidden', timeout: 5_000 });
+    results.steps.push({ step: 'dismiss-telemetry', passed: true });
+  } catch {
+    // Not shown
+  }
+
+  // 2. Foundry tours (e.g. "Backups Overview") — dismiss via API
+  try {
+    await page.waitForTimeout(2_000); // Allow tours to start
+    const dismissed = await page.evaluate(() => {
+      if (typeof Tour !== 'undefined' && Tour.activeTour) {
+        Tour.activeTour.exit();
+        return true;
+      }
+      return false;
+    });
+    if (dismissed) {
+      process.stdout.write('Active tour dismissed via API.\n');
+      results.steps.push({ step: 'dismiss-tour', passed: true });
+    }
+  } catch {
+    // No active tour
+  }
+}
+
 async function main() {
   await mkdir(RESULTS_DIR, { recursive: true });
 
   const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext();
+  const context = await browser.newContext({
+    viewport: { width: 1920, height: 1080 }
+  });
   const page = await context.newPage();
 
   // Capture all console output
@@ -132,25 +198,51 @@ async function main() {
   };
 
   try {
-    // ── Step 1: Navigate to setup page and handle first-run license ─────────
+    // ── Step 1: Navigate to setup page and handle first-run flows ──────────
     await page.goto(`${FOUNDRY_URL}/setup`, { waitUntil: 'networkidle' });
     results.steps.push({ step: 'navigate-setup', passed: true });
+
+    // Handle first-run license page (redirects /setup → /license → /auth)
     await acceptLicenseIfPresent(page, results);
-    await page.waitForURL(/\/setup(?:\?.*)?$/, { timeout: 15_000 });
-    await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-01-setup.png') });
 
-    // ── Step 2: Enter admin key ──────────────────────────────────────────────
-    const adminInput = page.locator('input[name="adminKey"], input[type="password"]').first();
-    await adminInput.fill(ADMIN_KEY);
-    await page.keyboard.press('Enter');
-    await page.waitForURL(/\/setup(?:\?.*)?$/, { timeout: 15_000 });
-    await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-02-authenticated.png') });
-    results.steps.push({ step: 'admin-auth', passed: true });
+    // Handle admin auth page (/auth → /setup)
+    await authenticateIfRequired(page, results);
 
-    // ── Step 3: Launch world ─────────────────────────────────────────────────
+    await page.waitForURL(/\/setup(?:\?.*)?$/, { timeout: 15_000 });
+
+    // Dismiss first-run dialogs (telemetry, tours) that overlay the setup page
+    await dismissFirstRunDialogs(page, results);
+
+    await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-02-setup-ready.png') });
+    results.steps.push({ step: 'setup-ready', passed: true });
+
+    // ── Step 2: Launch world ─────────────────────────────────────────────────
+    // Navigate to the Worlds tab via JavaScript (Foundry V13 setup page)
+    await page.evaluate(() => {
+      // Foundry V13 uses ApplicationV2 tabs — switch to worlds tab
+      const tab = document.querySelector('#setup-packages-header [data-tab="worlds"]');
+      if (tab) tab.click();
+    });
+    await page.waitForTimeout(2_000);
+    await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-02a-worlds-tab.png') });
+
     // Click the "Launch World" button for our smoke world
-    const launchBtn = page.locator(`[data-world="${WORLD_ID}"] button, button[data-action="launchWorld"]`).first();
-    await launchBtn.click();
+    const launchBtn = page.locator(`[data-package="${WORLD_ID}"] button, [data-world="${WORLD_ID}"] button, button[data-action="launchWorld"]`).first();
+    try {
+      await launchBtn.waitFor({ state: 'visible', timeout: 10_000 });
+      await launchBtn.click();
+    } catch {
+      // If no launch button visible, try launching via Foundry API
+      process.stdout.write('Launch button not found. Attempting API launch...\n');
+      await page.evaluate((worldId) => {
+        return Setup.worlds.get(worldId)?.launch?.()
+          ?? fetch('/api/launch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ world: worldId })
+          });
+      }, WORLD_ID);
+    }
     await page.waitForURL(`${FOUNDRY_URL}/game`, { timeout: 60_000 });
     await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-03-world-loaded.png') });
     results.steps.push({ step: 'launch-world', passed: true });

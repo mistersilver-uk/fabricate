@@ -40,6 +40,7 @@ jobs:
             # Find the oldest open issue that:
             #   - does NOT have the 'triage' label (humans haven't approved it yet)
             #   - does NOT have the 'in-progress' label (not already being worked)
+            #   - does NOT have the 'agent-failed' label (failed on previous attempt)
             #   - IS open
             # gh sorts by created date ascending by default (oldest first = highest priority)
             ISSUE_JSON=$(gh issue list \
@@ -49,7 +50,8 @@ jobs:
               --limit 50 \
               | jq -r '[.[] | select(
                   (.labels | map(.name) | contains(["triage"]) | not) and
-                  (.labels | map(.name) | contains(["in-progress"]) | not)
+                  (.labels | map(.name) | contains(["in-progress"]) | not) and
+                  (.labels | map(.name) | contains(["agent-failed"]) | not)
                 )] | first // empty')
 
             if [ -z "$ISSUE_JSON" ] || [ "$ISSUE_JSON" = "null" ]; then
@@ -106,8 +108,8 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: >-
             --model claude-sonnet-4-6
-            --max-turns 40
-            --allowedTools "Bash(npm test:*),Bash(npm run:*),Bash(npm ci:*),Bash(npx:*),Bash(git:*),Bash(gh:*),Bash(cat:*),Bash(ls:*),Edit,Write,Read,Glob,Grep,Agent"
+            --max-turns 50
+            --allowedTools "Bash,Edit,Write,Read,Glob,Grep,Agent"
           prompt: |
             You are running the Team B pipeline for Fabricate. You have four
             agent roles available. Read the agent definitions in .claude/agents/
@@ -225,7 +227,7 @@ jobs:
           EOF
           )"
 
-      - name: Remove in-progress when no changes
+      - name: Remove in-progress on success (no changes)
         if: env.HAS_CHANGES == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -233,19 +235,31 @@ jobs:
           gh issue edit "${{ needs.pick-task.outputs.issue_number }}" \
             --repo "${{ github.repository }}" \
             --remove-label in-progress
+          gh issue comment "${{ needs.pick-task.outputs.issue_number }}" \
+            --repo "${{ github.repository }}" \
+            --body "Agent completed pipeline but produced no code changes. Returning to backlog for review."
 
       - name: Cleanup on failure
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Remove in-progress label so the issue is eligible next run
+          # Swap in-progress for agent-failed so the issue is not retried automatically
           gh issue edit "${{ needs.pick-task.outputs.issue_number }}" \
             --repo "${{ github.repository }}" \
-            --remove-label in-progress
+            --remove-label in-progress \
+            --add-label agent-failed
 
-          # Delete remote branch if it was pushed
-          if git ls-remote --heads origin "$BRANCH" | grep -q .; then
-            git push origin --delete "$BRANCH"
-            echo "Deleted remote branch $BRANCH"
-          fi
+          # Post a comment with the run link for debugging
+          gh issue comment "${{ needs.pick-task.outputs.issue_number }}" \
+            --repo "${{ github.repository }}" \
+            --body "Agent pipeline failed. [View run logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).
+          Remove the \`agent-failed\` label to allow retry."
+
+          # Delete remote branch if it was pushed (use gh api — git credentials
+          # are revoked by the Claude Code Action post-step before this runs)
+          gh api \
+            --method DELETE \
+            "repos/${{ github.repository }}/git/refs/heads/$BRANCH" \
+            2>/dev/null && echo "Deleted remote branch $BRANCH" \
+            || echo "Branch $BRANCH was not pushed — nothing to delete"
