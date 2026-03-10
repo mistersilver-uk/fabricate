@@ -13,6 +13,14 @@ on:
       - 'scripts/**'
       - 'module.json'
       - 'docker-compose.foundry.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'scripts/**'
+      - 'module.json'
+      - 'docker-compose.foundry.yml'
 
 concurrency:
   group: foundry-integration

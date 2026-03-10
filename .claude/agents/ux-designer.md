@@ -95,6 +95,29 @@ When invoked, immediately gather context before making any recommendations:
     - `Player 1` — use when testing player-facing views and permission-restricted UI
     - `Player 2` — use for multi-user layout comparisons if needed
 
+## Smoke Test Screenshot Catalog
+
+The Foundry smoke test (`npm run test:foundry`) produces a comprehensive set of labeled screenshots in `test-results/`. **Always check for existing screenshots before launching Playwright manually** — the smoke test screenshots are faster to obtain and cover all major UI surfaces with realistic test data (actors with inventories, a crafting system with 7 components and 3 recipes, post-craft state).
+
+| Screenshot | Contents |
+|---|---|
+| `screenshot-01-world-loaded.png` | Foundry canvas after joining the game session |
+| `screenshot-02-items-sidebar.png` | Items sidebar with 7 crafting items (proper .webp icons) |
+| `screenshot-03-actor-sheet-*.png` | Actor character sheet — **inventory tab** with embedded items |
+| `screenshot-04-actor-sheet-*.png` | Second actor's inventory tab |
+| `screenshot-05-recipe-manager-default.png` | Recipe Manager with "Arcane Forge" system selected, Systems tab |
+| `screenshot-06-recipe-manager-systems.png` | Systems tab — system settings and feature toggles |
+| `screenshot-07-recipe-manager-items.png` | Components tab — 8 item cards with icons and sourceUuid |
+| `screenshot-08-recipe-manager-recipes.png` | Recipes tab — 3 recipes with ingredient/result counts |
+| `screenshot-09-recipe-manager-rules.png` | Rules tab |
+| `screenshot-10-recipe-manager-graph.png` | Graph tab — recipe dependency graph with nodes |
+| `screenshot-11-crafting-app-opened.png` | Crafting App — actor selection, craftable recipes listed |
+| `screenshot-12-post-craft.png` | Post-craft state with success notification |
+| `screenshot-13-alara-post-craft-inventory.png` | Actor inventory after crafting (consumed ingredients + crafted item) |
+
+To generate fresh screenshots: `npm run test:foundry` (builds, starts Docker, runs test, stops Docker).
+To use an already-running Foundry instance: `node scripts/foundry-test-run.mjs`.
+
 ## Screenshot & Visual Analysis Workflow
 
 Use the Playwright MCP tools to capture the current state of the UI:
@@ -126,6 +149,15 @@ Use the Playwright MCP tools to capture the current state of the UI:
     - Readable typography at each viewport size
 
 If Playwright is unavailable, fall back to Bash commands using any available screenshot tool or instruct the user on how to provide screenshots manually.
+
+## Foundry V13 API Notes
+
+When writing `browser_evaluate` code that interacts with Foundry V13:
+
+- **Document types** are `Set` objects, not arrays: `game.documentTypes.Item` — use `Array.from()` before `.includes()` or `.filter()`
+- **Tab switching** on ApplicationV2 sheets: use `sheet.changeTab('inventory', 'primary')`, not DOM clicks on `[data-tab]` elements (they exist in the DOM but clicking them doesn't trigger Foundry's tab management)
+- **System document types** moved: use `game.documentTypes` (V13) not `game.system.documentTypes` (V12)
+- **Embedded item source tracking**: `flags.core.sourceId` links an embedded item back to its world-level source UUID
 
 ## Design Principles for Foundry VTT Modules
 

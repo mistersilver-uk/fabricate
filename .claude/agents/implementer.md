@@ -20,6 +20,17 @@ Rules:
 Stack: TypeScript, Svelte components for UI, Vite for bundling, node:test for tests.
 FoundryVTT globals (game, ui, Hooks) are available at runtime — do not import them.
 
+## Foundry V13 Compatibility
+
+The module targets Foundry VTT V13. Key API differences from V12:
+
+- **Document types** are `Set` objects: `game.documentTypes.Item` — always `Array.from()` before `.includes()` or iteration methods that expect arrays.
+- **System document types** moved: use `game.documentTypes` (V13), not `game.system.documentTypes` (V12). Cascade fallback: `game.documentTypes?.Item ?? game.system?.documentTypes?.Item`.
+- **ApplicationV2 tab API**: use `sheet.changeTab(tabName, groupName)` to switch tabs programmatically. DOM `[data-tab]` elements exist but clicking them does not trigger Foundry's tab management.
+- **Embedded item source tracking**: `flags.core.sourceId` links an actor's embedded item back to its world-level source UUID. Set this when creating embedded copies: `{ flags: { core: { sourceId: worldItem.uuid } } }`.
+- **CraftingSystemManager API**: `getSystems()` returns all systems; `getItems(systemId)` returns managed components. There is no `getAllSystems()` method.
+- **Admin store system selection**: pre-set `lastManagedCraftingSystem` setting before opening the Recipe Manager to ensure the admin store initializes with the correct system selected.
+
 ## Commit Message Format
 
 All commits MUST follow Conventional Commits format:
