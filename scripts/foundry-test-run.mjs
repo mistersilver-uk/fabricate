@@ -201,12 +201,9 @@ async function main() {
   });
   const page = await context.newPage();
 
-  // Known non-Fabricate error patterns to ignore
+  // Known non-Fabricate error patterns to ignore (keep narrow — real 404s should be caught)
   const ignoredErrorPatterns = [
-    /Failed to load resource/i,
-    /404 \(Not Found\)/i,
-    /favicon/i,
-    /the server responded with a status of/i
+    /favicon/i
   ];
 
   // Capture all console output
@@ -362,6 +359,22 @@ async function main() {
     try {
       const createdDocs = await page.evaluate(async () => {
         // Clean up any stale test data from previous runs
+        // 1. Clean stale crafting systems and their recipes first
+        const csm = game.fabricate.getCraftingSystemManager();
+        const rm = game.fabricate.getRecipeManager();
+        const allSystems = csm.getSystems();
+        const staleSystems = allSystems.filter(s => s.name === 'Arcane Forge');
+        for (const sys of staleSystems) {
+          console.log(`Cleaning stale crafting system: ${sys.name} (${sys.id})`);
+          // Delete all recipes in this system
+          const recipes = rm.getRecipesForSystem?.(sys.id) ?? [];
+          for (const r of recipes) {
+            try { await rm.deleteRecipe(r.id); } catch { /* ok */ }
+          }
+          try { await csm.deleteSystem(sys.id); } catch { /* ok */ }
+        }
+
+        // 2. Clean stale actors
         const staleActors = game.actors.contents.filter(a =>
           a.name === 'Alara the Alchemist' || a.name === 'Brom the Blacksmith'
         );
@@ -369,6 +382,8 @@ async function main() {
           console.log(`Cleaning ${staleActors.length} stale test actors`);
           await Actor.deleteDocuments(staleActors.map(a => a.id));
         }
+
+        // 3. Clean stale items
         const staleItems = game.items.contents.filter(i =>
           ['Iron Ore', 'Mystic Herb', 'Dragon Scale', 'Empty Vial',
            'Iron Sword', 'Healing Potion', 'Dragon Scale Armor'].includes(i.name)
@@ -399,13 +414,13 @@ async function main() {
 
         // Create world-level items (all as loot — type doesn't matter for crafting)
         const itemData = [
-          { name: 'Iron Ore', type: itemType, img: 'icons/svg/item-bag.svg' },
-          { name: 'Mystic Herb', type: itemType, img: 'icons/svg/item-bag.svg' },
-          { name: 'Dragon Scale', type: itemType, img: 'icons/svg/item-bag.svg' },
-          { name: 'Empty Vial', type: itemType, img: 'icons/svg/item-bag.svg' },
-          { name: 'Iron Sword', type: itemType, img: 'icons/svg/item-bag.svg' },
-          { name: 'Healing Potion', type: itemType, img: 'icons/svg/item-bag.svg' },
-          { name: 'Dragon Scale Armor', type: itemType, img: 'icons/svg/item-bag.svg' }
+          { name: 'Iron Ore', type: itemType, img: 'icons/commodities/metal/ingot-worn-iron.webp' },
+          { name: 'Mystic Herb', type: itemType, img: 'icons/consumables/plants/leaf-herb-green.webp' },
+          { name: 'Dragon Scale', type: itemType, img: 'icons/commodities/leather/scales-blue-white.webp' },
+          { name: 'Empty Vial', type: itemType, img: 'icons/consumables/potions/vial-cork-empty.webp' },
+          { name: 'Iron Sword', type: itemType, img: 'icons/weapons/swords/sword-guard-brass-worn.webp' },
+          { name: 'Healing Potion', type: itemType, img: 'icons/consumables/potions/potion-tube-corked-red.webp' },
+          { name: 'Dragon Scale Armor', type: itemType, img: 'icons/equipment/chest/breastplate-metal-scaled-grey.webp' }
         ];
 
         const items = await Item.createDocuments(itemData);
@@ -470,7 +485,7 @@ async function main() {
       await page.waitForTimeout(1_000);
       await screenshot(page, 'items-sidebar');
 
-      // Screenshot each actor sheet
+      // Screenshot each actor sheet (inventory tab)
       for (const actorId of createdDocs.actorIds) {
         const actorName = await page.evaluate(async (id) => {
           const actor = game.actors.get(id);
@@ -478,6 +493,44 @@ async function main() {
           return actor.name;
         }, actorId);
         await page.waitForTimeout(1_500);
+        // Navigate to inventory tab via Foundry API
+        const invTabResult = await page.evaluate((id) => {
+          const actor = game.actors.get(id);
+          const sheet = actor?.sheet;
+          if (!sheet) return { found: false, reason: 'no sheet' };
+
+          // ApplicationV2: use changeTab API
+          if (typeof sheet.changeTab === 'function') {
+            try {
+              sheet.changeTab('inventory', 'primary');
+              return { found: true, method: 'changeTab(inventory, primary)' };
+            } catch (e) {
+              // Try without group
+              try {
+                sheet.changeTab('inventory');
+                return { found: true, method: 'changeTab(inventory)' };
+              } catch (e2) { /* continue */ }
+            }
+          }
+
+          // ApplicationV1: use activateTab
+          if (typeof sheet.activateTab === 'function') {
+            try {
+              sheet.activateTab('inventory');
+              return { found: true, method: 'activateTab(inventory)' };
+            } catch (e) { /* continue */ }
+          }
+
+          // Debug: list available methods and tab groups
+          const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(sheet))
+            .filter(m => m.toLowerCase().includes('tab'))
+            .slice(0, 10);
+          const tabGroups = sheet.tabGroups ? Object.keys(sheet.tabGroups) : [];
+          return { found: false, methods, tabGroups };
+        }, actorId);
+        if (invTabResult.found) {
+          await page.waitForTimeout(500);
+        }
         await screenshot(page, `actor-sheet-${actorName.replace(/\s+/g, '-').toLowerCase()}`);
         // Close the sheet
         await page.evaluate((id) => {
@@ -530,7 +583,7 @@ async function main() {
           name: 'Forge Iron Sword',
           description: 'Hammer iron ore into a sturdy blade.',
           craftingSystemId: systemId,
-          img: 'icons/svg/sword.svg',
+          img: 'icons/weapons/swords/sword-guard-brass-worn.webp',
           ingredientSets: [{
             ingredientGroups: [{
               name: 'Iron Ore',
@@ -553,7 +606,7 @@ async function main() {
           name: 'Brew Healing Potion',
           description: 'Combine mystic herbs and an empty vial to create a healing draught.',
           craftingSystemId: systemId,
-          img: 'icons/svg/potion.svg',
+          img: 'icons/consumables/potions/bottle-round-corked-red.webp',
           ingredientSets: [{
             ingredientGroups: [
               {
@@ -585,7 +638,7 @@ async function main() {
           name: 'Craft Dragon Scale Armor',
           description: 'Forge dragon scales with iron ore into legendary armor.',
           craftingSystemId: systemId,
-          img: 'icons/svg/shield.svg',
+          img: 'icons/equipment/chest/breastplate-metal-scaled-grey.webp',
           ingredientSets: [{
             ingredientGroups: [
               {
@@ -630,6 +683,11 @@ async function main() {
       // ── Phase D: Screenshot Recipe Manager ──────────────────────────────────
       process.stdout.write('Phase D: Opening Recipe Manager...\n');
       try {
+        // Pre-select the system via settings so the adminStore picks it up on init
+        await page.evaluate(async (sysId) => {
+          await game.settings.set('fabricate', 'lastManagedCraftingSystem', sysId);
+        }, craftingSetup.systemId);
+
         await page.evaluate(() => {
           fabricate.openRecipeManager();
         });
@@ -638,6 +696,15 @@ async function main() {
         // Wait for the Recipe Manager to be visible
         const adminApp = page.locator('.fabricate-admin, .recipe-manager').first();
         await adminApp.waitFor({ state: 'visible', timeout: 10_000 });
+
+        // Click "Arcane Forge" in the sidebar to ensure selection + refresh
+        const systemLink = page.locator('.admin-system-list button.system-link:has-text("Arcane Forge")').first();
+        if (await systemLink.count() > 0) {
+          await systemLink.click();
+          await page.waitForTimeout(2_000);
+          process.stdout.write('Selected "Arcane Forge" system in sidebar.\n');
+        }
+
         await screenshot(page, 'recipe-manager-default');
 
         // Click through tabs using button text (Svelte tabs have no data-tab attributes)
@@ -744,12 +811,23 @@ async function main() {
         await page.waitForTimeout(1_000);
         await screenshot(page, 'post-craft');
 
-        // Open Alara's sheet to show the crafted item
+        // Open Alara's sheet to show the crafted item (inventory tab)
         await page.evaluate(async (alaraId) => {
           const alara = game.actors.get(alaraId);
           if (alara) await alara.sheet.render(true);
         }, cleanup.alaraId);
         await page.waitForTimeout(1_500);
+        // Navigate to inventory tab via Foundry API
+        await page.evaluate((id) => {
+          const actor = game.actors.get(id);
+          const sheet = actor?.sheet;
+          if (typeof sheet?.changeTab === 'function') {
+            sheet.changeTab('inventory', 'primary');
+          } else if (typeof sheet?.activateTab === 'function') {
+            sheet.activateTab('inventory');
+          }
+        }, cleanup.alaraId);
+        await page.waitForTimeout(500);
         await screenshot(page, 'alara-post-craft-inventory');
 
         // Close the sheet
