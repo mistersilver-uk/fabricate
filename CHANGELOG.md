@@ -4,6 +4,12 @@ All notable changes to Fabricate will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.0.0-rc.4](https://github.com/misterpotts/fabricate-v2/compare/v1.0.0-rc.3...v1.0.0-rc.4) (2026-03-11)
+
+### Features
+
+* add codex skill definitions for Fabricate agents ([c081c3d](https://github.com/misterpotts/fabricate-v2/commit/c081c3d269bf75c5bd6536f155e7567b7f0bd6d1))
+
 ## [1.0.0-rc.3](https://github.com/misterpotts/fabricate-v2/compare/v1.0.0-rc.2...v1.0.0-rc.3) (2026-03-11)
 
 ### Bug Fixes
