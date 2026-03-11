@@ -1,0 +1,4 @@
+interface:
+  display_name: "Docs Writer"
+  short_description: "Sync Fabricate docs to approved code"
+  default_prompt: "Use $fabricate-docs-writer to update Fabricate documentation."

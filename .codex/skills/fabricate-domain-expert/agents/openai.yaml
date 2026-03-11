@@ -1,0 +1,4 @@
+interface:
+  display_name: "Domain Expert"
+  short_description: "Audit Fabricate domain language"
+  default_prompt: "Use $fabricate-domain-expert to audit this Fabricate domain question."

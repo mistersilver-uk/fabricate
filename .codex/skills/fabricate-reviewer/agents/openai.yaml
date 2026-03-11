@@ -1,0 +1,4 @@
+interface:
+  display_name: "Reviewer"
+  short_description: "Review Fabricate changes and gate them"
+  default_prompt: "Use $fabricate-reviewer to review the current Fabricate diff."

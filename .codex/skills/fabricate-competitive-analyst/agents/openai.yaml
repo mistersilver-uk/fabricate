@@ -1,0 +1,4 @@
+interface:
+  display_name: "Competitive Analyst"
+  short_description: "Research Fabricate market positioning"
+  default_prompt: "Use $fabricate-competitive-analyst to update Fabricate market analysis."

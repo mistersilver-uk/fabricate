@@ -1,0 +1,4 @@
+interface:
+  display_name: "Quality Engineer"
+  short_description: "Find Fabricate defects and test gaps"
+  default_prompt: "Use $fabricate-quality-engineer to audit Fabricate for defects."
