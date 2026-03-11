@@ -158,6 +158,26 @@ Steps:
 2. Run the Foundry integration smoke test (via the reusable workflow).
 3. Run `semantic-release` to determine the version bump, update `CHANGELOG.md` and `module.json`, build and zip the module, and publish a GitHub Release.
 
+### Manual Codex Team B workflow
+
+File: `.github/workflows/codex-team-b-manual.yml`
+
+This workflow is a manual-only Codex version of a Team B run for one explicitly selected issue. It does not run on a schedule and does not replace the existing Claude Team A or Team B automation.
+
+Requirements:
+- Repository secret: `OPENAI_API_KEY`
+- A specific issue number when triggering `workflow_dispatch`
+
+Behavior:
+- Fetches the selected issue body
+- Adds the `in-progress` label
+- Runs Codex against the checked-out repo with local repo instructions
+- Requires `npm test` and `npm run build` before PR creation
+- Opens a PR if changes were produced
+- Marks the issue `agent-failed` if the run fails or produces no code changes
+
+Use this workflow when you want a supervised, explicitly chosen Codex Team B run without changing the scheduled automation lanes.
+
 ---
 
 ## Release pipeline

@@ -91,6 +91,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### CI/CD
 
+- Added a manual-only `codex-team-b-manual.yml` workflow for explicitly selected Team B issue runs with Codex. The existing Claude scheduled workflows remain unchanged; the Codex path is opt-in via `workflow_dispatch`, requires `OPENAI_API_KEY`, and still runs `npm test` plus `npm run build` before PR creation.
 - Added Conventional Commits enforcement: commitlint.config.js configures @commitlint/config-conventional with an issue-scoped format. A new conventional-commits.yml workflow validates all commits on a PR and the PR title itself. Agent config files and team-b-backlog.yml have been updated with explicit commit format rules.
 - Added Foundry VTT integration smoke-test harness: docker-compose.foundry.yml launches a disposable felddy/foundryvtt container; four new scripts (foundry-test-up.mjs, foundry-test-run.mjs, foundry-test-down.mjs, foundry-test.mjs) orchestrate start, Playwright smoke test, and teardown. Artifacts (summary.json, screenshots, console log) are written to test-results/.
 - Added foundry-integration.yml GitHub Actions workflow that triggers on push to main, weekly schedule, and workflow_dispatch. On failure, opens a GitHub Issue with the foundry-smoke-failure label.
