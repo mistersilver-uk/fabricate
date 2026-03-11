@@ -4,6 +4,12 @@ All notable changes to Fabricate will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.0.0-rc.3](https://github.com/misterpotts/fabricate-v2/compare/v1.0.0-rc.2...v1.0.0-rc.3) (2026-03-11)
+
+### Bug Fixes
+
+* **ci:** increase `--max-turns` in team-b-backlog workflow from 75 to 125 ([0c286ec](https://github.com/misterpotts/fabricate-v2/commit/0c286ec30e10dd965e897ae3a02b01abb74682be))
+
 ## [1.0.0-rc.2](https://github.com/misterpotts/fabricate-v2/compare/v1.0.0-rc.1...v1.0.0-rc.2) (2026-03-11)
 
 ### Bug Fixes
