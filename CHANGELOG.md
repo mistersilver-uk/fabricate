@@ -4,6 +4,12 @@ All notable changes to Fabricate will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.0.0-rc.2](https://github.com/misterpotts/fabricate-v2/compare/v1.0.0-rc.1...v1.0.0-rc.2) (2026-03-11)
+
+### Bug Fixes
+
+* **ci:** re-authenticate git in team-b-backlog workflow to restore credentials before push ([1b15b7c](https://github.com/misterpotts/fabricate-v2/commit/1b15b7ceca6ff99903f37c13970ebfff84119c23))
+
 ## 1.0.0-rc.1 (2026-03-11)
 
 ### Features
