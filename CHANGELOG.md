@@ -4,6 +4,12 @@ All notable changes to Fabricate will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.0.0-rc.5](https://github.com/misterpotts/fabricate-v2/compare/v1.0.0-rc.4...v1.0.0-rc.5) (2026-03-11)
+
+### Features
+
+* **#135:** add gathering and harvesting mechanics ([f0bcb6d](https://github.com/misterpotts/fabricate-v2/commit/f0bcb6dd4dffe09ef7fdb6756bc252663d9eecd0)), closes [#135](https://github.com/misterpotts/fabricate-v2/issues/135)
+
 ## [1.0.0-rc.4](https://github.com/misterpotts/fabricate-v2/compare/v1.0.0-rc.3...v1.0.0-rc.4) (2026-03-11)
 
 ### Features
