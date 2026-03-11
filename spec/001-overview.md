@@ -104,11 +104,13 @@ World:
 
 - `fabricate.craftingSystems`
 - `fabricate.recipes`
+- `fabricate.gatheringEnvironments`
 
 Client:
 
 
 - `fabricate.lastCraftingActor`
+- `fabricate.lastGatheringActor`
 - `fabricate.lastComponentSources`
 - `fabricate.lastManagedCraftingSystem`
 - optional progressive order preferences
@@ -117,6 +119,8 @@ Client:
 
 - `flags.fabricate.craftingRuns.active` for resumable in-progress runs
 - `flags.fabricate.craftingRuns.history` for completed/failed/cancelled run history
+- `flags.fabricate.gatheringRuns.active` for in-progress time-gated gathering runs
+- `flags.fabricate.gatheringRuns.history` for completed/failed/cancelled gathering run history
 - `flags.fabricate.learnedRecipes` for learned recipe records
 
 Clean-up semantics for stale runs/learned records are defined in `007-destructive-changes-and-migrations.md`.

@@ -12,6 +12,7 @@ Behavioural semantics are defined in:
 - `005-recipes-and-steps.md`
 - `006-recipe-visibility.md`
 - `007-destructive-changes-and-migrations.md`
+- `009-gathering-and-harvesting.md`
 
 ## CraftingSystem
 
@@ -32,6 +33,7 @@ CraftingSystem = {
     propertyMacros: boolean,
     effectTransfer: boolean,
     multiStepRecipes: boolean,
+    gathering: boolean, // default false
     salvage: boolean, // default false
   },
 
@@ -140,6 +142,7 @@ CraftingSystem = {
 5. If `resolutionMode === "alchemy"`:
    - `features.multiStepRecipes` must be `false`.
    - `alchemy` config must be present; missing values use defaults (`learnOnCraft: false`, `consumeOnFail: true`, `showAttemptHistoryToPlayers: true`).
+6. If `features.gathering` is false, gathering environments and gathering tasks for that system are inert and hidden from normal UI flows.
 
 ### Recipe Visibility Requirements
 
@@ -275,8 +278,7 @@ Recipe = {
    - `rollTableOutcome`: `Recipe.resultSelection.rollTableUuid` is required.
 5. `ResultGroup.name` values must be unique per recipe under trim-normalized, case-insensitive comparison.
 6. `ResultGroup.name` values may not be reserved routing keywords under trim-normalized, case-insensitive comparison:
-   - fail keywords: `fail`, `failed`, `failure`, `f`
-   - miss keywords: `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`
+   - failure keywords: `fail`, `failed`, `failure`, `f`, `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`, `hazard`, `danger`, `complication`, `trap`, `oops`
 7. If `transferEffects` is true and essences are enabled, transfer behaviour follows `005-recipes-and-steps.md`.
 8. If `visibility.restricted` is true, `visibility.allowedUserIds` must be present as an array. An empty array is valid and means no non-GM user may see the recipe.
 9. If knowledge mode includes item matching or learning, `linkedRecipeItemUuid` should be configured for player craftability.
@@ -677,6 +679,25 @@ Requirements:
 4. History should be newest-first and capped by a configured or default limit.
 5. Deleting a recipe or crafting system should clean-up its associated crafting runs, both historical and in-progress.
 
+### Gathering Runs Flag
+
+```js
+Actor.flags.fabricate.gatheringRuns = {
+  active: {
+    [runId: string]: object,
+  },
+  history: object[],
+}
+```
+
+Requirements:
+
+1. `active` contains only non-terminal gathering runs (`inProgress` or `waitingTime`).
+2. `history` contains only terminal gathering runs (`succeeded`, `failed`, `cancelled`).
+3. When a gathering run reaches a terminal status, it must be removed from `active` and prepended to `history`.
+4. Within one actor's `gatheringRuns.active`, at most one active run may exist for a given `taskId`.
+5. Detailed `GatheringRun` shape and lifecycle semantics are defined in `009-gathering-and-harvesting.md`.
+
 ### Learned Recipes Flag
 
 ```js
@@ -771,13 +792,13 @@ Return by mode:
 Normalization and interpretation rules for `outcome` in routed/alchemy `macroOutcome`:
 
 1. `outcome` is required and must be interpreted using trim-normalized, case-insensitive comparison.
-2. Preferred reserved keywords:
+2. Preferred reserved keyword:
    - `fail` (failed craft outcome)
-   - `miss` (non-producing craft outcome)
-3. Accepted synonyms (same normalization rules):
+3. Accepted failure aliases (same normalization rules):
    - fail-family: `fail`, `failed`, `failure`, `f`
-   - miss-family: `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`
-4. If normalized `outcome` matches a reserved keyword, it does not route to a result group.
+   - miss-family compatibility aliases: `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`
+   - hazard-family compatibility aliases: `hazard`, `danger`, `complication`, `trap`, `oops`
+4. If normalized `outcome` matches a reserved failure keyword, it does not route to a result group and is treated as failure.
 5. Otherwise, `outcome` must equal a `ResultGroup.name` for the active recipe under the same normalization rules.
 6. If a non-reserved `outcome` does not match any `ResultGroup.name`, classify as crafting-system misconfiguration error.
 

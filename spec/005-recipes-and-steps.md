@@ -111,7 +111,7 @@ Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
    - resolve the target recipe + ingredient set,
    - execute provider-specific routing (`ingredientSet`, `macroOutcome`, or `rollTableOutcome`),
    - if routed output does not resolve to a valid result group, abort with crafting-system misconfiguration error and do not apply player-failure consumption,
-   - if routing returns fail/miss, apply alchemy failure policy (`consumeOnFail`, default true),
+   - if routing returns a reserved failure keyword, apply alchemy failure policy (`consumeOnFail`, default true),
    - on success, consume inputs and create outputs normally.
 5. Learn flow:
    - recipes are learned only on successful completion,
@@ -193,10 +193,14 @@ Salvage has a single implicit ingredient: `N × this component`, where `N = Comp
 Salvage is a single-step operation (no multi-step salvage):
 
 1. **Validate**: Confirm the actor owns sufficient quantity of the component and all required catalysts.
-2. **Check** (if `salvageCraftingCheck.enabled`): Execute the salvage crafting check macro.
-3. **Resolve**: Determine result group by `salvageResolutionMode` rules (same as recipe resolution per `004-resolution-modes.md`, but using salvage-specific settings).
-4. **Consume**: Remove `ingredientQuantity` instances of the component from the actor's inventory. Degrade/exhaust catalysts as applicable.
-5. **Create**: Create result items on the actor.
+2. **Time Gate** (if `Component.salvage.timeRequirement` is present): Create an active salvage run in `waitingTime` status and defer completion until the required world time has elapsed.
+3. **Check** (if `salvageCraftingCheck.enabled`): Execute the salvage crafting check macro.
+4. **Resolve**: Determine result group by `salvageResolutionMode` rules (same as recipe resolution per `004-resolution-modes.md`, but using salvage-specific settings).
+5. **Consume**: `ingredientQuantity` is always 1 for salvage. Remove that many instances of the component from the actor's inventory. Degrade/exhaust catalysts as applicable.
+6. **Create**: Create result items on the actor.
+
+If `Component.salvage.timeRequirement` is absent, salvage resolves immediately.
+If it is present, the run must resume automatically when world time reaches the derived completion timestamp, following the same startup and `updateWorldTime` re-check pattern used for crafting time gates.
 
 ### Resolution Mode Application
 
@@ -219,6 +223,8 @@ Success and failure macros follow the same contracts as crafting, substituting `
 - `salvageCraftingCheck.consumption.consumeComponentOnFail`: if true (default), the component is consumed even on failure.
 - `salvageCraftingCheck.consumption.consumeCatalystsOnFail`: if false (default), catalysts are not degraded on failure.
 
+When `Component.salvage.timeRequirement` is present, these policies are evaluated when the timed salvage run completes, not when it is first started.
+
 ### SalvageRun Actor Flag
 
 Active and historical salvage runs are stored alongside crafting runs:
@@ -240,11 +246,17 @@ SalvageRun = {
   craftingSystemId: string,
   componentId: string,
 
-  status: "inProgress" | "succeeded" | "failed" | "cancelled",
+  status: "inProgress" | "waitingTime" | "succeeded" | "failed" | "cancelled",
 
   startedAt: number,
   updatedAt: number,
   finishedAt?: number,
+
+  timeGate?: {
+    requiredSeconds: number,
+    availableAt: number,
+    initiatedAt: number,
+  },
 
   lastCheckResult?: {
     success: boolean,
@@ -304,6 +316,8 @@ When recipe-level `ingredientSets` or `resultGroups` are empty:
 - Integration tests for alchemy learn-on-success visibility behavior.
 - Unit tests for salvage lifecycle (validate, check, resolve, consume, create).
 - Unit tests for salvage resolution modes (simple, tiered, progressive).
+- Unit tests for salvage time-gated runs when `Component.salvage.timeRequirement` is present.
+- Unit tests for timed salvage completion after world-time advancement.
 - Unit tests for salvage destructive change handling.
 - Unit tests for validation accepting empty recipe-level `ingredientSets` and `resultGroups` when explicit steps are present.
 - Unit tests for validation rejecting empty step-level `ingredientSets` or `resultGroups` within explicit steps.

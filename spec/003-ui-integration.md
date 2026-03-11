@@ -9,6 +9,7 @@ This file is UI-only. Domain behaviour is defined in:
 - `005-recipes-and-steps.md`
 - `006-recipe-visibility.md`
 - `007-destructive-changes-and-migrations.md`
+- `009-gathering-and-harvesting.md`
 
 Global rule: if a system feature is disabled, controls for that feature are hidden.
 
@@ -19,7 +20,12 @@ Global rule: if a system feature is disabled, controls for that feature are hidd
 Add header actions:
 
 - `Crafting` for all users.
+- `Gathering` for all users, but only when at least one crafting system has `features.gathering === true`.
 - `Manage Crafting Systems` for GMs only.
+
+`Gathering` opens a dedicated gathering app. It must not reuse the crafting app shell or route.
+
+The `Gathering` button is hidden when no crafting system exposes gathering.
 
 ### Compendium Directory
 
@@ -34,6 +40,7 @@ Tabs:
 - Items
 - Essences (only when enabled)
 - Recipes
+- Environments (only when the selected system has `features.gathering === true`)
 
 ### Systems Tab
 
@@ -57,6 +64,7 @@ Changing resolution mode is destructive and must follow `007` confirmation/clean
 - Time requirements toggle (`requirements.time.enabled`)
 - Currency requirements toggle (`requirements.currency.enabled`)
 - Multi-step recipes toggle (`features.multiStepRecipes`)
+- Gathering toggle (`features.gathering`)
 
 #### Crafting Check Controls
 
@@ -76,6 +84,12 @@ Mode semantics are defined in `004`.
 - Currency toggle
 - Currency provider (`system` or `macro`)
 - Provider-specific fields
+
+If `features.gathering === false`:
+
+- the `Environments` tab is hidden
+- the player-facing `Gathering` directory button is hidden when no other system enables gathering
+- gathering environments for that system are not shown in runtime player flows
 
 #### Recipe Visibility Controls
 
@@ -138,6 +152,37 @@ Actions:
 - Edit
 - Duplicate
 - Delete
+
+### Environments Tab
+
+Only shown when `features.gathering === true` for the selected crafting system.
+
+Capabilities:
+
+- Create, edit, duplicate, enable/disable, and delete environments for the selected system
+- Reorder environments in the GM list view
+- Configure environment-level fields:
+  - name
+  - description
+  - `selectionMode` (`targeted` or `blind`)
+  - optional `sceneUuid`
+- Configure task list per environment:
+  - add/remove tasks
+  - enable/disable tasks
+  - edit task name, description, and image
+  - edit visibility gate
+  - edit catalysts
+  - edit `timeRequirement`
+  - edit resolution-specific fields (`resultSelection`, `progressive`, `resultGroups`, `failureOutcome`)
+
+Validation rules from `009-gathering-and-harvesting.md` must be enforced before save.
+
+The environments editor must block save when:
+
+- `selectionMode === "blind"` and the environment has anything other than exactly one task
+- `selectionMode === "targeted"` and the environment has zero tasks
+- a task is missing required routed or progressive fields
+- a task's result groups violate reserved failure keyword rules
 
 ## Recipe Editor
 
@@ -225,7 +270,7 @@ The UI must expose required data fields from `004`, but mode logic itself is def
 - `rollTableOutcome` provider UI:
   - Roll table picker (`rollTableUuid`).
   - Helper text states drawn result name routes by normalized match to `ResultGroup.name`.
-- Validation and helper copy must reserve failure/miss keywords and forbid them as result-group names.
+- Validation and helper copy must reserve failure keywords, including compatibility aliases such as former miss/hazard terms, and forbid them as result-group names.
 
 ### Alchemy Recipe UI (GM Editor)
 
@@ -289,6 +334,114 @@ When system mode is `alchemy`, this list is replaced by the alchemy attempt pane
 
 Before start/resume and before each step action, UI must invoke guard checks defined in `006`.
 
+## Gathering App (Player)
+
+This is a dedicated app distinct from the Crafting App.
+
+It is opened from the `Gathering` header action in the Items directory and must not be combined into the crafting browse-to-craft workflow.
+
+### App Availability
+
+- The app is available only when at least one crafting system has `features.gathering === true`.
+- If no crafting system exposes gathering, the Items directory must not show the `Gathering` action.
+
+### Actor Selection
+
+- Select the gathering actor.
+- Persist the last selected actor in `fabricate.lastGatheringActor`.
+- Only actors the user owns are selectable for non-GM users.
+
+### Environment List
+
+- Show only environments whose owning crafting system has `features.gathering === true`.
+- Hide disabled environments for non-GM users.
+- If an environment is scene-gated, show whether the selected actor currently meets the scene/token requirements.
+- Display environment name, description, and selection-mode summary.
+
+### Task Selection
+
+If the environment is `targeted`:
+
+- show one row/card per visible enabled task
+- each task shows:
+  - image
+  - name
+  - time requirement summary if present
+  - catalyst summary
+  - availability state
+
+If the environment is `blind`:
+
+- show one generic gather action for the single task
+- do not expose alternate per-task choices to the player
+- still show task-derived time requirement and requirement summaries where useful
+
+### Start Gathering Flow
+
+Before creating a run, the UI must check:
+
+- game is not paused 
+- the actor does not already have an active gathering run for the same `taskId`
+- selected environment and task are enabled
+- scene/token access rules pass when `sceneUuid` is configured
+- task visibility gate passes for the selected actor
+- required catalysts are available
+
+If `task.timeRequirement` is absent:
+
+- execute the gathering attempt immediately
+- show the terminal result in the same interaction flow
+- refresh task and run state
+
+If `task.timeRequirement` is present:
+
+- create the run
+- show it immediately in the app's active-runs area with `waitingTime` status
+- show the expected completion time derived from the world-time target
+- notify the user that gathering has started rather than completed
+
+### Active Runs
+
+The Gathering App must include a dedicated active-runs section.
+
+Each active run entry shows:
+
+- environment name
+- task name
+- actor name
+- status (`inProgress` or `waitingTime`)
+- started time
+- remaining or completion time when `timeGate` exists
+
+The app must not allow starting a second active run for the same actor and `taskId`.
+Instead it should show the existing run and an actionable blocking reason.
+
+### Completion and Refresh
+
+When a timed gathering run completes after world-time advancement:
+
+- remove it from the active-runs section
+- prepend it to gathering history
+- surface the terminal result to the user when possible through notification, refreshed app state, or both
+
+If the completion result is:
+
+- `succeeded`: show created results
+- `failed`: show failure feedback and any special-outcome text or macro result summary
+- `cancelled`: show that the run became invalid due to missing references or destructive change
+
+### History
+
+The Gathering App should expose recent gathering history for the selected actor.
+
+Each history row shows:
+
+- environment
+- task
+- terminal status
+- completion time
+- summary of results or failure outcome
+
 ## Data Storage (UI-relevant)
 
 All keys below use the literal `fabricate.*` namespace.
@@ -297,10 +450,12 @@ World settings:
 
 - `fabricate.craftingSystems`
 - `fabricate.recipes`
+- `fabricate.gatheringEnvironments`
 
 Client settings:
 
 - `fabricate.lastCraftingActor`
+- `fabricate.lastGatheringActor`
 - `fabricate.lastComponentSources`
 - `fabricate.lastManagedCraftingSystem`
 - optional progressive order preferences
@@ -309,6 +464,7 @@ Flags:
 
 - `flags.fabricate.learnedRecipes`
 - `flags.fabricate.craftingRuns`
+- `flags.fabricate.gatheringRuns`
 
 ## Compatibility
 

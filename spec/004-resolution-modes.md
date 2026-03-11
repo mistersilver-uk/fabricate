@@ -58,10 +58,9 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
 - Macro return contract is object-based: `{ success, outcome, description? }`.
 - `outcome` is trim-normalized and case-insensitive.
 - Resolution rules:
-  1. If `outcome` is a fail keyword (`fail`, `failed`, `failure`, `f`), execution takes failure path.
-  2. If `outcome` is a miss keyword (`miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`), execution takes non-producing fail/miss path.
-  3. Otherwise, `outcome` must match exactly one `ResultGroup.name` under the same normalization.
-  4. If no result-group name matches, execution aborts with crafting-system misconfiguration error (not a player failure outcome).
+  1. If `outcome` is a reserved failure keyword (`fail`, `failed`, `failure`, `f`, `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`, `hazard`, `danger`, `complication`, `trap`, `oops`), execution takes failure path.
+  2. Otherwise, `outcome` must match exactly one `ResultGroup.name` under the same normalization.
+  3. If no result-group name matches, execution aborts with crafting-system misconfiguration error (not a player failure outcome).
 
 ### Provider: `rollTableOutcome`
 
@@ -77,7 +76,7 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
 - `resultSelection.provider` must be one of the three supported values.
 - Provider-specific required fields must be present.
 - `ResultGroup.name` values must be unique under trim-normalized, case-insensitive comparison.
-- `ResultGroup.name` may not be any reserved fail/miss keyword.
+- `ResultGroup.name` may not be any reserved failure keyword.
 
 ## Progressive Mode
 
@@ -147,7 +146,7 @@ Let `remaining = check.value` and `cost = result.component.difficulty`.
 
 - Unit tests per mode for cardinality and routing validation.
 - Unit tests for provider-specific routed behavior (`ingredientSet`, `macroOutcome`, `rollTableOutcome`).
-- Unit tests for reserved fail/miss keyword handling and result-group name matching normalization.
+- Unit tests for reserved failure keyword handling and result-group name matching normalization.
 - Unit tests for progressive award modes (`partial`, `equal`, `exceed`).
 - Integration tests validating mode-specific behavior in full crafting flow.
 - Integration tests for alchemy no-signature failure behavior (failure message + ingredient consumption).
