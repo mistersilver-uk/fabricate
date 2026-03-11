@@ -189,12 +189,29 @@ jobs:
 
       - name: Validate before push
         run: |
-          if git diff --cached --quiet && git diff --quiet; then
+          # Check for commits ahead of main (Claude is instructed to commit)
+          COMMITS_AHEAD=$(git rev-list origin/main..HEAD --count)
+          # Also check for uncommitted changes (in case Claude didn't commit)
+          UNCOMMITTED=false
+          if ! git diff --cached --quiet || ! git diff --quiet; then
+            UNCOMMITTED=true
+          fi
+
+          if [ "$COMMITS_AHEAD" -eq 0 ] && [ "$UNCOMMITTED" = "false" ]; then
             echo "No changes to push."
             echo "HAS_CHANGES=false" >> "$GITHUB_ENV"
             exit 0
           fi
+
+          # Stage and commit any uncommitted changes Claude left behind
+          if [ "$UNCOMMITTED" = "true" ]; then
+            echo "Found uncommitted changes — staging and committing..."
+            git add -A
+            git commit -m "chore(#${{ needs.pick-task.outputs.issue_number }}): stage uncommitted agent changes"
+          fi
+
           echo "HAS_CHANGES=true" >> "$GITHUB_ENV"
+          echo "Found $COMMITS_AHEAD commit(s) ahead of main."
 
           echo "Running tests to verify implementation is complete…"
           npm test
