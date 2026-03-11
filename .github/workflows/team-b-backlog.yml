@@ -124,7 +124,7 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: >-
             --model claude-sonnet-4-6
-            --max-turns 75
+            --max-turns 125
             --allowedTools "Bash,Edit,Write,Read,Glob,Grep,Agent"
           prompt: |
             You are running the Team B pipeline for Fabricate, a FoundryVTT
