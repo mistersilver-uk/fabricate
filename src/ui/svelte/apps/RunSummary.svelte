@@ -9,7 +9,8 @@
     onCraft,
     onShowRunDetails,
     onRestartRun,
-    onCancelRun
+    onCancelRun,
+    onCancelSalvageRun
   } = $props();
 </script>
 
@@ -28,7 +29,7 @@
               {#if run.stepLabel}
                 <span class="hint">{run.stepLabel}</span>
               {/if}
-              <span class="run-row-actions">
+                <span class="run-row-actions">
                 {#if run.canContinue}
                   <button
                     type="button"
@@ -47,19 +48,23 @@
                 >
                   <i class="fas fa-list"></i>
                 </button>
-                <button
-                  type="button"
-                  class="details-btn"
-                  onclick={() => onRestartRun?.(run.recipeId, run.id)}
-                  title={localize('FABRICATE.RunSummary.RestartRun')}
-                >
-                  <i class="fas fa-rotate-left"></i>
-                </button>
+                {#if run.runType !== 'salvage'}
+                  <button
+                    type="button"
+                    class="details-btn"
+                    onclick={() => onRestartRun?.(run.recipeId, run.id)}
+                    title={localize('FABRICATE.RunSummary.RestartRun')}
+                  >
+                    <i class="fas fa-rotate-left"></i>
+                  </button>
+                {/if}
                 {#if run.canCancel}
                   <button
                     type="button"
                     class="details-btn"
-                    onclick={() => onCancelRun?.(run.id)}
+                    onclick={() => run.runType === 'salvage'
+                      ? onCancelSalvageRun?.(run.id)
+                      : onCancelRun?.(run.id)}
                     title={localize('FABRICATE.RunSummary.CancelRun')}
                   >
                     <i class="fas fa-stop"></i>

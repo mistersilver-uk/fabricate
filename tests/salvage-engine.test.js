@@ -14,6 +14,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
+import { SalvageRunManager } from '../src/systems/SalvageRunManager.js';
 
 // ---------------------------------------------------------------------------
 // Globals
@@ -178,7 +179,13 @@ function makeEngine(opts = {}) {
     },
     ingredientMatchesItem() { return false; }
   };
-  return new CraftingEngine(mockRecipeManager, null, opts.resolutionModeService || null);
+  return new CraftingEngine(
+    mockRecipeManager,
+    null,
+    opts.resolutionModeService || null,
+    null,
+    opts.salvageRunManager || new SalvageRunManager()
+  );
 }
 
 /**
@@ -186,6 +193,7 @@ function makeEngine(opts = {}) {
  * Also sets globalThis.fromUuid to return the given actor.
  */
 function setupGame(system, actor) {
+  const salvageRunManager = new SalvageRunManager();
   globalThis.fromUuid = async (uuid) => {
     if (actor && uuid === actor.uuid) return actor;
     return null;
@@ -193,11 +201,14 @@ function setupGame(system, actor) {
   globalThis.game = {
     fabricate: {
       getCraftingSystemManager: () => ({ getSystem: () => system }),
-      getResolutionModeService: () => null
+      getResolutionModeService: () => null,
+      getSalvageRunManager: () => salvageRunManager
     },
     user: { id: 'user-1' },
     time: { worldTime: 100 }
   };
+
+  return salvageRunManager;
 }
 
 // ---------------------------------------------------------------------------
@@ -1095,4 +1106,77 @@ test('end-to-end salvage: resolve actor, validate, check, consume, create, recor
   assert.ok(stored, 'salvageRuns flag should be set on actor');
   assert.ok(Array.isArray(stored.history), 'history should be an array');
   assert.equal(stored.history[0].componentId, 'comp-1', 'Most recent run should be at index 0');
+});
+
+test('salvage() creates a waitingTime run when salvage has a time requirement', async () => {
+  const engine = makeEngine();
+  const salvageRunManager = engine.salvageRunManager;
+  const compItem = makeItem('comp-item', 'Timed Relic', 1);
+  const actor = makeActor('actor-timed', [compItem]);
+  const component = {
+    id: 'comp-timed',
+    name: 'Timed Relic',
+    salvage: {
+      enabled: true,
+      ingredientQuantity: 1,
+      catalysts: [],
+      resultGroups: [{ id: 'rg-1', name: 'Bits', results: [{ id: 'r-1', componentId: 'scrap', quantity: 1 }] }],
+      timeRequirement: { minutes: 10 }
+    }
+  };
+  const system = makeSystem({ components: [component] });
+  setupGame(system, actor);
+
+  const result = await engine.salvage(actor.uuid, system.id, component.id);
+
+  assert.equal(result.success, true);
+  assert.equal(result.salvageRun?.status, 'waitingTime');
+  assert.equal(salvageRunManager.getActiveRuns(actor).length, 1);
+  assert.equal(actor.createdItems.length, 0, 'results should not be created before the time gate completes');
+});
+
+test('processPendingSalvageRuns() auto-completes timed salvage runs after world-time advancement', async () => {
+  const salvageRunManager = new SalvageRunManager();
+  const engine = makeEngine({ salvageRunManager });
+  const compItem = makeItem('comp-item', 'Dormant Core', 1);
+  const actor = makeActor('actor-resume', [compItem]);
+  const component = {
+    id: 'comp-resume',
+    name: 'Dormant Core',
+    salvage: {
+      enabled: true,
+      ingredientQuantity: 1,
+      catalysts: [],
+      resultGroups: [{ id: 'rg-1', name: 'Shards', results: [{ id: 'r-1', componentId: 'shard', quantity: 2 }] }],
+      timeRequirement: { minutes: 5 }
+    }
+  };
+  const resultComponent = { id: 'shard', name: 'Shard', difficulty: 1 };
+  const system = makeSystem({ id: 'sys-resume', components: [component, resultComponent] });
+
+  globalThis.fromUuid = async (uuid) => {
+    if (uuid === actor.uuid) return actor;
+    return null;
+  };
+  globalThis.game = {
+    fabricate: {
+      getCraftingSystemManager: () => ({ getSystem: () => system }),
+      getResolutionModeService: () => null,
+      getSalvageRunManager: () => salvageRunManager
+    },
+    user: { id: 'user-1' },
+    time: { worldTime: 100 },
+    actors: [actor]
+  };
+
+  const started = await engine.salvage(actor.uuid, system.id, component.id);
+  assert.equal(started.salvageRun?.status, 'waitingTime');
+
+  globalThis.game.time.worldTime = started.salvageRun.timeGate.availableAt;
+  await engine.processPendingSalvageRuns(globalThis.game.time.worldTime);
+
+  assert.equal(salvageRunManager.getActiveRuns(actor).length, 0, 'timed run should be removed from active runs after completion');
+  const history = salvageRunManager.getRunHistory(actor);
+  assert.equal(history[0]?.status, 'succeeded');
+  assert.equal(actor.createdItems.length, 1, 'timed completion should create results automatically');
 });

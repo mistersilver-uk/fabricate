@@ -7,6 +7,7 @@
  */
 import { writable, get } from 'svelte/store';
 import { aggregateShoppingList } from '../util/shoppingListAggregator.js';
+import { getSourceUuid } from '../../../utils/sourceUuid.js';
 
 const RECENTLY_CRAFTED_MAX = 10;
 
@@ -121,6 +122,121 @@ function _buildRunDisplay(run, recipeManager, worldTime, scope = 'active') {
   };
 }
 
+function _findActorComponentItems(actor, component) {
+  const items = Array.from(actor?.items || []);
+  if (component?.sourceUuid) {
+    const byUuid = items.filter(item =>
+      item.uuid === component.sourceUuid ||
+      getSourceUuid(item) === component.sourceUuid
+    );
+    if (byUuid.length > 0) return byUuid;
+  }
+
+  const name = component?.name;
+  if (name) {
+    return items.filter(item => item.name === name);
+  }
+
+  return [];
+}
+
+function _buildSalvageRunDisplay(run, systemManager, worldTime, scope = 'active') {
+  const system = systemManager?.getSystem?.(run.craftingSystemId) || null;
+  const component = (system?.components || []).find(entry => entry.id === run.componentId) || null;
+  const componentName = component?.name || run.componentName || 'Unknown Component';
+  const remainingSeconds = run?.timeGate?.availableAt
+    ? Math.max(0, Math.ceil(Number(run.timeGate.availableAt) - Number(worldTime)))
+    : 0;
+  const statusLabel = run.status === 'waitingTime'
+    ? (remainingSeconds > 0
+      ? `Waiting (${_formatRemainingSeconds(remainingSeconds)})`
+      : 'Resuming')
+    : (run.status === 'inProgress'
+      ? 'In Progress'
+      : (run.status === 'succeeded'
+        ? 'Succeeded'
+        : (run.status === 'failed' ? 'Failed' : 'Cancelled')));
+
+  return {
+    id: run.id,
+    runType: 'salvage',
+    recipeId: null,
+    recipeName: componentName,
+    status: run.status,
+    scope,
+    statusLabel,
+    stepLabel: system?.name ? `Salvage - ${system.name}` : 'Salvage',
+    remainingSeconds,
+    isActive: scope === 'active',
+    canContinue: false,
+    canCancel: scope === 'active' && ['inProgress', 'waitingTime'].includes(run.status),
+    steps: [],
+    currentStepIndex: null,
+    startedAt: run.startedAt,
+    finishedAt: run.finishedAt,
+    componentId: run.componentId,
+    craftingSystemId: run.craftingSystemId
+  };
+}
+
+function _buildSalvageEntries(
+  services,
+  craftingActor,
+  searchTerm,
+  showOnlyAvailable,
+  salvageRunsByKey = new Map()
+) {
+  if (!craftingActor) return [];
+
+  const systemManager = services.getCraftingSystemManager?.();
+  const systems = systemManager?.getSystems?.() || [];
+  const lowerSearch = String(searchTerm || '').trim().toLowerCase();
+  const entries = [];
+
+  for (const system of systems) {
+    if (system?.features?.salvage !== true) continue;
+    const components = Array.isArray(system.components) ? system.components : [];
+    for (const component of components) {
+      if (!component?.salvage?.enabled) continue;
+
+      const matchingItems = _findActorComponentItems(craftingActor, component);
+      const totalAvailable = matchingItems.reduce((sum, item) => sum + (Number(item.system?.quantity) || 1), 0);
+      const ingredientQuantity = Number(component.salvage.ingredientQuantity) || 1;
+      const activeRun = salvageRunsByKey.get(`${system.id}::${component.id}`) || null;
+      const canSalvage = totalAvailable >= ingredientQuantity;
+      const allowSalvageAction = !activeRun && canSalvage;
+      const statusLabel = activeRun
+        ? activeRun.statusLabel
+        : (canSalvage ? 'Available' : `Need ${ingredientQuantity}, have ${totalAvailable}`);
+
+      if (lowerSearch) {
+        const haystack = `${component.name || ''} ${system.name || ''}`.toLowerCase();
+        if (!haystack.includes(lowerSearch)) continue;
+      }
+
+      if (showOnlyAvailable && !allowSalvageAction && !activeRun) continue;
+
+      entries.push({
+        id: component.id,
+        systemId: system.id,
+        name: component.name || component.id,
+        img: component.img || null,
+        systemName: system.name || 'Crafting System',
+        quantityAvailable: totalAvailable,
+        quantityRequired: ingredientQuantity,
+        canSalvage,
+        allowSalvageAction,
+        activeRunId: activeRun?.id || null,
+        activeRunStatusLabel: activeRun?.statusLabel || null,
+        statusLabel,
+        buttonLabel: activeRun ? 'In Progress' : 'Salvage'
+      });
+    }
+  }
+
+  return entries.sort((a, b) => a.name.localeCompare(b.name));
+}
+
 /**
  * Track a recently crafted recipe.  Prepends, deduplicates by recipeId, and
  * caps at RECENTLY_CRAFTED_MAX.
@@ -151,6 +267,8 @@ function _buildPreparedRecipes(
   const recipeManager = services.getRecipeManager();
   const visibilityService = services.getRecipeVisibilityService();
   const runManager = services.getCraftingRunManager();
+  const salvageRunManager = services.getSalvageRunManager?.();
+  const craftingSystemManager = services.getCraftingSystemManager?.();
   const worldTime = services.getWorldTime();
   const gameUser = services.getGameUser();
 
@@ -173,39 +291,62 @@ function _buildPreparedRecipes(
   const activeRunsRaw = (runManager && craftingActor)
     ? runManager.getActiveRuns(craftingActor)
     : [];
-  const activeRunsAllSorted = activeRunsRaw
+  const craftingActiveRunsAllSorted = activeRunsRaw
     .filter(run => ['inProgress', 'waitingTime'].includes(run.status))
     .map(run => _buildRunDisplay(run, recipeManager, worldTime, 'active'))
     .sort((a, b) => Number(b.startedAt || 0) - Number(a.startedAt || 0));
   // Guard against duplicate run IDs (e.g. data corruption, race conditions) to prevent
   // Svelte each_key_duplicate errors in RunSummary.svelte.
   const seenActiveIds = new Set();
-  const activeRuns = activeRunsAllSorted.filter(run => {
+  const craftingActiveRuns = craftingActiveRunsAllSorted.filter(run => {
     if (seenActiveIds.has(run.id)) return false;
     seenActiveIds.add(run.id);
     return true;
   });
   const activeRunsByRecipeId = new Map();
-  for (const run of activeRuns) {
+  for (const run of craftingActiveRuns) {
     const list = activeRunsByRecipeId.get(run.recipeId) || [];
     list.push(run);
     activeRunsByRecipeId.set(run.recipeId, list);
   }
 
+  const salvageActiveRunsRaw = (salvageRunManager && craftingActor)
+    ? salvageRunManager.getActiveRuns(craftingActor)
+    : [];
+  const salvageActiveRuns = salvageActiveRunsRaw
+    .filter(run => ['inProgress', 'waitingTime'].includes(run.status))
+    .map(run => _buildSalvageRunDisplay(run, craftingSystemManager, worldTime, 'active'))
+    .sort((a, b) => Number(b.startedAt || 0) - Number(a.startedAt || 0));
+  const salvageRunsByKey = new Map(
+    salvageActiveRuns.map(run => [`${run.craftingSystemId}::${run.componentId}`, run])
+  );
+
   // --- Run history ---
   const historyRaw = (runManager && craftingActor)
     ? runManager.getRunHistory(craftingActor, 10)
     : [];
-  const runHistoryMapped = historyRaw
+  const craftingRunHistoryMapped = historyRaw
     .map(run => _buildRunDisplay(run, recipeManager, worldTime, 'history'));
   // Guard against duplicate run IDs in history (e.g. completeRun called twice) to prevent
   // Svelte each_key_duplicate errors in RunSummary.svelte.
   const seenHistoryIds = new Set();
-  const runHistory = runHistoryMapped.filter(run => {
+  const craftingRunHistory = craftingRunHistoryMapped.filter(run => {
     if (seenHistoryIds.has(run.id)) return false;
     seenHistoryIds.add(run.id);
     return true;
   });
+
+  const salvageHistoryRaw = (salvageRunManager && craftingActor)
+    ? salvageRunManager.getRunHistory(craftingActor, 10)
+    : [];
+  const salvageRunHistory = salvageHistoryRaw
+    .map(run => _buildSalvageRunDisplay(run, craftingSystemManager, worldTime, 'history'))
+    .sort((a, b) => Number(b.finishedAt || b.startedAt || 0) - Number(a.finishedAt || a.startedAt || 0));
+
+  const activeRuns = [...craftingActiveRuns, ...salvageActiveRuns]
+    .sort((a, b) => Number(b.startedAt || 0) - Number(a.startedAt || 0));
+  const runHistory = [...craftingRunHistory, ...salvageRunHistory]
+    .sort((a, b) => Number(b.finishedAt || b.startedAt || 0) - Number(a.finishedAt || a.startedAt || 0));
 
   // --- Recipes ---
   let recipes = recipeManager.getRecipes({ enabled: true });
@@ -367,11 +508,19 @@ function _buildPreparedRecipes(
     ? allRecipes.filter(r => r.isSimpleRecipe())
     : allRecipes;
   const categories = [...new Set(visibleRecipes.map(r => r.category))].sort();
+  const salvageEntries = _buildSalvageEntries(
+    services,
+    craftingActor,
+    searchTerm,
+    showOnlyAvailable,
+    salvageRunsByKey
+  );
 
   return {
     recipes: preparedRecipes,
     activeRuns,
     runHistory,
+    salvageEntries,
     categories,
     favouriteRecipes,
     recentRecipes,
@@ -412,6 +561,7 @@ export function createCraftingStore(services) {
   // --- Shopping list state ---
   const shoppingList = writable([]);  // [{ recipeId, quantity }]
   const shoppingListExpanded = writable(false);
+  const hookRegistrations = [];
 
   // --- Computed state ---
   const viewState = writable({
@@ -423,6 +573,7 @@ export function createCraftingStore(services) {
     recentRecipes: [],
     availableActors: [],
     ownedActors: [],
+    salvageEntries: [],
     hasCraftingActor: false,
     hasComponentSources: false,
     totalRecipes: 0,
@@ -472,6 +623,15 @@ export function createCraftingStore(services) {
       search: get(searchTerm),
       shoppingListData
     });
+  }
+
+  if (globalThis.Hooks?.on && globalThis.Hooks?.off) {
+    hookRegistrations.push(['updateWorldTime', Hooks.on('updateWorldTime', () => {
+      void refresh();
+    })]);
+    hookRegistrations.push(['fabricate.ready', Hooks.on('fabricate.ready', () => {
+      void refresh();
+    })]);
   }
 
   // --- Actions ---
@@ -627,6 +787,52 @@ export function createCraftingStore(services) {
     await refresh();
   }
 
+  async function salvage(systemId, componentId, opts = {}) {
+    const { skipConfirm = false, runId = null } = opts;
+    const actor = get(craftingActor);
+    if (!actor) {
+      services.notify.error('Please select a crafting actor');
+      return;
+    }
+
+    const craftingSystemManager = services.getCraftingSystemManager?.();
+    const system = craftingSystemManager?.getSystem?.(systemId);
+    const component = (system?.components || []).find(entry => entry.id === componentId) || null;
+    if (!system || !component) {
+      services.notify.error('Salvage component not found');
+      return;
+    }
+
+    const autoCraft = services.getSetting('autoCraft');
+    if (!autoCraft && !skipConfirm) {
+      const confirmed = await services.confirmDialog({
+        title: `Salvage ${component.name}?`,
+        content: `
+          <p>Are you sure you want to salvage <strong>${component.name}</strong>?</p>
+          <p>Results will be added to <strong>${actor.name}</strong>.</p>
+        `,
+        yes: () => true,
+        no: () => false
+      });
+      if (!confirmed) return;
+    }
+
+    const craftingEngine = services.getCraftingEngine?.();
+    if (!craftingEngine?.salvage) {
+      services.notify.error('Crafting engine is unavailable. Check module initialization.');
+      return;
+    }
+
+    const result = await craftingEngine.salvage(actor.uuid, systemId, componentId, { runId });
+    if (result.success) {
+      services.notify.info(result.message);
+    } else {
+      services.notify.error(result.message);
+    }
+
+    await refresh();
+  }
+
   async function cancelRun(runId) {
     const actor = get(craftingActor);
     if (!actor) {
@@ -660,6 +866,44 @@ export function createCraftingStore(services) {
       return;
     }
     services.notify.info(`Cancelled crafting run for ${recipe?.name || 'recipe'}.`);
+    await refresh();
+  }
+
+  async function cancelSalvageRun(runId) {
+    const actor = get(craftingActor);
+    if (!actor) {
+      services.notify.warn('Select a crafting actor first.');
+      return;
+    }
+
+    const salvageRunManager = services.getSalvageRunManager?.();
+    if (!salvageRunManager) return;
+
+    const run = salvageRunManager.getActiveRun(actor, runId);
+    if (!run) {
+      services.notify.warn('Active salvage run not found.');
+      return;
+    }
+
+    const craftingSystemManager = services.getCraftingSystemManager?.();
+    const system = craftingSystemManager?.getSystem?.(run.craftingSystemId);
+    const component = (system?.components || []).find(entry => entry.id === run.componentId) || null;
+
+    const confirmed = await services.confirmDialog({
+      title: 'Cancel Salvage Run?',
+      content: `<p>Cancel in-progress salvage for <strong>${component?.name || 'Unknown Component'}</strong>?</p>`,
+      yes: () => true,
+      no: () => false
+    });
+    if (!confirmed) return;
+
+    const cancelled = await salvageRunManager.cancelRun(actor, runId);
+    if (!cancelled) {
+      services.notify.error('Unable to cancel salvage run.');
+      return;
+    }
+
+    services.notify.info(`Cancelled salvage run for ${component?.name || 'component'}.`);
     await refresh();
   }
 
@@ -799,7 +1043,11 @@ export function createCraftingStore(services) {
   }
 
   function destroy() {
-    // No-op for now — hook cleanup would go here
+    if (globalThis.Hooks?.off) {
+      for (const [eventName, hookId] of hookRegistrations) {
+        Hooks.off(eventName, hookId);
+      }
+    }
   }
 
   // Trigger initial computation
@@ -827,8 +1075,10 @@ export function createCraftingStore(services) {
     toggleFavouritesOnly,
     toggleFavourite,
     craft,
+    salvage,
     learnRecipe,
     cancelRun,
+    cancelSalvageRun,
     restartRun,
     refresh,
     destroy,

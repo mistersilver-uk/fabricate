@@ -3,6 +3,7 @@ import { CompendiumImporter } from './systems/CompendiumImporter.js';
 import { CraftingEngine } from './systems/CraftingEngine.js';
 import { CraftingSystemManager } from './systems/CraftingSystemManager.js';
 import { CraftingRunManager } from './systems/CraftingRunManager.js';
+import { SalvageRunManager } from './systems/SalvageRunManager.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { ResolutionModeService } from './systems/ResolutionModeService.js';
 import { SignatureValidator } from './systems/SignatureValidator.js';
@@ -32,6 +33,7 @@ class Fabricate {
     this.craftingEngine = null;
     this.craftingSystemManager = null;
     this.craftingRunManager = null;
+    this.salvageRunManager = null;
     this.recipeVisibilityService = null;
     this.resolutionModeService = null;
     this.itemPilesIntegration = null;
@@ -53,6 +55,7 @@ class Fabricate {
     this.recipeManager = new RecipeManager();
     this.craftingSystemManager = new CraftingSystemManager(this.recipeManager);
     this.craftingRunManager = new CraftingRunManager();
+    this.salvageRunManager = new SalvageRunManager();
     this.recipeVisibilityService = new RecipeVisibilityService(this.recipeManager, this.craftingSystemManager);
     this.resolutionModeService = new ResolutionModeService(this.craftingSystemManager);
     this.itemPilesIntegration = new ItemPilesIntegration();
@@ -62,7 +65,8 @@ class Fabricate {
       this.recipeManager,
       this.craftingRunManager,
       this.resolutionModeService,
-      this.itemPilesIntegration
+      this.itemPilesIntegration,
+      this.salvageRunManager
     );
 
     // Initialize recipe manager
@@ -70,7 +74,14 @@ class Fabricate {
     await this.craftingSystemManager.initialize();
     const validRecipes = new Set(this.recipeManager.getRecipes({}).map(r => r.id));
     const validSystems = new Set(this.craftingSystemManager.getSystems().map(s => s.id));
+    const validSalvageComponentsBySystem = new Map(
+      this.craftingSystemManager.getSystems().map(system => [
+        system.id,
+        new Set((system.components || []).map(component => component.id))
+      ])
+    );
     await this.craftingRunManager.cleanupInvalidRuns(validRecipes, validSystems);
+    await this.salvageRunManager.cleanupInvalidRuns(validSystems, validSalvageComponentsBySystem);
     await this.recipeVisibilityService.cleanupLearnedRecipes(validRecipes);
     await cleanupStalePreferences(validSystems, validRecipes, getSetting, setSetting);
 
@@ -121,6 +132,10 @@ class Fabricate {
    */
   getCraftingRunManager() {
     return this.craftingRunManager;
+  }
+
+  getSalvageRunManager() {
+    return this.salvageRunManager;
   }
 
   /**
@@ -200,6 +215,7 @@ Hooks.once('init', async () => {
     getRecipeEditorAppClass,
     CraftingSystemManager,
     CraftingRunManager,
+    SalvageRunManager,
     RecipeVisibilityService,
     ResolutionModeService,
     SignatureValidator,
@@ -218,6 +234,7 @@ Hooks.once('init', async () => {
 Hooks.once('ready', async () => {
   await fabricate.initialize();
   await fabricate.getCraftingRunManager()?.processWorldTime?.();
+  await fabricate.getCraftingEngine()?.processPendingSalvageRuns?.();
 
   addModuleButtonsToItemsDirectory();
 
@@ -225,9 +242,14 @@ Hooks.once('ready', async () => {
 });
 
 Hooks.on('updateWorldTime', (worldTime) => {
-  const manager = game.fabricate?.getCraftingRunManager?.();
-  if (!manager) return;
-  manager.processWorldTime(worldTime);
+  const craftingManager = game.fabricate?.getCraftingRunManager?.();
+  if (craftingManager) {
+    craftingManager.processWorldTime(worldTime);
+  }
+  const craftingEngine = game.fabricate?.getCraftingEngine?.();
+  if (craftingEngine) {
+    craftingEngine.processPendingSalvageRuns(worldTime);
+  }
 });
 
 /**

@@ -19,6 +19,15 @@ function makeActor(id, name = `Actor-${id}`, owned = true) {
   };
 }
 
+function makeInventoryItem(id, name, quantity = 1) {
+  return {
+    id,
+    uuid: `Item.${id}`,
+    name,
+    system: { quantity }
+  };
+}
+
 function makeRecipe(id, name = `Recipe-${id}`, category = 'potions') {
   return {
     id,
@@ -98,6 +107,13 @@ function createMockServices(overrides = {}) {
     cancelRun: async () => true
   };
 
+  const defaultSalvageRunManager = {
+    getActiveRuns: () => [],
+    getRunHistory: () => [],
+    getActiveRun: () => null,
+    cancelRun: async () => true
+  };
+
   const defaultVisibilityService = {
     evaluateRecipeAccess: () => ({ visible: true, craftable: true, reason: 'ok' }),
     learnRecipe: async () => ({ success: true, message: 'Learned!' })
@@ -111,6 +127,7 @@ function createMockServices(overrides = {}) {
     getRecipeManager: () => defaultRecipeManager,
     getRecipeVisibilityService: () => defaultVisibilityService,
     getCraftingRunManager: () => defaultRunManager,
+    getSalvageRunManager: () => defaultSalvageRunManager,
     getCraftingEngine: () => defaultEngine,
     getSetting: (key) => store[key] ?? null,
     setSetting: async (key, value) => { store[key] = value; },
@@ -155,7 +172,8 @@ describe('createCraftingStore', () => {
         'selectActor', 'toggleSourceActor', 'setSearch', 'setCategory',
         'toggleAvailable', 'toggleFavourite', 'craft', 'learnRecipe',
         'showFavouritesOnly', 'toggleFavouritesOnly',
-        'cancelRun', 'restartRun', 'refresh', 'destroy'
+        'cancelRun', 'cancelSalvageRun', 'restartRun', 'refresh', 'destroy',
+        'salvage'
       ];
 
       for (const key of expectedKeys) {
@@ -610,6 +628,133 @@ describe('createCraftingStore', () => {
       await store.craft('r1', { skipConfirm: true });
       assert.equal(chatMessageCount, 0,
         'createChatMessage must NOT be called from craft(); the engine already posts chat');
+    });
+  });
+
+  // --- salvage action / state ---
+
+  describe('salvage', () => {
+    it('populates salvageEntries when the crafting actor has a salvageable component', async () => {
+      const actor = {
+        id: 'a1',
+        name: 'Alice',
+        isOwner: true,
+        items: [makeInventoryItem('itm-1', 'Broken Sword', 2)]
+      };
+      actor.items[Symbol.iterator] = function iterator() {
+        return [makeInventoryItem('itm-1', 'Broken Sword', 2)][Symbol.iterator]();
+      };
+      actor.items.size = 1;
+
+      const services = createMockServices({
+        getAvailableActors: () => [actor],
+        getOwnedActors: () => [actor],
+        getGameUser: () => ({ id: 'u1', character: actor }),
+        getCraftingSystemManager: () => ({
+          getSystems: () => [{
+            id: 'sys-1',
+            name: 'Weapons',
+            features: { salvage: true },
+            components: [{
+              id: 'comp-1',
+              name: 'Broken Sword',
+              salvage: {
+                enabled: true,
+                ingredientQuantity: 1,
+                resultGroups: []
+              }
+            }]
+          }],
+          getSystem: () => null
+        })
+      });
+
+      const store = createCraftingStore(services);
+      await store.refresh();
+
+      const vs = get(store.viewState);
+      assert.equal(vs.salvageEntries.length, 1);
+      assert.equal(vs.salvageEntries[0].name, 'Broken Sword');
+      assert.equal(vs.salvageEntries[0].canSalvage, true);
+    });
+
+    it('delegates to craftingEngine.salvage with actor uuid and component identifiers', async () => {
+      const actor = {
+        id: 'a1',
+        uuid: 'Actor.a1',
+        name: 'Alice',
+        isOwner: true,
+        items: [],
+        [Symbol.iterator]: function* iter() {}
+      };
+      let salvageArgs = null;
+      const services = createMockServices({
+        getAvailableActors: () => [actor],
+        getOwnedActors: () => [actor],
+        getGameUser: () => ({ id: 'u1', character: actor }),
+        getSetting: (key) => key === 'autoCraft' ? true : null,
+        getCraftingSystemManager: () => ({
+          getSystems: () => [],
+          getSystem: () => ({
+            id: 'sys-1',
+            components: [{ id: 'comp-1', name: 'Broken Sword', salvage: { enabled: true, ingredientQuantity: 1 } }]
+          })
+        }),
+        getCraftingEngine: () => ({
+          craft: async () => ({ success: true, message: 'ok' }),
+          salvage: async (...args) => {
+            salvageArgs = args;
+            return { success: true, message: 'Salvaged!' };
+          }
+        })
+      });
+
+      const store = createCraftingStore(services);
+      await store.salvage('sys-1', 'comp-1', { skipConfirm: true });
+
+      assert.ok(salvageArgs);
+      assert.equal(salvageArgs[0], 'Actor.a1');
+      assert.equal(salvageArgs[1], 'sys-1');
+      assert.equal(salvageArgs[2], 'comp-1');
+    });
+
+    it('cancelSalvageRun delegates to salvageRunManager.cancelRun', async () => {
+      const actor = {
+        id: 'a1',
+        uuid: 'Actor.a1',
+        name: 'Alice',
+        isOwner: true,
+        items: [],
+        [Symbol.iterator]: function* iter() {}
+      };
+      let cancelledRunId = null;
+      const services = createMockServices({
+        getAvailableActors: () => [actor],
+        getOwnedActors: () => [actor],
+        getGameUser: () => ({ id: 'u1', character: actor }),
+        getSalvageRunManager: () => ({
+          getActiveRuns: () => [],
+          getRunHistory: () => [],
+          getActiveRun: () => ({ id: 'run-1', craftingSystemId: 'sys-1', componentId: 'comp-1' }),
+          cancelRun: async (_actor, runId) => {
+            cancelledRunId = runId;
+            return { id: runId, status: 'cancelled' };
+          }
+        }),
+        getCraftingSystemManager: () => ({
+          getSystems: () => [],
+          getSystem: () => ({
+            id: 'sys-1',
+            components: [{ id: 'comp-1', name: 'Broken Sword', salvage: { enabled: true, ingredientQuantity: 1 } }]
+          })
+        }),
+        confirmDialog: async () => true
+      });
+
+      const store = createCraftingStore(services);
+      await store.cancelSalvageRun('run-1');
+
+      assert.equal(cancelledRunId, 'run-1');
     });
   });
 

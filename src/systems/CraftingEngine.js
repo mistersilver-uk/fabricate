@@ -2,7 +2,7 @@ import { Recipe } from '../models/Recipe.js';
 import { ItemPilesIntegration } from '../integrations/ItemPilesIntegration.js';
 import { MacroExecutor } from '../utils/MacroExecutor.js';
 import { CraftingCheckAdapterRegistry } from './CraftingCheckAdapter.js';
-import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
+import { getFabricateFlag } from '../config/flags.js';
 import { getSourceUuid } from '../utils/sourceUuid.js';
 import { SignatureValidator } from './SignatureValidator.js';
 
@@ -11,11 +11,12 @@ import { SignatureValidator } from './SignatureValidator.js';
  * Validates ingredients, consumes items, creates outputs
  */
 export class CraftingEngine {
-  constructor(recipeManager, craftingRunManager = null, resolutionModeService = null, itemPilesIntegration = null) {
+  constructor(recipeManager, craftingRunManager = null, resolutionModeService = null, itemPilesIntegration = null, salvageRunManager = null) {
     this.recipeManager = recipeManager;
     this.craftingRunManager = craftingRunManager;
     this.resolutionModeService = resolutionModeService;
     this.itemPilesIntegration = itemPilesIntegration;
+    this.salvageRunManager = salvageRunManager;
   }
 
   /**
@@ -1573,6 +1574,26 @@ export class CraftingEngine {
     };
   }
 
+  _getSalvageRunManager() {
+    return this.salvageRunManager || game.fabricate?.getSalvageRunManager?.() || null;
+  }
+
+  async processPendingSalvageRuns(worldTime = Number(game.time?.worldTime || 0)) {
+    const salvageRunManager = this._getSalvageRunManager();
+    if (!salvageRunManager) return;
+
+    await salvageRunManager.processWorldTime(worldTime, async (actor, run) => {
+      try {
+        await this.salvage(actor.uuid, run.craftingSystemId, run.componentId, {
+          runId: run.id,
+          skipTimeGate: true
+        });
+      } catch (err) {
+        console.error(`Fabricate | Failed to resume salvage run ${run.id}:`, err);
+      }
+    });
+  }
+
   /**
    * Perform the salvage pipeline for a component.
    *
@@ -1587,13 +1608,11 @@ export class CraftingEngine {
    * @returns {Promise<{success: boolean, results: Item[]|null, message: string, salvageRun: object|null}>}
    */
   async salvage(actorUuid, craftingSystemId, componentId, options = {}) {
-    // 1. Resolve actor
     const actor = await fromUuid(actorUuid);
     if (!actor) {
       return { success: false, results: null, message: 'Actor not found', salvageRun: null };
     }
 
-    // 2. Resolve system and component
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(craftingSystemId);
     if (!system) {
@@ -1607,7 +1626,6 @@ export class CraftingEngine {
       return { success: false, results: null, message: `Component "${componentId}" not found in system`, salvageRun: null };
     }
 
-    // 3. Validate salvage is enabled
     if (!system.features?.salvage) {
       return { success: false, results: null, message: 'Salvage feature is not enabled on this crafting system', salvageRun: null };
     }
@@ -1629,37 +1647,84 @@ export class CraftingEngine {
       }
     }
 
-    // 5. Check actor has enough of the component item
+    const salvageRunManager = this._getSalvageRunManager();
+    let salvageRun = null;
+    if (salvageRunManager) {
+      salvageRun = options?.runId
+        ? salvageRunManager.getActiveRun(actor, options.runId)
+        : salvageRunManager.findActiveRunForComponent(actor, craftingSystemId, componentId);
+    }
+
+    if (options?.runId && !salvageRun && salvageRunManager) {
+      return { success: false, results: null, message: 'Active salvage run not found', salvageRun: null };
+    }
+
     const ingredientQuantity = Number(component.salvage.ingredientQuantity) || 1;
     const componentItems = this._findComponentItems(actor, component, system);
     const totalAvailable = componentItems.reduce((sum, item) => sum + (Number(item.system?.quantity) || 1), 0);
     if (totalAvailable < ingredientQuantity) {
+      if (salvageRunManager && salvageRun) {
+        salvageRun = await salvageRunManager.completeRun(actor, salvageRun, 'failed', {
+          failureReason: `Not enough "${component.name || componentId}" to salvage. Need ${ingredientQuantity}, have ${totalAvailable}`
+        });
+      }
       return {
         success: false,
         results: null,
         message: `Not enough "${component.name || componentId}" to salvage. Need ${ingredientQuantity}, have ${totalAvailable}`,
-        salvageRun: null
+        salvageRun
       };
     }
 
-    // 6. Validate salvage catalysts
     const salvageCatalysts = Array.isArray(component.salvage.catalysts) ? component.salvage.catalysts : [];
-    // Build a minimal recipe-like object for catalyst matching
     const syntheticRecipe = { craftingSystemId, components: managedItems };
     const catalystValidation = await this._validateCatalysts([actor], syntheticRecipe, salvageCatalysts);
     if (!catalystValidation.valid) {
-      return { success: false, results: null, message: catalystValidation.message, salvageRun: null };
+      if (salvageRunManager && salvageRun) {
+        salvageRun = await salvageRunManager.completeRun(actor, salvageRun, 'failed', {
+          failureReason: catalystValidation.message
+        });
+      }
+      return { success: false, results: null, message: catalystValidation.message, salvageRun };
     }
 
     const now = Number(game.time?.worldTime || 0);
+    const timeRequirement = component.salvage?.timeRequirement || null;
 
-    // 7. Run salvage crafting check
+    if (salvageRunManager && !salvageRun) {
+      salvageRun = await salvageRunManager.createRun(actor, {
+        actorUuid,
+        craftingSystemId,
+        componentId,
+        componentName: component.name || componentId,
+        status: 'inProgress',
+        startedAt: now,
+        usedCatalysts: []
+      });
+    }
+
+    if (salvageRunManager && timeRequirement && !options?.skipTimeGate) {
+      salvageRun = await salvageRunManager.markRunWaitingForTime(actor, salvageRun, timeRequirement);
+      const canProceed = salvageRunManager.canProceedTimeGate(salvageRun, now);
+      if (!canProceed) {
+        const remaining = Math.max(0, Math.ceil(Number(salvageRun.timeGate?.availableAt || 0) - now));
+        return {
+          success: true,
+          results: null,
+          message: `Salvage started for ${component.name || componentId} (${remaining}s remaining)`,
+          salvageRun
+        };
+      }
+    }
+
+    if (salvageRunManager && salvageRun) {
+      salvageRun = await salvageRunManager.markRunInProgress(actor, salvageRun);
+    }
+
     const checkResult = await this._runSalvageCraftingCheck(component, system, actor, catalystValidation.catalysts);
-
     const failurePolicy = this._getSalvageFailureConsumptionPolicy(system);
 
     if (!checkResult.success) {
-      // Apply failure consumption policy
       let consumedOnFail = [];
       let degradedCatalysts = [];
       try {
@@ -1674,21 +1739,34 @@ export class CraftingEngine {
         console.error('Fabricate | Error during salvage failure-path consumption:', err);
       }
 
-      const failedRun = await this._createSalvageRun(actor, {
-        actorUuid,
-        craftingSystemId,
-        componentId,
-        status: 'failed',
-        startedAt: now,
-        finishedAt: Number(game.time?.worldTime || 0),
-        consumedComponents: consumedOnFail.map(({ item }) => ({ itemUuid: item.uuid, quantity: 1 })),
-        usedCatalysts: degradedCatalysts.map(({ item, catalyst }) => ({
-          itemUuid: item.uuid,
-          componentId: catalyst.componentId || catalyst.systemItemId,
-          degraded: true
-        })),
+      if (salvageRunManager && salvageRun) {
+        salvageRun = await salvageRunManager.completeRun(actor, salvageRun, 'failed', {
+          consumedComponents: consumedOnFail.map(({ item, quantity }) => ({ itemUuid: item.uuid, quantity })),
+          usedCatalysts: degradedCatalysts.map(({ item, catalyst }) => ({
+            itemUuid: item.uuid,
+            componentId: catalyst.componentId || catalyst.systemItemId,
+            degraded: true
+          })),
+          createdResults: [],
+          checkResult: {
+            success: false,
+            outcome: checkResult.outcome,
+            value: checkResult.value,
+            data: checkResult.data || {}
+          },
+          failureReason: checkResult.message || 'Salvage check failed'
+        });
+      }
+
+      await this._runSalvageFailureMacro(component, system, {
+        component,
+        craftingSystem: system,
+        craftingActor: actor,
+        salvageInput: { componentId, quantity: ingredientQuantity },
+        consumedComponents: consumedOnFail,
+        consumedCatalysts: degradedCatalysts,
         createdResults: [],
-        checkResult: { success: false, outcome: checkResult.outcome, value: checkResult.value },
+        checkResult,
         failureReason: checkResult.message || 'Salvage check failed'
       });
 
@@ -1696,20 +1774,14 @@ export class CraftingEngine {
         success: false,
         results: null,
         message: checkResult.message || 'Salvage check failed',
-        salvageRun: failedRun
+        salvageRun
       };
     }
 
-    // 8. Resolve which result groups to use
     const resultGroups = this._resolveSalvageResultGroups(component, system, checkResult);
-
-    // 9. Consume component items
     const consumedItems = await this._consumeComponentItems(actor, componentItems, ingredientQuantity);
-
-    // 10. Degrade catalysts
     await this._degradeCatalysts(catalystValidation.catalysts);
 
-    // 11. Create result items (reuse _createSingleResult with a synthetic recipe view)
     const salvageRecipeView = this._buildSalvageRecipeView(component, system);
     const resultItems = [];
     for (const group of resultGroups) {
@@ -1727,34 +1799,45 @@ export class CraftingEngine {
       }
     }
 
-    // 12. Record successful salvage run
-    const succeededRun = await this._createSalvageRun(actor, {
-      actorUuid,
-      craftingSystemId,
-      componentId,
-      status: 'succeeded',
-      startedAt: now,
-      finishedAt: Number(game.time?.worldTime || 0),
-      consumedComponents: consumedItems.map(({ item }) => ({ itemUuid: item.uuid, quantity: 1 })),
-      usedCatalysts: catalystValidation.catalysts.map(({ item, catalyst }) => ({
-        itemUuid: item.uuid,
-        componentId: catalyst.componentId || catalyst.systemItemId,
-        degraded: true
-      })),
-      createdResults: resultItems.map(item => ({
-        itemUuid: item.uuid,
-        componentId: null,
-        quantity: Number(item.system?.quantity || 1)
-      })),
-      checkResult: { success: true, outcome: checkResult.outcome, value: checkResult.value },
-      failureReason: null
+    if (salvageRunManager && salvageRun) {
+      salvageRun = await salvageRunManager.completeRun(actor, salvageRun, 'succeeded', {
+        consumedComponents: consumedItems.map(({ item, quantity }) => ({ itemUuid: item.uuid, quantity })),
+        usedCatalysts: catalystValidation.catalysts.map(({ item, catalyst }) => ({
+          itemUuid: item.uuid,
+          componentId: catalyst.componentId || catalyst.systemItemId,
+          degraded: true
+        })),
+        createdResults: resultItems.map(item => ({
+          itemUuid: item.uuid,
+          componentId: null,
+          quantity: Number(item.system?.quantity || 1)
+        })),
+        checkResult: {
+          success: true,
+          outcome: checkResult.outcome,
+          value: checkResult.value,
+          data: checkResult.data || {}
+        },
+        failureReason: null
+      });
+    }
+
+    await this._runSalvageSuccessMacro(component, system, {
+      component,
+      craftingSystem: system,
+      craftingActor: actor,
+      salvageInput: { componentId, quantity: ingredientQuantity },
+      consumedComponents: consumedItems,
+      consumedCatalysts: catalystValidation.catalysts,
+      createdResults: resultItems,
+      checkResult
     });
 
     return {
       success: true,
       results: resultItems,
       message: `Successfully salvaged ${component.name || componentId}`,
-      salvageRun: succeededRun
+      salvageRun
     };
   }
 
@@ -1819,6 +1902,33 @@ export class CraftingEngine {
       consumeComponentOnFail: consumption.consumeComponentOnFail !== false,
       consumeCatalystsOnFail: consumption.consumeCatalystsOnFail === true
     };
+  }
+
+  _getSalvageSuccessFailureMacroUuids(system) {
+    return {
+      successMacroUuid: system?.salvageCraftingCheck?.successMacroUuid || null,
+      failureMacroUuid: system?.salvageCraftingCheck?.failureMacroUuid || null
+    };
+  }
+
+  async _runSalvageSuccessMacro(component, system, context) {
+    const { successMacroUuid } = this._getSalvageSuccessFailureMacroUuids(system);
+    if (!successMacroUuid) return;
+    try {
+      await MacroExecutor.run(successMacroUuid, context);
+    } catch (err) {
+      console.error(`Fabricate | Salvage success macro failed (${successMacroUuid}):`, err);
+    }
+  }
+
+  async _runSalvageFailureMacro(component, system, context) {
+    const { failureMacroUuid } = this._getSalvageSuccessFailureMacroUuids(system);
+    if (!failureMacroUuid) return;
+    try {
+      await MacroExecutor.run(failureMacroUuid, context);
+    } catch (err) {
+      console.error(`Fabricate | Salvage failure macro failed (${failureMacroUuid}):`, err);
+    }
   }
 
   /**
@@ -1943,26 +2053,5 @@ export class CraftingEngine {
       transferEffects: false,
       toJSON() { return { id: this.id, name: this.name }; }
     };
-  }
-
-  /**
-   * Create and persist a SalvageRun record on the actor.
-   * History is capped at 50 entries.
-   * @private
-   */
-  async _createSalvageRun(actor, runData) {
-    const existing = getFabricateFlag(actor, 'salvageRuns', null) || { active: {}, history: [] };
-    const history = Array.isArray(existing.history) ? [...existing.history] : [];
-
-    const run = {
-      id: foundry.utils.randomID(),
-      ...runData
-    };
-
-    history.unshift(run);
-    if (history.length > 50) history.length = 50;
-
-    await setFabricateFlag(actor, 'salvageRuns', { ...existing, history });
-    return run;
   }
 }

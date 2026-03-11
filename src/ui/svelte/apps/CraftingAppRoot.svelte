@@ -81,7 +81,38 @@
     onShowRunDetails={handleShowRunDetails}
     onRestartRun={store.restartRun}
     onCancelRun={store.cancelRun}
+    onCancelSalvageRun={store.cancelSalvageRun}
   />
+
+  {#if $viewState.salvageEntries?.length > 0}
+    <section class="run-summary-section">
+      <h4>{localize('FABRICATE.Salvage.Title')}</h4>
+      <ul class="run-list">
+        {#each $viewState.salvageEntries as entry (`salvage-${entry.systemId}-${entry.id}`)}
+          <li class="run-row">
+            <strong>{entry.name}</strong>
+            <span class="badge">{entry.statusLabel}</span>
+            <span class="hint">
+              {entry.systemName} • {localize('FABRICATE.Salvage.AvailableCount')
+                .replace('{have}', String(entry.quantityAvailable))
+                .replace('{need}', String(entry.quantityRequired))}
+            </span>
+            <span class="run-row-actions">
+              <button
+                type="button"
+                class="details-btn"
+                disabled={!entry.allowSalvageAction}
+                onclick={() => store.salvage(entry.systemId, entry.id)}
+                title={localize('FABRICATE.Salvage.Start')}
+              >
+                {entry.buttonLabel}
+              </button>
+            </span>
+          </li>
+        {/each}
+      </ul>
+    </section>
+  {/if}
 
   <ShoppingListPanel
     shoppingListData={$viewState.shoppingListData}

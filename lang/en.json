@@ -72,6 +72,11 @@
       "RestartRun": "Restart run",
       "CancelRun": "Cancel run"
     },
+    "Salvage": {
+      "Title": "Salvage",
+      "Start": "Start salvage",
+      "AvailableCount": "{have} available / {need} required"
+    },
     "Recipe": {
       "Name": "Recipe Name",
       "Description": "Description",

@@ -849,7 +849,7 @@ export class CraftingSystemManager {
     }
 
     // Clean up salvage runs referencing the deleted component
-    await this._cleanupSalvageRunsForComponent(itemId);
+    await this._cleanupSalvageRunsForComponent(itemId, systemId);
 
     await this.save();
     return true;
@@ -861,6 +861,10 @@ export class CraftingSystemManager {
    */
   _getResolutionModeService() {
     return game.fabricate?.getResolutionModeService?.() || null;
+  }
+
+  _getSalvageRunManager() {
+    return game.fabricate?.getSalvageRunManager?.() || null;
   }
 
   /**
@@ -897,6 +901,16 @@ export class CraftingSystemManager {
    * @param {string} systemId
    */
   async _cleanupSalvageRunsForSystem(systemId) {
+    const salvageRunManager = this._getSalvageRunManager();
+    if (salvageRunManager) {
+      await salvageRunManager.removeRunsForSystem(systemId, {
+        cancelActive: true,
+        removeHistory: true,
+        cancellationReason: 'Salvage system disabled'
+      });
+      return;
+    }
+
     for (const actor of game.actors || []) {
       const existing = getFabricateFlag(actor, 'salvageRuns', null);
       if (!existing) continue;
@@ -913,12 +927,25 @@ export class CraftingSystemManager {
    * Called when a component is deleted.
    * @param {string} componentId
    */
-  async _cleanupSalvageRunsForComponent(componentId) {
+  async _cleanupSalvageRunsForComponent(componentId, systemId = null) {
+    const salvageRunManager = this._getSalvageRunManager();
+    if (salvageRunManager) {
+      await salvageRunManager.removeRunsForComponent(componentId, {
+        systemId,
+        cancelActive: true,
+        removeHistory: true,
+        cancellationReason: 'Salvage component removed'
+      });
+      return;
+    }
+
     for (const actor of game.actors || []) {
       const existing = getFabricateFlag(actor, 'salvageRuns', null);
       if (!existing) continue;
       const history = Array.isArray(existing.history) ? existing.history : [];
-      const filtered = history.filter(r => r.componentId !== componentId);
+      const filtered = history.filter(r =>
+        r.componentId !== componentId || (systemId && r.craftingSystemId !== systemId)
+      );
       if (filtered.length !== history.length) {
         await setFabricateFlag(actor, 'salvageRuns', { ...existing, history: filtered });
       }
