@@ -16,7 +16,6 @@ dist/
 test-results/
 .env.foundry
 # Claude-generated project docs
-DOMAIN.md
 COMPETITIVE_ANALYSIS.md
 CONTENT_PACKS.md
 # Content pack specifications (premium, not for public repo)
