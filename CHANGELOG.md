@@ -4,6 +4,53 @@ All notable changes to Fabricate will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## 1.0.0-rc.1 (2026-03-11)
+
+### Features
+
+* **#114:** warn user when item dropped with no crafting system selected ([36e4fd8](https://github.com/misterpotts/fabricate-v2/commit/36e4fd82792284cf62412183da1535942c2c6706)), closes [#114](https://github.com/misterpotts/fabricate-v2/issues/114)
+* add detailed progress logs to Foundry test script ([560e0f9](https://github.com/misterpotts/fabricate-v2/commit/560e0f960dd5538560ea2372932e8b64198cce33))
+* add standardized GitHub issue templates and auto-labeling workflow ([1bda169](https://github.com/misterpotts/fabricate-v2/commit/1bda16943f6d4b346e9bf7c613abaef94fbb8104))
+* auto-fetch game systems for Foundry smoke test ([3f7735c](https://github.com/misterpotts/fabricate-v2/commit/3f7735ca067d9f237097808d4c267552baaf92f5))
+* **core, ui:** rename module, update namespace, and enhance initialization checks ([15b8531](https://github.com/misterpotts/fabricate-v2/commit/15b85311a1844c00d6e9494e4d57a559f168e9b2))
+* enhance `run-pipeline-headless.sh` with expanded task selection and parallel execution ([31a0c4c](https://github.com/misterpotts/fabricate-v2/commit/31a0c4c4c1f8b5e0944f7dd4615bc1c6d43e4d2c))
+* improve Team B workflow automation with Claude context preparation ([f82bcaf](https://github.com/misterpotts/fabricate-v2/commit/f82bcaf83d1284d5d57c641aa1eabd32422817e2))
+* **specs:** enhance feature toggles, expand data models, and add namespace migration ([9a0bb10](https://github.com/misterpotts/fabricate-v2/commit/9a0bb10b2ea201a096327f731534b521fe0fae0d))
+* **specs:** update data models and mode semantics ([99e4d49](https://github.com/misterpotts/fabricate-v2/commit/99e4d4965c2258c7f4fd62e51a9f14c709fbf503))
+* standardize issue creation in Team A workflows and optimize agent context loading ([f29671f](https://github.com/misterpotts/fabricate-v2/commit/f29671f6a0cd7912a8bb430052dbdf898bd12447))
+* **tests:** add unit tests for crafting engine, app actions, and run manager ([f3cff11](https://github.com/misterpotts/fabricate-v2/commit/f3cff113398d21ad539ea52deb4a7a818011540c))
+
+### Bug Fixes
+
+* **#112:** remove orphaned Ingredient.Tier i18n key and improve agent i18n guidance ([d43fbaf](https://github.com/misterpotts/fabricate-v2/commit/d43fbaf97ed9aa97a4f5c0bffa89edbebce37772)), closes [#112](https://github.com/misterpotts/fabricate-v2/issues/112)
+* add --allowedTools to CI workflows to prevent permission denials ([60201f6](https://github.com/misterpotts/fabricate-v2/commit/60201f6305d166afcd6b20e9a6d80716a3e96799))
+* add release branch to semantic-release config to fix ERELEASEBRANCHES ([bc390ef](https://github.com/misterpotts/fabricate-v2/commit/bc390effa095daeadf0308623d22c2c04c7e9932))
+* **ci:** grant write permissions and fix change detection in agent workflows ([2cfd772](https://github.com/misterpotts/fabricate-v2/commit/2cfd772f7317c0d0e6594e11a625a4f4b9c80009))
+* create container cache directory for Docker write access ([8b0fd88](https://github.com/misterpotts/fabricate-v2/commit/8b0fd88e1e14baa96486e8711203aafac77a482c))
+* dismiss blocking overlays in Foundry tests and force-click sidebar tabs ([4a70cad](https://github.com/misterpotts/fabricate-v2/commit/4a70cad3824fb8aae02dd41755738726d7558753))
+* enhance Foundry V13 test compatibility and cleanup logic ([643fc9b](https://github.com/misterpotts/fabricate-v2/commit/643fc9bd0bb5b9676ab18e40ed715411170fa608))
+* ensure Foundry test compatibility with V13 Set-based documentTypes ([aef53f0](https://github.com/misterpotts/fabricate-v2/commit/aef53f084f6168781977ef984a2ec7bd683c7fc9))
+* overhaul Foundry smoke test for V13 compatibility ([932f9fc](https://github.com/misterpotts/fabricate-v2/commit/932f9fcf18fa4050e62285712dc661aa71dc23f4))
+* set container UID/GID to match host for writable bind-mounted volumes ([34b55aa](https://github.com/misterpotts/fabricate-v2/commit/34b55aa39a159d788da7ede7d7e7dcb2f6a75bc8))
+* **ui:** standardize British English spelling in UI texts ([8c9346e](https://github.com/misterpotts/fabricate-v2/commit/8c9346ed62818dbb9e6d7f9f83802b2dfcffc5df))
+* update Team B workflow to label issues with `agent-failed` on task removal ([7bc882a](https://github.com/misterpotts/fabricate-v2/commit/7bc882a076288f537e453572fbee98b289a6b6ec))
+* update vulnerable dependencies (happy-dom, vite, svelte-plugin) ([c87a87b](https://github.com/misterpotts/fabricate-v2/commit/c87a87b97342a0053b77afcc2a9d0a173b57b2c1))
+
+### Documentation
+
+* add detailed backlog tasks for documentation improvements ([3035150](https://github.com/misterpotts/fabricate-v2/commit/3035150d53635cd9691c83b718cd5b90cecbf80a))
+* add integration spec and how-to guides for advanced crafting features ([4667e5b](https://github.com/misterpotts/fabricate-v2/commit/4667e5bb5d698bea8e712025c9ae3aef649fc405))
+* add integration spec and how-to guides for advanced crafting features ([120b5a4](https://github.com/misterpotts/fabricate-v2/commit/120b5a4f5a6509960ed70e0f7555cc7d66ad9c3a))
+* add manual learn path and clarify drag-and-drop recipe learning changes ([1267c74](https://github.com/misterpotts/fabricate-v2/commit/1267c748e46122e3a16f1c2cd373fbe75d9bfb97))
+* add README for Foundry smoke test scripts ([2e7d8b7](https://github.com/misterpotts/fabricate-v2/commit/2e7d8b735379f0b96eedd6679eea0de40ac279d5))
+* **backlog:** update T-054 task with blocking details and new acceptance criteria ([63b1861](https://github.com/misterpotts/fabricate-v2/commit/63b1861530db5ad436e3a4f5190be61e8c897eb8))
+* clarify multi-step recipe behavior and update validation/UI guidance ([376edb6](https://github.com/misterpotts/fabricate-v2/commit/376edb639e26aef23e3064f9c00ec42f0ec93995))
+* clarify single-selection vs cumulative semantics in Resolution Modes ([f2915d1](https://github.com/misterpotts/fabricate-v2/commit/f2915d17bf84cee156b9dbfa7a1dae39f2065017)), closes [#118](https://github.com/misterpotts/fabricate-v2/issues/118)
+* document warnings for invalid drag-and-drop operations in crafting admin panel ([448a680](https://github.com/misterpotts/fabricate-v2/commit/448a680a72c3b4a1197b92be671c71126d3c5a22))
+* enhance search, clarify visibility rules, and improve navigation workflows ([be25907](https://github.com/misterpotts/fabricate-v2/commit/be2590706a51af3255b27b0c75c7cd59d13068ac))
+* refine drag-and-drop item handling and bulk import logic ([1a89e63](https://github.com/misterpotts/fabricate-v2/commit/1a89e63baea6a1bfadc464b515da2ee6e834661f))
+* replace QUICKSTART.md with AGENTS.md, add unit tests, and update changelog ([617aac1](https://github.com/misterpotts/fabricate-v2/commit/617aac16447fc6484d9aa20abf16f05ab2e0b8ca))
+
 ## [Unreleased]
 
 ### CI/CD
