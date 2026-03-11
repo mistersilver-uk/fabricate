@@ -208,11 +208,18 @@ export class ResolutionModeService {
     // Pre-checks: return early if there's nothing to validate
     if (!component?.salvage || !system) return { valid: true, errors };
 
-    const mode = system.salvageResolutionMode || 'simple';
+    const rawMode = system.salvageResolutionMode || 'simple';
+    const mode = rawMode === 'tiered' ? 'routed' : rawMode;
     const componentLabel = component.name || component.id || 'unknown';
 
-    if (mode === 'mapped') {
-      errors.push('Mapped mode is not supported for salvage');
+    if (!['simple', 'routed', 'progressive'].includes(mode)) {
+      if (rawMode === 'mapped') {
+        errors.push('Mapped mode is not supported for salvage');
+      } else if (rawMode === 'alchemy') {
+        errors.push('Alchemy mode is not supported for salvage');
+      } else {
+        errors.push(`Unsupported salvage resolution mode: ${rawMode}`);
+      }
       return { valid: false, errors };
     }
 
@@ -224,13 +231,13 @@ export class ResolutionModeService {
       }
     }
 
-    if (mode === 'tiered') {
+    if (mode === 'routed') {
       const checkEnabled = system.salvageCraftingCheck?.enabled === true || !!system.salvageCraftingCheck?.macroUuid;
       const outcomes = Array.isArray(system.salvageCraftingCheck?.outcomes) ? system.salvageCraftingCheck.outcomes : [];
 
-      if (!checkEnabled) errors.push('Tiered salvage mode requires crafting checks enabled');
-      if (outcomes.length === 0) errors.push('Tiered salvage mode requires at least one declared outcome');
-      if (groups.length < 1) errors.push(`Salvage for "${componentLabel}" must have at least 1 result group in tiered mode`);
+      if (!checkEnabled) errors.push('Routed salvage mode requires crafting checks enabled');
+      if (outcomes.length === 0) errors.push('Routed salvage mode requires at least one declared outcome');
+      if (groups.length < 1) errors.push(`Salvage for "${componentLabel}" must have at least 1 result group in routed mode`);
 
       const groupIds = new Set(groups.map(g => g.id));
       const routing = component.salvage.outcomeRouting || {};

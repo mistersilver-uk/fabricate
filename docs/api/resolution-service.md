@@ -89,15 +89,15 @@ Hooks.once('fabricate.ready', () => {
 | Mode | Rules |
 |:-----|:------|
 | Simple | Exactly 1 result group required. |
-| Tiered | Crafting checks must be enabled (via `salvageCraftingCheck.enabled: true` or a non-null `macroUuid`), at least 1 outcome declared, at least 1 result group present, and every declared outcome must map to a valid result group ID in `component.salvage.outcomeRouting`. |
+| Routed | Crafting checks must be enabled (via `salvageCraftingCheck.enabled: true` or a non-null `macroUuid`), at least 1 outcome declared, at least 1 result group present, and every declared outcome must map to a valid result group ID in `component.salvage.outcomeRouting`. |
 | Progressive | Crafting checks must be enabled, `salvageCraftingCheck.progressive` config must be present, exactly 1 result group required, the group must contain at least 1 ordered result, and every result must reference a component with `difficulty >= 1`. |
 
 **Error message examples:**
 
 - `'Mapped mode is not supported for salvage'`
 - `'Salvage for "Silver Ore" must have exactly 1 result group in simple mode'`
-- `'Tiered salvage mode requires crafting checks enabled'`
-- `'Tiered salvage mode requires at least one declared outcome'`
+- `'Routed salvage mode requires crafting checks enabled'`
+- `'Routed salvage mode requires at least one declared outcome'`
 - `'Outcome "pass" must map to a valid salvage result group for "Silver Ore"'`
 - `'Progressive salvage mode requires crafting checks enabled'`
 - `'Progressive salvage mode requires salvageCraftingCheck.progressive configuration'`

@@ -46,7 +46,7 @@ CraftingSystem = {
   components: Component[],
 
   // Present only when features.salvage is true.
-  salvageResolutionMode: "simple" | "tiered" | "progressive",
+  salvageResolutionMode: "simple" | "routed" | "progressive",
 
   salvageCraftingCheck: {
     enabled: boolean,
@@ -57,7 +57,7 @@ CraftingSystem = {
       consumeComponentOnFail: boolean,  // default true
       consumeCatalystsOnFail: boolean,  // default false
     },
-    outcomes?: string[],               // tiered mode
+    outcomes?: string[],               // routed mode
     progressive?: {
       awardMode: "partial" | "equal" | "exceed",
       allowPlayerReorder: boolean,
@@ -192,7 +192,7 @@ Component = {
     ingredientQuantity: number,    // default 1
     catalysts: Catalyst[],
     resultGroups: ResultGroup[],
-    outcomeRouting?: { [outcome: string]: string },  // tiered only
+    outcomeRouting?: { [outcome: string]: string },  // routed only
     timeRequirement?: TimeRequirement,
     currencyRequirement?: CurrencyRequirement,
   },
@@ -206,7 +206,7 @@ Component = {
 3. Each essence key must exist in `CraftingSystem.essences` when essences are enabled.
 4. `salvage` is only valid when `CraftingSystem.features.salvage` is true.
 5. When `salvage.enabled` is true, `salvage.resultGroups` must contain at least one result group.
-6. `salvage.outcomeRouting` is only valid when `salvageResolutionMode` is `"tiered"`.
+6. `salvage.outcomeRouting` is only valid when `salvageResolutionMode` is `"routed"`.
 7. `salvage.ingredientQuantity` must be a positive integer.
 
 ## Recipe

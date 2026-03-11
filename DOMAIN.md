@@ -284,7 +284,7 @@ Tracked as T-259.
 
 1. `SalvageRunManager` — a full execution lifecycle manager parallel to `CraftingRunManager`.
 2. Complete salvage execution paths in `CraftingEngine`.
-3. `salvageResolutionMode` references updated — `"tiered"` is not a valid mode (per OQ-6); valid salvage modes must align with the four canonical resolution modes.
+3. `salvageResolutionMode` references updated — valid salvage modes are exactly `"simple"`, `"routed"`, and `"progressive"`. `"alchemy"` is invalid for salvage because salvage always decomposes one known component rather than discovering results from blind input submission.
 4. Actor flags for `salvageRuns` (active + history) wired end-to-end.
 
 The spec (spec/005) remains authoritative for the salvage lifecycle. Tracked in Issue #110.

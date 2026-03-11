@@ -1,6 +1,6 @@
 /**
  * Unit tests for ResolutionModeService.validateSalvage (T-044)
- * Tests salvage-specific validation for simple, tiered, and progressive modes.
+ * Tests salvage-specific validation for simple, routed, and progressive modes.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -46,7 +46,7 @@ function buildService() {
 }
 
 // ---------------------------------------------------------------------------
-// Group 1: Pre-checks (3 tests)
+// Group 1: Pre-checks (4 tests)
 // ---------------------------------------------------------------------------
 
 test('pre-check — component has no salvage data → valid (no errors)', () => {
@@ -81,6 +81,20 @@ test('pre-check — mapped salvageResolutionMode → invalid with clear error', 
   assert.ok(
     result.errors.some((e) => /mapped/i.test(e)),
     `expected error mentioning "mapped", got: ${JSON.stringify(result.errors)}`
+  );
+});
+
+test('pre-check — alchemy salvageResolutionMode → invalid with clear error', () => {
+  const service = buildService();
+  const component = buildComponent();
+  const system = buildSystem({ salvageResolutionMode: 'alchemy' });
+
+  const result = service.validateSalvage(component, system);
+
+  assert.equal(result.valid, false);
+  assert.ok(
+    result.errors.some((e) => /alchemy/i.test(e)),
+    `expected error mentioning "alchemy", got: ${JSON.stringify(result.errors)}`
   );
 });
 
@@ -152,12 +166,12 @@ test('simple mode — 2 result groups → invalid', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Group 3: Tiered mode (6 tests — 5 original + 1 macroUuid test)
+// Group 3: Routed mode (6 tests — 5 original + 1 macroUuid test)
 // ---------------------------------------------------------------------------
 
-function buildTieredSystem(overrides = {}) {
+function buildRoutedSystem(overrides = {}) {
   return buildSystem({
-    salvageResolutionMode: 'tiered',
+    salvageResolutionMode: 'routed',
     salvageCraftingCheck: {
       enabled: true,
       macroUuid: null,
@@ -168,7 +182,7 @@ function buildTieredSystem(overrides = {}) {
   });
 }
 
-function buildTieredComponent(outcomeRouting = { fail: 'rg-fail', pass: 'rg-pass' }) {
+function buildRoutedComponent(outcomeRouting = { fail: 'rg-fail', pass: 'rg-pass' }) {
   return buildComponent({
     salvage: {
       enabled: true,
@@ -183,10 +197,10 @@ function buildTieredComponent(outcomeRouting = { fail: 'rg-fail', pass: 'rg-pass
   });
 }
 
-test('tiered mode — checks enabled, outcomes present, valid routing → valid', () => {
+test('routed mode — checks enabled, outcomes present, valid routing → valid', () => {
   const service = buildService();
-  const system = buildTieredSystem();
-  const component = buildTieredComponent();
+  const system = buildRoutedSystem();
+  const component = buildRoutedComponent();
 
   const result = service.validateSalvage(component, system);
 
@@ -194,9 +208,28 @@ test('tiered mode — checks enabled, outcomes present, valid routing → valid'
   assert.equal(result.errors.length, 0);
 });
 
-test('tiered mode — salvageCraftingCheck disabled → invalid', () => {
+test('legacy tiered salvageResolutionMode alias uses routed validation semantics', () => {
   const service = buildService();
-  const system = buildTieredSystem({
+  const system = buildSystem({
+    salvageResolutionMode: 'tiered',
+    salvageCraftingCheck: {
+      enabled: true,
+      macroUuid: null,
+      outcomes: ['fail', 'pass'],
+      progressive: null,
+    },
+  });
+  const component = buildRoutedComponent();
+
+  const result = service.validateSalvage(component, system);
+
+  assert.equal(result.valid, true);
+  assert.equal(result.errors.length, 0);
+});
+
+test('routed mode — salvageCraftingCheck disabled → invalid', () => {
+  const service = buildService();
+  const system = buildRoutedSystem({
     salvageCraftingCheck: {
       enabled: false,
       macroUuid: null,
@@ -204,7 +237,7 @@ test('tiered mode — salvageCraftingCheck disabled → invalid', () => {
       progressive: null,
     },
   });
-  const component = buildTieredComponent();
+  const component = buildRoutedComponent();
 
   const result = service.validateSalvage(component, system);
 
@@ -215,9 +248,9 @@ test('tiered mode — salvageCraftingCheck disabled → invalid', () => {
   );
 });
 
-test('tiered mode — checks enabled via macroUuid (not boolean enabled) → valid', () => {
+test('routed mode — checks enabled via macroUuid (not boolean enabled) → valid', () => {
   const service = buildService();
-  const system = buildTieredSystem({
+  const system = buildRoutedSystem({
     salvageCraftingCheck: {
       enabled: false,
       macroUuid: 'Macro.some-uuid',
@@ -225,7 +258,7 @@ test('tiered mode — checks enabled via macroUuid (not boolean enabled) → val
       progressive: null,
     },
   });
-  const component = buildTieredComponent();
+  const component = buildRoutedComponent();
 
   const result = service.validateSalvage(component, system);
 
@@ -233,9 +266,9 @@ test('tiered mode — checks enabled via macroUuid (not boolean enabled) → val
   assert.equal(result.errors.length, 0);
 });
 
-test('tiered mode — empty outcomes array → invalid', () => {
+test('routed mode — empty outcomes array → invalid', () => {
   const service = buildService();
-  const system = buildTieredSystem({
+  const system = buildRoutedSystem({
     salvageCraftingCheck: {
       enabled: true,
       macroUuid: null,
@@ -243,7 +276,7 @@ test('tiered mode — empty outcomes array → invalid', () => {
       progressive: null,
     },
   });
-  const component = buildTieredComponent({});
+  const component = buildRoutedComponent({});
 
   const result = service.validateSalvage(component, system);
 
@@ -254,10 +287,10 @@ test('tiered mode — empty outcomes array → invalid', () => {
   );
 });
 
-test('tiered mode — outcome maps to non-existent result group → invalid', () => {
+test('routed mode — outcome maps to non-existent result group → invalid', () => {
   const service = buildService();
-  const system = buildTieredSystem();
-  const component = buildTieredComponent({ fail: 'rg-fail', pass: 'rg-does-not-exist' });
+  const system = buildRoutedSystem();
+  const component = buildRoutedComponent({ fail: 'rg-fail', pass: 'rg-does-not-exist' });
 
   const result = service.validateSalvage(component, system);
 
@@ -268,11 +301,11 @@ test('tiered mode — outcome maps to non-existent result group → invalid', ()
   );
 });
 
-test('tiered mode — missing routing entry for an outcome → invalid', () => {
+test('routed mode — missing routing entry for an outcome → invalid', () => {
   const service = buildService();
-  const system = buildTieredSystem();
+  const system = buildRoutedSystem();
   // 'pass' outcome has no routing entry
-  const component = buildTieredComponent({ fail: 'rg-fail' });
+  const component = buildRoutedComponent({ fail: 'rg-fail' });
 
   const result = service.validateSalvage(component, system);
 

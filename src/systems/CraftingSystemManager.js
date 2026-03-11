@@ -73,9 +73,10 @@ export class CraftingSystemManager {
       requirements: this._normalizeRequirements(system.requirements),
       essenceDefinitions: resolvedEssenceDefinitions,
       craftingCheck: this._normalizeCraftingCheck(system.craftingCheck),
-      salvageResolutionMode: ['simple', 'tiered', 'progressive'].includes(system.salvageResolutionMode)
-        ? system.salvageResolutionMode
-        : 'simple',
+      salvageResolutionMode: (function _normalizeSalvageResolutionMode(raw) {
+        if (raw === 'tiered') return 'routed'; // legacy alias
+        return ['simple', 'routed', 'progressive'].includes(raw) ? raw : 'simple';
+      })(system.salvageResolutionMode),
       salvageCraftingCheck: this._normalizeSalvageCraftingCheck(system.salvageCraftingCheck),
       alchemy: this._normalizeAlchemyConfig(system.alchemy ?? system.cauldron, system.resolutionMode),
       teaserConfig: this._normalizeTeaserConfig(system.teaserConfig),

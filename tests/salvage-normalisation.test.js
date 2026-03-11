@@ -48,11 +48,14 @@ test('salvageResolutionMode defaults to "simple" when not provided', () => {
   assert.equal(system.salvageResolutionMode, 'simple');
 });
 
-test('salvageResolutionMode accepts valid values and rejects invalid ones', () => {
+test('salvageResolutionMode accepts canonical values, maps legacy tiered to routed, and rejects invalid ones', () => {
   const manager = makeManager();
 
-  const tiered = manager._normalizeSystem({ id: 's1', salvageResolutionMode: 'tiered' });
-  assert.equal(tiered.salvageResolutionMode, 'tiered');
+  const routed = manager._normalizeSystem({ id: 's1', salvageResolutionMode: 'routed' });
+  assert.equal(routed.salvageResolutionMode, 'routed');
+
+  const legacyTiered = manager._normalizeSystem({ id: 's1b', salvageResolutionMode: 'tiered' });
+  assert.equal(legacyTiered.salvageResolutionMode, 'routed');
 
   const progressive = manager._normalizeSystem({ id: 's2', salvageResolutionMode: 'progressive' });
   assert.equal(progressive.salvageResolutionMode, 'progressive');
@@ -277,6 +280,15 @@ test('salvageResolutionMode "mapped" is rejected and falls back to "simple"', ()
   assert.equal(system.salvageResolutionMode, 'simple');
 });
 
+test('salvageResolutionMode "alchemy" is rejected and falls back to "simple"', () => {
+  const manager = makeManager();
+  const system = manager._normalizeSystem({
+    id: 'sys-1',
+    salvageResolutionMode: 'alchemy'
+  });
+  assert.equal(system.salvageResolutionMode, 'simple');
+});
+
 test('outcomeRouting is preserved in salvage sub-object when provided', () => {
   const manager = makeManager();
   const system = manager._normalizeSystem({
@@ -300,7 +312,7 @@ test('full round-trip: system with salvage enabled, component with full salvage 
     id: 'full-sys',
     name: 'Full Salvage System',
     features: { salvage: true },
-    salvageResolutionMode: 'tiered',
+    salvageResolutionMode: 'routed',
     salvageCraftingCheck: {
       macroUuid: 'Macro.salvage-check',
       consumption: {
@@ -338,7 +350,7 @@ test('full round-trip: system with salvage enabled, component with full salvage 
 
   // System-level checks
   assert.equal(system.features.salvage, true);
-  assert.equal(system.salvageResolutionMode, 'tiered');
+  assert.equal(system.salvageResolutionMode, 'routed');
   assert.equal(system.salvageCraftingCheck.macroUuid, 'Macro.salvage-check');
   assert.equal(system.salvageCraftingCheck.consumption.consumeComponentOnFail, false);
   assert.equal(system.salvageCraftingCheck.consumption.consumeCatalystsOnFail, true);

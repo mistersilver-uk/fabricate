@@ -662,10 +662,10 @@ test('salvage() simple mode uses only the first result group when component has 
 });
 
 // ---------------------------------------------------------------------------
-// Group 8: Tiered mode -- outcome routing
+// Group 8: Routed mode -- outcome routing
 // ---------------------------------------------------------------------------
 
-test('salvage() tiered mode routes to correct result group based on check outcome', async () => {
+test('salvage() routed mode routes to correct result group based on check outcome', async () => {
   const passComp = { id: 'gold-nugget', name: 'Gold Nugget', sourceUuid: null };
   const failComp = { id: 'coal-dust', name: 'Coal Dust', sourceUuid: null };
   const passGroup = { id: 'rg-pass', name: 'Pass Results', results: [{ id: 'r-1', componentId: 'gold-nugget', quantity: 1 }] };
@@ -690,7 +690,7 @@ test('salvage() tiered mode routes to correct result group based on check outcom
     }
   };
   const system = makeSystem({
-    salvageResolutionMode: 'tiered',
+    salvageResolutionMode: 'routed',
     components: [component, passComp, failComp]
   });
   setupGame(system, actor);
@@ -703,7 +703,7 @@ test('salvage() tiered mode routes to correct result group based on check outcom
   assert.equal(actor.createdItems[0].name, 'Gold Nugget', 'Result should be from the pass group');
 });
 
-test('salvage() tiered mode returns empty results array when outcome has no routing entry', async () => {
+test('salvage() routed mode returns empty results array when outcome has no routing entry', async () => {
   const fakeResolutionService = {
     validateSalvage: () => ({ valid: true, errors: [] }),
     resolveResultGroups: () => ({ groups: [], meta: {} })
@@ -722,7 +722,7 @@ test('salvage() tiered mode returns empty results array when outcome has no rout
       outcomeRouting: { pass: 'rg-pass' }
     }
   };
-  const system = makeSystem({ salvageResolutionMode: 'tiered', components: [component] });
+  const system = makeSystem({ salvageResolutionMode: 'routed', components: [component] });
   setupGame(system, actor);
 
   const result = await engine.salvage(actor.uuid, system.id, component.id);
@@ -733,7 +733,7 @@ test('salvage() tiered mode returns empty results array when outcome has no rout
   assert.equal(actor.createdItems.length, 0, 'No items created');
 });
 
-test('_resolveSalvageResultGroups tiered mode selects correct group for each outcome', () => {
+test('_resolveSalvageResultGroups routed mode selects correct group for each outcome', () => {
   const engine = makeEngine();
   const groups = [
     { id: 'rg-critical', name: 'Critical', results: [{ id: 'r-1', componentId: 'gem', quantity: 3 }] },
@@ -748,7 +748,7 @@ test('_resolveSalvageResultGroups tiered mode selects correct group for each out
       outcomeRouting: { critical: 'rg-critical', pass: 'rg-pass', fail: 'rg-fail' }
     }
   };
-  const system = makeSystem({ salvageResolutionMode: 'tiered', components: [component] });
+  const system = makeSystem({ salvageResolutionMode: 'routed', components: [component] });
 
   const criticalResult = engine._resolveSalvageResultGroups(component, system, { outcome: 'critical', value: null });
   assert.equal(criticalResult.length, 1);
@@ -761,6 +761,27 @@ test('_resolveSalvageResultGroups tiered mode selects correct group for each out
   const failResult = engine._resolveSalvageResultGroups(component, system, { outcome: 'fail', value: null });
   assert.equal(failResult.length, 1);
   assert.equal(failResult[0].id, 'rg-fail');
+});
+
+test('_resolveSalvageResultGroups legacy tiered alias uses routed logic', () => {
+  const engine = makeEngine();
+  const groups = [
+    { id: 'rg-pass', name: 'Pass', results: [{ id: 'r-1', componentId: 'ore', quantity: 1 }] },
+    { id: 'rg-fail', name: 'Fail', results: [] }
+  ];
+  const component = {
+    id: 'comp-1', name: 'Ore',
+    salvage: {
+      enabled: true, ingredientQuantity: 1, catalysts: [],
+      resultGroups: groups,
+      outcomeRouting: { pass: 'rg-pass', fail: 'rg-fail' }
+    }
+  };
+  const system = makeSystem({ salvageResolutionMode: 'tiered', components: [component] });
+
+  const passResult = engine._resolveSalvageResultGroups(component, system, { outcome: 'pass', value: null });
+  assert.equal(passResult.length, 1);
+  assert.equal(passResult[0].id, 'rg-pass');
 });
 
 // ---------------------------------------------------------------------------

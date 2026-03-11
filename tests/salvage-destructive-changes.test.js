@@ -79,9 +79,9 @@ function makeActor(id, salvageRunsHistory = null) {
 // Group 1: Mode change disables invalid salvage configs
 // ---------------------------------------------------------------------------
 
-test('Changing salvageResolutionMode from simple to tiered disables components without outcomeRouting', async () => {
-  // Simple mode requires exactly 1 result group. Tiered requires outcomeRouting + check enabled.
-  // Component has 1 result group but no outcomeRouting → invalid for tiered.
+test('Changing salvageResolutionMode from simple to routed disables components without outcomeRouting', async () => {
+  // Simple mode requires exactly 1 result group. Routed requires outcomeRouting + check enabled.
+  // Component has 1 result group but no outcomeRouting → invalid for routed.
   const system = {
     id: 'sys-1',
     name: 'Test',
@@ -102,7 +102,7 @@ test('Changing salvageResolutionMode from simple to tiered disables components w
         ingredientQuantity: 1,
         catalysts: [],
         resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [{ id: 'r-1', componentId: 'scrap', quantity: 1 }] }]
-        // no outcomeRouting → invalid for tiered
+        // no outcomeRouting → invalid for routed
       }
     }]
   };
@@ -115,20 +115,20 @@ test('Changing salvageResolutionMode from simple to tiered disables components w
   const normalized = mgr._normalizeSystem(system);
   mgr.systems.set(normalized.id, normalized);
 
-  await mgr.updateSystem(normalized.id, { salvageResolutionMode: 'tiered' });
+  await mgr.updateSystem(normalized.id, { salvageResolutionMode: 'routed' });
 
   const updated = mgr.getSystem(normalized.id);
   const comp = updated.components.find(c => c.id === 'comp-1');
-  assert.equal(comp.salvage.enabled, false, 'Component without outcomeRouting should be disabled in tiered mode');
+  assert.equal(comp.salvage.enabled, false, 'Component without outcomeRouting should be disabled in routed mode');
 });
 
-test('Changing salvageResolutionMode from tiered to simple disables components with multiple result groups', async () => {
+test('Changing salvageResolutionMode from routed to simple disables components with multiple result groups', async () => {
   // Simple mode requires exactly 1 result group. A component with 2 groups is invalid.
   const system = {
     id: 'sys-2',
     name: 'Test',
     features: { salvage: true },
-    salvageResolutionMode: 'tiered',
+    salvageResolutionMode: 'routed',
     salvageCraftingCheck: {
       enabled: true, macroUuid: 'Macro.check', outcomes: ['pass', 'fail'],
       consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false },
@@ -168,7 +168,7 @@ test('Mode change does not disable components that are already valid for the new
     id: 'sys-3',
     name: 'Test',
     features: { salvage: true },
-    salvageResolutionMode: 'tiered',
+    salvageResolutionMode: 'routed',
     salvageCraftingCheck: {
       enabled: false, macroUuid: null, outcomes: [],
       consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false },
@@ -221,7 +221,7 @@ test('GM notification sent when components are disabled by mode change', async (
         ingredientQuantity: 1,
         catalysts: [],
         resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [{ id: 'r-1', componentId: 'scrap', quantity: 1 }] }]
-        // no outcomeRouting → invalid for tiered
+        // no outcomeRouting → invalid for routed
       }
     }]
   };
@@ -231,7 +231,7 @@ test('GM notification sent when components are disabled by mode change', async (
   const normalized = mgr._normalizeSystem(system);
   mgr.systems.set(normalized.id, normalized);
 
-  await mgr.updateSystem(normalized.id, { salvageResolutionMode: 'tiered' });
+  await mgr.updateSystem(normalized.id, { salvageResolutionMode: 'routed' });
 
   assert.ok(warnMessages.length > 0, 'At least one warn notification should be sent');
   const combined = warnMessages.join('\n');

@@ -26,25 +26,25 @@ The salvage resolution mode controls how result groups are awarded when a compon
 | Value | Description |
 |:------|:------------|
 | `"simple"` | Always awards exactly one result group. No check required. Default. |
-| `"tiered"` | Awards a result group based on the outcome of a salvage check. Outcome labels (e.g. `"critical"`, `"pass"`, `"fail"`) are mapped to result groups via `outcomeRouting` on the component. |
+| `"routed"` | Awards a result group based on the outcome of a salvage check. Outcome labels (e.g. `"critical"`, `"pass"`, `"fail"`) are mapped to result groups via `outcomeRouting` on the component. |
 | `"progressive"` | Awards results sequentially as the check value exceeds each result's difficulty threshold. |
 
 {: .warning }
-> `"mapped"` is not a valid salvage resolution mode and will be rejected. Use `"tiered"` if you need outcome-based routing.
+> `"mapped"` and `"alchemy"` are not valid salvage resolution modes and will be rejected. Use `"routed"` if you need outcome-based routing.
 
 ```javascript
 Hooks.once('fabricate.ready', async () => {
   const mgr = game.fabricate.getCraftingSystemManager();
   await mgr.updateSystem('blacksmithing-system-id', {
     features: { salvage: true },
-    salvageResolutionMode: 'tiered'
+    salvageResolutionMode: 'routed'
   });
 });
 ```
 
 ## Salvage Crafting Check
 
-When `salvageResolutionMode` is `"tiered"` or `"progressive"`, you must configure a salvage check. This is separate from the recipe crafting check — a system can have both.
+When `salvageResolutionMode` is `"routed"` or `"progressive"`, you must configure a salvage check. This is separate from the recipe crafting check — a system can have both.
 
 Configure `salvageCraftingCheck` on the system:
 
@@ -58,7 +58,7 @@ Configure `salvageCraftingCheck` on the system:
 | `consumption.consumeCatalystsOnFail` | `boolean` | `false` | Whether salvage catalysts are degraded even when the check fails |
 | `progressive.awardMode` | `string` | `"equal"` | How results are awarded in progressive mode: `"equal"`, `"exceed"`, or `"partial"` |
 | `progressive.allowPlayerReorder` | `boolean` | `false` | Whether players can reorder pending results |
-| `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for tiered routing |
+| `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for routed outcome routing |
 
 **Example: a Disenchanting system where the artefact is always destroyed on failure but the enchanting tools are spared:**
 
@@ -67,7 +67,7 @@ Hooks.once('fabricate.ready', async () => {
   const mgr = game.fabricate.getCraftingSystemManager();
   await mgr.updateSystem('disenchanting-system-id', {
     features: { salvage: true },
-    salvageResolutionMode: 'tiered',
+    salvageResolutionMode: 'routed',
     salvageCraftingCheck: {
       macroUuid: 'Macro.disenchant-check-uuid',
       successMacroUuid: 'Macro.disenchant-success-uuid',
@@ -92,7 +92,7 @@ When `features.salvage` is `true` on a system, each component gains a `salvage` 
 | `ingredientQuantity` | `integer` | `1` | How many of this component the actor must provide to begin salvage. Must be a positive integer; invalid values (zero, negative, non-numeric) fall back to `1`. |
 | `catalysts` | `array` | `[]` | Catalysts required for the salvage operation. Each entry has `componentId`, `degradesOnUse`, `destroyWhenExhausted`, and `maxUses`. |
 | `resultGroups` | `array` | `[]` | The possible sets of items produced by salvage. Each group has `id`, `name`, and a `results` array. Each result has `id`, `componentId`, `quantity`, and optionally `propertyMacroUuid`. |
-| `outcomeRouting` | `object` | omitted | Maps outcome labels to result group IDs. Required in tiered mode. |
+| `outcomeRouting` | `object` | omitted | Maps outcome labels to result group IDs. Required in routed mode. |
 | `timeRequirement` | `object` | omitted | Time duration fields (`minutes`, `hours`, `days`, `months`, `years`). Only positive finite values are kept. |
 | `currencyRequirement` | `object` | omitted | `{ unit, amount }` where `unit` defaults to `"gp"` and `amount` must be a positive number. |
 

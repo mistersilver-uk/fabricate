@@ -1826,14 +1826,15 @@ export class CraftingEngine {
    * @private
    */
   _resolveSalvageResultGroups(component, system, checkResult) {
-    const mode = system?.salvageResolutionMode || 'simple';
+    const rawMode = system?.salvageResolutionMode || 'simple';
+    const mode = rawMode === 'tiered' ? 'routed' : rawMode;
     const allGroups = Array.isArray(component.salvage?.resultGroups) ? component.salvage.resultGroups : [];
 
     if (mode === 'simple') {
       return allGroups.slice(0, 1);
     }
 
-    if (mode === 'tiered') {
+    if (mode === 'routed') {
       const outcome = checkResult?.outcome != null ? String(checkResult.outcome) : null;
       const routing = component.salvage?.outcomeRouting || {};
       const routedId = outcome ? routing[outcome] : null;

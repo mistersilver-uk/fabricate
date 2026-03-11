@@ -18,5 +18,6 @@ test-results/
 # Claude-generated project docs
 COMPETITIVE_ANALYSIS.md
 CONTENT_PACKS.md
+PLAN.md
 # Content pack specifications (premium, not for public repo)
 content-packs/

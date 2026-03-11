@@ -84,7 +84,7 @@ The returned system object also includes the following top-level salvage fields,
 
 | Field | Type | Default | Description |
 |:------|:-----|:--------|:------------|
-| `salvageResolutionMode` | `string` | `"simple"` | How salvage result groups are selected. Accepts `"simple"`, `"tiered"`, or `"progressive"`. `"mapped"` is rejected and falls back to `"simple"`. |
+| `salvageResolutionMode` | `string` | `"simple"` | How salvage result groups are selected. Accepts `"simple"`, `"routed"`, or `"progressive"`. Legacy `"tiered"` input is normalized to `"routed"`. `"mapped"` and `"alchemy"` are rejected and fall back to `"simple"`. |
 | `salvageCraftingCheck` | `object` | see below | System-level salvage check configuration. |
 
 `salvageCraftingCheck` shape:
@@ -180,12 +180,12 @@ Hooks.once('fabricate.ready', async () => {
 ```
 
 ```javascript
-// Enable salvage with tiered mode on an existing system.
+// Enable salvage with routed mode on an existing system.
 Hooks.once('fabricate.ready', async () => {
   const mgr = game.fabricate.getCraftingSystemManager();
   await mgr.updateSystem('blacksmithing-system-id', {
     features: { salvage: true },
-    salvageResolutionMode: 'tiered',
+    salvageResolutionMode: 'routed',
     salvageCraftingCheck: {
       macroUuid: 'Macro.salvage-check-uuid',
       consumption: {

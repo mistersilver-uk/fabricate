@@ -124,8 +124,8 @@ Additional causes:
 
 **Likely causes:**
 
-- `salvageResolutionMode` is set to `"mapped"`. Mapped mode is **not valid** for salvage and is explicitly rejected. Use `"simple"`, `"tiered"`, or `"progressive"` instead.
-- **Tiered salvage mode** requires:
+- `salvageResolutionMode` is set to `"mapped"` or `"alchemy"`. Those modes are **not valid** for salvage and are explicitly rejected. Use `"simple"`, `"routed"`, or `"progressive"` instead.
+- **Routed salvage mode** requires:
   - `salvageCraftingCheck.enabled` is `true` (or `salvageCraftingCheck.macroUuid` is set)
   - `salvageCraftingCheck.outcomes` contains at least one declared outcome label (e.g. `["critical", "pass", "fail"]`)
   - The component's `salvage.outcomeRouting` maps every declared outcome to an existing result group ID in `salvage.resultGroups`
@@ -137,8 +137,8 @@ Additional causes:
 
 **Step-by-step checks:**
 
-1. Check the system's `salvageResolutionMode`. If it is `"mapped"`, change it to `"simple"`, `"tiered"`, or `"progressive"`.
-2. For **tiered** mode:
+1. Check the system's `salvageResolutionMode`. If it is `"mapped"` or `"alchemy"`, change it to `"simple"`, `"routed"`, or `"progressive"`.
+2. For **routed** mode:
    - Is `salvageCraftingCheck.macroUuid` set to a valid macro UUID?
    - Are `salvageCraftingCheck.outcomes` defined (e.g. `["critical", "pass", "fail"]`)?
    - Does the component's `salvage.outcomeRouting` map every declared outcome to an existing result group ID?

@@ -182,7 +182,7 @@ Define the lifecycle and semantics for salvage operations — the inverse of cra
 
 - `CraftingSystem.features.salvage` must be true.
 - `Component.salvage.enabled` must be true.
-- `CraftingSystem.salvageResolutionMode` must be one of: `"simple"`, `"tiered"`, `"progressive"`. Mapped mode is not supported for salvage.
+- `CraftingSystem.salvageResolutionMode` must be one of: `"simple"`, `"routed"`, `"progressive"`. Alchemy is not supported for salvage because salvage always operates on one known component, not blind ingredient submission.
 
 ### Implicit Ingredient
 
@@ -205,7 +205,7 @@ If it is present, the run must resume automatically when world time reaches the 
 ### Resolution Mode Application
 
 - **Simple**: One result group. Optional pass/fail check. On success, produce the single result group.
-- **Tiered**: Check is mandatory. Check macro returns `outcome`. `Component.salvage.outcomeRouting` maps outcomes to result groups.
+- **Routed**: Check is mandatory. Check macro returns `outcome`. `Component.salvage.outcomeRouting` maps outcomes to result groups.
 - **Progressive**: One result group with ordered results. Check is mandatory. Check macro returns numeric `value`. Awards are evaluated using `salvageCraftingCheck.progressive.awardMode`.
 
 ### Macro Contracts
@@ -261,7 +261,7 @@ SalvageRun = {
   lastCheckResult?: {
     success: boolean,
     reason: string,
-    outcome?: string, // tiered mode
+    outcome?: string, // routed mode
     value?: number,   // progressive mode
     data?: object,
   },
@@ -286,7 +286,7 @@ SalvageRun = {
 
 ### Destructive Change Rules
 
-- **Mode change** (`salvageResolutionMode`): Disables any `Component.salvage` definitions that are invalid under the new mode (e.g., switching from tiered to simple invalidates salvage defs with outcome routing). Affected components have `salvage.enabled` set to false.
+- **Mode change** (`salvageResolutionMode`): Disables any `Component.salvage` definitions that are invalid under the new mode (e.g., switching from routed to simple invalidates salvage defs with outcome routing). Affected components have `salvage.enabled` set to false.
 - **Feature disable** (`features.salvage = false`): Cancels all active salvage runs. Salvage definitions on components are preserved but inert.
 - **Component deletion**: Cleans up any active salvage runs referencing the deleted component.
 
@@ -315,7 +315,7 @@ When recipe-level `ingredientSets` or `resultGroups` are empty:
 - Unit tests for no-multi-step enforcement in alchemy mode.
 - Integration tests for alchemy learn-on-success visibility behavior.
 - Unit tests for salvage lifecycle (validate, check, resolve, consume, create).
-- Unit tests for salvage resolution modes (simple, tiered, progressive).
+- Unit tests for salvage resolution modes (simple, routed, progressive).
 - Unit tests for salvage time-gated runs when `Component.salvage.timeRequirement` is present.
 - Unit tests for timed salvage completion after world-time advancement.
 - Unit tests for salvage destructive change handling.
