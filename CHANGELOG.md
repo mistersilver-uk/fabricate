@@ -4,6 +4,12 @@ All notable changes to Fabricate will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.0.0-rc.7](https://github.com/misterpotts/fabricate-v2/compare/v1.0.0-rc.6...v1.0.0-rc.7) (2026-03-11)
+
+### Features
+
+* **#120:** Define valid salvageResolutionMode values after full salvage implementation ([359fa14](https://github.com/misterpotts/fabricate-v2/commit/359fa14fc2aff6986c7c490d905752f2f6572f90)), closes [#120](https://github.com/misterpotts/fabricate-v2/issues/120)
+
 ## [1.0.0-rc.6](https://github.com/misterpotts/fabricate-v2/compare/v1.0.0-rc.5...v1.0.0-rc.6) (2026-03-11)
 
 ### Features
