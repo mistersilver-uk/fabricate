@@ -15,3 +15,7 @@ dist/
 .foundry-e2e/data/
 test-results/
 .env.foundry
+# Claude-generated project docs
+DOMAIN.md
+COMPETITIVE_ANALYSIS.md
+CONTENT_PACKS.md
