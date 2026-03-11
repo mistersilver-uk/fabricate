@@ -222,6 +222,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Re-authenticate git — Claude Code Action may have replaced credentials
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
           git push origin "$BRANCH"
 
           gh pr create \
