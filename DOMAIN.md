@@ -24,8 +24,8 @@
 | Term            | Definition                                                                                                                  | Code Mapping                    | Spec Reference |
 |-----------------|-----------------------------------------------------------------------------------------------------------------------------|---------------------------------|----------------|
 | **Simple**      | One ingredient set, one result group, optional pass/fail check.                                                             | `resolutionMode: 'simple'`      | spec/004       |
-| **Routed**      | Multiple sets/groups with recipe-level result selection provider (`ingredientSet`, `macroOutcome`, `rollTableOutcome`).     | `resolutionMode: 'routed'`      | spec/004       |
-| **Progressive** | One set, one ordered result group. Mandatory numeric check distributes results by difficulty cost.                          | `resolutionMode: 'progressive'` | spec/004       |
+| **Routed**      | Multiple sets/groups with recipe-level result selection provider (`ingredientSet`, `macroOutcome`, `rollTableOutcome`). **Single-selection semantics: exactly one result group is selected per craft attempt based on the check outcome or provider.**     | `resolutionMode: 'routed'`      | spec/004       |
+| **Progressive** | One set, one ordered result group. Mandatory numeric check distributes results by difficulty cost. **Cumulative semantics: all result groups whose difficulty threshold is met or exceeded are awarded, not just the highest matching group — contrast with `routed` which selects exactly one group.**                          | `resolutionMode: 'progressive'` | spec/004       |
 | **Alchemy**     | Discovery-based mode where players submit ingredients blindly. Hidden recipes, signature matching, optional learn-on-craft. | `resolutionMode: 'alchemy'`     | spec/004       |
 
 ### Visibility and Knowledge
