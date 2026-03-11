@@ -839,7 +839,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     const checksEnabled = (system.features?.craftingChecks === true) || system.enableCraftingChecks === true;
     if (!checksEnabled) return;
 
-    const mode = this._readInput('craftingCheckMode') === 'tiered' ? 'tiered' : 'passFail';
+    const mode = this._readInput('craftingCheckMode') === 'namedOutcomes' ? 'namedOutcomes' : 'passFail';
     const macroUuid = this._readInput('craftingCheckMacroUuid') || null;
     const rawOutcomes = this._readInput('craftingCheckOutcomes');
     const outcomes = rawOutcomes

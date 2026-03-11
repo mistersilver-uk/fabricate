@@ -226,7 +226,7 @@
           "Title": "Crafting Checks",
           "Hint": "Run a system-level check macro that returns pass/fail or named outcomes.",
           "PassFail": "Pass / Fail",
-          "TieredOutcomes": "Tiered Outcomes",
+          "NamedOutcomes": "Named Outcomes",
           "NoCheckMacro": "No check macro",
           "OutcomesPlaceholder": "Outcomes (comma separated)",
           "SaveConfig": "Save Check Config"

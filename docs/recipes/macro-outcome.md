@@ -8,7 +8,7 @@ nav_order: 3
 # Routed Mode — Macro Outcome Provider
 
 {: .note }
-> This page documents the `macroOutcome` provider for routed mode, which replaces the legacy `tiered` resolution mode. Existing `tiered` recipes are automatically normalised to `routed` + `macroOutcome` provider on load.
+> This page documents the `macroOutcome` provider for routed mode. Legacy recipes still stored with `resolutionMode: "tiered"` are automatically normalised to `routed` + `macroOutcome` on load.
 
 A crafting check macro returns a named **outcome**, and the outcome determines which result group is produced. The outcome is matched case-insensitively against result group names.
 
@@ -49,7 +49,7 @@ A blacksmithing recipe where the quality of the result depends on a skill check:
 Your crafting check macro receives context about the recipe and actors, and must return a named outcome:
 
 ```javascript
-// Crafting check macro for tiered weapon forging
+// Crafting check macro for routed macro-outcome weapon forging
 // Context is passed as the first argument
 const { craftingActor, recipe, step } = scope;
 

@@ -117,7 +117,7 @@ In routed mode, the `resultSelection.provider` field on a recipe controls how th
 | `rollTableOutcome` | No | The engine draws from a roll table; the drawn result name is matched to a result group |
 
 {: .note }
-> The legacy `mapped` and `tiered` resolution modes are automatically normalised to routed mode on load. `mapped` becomes `routed` + `ingredientSet` provider; `tiered` becomes `routed` + `macroOutcome` provider. No manual migration is required.
+> Legacy `mapped` and `tiered` recipes are automatically normalised to routed mode on load. `mapped` becomes `routed` + `ingredientSet`; `tiered` becomes `routed` + `macroOutcome`. No manual migration is required.
 
 ## Multi-Step Recipes
 

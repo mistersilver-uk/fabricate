@@ -225,7 +225,7 @@
     <div class="panel-toolbar compact">
       <select bind:value={checkMode}>
         <option value="passFail">{localize('FABRICATE.Admin.Features.CraftingChecks.PassFail')}</option>
-        <option value="tiered">{localize('FABRICATE.Admin.Features.CraftingChecks.TieredOutcomes')}</option>
+        <option value="namedOutcomes">{localize('FABRICATE.Admin.Features.CraftingChecks.NamedOutcomes')}</option>
       </select>
       <select bind:value={checkMacroUuid}>
         <option value="">{localize('FABRICATE.Admin.Features.CraftingChecks.NoCheckMacro')}</option>

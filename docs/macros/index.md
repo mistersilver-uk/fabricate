@@ -34,7 +34,7 @@ Called during step resolution when `craftingCheck.enabled` is `true`. The macro 
 |:-----|:------------|
 | Simple | `{ success: boolean, data?: object }` |
 | Mapped | `{ success: boolean, data?: object }` |
-| Tiered | `{ success: boolean, outcome: string, data?: object }` |
+| Routed (`macroOutcome`) | `{ success: boolean, outcome: string, data?: object }` |
 | Progressive | `{ success: boolean, value: number, data?: object }` |
 
 **Example (simple pass/fail):**

@@ -48,7 +48,7 @@ A three-step recipe for creating enchanted plate armour:
 
 **Step 3: Enchant**
 - Ingredients: 1x Plate Armour, 1x Enchanting Gem
-- Crafting check: skill-based (tiered)
+- Crafting check: skill-based (routed `macroOutcome`)
 - Result: 1x Enchanted Plate Armour (quality depends on check)
 
 ### Creating via Macro

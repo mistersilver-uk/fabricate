@@ -126,7 +126,7 @@ export class CraftingSystemManager {
   }
 
   _normalizeCraftingCheck(check = {}) {
-    const mode = check?.mode === 'tiered' ? 'tiered' : 'passFail';
+    const mode = check?.mode === 'tiered' || check?.mode === 'namedOutcomes' ? 'namedOutcomes' : 'passFail';
     const outcomes = Array.isArray(check?.outcomes) ? check.outcomes : [];
     const normalizedOutcomes = outcomes
       .map(o => String(o || '').trim().toLowerCase())
@@ -155,7 +155,7 @@ export class CraftingSystemManager {
       },
       outcomes: normalizedOutcomes.length > 0
         ? Array.from(new Set(normalizedOutcomes))
-        : (mode === 'tiered' ? ['low', 'high'] : ['fail', 'pass'])
+        : (mode === 'namedOutcomes' ? ['low', 'high'] : ['fail', 'pass'])
     };
   }
 

@@ -122,7 +122,6 @@ function makeEditorApp(draftOverrides = {}, featureOverrides = {}) {
     system: null,
     resolutionMode: 'simple',
     isMappedMode: false,
-    isTieredMode: false,
     isProgressiveMode: false,
     showRecipeVisibilityGlobal: false,
     showRecipeVisibilityPlayer: false,

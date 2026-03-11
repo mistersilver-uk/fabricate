@@ -263,7 +263,7 @@ Tracked in Issue #106.
 
 ### ~~OQ-4: `tier` field on Component — orphaned~~ CLOSED
 
-**Decision (2026-03-10):** Remove `tier` from `_normalizeComponent` entirely. It is dead data — the tiered mode was removed in T-166 and `difficulty` already serves the progressive mode purpose. Tracked in Issue #103.
+**Decision (2026-03-10):** Remove `tier` from `_normalizeComponent` entirely. It is dead data — the legacy outcome-routing predecessor was removed in T-166 and `difficulty` already serves the progressive mode purpose. Tracked in Issue #103.
 
 ### ~~OQ-5: `difficulty` object on CraftingSystem — orphaned~~ CLOSED
 

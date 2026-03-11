@@ -7,7 +7,7 @@
  * 3. Reserved fail keyword: drawn result "Failed" returns empty/fail outcome
  * 4. Missing table UUID: validation error
  * 5. No matching result group: crafting error
- * 6. Existing mapped/tiered modes unaffected (regression)
+ * 6. Existing legacy mapped/tiered compatibility modes unaffected (regression)
  * 7. Recipe model resultSelection field
  * 8. Recipe validation for rollTableOutcome
  */
@@ -442,7 +442,7 @@ describe('Regression: existing resolution modes unaffected', () => {
     assert.equal(result.groups[0].name, 'Shield');
   });
 
-  it('tiered mode: resolveResultGroups resolves by outcomeRouting', () => {
+  it('legacy tiered compatibility mode: resolveResultGroups resolves by outcomeRouting', () => {
     const service = makeService({ resolutionMode: 'tiered' });
     const groups = makeResultGroups(['Sword', 'Shield']);
     const recipe = {

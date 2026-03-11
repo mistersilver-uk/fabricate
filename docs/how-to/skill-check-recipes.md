@@ -27,6 +27,6 @@ Switch the crafting system to **routed** resolution mode and select the `macroOu
 ## Learn more
 
 - [Crafting Checks]({% link crafting-checks.md %})
-- [Routed Mode (Macro Outcome)]({% link recipes/tiered.md %})
+- [Routed Mode (Macro Outcome)]({% link recipes/macro-outcome.md %})
 - [Progressive Mode]({% link recipes/progressive.md %})
 - [Macros -- Crafting Check contract]({% link macros/index.md %}#crafting-check-macro)

@@ -49,7 +49,7 @@ new Recipe({
 ```
 
 {: .note }
-> The legacy `outcomeRouting` field and the `mapped`/`tiered` modes have been replaced by `resultSelection` with a `provider` field. Legacy recipes are automatically normalised on load. Use `resultSelection` for all new routed recipes.
+> The legacy `outcomeRouting` field and the legacy `mapped`/`tiered` modes have been replaced by `resultSelection` with a `provider` field. Legacy recipes are automatically normalised on load. Use `resultSelection` for all new routed recipes.
 
 **Key methods:**
 

@@ -245,7 +245,6 @@ function _getSystemFeatureState(draft, services) {
     system,
     resolutionMode,
     isMappedMode: resolutionMode === 'mapped',
-    isTieredMode: resolutionMode === 'tiered',
     isProgressiveMode: resolutionMode === 'progressive',
     showRecipeVisibilityGlobal: listMode === 'global',
     showRecipeVisibilityPlayer: listMode === 'player',

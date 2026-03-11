@@ -154,7 +154,7 @@ test('5 ingredient sets all appear in _prepareContext as ingredientSets array', 
 });
 
 // ---------------------------------------------------------------------------
-// Test 2: Create tiered recipe with 3 result groups -- all appear in context
+// Test 2: Create legacy tiered recipe with 3 result groups -- all appear in context
 // ---------------------------------------------------------------------------
 
 test('3 result groups all appear in _prepareContext as resultGroups array', async () => {

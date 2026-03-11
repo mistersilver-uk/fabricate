@@ -308,7 +308,7 @@ function makeResolutionService(systemOverride = {}) {
   return service;
 }
 
-test('validateRecipe accepts checkSource builtIn as valid for tiered mode', () => {
+test('validateRecipe accepts checkSource builtIn as valid for legacy tiered compatibility mode', () => {
   const service = makeResolutionService({ resolutionMode: 'tiered' });
   const recipe = {
     craftingSystemId: 'sys-res',
@@ -319,8 +319,8 @@ test('validateRecipe accepts checkSource builtIn as valid for tiered mode', () =
     }]
   };
   const result = service.validateRecipe(recipe);
-  const tieredErrors = result.errors.filter(e => e.includes('crafting checks'));
-  assert.equal(tieredErrors.length, 0, `Expected no check-enabled errors, got: ${tieredErrors.join(', ')}`);
+  const compatibilityErrors = result.errors.filter(e => e.includes('crafting checks'));
+  assert.equal(compatibilityErrors.length, 0, `Expected no check-enabled errors, got: ${compatibilityErrors.join(', ')}`);
 });
 
 test('validateRecipe accepts checkSource builtIn as valid for progressive mode', () => {

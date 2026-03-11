@@ -8,7 +8,7 @@
  * Groups:
  *   1. Simple mode  — validate + consume + create result (AC1)
  *   2. Multistep    — start run, advance 2 steps, complete (AC2)
- *   3. Tiered mode  — outcome routed to correct result group (AC3)
+ *   3. Legacy tiered compatibility mode — outcome routed to correct result group (AC3)
  *   4. Progressive  — value-based awarding by difficulty (AC4)
  */
 import test from 'node:test';
@@ -438,12 +438,12 @@ test('multistep: step failure records failure and stops run', async () => {
 });
 
 // ===========================================================================
-// Group 3: Tiered mode integration (AC3)
+// Group 3: Legacy tiered compatibility mode integration (AC3)
 // ===========================================================================
 
-function buildTieredFixture() {
+function buildLegacyOutcomeRoutingFixture() {
   const system = buildSystem({
-    id: 'sys-tiered',
+    id: 'sys-legacy-routing',
     resolutionMode: 'tiered',
     craftingCheck: {
       enabled: true,
@@ -471,7 +471,7 @@ function buildTieredFixture() {
   };
 
   const recipe = buildRecipe({
-    craftingSystemId: 'sys-tiered',
+    craftingSystemId: 'sys-legacy-routing',
     outcomeRouting: { pass: 'rg-pass', fail: 'rg-fail' },
     steps: [step]
   });
@@ -479,8 +479,8 @@ function buildTieredFixture() {
   return { system, herb, ingredientSet, step, recipe };
 }
 
-test("tiered mode: 'pass' outcome routes craft to the pass result group", async () => {
-  const { system, herb, ingredientSet, recipe } = buildTieredFixture();
+test("legacy tiered compatibility mode: 'pass' outcome routes craft to the pass result group", async () => {
+  const { system, herb, ingredientSet, recipe } = buildLegacyOutcomeRoutingFixture();
   setupGame(system);
 
   const sourceActor = new FakeActor('Brewer', [herb]);
@@ -505,13 +505,13 @@ test("tiered mode: 'pass' outcome routes craft to the pass result group", async 
 
   const craftResult = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
-  assert.equal(craftResult.success, true, 'tiered craft should succeed with "pass" outcome');
+  assert.equal(craftResult.success, true, 'legacy tiered compatibility craft should succeed with "pass" outcome');
   assert.equal(craftResult.results.length, 1, 'exactly one result item should be returned');
   assert.equal(craftResult.results[0].name, 'Good Potion', '"pass" outcome should yield Good Potion from rg-pass');
 });
 
-test("tiered mode: 'fail' outcome routes craft to the fail result group", async () => {
-  const { system, herb, ingredientSet, recipe } = buildTieredFixture();
+test("legacy tiered compatibility mode: 'fail' outcome routes craft to the fail result group", async () => {
+  const { system, herb, ingredientSet, recipe } = buildLegacyOutcomeRoutingFixture();
   setupGame(system);
 
   // Use fresh herb to avoid state from previous test
@@ -543,7 +543,7 @@ test("tiered mode: 'fail' outcome routes craft to the fail result group", async 
 
   const craftResult = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
-  assert.equal(craftResult.success, true, 'tiered craft should succeed with "fail" outcome (check passed, outcome routed)');
+  assert.equal(craftResult.success, true, 'legacy tiered compatibility craft should succeed with "fail" outcome (check passed, outcome routed)');
   assert.equal(craftResult.results.length, 1, 'exactly one result item should be returned');
   assert.equal(craftResult.results[0].name, 'Weak Potion', '"fail" outcome should yield Weak Potion from rg-fail');
 });

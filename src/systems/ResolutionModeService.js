@@ -139,10 +139,10 @@ export class ResolutionModeService {
       }
 
       if (mode === 'tiered') {
-        if (!checkEnabled) errors.push('Tiered mode requires crafting checks enabled');
-        if (outcomes.length === 0) errors.push('Tiered mode requires at least one declared outcome');
-        if (sets.length < 1) errors.push(`Step "${step.name || step.id}" must have at least 1 ingredient set in tiered mode`);
-        if (groups.length < 1) errors.push(`Step "${step.name || step.id}" must have at least 1 result group in tiered mode`);
+        if (!checkEnabled) errors.push('Legacy tiered compatibility mode requires crafting checks enabled');
+        if (outcomes.length === 0) errors.push('Legacy tiered compatibility mode requires at least one declared outcome');
+        if (sets.length < 1) errors.push(`Step "${step.name || step.id}" must have at least 1 ingredient set in legacy tiered compatibility mode`);
+        if (groups.length < 1) errors.push(`Step "${step.name || step.id}" must have at least 1 result group in legacy tiered compatibility mode`);
 
         const groupIds = new Set(groups.map(g => g.id));
         const routing = step?.outcomeRouting || recipe?.outcomeRouting || {};

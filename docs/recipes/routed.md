@@ -113,6 +113,6 @@ The roll table provider is ideal when:
 
 ## What's next?
 
-- [Routed Mode (Macro Outcome)]({% link recipes/tiered.md %}) -- a crafting check macro's named outcome selects the result group.
+- [Routed Mode (Macro Outcome)]({% link recipes/macro-outcome.md %}) -- a crafting check macro's named outcome selects the result group.
 - [Routed Mode (Ingredient Set)]({% link recipes/mapped.md %}) -- the player's ingredient choice selects the result group.
 - [Progressive Mode]({% link recipes/progressive.md %}) -- check values are spent to buy results in difficulty order.

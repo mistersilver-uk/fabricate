@@ -18,7 +18,7 @@ Fabricate lets GMs define crafting systems with recipes, ingredients, catalysts,
 | Feature | Description |
 |:--------|:------------|
 | **Crafting Systems** | Define independent systems with their own item libraries, essences, and rules |
-| **Resolution Modes** | Simple, mapped, tiered, and progressive crafting with optional skill checks |
+| **Resolution Modes** | Simple, routed, progressive, and alchemy crafting with optional skill checks |
 | **Multi-Step Recipes** | Chain steps that must be completed in sequence, with optional time gates |
 | **Catalysts** | Non-consumable tools and workstations with usage tracking |
 | **Essences** | Abstract properties on items for flexible ingredient matching |

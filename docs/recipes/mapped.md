@@ -107,6 +107,6 @@ The `ingredientSet` provider is ideal when:
 
 ## What's next?
 
-- [Routed Mode (Macro Outcome)]({% link recipes/tiered.md %}) -- a crafting check macro's named outcome selects the result group.
+- [Routed Mode (Macro Outcome)]({% link recipes/macro-outcome.md %}) -- a crafting check macro's named outcome selects the result group.
 - [Routed Mode (Roll Table)]({% link recipes/routed.md %}) -- a roll table draw selects the result group.
 - [Macros & Examples]({% link macros/index.md %}) -- crafting check macro contracts and ready-to-use examples.

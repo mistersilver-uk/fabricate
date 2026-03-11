@@ -1,6 +1,6 @@
 /**
  * Unit tests for ResolutionModeService.validateRecipe (T-021)
- * Tests mode-specific validation logic for simple, mapped, tiered, and progressive modes.
+ * Tests mode-specific validation logic for simple, mapped, legacy tiered compatibility, and progressive modes.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -266,13 +266,13 @@ test('mapped mode — zero result groups → invalid', () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC 3 — Tiered mode: checks enabled, outcomes non-empty, valid routing
+// AC 3 — Legacy tiered compatibility mode: checks enabled, outcomes non-empty, valid routing
 // ---------------------------------------------------------------------------
 
 /**
- * Build a valid tiered system: checks enabled, outcomes declared, managedItems populated.
+ * Build a valid legacy tiered compatibility system: checks enabled, outcomes declared, managedItems populated.
  */
-function buildTieredSystem(overrides = {}) {
+function buildLegacyOutcomeRoutingSystem(overrides = {}) {
   return buildSystem({
     resolutionMode: 'tiered',
     craftingCheck: {
@@ -286,9 +286,9 @@ function buildTieredSystem(overrides = {}) {
 }
 
 /**
- * Build a valid tiered step: 1 set, 2 result groups, outcomeRouting covers all declared outcomes.
+ * Build a valid legacy tiered compatibility step: 1 set, 2 result groups, outcomeRouting covers all declared outcomes.
  */
-function buildTieredStep(overrides = {}) {
+function buildLegacyOutcomeRoutingStep(overrides = {}) {
   return buildStep({
     ingredientSets: [{ id: 'set-1', ingredientGroups: [], catalysts: [] }],
     resultGroups: [
@@ -303,10 +303,10 @@ function buildTieredStep(overrides = {}) {
   });
 }
 
-test('tiered mode — checks enabled, outcomes present, valid routing → valid', () => {
-  const system = buildTieredSystem();
+test('legacy tiered compatibility mode — checks enabled, outcomes present, valid routing → valid', () => {
+  const system = buildLegacyOutcomeRoutingSystem();
   const service = buildService(system);
-  const step = buildTieredStep();
+  const step = buildLegacyOutcomeRoutingStep();
   const recipe = buildRecipe([step]);
 
   const result = service.validateRecipe(recipe);
@@ -315,8 +315,8 @@ test('tiered mode — checks enabled, outcomes present, valid routing → valid'
   assert.equal(result.errors.length, 0);
 });
 
-test('tiered mode — crafting checks disabled → invalid', () => {
-  const system = buildTieredSystem({
+test('legacy tiered compatibility mode — crafting checks disabled → invalid', () => {
+  const system = buildLegacyOutcomeRoutingSystem({
     craftingCheck: {
       enabled: false,
       macroUuid: null,
@@ -325,7 +325,7 @@ test('tiered mode — crafting checks disabled → invalid', () => {
     },
   });
   const service = buildService(system);
-  const step = buildTieredStep();
+  const step = buildLegacyOutcomeRoutingStep();
   const recipe = buildRecipe([step]);
 
   const result = service.validateRecipe(recipe);
@@ -337,9 +337,9 @@ test('tiered mode — crafting checks disabled → invalid', () => {
   );
 });
 
-test('tiered mode — crafting checks enabled via macroUuid (not boolean enabled) → valid', () => {
+test('legacy tiered compatibility mode — crafting checks enabled via macroUuid (not boolean enabled) → valid', () => {
   // checkEnabled = system.craftingCheck.enabled === true || !!system.craftingCheck.macroUuid
-  const system = buildTieredSystem({
+  const system = buildLegacyOutcomeRoutingSystem({
     craftingCheck: {
       enabled: false,
       macroUuid: 'Macro.some-uuid',
@@ -348,7 +348,7 @@ test('tiered mode — crafting checks enabled via macroUuid (not boolean enabled
     },
   });
   const service = buildService(system);
-  const step = buildTieredStep();
+  const step = buildLegacyOutcomeRoutingStep();
   const recipe = buildRecipe([step]);
 
   const result = service.validateRecipe(recipe);
@@ -357,8 +357,8 @@ test('tiered mode — crafting checks enabled via macroUuid (not boolean enabled
   assert.equal(result.errors.length, 0);
 });
 
-test('tiered mode — empty outcomes array → invalid', () => {
-  const system = buildTieredSystem({
+test('legacy tiered compatibility mode — empty outcomes array → invalid', () => {
+  const system = buildLegacyOutcomeRoutingSystem({
     craftingCheck: {
       enabled: true,
       macroUuid: null,
@@ -367,7 +367,7 @@ test('tiered mode — empty outcomes array → invalid', () => {
     },
   });
   const service = buildService(system);
-  const step = buildTieredStep();
+  const step = buildLegacyOutcomeRoutingStep();
   const recipe = buildRecipe([step]);
 
   const result = service.validateRecipe(recipe);
@@ -379,10 +379,10 @@ test('tiered mode — empty outcomes array → invalid', () => {
   );
 });
 
-test('tiered mode — outcome maps to non-existent result group → invalid', () => {
-  const system = buildTieredSystem();
+test('legacy tiered compatibility mode — outcome maps to non-existent result group → invalid', () => {
+  const system = buildLegacyOutcomeRoutingSystem();
   const service = buildService(system);
-  const step = buildTieredStep({
+  const step = buildLegacyOutcomeRoutingStep({
     outcomeRouting: {
       success: 'rg-success',
       failure: 'rg-does-not-exist', // invalid target
@@ -399,10 +399,10 @@ test('tiered mode — outcome maps to non-existent result group → invalid', ()
   );
 });
 
-test('tiered mode — missing routing entry for an outcome → invalid', () => {
-  const system = buildTieredSystem();
+test('legacy tiered compatibility mode — missing routing entry for an outcome → invalid', () => {
+  const system = buildLegacyOutcomeRoutingSystem();
   const service = buildService(system);
-  const step = buildTieredStep({
+  const step = buildLegacyOutcomeRoutingStep({
     outcomeRouting: {
       success: 'rg-success',
       // 'failure' is missing entirely
@@ -419,12 +419,12 @@ test('tiered mode — missing routing entry for an outcome → invalid', () => {
   );
 });
 
-test('tiered mode — step-level outcomeRouting overrides recipe-level routing', () => {
-  const system = buildTieredSystem();
+test('legacy tiered compatibility mode — step-level outcomeRouting overrides recipe-level routing', () => {
+  const system = buildLegacyOutcomeRoutingSystem();
   const service = buildService(system);
 
   // Step has valid routing; recipe-level routing is intentionally invalid/incomplete.
-  const step = buildTieredStep({
+  const step = buildLegacyOutcomeRoutingStep({
     outcomeRouting: {
       success: 'rg-success',
       failure: 'rg-failure',
@@ -445,8 +445,8 @@ test('tiered mode — step-level outcomeRouting overrides recipe-level routing',
   assert.equal(result.errors.length, 0);
 });
 
-test('tiered mode — no step-level routing, valid recipe-level routing → valid', () => {
-  const system = buildTieredSystem();
+test('legacy tiered compatibility mode — no step-level routing, valid recipe-level routing → valid', () => {
+  const system = buildLegacyOutcomeRoutingSystem();
   const service = buildService(system);
 
   // Step has NO outcomeRouting; recipe-level routing covers both outcomes

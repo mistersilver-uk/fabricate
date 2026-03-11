@@ -968,9 +968,9 @@ describe('createAdminStore', () => {
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
-      await store.saveCraftingCheckConfig('tiered', 'macro-uuid', 'critical, success, failure');
+      await store.saveCraftingCheckConfig('namedOutcomes', 'macro-uuid', 'critical, success, failure');
       assert.ok(updateArgs !== null);
-      assert.equal(updateArgs.updates.craftingCheck.mode, 'tiered');
+      assert.equal(updateArgs.updates.craftingCheck.mode, 'namedOutcomes');
       assert.deepEqual(updateArgs.updates.craftingCheck.outcomes, ['critical', 'success', 'failure']);
     });
 
@@ -1211,7 +1211,7 @@ describe('createAdminStore', () => {
       const origManager = services.getCraftingSystemManager();
       const sys = origManager.getSystem('sys1');
       if (sys) {
-        sys.craftingCheck = { mode: 'tiered', macroUuid: 'uuid', outcomes: ['critical', 'success', 'failure'] };
+        sys.craftingCheck = { mode: 'namedOutcomes', macroUuid: 'uuid', outcomes: ['critical', 'success', 'failure'] };
       }
       const store = createAdminStore(services);
       await store.selectSystem('sys1');

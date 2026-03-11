@@ -122,13 +122,13 @@ The `craftingCheck` field is always present on the returned system object. It co
 | `progressive.allowPlayerReorder` | `boolean` | `false` | Allow players to reorder pending progressive results. |
 | `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for routed macroOutcome routing. |
 
-**Example: built-in check on D&D 5e.** Configure a tiered alchemy system to use an Intelligence (Arcana) check, DC 18, without writing a macro:
+**Example: built-in check on D&D 5e.** Configure a routed system to use an Intelligence (Arcana) check, DC 18, without writing a macro:
 
 ```javascript
 Hooks.once('fabricate.ready', async () => {
   const mgr = game.fabricate.getCraftingSystemManager();
   await mgr.updateSystem('alchemy-system-id', {
-    resolutionMode: 'tiered',
+    resolutionMode: 'routed',
     craftingCheck: {
       checkSource: 'builtIn',
       builtIn: {
