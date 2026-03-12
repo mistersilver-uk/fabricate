@@ -460,8 +460,10 @@
 
 .fabricate-admin .admin-body {
   min-height: 0;
+  height: 100%;
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
+  align-items: stretch;
   min-width: 0;
   overflow: hidden;
 }
@@ -470,14 +472,20 @@
   border-right: 1px solid rgba(0, 0, 0, 0.2);
   padding: 10px;
   min-height: 0;
-  overflow-y: auto;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  gap: 8px;
 }
 
 .fabricate-admin .admin-sidebar-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .fabricate-admin .admin-sidebar-header h3 {
@@ -493,6 +501,14 @@
   background: rgba(0, 0, 0, 0.14);
 }
 
+.fabricate-admin .admin-system-list-shell {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
 .fabricate-admin .admin-system-list {
   margin: 0;
   padding: 0;
@@ -500,13 +516,18 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding-right: 2px;
+  min-height: 0;
 }
 
 .fabricate-admin .admin-system-list li {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 6px;
-  align-items: center;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 0;
 }
 
 .fabricate-admin .admin-system-list li .system-link {
@@ -518,11 +539,58 @@
   border: 1px solid transparent;
   text-align: left;
   width: 100%;
+  min-width: 0;
 }
 
 .fabricate-admin .admin-system-list li.active .system-link {
   background: var(--fabricate-primary);
   color: #fff;
+}
+
+.fabricate-admin .admin-system-list li.menu-open .system-link {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.fabricate-admin .admin-system-list .system-context-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.3);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+}
+
+.fabricate-admin .admin-system-list .system-context-action {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.fabricate-admin .admin-system-list .system-context-action:hover,
+.fabricate-admin .admin-system-list .system-context-action:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.fabricate-admin .admin-system-list .system-context-action.danger:hover,
+.fabricate-admin .admin-system-list .system-context-action.danger:focus-visible {
+  background: rgba(220, 53, 69, 0.16);
+}
+
+.fabricate-admin .admin-system-list .system-context-action i {
+  flex: 0 0 14px;
+  width: 14px;
+  text-align: center;
 }
 
 .fabricate-admin .system-meta-grid {
@@ -680,12 +748,31 @@
   background: rgba(0, 0, 0, 0.2);
 }
 
-.fabricate-admin .admin-system-list li > button:not(.system-link) {
-  width: 28px;
-  height: 28px;
+.fabricate-admin .admin-sidebar-footer {
+  flex-shrink: 0;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.15);
+  margin-top: auto;
+  width: 100%;
+}
+
+.fabricate-admin .admin-sidebar-footer .import-system-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 6px 8px;
   border: 1px solid rgba(0, 0, 0, 0.25);
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.14);
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.1);
+  text-align: center;
+  cursor: pointer;
+}
+
+.fabricate-admin .admin-sidebar-footer .import-system-btn i {
+  margin-right: 0;
 }
 
 .fabricate-admin .admin-system-list li.empty {
