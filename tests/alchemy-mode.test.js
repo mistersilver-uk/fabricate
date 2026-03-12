@@ -35,6 +35,7 @@ globalThis.fromUuid = async () => null;
 // Imports
 // ---------------------------------------------------------------------------
 
+const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 const { ResolutionModeService } = await import('../src/systems/ResolutionModeService.js');
 const { RecipeVisibilityService } = await import('../src/systems/RecipeVisibilityService.js');
@@ -104,6 +105,16 @@ function buildIngredientSet(groups) {
 
 function buildComponent(id, sourceItemUuid = null) {
   return { id, name: id, tags: [], sourceItemUuid, sourceUuid: sourceItemUuid };
+}
+
+function makeSubmittedAlchemyItem({ uuid = `Item.${Math.random().toString(36).slice(2)}`, sourceUuid, quantity = 1 } = {}) {
+  return {
+    uuid,
+    sourceUuid,
+    sourceItemUuid: sourceUuid,
+    system: { quantity },
+    flags: { core: { sourceId: sourceUuid } }
+  };
 }
 
 function buildIngredientGroup(componentId) {
@@ -542,4 +553,148 @@ test('SignatureValidator.computeSignature returns groups for alchemy ingredient 
   const sig = validator.computeSignature(set, components);
   assert.equal(sig.length, 1);
   assert.ok(sig[0].has('c1'));
+});
+
+test('CraftingEngine alchemy signature matches when submitted quantity meets requirement', () => {
+  const engine = new CraftingEngine(null);
+  const validator = new SignatureValidator({
+    getSystem: () => null,
+    getRecipesForSystem: () => [],
+    getComponentsForSystem: () => []
+  });
+
+  const component = buildComponent('iron-ingot', 'Compendium.world.items.iron-ingot');
+  const components = [component];
+  const group = buildIngredientGroup('iron-ingot');
+  group.options[0].quantity = 3;
+  const set = buildIngredientSet([group]);
+  const recipe = buildRecipe('recipe-iron', [set]);
+
+  const submitted = [
+    makeSubmittedAlchemyItem({ sourceUuid: component.sourceUuid, quantity: 3, uuid: 'Actor.a.Item.iron' })
+  ];
+
+  const result = engine._matchAlchemySignature(submitted, [recipe], components, validator);
+  assert.equal(result.matched, true);
+  assert.equal(result.recipe.id, 'recipe-iron');
+});
+
+test('CraftingEngine alchemy signature rejects insufficient submitted quantity', () => {
+  const engine = new CraftingEngine(null);
+  const validator = new SignatureValidator({
+    getSystem: () => null,
+    getRecipesForSystem: () => [],
+    getComponentsForSystem: () => []
+  });
+
+  const component = buildComponent('iron-ingot', 'Compendium.world.items.iron-ingot');
+  const components = [component];
+  const group = buildIngredientGroup('iron-ingot');
+  group.options[0].quantity = 5;
+  const set = buildIngredientSet([group]);
+  const recipe = buildRecipe('recipe-iron', [set]);
+
+  const submitted = [
+    makeSubmittedAlchemyItem({ sourceUuid: component.sourceUuid, quantity: 2, uuid: 'Actor.a.Item.iron' })
+  ];
+
+  const result = engine._matchAlchemySignature(submitted, [recipe], components, validator);
+  assert.equal(result.matched, false);
+});
+
+test('CraftingEngine alchemy signature accepts surplus submitted quantity', () => {
+  const engine = new CraftingEngine(null);
+  const validator = new SignatureValidator({
+    getSystem: () => null,
+    getRecipesForSystem: () => [],
+    getComponentsForSystem: () => []
+  });
+
+  const component = buildComponent('iron-ingot', 'Compendium.world.items.iron-ingot');
+  const components = [component];
+  const group = buildIngredientGroup('iron-ingot');
+  group.options[0].quantity = 3;
+  const set = buildIngredientSet([group]);
+  const recipe = buildRecipe('recipe-iron', [set]);
+
+  const submitted = [
+    makeSubmittedAlchemyItem({ sourceUuid: component.sourceUuid, quantity: 6, uuid: 'Actor.a.Item.iron' })
+  ];
+
+  const result = engine._matchAlchemySignature(submitted, [recipe], components, validator);
+  assert.equal(result.matched, true);
+  assert.equal(result.ingredientSetId, set.id);
+});
+
+test('craftAlchemy consumes submitted items when quantity is insufficient for alchemy match', async () => {
+  const component = buildComponent('iron-ingot', 'Compendium.world.items.iron-ingot');
+  const components = [component];
+  const group = buildIngredientGroup('iron-ingot');
+  group.options[0].quantity = 4;
+  const set = buildIngredientSet([group]);
+  const recipe = buildRecipe('recipe-iron', [set]);
+  const system = buildAlchemySystem({ id: 'alchemy-sys', components });
+
+  const signatureValidator = new SignatureValidator({
+    getSystem: () => system,
+    getRecipesForSystem: () => [recipe],
+    getComponentsForSystem: () => components
+  });
+
+  const recipeManager = {
+    getRecipes: () => [recipe],
+    getRecipe: () => recipe
+  };
+
+  const engine = new CraftingEngine(recipeManager);
+
+  const craftingActor = { id: 'crafter-1' };
+  const actorItem = {
+    uuid: 'Actor.a.Item.iron',
+    system: { quantity: 1 },
+    deleteCalled: false,
+    async delete() {
+      this.deleteCalled = true;
+      this.system.quantity = 0;
+    }
+  };
+  const sourceActor = { items: [actorItem] };
+
+  const submittedItems = [
+    makeSubmittedAlchemyItem({ sourceUuid: component.sourceUuid, quantity: 1, uuid: actorItem.uuid })
+  ];
+
+  const fabricate = game.fabricate || {};
+  const originalGetSystemManager = fabricate.getCraftingSystemManager;
+  const originalGetRecipeManager = fabricate.getRecipeManager;
+  const craftingSystemManager = {
+    getSystem: (id) => (id === system.id ? system : null)
+  };
+
+  fabricate.getCraftingSystemManager = () => craftingSystemManager;
+  fabricate.getRecipeManager = () => recipeManager;
+  game.fabricate = fabricate;
+
+  const result = await engine.craftAlchemy(
+    craftingActor,
+    [sourceActor],
+    submittedItems,
+    { craftingSystemId: 'alchemy-sys', signatureValidator }
+  );
+
+  assert.equal(result.success, false);
+  assert.equal(result.disposition, 'no-match');
+  assert.equal(result.consumed, true);
+  assert.equal(actorItem.deleteCalled, true);
+
+  if (originalGetSystemManager) {
+    fabricate.getCraftingSystemManager = originalGetSystemManager;
+  } else {
+    delete fabricate.getCraftingSystemManager;
+  }
+  if (originalGetRecipeManager) {
+    fabricate.getRecipeManager = originalGetRecipeManager;
+  } else {
+    delete fabricate.getRecipeManager;
+  }
 });

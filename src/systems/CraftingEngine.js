@@ -593,25 +593,105 @@ export class CraftingEngine {
    * @private
    */
   _matchAlchemySignature(submittedItems, recipes, components, signatureValidator) {
-    const submittedUuids = new Set(
-      submittedItems.map(item => item.uuid || item.sourceUuid).filter(Boolean)
-    );
+    const submittedQuantityByKey = new Map();
+
+    const extractQuantity = (item) => {
+      let fallback = 1;
+      const candidates = [
+        item?.system?.quantity,
+        item?.quantity,
+        item?.data?.data?.quantity,
+        item?.data?.quantity
+      ];
+
+      for (const value of candidates) {
+        const qty = Number(value);
+        if (Number.isFinite(qty) && qty >= 0) {
+          fallback = qty;
+          break;
+        }
+      }
+      return fallback;
+    };
+
+    const registerQuantityForKey = (key, quantity) => {
+      if (!key) return;
+      const existing = submittedQuantityByKey.get(key);
+      if (existing === undefined) {
+        submittedQuantityByKey.set(key, quantity);
+      } else {
+        submittedQuantityByKey.set(key, Math.max(existing, quantity));
+      }
+    };
+
+    for (const item of (submittedItems || [])) {
+      if (!item) continue;
+
+      const quantity = extractQuantity(item);
+      const keys = [
+        item.uuid,
+        item.itemUuid,
+        item.sourceUuid,
+        item.sourceItemUuid,
+        item.flags?.core?.sourceId,
+        getSourceUuid(item)
+      ];
+
+      for (const key of keys) {
+        registerQuantityForKey(key, quantity);
+      }
+    }
+
+    const componentById = new Map();
+    for (const component of (components || [])) {
+      if (component?.id) {
+        componentById.set(component.id, component);
+      }
+    }
+
+    const normalizeRequiredQuantity = (value) => {
+      const qty = Number(value);
+      return Number.isFinite(qty) && qty > 0 ? qty : 1;
+    };
 
     for (const recipe of recipes) {
-      if (!recipe.enabled) continue;
+      if (!recipe?.enabled) continue;
       const ingredientSets = Array.isArray(recipe.ingredientSets) ? recipe.ingredientSets : [];
       for (const set of ingredientSets) {
-        const signature = signatureValidator.computeSignature(set, components);
-        if (signature.length === 0) continue;
+        const groups = Array.isArray(set?.ingredientGroups) ? set.ingredientGroups : [];
+        if (groups.length === 0) continue;
 
-        // For each group in the signature, at least one submitted item must match
-        const allGroupsSatisfied = signature.every(groupComponentIds => {
-          for (const componentId of groupComponentIds) {
-            const comp = components.find(c => c.id === componentId);
-            if (!comp) continue;
-            const compSourceUuid = comp.sourceItemUuid || comp.sourceUuid;
-            if (compSourceUuid && submittedUuids.has(compSourceUuid)) return true;
+        const allGroupsSatisfied = groups.every(group => {
+          const options = Array.isArray(group?.options) ? group.options : [];
+          if (options.length === 0) return false;
+
+          for (const option of options) {
+            const requiredQty = normalizeRequiredQuantity(option?.quantity);
+            const candidateComponentIds = signatureValidator.expandIngredientToComponentIds(option, components);
+            if (candidateComponentIds.size === 0) continue;
+
+            const hasSufficientItem = Array.from(candidateComponentIds).some(componentId => {
+              const component = componentById.get(componentId);
+              if (!component) return false;
+
+              const matchKeys = [
+                component.sourceItemUuid || null,
+                component.sourceUuid || null,
+                option?.itemUuid || null
+              ];
+
+              return matchKeys.some(key => {
+                if (!key) return false;
+                const availableQty = submittedQuantityByKey.get(key);
+                return availableQty !== undefined && availableQty >= requiredQty;
+              });
+            });
+
+            if (hasSufficientItem) {
+              return true;
+            }
           }
+
           return false;
         });
 
