@@ -422,6 +422,23 @@ test('craft() does not consume on pre-check failure (missing ingredients)', asyn
   assert.equal(fakeCatalyst.applyDegradationCalled, false, 'catalyst should NOT be degraded on pre-check failure');
 });
 
+test('_consumeIngredients defaults missing item.system.quantity to 1', async () => {
+  const ingredientItem = buildFakeItem('ing-missing-system', 1);
+  ingredientItem.system = undefined;
+  const ingredientSet = buildFakeIngredientSet(ingredientItem);
+  const recipe = buildFakeRecipe(ingredientSet, []);
+  const engine = buildEngine({ ingredientItem, ingredientSet });
+  const sourceActor = { id: 'a1', name: 'Crafter', items: [ingredientItem] };
+
+  const consumedItems = await engine._consumeIngredients([sourceActor], ingredientSet, recipe);
+
+  assert.equal(consumedItems.length, 1, 'one matched ingredient should be returned');
+  assert.equal(consumedItems[0].item, ingredientItem);
+  assert.equal(consumedItems[0].quantity, 1);
+  assert.equal(ingredientItem.deleteCalled, true, 'item without system data should default to quantity 1 and delete cleanly');
+  assert.equal(ingredientItem.updateCalled, false, 'item should not be updated when default quantity is fully consumed');
+});
+
 test('craft() success path still consumes ingredients regardless of consumeIngredientsOnFail policy', async () => {
   // consumeIngredientsOnFail: false means nothing consumed ON FAILURE —
   // it should have no effect on the success path which always consumes.

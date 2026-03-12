@@ -644,7 +644,7 @@ export class CraftingEngine {
 
     // Execute consumption
     for (const { item, quantity, ingredient } of consumptionPlan) {
-      const itemQuantity = item.system.quantity || 1;
+      const itemQuantity = item.system?.quantity ?? 1;
 
       // Store consumed item info for effect transfer
       consumedItems.push({

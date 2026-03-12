@@ -101,6 +101,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- `CraftingEngine._consumeIngredients()` no longer throws when a matched item has no `system` object. Ingredient consumption now defaults missing `system.quantity` to `1`, which keeps crafting functional for system-agnostic or non-standard item documents. Added a regression test covering the missing-`system` path. (#84)
 - Saving a new recipe no longer creates a duplicate entry or shows two success notifications. The recipe editor save button was changed from `type="submit"` to `type="button"`, preventing the form from firing both a submit event and the click handler simultaneously. (T-036)
 - `Catalyst.validate()` no longer rejects a catalyst with a non-positive or null `maxUses` value when `degradesOnUse` is false. `maxUses` validation is now skipped entirely when `degradesOnUse` is disabled, because the field is irrelevant in that case. (T-051)
 - Saving a recipe with "Restrict visibility to specific users" checked but no users selected no longer raises a validation error. An empty `allowedUserIds` list is now a valid configuration meaning the recipe is hidden from all players. (T-052)
