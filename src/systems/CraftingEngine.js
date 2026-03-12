@@ -826,11 +826,11 @@ export class CraftingEngine {
     if (sourceItem) {
       itemData = sourceItem.toObject();
     } else if (managedItem) {
-      const fallbackType = craftingActor.items.contents[0]?.type || 'loot';
+      console.warn(`Fabricate | Managed result source item could not be resolved for "${managedItem.id || managedItem.name || 'unknown'}"; using fallback item data`);
       itemData = {
         name: managedItem.name || 'Crafted Item',
         img: managedItem.img || 'icons/svg/item-bag.svg',
-        type: fallbackType,
+        type: 'loot',
         system: {}
       };
     } else {

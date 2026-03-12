@@ -114,6 +114,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Managed result items with missing source documents no longer inherit an arbitrary item type from the crafting actor's inventory. `CraftingEngine._createSingleResult()` now falls back to a deterministic `loot` item type and emits a warning when it has to create fallback item data. Added regression coverage for the fallback type behavior. (#91)
 - Unknown crafting resolution modes no longer resolve every result group and report a false craft success. `ResolutionModeService.resolveResultGroups()` now returns an error disposition for unknown modes, and `CraftingEngine.craft()` treats that disposition as a craft failure before any result items are created. Added regression coverage for both the fallback and engine failure path. (#98)
 - `CraftingEngine._consumeIngredients()` no longer throws when a matched item has no `system` object. Ingredient consumption now defaults missing `system.quantity` to `1`, which keeps crafting functional for system-agnostic or non-standard item documents. Added a regression test covering the missing-`system` path. (#84)
 - Saving a new recipe no longer creates a duplicate entry or shows two success notifications. The recipe editor save button was changed from `type="submit"` to `type="button"`, preventing the form from firing both a submit event and the click handler simultaneously. (T-036)

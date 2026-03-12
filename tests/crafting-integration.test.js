@@ -324,6 +324,66 @@ test('unknown resolution mode: craft fails instead of creating all result groups
   assert.equal(craftingActor._createdDocs.length, 0, 'actor should not receive created documents on failure');
 });
 
+test('_createSingleResult uses deterministic loot fallback type when managed source item is missing', async () => {
+  const system = buildSystem({
+    id: 'sys-fallback-type',
+    managedItems: [{
+      id: 'comp-potion',
+      name: 'Potion',
+      img: 'icons/svg/potion.svg',
+      sourceUuid: 'uuid:missing-potion'
+    }]
+  });
+  setupGame(system);
+  globalThis.fromUuid = async () => null;
+
+  const engine = new CraftingEngine({});
+  const createdPayloads = [];
+  const craftingActor = {
+    id: 'actor-crafter',
+    uuid: 'Actor.actor-crafter',
+    name: 'Crafter',
+    items: { contents: [{ type: 'weapon' }] },
+    async createEmbeddedDocuments(_type, itemDatas) {
+      createdPayloads.push(...itemDatas.map(itemData => ({
+        ...itemData,
+        system: { ...(itemData.system || {}) }
+      })));
+      return itemDatas.map((itemData, index) => ({
+        id: `created-${index}`,
+        uuid: `Item.created-${index}`,
+        name: itemData.name,
+        type: itemData.type,
+        system: { ...(itemData.system || {}) }
+      }));
+    }
+  };
+  const warningMessages = [];
+  const originalWarn = console.warn;
+  console.warn = (message) => warningMessages.push(message);
+
+  try {
+    const createdItem = await engine._createSingleResult(
+      craftingActor,
+      { componentId: 'comp-potion', quantity: 1 },
+      [],
+      [],
+      { craftingSystemId: 'sys-fallback-type', transferEffects: false },
+      null,
+      null
+    );
+
+    assert.ok(createdItem, 'fallback path should still create an item');
+    assert.equal(createdPayloads.length, 1, 'one item payload should be created');
+    assert.equal(createdPayloads[0].type, 'loot', 'fallback item type should not depend on actor inventory');
+    assert.equal(createdItem.type, 'loot', 'created item should use deterministic loot type');
+    assert.ok(warningMessages.some(message => message.includes('Managed result source item could not be resolved')),
+      'fallback path should emit a warning');
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
 // ===========================================================================
 // Group 2: Multistep mode integration (AC2)
 // ===========================================================================
