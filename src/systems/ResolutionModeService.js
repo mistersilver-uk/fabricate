@@ -415,8 +415,11 @@ export class ResolutionModeService {
     }
 
     return {
-      groups: allGroups,
-      meta: {}
+      groups: [],
+      meta: {
+        error: 'Unknown resolution mode',
+        disposition: 'error'
+      }
     };
   }
 

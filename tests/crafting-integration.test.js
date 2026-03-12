@@ -285,6 +285,45 @@ test('simple mode: fails when ingredients missing', async () => {
   assert.equal(craftingActor._createdDocs.length, 0, 'no items should be created on failure');
 });
 
+test('unknown resolution mode: craft fails instead of creating all result groups', async () => {
+  const system = buildSystem({ id: 'sys-unknown', resolutionMode: 'unknown-mode' });
+  setupGame(system);
+
+  const wood = new FakeItem('wood', 'Wood', 2);
+  const ingredientSet = buildIngredientSet('set-1', [{ componentId: 'wood', quantity: 1 }]);
+  const resultGroups = [
+    { id: 'rg-1', results: [{ id: 'r-1', componentId: 'plank', quantity: 1 }] },
+    { id: 'rg-2', results: [{ id: 'r-2', componentId: 'beam', quantity: 1 }] }
+  ];
+  const recipe = buildRecipe({
+    craftingSystemId: 'sys-unknown',
+    ingredientSets: [ingredientSet],
+    resultGroups
+  });
+
+  const sourceActor = new FakeActor('Crafter', [wood]);
+  const craftingActor = new FakeActor('Crafter');
+  const recipeManager = buildMockRecipeManager(true);
+  const resolutionService = buildResolutionService(system);
+  const engine = new CraftingEngine(recipeManager, null, resolutionService);
+  let createSingleResultCalled = false;
+  engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
+  engine._runSuccessMacro = async () => {};
+  engine._runFailureMacro = async () => {};
+  engine._createSingleResult = async () => {
+    createSingleResultCalled = true;
+    return new FakeItem('unexpected', 'Unexpected');
+  };
+
+  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(result.success, false, 'craft should fail for unknown resolution mode');
+  assert.equal(result.results, null, 'failed craft should not return created results');
+  assert.equal(result.message, 'Unknown resolution mode');
+  assert.equal(createSingleResultCalled, false, 'no result items should be created when resolution fails');
+  assert.equal(craftingActor._createdDocs.length, 0, 'actor should not receive created documents on failure');
+});
+
 // ===========================================================================
 // Group 2: Multistep mode integration (AC2)
 // ===========================================================================

@@ -365,7 +365,7 @@ export class CraftingEngine {
     await this._deductItemPilesCurrencyCost(craftingActor, recipe);
 
     // Create the result item(s)
-    const { items: resultItems, rollTableMeta } = await this._createResultItems(
+    const { items: resultItems, rollTableMeta, resolutionMeta } = await this._createResultItems(
       craftingActor,
       executionRecipe,
       step,
@@ -375,6 +375,63 @@ export class CraftingEngine {
       checkResult,
       options?.resultGroupId || null
     );
+
+    if (resolutionMeta?.disposition === 'error') {
+      const message = resolutionMeta.error || 'Crafting resolution failed';
+      if (runManager && run) {
+        await runManager.completeStepFailure(craftingActor, run, stepIndex, message, {
+          selectedIngredientSetId: ingredientSet.id,
+          lastCheckResult: {
+            success: false,
+            reason: message,
+            outcome: checkResult.outcome ?? undefined,
+            value: checkResult.value ?? undefined,
+            data: checkResult.data || {}
+          },
+          consumedIngredients: consumedItems.map(({ item, quantity }) => ({
+            actorUuid: item.parent?.uuid || null,
+            itemUuid: item.uuid,
+            quantity
+          })),
+          usedCatalysts: catalystValidation.catalysts.map(({ item }) => ({
+            actorUuid: item.parent?.uuid || null,
+            itemUuid: item.uuid,
+            quantity: 1
+          }))
+        });
+      }
+      {
+        const _systemManager = game.fabricate?.getCraftingSystemManager?.();
+        const _craftingSystem = _systemManager?.getSystem(recipe.craftingSystemId);
+        await this._runFailureMacro(recipe, {
+          recipe: recipe?.toJSON?.() || recipe,
+          craftingSystem: _craftingSystem,
+          craftingActor,
+          componentSourceActors,
+          step,
+          selectedIngredientSet: ingredientSet,
+          failureReason: message,
+          checkResult,
+          consumedIngredients: consumedItems,
+          consumedCatalysts: catalystValidation.catalysts
+        });
+      }
+      await this._postCraftChatMessage({
+        success: false,
+        craftingActor,
+        recipe,
+        consumedIngredients: consumedItems,
+        catalysts: catalystValidation.catalysts,
+        createdResults: [],
+        failureReason: message,
+        rollTableMeta
+      });
+      return {
+        success: false,
+        results: null,
+        message
+      };
+    }
 
     if (runManager && run) {
       run = await runManager.completeStepSuccess(craftingActor, run, stepIndex, {
@@ -736,7 +793,11 @@ export class CraftingEngine {
       }
     }
 
-    return { items: createdItems, rollTableMeta: rollTableResult?.meta || null };
+    return {
+      items: createdItems,
+      rollTableMeta: rollTableResult?.meta || null,
+      resolutionMeta: resolved?.meta || null
+    };
   }
 
   /**

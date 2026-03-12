@@ -442,6 +442,19 @@ describe('Regression: existing resolution modes unaffected', () => {
     assert.equal(result.groups[0].name, 'Shield');
   });
 
+  it('unknown mode: resolveResultGroups returns error disposition and no groups', () => {
+    const service = makeService({ resolutionMode: 'unknown-mode' });
+    const groups = makeResultGroups(['Sword', 'Shield']);
+    const recipe = { craftingSystemId: 'sys-1', resultGroups: groups };
+    const step = { resultGroups: groups };
+
+    const result = service.resolveResultGroups({ recipe, step, ingredientSet: null, checkResult: null });
+
+    assert.deepEqual(result.groups, []);
+    assert.equal(result.meta.disposition, 'error');
+    assert.equal(result.meta.error, 'Unknown resolution mode');
+  });
+
   it('legacy tiered compatibility mode: resolveResultGroups resolves by outcomeRouting', () => {
     const service = makeService({ resolutionMode: 'tiered' });
     const groups = makeResultGroups(['Sword', 'Shield']);

@@ -108,6 +108,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Unknown crafting resolution modes no longer resolve every result group and report a false craft success. `ResolutionModeService.resolveResultGroups()` now returns an error disposition for unknown modes, and `CraftingEngine.craft()` treats that disposition as a craft failure before any result items are created. Added regression coverage for both the fallback and engine failure path. (#98)
 - `CraftingEngine._consumeIngredients()` no longer throws when a matched item has no `system` object. Ingredient consumption now defaults missing `system.quantity` to `1`, which keeps crafting functional for system-agnostic or non-standard item documents. Added a regression test covering the missing-`system` path. (#84)
 - Saving a new recipe no longer creates a duplicate entry or shows two success notifications. The recipe editor save button was changed from `type="submit"` to `type="button"`, preventing the form from firing both a submit event and the click handler simultaneously. (T-036)
 - `Catalyst.validate()` no longer rejects a catalyst with a non-positive or null `maxUses` value when `degradesOnUse` is false. `maxUses` validation is now skipped entirely when `degradesOnUse` is disabled, because the field is irrelevant in that case. (T-051)
