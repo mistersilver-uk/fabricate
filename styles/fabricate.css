@@ -844,7 +844,8 @@
   min-width: 0;
 }
 
-.fabricate-admin .admin-panel > .fabricate-empty {
+.fabricate-admin .admin-panel > .fabricate-empty,
+.fabricate-admin .items-panel-scroll > .fabricate-empty {
   min-height: 320px;
   display: flex;
   flex-direction: column;
@@ -887,15 +888,24 @@
   margin-bottom: 0;
 }
 
-.fabricate-admin .component-toolbar.sticky-toolbar {
-  position: sticky;
-  top: 0;
-  z-index: 8;
-  margin: -12px -12px 0;
-  padding: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(18, 14, 28, 0.97) 0%, rgba(18, 14, 28, 0.9) 82%, rgba(18, 14, 28, 0) 100%);
-  backdrop-filter: blur(8px);
+.fabricate-admin .items-panel {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.fabricate-admin .items-panel-header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.fabricate-admin .items-panel-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
 }
 
 .fabricate-admin .component-toolbar .fabricate-search {
@@ -1005,7 +1015,7 @@
 }
 
 .fabricate-admin .admin-item-drop-zone {
-  margin: 4px 0 10px 0;
+  margin: 0;
 }
 
 .fabricate-admin .drop-zone {
