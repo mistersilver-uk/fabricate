@@ -28,12 +28,13 @@ Use alchemy mode for systems where recipes are secrets — a witch's grimoire, a
 
 Fabricate identifies a recipe match by comparing the UUIDs of submitted items against the **component signatures** of each recipe in the system. A signature is the set of components that satisfy a recipe's ingredient groups.
 
-- Each ingredient group must be satisfied by at least one submitted item whose `sourceItemUuid` (or `sourceUuid`) matches a component in that group.
+- Each ingredient group must be satisfied by at least one submitted item whose source-reference chain overlaps a component in that group.
+- Fabricate checks the submitted item's live UUID, canonical source UUID, and the component's `sourceUuid`, `sourceItemUuid`, and `fallbackItemIds`.
 - If all groups in an ingredient set are satisfied, the recipe is considered a match and crafting proceeds using that ingredient set.
 - Recipes are checked in order; the first match is used.
 
 {: .note }
-> Alchemy matching uses the component's `sourceItemUuid` field (the item from which the component was derived) to identify submitted items. If a component's `sourceItemUuid` is not set, it cannot be matched in alchemy mode.
+> Alchemy matching is not limited to a single UUID field. A component can still match when its live `sourceUuid` changed, as long as the submitted item overlaps the component's canonical `sourceItemUuid` or any recorded fallback UUID.
 
 ---
 

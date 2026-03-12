@@ -81,6 +81,14 @@ function makeSystem(componentId, sourceUuid, name = 'Test Item') {
   };
 }
 
+function makeSystemWithComponent(component) {
+  return {
+    advancedOptionsEnabled: false,
+    features: {},
+    components: [component]
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Test 1 — ingredientMatchesItem: _stats.compendiumSource
 // ---------------------------------------------------------------------------
@@ -217,4 +225,28 @@ test('T6 - _catalystMatchesItem: no match when compendiumSource differs from com
   };
 
   assert.equal(manager.catalystMatchesItem(recipe, catalyst, item), false);
+});
+
+test('T7 - ingredientMatchesItem: matches canonical sourceItemUuid when live sourceUuid differs', () => {
+  const system = makeSystemWithComponent({
+    id: 'comp-7',
+    sourceUuid: 'Compendium.world.items.iron-ore-live',
+    sourceItemUuid: 'Compendium.source.items.iron-ore',
+    name: 'Iron Ore'
+  });
+  globalThis.game = makeFakeGame({ system });
+
+  const manager = new RecipeManager();
+  const recipe = makeRecipe();
+  const ingredient = makeIngredient('comp-7');
+
+  const item = {
+    uuid: 'Item.actor-owned-iron-ore',
+    _stats: { compendiumSource: 'Compendium.source.items.iron-ore' },
+    flags: {},
+    name: 'Iron Ore',
+    system: { quantity: 1 }
+  };
+
+  assert.equal(manager.ingredientMatchesItem(recipe, ingredient, item), true);
 });

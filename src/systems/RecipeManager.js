@@ -1,7 +1,7 @@
 import { Recipe } from '../models/Recipe.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { getFabricateFlag } from '../config/flags.js';
-import { getSourceUuid } from '../utils/sourceUuid.js';
+import { itemMatchesComponentSource } from '../utils/sourceUuid.js';
 import { SignatureValidator } from './SignatureValidator.js';
 
 const DEFAULT_RECIPE_IMG = 'icons/svg/item-bag.svg';
@@ -619,23 +619,12 @@ export class RecipeManager {
       const managedItem = this._getComponent(recipe, componentId);
       if (!managedItem) return false;
 
-      const sourceId = getSourceUuid(item);
-      const byUuid = managedItem.sourceUuid
-        ? (item.uuid === managedItem.sourceUuid || sourceId === managedItem.sourceUuid)
-        : false;
-      if (byUuid) return true;
-
-      // Fallback ID match (T-097)
-      const fallbacks = managedItem.fallbackItemIds || [];
-      if (fallbacks.length > 0) {
-        const byFallback = fallbacks.some(fid => item.uuid === fid || sourceId === fid);
-        if (byFallback) return true;
-      }
+      if (itemMatchesComponentSource(item, managedItem)) return true;
 
       const byName = !managedItem.sourceUuid && managedItem.name
         ? item.name?.toLowerCase() === managedItem.name.toLowerCase()
         : false;
-      if (!byUuid && !byName) return false;
+      if (!byName) return false;
     } else if (!this._matchesIngredient(ingredient, item, features)) {
       return false;
     }
@@ -662,12 +651,8 @@ export class RecipeManager {
     if (catalyst.componentId || catalyst.systemItemId) {
       const managedItem = this._getComponent(recipe, catalyst.componentId || catalyst.systemItemId);
       if (!managedItem) return false;
-      if (managedItem.sourceUuid) {
-        const sourceId = getSourceUuid(item);
-        if (item.uuid === managedItem.sourceUuid || sourceId === managedItem.sourceUuid) return true;
-        // Fallback ID match (T-097)
-        const fallbacks = managedItem.fallbackItemIds || [];
-        if (fallbacks.some(fid => item.uuid === fid || sourceId === fid)) return true;
+      if (managedItem.sourceUuid || managedItem.sourceItemUuid || managedItem.fallbackItemIds?.length) {
+        if (itemMatchesComponentSource(item, managedItem)) return true;
         return false;
       }
       return item.name?.toLowerCase() === (managedItem.name || '').toLowerCase();
