@@ -36,6 +36,7 @@ globalThis.fromUuid = async () => null;
 // ---------------------------------------------------------------------------
 
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
+const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
 const { ResolutionModeService } = await import('../src/systems/ResolutionModeService.js');
 const { RecipeVisibilityService } = await import('../src/systems/RecipeVisibilityService.js');
 const { SignatureValidator } = await import('../src/systems/SignatureValidator.js');
@@ -542,4 +543,35 @@ test('SignatureValidator.computeSignature returns groups for alchemy ingredient 
   const sig = validator.computeSignature(set, components);
   assert.equal(sig.length, 1);
   assert.ok(sig[0].has('c1'));
+});
+
+test('CraftingEngine._matchAlchemySignature matches submitted items by canonical sourceItemUuid when live sourceUuid differs', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const components = [{
+    id: 'c1',
+    name: 'Iron Ore',
+    sourceUuid: 'Compendium.world.items.iron-ore-live',
+    sourceItemUuid: 'Compendium.source.items.iron-ore',
+    fallbackItemIds: []
+  }];
+  const recipe = buildRecipe(
+    'alchemy-recipe',
+    [buildIngredientSet([buildIngredientGroup('c1')])],
+    [{ id: 'rg1', name: 'Result Group', results: [] }],
+    { resultSelection: { provider: 'ingredientSet' } }
+  );
+  const validator = new SignatureValidator({
+    getSystem: () => null,
+    getRecipesForSystem: () => [],
+    getComponentsForSystem: () => components
+  });
+
+  const result = engine._matchAlchemySignature([{
+    uuid: 'Item.actor-owned-iron-ore',
+    _stats: { compendiumSource: 'Compendium.source.items.iron-ore' },
+    flags: {}
+  }], [recipe], components, validator);
+
+  assert.equal(result.matched, true);
+  assert.equal(result.recipe.id, 'alchemy-recipe');
 });

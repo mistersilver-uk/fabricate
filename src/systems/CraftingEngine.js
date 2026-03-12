@@ -3,7 +3,7 @@ import { ItemPilesIntegration } from '../integrations/ItemPilesIntegration.js';
 import { MacroExecutor } from '../utils/MacroExecutor.js';
 import { CraftingCheckAdapterRegistry } from './CraftingCheckAdapter.js';
 import { getFabricateFlag } from '../config/flags.js';
-import { getSourceUuid } from '../utils/sourceUuid.js';
+import { getItemSourceReferences, getComponentSourceReferences, itemMatchesComponentSource } from '../utils/sourceUuid.js';
 import { SignatureValidator } from './SignatureValidator.js';
 
 /**
@@ -593,9 +593,11 @@ export class CraftingEngine {
    * @private
    */
   _matchAlchemySignature(submittedItems, recipes, components, signatureValidator) {
-    const submittedUuids = new Set(
-      submittedItems.map(item => item.uuid || item.sourceUuid).filter(Boolean)
-    );
+    const submittedRefs = new Set();
+    for (const item of submittedItems) {
+      for (const ref of getItemSourceReferences(item)) submittedRefs.add(ref);
+      if (item?.sourceUuid) submittedRefs.add(item.sourceUuid);
+    }
 
     for (const recipe of recipes) {
       if (!recipe.enabled) continue;
@@ -609,8 +611,7 @@ export class CraftingEngine {
           for (const componentId of groupComponentIds) {
             const comp = components.find(c => c.id === componentId);
             if (!comp) continue;
-            const compSourceUuid = comp.sourceItemUuid || comp.sourceUuid;
-            if (compSourceUuid && submittedUuids.has(compSourceUuid)) return true;
+            if (getComponentSourceReferences(comp).some(ref => submittedRefs.has(ref))) return true;
           }
           return false;
         });
@@ -1904,18 +1905,15 @@ export class CraftingEngine {
 
   /**
    * Find items on actor that match a managed component.
-   * Resolves source UUID via getSourceUuid() — checks _stats.compendiumSource first (Foundry v12+),
-   * then falls back to flags.core.sourceId (Foundry v11 and earlier). Falls back to name match
-   * when no sourceUuid is set on the component.
+   * Matches against the component's full source-reference chain: live `sourceUuid`,
+   * canonical `sourceItemUuid`, and any recorded `fallbackItemIds`. Falls back to
+   * name matching only when the component has no source references.
    * @private
    */
   _findComponentItems(actor, component, system) {
     const items = Array.from(actor.items);
-    if (component.sourceUuid) {
-      const byUuid = items.filter(item =>
-        item.uuid === component.sourceUuid ||
-        (getSourceUuid(item) === component.sourceUuid)
-      );
+    if (component.sourceUuid || component.sourceItemUuid || component.fallbackItemIds?.length) {
+      const byUuid = items.filter(item => itemMatchesComponentSource(item, component));
       if (byUuid.length > 0) return byUuid;
     }
     // Name fallback

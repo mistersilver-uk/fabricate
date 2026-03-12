@@ -17,7 +17,12 @@ if (typeof globalThis.foundry !== 'undefined') {
   delete globalThis.foundry;
 }
 
-const { getSourceUuid } = await import('../src/utils/sourceUuid.js');
+const {
+  getSourceUuid,
+  getItemSourceReferences,
+  getComponentSourceReferences,
+  itemMatchesComponentSource
+} = await import('../src/utils/sourceUuid.js');
 
 test('1 - returns _stats.compendiumSource when present (v12+ canonical field)', () => {
   const item = {
@@ -65,4 +70,43 @@ test('7 - reads system._stats.compendiumSource as secondary v12+ location', () =
 
 test('8 - returns null when item has no flags and no _stats', () => {
   assert.equal(getSourceUuid({}), null);
+});
+
+test('9 - getItemSourceReferences returns item uuid and canonical source without duplicates', () => {
+  const item = {
+    uuid: 'Item.actor-owned-1',
+    _stats: { compendiumSource: 'Compendium.world.items.iron-ore' },
+    flags: {}
+  };
+  assert.deepEqual(getItemSourceReferences(item), [
+    'Item.actor-owned-1',
+    'Compendium.world.items.iron-ore'
+  ]);
+});
+
+test('10 - getComponentSourceReferences includes sourceUuid, sourceItemUuid, and unique fallbacks', () => {
+  const component = {
+    sourceUuid: 'Compendium.world.items.iron-ore-live',
+    sourceItemUuid: 'Compendium.source.items.iron-ore',
+    fallbackItemIds: ['Compendium.world.items.iron-ore-live', 'Compendium.world.items.iron-ore-old']
+  };
+  assert.deepEqual(getComponentSourceReferences(component), [
+    'Compendium.world.items.iron-ore-live',
+    'Compendium.source.items.iron-ore',
+    'Compendium.world.items.iron-ore-old'
+  ]);
+});
+
+test('11 - itemMatchesComponentSource matches canonical sourceItemUuid when live uuid differs', () => {
+  const item = {
+    uuid: 'Item.actor-owned-2',
+    _stats: { compendiumSource: 'Compendium.source.items.iron-ore' },
+    flags: {}
+  };
+  const component = {
+    sourceUuid: 'Compendium.world.items.iron-ore-live',
+    sourceItemUuid: 'Compendium.source.items.iron-ore',
+    fallbackItemIds: []
+  };
+  assert.equal(itemMatchesComponentSource(item, component), true);
 });

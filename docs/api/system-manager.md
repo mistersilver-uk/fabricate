@@ -230,11 +230,10 @@ Adds a single Foundry Item document to the system as a component. GM only.
 
 Returns a result object that indicates whether the item was newly created, updated, or already up to date, so callers can show appropriate notifications.
 
-The method uses a two-level source-chain lookup before creating a new component:
+The method resolves both the dropped item's live UUID and its canonical source UUID (via `_stats.compendiumSource`, with `flags.core.sourceId` as a legacy fallback) before deciding what to do. A component can claim a full source-reference chain through `sourceUuid`, `sourceItemUuid`, and `fallbackItemIds`.
 
-1. **Exact match** — the dropped UUID already matches the recorded `sourceUuid` or `sourceItemUuid` on an existing component. If the source item's name or image has changed, the stored metadata is overwritten and `action` is `"updated"`. If metadata is already current, `action` is `"skipped"`.
-2. **Fallback-chain match** — the dropped UUID appears in the component's `fallbackItemIds` (recorded when a compendium item moves). The old `sourceUuid` is pushed into `fallbackItemIds` before the new UUID is written; `action` is `"updated"`.
-3. **No match** — a new component is created; `action` is `"added"`.
+1. **Claimed source chain** — an existing component already claims either the dropped live UUID, the canonical source UUID, or a fallback UUID in the same chain. Fabricate refreshes the component in place and returns `action: "updated"` when metadata or stored references changed, or `action: "skipped"` when nothing changed.
+2. **Unclaimed source chain** — no component claims any of those references, so a new component is created and `action` is `"added"`.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
@@ -244,7 +243,7 @@ The method uses a two-level source-chain lookup before creating a new component:
 **Returns:** `Promise<{ item: object, action: 'added' | 'updated' | 'skipped' }>`
 
 - `item` — the component object (new or existing).
-- `action` — `"added"` if a new component was created, `"updated"` if an existing component's name or image was refreshed, `"skipped"` if the item was already registered and already up to date.
+- `action` — `"added"` if a new component was created, `"updated"` if an existing component's name/image/source references were refreshed, `"skipped"` if the claimed source chain was already current.
 
 **Throws:** `Error` if the system ID is not found, or if the UUID resolves to a non-Item document (such as an Actor or JournalEntry).
 
@@ -269,7 +268,7 @@ Hooks.once('fabricate.ready', async () => {
 
 Imports all Item documents from a compendium pack into the system as components. GM only.
 
-Each item is processed via `addItemFromUuid()`, so the same source-chain deduplication rules apply: items already registered and up to date are skipped, items whose metadata has changed are updated, and new items are added.
+Each item is processed via `addItemFromUuid()`, so the same source-chain deduplication rules apply: items already registered by the same live UUID or canonical source UUID are updated or skipped in place, and only unclaimed source chains create new components.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
@@ -313,6 +312,8 @@ Updates a component's properties (tags, essences, difficulty, salvage). GM only.
 | `updates` | `object` | Partial item data |
 
 **Returns:** `Promise<object>`
+
+If `updates` changes `sourceUuid`, `sourceItemUuid`, or `fallbackItemIds`, the manager enforces the same per-system uniqueness rule used by imports. An update that would make two components claim the same source-reference chain throws an `Error`.
 
 When `features.salvage` is enabled on the system, you can set the `salvage` sub-object here. The shape is normalised on write — see [Component Salvage Configuration]({% link salvage.md %}#component-salvage-configuration) for the full field reference.
 
