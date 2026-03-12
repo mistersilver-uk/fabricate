@@ -28,6 +28,9 @@ jobs:
 
   smoke-test:
     needs: unit-tests
+    permissions:
+      contents: read
+      issues: write
     uses: ./.github/workflows/foundry-integration.yml
     secrets: inherit
 
