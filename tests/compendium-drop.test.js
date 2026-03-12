@@ -272,6 +272,50 @@ test('addItemsFromPack — skips items already in the system by sourceUuid', asy
   assert.ok('updated' in result);
 });
 
+test('addItemsFromPack — updates existing component when canonical source UUID matches but live UUID changes', async () => {
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'existing-1',
+      name: 'Iron Ore',
+      sourceUuid: 'Compendium.world.old-pack.item-a',
+      sourceItemUuid: 'Compendium.source.items.iron-ore'
+    }]
+  }]);
+
+  _mockPacks.set('world.new-pack', {
+    getDocuments: async () => [
+      { id: 'item-b', documentName: 'Item', name: 'Iron Ore', img: 'ore-new.png' }
+    ]
+  });
+
+  globalThis.fromUuid = async (uuid) => {
+    if (uuid !== 'Compendium.world.new-pack.item-b') return null;
+    return {
+      documentName: 'Item',
+      name: 'Iron Ore',
+      img: 'ore-new.png',
+      _stats: { compendiumSource: 'Compendium.source.items.iron-ore' }
+    };
+  };
+
+  const result = await mgr.addItemsFromPack('sys1', 'world.new-pack');
+
+  assert.equal(result.total, 1);
+  assert.equal(result.added, 0);
+  assert.equal(result.updated, 1);
+  assert.equal(result.skipped, 0);
+
+  const sys = mgr.getSystem('sys1');
+  assert.equal(sys.items.length, 1, 'should not duplicate the component');
+  assert.equal(sys.items[0].sourceUuid, 'Compendium.world.new-pack.item-b');
+  assert.equal(sys.items[0].sourceItemUuid, 'Compendium.source.items.iron-ore');
+  assert.ok(sys.items[0].fallbackItemIds.includes('Compendium.world.old-pack.item-a'));
+
+  globalThis.fromUuid = async () => null;
+});
+
 test('addItemsFromPack — filters out non-Item documents and returns correct counts', async () => {
   const mgr = buildManager([{
     id: 'sys1',
@@ -344,7 +388,8 @@ test('addItemFromUuid — new item returns { item, action: "added" }', async () 
   globalThis.fromUuid = async (uuid) => ({
     documentName: 'Item',
     name: 'Fresh Coal',
-    img: 'coal.png'
+    img: 'coal.png',
+    _stats: { compendiumSource: 'Compendium.source.items.coal' }
   });
 
   const result = await mgr.addItemFromUuid('sys1', 'Compendium.world.pack.item-coal');
@@ -353,6 +398,7 @@ test('addItemFromUuid — new item returns { item, action: "added" }', async () 
   assert.equal(result.item.name, 'Fresh Coal');
   assert.equal(result.item.img, 'coal.png');
   assert.equal(result.item.sourceUuid, 'Compendium.world.pack.item-coal');
+  assert.equal(result.item.sourceItemUuid, 'Compendium.source.items.coal');
   assert.equal(mgr.getSystem('sys1').items.length, 1);
 
   globalThis.fromUuid = async () => null;
@@ -368,7 +414,8 @@ test('addItemFromUuid — exact match with differing metadata overwrites name/im
   globalThis.fromUuid = async () => ({
     documentName: 'Item',
     name: 'Updated Iron Ore',
-    img: 'ore2.png'
+    img: 'ore2.png',
+    _stats: { compendiumSource: 'Compendium.source.items.iron-ore' }
   });
 
   const result = await mgr.addItemFromUuid('sys1', 'Compendium.world.pack.item-a');
@@ -378,6 +425,7 @@ test('addItemFromUuid — exact match with differing metadata overwrites name/im
   assert.equal(result.item.id, 'comp-1');
   assert.equal(result.item.name, 'Updated Iron Ore');
   assert.equal(result.item.img, 'ore2.png');
+  assert.equal(result.item.sourceItemUuid, 'Compendium.source.items.iron-ore');
   // System should still have only one item
   assert.equal(mgr.getSystem('sys1').items.length, 1);
 
@@ -533,6 +581,56 @@ test('addItemsFromPack — returns { added, updated, skipped, total } with updat
   assert.equal(result.added, 2);
   assert.equal(result.updated, 0);
   assert.ok('updated' in result, 'result must have an updated field');
+});
+
+test('createItem — rejects a duplicate source reference already used by another component', async () => {
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-existing',
+      name: 'Iron Ore',
+      sourceUuid: 'Compendium.world.pack.item-a',
+      sourceItemUuid: 'Compendium.source.items.iron-ore'
+    }]
+  }]);
+
+  await assert.rejects(
+    () => mgr.createItem('sys1', {
+      name: 'Duplicate Iron Ore',
+      sourceUuid: 'Compendium.world.other-pack.item-z',
+      sourceItemUuid: 'Compendium.source.items.iron-ore'
+    }),
+    /already belongs/
+  );
+});
+
+test('updateItem — rejects changing a component to a source reference already used by another component', async () => {
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [
+      {
+        id: 'comp-a',
+        name: 'Iron Ore',
+        sourceUuid: 'Compendium.world.pack.item-a',
+        sourceItemUuid: 'Compendium.source.items.iron-ore'
+      },
+      {
+        id: 'comp-b',
+        name: 'Coal',
+        sourceUuid: 'Compendium.world.pack.item-b',
+        sourceItemUuid: 'Compendium.source.items.coal'
+      }
+    ]
+  }]);
+
+  await assert.rejects(
+    () => mgr.updateItem('sys1', 'comp-b', {
+      sourceItemUuid: 'Compendium.source.items.iron-ore'
+    }),
+    /already belongs/
+  );
 });
 
 test('addItemFromUuid — rejects non-Item document type', async () => {

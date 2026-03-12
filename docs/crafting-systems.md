@@ -170,9 +170,9 @@ Drag any Item document from the **Items sidebar** or from an open **compendium b
 
 1. Open the Items sidebar or the compendium browser
 2. Drag the item onto the **Items** tab drop zone in the Crafting Admin panel
-3. The item appears in the list with a generated `componentId` and its `sourceItemUuid` linked to the compendium entry
+3. The item appears in the list with a generated `componentId`, a live `sourceUuid`, and a canonical `sourceItemUuid` when Foundry exposes one
 
-If the item is already registered in the system and its name and image are current, the drop is silently ignored. If the item is already registered but its name or image has changed (for example after the compendium item was updated), Fabricate overwrites the stored metadata and shows a notification.
+If the item is already registered in the system by either its live UUID or its canonical source UUID, the drop reuses the existing component instead of creating a duplicate. If the stored name, image, or live UUID is stale, Fabricate updates the component in place and records the previous live UUID in `fallbackItemIds`.
 
 If the dropped document is an Actor, JournalEntry, Scene, or any other non-Item type, a warning notification is shown and nothing is imported. If the drag data cannot be resolved to any UUID, the same warning is shown.
 
@@ -181,8 +181,9 @@ If the dropped document is an Actor, JournalEntry, Scene, or any other non-Item 
 To import all Item documents from a compendium pack at once, drag the **compendium pack header** (the title row in the compendium directory sidebar, not an individual entry within it) onto the drop zone. Fabricate enumerates every Item document in the pack and adds each one.
 
 - Items not yet in the system are added as new components.
-- Items already registered whose name or image has changed are updated automatically.
+- Items already registered by the same live UUID or canonical source UUID are updated in place rather than duplicated.
 - Items already registered and already up to date are skipped.
+- A single crafting system cannot contain two components that claim the same source item UUID chain.
 - A summary notification reports how many items were added, updated, and skipped.
 - Non-item document types in the pack (Actors, JournalEntries, etc.) are ignored.
 

@@ -3,6 +3,7 @@
  */
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
+import { getSourceUuid, getComponentSourceReferences, getItemSourceReferences } from '../utils/sourceUuid.js';
 
 export class CraftingSystemManager {
   constructor(recipeManager) {
@@ -339,16 +340,25 @@ export class CraftingSystemManager {
 
   _normalizeComponent(item = {}, validEssenceIds = null, salvageEnabled = false) {
     const difficulty = Number(item.difficulty);
+    const sourceItemUuid = item.sourceItemUuid || item.sourceUuid || null;
+    const sourceUuid = item.sourceUuid || item.sourceItemUuid || null;
+    const primaryRefs = new Set([sourceUuid, sourceItemUuid].filter(ref => typeof ref === 'string' && ref.trim()));
+    const fallbackItemIds = Array.isArray(item.fallbackItemIds)
+      ? Array.from(new Set(
+        item.fallbackItemIds
+          .filter(id => typeof id === 'string')
+          .map(id => id.trim())
+          .filter(id => id && !primaryRefs.has(id))
+      ))
+      : [];
     return {
       id: item.id || foundry.utils.randomID(),
       name: item.name || 'Unnamed Item',
       img: item.img || 'icons/svg/item-bag.svg',
-      sourceItemUuid: item.sourceItemUuid || item.sourceUuid || null,
+      sourceItemUuid,
       // Transitional alias for current UI/engine references.
-      sourceUuid: item.sourceUuid || item.sourceItemUuid || null,
-      fallbackItemIds: Array.isArray(item.fallbackItemIds)
-        ? item.fallbackItemIds.filter(id => typeof id === 'string' && id.trim())
-        : [],
+      sourceUuid,
+      fallbackItemIds,
       tier: item.tier || null,
       tags: Array.isArray(item.tags) ? item.tags : [],
       essences: this._normalizeEssenceQuantities(item.essences, validEssenceIds),
@@ -610,47 +620,78 @@ export class CraftingSystemManager {
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
     const validEssenceIds = new Set((system.essenceDefinitions || []).map(def => def.id));
     const item = this._normalizeComponent(data, validEssenceIds, system.features?.salvage === true);
+    this._assertUniqueComponentSources(system, item);
     system.items.push(item);
     await this.save();
     return item;
   }
 
   /**
-   * Find an existing component in the system that matches the given UUID via:
-   *   - exact sourceUuid / sourceItemUuid match (returns matchType 'exact')
-   *   - UUID appears in the item's fallbackItemIds (returns matchType 'source')
+   * Resolve the live and canonical source references for an imported item UUID.
    *
-   * @param {object} system - Normalised system object
-   * @param {string} uuid   - The UUID to search for
-   * @returns {{ item: object, matchType: 'exact'|'source' }|null}
+   * @param {string} itemUuid
+   * @param {Item|object|null} source
+   * @returns {{ currentUuid: string|null, canonicalUuid: string|null, references: string[] }}
    */
-  _findExistingBySourceChain(system, uuid) {
-    // Exact match: the dropped UUID is already the recorded sourceUuid or sourceItemUuid
-    const exactMatch = system.items.find(i =>
-      i.sourceUuid === uuid || i.sourceItemUuid === uuid
-    );
-    if (exactMatch) return { item: exactMatch, matchType: 'exact' };
+  _resolveImportedSourceData(itemUuid, source = null) {
+    const references = [];
+    if (typeof itemUuid === 'string' && itemUuid.trim()) {
+      references.push(itemUuid.trim());
+    }
+    for (const ref of getItemSourceReferences(source)) {
+      if (!references.includes(ref)) references.push(ref);
+    }
+    const currentUuid = references[0] || null;
+    const canonicalUuid = getSourceUuid(source) || currentUuid;
+    return { currentUuid, canonicalUuid, references };
+  }
 
-    // Source-chain match: the dropped UUID appears in the item's fallbackItemIds
-    const fallbackMatch = system.items.find(i =>
-      Array.isArray(i.fallbackItemIds) && i.fallbackItemIds.includes(uuid)
-    );
-    if (fallbackMatch) return { item: fallbackMatch, matchType: 'source' };
+  /**
+   * Find an existing component in the system that already claims any of the given source references.
+   *
+   * @param {object} system - Normalized system object
+   * @param {string[]} references - Candidate source references
+   * @param {string|null} [excludeItemId=null] - Optional component to ignore
+   * @returns {object|null}
+   */
+  _findComponentBySourceReferences(system, references, excludeItemId = null) {
+    const claimedRefs = new Set((references || []).filter(Boolean));
+    if (claimedRefs.size === 0) return null;
+    return (system.items || []).find(item => {
+      if (excludeItemId && item.id === excludeItemId) return false;
+      return getComponentSourceReferences(item).some(ref => claimedRefs.has(ref));
+    }) || null;
+  }
 
-    return null;
+  _assertUniqueComponentSources(system, item, excludeItemId = null) {
+    const claimedRefs = getComponentSourceReferences(item);
+    if (claimedRefs.length === 0) return;
+    const conflict = this._findComponentBySourceReferences(system, claimedRefs, excludeItemId);
+    if (!conflict) return;
+    throw new Error(
+      `Component source reference already belongs to "${conflict.name || conflict.id}" (${conflict.id})`
+    );
+  }
+
+  _sameSourceReferenceSet(left, right) {
+    const leftRefs = getComponentSourceReferences(left);
+    const rightRefs = getComponentSourceReferences(right);
+    return leftRefs.length === rightRefs.length
+      && leftRefs.every(ref => rightRefs.includes(ref));
   }
 
   /**
    * Add a crafting-system component from a Foundry item UUID.
    * Returns { item, action } where action is 'added', 'updated', or 'skipped'.
    *
-   * - 'skipped': exact UUID already registered as sourceUuid/sourceItemUuid AND
-   *              the source metadata (name/img) is already up-to-date (or source
-   *              doesn't resolve).
-   * - 'updated': exact UUID match but name/img differs from fresh source resolution;
-   *              OR UUID found via fallbackItemIds (source-chain match) with
-   *              name/img refreshed and old sourceUuid pushed into fallbackItemIds.
-   * - 'added':   no match found; new component created.
+   * Imports preserve both the live document UUID (`sourceUuid`) and the canonical
+   * compendium/source UUID (`sourceItemUuid`) when Foundry exposes both.
+   *
+   * - 'skipped': an existing component already claims the incoming live UUID or canonical
+   *              source UUID, and its metadata/source references are already current.
+   * - 'updated': an existing component claims that source chain, but its metadata or
+   *              stored live/canonical UUIDs need to be refreshed.
+   * - 'added':   no component currently claims the incoming source references.
    *
    * @param {string} systemId
    * @param {string} itemUuid
@@ -660,8 +701,6 @@ export class CraftingSystemManager {
     this._assertGM('add component from uuid');
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
-
-    const match = this._findExistingBySourceChain(system, itemUuid);
 
     // Resolve the source document (needed for type guard and name/img refresh in all paths)
     let source = null;
@@ -678,37 +717,37 @@ export class CraftingSystemManager {
       );
     }
 
-    if (match?.matchType === 'exact') {
-      // Exact match: overwrite name/img if the source resolved with different metadata;
-      // skip if already up-to-date or source doesn't resolve.
-      const existing = match.item;
-      if (source && (source.name !== existing.name || source.img !== existing.img)) {
-        existing.name = source.name;
-        existing.img = source.img;
-        await this.save();
-        return { item: existing, action: 'updated' };
+    const nextSourceData = this._resolveImportedSourceData(itemUuid, source);
+    const existing = this._findComponentBySourceReferences(system, nextSourceData.references);
+    if (existing) {
+      const nextSourceUuid = nextSourceData.currentUuid;
+      const nextSourceItemUuid = nextSourceData.canonicalUuid;
+      const fallbackSet = new Set(Array.isArray(existing.fallbackItemIds) ? existing.fallbackItemIds : []);
+      for (const ref of [existing.sourceUuid, existing.sourceItemUuid]) {
+        if (ref && ref !== nextSourceUuid && ref !== nextSourceItemUuid) fallbackSet.add(ref);
       }
-      return { item: existing, action: 'skipped' };
-    }
+      fallbackSet.delete(nextSourceUuid);
+      fallbackSet.delete(nextSourceItemUuid);
 
-    if (match?.matchType === 'source') {
-      // Overwrite path: update name/img, push old sourceUuid into fallbackItemIds
-      const existing = match.item;
-      const oldSourceUuid = existing.sourceUuid;
+      const nextName = source?.name || existing.name;
+      const nextImg = source?.img || existing.img;
+      const nextFallbacks = Array.from(fallbackSet);
+      const unchanged = existing.sourceUuid === nextSourceUuid
+        && existing.sourceItemUuid === nextSourceItemUuid
+        && existing.name === nextName
+        && existing.img === nextImg
+        && nextFallbacks.length === (existing.fallbackItemIds || []).length
+        && nextFallbacks.every(ref => (existing.fallbackItemIds || []).includes(ref));
 
-      existing.name = source?.name || existing.name;
-      existing.img = source?.img || existing.img;
-
-      // Accumulate fallbackItemIds without duplicates
-      const fallbacks = Array.isArray(existing.fallbackItemIds)
-        ? [...existing.fallbackItemIds]
-        : [];
-      if (oldSourceUuid && oldSourceUuid !== itemUuid && !fallbacks.includes(oldSourceUuid)) {
-        fallbacks.push(oldSourceUuid);
+      if (unchanged) {
+        return { item: existing, action: 'skipped' };
       }
-      existing.fallbackItemIds = fallbacks;
-      existing.sourceUuid = itemUuid;
-      existing.sourceItemUuid = itemUuid;
+
+      existing.name = nextName;
+      existing.img = nextImg;
+      existing.sourceUuid = nextSourceUuid;
+      existing.sourceItemUuid = nextSourceItemUuid;
+      existing.fallbackItemIds = nextFallbacks;
 
       await this.save();
       return { item: existing, action: 'updated' };
@@ -719,9 +758,11 @@ export class CraftingSystemManager {
     const item = this._normalizeComponent({
       name: source?.name || itemUuid.split('.').pop() || 'Imported Item',
       img: source?.img || 'icons/svg/item-bag.svg',
-      sourceUuid: itemUuid
+      sourceUuid: nextSourceData.currentUuid,
+      sourceItemUuid: nextSourceData.canonicalUuid
     }, validEssenceIds, system.features?.salvage === true);
 
+    this._assertUniqueComponentSources(system, item);
     system.items.push(item);
     await this.save();
     return { item, action: 'added' };
@@ -767,11 +808,15 @@ export class CraftingSystemManager {
     const idx = system.items.findIndex(i => i.id === itemId);
     if (idx < 0) throw new Error(`Component not found: ${itemId}`);
     const validEssenceIds = new Set((system.essenceDefinitions || []).map(def => def.id));
-    system.items[idx] = this._normalizeComponent(
+    const updatedItem = this._normalizeComponent(
       { ...system.items[idx], ...updates, id: itemId },
       validEssenceIds,
       system.features?.salvage === true
     );
+    if (!this._sameSourceReferenceSet(system.items[idx], updatedItem)) {
+      this._assertUniqueComponentSources(system, updatedItem, itemId);
+    }
+    system.items[idx] = updatedItem;
     await this.save();
     return system.items[idx];
   }
