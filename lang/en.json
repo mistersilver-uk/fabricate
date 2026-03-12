@@ -17,7 +17,8 @@
     },
     "Search": {
       "Placeholder": "Search recipes...",
-      "Label": "Search"
+      "Label": "Search",
+      "ClearLabel": "Clear search"
     },
     "Filter": {
       "CraftableOnly": "Craftable Only",

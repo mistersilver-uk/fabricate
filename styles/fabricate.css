@@ -79,6 +79,7 @@
 .fabricate-search {
   position: relative;
   margin-bottom: 8px;
+  width: 100%;
 }
 
 .fabricate-search input {
@@ -90,12 +91,60 @@
   font-size: 14px;
 }
 
-.fabricate-search i {
+.fabricate-search.has-clear-button input {
+  padding-right: 60px;
+}
+
+.fabricate-search > .fabricate-search-icon {
   position: absolute;
   right: 12px;
   top: 50%;
   transform: translateY(-50%);
   opacity: 0.5;
+  pointer-events: none;
+}
+
+.fabricate-search > .fabricate-search-icon i {
+  position: static;
+}
+
+.fabricate-search button.fabricate-search-clear {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  position: absolute;
+  right: 34px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.68;
+}
+
+.fabricate-search button.fabricate-search-clear:hover,
+.fabricate-search button.fabricate-search-clear:focus-visible {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.fabricate-search button.fabricate-search-clear.is-empty {
+  cursor: default;
+  opacity: 0.42;
+}
+
+.fabricate-search button.fabricate-search-clear i {
+  position: static;
+  font-size: 11px;
 }
 
 .fabricate-filters {
@@ -813,12 +862,18 @@
   margin-bottom: 6px;
 }
 
+.fabricate-admin .panel-toolbar .fabricate-search {
+  flex: 1 1 280px;
+  min-width: 240px;
+  margin-bottom: 0;
+}
+
 .fabricate-admin .panel-toolbar input {
   flex: 1;
   min-width: 240px;
 }
 
-.fabricate-admin .panel-toolbar button {
+.fabricate-admin .panel-toolbar > button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -826,6 +881,30 @@
   border-radius: 5px;
   border: 1px solid rgba(0, 0, 0, 0.25);
   background: rgba(0, 0, 0, 0.14);
+}
+
+.fabricate-admin .component-toolbar {
+  margin-bottom: 0;
+}
+
+.fabricate-admin .component-toolbar.sticky-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  margin: -12px -12px 0;
+  padding: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(18, 14, 28, 0.97) 0%, rgba(18, 14, 28, 0.9) 82%, rgba(18, 14, 28, 0) 100%);
+  backdrop-filter: blur(8px);
+}
+
+.fabricate-admin .component-toolbar .fabricate-search {
+  flex-basis: 100%;
+  min-width: 0;
+}
+
+.fabricate-admin .component-toolbar input {
+  min-width: 0;
 }
 
 .fabricate-admin .system-item-grid {
