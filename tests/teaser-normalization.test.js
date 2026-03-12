@@ -143,3 +143,11 @@ describe('CraftingSystemManager._normalizeTeaserConfig', () => {
     assert.equal(system.recipeVisibility.listMode, 'teaser');
   });
 });
+
+describe('CraftingSystemManager._normalizeSystem', () => {
+  it('omits the system-level difficulty object', () => {
+    const manager = makeManager();
+    const system = manager._normalizeSystem({ name: 'No Difficulty' });
+    assert.equal(Object.prototype.hasOwnProperty.call(system, 'difficulty'), false);
+  });
+});
