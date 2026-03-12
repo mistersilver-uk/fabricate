@@ -7,6 +7,12 @@
  */
 import { writable, get } from 'svelte/store';
 import { buildRecipeGraph, layoutGraph, filterGraph } from '../util/recipeGraphBuilder.js';
+import {
+  buildExportPayload,
+  validateImportData,
+  prepareForImport,
+  makeExportFilename
+} from '../../../systems/CraftingSystemExporter.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -658,6 +664,34 @@ export function createAdminStore(services) {
     services.notify.info(`Exported ${recipes.length} recipes to clipboard.`);
   }
 
+  // --- System import/export ---
+
+  async function exportSystem(systemId) {
+    const targetId = systemId || get(selectedSystemId);
+    if (!targetId) {
+      services.notify.warn('Select a crafting system to export.');
+      return;
+    }
+    const systemManager = services.getCraftingSystemManager();
+    const recipeManager = services.getRecipeManager();
+    const system = systemManager.getSystem(targetId);
+    if (!system) {
+      services.notify.error('Crafting system not found.');
+      return;
+    }
+    const recipes = recipeManager.getRecipes({ craftingSystemId: targetId }).map(r => r.toJSON());
+    const version = services.getModuleVersion ? services.getModuleVersion() : '0.0.0';
+    const payload = buildExportPayload(system, recipes, version);
+    const filename = makeExportFilename(system.name);
+    const json = JSON.stringify(payload, null, 2);
+    await services.downloadFile(json, filename);
+    services.notify.info(`Exported "${system.name}" (${recipes.length} recipes).`);
+  }
+
+  async function importSystem() {
+    await services.renderSystemImportDialog();
+  }
+
   // --- Item/Component management ---
 
   async function deleteComponent(itemId) {
@@ -737,6 +771,8 @@ export function createAdminStore(services) {
     toggleRecipeEnabled,
     importRecipes,
     exportRecipes,
+    exportSystem,
+    importSystem,
     deleteComponent,
     setRecipeSearch,
     setItemSearch,

@@ -168,6 +168,8 @@
         "Title": "Crafting Systems",
         "CreateSystem": "Create System",
         "DeleteSystem": "Delete",
+        "ExportSystem": "Export System",
+        "ImportSystem": "Import System",
         "Empty": "No systems created."
       },
       "SystemSettings": {
