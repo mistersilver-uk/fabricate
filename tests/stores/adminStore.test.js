@@ -1479,14 +1479,17 @@ describe('createAdminStore', () => {
       assert.equal(vs.itemCards.length, 2);
     });
 
-    it('viewState.itemCards expose description, source UUID display, and salvage summary fields', async () => {
+    it('viewState.itemCards expose essence icons, source UUID display, and salvage summary fields', async () => {
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
       const sys = origManager.getSystem('sys1');
       if (sys) {
         sys.features = { salvage: true, itemTags: true, essences: true };
         sys.advancedOptionsEnabled = true;
-        sys.essenceDefinitions = [{ id: 'ess-fire', name: 'Fire', description: '', icon: '', sourceItemUuid: null }];
+        sys.essenceDefinitions = [
+          { id: 'ess-fire', name: 'Fire', description: '', icon: 'fas fa-fire', sourceItemUuid: null },
+          { id: 'ess-shadow', name: 'Shadow', description: '', icon: '', sourceItemUuid: null }
+        ];
         sys.components = [
           makeItem({
             id: 'comp-1',
@@ -1495,7 +1498,7 @@ describe('createAdminStore', () => {
             sourceUuid: 'Item.live-123',
             sourceItemUuid: 'Compendium.source.items.blazing-herb',
             tags: ['fire'],
-            essences: { 'ess-fire': 2 },
+            essences: { 'ess-fire': 2, 'ess-shadow': 1 },
             salvage: {
               enabled: true,
               ingredientQuantity: 3,
@@ -1519,7 +1522,10 @@ describe('createAdminStore', () => {
       assert.equal(card.sourceUuidDisplay, 'Compendium.source.items.blazing-herb');
       assert.equal(card.hasSourceUuid, true);
       assert.deepEqual(card.tags, ['fire']);
-      assert.deepEqual(card.essences, [{ id: 'ess-fire', name: 'Fire', quantity: 2 }]);
+      assert.deepEqual(card.essences, [
+        { id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire', quantity: 2 },
+        { id: 'ess-shadow', name: 'Shadow', icon: 'fas fa-mortar-pestle', quantity: 1 }
+      ]);
       assert.deepEqual(card.salvageSummary, {
         quantityRequired: 3,
         catalystCount: 1,

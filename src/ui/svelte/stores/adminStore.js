@@ -140,7 +140,7 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
  * Build the item cards list for the items tab.
  * Mirrors _prepareContext item logic from RecipeManagerApp.
  */
-function _buildItemCards(systemManager, selectedSystem, itemSearchTerm, showTags, showEssences, essenceNameById) {
+function _buildItemCards(systemManager, selectedSystem, itemSearchTerm, showTags, showEssences, essenceDefinitionById) {
   if (!selectedSystem) return [];
   const showSalvage = selectedSystem.features?.salvage === true;
   return systemManager.getItems(selectedSystem.id, itemSearchTerm).map(item => ({
@@ -152,7 +152,8 @@ function _buildItemCards(systemManager, selectedSystem, itemSearchTerm, showTags
     essences: showEssences
       ? Object.entries(item.essences || {}).map(([id, quantity]) => ({
         id,
-        name: essenceNameById.get(id) || id,
+        name: essenceDefinitionById.get(id)?.name || id,
+        icon: essenceDefinitionById.get(id)?.icon || 'fas fa-mortar-pestle',
         quantity
       }))
       : [],
@@ -311,7 +312,7 @@ export function createAdminStore(services) {
         }))
         : [];
 
-      const essenceNameById = new Map(essenceDefinitions.map(def => [def.id, def.name]));
+      const essenceDefinitionById = new Map(essenceDefinitions.map(def => [def.id, def]));
       const advancedEnabled = selectedSystem.advancedOptionsEnabled !== false;
       const showTags = advancedEnabled && selectedSystem.features?.itemTags === true;
       const showEssences = advancedEnabled && selectedSystem.features?.essences === true;
@@ -329,7 +330,7 @@ export function createAdminStore(services) {
         get(itemSearch),
         showTags,
         showEssences,
-        essenceNameById
+        essenceDefinitionById
       );
 
       recipeListData = _buildRecipeList(

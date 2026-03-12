@@ -1061,6 +1061,17 @@
   font-size: 11px;
 }
 
+.fabricate-admin .system-item-card .item-essence-list .essence-token {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fabricate-admin .system-item-card .item-essence-list .essence-token i {
+  font-size: 10px;
+  opacity: 0.85;
+}
+
 .fabricate-admin .system-item-card .item-actions {
   display: flex;
   flex-direction: column;

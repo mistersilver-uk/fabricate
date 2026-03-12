@@ -79,7 +79,10 @@
                     <span class="item-section-label">{localize('FABRICATE.Admin.Items.Essences')}</span>
                     <div class="item-essence-list">
                       {#each item.essences as essence}
-                        <span class="token">{essence.name} {essence.quantity}</span>
+                        <span class="token essence-token">
+                          <i class={essence.icon} aria-hidden="true"></i>
+                          <span>{essence.name} {essence.quantity}</span>
+                        </span>
                       {:else}
                         <span class="hint">{localize('FABRICATE.Admin.Items.NoEssences')}</span>
                       {/each}

@@ -83,6 +83,23 @@ function buildItemsTab({ hasSystem = true, itemCount = 2 } = {}) {
       sourceButton.className = 'item-source-button';
       metaHeader.appendChild(sourceButton);
       meta.appendChild(metaHeader);
+
+      const essenceSection = document.createElement('div');
+      essenceSection.className = 'item-section';
+      const essenceList = document.createElement('div');
+      essenceList.className = 'item-essence-list';
+      const essenceToken = document.createElement('span');
+      essenceToken.className = 'token essence-token';
+      const essenceIcon = document.createElement('i');
+      essenceIcon.className = 'fas fa-fire';
+      const essenceText = document.createElement('span');
+      essenceText.textContent = 'Fire 2';
+      essenceToken.appendChild(essenceIcon);
+      essenceToken.appendChild(essenceText);
+      essenceList.appendChild(essenceToken);
+      essenceSection.appendChild(essenceList);
+      meta.appendChild(essenceSection);
+
       grid.appendChild(card);
       card.appendChild(meta);
 
@@ -143,6 +160,15 @@ describe('ItemsTab layout structure', () => {
     assert.ok(card.querySelector('.item-source-button'));
   });
 
+  it('renders essence badges with an icon inside each token', () => {
+    const panel = buildItemsTab({ itemCount: 1 });
+    const token = panel.querySelector('.item-essence-list .essence-token');
+
+    assert.ok(token, 'essence token should exist');
+    assert.ok(token.querySelector('i.fas.fa-fire'), 'essence token should render its icon');
+    assert.equal(token.textContent?.trim(), 'Fire 2');
+  });
+
   it('keeps the header visible when the component list is empty', () => {
     const panel = buildItemsTab({ itemCount: 0 });
 
@@ -193,6 +219,14 @@ describe('ItemsTab layout CSS', () => {
       css.includes('.fabricate-admin .system-item-card .item-description'),
       false,
       'item descriptions should no longer have dedicated card styling'
+    );
+    assert.ok(
+      css.includes('.fabricate-admin .system-item-card .item-essence-list .essence-token'),
+      'essence token selector should exist'
+    );
+    assert.ok(
+      css.includes('.fabricate-admin .system-item-card .item-essence-list .essence-token i'),
+      'essence token icon selector should exist'
     );
   });
 });
