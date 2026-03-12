@@ -932,12 +932,54 @@
   grid-template-columns: 70px 1fr auto;
   gap: 8px;
   align-items: start;
+  position: relative;
+  overflow: hidden;
+}
+
+.fabricate-admin .system-item-card.replace-active {
+  border-color: rgba(120, 160, 255, 0.65);
+  box-shadow: 0 0 0 1px rgba(120, 160, 255, 0.2);
+}
+
+.fabricate-admin .system-item-card .item-replace-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 16px;
+  background:
+    linear-gradient(180deg, rgba(12, 16, 32, 0.18), rgba(12, 16, 32, 0.78)),
+    rgba(120, 160, 255, 0.22);
+  border: 1px dashed rgba(120, 160, 255, 0.55);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+  z-index: 2;
+}
+
+.fabricate-admin .system-item-card.replace-active .item-replace-overlay {
+  opacity: 1;
+}
+
+.fabricate-admin .system-item-card .item-replace-overlay i {
+  font-size: 16px;
 }
 
 .fabricate-admin .system-item-card .item-preview {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  position: relative;
+  z-index: 1;
 }
 
 .fabricate-admin .system-item-card img {
@@ -947,45 +989,74 @@
   object-fit: cover;
 }
 
-.fabricate-admin .system-item-card .item-replace-drop {
-  padding: 4px 6px;
-  border: 1px dashed rgba(120, 160, 255, 0.45);
-  border-radius: 6px;
-  font-size: 11px;
-  text-align: center;
-  background: rgba(120, 160, 255, 0.08);
-  cursor: pointer;
+.fabricate-admin .system-item-card .item-meta {
+  min-width: 0;
+  position: relative;
+  z-index: 1;
 }
 
-.fabricate-admin .system-item-card .item-replace-drop.drop-active {
-  background: rgba(120, 160, 255, 0.2);
+.fabricate-admin .system-item-card .item-meta-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
 }
 
 .fabricate-admin .system-item-card .item-meta h4 {
-  margin: 0 0 2px 0;
+  margin: 0;
   font-size: 13px;
+  min-width: 0;
 }
 
-.fabricate-admin .system-item-card .item-meta p {
-  margin: 0 0 4px 0;
-  opacity: 0.85;
+.fabricate-admin .system-item-card .item-source-button {
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  flex: 0 0 auto;
+}
+
+.fabricate-admin .system-item-card .item-source-button:hover,
+.fabricate-admin .system-item-card .item-source-button:focus-visible {
+  border-color: rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.fabricate-admin .system-item-card .item-description {
+  margin: 0 0 8px 0;
+  opacity: 0.9;
   font-size: 12px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-.fabricate-admin .system-item-card .item-meta code,
-.fabricate-admin .system-item-card .item-meta .placeholder-src {
-  display: block;
-  font-size: 11px;
-  opacity: 0.75;
-  overflow-wrap: anywhere;
+.fabricate-admin .system-item-card .item-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.fabricate-admin .system-item-card .item-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.7;
 }
 
 .fabricate-admin .system-item-card .item-tag-list,
-.fabricate-admin .system-item-card .item-essence-list {
+.fabricate-admin .system-item-card .item-essence-list,
+.fabricate-admin .system-item-card .item-salvage-list {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin: 4px 0;
 }
 
 .fabricate-admin .system-item-card .hint {
@@ -994,7 +1065,8 @@
 }
 
 .fabricate-admin .system-item-card .item-tag-list .token,
-.fabricate-admin .system-item-card .item-essence-list .token {
+.fabricate-admin .system-item-card .item-essence-list .token,
+.fabricate-admin .system-item-card .item-salvage-list .token {
   padding: 2px 8px;
   border-radius: 6px;
   font-size: 11px;
@@ -1004,6 +1076,8 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  position: relative;
+  z-index: 1;
 }
 
 .fabricate-admin .system-item-card .item-actions button {

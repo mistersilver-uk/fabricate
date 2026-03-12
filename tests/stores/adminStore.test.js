@@ -99,7 +99,7 @@ function createMockServices(overrides = {}) {
     },
     getItems: (systemId, searchTerm) => {
       const sys = systems.find(s => s.id === systemId);
-      const items = sys?.items || [];
+      const items = sys?.components || sys?.items || [];
       if (!searchTerm) return items;
       const lower = searchTerm.toLowerCase();
       return items.filter(i => i.name.toLowerCase().includes(lower));
@@ -107,7 +107,12 @@ function createMockServices(overrides = {}) {
     deleteItem: async (systemId, itemId) => {
       const sys = systems.find(s => s.id === systemId);
       if (sys) {
-        sys.items = (sys.items || []).filter(i => i.id !== itemId);
+        if (Array.isArray(sys.items)) {
+          sys.items = sys.items.filter(i => i.id !== itemId);
+        }
+        if (Array.isArray(sys.components)) {
+          sys.components = sys.components.filter(i => i.id !== itemId);
+        }
       }
     }
   };
@@ -988,6 +993,25 @@ describe('createAdminStore', () => {
       await store.deleteComponent('item1');
       assert.equal(deletedArgs, null, 'should not delete when declined');
     });
+
+    it('deleteComponent resolves components from system.components when no items alias exists', async () => {
+      let deletedArgs = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.components = [makeItem({ id: 'comp-1', name: 'Herb' })];
+        delete sys.items;
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        deleteItem: async (sysId, itemId) => { deletedArgs = { sysId, itemId }; }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.deleteComponent('comp-1');
+      assert.deepEqual(deletedArgs, { sysId: 'sys1', itemId: 'comp-1' });
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -1453,6 +1477,57 @@ describe('createAdminStore', () => {
       const vs = get(store.viewState);
       assert.ok(Array.isArray(vs.itemCards), 'itemCards should be an array');
       assert.equal(vs.itemCards.length, 2);
+    });
+
+    it('viewState.itemCards expose description, source UUID display, and salvage summary fields', async () => {
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.features = { salvage: true, itemTags: true, essences: true };
+        sys.advancedOptionsEnabled = true;
+        sys.essenceDefinitions = [{ id: 'ess-fire', name: 'Fire', description: '', icon: '', sourceItemUuid: null }];
+        sys.components = [
+          makeItem({
+            id: 'comp-1',
+            name: 'Blazing Herb',
+            description: ' Hot enough to scorch your fingers. ',
+            sourceUuid: 'Item.live-123',
+            sourceItemUuid: 'Compendium.source.items.blazing-herb',
+            tags: ['fire'],
+            essences: { 'ess-fire': 2 },
+            salvage: {
+              enabled: true,
+              ingredientQuantity: 3,
+              catalysts: [{ componentId: 'knife' }],
+              resultGroups: [{ id: 'grp-1', results: [] }],
+              timeRequirement: { seconds: 60 },
+              currencyRequirement: { amount: 5 },
+              outcomeRouting: { success: 'grp-1' }
+            }
+          })
+        ];
+        delete sys.items;
+      }
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const vs = get(store.viewState);
+      const card = vs.itemCards[0];
+
+      assert.equal(card.description, 'Hot enough to scorch your fingers.');
+      assert.equal(card.hasDescription, true);
+      assert.equal(card.sourceUuidDisplay, 'Compendium.source.items.blazing-herb');
+      assert.equal(card.hasSourceUuid, true);
+      assert.deepEqual(card.tags, ['fire']);
+      assert.deepEqual(card.essences, [{ id: 'ess-fire', name: 'Fire', quantity: 2 }]);
+      assert.deepEqual(card.salvageSummary, {
+        quantityRequired: 3,
+        catalystCount: 1,
+        resultGroupCount: 1,
+        hasTimeRequirement: true,
+        hasCurrencyRequirement: true,
+        outcomeCount: 1
+      });
     });
 
     it('viewState.recipeSearchTerm and itemSearchTerm echo the current search values', async () => {

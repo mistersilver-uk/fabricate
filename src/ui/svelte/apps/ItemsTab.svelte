@@ -3,6 +3,7 @@
   import { localize } from '../util/foundryBridge.js';
   import SearchBar from './SearchBar.svelte';
   import DropZone from '../components/DropZone.svelte';
+  import { dragDrop } from '../actions/dragDrop.js';
 
   let {
     hasSystem = false,
@@ -12,7 +13,8 @@
     onDropItem,
     onEditComponent,
     onDeleteComponent,
-    onReplaceSource
+    onReplaceSource,
+    onCopySourceUuid
   } = $props();
 </script>
 
@@ -41,49 +43,114 @@
       {#if itemCards.length > 0}
         <div class="system-item-grid">
           {#each itemCards as item (item.id)}
-            <article class="system-item-card">
+            <article
+              class="system-item-card"
+              use:dragDrop={{
+                onDrop: (data) => onReplaceSource?.(item.id, data),
+                disabled: !onReplaceSource,
+                activeClass: 'replace-active'
+              }}
+            >
+              <div class="item-replace-overlay" aria-hidden="true">
+                <i class="fas fa-exchange-alt"></i>
+                <span>{localize('FABRICATE.Admin.Items.DropToReplace')}</span>
+              </div>
               <div class="item-preview">
                 <img src={item.img} alt={item.name} />
-                <div
-                  class="item-replace-drop"
-                  data-item-id={item.id}
-                  data-item-name={item.name}
-                >
-                  <i class="fas fa-exchange-alt"></i>
-                  {localize('FABRICATE.Admin.Items.DropToReplace')}
-                </div>
               </div>
               <div class="item-meta">
-                <h4>{item.name}</h4>
-                {#if item.showTags}
-                  <div class="item-tag-list">
-                    {#each item.tags as tag}
-                      <span class="token">{tag}</span>
-                    {:else}
-                      <span class="hint">{localize('FABRICATE.Admin.Items.NoTags')}</span>
-                    {/each}
-                  </div>
+                <div class="item-meta-header">
+                  <h4>{item.name}</h4>
+                  {#if item.hasSourceUuid}
+                    <button
+                      type="button"
+                      class="item-source-button"
+                      onclick={() => onCopySourceUuid?.(item.sourceUuidDisplay)}
+                      title={item.sourceUuidDisplay}
+                      aria-label={localize('FABRICATE.Admin.Items.CopySourceUuid')}
+                    >
+                      <i class="fas fa-copy"></i>
+                    </button>
+                  {/if}
+                </div>
+
+                {#if item.hasDescription}
+                  <p class="item-description">{item.description}</p>
                 {/if}
+
                 {#if item.showEssences}
-                  <div class="item-essence-list">
-                    {#each item.essences as essence}
-                      <span class="token">{essence.name} {essence.quantity}</span>
-                    {:else}
-                      <span class="hint">{localize('FABRICATE.Admin.Items.NoEssences')}</span>
-                    {/each}
+                  <div class="item-section">
+                    <span class="item-section-label">{localize('FABRICATE.Admin.Items.Essences')}</span>
+                    <div class="item-essence-list">
+                      {#each item.essences as essence}
+                        <span class="token">{essence.name} {essence.quantity}</span>
+                      {:else}
+                        <span class="hint">{localize('FABRICATE.Admin.Items.NoEssences')}</span>
+                      {/each}
+                    </div>
                   </div>
                 {/if}
-                {#if item.sourceUuid}
-                  <code>{item.sourceUuid}</code>
-                {:else}
-                  <span class="placeholder-src">{localize('FABRICATE.Admin.Items.NoSourceUuid')}</span>
+
+                {#if item.showTags}
+                  <div class="item-section">
+                    <span class="item-section-label">{localize('FABRICATE.Admin.Items.Tags')}</span>
+                    <div class="item-tag-list">
+                      {#each item.tags as tag}
+                        <span class="token">{tag}</span>
+                      {:else}
+                        <span class="hint">{localize('FABRICATE.Admin.Items.NoTags')}</span>
+                      {/each}
+                    </div>
+                  </div>
+                {/if}
+
+                {#if item.salvageSummary}
+                  <div class="item-section">
+                    <span class="item-section-label">{localize('FABRICATE.Admin.Items.Salvage')}</span>
+                    <div class="item-salvage-list">
+                      <span class="token">
+                        {localize('FABRICATE.Admin.Items.SalvageQuantity', { count: item.salvageSummary.quantityRequired })}
+                      </span>
+                      {#if item.salvageSummary.catalystCount > 0}
+                        <span class="token">
+                          {localize('FABRICATE.Admin.Items.SalvageCatalysts', { count: item.salvageSummary.catalystCount })}
+                        </span>
+                      {/if}
+                      {#if item.salvageSummary.resultGroupCount > 0}
+                        <span class="token">
+                          {localize('FABRICATE.Admin.Items.SalvageResults', { count: item.salvageSummary.resultGroupCount })}
+                        </span>
+                      {/if}
+                      {#if item.salvageSummary.outcomeCount > 0}
+                        <span class="token">
+                          {localize('FABRICATE.Admin.Items.SalvageOutcomes', { count: item.salvageSummary.outcomeCount })}
+                        </span>
+                      {/if}
+                      {#if item.salvageSummary.hasTimeRequirement}
+                        <span class="token">{localize('FABRICATE.Admin.Items.SalvageTime')}</span>
+                      {/if}
+                      {#if item.salvageSummary.hasCurrencyRequirement}
+                        <span class="token">{localize('FABRICATE.Admin.Items.SalvageCost')}</span>
+                      {/if}
+                    </div>
+                  </div>
                 {/if}
               </div>
               <div class="item-actions">
-                <button type="button" onclick={() => onEditComponent?.(item.id)} title={localize('FABRICATE.Admin.Items.EditItem')}>
+                <button
+                  type="button"
+                  onclick={() => onEditComponent?.(item.id)}
+                  title={localize('FABRICATE.Admin.Items.EditItem')}
+                  aria-label={localize('FABRICATE.Admin.Items.EditItem')}
+                >
                   <i class="fas fa-edit"></i>
                 </button>
-                <button type="button" onclick={() => onDeleteComponent(item.id)} title={localize('FABRICATE.Admin.Items.DeleteItem')}>
+                <button
+                  type="button"
+                  onclick={() => onDeleteComponent(item.id)}
+                  title={localize('FABRICATE.Admin.Items.DeleteItem')}
+                  aria-label={localize('FABRICATE.Admin.Items.DeleteItem')}
+                >
                   <i class="fas fa-trash"></i>
                 </button>
               </div>

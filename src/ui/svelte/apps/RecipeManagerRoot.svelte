@@ -67,6 +67,8 @@
           itemSearchTerm={$viewState.itemSearchTerm}
           onItemSearch={store.setItemSearch}
           onDropItem={(data) => services?.onDropItem?.(data)}
+          onReplaceSource={(itemId, data) => services?.onReplaceSource?.(itemId, data)}
+          onCopySourceUuid={(uuid) => services?.onCopySourceUuid?.(uuid)}
           onEditComponent={(id) => services?.onEditComponent?.(id)}
           onDeleteComponent={store.deleteComponent}
         />

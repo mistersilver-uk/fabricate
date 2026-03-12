@@ -336,6 +336,84 @@ export class CraftingSystemManager {
       .replace(/^-+|-+$/g, '');
   }
 
+  _normalizeComponentDescription(description) {
+    return this._plainTextDescription(description);
+  }
+
+  _plainTextDescription(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+
+    if (globalThis.document?.createElement) {
+      const template = globalThis.document.createElement('template');
+      template.innerHTML = raw;
+      return String(template.content?.textContent || '')
+        .replace(/\s+/g, ' ')
+        .replace(/\s+([,.;:!?])/g, '$1')
+        .trim();
+    }
+
+    return raw
+      .replace(/<br\s*\/?>/gi, ' ')
+      .replace(/<\/(p|div|li|h[1-6]|tr|section|article)>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;|&apos;/gi, '\'')
+      .replace(/\s+/g, ' ')
+      .replace(/\s+([,.;:!?])/g, '$1')
+      .trim();
+  }
+
+  _extractSourceDescription(source = null) {
+    if (!source || typeof source !== 'object') return '';
+
+    const candidates = [
+      source?.system?.description?.value,
+      source?.system?.description,
+      source?.description?.value,
+      source?.description
+    ];
+
+    for (const candidate of candidates) {
+      const plainText = this._plainTextDescription(candidate);
+      if (plainText) return plainText;
+    }
+
+    return '';
+  }
+
+  _buildComponentSourceSnapshot(itemUuid, source = null, fallbackItem = null) {
+    const sourceData = this._resolveImportedSourceData(itemUuid, source);
+    const sourceResolved = !!source;
+    const fallbackName = fallbackItem?.name || itemUuid?.split('.')?.pop() || 'Imported Item';
+    const fallbackImg = fallbackItem?.img || 'icons/svg/item-bag.svg';
+
+    return {
+      name: sourceResolved ? (source?.name || fallbackName) : fallbackName,
+      img: sourceResolved ? (source?.img || fallbackImg) : fallbackImg,
+      description: sourceResolved
+        ? this._extractSourceDescription(source)
+        : this._normalizeComponentDescription(fallbackItem?.description),
+      sourceUuid: sourceData.currentUuid,
+      sourceItemUuid: sourceData.canonicalUuid,
+      references: sourceData.references
+    };
+  }
+
+  _buildFallbackSourceReferences(item, nextSourceUuid, nextSourceItemUuid) {
+    const fallbackSet = new Set(Array.isArray(item?.fallbackItemIds) ? item.fallbackItemIds : []);
+    for (const ref of [item?.sourceUuid, item?.sourceItemUuid]) {
+      if (ref) fallbackSet.add(ref);
+    }
+    fallbackSet.delete(nextSourceUuid);
+    fallbackSet.delete(nextSourceItemUuid);
+    return Array.from(fallbackSet);
+  }
+
   _normalizeComponent(item = {}, validEssenceIds = null, salvageEnabled = false) {
     const difficulty = Number(item.difficulty);
     const sourceItemUuid = item.sourceItemUuid || item.sourceUuid || null;
@@ -353,6 +431,7 @@ export class CraftingSystemManager {
       id: item.id || foundry.utils.randomID(),
       name: item.name || 'Unnamed Item',
       img: item.img || 'icons/svg/item-bag.svg',
+      description: this._normalizeComponentDescription(item.description),
       sourceItemUuid,
       // Transitional alias for current UI/engine references.
       sourceUuid,
@@ -527,7 +606,9 @@ export class CraftingSystemManager {
     const q = search.toLowerCase();
     return managedItems.filter(item =>
       item.name.toLowerCase().includes(q) ||
-      (item.sourceUuid || '').toLowerCase().includes(q)
+      (item.description || '').toLowerCase().includes(q) ||
+      (item.sourceUuid || '').toLowerCase().includes(q) ||
+      (item.sourceItemUuid || '').toLowerCase().includes(q)
     );
   }
 
@@ -717,23 +798,18 @@ export class CraftingSystemManager {
 
     const nextSourceData = this._resolveImportedSourceData(itemUuid, source);
     const existing = this._findComponentBySourceReferences(system, nextSourceData.references);
+    const nextSnapshot = this._buildComponentSourceSnapshot(itemUuid, source, existing);
     if (existing) {
-      const nextSourceUuid = nextSourceData.currentUuid;
-      const nextSourceItemUuid = nextSourceData.canonicalUuid;
-      const fallbackSet = new Set(Array.isArray(existing.fallbackItemIds) ? existing.fallbackItemIds : []);
-      for (const ref of [existing.sourceUuid, existing.sourceItemUuid]) {
-        if (ref && ref !== nextSourceUuid && ref !== nextSourceItemUuid) fallbackSet.add(ref);
-      }
-      fallbackSet.delete(nextSourceUuid);
-      fallbackSet.delete(nextSourceItemUuid);
-
-      const nextName = source?.name || existing.name;
-      const nextImg = source?.img || existing.img;
-      const nextFallbacks = Array.from(fallbackSet);
-      const unchanged = existing.sourceUuid === nextSourceUuid
-        && existing.sourceItemUuid === nextSourceItemUuid
-        && existing.name === nextName
-        && existing.img === nextImg
+      const nextFallbacks = this._buildFallbackSourceReferences(
+        existing,
+        nextSnapshot.sourceUuid,
+        nextSnapshot.sourceItemUuid
+      );
+      const unchanged = existing.sourceUuid === nextSnapshot.sourceUuid
+        && existing.sourceItemUuid === nextSnapshot.sourceItemUuid
+        && existing.name === nextSnapshot.name
+        && existing.img === nextSnapshot.img
+        && existing.description === nextSnapshot.description
         && nextFallbacks.length === (existing.fallbackItemIds || []).length
         && nextFallbacks.every(ref => (existing.fallbackItemIds || []).includes(ref));
 
@@ -741,10 +817,11 @@ export class CraftingSystemManager {
         return { item: existing, action: 'skipped' };
       }
 
-      existing.name = nextName;
-      existing.img = nextImg;
-      existing.sourceUuid = nextSourceUuid;
-      existing.sourceItemUuid = nextSourceItemUuid;
+      existing.name = nextSnapshot.name;
+      existing.img = nextSnapshot.img;
+      existing.description = nextSnapshot.description;
+      existing.sourceUuid = nextSnapshot.sourceUuid;
+      existing.sourceItemUuid = nextSnapshot.sourceItemUuid;
       existing.fallbackItemIds = nextFallbacks;
 
       await this.save();
@@ -754,16 +831,63 @@ export class CraftingSystemManager {
     // No match: create new component
     const validEssenceIds = new Set((system.essenceDefinitions || []).map(def => def.id));
     const item = this._normalizeComponent({
-      name: source?.name || itemUuid.split('.').pop() || 'Imported Item',
-      img: source?.img || 'icons/svg/item-bag.svg',
-      sourceUuid: nextSourceData.currentUuid,
-      sourceItemUuid: nextSourceData.canonicalUuid
+      ...nextSnapshot
     }, validEssenceIds, system.features?.salvage === true);
 
     this._assertUniqueComponentSources(system, item);
     system.components.push(item);
     await this.save();
     return { item, action: 'added' };
+  }
+
+  async replaceItemSource(systemId, itemId, itemUuid) {
+    this._assertGM('replace component source');
+    const system = this.getSystem(systemId);
+    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
+    const idx = system.components.findIndex(i => i.id === itemId);
+    if (idx < 0) throw new Error(`Component not found: ${itemId}`);
+
+    let source = null;
+    try {
+      source = await fromUuid(itemUuid);
+    } catch (err) {
+      source = null;
+    }
+
+    if (source && source.documentName && source.documentName !== 'Item') {
+      throw new Error(
+        `Cannot use non-Item document (${source.documentName}) as a component source`
+      );
+    }
+
+    const existing = system.components[idx];
+    const nextSnapshot = this._buildComponentSourceSnapshot(itemUuid, source, existing);
+    const conflict = this._findComponentBySourceReferences(system, nextSnapshot.references, itemId);
+    if (conflict) {
+      throw new Error(
+        `Component source reference already belongs to "${conflict.name || conflict.id}" (${conflict.id})`
+      );
+    }
+
+    const validEssenceIds = new Set((system.essenceDefinitions || []).map(def => def.id));
+    const updatedItem = this._normalizeComponent(
+      {
+        ...existing,
+        ...nextSnapshot,
+        fallbackItemIds: this._buildFallbackSourceReferences(
+          existing,
+          nextSnapshot.sourceUuid,
+          nextSnapshot.sourceItemUuid
+        ),
+        id: itemId
+      },
+      validEssenceIds,
+      system.features?.salvage === true
+    );
+
+    system.components[idx] = updatedItem;
+    await this.save();
+    return updatedItem;
   }
 
   /**

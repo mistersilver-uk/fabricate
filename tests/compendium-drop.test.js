@@ -389,6 +389,7 @@ test('addItemFromUuid — new item returns { item, action: "added" }', async () 
     documentName: 'Item',
     name: 'Fresh Coal',
     img: 'coal.png',
+    system: { description: { value: '<p>Fresh <strong>coal</strong> for the forge.</p>' } },
     _stats: { compendiumSource: 'Compendium.source.items.coal' }
   });
 
@@ -397,6 +398,7 @@ test('addItemFromUuid — new item returns { item, action: "added" }', async () 
   assert.equal(result.action, 'added');
   assert.equal(result.item.name, 'Fresh Coal');
   assert.equal(result.item.img, 'coal.png');
+  assert.equal(result.item.description, 'Fresh coal for the forge.');
   assert.equal(result.item.sourceUuid, 'Compendium.world.pack.item-coal');
   assert.equal(result.item.sourceItemUuid, 'Compendium.source.items.coal');
   assert.equal(mgr.getSystem('sys1').components.length, 1);
@@ -408,13 +410,20 @@ test('addItemFromUuid — exact match with differing metadata overwrites name/im
   const mgr = buildManager([{
     id: 'sys1',
     name: 'System One',
-    items: [{ id: 'comp-1', name: 'Iron Ore', img: 'ore-old.png', sourceUuid: 'Compendium.world.pack.item-a' }]
+    items: [{
+      id: 'comp-1',
+      name: 'Iron Ore',
+      img: 'ore-old.png',
+      description: 'Old description',
+      sourceUuid: 'Compendium.world.pack.item-a'
+    }]
   }]);
 
   globalThis.fromUuid = async () => ({
     documentName: 'Item',
     name: 'Updated Iron Ore',
     img: 'ore2.png',
+    system: { description: { value: '<p>Smelts into sturdy ingots.</p>' } },
     _stats: { compendiumSource: 'Compendium.source.items.iron-ore' }
   });
 
@@ -425,6 +434,7 @@ test('addItemFromUuid — exact match with differing metadata overwrites name/im
   assert.equal(result.item.id, 'comp-1');
   assert.equal(result.item.name, 'Updated Iron Ore');
   assert.equal(result.item.img, 'ore2.png');
+  assert.equal(result.item.description, 'Smelts into sturdy ingots.');
   assert.equal(result.item.sourceItemUuid, 'Compendium.source.items.iron-ore');
   // System should still have only one item
   assert.equal(mgr.getSystem('sys1').components.length, 1);
@@ -535,6 +545,7 @@ test('addItemFromUuid — source-chain overwrite with fromUuid returning null ke
       id: 'comp-1',
       name: 'Old Iron Ore',
       img: 'old-ore.png',
+      description: 'Existing source description.',
       sourceUuid: 'Item.world-456',
       fallbackItemIds: ['Compendium.world.pack.item-b']
     }]
@@ -550,10 +561,69 @@ test('addItemFromUuid — source-chain overwrite with fromUuid returning null ke
   // Name and img should fall back to the existing values since source is null
   assert.equal(result.item.name, 'Old Iron Ore', 'name should retain old value when source is null');
   assert.equal(result.item.img, 'old-ore.png', 'img should retain old value when source is null');
+  assert.equal(result.item.description, 'Existing source description.');
   // sourceUuid updated to the dropped UUID
   assert.equal(result.item.sourceUuid, 'Compendium.world.pack.item-b');
   // Old sourceUuid pushed into fallbackItemIds
   assert.ok(result.item.fallbackItemIds.includes('Item.world-456'));
+});
+
+test('replaceItemSource — updates source refs, description, and fallbackItemIds for a specific component', async () => {
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-1',
+      name: 'Old Herb',
+      img: 'old-herb.png',
+      description: 'Old herb description.',
+      sourceUuid: 'Item.old-herb'
+    }]
+  }]);
+
+  globalThis.fromUuid = async () => ({
+    documentName: 'Item',
+    name: 'Sunleaf',
+    img: 'sunleaf.png',
+    system: { description: { value: '<p>Radiates <em>warmth</em>.</p>' } },
+    _stats: { compendiumSource: 'Compendium.source.items.sunleaf' }
+  });
+
+  const result = await mgr.replaceItemSource('sys1', 'comp-1', 'Compendium.world.pack.sunleaf');
+
+  assert.equal(result.id, 'comp-1');
+  assert.equal(result.name, 'Sunleaf');
+  assert.equal(result.img, 'sunleaf.png');
+  assert.equal(result.description, 'Radiates warmth.');
+  assert.equal(result.sourceUuid, 'Compendium.world.pack.sunleaf');
+  assert.equal(result.sourceItemUuid, 'Compendium.source.items.sunleaf');
+  assert.ok(result.fallbackItemIds.includes('Item.old-herb'));
+
+  globalThis.fromUuid = async () => null;
+});
+
+test('replaceItemSource — preserves existing metadata when fromUuid cannot resolve the dropped item', async () => {
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-1',
+      name: 'Old Herb',
+      img: 'old-herb.png',
+      description: 'Old herb description.',
+      sourceUuid: 'Item.old-herb'
+    }]
+  }]);
+
+  globalThis.fromUuid = async () => null;
+
+  const result = await mgr.replaceItemSource('sys1', 'comp-1', 'Compendium.world.pack.sunleaf');
+
+  assert.equal(result.name, 'Old Herb');
+  assert.equal(result.img, 'old-herb.png');
+  assert.equal(result.description, 'Old herb description.');
+  assert.equal(result.sourceUuid, 'Compendium.world.pack.sunleaf');
+  assert.ok(result.fallbackItemIds.includes('Item.old-herb'));
 });
 
 test('addItemsFromPack — returns { added, updated, skipped, total } with updated field', async () => {
@@ -647,6 +717,41 @@ test('updateItem — rejects changing a component to a source reference already 
     }),
     /already belongs/
   );
+});
+
+test('replaceItemSource — rejects changing a component to a source reference already used by another component', async () => {
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [
+      {
+        id: 'comp-a',
+        name: 'Iron Ore',
+        sourceUuid: 'Compendium.world.pack.item-a',
+        sourceItemUuid: 'Compendium.source.items.iron-ore'
+      },
+      {
+        id: 'comp-b',
+        name: 'Coal',
+        sourceUuid: 'Compendium.world.pack.item-b',
+        sourceItemUuid: 'Compendium.source.items.coal'
+      }
+    ]
+  }]);
+
+  globalThis.fromUuid = async () => ({
+    documentName: 'Item',
+    name: 'Duplicate Iron Ore',
+    img: 'ore.png',
+    _stats: { compendiumSource: 'Compendium.source.items.iron-ore' }
+  });
+
+  await assert.rejects(
+    () => mgr.replaceItemSource('sys1', 'comp-b', 'Compendium.world.other-pack.item-z'),
+    /already belongs/
+  );
+
+  globalThis.fromUuid = async () => null;
 });
 
 // ---------------------------------------------------------------------------

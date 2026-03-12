@@ -58,6 +58,30 @@ function _visibilitySummary(recipe) {
   return `Restricted (${allowed.length})`;
 }
 
+function _getManagedItems(system) {
+  if (Array.isArray(system?.components)) return system.components;
+  if (Array.isArray(system?.items)) return system.items;
+  return [];
+}
+
+function _buildSalvageSummary(item, salvageEnabled) {
+  if (!salvageEnabled || item?.salvage?.enabled !== true) return null;
+
+  const salvage = item.salvage || {};
+  const outcomeRouting = salvage.outcomeRouting && typeof salvage.outcomeRouting === 'object'
+    ? Object.keys(salvage.outcomeRouting).length
+    : 0;
+
+  return {
+    quantityRequired: Number(salvage.ingredientQuantity) || 1,
+    catalystCount: Array.isArray(salvage.catalysts) ? salvage.catalysts.length : 0,
+    resultGroupCount: Array.isArray(salvage.resultGroups) ? salvage.resultGroups.length : 0,
+    hasTimeRequirement: !!salvage.timeRequirement,
+    hasCurrencyRequirement: !!salvage.currencyRequirement,
+    outcomeCount: outcomeRouting
+  };
+}
+
 /**
  * Build the recipe list for the recipes tab.
  * Mirrors RecipeManagerApp._prepareRecipeContext().
@@ -118,9 +142,12 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
  */
 function _buildItemCards(systemManager, selectedSystem, itemSearchTerm, showTags, showEssences, essenceNameById) {
   if (!selectedSystem) return [];
+  const showSalvage = selectedSystem.features?.salvage === true;
   return systemManager.getItems(selectedSystem.id, itemSearchTerm).map(item => ({
     ...item,
     img: item.img || 'icons/svg/item-bag.svg',
+    description: String(item.description || '').trim(),
+    hasDescription: String(item.description || '').trim().length > 0,
     tags: showTags ? (item.tags || []) : [],
     essences: showEssences
       ? Object.entries(item.essences || {}).map(([id, quantity]) => ({
@@ -129,6 +156,9 @@ function _buildItemCards(systemManager, selectedSystem, itemSearchTerm, showTags
         quantity
       }))
       : [],
+    sourceUuidDisplay: item.sourceItemUuid || item.sourceUuid || '',
+    hasSourceUuid: Boolean(item.sourceItemUuid || item.sourceUuid),
+    salvageSummary: _buildSalvageSummary(item, showSalvage),
     showTags,
     showEssences
   }));
@@ -266,7 +296,8 @@ export function createAdminStore(services) {
     let recipeListData = { recipes: [], recipeCategories: [], showVisibilitySummary: false };
 
     if (selectedSystem) {
-      const managedItemOptions = (selectedSystem.items || []).map(item => ({
+      const managedItems = _getManagedItems(selectedSystem);
+      const managedItemOptions = managedItems.map(item => ({
         id: item.id,
         name: item.name
       }));
@@ -313,7 +344,7 @@ export function createAdminStore(services) {
     let graphData = { nodes: [], edges: [], width: 0, height: 0 };
     if (get(activeTab) === 'graph' && selectedSystem) {
       const allRecipes = recipeManager.getRecipes({ craftingSystemId: selectedSystem.id });
-      const components = selectedSystem.items || [];
+      const components = _getManagedItems(selectedSystem);
       const rawGraph = buildRecipeGraph(allRecipes, components);
       const layoutResult = layoutGraph(rawGraph);
       graphData = filterGraph(layoutResult, { searchTerm: get(graphSearch) });
@@ -699,7 +730,7 @@ export function createAdminStore(services) {
     const sysId = get(selectedSystemId);
     if (!itemId || !sysId) return;
     const system = systemManager.getSystem(sysId);
-    const item = system?.items?.find(i => i.id === itemId);
+    const item = _getManagedItems(system).find(i => i.id === itemId);
     if (!item) return;
 
     const confirmed = await services.confirmDialog({

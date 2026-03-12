@@ -66,7 +66,29 @@ function buildItemsTab({ hasSystem = true, itemCount = 2 } = {}) {
     for (let index = 0; index < itemCount; index++) {
       const card = document.createElement('article');
       card.className = 'system-item-card';
+
+      const overlay = document.createElement('div');
+      overlay.className = 'item-replace-overlay';
+      card.appendChild(overlay);
+
+      const preview = document.createElement('div');
+      preview.className = 'item-preview';
+      card.appendChild(preview);
+
+      const meta = document.createElement('div');
+      meta.className = 'item-meta';
+      const metaHeader = document.createElement('div');
+      metaHeader.className = 'item-meta-header';
+      const sourceButton = document.createElement('button');
+      sourceButton.className = 'item-source-button';
+      metaHeader.appendChild(sourceButton);
+      meta.appendChild(metaHeader);
       grid.appendChild(card);
+      card.appendChild(meta);
+
+      const actions = document.createElement('div');
+      actions.className = 'item-actions';
+      card.appendChild(actions);
     }
 
     scrollRegion.appendChild(grid);
@@ -112,6 +134,15 @@ describe('ItemsTab layout structure', () => {
     assert.equal(panel.querySelector('.items-panel-header .system-item-grid'), null);
   });
 
+  it('uses a card-level replace overlay instead of a nested replace drop box', () => {
+    const panel = buildItemsTab({ itemCount: 1 });
+    const card = panel.querySelector('.system-item-card');
+
+    assert.equal(card.firstElementChild?.className, 'item-replace-overlay');
+    assert.equal(card.querySelector('.item-replace-drop'), null);
+    assert.ok(card.querySelector('.item-source-button'));
+  });
+
   it('keeps the header visible when the component list is empty', () => {
     const panel = buildItemsTab({ itemCount: 0 });
 
@@ -137,5 +168,26 @@ describe('ItemsTab layout CSS', () => {
 
     assert.ok(block.includes('overflow-y: auto'), '.items-panel-scroll should own vertical scrolling');
     assert.ok(block.includes('min-height: 0'), '.items-panel-scroll should allow shrinking inside the panel');
+  });
+
+  it('defines a card-level replace overlay selector and removes the legacy nested drop selector', () => {
+    assert.ok(
+      css.includes('.fabricate-admin .system-item-card .item-replace-overlay'),
+      'item-replace-overlay selector should exist'
+    );
+    assert.ok(
+      css.includes('.fabricate-admin .system-item-card.replace-active .item-replace-overlay'),
+      'overlay should become visible for the active drag state'
+    );
+    assert.equal(
+      css.includes('.fabricate-admin .system-item-card:hover .item-replace-overlay'),
+      false,
+      'overlay should not become visible on hover alone'
+    );
+    assert.equal(
+      css.includes('.fabricate-admin .system-item-card .item-replace-drop'),
+      false,
+      'legacy item-replace-drop selector should be removed'
+    );
   });
 });

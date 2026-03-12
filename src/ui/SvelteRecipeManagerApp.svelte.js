@@ -197,6 +197,25 @@ export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
       this._services = this._buildServices();
       this._adminStore = createAdminStore(this._services);
     }
+
+    const resolveSingleItemDropUuid = (data) => {
+      const dropInfo = resolveDropData(data);
+      if (dropInfo.type && dropInfo.type !== 'Item' && dropInfo.type !== 'Compendium') {
+        ui.notifications.warn(localize('FABRICATE.Admin.Items.DropNotAnItem', {
+          type: dropInfo.type
+        }));
+        return null;
+      }
+
+      const uuid = resolveDropUuid(data);
+      if (!uuid) {
+        ui.notifications.warn(localize('FABRICATE.Admin.Items.DropInvalidItem'));
+        return null;
+      }
+
+      return uuid;
+    };
+
     return {
       store: this._adminStore,
       services: {
@@ -258,21 +277,9 @@ export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
             return;
           }
 
-          // Entity type guard: reject Actor and other non-Item types
-          const dropInfo = resolveDropData(data);
-          if (dropInfo.type && dropInfo.type !== 'Item' && dropInfo.type !== 'Compendium') {
-            ui.notifications.warn(localize('FABRICATE.Admin.Items.DropNotAnItem', {
-              type: dropInfo.type
-            }));
-            return;
-          }
-
           // Single item drop (world sidebar or compendium item)
-          const uuid = resolveDropUuid(data);
-          if (!uuid) {
-            ui.notifications.warn(localize('FABRICATE.Admin.Items.DropInvalidItem'));
-            return;
-          }
+          const uuid = resolveSingleItemDropUuid(data);
+          if (!uuid) return;
           if (!systemId) {
             ui.notifications.warn(localize('FABRICATE.Admin.Items.DropNoSystemSelected'));
             return;
@@ -284,6 +291,36 @@ export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
             }));
           }
           await this._adminStore.refresh();
+        },
+        onReplaceSource: async (itemId, data) => {
+          const systemManager = game.fabricate.getCraftingSystemManager();
+          const systemId = get(this._adminStore.selectedSystemId) || '';
+          if (!systemId || !itemId) {
+            if (!systemId) ui.notifications.warn(localize('FABRICATE.Admin.Items.DropNoSystemSelected'));
+            return;
+          }
+
+          const uuid = resolveSingleItemDropUuid(data);
+          if (!uuid) return;
+
+          try {
+            const item = await systemManager.replaceItemSource(systemId, itemId, uuid);
+            ui.notifications.info(localize('FABRICATE.Admin.Items.SourceReplaced', {
+              name: item.name
+            }));
+            await this._adminStore.refresh();
+          } catch (err) {
+            ui.notifications.warn(err.message || localize('FABRICATE.Admin.Items.ReplaceFailed'));
+          }
+        },
+        onCopySourceUuid: async (uuid) => {
+          if (!uuid) return;
+          try {
+            await this._services.copyToClipboard(uuid);
+            ui.notifications.info(localize('FABRICATE.Admin.Items.SourceUuidCopied'));
+          } catch (err) {
+            ui.notifications.error(localize('FABRICATE.Admin.Items.SourceUuidCopyFailed'));
+          }
         },
         onEditRecipe: (recipeId) => {
           const recipe = game.fabricate.getRecipeManager().getRecipe(recipeId);
