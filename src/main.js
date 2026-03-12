@@ -18,6 +18,7 @@ import { ItemPilesIntegration } from './integrations/ItemPilesIntegration.js';
 import { cleanupStalePreferences } from './config/preferencesCleanup.js';
 import { importStarterPack } from './starter/importStarterPack.js';
 import { registerFragmentDiscoveryHook } from './systems/FragmentDiscoveryHook.js';
+import * as CraftingSystemExporter from './systems/CraftingSystemExporter.js';
 import './ui/SvelteCraftingApp.svelte.js';
 import './ui/SvelteRecipeManagerApp.svelte.js';
 import './ui/SvelteRecipeEditorApp.svelte.js';
@@ -221,12 +222,36 @@ Hooks.once('init', async () => {
     SignatureValidator,
     ItemPilesIntegration,
     importStarterPack,
-    CompendiumImporter
+    CompendiumImporter,
+    CraftingSystemExporter
   };
 
   game.fabricate.importFromPack = (packData, options) =>
     fabricate.compendiumImporter?.importFromPackData(packData, options);
   game.fabricate.getCompendiumImporter = () => fabricate.compendiumImporter;
+
+  game.fabricate.exportSystem = (systemId) => {
+    const systemManager = fabricate.craftingSystemManager;
+    const recipeManager = fabricate.recipeManager;
+    if (!systemManager || !recipeManager) throw new Error('Fabricate not initialized');
+    const system = systemManager.getSystem(systemId);
+    if (!system) throw new Error(`System "${systemId}" not found`);
+    const recipes = recipeManager.getRecipes({ craftingSystemId: systemId }).map(r => r.toJSON());
+    const version = game.modules?.get('fabricate')?.version || '0.0.0';
+    return CraftingSystemExporter.buildExportPayload(system, recipes, version);
+  };
+
+  game.fabricate.importSystemFromFile = async (file, options = {}) => {
+    const text = typeof file === 'string' ? file : await file.text();
+    const data = JSON.parse(text);
+    const validation = CraftingSystemExporter.validateImportData(data);
+    if (!validation.valid) throw new Error(`Invalid import data: ${validation.errors.join('; ')}`);
+    const mode = options.copyMode ? 'copy' : 'keep';
+    const packData = CraftingSystemExporter.prepareForImport(data, mode);
+    return fabricate.compendiumImporter.importFromPackData(packData, {
+      overwriteExisting: options.overwriteExisting || false
+    });
+  };
 
 });
 
@@ -462,6 +487,14 @@ globalThis.fabricate = {
 
   importStarterPack: async (packId) => {
     return importStarterPack(packId);
+  },
+
+  exportSystem: (systemId) => {
+    return game.fabricate.exportSystem(systemId);
+  },
+
+  importSystemFromFile: async (file, options) => {
+    return game.fabricate.importSystemFromFile(file, options);
   }
 };
 

@@ -7,6 +7,8 @@ import { getRecipeEditorAppClass, registerSvelteRecipeManagerApp } from './appFa
 import { get } from 'svelte/store';
 import { resolveDropUuid, resolveDropData } from './svelte/util/dropUtils.js';
 import { localize } from './svelte/util/foundryBridge.js';
+import { validateImportData, prepareForImport } from '../systems/CraftingSystemExporter.js';
+import { CompendiumImporter } from '../systems/CompendiumImporter.js';
 
 export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
   foundry.applications.api.ApplicationV2
@@ -95,6 +97,96 @@ export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
           await foundry.utils.copyPlainText(text);
         } else {
           await navigator.clipboard.writeText(text);
+        }
+      },
+      getModuleVersion: () => game.modules?.get('fabricate')?.version || '0.0.0',
+      downloadFile: async (json, filename) => {
+        if (typeof saveDataToFile === 'function') {
+          saveDataToFile(json, 'application/json', filename);
+        } else {
+          const blob = new Blob([json], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }
+      },
+      renderSystemImportDialog: async () => {
+        const DialogV2 = foundry.applications?.api?.DialogV2;
+        if (!DialogV2) {
+          ui.notifications.warn('Dialog API not available.');
+          return;
+        }
+        const formContent = `
+          <p>Select a Fabricate system JSON file to import.</p>
+          <input type="file" name="importFile" accept=".json" style="width:100%; margin-bottom: 0.5rem;" />
+          <fieldset style="margin-top: 0.5rem;">
+            <legend>Conflict handling</legend>
+            <label><input type="radio" name="conflictMode" value="skip" checked /> Skip if system already exists</label><br/>
+            <label><input type="radio" name="conflictMode" value="overwrite" /> Overwrite existing system and recipes</label><br/>
+            <label><input type="radio" name="conflictMode" value="copy" /> Import as new copy</label>
+          </fieldset>
+        `;
+        const result = await DialogV2.prompt({
+          window: { title: 'Import Crafting System' },
+          content: formContent,
+          ok: {
+            label: 'Import',
+            callback: (event, button) => {
+              const fileInput = button.form?.querySelector('input[name="importFile"]');
+              const file = fileInput?.files?.[0] || null;
+              const conflictMode = button.form?.querySelector('input[name="conflictMode"]:checked')?.value || 'skip';
+              return { file, conflictMode };
+            }
+          },
+          rejectClose: false
+        });
+        if (!result || !result.file) return;
+
+        try {
+          const text = await result.file.text();
+          const data = JSON.parse(text);
+
+          const validation = validateImportData(data);
+          if (!validation.valid) {
+            ui.notifications.error(`Invalid file: ${validation.errors.join('; ')}`);
+            return;
+          }
+          if (validation.warnings.length > 0) {
+            for (const w of validation.warnings) ui.notifications.warn(w);
+          }
+
+          const mode = result.conflictMode === 'copy' ? 'copy' : 'keep';
+          const packData = prepareForImport(data, mode);
+
+          const systemManager = game.fabricate.getCraftingSystemManager();
+          const recipeManager = game.fabricate.getRecipeManager();
+          const importer = new CompendiumImporter(systemManager, recipeManager);
+          const summary = await importer.importFromPackData(packData, {
+            overwriteExisting: result.conflictMode === 'overwrite'
+          });
+
+          if (summary.system.skipped) {
+            ui.notifications.info(`System "${summary.system.name}" already exists — skipped.`);
+          } else {
+            const verb = summary.collisions.some(c => c.type === 'system' && c.resolution === 'overwritten')
+              ? 'Updated' : 'Imported';
+            ui.notifications.info(
+              `${verb} "${summary.system.name}" with ${summary.components.total} components and ${summary.recipes.imported} recipes.`
+            );
+          }
+
+          if (summary.recipes.errors.length > 0) {
+            ui.notifications.warn(`${summary.recipes.errors.length} recipe(s) failed to import.`);
+          }
+
+          await this._adminStore.refresh();
+        } catch (err) {
+          ui.notifications.error(`Import failed: ${err.message}`);
         }
       }
     };
