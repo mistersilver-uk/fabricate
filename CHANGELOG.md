@@ -4,6 +4,12 @@ All notable changes to Fabricate will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.0.0-rc.13](https://github.com/misterpotts/fabricate-v2/compare/v1.0.0-rc.12...v1.0.0-rc.13) (2026-03-12)
+
+### Features
+
+* **dev server:** add proxy for Foundry with HMR support ([37f0efa](https://github.com/misterpotts/fabricate-v2/commit/37f0efa564ba751ab3b80efa4263673958ef4966))
+
 ## [1.0.0-rc.12](https://github.com/misterpotts/fabricate-v2/compare/v1.0.0-rc.11...v1.0.0-rc.12) (2026-03-12)
 
 ### Bug Fixes
