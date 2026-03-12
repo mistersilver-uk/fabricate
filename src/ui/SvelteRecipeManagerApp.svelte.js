@@ -4,6 +4,7 @@ import { createAdminStore } from './svelte/stores/adminStore.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { confirmDialog } from './foundryCompat.js';
 import { getRecipeEditorAppClass, registerSvelteRecipeManagerApp } from './appFactory.js';
+import { SvelteComponentEditorApp } from './SvelteComponentEditorApp.svelte.js';
 import { get } from 'svelte/store';
 import { resolveDropUuid, resolveDropData } from './svelte/util/dropUtils.js';
 import { localize } from './svelte/util/foundryBridge.js';
@@ -328,99 +329,9 @@ export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
           getRecipeEditorAppClass().show(recipe, this, recipe.craftingSystemId);
         },
         onEditComponent: async (itemId) => {
-          const systemManager = game.fabricate.getCraftingSystemManager();
           const systemId = get(this._adminStore.selectedSystemId) || '';
           if (!systemId || !itemId) return;
-          const system = systemManager.getSystem(systemId);
-          if (!system) return;
-          const item = (system.components || []).find(i => i.id === itemId);
-          if (!item) return;
-
-          const advancedEnabled = system.advancedOptionsEnabled !== false;
-          const showTags = advancedEnabled && system.features?.itemTags === true;
-          const showEssences = advancedEnabled && system.features?.essences === true;
-
-          const tagOptions = (system.itemTags || system.tags || []).map(tag => ({
-            tag,
-            checked: (item.tags || []).includes(tag)
-          }));
-
-          const essenceOptions = (system.essenceDefinitions || []).map(def => ({
-            id: def.id,
-            name: def.name,
-            quantity: Number(item.essences?.[def.id] || 0)
-          }));
-
-          let formContent = '<form class="fabricate-item-editor">';
-          formContent += `<h3>${item.name}</h3>`;
-          formContent += '<p class="hint">Edit tags and essences for this component.</p>';
-
-          if (showTags) {
-            formContent += '<div class="form-group"><label>Tags</label>';
-            if (tagOptions.length) {
-              for (const opt of tagOptions) {
-                formContent += `<label class="checkbox-row"><input type="checkbox" name="itemTag" value="${opt.tag}" ${opt.checked ? 'checked' : ''} /> ${opt.tag}</label>`;
-              }
-            } else {
-              formContent += '<p class="hint">No tags defined in this system.</p>';
-            }
-            formContent += '</div>';
-          }
-
-          if (showEssences) {
-            formContent += '<div class="form-group"><label>Essences</label>';
-            if (essenceOptions.length) {
-              for (const opt of essenceOptions) {
-                formContent += `<label class="essence-row">${opt.name} <input type="number" name="essence.${opt.id}" min="0" value="${opt.quantity || ''}" /></label>`;
-              }
-            } else {
-              formContent += '<p class="hint">No essences defined in this system.</p>';
-            }
-            formContent += '</div>';
-          }
-
-          if (!showTags && !showEssences) {
-            formContent += '<p class="hint">Advanced options are disabled for this system.</p>';
-          }
-          formContent += '</form>';
-
-          const DialogV2 = foundry.applications?.api?.DialogV2;
-          if (!DialogV2) {
-            ui.notifications.warn('Dialog API not available.');
-            return;
-          }
-
-          const result = await DialogV2.prompt({
-            window: { title: `Edit ${item.name}` },
-            content: formContent,
-            ok: {
-              label: 'Save',
-              callback: (event, button, dialog) => {
-                const updates = {};
-                if (showTags) {
-                  updates.tags = Array.from(
-                    button.form?.querySelectorAll('input[name="itemTag"]:checked') || []
-                  ).map(el => el.value);
-                }
-                if (showEssences) {
-                  const essences = {};
-                  for (const opt of essenceOptions) {
-                    const input = button.form?.querySelector(`input[name="essence.${opt.id}"]`);
-                    const value = Number(input?.value || 0);
-                    if (value > 0) essences[opt.id] = value;
-                  }
-                  updates.essences = essences;
-                }
-                return updates;
-              }
-            },
-            rejectClose: false
-          });
-
-          if (result) {
-            await systemManager.updateItem(systemId, itemId, result);
-            await this._adminStore.refresh();
-          }
+          SvelteComponentEditorApp.show(itemId, systemId, this);
         }
       }
     };

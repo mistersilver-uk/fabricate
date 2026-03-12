@@ -302,7 +302,24 @@
         "DropNotAnItem": "Only Item documents can be added as crafting components. Dropped: {type}.",
         "FolderImportSummary": "Imported {added} items from folder \"{name}\".",
         "FolderEmpty": "Folder \"{name}\" contains no Item documents.",
-        "DropNoSystemSelected": "Select a crafting system first before dropping items."
+        "DropNoSystemSelected": "Select a crafting system first before dropping items.",
+        "Editor": {
+          "WindowTitle": "Edit {name}",
+          "HintTagsAndEssences": "Edit this component's tags and essences.",
+          "HintTagsOnly": "Edit this component's tags.",
+          "HintEssencesOnly": "Edit this component's essences.",
+          "NoEditableFields": "No editable component fields are enabled for this system.",
+          "NoTagsDefined": "No tags defined in this system.",
+          "NoEssencesDefined": "No essences defined in this system.",
+          "IncrementEssence": "Increase {name}",
+          "DecrementEssence": "Decrease {name}",
+          "QuantityLabel": "{name} quantity",
+          "Save": "Save Component",
+          "Cancel": "Cancel",
+          "NotGm": "Only GMs can manage components.",
+          "ComponentNotFound": "Component not found.",
+          "SaveFailed": "Failed to save component."
+        }
       },
       "Recipes": {
         "SearchPlaceholder": "Search recipes...",
