@@ -3,11 +3,10 @@
  *
  * Reads Conventional Commits and:
  *   - Determines version bump (major/minor/patch)
- *   - Updates CHANGELOG.md
  *   - Updates version in module.json
  *   - Creates a GitHub Release with the built module zip as an asset
  *
- * Triggered by pushing to `main` from the release.yml workflow.
+ * Triggered by pushing to `main` from the release-candidate workflow.
  *
  * Commit types that trigger a release:
  *   feat   → minor bump (new feature)
@@ -63,16 +62,7 @@ export default {
       }
     ],
 
-    // 3. Update CHANGELOG.md
-    [
-      '@semantic-release/changelog',
-      {
-        changelogFile: 'CHANGELOG.md',
-        changelogTitle: '# Changelog\n\nAll notable changes to Fabricate will be documented in this file.\n\nThe format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).'
-      }
-    ],
-
-    // 4. Build the module and create a GitHub Release with the zip asset
+    // 3. Build the module and create a GitHub Release with the zip asset
     [
       '@semantic-release/exec',
       {
@@ -82,16 +72,7 @@ export default {
       }
     ],
 
-    // 5. Commit updated CHANGELOG.md back to main
-    [
-      '@semantic-release/git',
-      {
-        assets: ['CHANGELOG.md'],
-        message: 'chore(release): ${nextRelease.version} [skip ci]'
-      }
-    ],
-
-    // 6. Create GitHub Release
+    // 4. Create GitHub Release
     [
       '@semantic-release/github',
       {

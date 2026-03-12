@@ -156,7 +156,7 @@ Trigger: manual (`workflow_dispatch`) with an optional dry-run flag.
 Steps:
 1. Run unit tests (`npm test`) and build.
 2. Run the Foundry integration smoke test (via the reusable workflow).
-3. Run `semantic-release` to determine the version bump, update `CHANGELOG.md` and `module.json`, build and zip the module, and publish a GitHub Release.
+3. Run `semantic-release` to determine the version bump, inject the release version into `module.json`, build and zip the module, and publish a GitHub Release.
 
 ### Manual Codex Team B workflow
 
@@ -197,10 +197,10 @@ Fabricate uses [semantic-release](https://semantic-release.gitbook.io/) to autom
 
 1. Reads all commits since the last tag using `@semantic-release/commit-analyzer`.
 2. Generates release notes with `@semantic-release/release-notes-generator`.
-3. Updates `CHANGELOG.md` with `@semantic-release/changelog`.
-4. Calls `node scripts/release.js --version <new-version>` via `@semantic-release/exec`. This injects the version into `module.json`, runs `vite build`, copies static assets, and creates `dist/fabricate-v<version>.zip`.
-5. Commits the updated `CHANGELOG.md` and `module.json` back to `main` with a `[skip ci]` message.
-6. Creates a GitHub Release with the zip and the raw `module.json` as assets.
+3. Calls `node scripts/release.js --version <new-version>` via `@semantic-release/exec`. This injects the version into `module.json`, runs `vite build`, copies static assets, and creates `dist/fabricate-v<version>.zip`.
+4. Creates a GitHub Release with the zip and the raw `module.json` as assets.
+
+GitHub Releases are the canonical release history. The CI release flow does not commit a repository changelog back to `main`; branch protection requires pull requests and status checks on `main`, so release automation publishes tags and GitHub Releases without a protected-branch writeback step.
 
 ### Running the release script locally
 

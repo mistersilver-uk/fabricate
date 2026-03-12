@@ -5,20 +5,15 @@ on:
     branches:
       - main
 
-# Skip when semantic-release commits CHANGELOG back
-# (commit message contains [skip ci])
-
 concurrency:
   group: release-candidate-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: write
-  issues: write
 
 jobs:
   unit-tests:
-    if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
