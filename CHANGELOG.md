@@ -109,6 +109,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Bug Fixes
+
+- Fixed `#83`: the crafting store now enables the alchemy panel and submits alchemy attempts based on the active recipe system, instead of any alchemy system present elsewhere in the world.
+
 ### CI/CD
 
 - Added a manual-only `codex-team-b-manual.yml` workflow for explicitly selected Team B issue runs with Codex. The existing Claude scheduled workflows remain unchanged; the Codex path is opt-in via `workflow_dispatch`, requires `OPENAI_API_KEY`, and still runs `npm test` plus `npm run build` before PR creation.

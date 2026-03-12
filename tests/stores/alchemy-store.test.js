@@ -33,6 +33,22 @@ function makeItem(id) {
   return { id, uuid: `Item.${id}`, name: `Item-${id}`, img: 'icon.png' };
 }
 
+function makeRecipe(id, craftingSystemId, name = `Recipe-${id}`) {
+  return {
+    id,
+    craftingSystemId,
+    name,
+    description: `${name} description`,
+    img: 'icon.png',
+    category: 'potions',
+    ingredientSets: [],
+    results: [],
+    steps: [],
+    isSimpleRecipe: () => true,
+    getResultDescription: () => 'result'
+  };
+}
+
 function makeAlchemySystem(id = 'alchemy-sys') {
   return { id, resolutionMode: 'alchemy', alchemy: { learnOnCraft: true, consumeOnFail: true } };
 }
@@ -123,6 +139,43 @@ test('isAlchemyMode is true when active system is alchemy mode', async () => {
   const store = createCraftingStore(services);
   await store.refresh();
   assert.equal(get(store.isAlchemyMode), true);
+});
+
+test('isAlchemyMode stays false in multi-system worlds when visible recipes belong to a simple system', async () => {
+  const simpleSystem = makeSimpleSystem();
+  const alchemySystem = makeAlchemySystem();
+  const simpleRecipe = makeRecipe('simple-recipe', simpleSystem.id, 'Simple Recipe');
+  const alchemyRecipe = makeRecipe('alchemy-recipe', alchemySystem.id, 'Alchemy Recipe');
+
+  const services = createMockServices({
+    getRecipeManager: () => ({
+      getRecipes: () => [simpleRecipe, alchemyRecipe],
+      getRecipe: (id) => [simpleRecipe, alchemyRecipe].find(recipe => recipe.id === id) || null,
+      evaluateCraftability: () => ({
+        canCraft: true,
+        satisfiableSet: {},
+        missing: { ingredients: [], essences: [], catalysts: [] },
+        ingredientStates: [],
+        essenceStates: [],
+        catalystStates: []
+      })
+    }),
+    getRecipeVisibilityService: () => ({
+      evaluateRecipeAccess: ({ recipe }) => ({
+        visible: recipe.id === simpleRecipe.id,
+        craftable: recipe.id === simpleRecipe.id,
+        reason: 'ok'
+      })
+    }),
+    getCraftingSystemManager: () => ({
+      getSystems: () => [simpleSystem, alchemySystem]
+    })
+  });
+
+  const store = createCraftingStore(services);
+  await store.refresh();
+
+  assert.equal(get(store.isAlchemyMode), false);
 });
 
 // ============================================================================
@@ -252,6 +305,60 @@ test('submitAlchemyAttempt calls craftAlchemy with submitted items', async () =>
   assert.equal(capturedArgs.items.length, 1);
   assert.equal(capturedArgs.items[0].id, 'i1');
   assert.equal(capturedArgs.opts.craftingSystemId, 'alchemy-sys');
+});
+
+test('submitAlchemyAttempt uses the active alchemy recipe system in multi-system worlds', async () => {
+  let capturedArgs = null;
+  const simpleSystem = makeSimpleSystem();
+  const alchemySystem = makeAlchemySystem();
+  const simpleRecipe = makeRecipe('simple-recipe', simpleSystem.id, 'Simple Recipe');
+  const alchemyRecipe = makeRecipe('alchemy-recipe', alchemySystem.id, 'Alchemy Recipe');
+
+  const services = createMockServices({
+    getOwnedActors: () => [makeActor('a1', 'Alice')],
+    getAvailableActors: () => [makeActor('a1', 'Alice')],
+    getSetting: (key) => {
+      if (key === 'lastComponentSources') return ['a1'];
+      return null;
+    },
+    getRecipeManager: () => ({
+      getRecipes: () => [simpleRecipe, alchemyRecipe],
+      getRecipe: (id) => [simpleRecipe, alchemyRecipe].find(recipe => recipe.id === id) || null,
+      evaluateCraftability: () => ({
+        canCraft: true,
+        satisfiableSet: {},
+        missing: { ingredients: [], essences: [], catalysts: [] },
+        ingredientStates: [],
+        essenceStates: [],
+        catalystStates: []
+      })
+    }),
+    getRecipeVisibilityService: () => ({
+      evaluateRecipeAccess: ({ recipe }) => ({
+        visible: recipe.id === alchemyRecipe.id,
+        craftable: recipe.id === alchemyRecipe.id,
+        reason: 'ok'
+      })
+    }),
+    getCraftingEngine: () => ({
+      craftAlchemy: async (actor, sources, items, opts) => {
+        capturedArgs = { actor, sources, items, opts };
+        return { success: true, message: 'Crafted!' };
+      }
+    }),
+    getCraftingSystemManager: () => ({
+      getSystems: () => [simpleSystem, alchemySystem]
+    })
+  });
+
+  const store = createCraftingStore(services);
+  await store.refresh();
+  store.addAlchemyItem(makeItem('i1'));
+
+  await store.submitAlchemyAttempt();
+
+  assert.ok(capturedArgs, 'craftAlchemy should have been called');
+  assert.equal(capturedArgs.opts.craftingSystemId, alchemySystem.id);
 });
 
 test('submitAlchemyAttempt clears alchemy items after attempt', async () => {

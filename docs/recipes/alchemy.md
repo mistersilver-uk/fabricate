@@ -16,7 +16,7 @@ Use alchemy mode for systems where recipes are secrets — a witch's grimoire, a
 ## How It Works
 
 1. The GM creates a crafting system and sets its **Resolution Mode** to `alchemy`.
-2. Players open the Crafting App and see an **Alchemy** panel instead of the normal recipe list.
+2. Players open the Crafting App and see an **Alchemy** panel instead of the normal recipe list when the currently active recipe view resolves to a single alchemy-mode crafting system.
 3. Players drag inventory items into the alchemy panel from their character sheet or inventory.
 4. Players click **Submit**. Fabricate matches the submitted items against all enabled recipes.
 5. If a matching recipe is found, the normal crafting flow runs (ingredients consumed, results created).

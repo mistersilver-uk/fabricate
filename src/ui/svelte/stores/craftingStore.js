@@ -237,6 +237,35 @@ function _buildSalvageEntries(
   return entries.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+function _resolveActiveCraftingSystem(services, recipes = []) {
+  const craftingSystemManager = services.getCraftingSystemManager?.();
+  if (!craftingSystemManager) return null;
+
+  const systems = craftingSystemManager.getSystems?.() || [];
+  if (systems.length === 0) return null;
+
+  const systemsById = new Map(
+    systems
+      .filter(system => system?.id)
+      .map(system => [system.id, system])
+  );
+  const recipeSystemIds = [...new Set(
+    recipes
+      .map(recipe => recipe?.craftingSystemId)
+      .filter(systemId => systemId && systemsById.has(systemId))
+  )];
+
+  if (recipeSystemIds.length === 1) {
+    return systemsById.get(recipeSystemIds[0]) || null;
+  }
+
+  if (recipeSystemIds.length > 1) {
+    return null;
+  }
+
+  return systems.length === 1 ? systems[0] || null : null;
+}
+
 /**
  * Track a recently crafted recipe.  Prepends, deduplicates by recipeId, and
  * caps at RECENTLY_CRAFTED_MAX.
@@ -457,6 +486,7 @@ function _buildPreparedRecipes(
 
     return {
       id: recipe.id,
+      craftingSystemId: recipe.craftingSystemId,
       name: recipe.name,
       description: isTeaser && teaserHiddenFields.includes('description') ? (teaserState.teaserDescription || 'FABRICATE.Teaser.HiddenDescription') : recipe.description,
       img: recipe.img,
@@ -588,14 +618,6 @@ export function createCraftingStore(services) {
       return;
     }
 
-    // Detect alchemy mode from the active crafting system
-    const craftingSystemManager = services.getCraftingSystemManager?.();
-    if (craftingSystemManager) {
-      const activeSystems = craftingSystemManager.getSystems?.() || [];
-      const activeSystem = activeSystems.find(s => s.resolutionMode === 'alchemy') || null;
-      isAlchemyMode.set(!!activeSystem);
-    }
-
     const computed = _buildPreparedRecipes(
       services,
       get(craftingActor),
@@ -605,6 +627,8 @@ export function createCraftingStore(services) {
       get(showOnlyAvailable),
       get(showFavouritesOnly)
     );
+    const activeSystem = _resolveActiveCraftingSystem(services, computed.recipes);
+    isAlchemyMode.set(activeSystem?.resolutionMode === 'alchemy');
 
     const currentShoppingList = get(shoppingList);
     let shoppingListData = null;
@@ -981,9 +1005,7 @@ export function createCraftingStore(services) {
       return;
     }
 
-    const craftingSystemManager = services.getCraftingSystemManager?.();
-    const activeSystems = craftingSystemManager?.getSystems?.() || [];
-    const activeSystem = activeSystems[0] || null;
+    const activeSystem = _resolveActiveCraftingSystem(services, get(viewState).recipes);
 
     const result = await craftingEngine.craftAlchemy(actor, sources, items, {
       craftingSystemId: activeSystem?.id
