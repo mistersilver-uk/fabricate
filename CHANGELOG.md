@@ -112,6 +112,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Bug Fixes
 
 - Fixed `#83`: the crafting store now enables the alchemy panel and submits alchemy attempts based on the active recipe system, instead of any alchemy system present elsewhere in the world.
+- Fixed `#92`: `learnRecipe()` now returns localization keys instead of hardcoded English strings, and both crafting UIs localize those notifications when shown to the user.
 
 ### CI/CD
 

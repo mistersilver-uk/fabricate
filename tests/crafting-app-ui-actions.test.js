@@ -135,6 +135,46 @@ test('CraftingApp._onRestartRun cancels active run and re-invokes craft with ski
   assert.equal(craftInvocation.target.dataset.skipConfirm, 'true');
 });
 
+test('CraftingApp._onLearnRecipe localizes success notifications from visibility service keys', async () => {
+  const app = createAppHarness();
+  let infoMessage = null;
+  let renderCalls = 0;
+
+  const previousI18n = game.i18n;
+  game.i18n = {
+    localize: (key) => `loc:${key}`,
+    format: (key, data) => `loc:${key}:${data.name}`
+  };
+
+  app.render = async () => {
+    renderCalls += 1;
+  };
+  app._notifyInfo = (message) => {
+    infoMessage = message;
+  };
+  app._getRecipeManager = () => ({
+    getRecipe: () => ({ id: 'r1', name: 'Healing Potion' })
+  });
+  app._getRecipeVisibilityService = () => ({
+    learnRecipe: async () => ({
+      success: true,
+      message: 'FABRICATE.Knowledge.LearnedRecipe',
+      messageData: { name: 'Healing Potion' }
+    })
+  });
+
+  try {
+    await CraftingApp._onLearnRecipe.call(app, {}, {
+      dataset: { recipeId: 'r1' }
+    });
+  } finally {
+    game.i18n = previousI18n;
+  }
+
+  assert.equal(infoMessage, 'loc:FABRICATE.Knowledge.LearnedRecipe:Healing Potion');
+  assert.equal(renderCalls, 1);
+});
+
 test('CraftingApp._onShowRunDetails renders dialog with resolved step IO names', async () => {
   const app = createAppHarness();
   let rendered = null;

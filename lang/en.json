@@ -139,6 +139,15 @@
       "ConsumedOnFailure": "Consumed on Failure",
       "RollTableResult": "Roll Table Result"
     },
+    "Knowledge": {
+      "SystemNotFound": "Crafting system not found",
+      "LearningDisabled": "Learning is not enabled for this crafting system",
+      "LinkedItemRequired": "Recipe item link is required to learn this recipe",
+      "AlreadyLearned": "Recipe is already learned",
+      "NoMatchingItem": "No matching recipe item available to learn",
+      "LearnedRecipe": "Learned recipe: {name}",
+      "CouldNotLearnRecipe": "Could not learn recipe"
+    },
     "Admin": {
       "Title": "Crafting Admin",
       "Selected": "Selected:",

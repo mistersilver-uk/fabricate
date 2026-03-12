@@ -624,6 +624,8 @@ test('AC6.1 - learnRecipe writes learnedAt and sourceItemUuid to actor flag', as
   const result = await service.learnRecipe({ viewer, recipe, craftingActor });
 
   assert.equal(result.success, true);
+  assert.equal(result.message, 'FABRICATE.Knowledge.LearnedRecipe');
+  assert.deepEqual(result.messageData, { name: recipe.name });
   // Verify flag was written
   const learned = craftingActor.getFlag('fabricate', 'fabricate.learnedRecipes');
   assert.ok(learned['recipe-1']);
@@ -653,6 +655,8 @@ test('AC6.2 - learnRecipe with consumeOnLearn deletes the matched item', async (
   const result = await service.learnRecipe({ viewer, recipe, craftingActor });
 
   assert.equal(result.success, true);
+  assert.equal(result.message, 'FABRICATE.Knowledge.LearnedRecipe');
+  assert.deepEqual(result.messageData, { name: recipe.name });
   assert.equal(item.deleted, true);
 });
 
@@ -678,7 +682,7 @@ test('AC6.3 - learnRecipe rejects when recipe is already learned', async () => {
   const result = await service.learnRecipe({ viewer, recipe, craftingActor });
 
   assert.equal(result.success, false);
-  assert.match(result.message, /already learned/i);
+  assert.equal(result.message, 'FABRICATE.Knowledge.AlreadyLearned');
 });
 
 test('AC6.4 - learnRecipe rejects when no matching recipe item exists', async () => {
@@ -700,7 +704,7 @@ test('AC6.4 - learnRecipe rejects when no matching recipe item exists', async ()
   const result = await service.learnRecipe({ viewer, recipe, craftingActor });
 
   assert.equal(result.success, false);
-  assert.match(result.message, /No matching/i);
+  assert.equal(result.message, 'FABRICATE.Knowledge.NoMatchingItem');
 });
 
 test('AC6.5 - learnRecipe rejects when knowledge mode does not support learning', async () => {
@@ -722,7 +726,7 @@ test('AC6.5 - learnRecipe rejects when knowledge mode does not support learning'
   const result = await service.learnRecipe({ viewer, recipe, craftingActor });
 
   assert.equal(result.success, false);
-  assert.match(result.message, /not enabled/i);
+  assert.equal(result.message, 'FABRICATE.Knowledge.LearningDisabled');
 });
 
 test('AC6.6 - learnRecipe rejects when recipe has no linkedRecipeItemUuid', async () => {
@@ -744,7 +748,19 @@ test('AC6.6 - learnRecipe rejects when recipe has no linkedRecipeItemUuid', asyn
   const result = await service.learnRecipe({ viewer, recipe, craftingActor });
 
   assert.equal(result.success, false);
-  assert.match(result.message, /item link is required/i);
+  assert.equal(result.message, 'FABRICATE.Knowledge.LinkedItemRequired');
+});
+
+test('AC6.7 - learnRecipe rejects with a localization key when the crafting system is missing', async () => {
+  const recipe = buildMockRecipe({ id: 'recipe-1', craftingSystemId: 'missing-system' });
+  const craftingActor = new FakeActor({ id: 'actor-1' });
+  const viewer = { isGM: false, id: 'user-1' };
+  const service = buildService({ system: null });
+
+  const result = await service.learnRecipe({ viewer, recipe, craftingActor });
+
+  assert.equal(result.success, false);
+  assert.equal(result.message, 'FABRICATE.Knowledge.SystemNotFound');
 });
 
 // ---------------------------------------------------------------------------

@@ -755,13 +755,18 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
       craftingActor: this.craftingActor,
       componentSourceActors: this.componentSourceActors
     });
+    const localizedMessage = result.message
+      ? (result.messageData
+        ? (game.i18n?.format?.(result.message, result.messageData) || result.message)
+        : (game.i18n?.localize?.(result.message) || result.message))
+      : (game.i18n?.localize?.('FABRICATE.Knowledge.CouldNotLearnRecipe') || 'FABRICATE.Knowledge.CouldNotLearnRecipe');
 
     if (result.success) {
-      this._notifyInfo(result.message);
+      this._notifyInfo(localizedMessage);
       await this.render();
       return;
     }
-    this._notifyWarn(result.message || 'Could not learn recipe');
+    this._notifyWarn(localizedMessage);
   }
 
   static async _onShowRunDetails(event, target) {

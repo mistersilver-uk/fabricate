@@ -7,6 +7,7 @@
  */
 import { writable, get } from 'svelte/store';
 import { aggregateShoppingList } from '../util/shoppingListAggregator.js';
+import { localize } from '../util/foundryBridge.js';
 import { getSourceUuid } from '../../../utils/sourceUuid.js';
 
 const RECENTLY_CRAFTED_MAX = 10;
@@ -801,11 +802,14 @@ export function createCraftingStore(services) {
       craftingActor: actor,
       componentSourceActors: get(componentSourceActors)
     });
+    const localizedMessage = result.message
+      ? localize(result.message, result.messageData)
+      : localize('FABRICATE.Knowledge.CouldNotLearnRecipe');
 
     if (result.success) {
-      services.notify.info(result.message);
+      services.notify.info(localizedMessage);
     } else {
-      services.notify.warn(result.message || 'Could not learn recipe');
+      services.notify.warn(localizedMessage);
     }
 
     await refresh();

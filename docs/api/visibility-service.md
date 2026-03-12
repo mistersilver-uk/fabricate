@@ -85,7 +85,9 @@ Records a recipe as learned for the crafting actor. Optionally consumes the reci
 | `params.craftingActor` | `Actor` | The actor who learns it |
 | `params.componentSourceActors` | `Actor[]` | Source actors (for item matching) |
 
-**Returns:** `Promise<{ success: boolean, message: string }>`
+**Returns:** `Promise<{ success: boolean, message: string, messageData?: object }>`
+
+`message` is an i18n key such as `FABRICATE.Knowledge.AlreadyLearned`. UI callers are expected to localize it at the presentation boundary, using `messageData` for interpolation when present.
 
 ### cleanupLearnedRecipes(validRecipeIds)
 

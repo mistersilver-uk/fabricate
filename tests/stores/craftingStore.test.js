@@ -972,37 +972,65 @@ describe('createCraftingStore', () => {
   // --- learnRecipe ---
 
   describe('learnRecipe', () => {
-    it('delegates to visibilityService.learnRecipe and notifies success', async () => {
+    it('delegates to visibilityService.learnRecipe and localizes success notifications', async () => {
       let learnCalled = false;
       let infoMsg = null;
+      const previousGame = globalThis.game;
+      globalThis.game = {
+        ...(previousGame || {}),
+        i18n: {
+          localize: (key) => `loc:${key}`,
+          format: (key, data) => `loc:${key}:${data.name}`
+        }
+      };
       const services = createMockServices({
         getRecipeVisibilityService: () => ({
           evaluateRecipeAccess: () => ({ visible: true, craftable: true, reason: 'ok' }),
           learnRecipe: async () => {
             learnCalled = true;
-            return { success: true, message: 'Learned!' };
+            return {
+              success: true,
+              message: 'FABRICATE.Knowledge.LearnedRecipe',
+              messageData: { name: 'Healing Potion' }
+            };
           }
         }),
         notify: { info: (m) => { infoMsg = m; }, warn: () => {}, error: () => {} }
       });
-      const store = createCraftingStore(services);
-      await store.learnRecipe('r1');
-      assert.ok(learnCalled);
-      assert.equal(infoMsg, 'Learned!');
+      try {
+        const store = createCraftingStore(services);
+        await store.learnRecipe('r1');
+        assert.ok(learnCalled);
+        assert.equal(infoMsg, 'loc:FABRICATE.Knowledge.LearnedRecipe:Healing Potion');
+      } finally {
+        globalThis.game = previousGame;
+      }
     });
 
-    it('notifies warn when learnRecipe fails', async () => {
+    it('localizes warn notifications when learnRecipe fails', async () => {
       let warnMsg = null;
+      const previousGame = globalThis.game;
+      globalThis.game = {
+        ...(previousGame || {}),
+        i18n: {
+          localize: (key) => `loc:${key}`,
+          format: (key, data) => `loc:${key}:${JSON.stringify(data)}`
+        }
+      };
       const services = createMockServices({
         getRecipeVisibilityService: () => ({
           evaluateRecipeAccess: () => ({ visible: true, craftable: true, reason: 'ok' }),
-          learnRecipe: async () => ({ success: false, message: 'Cannot learn' })
+          learnRecipe: async () => ({ success: false, message: 'FABRICATE.Knowledge.AlreadyLearned' })
         }),
         notify: { info: () => {}, warn: (m) => { warnMsg = m; }, error: () => {} }
       });
-      const store = createCraftingStore(services);
-      await store.learnRecipe('r1');
-      assert.ok(warnMsg !== null);
+      try {
+        const store = createCraftingStore(services);
+        await store.learnRecipe('r1');
+        assert.equal(warnMsg, 'loc:FABRICATE.Knowledge.AlreadyLearned');
+      } finally {
+        globalThis.game = previousGame;
+      }
     });
   });
 

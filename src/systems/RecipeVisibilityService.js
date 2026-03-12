@@ -1,6 +1,15 @@
 import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
 import { getSourceUuid } from '../utils/sourceUuid.js';
 
+const LEARN_RECIPE_MESSAGES = {
+  systemNotFound: 'FABRICATE.Knowledge.SystemNotFound',
+  learningDisabled: 'FABRICATE.Knowledge.LearningDisabled',
+  linkedItemRequired: 'FABRICATE.Knowledge.LinkedItemRequired',
+  alreadyLearned: 'FABRICATE.Knowledge.AlreadyLearned',
+  noMatchingItem: 'FABRICATE.Knowledge.NoMatchingItem',
+  learnedRecipe: 'FABRICATE.Knowledge.LearnedRecipe'
+};
+
 /**
  * Visibility, knowledge access, and learn-state service.
  */
@@ -357,26 +366,26 @@ export class RecipeVisibilityService {
 
   async learnRecipe({ viewer, recipe, craftingActor, componentSourceActors = [] }) {
     const system = this._getCraftingSystem(recipe);
-    if (!system) return { success: false, message: 'Crafting system not found' };
+    if (!system) return { success: false, message: LEARN_RECIPE_MESSAGES.systemNotFound };
 
     const knowledge = this._getKnowledgeConfig(system);
     const mode = knowledge?.mode || 'itemOrLearned';
     if (!['learned', 'itemOrLearned'].includes(mode)) {
-      return { success: false, message: 'Learning is not enabled for this crafting system' };
+      return { success: false, message: LEARN_RECIPE_MESSAGES.learningDisabled };
     }
     if (!recipe?.linkedRecipeItemUuid) {
-      return { success: false, message: 'Recipe item link is required to learn this recipe' };
+      return { success: false, message: LEARN_RECIPE_MESSAGES.linkedItemRequired };
     }
 
     const learnedMap = this._getLearnedMap(craftingActor);
     if (learnedMap?.[recipe.id]) {
-      return { success: false, message: 'Recipe is already learned' };
+      return { success: false, message: LEARN_RECIPE_MESSAGES.alreadyLearned };
     }
 
     const access = this.evaluateKnowledgeAccess({ recipe, viewer, craftingActor, componentSourceActors });
     const selected = this._selectDeterministic(access.matchedItems || []);
     if (!selected) {
-      return { success: false, message: 'No matching recipe item available to learn' };
+      return { success: false, message: LEARN_RECIPE_MESSAGES.noMatchingItem };
     }
 
     const next = {
@@ -392,7 +401,11 @@ export class RecipeVisibilityService {
       await selected.item.delete();
     }
 
-    return { success: true, message: `Learned recipe: ${recipe.name}` };
+    return {
+      success: true,
+      message: LEARN_RECIPE_MESSAGES.learnedRecipe,
+      messageData: { name: recipe.name }
+    };
   }
 
   async applyRecipeItemUseOnCraft({ recipe, craftingActor, componentSourceActors = [] }) {
