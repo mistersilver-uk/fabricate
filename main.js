@@ -11,7 +11,11 @@ const isViteDevServer = globalThis.location?.port === VITE_DEV_SERVER_PORT;
 const entryPath = isViteDevServer ? './src/main.js' : './dist/main.js';
 
 try {
-  await import(entryPath);
+  if (isViteDevServer) {
+    await import('./src/main.js');
+  } else {
+    await import('./dist/main.js');
+  }
 } catch (error) {
   const hint = isViteDevServer
     ? 'Ensure `npm run dev` is running and open Foundry through http://localhost:5173.'

@@ -101,6 +101,40 @@ describe('SearchBar debounce logic', () => {
       }, 100);
     });
   });
+
+  it('clear action cancels pending debounce and fires empty search immediately', () => {
+    return new Promise((resolve) => {
+      const calls = [];
+      const callback = (val) => { calls.push(val); };
+
+      let timer = null;
+      const debounceMs = 50;
+
+      function handleInput(value) {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => {
+          callback(value);
+          timer = null;
+        }, debounceMs);
+      }
+
+      function clearSearch() {
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+        callback('');
+      }
+
+      handleInput('queued');
+      clearSearch();
+
+      setTimeout(() => {
+        assert.deepEqual(calls, ['']);
+        resolve();
+      }, 100);
+    });
+  });
 });
 
 // --- SearchBar DOM structure tests ---
@@ -111,7 +145,7 @@ describe('SearchBar DOM structure', () => {
 
   it('creates expected DOM structure', () => {
     const container = document.createElement('div');
-    container.className = 'fabricate-search';
+    container.className = 'fabricate-search has-clear-button';
 
     const input = document.createElement('input');
     input.type = 'text';
@@ -120,15 +154,47 @@ describe('SearchBar DOM structure', () => {
     input.setAttribute('aria-label', 'Search');
     container.appendChild(input);
 
-    const icon = document.createElement('i');
-    icon.className = 'fas fa-search';
+    const clearButton = document.createElement('button');
+    clearButton.type = 'button';
+    clearButton.className = 'fabricate-search-clear';
+    clearButton.setAttribute('aria-label', 'Clear search');
+    container.appendChild(clearButton);
+
+    const clearIcon = document.createElement('i');
+    clearIcon.className = 'fas fa-times';
+    clearButton.appendChild(clearIcon);
+
+    const icon = document.createElement('span');
+    icon.className = 'fabricate-search-icon';
     container.appendChild(icon);
 
+    const iconGlyph = document.createElement('i');
+    iconGlyph.className = 'fas fa-search';
+    icon.appendChild(iconGlyph);
+
     assert.ok(container.querySelector('input[type="text"]'));
-    assert.ok(container.querySelector('i.fas.fa-search'));
+    assert.ok(container.querySelector('button.fabricate-search-clear'));
+    assert.ok(container.querySelector('.fabricate-search-icon i.fas.fa-search'));
     assert.equal(container.querySelector('input').placeholder, 'Search recipes...');
     assert.equal(container.querySelector('input').getAttribute('aria-label'), 'Search');
     assert.equal(container.querySelector('input').name, 'search');
+    assert.equal(container.querySelector('button').getAttribute('aria-label'), 'Clear search');
+  });
+
+  it('renders the clear button before the search icon', () => {
+    const container = document.createElement('div');
+
+    const clearButton = document.createElement('button');
+    clearButton.className = 'fabricate-search-clear';
+    container.appendChild(clearButton);
+
+    const icon = document.createElement('span');
+    icon.className = 'fabricate-search-icon';
+    container.appendChild(icon);
+
+    const children = [...container.children];
+    assert.equal(children[0], clearButton);
+    assert.equal(children[1], icon);
   });
 
   it('uses provided placeholder text', () => {

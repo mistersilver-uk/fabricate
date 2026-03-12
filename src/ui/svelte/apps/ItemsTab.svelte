@@ -16,12 +16,13 @@
   } = $props();
 </script>
 
-<section class="admin-panel">
-  <div class="panel-toolbar">
+<section class="admin-panel items-panel">
+  <div class="panel-toolbar component-toolbar sticky-toolbar">
     <SearchBar
       value={itemSearchTerm}
       onSearch={onItemSearch}
       placeholder={localize('FABRICATE.Admin.Items.SearchPlaceholder')}
+      showClearButton={true}
     />
   </div>
 
