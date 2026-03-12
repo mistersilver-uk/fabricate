@@ -60,13 +60,6 @@ export class CraftingSystemManager {
         if (raw === 'cauldron') return 'alchemy'; // T-189: legacy alias
         return ['simple', 'mapped', 'tiered', 'progressive', 'alchemy'].includes(raw) ? raw : 'simple';
       })(system.resolutionMode),
-      difficulty: system.difficulty || {
-        base: 10,
-        tierWeight: 0,
-        tagWeights: {},
-        essenceWeights: {}
-      },
-
       // New spec-first shape
       features,
       itemTags: this._normalizeStringList(system.itemTags ?? system.tags),

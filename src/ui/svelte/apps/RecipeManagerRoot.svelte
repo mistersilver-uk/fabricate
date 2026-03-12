@@ -53,6 +53,8 @@
       onSelectSystem={store.selectSystem}
       onCreateSystem={store.createSystem}
       onDeleteSystem={store.deleteSystem}
+      onExportSystem={store.exportSystem}
+      onImportSystem={store.importSystem}
     />
 
     <main class="admin-main">

@@ -865,6 +865,87 @@ describe('createAdminStore', () => {
   });
 
   // -------------------------------------------------------------------------
+  // 9b. System import/export
+  // -------------------------------------------------------------------------
+
+  describe('system import/export', () => {
+    it('exportSystem calls downloadFile with JSON payload', async () => {
+      let downloadedJson = null;
+      let downloadedFilename = null;
+      const services = createMockServices({
+        getModuleVersion: () => '1.0.0-rc.12',
+        downloadFile: async (json, filename) => {
+          downloadedJson = json;
+          downloadedFilename = filename;
+        }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.exportSystem();
+      assert.ok(downloadedJson !== null, 'downloadFile should be called');
+      assert.ok(downloadedFilename.startsWith('fabricate-'), 'filename should start with fabricate-');
+      assert.ok(downloadedFilename.endsWith('.json'), 'filename should end with .json');
+      const parsed = JSON.parse(downloadedJson);
+      assert.equal(parsed.fabricateVersion, '1.0.0-rc.12');
+      assert.ok(parsed.system, 'payload should have system');
+      assert.ok(Array.isArray(parsed.recipes), 'payload should have recipes array');
+    });
+
+    it('exportSystem replaces craftingSystemId with placeholder', async () => {
+      let downloadedJson = null;
+      const services = createMockServices({
+        getModuleVersion: () => '1.0.0',
+        downloadFile: async (json) => { downloadedJson = json; }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.exportSystem();
+      const parsed = JSON.parse(downloadedJson);
+      for (const recipe of parsed.recipes) {
+        assert.equal(recipe.craftingSystemId, '__SYSTEM_ID__');
+      }
+    });
+
+    it('exportSystem warns when no system is selected', async () => {
+      let warnMsg = null;
+      let downloadCalled = false;
+      const services = createMockServices({
+        notify: { info: () => {}, warn: (m) => { warnMsg = m; }, error: () => {} },
+        downloadFile: async () => { downloadCalled = true; }
+      });
+      const store = createAdminStore(services);
+      // No selectSystem call
+      await store.exportSystem();
+      assert.ok(warnMsg !== null, 'should warn');
+      assert.ok(!downloadCalled, 'downloadFile should not be called');
+    });
+
+    it('exportSystem accepts explicit systemId parameter', async () => {
+      let downloadedJson = null;
+      const services = createMockServices({
+        getModuleVersion: () => '1.0.0',
+        downloadFile: async (json) => { downloadedJson = json; }
+      });
+      const store = createAdminStore(services);
+      // Don't select — pass systemId directly
+      await store.exportSystem('sys1');
+      assert.ok(downloadedJson !== null, 'downloadFile should be called');
+      const parsed = JSON.parse(downloadedJson);
+      assert.equal(parsed.system.name, 'System One');
+    });
+
+    it('importSystem delegates to services.renderSystemImportDialog', async () => {
+      let dialogCalled = false;
+      const services = createMockServices({
+        renderSystemImportDialog: async () => { dialogCalled = true; }
+      });
+      const store = createAdminStore(services);
+      await store.importSystem();
+      assert.ok(dialogCalled, 'renderSystemImportDialog should be called');
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // 10. Item operations
   // -------------------------------------------------------------------------
 
@@ -1126,6 +1207,7 @@ describe('createAdminStore', () => {
         'saveCraftingCheckConfig', 'saveCurrencyConfig', 'saveVisibilityConfig', 'saveTeaserConfig',
         'createRecipe', 'deleteRecipe', 'duplicateRecipe', 'toggleRecipeEnabled',
         'importRecipes', 'exportRecipes',
+        'exportSystem', 'importSystem',
         'deleteComponent',
         'setRecipeSearch', 'setItemSearch',
         'refresh', 'destroy'
