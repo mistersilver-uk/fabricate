@@ -819,7 +819,71 @@ test('AC7.3 - GM bypasses knowledge access and gets granted: true with reason gm
   assert.equal(result.reason, 'gm');
 });
 
-test('AC7.4 - cleanupLearnedRecipes removes stale entries and retains valid ones', async () => {
+test('AC7.4 - evaluateRecipeAccess computes knowledge access exactly once per non-GM knowledge-mode call', () => {
+  const system = buildMockSystem({
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: {
+        mode: 'itemOrLearned',
+        item: { limitUses: false },
+        learn: { consumeOnLearn: false }
+      }
+    }
+  });
+  const recipe = buildMockRecipe({ linkedRecipeItemUuid: 'recipe-item-uuid' });
+  const craftingActor = new FakeActor({
+    id: 'actor-1',
+    items: [new FakeItem({ uuid: 'recipe-item-uuid' })]
+  });
+  const viewer = { isGM: false, id: 'user-1' };
+  const service = buildService({ system });
+  const originalEvaluateKnowledgeAccess = service.evaluateKnowledgeAccess.bind(service);
+  let knowledgeCalls = 0;
+
+  service.evaluateKnowledgeAccess = (params) => {
+    knowledgeCalls += 1;
+    return originalEvaluateKnowledgeAccess(params);
+  };
+
+  const result = service.evaluateRecipeAccess({ recipe, viewer, craftingActor });
+
+  assert.equal(knowledgeCalls, 1);
+  assert.equal(result.visible, true);
+  assert.equal(result.craftable, true);
+  assert.equal(result.reason, 'ok');
+});
+
+test('AC7.5 - locked recipe remains visible but not craftable in knowledge mode', () => {
+  const system = buildMockSystem({
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: {
+        mode: 'itemOrLearned',
+        item: { limitUses: false },
+        learn: { consumeOnLearn: false }
+      }
+    }
+  });
+  const recipe = buildMockRecipe({
+    locked: true,
+    linkedRecipeItemUuid: 'recipe-item-uuid'
+  });
+  const craftingActor = new FakeActor({
+    id: 'actor-1',
+    items: [new FakeItem({ uuid: 'recipe-item-uuid' })]
+  });
+  const viewer = { isGM: false, id: 'user-1' };
+  const service = buildService({ system });
+
+  const result = service.evaluateRecipeAccess({ recipe, viewer, craftingActor });
+
+  assert.equal(result.visible, true);
+  assert.equal(result.craftable, false);
+  assert.equal(result.reason, 'locked');
+  assert.equal(result.knowledge?.granted, true);
+});
+
+test('AC7.6 - cleanupLearnedRecipes removes stale entries and retains valid ones', async () => {
   const service = buildService();
   const actorA = new FakeActor({
     id: 'actor-a',

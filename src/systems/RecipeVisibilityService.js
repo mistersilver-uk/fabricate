@@ -336,13 +336,6 @@ export class RecipeVisibilityService {
       return { visible: true, craftable: false, reason: 'locked', knowledge };
     }
 
-    if (!viewer?.isGM && listMode === 'knowledge') {
-      knowledge = knowledge || this.evaluateKnowledgeAccess({ recipe, viewer, craftingActor, componentSourceActors });
-      if (!knowledge.granted) {
-        return { visible: true, craftable: false, reason: 'knowledge', knowledge };
-      }
-    }
-
     return { visible: true, craftable: true, reason: 'ok', knowledge };
   }
 
