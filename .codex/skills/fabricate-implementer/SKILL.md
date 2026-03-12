@@ -34,6 +34,8 @@ Keep this skill aligned with `.claude/agents/implementer.md`.
 - Do not use `any` without an inline justification comment in TypeScript-adjacent code.
 - Keep the work single-task scoped.
 - Do not add npm dependencies unless the plan explicitly justifies them.
+- For Svelte, CSS, layout, and other UI-focused changes, verify against the local Vite dev server first when available and use the user-provided dev URL if one exists.
+- Use `npm run test:foundry` for UI changes only when the task depends on Foundry runtime integration, no dev server is available, or reproducible container-backed evidence is required.
 
 ## Foundry V13 checks
 

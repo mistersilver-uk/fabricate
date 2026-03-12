@@ -50,6 +50,7 @@ Primary output: new GitHub Issues (not code fixes).
 3. Run project checks when useful:
    - `npm test`
    - `npm run build`
+   - For UI reliability work, prefer the local Vite dev server first when one is available; use container-backed Foundry validation only for runtime-sensitive behavior or reproducible evidence
 4. Analyze findings by risk:
    - Correctness defects
    - Edge-case breakage

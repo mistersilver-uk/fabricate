@@ -89,15 +89,25 @@ When invoked, immediately gather context before making any recommendations:
 
 ## Foundry Instance Configuration
 
-- **URL:** `http://localhost:30000`
+- **Preferred dev URL:** user-provided Vite proxy URL, typically `http://localhost:5173/join`
+- **Fallback direct Foundry URL:** `http://localhost:30000`
 - **Available users (all passwordless):**
     - `Gamemaster` — use this by default (full access to all sheets, settings, and module config)
     - `Player 1` — use when testing player-facing views and permission-restricted UI
     - `Player 2` — use for multi-user layout comparisons if needed
 
+## Environment Selection Order
+
+For UI and UX review work, use this order unless the user says otherwise:
+
+1. Use the local Vite dev server first for fast UI iteration and source-backed inspection.
+2. If no Vite URL is known, ask the user for the active dev URL before falling back.
+3. If no live dev server is available, review existing screenshots in `test-results/`.
+4. Use `npm run test:foundry` or another direct Foundry session only when the task depends on real Foundry runtime behavior, requires clean reproducible screenshots, or cannot be assessed through the Vite proxy.
+
 ## Smoke Test Screenshot Catalog
 
-The Foundry smoke test (`npm run test:foundry`) produces a comprehensive set of labeled screenshots in `test-results/`. **Always check for existing screenshots before launching Playwright manually** — the smoke test screenshots are faster to obtain and cover all major UI surfaces with realistic test data (actors with inventories, a crafting system with 7 components and 3 recipes, post-craft state).
+The Foundry smoke test (`npm run test:foundry`) produces a comprehensive set of labeled screenshots in `test-results/`. Check these when no Vite dev session is available or when you need reproducible container-backed evidence. They remain useful for broad coverage with realistic test data (actors with inventories, a crafting system with 7 components and 3 recipes, post-craft state).
 
 | Screenshot | Contents |
 |---|---|
@@ -115,32 +125,33 @@ The Foundry smoke test (`npm run test:foundry`) produces a comprehensive set of 
 | `screenshot-12-post-craft.png` | Post-craft state with success notification |
 | `screenshot-13-alara-post-craft-inventory.png` | Actor inventory after crafting (consumed ingredients + crafted item) |
 
-To generate fresh screenshots: `npm run test:foundry` (builds, starts Docker, runs test, stops Docker).
+To generate fresh container-backed screenshots: `npm run test:foundry` (builds, starts Docker, runs test, stops Docker).
 To use an already-running Foundry instance: `node scripts/foundry-test-run.mjs`.
 
 ## Screenshot & Visual Analysis Workflow
 
 Use the Playwright MCP tools to capture the current state of the UI:
 
-1. Navigate to `http://localhost:30000`.
-2. **Auto-login sequence** (no passwords required):
+1. Prefer navigating to the active Vite dev URL, typically `http://localhost:5173/join`.
+2. If no Vite dev server is available, fall back to `http://localhost:30000`.
+3. **Auto-login sequence** (no passwords required):
    a. On the Foundry login/join screen, use `browser_snapshot` to identify the user selection elements.
    b. Click the appropriate user (default: `Gamemaster`).
    c. Click the "Join Game Session" button (no password field needed).
    d. Wait for the Foundry canvas to fully load before proceeding.
-3. **To test player-perspective UI**, log out via the sidebar menu and repeat step 2 selecting `Player 1` or `Player 2` instead. Compare what players see vs what the GM sees — note any crafting UI elements that should or shouldn't be visible based on role.
-4. Open the relevant crafting dialogs/sheets. Methods to trigger UI:
+4. **To test player-perspective UI**, log out via the sidebar menu and repeat step 3 selecting `Player 1` or `Player 2` instead. Compare what players see vs what the GM sees — note any crafting UI elements that should or shouldn't be visible based on role.
+5. Open the relevant crafting dialogs/sheets. Methods to trigger UI:
    a. **Via macro console:** Use `browser_evaluate` to run Foundry API calls, e.g.:
     - `game.items.getName("Recipe Name")?.sheet.render(true)` — open an item sheet
     - `game.fabricate.api.getCraftingAppClass().show()` — open the player crafting app
     - `game.fabricate.api.getRecipeManagerAppClass().show()` — open the GM recipe manager
     - `ui.sidebar.activateTab("items")` — open the items sidebar tab
       b. **Via DOM interaction:** Click sidebar icons, right-click actors/items, and navigate through menus using Playwright click/snapshot tools.
-5. Take screenshots at **multiple viewport sizes**:
+6. Take screenshots at **multiple viewport sizes**:
     - Desktop: 1920×1080
     - Laptop: 1366×768
     - Narrow panel: 400×600 (simulates Foundry's pop-out window behaviour)
-6. Analyse each screenshot for:
+7. Analyse each screenshot for:
     - Alignment and grid consistency
     - Adequate contrast ratios (WCAG AA minimum)
     - Touch target sizing (minimum 44×44px interactive areas)
@@ -148,7 +159,7 @@ Use the Playwright MCP tools to capture the current state of the UI:
     - Consistency with Foundry VTT's native UI language
     - Readable typography at each viewport size
 
-If Playwright is unavailable, fall back to Bash commands using any available screenshot tool or instruct the user on how to provide screenshots manually.
+If Playwright is unavailable, rely on the Vite dev server plus code inspection first, then fall back to existing screenshots or user-provided captures.
 
 ## Foundry V13 API Notes
 

@@ -11,17 +11,19 @@ Keep this skill aligned with `.claude/agents/ux-designer.md`.
 
 - `spec/003-ui-integration.md` first, then other UI-related specs as needed
 - relevant files under `src/ui/`, `src/ui/svelte/`, `styles/`, and `lang/`
-- existing screenshots in `test-results/` before capturing new ones
+- the active Vite dev URL when available, or a prompt to ask the user for it before using container-backed flows
+- existing screenshots in `test-results/` when no live dev session is available
 - `.claude/agents/ux-designer.md` when you need the full audit intent
 
 ## Workflow
 
 1. Read the relevant UI spec before making recommendations.
 2. Inspect the current Svelte components, stores, styles, and localized strings.
-3. Check `test-results/` for recent screenshots before trying to capture fresh ones.
-4. If browser tooling is available, inspect the running Foundry UI at multiple sizes.
-5. Compare the implementation against the spec and against Foundry-native interaction patterns.
-6. Turn confirmed problems into specific design guidance or backlog issues.
+3. Use the active Vite dev server first for live UI inspection; ask the user for the URL if it is not known.
+4. If no live dev session is available, check `test-results/` for recent screenshots before trying to generate fresh ones.
+5. Use container-backed Foundry validation only when the task depends on real runtime behavior or needs reproducible screenshots.
+6. Compare the implementation against the spec and against Foundry-native interaction patterns.
+7. Turn confirmed problems into specific design guidance or backlog issues.
 
 ## Review checklist
 
@@ -38,7 +40,7 @@ Check:
 
 - Prefer Foundry-native patterns over novelty.
 - Be specific with file paths, selectors, viewport sizes, and screenshot names.
-- If browser tooling is unavailable, say so and rely on code plus existing screenshots.
+- If browser tooling is unavailable, say so and rely on the Vite dev server plus code inspection first, then existing screenshots.
 - Do not implement production UI changes unless the user explicitly switches to implementation work.
 
 ## Expected output

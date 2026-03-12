@@ -16,6 +16,7 @@ Review checklist:
 - FoundryVTT API usage is correct for the supported Foundry version
 - No console.log left in production code
 - `npm test` passes and `npm run build` compiles without errors or warnings
+- Pure UI/UX changes were verified against the local Vite dev server first when available; `npm run test:foundry` is only expected when the change is runtime-sensitive or needs clean reproducible UI evidence
 
 ## Foundry V13 Compatibility Checks
 

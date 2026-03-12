@@ -5,7 +5,7 @@ const MODULE_PATH_PREFIX = '/modules/fabricate/';
 
 /**
  * Vite plugin that proxies Foundry VTT and rewrites Fabricate module paths
- * so Vite serves source files with HMR transforms.
+ * so Vite serves the repo-root entry and source files with HMR transforms.
  */
 export function fabricateDevProxy() {
   return {
@@ -16,18 +16,10 @@ export function fabricateDevProxy() {
       // HTML requests looking for index.html (which doesn't exist) and 404.
       // Vite-owned paths (/@vite/, /src/, etc.) are passed through via next().
       server.middlewares.use((req, res, next) => {
-        // Rewrite Fabricate module paths to project-root-relative paths
-        if (req.url?.startsWith(MODULE_PATH_PREFIX)) {
-          const relative = req.url.slice(MODULE_PATH_PREFIX.length);
-
-          if (relative.startsWith('dist/main.js')) {
-            // Main entry: serve source instead of bundle
-            req.url = '/src/main.js';
-            return next();
-          }
-
-          // Other module files (styles/, lang/, etc.) — serve from project root
-          req.url = '/' + relative;
+        // Rewrite Fabricate module paths to project-root-relative paths.
+        const rewrittenModuleUrl = rewriteFabricateModuleUrl(req.url);
+        if (rewrittenModuleUrl) {
+          req.url = rewrittenModuleUrl;
           return next();
         }
 
@@ -45,6 +37,29 @@ export function fabricateDevProxy() {
       });
     }
   };
+}
+
+/**
+ * Map a Fabricate module request from Foundry's module namespace to a Vite
+ * project-root path. The root `main.js` shim is the canonical local-dev entry.
+ *
+ * @param {string | undefined} requestUrl
+ * @returns {string | null}
+ */
+export function rewriteFabricateModuleUrl(requestUrl) {
+  if (!requestUrl) return null;
+
+  const parsed = new URL(requestUrl, FOUNDRY_ORIGIN);
+  if (!parsed.pathname.startsWith(MODULE_PATH_PREFIX)) return null;
+
+  const relativePath = parsed.pathname.slice(MODULE_PATH_PREFIX.length);
+  const suffix = `${parsed.search}${parsed.hash}`;
+
+  if (relativePath === 'main.js' || relativePath === 'dist/main.js') {
+    return `/main.js${suffix}`;
+  }
+
+  return `/${relativePath}${suffix}`;
 }
 
 function proxyToFoundry(clientReq, clientRes) {

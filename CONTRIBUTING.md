@@ -91,7 +91,8 @@ Open `http://localhost:5173` instead of `:30000`. Foundry loads normally, but Fa
 **How it works:**
 
 - A custom Vite plugin (`scripts/vite-foundry-proxy.js`) proxies all requests to Foundry at `:30000`
-- Requests for `/modules/fabricate/dist/main.js` are rewritten to `/src/main.js` so Vite serves the source
+- Foundry requests `/modules/fabricate/main.js`, which Vite serves from the repo root
+- The repo-root `main.js` shim loads `src/main.js` on the Vite dev server and `dist/main.js` for direct Foundry or release-like loads
 - `/@vite/client` is injected into Foundry's HTML to bootstrap the HMR WebSocket
 - Foundry's `socket.io` is proxied with WebSocket upgrade support
 - HMR uses a separate port (5174) to avoid collision with Foundry's socket.io

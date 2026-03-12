@@ -16,6 +16,8 @@ Rules:
 - Run `npm run build` to confirm the build compiles cleanly
 - Keep changes focused — one task at a time
 - Follow existing patterns in the codebase before inventing new ones
+- For UI/UX changes, verify against the local Vite dev server first when one is available. If no dev URL is known, ask before defaulting to container-based verification.
+- Use `npm run test:foundry` for UI changes only when the behavior depends on real Foundry runtime integration or when clean reproducible screenshot evidence is required.
 
 Stack: TypeScript, Svelte components for UI, Vite for bundling, node:test for tests.
 FoundryVTT globals (game, ui, Hooks) are available at runtime — do not import them.

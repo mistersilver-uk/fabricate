@@ -17,9 +17,10 @@ Keep this skill aligned with `.claude/agents/quality-engineer.md`.
 
 1. Query existing issues first to avoid duplicates.
 2. Review the highest-risk code paths and their tests.
-3. Run `npm test` and `npm run build` when they help confirm a finding.
-4. Convert validated problems into issue-ready defect or test-gap tasks.
-5. Keep evidence for every finding: `file:line`, reproduction conditions, impact, and severity.
+3. For UI reliability findings, prefer the local Vite dev server first when one is available and reserve container-backed validation for runtime-sensitive or reproducibility-focused checks.
+4. Run `npm test` and `npm run build` when they help confirm a finding.
+5. Convert validated problems into issue-ready defect or test-gap tasks.
+6. Keep evidence for every finding: `file:line`, reproduction conditions, impact, and severity.
 
 ## Rules
 

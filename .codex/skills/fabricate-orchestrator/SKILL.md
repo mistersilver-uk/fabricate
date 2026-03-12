@@ -36,6 +36,7 @@ Keep this skill aligned with `.claude/agents/orchestrator.md`.
 - Do not edit `src/`, `tests/`, or production docs in this stage.
 - Use GitHub issue numbers such as `#42`, not legacy task IDs, when the issue exists.
 - For quick-start docs work, route changes only to `docs/quickstart.md`.
+- For tasks centered on `src/ui/`, `styles/`, or UX behavior, make the plan prefer the local Vite dev server first and reserve `npm run test:foundry` for runtime-sensitive or reproducibility-focused validation.
 - If `gh` is unavailable or unauthenticated, record the block in `PLAN.md` instead of guessing issue state.
 - In Default collaboration mode, do not stop for extra user input unless the task is genuinely blocked.
 

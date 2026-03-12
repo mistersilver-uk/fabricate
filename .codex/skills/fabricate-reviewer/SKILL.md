@@ -33,6 +33,7 @@ Keep this skill aligned with `.claude/agents/reviewer.md`.
 - Svelte components follow existing repo patterns.
 - No stray debug logging remains.
 - Validation passes without warnings that matter.
+- UI-only changes use Vite-first verification when available, with container-based validation reserved for runtime-sensitive or reproducibility-focused checks.
 
 ## Foundry V13 checks
 

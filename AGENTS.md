@@ -17,6 +17,8 @@ Primary stack: JavaScript ES modules, Svelte 5, Vite, `node:test`, happy-dom, Pl
 - `npm test` — required validation gate for implementation changes.
 - `npm run build` — required build gate for implementation changes.
 - `npm run test:foundry` — use when a task needs live Foundry UI or screenshot validation.
+- For UI/UX work, prefer the local Vite dev server first, using the user-provided dev URL when available.
+- Fall back to `npm run test:foundry` when a change depends on real Foundry runtime behavior, when no Vite dev server is available, or when clean reproducible screenshots are needed.
 
 ## Code Conventions
 

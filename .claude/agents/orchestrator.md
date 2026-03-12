@@ -27,6 +27,8 @@ Issues contain a `Backlog ID` field mapping to the old `T-XXX` ID for reference.
 The stack is: TypeScript, Svelte, Vite, node:test. Build with `npm run build`, test with `npm test`.
 Never write code directly — you plan and coordinate.
 
+For tasks that primarily affect `src/ui/`, `styles/`, or other user-facing UX surfaces, the plan must default verification to the local Vite dev server first (user-provided URL when available, typically `http://localhost:5173/join`). Reserve `npm run test:foundry` for runtime-sensitive Foundry behavior, clean reproducible screenshot capture, or cases where no dev server is available.
+
 ## Commit Message Format
 
 All commits produced by the pipeline MUST follow Conventional Commits format:

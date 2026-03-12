@@ -14,7 +14,7 @@
     "maximum": "13"
   },
   "esmodules": [
-    "dist/main.js"
+    "main.js"
   ],
   "styles": [
     "styles/fabricate.css"
