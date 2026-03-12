@@ -67,29 +67,34 @@ npm run release:validate
 
 The script exits with code 1 if validation fails and prints a list of missing files or parse errors.
 
-### Testing the Build in FoundryVTT
+### Local Development (dev server with HMR)
 
-After running `npm run release:build`, you can test the unzipped build by symlinking `dist/` into your local FoundryVTT module directory:
+Symlink the **project root** into Foundry's module directory.
+Run these commands in the project root:
 
 ```bash
 # Linux / macOS
-ln -s "$(pwd)/dist" ~/.local/share/FoundryVTT/Data/modules/fabricate
+ln -s "$(pwd)" ~/.local/share/FoundryVTT/Data/modules/fabricate
 
 # Windows (run as Administrator in PowerShell)
-New-Item -ItemType SymbolicLink -Path "$env:LOCALAPPDATA\FoundryVTT\Data\modules\fabricate" -Target "$(pwd)\dist"
+New-Item -ItemType SymbolicLink -Path "$env:LOCALAPPDATA\FoundryVTT\Data\modules\fabricate" -Target "$(pwd)"
 ```
 
-After symlinking, launch FoundryVTT and enable the module in a test world. Validate that the symlink is correct by checking that Foundry reports the module version matching your local `package.json`.
-
-To remove the symlink when you are done:
+Start Foundry at `http://localhost:30000` with a world that has the module enabled, then:
 
 ```bash
-# Linux / macOS
-rm ~/.local/share/FoundryVTT/Data/modules/fabricate
-
-# Windows
-Remove-Item "$env:LOCALAPPDATA\FoundryVTT\Data\modules\fabricate"
+npm run dev
 ```
+
+Open `http://localhost:5173` instead of `:30000`. Foundry loads normally, but Fabricate's source files are served by Vite with HMR transforms. Svelte component edits appear instantly without a page reload; other JS changes trigger a full reload.
+
+**How it works:**
+
+- A custom Vite plugin (`scripts/vite-foundry-proxy.js`) proxies all requests to Foundry at `:30000`
+- Requests for `/modules/fabricate/dist/main.js` are rewritten to `/src/main.js` so Vite serves the source
+- `/@vite/client` is injected into Foundry's HTML to bootstrap the HMR WebSocket
+- Foundry's `socket.io` is proxied with WebSocket upgrade support
+- HMR uses a separate port (5174) to avoid collision with Foundry's socket.io
 
 ### Release Script CI Usage
 

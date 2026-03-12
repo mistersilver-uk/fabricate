@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/release.js --no-zip",
-    "dev": "vite build --watch",
+    "dev": "vite serve",
     "test": "node --test tests/*.test.js tests/stores/*.test.js tests/components/*.test.js tests/actions/*.test.js",
     "test:foundry:install": "playwright install chromium --with-deps",
     "test:foundry:up": "node scripts/foundry-test-up.mjs",
