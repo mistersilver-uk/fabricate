@@ -4,6 +4,13 @@ All notable changes to Fabricate will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.0.0-rc.8](https://github.com/misterpotts/fabricate-v2/compare/v1.0.0-rc.7...v1.0.0-rc.8) (2026-03-12)
+
+### Features
+
+* **#142:** add salvage run management system ([688d133](https://github.com/misterpotts/fabricate-v2/commit/688d1333184d14afdb94b01af1c9224bf2c245c7)), closes [#142](https://github.com/misterpotts/fabricate-v2/issues/142)
+* **ci:** add manual Codex Team B workflow for explicit issue runs ([ef618ad](https://github.com/misterpotts/fabricate-v2/commit/ef618adc73ddc04370eed7c5ddf4e068a59b43e2))
+
 ## [1.0.0-rc.7](https://github.com/misterpotts/fabricate-v2/compare/v1.0.0-rc.6...v1.0.0-rc.7) (2026-03-11)
 
 ### Features
