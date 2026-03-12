@@ -296,7 +296,7 @@ export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
           if (!systemId || !itemId) return;
           const system = systemManager.getSystem(systemId);
           if (!system) return;
-          const item = (system.items || []).find(i => i.id === itemId);
+          const item = (system.components || []).find(i => i.id === itemId);
           if (!item) return;
 
           const advancedEnabled = system.advancedOptionsEnabled !== false;

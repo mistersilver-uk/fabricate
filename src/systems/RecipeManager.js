@@ -723,8 +723,7 @@ export class RecipeManager {
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(systemId);
     if (!system) return null;
-    const managedItems = Array.isArray(system.components) ? system.components : (Array.isArray(system.managedItems) ? system.managedItems : (system.items || []));
-    return managedItems.find(item => item.id === componentId) || null;
+    return (system.components || []).find(item => item.id === componentId) || null;
   }
 
   /**
@@ -956,9 +955,7 @@ export class RecipeManager {
       getComponentsForSystem: (id) => {
         const system = systemManager.getSystem(id);
         if (!system) return [];
-        return Array.isArray(system.components) ? system.components
-          : (Array.isArray(system.managedItems) ? system.managedItems
-          : (system.items || []));
+        return system.components || [];
       }
     };
 

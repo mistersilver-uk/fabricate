@@ -244,9 +244,9 @@ test('addItemsFromPack — imports all Item documents from a mock pack', async (
   assert.equal(result.skipped, 0);
 
   const sys = mgr.getSystem('sys1');
-  assert.equal(sys.items.length, 2);
-  assert.ok(sys.items.some(i => i.sourceUuid === 'Compendium.world.mypack.item-a'));
-  assert.ok(sys.items.some(i => i.sourceUuid === 'Compendium.world.mypack.item-b'));
+  assert.equal(sys.components.length, 2);
+  assert.ok(sys.components.some(i => i.sourceUuid === 'Compendium.world.mypack.item-a'));
+  assert.ok(sys.components.some(i => i.sourceUuid === 'Compendium.world.mypack.item-b'));
 });
 
 test('addItemsFromPack — skips items already in the system by sourceUuid', async () => {
@@ -308,10 +308,10 @@ test('addItemsFromPack — updates existing component when canonical source UUID
   assert.equal(result.skipped, 0);
 
   const sys = mgr.getSystem('sys1');
-  assert.equal(sys.items.length, 1, 'should not duplicate the component');
-  assert.equal(sys.items[0].sourceUuid, 'Compendium.world.new-pack.item-b');
-  assert.equal(sys.items[0].sourceItemUuid, 'Compendium.source.items.iron-ore');
-  assert.ok(sys.items[0].fallbackItemIds.includes('Compendium.world.old-pack.item-a'));
+  assert.equal(sys.components.length, 1, 'should not duplicate the component');
+  assert.equal(sys.components[0].sourceUuid, 'Compendium.world.new-pack.item-b');
+  assert.equal(sys.components[0].sourceItemUuid, 'Compendium.source.items.iron-ore');
+  assert.ok(sys.components[0].fallbackItemIds.includes('Compendium.world.old-pack.item-a'));
 
   globalThis.fromUuid = async () => null;
 });
@@ -379,7 +379,7 @@ test('addItemFromUuid — exact duplicate returns { item, action: "skipped" }', 
   assert.equal(result.action, 'skipped');
   assert.equal(result.item.id, 'comp-1');
   // System should still have only one item
-  assert.equal(mgr.getSystem('sys1').items.length, 1);
+  assert.equal(mgr.getSystem('sys1').components.length, 1);
 });
 
 test('addItemFromUuid — new item returns { item, action: "added" }', async () => {
@@ -399,7 +399,7 @@ test('addItemFromUuid — new item returns { item, action: "added" }', async () 
   assert.equal(result.item.img, 'coal.png');
   assert.equal(result.item.sourceUuid, 'Compendium.world.pack.item-coal');
   assert.equal(result.item.sourceItemUuid, 'Compendium.source.items.coal');
-  assert.equal(mgr.getSystem('sys1').items.length, 1);
+  assert.equal(mgr.getSystem('sys1').components.length, 1);
 
   globalThis.fromUuid = async () => null;
 });
@@ -427,7 +427,7 @@ test('addItemFromUuid — exact match with differing metadata overwrites name/im
   assert.equal(result.item.img, 'ore2.png');
   assert.equal(result.item.sourceItemUuid, 'Compendium.source.items.iron-ore');
   // System should still have only one item
-  assert.equal(mgr.getSystem('sys1').items.length, 1);
+  assert.equal(mgr.getSystem('sys1').components.length, 1);
 
   globalThis.fromUuid = async () => null;
 });
@@ -487,7 +487,7 @@ test('addItemFromUuid — overwrites when dropped UUID is in existing item\'s fa
   // Old sourceUuid pushed into fallbackItemIds
   assert.ok(result.item.fallbackItemIds.includes('Item.world-123'));
   // System still has only one item
-  assert.equal(mgr.getSystem('sys1').items.length, 1);
+  assert.equal(mgr.getSystem('sys1').components.length, 1);
 
   globalThis.fromUuid = async () => null;
 });
@@ -583,6 +583,22 @@ test('addItemsFromPack — returns { added, updated, skipped, total } with updat
   assert.ok('updated' in result, 'result must have an updated field');
 });
 
+test('addItemFromUuid — rejects non-Item document type', async () => {
+  const mgr = buildManager([{ id: 'sys1', name: 'System One', items: [] }]);
+
+  globalThis.fromUuid = async () => ({
+    documentName: 'Actor',
+    name: 'Bob the Blacksmith'
+  });
+
+  await assert.rejects(
+    () => mgr.addItemFromUuid('sys1', 'Actor.bob123'),
+    /non-Item|Actor/
+  );
+
+  globalThis.fromUuid = async () => null;
+});
+
 test('createItem — rejects a duplicate source reference already used by another component', async () => {
   const mgr = buildManager([{
     id: 'sys1',
@@ -631,22 +647,6 @@ test('updateItem — rejects changing a component to a source reference already 
     }),
     /already belongs/
   );
-});
-
-test('addItemFromUuid — rejects non-Item document type', async () => {
-  const mgr = buildManager([{ id: 'sys1', name: 'System One', items: [] }]);
-
-  globalThis.fromUuid = async () => ({
-    documentName: 'Actor',
-    name: 'Bob the Blacksmith'
-  });
-
-  await assert.rejects(
-    () => mgr.addItemFromUuid('sys1', 'Actor.bob123'),
-    /non-Item|Actor/
-  );
-
-  globalThis.fromUuid = async () => null;
 });
 
 // ---------------------------------------------------------------------------

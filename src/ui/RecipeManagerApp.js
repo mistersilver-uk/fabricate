@@ -543,7 +543,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     const itemId = target.dataset.itemId;
     const system = this._selectedSystem();
     if (!system || !itemId) return;
-    const item = system.items.find(i => i.id === itemId);
+    const item = (system.components || []).find(i => i.id === itemId);
     if (!item) return;
 
     const advancedEnabled = system.advancedOptionsEnabled !== false;

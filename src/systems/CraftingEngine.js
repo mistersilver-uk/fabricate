@@ -555,11 +555,11 @@ export class CraftingEngine {
       getRecipesForSystem: (id) => (recipeManager ? recipeManager.getRecipes({ craftingSystemId: id, enabled: true }) : []),
       getComponentsForSystem: (id) => {
         const sys = systemManager.getSystem(id);
-        return Array.isArray(sys?.components) ? sys.components : (Array.isArray(sys?.managedItems) ? sys.managedItems : (sys?.items || []));
+        return sys?.components || [];
       }
     });
 
-    const components = Array.isArray(system.components) ? system.components : (Array.isArray(system.managedItems) ? system.managedItems : (system.items || []));
+    const components = system.components || [];
     const recipes = systemRecipes;
     const matchResult = this._matchAlchemySignature(submittedItems, recipes, components, signatureValidator);
 
@@ -812,7 +812,7 @@ export class CraftingEngine {
     if ((result.componentId || result.systemItemId) && recipe.craftingSystemId) {
       const systemManager = game.fabricate?.getCraftingSystemManager?.();
       const system = systemManager?.getSystem(recipe.craftingSystemId);
-      const managedItems = Array.isArray(system?.components) ? system.components : (Array.isArray(system?.managedItems) ? system.managedItems : (system?.items || []));
+      const managedItems = system?.components || [];
       managedItem = managedItems.find(i => i.id === (result.componentId || result.systemItemId)) || null;
       if (managedItem?.sourceUuid) {
         sourceItem = await fromUuid(managedItem.sourceUuid);
@@ -1681,8 +1681,7 @@ export class CraftingEngine {
       return { success: false, results: null, message: `Crafting system "${craftingSystemId}" not found`, salvageRun: null };
     }
 
-    const managedItems = Array.isArray(system.components) ? system.components
-      : (Array.isArray(system.managedItems) ? system.managedItems : []);
+    const managedItems = system.components || [];
     const component = managedItems.find(c => c.id === componentId) || null;
     if (!component) {
       return { success: false, results: null, message: `Component "${componentId}" not found in system`, salvageRun: null };
@@ -2021,8 +2020,7 @@ export class CraftingEngine {
       let remaining = value;
 
       for (const result of group.results || []) {
-        const managedItems = Array.isArray(system?.components) ? system.components
-          : (Array.isArray(system?.managedItems) ? system.managedItems : []);
+        const managedItems = system?.components || [];
         const managedItem = managedItems.find(e => e.id === (result.componentId || result.systemItemId));
         const cost = Number(managedItem?.difficulty);
         if (!Number.isFinite(cost) || cost < 1) continue;

@@ -26,20 +26,20 @@ function buildSystem(overrides = {}) {
       outcomes: [],
       progressive: { awardMode: 'equal' },
     },
-    managedItems: [],
+    components: [],
     ...overrides,
   };
 }
 
 /**
- * Build a progressive system with the given managedItems and awardMode.
- * @param {object[]} managedItems - array of { id, difficulty } entries
+ * Build a progressive system with the given components and awardMode.
+ * @param {object[]} components - array of { id, difficulty } entries
  * @param {string} awardMode - 'equal' | 'exceed' | 'partial'
  * @param {object} overrides - additional top-level system overrides
  */
-function buildProgressiveSystem(managedItems = [], awardMode = 'equal', overrides = {}) {
+function buildProgressiveSystem(components = [], awardMode = 'equal', overrides = {}) {
   return buildSystem({
-    managedItems,
+    components,
     craftingCheck: {
       enabled: true,
       macroUuid: null,

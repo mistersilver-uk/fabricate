@@ -26,7 +26,7 @@ function buildSystem(overrides = {}) {
       outcomes: [],
       progressive: null,
     },
-    managedItems: [],
+    components: [],
     ...overrides,
   };
 }
@@ -477,10 +477,10 @@ test('legacy tiered compatibility mode — no step-level routing, valid recipe-l
 
 /**
  * Build a system with progressive mode fully configured.
- * @param {object[]} managedItems - items with id and difficulty fields
+ * @param {object[]} components - items with id and difficulty fields
  * @param {object} overrides
  */
-function buildProgressiveSystem(managedItems = [], overrides = {}) {
+function buildProgressiveSystem(components = [], overrides = {}) {
   return buildSystem({
     resolutionMode: 'progressive',
     craftingCheck: {
@@ -489,7 +489,7 @@ function buildProgressiveSystem(managedItems = [], overrides = {}) {
       outcomes: [],
       progressive: { awardMode: 'equal' },
     },
-    managedItems,
+    components,
     ...overrides,
   });
 }
@@ -707,8 +707,7 @@ test('progressive mode — empty results array in the single group → invalid',
   );
 });
 
-test('progressive mode — _getDifficulty falls back to system.items when managedItems absent', () => {
-  // _getDifficulty: managedItems = Array.isArray(system.managedItems) ? system.managedItems : (system.items || [])
+test('progressive mode — _getDifficulty reads difficulty from system.components', () => {
   const system = buildSystem({
     resolutionMode: 'progressive',
     craftingCheck: {
@@ -717,11 +716,8 @@ test('progressive mode — _getDifficulty falls back to system.items when manage
       outcomes: [],
       progressive: { awardMode: 'equal' },
     },
-    // No managedItems key — use items fallback
-    items: [{ id: 'item-sword', difficulty: 4 }],
+    components: [{ id: 'item-sword', difficulty: 4 }],
   });
-  // Remove managedItems so it falls back to items
-  delete system.managedItems;
   const service = buildService(system);
   const step = buildProgressiveStep([{ id: 'result-1', componentId: 'item-sword' }]);
   const recipe = buildRecipe([step]);
