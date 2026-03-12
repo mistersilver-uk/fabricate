@@ -113,24 +113,21 @@
                   <i class="fas fa-minus"></i>
                 </button>
 
-                <div class="essence-card-main">
-                  <div class="essence-icon" aria-hidden="true">
-                    <i class={option.icon}></i>
-                  </div>
+                <input
+                  class="essence-quantity-input"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={option.quantity}
+                  aria-label={localize('FABRICATE.Admin.Items.Editor.QuantityLabel', { name: option.name })}
+                  oninput={(event) => setEssenceQuantity(option.id, event.currentTarget.value)}
+                />
 
-                  <div class="essence-meta">
-                    <strong>{option.name}</strong>
-                    <input
-                      class="essence-quantity-input"
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={option.quantity}
-                      aria-label={localize('FABRICATE.Admin.Items.Editor.QuantityLabel', { name: option.name })}
-                      oninput={(event) => setEssenceQuantity(option.id, event.currentTarget.value)}
-                    />
-                  </div>
+                <div class="essence-icon" aria-hidden="true">
+                  <i class={option.icon}></i>
                 </div>
+
+                <strong class="essence-name">{option.name}</strong>
 
                 <button
                   type="button"
@@ -237,69 +234,78 @@
 
   .essence-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
   }
 
   .essence-card {
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto auto auto 1fr auto;
     align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    border-radius: 10px;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 9px;
     border: 1px solid var(--color-border-light, #ccc);
     background: rgba(0, 0, 0, 0.05);
   }
 
-  .essence-card-main {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-width: 0;
-  }
-
   .essence-icon {
-    width: 40px;
-    height: 40px;
+    width: 30px;
+    height: 30px;
     display: grid;
     place-items: center;
-    border-radius: 10px;
+    border-radius: 8px;
     background: rgba(0, 0, 0, 0.08);
     flex: 0 0 auto;
   }
 
   .essence-icon i {
-    font-size: 16px;
+    font-size: 13px;
   }
 
-  .essence-meta {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+  .essence-name {
     min-width: 0;
-  }
-
-  .essence-meta strong {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: 0.88rem;
   }
 
   .essence-quantity-input {
-    width: 84px;
+    width: 44px;
+    min-width: 44px;
+    height: 28px;
+    text-align: center;
+    padding: 0 4px;
+  }
+
+  .essence-quantity-input::-webkit-outer-spin-button,
+  .essence-quantity-input::-webkit-inner-spin-button {
+    margin: 0;
   }
 
   .essence-step {
-    width: 32px;
-    height: 32px;
-    border-radius: 999px;
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
     border: 1px solid var(--color-border-light, #bbb);
-    background: rgba(0, 0, 0, 0.08);
+    background: rgba(0, 0, 0, 0.04);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     flex: 0 0 auto;
+    color: inherit;
+  }
+
+  .essence-step i {
+    font-size: 9px;
+    opacity: 0.85;
+  }
+
+  .essence-step:hover,
+  .essence-step:focus-visible {
+    border-color: var(--color-text-accent, #666);
+    background: rgba(0, 0, 0, 0.08);
   }
 
   .component-editor-footer {
@@ -315,11 +321,17 @@
     min-width: 120px;
   }
 
-  @media (max-width: 640px) {
+  @media (max-width: 560px) {
     .component-editor-body {
       padding: 12px;
     }
 
+    .essence-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 420px) {
     .essence-grid {
       grid-template-columns: 1fr;
     }
