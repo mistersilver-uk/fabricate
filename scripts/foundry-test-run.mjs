@@ -40,6 +40,9 @@ const RESULTS_DIR = join(ROOT, 'test-results');
 const FOUNDRY_URL = process.env.FOUNDRY_URL ?? 'http://localhost:30000';
 const ADMIN_KEY = process.env.FOUNDRY_ADMIN_KEY ?? 'fabricate-test-admin';
 const WORLD_ID = 'fabricate-smoke';
+const JOIN_BUTTON_SELECTOR = 'button:has-text("Join Game Session"), button[name="join"]';
+const JOIN_USER_SELECT_SELECTOR = 'select[name="userid"]';
+const JOIN_USER_TILE_SELECTOR = '[data-user-id]';
 
 /** @type {string[]} */
 const consoleErrors = [];
@@ -72,6 +75,44 @@ function getPathname(rawUrl) {
   } catch {
     return '';
   }
+}
+
+/**
+ * Normalize text for stable UI matching.
+ * @param {unknown} value
+ * @returns {string}
+ */
+function normalizeText(value) {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+/**
+ * Summarize join-page state for debugging.
+ * @param {{
+ *   mode?: string | null,
+ *   reason?: string | null,
+ *   availableUsers?: string[],
+ *   selectedLabel?: string,
+ *   selectedValue?: string,
+ *   joinButtonDisabled?: boolean,
+ *   selectionMatches?: boolean
+ * }} state
+ * @param {string} userLabel
+ * @returns {string}
+ */
+function describeJoinState(state, userLabel) {
+  /** @type {string[]} */
+  const parts = [];
+  if (state.mode) parts.push(`mode=${state.mode}`);
+  if (state.selectedLabel) parts.push(`selectedLabel=${state.selectedLabel}`);
+  if (state.selectedValue) parts.push(`selectedValue=${state.selectedValue}`);
+  if (typeof state.selectionMatches === 'boolean') parts.push(`selectionMatches=${state.selectionMatches}`);
+  if (typeof state.joinButtonDisabled === 'boolean') parts.push(`joinButtonDisabled=${state.joinButtonDisabled}`);
+  if (Array.isArray(state.availableUsers) && state.availableUsers.length > 0) {
+    parts.push(`availableUsers=${state.availableUsers.join(', ')}`);
+  }
+  if (state.reason) parts.push(`reason=${state.reason}`);
+  return `Join diagnostics for "${userLabel}": ${parts.join('; ') || 'no details available'}.`;
 }
 
 /**
@@ -184,6 +225,336 @@ async function dismissFirstRunDialogs(page, results) {
   }
 }
 
+/**
+ * Read the current join-form state from the page.
+ * @param {import('playwright').Page} page
+ * @param {string} userLabel
+ * @returns {Promise<{
+ *   mode: string | null,
+ *   targetFound: boolean,
+ *   selectionMatches: boolean,
+ *   selectedLabel: string,
+ *   selectedValue: string,
+ *   availableUsers: string[],
+ *   joinButtonDisabled: boolean,
+ *   reason: string | null
+ * }>}
+ */
+async function readJoinState(page, userLabel) {
+  return page.evaluate(({ selectSelector, tileSelector, userLabel: targetLabel }) => {
+    const normalize = value => String(value ?? '').trim().toLowerCase();
+    const target = normalize(targetLabel);
+    const isVisible = element => {
+      if (!(element instanceof HTMLElement)) return false;
+      if (element.hidden) return false;
+      const style = window.getComputedStyle(element);
+      return style.display !== 'none' && style.visibility !== 'hidden' && element.offsetParent !== null;
+    };
+    const matchTarget = value => {
+      const normalized = normalize(value);
+      if (!normalized) return false;
+      return normalized === target || normalized.includes(target) || target.includes(normalized);
+    };
+    const getNodeLabel = node => {
+      const candidates = [
+        node.getAttribute('data-user-name'),
+        node.getAttribute('aria-label'),
+        node.textContent
+      ];
+      return candidates.map(value => String(value ?? '').trim()).find(Boolean) ?? '';
+    };
+
+    const joinButton = Array.from(document.querySelectorAll('button')).find(button => {
+      const text = normalize(button.textContent);
+      return text.includes('join game session') || button.name === 'join';
+    }) ?? null;
+    const selects = Array.from(document.querySelectorAll(selectSelector))
+      .filter(node => node instanceof HTMLSelectElement);
+    const select = selects.find(isVisible) ?? selects[selects.length - 1] ?? null;
+
+    if (select) {
+      const options = Array.from(select.options)
+        .map(option => ({
+          label: option.textContent?.trim() ?? '',
+          value: option.value,
+          disabled: option.disabled
+        }))
+        .filter(option => option.value && !option.disabled);
+      const selectedOption = select.selectedOptions?.[0];
+      const selectedLabel = selectedOption?.textContent?.trim() ?? '';
+      const selectedValue = select.value ?? '';
+
+      return {
+        mode: 'select',
+        targetFound: options.some(option => matchTarget(option.label)),
+        selectionMatches: Boolean(selectedValue) && matchTarget(selectedLabel),
+        selectedLabel,
+        selectedValue,
+        availableUsers: options.map(option => option.label || option.value).filter(Boolean),
+        joinButtonDisabled: Boolean(joinButton?.disabled),
+        reason: options.length === 0 ? 'User select has no joinable options yet.' : null
+      };
+    }
+
+    const tiles = Array.from(document.querySelectorAll(tileSelector))
+      .filter(isVisible);
+    const availableUsers = tiles.map(getNodeLabel).filter(Boolean);
+    const hiddenInput = document.querySelector('input[name="userid"]');
+    const selectedValue = hiddenInput instanceof HTMLInputElement ? hiddenInput.value : '';
+    const selectedTile = tiles.find(tile =>
+      tile.matches('[aria-selected="true"], .selected, [data-selected="true"], [aria-pressed="true"]')
+    ) ?? tiles.find(tile => {
+      const tileUserId = tile.getAttribute('data-user-id') ?? '';
+      return Boolean(selectedValue) && tileUserId === selectedValue;
+    }) ?? null;
+    const selectedLabel = selectedTile ? getNodeLabel(selectedTile) : '';
+
+    return {
+      mode: tiles.length > 0 ? 'tile' : null,
+      targetFound: availableUsers.some(matchTarget),
+      selectionMatches: Boolean(selectedValue || selectedLabel) && matchTarget(selectedLabel || selectedValue),
+      selectedLabel,
+      selectedValue,
+      availableUsers,
+      joinButtonDisabled: Boolean(joinButton?.disabled),
+      reason: tiles.length === 0 ? 'Join page did not expose a selectable user control.' : null
+    };
+  }, {
+    selectSelector: JOIN_USER_SELECT_SELECTOR,
+    tileSelector: JOIN_USER_TILE_SELECTOR,
+    userLabel
+  });
+}
+
+/**
+ * Wait until the join UI exposes a selectable user.
+ * @param {import('playwright').Page} page
+ * @param {string} userLabel
+ */
+async function waitForJoinUi(page, userLabel) {
+  const joinButton = page.locator(JOIN_BUTTON_SELECTOR).first();
+  await joinButton.waitFor({ state: 'visible', timeout: 15_000 });
+  await page.waitForFunction(({ selectSelector, tileSelector, targetLabel }) => {
+    const normalize = value => String(value ?? '').trim().toLowerCase();
+    const target = normalize(targetLabel);
+    const isVisible = element => {
+      if (!(element instanceof HTMLElement)) return false;
+      if (element.hidden) return false;
+      const style = window.getComputedStyle(element);
+      return style.display !== 'none' && style.visibility !== 'hidden' && element.offsetParent !== null;
+    };
+    const matchTarget = value => {
+      const normalized = normalize(value);
+      if (!normalized) return false;
+      return normalized === target || normalized.includes(target) || target.includes(normalized);
+    };
+
+    const selects = Array.from(document.querySelectorAll(selectSelector))
+      .filter(node => node instanceof HTMLSelectElement);
+    const select = selects.find(isVisible) ?? selects[selects.length - 1] ?? null;
+    if (select) {
+      const options = Array.from(select.options)
+        .filter(option => option.value && !option.disabled);
+      return options.length > 0 && options.some(option => matchTarget(option.textContent));
+    }
+
+    const tiles = Array.from(document.querySelectorAll(tileSelector))
+      .filter(isVisible);
+    return tiles.some(tile => {
+      const label = tile.getAttribute('data-user-name') || tile.getAttribute('aria-label') || tile.textContent || '';
+      return matchTarget(label);
+    });
+  }, {
+    selectSelector: JOIN_USER_SELECT_SELECTOR,
+    tileSelector: JOIN_USER_TILE_SELECTOR,
+    targetLabel: userLabel
+  }, { timeout: 15_000 });
+}
+
+/**
+ * Attempt to select the target join user.
+ * @param {import('playwright').Page} page
+ * @param {string} userLabel
+ * @returns {Promise<{
+ *   selected: boolean,
+ *   mode: string | null,
+ *   availableUsers: string[],
+ *   selectedLabel: string,
+ *   selectedValue: string,
+ *   reason: string | null
+ * }>}
+ */
+async function selectJoinUser(page, userLabel) {
+  return page.evaluate(({ selectSelector, tileSelector, userLabel: targetLabel }) => {
+    const normalize = value => String(value ?? '').trim().toLowerCase();
+    const target = normalize(targetLabel);
+    const isVisible = element => {
+      if (!(element instanceof HTMLElement)) return false;
+      if (element.hidden) return false;
+      const style = window.getComputedStyle(element);
+      return style.display !== 'none' && style.visibility !== 'hidden' && element.offsetParent !== null;
+    };
+    const matchTarget = value => {
+      const normalized = normalize(value);
+      if (!normalized) return false;
+      return normalized === target || normalized.includes(target) || target.includes(normalized);
+    };
+    const getNodeLabel = node => {
+      const candidates = [
+        node.getAttribute('data-user-name'),
+        node.getAttribute('aria-label'),
+        node.textContent
+      ];
+      return candidates.map(value => String(value ?? '').trim()).find(Boolean) ?? '';
+    };
+
+    const selects = Array.from(document.querySelectorAll(selectSelector))
+      .filter(node => node instanceof HTMLSelectElement);
+    const select = selects.find(isVisible) ?? selects[selects.length - 1] ?? null;
+
+    if (select) {
+      const options = Array.from(select.options)
+        .map(option => ({
+          option,
+          label: option.textContent?.trim() ?? '',
+          value: option.value,
+          disabled: option.disabled
+        }))
+        .filter(entry => entry.value && !entry.disabled);
+      const match = options.find(entry => matchTarget(entry.label)) ?? null;
+      if (!match) {
+        return {
+          selected: false,
+          mode: 'select',
+          availableUsers: options.map(entry => entry.label || entry.value).filter(Boolean),
+          selectedLabel: select.selectedOptions?.[0]?.textContent?.trim() ?? '',
+          selectedValue: select.value ?? '',
+          reason: `User "${targetLabel}" was not found in the join select.`
+        };
+      }
+
+      select.selectedIndex = match.option.index;
+      select.dispatchEvent(new Event('input', { bubbles: true }));
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+
+      return {
+        selected: select.value === match.value && matchTarget(select.selectedOptions?.[0]?.textContent ?? ''),
+        mode: 'select',
+        availableUsers: options.map(entry => entry.label || entry.value).filter(Boolean),
+        selectedLabel: select.selectedOptions?.[0]?.textContent?.trim() ?? '',
+        selectedValue: select.value ?? '',
+        reason: null
+      };
+    }
+
+    const tiles = Array.from(document.querySelectorAll(tileSelector))
+      .filter(isVisible);
+    const match = tiles.find(tile => matchTarget(getNodeLabel(tile))) ?? null;
+    if (!match) {
+      return {
+        selected: false,
+        mode: tiles.length > 0 ? 'tile' : null,
+        availableUsers: tiles.map(getNodeLabel).filter(Boolean),
+        selectedLabel: '',
+        selectedValue: '',
+        reason: `User "${targetLabel}" was not found in the join tiles.`
+      };
+    }
+
+    match.click();
+    const hiddenInput = document.querySelector('input[name="userid"]');
+    const selectedValue = hiddenInput instanceof HTMLInputElement ? hiddenInput.value : '';
+    const selectedTile = tiles.find(tile =>
+      tile.matches('[aria-selected="true"], .selected, [data-selected="true"], [aria-pressed="true"]')
+    ) ?? tiles.find(tile => {
+      const tileUserId = tile.getAttribute('data-user-id') ?? '';
+      return Boolean(selectedValue) && tileUserId === selectedValue;
+    }) ?? match;
+    const selectedLabel = getNodeLabel(selectedTile);
+
+    return {
+      selected: Boolean(selectedValue || selectedLabel) && matchTarget(selectedLabel || selectedValue),
+      mode: 'tile',
+      availableUsers: tiles.map(getNodeLabel).filter(Boolean),
+      selectedLabel,
+      selectedValue,
+      reason: null
+    };
+  }, {
+    selectSelector: JOIN_USER_SELECT_SELECTOR,
+    tileSelector: JOIN_USER_TILE_SELECTOR,
+    userLabel
+  });
+}
+
+/**
+ * Join the running world from the Foundry join page.
+ * @param {import('playwright').Page} page
+ * @param {{ steps: Array<Record<string, boolean | string>> }} results
+ * @param {{ userLabel?: string, stepName?: string | null }} [options]
+ */
+async function joinWorldSession(page, results, options = {}) {
+  if (getPathname(page.url()) !== '/join') {
+    return;
+  }
+
+  const userLabel = options.userLabel ?? 'Gamemaster';
+  const stepName = options.stepName ?? null;
+
+  process.stdout.write(`Join page detected. Joining as ${userLabel}...\n`);
+  await page.waitForLoadState('domcontentloaded');
+  await waitForJoinUi(page, userLabel);
+
+  let joinState = await readJoinState(page, userLabel);
+  if (!joinState.selectionMatches) {
+    let selected = false;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      await selectJoinUser(page, userLabel);
+      await page.waitForTimeout(250 * attempt);
+      joinState = await readJoinState(page, userLabel);
+      if (joinState.selectionMatches) {
+        selected = true;
+        break;
+      }
+    }
+
+    if (!selected) {
+      await screenshot(page, 'join-selection-failed');
+      throw new Error(`Unable to select join user. ${describeJoinState(joinState, userLabel)}`);
+    }
+  }
+
+  const joinButton = page.locator(JOIN_BUTTON_SELECTOR).first();
+  await joinButton.waitFor({ state: 'visible', timeout: 10_000 });
+  await page.waitForFunction(() => {
+    const button = Array.from(document.querySelectorAll('button')).find(candidate => {
+      const text = String(candidate.textContent ?? '').trim().toLowerCase();
+      return text.includes('join game session') || candidate.name === 'join';
+    });
+    return button instanceof HTMLButtonElement ? !button.disabled : true;
+  }, null, { timeout: 5_000 }).catch(() => {});
+
+  await screenshot(page, 'join-ready');
+
+  try {
+    await Promise.all([
+      page.waitForURL(/\/game/, { timeout: 60_000, waitUntil: 'load' }),
+      joinButton.click()
+    ]);
+  } catch (err) {
+    const failureState = await readJoinState(page, userLabel);
+    await screenshot(page, 'join-submit-failed');
+    throw new Error(
+      `Join session did not reach /game after selecting "${userLabel}". ` +
+      `${describeJoinState(failureState, userLabel)} Cause: ${err.message}`
+    );
+  }
+
+  if (stepName) {
+    results.steps.push({ step: stepName, passed: true });
+  }
+}
+
 // ── Cleanup tracking ──────────────────────────────────────────────────────
 const cleanup = {
   actorIds: [],
@@ -282,32 +653,7 @@ async function main() {
       results.steps.push({ step: 'launch-world', passed: true, skipped: true });
     }
 
-    // If on /join, select Gamemaster and join the session
-    if (getPathname(page.url()) === '/join') {
-      process.stdout.write('Join page detected. Joining as Gamemaster...\n');
-
-      // Select the Gamemaster user — try select element first, then Foundry V13 widgets
-      const selectEl = page.locator('select[name="userid"]');
-      if (await selectEl.count() > 0) {
-        await selectEl.selectOption({ label: 'Gamemaster' });
-      } else {
-        // Foundry V13 may use a custom user picker — select via API
-        await page.evaluate(() => {
-          const gm = document.querySelector('[data-user-id]');
-          if (gm) gm.click();
-        });
-      }
-
-      // Click the Join Game Session button
-      const joinBtn = page.locator('button:has-text("Join Game Session"), button[name="join"], button[type="submit"]').first();
-      await joinBtn.waitFor({ state: 'visible', timeout: 10_000 });
-
-      await Promise.all([
-        page.waitForURL(/\/game/, { timeout: 60_000, waitUntil: 'load' }),
-        joinBtn.click()
-      ]);
-      results.steps.push({ step: 'join-session', passed: true });
-    }
+    await joinWorldSession(page, results, { userLabel: 'Gamemaster', stepName: 'join-session' });
 
     await screenshot(page, 'world-loaded');
 
@@ -330,14 +676,7 @@ async function main() {
       // Reload the page to apply module activation
       await page.reload({ waitUntil: 'load', timeout: 60_000 });
       // Re-join if redirected to /join
-      if (getPathname(page.url()) === '/join') {
-        const joinBtn = page.locator('button:has-text("Join Game Session"), button[name="join"], button[type="submit"]').first();
-        await joinBtn.waitFor({ state: 'visible', timeout: 10_000 });
-        await Promise.all([
-          page.waitForURL(/\/game/, { timeout: 60_000, waitUntil: 'load' }),
-          joinBtn.click()
-        ]);
-      }
+      await joinWorldSession(page, results, { userLabel: 'Gamemaster' });
       await page.waitForFunction(() => typeof game !== 'undefined' && game.ready, { timeout: 30_000 });
 
       const nowActive = await page.evaluate(() => game.modules.get('fabricate')?.active === true);

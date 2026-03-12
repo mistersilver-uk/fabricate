@@ -35,7 +35,7 @@ The smoke test executes 6 phases:
 
 | Phase | Name | What It Does |
 |---|---|---|
-| A | Setup | Navigates to Foundry, accepts license, authenticates, launches world |
+| A | Setup | Navigates to Foundry, accepts license, authenticates, launches the world, and joins as Gamemaster |
 | B | Create Actors & Items | Cleans stale data, creates 2 actors and 7 items with inventories |
 | C | Create Crafting System | Creates "Arcane Forge" system, registers 7 components, creates 3 recipes |
 | D | Screenshot Recipe Manager | Opens Recipe Manager, selects system, screenshots all 5 tabs |
@@ -44,23 +44,19 @@ The smoke test executes 6 phases:
 
 ### Screenshot Catalog
 
-All screenshots are written to `test-results/` with auto-incrementing numeric prefixes.
+All screenshots are written to `test-results/` with auto-incrementing numeric prefixes. The
+stable part of each filename is the trailing label, not the numeric prefix.
 
-| File | Contents |
+| File label | Contents |
 |---|---|
-| `screenshot-01-world-loaded.png` | Foundry canvas after joining the game session |
-| `screenshot-02-items-sidebar.png` | Items sidebar with 7 crafting items (`.webp` icons) |
-| `screenshot-03-actor-sheet-*.png` | First actor — inventory tab with embedded items |
-| `screenshot-04-actor-sheet-*.png` | Second actor — inventory tab |
-| `screenshot-05-recipe-manager-default.png` | Recipe Manager — Systems tab with "Arcane Forge" selected |
-| `screenshot-06-recipe-manager-systems.png` | Systems tab — settings and feature toggles |
-| `screenshot-07-recipe-manager-items.png` | Components tab — 8 item cards with icons |
-| `screenshot-08-recipe-manager-recipes.png` | Recipes tab — 3 recipes with ingredient counts |
-| `screenshot-09-recipe-manager-rules.png` | Rules tab |
-| `screenshot-10-recipe-manager-graph.png` | Graph tab — recipe dependency visualization |
-| `screenshot-11-crafting-app-opened.png` | Crafting App — actor selection, craftable recipes |
-| `screenshot-12-post-craft.png` | Post-craft state with success notification |
-| `screenshot-13-alara-post-craft-inventory.png` | Actor inventory after crafting |
+| `license`, `license-accepted`, `auth-complete`, `setup-ready`, `worlds-tab`, `world-launching` | First-run setup and world-launch checkpoints |
+| `join-ready` | Join form with the Gamemaster selection confirmed before submission |
+| `world-loaded` | Foundry canvas after joining the game session |
+| `items-sidebar` | Items sidebar with 7 crafting items (`.webp` icons) |
+| `actor-sheet-*` | Actor inventory sheets with embedded test items |
+| `recipe-manager-default`, `recipe-manager-systems`, `recipe-manager-items`, `recipe-manager-recipes`, `recipe-manager-rules`, `recipe-manager-graph` | Recipe Manager checkpoints across the admin tabs |
+| `crafting-app-opened`, `post-craft`, `alara-post-craft-inventory` | Crafting flow checkpoints after opening the app and completing the craft |
+| `join-selection-failed`, `join-submit-failed`, `craft-failure`, `screenshot-failure.png` | Failure diagnostics captured when the harness aborts |
 
 ### Test Data
 
