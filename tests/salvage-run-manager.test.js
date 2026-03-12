@@ -119,6 +119,65 @@ test('SalvageRunManager: cleanupInvalidRuns removes active and historical runs w
   assert.equal(manager.getRunHistory(actor)[0].componentId, 'component-valid');
 });
 
+test('SalvageRunManager: history retention - 50th entry added without truncation', async () => {
+  const actor = new FakeActor('Hist50');
+  setupGlobals(3000, [actor]);
+  const manager = new SalvageRunManager();
+
+  // Pre-populate cache with 49 historical entries
+  const existing = Array.from({ length: 49 }, (_, i) => ({
+    id: `hist-${i}`,
+    craftingSystemId: 'system-1',
+    componentId: 'component-1'
+  }));
+  manager._cache.set(actor.id, { active: {}, history: existing });
+
+  const run = await manager.createRun(actor, { craftingSystemId: 'system-1', componentId: 'component-1' });
+  await manager.completeRun(actor, run, 'succeeded');
+
+  const history = manager.getRunHistory(actor);
+  assert.equal(history.length, 50, 'history should have exactly 50 entries after 50th addition');
+  assert.equal(history[0].status, 'succeeded', 'most recent entry should be first');
+});
+
+test('SalvageRunManager: history retention - 51st entry discards oldest, length stays 50', async () => {
+  const actor = new FakeActor('Hist51');
+  setupGlobals(3000, [actor]);
+  const manager = new SalvageRunManager();
+
+  // Pre-populate cache with 50 entries; oldest sentinel is last (index 49)
+  const recent = Array.from({ length: 49 }, (_, i) => ({
+    id: `hist-${i}`,
+    craftingSystemId: 'system-1',
+    componentId: 'component-1'
+  }));
+  const oldest = { id: 'oldest-sentinel', craftingSystemId: 'system-1', componentId: 'component-1' };
+  manager._cache.set(actor.id, { active: {}, history: [...recent, oldest] });
+
+  const run = await manager.createRun(actor, { craftingSystemId: 'system-1', componentId: 'component-1' });
+  await manager.completeRun(actor, run, 'succeeded');
+
+  const history = manager.getRunHistory(actor);
+  assert.equal(history.length, 50, 'history must not exceed 50 entries');
+  assert.ok(!history.find(r => r.id === 'oldest-sentinel'), 'oldest entry must be discarded');
+  assert.equal(history[0].status, 'succeeded', 'most recent entry must be first');
+});
+
+test('SalvageRunManager: history is stored most-recent-first', async () => {
+  const actor = new FakeActor('Ordering');
+  setupGlobals(3000, [actor]);
+  const manager = new SalvageRunManager();
+
+  const runA = await manager.createRun(actor, { craftingSystemId: 'system-1', componentId: 'component-1' });
+  await manager.completeRun(actor, runA, 'succeeded');
+  const runB = await manager.createRun(actor, { craftingSystemId: 'system-1', componentId: 'component-1' });
+  await manager.completeRun(actor, runB, 'succeeded');
+
+  const history = manager.getRunHistory(actor);
+  assert.equal(history[0].id, runB.id, 'most recently completed run must be first');
+  assert.equal(history[1].id, runA.id, 'earlier run must be second');
+});
+
 test('SalvageRunManager: removeRunsForSystem and removeRunsForComponent cancel active runs and trim history', async () => {
   const actor = new FakeActor('Prune');
   setupGlobals(1000, [actor]);

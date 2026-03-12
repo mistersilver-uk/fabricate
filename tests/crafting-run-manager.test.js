@@ -94,3 +94,69 @@ test('CraftingRunManager: getRun and history limit helpers work for active + his
   const limitedHistory = manager.getRunHistory(actor, 1);
   assert.equal(limitedHistory.length, 1);
 });
+
+test('CraftingRunManager: history retention - 50th entry added without truncation', async () => {
+  setupGlobals(3000);
+  const manager = new CraftingRunManager();
+  const actor = new FakeActor('Hist50');
+  const recipe = {
+    id: 'recipe-h',
+    craftingSystemId: 'system-h',
+    getExecutionSteps: () => [{ id: 'step-1', name: 'Step' }]
+  };
+
+  // Pre-populate cache with 49 historical entries
+  const existing = Array.from({ length: 49 }, (_, i) => ({ id: `hist-${i}`, recipeId: 'recipe-h', craftingSystemId: 'system-h' }));
+  manager._cache.set(actor.id, { active: {}, history: existing });
+
+  const run = await manager.createRun(actor, recipe, [], 'user-1');
+  await manager.cancelRun(actor, run.id);
+
+  const history = manager.getRunHistory(actor);
+  assert.equal(history.length, 50, 'history should have exactly 50 entries after 50th addition');
+  assert.equal(history[0].status, 'cancelled', 'most recent entry should be first');
+});
+
+test('CraftingRunManager: history retention - 51st entry discards oldest, length stays 50', async () => {
+  setupGlobals(3000);
+  const manager = new CraftingRunManager();
+  const actor = new FakeActor('Hist51');
+  const recipe = {
+    id: 'recipe-h',
+    craftingSystemId: 'system-h',
+    getExecutionSteps: () => [{ id: 'step-1', name: 'Step' }]
+  };
+
+  // Pre-populate cache with 50 entries; oldest sentinel is last (index 49)
+  const recent = Array.from({ length: 49 }, (_, i) => ({ id: `hist-${i}`, recipeId: 'recipe-h', craftingSystemId: 'system-h' }));
+  const oldest = { id: 'oldest-sentinel', recipeId: 'recipe-h', craftingSystemId: 'system-h' };
+  manager._cache.set(actor.id, { active: {}, history: [...recent, oldest] });
+
+  const run = await manager.createRun(actor, recipe, [], 'user-1');
+  await manager.cancelRun(actor, run.id);
+
+  const history = manager.getRunHistory(actor);
+  assert.equal(history.length, 50, 'history must not exceed 50 entries');
+  assert.ok(!history.find(r => r.id === 'oldest-sentinel'), 'oldest entry must be discarded');
+  assert.equal(history[0].status, 'cancelled', 'most recent entry must be first');
+});
+
+test('CraftingRunManager: history is stored most-recent-first', async () => {
+  setupGlobals(3000);
+  const manager = new CraftingRunManager();
+  const actor = new FakeActor('Ordering');
+  const recipe = {
+    id: 'recipe-ord',
+    craftingSystemId: 'system-ord',
+    getExecutionSteps: () => [{ id: 'step-1', name: 'Step' }]
+  };
+
+  const runA = await manager.createRun(actor, recipe, [], 'user-1');
+  await manager.cancelRun(actor, runA.id);
+  const runB = await manager.createRun(actor, recipe, [], 'user-1');
+  await manager.cancelRun(actor, runB.id);
+
+  const history = manager.getRunHistory(actor);
+  assert.equal(history[0].id, runB.id, 'most recently completed run must be first');
+  assert.equal(history[1].id, runA.id, 'earlier run must be second');
+});
