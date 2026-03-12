@@ -8,7 +8,7 @@
 import { writable, get } from 'svelte/store';
 import { aggregateShoppingList } from '../util/shoppingListAggregator.js';
 import { localize } from '../util/foundryBridge.js';
-import { getSourceUuid } from '../../../utils/sourceUuid.js';
+import { itemMatchesComponentSource } from '../../../utils/sourceUuid.js';
 
 const RECENTLY_CRAFTED_MAX = 10;
 
@@ -125,11 +125,8 @@ function _buildRunDisplay(run, recipeManager, worldTime, scope = 'active') {
 
 function _findActorComponentItems(actor, component) {
   const items = Array.from(actor?.items || []);
-  if (component?.sourceUuid) {
-    const byUuid = items.filter(item =>
-      item.uuid === component.sourceUuid ||
-      getSourceUuid(item) === component.sourceUuid
-    );
+  if (component?.sourceUuid || component?.sourceItemUuid || component?.fallbackItemIds?.length) {
+    const byUuid = items.filter(item => itemMatchesComponentSource(item, component));
     if (byUuid.length > 0) return byUuid;
   }
 

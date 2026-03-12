@@ -135,6 +135,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Fixed `#83`: the crafting store now enables the alchemy panel and submits alchemy attempts based on the active recipe system, instead of any alchemy system present elsewhere in the world.
 - Fixed `#92`: `learnRecipe()` now returns localization keys instead of hardcoded English strings, and both crafting UIs localize those notifications when shown to the user.
 - Fixed `#93`: `evaluateRecipeAccess()` now reuses its first knowledge-mode access evaluation instead of recomputing the same item-matching work for craftability.
+- Fixed repeated component compendium imports creating duplicates in the same crafting system. `CraftingSystemManager` now preserves live `sourceUuid` and canonical `sourceItemUuid` separately, treats repeated or moved compendium entries with the same canonical source as the same component, enforces a per-system unique source-reference constraint during create/update/import, and keeps runtime crafting/alchemy matching aligned with the expanded source-reference chain.
 
 ### CI/CD
 
