@@ -4,6 +4,15 @@ All notable changes to Fabricate will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.0.0-rc.11](https://github.com/misterpotts/fabricate-v2/compare/v1.0.0-rc.10...v1.0.0-rc.11) (2026-03-12)
+
+### Bug Fixes
+
+* **#83:** resolve active crafting system for alchemy mode dynamically ([65c0ee3](https://github.com/misterpotts/fabricate-v2/commit/65c0ee376b7830ebc97109a71f80da1c5b1a1ef9))
+* **#92:** localize `learnRecipe()` messages and UI notifications ([d7cbf0f](https://github.com/misterpotts/fabricate-v2/commit/d7cbf0f7a0c4aa3b1f66d9566c104095eb6161a5)), closes [#92](https://github.com/misterpotts/fabricate-v2/issues/92)
+* **#93:** optimize `evaluateRecipeAccess` to reuse knowledge-mode evaluation ([af5d1bc](https://github.com/misterpotts/fabricate-v2/commit/af5d1bc0f0e13bbfd0437704bd3797a8b1f25e41)), closes [#93](https://github.com/misterpotts/fabricate-v2/issues/93)
+* **workflows:** improve PR creation fallback for restricted tokens ([a32d80b](https://github.com/misterpotts/fabricate-v2/commit/a32d80b0c00482c89431d6e9f3263f37bbcc2a63))
+
 ## [1.0.0-rc.10](https://github.com/misterpotts/fabricate-v2/compare/v1.0.0-rc.9...v1.0.0-rc.10) (2026-03-12)
 
 ### Bug Fixes
