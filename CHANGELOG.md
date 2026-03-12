@@ -4,6 +4,12 @@ All notable changes to Fabricate will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.0.0-rc.9](https://github.com/misterpotts/fabricate-v2/compare/v1.0.0-rc.8...v1.0.0-rc.9) (2026-03-12)
+
+### Bug Fixes
+
+* **crafting:** handle missing `system` object in ingredient consumption ([f28674d](https://github.com/misterpotts/fabricate-v2/commit/f28674ddf6491891e372dd237ea1081eec76b1df))
+
 ## [1.0.0-rc.8](https://github.com/misterpotts/fabricate-v2/compare/v1.0.0-rc.7...v1.0.0-rc.8) (2026-03-12)
 
 ### Features
