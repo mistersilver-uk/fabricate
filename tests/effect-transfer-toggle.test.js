@@ -199,13 +199,13 @@ async function runCraftAndCheckTransfer(transferEffectsFlag, effectTransferValue
     createEmbeddedDocuments: async () => [fakeCreatedItem]
   };
 
-  // Also inject the system with managedItems so _createSingleResult can find it
+  // Also inject the system with components so _createSingleResult can find it
   globalThis.game.fabricate.getCraftingSystemManager = () => ({
     getSystem: () => ({
       advancedOptionsEnabled: true,
       features: { effectTransfer: effectTransferValue },
       craftingCheck: { enabled: false },
-      managedItems: [
+      components: [
         { id: 'item-a', name: 'Item A', img: 'icons/svg/item-bag.svg', sourceUuid: null }
       ]
     })

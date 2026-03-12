@@ -4,6 +4,12 @@ All notable changes to Fabricate will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Changed
+
+- Collapse `items`/`components`/`managedItems` triple-alias to canonical `components` on normalized system objects. `_normalizeSystem()` output now exposes only `components`; legacy `items` and `managedItems` are still accepted as input for backwards compatibility. (#101)
+
 ## [1.0.0-rc.13](https://github.com/misterpotts/fabricate-v2/compare/v1.0.0-rc.12...v1.0.0-rc.13) (2026-03-12)
 
 ### Features

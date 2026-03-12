@@ -436,7 +436,7 @@ export class ResolutionModeService {
 
   _getDifficulty(system, componentId) {
     if (!componentId) return null;
-    const managedItems = Array.isArray(system?.components) ? system.components : (Array.isArray(system?.managedItems) ? system.managedItems : (system?.items || []));
+    const managedItems = system?.components || [];
     const item = managedItems.find(entry => entry.id === componentId);
     const difficulty = Number(item?.difficulty);
     return Number.isFinite(difficulty) ? difficulty : null;

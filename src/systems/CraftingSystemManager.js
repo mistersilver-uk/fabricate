@@ -92,9 +92,7 @@ export class CraftingSystemManager {
       enableMultiStepRecipes: features.multiStepRecipes === true,
       enableTiers: false,
       tiers: [],
-      items,
-      components: items,
-      managedItems: items
+      components: items
     };
   }
 
@@ -521,7 +519,7 @@ export class CraftingSystemManager {
   getItems(systemId, search = '') {
     const system = this.getSystem(systemId);
     if (!system) return [];
-    const managedItems = Array.isArray(system.components) ? system.components : (Array.isArray(system.managedItems) ? system.managedItems : (system.items || []));
+    const managedItems = system.components || [];
     if (!search) return [...managedItems];
     const q = search.toLowerCase();
     return managedItems.filter(item =>
@@ -617,7 +615,7 @@ export class CraftingSystemManager {
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
     const validEssenceIds = new Set((system.essenceDefinitions || []).map(def => def.id));
     const item = this._normalizeComponent(data, validEssenceIds, system.features?.salvage === true);
-    system.items.push(item);
+    system.components.push(item);
     await this.save();
     return item;
   }
@@ -633,13 +631,13 @@ export class CraftingSystemManager {
    */
   _findExistingBySourceChain(system, uuid) {
     // Exact match: the dropped UUID is already the recorded sourceUuid or sourceItemUuid
-    const exactMatch = system.items.find(i =>
+    const exactMatch = system.components.find(i =>
       i.sourceUuid === uuid || i.sourceItemUuid === uuid
     );
     if (exactMatch) return { item: exactMatch, matchType: 'exact' };
 
     // Source-chain match: the dropped UUID appears in the item's fallbackItemIds
-    const fallbackMatch = system.items.find(i =>
+    const fallbackMatch = system.components.find(i =>
       Array.isArray(i.fallbackItemIds) && i.fallbackItemIds.includes(uuid)
     );
     if (fallbackMatch) return { item: fallbackMatch, matchType: 'source' };
@@ -729,7 +727,7 @@ export class CraftingSystemManager {
       sourceUuid: itemUuid
     }, validEssenceIds, system.features?.salvage === true);
 
-    system.items.push(item);
+    system.components.push(item);
     await this.save();
     return { item, action: 'added' };
   }
@@ -771,29 +769,26 @@ export class CraftingSystemManager {
     this._assertGM('update component');
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
-    const idx = system.items.findIndex(i => i.id === itemId);
+    const idx = system.components.findIndex(i => i.id === itemId);
     if (idx < 0) throw new Error(`Component not found: ${itemId}`);
     const validEssenceIds = new Set((system.essenceDefinitions || []).map(def => def.id));
-    system.items[idx] = this._normalizeComponent(
-      { ...system.items[idx], ...updates, id: itemId },
+    system.components[idx] = this._normalizeComponent(
+      { ...system.components[idx], ...updates, id: itemId },
       validEssenceIds,
       system.features?.salvage === true
     );
     await this.save();
-    return system.items[idx];
+    return system.components[idx];
   }
 
   async deleteItem(systemId, itemId) {
     this._assertGM('delete component');
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
-    const managedItems = Array.isArray(system.components) ? system.components : (Array.isArray(system.managedItems) ? system.managedItems : (system.items || []));
-    const before = managedItems.length;
-    const filteredItems = managedItems.filter(i => i.id !== itemId);
+    const before = system.components.length;
+    const filteredItems = system.components.filter(i => i.id !== itemId);
     if (filteredItems.length === before) return false;
-    system.items = filteredItems;
     system.components = filteredItems;
-    system.managedItems = filteredItems;
 
     // Clear essence source-item links that pointed to the deleted component.
     const essenceDefinitions = (system.essenceDefinitions || []).map(def => ({
