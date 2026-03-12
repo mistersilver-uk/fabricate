@@ -74,10 +74,6 @@
                   {/if}
                 </div>
 
-                {#if item.hasDescription}
-                  <p class="item-description">{item.description}</p>
-                {/if}
-
                 {#if item.showEssences}
                   <div class="item-section">
                     <span class="item-section-label">{localize('FABRICATE.Admin.Items.Essences')}</span>

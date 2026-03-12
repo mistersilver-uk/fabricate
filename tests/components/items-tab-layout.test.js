@@ -189,5 +189,10 @@ describe('ItemsTab layout CSS', () => {
       false,
       'legacy item-replace-drop selector should be removed'
     );
+    assert.equal(
+      css.includes('.fabricate-admin .system-item-card .item-description'),
+      false,
+      'item descriptions should no longer have dedicated card styling'
+    );
   });
 });

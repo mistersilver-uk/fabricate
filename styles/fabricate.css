@@ -1025,17 +1025,6 @@
   background: rgba(255, 255, 255, 0.12);
 }
 
-.fabricate-admin .system-item-card .item-description {
-  margin: 0 0 8px 0;
-  opacity: 0.9;
-  font-size: 12px;
-  line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
 .fabricate-admin .system-item-card .item-section {
   display: flex;
   flex-direction: column;
