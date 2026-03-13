@@ -4,6 +4,7 @@ export const SETTING_KEYS = Object.freeze({
   RECIPES: 'recipes',
   CRAFTING_SYSTEMS: 'craftingSystems',
   ENABLED: 'enabled',
+  CHAT_OUTPUT: 'chatOutput',
   SHOW_SIMPLE_RECIPES_ONLY: 'showSimpleRecipesOnly',
   AUTO_CRAFT: 'autoCraft',
   LAST_CRAFTING_ACTOR: 'lastCraftingActor',
@@ -34,6 +35,14 @@ const BASE_DEFINITIONS = Object.freeze({
     name: 'FABRICATE.Settings.Enabled.Name',
     hint: 'FABRICATE.Settings.Enabled.Hint',
     scope: 'world',
+    config: true,
+    type: Boolean,
+    default: true
+  },
+  [SETTING_KEYS.CHAT_OUTPUT]: {
+    name: 'FABRICATE.Settings.ChatOutput.Name',
+    hint: 'FABRICATE.Settings.ChatOutput.Hint',
+    scope: 'client',
     config: true,
     type: Boolean,
     default: true

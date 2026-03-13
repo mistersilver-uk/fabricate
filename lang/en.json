@@ -16,6 +16,10 @@
       "AutoCraft": {
         "Name": "Auto-Craft",
         "Hint": "Automatically craft items without showing a confirmation dialog when you have all required materials."
+      },
+      "ChatOutput": {
+        "Name": "Post Results to Chat",
+        "Hint": "Post crafting and salvage results to the Foundry chat log after each attempt."
       }
     },
     "Search": {
