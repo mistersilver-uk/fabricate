@@ -32,7 +32,7 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
 
 - Exactly one `IngredientSet`.
 - Exactly one `ResultGroup`.
-- If checks are enabled, macro must return the simple contract from `002-data-models.md`.
+- If checks are enabled, the check is executed via either a macro (`checkSource: "macro"`) or the built-in game-system adapter (`checkSource: "builtIn"`). Macro checks must return the simple contract from `002-data-models.md`; built-in checks are executed by the registered `CraftingCheckAdapter` (see `002-data-models.md`).
 
 ## Routed Mode
 
@@ -54,7 +54,7 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
 
 ### Provider: `macroOutcome`
 
-- A crafting check macro is required (`Recipe.resultSelection.macroUuid` or system fallback).
+- A crafting check is required. Either a macro (`checkSource: "macro"`, resolved via `Recipe.resultSelection.macroUuid` or system fallback) or the built-in adapter (`checkSource: "builtIn"`) must be configured. The check result `outcome` string is used for routing.
 - Macro return contract is object-based: `{ success, outcome, description? }`.
 - `outcome` is trim-normalized and case-insensitive.
 - Resolution rules:
@@ -113,7 +113,7 @@ Let `remaining = check.value` and `cost = result.component.difficulty`.
 - Every referenced `Component` has `difficulty >= 1`.
 - `CraftingSystem.craftingCheck.enabled` must be true.
 - `CraftingSystem.craftingCheck.progressive` must exist.
-- Check macro must return progressive check contract with numeric `value`.
+- A crafting check is mandatory and must return a numeric `value`. The check is executed via either a macro (`checkSource: "macro"`) or the built-in adapter (`checkSource: "builtIn"`). Both must conform to the progressive check contract defined in `002-data-models.md`.
 
 ## Alchemy Mode
 

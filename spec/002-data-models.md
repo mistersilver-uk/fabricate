@@ -66,9 +66,23 @@ CraftingSystem = {
 
   craftingCheck: {
     enabled: boolean,
+
+    // How the check is executed. Defaults to "macro" when not specified.
+    checkSource: "macro" | "builtIn",
+
+    // checkSource = "macro"
     macroUuid?: string,
     successMacroUuid?: string,
     failureMacroUuid?: string,
+
+    // checkSource = "builtIn"
+    // Requires a CraftingCheckAdapter registered for the current game system.
+    builtIn?: {
+      ability: string,    // ability score key, e.g. "int", "wis". Required unless skill is set.
+      skill: string,      // skill key, e.g. "arc", "nat". Takes precedence over ability when set.
+      dc: number,         // difficulty class (positive integer). Defaults to 15 when invalid or absent.
+      advantage: "advantage" | "disadvantage" | "normal", // default "normal"
+    },
 
     consumption: {
       consumeIngredientsOnFail: boolean, // default true
@@ -142,10 +156,18 @@ CraftingSystem = {
 5. If `features.itemTags` is false, tag-based ingredient placeholders are invalid.
 6. `categories` and `itemTags` should be normalized to unique, trimmed strings.
 7. `resolutionMode` must be one of `"simple"`, `"routed"`, `"progressive"`, or `"alchemy"`.
-8. If `resolutionMode === "alchemy"`:
+8. `craftingCheck.checkSource` must be `"macro"` or `"builtIn"`. When absent or invalid, it defaults to `"macro"`.
+9. When `craftingCheck.checkSource === "builtIn"`:
+   - `craftingCheck.builtIn` must be present. Missing or invalid values use defaults: `ability: ""`, `skill: ""`, `dc: 15`, `advantage: "normal"`.
+   - `craftingCheck.builtIn.dc` must be a positive integer >= 1. Invalid or zero values default to `15`.
+   - `craftingCheck.builtIn.advantage` must be one of `"advantage"`, `"disadvantage"`, `"normal"`. Invalid values default to `"normal"`.
+   - When `skill` is non-empty, it takes precedence and the engine calls `actor.rollSkill(skill)`. Otherwise `actor.rollAbilityCheck(ability)` is called.
+   - A `CraftingCheckAdapter` must be registered for the current game system in `CraftingCheckAdapterRegistry`. If no adapter is available, the check fails with an error and nothing is consumed.
+   - `craftingCheck.enabled` is implicitly `true` when `checkSource === "builtIn"`.
+10. If `resolutionMode === "alchemy"`:
    - `features.multiStepRecipes` must be `false`.
    - `alchemy` config must be present; missing values use defaults (`learnOnCraft: false`, `consumeOnFail: true`, `showAttemptHistoryToPlayers: true`).
-9. If `features.gathering` is false, gathering environments and gathering tasks for that system are inert and hidden from normal UI flows.
+11. If `features.gathering` is false, gathering environments and gathering tasks for that system are inert and hidden from normal UI flows.
 
 ### Recipe Visibility Requirements
 
@@ -866,6 +888,89 @@ Input context must include:
 - `consumedCatalysts`
 
 Return: optional side effects only.
+
+## CraftingCheckAdapter
+
+### Purpose
+
+Define the contract for game-system adapters that execute built-in crafting checks.
+An adapter abstracts the game-system dice API so that GMs can configure checks with a few UI fields instead of writing a macro.
+
+### CraftingCheckAdapter Interface
+
+```js
+CraftingCheckAdapter = {
+  systemId: string,   // the game system this adapter targets (e.g. "dnd5e")
+
+  // Returns the list of ability score options available for this system.
+  getAbilities(): Array<{ key: string, label: string }>,
+
+  // Returns the list of skill options available for this system.
+  getSkills(): Array<{ key: string, label: string }>,
+
+  // Execute a crafting check for the given actor and built-in config.
+  // Returns a check result compatible with the crafting check macro contract.
+  executeCheck(actor, config): Promise<CheckAdapterResult>,
+}
+```
+
+### CheckAdapterResult
+
+```js
+CheckAdapterResult = {
+  success: boolean,         // whether the check passed
+  outcome: string | null,   // named outcome label for macroOutcome routing (may be null for simple/progressive)
+  value: number | null,     // numeric roll total for progressive mode; null when not applicable
+  data: object,             // arbitrary raw roll data forwarded to success/failure macros
+}
+```
+
+### Requirements
+
+1. `executeCheck` must resolve to a `CheckAdapterResult`. If the roll is cancelled or fails unexpectedly, the method must throw an `Error` with a descriptive message; the engine converts the thrown error into a failed check result without consuming any materials.
+2. `outcome` in `CheckAdapterResult` is interpreted using the same trim-normalized, case-insensitive reserved-keyword and result-group-name rules as the macro check contract (see [Crafting Check Macro Contract](#crafting-check-macro-contract)).
+3. `value` is only used by the engine in progressive resolution mode.
+4. Adapters must not apply side effects to the actor directly; all inventory mutations are performed by the crafting engine after a successful check.
+
+### CraftingCheckAdapterRegistry
+
+The registry maps game system IDs to adapter classes.
+
+```js
+CraftingCheckAdapterRegistry = {
+  // Register an adapter class for a game system.
+  register(systemId: string, AdapterClass: typeof CraftingCheckAdapter): void,
+
+  // Returns an instantiated adapter for the given system ID, or null if not registered.
+  get(systemId: string): CraftingCheckAdapter | null,
+
+  // Returns true if an adapter is registered for the given system ID.
+  has(systemId: string): boolean,
+
+  // Auto-registers known built-in adapters based on the current game system.
+  // Called during module initialization.
+  initialize(): void,
+}
+```
+
+### Requirements
+
+1. `register` must be idempotent: re-registering a system ID replaces the previous adapter silently.
+2. `get` must return `null` (not throw) when no adapter is registered.
+3. `initialize` must register adapters only for recognized game system IDs. Unknown systems must not cause errors.
+4. Third-party modules may call `register` after the `"fabricate.ready"` hook to add support for additional game systems.
+
+### Built-in Adapters
+
+| Game System | Adapter Class | Check API |
+|:------------|:-------------|:----------|
+| `dnd5e` | `Dnd5eCraftingCheckAdapter` | `actor.rollSkill(skill)` / `actor.rollAbilityCheck(ability)` |
+
+### Testing Requirements
+
+- Unit tests for `CraftingCheckAdapterRegistry`: `get` returns null for unknown systems, `has` returns true after registration, `register` replaces previous adapter.
+- Unit tests for each built-in adapter: `getAbilities()` returns correct keys, `getSkills()` returns correct keys, `executeCheck` returns pass when roll >= dc, `executeCheck` returns fail when roll < dc.
+- Integration tests for the engine `builtIn` path: adapter called when `checkSource === "builtIn"`, no-adapter path returns failure without consuming materials, adapter error returns failure without consuming materials.
 
 ## Behavioural Ownership
 
