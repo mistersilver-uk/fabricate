@@ -38,8 +38,7 @@
     border-radius: 10px;
     padding: 12px 14px;
     margin-bottom: 10px;
-    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.22);
-    backdrop-filter: blur(8px);
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
   }
 
   .validation-banner strong {

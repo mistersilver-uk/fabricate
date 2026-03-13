@@ -45,6 +45,9 @@
   // All system tags for datalist
   const allTags = $derived(services.getSystemTags?.($draft.craftingSystemId) || []);
 
+  // All system essence definitions
+  const allEssences = $derived(services.getEssenceDefinitions?.($draft.craftingSystemId) || []);
+
   // Active step (when multi-step enabled)
   const activeStep = $derived(
     $featureState.showMultiStepRecipes && $draft.steps?.[$activeStepIndex]
@@ -374,6 +377,11 @@
             onClearCatalyst={(si, ci) => store.clearCatalystComponent(si, ci)}
             onDropCatalyst={handleDropCatalyst}
             onUpdateCatalyst={handleUpdateCatalyst}
+            showEssences={$featureState.showEssences}
+            {allEssences}
+            onAddEssence={(si, eid, qty) => store.addEssence(si, eid, qty)}
+            onUpdateEssence={(si, eid, qty) => store.updateEssence(si, eid, qty)}
+            onRemoveEssence={(si, eid) => store.removeEssence(si, eid)}
           />
         {/each}
       </section>
@@ -465,24 +473,20 @@
     --fabricate-editor-accent-soft: rgba(74, 144, 226, 0.22);
     --fabricate-editor-danger: rgba(255, 216, 208, 0.95);
     --fabricate-editor-danger-soft: rgba(220, 53, 69, 0.18);
-    --fabricate-editor-shadow: 0 14px 36px rgba(0, 0, 0, 0.22);
+    --fabricate-editor-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
     display: flex;
     flex-direction: column;
     height: 100%;
     overflow: hidden;
     color: var(--fabricate-editor-text);
-    background:
-      radial-gradient(circle at top, rgba(128, 84, 56, 0.12), transparent 48%),
-      linear-gradient(180deg, rgba(8, 11, 21, 0.24), rgba(4, 6, 13, 0.18));
+    background: rgba(6, 9, 17, 0.21);
   }
 
   .editor-header {
     padding: 12px 18px;
     border-bottom: 1px solid var(--fabricate-editor-border);
     flex-shrink: 0;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
-      rgba(0, 0, 0, 0.12);
+    background: rgba(0, 0, 0, 0.14);
   }
 
   .editor-header h2 {
@@ -549,7 +553,6 @@
     border-radius: 12px;
     padding: 14px;
     box-shadow: var(--fabricate-editor-shadow);
-    backdrop-filter: blur(10px);
   }
 
   .flags-section {
@@ -595,15 +598,12 @@
     padding: 12px 18px;
     border-top: 1px solid var(--fabricate-editor-border);
     flex-shrink: 0;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(0, 0, 0, 0.12)),
-      rgba(0, 0, 0, 0.12);
+    background: rgba(0, 0, 0, 0.18);
   }
 
   .save-btn {
     font-weight: bold;
-    background:
-      linear-gradient(180deg, rgba(87, 133, 202, 0.88), rgba(43, 87, 152, 0.98));
+    background: rgba(62, 108, 175, 0.93);
     border-color: rgba(148, 190, 255, 0.34);
     color: #fff;
   }

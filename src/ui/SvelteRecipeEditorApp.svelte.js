@@ -73,6 +73,10 @@ export class SvelteRecipeEditorApp extends SvelteApplicationMixin(
         const system = game?.fabricate?.getCraftingSystemManager?.()?.getSystem?.(systemId);
         return system?.itemTags || [];
       },
+      getEssenceDefinitions: (systemId) => {
+        if (!systemId) return [];
+        return game?.fabricate?.getCraftingSystemManager?.()?.getEssenceDefinitions?.(systemId) ?? [];
+      },
       browseLinkedItem: async () => {
         const DialogV2 = foundry.applications?.api?.DialogV2;
         if (!DialogV2) {

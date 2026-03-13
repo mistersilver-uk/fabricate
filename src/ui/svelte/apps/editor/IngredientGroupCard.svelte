@@ -66,7 +66,9 @@
   <table class="ingredient-options-table">
     <thead>
       <tr>
-        <th>{localize('FABRICATE.Editor.IngredientOptions.MatchTypeLabel')}</th>
+        {#if showItemTags}
+          <th>{localize('FABRICATE.Editor.IngredientOptions.MatchTypeLabel')}</th>
+        {/if}
         <th>{localize('FABRICATE.Editor.IngredientOptions.RequirementLabel')}</th>
         <th>{localize('FABRICATE.Ingredient.Quantity')}</th>
         <th></th>
@@ -75,24 +77,24 @@
     <tbody>
       {#each group.options || [] as option, optionIndex}
         {#if optionIndex > 0}
-          <tr class="or-separator"><td colspan="4">{localize('FABRICATE.Editor.IngredientOptions.OrSeparator')}</td></tr>
+          <tr class="or-separator"><td colspan={showItemTags ? 4 : 3}>{localize('FABRICATE.Editor.IngredientOptions.OrSeparator')}</td></tr>
         {/if}
         <tr
           class="option-row"
           ondrop={(e) => handleDrop(e, optionIndex)}
           ondragover={handleDragOver}
         >
-          <td>
-            <select
-              value={option.matchType}
-              onchange={(e) => onUpdateOption?.(setIndex, groupIndex, optionIndex, 'matchType', e.target.value)}
-            >
-              <option value="component">{localize('FABRICATE.Editor.IngredientOptions.MatchManaged')}</option>
-              {#if showItemTags}
+          {#if showItemTags}
+            <td>
+              <select
+                value={option.matchType}
+                onchange={(e) => onUpdateOption?.(setIndex, groupIndex, optionIndex, 'matchType', e.target.value)}
+              >
+                <option value="component">{localize('FABRICATE.Editor.IngredientOptions.MatchManaged')}</option>
                 <option value="tags">{localize('FABRICATE.Editor.IngredientOptions.MatchTag')}</option>
-              {/if}
-            </select>
-          </td>
+              </select>
+            </td>
+          {/if}
           <td>
             {#if option.matchType === 'tags' && showItemTags}
               <div class="tag-match-fields">

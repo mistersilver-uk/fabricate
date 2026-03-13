@@ -35,6 +35,22 @@ describe('Recipe editor theme layout contract', () => {
       'validation banner should rely on the editor danger token set'
     );
     assert.ok(
+      !bannerSource.includes('backdrop-filter:'),
+      'validation banner should avoid blur-based glass styling in the flat UI'
+    );
+    assert.ok(
+      !rootSource.includes('linear-gradient('),
+      'recipe editor should not use gradient backgrounds in the flat UI'
+    );
+    assert.ok(
+      !rootSource.includes('radial-gradient('),
+      'recipe editor should not use radial gradient backgrounds in the flat UI'
+    );
+    assert.ok(
+      !rootSource.includes('backdrop-filter:'),
+      'recipe editor panels should avoid blur-based glass styling in the flat UI'
+    );
+    assert.ok(
       !pickerSource.includes('background: var(--color-bg-option, #fff);'),
       'picker header should not use the previous white fallback surface'
     );
@@ -95,7 +111,10 @@ describe('Recipe editor shared control CSS', () => {
       /\.fabricate-recipe-editor button:not\(\.validation-error-link\):not\(\.icon-button\) \{/s
     );
     assert.ok(css.includes('accent-color: var(--fabricate-editor-accent, #4a90e2);'));
-    assert.ok(css.includes('box-shadow:\n    0 0 0 1px var(--fabricate-editor-accent, #4a90e2),'));
+    assert.match(
+      css,
+      /box-shadow:\s+0 0 0 1px var\(--fabricate-editor-accent, #4a90e2\),/s
+    );
   });
 
   it('keeps recipe-editor selects dark without forcing a taller closed control', () => {
