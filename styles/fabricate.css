@@ -543,7 +543,7 @@
 }
 
 .fabricate-admin .admin-sidebar-header button,
-.fabricate-admin .essence-definition-row button,
+.fabricate-admin .essence-definition-actions button,
 .fabricate-admin .token-list .token button,
 .fabricate-admin .system-item-card .item-source-button,
 .fabricate-admin .system-item-card .item-actions button {
@@ -747,10 +747,21 @@
   margin-top: 10px;
 }
 
+.fabricate-admin .essence-creation-toolbar {
+  align-items: stretch;
+}
+
+.fabricate-admin .panel-toolbar.essence-creation-toolbar input,
+.fabricate-admin .panel-toolbar.essence-creation-toolbar select,
+.fabricate-admin .panel-toolbar.essence-creation-toolbar .essence-icon-picker {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
 .fabricate-admin .essence-definition-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
+  gap: 12px;
   align-items: start;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
@@ -758,19 +769,189 @@
   background: rgba(0, 0, 0, 0.12);
 }
 
-.fabricate-admin .essence-definition-meta code {
-  display: inline-block;
-  margin-left: 8px;
-  font-size: 11px;
-  opacity: 0.75;
+.fabricate-admin .essence-definition-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
 }
 
-.fabricate-admin .essence-definition-row button {
+.fabricate-admin .essence-definition-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.fabricate-admin .essence-definition-icon {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.fabricate-admin .essence-definition-icon i {
+  font-size: 16px;
+}
+
+.fabricate-admin .essence-definition-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.fabricate-admin .essence-definition-copy .hint {
+  margin: 0;
+}
+
+.fabricate-admin .essence-definition-editor {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.fabricate-admin .essence-definition-editor textarea {
+  width: 100%;
+  max-width: 100%;
+  min-height: 72px;
+  box-sizing: border-box;
+  resize: vertical;
+}
+
+.fabricate-admin .essence-definition-editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.fabricate-admin .essence-definition-editor-toolbar .hint {
+  margin: 0;
+}
+
+.fabricate-admin .essence-definition-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.fabricate-admin .essence-definition-actions button {
   width: 28px;
   height: 28px;
   border: 1px solid rgba(0, 0, 0, 0.25);
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.14);
+}
+
+.fabricate-admin .essence-definition-actions button:disabled {
+  opacity: 0.55;
+}
+
+.fabricate-admin .essence-icon-picker {
+  position: relative;
+  min-width: 0;
+}
+
+.fabricate-admin .essence-icon-picker-trigger,
+.fabricate-admin .essence-icon-picker-option {
+  appearance: none;
+  -webkit-appearance: none;
+  color: inherit;
+}
+
+.fabricate-admin .essence-icon-picker-trigger {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  text-align: left;
+}
+
+.fabricate-admin .essence-icon-picker-trigger:disabled {
+  opacity: 0.65;
+}
+
+.fabricate-admin .essence-icon-picker-trigger-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-admin .essence-icon-picker-preview {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.fabricate-admin .essence-icon-picker-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  width: clamp(260px, 100%, 360px);
+  max-width: min(360px, calc(100vw - 80px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  background: rgba(12, 16, 32, 0.96);
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.34);
+}
+
+.fabricate-admin .essence-icon-picker-search input {
+  width: 100%;
+  min-width: 0;
+}
+
+.fabricate-admin .essence-icon-picker-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.fabricate-admin .essence-icon-picker-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  text-align: left;
+}
+
+.fabricate-admin .essence-icon-picker-option:hover,
+.fabricate-admin .essence-icon-picker-option:focus-visible,
+.fabricate-admin .essence-icon-picker-option.selected {
+  border-color: rgba(120, 160, 255, 0.55);
+  background: rgba(120, 160, 255, 0.14);
+}
+
+.fabricate-admin .essence-icon-picker-empty {
+  margin: 0;
+  grid-column: 1 / -1;
 }
 
 .fabricate-admin .config-block {

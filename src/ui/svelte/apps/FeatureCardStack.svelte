@@ -2,23 +2,68 @@
 <script>
   import { localize } from '../util/foundryBridge.js';
   import FeatureCard from './FeatureCard.svelte';
+  import IconPicker from '../components/IconPicker.svelte';
   import TokenList from './TokenList.svelte';
+  import { DEFAULT_ESSENCE_ICON, normalizeEssenceIcon } from '../util/essenceIcons.js';
 
   let { selectedSystem, store } = $props();
 
   // Essence add form state
   let essenceName = $state('');
   let essenceDesc = $state('');
-  let essenceIcon = $state('');
+  let essenceIcon = $state(DEFAULT_ESSENCE_ICON);
   let essenceSourceItem = $state('');
+  let editingEssenceId = $state(null);
+  let editingEssenceName = $state('');
+  let editingEssenceDesc = $state('');
+  let editingEssenceIcon = $state(DEFAULT_ESSENCE_ICON);
+  let lastSelectedSystemId = $state(null);
 
-  function handleAddEssence() {
-    if (!essenceName.trim()) return;
-    store.addEssence(essenceName.trim(), essenceDesc, essenceIcon, essenceSourceItem || null);
+  function resetAddEssenceForm() {
     essenceName = '';
     essenceDesc = '';
-    essenceIcon = '';
+    essenceIcon = DEFAULT_ESSENCE_ICON;
     essenceSourceItem = '';
+  }
+
+  function cancelEssenceEdit() {
+    editingEssenceId = null;
+    editingEssenceName = '';
+    editingEssenceDesc = '';
+    editingEssenceIcon = DEFAULT_ESSENCE_ICON;
+  }
+
+  async function handleAddEssence() {
+    if (!essenceName.trim()) return;
+    const didAdd = await store.addEssence(
+      essenceName.trim(),
+      essenceDesc,
+      essenceIcon,
+      essenceSourceItem || null
+    );
+    if (didAdd) {
+      resetAddEssenceForm();
+    }
+  }
+
+  function beginEssenceEdit(definition) {
+    editingEssenceId = definition.id;
+    editingEssenceName = definition.name || '';
+    editingEssenceDesc = definition.description || '';
+    editingEssenceIcon = normalizeEssenceIcon(definition.icon);
+  }
+
+  async function handleSaveEssence(definition) {
+    if (!editingEssenceName.trim()) return;
+    const didSave = await store.updateEssence(definition.id, {
+      name: editingEssenceName.trim(),
+      description: editingEssenceDesc,
+      icon: editingEssenceIcon
+    });
+
+    if (didSave) {
+      cancelEssenceEdit();
+    }
   }
 
   // Crafting check state
@@ -62,6 +107,14 @@
     visKnowledgeMode = vis.knowledge?.mode || 'itemOrLearned';
     visConsumeOnLearn = vis.knowledge?.learn?.consumeOnLearn !== false;
   });
+
+  $effect(() => {
+    const currentSystemId = selectedSystem?.id || null;
+    if (currentSystemId === lastSelectedSystemId) return;
+    lastSelectedSystemId = currentSystemId;
+    resetAddEssenceForm();
+    cancelEssenceEdit();
+  });
 </script>
 
 <div class="feature-card-stack">
@@ -104,17 +157,21 @@
     enabled={selectedSystem.features.essences}
     onToggle={(v) => store.toggleFeature('essences', v)}
   >
-    <div class="panel-toolbar compact">
+    <div class="panel-toolbar compact essence-creation-toolbar">
       <input type="text" bind:value={essenceName} placeholder={localize('FABRICATE.Admin.Features.Essences.NamePlaceholder')} />
       <input type="text" bind:value={essenceDesc} placeholder={localize('FABRICATE.Admin.Features.Essences.DescPlaceholder')} />
-      <input type="text" bind:value={essenceIcon} placeholder={localize('FABRICATE.Admin.Features.Essences.IconPlaceholder')} />
+      <IconPicker
+        value={essenceIcon}
+        buttonTitle={localize('FABRICATE.Admin.Features.Essences.ChooseIcon')}
+        onChange={(iconClass) => { essenceIcon = iconClass; }}
+      />
       <select bind:value={essenceSourceItem}>
         <option value="">{localize('FABRICATE.Admin.Features.Essences.NoSourceItem')}</option>
         {#each selectedSystem.managedItemOptions as opt}
           <option value={opt.id}>{opt.name}</option>
         {/each}
       </select>
-      <button type="button" onclick={handleAddEssence}>
+      <button type="button" onclick={handleAddEssence} disabled={!essenceName.trim()}>
         <i class="fas fa-plus"></i> {localize('FABRICATE.Admin.Features.Essences.Add')}
       </button>
     </div>
@@ -122,17 +179,86 @@
       {#each selectedSystem.essenceDefinitions as def}
         <article class="essence-definition-row">
           <div class="essence-definition-meta">
-            <i class={def.icon || 'fas fa-mortar-pestle'}></i>
-            <strong>{def.name}</strong>
-            <code>{def.id}</code>
-            {#if def.description}<p class="hint">{def.description}</p>{/if}
-            {#if def.associatedItemName}
-              <p class="hint">{localize('FABRICATE.Admin.Features.Essences.SourceItem')} {def.associatedItemName}</p>
+            <div class="essence-definition-summary">
+              <span class="essence-definition-icon" aria-hidden="true">
+                <i class={normalizeEssenceIcon(def.icon || DEFAULT_ESSENCE_ICON)}></i>
+              </span>
+              <div class="essence-definition-copy">
+                <strong>{def.name}</strong>
+                {#if editingEssenceId !== def.id}
+                  {#if def.description}
+                    <p class="hint">{def.description}</p>
+                  {/if}
+                  {#if def.associatedItemName}
+                    <p class="hint">
+                      {localize('FABRICATE.Admin.Features.Essences.SourceItem')} {def.associatedItemName}
+                    </p>
+                  {/if}
+                {/if}
+              </div>
+            </div>
+
+            {#if editingEssenceId === def.id}
+              <div class="essence-definition-editor">
+                <input
+                  type="text"
+                  bind:value={editingEssenceName}
+                  placeholder={localize('FABRICATE.Admin.Features.Essences.NamePlaceholder')}
+                />
+                <textarea
+                  bind:value={editingEssenceDesc}
+                  rows="3"
+                  placeholder={localize('FABRICATE.Admin.Features.Essences.DescPlaceholder')}
+                ></textarea>
+                <div class="essence-definition-editor-toolbar">
+                  <IconPicker
+                    value={editingEssenceIcon}
+                    buttonTitle={localize('FABRICATE.Admin.Features.Essences.ChooseIcon')}
+                    onChange={(iconClass) => { editingEssenceIcon = iconClass; }}
+                  />
+                  {#if def.associatedItemName}
+                    <p class="hint">
+                      {localize('FABRICATE.Admin.Features.Essences.SourceItem')} {def.associatedItemName}
+                    </p>
+                  {/if}
+                </div>
+              </div>
             {/if}
           </div>
-          <button type="button" onclick={() => store.removeEssence(def.id)} title={localize('FABRICATE.Admin.Features.Essences.Remove')}>
-            <i class="fas fa-trash"></i>
-          </button>
+          <div class="essence-definition-actions">
+            {#if editingEssenceId === def.id}
+              <button
+                type="button"
+                onclick={() => handleSaveEssence(def)}
+                title={localize('FABRICATE.Admin.Features.Essences.Save')}
+                disabled={!editingEssenceName.trim()}
+              >
+                <i class="fas fa-save"></i>
+              </button>
+              <button
+                type="button"
+                onclick={cancelEssenceEdit}
+                title={localize('FABRICATE.Admin.Features.Essences.Cancel')}
+              >
+                <i class="fas fa-times"></i>
+              </button>
+            {:else}
+              <button
+                type="button"
+                onclick={() => beginEssenceEdit(def)}
+                title={localize('FABRICATE.Admin.Features.Essences.Edit')}
+              >
+                <i class="fas fa-pen"></i>
+              </button>
+              <button
+                type="button"
+                onclick={() => store.removeEssence(def.id)}
+                title={localize('FABRICATE.Admin.Features.Essences.Remove')}
+              >
+                <i class="fas fa-trash"></i>
+              </button>
+            {/if}
+          </div>
         </article>
       {:else}
         <p class="hint">{localize('FABRICATE.Admin.Features.Essences.Empty')}</p>

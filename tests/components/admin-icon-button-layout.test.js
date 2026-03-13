@@ -10,7 +10,7 @@ const css = readFileSync(cssPath, 'utf8');
 
 test('admin icon-only buttons normalize their box model against host button defaults', () => {
   const match = css.match(
-    /\.fabricate-admin \.admin-sidebar-header button,\s*\.fabricate-admin \.essence-definition-row button,\s*\.fabricate-admin \.token-list \.token button,\s*\.fabricate-admin \.system-item-card \.item-source-button,\s*\.fabricate-admin \.system-item-card \.item-actions button \{[\s\S]*?\}/
+    /\.fabricate-admin \.admin-sidebar-header button,\s*\.fabricate-admin \.essence-definition-actions button,\s*\.fabricate-admin \.token-list \.token button,\s*\.fabricate-admin \.system-item-card \.item-source-button,\s*\.fabricate-admin \.system-item-card \.item-actions button \{[\s\S]*?\}/
   );
 
   assert.ok(match, 'shared admin icon-button selector block should exist');

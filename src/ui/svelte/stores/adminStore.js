@@ -7,6 +7,7 @@
  */
 import { writable, get } from 'svelte/store';
 import { buildRecipeGraph, layoutGraph, filterGraph } from '../util/recipeGraphBuilder.js';
+import { DEFAULT_ESSENCE_ICON, normalizeEssenceIcon } from '../util/essenceIcons.js';
 import {
   buildExportPayload,
   validateImportData,
@@ -522,35 +523,90 @@ export function createAdminStore(services) {
   // --- Essence management ---
 
   async function addEssence(name, description, icon, sourceItemUuid) {
-    if (!name || !name.trim()) return;
+    const normalizedName = String(name || '').trim();
+    if (!normalizedName) return false;
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
-    if (!sysId) return;
+    if (!sysId) return false;
     const system = systemManager.getSystem(sysId);
-    if (!system) return;
+    if (!system) return false;
 
     const existing = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
     const duplicate = existing.some(
-      def => String(def.name || '').toLowerCase() === name.trim().toLowerCase()
+      def => String(def.name || '').toLowerCase() === normalizedName.toLowerCase()
     );
     if (duplicate) {
-      services.notify.warn(`Essence "${name}" already exists in this system.`);
-      return;
+      services.notify.warn(`Essence "${normalizedName}" already exists in this system.`);
+      return false;
     }
 
     const essenceDefinitions = [
       ...existing,
       {
         id: crypto.randomUUID(),
-        name: name.trim(),
-        description: description || '',
-        icon: icon || 'fas fa-mortar-pestle',
+        name: normalizedName,
+        description: String(description || ''),
+        icon: normalizeEssenceIcon(icon || DEFAULT_ESSENCE_ICON),
         sourceItemUuid: sourceItemUuid || null,
         associatedSystemItemId: sourceItemUuid || null
       }
     ];
     await systemManager.updateSystem(sysId, { essenceDefinitions });
     await refresh();
+    return true;
+  }
+
+  async function updateEssence(essenceId, updates = {}) {
+    if (!essenceId || !updates || typeof updates !== 'object') return false;
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return false;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return false;
+
+    const existing = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
+    const current = existing.find(def => def.id === essenceId);
+    if (!current) return false;
+
+    const nextName = Object.prototype.hasOwnProperty.call(updates, 'name')
+      ? String(updates.name || '').trim()
+      : String(current.name || '').trim();
+    if (!nextName) return false;
+
+    const duplicate = existing.some(def =>
+      def.id !== essenceId &&
+      String(def.name || '').trim().toLowerCase() === nextName.toLowerCase()
+    );
+    if (duplicate) {
+      services.notify.warn(`Essence "${nextName}" already exists in this system.`);
+      return false;
+    }
+
+    const nextDescription = Object.prototype.hasOwnProperty.call(updates, 'description')
+      ? String(updates.description || '')
+      : String(current.description || '');
+    const nextIcon = Object.prototype.hasOwnProperty.call(updates, 'icon')
+      ? normalizeEssenceIcon(updates.icon)
+      : normalizeEssenceIcon(current.icon);
+    const nextSourceItemUuid = Object.prototype.hasOwnProperty.call(updates, 'sourceItemUuid')
+      ? (updates.sourceItemUuid || null)
+      : (current.sourceItemUuid || current.associatedSystemItemId || null);
+
+    const essenceDefinitions = existing.map(def => {
+      if (def.id !== essenceId) return def;
+      return {
+        ...def,
+        name: nextName,
+        description: nextDescription,
+        icon: nextIcon,
+        sourceItemUuid: nextSourceItemUuid,
+        associatedSystemItemId: nextSourceItemUuid
+      };
+    });
+
+    await systemManager.updateSystem(sysId, { essenceDefinitions });
+    await refresh();
+    return true;
   }
 
   async function removeEssence(essenceId) {
@@ -792,6 +848,7 @@ export function createAdminStore(services) {
     addTag,
     removeTag,
     addEssence,
+    updateEssence,
     removeEssence,
     saveCraftingCheckConfig,
     saveCurrencyConfig,
