@@ -3,11 +3,11 @@ description: A system-agnostic crafting module for Foundry Virtual Tabletop
 theme: just-the-docs
 
 url: https://misterpotts.github.io
-baseurl: /fabricate
+baseurl: /fabricate-v2
 
 aux_links:
   "GitHub":
-    - https://github.com/misterpotts/fabricate
+    - https://github.com/misterpotts/fabricate-v2
 
 nav_sort: order
 
