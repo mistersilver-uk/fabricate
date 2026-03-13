@@ -113,24 +113,29 @@
 
 <style>
   .step-navigator {
-    margin-bottom: 12px;
-    padding: 8px;
-    border: 1px solid var(--color-border-light, #ddd);
-    border-radius: 4px;
-    background: var(--color-bg-option, #f9f9f9);
+    margin-bottom: 0;
+    padding: 14px;
+    border: 1px solid var(--fabricate-editor-border, rgba(255, 255, 255, 0.14));
+    border-radius: 12px;
+    background: var(--fabricate-editor-surface, rgba(0, 0, 0, 0.16));
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.2);
   }
 
   .step-nav-bar {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 6px;
-    margin-bottom: 8px;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   }
 
   .step-label {
     font-weight: bold;
     flex: 1;
     text-align: center;
+    color: var(--fabricate-editor-muted-strong, rgba(255, 236, 220, 0.82));
   }
 
   .step-nav-bar button:disabled {
@@ -154,6 +159,7 @@
     white-space: nowrap;
     min-width: 80px;
     padding-top: 4px;
+    color: var(--fabricate-editor-muted-strong, rgba(255, 236, 220, 0.82));
   }
 
   .field-row input,
@@ -170,6 +176,7 @@
   .currency-fields h4 {
     margin: 0 0 6px;
     font-size: 0.9rem;
+    color: var(--fabricate-editor-muted-strong, rgba(255, 236, 220, 0.82));
   }
 
   .time-grid {
@@ -186,6 +193,7 @@
 
   .time-field label {
     font-size: 0.8rem;
+    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
   }
 
   .time-field input {
@@ -196,5 +204,22 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
+  }
+
+  @media (max-width: 860px) {
+    .field-row {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .field-row label {
+      min-width: 0;
+      padding-top: 0;
+    }
+
+    .time-grid,
+    .currency-grid {
+      grid-template-columns: 1fr;
+    }
   }
 </style>

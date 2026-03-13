@@ -2,11 +2,12 @@
 <script>
   import { localize } from '../util/foundryBridge.js';
   import FeatureCard from './FeatureCard.svelte';
+  import EssenceSourceSelector from '../components/EssenceSourceSelector.svelte';
   import IconPicker from '../components/IconPicker.svelte';
   import TokenList from './TokenList.svelte';
   import { DEFAULT_ESSENCE_ICON, normalizeEssenceIcon } from '../util/essenceIcons.js';
 
-  let { selectedSystem, store } = $props();
+  let { selectedSystem, store, services = null } = $props();
 
   // Essence add form state
   let essenceName = $state('');
@@ -115,6 +116,40 @@
     resetAddEssenceForm();
     cancelEssenceEdit();
   });
+
+  function getManagedItemOption(itemId) {
+    if (!itemId) return null;
+    return selectedSystem?.managedItemOptions?.find(option => option.id === itemId) || null;
+  }
+
+  async function importDroppedManagedItem(data) {
+    return services?.importSingleManagedItemFromDrop?.(data) ?? null;
+  }
+
+  function handleCreateEssenceSourceSelect(itemId) {
+    essenceSourceItem = itemId || '';
+  }
+
+  async function handleCreateEssenceSourceDrop(data) {
+    const item = await importDroppedManagedItem(data);
+    if (item?.id) {
+      essenceSourceItem = item.id;
+    }
+  }
+
+  async function handleEssenceSourceDrop(definition, data) {
+    const item = await importDroppedManagedItem(data);
+    if (!item?.id) return;
+    await store.updateEssence(definition.id, { sourceItemUuid: item.id });
+  }
+
+  async function handleEssenceSourceSelect(definition, itemId) {
+    await store.updateEssence(definition.id, { sourceItemUuid: itemId || null });
+  }
+
+  async function handleEssenceSourceClear(definition) {
+    await store.updateEssence(definition.id, { sourceItemUuid: null });
+  }
 </script>
 
 <div class="feature-card-stack">
@@ -157,27 +192,66 @@
     enabled={selectedSystem.features.essences}
     onToggle={(v) => store.toggleFeature('essences', v)}
   >
-    <div class="panel-toolbar compact essence-creation-toolbar">
-      <input type="text" bind:value={essenceName} placeholder={localize('FABRICATE.Admin.Features.Essences.NamePlaceholder')} />
-      <input type="text" bind:value={essenceDesc} placeholder={localize('FABRICATE.Admin.Features.Essences.DescPlaceholder')} />
-      <IconPicker
-        value={essenceIcon}
-        buttonTitle={localize('FABRICATE.Admin.Features.Essences.ChooseIcon')}
-        onChange={(iconClass) => { essenceIcon = iconClass; }}
+    <div class="essence-creation-form">
+      <EssenceSourceSelector
+        value={getManagedItemOption(essenceSourceItem)}
+        items={selectedSystem.managedItemOptions}
+        onDrop={handleCreateEssenceSourceDrop}
+        onSelect={handleCreateEssenceSourceSelect}
+        onClear={() => { essenceSourceItem = ''; }}
       />
-      <select bind:value={essenceSourceItem}>
-        <option value="">{localize('FABRICATE.Admin.Features.Essences.NoSourceItem')}</option>
-        {#each selectedSystem.managedItemOptions as opt}
-          <option value={opt.id}>{opt.name}</option>
-        {/each}
-      </select>
-      <button type="button" onclick={handleAddEssence} disabled={!essenceName.trim()}>
-        <i class="fas fa-plus"></i> {localize('FABRICATE.Admin.Features.Essences.Add')}
-      </button>
+
+      <div class="essence-creation-fields">
+        <div class="panel-toolbar compact essence-creation-toolbar">
+          <input
+            type="text"
+            bind:value={essenceName}
+            placeholder={localize('FABRICATE.Admin.Features.Essences.NamePlaceholder')}
+          />
+          <IconPicker
+            value={essenceIcon}
+            buttonTitle={localize('FABRICATE.Admin.Features.Essences.ChooseIcon')}
+            onChange={(iconClass) => { essenceIcon = iconClass; }}
+          />
+        </div>
+
+        <div class="essence-creation-description-row">
+          <input
+            type="text"
+            bind:value={essenceDesc}
+            placeholder={localize('FABRICATE.Admin.Features.Essences.DescPlaceholder')}
+          />
+          {#if getManagedItemOption(essenceSourceItem)}
+            <p class="hint">
+              {localize('FABRICATE.Admin.Features.Essences.SourceItem')} {getManagedItemOption(essenceSourceItem).name}
+            </p>
+          {/if}
+        </div>
+
+        <div class="essence-creation-actions">
+          <button
+            type="button"
+            class="essence-create-submit"
+            onclick={handleAddEssence}
+            disabled={!essenceName.trim()}
+          >
+            <i class="fas fa-plus"></i> {localize('FABRICATE.Admin.Features.Essences.Add')}
+          </button>
+        </div>
+      </div>
     </div>
+
     <div class="essence-definition-list">
       {#each selectedSystem.essenceDefinitions as def}
         <article class="essence-definition-row">
+          <EssenceSourceSelector
+            value={def.associatedItem}
+            items={selectedSystem.managedItemOptions}
+            onDrop={(data) => handleEssenceSourceDrop(def, data)}
+            onSelect={(itemId) => handleEssenceSourceSelect(def, itemId)}
+            onClear={() => handleEssenceSourceClear(def)}
+          />
+
           <div class="essence-definition-meta">
             <div class="essence-definition-summary">
               {#if editingEssenceId === def.id}

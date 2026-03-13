@@ -123,7 +123,7 @@
 <style>
   .catalyst-block {
     margin-top: 12px;
-    border-top: 1px solid var(--color-border-light, #ddd);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
     padding-top: 8px;
   }
 
@@ -137,6 +137,7 @@
   .catalyst-header h4 {
     margin: 0;
     font-size: 0.9rem;
+    color: var(--fabricate-editor-muted-strong, rgba(255, 236, 220, 0.82));
   }
 
   .catalyst-table {
@@ -148,7 +149,8 @@
     text-align: left;
     font-size: 0.8rem;
     padding: 2px 4px;
-    border-bottom: 1px solid var(--color-border-light, #ddd);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
   }
 
   .catalyst-table td {
@@ -160,6 +162,11 @@
     display: flex;
     align-items: center;
     gap: 4px;
+    min-height: 34px;
+    padding: 4px 6px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.03);
   }
 
   .item-thumb {
@@ -169,7 +176,7 @@
   }
 
   .no-item {
-    color: var(--color-text-light-heading, #999);
+    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
     font-style: italic;
   }
 
@@ -182,18 +189,21 @@
     border: none;
     cursor: pointer;
     padding: 2px 4px;
+    border-radius: 5px;
+    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
   }
 
   .icon-button.danger {
-    color: var(--color-text-error, #c00);
+    color: var(--fabricate-editor-danger, rgba(255, 216, 208, 0.95));
   }
 
   .catalyst-empty {
-    border: 2px dashed var(--color-border-light, #ccc);
-    border-radius: 4px;
+    border: 2px dashed rgba(148, 190, 255, 0.3);
+    border-radius: 8px;
     padding: 12px;
     text-align: center;
-    color: var(--color-text-light-heading, #999);
+    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
     font-style: italic;
+    background: rgba(74, 144, 226, 0.08);
   }
 </style>

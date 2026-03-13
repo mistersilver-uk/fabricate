@@ -43,15 +43,24 @@ jobs:
             #   - does NOT have the 'agent-failed' label (failed on previous attempt)
             #   - IS open
             # gh sorts by created date ascending by default (oldest first = highest priority)
+            # Get issues that already have an open PR (by branch naming convention)
+            ISSUES_WITH_PRS=$(gh pr list \
+              --repo "${{ github.repository }}" \
+              --state open \
+              --json headRefName -q '.[].headRefName' \
+              | sed -n 's/^agent\/issue-//p' \
+              | jq -R -s 'split("\n") | map(select(. != "") | tonumber)')
+
             ISSUE_JSON=$(gh issue list \
               --repo "${{ github.repository }}" \
               --state open \
               --json number,title,labels \
               --limit 50 \
-              | jq -r '[.[] | select(
+              | jq -r --argjson prs "$ISSUES_WITH_PRS" '[.[] | select(
                   (.labels | map(.name) | contains(["triage"]) | not) and
                   (.labels | map(.name) | contains(["in-progress"]) | not) and
-                  (.labels | map(.name) | contains(["agent-failed"]) | not)
+                  (.labels | map(.name) | contains(["agent-failed"]) | not) and
+                  (.number as $n | $prs | index($n) | not)
                 )] | first // empty')
 
             if [ -z "$ISSUE_JSON" ] || [ "$ISSUE_JSON" = "null" ]; then
@@ -114,7 +123,12 @@ jobs:
       - name: Create working branch
         run: |
           BRANCH="agent/issue-${{ needs.pick-task.outputs.issue_number }}"
-          git checkout -b "$BRANCH"
+          if git ls-remote --exit-code origin "refs/heads/$BRANCH" >/dev/null 2>&1; then
+            echo "Branch $BRANCH already exists on remote — checking it out."
+            git checkout -b "$BRANCH" "origin/$BRANCH"
+          else
+            git checkout -b "$BRANCH"
+          fi
           echo "BRANCH=$BRANCH" >> "$GITHUB_ENV"
 
       - name: Plan and implement
@@ -296,6 +310,11 @@ jobs:
 
           if try_create_pr "$PRIMARY_PR_TOKEN"; then
             cat "$PR_OUTPUT"
+            echo "pr_created=true" >> "$GITHUB_OUTPUT"
+          elif grep -q "already exists" "$PR_OUTPUT"; then
+            echo "::notice::PR already exists for branch ${BRANCH} — skipping creation."
+            EXISTING_PR_URL=$(GH_TOKEN="$PRIMARY_PR_TOKEN" gh pr view "$BRANCH" --repo "${{ github.repository }}" --json url -q .url 2>/dev/null || true)
+            echo "Existing PR: ${EXISTING_PR_URL:-unknown}"
             echo "pr_created=true" >> "$GITHUB_OUTPUT"
           else
             LAST_PR_ERROR="$(cat "$PR_OUTPUT")"

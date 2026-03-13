@@ -3,7 +3,7 @@
   import { localize } from '../util/foundryBridge.js';
   import FeatureCardStack from './FeatureCardStack.svelte';
 
-  let { selectedSystem = null, store } = $props();
+  let { selectedSystem = null, store, services = null } = $props();
 
   // svelte-ignore state_referenced_locally
   let nameValue = $state(selectedSystem?.name ?? '');
@@ -51,7 +51,7 @@
     </div>
 
     {#if selectedSystem.advancedOptionsEnabled}
-      <FeatureCardStack {selectedSystem} {store} />
+      <FeatureCardStack {selectedSystem} {store} {services} />
     {:else}
       <p class="hint">{localize('FABRICATE.Admin.SystemSettings.AdvancedDisabled')}</p>
     {/if}

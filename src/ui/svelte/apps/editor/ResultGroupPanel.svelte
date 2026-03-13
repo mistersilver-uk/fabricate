@@ -200,14 +200,17 @@
 
 <style>
   .accordion-panel {
-    border: 1px solid var(--color-border-light, #ccc);
-    border-radius: 4px;
+    border: 1px solid var(--fabricate-editor-border, rgba(255, 255, 255, 0.14));
+    border-radius: 10px;
     margin-bottom: 8px;
+    overflow: hidden;
+    background: var(--fabricate-editor-surface-soft, rgba(255, 255, 255, 0.05));
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
   }
 
   .group-error {
-    border-color: var(--color-border-error, #dc3545);
-    box-shadow: 0 0 0 1px var(--color-border-error, #dc3545);
+    border-color: var(--fabricate-editor-border-danger, rgba(255, 124, 102, 0.48));
+    box-shadow: 0 0 0 1px var(--fabricate-editor-border-danger, rgba(255, 124, 102, 0.48));
   }
 
   .accordion-header {
@@ -216,8 +219,10 @@
     gap: 6px;
     padding: 8px 12px;
     cursor: pointer;
-    background: var(--color-bg-option, #f5f5f5);
-    border-radius: 4px 4px 0 0;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
+      rgba(0, 0, 0, 0.16);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     user-select: none;
   }
 
@@ -232,17 +237,18 @@
 
   .drag-handle {
     cursor: grab;
-    color: var(--color-text-light-heading, #999);
+    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
   }
 
   .panel-title {
     font-weight: bold;
     flex: 1;
+    color: var(--fabricate-editor-text, rgba(255, 243, 232, 0.92));
   }
 
   .panel-summary {
     font-size: 0.85rem;
-    color: var(--color-text-light-heading, #888);
+    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
   }
 
   .panel-actions {
@@ -255,6 +261,8 @@
     border: none;
     cursor: pointer;
     padding: 2px 4px;
+    border-radius: 5px;
+    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
   }
 
   .panel-actions button:disabled {
@@ -262,8 +270,15 @@
     cursor: not-allowed;
   }
 
+  .panel-actions button:hover:not(:disabled),
+  .panel-actions button:focus-visible:not(:disabled) {
+    background: var(--fabricate-editor-input-bg-hover, rgba(255, 255, 255, 0.07));
+    color: var(--fabricate-editor-text, rgba(255, 243, 232, 0.92));
+  }
+
   .accordion-body {
     padding: 12px;
+    background: rgba(0, 0, 0, 0.12);
   }
 
   .group-name-row {
@@ -276,6 +291,7 @@
   .group-name-row label {
     font-weight: bold;
     white-space: nowrap;
+    color: var(--fabricate-editor-muted-strong, rgba(255, 236, 220, 0.82));
   }
 
   .group-name-row input {
@@ -292,7 +308,8 @@
     text-align: left;
     font-size: 0.8rem;
     padding: 2px 4px;
-    border-bottom: 1px solid var(--color-border-light, #ddd);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
   }
 
   .result-table td {
@@ -304,6 +321,11 @@
     display: flex;
     align-items: center;
     gap: 4px;
+    min-height: 34px;
+    padding: 4px 6px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.03);
   }
 
   .item-thumb {
@@ -313,7 +335,7 @@
   }
 
   .no-item {
-    color: var(--color-text-light-heading, #999);
+    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
     font-style: italic;
   }
 
@@ -330,10 +352,12 @@
     border: none;
     cursor: pointer;
     padding: 2px 4px;
+    border-radius: 5px;
+    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
   }
 
   .icon-button.danger {
-    color: var(--color-text-error, #c00);
+    color: var(--fabricate-editor-danger, rgba(255, 216, 208, 0.95));
   }
 
   .result-actions {
@@ -341,20 +365,22 @@
   }
 
   .results-empty {
-    border: 2px dashed var(--color-border-light, #ccc);
-    border-radius: 4px;
+    border: 2px dashed rgba(148, 190, 255, 0.3);
+    border-radius: 8px;
     padding: 12px;
     text-align: center;
-    color: var(--color-text-light-heading, #999);
+    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
     font-style: italic;
+    background: rgba(74, 144, 226, 0.08);
   }
 
   .drop-zone-area {
-    border: 2px dashed var(--color-border-light, #ccc);
-    border-radius: 4px;
+    border: 2px dashed rgba(148, 190, 255, 0.3);
+    border-radius: 8px;
     padding: 12px;
     text-align: center;
-    color: var(--color-text-light-heading, #999);
+    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
     margin-top: 8px;
+    background: rgba(74, 144, 226, 0.08);
   }
 </style>
