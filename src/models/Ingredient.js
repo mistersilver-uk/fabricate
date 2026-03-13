@@ -89,7 +89,7 @@ export class Ingredient {
       if (!matched) {
         return false;
       }
-      return true;
+      return matched;
     }
 
     // Check alternatives
