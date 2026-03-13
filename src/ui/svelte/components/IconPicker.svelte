@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
+  import { portal } from '../actions/portal.js';
   import { localize } from '../util/foundryBridge.js';
   import {
     DEFAULT_ESSENCE_ICON,
@@ -9,6 +10,7 @@
     getEssenceIconOption,
     normalizeEssenceIcon
   } from '../util/essenceIcons.js';
+  import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
 
   let {
     value = DEFAULT_ESSENCE_ICON,
@@ -20,7 +22,11 @@
 
   let pickerOpen = $state(false);
   let searchTerm = $state('');
+  let pickerRoot = $state(null);
+  let popoverRoot = $state(null);
+  let triggerButton = $state(null);
   let searchInput = $state(null);
+  let popoverStyle = $state('');
 
   const iconOptions = ESSENCE_ICON_OPTIONS;
   const selectedIconClass = $derived(normalizeEssenceIcon(value));
@@ -47,18 +53,109 @@
     closePicker();
   }
 
+  function getPopoverHost() {
+    if (!pickerRoot || typeof document === 'undefined') return null;
+
+    return pickerRoot.closest('.fabricate-admin');
+  }
+
+  function getPopoverHorizontalBounds(hostRect) {
+    if (!pickerRoot) return {};
+
+    const mainPanel = pickerRoot.closest('.admin-main');
+    const mainPanelRect = mainPanel?.getBoundingClientRect?.();
+    if (!mainPanelRect) return {};
+
+    return {
+      minLeft: mainPanelRect.left - hostRect.left + 16,
+      maxRight: mainPanelRect.right - hostRect.left - 16
+    };
+  }
+
+  function updatePopoverPosition() {
+    if (!pickerOpen || !triggerButton || typeof window === 'undefined') return;
+
+    const popoverHost = getPopoverHost();
+    const hostRect = popoverHost?.getBoundingClientRect?.() ?? {
+      left: 0,
+      top: 0,
+      width: window.innerWidth,
+      height: window.innerHeight
+    };
+    const triggerRect = triggerButton.getBoundingClientRect();
+    const horizontalBounds = getPopoverHorizontalBounds(hostRect);
+
+    const layout = computeIconPickerPopoverLayout(
+      {
+        left: triggerRect.left - hostRect.left,
+        right: triggerRect.right - hostRect.left,
+        top: triggerRect.top - hostRect.top,
+        bottom: triggerRect.bottom - hostRect.top,
+        width: triggerRect.width,
+        height: triggerRect.height
+      },
+      { width: hostRect.width || window.innerWidth, height: hostRect.height || window.innerHeight },
+      {
+        horizontalAlign: iconOnly ? 'left' : 'right',
+        minLeft: horizontalBounds.minLeft,
+        maxRight: horizontalBounds.maxRight
+      }
+    );
+
+    if (!layout) {
+      popoverStyle = '';
+      return;
+    }
+
+    const verticalPosition = layout.placement === 'top'
+      ? `top: auto; bottom: ${layout.bottom}px;`
+      : `top: ${layout.top}px; bottom: auto;`;
+
+    popoverStyle = [
+      `left: ${layout.left}px;`,
+      'right: auto;',
+      `width: ${layout.width}px;`,
+      `max-height: ${layout.maxHeight}px;`,
+      verticalPosition
+    ].join(' ');
+  }
+
   $effect(() => {
     if (!pickerOpen || !searchInput) return;
     queueMicrotask(() => searchInput?.focus());
   });
+
+  $effect(() => {
+    if (!pickerOpen || typeof window === 'undefined' || typeof document === 'undefined') {
+      popoverStyle = '';
+      return;
+    }
+
+    updatePopoverPosition();
+
+    const handleViewportChange = () => updatePopoverPosition();
+    window.addEventListener('resize', handleViewportChange);
+    document.addEventListener('scroll', handleViewportChange, true);
+
+    return () => {
+      window.removeEventListener('resize', handleViewportChange);
+      document.removeEventListener('scroll', handleViewportChange, true);
+    };
+  });
 </script>
 
 <div
+  bind:this={pickerRoot}
   class="essence-icon-picker"
-  use:dismissOnOutsideClick={{ enabled: pickerOpen, onDismiss: closePicker }}
+  use:dismissOnOutsideClick={{
+    enabled: pickerOpen,
+    onDismiss: closePicker,
+    additionalNodes: () => [popoverRoot]
+  }}
 >
   <button
     type="button"
+    bind:this={triggerButton}
     class="essence-icon-picker-trigger"
     class:icon-only={iconOnly}
     onclick={togglePicker}
@@ -81,9 +178,12 @@
 
   {#if pickerOpen}
     <div
+      bind:this={popoverRoot}
       class="essence-icon-picker-popover"
+      style={popoverStyle}
       role="dialog"
       aria-label={localize('FABRICATE.Admin.Features.Essences.IconDialogLabel')}
+      use:portal={() => getPopoverHost()}
     >
       <div class="essence-icon-picker-search">
         <input

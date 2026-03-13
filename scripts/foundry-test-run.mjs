@@ -922,11 +922,54 @@ async function main() {
 
         // Register all 7 world items as managed components
         const worldItems = game.items.contents;
+        const worldItemByName = Object.fromEntries(worldItems.map(item => [item.name, item]));
         const componentMap = {};
         for (const item of worldItems) {
           const result = await csm.addItemFromUuid(systemId, item.uuid);
           componentMap[item.name] = result.item.id;
         }
+
+        await csm.updateSystem(systemId, {
+          features: { essences: true },
+          essenceDefinitions: [
+            {
+              name: 'Verdant',
+              description: 'The essence of growth, renewal, and living roots.',
+              icon: 'fas fa-leaf',
+              sourceItemUuid: worldItemByName['Mystic Herb']?.uuid ?? null
+            },
+            {
+              name: 'Restorative',
+              description: 'The essence of mending, resilience, and recovery.',
+              icon: 'fas fa-heart',
+              sourceItemUuid: worldItemByName['Healing Potion']?.uuid ?? null
+            },
+            {
+              name: 'Toxic',
+              description: 'The essence of venom, corruption, and dangerous decay.',
+              icon: 'fas fa-skull-crossbones',
+              sourceItemUuid: null
+            },
+            {
+              name: 'Volatile',
+              description: 'The essence of sparks, heat, and unstable reactions.',
+              icon: 'fas fa-bolt',
+              sourceItemUuid: null
+            },
+            {
+              name: 'Positive',
+              description: 'The essence of radiance, blessing, and warm light.',
+              icon: 'fas fa-sun',
+              sourceItemUuid: null
+            },
+            {
+              name: 'Negative',
+              description: 'The essence of shadow, concealment, and entropy.',
+              icon: 'fas fa-moon',
+              sourceItemUuid: null
+            }
+          ]
+        });
 
         // Create 3 recipes
         const rm = game.fabricate.getRecipeManager();
@@ -1079,6 +1122,60 @@ async function main() {
               await page.waitForTimeout(1_000);
               await screenshot(page, `recipe-manager-${slug}`);
               process.stdout.write(`  Screenshotted Recipe Manager "${label}" tab.\n`);
+
+              if (slug === 'systems') {
+                await page.evaluate(() => {
+                  document.querySelector('.essence-creation-toolbar')?.scrollIntoView({
+                    behavior: 'auto',
+                    block: 'center'
+                  });
+                });
+                await page.waitForTimeout(500);
+
+                const pickerTrigger = page.locator('.essence-creation-toolbar .essence-icon-picker-trigger').first();
+                await pickerTrigger.click();
+                await page.locator('.essence-icon-picker-popover').first().waitFor({ state: 'visible', timeout: 5_000 });
+                await page.waitForTimeout(300);
+                await screenshot(page, 'recipe-manager-systems-essence-picker');
+                process.stdout.write('  Screenshotted Systems tab essence picker.\n');
+
+                const pickerSearch = page.locator('.essence-icon-picker-search input').first();
+                await pickerSearch.fill('backward fast');
+                await page.waitForTimeout(300);
+                await screenshot(page, 'recipe-manager-systems-essence-picker-filtered');
+                process.stdout.write('  Screenshotted filtered essence picker state.\n');
+
+                await page.keyboard.press('Escape');
+                await page.waitForTimeout(300);
+
+                const editEssenceButton = page.locator(
+                  '.essence-definition-row .essence-definition-actions button:has(i.fa-pen)'
+                ).first();
+                if (await editEssenceButton.count() > 0) {
+                  await editEssenceButton.click();
+                  await page.waitForTimeout(300);
+
+                  const editPickerTrigger = page.locator(
+                    '.essence-definition-row .essence-icon-picker-trigger.icon-only'
+                  ).first();
+                  await editPickerTrigger.click();
+                  await page.locator('.essence-icon-picker-popover').first().waitFor({ state: 'visible', timeout: 5_000 });
+                  await page.waitForTimeout(300);
+                  await screenshot(page, 'recipe-manager-systems-essence-edit-picker');
+                  process.stdout.write('  Screenshotted inline essence edit picker.\n');
+
+                  await page.keyboard.press('Escape');
+                  await page.waitForTimeout(300);
+
+                  const cancelEditButton = page.locator(
+                    '.essence-definition-row .essence-definition-actions button:has(i.fa-times)'
+                  ).first();
+                  if (await cancelEditButton.count() > 0) {
+                    await cancelEditButton.click();
+                    await page.waitForTimeout(300);
+                  }
+                }
+              }
             }
           } catch {
             // Tab may not exist in this version

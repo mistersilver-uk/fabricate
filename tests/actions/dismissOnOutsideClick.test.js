@@ -79,4 +79,23 @@ describe('dismissOnOutsideClick action', () => {
     assert.equal(dismissCount, 1);
     action.destroy();
   });
+
+  it('does not dismiss when clicking inside an additional allowed node', () => {
+    const host = document.createElement('div');
+    const popover = document.createElement('div');
+    const popoverButton = document.createElement('button');
+    popover.appendChild(popoverButton);
+    document.body.append(host, popover);
+
+    let dismissed = false;
+    const action = dismissOnOutsideClick(host, {
+      additionalNodes: () => [popover],
+      onDismiss: () => { dismissed = true; }
+    });
+
+    popoverButton.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+
+    assert.equal(dismissed, false);
+    action.destroy();
+  });
 });
