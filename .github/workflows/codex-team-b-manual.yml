@@ -121,8 +121,21 @@ jobs:
           FALLBACK_PR_TOKEN: ${{ secrets.WORKFLOW_GH_TOKEN }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch || 'main' }}
         run: |
-          git remote set-url origin "https://x-access-token:${PUSH_TOKEN}@github.com/${{ github.repository }}.git"
-          git push origin "$BRANCH"
+          push_with_token() {
+            local token="$1"
+            git remote set-url origin "https://x-access-token:${token}@github.com/${{ github.repository }}.git"
+            git push origin "$BRANCH" 2>&1
+          }
+
+          if ! push_with_token "$PUSH_TOKEN"; then
+            echo "::warning::Push failed with primary token — falling back to github.token"
+            if [ "$PUSH_TOKEN" != "$PRIMARY_PR_TOKEN" ]; then
+              push_with_token "$PRIMARY_PR_TOKEN"
+            else
+              echo "::error::Push failed and no fallback token available."
+              exit 1
+            fi
+          fi
 
           MANUAL_PR_URL="${{ github.server_url }}/${{ github.repository }}/compare/${DEFAULT_BRANCH}...${BRANCH}?expand=1"
           PR_OUTPUT="$(mktemp)"

@@ -186,8 +186,7 @@ jobs:
 
             ### 4. Document
             Follow the rules in /tmp/claude-context/docs-writer.md.
-            At minimum, update CHANGELOG.md with an entry referencing
-            #${{ needs.pick-task.outputs.issue_number }}.
+            Update relevant documentation if behavior changed.
 
             ### 5. Commit
             Stage all changes and commit:
@@ -257,8 +256,21 @@ jobs:
           ISSUE_TITLE: ${{ needs.pick-task.outputs.issue_title }}
         run: |
           # Re-authenticate git — Claude Code Action may have replaced credentials
-          git remote set-url origin "https://x-access-token:${PUSH_TOKEN}@github.com/${{ github.repository }}.git"
-          git push origin "$BRANCH"
+          push_with_token() {
+            local token="$1"
+            git remote set-url origin "https://x-access-token:${token}@github.com/${{ github.repository }}.git"
+            git push origin "$BRANCH" 2>&1
+          }
+
+          if ! push_with_token "$PUSH_TOKEN"; then
+            echo "::warning::Push failed with primary token — falling back to github.token"
+            if [ "$PUSH_TOKEN" != "$PRIMARY_PR_TOKEN" ]; then
+              push_with_token "$PRIMARY_PR_TOKEN"
+            else
+              echo "::error::Push failed and no fallback token available."
+              exit 1
+            fi
+          fi
 
           # Extract PR title from the first commit on the branch (already conventional-commit formatted)
           PR_TITLE=$(git log origin/main..HEAD --format='%s' --reverse | head -1)
