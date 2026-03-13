@@ -370,9 +370,7 @@
         "Delete": "Delete"
       },
       "Rules": {
-        "Title": "Global Rules",
-        "Placeholder": "Difficulty and advanced system-wide rule editing will live here.",
-        "PlaceholderDetail": "This first implementation pass focuses on systems, item libraries, and recipe scoping."
+        "Title": "Global Rules"
       }
     },
     "Editor": {
