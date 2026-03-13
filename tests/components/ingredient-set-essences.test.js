@@ -1,14 +1,34 @@
 /**
- * Tests for essence requirements section in IngredientSetPanel
- * DOM-based tests mirroring the component output structure (card layout).
+ * Tests for the recipe editor ingredient-set essence requirements section.
+ *
+ * Mirrors the component editor card-roster interaction model:
+ * - render every system essence definition
+ * - edit quantities inline with steppers and direct numeric input
+ * - treat 0 as the neutral "not required" state
  */
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 
-// ---------------------------------------------------------------------------
-// Helper: build DOM structure mirroring the new card-layout essence section
-// ---------------------------------------------------------------------------
+const DEFAULT_ESSENCE_ICON = 'fas fa-mortar-pestle';
+
+function sortEssenceDefinitions(definitions = []) {
+  return [...definitions].sort((left, right) => {
+    const nameCompare = String(left?.name || '').localeCompare(String(right?.name || ''), undefined, {
+      sensitivity: 'base'
+    });
+    if (nameCompare !== 0) return nameCompare;
+    return String(left?.id || '').localeCompare(String(right?.id || ''), undefined, {
+      sensitivity: 'base'
+    });
+  });
+}
+
+function clampQuantity(value) {
+  const quantity = Number(value);
+  if (!Number.isFinite(quantity) || quantity <= 0) return 0;
+  return Math.max(0, Math.floor(quantity));
+}
 
 function buildEssenceSection(set, allEssences, showEssences, callbacks = {}) {
   if (!showEssences) return null;
@@ -16,127 +36,80 @@ function buildEssenceSection(set, allEssences, showEssences, callbacks = {}) {
   const container = document.createElement('div');
   container.className = 'essence-requirements';
 
-  const h4 = document.createElement('h4');
-  h4.textContent = 'Essence Requirements';
-  container.appendChild(h4);
+  const heading = document.createElement('h4');
+  heading.textContent = 'Essence Requirements';
+  container.appendChild(heading);
 
-  // Grid wrapper
+  const essenceOptions = sortEssenceDefinitions(allEssences).map(def => ({
+    id: def.id,
+    name: def.name || def.id,
+    icon: String(def.icon || '').trim() || DEFAULT_ESSENCE_ICON,
+    quantity: clampQuantity(set?.essences?.[def.id])
+  }));
+
+  if (essenceOptions.length === 0) {
+    const hint = document.createElement('p');
+    hint.className = 'hint';
+    hint.textContent = 'No essences defined yet. Add essences in Crafting Admin > Systems.';
+    container.appendChild(hint);
+    return container;
+  }
+
   const grid = document.createElement('div');
   grid.className = 'essence-grid';
   container.appendChild(grid);
 
-  const essences = set?.essences || {};
-  for (const [essenceId, quantity] of Object.entries(essences)) {
-    const def = allEssences.find(e => e.id === essenceId);
-
-    // Card article — 6-column inner grid: [minus] [qty input] [icon] [name] [plus] [remove]
+  for (const option of essenceOptions) {
     const card = document.createElement('article');
     card.className = 'essence-card';
-    card.dataset.essenceId = essenceId;
+    card.dataset.essenceId = option.id;
 
-    // 1. Decrement button
     const minusBtn = document.createElement('button');
     minusBtn.type = 'button';
     minusBtn.className = 'essence-step essence-step-minus';
-    minusBtn.disabled = quantity <= 1;
-    minusBtn.title = `Decrease ${def?.name || essenceId}`;
-    minusBtn.setAttribute('aria-label', `Decrease ${def?.name || essenceId}`);
-    minusBtn.onclick = () => callbacks.onUpdateEssence?.(0, essenceId, Math.max(1, quantity - 1));
-    const minusIcon = document.createElement('i');
-    minusIcon.className = 'fas fa-minus';
-    minusBtn.appendChild(minusIcon);
+    minusBtn.title = `Decrease ${option.name}`;
+    minusBtn.setAttribute('aria-label', `Decrease ${option.name}`);
+    minusBtn.onclick = () => callbacks.onUpdateEssence?.(0, option.id, Math.max(0, option.quantity - 1));
+    minusBtn.appendChild(document.createElement('i')).className = 'fas fa-minus';
     card.appendChild(minusBtn);
 
-    // 2. Quantity input
     const input = document.createElement('input');
     input.type = 'number';
+    input.min = '0';
+    input.step = '1';
     input.className = 'essence-quantity-input';
-    input.min = '1';
-    input.value = String(quantity);
-    input.oninput = (e) => {
-      const val = Math.max(1, Math.floor(Number(e.target.value) || 1));
-      callbacks.onUpdateEssence?.(0, essenceId, val);
+    input.value = String(option.quantity);
+    input.setAttribute('aria-label', `${option.name} quantity`);
+    input.oninput = (event) => {
+      callbacks.onUpdateEssence?.(0, option.id, clampQuantity(event.target.value));
     };
     card.appendChild(input);
 
-    // 3. Icon badge
     const iconBadge = document.createElement('div');
     iconBadge.className = 'essence-icon';
     iconBadge.setAttribute('aria-hidden', 'true');
-    if (def?.icon) {
-      const icon = document.createElement('i');
-      icon.className = def.icon;
-      icon.setAttribute('aria-hidden', 'true');
-      iconBadge.appendChild(icon);
-    }
+    iconBadge.appendChild(document.createElement('i')).className = option.icon;
     card.appendChild(iconBadge);
 
-    // 4. Name
     const nameEl = document.createElement('strong');
     nameEl.className = 'essence-name';
-    nameEl.textContent = def?.name || essenceId;
+    nameEl.textContent = option.name;
     card.appendChild(nameEl);
 
-    // 5. Increment button
     const plusBtn = document.createElement('button');
     plusBtn.type = 'button';
     plusBtn.className = 'essence-step essence-step-plus';
-    plusBtn.title = `Increase ${def?.name || essenceId}`;
-    plusBtn.setAttribute('aria-label', `Increase ${def?.name || essenceId}`);
-    plusBtn.onclick = () => callbacks.onUpdateEssence?.(0, essenceId, quantity + 1);
-    const plusIcon = document.createElement('i');
-    plusIcon.className = 'fas fa-plus';
-    plusBtn.appendChild(plusIcon);
+    plusBtn.title = `Increase ${option.name}`;
+    plusBtn.setAttribute('aria-label', `Increase ${option.name}`);
+    plusBtn.onclick = () => callbacks.onUpdateEssence?.(0, option.id, option.quantity + 1);
+    plusBtn.appendChild(document.createElement('i')).className = 'fas fa-plus';
     card.appendChild(plusBtn);
-
-    // 6. Remove button
-    const removeBtn = document.createElement('button');
-    removeBtn.type = 'button';
-    removeBtn.className = 'essence-remove';
-    removeBtn.title = 'Remove';
-    removeBtn.onclick = () => callbacks.onRemoveEssence?.(0, essenceId);
-    const removeIcon = document.createElement('i');
-    removeIcon.className = 'fas fa-times';
-    removeBtn.appendChild(removeIcon);
-    card.appendChild(removeBtn);
 
     grid.appendChild(card);
   }
 
-  // Add-essence row
-  const addableEssences = allEssences.filter(def => !Object.hasOwn(essences, def.id));
-  if (addableEssences.length > 0) {
-    const addRow = document.createElement('div');
-    addRow.className = 'add-essence-row';
-
-    const select = document.createElement('select');
-    const placeholder = document.createElement('option');
-    placeholder.value = '';
-    placeholder.textContent = 'Add essence...';
-    select.appendChild(placeholder);
-    for (const def of addableEssences) {
-      const opt = document.createElement('option');
-      opt.value = def.id;
-      opt.textContent = def.name;
-      select.appendChild(opt);
-    }
-    addRow.appendChild(select);
-
-    const addBtn = document.createElement('button');
-    addBtn.type = 'button';
-    addBtn.disabled = true;
-    addBtn.textContent = 'Add';
-    addRow.appendChild(addBtn);
-
-    container.appendChild(addRow);
-  }
-
   return container;
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 describe('IngredientSetPanel essence requirements section', () => {
   before(() => setupDOM());
@@ -148,202 +121,143 @@ describe('IngredientSetPanel essence requirements section', () => {
       [{ id: 'fire', name: 'Fire', icon: 'fas fa-fire' }],
       false
     );
+
     assert.equal(result, null);
   });
 
-  it('renders section with heading when showEssences is true', () => {
-    const section = buildEssenceSection(
-      { essences: {} },
-      [],
-      true
-    );
+  it('renders the section heading when showEssences is true', () => {
+    const section = buildEssenceSection({ essences: {} }, [], true);
+
     assert.ok(section);
     assert.equal(section.className, 'essence-requirements');
-    const h4 = section.querySelector('h4');
-    assert.equal(h4.textContent, 'Essence Requirements');
+    assert.equal(section.querySelector('h4').textContent, 'Essence Requirements');
   });
 
-  it('renders essence cards inside an essence-grid for each entry in set.essences', () => {
+  it('renders a hint when the system defines no essences', () => {
+    const section = buildEssenceSection({ essences: {} }, [], true);
+
+    const hint = section.querySelector('.hint');
+    assert.ok(hint);
+    assert.match(hint.textContent, /No essences defined yet/i);
+  });
+
+  it('renders one card per system essence definition', () => {
     const allEssences = [
       { id: 'fire', name: 'Fire', icon: 'fas fa-fire' },
       { id: 'water', name: 'Water', icon: 'fas fa-water' }
     ];
     const section = buildEssenceSection(
-      { essences: { fire: 3, water: 1 } },
+      { essences: { fire: 3 } },
       allEssences,
       true
     );
 
-    const grid = section.querySelector('.essence-grid');
-    assert.ok(grid, 'essence-grid wrapper should exist');
-
-    const cards = grid.querySelectorAll('.essence-card');
+    const cards = section.querySelectorAll('.essence-card');
     assert.equal(cards.length, 2);
-
-    // First card: Fire (quantity 3)
-    const fireCard = cards[0];
-    assert.equal(fireCard.querySelector('.essence-name').textContent, 'Fire');
-    assert.equal(fireCard.querySelector('.essence-quantity-input').value, '3');
-
-    // Second card: Water (quantity 1)
-    const waterCard = cards[1];
-    assert.equal(waterCard.querySelector('.essence-name').textContent, 'Water');
-    assert.equal(waterCard.querySelector('.essence-quantity-input').value, '1');
+    assert.equal(cards[0].dataset.essenceId, 'fire');
+    assert.equal(cards[1].dataset.essenceId, 'water');
   });
 
-  it('each essence card has increment and decrement buttons', () => {
-    const allEssences = [{ id: 'fire', name: 'Fire', icon: 'fas fa-fire' }];
+  it('sorts essence cards alphabetically by display name', () => {
+    const section = buildEssenceSection(
+      { essences: { 'ess-z': 4, 'ess-a': 1 } },
+      [
+        { id: 'ess-z', name: 'Zephyr', icon: 'fas fa-wind' },
+        { id: 'ess-a', name: 'Amber', icon: 'fas fa-gem' }
+      ],
+      true
+    );
+
+    const names = [...section.querySelectorAll('.essence-name')].map(el => el.textContent);
+    assert.deepEqual(names, ['Amber', 'Zephyr']);
+  });
+
+  it('shows quantity 0 for unselected essences instead of hiding them', () => {
     const section = buildEssenceSection(
       { essences: { fire: 2 } },
-      allEssences,
+      [
+        { id: 'fire', name: 'Fire', icon: 'fas fa-fire' },
+        { id: 'water', name: 'Water', icon: 'fas fa-water' }
+      ],
       true
     );
-    const card = section.querySelector('.essence-card');
-    assert.ok(card.querySelector('.essence-step-minus'), 'minus button should exist');
-    assert.ok(card.querySelector('.essence-step-plus'), 'plus button should exist');
-    assert.ok(card.querySelector('.essence-step-minus i.fas.fa-minus'), 'minus icon should exist');
-    assert.ok(card.querySelector('.essence-step-plus i.fas.fa-plus'), 'plus icon should exist');
+
+    const cards = section.querySelectorAll('.essence-card');
+    assert.equal(cards[0].querySelector('.essence-quantity-input').value, '2');
+    assert.equal(cards[1].querySelector('.essence-quantity-input').value, '0');
   });
 
-  it('minus button is disabled when quantity is 1', () => {
-    const allEssences = [{ id: 'fire', name: 'Fire', icon: 'fas fa-fire' }];
-    const section = buildEssenceSection(
-      { essences: { fire: 1 } },
-      allEssences,
-      true
-    );
-    const card = section.querySelector('.essence-card');
-    const minusBtn = card.querySelector('.essence-step-minus');
-    assert.equal(minusBtn.disabled, true, 'minus button should be disabled at quantity 1');
-  });
-
-  it('minus button is enabled when quantity is greater than 1', () => {
-    const allEssences = [{ id: 'fire', name: 'Fire', icon: 'fas fa-fire' }];
-    const section = buildEssenceSection(
-      { essences: { fire: 2 } },
-      allEssences,
-      true
-    );
-    const card = section.querySelector('.essence-card');
-    const minusBtn = card.querySelector('.essence-step-minus');
-    assert.equal(minusBtn.disabled, false, 'minus button should be enabled at quantity > 1');
-  });
-
-  it('icon badge renders inside .essence-icon wrapper', () => {
-    const allEssences = [{ id: 'fire', name: 'Fire', icon: 'fas fa-fire' }];
-    const section = buildEssenceSection(
-      { essences: { fire: 2 } },
-      allEssences,
-      true
-    );
-    const card = section.querySelector('.essence-card');
-    const iconBadge = card.querySelector('.essence-icon');
-    assert.ok(iconBadge, '.essence-icon wrapper should exist');
-    assert.ok(iconBadge.querySelector('i.fas.fa-fire'), 'icon should be inside .essence-icon');
-  });
-
-  it('remove button has .essence-remove class', () => {
-    const allEssences = [{ id: 'fire', name: 'Fire', icon: 'fas fa-fire' }];
-    const section = buildEssenceSection(
-      { essences: { fire: 2 } },
-      allEssences,
-      true
-    );
-    const card = section.querySelector('.essence-card');
-    const removeBtn = card.querySelector('.essence-remove');
-    assert.ok(removeBtn, '.essence-remove button should exist');
-    assert.ok(removeBtn.querySelector('i.fas.fa-times'), 'remove icon should exist');
-  });
-
-  it('essence name is rendered in a strong element', () => {
-    const allEssences = [{ id: 'fire', name: 'Fire', icon: 'fas fa-fire' }];
-    const section = buildEssenceSection(
-      { essences: { fire: 2 } },
-      allEssences,
-      true
-    );
-    const card = section.querySelector('.essence-card');
-    const nameEl = card.querySelector('strong.essence-name');
-    assert.ok(nameEl, 'essence name should be a strong element');
-    assert.equal(nameEl.textContent, 'Fire');
-  });
-
-  it('shows add-essence dropdown with only unassigned essences', () => {
-    const allEssences = [
-      { id: 'fire', name: 'Fire', icon: 'fas fa-fire' },
-      { id: 'water', name: 'Water', icon: 'fas fa-water' },
-      { id: 'earth', name: 'Earth', icon: 'fas fa-mountain' }
-    ];
-    const section = buildEssenceSection(
-      { essences: { fire: 2 } },
-      allEssences,
-      true
-    );
-    const addRow = section.querySelector('.add-essence-row');
-    assert.ok(addRow);
-
-    const select = addRow.querySelector('select');
-    const options = select.querySelectorAll('option');
-    // Placeholder + 2 addable (water, earth)
-    assert.equal(options.length, 3);
-    assert.equal(options[1].value, 'water');
-    assert.equal(options[1].textContent, 'Water');
-    assert.equal(options[2].value, 'earth');
-    assert.equal(options[2].textContent, 'Earth');
-  });
-
-  it('hides add-essence dropdown when all essences are assigned', () => {
-    const allEssences = [
-      { id: 'fire', name: 'Fire', icon: 'fas fa-fire' }
-    ];
-    const section = buildEssenceSection(
-      { essences: { fire: 2 } },
-      allEssences,
-      true
-    );
-    const addRow = section.querySelector('.add-essence-row');
-    assert.equal(addRow, null);
-  });
-
-  it('displays essence id as fallback when definition is missing', () => {
-    const section = buildEssenceSection(
-      { essences: { unknown_essence: 1 } },
-      [],
-      true
-    );
-    const nameEl = section.querySelector('.essence-name');
-    assert.equal(nameEl.textContent, 'unknown_essence');
-  });
-
-  it('calls onRemoveEssence callback when remove button is clicked', () => {
-    const calls = [];
+  it('renders increment and decrement buttons but no remove button', () => {
     const section = buildEssenceSection(
       { essences: { fire: 2 } },
       [{ id: 'fire', name: 'Fire', icon: 'fas fa-fire' }],
-      true,
-      { onRemoveEssence: (...args) => calls.push(args) }
+      true
     );
-    const removeBtn = section.querySelector('.essence-remove');
-    removeBtn.click();
-    assert.equal(calls.length, 1);
-    assert.deepEqual(calls[0], [0, 'fire']);
+
+    const card = section.querySelector('.essence-card');
+    assert.ok(card.querySelector('.essence-step-minus'));
+    assert.ok(card.querySelector('.essence-step-plus'));
+    assert.equal(card.querySelector('.essence-remove'), null);
   });
 
-  it('calls onUpdateEssence with quantity+1 when increment button is clicked', () => {
-    const calls = [];
+  it('does not render the legacy add-essence row', () => {
+    const section = buildEssenceSection(
+      { essences: {} },
+      [{ id: 'fire', name: 'Fire', icon: 'fas fa-fire' }],
+      true
+    );
+
+    assert.equal(section.querySelector('.add-essence-row'), null);
+  });
+
+  it('uses min=0 on quantity inputs', () => {
     const section = buildEssenceSection(
       { essences: { fire: 2 } },
+      [{ id: 'fire', name: 'Fire', icon: 'fas fa-fire' }],
+      true
+    );
+
+    assert.equal(section.querySelector('.essence-quantity-input').min, '0');
+  });
+
+  it('uses the default icon when an essence definition has no icon', () => {
+    const section = buildEssenceSection(
+      { essences: { mystery: 1 } },
+      [{ id: 'mystery', name: 'Mystery', icon: '' }],
+      true
+    );
+
+    const icon = section.querySelector('.essence-icon i');
+    assert.equal(icon.className, DEFAULT_ESSENCE_ICON);
+  });
+
+  it('incrementing an unselected essence requests quantity 1', () => {
+    const calls = [];
+    const section = buildEssenceSection(
+      { essences: {} },
       [{ id: 'fire', name: 'Fire', icon: 'fas fa-fire' }],
       true,
       { onUpdateEssence: (...args) => calls.push(args) }
     );
-    const plusBtn = section.querySelector('.essence-step-plus');
-    plusBtn.click();
-    assert.equal(calls.length, 1);
-    assert.deepEqual(calls[0], [0, 'fire', 3]);
+
+    section.querySelector('.essence-step-plus').click();
+    assert.deepEqual(calls, [[0, 'fire', 1]]);
   });
 
-  it('calls onUpdateEssence with quantity-1 when decrement button is clicked (quantity > 1)', () => {
+  it('decrementing a zero-quantity essence keeps the quantity at zero', () => {
+    const calls = [];
+    const section = buildEssenceSection(
+      { essences: {} },
+      [{ id: 'fire', name: 'Fire', icon: 'fas fa-fire' }],
+      true,
+      { onUpdateEssence: (...args) => calls.push(args) }
+    );
+
+    section.querySelector('.essence-step-minus').click();
+    assert.deepEqual(calls, [[0, 'fire', 0]]);
+  });
+
+  it('typing 0 into the quantity input requests removal through updateEssence', () => {
     const calls = [];
     const section = buildEssenceSection(
       { essences: { fire: 3 } },
@@ -351,25 +265,11 @@ describe('IngredientSetPanel essence requirements section', () => {
       true,
       { onUpdateEssence: (...args) => calls.push(args) }
     );
-    const minusBtn = section.querySelector('.essence-step-minus');
-    minusBtn.click();
-    assert.equal(calls.length, 1);
-    assert.deepEqual(calls[0], [0, 'fire', 2]);
-  });
 
-  it('does not fire update callback from disabled minus button at quantity 1', () => {
-    const calls = [];
-    const section = buildEssenceSection(
-      { essences: { fire: 1 } },
-      [{ id: 'fire', name: 'Fire', icon: 'fas fa-fire' }],
-      true,
-      { onUpdateEssence: (...args) => calls.push(args) }
-    );
-    const minusBtn = section.querySelector('.essence-step-minus');
-    // The button is disabled — clicking should have no effect
-    assert.equal(minusBtn.disabled, true);
-    // Simulate what a browser would do: disabled buttons do not fire click handlers
-    // We verify the button is disabled rather than manually invoking click()
-    assert.equal(calls.length, 0);
+    const input = section.querySelector('.essence-quantity-input');
+    input.value = '0';
+    input.oninput({ target: input });
+
+    assert.deepEqual(calls, [[0, 'fire', 0]]);
   });
 });

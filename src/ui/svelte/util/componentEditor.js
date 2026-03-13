@@ -14,6 +14,20 @@ function compareComponentEditorEssenceOptions(left, right) {
   });
 }
 
+export function buildEditableEssenceOptions(essenceDefinitions = [], currentEssences = {}) {
+  const definitions = Array.isArray(essenceDefinitions) ? essenceDefinitions : [];
+  const quantities = currentEssences && typeof currentEssences === 'object' ? currentEssences : {};
+
+  return definitions
+    .map(def => ({
+      id: def.id,
+      name: def.name || def.id,
+      icon: String(def.icon || '').trim() || DEFAULT_ESSENCE_ICON,
+      quantity: clampComponentEssenceQuantity(quantities[def.id])
+    }))
+    .sort(compareComponentEditorEssenceOptions);
+}
+
 export function clampComponentEssenceQuantity(value) {
   const quantity = Number(value);
   if (!Number.isFinite(quantity) || quantity <= 0) return 0;
@@ -58,12 +72,7 @@ export function buildComponentEditorState(system, item) {
       }))
       : [],
     essenceOptions: showEssences
-      ? essenceDefinitions.map(def => ({
-        id: def.id,
-        name: def.name || def.id,
-        icon: String(def.icon || '').trim() || DEFAULT_ESSENCE_ICON,
-        quantity: clampComponentEssenceQuantity(currentEssences[def.id])
-      })).sort(compareComponentEditorEssenceOptions)
+      ? buildEditableEssenceOptions(essenceDefinitions, currentEssences)
       : []
   };
 }

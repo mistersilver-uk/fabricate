@@ -183,6 +183,27 @@ describe('editorStore activeContainers reactivity', () => {
       'essences object reference must change after addEssence');
   });
 
+  it('updateEssence adds a missing essence and emits new set and essences references', () => {
+    const recipe = makeRecipe({
+      ingredientSets: [{ id: 'set1', ingredientGroups: [], essences: {} }]
+    });
+    const store = createEditorStore(essenceServices(), { recipe, craftingSystemId: 'sys1' });
+
+    const before = get(store.activeContainers);
+    const setBefore = before.ingredientSets[0];
+    const essencesBefore = before.ingredientSets[0].essences;
+
+    store.updateEssence(0, 'fire', 2);
+
+    const after = get(store.activeContainers);
+    assert.equal(after.ingredientSets[0].essences.fire, 2,
+      'missing essence should be created when updateEssence receives a positive quantity');
+    assert.notEqual(after.ingredientSets[0], setBefore,
+      'ingredient set object reference must change after updateEssence adds an essence');
+    assert.notEqual(after.ingredientSets[0].essences, essencesBefore,
+      'essences object reference must change after updateEssence adds an essence');
+  });
+
   it('addCatalystRow emits new ingredientSets reference with catalyst in set', () => {
     const recipe = makeRecipe();
     const store = createEditorStore(mockServices(), { recipe, craftingSystemId: 'sys1' });
@@ -269,6 +290,26 @@ describe('editorStore activeContainers reactivity', () => {
       'essences object reference must change after updateEssence');
     assert.notEqual(after.ingredientSets, before.ingredientSets,
       'ingredientSets array reference must change after updateEssence');
+  });
+
+  it('updateEssence removes the essence when quantity is zero', () => {
+    const recipe = makeRecipe({
+      ingredientSets: [{ id: 'set1', ingredientGroups: [], essences: { fire: 2, water: 3 } }]
+    });
+    const store = createEditorStore(essenceServices(), { recipe, craftingSystemId: 'sys1' });
+
+    const before = get(store.activeContainers);
+    const essencesBefore = before.ingredientSets[0].essences;
+
+    store.updateEssence(0, 'fire', 0);
+
+    const after = get(store.activeContainers);
+    assert.equal(Object.hasOwn(after.ingredientSets[0].essences, 'fire'), false,
+      'essence should be removed when updateEssence receives zero');
+    assert.equal(after.ingredientSets[0].essences.water, 3,
+      'other essences should remain unchanged');
+    assert.notEqual(after.ingredientSets[0].essences, essencesBefore,
+      'essences object reference must change after removing an essence via updateEssence');
   });
 
   it('removeEssence produces a new essences object reference on the set', () => {

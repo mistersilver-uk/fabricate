@@ -516,7 +516,7 @@
         "SectionTitle": "Essence Requirements",
         "SelectPlaceholder": "Add essence...",
         "Add": "Add",
-        "QuantityLabel": "Qty",
+        "QuantityLabel": "{name} quantity",
         "Increment": "Increase {name}",
         "Decrement": "Decrease {name}"
       },

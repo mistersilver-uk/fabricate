@@ -4,8 +4,8 @@
  * Tests covering:
  * 1. addEssence adds a new essence to the set
  * 2. addEssence does not overwrite an existing essence
- * 3. updateEssence changes the quantity
- * 4. updateEssence clamps to minimum 1
+ * 3. updateEssence changes or adds the quantity
+ * 4. updateEssence removes the essence when quantity is zero
  * 5. removeEssence deletes the essence key
  * 6. removeEssence is a no-op for missing keys
  */
@@ -109,25 +109,39 @@ describe('editorStore essence actions', () => {
     assert.equal($draft.ingredientSets[0].essences.fire, 7);
   });
 
-  it('updateEssence clamps to minimum 1', () => {
+  it('updateEssence adds a missing essence when quantity is greater than zero', () => {
     const recipe = makeRecipe({
       ingredientSets: [{ id: 'set1', ingredientGroups: [], essences: { fire: 3 } }]
+    });
+    const store = createEditorStore(mockServices(), { recipe, craftingSystemId: 'sys1' });
+
+    store.updateEssence(0, 'water', 5);
+
+    const $draft = get(store.draft);
+    assert.equal($draft.ingredientSets[0].essences.fire, 3);
+    assert.equal($draft.ingredientSets[0].essences.water, 5);
+  });
+
+  it('updateEssence removes an essence when quantity is zero', () => {
+    const recipe = makeRecipe({
+      ingredientSets: [{ id: 'set1', ingredientGroups: [], essences: { fire: 2, water: 4 } }]
     });
     const store = createEditorStore(mockServices(), { recipe, craftingSystemId: 'sys1' });
 
     store.updateEssence(0, 'fire', 0);
 
     const $draft = get(store.draft);
-    assert.equal($draft.ingredientSets[0].essences.fire, 1);
+    assert.equal(Object.hasOwn($draft.ingredientSets[0].essences, 'fire'), false);
+    assert.equal($draft.ingredientSets[0].essences.water, 4);
   });
 
-  it('updateEssence is a no-op for missing essence key', () => {
+  it('updateEssence is a no-op for missing essence key when quantity is zero', () => {
     const recipe = makeRecipe({
       ingredientSets: [{ id: 'set1', ingredientGroups: [], essences: { fire: 2 } }]
     });
     const store = createEditorStore(mockServices(), { recipe, craftingSystemId: 'sys1' });
 
-    store.updateEssence(0, 'water', 5);
+    store.updateEssence(0, 'water', 0);
 
     const $draft = get(store.draft);
     assert.equal($draft.ingredientSets[0].essences.water, undefined);

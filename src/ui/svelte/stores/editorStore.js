@@ -11,6 +11,7 @@ import {
   getEffectiveRecipeCategories,
   normalizeRecipeCategory
 } from '../../../utils/recipeCategories.js';
+import { clampComponentEssenceQuantity } from '../util/componentEditor.js';
 
 // ---------------------------------------------------------------------------
 // ID generation helper (injectable for tests)
@@ -930,10 +931,11 @@ export function createEditorStore(services, options = {}) {
       const $features = _getSystemFeatureState(d, services);
       const containers = _getActiveDraftContainers(d, $features, get(activeStepIndex), services);
       const set = containers.ingredientSets[Number(setIndex)] || containers.ingredientSets[0];
-      if (!set) return;
+      if (!set || !essenceId) return;
+      const nextQuantity = Math.max(1, clampComponentEssenceQuantity(quantity) || 1);
       if (typeof set.essences !== 'object' || set.essences === null) set.essences = {};
       if (!Object.hasOwn(set.essences, essenceId)) {
-        set.essences[essenceId] = Math.max(1, Number(quantity) || 1);
+        set.essences = { ...set.essences, [essenceId]: nextQuantity };
       }
     });
   }
@@ -943,8 +945,18 @@ export function createEditorStore(services, options = {}) {
       const $features = _getSystemFeatureState(d, services);
       const containers = _getActiveDraftContainers(d, $features, get(activeStepIndex), services);
       const set = containers.ingredientSets[Number(setIndex)] || containers.ingredientSets[0];
-      if (!set?.essences || !Object.hasOwn(set.essences, essenceId)) return;
-      set.essences = { ...set.essences, [essenceId]: Math.max(1, Number(quantity) || 1) };
+      if (!set || !essenceId) return;
+      const currentEssences = set.essences && typeof set.essences === 'object' ? set.essences : {};
+      const nextQuantity = clampComponentEssenceQuantity(quantity);
+
+      if (nextQuantity <= 0) {
+        if (!Object.hasOwn(currentEssences, essenceId)) return;
+        const { [essenceId]: _, ...rest } = currentEssences;
+        set.essences = rest;
+        return;
+      }
+
+      set.essences = { ...currentEssences, [essenceId]: nextQuantity };
     });
   }
 
