@@ -1,3 +1,8 @@
+// Import global stylesheet so Vite includes it in the module graph for HMR.
+// In production builds, a Vite plugin resolves this to a no-op since Foundry
+// loads the stylesheet via module.json's "styles" field instead.
+import '../styles/fabricate.css';
+
 import { RecipeManager } from './systems/RecipeManager.js';
 import { CompendiumImporter } from './systems/CompendiumImporter.js';
 import { CraftingEngine } from './systems/CraftingEngine.js';

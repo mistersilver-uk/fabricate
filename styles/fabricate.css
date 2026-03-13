@@ -956,7 +956,7 @@
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  z-index: 999;
+  z-index: 200;
   width: clamp(260px, 100%, 360px);
   max-width: min(360px, calc(100vw - 80px));
   display: grid;
