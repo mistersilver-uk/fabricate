@@ -152,6 +152,8 @@ function stripTransitionalAliases(system) {
   delete system.enableEssences;
   delete system.enableCategories;
   delete system.enableMultiStepRecipes;
+  // enableTiers/tiers: no longer emitted by _normalizeSystem, but may be present
+  // in data exported/stored by older versions — strip defensively
   delete system.enableTiers;
   delete system.tiers;
   delete system.advancedOptionsEnabled;
