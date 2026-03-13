@@ -932,7 +932,7 @@ These transitional aliases exist solely for UI code paths that have not yet been
 
 ### Retired Aliases (Fully Removed)
 
-The following aliases have been fully removed from normalization output and must not appear in any stored data or code paths:
+The following aliases **must not be emitted by new code** and must be stripped on import/export for backward compatibility with data written by older versions:
 
 | Retired Alias | Removed In | Notes |
 |--------------|-----------|-------|
