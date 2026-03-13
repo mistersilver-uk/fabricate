@@ -936,8 +936,8 @@ The following aliases **must not be emitted by new code** and must be stripped o
 
 | Retired Alias | Removed In | Notes |
 |--------------|-----------|-------|
-| `enableTiers` | #105 | Tiered mode was removed in T-166. Was hardcoded to `false`; never functionally active. |
-| `tiers` | #105 | Tiered mode was removed in T-166. Was hardcoded to `[]`; never functionally active. |
+| `enableTiers` | #105 | Tiered crafting mode was removed; this field was hardcoded to `false` and never functionally active. |
+| `tiers` | #105 | Tiered crafting mode was removed; this field was hardcoded to `[]` and never functionally active. |
 
 ### Testing Requirements
 

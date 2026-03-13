@@ -19,7 +19,6 @@ export class Ingredient {
     this.itemUuid = data.itemUuid || null;
     this.tag = this.match?.type === 'tags' ? (this.match.tags?.[0] || null) : (data.tag || null);
 
-    this.tier = data.tier || null; // e.g., "common", "rare", "legendary"
     this.alternatives = data.alternatives || []; // Array of Ingredient objects
 
     // Effect extraction settings
@@ -90,11 +89,6 @@ export class Ingredient {
       if (!matched) {
         return false;
       }
-
-      if (this.tier) {
-        const itemTier = getFabricateFlag(item, 'tier', null);
-        return itemTier === this.tier;
-      }
       return true;
     }
 
@@ -150,8 +144,7 @@ export class Ingredient {
     }
     if (this.match?.type === 'tags' && Array.isArray(this.match.tags) && this.match.tags.length > 0) {
       const joined = this.match.tags.join(this.match.tagMatch === 'all' ? ' & ' : ' | ');
-      const tierStr = this.tier ? ` (${this.tier})` : '';
-      return `${this.quantity}x ${joined}${tierStr}`;
+      return `${this.quantity}x ${joined}`;
     }
     if (this.alternatives.length > 0) {
       return `${this.quantity}x (${this.alternatives.length} alternatives)`;
@@ -167,7 +160,6 @@ export class Ingredient {
       itemUuid: this.itemUuid,
       quantity: this.quantity,
       tag: this.tag,
-      tier: this.tier,
       alternatives: this.alternatives.map(alt => alt.toJSON()),
       extractEffects: this.extractEffects,
       effectFilter: this.effectFilter
