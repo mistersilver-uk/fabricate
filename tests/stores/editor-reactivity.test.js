@@ -101,6 +101,20 @@ describe('editorStore activeContainers reactivity', () => {
       'ingredientSets array reference must change after addIngredientGroup');
   });
 
+  it('addIngredientGroup emits a new set object reference for the updated panel', () => {
+    const recipe = makeRecipe();
+    const store = createEditorStore(mockServices(), { recipe, craftingSystemId: 'sys1' });
+
+    const before = get(store.activeContainers);
+    const setBefore = before.ingredientSets[0];
+
+    store.addIngredientGroup(0);
+
+    const after = get(store.activeContainers);
+    assert.notEqual(after.ingredientSets[0], setBefore,
+      'ingredient set object reference must change after addIngredientGroup');
+  });
+
   it('addIngredientSet emits new ingredientSets reference with the new set (complexRecipes=true)', () => {
     const recipe = makeRecipe();
     const store = createEditorStore(complexServices(), { recipe, craftingSystemId: 'sys1' });
@@ -150,6 +164,25 @@ describe('editorStore activeContainers reactivity', () => {
       'ingredientSets array reference must change after addEssence');
   });
 
+  it('addEssence emits new set and essences object references', () => {
+    const recipe = makeRecipe({
+      ingredientSets: [{ id: 'set1', ingredientGroups: [], essences: {} }]
+    });
+    const store = createEditorStore(essenceServices(), { recipe, craftingSystemId: 'sys1' });
+
+    const before = get(store.activeContainers);
+    const setBefore = before.ingredientSets[0];
+    const essencesBefore = before.ingredientSets[0].essences;
+
+    store.addEssence(0, 'fire', 2);
+
+    const after = get(store.activeContainers);
+    assert.notEqual(after.ingredientSets[0], setBefore,
+      'ingredient set object reference must change after addEssence');
+    assert.notEqual(after.ingredientSets[0].essences, essencesBefore,
+      'essences object reference must change after addEssence');
+  });
+
   it('addCatalystRow emits new ingredientSets reference with catalyst in set', () => {
     const recipe = makeRecipe();
     const store = createEditorStore(mockServices(), { recipe, craftingSystemId: 'sys1' });
@@ -166,6 +199,38 @@ describe('editorStore activeContainers reactivity', () => {
       'catalyst array should grow after addCatalystRow');
     assert.notEqual(after.ingredientSets, refBefore,
       'ingredientSets array reference must change after addCatalystRow');
+  });
+
+  it('assignIngredientItem emits new set, group, and option references', () => {
+    const recipe = makeRecipe({
+      ingredientSets: [{
+        id: 'set1',
+        ingredientGroups: [{
+          id: 'group1',
+          name: 'Group 1',
+          options: [{ id: 'option1', matchType: 'component', componentId: null, quantity: 1 }]
+        }],
+        essences: {}
+      }]
+    });
+    const store = createEditorStore(mockServices(), { recipe, craftingSystemId: 'sys1' });
+
+    const before = get(store.activeContainers);
+    const setBefore = before.ingredientSets[0];
+    const groupBefore = before.ingredientSets[0].ingredientGroups[0];
+    const optionBefore = before.ingredientSets[0].ingredientGroups[0].options[0];
+
+    store.assignIngredientItem(0, 0, 0, 'component-1');
+
+    const after = get(store.activeContainers);
+    assert.equal(after.ingredientSets[0].ingredientGroups[0].options[0].componentId, 'component-1',
+      'assigned component should be visible in the active containers');
+    assert.notEqual(after.ingredientSets[0], setBefore,
+      'ingredient set object reference must change after assignIngredientItem');
+    assert.notEqual(after.ingredientSets[0].ingredientGroups[0], groupBefore,
+      'ingredient group object reference must change after assignIngredientItem');
+    assert.notEqual(after.ingredientSets[0].ingredientGroups[0].options[0], optionBefore,
+      'ingredient option object reference must change after assignIngredientItem');
   });
 
   it('addResultRow emits new results reference with new result row', () => {

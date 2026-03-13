@@ -20,6 +20,22 @@ function _randomID(services) {
   return services?.randomID?.() ?? Math.random().toString(36).slice(2, 14);
 }
 
+function _cloneDraftState(value) {
+  if (Array.isArray(value)) {
+    return value.map(entry => _cloneDraftState(entry));
+  }
+
+  if (value && typeof value === 'object') {
+    const clone = {};
+    for (const [key, entry] of Object.entries(value)) {
+      clone[key] = _cloneDraftState(entry);
+    }
+    return clone;
+  }
+
+  return value;
+}
+
 // ---------------------------------------------------------------------------
 // Draft builder helpers (ported from RecipeEditorApp.js)
 // ---------------------------------------------------------------------------
@@ -657,7 +673,9 @@ export function createEditorStore(services, options = {}) {
   function updateDraft(updater) {
     draft.update(d => {
       updater(d);
-      return d;
+      // Publish a fresh draft graph so runes-mode child components receive
+      // updated nested prop identities after in-place mutations.
+      return _cloneDraftState(d);
     });
   }
 
