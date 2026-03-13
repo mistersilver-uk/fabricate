@@ -172,6 +172,7 @@ function createMockServices(overrides = {}) {
 // Import the store factory
 // ---------------------------------------------------------------------------
 const { createAdminStore } = await import('../../src/ui/svelte/stores/adminStore.js');
+const { DEFAULT_ESSENCE_ICON } = await import('../../src/ui/svelte/util/essenceIcons.js');
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -653,6 +654,26 @@ describe('createAdminStore', () => {
       assert.equal(typeof newEssence.id, 'string');
     });
 
+    it('addEssence uses the default icon when none is provided', async () => {
+      let savedEssences = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => {
+          if (updates.essenceDefinitions) savedEssences = updates.essenceDefinitions;
+          await origManager.updateSystem(id, updates);
+        }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.addEssence('Water', 'Flowing essence', '', null);
+
+      const newEssence = savedEssences?.find(e => e.name === 'Water');
+      assert.ok(newEssence, 'new essence should be persisted');
+      assert.equal(newEssence.icon, DEFAULT_ESSENCE_ICON);
+    });
+
     it('addEssence rejects duplicate name', async () => {
       let warnMsg = null;
       const services = createMockServices({
@@ -715,6 +736,88 @@ describe('createAdminStore', () => {
       assert.ok(!savedEssences.some(e => e.id === 'ess1'));
       assert.ok(savedEssences.some(e => e.id === 'ess2'));
     });
+
+    it('updateEssence renames and updates description and icon inline', async () => {
+      let savedEssences = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.essenceDefinitions = [
+          {
+            id: 'ess1',
+            name: 'Fire',
+            description: 'Burning essence',
+            icon: 'fas fa-fire',
+            sourceItemUuid: 'item-1',
+            associatedSystemItemId: 'item-1'
+          }
+        ];
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => {
+          if (updates.essenceDefinitions) savedEssences = updates.essenceDefinitions;
+          await origManager.updateSystem(id, updates);
+        }
+      });
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.updateEssence('ess1', {
+        name: 'Volatile',
+        description: 'Explosive energy',
+        icon: 'fas fa-bolt'
+      });
+
+      assert.equal(savedEssences?.length, 1);
+      assert.deepEqual(savedEssences?.[0], {
+        id: 'ess1',
+        name: 'Volatile',
+        description: 'Explosive energy',
+        icon: 'fas fa-bolt',
+        sourceItemUuid: 'item-1',
+        associatedSystemItemId: 'item-1'
+      });
+    });
+
+    it('updateEssence rejects duplicate names from another essence', async () => {
+      let warnMsg = null;
+      let updateCalled = false;
+      const services = createMockServices({
+        notify: {
+          info: () => {},
+          warn: (message) => { warnMsg = message; },
+          error: () => {}
+        }
+      });
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.essenceDefinitions = [
+          { id: 'ess1', name: 'Fire', description: '', icon: 'fas fa-fire', sourceItemUuid: null },
+          { id: 'ess2', name: 'Water', description: '', icon: 'fas fa-tint', sourceItemUuid: null }
+        ];
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async () => {
+          updateCalled = true;
+        }
+      });
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const didSave = await store.updateEssence('ess2', {
+        name: 'Fire',
+        description: 'Duplicate'
+      });
+
+      assert.equal(didSave, false);
+      assert.ok(warnMsg, 'duplicate rename should warn');
+      assert.equal(updateCalled, false, 'duplicate rename should not persist');
+    });
+
     it('addEssence followed by removeEssence round-trips correctly', async () => {
       let lastSavedEssences = null;
       const services = createMockServices();

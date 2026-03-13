@@ -128,12 +128,18 @@ jobs:
           PR_OUTPUT="$(mktemp)"
           LAST_PR_ERROR=""
 
+          # Extract PR title from the first commit on the branch (already conventional-commit formatted)
+          PR_TITLE=$(git log origin/main..HEAD --format='%s' --reverse | head -1)
+          if [ -z "$PR_TITLE" ] || ! echo "$PR_TITLE" | grep -qE '^[a-z]+(\(.*\))?!?: '; then
+            PR_TITLE="chore(#${ISSUE_NUMBER}): ${ISSUE_TITLE}"
+          fi
+
           try_create_pr() {
             local token="$1"
             GH_TOKEN="$token" gh pr create \
               --repo "${{ github.repository }}" \
               --head "$BRANCH" \
-              --title "#${ISSUE_NUMBER} — ${ISSUE_TITLE}" \
+              --title "$PR_TITLE" \
               --label agent-created \
               --body "$(cat <<EOF
           ## Summary
@@ -146,6 +152,10 @@ jobs:
           - [ ] Verify tests pass: \`npm test\`
           - [ ] Verify build: \`npm run build\`
           - [ ] Manual verification if applicable
+
+          ## Screenshots
+
+          _Added by the agent if UI files were changed, or add manually before merging._
 
           Closes #${ISSUE_NUMBER}
 

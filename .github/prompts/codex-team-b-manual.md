@@ -42,6 +42,12 @@ Work through these phases:
 - Allowed types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `ci`
 - Validate the final commit message with `npx commitlint --from HEAD~1 --to HEAD --verbose`
 
+6. Screenshots (UI changes only)
+- If you changed any files matching `src/ui/**`, `styles/**`, `*.svelte`, or `*.css`, you MUST attach before/after screenshots to the PR description.
+- Write a short Node script that renders the changed component and screenshots it using Playwright, or use `npm run test:foundry` if Foundry credentials are available.
+- Upload the screenshot to the PR using `gh api` and embed the resulting URL in the PR body with `![screenshot](url)` syntax.
+- If you cannot capture screenshots (e.g. no display server, no Foundry, sandbox restrictions), add a clearly visible `> ⚠️ SCREENSHOTS NEEDED` callout to the PR body describing the visual changes, so a human reviewer can add them before merge.
+
 Rules:
 
 - Never remove the `triage` label from any issue.
