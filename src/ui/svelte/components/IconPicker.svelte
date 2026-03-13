@@ -9,6 +9,7 @@
     getEssenceIconOption,
     normalizeEssenceIcon
   } from '../util/essenceIcons.js';
+  import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
 
   let {
     value = DEFAULT_ESSENCE_ICON,
@@ -20,7 +21,10 @@
 
   let pickerOpen = $state(false);
   let searchTerm = $state('');
+  let pickerRoot = $state(null);
+  let triggerButton = $state(null);
   let searchInput = $state(null);
+  let popoverStyle = $state('');
 
   const iconOptions = ESSENCE_ICON_OPTIONS;
   const selectedIconClass = $derived(normalizeEssenceIcon(value));
@@ -47,18 +51,89 @@
     closePicker();
   }
 
+  function getPopoverContainer() {
+    if (!pickerRoot || typeof document === 'undefined') return null;
+
+    return pickerRoot.closest('.application')
+      || pickerRoot.closest('.window-app')
+      || pickerRoot.closest('.fabricate-admin')
+      || document.documentElement;
+  }
+
+  function updatePopoverPosition() {
+    if (!pickerOpen || !triggerButton || typeof window === 'undefined') return;
+
+    const container = getPopoverContainer();
+    const containerRect = container?.getBoundingClientRect?.() ?? {
+      left: 0,
+      top: 0,
+      width: window.innerWidth,
+      height: window.innerHeight
+    };
+    const triggerRect = triggerButton.getBoundingClientRect();
+
+    const layout = computeIconPickerPopoverLayout(
+      {
+        left: triggerRect.left - containerRect.left,
+        right: triggerRect.right - containerRect.left,
+        top: triggerRect.top - containerRect.top,
+        bottom: triggerRect.bottom - containerRect.top,
+        width: triggerRect.width,
+        height: triggerRect.height
+      },
+      { width: containerRect.width || window.innerWidth, height: containerRect.height || window.innerHeight }
+    );
+
+    if (!layout) {
+      popoverStyle = '';
+      return;
+    }
+
+    const verticalPosition = layout.placement === 'top'
+      ? `top: auto; bottom: ${layout.bottom}px;`
+      : `top: ${layout.top}px; bottom: auto;`;
+
+    popoverStyle = [
+      `left: ${layout.left}px;`,
+      'right: auto;',
+      `width: ${layout.width}px;`,
+      `max-height: ${layout.maxHeight}px;`,
+      verticalPosition
+    ].join(' ');
+  }
+
   $effect(() => {
     if (!pickerOpen || !searchInput) return;
     queueMicrotask(() => searchInput?.focus());
   });
+
+  $effect(() => {
+    if (!pickerOpen || typeof window === 'undefined' || typeof document === 'undefined') {
+      popoverStyle = '';
+      return;
+    }
+
+    updatePopoverPosition();
+
+    const handleViewportChange = () => updatePopoverPosition();
+    window.addEventListener('resize', handleViewportChange);
+    document.addEventListener('scroll', handleViewportChange, true);
+
+    return () => {
+      window.removeEventListener('resize', handleViewportChange);
+      document.removeEventListener('scroll', handleViewportChange, true);
+    };
+  });
 </script>
 
 <div
+  bind:this={pickerRoot}
   class="essence-icon-picker"
   use:dismissOnOutsideClick={{ enabled: pickerOpen, onDismiss: closePicker }}
 >
   <button
     type="button"
+    bind:this={triggerButton}
     class="essence-icon-picker-trigger"
     class:icon-only={iconOnly}
     onclick={togglePicker}
@@ -82,6 +157,7 @@
   {#if pickerOpen}
     <div
       class="essence-icon-picker-popover"
+      style={popoverStyle}
       role="dialog"
       aria-label={localize('FABRICATE.Admin.Features.Essences.IconDialogLabel')}
     >

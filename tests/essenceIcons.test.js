@@ -35,8 +35,16 @@ describe('essenceIcons utility', () => {
     assert.ok(FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS.some((entry) => entry.iconCode === 'mortar-pestle'));
     assert.ok(!FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS.some((entry) => entry.iconCode === 'align-right'));
     assert.ok(!FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS.some((entry) => entry.iconCode === 'arrow-down-a-z'));
+    assert.ok(!FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS.some((entry) => entry.iconCode === 'ban-smoking'));
+    assert.ok(!FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS.some((entry) => entry.iconCode === 'backward-fast'));
+    assert.ok(!FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS.some((entry) => entry.iconCode === 'circle-play'));
+    assert.ok(!FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS.some((entry) => entry.iconCode === 'upload'));
     assert.equal(isFantasySafeFontAwesomeClassicFreeIcon('mortar-pestle'), true);
     assert.equal(isFantasySafeFontAwesomeClassicFreeIcon('align-right'), false);
+    assert.equal(isFantasySafeFontAwesomeClassicFreeIcon('ban-smoking'), false);
+    assert.equal(isFantasySafeFontAwesomeClassicFreeIcon('backward-fast'), false);
+    assert.equal(isFantasySafeFontAwesomeClassicFreeIcon('circle-play'), false);
+    assert.equal(isFantasySafeFontAwesomeClassicFreeIcon('upload'), false);
   });
 
   it('builds the fantasy-safe picker catalog by default', () => {
@@ -49,6 +57,10 @@ describe('essenceIcons utility', () => {
     assert.ok(options.some(option => option.iconClass === 'far fa-bell'));
     assert.ok(!options.some(option => option.iconClass === 'fas fa-align-right'));
     assert.ok(!options.some(option => option.iconClass === 'fas fa-arrow-down-a-z'));
+    assert.ok(!options.some(option => option.iconClass === 'fas fa-ban-smoking'));
+    assert.ok(!options.some(option => option.iconClass === 'fas fa-backward-fast'));
+    assert.ok(!options.some(option => option.iconClass === 'fas fa-circle-play'));
+    assert.ok(!options.some(option => option.iconClass === 'fas fa-upload'));
   });
 
   it('can still build the full classic free icon catalog when explicitly requested', () => {
