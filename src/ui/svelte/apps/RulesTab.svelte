@@ -32,8 +32,6 @@
 
 <section class="admin-panel">
   <h3>{localize('FABRICATE.Admin.Rules.Title')}</h3>
-  <p>{localize('FABRICATE.Admin.Rules.Placeholder')}</p>
-  <p>{localize('FABRICATE.Admin.Rules.PlaceholderDetail')}</p>
 
   <div class="teaser-config-section">
     <h4>{localize('FABRICATE.Teaser.Title')}</h4>
