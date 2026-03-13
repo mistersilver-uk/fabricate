@@ -60,9 +60,9 @@ test('salvageResolutionMode accepts canonical values, maps legacy tiered to rout
   const progressive = manager._normalizeSystem({ id: 's2', salvageResolutionMode: 'progressive' });
   assert.equal(progressive.salvageResolutionMode, 'progressive');
 
-  // "mapped" is NOT allowed for salvage
+  // "mapped" is a legacy alias for "routed" in salvage mode
   const mapped = manager._normalizeSystem({ id: 's3', salvageResolutionMode: 'mapped' });
-  assert.equal(mapped.salvageResolutionMode, 'simple');
+  assert.equal(mapped.salvageResolutionMode, 'routed');
 
   const invalid = manager._normalizeSystem({ id: 's4', salvageResolutionMode: 'random-value' });
   assert.equal(invalid.salvageResolutionMode, 'simple');
@@ -271,13 +271,13 @@ test('empty salvage object on component produces defaults', () => {
   assert.deepEqual(salvage.resultGroups, []);
 });
 
-test('salvageResolutionMode "mapped" is rejected and falls back to "simple"', () => {
+test('salvageResolutionMode "mapped" is a legacy alias that normalizes to "routed"', () => {
   const manager = makeManager();
   const system = manager._normalizeSystem({
     id: 'sys-1',
     salvageResolutionMode: 'mapped'
   });
-  assert.equal(system.salvageResolutionMode, 'simple');
+  assert.equal(system.salvageResolutionMode, 'routed');
 });
 
 test('salvageResolutionMode "alchemy" is rejected and falls back to "simple"', () => {

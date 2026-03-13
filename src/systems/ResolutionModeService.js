@@ -126,6 +126,31 @@ export class ResolutionModeService {
         if (groups.length !== 1) errors.push(`Step "${step.name || step.id}" must have exactly 1 result group in simple mode`);
       }
 
+      if (mode === 'routed' || mode === 'tiered') {
+        if (!checkEnabled) errors.push('Routed mode requires crafting checks enabled');
+        if (outcomes.length === 0) errors.push('Routed mode requires at least one declared outcome');
+        const groupIds = new Set(groups.map(g => g.id));
+        const routing = step?.outcomeRouting || recipe?.outcomeRouting || {};
+        for (const outcome of outcomes) {
+          const target = routing[outcome];
+          if (!target || !groupIds.has(target)) {
+            errors.push(`Outcome "${outcome}" must map to a valid result group`);
+          }
+        }
+      }
+
+      if (mode === 'mapped') {
+        if (sets.length < 1) errors.push(`Step "${step.name || step.id}" must have at least 1 ingredient set in routed mode`);
+        if (groups.length < 1) errors.push(`Step "${step.name || step.id}" must have at least 1 result group in routed mode`);
+        const groupIds = new Set(groups.map(g => g.id));
+        for (const set of sets) {
+          const mappedId = set?.resultGroupId || null;
+          if (mappedId && !groupIds.has(mappedId)) {
+            errors.push(`Ingredient set "${set.name || set.id}" has invalid resultGroupId "${mappedId}"`);
+          }
+        }
+      }
+
       if (mode === 'progressive') {
         if (!checkEnabled) errors.push('Progressive mode requires crafting checks enabled');
         if (!system?.craftingCheck?.progressive) {
@@ -180,7 +205,8 @@ export class ResolutionModeService {
     // Pre-checks: return early if there's nothing to validate
     if (!component?.salvage || !system) return { valid: true, errors };
 
-    const mode = system.salvageResolutionMode || 'simple';
+    const rawMode = system.salvageResolutionMode || 'simple';
+    const mode = rawMode === 'tiered' ? 'routed' : rawMode;
     const componentLabel = component.name || component.id || 'unknown';
 
     if (!['simple', 'routed', 'progressive'].includes(mode)) {
@@ -321,6 +347,38 @@ export class ResolutionModeService {
           remaining
         }
       };
+    }
+
+    if (mode === 'routed' || mode === 'mapped' || mode === 'tiered') {
+      // Outcome routing (canonical routed / legacy tiered behavior): if outcome + routing table present, use it
+      const outcomeRouting = step?.outcomeRouting || recipe?.outcomeRouting || {};
+      const outcome = checkResult?.outcome != null ? String(checkResult.outcome) : null;
+      if (outcome && Object.keys(outcomeRouting).length > 0) {
+        const routedId = outcomeRouting[outcome] || null;
+        return {
+          groups: routedId ? allGroups.filter(group => group.id === routedId) : [],
+          meta: { outcome, routedId }
+        };
+      }
+
+      // resultGroupId-based routing (legacy mapped behavior)
+      const mappedId = ingredientSet?.resultGroupId || selectedResultGroupId || null;
+      if (mappedId) {
+        return {
+          groups: allGroups.filter(group => group.id === mappedId),
+          meta: {}
+        };
+      }
+
+      // Legacy fallback to resultMapping
+      if (Array.isArray(ingredientSet?.resultMapping) && ingredientSet.resultMapping.length > 0) {
+        return {
+          groups: allGroups.filter(group => ingredientSet.resultMapping.includes(group.id)),
+          meta: {}
+        };
+      }
+
+      return { groups: allGroups.slice(0, 1), meta: {} };
     }
 
     if (mode === 'alchemy') {

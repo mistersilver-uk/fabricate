@@ -1994,7 +1994,8 @@ export class CraftingEngine {
    * @private
    */
   _resolveSalvageResultGroups(component, system, checkResult) {
-    const mode = system?.salvageResolutionMode || 'simple';
+    const rawMode = system?.salvageResolutionMode || 'simple';
+    const mode = rawMode === 'tiered' ? 'routed' : rawMode;
     const allGroups = Array.isArray(component.salvage?.resultGroups) ? component.salvage.resultGroups : [];
 
     if (mode === 'simple') {

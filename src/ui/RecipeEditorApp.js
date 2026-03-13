@@ -387,7 +387,7 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
     return {
       system,
       resolutionMode,
-      isMappedMode: resolutionMode === 'mapped',
+      isMappedMode: resolutionMode === 'routed',
       isProgressiveMode: resolutionMode === 'progressive',
       showRecipeVisibilityGlobal: listMode === 'global',
       showRecipeVisibilityPlayer: listMode === 'player',
