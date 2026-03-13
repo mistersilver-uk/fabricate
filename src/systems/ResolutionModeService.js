@@ -126,34 +126,6 @@ export class ResolutionModeService {
         if (groups.length !== 1) errors.push(`Step "${step.name || step.id}" must have exactly 1 result group in simple mode`);
       }
 
-      if (mode === 'mapped') {
-        if (sets.length < 1) errors.push(`Step "${step.name || step.id}" must have at least 1 ingredient set in mapped mode`);
-        if (groups.length < 1) errors.push(`Step "${step.name || step.id}" must have at least 1 result group in mapped mode`);
-        const groupIds = new Set(groups.map(g => g.id));
-        for (const set of sets) {
-          const mappedId = set?.resultGroupId || null;
-          if (mappedId && !groupIds.has(mappedId)) {
-            errors.push(`Ingredient set "${set.name || set.id}" has invalid resultGroupId "${mappedId}"`);
-          }
-        }
-      }
-
-      if (mode === 'tiered') {
-        if (!checkEnabled) errors.push('Legacy tiered compatibility mode requires crafting checks enabled');
-        if (outcomes.length === 0) errors.push('Legacy tiered compatibility mode requires at least one declared outcome');
-        if (sets.length < 1) errors.push(`Step "${step.name || step.id}" must have at least 1 ingredient set in legacy tiered compatibility mode`);
-        if (groups.length < 1) errors.push(`Step "${step.name || step.id}" must have at least 1 result group in legacy tiered compatibility mode`);
-
-        const groupIds = new Set(groups.map(g => g.id));
-        const routing = step?.outcomeRouting || recipe?.outcomeRouting || {};
-        for (const outcome of outcomes) {
-          const target = routing?.[outcome];
-          if (!target || !groupIds.has(target)) {
-            errors.push(`Outcome "${outcome}" must map to a valid result group in step "${step.name || step.id}"`);
-          }
-        }
-      }
-
       if (mode === 'progressive') {
         if (!checkEnabled) errors.push('Progressive mode requires crafting checks enabled');
         if (!system?.craftingCheck?.progressive) {
@@ -208,17 +180,14 @@ export class ResolutionModeService {
     // Pre-checks: return early if there's nothing to validate
     if (!component?.salvage || !system) return { valid: true, errors };
 
-    const rawMode = system.salvageResolutionMode || 'simple';
-    const mode = rawMode === 'tiered' ? 'routed' : rawMode;
+    const mode = system.salvageResolutionMode || 'simple';
     const componentLabel = component.name || component.id || 'unknown';
 
     if (!['simple', 'routed', 'progressive'].includes(mode)) {
-      if (rawMode === 'mapped') {
-        errors.push('Mapped mode is not supported for salvage');
-      } else if (rawMode === 'alchemy') {
+      if (mode === 'alchemy') {
         errors.push('Alchemy mode is not supported for salvage');
       } else {
-        errors.push(`Unsupported salvage resolution mode: ${rawMode}`);
+        errors.push(`Unsupported salvage resolution mode: ${mode}`);
       }
       return { valid: false, errors };
     }
@@ -294,39 +263,6 @@ export class ResolutionModeService {
       return {
         groups: allGroups.slice(0, 1),
         meta: {}
-      };
-    }
-
-    if (mode === 'mapped') {
-      const mappedId = ingredientSet?.resultGroupId || selectedResultGroupId || null;
-      if (mappedId) {
-        return {
-          groups: allGroups.filter(group => group.id === mappedId),
-          meta: {}
-        };
-      }
-
-      // Legacy fallback to resultMapping support.
-      if (Array.isArray(ingredientSet?.resultMapping) && ingredientSet.resultMapping.length > 0) {
-        return {
-          groups: allGroups.filter(group => ingredientSet.resultMapping.includes(group.id)),
-          meta: {}
-        };
-      }
-
-      return {
-        groups: allGroups.slice(0, 1),
-        meta: {}
-      };
-    }
-
-    if (mode === 'tiered') {
-      const outcome = checkResult?.outcome != null ? String(checkResult.outcome) : null;
-      const routing = step?.outcomeRouting || recipe?.outcomeRouting || {};
-      const routedId = outcome ? routing[outcome] : null;
-      return {
-        groups: routedId ? allGroups.filter(group => group.id === routedId) : [],
-        meta: { outcome, routedId }
       };
     }
 
@@ -425,9 +361,6 @@ export class ResolutionModeService {
 
   validateCheckResult({ recipe, checkResult }) {
     const mode = this.getMode(recipe);
-    if (mode === 'tiered') {
-      return !!(checkResult?.outcome != null && String(checkResult.outcome).trim().length > 0);
-    }
     if (mode === 'progressive') {
       return Number.isFinite(Number(checkResult?.value));
     }

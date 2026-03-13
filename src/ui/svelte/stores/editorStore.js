@@ -438,8 +438,7 @@ function _buildRecipePayload(draft, featureState, services) {
               extractEffects: false,
               effectFilter: null,
               match: { type: 'tags', tags, tagMatch: option.tagMatch === 'all' ? 'all' : 'any' },
-              tag: tags[0] || null,
-              tier: null
+              tag: tags[0] || null
             };
           }
           return {
@@ -453,8 +452,7 @@ function _buildRecipePayload(draft, featureState, services) {
               componentId: option.componentId || null,
               systemItemId: option.componentId || null
             },
-            tag: null,
-            tier: null
+            tag: null
           };
         });
         return {

@@ -1256,8 +1256,7 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
                   tags,
                   tagMatch: option.tagMatch === 'all' ? 'all' : 'any'
                 },
-                tag: tags[0] || null,
-                tier: null
+                tag: tags[0] || null
               };
             }
 
@@ -1272,8 +1271,7 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
                 componentId: option.componentId || null,
                 systemItemId: option.componentId || null
               },
-              tag: null,
-              tier: null
+              tag: null
             };
           });
 

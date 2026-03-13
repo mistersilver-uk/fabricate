@@ -1,10 +1,13 @@
 /**
  * Unit tests for tiered-mode normalization cleanup (#134).
  * Covers:
- * 1. _normalizeResolutionMode maps 'mapped' and 'tiered' → 'routed'
- * 2. Existing 'cauldron' → 'alchemy' alias is preserved (regression)
- * 3. _normalizeComponent no longer emits a 'tier' field
- * 4. _normalizeSystem no longer emits 'enableTiers' or 'tiers' fields
+ * AC 1. _normalizeResolutionMode maps 'mapped' → 'routed'
+ * AC 2. _normalizeResolutionMode maps 'tiered' → 'routed'
+ * AC 3. Existing 'cauldron' → 'alchemy' alias is preserved (regression)
+ * AC 4. _normalizeComponent no longer emits a 'tier' field
+ * AC 5. _normalizeSystem no longer emits 'enableTiers' or 'tiers' fields
+ * AC 6. _normalizeSalvageResolutionMode maps 'mapped' → 'routed'
+ * AC 7. _normalizeSalvageResolutionMode maps 'tiered' → 'routed'
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -27,7 +30,7 @@ function makeManager() {
 }
 
 // ---------------------------------------------------------------------------
-// AC 1 + AC 2: _normalizeResolutionMode
+// AC 1 + AC 2: _normalizeResolutionMode legacy aliases
 // ---------------------------------------------------------------------------
 
 test('resolutionMode: "mapped" normalizes to "routed"', () => {
@@ -67,6 +70,7 @@ test('resolutionMode: "alchemy" passes through unchanged', () => {
 });
 
 // AC 3: regression — cauldron → alchemy alias preserved
+
 test('resolutionMode: "cauldron" normalizes to "alchemy" (regression)', () => {
   const manager = makeManager();
   const system = manager._normalizeSystem({ id: 'sys-7', resolutionMode: 'cauldron' });
@@ -80,7 +84,7 @@ test('resolutionMode: unknown value defaults to "simple"', () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC 4: _normalizeComponent no longer emits 'tier'
+// AC 4: _normalizeComponent no longer emits 'tier' (AC 4)
 // ---------------------------------------------------------------------------
 
 test('_normalizeComponent does not emit a "tier" field', () => {
@@ -106,7 +110,7 @@ test('_normalizeComponent does not emit "tier" even when item.tier is null', () 
 });
 
 // ---------------------------------------------------------------------------
-// AC 5: _normalizeSystem no longer emits 'enableTiers' or 'tiers'
+// AC 5: _normalizeSystem no longer emits 'enableTiers' or 'tiers' (AC 5)
 // ---------------------------------------------------------------------------
 
 test('_normalizeSystem does not emit "enableTiers" field', () => {
@@ -121,4 +125,32 @@ test('_normalizeSystem does not emit "tiers" field', () => {
   const system = manager._normalizeSystem({ id: 'sys-12' });
   assert.ok(!Object.prototype.hasOwnProperty.call(system, 'tiers'),
     'system should not have a "tiers" field');
+});
+
+// ---------------------------------------------------------------------------
+// AC 6 + AC 7: _normalizeSalvageResolutionMode legacy aliases
+// ---------------------------------------------------------------------------
+
+test('salvageResolutionMode: "mapped" normalizes to "routed"', () => {
+  const manager = makeManager();
+  const system = manager._normalizeSystem({ id: 'sys-13', salvageResolutionMode: 'mapped' });
+  assert.equal(system.salvageResolutionMode, 'routed');
+});
+
+test('salvageResolutionMode: "tiered" normalizes to "routed"', () => {
+  const manager = makeManager();
+  const system = manager._normalizeSystem({ id: 'sys-14', salvageResolutionMode: 'tiered' });
+  assert.equal(system.salvageResolutionMode, 'routed');
+});
+
+test('salvageResolutionMode: "routed" passes through unchanged', () => {
+  const manager = makeManager();
+  const system = manager._normalizeSystem({ id: 'sys-15', salvageResolutionMode: 'routed' });
+  assert.equal(system.salvageResolutionMode, 'routed');
+});
+
+test('salvageResolutionMode: unknown value defaults to "simple"', () => {
+  const manager = makeManager();
+  const system = manager._normalizeSystem({ id: 'sys-16', salvageResolutionMode: 'legacy-unknown' });
+  assert.equal(system.salvageResolutionMode, 'simple');
 });

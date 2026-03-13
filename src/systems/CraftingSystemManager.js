@@ -70,7 +70,7 @@ export class CraftingSystemManager {
       essenceDefinitions: resolvedEssenceDefinitions,
       craftingCheck: this._normalizeCraftingCheck(system.craftingCheck),
       salvageResolutionMode: (function _normalizeSalvageResolutionMode(raw) {
-        if (raw === 'tiered') return 'routed'; // legacy alias
+        if (raw === 'mapped' || raw === 'tiered') return 'routed'; // #134: legacy aliases
         return ['simple', 'routed', 'progressive'].includes(raw) ? raw : 'simple';
       })(system.salvageResolutionMode),
       salvageCraftingCheck: this._normalizeSalvageCraftingCheck(system.salvageCraftingCheck),

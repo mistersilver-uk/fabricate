@@ -1287,7 +1287,7 @@ export class CraftingEngine {
     }
 
     const mode = resolutionService?.getMode(recipe) || system?.resolutionMode || 'simple';
-    const checkRequired = mode === 'tiered' || mode === 'progressive';
+    const checkRequired = mode === 'progressive';
     const advancedEnabled = system.advancedOptionsEnabled !== false;
     const features = system.features || {};
     const checksEnabled = advancedEnabled && (features.craftingChecks === true || system?.craftingCheck?.enabled === true);
@@ -1994,8 +1994,7 @@ export class CraftingEngine {
    * @private
    */
   _resolveSalvageResultGroups(component, system, checkResult) {
-    const rawMode = system?.salvageResolutionMode || 'simple';
-    const mode = rawMode === 'tiered' ? 'routed' : rawMode;
+    const mode = system?.salvageResolutionMode || 'simple';
     const allGroups = Array.isArray(component.salvage?.resultGroups) ? component.salvage.resultGroups : [];
 
     if (mode === 'simple') {
