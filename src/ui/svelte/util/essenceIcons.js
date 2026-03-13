@@ -1,4 +1,7 @@
-import { FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS } from './fontAwesomeFreeClassicIcons.js';
+import {
+  FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS,
+  FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS
+} from './fontAwesomeFreeClassicIcons.js';
 
 export const DEFAULT_ESSENCE_ICON = 'fas fa-mortar-pestle';
 
@@ -113,16 +116,16 @@ function normalizePrefix(prefix) {
   return PREFIX_ALIASES[trimmed] || (STYLE_PREFIXES.has(trimmed) ? trimmed : DEFAULT_ICON_PREFIX);
 }
 
-function createIconOption({ iconName, label }, prefix) {
+function createIconOption({ iconCode, label }, prefix) {
   const variant = prefix === 'far' ? 'regular' : 'solid';
-  const resolvedLabel = String(label || '').trim() || humanizeIconName(iconName);
+  const resolvedLabel = String(label || '').trim() || humanizeIconName(iconCode);
 
   return Object.freeze({
-    iconClass: `${prefix} fa-${iconName}`,
-    iconName,
+    iconClass: `${prefix} fa-${iconCode}`,
+    iconName: iconCode,
     label: resolvedLabel,
     variant,
-    searchText: normalizeSearch(`${resolvedLabel} ${iconName} fa-${iconName} ${prefix} ${variant}`)
+    searchText: normalizeSearch(`${resolvedLabel} ${iconCode} fa-${iconCode} ${prefix} ${variant}`)
   });
 }
 
@@ -130,17 +133,21 @@ function createEssenceIconOptions(iconDefinitions) {
   const options = [];
 
   for (const definition of iconDefinitions) {
-    if (!definition?.iconName) continue;
-    options.push(createIconOption(definition, 'fas'));
-    if (definition.hasRegular) {
-      options.push(createIconOption(definition, 'far'));
+    const iconCode = String(definition?.iconCode || definition?.iconName || '').trim();
+    if (!iconCode) continue;
+
+    const normalizedDefinition = { iconCode, label: definition.label, hasRegular: definition.hasRegular };
+    options.push(createIconOption(normalizedDefinition, 'fas'));
+    if (normalizedDefinition.hasRegular) {
+      options.push(createIconOption(normalizedDefinition, 'far'));
     }
   }
 
   return Object.freeze(options);
 }
 
-export const ESSENCE_ICON_OPTIONS = createEssenceIconOptions(FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS);
+export const ESSENCE_ALL_ICON_OPTIONS = createEssenceIconOptions(FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS);
+export const ESSENCE_ICON_OPTIONS = createEssenceIconOptions(FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS);
 
 export function getEssenceIconPrefix(iconClass) {
   const tokens = String(iconClass || '').trim().split(/\s+/).filter(Boolean);
@@ -160,14 +167,17 @@ export function normalizeEssenceIcon(iconClass) {
   return iconName ? `${prefix} fa-${iconName}` : DEFAULT_ESSENCE_ICON;
 }
 
-export function buildEssenceIconOptions(iconDefinitions = FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS) {
-  if (iconDefinitions === FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS) {
+export function buildEssenceIconOptions(iconDefinitions = FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS) {
+  if (iconDefinitions === FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS) {
     return ESSENCE_ICON_OPTIONS;
+  }
+  if (iconDefinitions === FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS) {
+    return ESSENCE_ALL_ICON_OPTIONS;
   }
 
   const resolvedDefinitions = Array.isArray(iconDefinitions) && iconDefinitions.length > 0
     ? iconDefinitions
-    : FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS;
+    : FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS;
 
   return createEssenceIconOptions(resolvedDefinitions);
 }
