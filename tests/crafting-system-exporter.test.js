@@ -60,8 +60,6 @@ function makeSystem(overrides = {}) {
     enableEssences: true,
     enableCategories: false,
     enableMultiStepRecipes: false,
-    enableTiers: false,
-    tiers: [],
     advancedOptionsEnabled: true,
     ...overrides
   };

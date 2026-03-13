@@ -152,8 +152,6 @@ function stripTransitionalAliases(system) {
   delete system.enableEssences;
   delete system.enableCategories;
   delete system.enableMultiStepRecipes;
-  delete system.enableTiers;
-  delete system.tiers;
   delete system.advancedOptionsEnabled;
 
   // Strip associatedSystemItemId from essence definitions (transitional alias)

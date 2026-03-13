@@ -84,8 +84,6 @@ export class CraftingSystemManager {
       enableEssences: features.essences === true,
       enableCategories: features.recipeCategories === true,
       enableMultiStepRecipes: features.multiStepRecipes === true,
-      enableTiers: false,
-      tiers: [],
       components: items
     };
   }

@@ -930,6 +930,15 @@ The following aliases are currently emitted in `toJSON()` / normalization output
 
 These transitional aliases exist solely for UI code paths that have not yet been updated. They do not represent the canonical data contract and must not be relied upon by new code.
 
+### Retired Aliases (Fully Removed)
+
+The following aliases have been fully removed from normalization output and must not appear in any stored data or code paths:
+
+| Retired Alias | Removed In | Notes |
+|--------------|-----------|-------|
+| `enableTiers` | #105 | Tiered mode was removed in T-166. Was hardcoded to `false`; never functionally active. |
+| `tiers` | #105 | Tiered mode was removed in T-166. Was hardcoded to `[]`; never functionally active. |
+
 ### Testing Requirements
 
 Tests must include:
