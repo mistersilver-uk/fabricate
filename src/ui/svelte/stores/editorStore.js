@@ -12,6 +12,11 @@ import {
   normalizeRecipeCategory
 } from '../../../utils/recipeCategories.js';
 import { clampComponentEssenceQuantity } from '../util/componentEditor.js';
+import {
+  draftIngredientGroupHasRequirement,
+  draftIngredientSetHasRequirement,
+  serializeDraftIngredientGroups
+} from '../../recipeIngredientGroups.js';
 
 // ---------------------------------------------------------------------------
 // ID generation helper (injectable for tests)
@@ -49,10 +54,12 @@ function _newIngredientOption(data = {}, services) {
   const rawTags = Array.isArray(data.tags)
     ? data.tags
     : (Array.isArray(rawMatch.tags) ? rawMatch.tags : (data.tag ? [data.tag] : []));
-  const tagsText = rawTags
-    .map(tag => String(tag || '').trim())
-    .filter(Boolean)
-    .join(', ');
+  const tagsText = typeof data.tagsText === 'string'
+    ? data.tagsText
+    : rawTags
+      .map(tag => String(tag || '').trim())
+      .filter(Boolean)
+      .join(', ');
 
   return {
     id: data.id || _randomID(services),
@@ -370,10 +377,14 @@ function _validateDraft(draft, featureState, services) {
 
   for (const set of ingredientSets) {
     const groups = set.ingredientGroups || [];
+    const setHasRequirements = draftIngredientSetHasRequirement(set, {
+      showItemTags: featureState.showItemTags
+    });
     for (const group of groups) {
-      const opts = group.options || [];
-      const hasContent = opts.some(o => o.componentId || (o.matchType === 'tags' && o.tagsText));
-      if (!hasContent) {
+      const hasContent = draftIngredientGroupHasRequirement(group, {
+        showItemTags: featureState.showItemTags
+      });
+      if (!hasContent && !setHasRequirements) {
         errors.push({
           message: `Ingredient group "${group.name}" has no items or tags assigned`,
           panelId: set.id,
@@ -426,44 +437,13 @@ function _buildRecipePayload(draft, featureState, services) {
   const serializeIngredientSets = (sourceSets = []) => {
     const sets = enableComplexRecipes ? sourceSets : [sourceSets[0]];
     return sets.filter(Boolean).map((set, idx) => {
-      const ingredientGroups = _normalizeIngredientGroups(set, idx, services).map((group, groupIdx) => {
-        const options = (group.options || []).map(option => {
-          const quantity = Number(option.quantity || 1);
-          if (option.matchType === 'tags' && featureState.showItemTags) {
-            const tags = String(option.tagsText || '')
-              .split(',')
-              .map(tag => tag.trim())
-              .filter(Boolean);
-            return {
-              quantity,
-              extractEffects: false,
-              effectFilter: null,
-              match: { type: 'tags', tags, tagMatch: option.tagMatch === 'all' ? 'all' : 'any' },
-              tag: tags[0] || null,
-              tier: null
-            };
-          }
-          return {
-            componentId: option.componentId || null,
-            systemItemId: option.componentId || null,
-            quantity,
-            extractEffects: false,
-            effectFilter: null,
-            match: {
-              type: 'component',
-              componentId: option.componentId || null,
-              systemItemId: option.componentId || null
-            },
-            tag: null,
-            tier: null
-          };
-        });
-        return {
-          id: group.id || _randomID(services),
-          name: group.name || `Group ${groupIdx + 1}`,
-          options
-        };
-      });
+      const ingredientGroups = serializeDraftIngredientGroups(
+        _normalizeIngredientGroups(set, idx, services),
+        {
+          showItemTags: featureState.showItemTags,
+          randomID: () => _randomID(services)
+        }
+      );
       const legacyIngredients = ingredientGroups
         .map(group => group.options?.[0] || null)
         .filter(Boolean);

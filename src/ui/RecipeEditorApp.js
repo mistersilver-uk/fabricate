@@ -5,6 +5,7 @@ import {
   getEffectiveRecipeCategories,
   normalizeRecipeCategory
 } from '../utils/recipeCategories.js';
+import { serializeDraftIngredientGroups } from './recipeIngredientGroups.js';
 
 /**
  * GM recipe editor with system-item picker grid
@@ -234,10 +235,12 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
     const rawTags = Array.isArray(data.tags)
       ? data.tags
       : (Array.isArray(rawMatch.tags) ? rawMatch.tags : (data.tag ? [data.tag] : []));
-    const tagsText = rawTags
-      .map(tag => String(tag || '').trim())
-      .filter(Boolean)
-      .join(', ');
+    const tagsText = typeof data.tagsText === 'string'
+      ? data.tagsText
+      : rawTags
+        .map(tag => String(tag || '').trim())
+        .filter(Boolean)
+        .join(', ');
 
     return {
       id: data.id || foundry.utils.randomID(),
@@ -1239,50 +1242,13 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
     const serializeIngredientSets = (sourceSets = []) => {
       const sets = enableComplexRecipes ? sourceSets : [sourceSets[0]];
       return sets.filter(Boolean).map((set, idx) => {
-        const ingredientGroups = this._normalizeIngredientGroups(set).map((group, groupIdx) => {
-          const options = (group.options || []).map(option => {
-            const quantity = Number(option.quantity || 1);
-            if (option.matchType === 'tags' && features.showItemTags) {
-              const tags = String(option.tagsText || '')
-                .split(',')
-                .map(tag => tag.trim())
-                .filter(Boolean);
-              return {
-                quantity,
-                extractEffects: false,
-                effectFilter: null,
-                match: {
-                  type: 'tags',
-                  tags,
-                  tagMatch: option.tagMatch === 'all' ? 'all' : 'any'
-                },
-                tag: tags[0] || null,
-                tier: null
-              };
-            }
-
-            return {
-              componentId: option.componentId || null,
-              systemItemId: option.componentId || null,
-              quantity,
-              extractEffects: false,
-              effectFilter: null,
-              match: {
-                type: 'component',
-                componentId: option.componentId || null,
-                systemItemId: option.componentId || null
-              },
-              tag: null,
-              tier: null
-            };
-          });
-
-          return {
-            id: group.id || foundry.utils.randomID(),
-            name: group.name || `Group ${groupIdx + 1}`,
-            options
-          };
-        });
+        const ingredientGroups = serializeDraftIngredientGroups(
+          this._normalizeIngredientGroups(set),
+          {
+            showItemTags: features.showItemTags,
+            randomID: () => foundry.utils.randomID()
+          }
+        );
         const legacyIngredients = ingredientGroups
           .map(group => group.options?.[0] || null)
           .filter(Boolean);

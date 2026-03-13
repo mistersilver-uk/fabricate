@@ -65,6 +65,8 @@ const TEST_SYSTEM_ID = 'test-system-001';
 function installFabricate({
   showComplexRecipes = true,
   resolutionMode = 'simple',
+  showEssences = false,
+  showItemTags = false,
   items = []
 } = {}) {
   const system = {
@@ -73,8 +75,8 @@ function installFabricate({
     features: {
       complexRecipes: showComplexRecipes,
       multiStepRecipes: false,
-      essences: false,
-      itemTags: false,
+      essences: showEssences,
+      itemTags: showItemTags,
       recipeCategories: false,
       propertyMacros: false,
       craftingChecks: false,
@@ -365,6 +367,93 @@ test('_buildRecipePayload produces same output regardless of collapsedPanels sta
     payloadCollapsed.resultGroups.map(g => g.id),
     'result group IDs should be identical regardless of collapse state'
   );
+});
+
+test('_buildRecipePayload omits empty placeholder groups and options for mixed ingredient-set validation', async () => {
+  installFabricate({ showComplexRecipes: true, showEssences: true, showItemTags: true });
+  const app = makeApp();
+  app.draft.name = 'Mixed Requirements';
+  app.draft.ingredientSets = [{
+    id: 'set-mixed',
+    name: 'Set Mixed',
+    ingredientGroups: [
+      {
+        id: 'group-empty',
+        name: 'Placeholder',
+        options: [{ id: 'opt-empty', matchType: 'component', componentId: null, quantity: 1, tagsText: '', tagMatch: 'any' }]
+      },
+      {
+        id: 'group-component',
+        name: 'Components',
+        options: [
+          { id: 'opt-component', matchType: 'component', componentId: 'component-1', quantity: 2, tagsText: '', tagMatch: 'any' },
+          { id: 'opt-component-empty', matchType: 'component', componentId: null, quantity: 1, tagsText: '', tagMatch: 'any' }
+        ]
+      },
+      {
+        id: 'group-tags',
+        name: 'Tags',
+        options: [
+          { id: 'opt-tags', matchType: 'tags', componentId: null, quantity: 1, tagsText: 'herb, rare', tagMatch: 'all' },
+          { id: 'opt-tags-empty', matchType: 'tags', componentId: null, quantity: 1, tagsText: '', tagMatch: 'any' }
+        ]
+      }
+    ],
+    catalysts: [],
+    essences: { fire: 1 },
+    resultGroupId: null,
+    resultMapping: []
+  }];
+  app.draft.results = [{
+    id: 'rg-1',
+    name: 'Result Group 1',
+    results: [{ id: 'res-1', componentId: 'result-1', quantity: 1, propertyMacroUuid: null }]
+  }];
+
+  const payload = app._buildRecipePayload();
+  const validation = app._validatePayload(payload, app._getSystemFeatureState());
+
+  assert.equal(payload.ingredientSets[0].ingredientGroups.length, 2);
+  assert.deepEqual(payload.ingredientSets[0].ingredientGroups.map(group => group.id), ['group-component', 'group-tags']);
+  assert.equal(payload.ingredientSets[0].ingredientGroups[0].options.length, 1);
+  assert.equal(payload.ingredientSets[0].ingredientGroups[0].options[0].componentId, 'component-1');
+  assert.equal(payload.ingredientSets[0].ingredientGroups[1].options.length, 1);
+  assert.deepEqual(payload.ingredientSets[0].ingredientGroups[1].options[0].match.tags, ['herb', 'rare']);
+  assert.equal(payload.ingredientSets[0].ingredientGroups[1].options[0].match.tagMatch, 'all');
+  assert.deepEqual(payload.ingredientSets[0].essences, { fire: 1 });
+  assert.equal(validation.valid, true);
+});
+
+test('_buildRecipePayload allows essence-only ingredient sets by omitting the default placeholder group', async () => {
+  installFabricate({ showComplexRecipes: true, showEssences: true });
+  const app = makeApp();
+  app.draft.name = 'Essence Only';
+  app.draft.ingredientSets = [{
+    id: 'set-essence',
+    name: 'Set Essence',
+    ingredientGroups: [{
+      id: 'group-empty',
+      name: 'Placeholder',
+      options: [{ id: 'opt-empty', matchType: 'component', componentId: null, quantity: 1, tagsText: '', tagMatch: 'any' }]
+    }],
+    catalysts: [],
+    essences: { fire: 2 },
+    resultGroupId: null,
+    resultMapping: []
+  }];
+  app.draft.results = [{
+    id: 'rg-1',
+    name: 'Result Group 1',
+    results: [{ id: 'res-1', componentId: 'result-1', quantity: 1, propertyMacroUuid: null }]
+  }];
+
+  const payload = app._buildRecipePayload();
+  const validation = app._validatePayload(payload, app._getSystemFeatureState());
+
+  assert.deepEqual(payload.ingredientSets[0].ingredientGroups, []);
+  assert.deepEqual(payload.ingredientSets[0].ingredients, []);
+  assert.deepEqual(payload.ingredientSets[0].essences, { fire: 2 });
+  assert.equal(validation.valid, true);
 });
 
 // ---------------------------------------------------------------------------
