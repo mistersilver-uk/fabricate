@@ -458,6 +458,8 @@
    ========================================== */
 
 .fabricate-admin {
+  position: relative;
+  isolation: isolate;
   height: 100%;
   display: grid;
   grid-template-rows: auto 1fr;
@@ -833,6 +835,7 @@
   min-height: 72px;
   box-sizing: border-box;
   resize: vertical;
+  font: inherit;
 }
 
 .fabricate-admin .essence-definition-editor-toolbar {
@@ -953,11 +956,11 @@
 }
 
 .fabricate-admin .essence-icon-picker-popover {
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   z-index: 4000;
-  max-width: calc(100vw - 32px);
+  max-width: calc(100% - 32px);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 10px;
@@ -984,21 +987,22 @@
   overflow-y: auto;
 }
 
-.fabricate-admin .essence-icon-picker-option {
+.fabricate-admin .essence-icon-picker-options button.essence-icon-picker-option {
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: flex-start;
   gap: 8px;
-  min-height: 32px;
-  height: auto;
-  padding: 4px;
+  min-height: 32px !important;
+  height: auto !important;
+  padding: 4px !important;
   box-sizing: border-box;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.04);
   text-align: left;
   line-height: 1.2;
+  font: inherit;
 }
 
 .fabricate-admin .essence-icon-picker-option span:last-child {

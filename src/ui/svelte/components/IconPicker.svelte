@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
+  import { portal } from '../actions/portal.js';
   import { localize } from '../util/foundryBridge.js';
   import {
     DEFAULT_ESSENCE_ICON,
@@ -22,6 +23,7 @@
   let pickerOpen = $state(false);
   let searchTerm = $state('');
   let pickerRoot = $state(null);
+  let popoverRoot = $state(null);
   let triggerButton = $state(null);
   let searchInput = $state(null);
   let popoverStyle = $state('');
@@ -51,20 +53,17 @@
     closePicker();
   }
 
-  function getPopoverContainer() {
+  function getPopoverHost() {
     if (!pickerRoot || typeof document === 'undefined') return null;
 
-    return pickerRoot.closest('.application')
-      || pickerRoot.closest('.window-app')
-      || pickerRoot.closest('.fabricate-admin')
-      || document.documentElement;
+    return pickerRoot.closest('.fabricate-admin');
   }
 
   function updatePopoverPosition() {
     if (!pickerOpen || !triggerButton || typeof window === 'undefined') return;
 
-    const container = getPopoverContainer();
-    const containerRect = container?.getBoundingClientRect?.() ?? {
+    const popoverHost = getPopoverHost();
+    const hostRect = popoverHost?.getBoundingClientRect?.() ?? {
       left: 0,
       top: 0,
       width: window.innerWidth,
@@ -74,14 +73,14 @@
 
     const layout = computeIconPickerPopoverLayout(
       {
-        left: triggerRect.left - containerRect.left,
-        right: triggerRect.right - containerRect.left,
-        top: triggerRect.top - containerRect.top,
-        bottom: triggerRect.bottom - containerRect.top,
+        left: triggerRect.left - hostRect.left,
+        right: triggerRect.right - hostRect.left,
+        top: triggerRect.top - hostRect.top,
+        bottom: triggerRect.bottom - hostRect.top,
         width: triggerRect.width,
         height: triggerRect.height
       },
-      { width: containerRect.width || window.innerWidth, height: containerRect.height || window.innerHeight }
+      { width: hostRect.width || window.innerWidth, height: hostRect.height || window.innerHeight }
     );
 
     if (!layout) {
@@ -129,7 +128,11 @@
 <div
   bind:this={pickerRoot}
   class="essence-icon-picker"
-  use:dismissOnOutsideClick={{ enabled: pickerOpen, onDismiss: closePicker }}
+  use:dismissOnOutsideClick={{
+    enabled: pickerOpen,
+    onDismiss: closePicker,
+    additionalNodes: () => [popoverRoot]
+  }}
 >
   <button
     type="button"
@@ -156,10 +159,12 @@
 
   {#if pickerOpen}
     <div
+      bind:this={popoverRoot}
       class="essence-icon-picker-popover"
       style={popoverStyle}
       role="dialog"
       aria-label={localize('FABRICATE.Admin.Features.Essences.IconDialogLabel')}
+      use:portal={() => getPopoverHost()}
     >
       <div class="essence-icon-picker-search">
         <input
