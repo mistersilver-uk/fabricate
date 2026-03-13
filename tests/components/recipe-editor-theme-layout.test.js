@@ -63,6 +63,24 @@ describe('Recipe editor theme layout contract', () => {
       'picker cards should use the shared editor input/surface token'
     );
   });
+
+  it('renders picker results as one-row entries with truncation-safe names', () => {
+    assert.match(
+      pickerSource,
+      /\.picker-grid \{[\s\S]*display: flex;[\s\S]*flex-direction: column;/,
+      'picker results should stack vertically'
+    );
+    assert.match(
+      pickerSource,
+      /\.picker-card \{[\s\S]*flex-direction: row;[\s\S]*width: 100%;/,
+      'picker cards should use a horizontal row layout'
+    );
+    assert.match(
+      pickerSource,
+      /\.picker-card-name \{[\s\S]*white-space: nowrap;[\s\S]*text-overflow: ellipsis;/,
+      'picker names should truncate within the row instead of overflowing'
+    );
+  });
 });
 
 describe('Recipe editor shared control CSS', () => {

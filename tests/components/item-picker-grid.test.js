@@ -184,6 +184,14 @@ describe('ItemPickerGrid: card structure', () => {
     assert.equal(img.alt, 'Herb');
   });
 
+  it('card places the image before the name for the row layout', () => {
+    const items = [{ id: 'i-1', name: 'Herb', img: 'icons/herb.svg' }];
+    const panel = buildItemPickerGrid({ items });
+    const card = panel.querySelector('.picker-card');
+    assert.equal(card.firstElementChild?.className, 'picker-card-img');
+    assert.equal(card.lastElementChild?.className, 'picker-card-name');
+  });
+
   it('card uses fallback image when img is empty', () => {
     const items = [{ id: 'i-1', name: 'Unknown', img: '' }];
     const panel = buildItemPickerGrid({ items });
