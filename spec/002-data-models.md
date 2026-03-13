@@ -933,6 +933,15 @@ The following aliases are currently emitted in `toJSON()` / normalization output
 
 These transitional aliases exist solely for UI code paths that have not yet been updated. They do not represent the canonical data contract and must not be relied upon by new code.
 
+### Retired Aliases (Fully Removed)
+
+The following aliases **must not be emitted by new code** and must be stripped on import/export for backward compatibility with data written by older versions:
+
+| Retired Alias | Removed In | Notes |
+|--------------|-----------|-------|
+| `enableTiers` | #105 | Tiered crafting mode was removed; this field was hardcoded to `false` and never functionally active. |
+| `tiers` | #105 | Tiered crafting mode was removed; this field was hardcoded to `[]` and never functionally active. |
+
 ### Testing Requirements
 
 Tests must include:
