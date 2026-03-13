@@ -282,6 +282,48 @@ describe('createEditorStore', () => {
   });
 
   // -------------------------------------------------------------------------
+  // 2b. Availability state
+  // -------------------------------------------------------------------------
+
+  describe('setAvailabilityState', () => {
+    it('defaults new recipes to enabled', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      const draft = get(store.draft);
+      assert.equal(draft.enabled, true);
+      assert.equal(draft.locked, false);
+    });
+
+    it('setAvailabilityState("disabled") clears locked and disables the recipe', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setAvailabilityState('disabled');
+      const draft = get(store.draft);
+      assert.equal(draft.enabled, false);
+      assert.equal(draft.locked, false);
+    });
+
+    it('setAvailabilityState("locked") enables and locks the recipe', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setAvailabilityState('locked');
+      const draft = get(store.draft);
+      assert.equal(draft.enabled, true);
+      assert.equal(draft.locked, true);
+    });
+
+    it('setAvailabilityState("enabled") enables the recipe and clears locked', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setAvailabilityState('locked');
+      store.setAvailabilityState('enabled');
+      const draft = get(store.draft);
+      assert.equal(draft.enabled, true);
+      assert.equal(draft.locked, false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // 3. Step navigation
   // -------------------------------------------------------------------------
 
@@ -964,6 +1006,35 @@ describe('createEditorStore', () => {
       const errors = get(store.validationErrors);
       assert.equal(errors.length, 0);
     });
+
+    it('validationErrors ignores empty placeholder groups when a set has essences or other valid requirements', () => {
+      const svc = mockServices({
+        getSystem: () => ({
+          advancedOptionsEnabled: true,
+          features: { itemTags: true, essences: true }
+        })
+      });
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setField('name', 'Mixed Requirements');
+      store.updateDraft(d => {
+        d.ingredientSets[0].essences = { fire: 1 };
+        d.ingredientSets[0].ingredientGroups = [
+          {
+            id: 'group-empty',
+            name: 'Placeholder',
+            options: [{ id: 'opt-empty', matchType: 'component', componentId: null, quantity: 1, tagsText: '', tagMatch: 'any' }]
+          },
+          {
+            id: 'group-component',
+            name: 'Components',
+            options: [{ id: 'opt-component', matchType: 'component', componentId: 'item-ingredient', quantity: 1, tagsText: '', tagMatch: 'any' }]
+          }
+        ];
+        d.results[0].results[0].componentId = 'item-result';
+      });
+      const errors = get(store.validationErrors);
+      assert.equal(errors.length, 0);
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -1040,6 +1111,122 @@ describe('createEditorStore', () => {
       const result = await store.saveRecipe();
       assert.equal(result.success, false);
       assert.ok(result.errors[0].message.includes('Network error'));
+    });
+
+    it('saveRecipe drops empty placeholder groups and options while preserving mixed essences, components, and tags', async () => {
+      let savedPayload = null;
+      const svc = mockServices({
+        getSystem: () => ({
+          advancedOptionsEnabled: true,
+          features: { itemTags: true, essences: true }
+        }),
+        saveRecipe: async (payload) => { savedPayload = payload; }
+      });
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setField('name', 'Mixed Requirements');
+      store.updateDraft(d => {
+        d.ingredientSets[0].essences = { fire: 2 };
+        d.ingredientSets[0].ingredientGroups = [
+          {
+            id: 'group-empty',
+            name: 'Placeholder',
+            options: [{ id: 'opt-empty', matchType: 'component', componentId: null, quantity: 1, tagsText: '', tagMatch: 'any' }]
+          },
+          {
+            id: 'group-component',
+            name: 'Components',
+            options: [
+              { id: 'opt-component', matchType: 'component', componentId: 'item-ingredient', quantity: 2, tagsText: '', tagMatch: 'any' },
+              { id: 'opt-component-empty', matchType: 'component', componentId: null, quantity: 1, tagsText: '', tagMatch: 'any' }
+            ]
+          },
+          {
+            id: 'group-tags',
+            name: 'Tags',
+            options: [
+              { id: 'opt-tags', matchType: 'tags', componentId: null, quantity: 1, tagsText: 'herb, rare', tagMatch: 'all' },
+              { id: 'opt-tags-empty', matchType: 'tags', componentId: null, quantity: 1, tagsText: ' , ', tagMatch: 'any' }
+            ]
+          }
+        ];
+        d.results[0].results[0].componentId = 'item-result';
+      });
+
+      const result = await store.saveRecipe();
+
+      assert.equal(result.success, true);
+      assert.ok(savedPayload, 'saveRecipe should receive a payload');
+      assert.deepEqual(savedPayload.ingredientSets[0].essences, { fire: 2 });
+      assert.equal(savedPayload.ingredientSets[0].ingredientGroups.length, 2);
+      assert.deepEqual(savedPayload.ingredientSets[0].ingredientGroups.map(group => group.id), ['group-component', 'group-tags']);
+      assert.equal(savedPayload.ingredientSets[0].ingredientGroups[0].options.length, 1);
+      assert.equal(savedPayload.ingredientSets[0].ingredientGroups[0].options[0].match.type, 'component');
+      assert.equal(savedPayload.ingredientSets[0].ingredientGroups[0].options[0].componentId, 'item-ingredient');
+      assert.equal(savedPayload.ingredientSets[0].ingredientGroups[1].options.length, 1);
+      assert.equal(savedPayload.ingredientSets[0].ingredientGroups[1].options[0].match.type, 'tags');
+      assert.deepEqual(savedPayload.ingredientSets[0].ingredientGroups[1].options[0].match.tags, ['herb', 'rare']);
+      assert.equal(savedPayload.ingredientSets[0].ingredientGroups[1].options[0].match.tagMatch, 'all');
+    });
+
+    it('saveRecipe allows an essence-only ingredient set by omitting the default placeholder group', async () => {
+      let savedPayload = null;
+      const svc = mockServices({
+        getSystem: () => ({
+          advancedOptionsEnabled: true,
+          features: { essences: true }
+        }),
+        saveRecipe: async (payload) => { savedPayload = payload; }
+      });
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setField('name', 'Essence Only');
+      store.updateDraft(d => {
+        d.ingredientSets[0].essences = { fire: 1 };
+        d.results[0].results[0].componentId = 'item-result';
+      });
+
+      const result = await store.saveRecipe();
+
+      assert.equal(result.success, true);
+      assert.ok(savedPayload, 'saveRecipe should receive a payload');
+      assert.deepEqual(savedPayload.ingredientSets[0].essences, { fire: 1 });
+      assert.deepEqual(savedPayload.ingredientSets[0].ingredientGroups, []);
+      assert.deepEqual(savedPayload.ingredientSets[0].ingredients, []);
+    });
+
+    it('saveRecipe normalizes contradictory disabled-plus-locked draft state to disabled', async () => {
+      let savedPayload = null;
+      const svc = mockServices({
+        saveRecipe: async (payload) => { savedPayload = payload; }
+      });
+      const recipe = makeRecipe({
+        name: 'Contradictory Status',
+        enabled: false,
+        locked: true,
+        ingredientSets: [{
+          id: 'set-1',
+          name: 'Set 1',
+          ingredientGroups: [{
+            id: 'group-1',
+            name: 'Group 1',
+            options: [{ id: 'opt-1', matchType: 'component', componentId: 'item-ingredient', quantity: 1, tagsText: '', tagMatch: 'any' }]
+          }],
+          essences: {},
+          catalysts: []
+        }],
+        resultGroups: [{
+          id: 'result-group-1',
+          name: 'Result Group 1',
+          results: [{ id: 'result-1', componentId: 'item-result', quantity: 1, propertyMacroUuid: null }]
+        }]
+      });
+      const store = createEditorStore(svc, { recipe });
+
+      const result = await store.saveRecipe();
+
+      assert.equal(result.success, true);
+      assert.ok(savedPayload, 'saveRecipe should receive a payload');
+      assert.equal(savedPayload.enabled, false);
+      assert.equal(savedPayload.locked, false);
     });
   });
 

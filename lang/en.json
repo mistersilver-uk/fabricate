@@ -370,9 +370,7 @@
         "Delete": "Delete"
       },
       "Rules": {
-        "Title": "Global Rules",
-        "Placeholder": "Difficulty and advanced system-wide rule editing will live here.",
-        "PlaceholderDetail": "This first implementation pass focuses on systems, item libraries, and recipe scoping."
+        "Title": "Global Rules"
       }
     },
     "Editor": {
@@ -389,8 +387,12 @@
         "CategoryHint": "Define categories in Crafting Admin > Systems."
       },
       "Flags": {
+        "Availability": "Availability",
         "Enabled": "Enabled",
         "Locked": "Locked",
+        "StatusEnabled": "Enabled",
+        "StatusDisabled": "Disabled",
+        "StatusLocked": "Locked",
         "VariableOutput": "Variable Output",
         "TransferEffects": "Transfer Effects"
       },
@@ -516,7 +518,7 @@
         "SectionTitle": "Essence Requirements",
         "SelectPlaceholder": "Add essence...",
         "Add": "Add",
-        "QuantityLabel": "Qty",
+        "QuantityLabel": "{name} quantity",
         "Increment": "Increase {name}",
         "Decrement": "Decrease {name}"
       },

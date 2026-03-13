@@ -3,6 +3,11 @@
   import { localize } from '../../util/foundryBridge.js';
   import IngredientGroupCard from './IngredientGroupCard.svelte';
   import CatalystBlock from './CatalystBlock.svelte';
+  import {
+    adjustComponentEssenceQuantity,
+    buildEditableEssenceOptions,
+    clampComponentEssenceQuantity
+  } from '../../util/componentEditor.js';
 
   let {
     set,
@@ -38,15 +43,11 @@
     // Essence actions
     showEssences = false,
     allEssences = [],
-    onAddEssence,
-    onUpdateEssence,
-    onRemoveEssence
+    onUpdateEssence
   } = $props();
 
-  let selectedNewEssence = $state('');
-
-  const addableEssences = $derived(
-    (allEssences || []).filter(def => !Object.hasOwn(set?.essences || {}, def.id))
+  const essenceOptions = $derived(
+    buildEditableEssenceOptions(allEssences || [], set?.essences || {})
   );
 
   const panelId = $derived(set?.id || `set-${setIndex}`);
@@ -82,6 +83,16 @@
   function handleDragOver(event) {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'copy';
+  }
+
+  function setEssenceQuantity(essenceId, rawValue) {
+    onUpdateEssence?.(setIndex, essenceId, clampComponentEssenceQuantity(rawValue));
+  }
+
+  function adjustEssenceQuantity(essenceId, delta) {
+    const option = essenceOptions.find(entry => entry.id === essenceId);
+    if (!option) return;
+    onUpdateEssence?.(setIndex, essenceId, adjustComponentEssenceQuantity(option.quantity, delta));
   }
 
   const setNameId = $derived(`fab-set-name-${panelId}`);
@@ -188,75 +199,50 @@
       {#if showEssences}
         <div class="essence-requirements">
           <h4>{localize('FABRICATE.Editor.Essences.SectionTitle')}</h4>
-          <div class="essence-grid">
-            {#each Object.entries(set?.essences || {}) as [essenceId, quantity]}
-              {@const def = allEssences.find(e => e.id === essenceId)}
-              <article class="essence-card">
-                <button
-                  type="button"
-                  class="essence-step essence-step-minus"
-                  disabled={quantity <= 1}
-                  onclick={() => onUpdateEssence?.(setIndex, essenceId, Math.max(1, quantity - 1))}
-                  aria-label={localize('FABRICATE.Editor.Essences.Decrement', { name: def?.name || essenceId })}
-                  title={localize('FABRICATE.Editor.Essences.Decrement', { name: def?.name || essenceId })}
-                >
-                  <i class="fas fa-minus"></i>
-                </button>
+          {#if essenceOptions.length > 0}
+            <div class="essence-grid">
+              {#each essenceOptions as option (option.id)}
+                <article class="essence-card" data-essence-id={option.id}>
+                  <button
+                    type="button"
+                    class="essence-step essence-step-minus"
+                    onclick={() => adjustEssenceQuantity(option.id, -1)}
+                    aria-label={localize('FABRICATE.Editor.Essences.Decrement', { name: option.name })}
+                    title={localize('FABRICATE.Editor.Essences.Decrement', { name: option.name })}
+                  >
+                    <i class="fas fa-minus"></i>
+                  </button>
 
-                <input
-                  class="essence-quantity-input"
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={quantity}
-                  aria-label={localize('FABRICATE.Editor.Essences.QuantityLabel')}
-                  oninput={(e) => {
-                    const val = Math.max(1, Math.floor(Number(e.target.value) || 1));
-                    onUpdateEssence?.(setIndex, essenceId, val);
-                  }}
-                />
+                  <input
+                    class="essence-quantity-input"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={option.quantity}
+                    aria-label={localize('FABRICATE.Editor.Essences.QuantityLabel', { name: option.name })}
+                    oninput={(event) => setEssenceQuantity(option.id, event.currentTarget.value)}
+                  />
 
-                <div class="essence-icon" aria-hidden="true">
-                  {#if def?.icon}<i class={def.icon} aria-hidden="true"></i>{/if}
-                </div>
+                  <div class="essence-icon" aria-hidden="true">
+                    <i class={option.icon} aria-hidden="true"></i>
+                  </div>
 
-                <strong class="essence-name">{def?.name || essenceId}</strong>
+                  <strong class="essence-name">{option.name}</strong>
 
-                <button
-                  type="button"
-                  class="essence-step essence-step-plus"
-                  onclick={() => onUpdateEssence?.(setIndex, essenceId, quantity + 1)}
-                  aria-label={localize('FABRICATE.Editor.Essences.Increment', { name: def?.name || essenceId })}
-                  title={localize('FABRICATE.Editor.Essences.Increment', { name: def?.name || essenceId })}
-                >
-                  <i class="fas fa-plus"></i>
-                </button>
-
-                <button
-                  type="button"
-                  class="essence-remove"
-                  onclick={() => onRemoveEssence?.(setIndex, essenceId)}
-                  title={localize('FABRICATE.Admin.Features.Essences.Remove')}
-                  aria-label={localize('FABRICATE.Admin.Features.Essences.Remove')}
-                >
-                  <i class="fas fa-times"></i>
-                </button>
-              </article>
-            {/each}
-          </div>
-          {#if addableEssences.length > 0}
-            <div class="add-essence-row">
-              <select value={selectedNewEssence} onchange={(e) => selectedNewEssence = e.target.value}>
-                <option value="">{localize('FABRICATE.Editor.Essences.SelectPlaceholder')}</option>
-                {#each addableEssences as def}
-                  <option value={def.id}>{def.name}</option>
-                {/each}
-              </select>
-              <button type="button" disabled={!selectedNewEssence}
-                onclick={() => { onAddEssence?.(setIndex, selectedNewEssence, 1); selectedNewEssence = ''; }}>
-                <i class="fas fa-plus"></i> {localize('FABRICATE.Editor.Essences.Add')}
-              </button>
+                  <button
+                    type="button"
+                    class="essence-step essence-step-plus"
+                    onclick={() => adjustEssenceQuantity(option.id, 1)}
+                    aria-label={localize('FABRICATE.Editor.Essences.Increment', { name: option.name })}
+                    title={localize('FABRICATE.Editor.Essences.Increment', { name: option.name })}
+                  >
+                    <i class="fas fa-plus"></i>
+                  </button>
+                </article>
+              {/each}
             </div>
+          {:else}
+            <p class="hint">{localize('FABRICATE.Editor.IngredientSets.NoEssencesDefined')}</p>
           {/if}
         </div>
       {/if}
@@ -391,13 +377,14 @@
 
   .essence-card {
     display: grid;
-    grid-template-columns: auto auto auto 1fr auto auto;
+    grid-template-columns: 24px 3.25rem 30px minmax(0, 1fr) 24px;
     align-items: center;
-    gap: 8px;
-    padding: 8px 10px;
+    gap: 6px;
+    padding: 8px 9px;
     border-radius: 9px;
     border: 1px solid var(--fabricate-editor-border, rgba(255, 255, 255, 0.14));
     background: rgba(255, 255, 255, 0.04);
+    min-width: 0;
   }
 
   .essence-step {
@@ -420,23 +407,25 @@
   }
 
   .essence-step:hover:not(:disabled),
-  .essence-step:focus-visible:not(:disabled) {
+  .essence-step:focus-visible {
     border-color: var(--color-border-highlight, #4488cc);
     background: rgba(255, 255, 255, 0.08);
   }
 
-  .essence-step:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
+  .essence-requirements .hint {
+    margin: 0;
+    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
   }
 
-  .essence-quantity-input {
-    width: 44px;
-    min-width: 44px;
+  .essence-requirements .essence-card .essence-quantity-input {
+    width: 100%;
+    min-width: 0;
     height: 28px;
     text-align: center;
-    padding: 0 4px;
+    padding: 0 6px;
     border-radius: 5px;
+    justify-self: stretch;
+    font-variant-numeric: tabular-nums;
   }
 
   .essence-quantity-input::-webkit-outer-spin-button,
@@ -471,43 +460,7 @@
     font-size: 0.88rem;
   }
 
-  .essence-remove {
-    width: 24px;
-    height: 24px;
-    border-radius: 7px;
-    border: 1px solid transparent;
-    background: none;
-    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 auto;
-  }
-
-  .essence-remove i {
-    font-size: 9px;
-  }
-
-  .essence-remove:hover,
-  .essence-remove:focus-visible {
-    color: var(--fabricate-editor-danger, rgba(255, 216, 208, 0.95));
-    background: var(--fabricate-editor-danger-soft, rgba(220, 53, 69, 0.18));
-    border-color: var(--fabricate-editor-danger-soft, rgba(220, 53, 69, 0.18));
-  }
-
-  .add-essence-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 8px;
-  }
-
-  .add-essence-row select {
-    flex: 1;
-  }
-
-  @media (max-width: 720px) {
+  @media (max-width: 420px) {
     .essence-grid {
       grid-template-columns: 1fr;
     }

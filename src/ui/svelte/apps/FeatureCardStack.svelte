@@ -160,19 +160,18 @@
     enabled={selectedSystem.features.recipeCategories}
     onToggle={(v) => store.toggleFeature('categories', v)}
   >
-    <div class="token-list">
-      <span class="token token-locked">
-        {localize('FABRICATE.Common.General')}
-        <i class="fas fa-lock" aria-hidden="true"></i>
-      </span>
-    </div>
     <TokenList
       items={selectedSystem.categories}
       placeholder={localize('FABRICATE.Admin.Features.Categories.Placeholder')}
       emptyText={localize('FABRICATE.Admin.Features.Categories.Empty')}
       onAdd={store.addCategory}
       onRemove={store.removeCategory}
-    />
+    >
+      <span class="token token-locked">
+        {localize('FABRICATE.Common.General')}
+        <i class="fas fa-lock" aria-hidden="true"></i>
+      </span>
+    </TokenList>
   </FeatureCard>
 
   <!-- Item Tags -->

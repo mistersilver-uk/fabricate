@@ -1,6 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
-  let { items = [], placeholder = '', emptyText = '', onAdd, onRemove } = $props();
+  let { items = [], placeholder = '', emptyText = '', onAdd, onRemove, children } = $props();
 
   let newValue = $state('');
 
@@ -23,12 +23,15 @@
   <button type="button" onclick={handleAdd} aria-label="Add"><i class="fas fa-plus"></i></button>
 </div>
 <div class="token-list">
-  {#each items as item}
-    <span class="token">
-      {item}
-      <button type="button" onclick={() => onRemove(item)} aria-label="Remove {item}"><i class="fas fa-times"></i></button>
-    </span>
-  {:else}
+  {@render children?.()}
+  {#if items.length}
+    {#each items as item}
+      <span class="token">
+        {item}
+        <button type="button" onclick={() => onRemove(item)} aria-label="Remove {item}"><i class="fas fa-times"></i></button>
+      </span>
+    {/each}
+  {:else if !children}
     <p class="hint">{emptyText}</p>
-  {/each}
+  {/if}
 </div>
