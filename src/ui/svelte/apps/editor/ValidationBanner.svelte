@@ -36,7 +36,6 @@
     background:
       linear-gradient(135deg, rgba(107, 29, 39, 0.92), rgba(61, 17, 25, 0.96));
     border: 1px solid var(--fabricate-editor-border-danger, rgba(255, 124, 102, 0.48));
-    border-left-width: 4px;
     border-radius: 10px;
     padding: 12px 14px;
     margin-bottom: 10px;
