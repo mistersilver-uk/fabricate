@@ -69,6 +69,42 @@ test('CraftingRunManager: create/advance/cancel flow moves active run into histo
   assert.equal(history[0].currentStepIndex, null);
 });
 
+test('CraftingRunManager: history retention limit enforced — 50th entry no truncation, 51st discards oldest, most-recent-first order', async () => {
+  setupGlobals();
+  const manager = new CraftingRunManager();
+  const actor = new FakeActor('HistoryLimit');
+  const recipe = {
+    id: 'recipe-limit',
+    craftingSystemId: 'system-limit',
+    getExecutionSteps: () => [{ id: 'step-1', name: 'Only Step' }]
+  };
+
+  // Create and complete 50 runs
+  const completedIds = [];
+  for (let i = 0; i < 50; i++) {
+    const run = await manager.createRun(actor, recipe, [], 'user-1');
+    const completed = await manager.completeStepSuccess(actor, run, 0, {});
+    completedIds.push(completed.id);
+  }
+
+  // After 50 entries, no truncation has occurred
+  const historyAt50 = manager.getRunHistory(actor);
+  assert.equal(historyAt50.length, 50);
+
+  // Most-recent-first: last completed run is at index 0, first at index 49
+  assert.equal(historyAt50[0].id, completedIds[49]);
+  assert.equal(historyAt50[49].id, completedIds[0]);
+
+  // Insert the 51st run — oldest should be discarded, length stays at 50
+  const run51 = await manager.createRun(actor, recipe, [], 'user-1');
+  const completed51 = await manager.completeStepSuccess(actor, run51, 0, {});
+
+  const historyAt51 = manager.getRunHistory(actor);
+  assert.equal(historyAt51.length, 50);
+  assert.equal(historyAt51.find(r => r.id === completedIds[0]), undefined, 'oldest entry should be evicted');
+  assert.equal(historyAt51[0].id, completed51.id, 'newest entry should be first');
+});
+
 test('CraftingRunManager: getRun and history limit helpers work for active + historical entries', async () => {
   setupGlobals(2000);
   const manager = new CraftingRunManager();

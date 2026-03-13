@@ -119,6 +119,43 @@ test('SalvageRunManager: cleanupInvalidRuns removes active and historical runs w
   assert.equal(manager.getRunHistory(actor)[0].componentId, 'component-valid');
 });
 
+test('SalvageRunManager: history retention limit enforced — 50th entry no truncation, 51st discards oldest, most-recent-first order', async () => {
+  const actor = new FakeActor('HistoryLimit');
+  setupGlobals(1000, [actor]);
+  const manager = new SalvageRunManager();
+
+  // Create and complete 50 runs
+  const completedIds = [];
+  for (let i = 0; i < 50; i++) {
+    const run = await manager.createRun(actor, {
+      craftingSystemId: 'system-limit',
+      componentId: `component-${i}`
+    });
+    const completed = await manager.completeRun(actor, run, 'succeeded');
+    completedIds.push(completed.id);
+  }
+
+  // After 50 entries, no truncation has occurred
+  const historyAt50 = manager.getRunHistory(actor);
+  assert.equal(historyAt50.length, 50);
+
+  // Most-recent-first: last completed run is at index 0, first at index 49
+  assert.equal(historyAt50[0].id, completedIds[49]);
+  assert.equal(historyAt50[49].id, completedIds[0]);
+
+  // Insert the 51st run — oldest should be discarded, length stays at 50
+  const run51 = await manager.createRun(actor, {
+    craftingSystemId: 'system-limit',
+    componentId: 'component-51'
+  });
+  const completed51 = await manager.completeRun(actor, run51, 'succeeded');
+
+  const historyAt51 = manager.getRunHistory(actor);
+  assert.equal(historyAt51.length, 50);
+  assert.equal(historyAt51.find(r => r.id === completedIds[0]), undefined, 'oldest entry should be evicted');
+  assert.equal(historyAt51[0].id, completed51.id, 'newest entry should be first');
+});
+
 test('SalvageRunManager: removeRunsForSystem and removeRunsForComponent cancel active runs and trim history', async () => {
   const actor = new FakeActor('Prune');
   setupGlobals(1000, [actor]);
