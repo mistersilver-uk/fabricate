@@ -930,6 +930,23 @@ The following aliases are currently emitted in `toJSON()` / normalization output
 
 These transitional aliases exist solely for UI code paths that have not yet been updated. They do not represent the canonical data contract and must not be relied upon by new code.
 
+### Retired Aliases (Removed)
+
+The following fields were once emitted by the normalization layer and are now fully removed (#134):
+
+| Retired Field | Was On | Reason |
+|--------------|--------|--------|
+| `enableTiers` | `CraftingSystem` normalization | Tiered mode removed; field was always hardcoded `false` |
+| `tiers` | `CraftingSystem` normalization | Tiered mode removed; field was always hardcoded `[]` |
+| `tier` | `Component` normalization | Tiered mode removed; no spec field on Component |
+
+Resolution mode aliases retired as read aliases:
+
+| Retired Alias | Was Accepted By | Now Normalizes To |
+|--------------|----------------|-------------------|
+| `'mapped'` | `_normalizeResolutionMode` | `'routed'` |
+| `'tiered'` | `_normalizeResolutionMode` | `'routed'` |
+
 ### Testing Requirements
 
 Tests must include:
