@@ -50,6 +50,7 @@ export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
         warn: (msg) => ui.notifications.warn(msg),
         error: (msg) => ui.notifications.error(msg)
       },
+      localize: (key, data) => localize(key, data),
       confirmDialog: (options) => confirmDialog(options),
       openRecipeEditor: (recipe, actorId, systemId) => {
         getRecipeEditorAppClass().show(recipe, this, systemId);

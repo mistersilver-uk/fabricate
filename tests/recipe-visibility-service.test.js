@@ -919,6 +919,143 @@ test('AC7.6 - cleanupLearnedRecipes removes stale entries and retains valid ones
 // AC3 (T-087) — Recipe item matching via _stats.compendiumSource
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// AC8 — Knowledge mode: visibility and learnability via formula items
+// ---------------------------------------------------------------------------
+
+test('AC8.1 - learned mode: recipe visible but not craftable when player has matching item but has not learned', () => {
+  const system = buildMockSystem({
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: {
+        mode: 'learned',
+        item: { limitUses: false },
+        learn: { consumeOnLearn: true }
+      }
+    }
+  });
+  const recipe = buildMockRecipe({ id: 'recipe-1', linkedRecipeItemUuid: 'formula-uuid' });
+  const formulaItem = new FakeItem({ uuid: 'formula-uuid' });
+  const craftingActor = new FakeActor({ id: 'actor-1', items: [formulaItem] });
+  const viewer = { isGM: false, id: 'user-1' };
+  const service = buildService({ system });
+
+  const result = service.evaluateRecipeAccess({ recipe, viewer, craftingActor });
+
+  assert.equal(result.visible, true, 'recipe should be visible when player has matching formula item');
+  assert.equal(result.craftable, false, 'recipe should not be craftable until learned');
+  assert.equal(result.reason, 'knowledge', 'reason should be knowledge');
+  assert.equal(result.knowledge.hasMatchedItem, true);
+  assert.equal(result.knowledge.hasLearned, false);
+  assert.equal(result.knowledge.granted, false, 'knowledge should not be granted in learned mode without learning');
+});
+
+test('AC8.2 - learned mode: recipe visible and craftable after learning', () => {
+  const system = buildMockSystem({
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: {
+        mode: 'learned',
+        item: { limitUses: false },
+        learn: { consumeOnLearn: true }
+      }
+    }
+  });
+  const recipe = buildMockRecipe({ id: 'recipe-1', linkedRecipeItemUuid: 'formula-uuid' });
+  const craftingActor = new FakeActor({
+    id: 'actor-1',
+    items: [],
+    flagsArg: { fabricate: { learnedRecipes: { 'recipe-1': { learnedAt: 1 } } } }
+  });
+  const viewer = { isGM: false, id: 'user-1' };
+  const service = buildService({ system });
+
+  const result = service.evaluateRecipeAccess({ recipe, viewer, craftingActor });
+
+  assert.equal(result.visible, true);
+  assert.equal(result.craftable, true);
+  assert.equal(result.reason, 'ok');
+});
+
+test('AC8.3 - learned mode: recipe not visible when player has neither item nor learned', () => {
+  const system = buildMockSystem({
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: {
+        mode: 'learned',
+        item: { limitUses: false },
+        learn: { consumeOnLearn: true }
+      }
+    }
+  });
+  const recipe = buildMockRecipe({ id: 'recipe-1', linkedRecipeItemUuid: 'formula-uuid' });
+  const craftingActor = new FakeActor({ id: 'actor-1', items: [] });
+  const viewer = { isGM: false, id: 'user-1' };
+  const service = buildService({ system });
+
+  const result = service.evaluateRecipeAccess({ recipe, viewer, craftingActor });
+
+  assert.equal(result.visible, false, 'recipe should be hidden without item or learned state');
+  assert.equal(result.craftable, false);
+});
+
+test('AC8.4 - itemOrLearned mode: recipe visible and craftable when player has item but has not learned', () => {
+  const system = buildMockSystem({
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: {
+        mode: 'itemOrLearned',
+        item: { limitUses: false },
+        learn: { consumeOnLearn: true }
+      }
+    }
+  });
+  const recipe = buildMockRecipe({ id: 'recipe-1', linkedRecipeItemUuid: 'formula-uuid' });
+  const formulaItem = new FakeItem({ uuid: 'formula-uuid' });
+  const craftingActor = new FakeActor({ id: 'actor-1', items: [formulaItem] });
+  const viewer = { isGM: false, id: 'user-1' };
+  const service = buildService({ system });
+
+  const result = service.evaluateRecipeAccess({ recipe, viewer, craftingActor });
+
+  assert.equal(result.visible, true);
+  assert.equal(result.craftable, true, 'itemOrLearned grants craftability with just the item');
+  assert.equal(result.reason, 'ok');
+});
+
+test('AC8.5 - learned mode: canLearn derivation is true when recipe is visible via item but not yet learned', () => {
+  const system = buildMockSystem({
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: {
+        mode: 'learned',
+        item: { limitUses: false },
+        learn: { consumeOnLearn: true }
+      }
+    }
+  });
+  const recipe = buildMockRecipe({ id: 'recipe-1', linkedRecipeItemUuid: 'formula-uuid' });
+  const formulaItem = new FakeItem({ uuid: 'formula-uuid' });
+  const craftingActor = new FakeActor({ id: 'actor-1', items: [formulaItem] });
+  const viewer = { isGM: false, id: 'user-1' };
+  const service = buildService({ system });
+
+  const access = service.evaluateRecipeAccess({ recipe, viewer, craftingActor });
+
+  // Replicate the canLearn logic from craftingStore.js
+  const canLearn = access.reason === 'knowledge' &&
+    !!access.knowledge &&
+    access.knowledge.hasLearned !== true &&
+    Array.isArray(access.knowledge.matchedItems) &&
+    access.knowledge.matchedItems.length > 0;
+
+  assert.equal(canLearn, true, 'canLearn should be true for visible-but-unlearned recipe with matching item');
+});
+
+// ---------------------------------------------------------------------------
+// AC3 (T-087) — Recipe item matching via _stats.compendiumSource
+// ---------------------------------------------------------------------------
+
 test('AC3.5 - _isMatchingRecipeItem returns true when _stats.compendiumSource matches linkedRecipeItemUuid', () => {
   const service = buildService();
   const recipe = buildMockRecipe({ linkedRecipeItemUuid: 'Compendium.world.items.abc' });

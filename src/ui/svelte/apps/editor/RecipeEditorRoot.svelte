@@ -291,7 +291,7 @@
             </option>
           </select>
         </div>
-        {#if $featureState.showComplexRecipes && !$featureState.isMappedMode}
+        {#if $featureState.showComplexRecipes && !$featureState.isMappedMode && !$featureState.isAlchemyMode}
           <label class="checkbox-label">
             <input
               type="checkbox"

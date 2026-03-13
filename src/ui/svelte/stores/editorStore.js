@@ -274,11 +274,16 @@ function _getSystemFeatureState(draft, services) {
   const resolutionMode = system?.resolutionMode || 'simple';
   const listMode = system?.recipeVisibility?.listMode || 'global';
   const knowledgeMode = system?.recipeVisibility?.knowledge?.mode || 'itemOrLearned';
+  const routedByIngredientSet = resolutionMode === 'mapped';
+  const routedByOutcome = resolutionMode === 'tiered';
+  const supportsAdvancedRouting = ['mapped', 'tiered', 'alchemy', 'routed'].includes(resolutionMode);
+  const hasConfiguredCraftingCheck = system?.craftingCheck?.enabled === true || !!system?.craftingCheck?.macroUuid;
 
   return {
     system,
     resolutionMode,
-    isMappedMode: resolutionMode === 'mapped',
+    isMappedMode: routedByIngredientSet,
+    isAlchemyMode: resolutionMode === 'alchemy',
     isProgressiveMode: resolutionMode === 'progressive',
     showRecipeVisibilityGlobal: listMode === 'global',
     showRecipeVisibilityPlayer: listMode === 'player',
@@ -288,13 +293,13 @@ function _getSystemFeatureState(draft, services) {
     showCategories: advancedEnabled && features.recipeCategories === true,
     showItemTags: advancedEnabled && features.itemTags === true,
     showEssences: advancedEnabled && (features.essences === true),
-    showComplexRecipes: advancedEnabled && features.complexRecipes === true,
+    showComplexRecipes: advancedEnabled && (features.complexRecipes === true || supportsAdvancedRouting),
     showMultiStepRecipes: advancedEnabled && features.multiStepRecipes === true,
     showTimeRequirements: system?.requirements?.time?.enabled === true,
     showCurrencyRequirements: system?.requirements?.currency?.enabled === true,
     showPropertyMacros: advancedEnabled && features.propertyMacros === true,
-    showCraftingChecks: advancedEnabled && features.craftingChecks === true,
-    showOutcomeRouting: advancedEnabled && features.outcomeRouting === true,
+    showCraftingChecks: advancedEnabled && (features.craftingChecks === true || hasConfiguredCraftingCheck),
+    showOutcomeRouting: advancedEnabled && (features.outcomeRouting === true || routedByOutcome),
     craftingCheckOutcomes: Array.isArray(system?.craftingCheck?.outcomes) ? system.craftingCheck.outcomes : []
   };
 }

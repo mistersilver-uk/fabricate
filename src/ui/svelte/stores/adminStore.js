@@ -36,6 +36,14 @@ const FEATURE_MAP = {
   effectTransfer: 'effectTransfer'
 };
 
+const RESOLUTION_MODE_LABEL_KEYS = {
+  simple: 'FABRICATE.Admin.SystemSettings.ResolutionSimple',
+  mapped: 'FABRICATE.Admin.SystemSettings.ResolutionMapped',
+  tiered: 'FABRICATE.Admin.SystemSettings.ResolutionTiered',
+  progressive: 'FABRICATE.Admin.SystemSettings.ResolutionProgressive',
+  alchemy: 'FABRICATE.Admin.SystemSettings.ResolutionAlchemy'
+};
+
 // ---------------------------------------------------------------------------
 // Module-private helper functions
 // ---------------------------------------------------------------------------
@@ -76,6 +84,11 @@ function _buildManagedItemOptions(managedItems = []) {
     name: item.name,
     img: item.img || 'icons/svg/item-bag.svg'
   }));
+}
+
+function _resolutionModeLabel(mode, localizeFn) {
+  const key = RESOLUTION_MODE_LABEL_KEYS[mode];
+  return key ? (localizeFn?.(key) || mode) : mode;
 }
 
 function _buildSalvageSummary(item, salvageEnabled) {
@@ -198,6 +211,7 @@ function _buildSelectedSystemViewData(selectedSystem, managedItemOptions, essenc
     id: selectedSystem.id,
     name: selectedSystem.name,
     description: selectedSystem.description,
+    resolutionMode: selectedSystem.resolutionMode || 'simple',
     advancedOptionsEnabled: advancedEnabled,
 
     features: {
@@ -223,12 +237,21 @@ function _buildSelectedSystemViewData(selectedSystem, managedItemOptions, essenc
     },
 
     craftingCheck: {
+      enabled: selectedSystem.craftingCheck?.enabled === true,
       mode: selectedSystem.craftingCheck?.mode || 'passFail',
       macroUuid: selectedSystem.craftingCheck?.macroUuid || '',
       outcomesText: Array.isArray(selectedSystem.craftingCheck?.outcomes)
         ? selectedSystem.craftingCheck.outcomes.join(', ')
         : ''
     },
+
+    alchemy: selectedSystem.resolutionMode === 'alchemy'
+      ? {
+        learnOnCraft: selectedSystem.alchemy?.learnOnCraft === true,
+        consumeOnFail: selectedSystem.alchemy?.consumeOnFail !== false,
+        showAttemptHistoryToPlayers: selectedSystem.alchemy?.showAttemptHistoryToPlayers !== false
+      }
+      : null,
 
     recipeVisibility: selectedSystem.recipeVisibility || {},
     teaserConfig: selectedSystem.teaserConfig || { enabled: false, discoveryMode: 'threshold', fragments: [] },
@@ -428,6 +451,41 @@ export function createAdminStore(services) {
     if (!sysId) return;
     await systemManager.updateSystem(sysId, { name, description, advancedOptionsEnabled });
     await refresh();
+  }
+
+  async function setResolutionMode(resolutionMode) {
+    const systemManager = services.getCraftingSystemManager();
+    const recipeManager = services.getRecipeManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return false;
+
+    const system = systemManager.getSystem(sysId);
+    if (!system) return false;
+
+    const nextMode = String(resolutionMode || '').trim() || 'simple';
+    const currentMode = system.resolutionMode || 'simple';
+    if (nextMode === currentMode) return true;
+
+    const recipeCount = recipeManager?.getRecipes?.({ craftingSystemId: sysId })?.length || 0;
+    const localizeFn = services.localize;
+    const confirmed = await services.confirmDialog({
+      title: localizeFn?.('FABRICATE.Admin.SystemSettings.ResolutionModeChangeTitle')
+        || 'Change Resolution Mode?',
+      content: `<p>${
+        localizeFn?.('FABRICATE.Admin.SystemSettings.ResolutionModeChangeContent', {
+          count: recipeCount,
+          name: system.name,
+          mode: _resolutionModeLabel(nextMode, localizeFn)
+        }) || `Changing resolution mode to ${_resolutionModeLabel(nextMode, localizeFn)} will delete ${recipeCount} recipe(s) in this crafting system and clean up related runs and learned recipes.`
+      }</p>`,
+      yes: () => true,
+      no: () => false
+    });
+    if (!confirmed) return false;
+
+    await systemManager.updateSystem(sysId, { resolutionMode: nextMode });
+    await refresh();
+    return true;
   }
 
   // --- Tab navigation ---
@@ -634,13 +692,34 @@ export function createAdminStore(services) {
 
   // --- Config save actions ---
 
-  async function saveCraftingCheckConfig(mode, macroUuid, outcomesText) {
+  async function saveCraftingCheckConfig(configOrMode, macroUuid, outcomesText) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
     if (!sysId) return;
-    const outcomes = (outcomesText || '').split(',').map(s => s.trim()).filter(Boolean);
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+
+    const existing = system.craftingCheck || {};
+    const normalizedConfig = typeof configOrMode === 'object' && configOrMode !== null
+      ? configOrMode
+      : {
+        mode: configOrMode,
+        macroUuid,
+        outcomesText
+      };
+    const mode = normalizedConfig.mode === 'namedOutcomes' ? 'namedOutcomes' : 'passFail';
+    const resolvedMacroUuid = normalizedConfig.macroUuid || null;
+    const outcomes = String(normalizedConfig.outcomesText || '')
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
     await systemManager.updateSystem(sysId, {
-      craftingCheck: { mode, macroUuid: macroUuid || null, outcomes }
+      craftingCheck: {
+        ...existing,
+        mode,
+        macroUuid: resolvedMacroUuid,
+        outcomes
+      }
     });
     await refresh();
   }
@@ -671,7 +750,26 @@ export function createAdminStore(services) {
     await refresh();
   }
 
-  async function saveVisibilityConfig(listMode, knowledgeMode, consumeOnLearn) {
+  async function saveAlchemyConfig(config = {}) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+
+    const existing = system.alchemy || {};
+    await systemManager.updateSystem(sysId, {
+      alchemy: {
+        ...existing,
+        learnOnCraft: config.learnOnCraft === true,
+        consumeOnFail: config.consumeOnFail !== false,
+        showAttemptHistoryToPlayers: config.showAttemptHistoryToPlayers !== false
+      }
+    });
+    await refresh();
+  }
+
+  async function saveVisibilityConfig(configOrListMode, knowledgeMode, consumeOnLearn, extras = {}) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
     if (!sysId) return;
@@ -679,15 +777,55 @@ export function createAdminStore(services) {
     if (!system) return;
 
     const existing = system.recipeVisibility || {};
+    const currentKnowledge = existing.knowledge || {};
+    const currentItem = currentKnowledge.item || {};
+    const currentLearn = currentKnowledge.learn || {};
+    const normalizedConfig = typeof configOrListMode === 'object' && configOrListMode !== null
+      ? configOrListMode
+      : {
+        listMode: configOrListMode,
+        knowledgeMode,
+        consumeOnLearn,
+        ...extras
+      };
+    const nextListMode = normalizedConfig.listMode || existing.listMode || 'global';
+    const nextKnowledgeMode = normalizedConfig.knowledgeMode || currentKnowledge.mode || 'itemOrLearned';
+    const nextLimitUses = normalizedConfig.limitUses !== undefined
+      ? normalizedConfig.limitUses === true
+      : currentItem.limitUses === true;
+    const rawMaxUses = normalizedConfig.maxUses !== undefined
+      ? normalizedConfig.maxUses
+      : currentItem.maxUses;
+    const nextMaxUses = nextLimitUses && Number.isFinite(Number(rawMaxUses)) && Number(rawMaxUses) > 0
+      ? Number(rawMaxUses)
+      : undefined;
+    const nextDestroyWhenExhausted = nextLimitUses
+      ? (normalizedConfig.destroyWhenExhausted !== undefined
+        ? normalizedConfig.destroyWhenExhausted === true
+        : currentItem.destroyWhenExhausted === true)
+      : false;
+    const nextConsumeOnLearn = normalizedConfig.consumeOnLearn !== undefined
+      ? normalizedConfig.consumeOnLearn !== false
+      : currentLearn.consumeOnLearn !== false;
+    const nextDragDropEnabled = normalizedConfig.dragDropEnabled !== undefined
+      ? normalizedConfig.dragDropEnabled !== false
+      : currentLearn.dragDropEnabled !== false;
     const recipeVisibility = {
       ...existing,
-      listMode,
+      listMode: nextListMode,
       knowledge: {
-        ...(existing.knowledge || {}),
-        mode: knowledgeMode,
+        ...currentKnowledge,
+        mode: nextKnowledgeMode,
+        item: {
+          ...currentItem,
+          limitUses: nextLimitUses,
+          maxUses: nextMaxUses,
+          destroyWhenExhausted: nextDestroyWhenExhausted
+        },
         learn: {
-          ...(existing.knowledge?.learn || {}),
-          consumeOnLearn
+          ...currentLearn,
+          consumeOnLearn: nextConsumeOnLearn,
+          dragDropEnabled: nextDragDropEnabled
         }
       }
     };
@@ -851,6 +989,7 @@ export function createAdminStore(services) {
     createSystem,
     deleteSystem,
     saveSystemDetails,
+    setResolutionMode,
     setTab,
     toggleFeature,
     toggleAdvancedOptions,
@@ -864,6 +1003,7 @@ export function createAdminStore(services) {
     removeEssence,
     saveCraftingCheckConfig,
     saveCurrencyConfig,
+    saveAlchemyConfig,
     saveVisibilityConfig,
     saveTeaserConfig,
     createRecipe,
