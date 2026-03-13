@@ -4,6 +4,8 @@ title: Home
 nav_order: 1
 ---
 
+![](img/fabricate-repo-preview.png)
+
 # Fabricate
 
 A system-agnostic crafting module for Foundry Virtual Tabletop.

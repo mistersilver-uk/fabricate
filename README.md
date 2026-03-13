@@ -1,3 +1,17 @@
+![](https://img.shields.io/endpoint?url=https%3A%2F%2Ffoundryshields.com%2Fversion%3Fstyle%3Dfor-the-badge%26url%3Dhttps%3A%2F%2Fgithub.com%2Fmisterpotts%2Ffabricate%2Freleases%2Flatest%2Fdownload%2Fmodule.json)
+<!--- Downloads @ Latest Badge -->
+![Latest Release Download Count](https://img.shields.io/github/downloads/misterpotts/fabricate/latest/total?sort=semver&style=for-the-badge)
+![Total Release Download Count](https://img.shields.io/github/downloads/misterpotts/fabricate/total?label=total%20downloads&style=for-the-badge)
+<!--- Social badges -->
+[![Support me on Patreon](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Fshieldsio-patreon.vercel.app%2Fapi%3Fusername%3Dmisterpotts%26type%3Dpatrons&style=for-the-badge)](https://patreon.com/misterpotts)
+[![Discord](https://dcbadge.limes.pink/api/server/APHyMzhPTk)](https://discord.gg/APHyMzhPTk)
+
+<!--- Forge Bazaar Install % Badge -->
+<!--- replace <your-module-name> with the `name` in your manifest -->
+<!--- ![Forge Installs](https://img.shields.io/badge/dynamic/json?label=Forge%20Installs&query=package.installs&suffix=%25&url=https%3A%2F%2Fforge-vtt.com%2Fapi%2Fbazaar%2Fpackage%2Ffabricate&colorB=4aa94a) -->
+
+![](/assets/img/fabricate-repo-preview.png)
+
 # Fabricate - Universal Crafting System
 
 A system-agnostic, flexible crafting module for Foundry Virtual Tabletop that supports any tabletop RPG system and any crafting system you can imagine.

@@ -542,6 +542,24 @@
   font-size: 14px;
 }
 
+.fabricate-admin .admin-sidebar-header button,
+.fabricate-admin .essence-definition-row button,
+.fabricate-admin .token-list .token button,
+.fabricate-admin .system-item-card .item-source-button,
+.fabricate-admin .system-item-card .item-actions button {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+
 .fabricate-admin .admin-sidebar-header button {
   width: 30px;
   height: 30px;
@@ -792,7 +810,7 @@
   width: 20px;
   height: 20px;
   border: 0;
-  padding: 0;
+  aspect-ratio: 1 / 1;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.2);
 }
