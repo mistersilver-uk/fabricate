@@ -180,12 +180,27 @@
         <article class="essence-definition-row">
           <div class="essence-definition-meta">
             <div class="essence-definition-summary">
-              <span class="essence-definition-icon" aria-hidden="true">
-                <i class={normalizeEssenceIcon(def.icon || DEFAULT_ESSENCE_ICON)}></i>
-              </span>
+              {#if editingEssenceId === def.id}
+                <IconPicker
+                  value={editingEssenceIcon}
+                  iconOnly={true}
+                  buttonTitle={localize('FABRICATE.Admin.Features.Essences.ChooseIcon')}
+                  onChange={(iconClass) => { editingEssenceIcon = iconClass; }}
+                />
+              {:else}
+                <span class="essence-definition-icon" aria-hidden="true">
+                  <i class={normalizeEssenceIcon(def.icon || DEFAULT_ESSENCE_ICON)}></i>
+                </span>
+              {/if}
               <div class="essence-definition-copy">
-                <strong>{def.name}</strong>
-                {#if editingEssenceId !== def.id}
+                {#if editingEssenceId === def.id}
+                  <input
+                    type="text"
+                    bind:value={editingEssenceName}
+                    placeholder={localize('FABRICATE.Admin.Features.Essences.NamePlaceholder')}
+                  />
+                {:else}
+                  <strong>{def.name}</strong>
                   {#if def.description}
                     <p class="hint">{def.description}</p>
                   {/if}
@@ -200,28 +215,16 @@
 
             {#if editingEssenceId === def.id}
               <div class="essence-definition-editor">
-                <input
-                  type="text"
-                  bind:value={editingEssenceName}
-                  placeholder={localize('FABRICATE.Admin.Features.Essences.NamePlaceholder')}
-                />
                 <textarea
                   bind:value={editingEssenceDesc}
                   rows="3"
                   placeholder={localize('FABRICATE.Admin.Features.Essences.DescPlaceholder')}
                 ></textarea>
-                <div class="essence-definition-editor-toolbar">
-                  <IconPicker
-                    value={editingEssenceIcon}
-                    buttonTitle={localize('FABRICATE.Admin.Features.Essences.ChooseIcon')}
-                    onChange={(iconClass) => { editingEssenceIcon = iconClass; }}
-                  />
-                  {#if def.associatedItemName}
-                    <p class="hint">
-                      {localize('FABRICATE.Admin.Features.Essences.SourceItem')} {def.associatedItemName}
-                    </p>
-                  {/if}
-                </div>
+                {#if def.associatedItemName}
+                  <p class="hint">
+                    {localize('FABRICATE.Admin.Features.Essences.SourceItem')} {def.associatedItemName}
+                  </p>
+                {/if}
               </div>
             {/if}
           </div>
@@ -250,14 +253,14 @@
               >
                 <i class="fas fa-pen"></i>
               </button>
-              <button
-                type="button"
-                onclick={() => store.removeEssence(def.id)}
-                title={localize('FABRICATE.Admin.Features.Essences.Remove')}
-              >
-                <i class="fas fa-trash"></i>
-              </button>
             {/if}
+            <button
+              type="button"
+              onclick={() => store.removeEssence(def.id)}
+              title={localize('FABRICATE.Admin.Features.Essences.Remove')}
+            >
+              <i class="fas fa-trash"></i>
+            </button>
           </div>
         </article>
       {:else}

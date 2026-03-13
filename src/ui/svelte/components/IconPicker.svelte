@@ -1,11 +1,16 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import { onMount } from 'svelte';
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { localize } from '../util/foundryBridge.js';
   import {
     DEFAULT_ESSENCE_ICON,
+    buildEssenceIconOptions,
     filterEssenceIconOptions,
+    getEssenceIconNames,
     getEssenceIconOption,
+    getEssenceIconPrefix,
+    loadEssenceIconNames,
     normalizeEssenceIcon
   } from '../util/essenceIcons.js';
 
@@ -13,16 +18,20 @@
     value = DEFAULT_ESSENCE_ICON,
     disabled = false,
     buttonTitle = '',
+    iconOnly = false,
     onChange = () => {}
   } = $props();
 
   let pickerOpen = $state(false);
   let searchTerm = $state('');
   let searchInput = $state(null);
+  let iconNames = $state(getEssenceIconNames());
 
   const selectedIconClass = $derived(normalizeEssenceIcon(value));
-  const selectedOption = $derived(getEssenceIconOption(selectedIconClass));
-  const filteredOptions = $derived(filterEssenceIconOptions(searchTerm));
+  const selectedPrefix = $derived(getEssenceIconPrefix(selectedIconClass));
+  const iconOptions = $derived(buildEssenceIconOptions(iconNames, selectedPrefix));
+  const selectedOption = $derived(getEssenceIconOption(selectedIconClass, iconOptions));
+  const filteredOptions = $derived(filterEssenceIconOptions(iconOptions, searchTerm));
 
   function closePicker() {
     pickerOpen = false;
@@ -48,6 +57,20 @@
     if (!pickerOpen || !searchInput) return;
     queueMicrotask(() => searchInput?.focus());
   });
+
+  onMount(() => {
+    let cancelled = false;
+
+    loadEssenceIconNames().then(loadedIconNames => {
+      if (!cancelled && Array.isArray(loadedIconNames) && loadedIconNames.length > 0) {
+        iconNames = loadedIconNames;
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  });
 </script>
 
 <div
@@ -57,17 +80,23 @@
   <button
     type="button"
     class="essence-icon-picker-trigger"
+    class:icon-only={iconOnly}
     onclick={togglePicker}
     disabled={disabled}
     aria-expanded={pickerOpen}
     aria-haspopup="dialog"
+    aria-label={buttonTitle || localize('FABRICATE.Admin.Features.Essences.ChooseIcon')}
     title={buttonTitle || localize('FABRICATE.Admin.Features.Essences.ChooseIcon')}
   >
     <span class="essence-icon-picker-preview" aria-hidden="true">
       <i class={selectedOption.iconClass}></i>
     </span>
-    <span class="essence-icon-picker-trigger-label">{selectedOption.label}</span>
-    <i class={`fas ${pickerOpen ? 'fa-chevron-up' : 'fa-chevron-down'}`} aria-hidden="true"></i>
+    {#if !iconOnly}
+      <span class="essence-icon-picker-trigger-label">{selectedOption.label}</span>
+    {/if}
+    <span class="essence-icon-picker-trigger-caret" aria-hidden="true">
+      <i class={`fas ${pickerOpen ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i>
+    </span>
   </button>
 
   {#if pickerOpen}
