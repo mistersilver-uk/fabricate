@@ -33,19 +33,20 @@
     position: sticky;
     top: 0;
     z-index: 10;
-    background: var(--color-bg-error, #f8d7da);
-    border: 1px solid var(--color-border-error, #f5c6cb);
-    border-radius: 4px;
-    padding: 8px 12px;
-    margin-bottom: 8px;
+    background: rgba(82, 22, 31, 0.94);
+    border: 1px solid var(--fabricate-editor-border-danger, rgba(255, 124, 102, 0.48));
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
   }
 
   .validation-banner strong {
     display: flex;
     align-items: center;
     gap: 6px;
-    margin-bottom: 4px;
-    color: var(--color-text-error, #721c24);
+    margin-bottom: 6px;
+    color: var(--fabricate-editor-danger, rgba(255, 216, 208, 0.95));
   }
 
   .validation-error-list {
@@ -55,20 +56,24 @@
   }
 
   .validation-error-list li {
-    padding: 2px 0;
+    padding: 3px 0;
+    line-height: 1.45;
   }
 
   .validation-error-link {
     background: none;
     border: none;
     padding: 0;
-    color: var(--color-text-error, #721c24);
+    color: var(--fabricate-editor-danger, rgba(255, 216, 208, 0.95));
     text-decoration: underline;
+    text-decoration-color: rgba(255, 216, 208, 0.56);
     cursor: pointer;
     font-size: inherit;
+    text-align: left;
   }
 
   .validation-error-link:hover {
-    text-decoration: none;
+    color: #fff;
+    text-decoration-color: #fff;
   }
 </style>

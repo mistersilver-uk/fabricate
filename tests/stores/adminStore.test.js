@@ -561,6 +561,34 @@ describe('createAdminStore', () => {
       await store.addCategory('');
       assert.ok(!updateCalled, 'updateSystem should not be called for empty category');
     });
+
+    it('addCategory does not persist the reserved general category as a custom category', async () => {
+      let updateCalled = false;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async () => { updateCalled = true; }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.addCategory('General');
+      assert.ok(!updateCalled, 'updateSystem should not be called for the reserved General category');
+    });
+
+    it('removeCategory does nothing for the reserved general category', async () => {
+      let updateCalled = false;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async () => { updateCalled = true; }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.removeCategory('general');
+      assert.ok(!updateCalled, 'updateSystem should not be called for the reserved General category');
+    });
   });
 
   // -------------------------------------------------------------------------

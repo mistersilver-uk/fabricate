@@ -1,5 +1,10 @@
 import { Recipe } from '../models/Recipe.js';
 import { getDragEventData } from './foundryCompat.js';
+import {
+  GENERAL_RECIPE_CATEGORY,
+  getEffectiveRecipeCategories,
+  normalizeRecipeCategory
+} from '../utils/recipeCategories.js';
 
 /**
  * GM recipe editor with system-item picker grid
@@ -120,7 +125,7 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
       name: data.name || '',
       description: data.description || '',
       img: data.img || 'icons/svg/item-bag.svg',
-      category: data.category || 'general',
+      category: normalizeRecipeCategory(data.category),
       system: data.system || 'all',
       enabled: data.enabled !== false,
       locked: data.locked === true,
@@ -526,7 +531,7 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
     const context = await super._prepareContext(options);
     const featureState = this._enforceFeatureConstraints();
     const categories = featureState.showCategories && Array.isArray(featureState.system?.categories)
-      ? featureState.system.categories
+      ? getEffectiveRecipeCategories(featureState.system.categories)
       : [];
     const itemTags = featureState.showItemTags
       ? Array.from(new Set([
@@ -1027,7 +1032,7 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
     this.draft.name = get('name');
     this.draft.description = get('description');
     this.draft.img = get('img', 'icons/svg/item-bag.svg');
-    this.draft.category = get('category', 'general');
+    this.draft.category = normalizeRecipeCategory(get('category', GENERAL_RECIPE_CATEGORY));
     this.draft.enabled = fd.get('enabled') === 'on';
     this.draft.locked = fd.get('locked') === 'on';
     this.draft.linkedRecipeItemUuid = get('linkedRecipeItemUuid', this.draft.linkedRecipeItemUuid || '');
@@ -1386,7 +1391,7 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
       name: this.draft.name,
       description: this.draft.description,
       img: this.draft.img,
-      category: enableCategories ? (this.draft.category || 'general') : 'general',
+      category: enableCategories ? normalizeRecipeCategory(this.draft.category) : GENERAL_RECIPE_CATEGORY,
       craftingSystemId: this.draft.craftingSystemId || this.craftingSystemId || null,
       system: 'all',
       enabled: this.draft.enabled,

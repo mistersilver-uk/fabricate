@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { getRecipeCategoryLabel } from '../../../../utils/recipeCategories.js';
   import ValidationBanner from './ValidationBanner.svelte';
   import ItemPickerGrid from './ItemPickerGrid.svelte';
   import IngredientSetPanel from './IngredientSetPanel.svelte';
@@ -43,6 +44,9 @@
 
   // All system tags for datalist
   const allTags = $derived(services.getSystemTags?.($draft.craftingSystemId) || []);
+
+  // All system essence definitions
+  const allEssences = $derived(services.getEssenceDefinitions?.($draft.craftingSystemId) || []);
 
   // Active step (when multi-step enabled)
   const activeStep = $derived(
@@ -196,7 +200,7 @@
       <ValidationBanner errors={$validationErrors} onScrollToError={handleScrollToError} />
 
       <!-- Basic Info Grid -->
-      <section class="basic-info">
+      <section class="basic-info editor-panel-surface">
         <div class="info-grid">
           <div class="field-row">
             <label for="recipeName">{localize('FABRICATE.Editor.BasicInfo.NameLabel')}</label>
@@ -225,7 +229,7 @@
                   onchange={(e) => store.setField('category', e.target.value)}
                 >
                   {#each categories as cat}
-                    <option value={cat}>{cat}</option>
+                    <option value={cat}>{getRecipeCategoryLabel(cat, localize)}</option>
                   {/each}
                 </select>
               {:else}
@@ -263,7 +267,7 @@
       </section>
 
       <!-- Flags -->
-      <section class="flags-section">
+      <section class="flags-section editor-panel-surface">
         <label class="checkbox-label">
           <input
             type="checkbox"
@@ -334,7 +338,7 @@
       {/if}
 
       <!-- Ingredient Sets -->
-      <section class="ingredient-sets-section">
+      <section class="ingredient-sets-section editor-panel-surface">
         <div class="section-header">
           <h3>{localize('FABRICATE.Editor.IngredientSets.SectionTitle')}</h3>
           {#if $featureState.showComplexRecipes}
@@ -373,12 +377,17 @@
             onClearCatalyst={(si, ci) => store.clearCatalystComponent(si, ci)}
             onDropCatalyst={handleDropCatalyst}
             onUpdateCatalyst={handleUpdateCatalyst}
+            showEssences={$featureState.showEssences}
+            {allEssences}
+            onAddEssence={(si, eid, qty) => store.addEssence(si, eid, qty)}
+            onUpdateEssence={(si, eid, qty) => store.updateEssence(si, eid, qty)}
+            onRemoveEssence={(si, eid) => store.removeEssence(si, eid)}
           />
         {/each}
       </section>
 
       <!-- Result Groups -->
-      <section class="result-groups-section">
+      <section class="result-groups-section editor-panel-surface">
         <div class="section-header">
           <h3>{localize('FABRICATE.Editor.ResultGroups.SectionTitle')}</h3>
           {#if $featureState.showComplexRecipes}
@@ -443,18 +452,41 @@
   </footer>
 </div>
 
-<style>
+  <style>
   .fabricate-recipe-editor {
+    --fabricate-editor-surface: rgba(0, 0, 0, 0.16);
+    --fabricate-editor-surface-strong: rgba(0, 0, 0, 0.24);
+    --fabricate-editor-surface-soft: rgba(255, 255, 255, 0.05);
+    --fabricate-editor-border: rgba(255, 255, 255, 0.14);
+    --fabricate-editor-border-strong: rgba(255, 255, 255, 0.24);
+    --fabricate-editor-border-danger: rgba(255, 124, 102, 0.48);
+    --fabricate-editor-text: rgba(255, 243, 232, 0.92);
+    --fabricate-editor-muted: rgba(255, 229, 210, 0.68);
+    --fabricate-editor-muted-strong: rgba(255, 236, 220, 0.82);
+    --fabricate-editor-placeholder: rgba(255, 231, 212, 0.42);
+    --fabricate-editor-input-bg: rgba(255, 255, 255, 0.04);
+    --fabricate-editor-input-bg-hover: rgba(255, 255, 255, 0.07);
+    --fabricate-editor-input-bg-active: rgba(255, 255, 255, 0.1);
+    --fabricate-editor-menu-bg: #171b26;
+    --fabricate-editor-menu-selected: #5a88bb;
+    --fabricate-editor-accent: var(--fabricate-primary, #4a90e2);
+    --fabricate-editor-accent-soft: rgba(74, 144, 226, 0.22);
+    --fabricate-editor-danger: rgba(255, 216, 208, 0.95);
+    --fabricate-editor-danger-soft: rgba(220, 53, 69, 0.18);
+    --fabricate-editor-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
     display: flex;
     flex-direction: column;
     height: 100%;
     overflow: hidden;
+    color: var(--fabricate-editor-text);
+    background: rgba(6, 9, 17, 0.21);
   }
 
   .editor-header {
-    padding: 8px 16px;
-    border-bottom: 1px solid var(--color-border-light, #ccc);
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--fabricate-editor-border);
     flex-shrink: 0;
+    background: rgba(0, 0, 0, 0.14);
   }
 
   .editor-header h2 {
@@ -462,28 +494,34 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    font-size: 1.05rem;
   }
 
   .editor-layout {
     display: flex;
     flex: 1;
     overflow: hidden;
+    min-height: 0;
   }
 
   .editor-main {
     flex: 1;
     overflow-y: auto;
-    padding: 12px 16px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
   }
 
   .basic-info {
-    margin-bottom: 12px;
+    margin-bottom: 0;
   }
 
   .info-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    gap: 12px;
   }
 
   .full-width {
@@ -499,6 +537,7 @@
   .field-row label {
     font-weight: bold;
     font-size: 0.9rem;
+    color: var(--fabricate-editor-muted-strong);
   }
 
   .field-row input,
@@ -508,14 +547,20 @@
     box-sizing: border-box;
   }
 
+  .editor-panel-surface {
+    background: var(--fabricate-editor-surface);
+    border: 1px solid var(--fabricate-editor-border);
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: var(--fabricate-editor-shadow);
+  }
+
   .flags-section {
     display: flex;
     flex-wrap: wrap;
-    gap: 12px;
-    margin-bottom: 12px;
-    padding: 8px;
-    border: 1px solid var(--color-border-light, #ddd);
-    border-radius: 4px;
+    gap: 14px;
+    margin-bottom: 0;
+    padding: 12px 14px;
   }
 
   .checkbox-label {
@@ -523,50 +568,87 @@
     align-items: center;
     gap: 6px;
     cursor: pointer;
+    color: var(--fabricate-editor-muted-strong);
   }
 
   .section-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px;
+    gap: 12px;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   }
 
   .section-header h3 {
     margin: 0;
+    font-size: 1.1rem;
   }
 
   .ingredient-sets-section,
   .result-groups-section {
-    margin-bottom: 12px;
+    margin-bottom: 0;
   }
 
   .editor-footer {
     display: flex;
     justify-content: flex-end;
     gap: 8px;
-    padding: 8px 16px;
-    border-top: 1px solid var(--color-border-light, #ccc);
+    padding: 12px 18px;
+    border-top: 1px solid var(--fabricate-editor-border);
     flex-shrink: 0;
+    background: rgba(0, 0, 0, 0.18);
   }
 
   .save-btn {
     font-weight: bold;
+    background: rgba(62, 108, 175, 0.93);
+    border-color: rgba(148, 190, 255, 0.34);
+    color: #fff;
   }
 
   .save-btn:disabled {
-    opacity: 0.5;
+    opacity: 0.6;
     cursor: not-allowed;
+    background: var(--fabricate-editor-surface-strong);
+    border-color: var(--fabricate-editor-border);
+    color: var(--fabricate-editor-muted);
   }
 
   .field-error {
-    border-color: var(--color-border-error, #dc3545) !important;
-    box-shadow: 0 0 0 1px var(--color-border-error, #dc3545);
+    border-color: var(--fabricate-editor-border-danger) !important;
+    box-shadow: 0 0 0 1px var(--fabricate-editor-border-danger), 0 0 0 4px rgba(220, 53, 69, 0.12);
   }
 
   .inline-error {
-    color: var(--color-text-error, #dc3545);
+    color: var(--fabricate-editor-danger);
     font-size: 0.8rem;
     margin-top: 2px;
+  }
+
+  @media (max-width: 1100px) {
+    .editor-layout {
+      flex-direction: column;
+    }
+  }
+
+  @media (max-width: 780px) {
+    .editor-main {
+      padding: 12px;
+    }
+
+    .editor-panel-surface {
+      padding: 12px;
+    }
+
+    .info-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .section-header {
+      align-items: flex-start;
+      flex-direction: column;
+    }
   }
 </style>

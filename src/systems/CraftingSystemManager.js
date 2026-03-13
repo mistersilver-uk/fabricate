@@ -4,6 +4,7 @@
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
 import { getSourceUuid, getComponentSourceReferences, getItemSourceReferences } from '../utils/sourceUuid.js';
+import { normalizeCustomRecipeCategories } from '../utils/recipeCategories.js';
 
 export class CraftingSystemManager {
   constructor(recipeManager) {
@@ -77,7 +78,7 @@ export class CraftingSystemManager {
       teaserConfig: this._normalizeTeaserConfig(system.teaserConfig),
 
       // Transitional aliases for existing UI code paths
-      categories: this._normalizeStringList(system.categories),
+      categories: normalizeCustomRecipeCategories(system.categories),
       tags: this._normalizeStringList(system.tags ?? system.itemTags),
       essences: resolvedEssenceDefinitions.map(def => def.id),
       advancedOptionsEnabled: system.advancedOptionsEnabled !== false,

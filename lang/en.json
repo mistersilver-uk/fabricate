@@ -1,6 +1,9 @@
 {
   "FABRICATE": {
     "ModuleName": "Fabricate - Universal Crafting",
+    "Common": {
+      "General": "General"
+    },
     "Settings": {
       "Enabled": {
         "Name": "Enable Crafting System",
@@ -191,7 +194,7 @@
           "Hint": "Organize and filter recipes by category in admin and crafting views.",
           "Placeholder": "e.g. Cooking",
           "Add": "Add",
-          "Empty": "No categories defined yet."
+          "Empty": "No custom categories defined yet."
         },
         "ItemTags": {
           "Title": "Item Tags",
@@ -396,7 +399,7 @@
         "NameRequired": "Recipe name is required."
       },
       "Visibility": {
-        "GlobalHint": "This system uses global visibility \u2014 all recipes are visible to all players. To control visibility per recipe, change the system's recipe visibility mode to Player-specific in the crafting admin.",
+        "GlobalHint": "This system uses global visibility — all recipes are visible to all players. To control visibility per recipe, change the system's recipe visibility mode to Player-specific in the crafting admin.",
         "PlayerVisibilityTitle": "Player Visibility",
         "RestrictLabel": "Restrict recipe visibility to specific users",
         "NoNonGmUsers": "No non-GM users available."
@@ -509,6 +512,14 @@
         "Hint": "Route check outcomes to a specific result group. Leave blank to use default recipe output.",
         "DefaultOutput": "Default output"
       },
+      "Essences": {
+        "SectionTitle": "Essence Requirements",
+        "SelectPlaceholder": "Add essence...",
+        "Add": "Add",
+        "QuantityLabel": "Qty",
+        "Increment": "Increase {name}",
+        "Decrement": "Decrease {name}"
+      },
       "ItemPicker": {
         "SectionTitle": "Components",
         "SearchPlaceholder": "Search components...",
@@ -542,9 +553,9 @@
     "Import": {
       "Title": "Import Crafting System",
       "SummaryTitle": "Import Summary",
-      "SystemCreated": "Crafting system \u201c{name}\u201d created.",
-      "SystemUpdated": "Crafting system \u201c{name}\u201d updated.",
-      "SystemSkipped": "Crafting system \u201c{name}\u201d skipped (already exists).",
+      "SystemCreated": "Crafting system “{name}” created.",
+      "SystemUpdated": "Crafting system “{name}” updated.",
+      "SystemSkipped": "Crafting system “{name}” skipped (already exists).",
       "ComponentsRemapped": "{count} component(s) remapped to world items.",
       "ComponentsUnresolved": "{count} component(s) have unresolved source items.",
       "RecipesImported": "{imported} of {total} recipe(s) imported.",
@@ -569,7 +580,7 @@
       "NoMatch": "The combination didn't produce anything",
       "Consumed": "Ingredients were consumed in the attempt",
       "LearnedRecipe": "You discovered a new recipe!",
-      "MisconfigError": "Crafting system error \u2014 contact your GM"
+      "MisconfigError": "Crafting system error — contact your GM"
     },
     "Labels": {
       "UnknownComponent": "Unknown Component",

@@ -811,7 +811,7 @@
   padding: 10px 14px;
   border: 1px solid rgba(120, 170, 255, 0.7);
   border-radius: 8px;
-  background: linear-gradient(180deg, rgba(92, 148, 245, 0.95), rgba(67, 119, 219, 0.95));
+  background: rgba(78, 132, 230, 0.95);
   color: #fff;
   font-weight: 700;
   letter-spacing: 0.01em;
@@ -820,7 +820,7 @@
 
 .fabricate-admin .essence-create-submit:hover,
 .fabricate-admin .essence-create-submit:focus-visible {
-  background: linear-gradient(180deg, rgba(108, 162, 255, 0.98), rgba(78, 131, 232, 0.98));
+  background: rgba(92, 146, 242, 0.98);
   box-shadow: 0 12px 22px rgba(33, 76, 156, 0.32);
 }
 
@@ -1303,6 +1303,11 @@
   border: 1px solid rgba(120, 160, 255, 0.35);
 }
 
+.fabricate-admin .token-list .token-locked {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
 .fabricate-admin .token-list .token button {
   width: 20px;
   height: 20px;
@@ -1465,9 +1470,7 @@
   justify-content: center;
   gap: 6px;
   padding: 16px;
-  background:
-    linear-gradient(180deg, rgba(12, 16, 32, 0.18), rgba(12, 16, 32, 0.78)),
-    rgba(120, 160, 255, 0.22);
+  background: rgba(12, 16, 32, 0.55);
   border: 1px dashed rgba(120, 160, 255, 0.55);
   border-radius: 8px;
   color: rgba(255, 255, 255, 0.92);
@@ -1617,6 +1620,91 @@
 
 .fabricate-admin .drop-zone.drop-active {
   background: rgba(120, 160, 255, 0.2);
+}
+
+.fabricate-recipe-editor :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  padding: 4px 10px;
+  border: 1px solid var(--fabricate-editor-border, rgba(255, 255, 255, 0.14));
+  border-radius: 7px;
+  background: var(--fabricate-editor-input-bg, rgba(255, 255, 255, 0.04));
+  color: var(--fabricate-editor-text, rgba(255, 243, 232, 0.92));
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.fabricate-recipe-editor :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea):hover {
+  border-color: var(--fabricate-editor-border-strong, rgba(255, 255, 255, 0.24));
+  background: var(--fabricate-editor-input-bg-hover, rgba(255, 255, 255, 0.07));
+}
+
+.fabricate-recipe-editor :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea):focus-visible {
+  outline: none;
+  border-color: var(--fabricate-editor-accent, #4a90e2);
+  background: var(--fabricate-editor-input-bg-active, rgba(255, 255, 255, 0.1));
+  box-shadow:
+          0 0 0 1px var(--fabricate-editor-accent, #4a90e2),
+          0 0 0 4px var(--fabricate-editor-accent-soft, rgba(74, 144, 226, 0.22));
+}
+
+.fabricate-recipe-editor :is(input:not([type="checkbox"]):not([type="radio"]), textarea)::placeholder {
+  color: var(--fabricate-editor-placeholder, rgba(255, 231, 212, 0.42));
+}
+
+.fabricate-recipe-editor select {
+  color-scheme: dark;
+}
+
+.fabricate-recipe-editor select option,
+.fabricate-recipe-editor select optgroup {
+  background: var(--fabricate-editor-menu-bg, #171b26);
+  color: var(--fabricate-editor-text, rgba(255, 243, 232, 0.92));
+  line-height: 1.25;
+}
+
+.fabricate-recipe-editor select option {
+  min-height: 24px;
+  padding: 4px 8px;
+}
+
+.fabricate-recipe-editor select option:checked,
+.fabricate-recipe-editor select option:hover,
+.fabricate-recipe-editor select option:focus {
+  background: var(--fabricate-editor-menu-selected, #5a88bb);
+  color: #fff;
+}
+
+.fabricate-recipe-editor :is(input[type="checkbox"], input[type="radio"]) {
+  accent-color: var(--fabricate-editor-accent, #4a90e2);
+}
+
+.fabricate-recipe-editor button:not(.validation-error-link):not(.icon-button) {
+  color: inherit;
+  border: 1px solid var(--fabricate-editor-border, rgba(255, 255, 255, 0.14));
+  border-radius: 7px;
+  background: var(--fabricate-editor-surface-strong, rgba(0, 0, 0, 0.24));
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.fabricate-recipe-editor button:not(.validation-error-link):not(.icon-button):hover:not(:disabled),
+.fabricate-recipe-editor button:not(.validation-error-link):not(.icon-button):focus-visible:not(:disabled) {
+  border-color: var(--fabricate-editor-border-strong, rgba(255, 255, 255, 0.24));
+  background: var(--fabricate-editor-input-bg-hover, rgba(255, 255, 255, 0.07));
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
+  transform: translateY(-1px);
+}
+
+.fabricate-recipe-editor button:not(.validation-error-link):not(.icon-button):focus-visible {
+  outline: none;
+}
+
+.fabricate-recipe-editor button:not(.validation-error-link):not(.icon-button):disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 
 .btn-danger:hover {

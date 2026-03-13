@@ -14,14 +14,13 @@ function buildItemPickerGrid({ items = [], searchTerm = '', onSearch } = {}) {
   const aside = document.createElement('aside');
   aside.className = 'item-picker-panel';
 
-  // Sticky header wrapping heading + search
-  const stickyHeader = document.createElement('div');
-  stickyHeader.className = 'picker-sticky-header';
+  const header = document.createElement('div');
+  header.className = 'picker-header';
 
   const h3 = document.createElement('h3');
   h3.className = 'picker-heading';
   h3.textContent = 'Components';
-  stickyHeader.appendChild(h3);
+  header.appendChild(h3);
 
   const searchInput = document.createElement('input');
   searchInput.type = 'text';
@@ -30,9 +29,13 @@ function buildItemPickerGrid({ items = [], searchTerm = '', onSearch } = {}) {
   searchInput.placeholder = 'Search components...';
   searchInput.setAttribute('aria-label', 'Search components...');
   searchInput.oninput = (e) => onSearch?.(e.target.value);
-  stickyHeader.appendChild(searchInput);
+  header.appendChild(searchInput);
 
-  aside.appendChild(stickyHeader);
+  aside.appendChild(header);
+
+  const scrollRegion = document.createElement('div');
+  scrollRegion.className = 'picker-grid-scroll';
+  aside.appendChild(scrollRegion);
 
   if (items.length > 0) {
     const grid = document.createElement('div');
@@ -59,12 +62,12 @@ function buildItemPickerGrid({ items = [], searchTerm = '', onSearch } = {}) {
       grid.appendChild(card);
     }
 
-    aside.appendChild(grid);
+    scrollRegion.appendChild(grid);
   } else {
     const empty = document.createElement('p');
     empty.className = 'picker-empty';
     empty.textContent = 'No components available.';
-    aside.appendChild(empty);
+    scrollRegion.appendChild(empty);
   }
 
   return aside;
@@ -74,29 +77,29 @@ function buildItemPickerGrid({ items = [], searchTerm = '', onSearch } = {}) {
 // ItemPickerGrid: structure tests
 // ---------------------------------------------------------------------------
 
-describe('ItemPickerGrid: sticky header structure', () => {
+describe('ItemPickerGrid: header structure', () => {
   before(() => setupDOM());
   after(() => teardownDOM());
 
-  it('renders a picker-sticky-header div wrapping heading and search', () => {
+  it('renders a picker-header div wrapping heading and search', () => {
     const panel = buildItemPickerGrid();
-    const header = panel.querySelector('.picker-sticky-header');
-    assert.ok(header, '.picker-sticky-header should exist');
+    const header = panel.querySelector('.picker-header');
+    assert.ok(header, '.picker-header should exist');
   });
 
-  it('heading is inside picker-sticky-header', () => {
+  it('heading is inside picker-header', () => {
     const panel = buildItemPickerGrid();
-    const header = panel.querySelector('.picker-sticky-header');
+    const header = panel.querySelector('.picker-header');
     const heading = header.querySelector('.picker-heading');
-    assert.ok(heading, '.picker-heading should be inside .picker-sticky-header');
+    assert.ok(heading, '.picker-heading should be inside .picker-header');
     assert.equal(heading.textContent, 'Components');
   });
 
-  it('search input is inside picker-sticky-header', () => {
+  it('search input is inside picker-header', () => {
     const panel = buildItemPickerGrid();
-    const header = panel.querySelector('.picker-sticky-header');
+    const header = panel.querySelector('.picker-header');
     const search = header.querySelector('.picker-search');
-    assert.ok(search, '.picker-search should be inside .picker-sticky-header');
+    assert.ok(search, '.picker-search should be inside .picker-header');
     assert.equal(search.type, 'text');
   });
 
@@ -106,13 +109,22 @@ describe('ItemPickerGrid: sticky header structure', () => {
     assert.ok(search.getAttribute('aria-label'), 'search input should have aria-label');
   });
 
-  it('picker-sticky-header appears before picker-grid in the DOM', () => {
+  it('renders a dedicated scroll region beneath the header', () => {
+    const panel = buildItemPickerGrid();
+    const header = panel.querySelector('.picker-header');
+    const scrollRegion = panel.querySelector('.picker-grid-scroll');
+    assert.ok(scrollRegion, '.picker-grid-scroll should exist');
+    assert.equal(scrollRegion.previousElementSibling, header);
+    assert.equal(scrollRegion.querySelector('.picker-search'), null);
+  });
+
+  it('picker-header appears before picker-grid-scroll in the DOM', () => {
     const items = [{ id: 'item-1', name: 'Herb', img: '' }];
     const panel = buildItemPickerGrid({ items });
     const children = [...panel.children];
-    const headerIdx = children.findIndex(c => c.classList.contains('picker-sticky-header'));
-    const gridIdx = children.findIndex(c => c.classList.contains('picker-grid'));
-    assert.ok(headerIdx < gridIdx, 'sticky header should come before the grid');
+    const headerIdx = children.findIndex(c => c.classList.contains('picker-header'));
+    const scrollIdx = children.findIndex(c => c.classList.contains('picker-grid-scroll'));
+    assert.ok(headerIdx < scrollIdx, 'picker header should come before the scroll region');
   });
 });
 
@@ -170,6 +182,14 @@ describe('ItemPickerGrid: card structure', () => {
     assert.ok(img, 'img.picker-card-img should exist');
     assert.equal(img.src, 'icons/herb.svg');
     assert.equal(img.alt, 'Herb');
+  });
+
+  it('card places the image before the name for the row layout', () => {
+    const items = [{ id: 'i-1', name: 'Herb', img: 'icons/herb.svg' }];
+    const panel = buildItemPickerGrid({ items });
+    const card = panel.querySelector('.picker-card');
+    assert.equal(card.firstElementChild?.className, 'picker-card-img');
+    assert.equal(card.lastElementChild?.className, 'picker-card-name');
   });
 
   it('card uses fallback image when img is empty', () => {
@@ -256,11 +276,12 @@ describe('ItemPickerGrid: empty state', () => {
     const panel = buildItemPickerGrid({ items });
     const grid = panel.querySelector('.picker-grid');
     assert.ok(grid, '.picker-grid should render when items exist');
+    assert.ok(panel.querySelector('.picker-grid-scroll')?.contains(grid));
   });
 
-  it('sticky header always renders even when items is empty', () => {
+  it('picker header always renders even when items is empty', () => {
     const panel = buildItemPickerGrid({ items: [] });
-    const header = panel.querySelector('.picker-sticky-header');
-    assert.ok(header, 'Sticky header should always render regardless of items');
+    const header = panel.querySelector('.picker-header');
+    assert.ok(header, 'Picker header should always render regardless of items');
   });
 });
