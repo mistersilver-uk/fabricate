@@ -2,6 +2,7 @@ import { IngredientSet } from './IngredientSet.js';
 import { Result } from './Result.js';
 import { Ingredient } from './Ingredient.js';
 import { Catalyst } from './Catalyst.js';
+import { normalizeRecipeCategory } from '../utils/recipeCategories.js';
 
 /**
  * Represents a crafting recipe
@@ -13,7 +14,7 @@ export class Recipe {
     this.name = data.name || 'Unnamed Recipe';
     this.description = data.description || '';
     this.img = data.img || 'icons/svg/item-bag.svg';
-    this.category = data.category || 'general';
+    this.category = normalizeRecipeCategory(data.category);
     this.craftingSystemId = data.craftingSystemId || null;
     this.system = data.system || 'all';
     this.tags = Array.isArray(data.tags) ? data.tags : [];

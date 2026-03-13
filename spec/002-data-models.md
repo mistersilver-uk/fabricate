@@ -37,7 +37,7 @@ CraftingSystem = {
     salvage: boolean, // default false
   },
 
-  categories: string[],
+  categories: string[], // custom recipe categories only; reserved "general" is implicit
   itemTags: string[],
 
   // Present only when features.essences is true.
@@ -135,14 +135,17 @@ CraftingSystem = {
 
 ### Requirements
 
-1. If `features.recipeCategories` is false, `Recipe.category` is ignored at runtime.
-2. If `features.itemTags` is false, tag-based ingredient placeholders are invalid.
-3. `categories` and `itemTags` should be normalized to unique, trimmed strings.
-4. `resolutionMode` must be one of `"simple"`, `"routed"`, `"progressive"`, or `"alchemy"`.
-5. If `resolutionMode === "alchemy"`:
+1. Every crafting system has a reserved effective recipe category named `general` (`General` in UI copy). It is always enabled and cannot be removed.
+2. `CraftingSystem.categories` stores only additional user-defined recipe categories. The reserved `general` category must not be persisted in that array.
+3. `Recipe.category` defaults to `general`.
+4. If `features.recipeCategories` is false, custom recipe categories are ignored at runtime and recipes resolve under `general`.
+5. If `features.itemTags` is false, tag-based ingredient placeholders are invalid.
+6. `categories` and `itemTags` should be normalized to unique, trimmed strings.
+7. `resolutionMode` must be one of `"simple"`, `"routed"`, `"progressive"`, or `"alchemy"`.
+8. If `resolutionMode === "alchemy"`:
    - `features.multiStepRecipes` must be `false`.
    - `alchemy` config must be present; missing values use defaults (`learnOnCraft: false`, `consumeOnFail: true`, `showAttemptHistoryToPlayers: true`).
-6. If `features.gathering` is false, gathering environments and gathering tasks for that system are inert and hidden from normal UI flows.
+9. If `features.gathering` is false, gathering environments and gathering tasks for that system are inert and hidden from normal UI flows.
 
 ### Recipe Visibility Requirements
 
@@ -224,7 +227,7 @@ Recipe = {
   description: string,
   craftingSystemId: string,
   enabled: boolean,
-  category: string | null,
+  category: string,
 
   // Multi-step mode
   steps?: Step[],

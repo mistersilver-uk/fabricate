@@ -33,8 +33,7 @@
     position: sticky;
     top: 0;
     z-index: 10;
-    background:
-      linear-gradient(135deg, rgba(107, 29, 39, 0.92), rgba(61, 17, 25, 0.96));
+    background: rgba(82, 22, 31, 0.94);
     border: 1px solid var(--fabricate-editor-border-danger, rgba(255, 124, 102, 0.48));
     border-radius: 10px;
     padding: 12px 14px;

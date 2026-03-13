@@ -1,6 +1,7 @@
 import { confirmDialog, renderDialog } from './foundryCompat.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { getFabricateFlag } from '../config/flags.js';
+import { normalizeRecipeCategory } from '../utils/recipeCategories.js';
 
 const RECENTLY_CRAFTED_MAX = 10;
 
@@ -414,7 +415,7 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
 
     // Apply category filter
     if (this.selectedCategory) {
-      recipes = recipes.filter(r => r.category === this.selectedCategory);
+      recipes = recipes.filter(r => normalizeRecipeCategory(r.category) === this.selectedCategory);
     }
 
     // Evaluate craftability for all recipes using a single unified path.
@@ -494,7 +495,7 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
         name: recipe.name,
         description: recipe.description,
         img: recipe.img,
-        category: recipe.category,
+        category: normalizeRecipeCategory(recipe.category),
         canCraft: craftable,
         allowCraftAction,
         accessReason: access.reason,
@@ -542,7 +543,7 @@ export class CraftingApp extends foundry.applications.api.HandlebarsApplicationM
     // Get unique categories
     const allRecipes = recipeManager.getRecipes({ enabled: true });
     const visibleRecipes = showSimpleRecipesOnly ? allRecipes.filter(r => r.isSimpleRecipe()) : allRecipes;
-    const categories = [...new Set(visibleRecipes.map(r => r.category))].sort();
+    const categories = [...new Set(visibleRecipes.map(r => normalizeRecipeCategory(r.category)))].sort();
 
     return {
       ...context,

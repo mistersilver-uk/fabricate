@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { getRecipeCategoryLabel } from '../../../../utils/recipeCategories.js';
   import ValidationBanner from './ValidationBanner.svelte';
   import ItemPickerGrid from './ItemPickerGrid.svelte';
   import IngredientSetPanel from './IngredientSetPanel.svelte';
@@ -225,7 +226,7 @@
                   onchange={(e) => store.setField('category', e.target.value)}
                 >
                   {#each categories as cat}
-                    <option value={cat}>{cat}</option>
+                    <option value={cat}>{getRecipeCategoryLabel(cat, localize)}</option>
                   {/each}
                 </select>
               {:else}

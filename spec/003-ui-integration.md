@@ -57,6 +57,7 @@ Changing resolution mode is destructive and must follow `007` confirmation/clean
 #### Feature Controls
 
 - Recipe categories toggle (`features.recipeCategories`)
+- Category list editor for custom categories only; reserved `General` is always present and not removable
 - Item tags toggle (`features.itemTags`)
 - Essences toggle (`features.essences`)
 - Property macros toggle (`features.propertyMacros`)
@@ -192,7 +193,7 @@ Scoped to a single crafting system.
 
 - Name
 - Description
-- Category (if enabled)
+- Category (if enabled; always includes reserved `General`)
 - Locked toggle
 
 ### Visibility Form

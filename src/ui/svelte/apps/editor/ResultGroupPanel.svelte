@@ -219,9 +219,7 @@
     gap: 6px;
     padding: 8px 12px;
     cursor: pointer;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
-      rgba(0, 0, 0, 0.16);
+    background: rgba(0, 0, 0, 0.18);
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     user-select: none;
   }

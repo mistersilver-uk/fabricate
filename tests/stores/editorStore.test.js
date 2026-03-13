@@ -1108,6 +1108,30 @@ describe('createEditorStore', () => {
       assert.equal(get(store.featureState).showCategories, false);
     });
 
+    it('systemCategories includes the reserved general category before custom categories', () => {
+      const svc = mockServices({
+        getSystem: () => ({
+          advancedOptionsEnabled: true,
+          features: { recipeCategories: true },
+          categories: ['Potions', 'Weapons']
+        })
+      });
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      assert.deepEqual(get(store.systemCategories), ['general', 'Potions', 'Weapons']);
+    });
+
+    it('systemCategories falls back to only the reserved general category when no custom categories exist', () => {
+      const svc = mockServices({
+        getSystem: () => ({
+          advancedOptionsEnabled: true,
+          features: { recipeCategories: true },
+          categories: []
+        })
+      });
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      assert.deepEqual(get(store.systemCategories), ['general']);
+    });
+
     it('featureState.requiresLinkedRecipeItem is true when listMode is knowledge and mode is itemOrLearned', () => {
       const svc = mockServices({
         getSystem: () => ({

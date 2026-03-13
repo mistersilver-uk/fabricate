@@ -19,6 +19,7 @@
 | **Crafting System**       | A self-contained configuration that owns components, recipes, feature toggles, and execution rules.                                                    | `CraftingSystemManager.systems`, normalized system object                               | spec/001, spec/002           |
 | **Module Setting**        | A Foundry module-level configuration value registered under the `fabricate.*` namespace. It is not part of any crafting system's persisted data model. | `src/config/settings.js`, `SETTING_KEYS`, `game.settings.register`                      | spec/001, issue #117         |
 | **Recipe**                | A specification for transforming ingredients and catalysts into results inside one crafting system.                                                    | `Recipe`, `RecipeManager`                                                               | spec/002, spec/005           |
+| **General Recipe Category** | The reserved recipe category present in every crafting system. It is effective even when no custom categories exist and is not stored as a deletable custom category entry. | `general`, `src/utils/recipeCategories.js`, recipe/admin editor category helpers        | spec/002, spec/003           |
 | **Component**             | A curated library entry in a crafting system that references a Foundry Item via `sourceItemUuid` and may carry tags, essences, difficulty, fallback item IDs, and optional salvage configuration. Recipes, catalysts, salvage definitions, and gathering results reference components by Fabricate component identity, not by raw Foundry Item identity. | `_normalizeComponent()` in `CraftingSystemManager`, `system.components`                 | spec/002, spec/005, spec/009 |
 | **Step**                  | One phase of a multi-step recipe, with its own ingredients, results, and optional time or currency requirements.                                       | `recipe.steps[]`                                                                        | spec/002, spec/005           |
 | **Gathering Environment** | A configured place where gathering occurs for one crafting system. It contains one or more attemptable gathering tasks.                                | Specced world setting `fabricate.gatheringEnvironments`; runtime implementation pending | spec/001, spec/009           |
@@ -92,6 +93,7 @@ Crafting System
 |  |- gathering
 |  |- salvage
 |  `- itemPiles
+|- categories (custom only; General implied)
 |- components
 |  |- tags
 |  |- essences
@@ -106,6 +108,7 @@ Crafting System
 
 Recipe
 |- identity and metadata
+|- category (defaults to general)
 |- ingredientSets -> ingredientGroups -> ingredients
 |- resultGroups -> results
 |- catalysts

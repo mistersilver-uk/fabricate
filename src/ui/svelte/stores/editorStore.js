@@ -6,6 +6,11 @@
  * isolated set of writable() instances.
  */
 import { writable, derived, get } from 'svelte/store';
+import {
+  GENERAL_RECIPE_CATEGORY,
+  getEffectiveRecipeCategories,
+  normalizeRecipeCategory
+} from '../../../utils/recipeCategories.js';
 
 // ---------------------------------------------------------------------------
 // ID generation helper (injectable for tests)
@@ -199,7 +204,7 @@ function _buildDraft(recipe, craftingSystemId, services) {
     name: data.name || '',
     description: data.description || '',
     img: data.img || 'icons/svg/item-bag.svg',
-    category: data.category || 'general',
+    category: normalizeRecipeCategory(data.category),
     system: data.system || 'all',
     enabled: data.enabled !== false,
     locked: data.locked === true,
@@ -550,7 +555,7 @@ function _buildRecipePayload(draft, featureState, services) {
     name: draft.name,
     description: draft.description,
     img: draft.img,
-    category: enableCategories ? (draft.category || 'general') : 'general',
+    category: enableCategories ? normalizeRecipeCategory(draft.category) : GENERAL_RECIPE_CATEGORY,
     craftingSystemId: draft.craftingSystemId || null,
     system: 'all',
     enabled: draft.enabled,
@@ -635,7 +640,7 @@ export function createEditorStore(services, options = {}) {
   const systemCategories = derived(draft, ($draft) => {
     if (!$draft.craftingSystemId || !services.getSystem) return [];
     const system = services.getSystem($draft.craftingSystemId);
-    return system?.categories || [];
+    return getEffectiveRecipeCategories(system?.categories || []);
   });
 
   // ---------------------------------------------------------------------------

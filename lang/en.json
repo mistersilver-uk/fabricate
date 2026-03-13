@@ -1,6 +1,9 @@
 {
   "FABRICATE": {
     "ModuleName": "Fabricate - Universal Crafting",
+    "Common": {
+      "General": "General"
+    },
     "Settings": {
       "Enabled": {
         "Name": "Enable Crafting System",
@@ -191,7 +194,7 @@
           "Hint": "Organize and filter recipes by category in admin and crafting views.",
           "Placeholder": "e.g. Cooking",
           "Add": "Add",
-          "Empty": "No categories defined yet."
+          "Empty": "No custom categories defined yet."
         },
         "ItemTags": {
           "Title": "Item Tags",

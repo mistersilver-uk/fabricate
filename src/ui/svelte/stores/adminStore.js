@@ -14,6 +14,11 @@ import {
   prepareForImport,
   makeExportFilename
 } from '../../../systems/CraftingSystemExporter.js';
+import {
+  isGeneralRecipeCategory,
+  normalizeCustomRecipeCategories,
+  normalizeRecipeCategory
+} from '../../../utils/recipeCategories.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -113,7 +118,7 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
 
   const categoriesMap = new Map();
   for (const recipe of recipeManager.getRecipes({ craftingSystemId: selectedSystem.id })) {
-    const key = recipe.category || 'general';
+    const key = normalizeRecipeCategory(recipe.category);
     categoriesMap.set(key, (categoriesMap.get(key) || 0) + 1);
   }
   const recipeCategories = Array.from(categoriesMap.entries())
@@ -132,7 +137,7 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
       id: recipe.id,
       name: recipe.name,
       img: recipe.img,
-      category: recipe.category,
+      category: normalizeRecipeCategory(recipe.category),
       visibilitySummary: _visibilitySummary(recipe),
       locked: recipe.locked === true,
       enabled: recipe.enabled,
@@ -478,23 +483,25 @@ export function createAdminStore(services) {
 
   async function addCategory(value) {
     if (!value || !value.trim()) return;
+    if (isGeneralRecipeCategory(value)) return;
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
     if (!sysId) return;
     const system = systemManager.getSystem(sysId);
     if (!system) return;
-    const categories = Array.from(new Set([...(system.categories || []), value.trim()]));
+    const categories = normalizeCustomRecipeCategories([...(system.categories || []), value.trim()]);
     await systemManager.updateSystem(sysId, { categories });
     await refresh();
   }
 
   async function removeCategory(category) {
+    if (isGeneralRecipeCategory(category)) return;
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
     if (!sysId) return;
     const system = systemManager.getSystem(sysId);
     if (!system) return;
-    const categories = (system.categories || []).filter(c => c !== category);
+    const categories = normalizeCustomRecipeCategories((system.categories || []).filter(c => c !== category));
     await systemManager.updateSystem(sysId, { categories });
     await refresh();
   }
