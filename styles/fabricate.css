@@ -742,6 +742,11 @@
   margin: 0;
 }
 
+.fabricate-admin .feature-card-content {
+  margin-top: 10px;
+  min-width: 0;
+}
+
 .fabricate-admin .essence-definition-list {
   display: flex;
   flex-direction: column;

@@ -19,6 +19,8 @@
     {/if}
   </div>
   {#if enabled || !showToggle}
-    {@render children?.()}
+    <div class="feature-card-content">
+      {@render children?.()}
+    </div>
   {/if}
 </section>
