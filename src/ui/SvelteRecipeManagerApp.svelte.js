@@ -217,9 +217,36 @@ export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
       return uuid;
     };
 
+    const importSingleManagedItemFromDrop = async (data) => {
+      const systemManager = game.fabricate.getCraftingSystemManager();
+      const systemId = get(this._adminStore.selectedSystemId) || '';
+      if (!systemId) {
+        ui.notifications.warn(localize('FABRICATE.Admin.Items.DropNoSystemSelected'));
+        return null;
+      }
+
+      const uuid = resolveSingleItemDropUuid(data);
+      if (!uuid) return null;
+
+      try {
+        const result = await systemManager.addItemFromUuid(systemId, uuid);
+        if (result.action === 'updated') {
+          ui.notifications.info(localize('FABRICATE.Admin.Items.ItemUpdated', {
+            name: result.item.name
+          }));
+        }
+        await this._adminStore.refresh();
+        return result.item ?? null;
+      } catch (err) {
+        ui.notifications.warn(err.message || localize('FABRICATE.Admin.Items.DropInvalidItem'));
+        return null;
+      }
+    };
+
     return {
       store: this._adminStore,
       services: {
+        importSingleManagedItemFromDrop,
         onDropItem: async (data) => {
           const systemManager = game.fabricate.getCraftingSystemManager();
           const systemId = get(this._adminStore.selectedSystemId) || '';
@@ -279,19 +306,7 @@ export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
           }
 
           // Single item drop (world sidebar or compendium item)
-          const uuid = resolveSingleItemDropUuid(data);
-          if (!uuid) return;
-          if (!systemId) {
-            ui.notifications.warn(localize('FABRICATE.Admin.Items.DropNoSystemSelected'));
-            return;
-          }
-          const singleResult = await systemManager.addItemFromUuid(systemId, uuid);
-          if (singleResult.action === 'updated') {
-            ui.notifications.info(localize('FABRICATE.Admin.Items.ItemUpdated', {
-              name: singleResult.item.name
-            }));
-          }
-          await this._adminStore.refresh();
+          await importSingleManagedItemFromDrop(data);
         },
         onReplaceSource: async (itemId, data) => {
           const systemManager = game.fabricate.getCraftingSystemManager();

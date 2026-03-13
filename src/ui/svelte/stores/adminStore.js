@@ -65,6 +65,14 @@ function _getManagedItems(system) {
   return [];
 }
 
+function _buildManagedItemOptions(managedItems = []) {
+  return managedItems.map(item => ({
+    id: item.id,
+    name: item.name,
+    img: item.img || 'icons/svg/item-bag.svg'
+  }));
+}
+
 function _buildSalvageSummary(item, salvageEnabled) {
   if (!salvageEnabled || item?.salvage?.enabled !== true) return null;
 
@@ -299,17 +307,14 @@ export function createAdminStore(services) {
 
     if (selectedSystem) {
       const managedItems = _getManagedItems(selectedSystem);
-      const managedItemOptions = managedItems.map(item => ({
-        id: item.id,
-        name: item.name
-      }));
+      const managedItemOptions = _buildManagedItemOptions(managedItems);
+      const managedItemById = new Map(managedItemOptions.map(item => [item.id, item]));
 
       const essenceDefinitions = Array.isArray(selectedSystem.essenceDefinitions)
         ? selectedSystem.essenceDefinitions.map(def => ({
           ...def,
-          associatedItemName: managedItemOptions.find(
-            opt => opt.id === (def.sourceItemUuid || def.associatedSystemItemId)
-          )?.name || null
+          associatedItem: managedItemById.get(def.sourceItemUuid || def.associatedSystemItemId) || null,
+          associatedItemName: managedItemById.get(def.sourceItemUuid || def.associatedSystemItemId)?.name || null
         }))
         : [];
 

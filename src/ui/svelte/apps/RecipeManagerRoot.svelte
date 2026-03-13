@@ -59,7 +59,7 @@
 
     <main class="admin-main">
       {#if $activeTab === 'systems'}
-        <SystemSettings selectedSystem={$viewState.selectedSystem} {store} />
+        <SystemSettings selectedSystem={$viewState.selectedSystem} {store} {services} />
       {:else if $activeTab === 'items'}
         <ItemsTab
           hasSystem={$viewState.hasSystem}

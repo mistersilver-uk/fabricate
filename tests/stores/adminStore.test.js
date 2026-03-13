@@ -674,6 +674,31 @@ describe('createAdminStore', () => {
       assert.equal(newEssence.icon, DEFAULT_ESSENCE_ICON);
     });
 
+    it('addEssence persists the selected source item id on both essence source fields', async () => {
+      let savedEssences = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.components = [makeItem({ id: 'comp-1', name: 'Sunleaf', img: 'sunleaf.png' })];
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => {
+          if (updates.essenceDefinitions) savedEssences = updates.essenceDefinitions;
+          await origManager.updateSystem(id, updates);
+        }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.addEssence('Radiance', 'Bright essence', 'fas fa-sun', 'comp-1');
+
+      const newEssence = savedEssences?.find(e => e.name === 'Radiance');
+      assert.ok(newEssence, 'new essence should be persisted');
+      assert.equal(newEssence.sourceItemUuid, 'comp-1');
+      assert.equal(newEssence.associatedSystemItemId, 'comp-1');
+    });
+
     it('addEssence rejects duplicate name', async () => {
       let warnMsg = null;
       const services = createMockServices({
@@ -1637,6 +1662,56 @@ describe('createAdminStore', () => {
         hasCurrencyRequirement: true,
         outcomeCount: 1
       });
+    });
+
+    it('viewState.selectedSystem exposes managed item images and resolved essence source item metadata', async () => {
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.features = { essences: true };
+        sys.advancedOptionsEnabled = true;
+        sys.components = [
+          makeItem({ id: 'comp-1', name: 'Blazing Herb', img: 'blazing-herb.png' }),
+          makeItem({ id: 'comp-2', name: 'Moon Salt', img: '' })
+        ];
+        sys.essenceDefinitions = [
+          {
+            id: 'ess-fire',
+            name: 'Fire',
+            description: 'Hot stuff',
+            icon: 'fas fa-fire',
+            sourceItemUuid: 'comp-1',
+            associatedSystemItemId: 'comp-1'
+          },
+          {
+            id: 'ess-moon',
+            name: 'Moon',
+            description: '',
+            icon: 'fas fa-moon',
+            sourceItemUuid: null,
+            associatedSystemItemId: null
+          }
+        ];
+      }
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const vs = get(store.viewState);
+      const [linkedEssence, unlinkedEssence] = vs.selectedSystem.essenceDefinitions;
+
+      assert.deepEqual(vs.selectedSystem.managedItemOptions, [
+        { id: 'comp-1', name: 'Blazing Herb', img: 'blazing-herb.png' },
+        { id: 'comp-2', name: 'Moon Salt', img: 'icons/svg/item-bag.svg' }
+      ]);
+      assert.deepEqual(linkedEssence.associatedItem, {
+        id: 'comp-1',
+        name: 'Blazing Herb',
+        img: 'blazing-herb.png'
+      });
+      assert.equal(linkedEssence.associatedItemName, 'Blazing Herb');
+      assert.equal(unlinkedEssence.associatedItem, null);
+      assert.equal(unlinkedEssence.associatedItemName, null);
     });
 
     it('viewState.recipeSearchTerm and itemSearchTerm echo the current search values', async () => {
