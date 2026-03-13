@@ -13,6 +13,7 @@ This directory contains the authoritative design specifications for Fabricate.
 - `007-destructive-changes-and-migrations.md` - destructive changes and clean-up/migration policy
 - `008-integrations.md` - third-party module integration requirements
 - `009-gathering-and-harvesting.md` - environment gathering and harvesting boundaries
+- `010-module-settings.md` - module-level Foundry settings: boundary, canonical list, and authoring pattern
 
 When files overlap, behaviour specs (`004`-`009`) override summary text in `001` and UI text in `003`.
 

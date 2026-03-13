@@ -99,21 +99,34 @@ Behaviour is defined in `006-recipe-visibility.md`.
 ### Settings
 
 All settings keys use the literal `fabricate.*` namespace.
+Settings are **Module Settings** — registered via `game.settings.register`, not part of any crafting system's data model,
+and not persisted to world documents.
+Full authoring pattern and rationale are in `spec/010-module-settings.md`.
 
-World:
+World-scoped (GM-controlled, shared across all clients):
 
-- `fabricate.craftingSystems`
-- `fabricate.recipes`
-- `fabricate.gatheringEnvironments`
+| Key | Visible in UI | Purpose |
+|-----|:---:|---------|
+| `fabricate.craftingSystems` | No | Persisted crafting system definitions |
+| `fabricate.recipes` | No | Persisted recipe definitions |
+| `fabricate.enabled` | Yes | Master on/off switch |
+| `fabricate.migrationVersion` | No | Last completed data migration checkpoint |
+| `fabricate.gatheringEnvironments` | No | Persisted gathering environment definitions (specced; runtime pending) |
 
-Client:
+Client-scoped (per-user, not synced):
 
-
-- `fabricate.lastCraftingActor`
-- `fabricate.lastGatheringActor`
-- `fabricate.lastComponentSources`
-- `fabricate.lastManagedCraftingSystem`
-- optional progressive order preferences
+| Key | Visible in UI | Default | Purpose |
+|-----|:---:|---------|---------|
+| `fabricate.chatOutput` | Yes | `true` | Post crafting results to chat |
+| `fabricate.showSimpleRecipesOnly` | Yes | `false` | Hide multi-step and check-gated recipes |
+| `fabricate.autoCraft` | Yes | `false` | Skip confirmation step before crafting |
+| `fabricate.lastCraftingActor` | No | `""` | Most recently used crafting actor UUID |
+| `fabricate.lastComponentSources` | No | `[]` | Most recently used component source actor UUIDs |
+| `fabricate.lastManagedCraftingSystem` | No | `""` | Most recently opened crafting system in admin UI |
+| `fabricate.progressiveResultOrder` | No | `{}` | Per-system progressive result ordering preferences |
+| `fabricate.favouriteRecipes` | No | `[]` | Pinned recipe UUIDs |
+| `fabricate.recentlyCrafted` | No | `[]` | Recently crafted recipe UUIDs |
+| `fabricate.lastGatheringActor` | No | `""` | Most recently used gathering actor UUID (specced; runtime pending) |
 
 ### Actor Flags
 

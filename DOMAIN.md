@@ -279,10 +279,41 @@ the salvage lifecycle or the crafting lifecycle. There is no separate harvesting
 
 ### 1. Module Configuration
 
-- Foundry settings registered under `fabricate.*`
-- World and client scope boundaries
-- Module-wide toggles and preferences
-- Canonical home for `chatOutput`, not `CraftingSystem.features`
+**Boundary:** Foundry module settings registered via `game.settings.register` under the `fabricate.*` namespace.
+These values are not part of any crafting system's data model and are not persisted to world documents (actors, items, scenes).
+They control module-wide behaviour and per-client preferences independently of any individual crafting system.
+
+**World-scoped settings** (shared across all clients, GM-controlled):
+
+| Key | Purpose |
+|-----|---------|
+| `fabricate.craftingSystems` | Persisted crafting system definitions |
+| `fabricate.recipes` | Persisted recipe definitions |
+| `fabricate.enabled` | Master on/off switch for the module |
+| `fabricate.migrationVersion` | Tracks the last completed data migration |
+| `fabricate.gatheringEnvironments` | Persisted gathering environment definitions (specced; not yet registered in runtime) |
+
+**Client-scoped settings** (per-user preferences, not synced):
+
+| Key | Purpose | Default |
+|-----|---------|---------|
+| `fabricate.chatOutput` | Whether crafting results are posted to chat | `true` |
+| `fabricate.showSimpleRecipesOnly` | Hides recipes that require multi-step or check flows | `false` |
+| `fabricate.autoCraft` | Automatically executes crafting without a confirmation step | `false` |
+| `fabricate.lastCraftingActor` | Most recently used crafting actor UUID | `""` |
+| `fabricate.lastComponentSources` | Most recently used component source actor UUIDs | `[]` |
+| `fabricate.lastManagedCraftingSystem` | Most recently opened crafting system in admin UI | `""` |
+| `fabricate.progressiveResultOrder` | Per-system progressive result ordering preferences | `{}` |
+| `fabricate.favouriteRecipes` | Pinned recipe UUIDs | `[]` |
+| `fabricate.recentlyCrafted` | Recently crafted recipe UUIDs | `[]` |
+| `fabricate.lastGatheringActor` | Most recently used gathering actor UUID (specced; not yet registered in runtime) | `""` |
+
+**Cross-context concepts:** `chatOutput` belongs to this context as a client-scoped module setting.
+It must not be stored on `CraftingSystem.features`; any runtime feature flag at the system level is a transitional alias only.
+
+**Pattern for adding new module settings:** define the key in `SETTING_KEYS` in `src/config/settings.js`,
+add its `BASE_DEFINITIONS` entry with explicit `scope`, `type`, `default`, and whether `config: true` (user-visible) or `false` (internal).
+Full authoring guidance is in `spec/010-module-settings.md`.
 
 ### 2. Crafting Configuration (GM Domain)
 
@@ -340,8 +371,9 @@ the salvage lifecycle or the crafting lifecycle. There is no separate harvesting
 
 - Issue `#2`: the gathering domain is spec-complete, but runtime managers, settings registration, and UI flows are still
   pending.
-- Issue `#117`: `DOMAIN.md` now models `Module Setting`, but `spec/001` and runtime settings still need the same
-  boundary applied consistently.
+- Issue `#117`: Module Configuration bounded context, `Module Setting` ubiquitous language entry, and
+  `spec/010-module-settings.md` are now authoritative. The `chatOutput` runtime feature flag on `CraftingSystem.features`
+  is a transitional alias pending removal.
 - Issue `#111`: built-in crafting checks (`checkSource: "builtIn"`, `CraftingCheckAdapter`) exist in runtime but remain
   under-specified in the domain/spec layer.
 - Issue `#119`: discovery-mode rename remains partial in runtime (`teaserConfig`, `Recipe.teaser`,
