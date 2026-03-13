@@ -42,3 +42,46 @@ jobs:
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: echo "$PR_TITLE" | npx commitlint --verbose
+
+  check-screenshots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check for screenshots in UI/UX PRs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          # Get changed files
+          CHANGED_FILES=$(gh pr diff "$PR_NUMBER" \
+            --repo "${{ github.repository }}" \
+            --name-only 2>/dev/null || echo "")
+
+          # Check if any UI-related files changed
+          UI_CHANGED=false
+          while IFS= read -r file; do
+            case "$file" in
+              src/ui/*|styles/*|*.svelte|*.css)
+                UI_CHANGED=true
+                break
+                ;;
+            esac
+          done <<< "$CHANGED_FILES"
+
+          if [ "$UI_CHANGED" = "false" ]; then
+            echo "No UI files changed — screenshot check skipped."
+            exit 0
+          fi
+
+          echo "UI files changed — checking PR body for screenshots..."
+
+          # Check PR body for image evidence
+          if echo "$PR_BODY" | grep -qiE '!\[.*\]\(.*\)|<img\s|\.png|\.jpg|\.jpeg|\.gif|\.webp|screenshot|screen.shot'; then
+            echo "Screenshots found in PR description."
+            exit 0
+          fi
+
+          echo "::error::This PR changes UI files but the description contains no screenshots."
+          echo "Please add before/after screenshots to the PR description showing the visual changes."
+          exit 1

@@ -182,6 +182,20 @@ jobs:
             Types: feat, fix, docs, refactor, test, chore
             Validate: `npx commitlint --from HEAD~1 --to HEAD --verbose`
 
+            ### 6. Screenshots (UI changes only)
+            If you changed any files matching `src/ui/**`, `styles/**`, `*.svelte`,
+            or `*.css`, you MUST attach before/after screenshots to the PR description.
+            Use Playwright via Bash to capture them:
+            1. `npx playwright install chromium --with-deps`
+            2. Write a short Node script that renders the changed component and
+               screenshots it, or use `npm run test:foundry` if Foundry credentials
+               are available in the environment.
+            3. Upload the screenshot to the PR using `gh api` and embed the
+               resulting URL in the PR body with `![screenshot](url)` syntax.
+            If you cannot capture screenshots (e.g. no display server, no Foundry),
+            add a clearly visible `> ⚠️ SCREENSHOTS NEEDED` callout to the PR body
+            describing the visual changes, so a human reviewer can add them before merge.
+
             ## Rules
             - NEVER remove the `triage` label from any issue.
             - Do NOT close the issue — the PR will reference it.
@@ -232,6 +246,12 @@ jobs:
           git remote set-url origin "https://x-access-token:${PUSH_TOKEN}@github.com/${{ github.repository }}.git"
           git push origin "$BRANCH"
 
+          # Extract PR title from the first commit on the branch (already conventional-commit formatted)
+          PR_TITLE=$(git log origin/main..HEAD --format='%s' --reverse | head -1)
+          if [ -z "$PR_TITLE" ] || ! echo "$PR_TITLE" | grep -qE '^[a-z]+(\(.*\))?!?: '; then
+            PR_TITLE="chore(#${ISSUE_NUMBER}): ${ISSUE_TITLE}"
+          fi
+
           MANUAL_PR_URL="${{ github.server_url }}/${{ github.repository }}/compare/${DEFAULT_BRANCH}...${BRANCH}?expand=1"
           PR_OUTPUT="$(mktemp)"
           LAST_PR_ERROR=""
@@ -241,7 +261,7 @@ jobs:
             GH_TOKEN="$token" gh pr create \
               --repo "${{ github.repository }}" \
               --head "$BRANCH" \
-              --title "#${ISSUE_NUMBER} — ${ISSUE_TITLE}" \
+              --title "$PR_TITLE" \
               --label agent-created \
               --body "$(cat <<EOF
           ## Summary
@@ -261,6 +281,10 @@ jobs:
           - [ ] Verify tests pass: \`npm test\`
           - [ ] Verify build: \`npm run build\`
           - [ ] Manual verification if applicable
+
+          ## Screenshots
+
+          _Added by the agent if UI files were changed, or add manually before merging._
 
           Closes #${ISSUE_NUMBER}
 
