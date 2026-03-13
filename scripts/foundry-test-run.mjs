@@ -1147,6 +1147,34 @@ async function main() {
 
                 await page.keyboard.press('Escape');
                 await page.waitForTimeout(300);
+
+                const editEssenceButton = page.locator(
+                  '.essence-definition-row .essence-definition-actions button:has(i.fa-pen)'
+                ).first();
+                if (await editEssenceButton.count() > 0) {
+                  await editEssenceButton.click();
+                  await page.waitForTimeout(300);
+
+                  const editPickerTrigger = page.locator(
+                    '.essence-definition-row .essence-icon-picker-trigger.icon-only'
+                  ).first();
+                  await editPickerTrigger.click();
+                  await page.locator('.essence-icon-picker-popover').first().waitFor({ state: 'visible', timeout: 5_000 });
+                  await page.waitForTimeout(300);
+                  await screenshot(page, 'recipe-manager-systems-essence-edit-picker');
+                  process.stdout.write('  Screenshotted inline essence edit picker.\n');
+
+                  await page.keyboard.press('Escape');
+                  await page.waitForTimeout(300);
+
+                  const cancelEditButton = page.locator(
+                    '.essence-definition-row .essence-definition-actions button:has(i.fa-times)'
+                  ).first();
+                  if (await cancelEditButton.count() > 0) {
+                    await cancelEditButton.click();
+                    await page.waitForTimeout(300);
+                  }
+                }
               }
             }
           } catch {

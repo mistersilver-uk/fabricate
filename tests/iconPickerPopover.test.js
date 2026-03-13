@@ -28,6 +28,31 @@ test('icon picker popover clamps to the viewport edge instead of overflowing lef
   assert.equal(layout.width, 260);
 });
 
+test('icon picker popover can left-align with the trigger for inline icon-only pickers', () => {
+  const layout = computeIconPickerPopoverLayout(
+    { top: 120, bottom: 154, left: 304, right: 338, width: 34, height: 34 },
+    { width: 1280, height: 900 },
+    { horizontalAlign: 'left' }
+  );
+
+  assert.ok(layout, 'layout should be returned for an inline icon picker');
+  assert.equal(layout.left, 304);
+  assert.equal(layout.width, 260);
+  assert.equal(layout.top, 160);
+});
+
+test('icon picker popover respects a custom editor-pane left boundary', () => {
+  const layout = computeIconPickerPopoverLayout(
+    { top: 120, bottom: 154, left: 304, right: 338, width: 34, height: 34 },
+    { width: 1024, height: 768 },
+    { minLeft: 280, maxRight: 960 }
+  );
+
+  assert.ok(layout, 'layout should be returned when custom horizontal bounds are provided');
+  assert.equal(layout.left, 280);
+  assert.equal(layout.width, 260);
+});
+
 test('icon picker popover flips above the trigger when there is not enough room below', () => {
   const layout = computeIconPickerPopoverLayout(
     { top: 700, bottom: 732, left: 540, right: 720, width: 180, height: 32 },

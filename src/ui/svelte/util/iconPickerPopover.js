@@ -4,7 +4,8 @@ const DEFAULT_LAYOUT_OPTIONS = Object.freeze({
   gap: 6,
   viewportMargin: 16,
   preferredMaxHeight: 380,
-  minUsableHeight: 160
+  minUsableHeight: 160,
+  horizontalAlign: 'right'
 });
 
 function clamp(value, min, max) {
@@ -24,8 +25,21 @@ export function computeIconPickerPopoverLayout(triggerRect, viewport, options = 
   const minUsableHeight = Number(options.minUsableHeight) || DEFAULT_LAYOUT_OPTIONS.minUsableHeight;
   const requestedMinWidth = Number(options.minWidth) || DEFAULT_LAYOUT_OPTIONS.minWidth;
   const requestedMaxWidth = Number(options.maxWidth) || DEFAULT_LAYOUT_OPTIONS.maxWidth;
+  const horizontalAlign = options.horizontalAlign === 'left' ? 'left' : DEFAULT_LAYOUT_OPTIONS.horizontalAlign;
+  const requestedMinLeft = Number.isFinite(Number(options.minLeft))
+    ? Number(options.minLeft)
+    : viewportMargin;
+  const requestedMaxRight = Number.isFinite(Number(options.maxRight))
+    ? Number(options.maxRight)
+    : viewportWidth - viewportMargin;
+  const minLeft = clamp(requestedMinLeft, 0, Math.max(0, viewportWidth - viewportMargin));
+  const maxRight = clamp(
+    requestedMaxRight,
+    minLeft,
+    Math.max(minLeft, viewportWidth - viewportMargin)
+  );
 
-  const availableWidth = Math.max(0, viewportWidth - (viewportMargin * 2));
+  const availableWidth = Math.max(0, maxRight - minLeft);
   if (availableWidth <= 0) return null;
 
   const minWidth = Math.min(requestedMinWidth, availableWidth);
@@ -33,15 +47,16 @@ export function computeIconPickerPopoverLayout(triggerRect, viewport, options = 
   const triggerWidth = Math.max(0, Number(resolvedRect.width) || 0);
   const width = clamp(Math.max(triggerWidth, minWidth), minWidth, maxWidth);
 
+  const triggerLeft = Number(resolvedRect.left) || 0;
   const triggerRight = Number(resolvedRect.right) || 0;
   const triggerTop = Number(resolvedRect.top) || 0;
   const triggerBottom = Number(resolvedRect.bottom) || 0;
+  const maxLeft = Math.max(minLeft, maxRight - width);
+  const preferredLeft = horizontalAlign === 'left'
+    ? triggerLeft
+    : triggerRight - width;
 
-  const left = clamp(
-    triggerRight - width,
-    viewportMargin,
-    Math.max(viewportMargin, viewportWidth - viewportMargin - width)
-  );
+  const left = clamp(preferredLeft, minLeft, maxLeft);
 
   const spaceBelow = Math.max(0, viewportHeight - triggerBottom - gap - viewportMargin);
   const spaceAbove = Math.max(0, triggerTop - gap - viewportMargin);

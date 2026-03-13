@@ -59,6 +59,19 @@
     return pickerRoot.closest('.fabricate-admin');
   }
 
+  function getPopoverHorizontalBounds(hostRect) {
+    if (!pickerRoot) return {};
+
+    const mainPanel = pickerRoot.closest('.admin-main');
+    const mainPanelRect = mainPanel?.getBoundingClientRect?.();
+    if (!mainPanelRect) return {};
+
+    return {
+      minLeft: mainPanelRect.left - hostRect.left + 16,
+      maxRight: mainPanelRect.right - hostRect.left - 16
+    };
+  }
+
   function updatePopoverPosition() {
     if (!pickerOpen || !triggerButton || typeof window === 'undefined') return;
 
@@ -70,6 +83,7 @@
       height: window.innerHeight
     };
     const triggerRect = triggerButton.getBoundingClientRect();
+    const horizontalBounds = getPopoverHorizontalBounds(hostRect);
 
     const layout = computeIconPickerPopoverLayout(
       {
@@ -80,7 +94,12 @@
         width: triggerRect.width,
         height: triggerRect.height
       },
-      { width: hostRect.width || window.innerWidth, height: hostRect.height || window.innerHeight }
+      { width: hostRect.width || window.innerWidth, height: hostRect.height || window.innerHeight },
+      {
+        horizontalAlign: iconOnly ? 'left' : 'right',
+        minLeft: horizontalBounds.minLeft,
+        maxRight: horizontalBounds.maxRight
+      }
     );
 
     if (!layout) {
