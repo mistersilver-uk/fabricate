@@ -33,15 +33,12 @@
     position: sticky;
     top: 0;
     z-index: 10;
-    background:
-      linear-gradient(135deg, rgba(107, 29, 39, 0.92), rgba(61, 17, 25, 0.96));
+    background: rgba(82, 22, 31, 0.94);
     border: 1px solid var(--fabricate-editor-border-danger, rgba(255, 124, 102, 0.48));
-    border-left-width: 4px;
     border-radius: 10px;
     padding: 12px 14px;
     margin-bottom: 10px;
-    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.22);
-    backdrop-filter: blur(8px);
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
   }
 
   .validation-banner strong {

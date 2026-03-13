@@ -35,6 +35,22 @@ describe('Recipe editor theme layout contract', () => {
       'validation banner should rely on the editor danger token set'
     );
     assert.ok(
+      !bannerSource.includes('backdrop-filter:'),
+      'validation banner should avoid blur-based glass styling in the flat UI'
+    );
+    assert.ok(
+      !rootSource.includes('linear-gradient('),
+      'recipe editor should not use gradient backgrounds in the flat UI'
+    );
+    assert.ok(
+      !rootSource.includes('radial-gradient('),
+      'recipe editor should not use radial gradient backgrounds in the flat UI'
+    );
+    assert.ok(
+      !rootSource.includes('backdrop-filter:'),
+      'recipe editor panels should avoid blur-based glass styling in the flat UI'
+    );
+    assert.ok(
       !pickerSource.includes('background: var(--color-bg-option, #fff);'),
       'picker header should not use the previous white fallback surface'
     );
@@ -63,6 +79,24 @@ describe('Recipe editor theme layout contract', () => {
       'picker cards should use the shared editor input/surface token'
     );
   });
+
+  it('renders picker results as one-row entries with truncation-safe names', () => {
+    assert.match(
+      pickerSource,
+      /\.picker-grid \{[\s\S]*display: flex;[\s\S]*flex-direction: column;/,
+      'picker results should stack vertically'
+    );
+    assert.match(
+      pickerSource,
+      /\.picker-card \{[\s\S]*flex-direction: row;[\s\S]*width: 100%;/,
+      'picker cards should use a horizontal row layout'
+    );
+    assert.match(
+      pickerSource,
+      /\.picker-card-name \{[\s\S]*white-space: nowrap;[\s\S]*text-overflow: ellipsis;/,
+      'picker names should truncate within the row instead of overflowing'
+    );
+  });
 });
 
 describe('Recipe editor shared control CSS', () => {
@@ -77,7 +111,10 @@ describe('Recipe editor shared control CSS', () => {
       /\.fabricate-recipe-editor button:not\(\.validation-error-link\):not\(\.icon-button\) \{/s
     );
     assert.ok(css.includes('accent-color: var(--fabricate-editor-accent, #4a90e2);'));
-    assert.ok(css.includes('box-shadow:\n    0 0 0 1px var(--fabricate-editor-accent, #4a90e2),'));
+    assert.match(
+      css,
+      /box-shadow:\s+0 0 0 1px var\(--fabricate-editor-accent, #4a90e2\),/s
+    );
   });
 
   it('keeps recipe-editor selects dark without forcing a taller closed control', () => {

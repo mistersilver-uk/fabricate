@@ -13,6 +13,16 @@ This file is UI-only. Domain behaviour is defined in:
 
 Global rule: if a system feature is disabled, controls for that feature are hidden.
 
+## Product UI Visual Style
+
+Fabricate's Foundry-facing product UI must use a clean flat visual style.
+
+- Product UI surfaces, headers, buttons, overlays, and selected states must not use `linear-gradient`, `radial-gradient`, or `conic-gradient`.
+- Use solid colors or RGBA fills for shells, cards, headers, overlays, and controls.
+- Visual hierarchy should come from spacing, typography, borders, and restrained shadows rather than decorative gradients or blur-based glass effects.
+- Shared tokens in `styles/fabricate.css` and app-local editor tokens should be the source of truth for reusable surface treatments.
+- Generated documentation output and third-party/vendor theme assets are out of scope for this rule unless they are explicitly restyled as Fabricate product UI.
+
 ## Integration Points
 
 ### Items Directory
@@ -57,6 +67,7 @@ Changing resolution mode is destructive and must follow `007` confirmation/clean
 #### Feature Controls
 
 - Recipe categories toggle (`features.recipeCategories`)
+- Category list editor for custom categories only; reserved `General` is always present and not removable
 - Item tags toggle (`features.itemTags`)
 - Essences toggle (`features.essences`)
 - Property macros toggle (`features.propertyMacros`)
@@ -192,7 +203,7 @@ Scoped to a single crafting system.
 
 - Name
 - Description
-- Category (if enabled)
+- Category (if enabled; always includes reserved `General`)
 - Locked toggle
 
 ### Visibility Form

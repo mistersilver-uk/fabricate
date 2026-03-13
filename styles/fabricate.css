@@ -811,7 +811,7 @@
   padding: 10px 14px;
   border: 1px solid rgba(120, 170, 255, 0.7);
   border-radius: 8px;
-  background: linear-gradient(180deg, rgba(92, 148, 245, 0.95), rgba(67, 119, 219, 0.95));
+  background: rgba(78, 132, 230, 0.95);
   color: #fff;
   font-weight: 700;
   letter-spacing: 0.01em;
@@ -820,7 +820,7 @@
 
 .fabricate-admin .essence-create-submit:hover,
 .fabricate-admin .essence-create-submit:focus-visible {
-  background: linear-gradient(180deg, rgba(108, 162, 255, 0.98), rgba(78, 131, 232, 0.98));
+  background: rgba(92, 146, 242, 0.98);
   box-shadow: 0 12px 22px rgba(33, 76, 156, 0.32);
 }
 
@@ -1303,6 +1303,11 @@
   border: 1px solid rgba(120, 160, 255, 0.35);
 }
 
+.fabricate-admin .token-list .token-locked {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
 .fabricate-admin .token-list .token button {
   width: 20px;
   height: 20px;
@@ -1465,9 +1470,7 @@
   justify-content: center;
   gap: 6px;
   padding: 16px;
-  background:
-    linear-gradient(180deg, rgba(12, 16, 32, 0.18), rgba(12, 16, 32, 0.78)),
-    rgba(120, 160, 255, 0.22);
+  background: rgba(12, 16, 32, 0.55);
   border: 1px dashed rgba(120, 160, 255, 0.55);
   border-radius: 8px;
   color: rgba(255, 255, 255, 0.92);
@@ -1642,8 +1645,8 @@
   border-color: var(--fabricate-editor-accent, #4a90e2);
   background: var(--fabricate-editor-input-bg-active, rgba(255, 255, 255, 0.1));
   box-shadow:
-    0 0 0 1px var(--fabricate-editor-accent, #4a90e2),
-    0 0 0 4px var(--fabricate-editor-accent-soft, rgba(74, 144, 226, 0.22));
+          0 0 0 1px var(--fabricate-editor-accent, #4a90e2),
+          0 0 0 4px var(--fabricate-editor-accent-soft, rgba(74, 144, 226, 0.22));
 }
 
 .fabricate-recipe-editor :is(input:not([type="checkbox"]):not([type="radio"]), textarea)::placeholder {

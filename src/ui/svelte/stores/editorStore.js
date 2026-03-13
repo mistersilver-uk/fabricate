@@ -6,6 +6,11 @@
  * isolated set of writable() instances.
  */
 import { writable, derived, get } from 'svelte/store';
+import {
+  GENERAL_RECIPE_CATEGORY,
+  getEffectiveRecipeCategories,
+  normalizeRecipeCategory
+} from '../../../utils/recipeCategories.js';
 
 // ---------------------------------------------------------------------------
 // ID generation helper (injectable for tests)
@@ -13,6 +18,22 @@ import { writable, derived, get } from 'svelte/store';
 
 function _randomID(services) {
   return services?.randomID?.() ?? Math.random().toString(36).slice(2, 14);
+}
+
+function _cloneDraftState(value) {
+  if (Array.isArray(value)) {
+    return value.map(entry => _cloneDraftState(entry));
+  }
+
+  if (value && typeof value === 'object') {
+    const clone = {};
+    for (const [key, entry] of Object.entries(value)) {
+      clone[key] = _cloneDraftState(entry);
+    }
+    return clone;
+  }
+
+  return value;
 }
 
 // ---------------------------------------------------------------------------
@@ -199,7 +220,7 @@ function _buildDraft(recipe, craftingSystemId, services) {
     name: data.name || '',
     description: data.description || '',
     img: data.img || 'icons/svg/item-bag.svg',
-    category: data.category || 'general',
+    category: normalizeRecipeCategory(data.category),
     system: data.system || 'all',
     enabled: data.enabled !== false,
     locked: data.locked === true,
@@ -550,7 +571,7 @@ function _buildRecipePayload(draft, featureState, services) {
     name: draft.name,
     description: draft.description,
     img: draft.img,
-    category: enableCategories ? (draft.category || 'general') : 'general',
+    category: enableCategories ? normalizeRecipeCategory(draft.category) : GENERAL_RECIPE_CATEGORY,
     craftingSystemId: draft.craftingSystemId || null,
     system: 'all',
     enabled: draft.enabled,
@@ -612,9 +633,16 @@ export function createEditorStore(services, options = {}) {
   });
 
   // Derived: active containers (ingredient sets + results for current step or top-level)
+  // Shallow-copy the top-level arrays on every re-evaluation so that downstream
+  // Svelte $derived expressions and {#each} blocks detect in-place mutations
+  // applied by updateDraft() callbacks.
   const activeContainers = derived([draft, featureState, activeStepIndex], ([$draft, $features, $stepIdx]) => {
-    // Work on a deep copy to avoid mutations leaking
-    return _getActiveDraftContainers($draft, $features, $stepIdx, services);
+    const containers = _getActiveDraftContainers($draft, $features, $stepIdx, services);
+    return {
+      ...containers,
+      ingredientSets: [...(containers.ingredientSets || [])],
+      results: [...(containers.results || [])]
+    };
   });
 
   // Derived: validation errors
@@ -635,7 +663,7 @@ export function createEditorStore(services, options = {}) {
   const systemCategories = derived(draft, ($draft) => {
     if (!$draft.craftingSystemId || !services.getSystem) return [];
     const system = services.getSystem($draft.craftingSystemId);
-    return system?.categories || [];
+    return getEffectiveRecipeCategories(system?.categories || []);
   });
 
   // ---------------------------------------------------------------------------
@@ -645,7 +673,9 @@ export function createEditorStore(services, options = {}) {
   function updateDraft(updater) {
     draft.update(d => {
       updater(d);
-      return d;
+      // Publish a fresh draft graph so runes-mode child components receive
+      // updated nested prop identities after in-place mutations.
+      return _cloneDraftState(d);
     });
   }
 
@@ -893,6 +923,42 @@ export function createEditorStore(services, options = {}) {
     });
   }
 
+  // --- Essence requirement management ---
+
+  function addEssence(setIndex, essenceId, quantity = 1) {
+    updateDraft(d => {
+      const $features = _getSystemFeatureState(d, services);
+      const containers = _getActiveDraftContainers(d, $features, get(activeStepIndex), services);
+      const set = containers.ingredientSets[Number(setIndex)] || containers.ingredientSets[0];
+      if (!set) return;
+      if (typeof set.essences !== 'object' || set.essences === null) set.essences = {};
+      if (!Object.hasOwn(set.essences, essenceId)) {
+        set.essences[essenceId] = Math.max(1, Number(quantity) || 1);
+      }
+    });
+  }
+
+  function updateEssence(setIndex, essenceId, quantity) {
+    updateDraft(d => {
+      const $features = _getSystemFeatureState(d, services);
+      const containers = _getActiveDraftContainers(d, $features, get(activeStepIndex), services);
+      const set = containers.ingredientSets[Number(setIndex)] || containers.ingredientSets[0];
+      if (!set?.essences || !Object.hasOwn(set.essences, essenceId)) return;
+      set.essences = { ...set.essences, [essenceId]: Math.max(1, Number(quantity) || 1) };
+    });
+  }
+
+  function removeEssence(setIndex, essenceId) {
+    updateDraft(d => {
+      const $features = _getSystemFeatureState(d, services);
+      const containers = _getActiveDraftContainers(d, $features, get(activeStepIndex), services);
+      const set = containers.ingredientSets[Number(setIndex)] || containers.ingredientSets[0];
+      if (!set?.essences) return;
+      const { [essenceId]: _, ...rest } = set.essences;
+      set.essences = rest;
+    });
+  }
+
   // --- Result group management ---
 
   function addResultGroup() {
@@ -1126,6 +1192,11 @@ export function createEditorStore(services, options = {}) {
     addCatalystRow,
     removeCatalystRow,
     clearCatalystComponent,
+
+    // Essence CRUD
+    addEssence,
+    updateEssence,
+    removeEssence,
 
     // Result group CRUD
     addResultGroup,

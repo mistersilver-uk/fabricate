@@ -91,18 +91,20 @@
   }
 
   .picker-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    display: flex;
+    flex-direction: column;
     gap: 8px;
     padding: 10px;
   }
 
   .picker-card {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
-    gap: 6px;
-    padding: 8px 6px;
+    justify-content: flex-start;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 10px;
     border: 1px solid var(--fabricate-editor-border, rgba(255, 255, 255, 0.14));
     border-radius: 8px;
     background: var(--fabricate-editor-input-bg, rgba(255, 255, 255, 0.04));
@@ -113,7 +115,7 @@
     box-sizing: border-box;
     max-width: 100%;
     min-width: 0;
-    min-height: 86px;
+    min-height: 0;
     transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
   }
 
@@ -125,22 +127,24 @@
   }
 
   .picker-card-img {
+    flex: 0 0 auto;
     width: 36px;
     height: 36px;
     object-fit: contain;
   }
 
   .picker-card-name {
+    display: block;
+    flex: 1 1 auto;
     font-size: 0.75rem;
     line-height: 1.2;
     color: var(--fabricate-editor-text, rgba(255, 243, 232, 0.92));
     max-width: 100%;
     min-width: 0;
+    text-align: left;
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
   }
 
   .picker-empty {

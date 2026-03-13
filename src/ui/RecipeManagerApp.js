@@ -2,6 +2,11 @@ import { RecipeEditorApp } from './RecipeEditorApp.js';
 import { getRecipeEditorAppClass } from './appFactory.js';
 import { confirmDialog, getDragEventData, renderDialog } from './foundryCompat.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
+import {
+  isGeneralRecipeCategory,
+  normalizeCustomRecipeCategories,
+  normalizeRecipeCategory
+} from '../utils/recipeCategories.js';
 
 /**
  * GM crafting administration UI
@@ -107,12 +112,12 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     }
 
     if (this.selectedCategory) {
-      recipes = recipes.filter(r => r.category === this.selectedCategory);
+      recipes = recipes.filter(r => normalizeRecipeCategory(r.category) === this.selectedCategory);
     }
 
     const categoriesMap = new Map();
     for (const recipe of selectedSystem ? manager.getRecipes({ craftingSystemId: selectedSystem.id }) : []) {
-      const key = recipe.category || 'general';
+      const key = normalizeRecipeCategory(recipe.category);
       categoriesMap.set(key, (categoriesMap.get(key) || 0) + 1);
     }
     const categories = Array.from(categoriesMap.entries())
@@ -131,7 +136,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
         id: recipe.id,
         name: recipe.name,
         img: recipe.img,
-        category: recipe.category,
+        category: normalizeRecipeCategory(recipe.category),
         visibilitySummary: (() => {
           const visibility = recipe.visibility || {};
           if (visibility.restricted !== true) return 'All players';
@@ -815,8 +820,8 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
       system.features?.recipeCategories === true;
     if (system.advancedOptionsEnabled === false || !categoriesEnabled) return;
     const value = this._readInput('newSystemCategory');
-    if (!value) return;
-    const categories = Array.from(new Set([...(system.categories || []), value]));
+    if (!value || isGeneralRecipeCategory(value)) return;
+    const categories = normalizeCustomRecipeCategories([...(system.categories || []), value]);
     await game.fabricate.getCraftingSystemManager().updateSystem(system.id, { categories });
     await this.render();
   }
@@ -826,7 +831,8 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     const system = this._selectedSystem();
     if (!system) return;
     const category = target.dataset.category;
-    const categories = (system.categories || []).filter(t => t !== category);
+    if (isGeneralRecipeCategory(category)) return;
+    const categories = normalizeCustomRecipeCategories((system.categories || []).filter(t => t !== category));
     await game.fabricate.getCraftingSystemManager().updateSystem(system.id, { categories });
     await this.render();
   }

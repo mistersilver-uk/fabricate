@@ -34,8 +34,20 @@
     onRemoveCatalyst,
     onClearCatalyst,
     onDropCatalyst,
-    onUpdateCatalyst
+    onUpdateCatalyst,
+    // Essence actions
+    showEssences = false,
+    allEssences = [],
+    onAddEssence,
+    onUpdateEssence,
+    onRemoveEssence
   } = $props();
+
+  let selectedNewEssence = $state('');
+
+  const addableEssences = $derived(
+    (allEssences || []).filter(def => !Object.hasOwn(set?.essences || {}, def.id))
+  );
 
   const panelId = $derived(set?.id || `set-${setIndex}`);
   const ingredientCount = $derived(
@@ -172,6 +184,82 @@
         onDrop={onDropCatalyst}
         onUpdate={onUpdateCatalyst}
       />
+
+      {#if showEssences}
+        <div class="essence-requirements">
+          <h4>{localize('FABRICATE.Editor.Essences.SectionTitle')}</h4>
+          <div class="essence-grid">
+            {#each Object.entries(set?.essences || {}) as [essenceId, quantity]}
+              {@const def = allEssences.find(e => e.id === essenceId)}
+              <article class="essence-card">
+                <button
+                  type="button"
+                  class="essence-step essence-step-minus"
+                  disabled={quantity <= 1}
+                  onclick={() => onUpdateEssence?.(setIndex, essenceId, Math.max(1, quantity - 1))}
+                  aria-label={localize('FABRICATE.Editor.Essences.Decrement', { name: def?.name || essenceId })}
+                  title={localize('FABRICATE.Editor.Essences.Decrement', { name: def?.name || essenceId })}
+                >
+                  <i class="fas fa-minus"></i>
+                </button>
+
+                <input
+                  class="essence-quantity-input"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={quantity}
+                  aria-label={localize('FABRICATE.Editor.Essences.QuantityLabel')}
+                  oninput={(e) => {
+                    const val = Math.max(1, Math.floor(Number(e.target.value) || 1));
+                    onUpdateEssence?.(setIndex, essenceId, val);
+                  }}
+                />
+
+                <div class="essence-icon" aria-hidden="true">
+                  {#if def?.icon}<i class={def.icon} aria-hidden="true"></i>{/if}
+                </div>
+
+                <strong class="essence-name">{def?.name || essenceId}</strong>
+
+                <button
+                  type="button"
+                  class="essence-step essence-step-plus"
+                  onclick={() => onUpdateEssence?.(setIndex, essenceId, quantity + 1)}
+                  aria-label={localize('FABRICATE.Editor.Essences.Increment', { name: def?.name || essenceId })}
+                  title={localize('FABRICATE.Editor.Essences.Increment', { name: def?.name || essenceId })}
+                >
+                  <i class="fas fa-plus"></i>
+                </button>
+
+                <button
+                  type="button"
+                  class="essence-remove"
+                  onclick={() => onRemoveEssence?.(setIndex, essenceId)}
+                  title={localize('FABRICATE.Admin.Features.Essences.Remove')}
+                  aria-label={localize('FABRICATE.Admin.Features.Essences.Remove')}
+                >
+                  <i class="fas fa-times"></i>
+                </button>
+              </article>
+            {/each}
+          </div>
+          {#if addableEssences.length > 0}
+            <div class="add-essence-row">
+              <select value={selectedNewEssence} onchange={(e) => selectedNewEssence = e.target.value}>
+                <option value="">{localize('FABRICATE.Editor.Essences.SelectPlaceholder')}</option>
+                {#each addableEssences as def}
+                  <option value={def.id}>{def.name}</option>
+                {/each}
+              </select>
+              <button type="button" disabled={!selectedNewEssence}
+                onclick={() => { onAddEssence?.(setIndex, selectedNewEssence, 1); selectedNewEssence = ''; }}>
+                <i class="fas fa-plus"></i> {localize('FABRICATE.Editor.Essences.Add')}
+              </button>
+            </div>
+          {/if}
+        </div>
+      {/if}
     </div>
   {/if}
 </section>
@@ -192,9 +280,7 @@
     gap: 6px;
     padding: 8px 12px;
     cursor: pointer;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
-      rgba(0, 0, 0, 0.16);
+    background: rgba(0, 0, 0, 0.18);
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     user-select: none;
   }
@@ -283,5 +369,147 @@
     color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
     margin: 8px 0;
     background: rgba(74, 144, 226, 0.08);
+  }
+
+  .essence-requirements {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .essence-requirements h4 {
+    margin: 0 0 8px 0;
+    font-size: 0.9rem;
+    color: var(--fabricate-editor-muted-strong, rgba(255, 236, 220, 0.82));
+  }
+
+  .essence-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .essence-card {
+    display: grid;
+    grid-template-columns: auto auto auto 1fr auto auto;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 9px;
+    border: 1px solid var(--fabricate-editor-border, rgba(255, 255, 255, 0.14));
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .essence-step {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    border: 1px solid var(--fabricate-editor-border, rgba(255, 255, 255, 0.14));
+    background: rgba(255, 255, 255, 0.04);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex: 0 0 auto;
+    color: inherit;
+  }
+
+  .essence-step i {
+    font-size: 9px;
+    opacity: 0.85;
+  }
+
+  .essence-step:hover:not(:disabled),
+  .essence-step:focus-visible:not(:disabled) {
+    border-color: var(--color-border-highlight, #4488cc);
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .essence-step:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  .essence-quantity-input {
+    width: 44px;
+    min-width: 44px;
+    height: 28px;
+    text-align: center;
+    padding: 0 4px;
+    border-radius: 5px;
+  }
+
+  .essence-quantity-input::-webkit-outer-spin-button,
+  .essence-quantity-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .essence-quantity-input[type="number"] {
+    -moz-appearance: textfield;
+  }
+
+  .essence-icon {
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    flex: 0 0 auto;
+  }
+
+  .essence-icon i {
+    font-size: 13px;
+  }
+
+  .essence-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.88rem;
+  }
+
+  .essence-remove {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    border: 1px solid transparent;
+    background: none;
+    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+  }
+
+  .essence-remove i {
+    font-size: 9px;
+  }
+
+  .essence-remove:hover,
+  .essence-remove:focus-visible {
+    color: var(--fabricate-editor-danger, rgba(255, 216, 208, 0.95));
+    background: var(--fabricate-editor-danger-soft, rgba(220, 53, 69, 0.18));
+    border-color: var(--fabricate-editor-danger-soft, rgba(220, 53, 69, 0.18));
+  }
+
+  .add-essence-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .add-essence-row select {
+    flex: 1;
+  }
+
+  @media (max-width: 720px) {
+    .essence-grid {
+      grid-template-columns: 1fr;
+    }
   }
 </style>

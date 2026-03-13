@@ -9,6 +9,7 @@ import { writable, get } from 'svelte/store';
 import { aggregateShoppingList } from '../util/shoppingListAggregator.js';
 import { localize } from '../util/foundryBridge.js';
 import { itemMatchesComponentSource } from '../../../utils/sourceUuid.js';
+import { normalizeRecipeCategory } from '../../../utils/recipeCategories.js';
 
 const RECENTLY_CRAFTED_MAX = 10;
 
@@ -403,7 +404,7 @@ function _buildPreparedRecipes(
   }
 
   if (selectedCategory) {
-    recipes = recipes.filter(r => r.category === selectedCategory);
+    recipes = recipes.filter(r => normalizeRecipeCategory(r.category) === selectedCategory);
   }
 
   // --- Craftability evaluation ---
@@ -488,7 +489,7 @@ function _buildPreparedRecipes(
       name: recipe.name,
       description: isTeaser && teaserHiddenFields.includes('description') ? (teaserState.teaserDescription || 'FABRICATE.Teaser.HiddenDescription') : recipe.description,
       img: recipe.img,
-      category: recipe.category,
+      category: normalizeRecipeCategory(recipe.category),
       canCraft: craftable,
       allowCraftAction,
       accessReason: access.reason,
@@ -535,7 +536,7 @@ function _buildPreparedRecipes(
   const visibleRecipes = showSimpleRecipesOnly
     ? allRecipes.filter(r => r.isSimpleRecipe())
     : allRecipes;
-  const categories = [...new Set(visibleRecipes.map(r => r.category))].sort();
+  const categories = [...new Set(visibleRecipes.map(r => normalizeRecipeCategory(r.category)))].sort();
   const salvageEntries = _buildSalvageEntries(
     services,
     craftingActor,
