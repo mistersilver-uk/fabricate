@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   buildEssenceIconOptions,
   DEFAULT_ESSENCE_ICON,
-  extractFontAwesomeIconNamesFromCss,
+  ESSENCE_ICON_OPTIONS,
   filterEssenceIconOptions,
   getEssenceIconOption,
   getEssenceIconPrefix,
@@ -17,62 +17,59 @@ describe('essenceIcons utility', () => {
     assert.equal(normalizeEssenceIcon(null), DEFAULT_ESSENCE_ICON);
   });
 
-  it('preserves the detected style prefix when normalizing an icon class', () => {
+  it('canonicalizes solid and regular aliases while preserving other known prefixes', () => {
+    assert.equal(normalizeEssenceIcon('fa-solid fa-fire'), 'fas fa-fire');
+    assert.equal(normalizeEssenceIcon('fa-regular fa-address-book'), 'far fa-address-book');
     assert.equal(normalizeEssenceIcon('fa-duotone fa-flask'), 'fa-duotone fa-flask');
-    assert.equal(normalizeEssenceIcon('fas fa-fire'), 'fas fa-fire');
   });
 
-  it('extracts icon names from Font Awesome CSS declarations with aliases', () => {
-    const css = [
-      '.fa-fire{--fa:"\\\\f06d";--fa--fa:"\\\\f06d\\\\f06d"}',
-      '.fa-person-dress-simple,.fa-female{--fa:"\\\\f182";--fa--fa:"\\\\f182\\\\f182"}',
-      '.fa-solid{font-weight:900}',
-      '.fa-spin{animation:fa-spin 2s linear infinite}'
-    ].join('');
+  it('builds the full classic free icon catalog with solid and regular variants only', () => {
+    const options = buildEssenceIconOptions();
 
-    assert.deepEqual(extractFontAwesomeIconNamesFromCss(css), [
-      'female',
-      'fire',
-      'person-dress-simple'
+    assert.ok(options.length > 1500);
+    assert.ok(options.some(option => option.iconClass === 'fas fa-soap'));
+    assert.ok(options.some(option => option.iconClass === 'fas fa-fingerprint'));
+    assert.ok(options.some(option => option.iconClass === 'fas fa-wine-glass'));
+    assert.ok(options.some(option => option.iconClass === 'fas fa-address-book'));
+    assert.ok(options.some(option => option.iconClass === 'far fa-address-book'));
+    assert.ok(options.every(option => option.iconClass.startsWith('fas ') || option.iconClass.startsWith('far ')));
+    assert.ok(!options.some(option => option.iconClass === 'fab fa-github'));
+  });
+
+  it('builds custom icon definitions into solid and regular picker options', () => {
+    const options = buildEssenceIconOptions([
+      { iconName: 'address-book', label: 'Address Book', hasRegular: true },
+      { iconName: 'soap', label: 'Soap', hasRegular: false }
     ]);
-  });
-
-  it('builds icon options with the supplied prefix and humanized labels', () => {
-    const options = buildEssenceIconOptions(['mortar-pestle', 'seedling'], 'fa-duotone');
 
     assert.deepEqual(options.map(option => option.iconClass), [
-      'fa-duotone fa-mortar-pestle',
-      'fa-duotone fa-seedling'
-    ]);
-    assert.deepEqual(options.map(option => option.label), [
-      'Mortar Pestle',
-      'Seedling'
+      'fas fa-address-book',
+      'far fa-address-book',
+      'fas fa-soap'
     ]);
   });
 
-  it('filters icon options by icon name and class text', () => {
-    const options = buildEssenceIconOptions(['skull-crossbones', 'seedling', 'fire']);
+  it('filters icon options by icon name, class text, and style', () => {
+    const wineMatches = filterEssenceIconOptions(ESSENCE_ICON_OPTIONS, 'wine glass');
+    assert.ok(wineMatches.some(option => option.iconClass === 'fas fa-wine-glass'));
 
-    const poisonMatches = filterEssenceIconOptions(options, 'skull');
-    assert.ok(poisonMatches.some(option => option.iconClass === 'fas fa-skull-crossbones'));
-
-    const classMatches = filterEssenceIconOptions(options, 'fa-fire');
-    assert.ok(classMatches.some(option => option.iconClass === 'fas fa-fire'));
+    const regularMatches = filterEssenceIconOptions(ESSENCE_ICON_OPTIONS, 'address book regular');
+    assert.ok(regularMatches.some(option => option.iconClass === 'far fa-address-book'));
+    assert.ok(!regularMatches.some(option => option.iconClass === 'fas fa-address-book'));
   });
 
-  it('detects short and long style prefixes from an icon class', () => {
+  it('detects style prefixes from stored icon classes', () => {
     assert.equal(getEssenceIconPrefix('fas fa-fire'), 'fas');
-    assert.equal(getEssenceIconPrefix('fa-duotone fa-flask'), 'fa-duotone');
-    assert.equal(getEssenceIconPrefix('fa-sharp-duotone fa-leaf'), 'fa-sharp-duotone');
+    assert.equal(getEssenceIconPrefix('fa-regular fa-address-book'), 'far');
+    assert.equal(getEssenceIconPrefix('fa-duotone fa-leaf'), 'fa-duotone');
   });
 
   it('returns a catalog match when one exists and a humanized passthrough otherwise', () => {
-    const options = buildEssenceIconOptions(['fire', 'leaf']);
+    const known = getEssenceIconOption('far fa-address-book', ESSENCE_ICON_OPTIONS);
+    assert.equal(known.label, 'Address Book');
+    assert.equal(known.variant, 'regular');
 
-    const known = getEssenceIconOption('fas fa-fire', options);
-    assert.equal(known.label, 'Fire');
-
-    const custom = getEssenceIconOption('fas fa-dragon', options);
+    const custom = getEssenceIconOption('fas fa-dragon', ESSENCE_ICON_OPTIONS);
     assert.equal(custom.label, 'Dragon');
     assert.equal(custom.iconClass, 'fas fa-dragon');
   });

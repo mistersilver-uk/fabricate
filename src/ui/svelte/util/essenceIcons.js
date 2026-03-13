@@ -1,39 +1,8 @@
+import { FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS } from './fontAwesomeFreeClassicIcons.js';
+
 export const DEFAULT_ESSENCE_ICON = 'fas fa-mortar-pestle';
 
 const DEFAULT_ICON_PREFIX = 'fas';
-
-const FALLBACK_ICON_NAMES = Object.freeze([
-  'mortar-pestle',
-  'tint',
-  'fire',
-  'leaf',
-  'skull-crossbones',
-  'heart',
-  'bolt',
-  'sun',
-  'moon',
-  'snowflake',
-  'wind',
-  'mountain',
-  'paw',
-  'bone',
-  'brain',
-  'eye',
-  'ghost',
-  'hourglass-half',
-  'flask',
-  'vial',
-  'gem',
-  'star',
-  'shield-alt',
-  'feather-alt',
-  'cloud',
-  'spider',
-  'seedling',
-  'atom',
-  'radiation-alt',
-  'anchor'
-]);
 
 const STYLE_PREFIXES = Object.freeze(new Set([
   'fas',
@@ -115,8 +84,10 @@ const NON_ICON_TOKENS = Object.freeze(new Set([
   'fa-10x'
 ]));
 
-let cachedIconNames = null;
-let pendingIconNames = null;
+const PREFIX_ALIASES = Object.freeze({
+  'fa-solid': 'fas',
+  'fa-regular': 'far'
+});
 
 function normalizeSearch(value) {
   return String(value || '')
@@ -138,30 +109,43 @@ function humanizeIconName(iconName) {
 
 function normalizePrefix(prefix) {
   const trimmed = String(prefix || '').trim();
-  return STYLE_PREFIXES.has(trimmed) ? trimmed : DEFAULT_ICON_PREFIX;
+  if (!trimmed) return DEFAULT_ICON_PREFIX;
+  return PREFIX_ALIASES[trimmed] || (STYLE_PREFIXES.has(trimmed) ? trimmed : DEFAULT_ICON_PREFIX);
 }
 
-function extractIconNamesFromSelectorText(selectorText = '') {
-  const names = new Set();
-  for (const match of selectorText.matchAll(/\.fa-([a-z0-9-]+)/g)) {
-    const iconName = match[1];
-    if (!iconName || NON_ICON_TOKENS.has(`fa-${iconName}`)) continue;
-    names.add(iconName);
+function createIconOption({ iconName, label }, prefix) {
+  const variant = prefix === 'far' ? 'regular' : 'solid';
+  const resolvedLabel = String(label || '').trim() || humanizeIconName(iconName);
+
+  return Object.freeze({
+    iconClass: `${prefix} fa-${iconName}`,
+    iconName,
+    label: resolvedLabel,
+    variant,
+    searchText: normalizeSearch(`${resolvedLabel} ${iconName} fa-${iconName} ${prefix} ${variant}`)
+  });
+}
+
+function createEssenceIconOptions(iconDefinitions) {
+  const options = [];
+
+  for (const definition of iconDefinitions) {
+    if (!definition?.iconName) continue;
+    options.push(createIconOption(definition, 'fas'));
+    if (definition.hasRegular) {
+      options.push(createIconOption(definition, 'far'));
+    }
   }
-  return [...names];
+
+  return Object.freeze(options);
 }
 
-function freezeNames(iconNames) {
-  return Object.freeze([...iconNames].sort((left, right) => left.localeCompare(right)));
-}
-
-export function getFallbackEssenceIconNames() {
-  return FALLBACK_ICON_NAMES;
-}
+export const ESSENCE_ICON_OPTIONS = createEssenceIconOptions(FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS);
 
 export function getEssenceIconPrefix(iconClass) {
   const tokens = String(iconClass || '').trim().split(/\s+/).filter(Boolean);
-  return tokens.find(token => STYLE_PREFIXES.has(token)) || DEFAULT_ICON_PREFIX;
+  const prefix = tokens.find(token => STYLE_PREFIXES.has(token));
+  return normalizePrefix(prefix);
 }
 
 export function getEssenceIconName(iconClass) {
@@ -176,39 +160,37 @@ export function normalizeEssenceIcon(iconClass) {
   return iconName ? `${prefix} fa-${iconName}` : DEFAULT_ESSENCE_ICON;
 }
 
-export function buildEssenceIconOptions(iconNames = FALLBACK_ICON_NAMES, prefix = DEFAULT_ICON_PREFIX) {
-  const resolvedPrefix = normalizePrefix(prefix);
-  const uniqueNames = freezeNames(
-    new Set(
-      (Array.isArray(iconNames) ? iconNames : FALLBACK_ICON_NAMES)
-        .map(name => String(name || '').trim())
-        .filter(Boolean)
-    )
-  );
+export function buildEssenceIconOptions(iconDefinitions = FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS) {
+  if (iconDefinitions === FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS) {
+    return ESSENCE_ICON_OPTIONS;
+  }
 
-  return uniqueNames.map(iconName => {
-    const label = humanizeIconName(iconName);
-    return Object.freeze({
-      iconClass: `${resolvedPrefix} fa-${iconName}`,
-      iconName,
-      label,
-      searchText: normalizeSearch(`${label} fa-${iconName} ${iconName} ${resolvedPrefix}`)
-    });
-  });
+  const resolvedDefinitions = Array.isArray(iconDefinitions) && iconDefinitions.length > 0
+    ? iconDefinitions
+    : FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS;
+
+  return createEssenceIconOptions(resolvedDefinitions);
 }
 
-export function getEssenceIconOption(iconClass, options = []) {
+export function getEssenceIconOption(iconClass, options = ESSENCE_ICON_OPTIONS) {
   const normalizedIcon = normalizeEssenceIcon(iconClass);
   const resolvedOptions = Array.isArray(options) && options.length > 0
     ? options
-    : buildEssenceIconOptions(FALLBACK_ICON_NAMES, getEssenceIconPrefix(normalizedIcon));
+    : ESSENCE_ICON_OPTIONS;
 
-  return resolvedOptions.find(option => option.iconClass === normalizedIcon) || {
-    label: humanizeIconName(getEssenceIconName(normalizedIcon)) || normalizedIcon,
+  const match = resolvedOptions.find(option => option.iconClass === normalizedIcon);
+  if (match) return match;
+
+  const prefix = getEssenceIconPrefix(normalizedIcon);
+  const iconName = getEssenceIconName(normalizedIcon);
+
+  return Object.freeze({
+    label: humanizeIconName(iconName) || normalizedIcon,
     iconClass: normalizedIcon,
-    iconName: getEssenceIconName(normalizedIcon),
+    iconName,
+    variant: prefix === 'far' ? 'regular' : 'solid',
     searchText: normalizeSearch(normalizedIcon)
-  };
+  });
 }
 
 export function filterEssenceIconOptions(options = [], searchTerm = '') {
@@ -220,112 +202,4 @@ export function filterEssenceIconOptions(options = [], searchTerm = '') {
   return resolvedOptions.filter(option =>
     tokens.every(token => option.searchText.includes(token))
   );
-}
-
-export function extractFontAwesomeIconNamesFromCss(cssText = '') {
-  if (!cssText) return [];
-
-  const iconNames = new Set();
-  for (const match of cssText.matchAll(/([^{}]+)\{--fa:[^}]+\}/g)) {
-    for (const iconName of extractIconNamesFromSelectorText(match[1])) {
-      iconNames.add(iconName);
-    }
-  }
-
-  return freezeNames(iconNames);
-}
-
-export function extractFontAwesomeIconNamesFromStyleSheet(sheet) {
-  if (!sheet?.cssRules) return [];
-
-  const iconNames = new Set();
-  let rules = [];
-  try {
-    rules = Array.from(sheet.cssRules);
-  } catch {
-    return [];
-  }
-
-  for (const rule of rules) {
-    if (!rule?.style?.getPropertyValue) continue;
-    if (!rule.style.getPropertyValue('--fa')) continue;
-    for (const iconName of extractIconNamesFromSelectorText(rule.selectorText || '')) {
-      iconNames.add(iconName);
-    }
-  }
-
-  return freezeNames(iconNames);
-}
-
-export function extractFontAwesomeIconNamesFromDocument(doc = globalThis.document) {
-  if (!doc?.styleSheets) return [];
-
-  const iconNames = new Set();
-  const styleSheets = Array.from(doc.styleSheets);
-  for (const sheet of styleSheets) {
-    const href = String(sheet?.href || '');
-    if (href && !href.includes('fontawesome')) continue;
-    for (const iconName of extractFontAwesomeIconNamesFromStyleSheet(sheet)) {
-      iconNames.add(iconName);
-    }
-  }
-
-  return freezeNames(iconNames);
-}
-
-function findFontAwesomeStylesheetHref(doc = globalThis.document) {
-  if (!doc?.styleSheets) return '';
-
-  for (const sheet of Array.from(doc.styleSheets)) {
-    const href = String(sheet?.href || '');
-    if (href.includes('fontawesome') && href.endsWith('.css')) {
-      return href;
-    }
-  }
-
-  return '';
-}
-
-export function getEssenceIconNames() {
-  return cachedIconNames || FALLBACK_ICON_NAMES;
-}
-
-export async function loadEssenceIconNames() {
-  if (cachedIconNames) return cachedIconNames;
-  if (pendingIconNames) return pendingIconNames;
-
-  pendingIconNames = (async () => {
-    const doc = globalThis.document;
-    const runtimeNames = extractFontAwesomeIconNamesFromDocument(doc);
-    if (runtimeNames.length > 0) {
-      cachedIconNames = runtimeNames;
-      return cachedIconNames;
-    }
-
-    const stylesheetHref = findFontAwesomeStylesheetHref(doc);
-    if (stylesheetHref && typeof globalThis.fetch === 'function') {
-      try {
-        const response = await globalThis.fetch(stylesheetHref);
-        if (response?.ok) {
-          const cssText = await response.text();
-          const extractedNames = extractFontAwesomeIconNamesFromCss(cssText);
-          if (extractedNames.length > 0) {
-            cachedIconNames = extractedNames;
-            return cachedIconNames;
-          }
-        }
-      } catch {
-        // Fall through to the curated fallback set.
-      }
-    }
-
-    cachedIconNames = FALLBACK_ICON_NAMES;
-    return cachedIconNames;
-  })();
-
-  try {
-    return await pendingIconNames;
-  } finally {
-    pendingIconNames = null;
-  }
 }

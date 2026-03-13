@@ -1,16 +1,12 @@
 <!-- Svelte 5 runes mode -->
 <script>
-  import { onMount } from 'svelte';
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { localize } from '../util/foundryBridge.js';
   import {
     DEFAULT_ESSENCE_ICON,
-    buildEssenceIconOptions,
+    ESSENCE_ICON_OPTIONS,
     filterEssenceIconOptions,
-    getEssenceIconNames,
     getEssenceIconOption,
-    getEssenceIconPrefix,
-    loadEssenceIconNames,
     normalizeEssenceIcon
   } from '../util/essenceIcons.js';
 
@@ -25,11 +21,9 @@
   let pickerOpen = $state(false);
   let searchTerm = $state('');
   let searchInput = $state(null);
-  let iconNames = $state(getEssenceIconNames());
 
+  const iconOptions = ESSENCE_ICON_OPTIONS;
   const selectedIconClass = $derived(normalizeEssenceIcon(value));
-  const selectedPrefix = $derived(getEssenceIconPrefix(selectedIconClass));
-  const iconOptions = $derived(buildEssenceIconOptions(iconNames, selectedPrefix));
   const selectedOption = $derived(getEssenceIconOption(selectedIconClass, iconOptions));
   const filteredOptions = $derived(filterEssenceIconOptions(iconOptions, searchTerm));
 
@@ -56,20 +50,6 @@
   $effect(() => {
     if (!pickerOpen || !searchInput) return;
     queueMicrotask(() => searchInput?.focus());
-  });
-
-  onMount(() => {
-    let cancelled = false;
-
-    loadEssenceIconNames().then(loadedIconNames => {
-      if (!cancelled && Array.isArray(loadedIconNames) && loadedIconNames.length > 0) {
-        iconNames = loadedIconNames;
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
   });
 </script>
 
@@ -127,7 +107,7 @@
             class="essence-icon-picker-option"
             role="option"
             aria-selected={option.iconClass === selectedIconClass}
-            title={option.label}
+            title={`${option.label} (${option.variant})`}
             onclick={() => selectIcon(option.iconClass)}
           >
             <span class="essence-icon-picker-preview" aria-hidden="true">
