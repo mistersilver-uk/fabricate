@@ -11,6 +11,11 @@ import {
   getEffectiveRecipeCategories,
   normalizeRecipeCategory
 } from '../../../utils/recipeCategories.js';
+import {
+  applyRecipeAvailabilityState,
+  getRecipeAvailabilityFlags,
+  getRecipeAvailabilityState
+} from '../../recipeAvailability.js';
 import { clampComponentEssenceQuantity } from '../util/componentEditor.js';
 import {
   draftIngredientGroupHasRequirement,
@@ -433,6 +438,7 @@ function _buildRecipePayload(draft, featureState, services) {
   const enableCategories = featureState.showCategories;
   const enableComplexRecipes = featureState.showComplexRecipes;
   const enablePropertyMacros = featureState.showPropertyMacros;
+  const availability = getRecipeAvailabilityFlags(getRecipeAvailabilityState(draft));
 
   const serializeIngredientSets = (sourceSets = []) => {
     const sets = enableComplexRecipes ? sourceSets : [sourceSets[0]];
@@ -555,8 +561,8 @@ function _buildRecipePayload(draft, featureState, services) {
     category: enableCategories ? normalizeRecipeCategory(draft.category) : GENERAL_RECIPE_CATEGORY,
     craftingSystemId: draft.craftingSystemId || null,
     system: 'all',
-    enabled: draft.enabled,
-    locked: draft.locked === true,
+    enabled: availability.enabled,
+    locked: availability.locked,
     linkedRecipeItemUuid: draft.linkedRecipeItemUuid || null,
     visibility: featureState.showRecipeVisibilityPlayer
       ? {
@@ -662,6 +668,12 @@ export function createEditorStore(services, options = {}) {
 
   function setField(field, value) {
     updateDraft(d => { d[field] = value; });
+  }
+
+  function setAvailabilityState(state) {
+    updateDraft(d => {
+      applyRecipeAvailabilityState(d, state);
+    });
   }
 
   // --- Step navigation ---
@@ -1154,6 +1166,7 @@ export function createEditorStore(services, options = {}) {
 
     // Actions
     setField,
+    setAvailabilityState,
     updateDraft,
 
     // Step navigation

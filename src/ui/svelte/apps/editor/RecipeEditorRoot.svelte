@@ -2,6 +2,10 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import { getRecipeCategoryLabel } from '../../../../utils/recipeCategories.js';
+  import {
+    getRecipeAvailabilityState,
+    RECIPE_AVAILABILITY_STATES
+  } from '../../../recipeAvailability.js';
   import ValidationBanner from './ValidationBanner.svelte';
   import ItemPickerGrid from './ItemPickerGrid.svelte';
   import IngredientSetPanel from './IngredientSetPanel.svelte';
@@ -58,6 +62,7 @@
   // Active ingredient sets & result groups (either from step or top-level)
   const ingredientSets = $derived($activeContainers?.ingredientSets || []);
   const resultGroups = $derived($activeContainers?.results || []);
+  const availabilityState = $derived(getRecipeAvailabilityState($draft));
 
   // Field-level error helpers
   const errorFieldSelectors = $derived(
@@ -268,22 +273,24 @@
 
       <!-- Flags -->
       <section class="flags-section editor-panel-surface">
-        <label class="checkbox-label">
-          <input
-            type="checkbox"
-            checked={$draft.enabled}
-            onchange={(e) => store.setField('enabled', e.target.checked)}
-          />
-          {localize('FABRICATE.Editor.Flags.Enabled')}
-        </label>
-        <label class="checkbox-label">
-          <input
-            type="checkbox"
-            checked={$draft.locked}
-            onchange={(e) => store.setField('locked', e.target.checked)}
-          />
-          {localize('FABRICATE.Editor.Flags.Locked')}
-        </label>
+        <div class="field-row availability-field">
+          <label for="recipeAvailability">{localize('FABRICATE.Editor.Flags.Availability')}</label>
+          <select
+            id="recipeAvailability"
+            value={availabilityState}
+            onchange={(e) => store.setAvailabilityState(e.target.value)}
+          >
+            <option value={RECIPE_AVAILABILITY_STATES.ENABLED}>
+              {localize('FABRICATE.Editor.Flags.StatusEnabled')}
+            </option>
+            <option value={RECIPE_AVAILABILITY_STATES.DISABLED}>
+              {localize('FABRICATE.Editor.Flags.StatusDisabled')}
+            </option>
+            <option value={RECIPE_AVAILABILITY_STATES.LOCKED}>
+              {localize('FABRICATE.Editor.Flags.StatusLocked')}
+            </option>
+          </select>
+        </div>
         {#if $featureState.showComplexRecipes && !$featureState.isMappedMode}
           <label class="checkbox-label">
             <input
@@ -561,6 +568,11 @@
     gap: 14px;
     margin-bottom: 0;
     padding: 12px 14px;
+  }
+
+  .availability-field {
+    flex: 1 1 220px;
+    min-width: min(100%, 240px);
   }
 
   .checkbox-label {

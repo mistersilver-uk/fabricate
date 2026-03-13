@@ -282,6 +282,48 @@ describe('createEditorStore', () => {
   });
 
   // -------------------------------------------------------------------------
+  // 2b. Availability state
+  // -------------------------------------------------------------------------
+
+  describe('setAvailabilityState', () => {
+    it('defaults new recipes to enabled', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      const draft = get(store.draft);
+      assert.equal(draft.enabled, true);
+      assert.equal(draft.locked, false);
+    });
+
+    it('setAvailabilityState("disabled") clears locked and disables the recipe', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setAvailabilityState('disabled');
+      const draft = get(store.draft);
+      assert.equal(draft.enabled, false);
+      assert.equal(draft.locked, false);
+    });
+
+    it('setAvailabilityState("locked") enables and locks the recipe', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setAvailabilityState('locked');
+      const draft = get(store.draft);
+      assert.equal(draft.enabled, true);
+      assert.equal(draft.locked, true);
+    });
+
+    it('setAvailabilityState("enabled") enables the recipe and clears locked', () => {
+      const svc = mockServices();
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setAvailabilityState('locked');
+      store.setAvailabilityState('enabled');
+      const draft = get(store.draft);
+      assert.equal(draft.enabled, true);
+      assert.equal(draft.locked, false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // 3. Step navigation
   // -------------------------------------------------------------------------
 
@@ -1149,6 +1191,42 @@ describe('createEditorStore', () => {
       assert.deepEqual(savedPayload.ingredientSets[0].essences, { fire: 1 });
       assert.deepEqual(savedPayload.ingredientSets[0].ingredientGroups, []);
       assert.deepEqual(savedPayload.ingredientSets[0].ingredients, []);
+    });
+
+    it('saveRecipe normalizes contradictory disabled-plus-locked draft state to disabled', async () => {
+      let savedPayload = null;
+      const svc = mockServices({
+        saveRecipe: async (payload) => { savedPayload = payload; }
+      });
+      const recipe = makeRecipe({
+        name: 'Contradictory Status',
+        enabled: false,
+        locked: true,
+        ingredientSets: [{
+          id: 'set-1',
+          name: 'Set 1',
+          ingredientGroups: [{
+            id: 'group-1',
+            name: 'Group 1',
+            options: [{ id: 'opt-1', matchType: 'component', componentId: 'item-ingredient', quantity: 1, tagsText: '', tagMatch: 'any' }]
+          }],
+          essences: {},
+          catalysts: []
+        }],
+        resultGroups: [{
+          id: 'result-group-1',
+          name: 'Result Group 1',
+          results: [{ id: 'result-1', componentId: 'item-result', quantity: 1, propertyMacroUuid: null }]
+        }]
+      });
+      const store = createEditorStore(svc, { recipe });
+
+      const result = await store.saveRecipe();
+
+      assert.equal(result.success, true);
+      assert.ok(savedPayload, 'saveRecipe should receive a payload');
+      assert.equal(savedPayload.enabled, false);
+      assert.equal(savedPayload.locked, false);
     });
   });
 

@@ -25,6 +25,29 @@ describe('Recipe editor theme layout contract', () => {
     assert.match(rootSource, /\.editor-panel-surface \{/);
   });
 
+  it('uses a single availability dropdown instead of separate enabled and locked checkboxes', () => {
+    assert.ok(
+      rootSource.includes('id="recipeAvailability"'),
+      'recipe editor should render a dedicated availability select'
+    );
+    assert.ok(
+      rootSource.includes("store.setAvailabilityState"),
+      'availability changes should route through the dedicated store action'
+    );
+    assert.ok(
+      rootSource.includes("RECIPE_AVAILABILITY_STATES.ENABLED"),
+      'the availability select should include the enabled option'
+    );
+    assert.ok(
+      rootSource.includes("RECIPE_AVAILABILITY_STATES.DISABLED"),
+      'the availability select should include the disabled option'
+    );
+    assert.ok(
+      rootSource.includes("RECIPE_AVAILABILITY_STATES.LOCKED"),
+      'the availability select should include the locked option'
+    );
+  });
+
   it('removes the light validation and picker surface fallbacks in favor of editor tokens', () => {
     assert.ok(
       !bannerSource.includes('#f8d7da'),

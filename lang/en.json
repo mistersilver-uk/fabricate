@@ -389,8 +389,12 @@
         "CategoryHint": "Define categories in Crafting Admin > Systems."
       },
       "Flags": {
+        "Availability": "Availability",
         "Enabled": "Enabled",
         "Locked": "Locked",
+        "StatusEnabled": "Enabled",
+        "StatusDisabled": "Disabled",
+        "StatusLocked": "Locked",
         "VariableOutput": "Variable Output",
         "TransferEffects": "Transfer Effects"
       },
