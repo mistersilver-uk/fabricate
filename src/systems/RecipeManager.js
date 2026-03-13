@@ -672,10 +672,6 @@ export class RecipeManager {
         ? requiredTags.every(tag => itemTags.includes(tag))
         : requiredTags.some(tag => itemTags.includes(tag));
       if (!matched) return false;
-      if (ingredient.tier && features.enableTiers) {
-        const itemTier = getFabricateFlag(item, 'tier', null);
-        return itemTier === ingredient.tier;
-      }
       return true;
     }
 
@@ -683,10 +679,6 @@ export class RecipeManager {
       if (!features.enableTags) return false;
       const itemTags = getFabricateFlag(item, 'tags', []);
       if (!itemTags.includes(ingredient.tag)) return false;
-      if (ingredient.tier && features.enableTiers) {
-        const itemTier = getFabricateFlag(item, 'tier', null);
-        return itemTier === ingredient.tier;
-      }
       return true;
     }
 
@@ -700,7 +692,7 @@ export class RecipeManager {
   _getSystemFeatures(recipe) {
     const systemId = recipe?.craftingSystemId;
     if (!systemId) {
-      return { enableTags: false, enableTiers: false, enableEssences: false };
+      return { enableTags: false, enableEssences: false };
     }
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(systemId);
@@ -708,7 +700,6 @@ export class RecipeManager {
     const features = system?.features || {};
     return {
       enableTags: advancedEnabled && features.itemTags === true,
-      enableTiers: false,
       enableEssences: advancedEnabled && features.essences === true
     };
   }

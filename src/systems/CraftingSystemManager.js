@@ -58,7 +58,8 @@ export class CraftingSystemManager {
       enabled: system.enabled !== false,
       resolutionMode: (function _normalizeResolutionMode(raw) {
         if (raw === 'cauldron') return 'alchemy'; // T-189: legacy alias
-        return ['simple', 'mapped', 'tiered', 'progressive', 'alchemy'].includes(raw) ? raw : 'simple';
+        if (raw === 'mapped' || raw === 'tiered') return 'routed'; // #134: legacy tiered-mode aliases
+        return ['simple', 'routed', 'progressive', 'alchemy'].includes(raw) ? raw : 'simple';
       })(system.resolutionMode),
       // New spec-first shape
       features,
@@ -84,8 +85,6 @@ export class CraftingSystemManager {
       enableEssences: features.essences === true,
       enableCategories: features.recipeCategories === true,
       enableMultiStepRecipes: features.multiStepRecipes === true,
-      enableTiers: false,
-      tiers: [],
       components: items
     };
   }
@@ -436,7 +435,6 @@ export class CraftingSystemManager {
       // Transitional alias for current UI/engine references.
       sourceUuid,
       fallbackItemIds,
-      tier: item.tier || null,
       tags: Array.isArray(item.tags) ? item.tags : [],
       essences: this._normalizeEssenceQuantities(item.essences, validEssenceIds),
       difficulty: Number.isFinite(difficulty) && difficulty >= 1 ? Math.floor(difficulty) : undefined,
