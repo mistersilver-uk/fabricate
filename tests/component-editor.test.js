@@ -39,8 +39,8 @@ test('buildComponentEditorState exposes tag and essence sections when both featu
     features: { itemTags: true, essences: true },
     itemTags: ['fire', 'flora'],
     essenceDefinitions: [
-      { id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire' },
-      { id: 'ess-shadow', name: 'Shadow', icon: '' }
+      { id: 'ess-shadow', name: 'Shadow', icon: '' },
+      { id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire' }
     ]
   });
   const item = makeItem({
@@ -65,6 +65,34 @@ test('buildComponentEditorState exposes tag and essence sections when both featu
     { id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire', quantity: 2 },
     { id: 'ess-shadow', name: 'Shadow', icon: getDefaultEssenceIcon(), quantity: 1 }
   ]);
+});
+
+test('buildComponentEditorState sorts essence options alphabetically by display name', () => {
+  const system = makeSystem({
+    features: { itemTags: false, essences: true },
+    essenceDefinitions: [
+      { id: 'ess-zeta', name: 'zeta', icon: 'fas fa-bolt' },
+      { id: 'ess-ember', icon: 'fas fa-fire' },
+      { id: 'ess-alpha', name: 'Alpha', icon: 'fas fa-feather' }
+    ]
+  });
+
+  const state = buildComponentEditorState(system, makeItem({
+    essences: {
+      'ess-alpha': 2,
+      'ess-ember': 1,
+      'ess-zeta': 3
+    }
+  }));
+
+  assert.deepEqual(
+    state.essenceOptions.map(option => ({ id: option.id, name: option.name, quantity: option.quantity })),
+    [
+      { id: 'ess-alpha', name: 'Alpha', quantity: 2 },
+      { id: 'ess-ember', name: 'ess-ember', quantity: 1 },
+      { id: 'ess-zeta', name: 'zeta', quantity: 3 }
+    ]
+  );
 });
 
 test('buildComponentEditorState only refers to tags when essences are disabled', () => {

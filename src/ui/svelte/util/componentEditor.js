@@ -4,6 +4,16 @@ export function getDefaultEssenceIcon() {
   return DEFAULT_ESSENCE_ICON;
 }
 
+function compareComponentEditorEssenceOptions(left, right) {
+  const nameCompare = String(left?.name || '').localeCompare(String(right?.name || ''), undefined, {
+    sensitivity: 'base'
+  });
+  if (nameCompare !== 0) return nameCompare;
+  return String(left?.id || '').localeCompare(String(right?.id || ''), undefined, {
+    sensitivity: 'base'
+  });
+}
+
 export function clampComponentEssenceQuantity(value) {
   const quantity = Number(value);
   if (!Number.isFinite(quantity) || quantity <= 0) return 0;
@@ -53,7 +63,7 @@ export function buildComponentEditorState(system, item) {
         name: def.name || def.id,
         icon: String(def.icon || '').trim() || DEFAULT_ESSENCE_ICON,
         quantity: clampComponentEssenceQuantity(currentEssences[def.id])
-      }))
+      })).sort(compareComponentEditorEssenceOptions)
       : []
   };
 }
