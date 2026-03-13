@@ -3,8 +3,8 @@ name: docs-writer
 description: >
   Keeps Fabricate's documentation in sync with the codebase. Invoke after the
   reviewer approves a change, or as a standalone task when docs are stale.
-  Handles JSDoc on TypeScript source, the Jekyll docs site under docs/, and
-  CHANGELOG.md. Never modifies src/ or test/ files.
+  Handles JSDoc on TypeScript source and the Jekyll docs site under docs/.
+  Never modifies src/ or test/ files.
 tools: Read, Write, Glob, Grep, Bash
 model: sonnet
 permissionMode: acceptEdits
@@ -44,10 +44,6 @@ Structure mirrors the public API:
 - `docs/crafting-systems/` — User-facing system guides
 - `docs/essences/` — User-facing essence guides
 
-**3. `CHANGELOG.md`** at the repo root.
-
-You append entries for approved changes following the format already in use.
-
 ## README.md Policy
 
 **Do NOT edit README.md.** The README is a high-level project overview and
@@ -78,7 +74,6 @@ git log --oneline -10
 
 # 2. Read the changed source files
 # 3. Read the existing docs for those areas
-# 4. Read CHANGELOG.md to understand the entry format
 # 5. Check whether existing JSDoc matches the current signatures
 grep -r "@param\|@returns\|@example" src/ --include="*.ts" -l
 ```
@@ -186,18 +181,6 @@ const component = await game.fabricate.api.components.getById(id, systemId);
 - The `game.fabricate.api` global is only available after the `"fabricate.ready"` Hooks event fires. All examples must show this guard or be placed inside a handler for that hook.
 - Do not document private or internal APIs.
 
-## CHANGELOG.md Standards
-
-Read the existing CHANGELOG.md first to match the format exactly.
-Entries belong under the correct version heading (create one if this is a new version) and under the correct subsection: `Added`, `Changed`, `Fixed`, or `Removed`.
-
-Entry format:
-```markdown
-- Brief present-tense description of the change. (#PR-number if known)
-```
-
-One line per change. Reference the GitHub issue number in the entry where the PR number is not yet known: e.g. `(#42)`.
-
 ## What You Must Not Do
 
 - Do not edit `README.md`. It is a project overview — not a docs surface.
@@ -220,9 +203,6 @@ JSDoc updated:
 
 Jekyll pages updated:
   - docs/api/components/index.md (added getById reference section)
-
-CHANGELOG.md:
-  - Added entry under [Unreleased] > Fixed
 
 Skipped:
   - docs/api/recipes/ — no recipe-related changes in this diff

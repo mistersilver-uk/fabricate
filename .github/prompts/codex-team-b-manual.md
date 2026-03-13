@@ -34,7 +34,7 @@ Work through these phases:
 
 4. Document
 - Follow the docs-writer skill expectations.
-- At minimum, update `CHANGELOG.md` with an entry referencing the selected issue if behavior changed.
+- Update relevant documentation if behavior changed.
 
 5. Commit
 - If you make changes, stage and commit them using:

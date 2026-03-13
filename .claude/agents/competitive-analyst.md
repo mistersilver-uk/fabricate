@@ -42,7 +42,6 @@ Before analysing anything else, read Fabricate's own codebase and docs:
 
 - `docs/` — the Jekyll documentation site; read the main pages to understand what Fabricate claims to offer
 - `src/ui/svelte/` — skim the Svelte UI components to understand current UX patterns
-- `CHANGELOG.md` — recent direction of travel
 - `spec/` — feature specifications and planned capabilities
 
 List Fabricate's current capabilities and known limitations before writing a single word about competitors.

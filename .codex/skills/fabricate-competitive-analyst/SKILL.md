@@ -12,7 +12,6 @@ Keep this skill aligned with `.claude/agents/competitive-analyst.md`.
 - `COMPETITIVE_ANALYSIS.md` if it exists
 - Fabricate docs under `docs/`
 - relevant UI files under `src/ui/svelte/`
-- `CHANGELOG.md`
 - relevant spec files
 
 ## Workflow
