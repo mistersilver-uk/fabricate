@@ -170,15 +170,16 @@
 
 <style>
   .ingredient-group-card {
-    border: 1px solid var(--color-border-light, #ddd);
-    border-radius: 4px;
-    padding: 8px;
+    border: 1px solid var(--fabricate-editor-border, rgba(255, 255, 255, 0.14));
+    border-radius: 8px;
+    padding: 10px;
     margin-bottom: 8px;
+    background: rgba(255, 255, 255, 0.03);
   }
 
   .group-error {
-    border-color: var(--color-border-error, #dc3545);
-    box-shadow: 0 0 0 1px var(--color-border-error, #dc3545);
+    border-color: var(--fabricate-editor-border-danger, rgba(255, 124, 102, 0.48));
+    box-shadow: 0 0 0 1px var(--fabricate-editor-border-danger, rgba(255, 124, 102, 0.48));
   }
 
   .group-header {
@@ -203,7 +204,8 @@
     text-align: left;
     font-size: 0.8rem;
     padding: 2px 4px;
-    border-bottom: 1px solid var(--color-border-light, #ddd);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
   }
 
   .ingredient-options-table td {
@@ -215,7 +217,7 @@
     text-align: center;
     font-weight: bold;
     font-size: 0.8rem;
-    color: var(--color-text-light-heading, #888);
+    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
     padding: 2px;
   }
 
@@ -223,6 +225,11 @@
     display: flex;
     align-items: center;
     gap: 4px;
+    min-height: 34px;
+    padding: 4px 6px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.03);
   }
 
   .item-thumb {
@@ -232,7 +239,7 @@
   }
 
   .no-item {
-    color: var(--color-text-light-heading, #999);
+    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
     font-style: italic;
   }
 
@@ -254,13 +261,39 @@
     border: none;
     cursor: pointer;
     padding: 2px 4px;
+    border-radius: 5px;
+    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
   }
 
   .icon-button.danger {
-    color: var(--color-text-error, #c00);
+    color: var(--fabricate-editor-danger, rgba(255, 216, 208, 0.95));
   }
 
   .add-option-btn {
     font-size: 0.85rem;
+  }
+
+  @media (max-width: 720px) {
+    .tag-match-fields {
+      flex-direction: column;
+    }
+
+    .ingredient-options-table,
+    .ingredient-options-table tbody,
+    .ingredient-options-table tr,
+    .ingredient-options-table td,
+    .ingredient-options-table th {
+      display: block;
+      width: 100%;
+    }
+
+    .ingredient-options-table thead {
+      display: none;
+    }
+
+    .option-row {
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
   }
 </style>

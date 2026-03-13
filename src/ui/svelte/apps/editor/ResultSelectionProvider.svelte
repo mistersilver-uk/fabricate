@@ -117,21 +117,24 @@
 
 <style>
   .result-selection-section {
-    margin: 12px 0;
-    padding: 8px;
-    border: 1px solid var(--color-border-light, #ddd);
-    border-radius: 4px;
+    margin: 0;
+    padding: 14px;
+    border: 1px solid var(--fabricate-editor-border, rgba(255, 255, 255, 0.14));
+    border-radius: 12px;
+    background: var(--fabricate-editor-surface, rgba(0, 0, 0, 0.16));
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.2);
   }
 
   .result-selection-section h4 {
-    margin: 0 0 8px;
+    margin: 0 0 10px;
   }
 
   .provider-selector {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 8px;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
   }
 
   .provider-selector select {
@@ -147,7 +150,7 @@
   }
 
   .hint {
-    color: var(--color-text-light-heading, #888);
+    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
     font-style: italic;
     font-size: 0.9rem;
     margin: 4px 0 8px;
@@ -161,6 +164,7 @@
 
   .outcome-routing-section h5 {
     margin: 0 0 4px;
+    color: var(--fabricate-editor-muted-strong, rgba(255, 236, 220, 0.82));
   }
 
   .roll-table-section label {
@@ -178,7 +182,11 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
+    padding: 8px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
   }
 
   .mapping-label {
@@ -188,5 +196,17 @@
 
   .mapping-row select {
     flex: 1;
+  }
+
+  @media (max-width: 760px) {
+    .provider-selector,
+    .mapping-row {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .mapping-label {
+      min-width: 0;
+    }
   }
 </style>
