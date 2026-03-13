@@ -41,3 +41,15 @@ test('essence icon picker options keep visible 4px padding and flexible height',
   assert.ok(block.includes('height: auto !important;'), 'option rows should size to content plus padding');
   assert.ok(block.includes('box-sizing: border-box;'), 'option rows should keep padding inside the row box');
 });
+
+test('essence icon picker trigger aligns its left inset with the option rows', () => {
+  const match = css.match(/\.fabricate-admin \.essence-icon-picker-trigger \{[\s\S]*?\}/);
+
+  assert.ok(match, 'icon picker trigger block should exist');
+  const block = match[0];
+
+  assert.ok(
+    block.includes('padding: 4px 10px 4px 4px;'),
+    'trigger should use the same 4px left inset as picker rows'
+  );
+});
