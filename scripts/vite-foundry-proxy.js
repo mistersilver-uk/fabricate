@@ -27,7 +27,8 @@ export function fabricateDevProxy() {
         if (
           req.url?.startsWith('/@') ||
           req.url?.startsWith('/src/') ||
-          req.url?.startsWith('/node_modules/')
+          req.url?.startsWith('/node_modules/') ||
+          req.url?.startsWith('/styles/')
         ) {
           return next();
         }
