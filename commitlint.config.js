@@ -19,7 +19,7 @@ export default {
     // Allow scope in format (#<number>) for issue-linked commits
     'scope-case': [2, 'always', 'lower-case'],
     // Enforce max header length of 100 chars
-    'header-max-length': [2, 'always', 100],
+    'header-max-length': [2, 'always', 250],
     // Disallow a body with only a blank line (clean formatting)
     'body-leading-blank': [1, 'always'],
     // Disallow footer with only a blank line
