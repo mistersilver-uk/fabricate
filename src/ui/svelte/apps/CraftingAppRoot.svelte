@@ -142,36 +142,37 @@
     />
   </header>
 
-  <!-- Recipe List / Alchemy Panel -->
+  <!-- Alchemy Panel (shown alongside recipe list when in alchemy mode) -->
   {#if $isAlchemyMode}
     <AlchemySubmitPanel {store} />
-  {:else}
-    <div class="fabricate-recipe-list">
-      {#if !$viewState.hasComponentSources}
-        <div class="fabricate-empty">
-          <i class="fas fa-info-circle"></i>
-          <p>{localize('FABRICATE.SourceActorPicker.NoActors')}</p>
-        </div>
-      {:else}
-        <RecentsSection
-          recipes={$viewState.recentRecipes}
-          onCraft={store.craft}
-          onShowDetails={handleShowDetails}
-        />
-        <RecipeList
-          recipes={$viewState.recipes}
-          search={$searchTerm}
-          onCraft={store.craft}
-          onLearnRecipe={store.learnRecipe}
-          onToggleFavourite={store.toggleFavourite}
-          onShowDetails={handleShowDetails}
-          onRestartRun={store.restartRun}
-          onAddToShoppingList={store.addToShoppingList}
-        />
-        {#if $viewState.totalRecipes > 0}
-          <p class="hint">{localize('FABRICATE.RecipeList.Count').replace('{count}', $viewState.totalRecipes)}</p>
-        {/if}
-      {/if}
-    </div>
   {/if}
+
+  <!-- Recipe List -->
+  <div class="fabricate-recipe-list">
+    {#if !$viewState.hasComponentSources}
+      <div class="fabricate-empty">
+        <i class="fas fa-info-circle"></i>
+        <p>{localize('FABRICATE.SourceActorPicker.NoActors')}</p>
+      </div>
+    {:else}
+      <RecentsSection
+        recipes={$viewState.recentRecipes}
+        onCraft={store.craft}
+        onShowDetails={handleShowDetails}
+      />
+      <RecipeList
+        recipes={$viewState.recipes}
+        search={$searchTerm}
+        onCraft={store.craft}
+        onLearnRecipe={store.learnRecipe}
+        onToggleFavourite={store.toggleFavourite}
+        onShowDetails={handleShowDetails}
+        onRestartRun={store.restartRun}
+        onAddToShoppingList={store.addToShoppingList}
+      />
+      {#if $viewState.totalRecipes > 0}
+        <p class="hint">{localize('FABRICATE.RecipeList.Count').replace('{count}', $viewState.totalRecipes)}</p>
+      {/if}
+    {/if}
+  </div>
 </div>

@@ -1053,6 +1053,137 @@ test('AC8.5 - learned mode: canLearn derivation is true when recipe is visible v
 });
 
 // ---------------------------------------------------------------------------
+// AC9 — Alchemy mode with formula item learning
+// ---------------------------------------------------------------------------
+
+test('AC9.1 - alchemy mode: unlearned recipe with formula item is visible but not craftable', () => {
+  const system = buildMockSystem({
+    resolutionMode: 'alchemy',
+    alchemy: { learnOnCraft: true },
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: {
+        mode: 'learned',
+        item: { limitUses: false },
+        learn: { consumeOnLearn: true }
+      }
+    }
+  });
+  const recipe = buildMockRecipe({ id: 'recipe-1', linkedRecipeItemUuid: 'formula-uuid' });
+  const formulaItem = new FakeItem({ uuid: 'formula-uuid' });
+  const craftingActor = new FakeActor({ id: 'actor-1', items: [formulaItem] });
+  const viewer = { isGM: false, id: 'user-1' };
+  const service = buildService({ system });
+
+  const result = service.evaluateRecipeAccess({ recipe, viewer, craftingActor });
+
+  assert.equal(result.visible, true, 'recipe should be visible when player has formula item');
+  assert.equal(result.craftable, false, 'recipe should not be craftable until learned');
+  assert.equal(result.reason, 'knowledge');
+  assert.equal(result.knowledge.hasMatchedItem, true);
+  assert.equal(result.knowledge.hasLearned, false);
+});
+
+test('AC9.2 - alchemy mode: unlearned recipe without formula item remains hidden', () => {
+  const system = buildMockSystem({
+    resolutionMode: 'alchemy',
+    alchemy: { learnOnCraft: true },
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: {
+        mode: 'learned',
+        item: { limitUses: false },
+        learn: { consumeOnLearn: true }
+      }
+    }
+  });
+  const recipe = buildMockRecipe({ id: 'recipe-1', linkedRecipeItemUuid: 'formula-uuid' });
+  const craftingActor = new FakeActor({ id: 'actor-1', items: [] });
+  const viewer = { isGM: false, id: 'user-1' };
+  const service = buildService({ system });
+
+  const result = service.evaluateRecipeAccess({ recipe, viewer, craftingActor });
+
+  assert.equal(result.visible, false);
+  assert.equal(result.reason, 'alchemy-not-learned');
+});
+
+test('AC9.3 - alchemy mode: learned recipe remains visible and craftable', () => {
+  const system = buildMockSystem({
+    resolutionMode: 'alchemy',
+    alchemy: { learnOnCraft: true },
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: {
+        mode: 'learned',
+        item: { limitUses: false },
+        learn: { consumeOnLearn: true }
+      }
+    }
+  });
+  const recipe = buildMockRecipe({ id: 'recipe-1', linkedRecipeItemUuid: 'formula-uuid' });
+  const craftingActor = new FakeActor({
+    id: 'actor-1',
+    items: [],
+    flagsArg: { fabricate: { learnedRecipes: { 'recipe-1': { learnedAt: 1 } } } }
+  });
+  const viewer = { isGM: false, id: 'user-1' };
+  const service = buildService({ system });
+
+  const result = service.evaluateRecipeAccess({ recipe, viewer, craftingActor });
+
+  assert.equal(result.visible, true);
+  assert.equal(result.craftable, true);
+  assert.equal(result.reason, 'alchemy-learned');
+});
+
+test('AC9.4 - alchemy mode: recipe without linkedRecipeItemUuid stays hidden when not learned', () => {
+  const system = buildMockSystem({
+    resolutionMode: 'alchemy',
+    alchemy: { learnOnCraft: true }
+  });
+  const recipe = buildMockRecipe({ id: 'recipe-1', linkedRecipeItemUuid: null });
+  const craftingActor = new FakeActor({ id: 'actor-1', items: [] });
+  const viewer = { isGM: false, id: 'user-1' };
+  const service = buildService({ system });
+
+  const result = service.evaluateRecipeAccess({ recipe, viewer, craftingActor });
+
+  assert.equal(result.visible, false);
+  assert.equal(result.reason, 'alchemy-not-learned');
+});
+
+test('AC9.5 - alchemy mode: canLearn derivation is true for unlearned recipe with formula item', () => {
+  const system = buildMockSystem({
+    resolutionMode: 'alchemy',
+    alchemy: { learnOnCraft: true },
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: {
+        mode: 'learned',
+        item: { limitUses: false },
+        learn: { consumeOnLearn: true }
+      }
+    }
+  });
+  const recipe = buildMockRecipe({ id: 'recipe-1', linkedRecipeItemUuid: 'formula-uuid' });
+  const formulaItem = new FakeItem({ uuid: 'formula-uuid' });
+  const craftingActor = new FakeActor({ id: 'actor-1', items: [formulaItem] });
+  const viewer = { isGM: false, id: 'user-1' };
+  const service = buildService({ system });
+
+  const access = service.evaluateRecipeAccess({ recipe, viewer, craftingActor });
+
+  const canLearn = access.reason === 'knowledge' &&
+    !!access.knowledge &&
+    access.knowledge.hasLearned !== true &&
+    Array.isArray(access.knowledge.matchedItems) &&
+    access.knowledge.matchedItems.length > 0;
+
+  assert.equal(canLearn, true);
+});
+
+// ---------------------------------------------------------------------------
 // AC3 (T-087) — Recipe item matching via _stats.compendiumSource
 // ---------------------------------------------------------------------------
 
