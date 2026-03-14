@@ -12,7 +12,9 @@
 
   let {
     value = '',
-    onChange = () => {}
+    onChange = () => {},
+    disabled = false,
+    disabledTitle = ''
   } = $props();
 
   let pickerOpen = $state(false);
@@ -33,6 +35,7 @@
   }
 
   function togglePicker() {
+    if (disabled) return;
     if (pickerOpen) {
       closePicker();
       return;
@@ -112,6 +115,11 @@
   }
 
   $effect(() => {
+    if (!disabled || !pickerOpen) return;
+    closePicker();
+  });
+
+  $effect(() => {
     if (!pickerOpen || !searchInput) return;
     queueMicrotask(() => searchInput?.focus());
   });
@@ -149,10 +157,11 @@
     bind:this={triggerButton}
     class="recipe-image-picker-trigger"
     onclick={togglePicker}
+    disabled={disabled}
     aria-expanded={pickerOpen}
     aria-haspopup="dialog"
     aria-label={localize('FABRICATE.Editor.BasicInfo.ChooseImage')}
-    title={localize('FABRICATE.Editor.BasicInfo.ChooseImage')}
+    title={disabled ? disabledTitle : localize('FABRICATE.Editor.BasicInfo.ChooseImage')}
   >
     <img
       src={currentImage}
@@ -238,6 +247,13 @@
   .recipe-image-picker-trigger:hover {
     background: rgba(255, 255, 255, 0.12);
     border-color: rgba(255, 255, 255, 0.28);
+  }
+
+  .recipe-image-picker-trigger:disabled {
+    cursor: not-allowed;
+    opacity: 0.72;
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.12);
   }
 
   .recipe-image-thumbnail {

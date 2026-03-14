@@ -17,6 +17,12 @@ function mockServices(overrides = {}) {
     randomID: () => `id-${++idCounter}`,
     getSystem: () => null,
     getItems: () => [],
+    getRecipeItemDefinitions: () => [],
+    getRecipeItemUsage: () => [],
+    deleteRecipeItemDefinition: async () => ({ deleted: true, affectedRecipes: [] }),
+    confirmDialog: async () => true,
+    localize: (key) => key,
+    resolveItem: () => null,
     saveRecipe: async () => {},
     onClose: () => {},
     notify: () => {},
@@ -54,6 +60,7 @@ function makeRecipe(overrides = {}) {
     craftingSystemId: overrides.craftingSystemId || 'sys1',
     enabled: overrides.enabled !== undefined ? overrides.enabled : true,
     locked: overrides.locked || false,
+    recipeItemId: overrides.recipeItemId || '',
     linkedRecipeItemUuid: overrides.linkedRecipeItemUuid || '',
     visibility: overrides.visibility || { restricted: false, allowedUserIds: [] },
     isVariable: overrides.isVariable || false,
@@ -181,11 +188,42 @@ describe('createEditorStore', () => {
       assert.equal(d.locked, true);
     });
 
-    it('existing recipe preserves linkedRecipeItemUuid', () => {
+    it('existing recipe preserves recipeItemId', () => {
       const svc = mockServices();
+      const recipe = makeRecipe({ recipeItemId: 'recipe-item-123' });
+      const store = createEditorStore(svc, { recipe });
+      const d = get(store.draft);
+      assert.equal(d.recipeItemId, 'recipe-item-123');
+    });
+
+    it('existing recipe with recipeItemId syncs its image from the recipe item definition', () => {
+      const svc = mockServices({
+        getRecipeItemDefinitions: () => [{
+          id: 'recipe-item-123',
+          sourceItemUuid: 'uuid-linked-123',
+          img: 'icons/svg/book.svg'
+        }]
+      });
+      const recipe = makeRecipe({
+        recipeItemId: 'recipe-item-123',
+        img: 'icons/svg/item-bag.svg'
+      });
+      const store = createEditorStore(svc, { recipe });
+      const d = get(store.draft);
+      assert.equal(d.img, 'icons/svg/book.svg');
+    });
+
+    it('existing recipe maps linkedRecipeItemUuid to recipeItemId when the system has a matching definition', () => {
+      const svc = mockServices({
+        getRecipeItemDefinitions: () => [{
+          id: 'recipe-item-linked',
+          sourceItemUuid: 'uuid-abc-123'
+        }]
+      });
       const recipe = makeRecipe({ linkedRecipeItemUuid: 'uuid-abc-123' });
       const store = createEditorStore(svc, { recipe });
       const d = get(store.draft);
+      assert.equal(d.recipeItemId, 'recipe-item-linked');
       assert.equal(d.linkedRecipeItemUuid, 'uuid-abc-123');
     });
 
@@ -901,31 +939,137 @@ describe('createEditorStore', () => {
   });
 
   // -------------------------------------------------------------------------
-  // 13. Linked recipe item
+  // 13. Recipe item
   // -------------------------------------------------------------------------
 
-  describe('linked recipe item', () => {
-    it('setLinkedRecipeItemUuid sets the linkedRecipeItemUuid on the draft', () => {
-      const svc = mockServices();
+  describe('recipe item', () => {
+    it('setRecipeItemId sets the recipeItemId on the draft, resolves the linked UUID alias, and syncs the recipe image', () => {
+      const svc = mockServices({
+        getRecipeItemDefinitions: () => [{
+          id: 'recipe-item-123',
+          sourceItemUuid: 'uuid-linked-123',
+          img: 'icons/svg/book.svg'
+        }]
+      });
       const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
-      store.setLinkedRecipeItemUuid('uuid-linked-123');
+      store.setRecipeItemId('recipe-item-123');
+      assert.equal(get(store.draft).recipeItemId, 'recipe-item-123');
       assert.equal(get(store.draft).linkedRecipeItemUuid, 'uuid-linked-123');
+      assert.equal(get(store.draft).img, 'icons/svg/book.svg');
     });
 
-    it('setLinkedRecipeItemUuid with falsy value sets empty string', () => {
-      const svc = mockServices();
+    it('setRecipeItemId with falsy value clears the recipe item selection', () => {
+      const svc = mockServices({
+        getRecipeItemDefinitions: () => [{
+          id: 'recipe-item-123',
+          sourceItemUuid: 'uuid-linked-123'
+        }]
+      });
       const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
-      store.setLinkedRecipeItemUuid('uuid-linked-123');
-      store.setLinkedRecipeItemUuid(null);
+      store.setRecipeItemId('recipe-item-123');
+      store.setRecipeItemId(null);
+      assert.equal(get(store.draft).recipeItemId, '');
       assert.equal(get(store.draft).linkedRecipeItemUuid, '');
     });
 
-    it('clearLinkedRecipeItem clears the linkedRecipeItemUuid', () => {
-      const svc = mockServices();
-      const recipe = makeRecipe({ linkedRecipeItemUuid: 'uuid-linked-abc' });
+    it('clearRecipeItem clears the recipeItemId and linkedRecipeItemUuid alias', () => {
+      const svc = mockServices({
+        getRecipeItemDefinitions: () => [{
+          id: 'recipe-item-abc',
+          sourceItemUuid: 'uuid-linked-abc'
+        }]
+      });
+      const recipe = makeRecipe({ recipeItemId: 'recipe-item-abc', linkedRecipeItemUuid: 'uuid-linked-abc' });
       const store = createEditorStore(svc, { recipe });
-      store.clearLinkedRecipeItem();
+      store.clearRecipeItem();
+      assert.equal(get(store.draft).recipeItemId, '');
       assert.equal(get(store.draft).linkedRecipeItemUuid, '');
+    });
+
+    it('setField ignores direct recipe image changes while a recipe item is associated', () => {
+      const svc = mockServices({
+        getRecipeItemDefinitions: () => [{
+          id: 'recipe-item-123',
+          sourceItemUuid: 'uuid-linked-123',
+          img: 'icons/svg/book.svg'
+        }]
+      });
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setRecipeItemId('recipe-item-123');
+      store.setField('img', 'icons/svg/potion.svg');
+      assert.equal(get(store.draft).img, 'icons/svg/book.svg');
+    });
+
+    it('refreshRecipeItemImage re-syncs the recipe image from the live source item', () => {
+      let currentImg = 'icons/svg/book.svg';
+      const svc = mockServices({
+        getRecipeItemDefinitions: () => [{
+          id: 'recipe-item-123',
+          sourceItemUuid: 'uuid-linked-123',
+          img: 'icons/svg/item-bag.svg'
+        }],
+        resolveItem: () => ({ img: currentImg })
+      });
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setRecipeItemId('recipe-item-123');
+      assert.equal(get(store.draft).img, 'icons/svg/book.svg');
+      currentImg = 'icons/svg/scroll.svg';
+      store.refreshRecipeItemImage();
+      assert.equal(get(store.draft).img, 'icons/svg/scroll.svg');
+    });
+
+    it('deleteRecipeItemDefinition confirms, deletes the definition, and clears the current draft selection', async () => {
+      let deleteArgs = null;
+      let notifyArgs = null;
+      const svc = mockServices({
+        getRecipeItemDefinitions: () => [{
+          id: 'recipe-item-123',
+          sourceItemUuid: 'uuid-linked-123',
+          img: 'icons/svg/book.svg',
+          name: 'Formula Book'
+        }],
+        getRecipeItemUsage: () => [{ id: 'recipe-1', name: 'Potion A' }],
+        deleteRecipeItemDefinition: async (systemId, recipeItemId) => {
+          deleteArgs = { systemId, recipeItemId };
+          return { deleted: true, affectedRecipes: [{ id: 'recipe-1', name: 'Potion A' }] };
+        },
+        notify: (type, message) => { notifyArgs = { type, message }; }
+      });
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      store.setRecipeItemId('recipe-item-123');
+
+      const deleted = await store.deleteRecipeItemDefinition('recipe-item-123');
+
+      assert.equal(deleted, true);
+      assert.deepEqual(deleteArgs, { systemId: 'sys1', recipeItemId: 'recipe-item-123' });
+      assert.equal(get(store.draft).recipeItemId, '');
+      assert.equal(get(store.draft).linkedRecipeItemUuid, '');
+      assert.deepEqual(notifyArgs, {
+        type: 'info',
+        message: 'FABRICATE.Editor.Notifications.LinkedItemDeleted'
+      });
+    });
+
+    it('deleteRecipeItemDefinition does nothing when confirmation is declined', async () => {
+      let deleteCalled = false;
+      const svc = mockServices({
+        getRecipeItemDefinitions: () => [{
+          id: 'recipe-item-123',
+          sourceItemUuid: 'uuid-linked-123',
+          img: 'icons/svg/book.svg'
+        }],
+        confirmDialog: async () => false,
+        deleteRecipeItemDefinition: async () => {
+          deleteCalled = true;
+          return { deleted: true, affectedRecipes: [] };
+        }
+      });
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+
+      const deleted = await store.deleteRecipeItemDefinition('recipe-item-123');
+
+      assert.equal(deleted, false);
+      assert.equal(deleteCalled, false);
     });
   });
 
@@ -952,7 +1096,7 @@ describe('createEditorStore', () => {
       assert.equal(nameErrors.length, 0);
     });
 
-    it('validationErrors includes error when linkedRecipeItemUuid is required but missing', () => {
+    it('validationErrors includes error when recipeItemId is required but missing', () => {
       const svc = mockServices({
         getSystem: () => ({
           advancedOptionsEnabled: true,
@@ -963,7 +1107,7 @@ describe('createEditorStore', () => {
       const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
       store.setField('name', 'Test Recipe');
       const errors = get(store.validationErrors);
-      assert.ok(errors.some(e => e.message.toLowerCase().includes('linked recipe item')));
+      assert.ok(errors.some(e => e.message.toLowerCase().includes('recipe item')));
     });
 
     it('validationErrors does not require linkedRecipeItemUuid for global visibility', () => {

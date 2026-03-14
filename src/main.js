@@ -349,8 +349,6 @@ function addModuleButtonsToItemsDirectory() {
       actionsContainer.insertBefore(managerButton, actionsContainer.firstChild);
     }
   }
-
-  console.log('Fabricate | Fabricate buttons updated in', actionsContainer.className);
 }
 
 /**
