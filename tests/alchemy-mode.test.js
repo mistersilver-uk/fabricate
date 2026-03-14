@@ -96,10 +96,11 @@ function buildAlchemySystem(overrides = {}) {
   };
 }
 
-function buildIngredientSet(groups) {
+function buildIngredientSet(groups, essences = {}) {
   return {
     id: `set-${Math.random().toString(36).slice(2)}`,
-    ingredientGroups: groups
+    ingredientGroups: groups,
+    essences
   };
 }
 
@@ -545,7 +546,7 @@ test('SignatureValidator.computeSignature returns groups for alchemy ingredient 
   assert.ok(sig[0].has('c1'));
 });
 
-test('CraftingEngine._matchAlchemySignature matches submitted items by canonical sourceItemUuid when live sourceUuid differs', () => {
+test('CraftingEngine._matchAlchemySignature matches submitted items by canonical sourceItemUuid when live sourceUuid differs (no essences)', () => {
   const engine = new CraftingEngine({ getRecipes: () => [] });
   const components = [{
     id: 'c1',
@@ -574,4 +575,218 @@ test('CraftingEngine._matchAlchemySignature matches submitted items by canonical
 
   assert.equal(result.matched, true);
   assert.equal(result.recipe.id, 'alchemy-recipe');
+});
+
+// ============================================================================
+// CraftingEngine._matchAlchemySignature: essence matching
+// ============================================================================
+
+function buildEssenceItem(uuid, essences = {}) {
+  return new FakeDocument({ fabricate: { essences } });
+}
+
+// Patch uuid onto FakeDocument for submitted item matching
+function buildSubmittedItem(uuid, essences = {}) {
+  const doc = new FakeDocument({ fabricate: { essences } });
+  doc.uuid = uuid;
+  return doc;
+}
+
+const essenceSystem = {
+  features: { essences: true },
+  advancedOptionsEnabled: true
+};
+
+const noEssenceSystem = {
+  features: { essences: false },
+  advancedOptionsEnabled: true
+};
+
+test('_matchAlchemySignature matches pure-essence recipe when submitted items satisfy essences', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const essenceId = 'essence-fire';
+  const recipe = buildRecipe(
+    'fire-potion',
+    [buildIngredientSet([], { [essenceId]: 2 })],
+    [{ id: 'rg1', name: 'Result', results: [] }],
+    { resultSelection: { provider: 'ingredientSet' } }
+  );
+  const validator = new SignatureValidator({
+    getSystem: () => null,
+    getRecipesForSystem: () => [],
+    getComponentsForSystem: () => []
+  });
+
+  // Submit same item twice → 1 essence × 2 = 2 total
+  const item = buildSubmittedItem('Item.herb-1', { [essenceId]: 1 });
+  const result = engine._matchAlchemySignature(
+    [item, item], [recipe], [], validator, { system: essenceSystem }
+  );
+
+  assert.equal(result.matched, true);
+  assert.equal(result.recipe.id, 'fire-potion');
+});
+
+test('_matchAlchemySignature rejects pure-essence recipe when essences are insufficient', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const essenceId = 'essence-fire';
+  const recipe = buildRecipe(
+    'fire-potion',
+    [buildIngredientSet([], { [essenceId]: 3 })],
+    [{ id: 'rg1', name: 'Result', results: [] }],
+    { resultSelection: { provider: 'ingredientSet' } }
+  );
+  const validator = new SignatureValidator({
+    getSystem: () => null,
+    getRecipesForSystem: () => [],
+    getComponentsForSystem: () => []
+  });
+
+  // Only 2 essences submitted but 3 needed
+  const item = buildSubmittedItem('Item.herb-1', { [essenceId]: 1 });
+  const result = engine._matchAlchemySignature(
+    [item, item], [recipe], [], validator, { system: essenceSystem }
+  );
+
+  assert.equal(result.matched, false);
+});
+
+test('_matchAlchemySignature skips essence check when system has essences disabled', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const essenceId = 'essence-fire';
+  // Recipe has essences but system does not enable them
+  const recipe = buildRecipe(
+    'fire-potion',
+    [buildIngredientSet([], { [essenceId]: 2 })],
+    [{ id: 'rg1', name: 'Result', results: [] }],
+    { resultSelection: { provider: 'ingredientSet' } }
+  );
+  const validator = new SignatureValidator({
+    getSystem: () => null,
+    getRecipesForSystem: () => [],
+    getComponentsForSystem: () => []
+  });
+
+  const item = buildSubmittedItem('Item.herb-1', { [essenceId]: 1 });
+  // With essences disabled, the set has no groups and no recognized essences → skip
+  const result = engine._matchAlchemySignature(
+    [item, item], [recipe], [], validator, { system: noEssenceSystem }
+  );
+
+  assert.equal(result.matched, false);
+});
+
+test('_matchAlchemySignature matches mixed ingredient-group + essence recipe', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const essenceId = 'essence-light';
+  const components = [buildComponent('c1', 'Compendium.source.items.crystal')];
+  const recipe = buildRecipe(
+    'light-crystal',
+    [buildIngredientSet([buildIngredientGroup('c1')], { [essenceId]: 1 })],
+    [{ id: 'rg1', name: 'Result', results: [] }],
+    { resultSelection: { provider: 'ingredientSet' } }
+  );
+  const validator = new SignatureValidator({
+    getSystem: () => null,
+    getRecipesForSystem: () => [],
+    getComponentsForSystem: () => components
+  });
+
+  // Item satisfies both the ingredient group AND carries essence
+  const item = buildSubmittedItem('Item.actor-crystal', { [essenceId]: 1 });
+  item._stats = { compendiumSource: 'Compendium.source.items.crystal' };
+
+  const result = engine._matchAlchemySignature(
+    [item], [recipe], components, validator, { system: essenceSystem }
+  );
+
+  assert.equal(result.matched, true);
+  assert.equal(result.recipe.id, 'light-crystal');
+});
+
+test('_matchAlchemySignature rejects mixed recipe when groups match but essences do not', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const essenceId = 'essence-light';
+  const components = [buildComponent('c1', 'Compendium.source.items.crystal')];
+  const recipe = buildRecipe(
+    'light-crystal',
+    [buildIngredientSet([buildIngredientGroup('c1')], { [essenceId]: 3 })],
+    [{ id: 'rg1', name: 'Result', results: [] }],
+    { resultSelection: { provider: 'ingredientSet' } }
+  );
+  const validator = new SignatureValidator({
+    getSystem: () => null,
+    getRecipesForSystem: () => [],
+    getComponentsForSystem: () => components
+  });
+
+  // Item matches ingredient group but only carries 1 essence (need 3)
+  const item = buildSubmittedItem('Item.actor-crystal', { [essenceId]: 1 });
+  item._stats = { compendiumSource: 'Compendium.source.items.crystal' };
+
+  const result = engine._matchAlchemySignature(
+    [item], [recipe], components, validator, { system: essenceSystem }
+  );
+
+  assert.equal(result.matched, false);
+});
+
+// ============================================================================
+// CraftingEngine._consumeSubmittedAlchemyItems: quantity handling
+// ============================================================================
+
+test('_consumeSubmittedAlchemyItems consumes correct quantity when same item submitted multiple times', async () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+
+  const deleteCalls = [];
+  const updateCalls = [];
+
+  const actorItem = {
+    uuid: 'Item.herb-1',
+    system: { quantity: 5 },
+    async delete() { deleteCalls.push(this.uuid); },
+    async update(data) { updateCalls.push({ uuid: this.uuid, data }); }
+  };
+
+  const actor = { items: [actorItem] };
+
+  // Submit 3x of the same item
+  const submitted = [
+    { uuid: 'Item.herb-1' },
+    { uuid: 'Item.herb-1' },
+    { uuid: 'Item.herb-1' }
+  ];
+
+  await engine._consumeSubmittedAlchemyItems([actor], submitted);
+
+  assert.equal(deleteCalls.length, 0, 'should not delete (5 - 3 = 2 remaining)');
+  assert.equal(updateCalls.length, 1);
+  assert.equal(updateCalls[0].data['system.quantity'], 2);
+});
+
+test('_consumeSubmittedAlchemyItems deletes item when quantity consumed equals item quantity', async () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+
+  const deleteCalls = [];
+  const updateCalls = [];
+
+  const actorItem = {
+    uuid: 'Item.herb-1',
+    system: { quantity: 2 },
+    async delete() { deleteCalls.push(this.uuid); },
+    async update(data) { updateCalls.push({ uuid: this.uuid, data }); }
+  };
+
+  const actor = { items: [actorItem] };
+
+  // Submit 2x — matches item quantity exactly
+  const submitted = [
+    { uuid: 'Item.herb-1' },
+    { uuid: 'Item.herb-1' }
+  ];
+
+  await engine._consumeSubmittedAlchemyItems([actor], submitted);
+
+  assert.equal(deleteCalls.length, 1, 'should delete when count >= qty');
+  assert.equal(updateCalls.length, 0);
 });

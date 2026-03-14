@@ -357,6 +357,31 @@ export class CraftingEngine {
     // Consume ingredients from component source actors
     const consumedItems = await this._consumeIngredients(componentSourceActors, ingredientSet, executionRecipe);
 
+    // For alchemy attempts: also consume submitted items that weren't handled
+    // by standard ingredient matching (e.g. items used only for essences).
+    if (options?.isAlchemyAttempt && Array.isArray(options?.alchemySubmittedItems)) {
+      const alreadyConsumedUuids = new Set(consumedItems.map(c => c.item.uuid));
+      const essenceConsumeCounts = new Map();
+      for (const item of options.alchemySubmittedItems) {
+        if (item.uuid && !alreadyConsumedUuids.has(item.uuid)) {
+          essenceConsumeCounts.set(item.uuid, (essenceConsumeCounts.get(item.uuid) || 0) + 1);
+        }
+      }
+      for (const actor of componentSourceActors) {
+        for (const item of Array.from(actor.items || [])) {
+          const count = essenceConsumeCounts.get(item.uuid);
+          if (!count) continue;
+          const qty = Number(item.system?.quantity ?? 1);
+          if (count >= qty) {
+            await item.delete();
+          } else {
+            await item.update({ 'system.quantity': qty - count });
+          }
+          consumedItems.push({ item, quantity: count, ingredient: null });
+        }
+      }
+    }
+
     // Apply catalyst degradation
     await this._degradeCatalysts(catalystValidation.catalysts);
 
@@ -561,7 +586,7 @@ export class CraftingEngine {
 
     const components = system.components || [];
     const recipes = systemRecipes;
-    const matchResult = this._matchAlchemySignature(submittedItems, recipes, components, signatureValidator);
+    const matchResult = this._matchAlchemySignature(submittedItems, recipes, components, signatureValidator, { system });
 
     const alchemyCfg = system.alchemy || {};
     const shouldConsume = alchemyCfg.consumeOnFail !== false;
@@ -583,7 +608,8 @@ export class CraftingEngine {
     const ingredientSetId = matchResult.ingredientSetId;
     return this.craft(craftingActor, componentSourceActors, recipe, ingredientSetId, {
       ...options,
-      isAlchemyAttempt: true
+      isAlchemyAttempt: true,
+      alchemySubmittedItems: submittedItems
     });
   }
 
@@ -592,11 +618,27 @@ export class CraftingEngine {
    * Returns { matched: true, recipe, ingredientSetId } or { matched: false }.
    * @private
    */
-  _matchAlchemySignature(submittedItems, recipes, components, signatureValidator) {
+  _matchAlchemySignature(submittedItems, recipes, components, signatureValidator, options = {}) {
     const submittedRefs = new Set();
     for (const item of submittedItems) {
       for (const ref of getItemSourceReferences(item)) submittedRefs.add(ref);
       if (item?.sourceUuid) submittedRefs.add(item.sourceUuid);
+    }
+
+    // Check whether the system supports essences
+    const system = options?.system;
+    const essencesEnabled = system?.features?.essences === true && system?.advancedOptionsEnabled !== false;
+
+    // Accumulate essences from ALL submitted items (duplicates count multiple times)
+    let submittedEssences = null;
+    if (essencesEnabled) {
+      submittedEssences = {};
+      for (const item of submittedItems) {
+        const itemEssences = getFabricateFlag(item, 'essences', {});
+        for (const [essenceType, qty] of Object.entries(itemEssences)) {
+          submittedEssences[essenceType] = (submittedEssences[essenceType] || 0) + qty;
+        }
+      }
     }
 
     for (const recipe of recipes) {
@@ -604,9 +646,13 @@ export class CraftingEngine {
       const ingredientSets = Array.isArray(recipe.ingredientSets) ? recipe.ingredientSets : [];
       for (const set of ingredientSets) {
         const signature = signatureValidator.computeSignature(set, components);
-        if (signature.length === 0) continue;
+        const setEssences = set.essences || {};
+        const hasEssences = essencesEnabled && Object.keys(setEssences).length > 0;
 
-        // For each group in the signature, at least one submitted item must match
+        // Skip sets that have neither ingredient groups nor essence requirements
+        if (signature.length === 0 && !hasEssences) continue;
+
+        // Check ingredient groups (existing logic)
         const allGroupsSatisfied = signature.every(groupComponentIds => {
           for (const componentId of groupComponentIds) {
             const comp = components.find(c => c.id === componentId);
@@ -616,7 +662,18 @@ export class CraftingEngine {
           return false;
         });
 
-        if (allGroupsSatisfied) {
+        // Check essences
+        let essencesSatisfied = true;
+        if (hasEssences && submittedEssences) {
+          for (const [essenceType, requiredQty] of Object.entries(setEssences)) {
+            if ((submittedEssences[essenceType] || 0) < requiredQty) {
+              essencesSatisfied = false;
+              break;
+            }
+          }
+        }
+
+        if (allGroupsSatisfied && essencesSatisfied) {
           return { matched: true, recipe, ingredientSetId: set.id };
         }
       }
@@ -630,22 +687,26 @@ export class CraftingEngine {
    * @private
    */
   async _consumeSubmittedAlchemyItems(componentSourceActors, submittedItems) {
-    const submittedUuids = new Set(
-      submittedItems.map(i => i.uuid).filter(Boolean)
-    );
+    // Count how many times each UUID appears in submitted items
+    const consumeCounts = new Map();
+    for (const item of submittedItems) {
+      if (item.uuid) {
+        consumeCounts.set(item.uuid, (consumeCounts.get(item.uuid) || 0) + 1);
+      }
+    }
     for (const actor of componentSourceActors) {
       for (const item of Array.from(actor.items || [])) {
-        if (submittedUuids.has(item.uuid)) {
-          try {
-            const qty = Number(item.system?.quantity ?? 1);
-            if (qty <= 1) {
-              await item.delete();
-            } else {
-              await item.update({ 'system.quantity': qty - 1 });
-            }
-          } catch (e) {
-            console.error('Fabricate | Alchemy: failed to consume item', item.uuid, e);
+        const count = consumeCounts.get(item.uuid);
+        if (!count) continue;
+        try {
+          const qty = Number(item.system?.quantity ?? 1);
+          if (count >= qty) {
+            await item.delete();
+          } else {
+            await item.update({ 'system.quantity': qty - count });
           }
+        } catch (e) {
+          console.error('Fabricate | Alchemy: failed to consume item', item.uuid, e);
         }
       }
     }
