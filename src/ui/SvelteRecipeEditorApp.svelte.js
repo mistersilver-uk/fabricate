@@ -2,7 +2,8 @@ import SvelteApplicationMixin from './svelte/SvelteApplicationMixin.svelte.js';
 import RecipeEditorRoot from './svelte/apps/editor/RecipeEditorRoot.svelte';
 import { createEditorStore } from './svelte/stores/editorStore.js';
 import { registerSvelteRecipeEditorApp } from './appFactory.js';
-import { get } from 'svelte/store';
+import { resolveDropData, resolveDropUuid } from './svelte/util/dropUtils.js';
+import { confirmDialog, localize } from './svelte/util/foundryBridge.js';
 
 export class SvelteRecipeEditorApp extends SvelteApplicationMixin(
   foundry.applications.api.ApplicationV2
@@ -53,10 +54,20 @@ export class SvelteRecipeEditorApp extends SvelteApplicationMixin(
       onClose: () => {
         this.close();
         if (this._parentApp) {
+          this._parentApp._adminStore?.refresh?.();
           this._parentApp.render?.();
         }
       },
       notify: (type, msg) => ui.notifications[type]?.(msg),
+      confirmDialog: (options) => confirmDialog(options),
+      localize: (key, data) => localize(key, data),
+      copyToClipboard: async (text) => {
+        if (foundry?.utils?.copyPlainText) {
+          await foundry.utils.copyPlainText(text);
+        } else {
+          await navigator.clipboard.writeText(text);
+        }
+      },
       getNonGMUsers: () =>
         Array.from(game.users?.contents || [])
           .filter(u => !u.isGM)
@@ -77,48 +88,67 @@ export class SvelteRecipeEditorApp extends SvelteApplicationMixin(
         if (!systemId) return [];
         return game?.fabricate?.getCraftingSystemManager?.()?.getEssenceDefinitions?.(systemId) ?? [];
       },
-      browseLinkedItem: async () => {
-        const DialogV2 = foundry.applications?.api?.DialogV2;
-        if (!DialogV2) {
-          ui.notifications.warn('Dialog API not available.');
-          return;
-        }
-        const uuid = await DialogV2.prompt({
-          window: { title: 'Select Linked Recipe Item' },
-          content: '<div class="form-group"><label>Item UUID</label><input type="text" name="uuid" placeholder="Paste or type item UUID" /></div>',
-          ok: {
-            label: 'Confirm',
-            callback: (event, button, dialog) => {
-              return button.form?.elements?.uuid?.value?.trim() || '';
+      getRecipeItemDefinitions: (systemId) => {
+        if (!systemId) return [];
+        const manager = game?.fabricate?.getCraftingSystemManager?.();
+        const definitions = manager?.getRecipeItemDefinitions?.(systemId) ?? [];
+        return definitions.map(definition => {
+          let source = null;
+          let sourceMissing = false;
+          if (definition?.sourceItemUuid) {
+            try {
+              source = fromUuidSync(definition.sourceItemUuid);
+              sourceMissing = !source;
+            } catch {
+              sourceMissing = true;
             }
-          },
-          rejectClose: false
+          }
+          return {
+            ...definition,
+            img: source?.img || definition.img,
+            hasSourceUuid: !!definition?.sourceItemUuid,
+            sourceUuidDisplay: definition?.sourceItemUuid || localize('FABRICATE.Admin.Items.NoSourceUuid'),
+            sourceMissing
+          };
         });
-        if (uuid) {
-          this._editorStore.setLinkedRecipeItemUuid(uuid);
-        }
       },
-      createLinkedItem: async () => {
-        const store = this._editorStore;
-        const draft = store.draft;
-        const draftVal = draft.subscribe ? get(draft) : {};
-        if (draftVal.linkedRecipeItemUuid) {
-          ui.notifications.warn('A linked recipe item UUID is already set. Clear it first to create a new one.');
-          return;
+      getRecipeItemUsage: (systemId, recipeItemId) => {
+        if (!systemId || !recipeItemId) return [];
+        return game?.fabricate?.getCraftingSystemManager?.()
+          ?.getRecipesUsingRecipeItemDefinition?.(systemId, recipeItemId) ?? [];
+      },
+      deleteRecipeItemDefinition: async (systemId, recipeItemId) => {
+        if (!systemId || !recipeItemId) return { deleted: false, affectedRecipes: [] };
+        return game?.fabricate?.getCraftingSystemManager?.()
+          ?.deleteRecipeItemDefinition?.(systemId, recipeItemId);
+      },
+      assignRecipeItemFromDrop: async (data, systemId) => {
+        const manager = game?.fabricate?.getCraftingSystemManager?.();
+        if (!manager || !systemId) return null;
+
+        if (data?.type === 'recipeItem' && data?.recipeItemId) {
+          return manager.getRecipeItemDefinition?.(systemId, data.recipeItemId) ?? null;
         }
-        const recipeName = draftVal.name || 'Unnamed Recipe';
-        const itemData = {
-          name: `Recipe: ${recipeName}`,
-          type: 'loot',
-          img: draftVal.img || 'icons/svg/item-bag.svg'
-        };
+
+        const dropInfo = resolveDropData(data);
+        if (dropInfo.type && dropInfo.type !== 'Item' && dropInfo.type !== 'Compendium') {
+          ui.notifications.warn(localize('FABRICATE.Editor.LinkedItem.DropInvalid'));
+          return null;
+        }
+
+        const uuid = resolveDropUuid(data);
+        if (!uuid) {
+          ui.notifications.warn(localize('FABRICATE.Editor.LinkedItem.DropInvalid'));
+          return null;
+        }
+
         try {
-          const item = await Item.create(itemData, { parent: null });
-          store.setLinkedRecipeItemUuid(item.uuid);
-          ui.notifications.info(`Created world item "${item.name}" and linked it to this recipe.`);
+          const result = await manager.addRecipeItemFromUuid(systemId, uuid);
+          return result.item ?? null;
         } catch (err) {
-          console.error('Fabricate | Failed to create linked recipe item:', err);
-          ui.notifications.error('Failed to create recipe item. Check console for details.');
+          console.error('Fabricate | Failed to assign recipe item:', err);
+          ui.notifications.error(localize('FABRICATE.Editor.Notifications.LinkedItemCreateFailed'));
+          return null;
         }
       }
     };

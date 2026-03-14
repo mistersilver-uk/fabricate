@@ -31,8 +31,26 @@ export class RecipeVisibilityService {
     return Array.isArray(visibility.allowedUserIds) && visibility.allowedUserIds.includes(viewer?.id);
   }
 
+  _getRecipeItemDefinition(recipe) {
+    const system = this._getCraftingSystem(recipe);
+    if (!system || !recipe?.recipeItemId) return null;
+    return this.craftingSystemManager?.getRecipeItemDefinition?.(system.id, recipe.recipeItemId)
+      || (system.recipeItemDefinitions || []).find(def => def.id === recipe.recipeItemId)
+      || null;
+  }
+
+  _getRecipeItemSourceUuid(recipe) {
+    return this._getRecipeItemDefinition(recipe)?.sourceItemUuid
+      || recipe?.linkedRecipeItemUuid
+      || null;
+  }
+
+  _hasRecipeItemReference(recipe) {
+    return Boolean(recipe?.recipeItemId || recipe?.linkedRecipeItemUuid);
+  }
+
   _isMatchingRecipeItem(recipe, item) {
-    const linked = recipe?.linkedRecipeItemUuid;
+    const linked = this._getRecipeItemSourceUuid(recipe);
     if (!linked || !item) return false;
     const sourceId = getSourceUuid(item);
     return item.uuid === linked || sourceId === linked;
@@ -302,7 +320,7 @@ export class RecipeVisibilityService {
         return { visible: true, craftable: true, reason: 'alchemy-learned', knowledge: null };
       }
       // Check if the player has a formula item that could teach this recipe
-      if (recipe?.linkedRecipeItemUuid) {
+      if (this._hasRecipeItemReference(recipe)) {
         const knowledge = this.evaluateKnowledgeAccess({ recipe, viewer, craftingActor, componentSourceActors });
         if (knowledge.hasMatchedItem) {
           return { visible: true, craftable: false, reason: 'knowledge', knowledge };
@@ -379,7 +397,7 @@ export class RecipeVisibilityService {
     if (!['learned', 'itemOrLearned'].includes(mode)) {
       return { success: false, message: LEARN_RECIPE_MESSAGES.learningDisabled };
     }
-    if (!recipe?.linkedRecipeItemUuid) {
+    if (!this._hasRecipeItemReference(recipe)) {
       return { success: false, message: LEARN_RECIPE_MESSAGES.linkedItemRequired };
     }
 

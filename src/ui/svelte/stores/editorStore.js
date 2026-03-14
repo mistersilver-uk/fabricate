@@ -48,6 +48,73 @@ function _cloneDraftState(value) {
   return value;
 }
 
+function _resolveDraftRecipeItem(data = {}, craftingSystemId, services) {
+  const systemId = data.craftingSystemId || craftingSystemId || null;
+  const recipeItemDefinitions = _getRecipeItemDefinitions(systemId, services);
+  const explicitRecipeItemId = String(data.recipeItemId || '').trim();
+  const explicitLinkedUuid = String(data.linkedRecipeItemUuid || '').trim();
+
+  if (explicitRecipeItemId) {
+    const definition = recipeItemDefinitions.find(def => def.id === explicitRecipeItemId) || null;
+    return {
+      recipeItemId: explicitRecipeItemId,
+      linkedRecipeItemUuid: explicitLinkedUuid || definition?.sourceItemUuid || ''
+    };
+  }
+
+  if (explicitLinkedUuid) {
+    const definition = recipeItemDefinitions.find(def => def.sourceItemUuid === explicitLinkedUuid) || null;
+    return {
+      recipeItemId: definition?.id || '',
+      linkedRecipeItemUuid: explicitLinkedUuid
+    };
+  }
+
+  return {
+    recipeItemId: '',
+    linkedRecipeItemUuid: ''
+  };
+}
+
+function _getRecipeItemDefinitions(systemId, services) {
+  return systemId
+    ? (services.getRecipeItemDefinitions?.(systemId) || [])
+    : [];
+}
+
+function _getRecipeItemDefinition(systemId, recipeItemId, services) {
+  if (!systemId || !recipeItemId) return null;
+  return _getRecipeItemDefinitions(systemId, services)
+    .find(definition => definition.id === recipeItemId) || null;
+}
+
+function _resolveRecipeItemImage(systemId, recipeItemId, services) {
+  const definition = _getRecipeItemDefinition(systemId, recipeItemId, services);
+  if (!definition) return '';
+
+  const liveSource = definition.sourceItemUuid
+    ? services.resolveItem?.(definition.sourceItemUuid)
+    : null;
+
+  return liveSource?.img || definition.img || DEFAULT_RECIPE_IMAGE;
+}
+
+function _syncDraftRecipeImageFromRecipeItem(draft, services, recipeItemId = draft.recipeItemId) {
+  const nextImage = _resolveRecipeItemImage(draft.craftingSystemId, recipeItemId, services);
+  if (!nextImage) return false;
+  draft.img = nextImage;
+  return true;
+}
+
+function _escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // ---------------------------------------------------------------------------
 // Draft builder helpers (ported from RecipeEditorApp.js)
 // ---------------------------------------------------------------------------
@@ -195,6 +262,10 @@ function _newDraftStep(stepIndex = 0, data = null, services) {
 
 function _buildDraft(recipe, craftingSystemId, services) {
   const data = recipe?.toJSON ? recipe.toJSON() : (recipe || {});
+  const recipeItem = _resolveDraftRecipeItem(data, craftingSystemId, services);
+  const resolvedRecipeImage = recipeItem.recipeItemId
+    ? _resolveRecipeItemImage(data.craftingSystemId || craftingSystemId || null, recipeItem.recipeItemId, services)
+    : '';
   const ingredientSets = (data.ingredientSets || []).length > 0
     ? data.ingredientSets
     : [{
@@ -233,12 +304,13 @@ function _buildDraft(recipe, craftingSystemId, services) {
     craftingSystemId: data.craftingSystemId || craftingSystemId || null,
     name: data.name || '',
     description: data.description || '',
-    img: data.img || DEFAULT_RECIPE_IMAGE,
+    img: resolvedRecipeImage || data.img || DEFAULT_RECIPE_IMAGE,
     category: normalizeRecipeCategory(data.category),
     system: data.system || 'all',
     enabled: data.enabled !== false,
     locked: data.locked === true,
-    linkedRecipeItemUuid: data.linkedRecipeItemUuid || '',
+    recipeItemId: recipeItem.recipeItemId,
+    linkedRecipeItemUuid: recipeItem.linkedRecipeItemUuid,
     visibility: data.visibility && typeof data.visibility === 'object'
       ? {
         restricted: data.visibility.restricted === true,
@@ -374,10 +446,10 @@ function _validateDraft(draft, featureState, services) {
     errors.push({ message: 'Recipe must have a name', fieldSelector: '[name="recipeName"]' });
   }
 
-  if (featureState.requiresLinkedRecipeItem && !draft.linkedRecipeItemUuid) {
+  if (featureState.requiresLinkedRecipeItem && !draft.recipeItemId) {
     errors.push({
-      message: 'Linked recipe item UUID is required for this crafting system visibility mode',
-      fieldSelector: '[name="linkedRecipeItemUuid"]'
+      message: 'Recipe item is required for this crafting system visibility mode',
+      fieldSelector: '[data-field="recipeItemId"]'
     });
   }
 
@@ -569,7 +641,8 @@ function _buildRecipePayload(draft, featureState, services) {
     system: 'all',
     enabled: availability.enabled,
     locked: availability.locked,
-    linkedRecipeItemUuid: draft.linkedRecipeItemUuid || null,
+    recipeItemId: draft.recipeItemId || null,
+    linkedRecipeItemUuid: null,
     visibility: featureState.showRecipeVisibilityPlayer
       ? {
         restricted: draft.visibility?.restricted === true,
@@ -603,6 +676,11 @@ function _buildRecipePayload(draft, featureState, services) {
  * @param {Function} services.randomID - Generate unique IDs
  * @param {Function} services.getSystem - Get a crafting system by ID
  * @param {Function} services.getItems - Get components for picker
+ * @param {Function} [services.getRecipeItemDefinitions] - Get recipe-item definitions for a system
+ * @param {Function} [services.getRecipeItemUsage] - Get recipes affected by recipe-item deletion
+ * @param {Function} [services.deleteRecipeItemDefinition] - Delete a recipe-item definition
+ * @param {Function} [services.confirmDialog] - Show a confirmation dialog
+ * @param {Function} [services.localize] - Localize UI strings
  * @param {Function} services.saveRecipe - Persist recipe (create or update)
  * @param {Function} services.onClose - Callback when editor closes
  * @param {Function} [services.notify] - Show notifications
@@ -620,6 +698,7 @@ export function createEditorStore(services, options = {}) {
   const activeStepIndex = writable(0);
   const collapsedPanels = writable(new Set());
   const pickerSearch = writable('');
+  const recipeItemDefinitionsVersion = writable(0);
 
   // Derived: feature state from system config
   const featureState = derived(draft, ($draft) => {
@@ -674,7 +753,10 @@ export function createEditorStore(services, options = {}) {
   }
 
   function setField(field, value) {
-    updateDraft(d => { d[field] = value; });
+    updateDraft(d => {
+      if (field === 'img' && d.recipeItemId) return;
+      d[field] = value;
+    });
   }
 
   function setAvailabilityState(state) {
@@ -1100,14 +1182,108 @@ export function createEditorStore(services, options = {}) {
     pickerSearch.set(term || '');
   }
 
-  // --- Linked recipe item ---
+  function invalidateRecipeItemDefinitions() {
+    recipeItemDefinitionsVersion.update(version => version + 1);
+  }
+
+  // --- Recipe item ---
+
+  function clearRecipeItem() {
+    updateDraft(d => {
+      d.recipeItemId = '';
+      d.linkedRecipeItemUuid = '';
+    });
+  }
+
+  function setRecipeItemId(recipeItemId) {
+    updateDraft(d => {
+      const resolvedRecipeItemId = recipeItemId || '';
+      const definition = _getRecipeItemDefinition(d.craftingSystemId, resolvedRecipeItemId, services);
+      d.recipeItemId = resolvedRecipeItemId;
+      d.linkedRecipeItemUuid = definition?.sourceItemUuid || '';
+      if (definition) {
+        _syncDraftRecipeImageFromRecipeItem(d, services, resolvedRecipeItemId);
+      }
+    });
+  }
 
   function clearLinkedRecipeItem() {
-    updateDraft(d => { d.linkedRecipeItemUuid = ''; });
+    clearRecipeItem();
   }
 
   function setLinkedRecipeItemUuid(uuid) {
-    updateDraft(d => { d.linkedRecipeItemUuid = uuid || ''; });
+    updateDraft(d => {
+      const nextUuid = uuid || '';
+      const recipeItemDefinitions = _getRecipeItemDefinitions(d.craftingSystemId, services);
+      const definition = recipeItemDefinitions.find(def => def.sourceItemUuid === nextUuid) || null;
+      d.recipeItemId = definition?.id || '';
+      d.linkedRecipeItemUuid = nextUuid;
+      if (definition) {
+        _syncDraftRecipeImageFromRecipeItem(d, services, definition.id);
+      }
+    });
+  }
+
+  function refreshRecipeItemImage() {
+    updateDraft(d => {
+      if (!d.recipeItemId) return;
+      _syncDraftRecipeImageFromRecipeItem(d, services);
+    });
+  }
+
+  async function deleteRecipeItemDefinition(recipeItemId) {
+    const $draft = get(draft);
+    const systemId = $draft.craftingSystemId;
+    if (!systemId || !recipeItemId || !services.deleteRecipeItemDefinition) return false;
+
+    const localizeFn = services.localize;
+    const definition = _getRecipeItemDefinition(systemId, recipeItemId, services);
+    const label = definition?.name || 'Recipe Item';
+    const impactedRecipes = services.getRecipeItemUsage?.(systemId, recipeItemId) || [];
+    const impactedList = impactedRecipes
+      .slice(0, 8)
+      .map(recipe => `<li>${_escapeHtml(recipe.name || 'Unnamed Recipe')}</li>`)
+      .join('');
+    const overflowCount = Math.max(0, impactedRecipes.length - 8);
+    const confirmContent = impactedRecipes.length > 0
+      ? [
+        `<p>${localizeFn?.('FABRICATE.Editor.LinkedItem.DeleteConfirmWithRecipes', { name: label, count: impactedRecipes.length }) || `Delete recipe item "${label}"? ${impactedRecipes.length} recipe(s) will lose this association:`}</p>`,
+        `<ul>${impactedList}</ul>`,
+        overflowCount > 0
+          ? `<p>${localizeFn?.('FABRICATE.Editor.LinkedItem.DeleteConfirmMore', { count: overflowCount }) || `${overflowCount} more recipe(s)`}</p>`
+          : ''
+      ].join('')
+      : `<p>${localizeFn?.('FABRICATE.Editor.LinkedItem.DeleteConfirmNoRecipes', { name: label }) || `Delete recipe item "${label}" from this crafting system?`}</p>`;
+
+    const confirmed = await services.confirmDialog?.({
+      title: localizeFn?.('FABRICATE.Editor.LinkedItem.DeleteConfirmTitle', { name: label }) || `Delete ${label}?`,
+      content: confirmContent,
+      yes: () => true,
+      no: () => false
+    });
+    if (!confirmed) return false;
+
+    try {
+      const result = await services.deleteRecipeItemDefinition(systemId, recipeItemId);
+      if (result?.deleted !== false) {
+        invalidateRecipeItemDefinitions();
+        if (get(draft).recipeItemId === recipeItemId) {
+          clearRecipeItem();
+        }
+      }
+      services.notify?.(
+        'info',
+        localizeFn?.('FABRICATE.Editor.Notifications.LinkedItemDeleted', { name: label })
+          || `Deleted recipe item "${label}".`
+      );
+      return result?.deleted !== false;
+    } catch (err) {
+      services.notify?.(
+        'error',
+        err?.message || localizeFn?.('FABRICATE.Editor.Notifications.LinkedItemDeleteFailed') || 'Failed to delete recipe item.'
+      );
+      return false;
+    }
   }
 
   // --- Result selection (rollTableOutcome provider) ---
@@ -1162,6 +1338,7 @@ export function createEditorStore(services, options = {}) {
     activeStepIndex,
     collapsedPanels,
     pickerSearch,
+    recipeItemDefinitionsVersion,
 
     // Derived stores
     featureState,
@@ -1225,10 +1402,15 @@ export function createEditorStore(services, options = {}) {
 
     // Picker
     setPickerSearch,
+    invalidateRecipeItemDefinitions,
 
-    // Linked recipe item
+    // Recipe item
+    clearRecipeItem,
+    setRecipeItemId,
     clearLinkedRecipeItem,
     setLinkedRecipeItemUuid,
+    refreshRecipeItemImage,
+    deleteRecipeItemDefinition,
 
     // Result selection
     setResultSelection,

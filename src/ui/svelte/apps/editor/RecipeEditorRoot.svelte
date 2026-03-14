@@ -28,7 +28,8 @@
     validationErrors,
     pickerItems,
     isNewRecipe,
-    systemCategories
+    systemCategories,
+    recipeItemDefinitionsVersion
   } = store;
 
   // Build item map for name/image resolution
@@ -40,11 +41,12 @@
   // Resolve non-GM users for visibility
   const nonGMUsers = $derived(services.getNonGMUsers?.() || []);
 
-  // Resolve linked item if any
-  const linkedItem = $derived(
-    $draft.linkedRecipeItemUuid
-      ? services.resolveItem?.($draft.linkedRecipeItemUuid) || null
-      : null
+  const recipeItems = $derived.by(() => {
+    $recipeItemDefinitionsVersion;
+    return services.getRecipeItemDefinitions?.($draft.craftingSystemId) || [];
+  });
+  const selectedRecipeItem = $derived(
+    (recipeItems || []).find(item => item.id === $draft.recipeItemId) || null
   );
 
   // All system tags for datalist
@@ -189,6 +191,39 @@
       if (set) set[field] = value;
     });
   }
+
+  async function handleAssignRecipeItem(data) {
+    if (!$draft.craftingSystemId) return;
+    const recipeItem = await services.assignRecipeItemFromDrop?.(data, $draft.craftingSystemId);
+    if (recipeItem?.id) {
+      store.setRecipeItemId(recipeItem.id);
+    }
+  }
+
+  async function handleCopyRecipeItemSource(recipeItemId) {
+    const recipeItem = (recipeItems || []).find(item => item.id === recipeItemId) || null;
+    const sourceUuid = recipeItem?.sourceItemUuid || '';
+    if (!sourceUuid) {
+      services.notify?.('warn', localize('FABRICATE.Admin.Items.NoSourceUuid'));
+      return;
+    }
+
+    try {
+      await services.copyToClipboard?.(sourceUuid);
+      services.notify?.('info', localize('FABRICATE.Admin.Items.SourceUuidCopied'));
+    } catch (err) {
+      console.error('Fabricate | Failed to copy recipe item source UUID:', err);
+      services.notify?.('error', localize('FABRICATE.Admin.Items.SourceUuidCopyFailed'));
+    }
+  }
+
+  async function handleDeleteRecipeItem(recipeItemId) {
+    await store.deleteRecipeItemDefinition?.(recipeItemId);
+  }
+
+  function handleRefreshRecipeItem() {
+    store.refreshRecipeItemImage?.();
+  }
 </script>
 
 <div class="fabricate-recipe-editor">
@@ -212,7 +247,16 @@
             <RecipeImagePicker
               value={$draft.img}
               onChange={(path) => store.setField('img', path)}
+              disabled={Boolean(selectedRecipeItem)}
+              disabledTitle={selectedRecipeItem
+                ? localize('FABRICATE.Editor.LinkedItem.ImageLockedHint', { name: selectedRecipeItem.name })
+                : ''}
             />
+            {#if selectedRecipeItem}
+              <p class="recipe-image-lock-hint">
+                {localize('FABRICATE.Editor.LinkedItem.ImageLockedHint', { name: selectedRecipeItem.name })}
+              </p>
+            {/if}
           </div>
           <div class="info-grid">
             <div class="field-row">
@@ -313,14 +357,17 @@
       <VisibilitySection
         featureState={$featureState}
         visibility={$draft.visibility}
-        linkedRecipeItemUuid={$draft.linkedRecipeItemUuid}
-        {linkedItem}
+        recipeItemId={$draft.recipeItemId}
+        {recipeItems}
+        selectedRecipeItem={selectedRecipeItem}
         {nonGMUsers}
         onUpdateVisibility={(vis) => store.setField('visibility', vis)}
-        onClearLinkedItem={() => store.clearLinkedRecipeItem()}
-        onSetLinkedItemUuid={(uuid) => store.setLinkedRecipeItemUuid(uuid)}
-        onBrowseLinkedItem={() => services.browseLinkedItem?.()}
-        onCreateLinkedItem={() => services.createLinkedItem?.()}
+        onClearRecipeItem={() => store.clearRecipeItem()}
+        onSelectRecipeItem={(recipeItemId) => store.setRecipeItemId(recipeItemId)}
+        onAssignRecipeItemFromDrop={handleAssignRecipeItem}
+        onCopyRecipeItemSource={handleCopyRecipeItemSource}
+        onDeleteRecipeItem={handleDeleteRecipeItem}
+        onRefreshRecipeItem={handleRefreshRecipeItem}
       />
 
       <!-- Multi-Step Navigator -->
@@ -533,6 +580,17 @@
 
   .recipe-image-column {
     flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .recipe-image-lock-hint {
+    max-width: 190px;
+    margin: 0;
+    font-size: 0.78rem;
+    line-height: 1.35;
+    color: var(--fabricate-editor-muted);
   }
 
   .basic-info-layout .info-grid {
