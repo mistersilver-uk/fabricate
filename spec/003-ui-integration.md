@@ -323,8 +323,18 @@ The UI must expose required data fields from `004`, but mode logic itself is def
 - Select crafting actor
 - Select component source actors
 - Persist last selections in client settings
+- Actor/source selection is shared across both tabs (rendered above tab content)
 
-### Recipe List
+### Top-Level Tabs
+
+- **Alchemy tab**: shown when >= 1 crafting system has `resolutionMode === "alchemy"`
+- **Crafting tab**: shown when >= 1 crafting system has a non-alchemy resolution mode
+- If only one tab type exists, show that tab without a tab bar
+- If both exist, show tab bar; default to last-used or Crafting
+
+### Crafting Tab
+
+#### Recipe List
 
 - Filter/search controls (category/tags if enabled)
 - Row status badges from `006` evaluation, including:
@@ -334,22 +344,72 @@ The UI must expose required data fields from `004`, but mode logic itself is def
   - Exhausted recipe item uses
   - Missing materials
 
-When system mode is `alchemy`, this list is replaced by the alchemy attempt panel for non-GM users.
-
-### Recipe Detail
+#### Recipe Detail
 
 - Show blocking reasons when not craftable.
 - Show learn action when applicable.
 - Show consume-on-learn warning text when applicable.
 
-### Alchemy Panel (Player)
+#### Shopping List Panel
 
-- Shown when `CraftingSystem.resolutionMode === "alchemy"`.
-- Replaces recipe browse-to-craft flow for non-GM users.
-- Provides:
-  - ingredient selection area
-  - submit attempt action
-  - specific attempt feedback message
+- Session-scoped aggregation of materials needed for queued recipes.
+- Shown only on the Crafting tab.
+
+#### Recents Section
+
+- Recently crafted recipes for quick access.
+
+#### Run Summary
+
+- Active and historical crafting runs.
+
+### Alchemy Tab
+
+#### Alchemy System Selector
+
+- Shown only when multiple alchemy-mode systems exist.
+- Auto-selects if exactly one alchemy system is available.
+- Persisted in client settings.
+
+#### Component Palette
+
+- Grid of all components in selected alchemy system owned by component source actor(s).
+- Shows: image, name, available quantity (inventory minus workbench count).
+- Zero-quantity components remain visible but visually distinguished.
+- Left-click: add one to workbench.
+- Right-click: remove one from workbench (only if component is in workbench).
+- Drag-drop from external sources remains supported.
+
+#### The Workbench
+
+- Session-scoped working set displayed as compact grid with quantity badges (e.g., "Iron Ore x3").
+- Each unique component appears once; adding increments the badge count.
+- Supports: add from palette, remove (right-click or direct action), clear all, submit.
+- Submit triggers signature matching per existing Signature Resolution rules in `004`.
+
+#### Discovered Recipes Panel
+
+- Always visible on the right side, with empty state when no recipes have been discovered.
+- Shows recipes from selected alchemy system where crafting actor has entry in `learnedRecipes`.
+- GM sees all recipes in panel (consistent with GM-sees-all rule).
+- Searchable by recipe name.
+- "Craftable only" filter: shows only recipes whose requirements can be fully satisfied by palette quantities.
+- Auto-fill action per recipe: populates the workbench from the recipe's ingredient requirements (per Auto-Fill algorithm in `006`).
+- Visibility and learning semantics defined in `006`.
+
+#### Active Runs and History
+
+- Filtered to alchemy systems only.
+
+#### Excluded from Alchemy Tab
+
+- Shopping list
+- Recipe browse list
+- Recents
+- Favourites
+
+### Alchemy Attempt Feedback
+
 - Must not leak hidden recipe metadata on invalid combinations or failed attempts.
 - No-signature attempts are shown as failed attempts with specific feedback and ingredient consumption.
 - If a matched attempt cannot route to a valid result group, show a misconfiguration error state (GM fix required) rather than a normal player-failure outcome.
@@ -489,6 +549,7 @@ Client settings:
 - `fabricate.lastGatheringActor`
 - `fabricate.lastComponentSources`
 - `fabricate.lastManagedCraftingSystem`
+- `fabricate.lastAlchemySystem`
 - optional progressive order preferences
 
 Flags:

@@ -61,6 +61,9 @@
 | **Source UUID**                | The compendium origin of an owned item, used for recipe-item and component matching.                                                                                                                                                                                                                                                                                                                                                                                                                                             | `getSourceUuid()` in `src/utils/sourceUuid.js`                                       | spec/006                     |
 | **Component Source Actor**     | An actor selected as an inventory source for crafting. Fabricate searches the selected component source actors for ingredients and, when visibility rules allow, recipe-item matches. The crafting actor receives created results, but ingredient consumption may come from any selected component source actor. This is distinct from a component's `sourceItemUuid` or an owned item's source UUID. Component source actors apply to crafting and recipe-knowledge evaluation; they are not the source of gathering catalysts. | `componentSourceActors`, `componentSourceActorUuids`, `lastComponentSources`         | spec/003, spec/005, spec/006 |
 | **Shopping List**              | A session-scoped aggregation of materials needed for queued recipes. It is derived state, not a persisted aggregate.                                                                                                                                                                                                                                                                                                                                                                                                             | `shoppingListAggregator.js`, `craftingStore`                                         | issue #11, issue #12         |
+| **Workbench**                  | Session-scoped, actor-scoped working set of components committed for an alchemy attempt. Displayed as compact entries with quantity badges. Components move between palette and workbench. Derived state, not persisted. Submitting triggers signature matching.                                                                                                                                                                                                                                                                 | `craftingStore.alchemyWorkbench`                                                     | spec/004                     |
+| **Component Palette**          | Grid view of all components in the selected alchemy crafting system owned by component source actor(s). Each entry shows image, name, and available quantity (inventory minus workbench). | Derived from actor inventories + system components | spec/004 |
+| **Auto-Fill**                  | Populating the workbench from a discovered recipe's ingredient requirements by selecting satisfying components from the palette. Reuses the same ingredient expansion logic as signature matching. | New store action | spec/003, spec/006 |
 
 ## Concept Taxonomy
 
@@ -79,6 +82,7 @@ Module Configuration
    |- progressiveResultOrder
    |- favouriteRecipes
    |- recentlyCrafted
+   |- lastAlchemySystem
    |- lastGatheringActor (specced, not yet registered in runtime)
    `- chatOutput (canonical target; still implemented on system features in runtime)
 
@@ -310,6 +314,10 @@ the salvage lifecycle or the crafting lifecycle. There is no separate harvesting
 - Active and historical crafting/salvage run management
 - Result creation, consumption, and catalyst degradation
 - Shopping list derivation
+- Alchemy workbench management (session-scoped working set)
+- Component palette derivation
+- Auto-fill resolution from discovered recipe requirements
+- Alchemy crafting system selection (persisted in client settings)
 
 ### 5. Gathering Execution (Player/Runtime Domain)
 

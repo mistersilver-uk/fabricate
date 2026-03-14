@@ -117,6 +117,48 @@ Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
 4. No-signature attempts are treated as failed attempts (not misconfiguration errors).
 5. If a matched alchemy attempt cannot route to a valid result group, classify as crafting-system misconfiguration error (GM-fix required), not a player-failure outcome.
 
+## Discovered Recipe Browsing
+
+Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
+
+### Listing
+
+- Show recipes from selected alchemy system where crafting actor has entry in `learnedRecipes`.
+- GM sees all recipes in panel (consistent with GM-sees-all rule).
+- Searchable by recipe name.
+- "Craftable only" filter: shows only recipes whose requirements can be fully satisfied by full inventory quantities (not inventory minus workbench, since auto-fill clears the workbench first).
+
+### Craftability Evaluation
+
+- A discovered recipe is craftable when >= 1 ingredient set can be fully satisfied by full inventory quantities.
+- Evaluate against full inventory, not inventory minus workbench, since auto-fill clears the workbench before populating it.
+
+### Auto-Fill
+
+1. Clear the workbench.
+2. For each ingredient group in first satisfiable ingredient set:
+   - Resolve which components satisfy the group (component match, tag match, essence match — same expansion as signature matching via `SignatureValidator.expandIngredientToComponentIds()`).
+   - Select first available component with sufficient palette quantity.
+   - Decrement palette quantity tracker.
+   - Add to workbench.
+3. If all groups satisfied → workbench is ready for submission.
+4. If any group unsatisfied → fill what is possible, report unfulfilled requirements:
+   - Which ingredient groups failed.
+   - What was needed (component name, tag set, or essence type).
+   - What was available.
+
+### Multi-Set Auto-Fill
+
+- If recipe has multiple ingredient sets, try each in order, use first fully satisfiable.
+- If none fully satisfiable, use set satisfying most groups and report remainder.
+
+### Information Disclosure
+
+- Show recipe name and image for discovered recipes.
+- May show ingredient details (player has already crafted it).
+- May show result descriptions.
+- Undiscovered recipes must not appear for non-GM users.
+
 ## Knowledge Access Evaluation
 
 Input:
