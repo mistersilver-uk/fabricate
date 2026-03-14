@@ -3,6 +3,7 @@ import { ItemPilesIntegration } from '../integrations/ItemPilesIntegration.js';
 import { MacroExecutor } from '../utils/MacroExecutor.js';
 import { CraftingCheckAdapterRegistry } from './CraftingCheckAdapter.js';
 import { getFabricateFlag } from '../config/flags.js';
+import { getSetting, SETTING_KEYS } from '../config/settings.js';
 import { getItemSourceReferences, getComponentSourceReferences, itemMatchesComponentSource } from '../utils/sourceUuid.js';
 import { SignatureValidator } from './SignatureValidator.js';
 
@@ -1417,7 +1418,7 @@ export class CraftingEngine {
   /**
    * Post an automatic crafting summary chat message.
    *
-   * Checks system.features.chatOutput; returns silently when the toggle is off or
+   * Reads the `CHAT_OUTPUT` module setting; returns silently when the toggle is off or
    * when the crafting system cannot be resolved.  Errors from ChatMessage.create
    * are caught so they never propagate up the craft() call stack.
    *
@@ -1434,7 +1435,7 @@ export class CraftingEngine {
   async _postCraftChatMessage({ success, craftingActor, recipe, consumedIngredients, catalysts, createdResults, failureReason, rollTableMeta = null }) {
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(recipe?.craftingSystemId);
-    if (!system || system.features?.chatOutput !== true) return;
+    if (!system || getSetting(SETTING_KEYS.CHAT_OUTPUT) !== true) return;
 
     const loc = (key) => game.i18n?.localize?.(key) ?? key;
 
