@@ -40,9 +40,6 @@
       type="button"
       class="workbench-submit-btn"
       disabled={isEmpty}
-      style={isEmpty
-        ? 'opacity: 0.4; cursor: default;'
-        : 'background: var(--fabricate-primary); color: #fff; border: none; border-radius: 4px; padding: 6px 16px; font-size: 13px;'}
       onclick={() => { if (!isEmpty) onSubmitWorkbench?.(); }}
     >
       {localize('FABRICATE.Workbench.Submit')}
@@ -69,6 +66,7 @@
           aria-label="{entry.name} x{entry.quantity}"
           style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 4px; background: rgba(0, 0, 0, 0.1); border: 1px solid rgba(0, 0, 0, 0.15); font-size: 12px;"
           oncontextmenu={(event) => { event.preventDefault(); onRemoveFromWorkbench?.(entry.componentId); }}
+          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRemoveFromWorkbench?.(entry.componentId); } }}
           role="button"
           tabindex="0"
         >
@@ -86,3 +84,20 @@
     </div>
   {/if}
 </div>
+
+<style>
+  .workbench-submit-btn {
+    background: var(--fabricate-primary, #4a90e2);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 16px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .workbench-submit-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+</style>

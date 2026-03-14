@@ -1,5 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import { localize } from '../util/foundryBridge.js';
+
   let {
     alchemySystems = [],
     selectedSystemId = '',
@@ -17,6 +19,7 @@
       class="alchemy-system-select"
       value={selectedSystemId}
       onchange={handleChange}
+      aria-label={localize('FABRICATE.Alchemy.SelectSystem')}
       style="width: 100%; height: 32px; font-size: 13px;"
     >
       {#each alchemySystems as system (system.id)}

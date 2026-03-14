@@ -379,18 +379,6 @@ function createHeaderButton(labelText, iconClass, actionId, onClick) {
   return button;
 }
 
-// Also add button when Items directory is activated
-Hooks.on('activateItemDirectory', (app) => {
-  console.log('Fabricate | activateItemDirectory hook fired');
-  addModuleButtonsToItemsDirectory();
-});
-
-// Handle D&D 5e specific hook
-Hooks.on('activateItemDirectory5e', (app) => {
-  console.log('Fabricate | activateItemDirectory5e hook fired');
-  addModuleButtonsToItemsDirectory();
-});
-
 // Chat command for quick crafting (for testing)
 Hooks.on('chatMessage', (chatLog, message, chatData) => {
   // Check for /craft command

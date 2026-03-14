@@ -57,7 +57,7 @@
         <div class="alchemy-discovered-row" data-recipe-id={recipe.id}>
           <img
             class="alchemy-discovered-img"
-            src={recipe.img || ''}
+            src={recipe.img || 'icons/svg/item-bag.svg'}
             alt={recipe.name}
             width="28"
             height="28"

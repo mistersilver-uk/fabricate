@@ -46,6 +46,7 @@
         role="button"
         aria-label="{component.name} ({component.availableQuantity} {localize('FABRICATE.Alchemy.Palette.Available')})"
         aria-disabled={isEmpty ? 'true' : undefined}
+        tabindex={isEmpty ? -1 : 0}
         onclick={() => onAddToWorkbench?.(component.componentId)}
         oncontextmenu={(e) => handleContextMenu(e, component)}
       >
