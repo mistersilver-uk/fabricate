@@ -146,8 +146,22 @@ function createEssenceIconOptions(iconDefinitions) {
   return Object.freeze(options);
 }
 
-export const ESSENCE_ALL_ICON_OPTIONS = createEssenceIconOptions(FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS);
-export const ESSENCE_ICON_OPTIONS = createEssenceIconOptions(FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS);
+let _essenceAllIconOptions = null;
+let _essenceIconOptions = null;
+
+export function getEssenceAllIconOptions() {
+  if (!_essenceAllIconOptions) {
+    _essenceAllIconOptions = createEssenceIconOptions(FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS);
+  }
+  return _essenceAllIconOptions;
+}
+
+export function getEssenceIconOptions() {
+  if (!_essenceIconOptions) {
+    _essenceIconOptions = createEssenceIconOptions(FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS);
+  }
+  return _essenceIconOptions;
+}
 
 export function getEssenceIconPrefix(iconClass) {
   const tokens = String(iconClass || '').trim().split(/\s+/).filter(Boolean);
@@ -169,10 +183,10 @@ export function normalizeEssenceIcon(iconClass) {
 
 export function buildEssenceIconOptions(iconDefinitions = FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS) {
   if (iconDefinitions === FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS) {
-    return ESSENCE_ICON_OPTIONS;
+    return getEssenceIconOptions();
   }
   if (iconDefinitions === FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS) {
-    return ESSENCE_ALL_ICON_OPTIONS;
+    return getEssenceAllIconOptions();
   }
 
   const resolvedDefinitions = Array.isArray(iconDefinitions) && iconDefinitions.length > 0
@@ -182,11 +196,11 @@ export function buildEssenceIconOptions(iconDefinitions = FONT_AWESOME_FREE_CLAS
   return createEssenceIconOptions(resolvedDefinitions);
 }
 
-export function getEssenceIconOption(iconClass, options = ESSENCE_ICON_OPTIONS) {
+export function getEssenceIconOption(iconClass, options = null) {
   const normalizedIcon = normalizeEssenceIcon(iconClass);
   const resolvedOptions = Array.isArray(options) && options.length > 0
     ? options
-    : ESSENCE_ICON_OPTIONS;
+    : getEssenceIconOptions();
 
   const match = resolvedOptions.find(option => option.iconClass === normalizedIcon);
   if (match) return match;
