@@ -196,6 +196,18 @@ class Fabricate {
       options
     );
   }
+
+  /**
+   * Delete a recipe by ID.
+   * @param {string} recipeId - The recipe ID to delete
+   */
+  async deleteRecipe(recipeId) {
+    if (!this.ready) {
+      throw new Error('Fabricate not initialized');
+    }
+
+    return await this.recipeManager.deleteRecipe(recipeId);
+  }
 }
 
 // Create global instance
@@ -452,6 +464,13 @@ globalThis.fabricate = {
    */
   listRecipes: (filters = {}) => {
     return game.fabricate.getRecipeManager().getRecipes(filters);
+  },
+
+  /**
+   * Delete a recipe by ID
+   */
+  deleteRecipe: async (recipeId) => {
+    return await game.fabricate.deleteRecipe(recipeId);
   },
 
   /**
