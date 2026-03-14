@@ -20,8 +20,9 @@ This spec governs:
 From `002-data-models.md`:
 
 - `CraftingSystem.recipeVisibility`
+- `CraftingSystem.recipeItemDefinitions`
 - `Recipe.visibility`
-- `Recipe.linkedRecipeItemUuid`
+- `Recipe.recipeItemId`
 - `Recipe.locked`
 - `Actor.flags.fabricate.learnedRecipes`
 - `Item._stats.compendiumSource` (Foundry v12+, primary source UUID field)
@@ -47,10 +48,10 @@ Every matching rule in this spec that compares an item's source identity to a st
 
 ## Recipe Item Matching
 
-A candidate owned item matches `Recipe.linkedRecipeItemUuid` when any of the following is true:
+A candidate owned item matches a recipe's selected recipe item definition when any of the following is true:
 
-1. `candidate.uuid === linkedRecipeItemUuid`
-2. `resolveSourceUuid(candidate) === linkedRecipeItemUuid`
+1. `candidate.uuid === recipeItemDefinition.sourceItemUuid`
+2. `resolveSourceUuid(candidate) === recipeItemDefinition.sourceItemUuid`
 
 The second condition covers compendium-derived copies. On Foundry v12+, `_stats.compendiumSource` carries this value; on v11, `flags.core.sourceId` carries it. The resolver handles both transparently.
 
@@ -121,6 +122,7 @@ Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
 Input:
 
 - `recipe`
+- `craftingSystem`
 - `viewer`
 - `craftingActor`
 - `componentSourceActors`
@@ -131,7 +133,9 @@ Algorithm:
 1. If the viewer is GM, grant access.
 2. Compute `hasLearned` from `Actor.flags.fabricate.learnedRecipes`.
 3. Compute `hasMatchedItem`:
-   - If `linkedRecipeItemUuid` missing: false.
+   - If `recipeItemId` missing: false.
+   - Resolve `recipeItemDefinition` from `craftingSystem.recipeItemDefinitions`.
+   - If the definition is missing: false.
    - Else, gather candidate items from crafting actor plus component sources (if allowed).
    - Keep candidates matching by UUID or `resolveSourceUuid(candidate)`.
    - If limited uses are enabled, keep only non-exhausted candidates.
@@ -162,7 +166,8 @@ When a single matched instance must be mutated (increment or consume), choose:
 ### Preconditions
 
 - Mode is `learned` or `itemOrLearned`.
-- Recipe has `linkedRecipeItemUuid`.
+- Recipe has `recipeItemId`.
+- The referenced recipe item definition exists.
 - Recipe is not yet learned for the selected crafting actor.
 - At least one matched, owned recipe item exists.
 
@@ -220,20 +225,20 @@ When `dragDropEnabled === true`, dropping a matched recipe item onto an actor mu
 - Evaluate only enabled recipes whose crafting system visibility mode is `knowledge`.
 - Learning-by-drop is only valid when `knowledge.mode` is `learned` or `itemOrLearned`.
 - Systems in `global` or `player` list mode are not evaluated for drag-and-drop learning.
-- In multi-system worlds, all eligible knowledge-mode recipes are considered, and matching is based solely on linked recipe item identity rules below.
+- In multi-system worlds, all eligible knowledge-mode recipes are considered, and matching is based solely on the resolved recipe item definition identity rules below.
 
 #### Matching Rules
 
 A dropped item matches a recipe when any of the following is true:
 
-1. `droppedItem.uuid === recipe.linkedRecipeItemUuid`
-2. `resolveSourceUuid(droppedItem) === recipe.linkedRecipeItemUuid`
+1. `droppedItem.uuid === recipeItemDefinition.sourceItemUuid`
+2. `resolveSourceUuid(droppedItem) === recipeItemDefinition.sourceItemUuid`
 
 `resolveSourceUuid` reads `_stats.compendiumSource` first (Foundry v12+), then falls back to `flags.core.sourceId` (Foundry v11 and earlier). A match on any condition is sufficient.
 
 #### Multi-Recipe Matching
 
-When a single dropped item matches multiple recipes, the actor learns all matched recipes in a single operation. A recipe item linked to multiple recipes functions as a "recipe book" -- one drop teaches every recipe it is linked to.
+When a single dropped item matches multiple recipes, the actor learns all matched recipes in a single operation. A recipe item definition linked to multiple recipes functions as a "recipe book" -- one drop teaches every recipe it is linked to.
 
 Learning is applied per matched recipe independently:
 
@@ -262,11 +267,19 @@ When `dragDropEnabled === false`:
 
 ## Edge Cases
 
-### Linked Template Missing
+### Recipe Item Definition Missing
 
-If `linkedRecipeItemUuid` no longer resolves to a template:
+If `recipeItemId` points to no `RecipeItemDefinition` in the recipe's crafting system:
 
-- Keep the stored UUID.
+- Keep the stored `recipeItemId`.
+- Warn in admin/editor UI.
+- Item-based knowledge matching fails until the reference is repaired.
+
+### Recipe Item Source Template Missing
+
+If `recipeItemDefinition.sourceItemUuid` no longer resolves to a template:
+
+- Keep the stored `sourceItemUuid`.
 - Warn in admin/editor UI.
 - Matching may still succeed via `resolveSourceUuid` on owned items.
 

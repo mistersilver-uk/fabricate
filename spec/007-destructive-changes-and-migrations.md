@@ -51,12 +51,22 @@ When switching `recipeVisibility.listMode` or `knowledge.mode`:
 - Access behaviour changes immediately according to `006`.
 - UI must hide controls that are no longer applicable.
 
-### Linked Recipe Item Template Deletion
+### Delete Recipe Item Definition
 
-If a linked world/compendium item is deleted:
+When deleting a `RecipeItemDefinition` from a crafting system:
 
-- Keep `linkedRecipeItemUuid` unchanged.
+- Require explicit GM confirmation.
+- Clear `recipeItemId` from every recipe in that system that references the deleted definition.
 - Warn in the recipe editor.
+- Learned recipe flags remain stored.
+- Access behaviour changes immediately according to `006`.
+
+### Recipe Item Source Template Deletion
+
+If a recipe item's linked world/compendium source item is deleted:
+
+- Keep `RecipeItemDefinition.sourceItemUuid` unchanged.
+- Warn in the relevant admin/editor UI.
 - Runtime matching may still succeed via source UUID resolution (`_stats.compendiumSource`, legacy fallback `flags.core.sourceId`) on owned copies.
 
 ### Import Recipes into Crafting System
@@ -202,6 +212,20 @@ The pre-release migration path removes legacy crafting modes `mapped` and `tiere
    - when provider is changed, stale provider-specific config from the previous provider is cleared.
 5. Because this is pre-release, legacy-mode compatibility shims are not retained.
 
+### Recipe Item Library Migration (Pre-Release)
+
+The pre-release migration path replaces legacy recipe-level `linkedRecipeItemUuid` values with system-owned recipe item definitions.
+
+1. Group recipes by `craftingSystemId`.
+2. For each distinct legacy `linkedRecipeItemUuid` inside one crafting system:
+   - create one generated `RecipeItemDefinition`,
+   - set `sourceItemUuid` to the legacy UUID,
+   - derive `name`/`img` from the resolved source item when available, otherwise use deterministic fallback metadata.
+3. Rewrite each recipe to `recipeItemId` referencing the generated definition for that UUID.
+4. If a legacy UUID is unresolved, keep it as stale `sourceItemUuid` on the generated definition and emit a migration warning rather than dropping the reference.
+5. When multiple recipes in one system share the same legacy UUID, they must reuse the same generated `RecipeItemDefinition`.
+6. Remove `linkedRecipeItemUuid` from canonical migrated recipe output.
+
 ## Testing Requirements
 
 - Unit tests for each destructive operation clean-up path.
@@ -213,6 +237,7 @@ The pre-release migration path removes legacy crafting modes `mapped` and `tiere
 - Unit tests for write-on-change: verify no setting writes occur when data is unchanged.
 - Unit tests for pending migration selection: only migrations newer than `migrationVersion` are selected, ordered by ascending semver.
 - Unit tests for pre-release mode migration (`mapped`/`tiered` -> `routed`) and provider assignment.
+- Unit tests for pre-release recipe-item migration (`linkedRecipeItemUuid` -> `recipeItemDefinitions` + `recipeItemId`).
 - Unit tests for unmigratable recipe deletion with cascade cleanup and JSON logging output.
 - Unit tests for provider-switch stale-config cleanup.
 - Unit tests for partial import conflict handling and aggregated conflict reporting.

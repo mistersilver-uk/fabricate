@@ -44,6 +44,7 @@ CraftingSystem = {
   essences?: Record<string, EssenceDefinition>,
 
   components: Component[],
+  recipeItemDefinitions: RecipeItemDefinition[],
 
   // Present only when features.salvage is true.
   salvageResolutionMode: "simple" | "routed" | "progressive",
@@ -146,6 +147,9 @@ CraftingSystem = {
    - `features.multiStepRecipes` must be `false`.
    - `alchemy` config must be present; missing values use defaults (`learnOnCraft: false`, `consumeOnFail: true`, `showAttemptHistoryToPlayers: true`).
 9. If `features.gathering` is false, gathering environments and gathering tasks for that system are inert and hidden from normal UI flows.
+10. `recipeItemDefinitions` are distinct from `components`; a recipe item definition must not be treated as a crafting ingredient/result component unless it is also intentionally imported as a component.
+11. `RecipeItemDefinition.id` values must be unique within a crafting system.
+12. `RecipeItemDefinition.sourceItemUuid` values should be unique within a crafting system so one system recipe item can be reused across multiple recipes.
 
 ### Recipe Visibility Requirements
 
@@ -172,6 +176,31 @@ EssenceDefinition = {
   sourceItemUuid?: string,
 }
 ```
+
+## RecipeItemDefinition
+
+### Purpose
+
+Define one curated knowledge item available for recipe visibility and learning flows.
+
+### Properties
+
+```js
+RecipeItemDefinition = {
+  id: string,
+  name: string,
+  img: string,
+  description?: string,
+  sourceItemUuid: string,
+}
+```
+
+### Requirements
+
+1. `sourceItemUuid` points to the canonical world or compendium item template used for recipe-item matching.
+2. New recipe item definitions are created from dropped or selected Foundry items; manual UUID entry is not part of the canonical UI flow.
+3. If the source template later becomes unresolved, the stored `sourceItemUuid` is retained and the definition becomes stale-but-readable.
+4. Multiple recipes may reference the same recipe item definition. This is the canonical way to model shared formulas, books, schematics, or recipe scrolls.
 
 ## Component
 
@@ -256,8 +285,8 @@ Recipe = {
     allowedUserIds?: string[],  // Required when restricted is true. Empty array = hidden from all non-GM users.
   },
 
-  // Canonical recipe-item template reference (world or compendium UUID)
-  linkedRecipeItemUuid?: string,
+  // Canonical recipe-item definition reference inside the owning crafting system
+  recipeItemId?: string,
 
   locked: boolean,
 
@@ -284,8 +313,9 @@ Recipe = {
    - failure keywords: `fail`, `failed`, `failure`, `f`, `miss`, `missed`, `m`, `nothing`, `none`, `whiff`, `whiffed`, `hazard`, `danger`, `complication`, `trap`, `oops`
 7. If `transferEffects` is true and essences are enabled, transfer behaviour follows `005-recipes-and-steps.md`.
 8. If `visibility.restricted` is true, `visibility.allowedUserIds` must be present as an array. An empty array is valid and means no non-GM user may see the recipe.
-9. If knowledge mode includes item matching or learning, `linkedRecipeItemUuid` should be configured for player craftability.
-10. If `linkedRecipeItemUuid` is configured and does not resolve, validation must warn.
+9. If knowledge mode includes item matching or learning, `recipeItemId` should be configured for player craftability.
+10. If `recipeItemId` is configured and the referenced `RecipeItemDefinition` does not exist, validation must warn.
+11. If `recipeItemId` is configured and the referenced `RecipeItemDefinition.sourceItemUuid` is stale or no longer resolves, validation must warn.
 
 ### Validation Guidance
 
@@ -299,20 +329,21 @@ Valid-but-hidden configuration:
 
 ### Purpose
 
-Define matching between a recipe's linked template and owned inventory items.
+Define matching between a recipe's system-managed recipe item definition and owned inventory items.
 
 ### Canonical Link
 
-- `Recipe.linkedRecipeItemUuid` stores the canonical template reference to the recipe item.
-- It may point to a world item or a compendium item.
+- `Recipe.recipeItemId` stores the reference to a `CraftingSystem.recipeItemDefinitions[].id` entry.
+- `RecipeItemDefinition.sourceItemUuid` stores the canonical template reference to the recipe item.
+- The template may point to a world item or a compendium item.
 
 ### Match Rule
 
 A candidate owned item matches when either condition is true:
 
-1. `ownedItem.uuid === recipe.linkedRecipeItemUuid`
-2. `ownedItem._stats.compendiumSource === recipe.linkedRecipeItemUuid`
-3. `ownedItem.flags.core.sourceId === recipe.linkedRecipeItemUuid` (legacy fallback)
+1. `ownedItem.uuid === recipeItemDefinition.sourceItemUuid`
+2. `ownedItem._stats.compendiumSource === recipeItemDefinition.sourceItemUuid`
+3. `ownedItem.flags.core.sourceId === recipeItemDefinition.sourceItemUuid` (legacy fallback)
 
 Foundry v12+ uses `_stats.compendiumSource`; Foundry v11 and earlier used `flags.core.sourceId`.
 Runtime implementations should call the shared source UUID resolver defined in `006-recipe-visibility.md`.
@@ -324,7 +355,8 @@ This structure need not explicitly appear in implementation.
 
 ```js
 RecipeItemMatchContext = {
-  linkedRecipeItemUuid: string,
+  recipeItemId: string,
+  recipeItemSourceUuid: string,
   candidateItemUuid: string,
   candidateSourceId: string | null,
   isMatch: boolean,
@@ -895,10 +927,13 @@ The following canonical field names must be used in all new writes:
 | Ingredient | `match.componentId` | Component reference inside match object |
 | Result | `componentId` | Produced item component reference |
 | CraftingSystem | `components` | Array of managed item entries |
+| CraftingSystem | `recipeItemDefinitions` | Array of managed recipe-item entries |
 | IngredientSet | `ingredientGroups` | Array of ingredient group objects |
 | Recipe | `resultGroups` | Array of result group objects |
+| Recipe | `recipeItemId` | Recipe item definition reference |
 | EssenceDefinition | `sourceItemUuid` | Template item reference |
 | Component | `sourceItemUuid` | Template item reference |
+| RecipeItemDefinition | `sourceItemUuid` | Template item reference |
 | CraftingSystem | `itemTags` | Array of tag strings |
 | Item flag | `catalystItemUsage.timesUsed` | Catalyst usage tracking |
 
@@ -918,6 +953,7 @@ The following legacy aliases are accepted by constructors and normalization func
 | `tags` | `itemTags` | CraftingSystem | Normalization reads `tags` as fallback for `itemTags` |
 | `catalystUses` (bare number) | `catalystItemUsage.timesUsed` | Item flag | Runtime reads legacy flag and converts to `{ timesUsed }` shape |
 | `sourceUuid` | `sourceItemUuid` | Component | Normalization reads as fallback |
+| `linkedRecipeItemUuid` | `recipeItemId` | Recipe | Migration/import paths synthesize or resolve a `RecipeItemDefinition` by `sourceItemUuid` within the recipe's crafting system |
 
 ### Transitional Write Aliases (Scheduled for Removal)
 

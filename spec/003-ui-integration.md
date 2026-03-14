@@ -110,6 +110,22 @@ If `features.gathering === false`:
 - `learn.consumeOnLearn` (only shown when `listMode === "knowledge"` and learned mode is active)
 - `learn.dragDropEnabled` (only shown when `listMode === "knowledge"` and learned mode is active)
 
+#### Recipe Item Definition Controls
+
+The GM admin must expose a recipe-item management surface for the selected crafting system.
+
+Capabilities:
+
+- Add recipe item definitions from world or compendium items by drag/drop or picker
+- Remove recipe item definitions
+- Show source-linked name and image preview
+- Warn when a recipe item definition's source item no longer resolves
+
+Recipe item definitions are distinct from components:
+
+- adding a recipe item definition must not add or require a component entry
+- selecting a recipe item for knowledge gating must not require importing that item into the component library
+
 When `listMode === "global"`, no per-recipe player allow-list controls are shown.
 Visibility and learning semantics are defined in `006`.
 
@@ -220,11 +236,15 @@ If `listMode === "player"`:
 
 If knowledge mode includes item matching or learning:
 
-- Linked recipe item UUID picker (`linkedRecipeItemUuid`)
-- Helper text: owned copies match by UUID or `flags.core.sourceId`
-- `Create Recipe Item` helper action when unset
+- Recipe item selector / drop zone bound to `recipeItemId`
+- Preview of the selected system recipe item definition (name, image, and source status)
+- Clear action for removing the current recipe item reference
+- Helper text: owned copies match by UUID or resolved source UUID of the selected recipe item definition
 
 If the required linkage is missing, show a validation warning.
+
+The canonical recipe-editor flow must not require manual UUID entry for recipe items.
+The selector should follow the same drag/drop-first interaction pattern used elsewhere for component and essence-source selection.
 
 ### Step Structure UI
 
