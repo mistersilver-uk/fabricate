@@ -1155,12 +1155,12 @@ export function createCraftingStore(services) {
     }
 
     if (items.length === 0) {
-      services.notify.error('Could not find any of the workbench components in your inventory');
+      services.notify.error(localize('FABRICATE.Alchemy.ComponentsNotFound'));
       return;
     }
 
     if (missingComponents.length > 0) {
-      services.notify.warn(`Some components could not be found: ${missingComponents.join(', ')}`);
+      services.notify.warn(localize('FABRICATE.Alchemy.ComponentsMissing').replace('{names}', missingComponents.join(', ')));
     }
 
     const result = await craftingEngine.craftAlchemy(actor, sources, items, {
@@ -1170,7 +1170,7 @@ export function createCraftingStore(services) {
     if (result.success) {
       services.notify.info(result.message);
     } else if (result.disposition === 'no-match') {
-      services.notify.warn("The combination didn't produce anything");
+      services.notify.warn(localize('FABRICATE.Alchemy.NoMatch'));
     } else {
       services.notify.error(result.message);
     }
@@ -1234,10 +1234,10 @@ export function createCraftingStore(services) {
 
     if (unfulfilled.length > 0) {
       services.notify.warn(
-        `Auto-fill: ${unfulfilled.length} ingredient group(s) could not be satisfied`
+        localize('FABRICATE.Alchemy.AutoFillPartial').replace('{count}', String(unfulfilled.length))
       );
     } else if (entries.length > 0) {
-      services.notify.info('Workbench populated from recipe');
+      services.notify.info(localize('FABRICATE.Alchemy.AutoFillComplete'));
     }
   }
 

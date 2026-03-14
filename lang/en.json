@@ -631,6 +631,10 @@
       "StatusAvailable": "Available",
       "StatusMissing": "Missing materials",
       "AutoFill": "Auto-fill",
+      "AutoFillPartial": "Auto-fill: {count} ingredient group(s) could not be satisfied",
+      "AutoFillComplete": "Workbench populated from recipe",
+      "ComponentsNotFound": "Could not find any of the workbench components in your inventory",
+      "ComponentsMissing": "Some components could not be found: {names}",
       "Palette": {
         "NoComponents": "No components available",
         "Available": "available"
