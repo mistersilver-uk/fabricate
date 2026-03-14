@@ -1707,6 +1707,74 @@
   transform: none;
 }
 
+/* ==========================================
+   Recipe Image Picker (#141)
+   ========================================== */
+
+.fabricate-recipe-editor {
+  position: relative;
+  isolation: isolate;
+}
+
+.fabricate-recipe-editor .recipe-image-picker-trigger {
+  padding: 6px !important;
+  min-height: unset !important;
+  height: 84px !important;
+  width: 84px !important;
+  box-sizing: border-box;
+}
+
+.fabricate-recipe-editor .recipe-image-picker-popover {
+  position: absolute;
+  z-index: 4000;
+  background: var(--fabricate-editor-menu-bg, #171b26);
+  border: 1px solid var(--fabricate-editor-border-strong, rgba(255, 255, 255, 0.24));
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.fabricate-recipe-editor .recipe-image-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  padding: 8px;
+  overflow-y: auto;
+  max-height: inherit;
+}
+
+.fabricate-recipe-editor .recipe-image-picker-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--fabricate-editor-input-bg, rgba(255, 255, 255, 0.04));
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 4px !important;
+  min-height: 40px !important;
+  height: auto !important;
+  box-sizing: border-box;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.fabricate-recipe-editor .recipe-image-picker-option:hover {
+  background: var(--fabricate-editor-input-bg-hover, rgba(255, 255, 255, 0.07));
+  border-color: var(--fabricate-editor-border, rgba(255, 255, 255, 0.14));
+}
+
+.fabricate-recipe-editor .recipe-image-picker-option.selected {
+  border-color: var(--fabricate-editor-accent, #4a90e2);
+  background: var(--fabricate-editor-accent-soft, rgba(74, 144, 226, 0.22));
+}
+
+.fabricate-recipe-editor .recipe-image-picker-option-img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  display: block;
+}
+
 .btn-danger:hover {
   color: var(--fabricate-danger);
 }

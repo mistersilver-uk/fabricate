@@ -404,7 +404,9 @@
         "CategoryLabel": "Category",
         "ImageLabel": "Image",
         "CategoryPlaceholder": "No system categories defined yet",
-        "CategoryHint": "Define categories in Crafting Admin > Systems."
+        "CategoryHint": "Define categories in Crafting Admin > Systems.",
+        "PickImageLabel": "Choose recipe image",
+        "PickImageDialogLabel": "Recipe image picker"
       },
       "Flags": {
         "Availability": "Availability",
@@ -421,7 +423,7 @@
         "NameRequired": "Recipe name is required."
       },
       "Visibility": {
-        "GlobalHint": "This system uses global visibility — all recipes are visible to all players. To control visibility per recipe, change the system's recipe visibility mode to Player-specific in the crafting admin.",
+        "GlobalHint": "This system uses global visibility \u2014 all recipes are visible to all players. To control visibility per recipe, change the system's recipe visibility mode to Player-specific in the crafting admin.",
         "PlayerVisibilityTitle": "Player Visibility",
         "RestrictLabel": "Restrict recipe visibility to specific users",
         "NoNonGmUsers": "No non-GM users available."
@@ -575,9 +577,9 @@
     "Import": {
       "Title": "Import Crafting System",
       "SummaryTitle": "Import Summary",
-      "SystemCreated": "Crafting system “{name}” created.",
-      "SystemUpdated": "Crafting system “{name}” updated.",
-      "SystemSkipped": "Crafting system “{name}” skipped (already exists).",
+      "SystemCreated": "Crafting system \u201c{name}\u201d created.",
+      "SystemUpdated": "Crafting system \u201c{name}\u201d updated.",
+      "SystemSkipped": "Crafting system \u201c{name}\u201d skipped (already exists).",
       "ComponentsRemapped": "{count} component(s) remapped to world items.",
       "ComponentsUnresolved": "{count} component(s) have unresolved source items.",
       "RecipesImported": "{imported} of {total} recipe(s) imported.",
@@ -602,7 +604,7 @@
       "NoMatch": "The combination didn't produce anything",
       "Consumed": "Ingredients were consumed in the attempt",
       "LearnedRecipe": "You discovered a new recipe!",
-      "MisconfigError": "Crafting system error — contact your GM"
+      "MisconfigError": "Crafting system error \u2014 contact your GM"
     },
     "Labels": {
       "UnknownComponent": "Unknown Component",
