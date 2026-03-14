@@ -404,7 +404,10 @@
         "CategoryLabel": "Category",
         "ImageLabel": "Image",
         "CategoryPlaceholder": "No system categories defined yet",
-        "CategoryHint": "Define categories in Crafting Admin > Systems."
+        "CategoryHint": "Define categories in Crafting Admin > Systems.",
+        "ChooseImage": "Choose recipe image",
+        "SearchImage": "Search icons...",
+        "ImageDialogLabel": "Recipe image picker"
       },
       "Flags": {
         "Availability": "Availability",

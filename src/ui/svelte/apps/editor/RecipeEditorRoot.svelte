@@ -13,6 +13,7 @@
   import VisibilitySection from './VisibilitySection.svelte';
   import StepNavigator from './StepNavigator.svelte';
   import ResultSelectionProvider from './ResultSelectionProvider.svelte';
+  import RecipeImagePicker from './RecipeImagePicker.svelte';
 
   let { store, services = {} } = $props();
 
@@ -206,67 +207,64 @@
 
       <!-- Basic Info Grid -->
       <section class="basic-info editor-panel-surface">
-        <div class="info-grid">
-          <div class="field-row">
-            <label for="recipeName">{localize('FABRICATE.Editor.BasicInfo.NameLabel')}</label>
-            <input
-              id="recipeName"
-              name="recipeName"
-              type="text"
-              value={$draft.name}
-              oninput={(e) => store.setField('name', e.target.value)}
-              placeholder={localize('FABRICATE.Recipe.Name')}
-              required
-              class:field-error={hasFieldError('[name="recipeName"]')}
+        <div class="basic-info-layout">
+          <div class="recipe-image-column">
+            <RecipeImagePicker
+              value={$draft.img}
+              onChange={(path) => store.setField('img', path)}
             />
-            {#if hasFieldError('[name="recipeName"]')}
-              <span class="inline-error">{localize('FABRICATE.Editor.Validation.NameRequired')}</span>
-            {/if}
           </div>
-
-          {#if $featureState.showCategories}
+          <div class="info-grid">
             <div class="field-row">
-              <label for="recipeCategory">{localize('FABRICATE.Editor.BasicInfo.CategoryLabel')}</label>
-              {#if categories.length > 0}
-                <select
-                  id="recipeCategory"
-                  value={$draft.category}
-                  onchange={(e) => store.setField('category', e.target.value)}
-                >
-                  {#each categories as cat}
-                    <option value={cat}>{getRecipeCategoryLabel(cat, localize)}</option>
-                  {/each}
-                </select>
-              {:else}
-                <input
-                  id="recipeCategory"
-                  type="text"
-                  value={$draft.category}
-                  oninput={(e) => store.setField('category', e.target.value)}
-                />
+              <label for="recipeName">{localize('FABRICATE.Editor.BasicInfo.NameLabel')}</label>
+              <input
+                id="recipeName"
+                name="recipeName"
+                type="text"
+                value={$draft.name}
+                oninput={(e) => store.setField('name', e.target.value)}
+                placeholder={localize('FABRICATE.Recipe.Name')}
+                required
+                class:field-error={hasFieldError('[name="recipeName"]')}
+              />
+              {#if hasFieldError('[name="recipeName"]')}
+                <span class="inline-error">{localize('FABRICATE.Editor.Validation.NameRequired')}</span>
               {/if}
             </div>
-          {/if}
 
-          <div class="field-row full-width">
-            <label for="recipeDescription">{localize('FABRICATE.Editor.BasicInfo.DescriptionLabel')}</label>
-            <textarea
-              id="recipeDescription"
-              value={$draft.description}
-              oninput={(e) => store.setField('description', e.target.value)}
-              rows="3"
-            ></textarea>
-          </div>
+            {#if $featureState.showCategories}
+              <div class="field-row">
+                <label for="recipeCategory">{localize('FABRICATE.Editor.BasicInfo.CategoryLabel')}</label>
+                {#if categories.length > 0}
+                  <select
+                    id="recipeCategory"
+                    value={$draft.category}
+                    onchange={(e) => store.setField('category', e.target.value)}
+                  >
+                    {#each categories as cat}
+                      <option value={cat}>{getRecipeCategoryLabel(cat, localize)}</option>
+                    {/each}
+                  </select>
+                {:else}
+                  <input
+                    id="recipeCategory"
+                    type="text"
+                    value={$draft.category}
+                    oninput={(e) => store.setField('category', e.target.value)}
+                  />
+                {/if}
+              </div>
+            {/if}
 
-          <div class="field-row">
-            <label for="recipeImg">{localize('FABRICATE.Editor.BasicInfo.ImageLabel')}</label>
-            <input
-              id="recipeImg"
-              type="text"
-              value={$draft.img}
-              oninput={(e) => store.setField('img', e.target.value)}
-              placeholder="icons/svg/item-bag.svg"
-            />
+            <div class="field-row full-width">
+              <label for="recipeDescription">{localize('FABRICATE.Editor.BasicInfo.DescriptionLabel')}</label>
+              <textarea
+                id="recipeDescription"
+                value={$draft.description}
+                oninput={(e) => store.setField('description', e.target.value)}
+                rows="3"
+              ></textarea>
+            </div>
           </div>
         </div>
       </section>
@@ -525,6 +523,21 @@
     margin-bottom: 0;
   }
 
+  .basic-info-layout {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+
+  .recipe-image-column {
+    flex: 0 0 auto;
+  }
+
+  .basic-info-layout .info-grid {
+    flex: 1;
+    min-width: 0;
+  }
+
   .info-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -652,6 +665,11 @@
 
     .editor-panel-surface {
       padding: 12px;
+    }
+
+    .basic-info-layout {
+      flex-direction: column;
+      align-items: center;
     }
 
     .info-grid {

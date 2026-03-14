@@ -22,6 +22,7 @@ import {
   draftIngredientSetHasRequirement,
   serializeDraftIngredientGroups
 } from '../../recipeIngredientGroups.js';
+import { DEFAULT_RECIPE_IMAGE } from '../util/recipeImageIcons.js';
 
 // ---------------------------------------------------------------------------
 // ID generation helper (injectable for tests)
@@ -232,7 +233,7 @@ function _buildDraft(recipe, craftingSystemId, services) {
     craftingSystemId: data.craftingSystemId || craftingSystemId || null,
     name: data.name || '',
     description: data.description || '',
-    img: data.img || 'icons/svg/item-bag.svg',
+    img: data.img || DEFAULT_RECIPE_IMAGE,
     category: normalizeRecipeCategory(data.category),
     system: data.system || 'all',
     enabled: data.enabled !== false,
@@ -562,7 +563,7 @@ function _buildRecipePayload(draft, featureState, services) {
   return {
     name: draft.name,
     description: draft.description,
-    img: draft.img,
+    img: draft.img || DEFAULT_RECIPE_IMAGE,
     category: enableCategories ? normalizeRecipeCategory(draft.category) : GENERAL_RECIPE_CATEGORY,
     craftingSystemId: draft.craftingSystemId || null,
     system: 'all',
