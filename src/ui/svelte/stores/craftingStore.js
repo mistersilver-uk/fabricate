@@ -607,7 +607,7 @@ function _buildPalette(system, sourceActors, workbenchEntries) {
   const components = Array.isArray(system.components) ? system.components : [];
   const workbenchMap = new Map(workbenchEntries.map(e => [e.componentId, e.quantity]));
 
-  return components.map(component => {
+  const entries = components.map(component => {
     let inventoryQuantity = 0;
     for (const actor of sourceActors) {
       const items = _findActorComponentItems(actor, component);
@@ -628,6 +628,13 @@ function _buildPalette(system, sourceActors, workbenchEntries) {
       availableQuantity
     };
   });
+  entries.sort((a, b) => {
+    const aAvail = a.availableQuantity > 0 ? 0 : 1;
+    const bAvail = b.availableQuantity > 0 ? 0 : 1;
+    if (aAvail !== bAvail) return aAvail - bAvail;
+    return a.name.localeCompare(b.name);
+  });
+  return entries;
 }
 
 /**
@@ -816,6 +823,43 @@ export function createCraftingStore(services) {
     showPagination: false
   });
 
+  // --- Internal: handle inventory changes from Foundry hooks ---
+  function _handleInventoryChange(item) {
+    const affectedActorId = item?.parent?.id;
+    if (!affectedActorId) return;
+
+    const actor = get(craftingActor);
+    const sources = get(componentSourceActors);
+    const isRelevant = actor?.id === affectedActorId ||
+      sources.some(a => a.id === affectedActorId);
+    if (!isRelevant) return;
+
+    _recomputePalette();
+    _clampWorkbench();
+    _recomputeDiscoveredRecipes();
+  }
+
+  // --- Internal: clamp workbench quantities to current inventory ---
+  function _clampWorkbench() {
+    const currentPalette = get(palette);
+    const invMap = new Map(currentPalette.map(e => [e.componentId, e.inventoryQuantity]));
+
+    let changed = false;
+    workbench.update(wb => {
+      const clamped = wb.map(entry => {
+        const maxQty = invMap.get(entry.componentId) ?? 0;
+        if (entry.quantity > maxQty) {
+          changed = true;
+          return { ...entry, quantity: maxQty };
+        }
+        return entry;
+      }).filter(entry => entry.quantity > 0);
+      return clamped;
+    });
+
+    if (changed) _recomputePalette();
+  }
+
   // --- Internal: recompute palette from current state ---
   function _recomputePalette() {
     const system = get(selectedAlchemySystem);
@@ -952,6 +996,15 @@ export function createCraftingStore(services) {
     })]);
     hookRegistrations.push(['fabricate.ready', Hooks.on('fabricate.ready', () => {
       void refresh();
+    })]);
+    hookRegistrations.push(['updateItem', Hooks.on('updateItem', (item) => {
+      _handleInventoryChange(item);
+    })]);
+    hookRegistrations.push(['createItem', Hooks.on('createItem', (item) => {
+      _handleInventoryChange(item);
+    })]);
+    hookRegistrations.push(['deleteItem', Hooks.on('deleteItem', (item) => {
+      _handleInventoryChange(item);
     })]);
   }
 

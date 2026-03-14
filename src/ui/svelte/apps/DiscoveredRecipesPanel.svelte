@@ -33,10 +33,11 @@
 
     <button
       type="button"
-      class="alchemy-craftable-toggle"
+      class="fabricate-filter-btn"
       class:active={craftableOnly}
       onclick={() => onToggleCraftableOnly?.()}
     >
+      <i class="fas fa-check-circle"></i>
       {localize('FABRICATE.Alchemy.CraftableOnly')}
     </button>
   </div>
@@ -59,8 +60,8 @@
             class="alchemy-discovered-img"
             src={recipe.img || 'icons/svg/item-bag.svg'}
             alt={recipe.name}
-            width="28"
-            height="28"
+            width="32"
+            height="32"
           />
 
           <span class="alchemy-discovered-name">{recipe.name}</span>
@@ -111,7 +112,7 @@
 
   .alchemy-discovered-title {
     margin: 0 0 2px 0;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 700;
     text-transform: uppercase;
     opacity: 0.7;
@@ -132,29 +133,13 @@
 
   .alchemy-discovered-search {
     height: 28px;
-    font-size: 12px;
+    font-size: 13px;
     border-radius: 4px;
     padding: 0 6px;
     width: 100%;
     box-sizing: border-box;
-    border: 1px solid rgba(0, 0, 0, 0.2);
-    background: rgba(255, 255, 255, 0.6);
-  }
-
-  .alchemy-craftable-toggle {
-    font-size: 11px;
-    padding: 3px 8px;
-    border-radius: 3px;
-    border: 1px solid rgba(0, 0, 0, 0.2);
-    background: rgba(0, 0, 0, 0.04);
-    cursor: pointer;
-    align-self: flex-start;
-  }
-
-  .alchemy-craftable-toggle.active {
-    background: rgba(60, 120, 200, 0.15);
-    border-color: rgba(60, 120, 200, 0.4);
-    color: #2c5faa;
+    border: 1px solid rgba(0, 0, 0, 0.3);
+    background: rgba(255, 255, 255, 0.1);
   }
 
   .alchemy-discovered-list {
@@ -166,7 +151,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 6px 4px;
+    padding: 6px 8px;
     border-bottom: 1px solid rgba(0, 0, 0, 0.06);
   }
 
@@ -175,15 +160,15 @@
   }
 
   .alchemy-discovered-img {
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
     object-fit: contain;
     flex-shrink: 0;
   }
 
   .alchemy-discovered-name {
     flex: 1;
-    font-size: 12px;
+    font-size: 13px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -191,7 +176,7 @@
   }
 
   .alchemy-discovered-badge {
-    font-size: 10px;
+    font-size: 12px;
     padding: 1px 5px;
     border-radius: 3px;
     flex-shrink: 0;
@@ -209,8 +194,8 @@
   }
 
   .alchemy-autofill-btn {
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -219,7 +204,7 @@
     background: rgba(0, 0, 0, 0.04);
     cursor: pointer;
     flex-shrink: 0;
-    font-size: 12px;
+    font-size: 13px;
     padding: 0;
   }
 

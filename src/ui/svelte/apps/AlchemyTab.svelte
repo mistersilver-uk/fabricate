@@ -52,8 +52,16 @@
   onSelectSystem={store.selectAlchemySystem}
 />
 
+<WorkbenchComponent
+  entries={$workbench}
+  onAddToWorkbench={store.addToWorkbench}
+  onRemoveFromWorkbench={store.removeFromWorkbench}
+  onClearWorkbench={store.clearWorkbench}
+  onSubmitWorkbench={store.submitWorkbench}
+/>
+
 <div class="alchemy-tab-panels">
-  <!-- Left panel: palette + workbench -->
+  <!-- Left panel: palette -->
   <div class="alchemy-tab-left">
     <div class="alchemy-palette">
       <ComponentPalette
@@ -62,12 +70,6 @@
         onRemoveFromWorkbench={store.removeFromWorkbench}
       />
     </div>
-    <WorkbenchComponent
-      entries={$workbench}
-      onRemoveFromWorkbench={store.removeFromWorkbench}
-      onClearWorkbench={store.clearWorkbench}
-      onSubmitWorkbench={store.submitWorkbench}
-    />
   </div>
 
   <!-- Right panel: discovered recipes -->
