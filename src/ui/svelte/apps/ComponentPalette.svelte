@@ -73,6 +73,7 @@
             alt={component.name}
             width="64"
             height="64"
+            draggable="false"
           />
           <span
             class="alchemy-palette-badge"
