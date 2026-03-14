@@ -147,7 +147,7 @@ test('SalvageRunManager: history retention limit enforced — 50th entry no trun
   const run51 = await manager.createRun(actor, {
     craftingSystemId: 'system-limit',
     componentId: 'component-51'
-  });
+    componentId: 'component-50'
   const completed51 = await manager.completeRun(actor, run51, 'succeeded');
 
   const historyAt51 = manager.getRunHistory(actor);
