@@ -57,8 +57,7 @@ They capture per-user preferences and transient session state.
 
 ## `chatOutput` Detail
 
-`chatOutput` is the canonical example of a setting promoted from a per-crafting-system feature flag to a module-level
-setting (OQ-3 decision, 2026-03-10).
+`chatOutput` is the canonical example of a setting promoted from a per-crafting-system feature flag to a module-level setting.
 
 - **Key:** `fabricate.chatOutput`
 - **Scope:** `client`
