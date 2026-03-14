@@ -6,7 +6,6 @@
   import RecipeList from './RecipeList.svelte';
   import RunSummary from './RunSummary.svelte';
   import RecentsSection from './RecentsSection.svelte';
-  import AlchemySubmitPanel from './AlchemySubmitPanel.svelte';
   import ShoppingListPanel from './ShoppingListPanel.svelte';
 
   let { store, services = null } = $props();
@@ -26,11 +25,13 @@
   // svelte-ignore state_referenced_locally
   const showFavouritesOnly = store.showFavouritesOnly;
   // svelte-ignore state_referenced_locally
-  const isAlchemyMode = store.isAlchemyMode;
-  // svelte-ignore state_referenced_locally
   const shoppingList = store.shoppingList;
   // svelte-ignore state_referenced_locally
   const shoppingListExpanded = store.shoppingListExpanded;
+  // svelte-ignore state_referenced_locally
+  const craftingRuns = store.craftingRuns;
+  // svelte-ignore state_referenced_locally
+  const craftingRunHistory = store.craftingRunHistory;
 
   function handleShowRunDetails(runId, scope) {
     // TODO: Replace with full run details dialog
@@ -60,8 +61,8 @@
 </script>
 
 <RunSummary
-  activeRuns={$viewState.activeRuns}
-  runHistory={$viewState.runHistory}
+  activeRuns={$craftingRuns ?? $viewState.activeRuns}
+  runHistory={$craftingRunHistory ?? $viewState.runHistory}
   hasCraftingActor={$viewState.hasCraftingActor}
   onCraft={store.craft}
   onShowRunDetails={handleShowRunDetails}
@@ -127,11 +128,6 @@
     onCategoryChange={store.setCategory}
   />
 </header>
-
-<!-- Alchemy Panel (shown alongside recipe list when in alchemy mode) -->
-{#if $isAlchemyMode}
-  <AlchemySubmitPanel {store} />
-{/if}
 
 <!-- Recipe List -->
 <div class="fabricate-recipe-list">

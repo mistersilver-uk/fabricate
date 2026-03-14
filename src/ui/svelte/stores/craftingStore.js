@@ -760,9 +760,8 @@ export function createCraftingStore(services) {
   const showOnlyAvailable = writable(true);
   const showFavouritesOnly = writable(false);
 
-  // --- Alchemy state (legacy) ---
+  // --- Alchemy state ---
   const isAlchemyMode = writable(false);
-  const alchemyItems = writable([]);
 
   // --- Alchemy system selection (Task 2) ---
   const alchemySystems = writable([]);
@@ -786,6 +785,14 @@ export function createCraftingStore(services) {
   const discoveredRecipes = writable([]);
   const discoveredRecipeSearch = writable('');
   const discoveredCraftableOnly = writable(false);
+
+  // --- Filtered run views (Task 16) ---
+  // Runs filtered to alchemy systems only (for AlchemyTab RunSummary)
+  const alchemyRuns = writable([]);
+  const alchemyRunHistory = writable([]);
+  // Runs filtered to non-alchemy systems only (for CraftingTab RunSummary)
+  const craftingRuns = writable([]);
+  const craftingRunHistory = writable([]);
 
   // --- Shopping list state ---
   const shoppingList = writable([]);  // [{ recipeId, quantity }]
@@ -881,7 +888,13 @@ export function createCraftingStore(services) {
 
     const persistedAlchemySystemId = services.getSetting('lastAlchemySystem') || '';
     const resolvedAlchemySystem = _resolveSelectedAlchemySystem(alchemySystemList, persistedAlchemySystemId);
+    const previousSystem = get(selectedAlchemySystem);
     selectedAlchemySystem.set(resolvedAlchemySystem);
+
+    // Clear workbench if the resolved system changed (e.g. stale persisted ID fallback)
+    if (previousSystem?.id && resolvedAlchemySystem?.id !== previousSystem.id) {
+      workbench.set([]);
+    }
 
     // --- Task 6: Tab visibility ---
     const hasAlchemy = alchemySystemList.length > 0;
@@ -913,6 +926,24 @@ export function createCraftingStore(services) {
       search: get(searchTerm),
       shoppingListData
     });
+
+    // --- Task 16: Filter runs by tab context ---
+    // Build a set of recipe IDs that belong to alchemy systems
+    const alchemySystemIds = new Set(alchemySystemList.map(s => s.id));
+    const allKnownRecipes = recipeManager.getRecipes({ enabled: true });
+    const alchemyRecipeIds = new Set(
+      allKnownRecipes
+        .filter(r => alchemySystemIds.has(r.craftingSystemId))
+        .map(r => r.id)
+    );
+
+    const activeRunsAll = computed.activeRuns || [];
+    const runHistoryAll = computed.runHistory || [];
+
+    alchemyRuns.set(activeRunsAll.filter(r => r.recipeId && alchemyRecipeIds.has(r.recipeId)));
+    alchemyRunHistory.set(runHistoryAll.filter(r => r.recipeId && alchemyRecipeIds.has(r.recipeId)));
+    craftingRuns.set(activeRunsAll.filter(r => !r.recipeId || !alchemyRecipeIds.has(r.recipeId)));
+    craftingRunHistory.set(runHistoryAll.filter(r => !r.recipeId || !alchemyRecipeIds.has(r.recipeId)));
   }
 
   if (globalThis.Hooks?.on && globalThis.Hooks?.off) {
@@ -1148,55 +1179,9 @@ export function createCraftingStore(services) {
     await refresh();
   }
 
-  // Backward-compat delegation
+  // Backward-compat thin wrapper (Task 15): delegates to submitWorkbench
   async function submitAlchemyAttempt() {
-    // If there are workbench entries, use the new submitWorkbench
-    const wb = get(workbench);
-    if (wb.length > 0) {
-      return submitWorkbench();
-    }
-
-    // Legacy path: use alchemyItems
-    const craftingEngine = services.getCraftingEngine();
-    if (!craftingEngine) {
-      services.notify.error('Crafting engine is unavailable. Check module initialization.');
-      return;
-    }
-
-    const actor = get(craftingActor);
-    if (!actor) {
-      services.notify.error('Please select a crafting actor');
-      return;
-    }
-
-    const sources = get(componentSourceActors);
-    if (sources.length === 0) {
-      services.notify.error('Please select at least one component source actor');
-      return;
-    }
-
-    const items = get(alchemyItems);
-    if (items.length === 0) {
-      services.notify.warn('Add some alchemy ingredients first');
-      return;
-    }
-
-    const activeSystem = _resolveActiveCraftingSystem(services, get(viewState).recipes);
-
-    const result = await craftingEngine.craftAlchemy(actor, sources, items, {
-      craftingSystemId: activeSystem?.id
-    });
-
-    if (result.success) {
-      services.notify.info(result.message);
-    } else if (result.disposition === 'no-match') {
-      services.notify.warn("The combination didn't produce anything");
-    } else {
-      services.notify.error(result.message);
-    }
-
-    clearAlchemyItems();
-    await refresh();
+    return submitWorkbench();
   }
 
   // --- Task 5: Discovered recipes + auto-fill actions ---
@@ -1233,7 +1218,7 @@ export function createCraftingStore(services) {
     const expandGroupFn = (group, comps) =>
       _signatureValidator.expandGroupToComponentIds(group, comps);
 
-    const { entries } = resolveAutoFill(recipe, systemComponents, currentPalette, expandGroupFn);
+    const { entries, unfulfilled } = resolveAutoFill(recipe, systemComponents, currentPalette, expandGroupFn);
 
     // Clear workbench first, then populate with resolved entries
     workbench.set([]);
@@ -1245,6 +1230,14 @@ export function createCraftingStore(services) {
       for (let i = 0; i < entry.quantity; i++) {
         addToWorkbench(entry.componentId);
       }
+    }
+
+    if (unfulfilled.length > 0) {
+      services.notify.warn(
+        `Auto-fill: ${unfulfilled.length} ingredient group(s) could not be satisfied`
+      );
+    } else if (entries.length > 0) {
+      services.notify.info('Workbench populated from recipe');
     }
   }
 
@@ -1499,20 +1492,6 @@ export function createCraftingStore(services) {
     await craft(recipeId, { skipConfirm: true, runId: null });
   }
 
-  // Legacy alchemy item management (kept for backward compat, Task 15 will remove)
-  function addAlchemyItem(item) {
-    if (!item) return;
-    alchemyItems.update(items => [...items, item]);
-  }
-
-  function removeAlchemyItem(index) {
-    alchemyItems.update(items => items.filter((_, i) => i !== index));
-  }
-
-  function clearAlchemyItems() {
-    alchemyItems.set([]);
-  }
-
   async function addToShoppingList(recipeId) {
     shoppingList.update(list => {
       const existing = list.find(e => e.recipeId === recipeId);
@@ -1575,9 +1554,8 @@ export function createCraftingStore(services) {
     showFavouritesOnly,
     // Computed state
     viewState,
-    // Alchemy state (legacy)
+    // Alchemy state
     isAlchemyMode,
-    alchemyItems,
     // Task 2: Alchemy system selection
     alchemySystems,
     selectedAlchemySystem,
@@ -1603,6 +1581,11 @@ export function createCraftingStore(services) {
     setDiscoveredRecipeSearch,
     toggleDiscoveredCraftableOnly,
     autoFill,
+    // Task 16: Filtered run views
+    alchemyRuns,
+    alchemyRunHistory,
+    craftingRuns,
+    craftingRunHistory,
     // Actions
     selectActor,
     toggleSourceActor,
@@ -1619,10 +1602,7 @@ export function createCraftingStore(services) {
     restartRun,
     refresh,
     destroy,
-    // Alchemy actions (legacy + compat)
-    addAlchemyItem,
-    removeAlchemyItem,
-    clearAlchemyItems,
+    // Backward compat
     submitAlchemyAttempt,
     // Shopping list stores
     shoppingList,

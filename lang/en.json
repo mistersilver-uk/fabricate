@@ -620,7 +620,31 @@
       "NoMatch": "The combination didn't produce anything",
       "Consumed": "Ingredients were consumed in the attempt",
       "LearnedRecipe": "You discovered a new recipe!",
-      "MisconfigError": "Crafting system error — contact your GM"
+      "MisconfigError": "Crafting system error — contact your GM",
+      "SelectSystem": "Select alchemy system",
+      "DiscoveredRecipes": "Discovered Recipes",
+      "SearchRecipes": "Search recipes",
+      "SearchPlaceholder": "Search…",
+      "CraftableOnly": "Craftable only",
+      "NoDiscoveredRecipes": "No recipes discovered yet",
+      "NoDiscoveredRecipesHint": "Experiment with components on the workbench to discover new recipes",
+      "StatusAvailable": "Available",
+      "StatusMissing": "Missing materials",
+      "AutoFill": "Auto-fill",
+      "Palette": {
+        "NoComponents": "No components available",
+        "Available": "available"
+      }
+    },
+    "Workbench": {
+      "Title": "Workbench",
+      "Clear": "Clear workbench",
+      "Submit": "Craft",
+      "EmptyHint": "Drop or click components to begin"
+    },
+    "Tabs": {
+      "Alchemy": "Alchemy",
+      "Crafting": "Crafting"
     },
     "Labels": {
       "UnknownComponent": "Unknown Component",

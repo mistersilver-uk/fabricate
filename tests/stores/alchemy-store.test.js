@@ -1,6 +1,10 @@
 /**
  * Tests for T-099: craftingStore alchemy mode
- * Covers isAlchemyMode detection, alchemy item management, and submitAlchemyAttempt.
+ * Covers isAlchemyMode detection and submitAlchemyAttempt delegation.
+ *
+ * Task 15 cleanup: removed tests for addAlchemyItem, removeAlchemyItem,
+ * clearAlchemyItems (deprecated API). submitAlchemyAttempt now delegates
+ * to submitWorkbench().
  */
 
 import test from 'node:test';
@@ -27,10 +31,6 @@ const { createCraftingStore } = await import('../../src/ui/svelte/stores/craftin
 
 function makeActor(id, name = `Actor-${id}`) {
   return { id, name, isOwner: true, items: { size: 0 } };
-}
-
-function makeItem(id) {
-  return { id, uuid: `Item.${id}`, name: `Item-${id}`, img: 'icon.png' };
 }
 
 function makeRecipe(id, craftingSystemId, name = `Recipe-${id}`) {
@@ -179,82 +179,10 @@ test('isAlchemyMode stays false in multi-system worlds when visible recipes belo
 });
 
 // ============================================================================
-// Alchemy item management
+// submitAlchemyAttempt — delegates to submitWorkbench
 // ============================================================================
 
-test('addAlchemyItem appends item to alchemyItems store', () => {
-  const services = createMockServices();
-  const store = createCraftingStore(services);
-
-  const item = makeItem('i1');
-  store.addAlchemyItem(item);
-
-  const items = get(store.alchemyItems);
-  assert.equal(items.length, 1);
-  assert.equal(items[0].id, 'i1');
-});
-
-test('addAlchemyItem ignores null/undefined', () => {
-  const services = createMockServices();
-  const store = createCraftingStore(services);
-
-  store.addAlchemyItem(null);
-  store.addAlchemyItem(undefined);
-
-  const items = get(store.alchemyItems);
-  assert.equal(items.length, 0);
-});
-
-test('removeAlchemyItem removes item at given index', () => {
-  const services = createMockServices();
-  const store = createCraftingStore(services);
-
-  store.addAlchemyItem(makeItem('i1'));
-  store.addAlchemyItem(makeItem('i2'));
-  store.addAlchemyItem(makeItem('i3'));
-
-  store.removeAlchemyItem(1); // remove i2
-
-  const items = get(store.alchemyItems);
-  assert.equal(items.length, 2);
-  assert.equal(items[0].id, 'i1');
-  assert.equal(items[1].id, 'i3');
-});
-
-test('clearAlchemyItems empties the store', () => {
-  const services = createMockServices();
-  const store = createCraftingStore(services);
-
-  store.addAlchemyItem(makeItem('i1'));
-  store.addAlchemyItem(makeItem('i2'));
-
-  store.clearAlchemyItems();
-
-  assert.equal(get(store.alchemyItems).length, 0);
-});
-
-// ============================================================================
-// submitAlchemyAttempt
-// ============================================================================
-
-test('submitAlchemyAttempt notifies error when no crafting engine', async () => {
-  const messages = [];
-  const services = createMockServices({
-    getCraftingEngine: () => null,
-    getCraftingSystemManager: () => ({
-      getSystems: () => [makeAlchemySystem()]
-    }),
-    notify: { info: () => {}, warn: () => {}, error: (m) => messages.push(m) }
-  });
-  const store = createCraftingStore(services);
-  store.addAlchemyItem(makeItem('i1'));
-
-  await store.submitAlchemyAttempt();
-
-  assert.ok(messages.some(m => m.includes('engine') || m.includes('unavailable')));
-});
-
-test('submitAlchemyAttempt notifies warn when no items submitted', async () => {
+test('submitAlchemyAttempt notifies warn when workbench is empty', async () => {
   const warns = [];
   const services = createMockServices({
     getCraftingEngine: () => ({ craftAlchemy: async () => ({ success: false }) }),
@@ -264,27 +192,65 @@ test('submitAlchemyAttempt notifies warn when no items submitted', async () => {
     notify: { info: () => {}, warn: (m) => warns.push(m), error: () => {} }
   });
   const store = createCraftingStore(services);
-  // No items added
+  await store.refresh();
+  // No workbench items added
 
   await store.submitAlchemyAttempt();
 
-  assert.ok(warns.length > 0, 'should warn about empty ingredients');
+  assert.ok(warns.length > 0, 'should warn about empty workbench');
 });
 
-test('submitAlchemyAttempt calls craftAlchemy with submitted items', async () => {
-  let capturedArgs = null;
+test('submitAlchemyAttempt notifies error when no crafting engine', async () => {
+  const errors = [];
   const alchemySystem = makeAlchemySystem();
+  const component = { id: 'comp-1', name: 'Iron Ore', img: null };
+  alchemySystem.components = [component];
 
   const services = createMockServices({
+    getCraftingEngine: () => null,
+    getCraftingSystemManager: () => ({
+      getSystems: () => [alchemySystem]
+    }),
+    getSetting: (key) => {
+      if (key === 'lastComponentSources') return ['a1'];
+      return null;
+    },
     getOwnedActors: () => [makeActor('a1', 'Alice')],
     getAvailableActors: () => [makeActor('a1', 'Alice')],
+    notify: { info: () => {}, warn: () => {}, error: (m) => errors.push(m) }
+  });
+  const store = createCraftingStore(services);
+  await store.refresh();
+
+  // Add a workbench entry so we get past the empty check
+  store.addToWorkbench('comp-1');
+
+  await store.submitAlchemyAttempt();
+
+  assert.ok(errors.some(m => m.includes('engine') || m.includes('unavailable')));
+});
+
+test('submitAlchemyAttempt delegates to submitWorkbench with workbench contents', async () => {
+  let capturedArgs = null;
+  const alchemySystem = makeAlchemySystem();
+  const component = { id: 'comp-1', name: 'Iron Ore', img: null };
+  alchemySystem.components = [component];
+
+  const actor = makeActor('a1', 'Alice');
+  // Give actor an item matching the component
+  actor.items = new Map([['item-1', { id: 'item-1', name: 'Iron Ore', uuid: 'Item.item-1', system: { quantity: 5 } }]]);
+  actor.items[Symbol.iterator] = function* () { yield* this.values(); };
+
+  const services = createMockServices({
+    getOwnedActors: () => [actor],
+    getAvailableActors: () => [actor],
     getSetting: (key) => {
       if (key === 'lastComponentSources') return ['a1'];
       return null;
     },
     getCraftingEngine: () => ({
-      craftAlchemy: async (actor, sources, items, opts) => {
-        capturedArgs = { actor, sources, items, opts };
+      craftAlchemy: async (a, sources, items, opts) => {
+        capturedArgs = { a, sources, items, opts };
         return { success: true, message: 'Crafted!' };
       }
     }),
@@ -294,78 +260,27 @@ test('submitAlchemyAttempt calls craftAlchemy with submitted items', async () =>
   });
 
   const store = createCraftingStore(services);
-  await store.refresh(); // ensure actor is resolved
-
-  const item = makeItem('i1');
-  store.addAlchemyItem(item);
-
-  await store.submitAlchemyAttempt();
-
-  assert.ok(capturedArgs, 'craftAlchemy should have been called');
-  assert.equal(capturedArgs.items.length, 1);
-  assert.equal(capturedArgs.items[0].id, 'i1');
-  assert.equal(capturedArgs.opts.craftingSystemId, 'alchemy-sys');
-});
-
-test('submitAlchemyAttempt uses the active alchemy recipe system in multi-system worlds', async () => {
-  let capturedArgs = null;
-  const simpleSystem = makeSimpleSystem();
-  const alchemySystem = makeAlchemySystem();
-  const simpleRecipe = makeRecipe('simple-recipe', simpleSystem.id, 'Simple Recipe');
-  const alchemyRecipe = makeRecipe('alchemy-recipe', alchemySystem.id, 'Alchemy Recipe');
-
-  const services = createMockServices({
-    getOwnedActors: () => [makeActor('a1', 'Alice')],
-    getAvailableActors: () => [makeActor('a1', 'Alice')],
-    getSetting: (key) => {
-      if (key === 'lastComponentSources') return ['a1'];
-      return null;
-    },
-    getRecipeManager: () => ({
-      getRecipes: () => [simpleRecipe, alchemyRecipe],
-      getRecipe: (id) => [simpleRecipe, alchemyRecipe].find(recipe => recipe.id === id) || null,
-      evaluateCraftability: () => ({
-        canCraft: true,
-        satisfiableSet: {},
-        missing: { ingredients: [], essences: [], catalysts: [] },
-        ingredientStates: [],
-        essenceStates: [],
-        catalystStates: []
-      })
-    }),
-    getRecipeVisibilityService: () => ({
-      evaluateRecipeAccess: ({ recipe }) => ({
-        visible: recipe.id === alchemyRecipe.id,
-        craftable: recipe.id === alchemyRecipe.id,
-        reason: 'ok'
-      })
-    }),
-    getCraftingEngine: () => ({
-      craftAlchemy: async (actor, sources, items, opts) => {
-        capturedArgs = { actor, sources, items, opts };
-        return { success: true, message: 'Crafted!' };
-      }
-    }),
-    getCraftingSystemManager: () => ({
-      getSystems: () => [simpleSystem, alchemySystem]
-    })
-  });
-
-  const store = createCraftingStore(services);
   await store.refresh();
-  store.addAlchemyItem(makeItem('i1'));
+  store.addToWorkbench('comp-1');
 
   await store.submitAlchemyAttempt();
 
-  assert.ok(capturedArgs, 'craftAlchemy should have been called');
+  assert.ok(capturedArgs !== null, 'craftAlchemy should have been called');
   assert.equal(capturedArgs.opts.craftingSystemId, alchemySystem.id);
 });
 
-test('submitAlchemyAttempt clears alchemy items after attempt', async () => {
+test('submitAlchemyAttempt clears workbench after attempt', async () => {
   const alchemySystem = makeAlchemySystem();
+  const component = { id: 'comp-1', name: 'Iron Ore', img: null };
+  alchemySystem.components = [component];
+
+  const actor = makeActor('a1', 'Alice');
+  actor.items = new Map([['item-1', { id: 'item-1', name: 'Iron Ore', uuid: 'Item.item-1', system: { quantity: 5 } }]]);
+  actor.items[Symbol.iterator] = function* () { yield* this.values(); };
+
   const services = createMockServices({
-    getOwnedActors: () => [makeActor('a1', 'Alice')],
-    getAvailableActors: () => [makeActor('a1', 'Alice')],
+    getOwnedActors: () => [actor],
+    getAvailableActors: () => [actor],
     getSetting: (key) => {
       if (key === 'lastComponentSources') return ['a1'];
       return null;
@@ -381,17 +296,16 @@ test('submitAlchemyAttempt clears alchemy items after attempt', async () => {
 
   const store = createCraftingStore(services);
   await store.refresh();
-
-  store.addAlchemyItem(makeItem('i1'));
-  store.addAlchemyItem(makeItem('i2'));
+  store.addToWorkbench('comp-1');
+  assert.equal(get(store.workbench).length, 1, 'workbench should have 1 entry before attempt');
 
   await store.submitAlchemyAttempt();
 
-  assert.equal(get(store.alchemyItems).length, 0, 'alchemy items should be cleared after attempt');
+  assert.equal(get(store.workbench).length, 0, 'workbench should be cleared after attempt');
 });
 
 // ============================================================================
-// Store shape -- new exports present
+// Store shape — key exports still present
 // ============================================================================
 
 test('createCraftingStore exports alchemy-related stores and actions', () => {
@@ -399,9 +313,16 @@ test('createCraftingStore exports alchemy-related stores and actions', () => {
   const store = createCraftingStore(services);
 
   assert.ok('isAlchemyMode' in store, 'isAlchemyMode should be exported');
-  assert.ok('alchemyItems' in store, 'alchemyItems should be exported');
-  assert.ok('addAlchemyItem' in store, 'addAlchemyItem should be exported');
-  assert.ok('removeAlchemyItem' in store, 'removeAlchemyItem should be exported');
-  assert.ok('clearAlchemyItems' in store, 'clearAlchemyItems should be exported');
   assert.ok('submitAlchemyAttempt' in store, 'submitAlchemyAttempt should be exported');
+  // New workbench API
+  assert.ok('workbench' in store, 'workbench should be exported');
+  assert.ok('addToWorkbench' in store, 'addToWorkbench should be exported');
+  assert.ok('removeFromWorkbench' in store, 'removeFromWorkbench should be exported');
+  assert.ok('clearWorkbench' in store, 'clearWorkbench should be exported');
+  assert.ok('submitWorkbench' in store, 'submitWorkbench should be exported');
+  // Legacy API no longer exported
+  assert.ok(!('alchemyItems' in store), 'alchemyItems should NOT be exported (deprecated)');
+  assert.ok(!('addAlchemyItem' in store), 'addAlchemyItem should NOT be exported (deprecated)');
+  assert.ok(!('removeAlchemyItem' in store), 'removeAlchemyItem should NOT be exported (deprecated)');
+  assert.ok(!('clearAlchemyItems' in store), 'clearAlchemyItems should NOT be exported (deprecated)');
 });

@@ -29,11 +29,15 @@
   const discoveredCraftableOnly = store.discoveredCraftableOnly;
   // svelte-ignore state_referenced_locally
   const viewState = store.viewState;
+  // svelte-ignore state_referenced_locally
+  const alchemyRuns = store.alchemyRuns;
+  // svelte-ignore state_referenced_locally
+  const alchemyRunHistory = store.alchemyRunHistory;
 </script>
 
 <RunSummary
-  activeRuns={$viewState.activeRuns}
-  runHistory={$viewState.runHistory}
+  activeRuns={$alchemyRuns ?? $viewState.activeRuns}
+  runHistory={$alchemyRunHistory ?? $viewState.runHistory}
   hasCraftingActor={$viewState.hasCraftingActor}
   onCraft={store.craft}
   onShowRunDetails={null}
