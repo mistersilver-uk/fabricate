@@ -385,15 +385,17 @@ function _buildPreparedRecipes(
   // --- Recipes ---
   let recipes = recipeManager.getRecipes({ enabled: true });
 
+  // --- Access evaluation: single pass for all enabled recipes ---
+  // Results are reused by the visibility filter, availability filter, and display-data map.
+  const accessMap = new Map();
+  for (const recipe of recipes) {
+    accessMap.set(recipe.id, visibilityService && craftingActor
+      ? visibilityService.evaluateRecipeAccess({ recipe, viewer: gameUser, craftingActor, componentSourceActors })
+      : { visible: true, craftable: true, reason: 'ok' });
+  }
+
   if (visibilityService && craftingActor) {
-    recipes = recipes.filter(recipe =>
-      visibilityService.evaluateRecipeAccess({
-        recipe,
-        viewer: gameUser,
-        craftingActor,
-        componentSourceActors
-      }).visible
-    );
+    recipes = recipes.filter(recipe => accessMap.get(recipe.id)?.visible);
   }
 
   const showSimpleRecipesOnly = services.getSetting('showSimpleRecipesOnly');
@@ -433,14 +435,7 @@ function _buildPreparedRecipes(
   // --- Availability filter ---
   if (showOnlyAvailable && componentSourceActors.length > 0) {
     recipes = recipes.filter(r => {
-      const access = visibilityService
-        ? visibilityService.evaluateRecipeAccess({
-          recipe: r,
-          viewer: gameUser,
-          craftingActor,
-          componentSourceActors
-        })
-        : { craftable: true };
+      const access = accessMap.get(r.id);
       if (access.reason === 'teaser') return true;
       if (!access.craftable) return false;
       return evaluations.get(r.id)?.canCraft === true;
@@ -461,14 +456,7 @@ function _buildPreparedRecipes(
     const evaluation = evaluations.get(recipe.id);
     const canCraft = evaluation?.canCraft ?? false;
 
-    const access = visibilityService
-      ? visibilityService.evaluateRecipeAccess({
-        recipe,
-        viewer: gameUser,
-        craftingActor,
-        componentSourceActors
-      })
-      : { craftable: true, reason: 'ok' };
+    const access = accessMap.get(recipe.id);
     const teaserState = access.teaserState || null;
     const isTeaser = teaserState?.isTeaser === true;
     const teaserHiddenFields = teaserState?.hiddenFields ?? [];

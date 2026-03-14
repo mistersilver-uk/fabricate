@@ -967,6 +967,34 @@ describe('createCraftingStore', () => {
       assert.ok(vs.recipes.some(r => r.id === 'r1'), 'craftable recipe should appear');
       assert.ok(vs.recipes.some(r => r.id === 'r2'), 'uncraftable recipe should also appear when showOnlyAvailable=false');
     });
+
+    it('calls evaluateRecipeAccess exactly once per recipe per refresh (#152)', async () => {
+      const recipe1 = makeRecipe('r1', 'Fireball');
+      const recipe2 = makeRecipe('r2', 'Ice Bolt');
+      const callCounts = { r1: 0, r2: 0 };
+      const services = createMockServices({
+        getRecipeManager: () => ({
+          getRecipes: () => [recipe1, recipe2],
+          getRecipe: (id) => [recipe1, recipe2].find(r => r.id === id) || null,
+          evaluateCraftability: () => ({ canCraft: true, satisfiableSet: {}, missing: { ingredients: [], essences: [], catalysts: [] }, ingredientStates: [], essenceStates: [], catalystStates: [] })
+        }),
+        getRecipeVisibilityService: () => ({
+          evaluateRecipeAccess: ({ recipe }) => {
+            callCounts[recipe.id] = (callCounts[recipe.id] || 0) + 1;
+            return { visible: true, craftable: true, reason: 'ok' };
+          },
+          learnRecipe: async () => ({ success: true, message: 'Learned!' })
+        })
+      });
+      const store = createCraftingStore(services);
+      store.showOnlyAvailable.set(true);
+      // Reset counts after initial store construction refresh; we only care about single-refresh behaviour.
+      callCounts.r1 = 0;
+      callCounts.r2 = 0;
+      await store.refresh();
+      assert.equal(callCounts.r1, 1, 'evaluateRecipeAccess should be called exactly once for r1');
+      assert.equal(callCounts.r2, 1, 'evaluateRecipeAccess should be called exactly once for r2');
+    });
   });
 
   // --- learnRecipe ---
