@@ -25,8 +25,6 @@ import { importStarterPack } from './starter/importStarterPack.js';
 import { registerFragmentDiscoveryHook } from './systems/FragmentDiscoveryHook.js';
 import * as CraftingSystemExporter from './systems/CraftingSystemExporter.js';
 import './ui/SvelteCraftingApp.svelte.js';
-import './ui/SvelteRecipeManagerApp.svelte.js';
-import './ui/SvelteRecipeEditorApp.svelte.js';
 
 /**
  * Fabricate - Universal Crafting System
@@ -277,6 +275,16 @@ Hooks.once('ready', async () => {
   await fabricate.initialize();
   await fabricate.getCraftingRunManager()?.processWorldTime?.();
   await fabricate.getCraftingEngine()?.processPendingSalvageRuns?.();
+
+  // Only GMs use the Recipe Manager and Recipe Editor. Load their code lazily
+  // so that non-GM players never parse or execute those modules (including
+  // adminStore.js, editorStore.js, and the Font Awesome icon chain).
+  if (game.user?.isGM) {
+    await Promise.all([
+      import('./ui/SvelteRecipeManagerApp.svelte.js'),
+      import('./ui/SvelteRecipeEditorApp.svelte.js')
+    ]);
+  }
 
   addModuleButtonsToItemsDirectory();
 
