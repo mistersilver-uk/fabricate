@@ -376,3 +376,4 @@ test('palette is recomputed after salvage() — cache invalidated for inventory 
   unsub();
   assert.ok(counter.count >= 1, 'palette should be recomputed after salvage() invalidates the cache');
 });
+
