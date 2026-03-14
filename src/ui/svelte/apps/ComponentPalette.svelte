@@ -29,6 +29,21 @@
       onRemoveFromWorkbench?.(component.componentId);
     }
   }
+
+  /**
+   * Handle drag start on a palette cell.
+   * Sets drag data so the workbench can receive the component drop.
+   *
+   * @param {DragEvent} event
+   * @param {PaletteEntry} component
+   */
+  function handleDragStart(event, component) {
+    event.dataTransfer.setData('text/plain', JSON.stringify({
+      type: 'component',
+      componentId: component.componentId
+    }));
+    event.dataTransfer.effectAllowed = 'copy';
+  }
 </script>
 
 <div class="alchemy-palette">
@@ -47,20 +62,25 @@
         aria-label="{component.name} ({component.availableQuantity} {localize('FABRICATE.Alchemy.Palette.Available')})"
         aria-disabled={isEmpty ? 'true' : undefined}
         tabindex={isEmpty ? -1 : 0}
+        draggable={!isEmpty}
         onclick={() => onAddToWorkbench?.(component.componentId)}
         oncontextmenu={(e) => handleContextMenu(e, component)}
+        ondragstart={(e) => handleDragStart(e, component)}
       >
-        <img
-          src={component.img || 'icons/svg/item-bag.svg'}
-          alt={component.name}
-          width="48"
-          height="48"
-        />
+        <div class="alchemy-palette-img-wrapper">
+          <img
+            src={component.img || 'icons/svg/item-bag.svg'}
+            alt={component.name}
+            width="64"
+            height="64"
+            draggable="false"
+          />
+          <span
+            class="alchemy-palette-badge"
+            class:alchemy-palette-badge--zero={isEmpty}
+          >{component.availableQuantity}</span>
+        </div>
         <span class="alchemy-palette-cell-name">{component.name}</span>
-        <span
-          class="alchemy-palette-badge"
-          class:alchemy-palette-badge--zero={isEmpty}
-        >{component.availableQuantity}</span>
       </div>
     {/each}
   {/if}
@@ -69,7 +89,7 @@
 <style>
   .alchemy-palette {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
     gap: 6px;
     padding: 4px;
   }
@@ -103,9 +123,9 @@
     border-radius: 6px;
     border: 1px solid rgba(0, 0, 0, 0.1);
     background: rgba(0, 0, 0, 0.04);
-    cursor: pointer;
+    cursor: grab;
     position: relative;
-    min-height: 88px;
+    min-height: 104px;
     user-select: none;
   }
 
@@ -119,16 +139,22 @@
     pointer-events: none;
   }
 
+  .alchemy-palette-img-wrapper {
+    position: relative;
+    display: inline-block;
+    overflow: visible;
+  }
+
   .alchemy-palette-cell img {
     display: block;
     object-fit: contain;
-    width: 48px;
-    height: 48px;
+    width: 64px;
+    height: 64px;
   }
 
   .alchemy-palette-cell-name {
     margin-top: 4px;
-    font-size: 10px;
+    font-size: 12px;
     line-height: 1.2;
     text-align: center;
     overflow: hidden;
@@ -139,14 +165,14 @@
 
   .alchemy-palette-badge {
     position: absolute;
-    bottom: 4px;
-    right: 4px;
+    top: -4px;
+    right: -4px;
     display: inline-block;
-    padding: 1px 5px;
-    border-radius: 8px;
-    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 12px;
     font-weight: 700;
-    min-width: 18px;
+    min-width: 20px;
     text-align: center;
     background: var(--fabricate-primary, #4a90d9);
     color: #fff;
