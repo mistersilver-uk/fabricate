@@ -799,6 +799,10 @@ export function createCraftingStore(services) {
   const shoppingListExpanded = writable(false);
   const hookRegistrations = [];
 
+  // --- Palette cache: track inputs to avoid redundant recomputation inside refresh() ---
+  let _lastPaletteSystemId = undefined;
+  let _lastPaletteActorIds = undefined;
+
   // --- Computed state ---
   const viewState = writable({
     recipes: [],
@@ -904,7 +908,15 @@ export function createCraftingStore(services) {
     showTabBar.set(hasAlchemy && hasCrafting);
 
     // --- Task 4: Palette ---
-    _recomputePalette();
+    // Only recompute when the system or source actors have changed; skip for
+    // unrelated refresh triggers (search term, category filter, etc.).
+    const currentSystemId = resolvedAlchemySystem?.id;
+    const currentActorIds = get(componentSourceActors).map(a => a.id).join(',');
+    if (currentSystemId !== _lastPaletteSystemId || currentActorIds !== _lastPaletteActorIds) {
+      _recomputePalette();
+      _lastPaletteSystemId = currentSystemId;
+      _lastPaletteActorIds = currentActorIds;
+    }
 
     // --- Task 5: Discovered recipes ---
     _recomputeDiscoveredRecipes();
