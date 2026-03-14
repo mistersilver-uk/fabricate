@@ -807,8 +807,8 @@ export function createCraftingStore(services) {
   const hookRegistrations = [];
 
   // --- Palette cache: track inputs to avoid redundant recomputation inside refresh() ---
-  let _lastPaletteSystemId = undefined;
-  let _lastPaletteActorIds = undefined;
+  let _lastPaletteSystemId;
+  let _lastPaletteActorIds;
 
   // --- Computed state ---
   const viewState = writable({
@@ -1091,6 +1091,8 @@ export function createCraftingStore(services) {
     // Clear workbench when switching systems
     workbench.set([]);
     _recomputePalette();
+    _lastPaletteSystemId = systemId;
+    _lastPaletteActorIds = get(componentSourceActors).map(a => a.id).join(',');
     _recomputeDiscoveredRecipes();
   }
 
@@ -1240,6 +1242,8 @@ export function createCraftingStore(services) {
       services.notify.error(result.message);
     }
 
+    _lastPaletteSystemId = undefined;
+    _lastPaletteActorIds = undefined;
     clearWorkbench();
     await refresh();
   }
@@ -1362,6 +1366,8 @@ export function createCraftingStore(services) {
       services.notify.error(result.message);
     }
 
+    _lastPaletteSystemId = undefined;
+    _lastPaletteActorIds = undefined;
     await refresh();
   }
 
@@ -1444,6 +1450,8 @@ export function createCraftingStore(services) {
       services.notify.error(result.message);
     }
 
+    _lastPaletteSystemId = undefined;
+    _lastPaletteActorIds = undefined;
     await refresh();
   }
 

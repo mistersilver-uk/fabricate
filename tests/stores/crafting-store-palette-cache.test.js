@@ -200,10 +200,9 @@ test('palette is recomputed when component source actors change', async () => {
 test('addToWorkbench triggers palette recomputation', async () => {
   const alchemySystem = makeAlchemySystem();
   const actorA = makeActor('a1', 'Alice');
-  actorA.items = new Map([
-    ['item-1', { id: 'item-1', name: 'Iron Ore', uuid: 'Item.item-1', system: { quantity: 5 } }]
-  ]);
-  actorA.items[Symbol.iterator] = function* () { yield* this.values(); };
+  actorA.items = [
+    { id: 'item-1', name: 'Iron Ore', uuid: 'Item.item-1', system: { quantity: 5 } }
+  ];
 
   const services = createMockServices({
     getCraftingSystemManager: () => ({ getSystems: () => [alchemySystem] }),
@@ -226,10 +225,9 @@ test('addToWorkbench triggers palette recomputation', async () => {
 test('removeFromWorkbench triggers palette recomputation', async () => {
   const alchemySystem = makeAlchemySystem();
   const actorA = makeActor('a1', 'Alice');
-  actorA.items = new Map([
-    ['item-1', { id: 'item-1', name: 'Iron Ore', uuid: 'Item.item-1', system: { quantity: 5 } }]
-  ]);
-  actorA.items[Symbol.iterator] = function* () { yield* this.values(); };
+  actorA.items = [
+    { id: 'item-1', name: 'Iron Ore', uuid: 'Item.item-1', system: { quantity: 5 } }
+  ];
 
   const services = createMockServices({
     getCraftingSystemManager: () => ({ getSystems: () => [alchemySystem] }),
@@ -276,4 +274,105 @@ test('repeated refresh() calls without system/actor change do not recompute pale
 
   unsub();
   assert.equal(counter.count, 0, 'palette should not be recomputed on repeated refresh() with unchanged inputs');
+});
+
+// ============================================================================
+// AC6: palette IS recomputed after inventory-mutating operations (craft/salvage)
+// ============================================================================
+
+test('palette is recomputed after craft() — cache invalidated for inventory changes', async () => {
+  const alchemySystem = makeAlchemySystem();
+  const actorA = makeActor('a1', 'Alice');
+  actorA.items = [
+    { id: 'item-1', name: 'Iron Ore', uuid: 'Item.item-1', system: { quantity: 5 } }
+  ];
+
+  const settings = {
+    lastComponentSources: ['a1'],
+    autoCraft: true,
+    recentlyCrafted: [],
+    favouriteRecipes: []
+  };
+
+  const mockRecipe = { id: 'recipe-1', name: 'Basic Potion', ingredientSets: [] };
+  const services = createMockServices({
+    getCraftingSystemManager: () => ({ getSystems: () => [alchemySystem] }),
+    getOwnedActors: () => [actorA],
+    getAvailableActors: () => [actorA],
+    getSetting: (key) => settings[key] ?? null,
+    setSetting: async (key, value) => { settings[key] = value; },
+    getRecipeManager: () => ({
+      getRecipes: () => [mockRecipe],
+      getRecipe: (id) => id === 'recipe-1' ? mockRecipe : null,
+      evaluateCraftability: () => ({
+        canCraft: false,
+        satisfiableSet: null,
+        missing: { ingredients: [], essences: [], catalysts: [] },
+        ingredientStates: [],
+        essenceStates: [],
+        catalystStates: []
+      })
+    }),
+    getCraftingEngine: () => ({
+      craft: async () => ({ success: true, message: 'Crafted!' })
+    })
+  });
+
+  const store = createCraftingStore(services);
+  await store.refresh(); // Establishes cache (_lastPaletteSystemId, _lastPaletteActorIds set)
+
+  // Verify subsequent plain refresh() is a cache-hit (no palette update)
+  const { counter: cacheHitCounter, unsub: unsub1 } = countUpdates(store.palette);
+  await store.refresh();
+  unsub1();
+  assert.equal(cacheHitCounter.count, 0, 'plain refresh after cache is primed should not recompute palette');
+
+  // craft() invalidates the cache then calls refresh() → palette must be recomputed
+  const { counter, unsub } = countUpdates(store.palette);
+  await store.craft('recipe-1', { skipConfirm: true });
+  unsub();
+  assert.ok(counter.count >= 1, 'palette should be recomputed after craft() invalidates the cache');
+});
+
+test('palette is recomputed after salvage() — cache invalidated for inventory changes', async () => {
+  const alchemySystem = makeAlchemySystem();
+  const actorA = makeActor('a1', 'Alice');
+  actorA.items = [
+    { id: 'item-1', name: 'Iron Ore', uuid: 'Item.item-1', system: { quantity: 5 } }
+  ];
+
+  const settings = {
+    lastComponentSources: ['a1'],
+    autoCraft: true,
+    favouriteRecipes: []
+  };
+
+  const services = createMockServices({
+    getCraftingSystemManager: () => ({
+      getSystems: () => [alchemySystem],
+      getSystem: (id) => id === alchemySystem.id ? alchemySystem : null
+    }),
+    getOwnedActors: () => [actorA],
+    getAvailableActors: () => [actorA],
+    getSetting: (key) => settings[key] ?? null,
+    setSetting: async (key, value) => { settings[key] = value; },
+    getCraftingEngine: () => ({
+      salvage: async () => ({ success: true, message: 'Salvaged!' })
+    })
+  });
+
+  const store = createCraftingStore(services);
+  await store.refresh(); // Establishes cache
+
+  // Verify plain refresh is cached
+  const { counter: cacheHitCounter, unsub: unsub1 } = countUpdates(store.palette);
+  await store.refresh();
+  unsub1();
+  assert.equal(cacheHitCounter.count, 0, 'plain refresh after cache is primed should not recompute palette');
+
+  // salvage() invalidates the cache then calls refresh() → palette must be recomputed
+  const { counter, unsub } = countUpdates(store.palette);
+  await store.salvage(alchemySystem.id, 'comp-1', { skipConfirm: true });
+  unsub();
+  assert.ok(counter.count >= 1, 'palette should be recomputed after salvage() invalidates the cache');
 });
