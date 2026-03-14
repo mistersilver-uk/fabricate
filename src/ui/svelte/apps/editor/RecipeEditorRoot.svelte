@@ -28,7 +28,8 @@
     validationErrors,
     pickerItems,
     isNewRecipe,
-    systemCategories
+    systemCategories,
+    recipeItemDefinitionsVersion
   } = store;
 
   // Build item map for name/image resolution
@@ -40,7 +41,10 @@
   // Resolve non-GM users for visibility
   const nonGMUsers = $derived(services.getNonGMUsers?.() || []);
 
-  const recipeItems = $derived(services.getRecipeItemDefinitions?.($draft.craftingSystemId) || []);
+  const recipeItems = $derived.by(() => {
+    $recipeItemDefinitionsVersion;
+    return services.getRecipeItemDefinitions?.($draft.craftingSystemId) || [];
+  });
   const selectedRecipeItem = $derived(
     (recipeItems || []).find(item => item.id === $draft.recipeItemId) || null
   );

@@ -6,9 +6,11 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const visibilitySectionPath = resolve(__dirname, '../../src/ui/svelte/apps/editor/VisibilitySection.svelte');
-const recipeEditorRootPath = resolve(__dirname, '../../src/ui/SvelteRecipeEditorApp.svelte.js');
+const recipeEditorRootPath = resolve(__dirname, '../../src/ui/svelte/apps/editor/RecipeEditorRoot.svelte');
+const recipeEditorAppPath = resolve(__dirname, '../../src/ui/SvelteRecipeEditorApp.svelte.js');
 const visibilitySectionSource = readFileSync(visibilitySectionPath, 'utf8');
 const recipeEditorRootSource = readFileSync(recipeEditorRootPath, 'utf8');
+const recipeEditorAppSource = readFileSync(recipeEditorAppPath, 'utf8');
 
 describe('Recipe item selector UI contract', () => {
   it('uses recipeItemId rather than a raw linkedRecipeItemUuid input in the Svelte editor', () => {
@@ -73,27 +75,38 @@ describe('Recipe item selector UI contract', () => {
 
   it('lets the editor app create or reuse recipe-item definitions from dropped Foundry items', () => {
     assert.ok(
-      recipeEditorRootSource.includes('assignRecipeItemFromDrop'),
+      recipeEditorAppSource.includes('assignRecipeItemFromDrop'),
       'editor app services should convert dropped Foundry items into recipe-item definitions'
     );
     assert.ok(
-      recipeEditorRootSource.includes('addRecipeItemFromUuid'),
+      recipeEditorAppSource.includes('addRecipeItemFromUuid'),
       'recipe-item assignment should use the crafting-system recipe-item library rather than components'
     );
   });
 
   it('locks recipe images to the associated recipe item in the active Svelte editor path', () => {
     assert.ok(
-      recipeEditorRootSource.includes('deleteRecipeItemDefinition'),
+      recipeEditorAppSource.includes('deleteRecipeItemDefinition'),
       'editor app services should support recipe-item deletion from the editor'
     );
     assert.ok(
-      recipeEditorRootSource.includes('copyToClipboard'),
+      recipeEditorAppSource.includes('copyToClipboard'),
       'editor app services should support source UUID copy affordances'
     );
     assert.ok(
       visibilitySectionSource.includes('onRefreshRecipeItem'),
       'visibility section should expose a refresh action for syncing the recipe image'
+    );
+  });
+
+  it('refreshes the system recipe-item list from a reactive invalidation signal after deletes', () => {
+    assert.ok(
+      recipeEditorRootSource.includes('recipeItemDefinitionsVersion'),
+      'recipe editor root should subscribe to a recipe-item definition invalidation signal'
+    );
+    assert.ok(
+      recipeEditorRootSource.includes('$recipeItemDefinitionsVersion;'),
+      'recipe editor root should re-read recipe-item definitions when the invalidation signal changes'
     );
   });
 });

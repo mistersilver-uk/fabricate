@@ -698,6 +698,7 @@ export function createEditorStore(services, options = {}) {
   const activeStepIndex = writable(0);
   const collapsedPanels = writable(new Set());
   const pickerSearch = writable('');
+  const recipeItemDefinitionsVersion = writable(0);
 
   // Derived: feature state from system config
   const featureState = derived(draft, ($draft) => {
@@ -1181,6 +1182,10 @@ export function createEditorStore(services, options = {}) {
     pickerSearch.set(term || '');
   }
 
+  function invalidateRecipeItemDefinitions() {
+    recipeItemDefinitionsVersion.update(version => version + 1);
+  }
+
   // --- Recipe item ---
 
   function clearRecipeItem() {
@@ -1260,8 +1265,11 @@ export function createEditorStore(services, options = {}) {
 
     try {
       const result = await services.deleteRecipeItemDefinition(systemId, recipeItemId);
-      if (result?.deleted !== false && get(draft).recipeItemId === recipeItemId) {
-        clearRecipeItem();
+      if (result?.deleted !== false) {
+        invalidateRecipeItemDefinitions();
+        if (get(draft).recipeItemId === recipeItemId) {
+          clearRecipeItem();
+        }
       }
       services.notify?.(
         'info',
@@ -1330,6 +1338,7 @@ export function createEditorStore(services, options = {}) {
     activeStepIndex,
     collapsedPanels,
     pickerSearch,
+    recipeItemDefinitionsVersion,
 
     // Derived stores
     featureState,
@@ -1393,6 +1402,7 @@ export function createEditorStore(services, options = {}) {
 
     // Picker
     setPickerSearch,
+    invalidateRecipeItemDefinitions,
 
     // Recipe item
     clearRecipeItem,

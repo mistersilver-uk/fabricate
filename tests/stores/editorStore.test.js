@@ -1042,6 +1042,7 @@ describe('createEditorStore', () => {
 
       assert.equal(deleted, true);
       assert.deepEqual(deleteArgs, { systemId: 'sys1', recipeItemId: 'recipe-item-123' });
+      assert.equal(get(store.recipeItemDefinitionsVersion), 1);
       assert.equal(get(store.draft).recipeItemId, '');
       assert.equal(get(store.draft).linkedRecipeItemUuid, '');
       assert.deepEqual(notifyArgs, {
@@ -1070,6 +1071,7 @@ describe('createEditorStore', () => {
 
       assert.equal(deleted, false);
       assert.equal(deleteCalled, false);
+      assert.equal(get(store.recipeItemDefinitionsVersion), 0);
     });
   });
 
