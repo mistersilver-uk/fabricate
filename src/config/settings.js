@@ -12,7 +12,8 @@ export const SETTING_KEYS = Object.freeze({
   PROGRESSIVE_RESULT_ORDER: 'progressiveResultOrder',
   MIGRATION_VERSION: 'migrationVersion',
   FAVOURITE_RECIPES: 'favouriteRecipes',
-  RECENTLY_CRAFTED: 'recentlyCrafted'
+  RECENTLY_CRAFTED: 'recentlyCrafted',
+  LAST_ALCHEMY_SYSTEM: 'lastAlchemySystem'
 });
 
 const BASE_DEFINITIONS = Object.freeze({
@@ -102,6 +103,13 @@ const BASE_DEFINITIONS = Object.freeze({
     config: false,
     type: Array,
     default: []
+  },
+  [SETTING_KEYS.LAST_ALCHEMY_SYSTEM]: {
+    name: 'Last Alchemy System',
+    scope: 'client',
+    config: false,
+    type: String,
+    default: ''
   }
 });
 
