@@ -431,10 +431,12 @@
         isVariable={$draft.isVariable}
         {ingredientSets}
         {resultGroups}
+        resultSelection={$draft.resultSelection}
         outcomeRouting={$activeContainers?.outcomeRouting || {}}
         onUpdateOutcomeRouting={handleUpdateOutcomeRouting}
         onUpdateIngredientSetMapping={handleUpdateIngredientSetMapping}
         onUpdateIsVariable={(v) => store.setField('isVariable', v)}
+        onUpdateResultSelection={store.setResultSelection}
       />
     </main>
 

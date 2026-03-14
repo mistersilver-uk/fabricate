@@ -586,7 +586,8 @@ function _buildRecipePayload(draft, featureState, services) {
     isVariable: enableComplexRecipes ? draft.isVariable : false,
     transferEffects: draft.transferEffects,
     outcomeRouting: topLevelOutcomeRouting,
-    resultSelection: draft.resultSelection || null,
+    resultSelection: draft.resultSelection
+      || (featureState.isAlchemyMode ? { provider: 'ingredientSet', rollTableUuid: null, macroUuid: null } : null),
     metadata: draft.metadata
   };
 }
