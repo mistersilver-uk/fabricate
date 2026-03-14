@@ -91,6 +91,47 @@ function _resolutionModeLabel(mode, localizeFn) {
   return key ? (localizeFn?.(key) || mode) : mode;
 }
 
+/**
+ * Compute a cache key for the graph build inputs.
+ * Changes whenever a recipe's structure or name/img/category changes,
+ * or when the component list changes.
+ *
+ * @param {string} systemId
+ * @param {object[]} recipes
+ * @param {object[]} components
+ * @returns {string}
+ */
+function _makeGraphCacheKey(systemId, recipes, components) {
+  const rPart = recipes
+    .map(r => {
+      const inIds = [];
+      for (const s of r.ingredientSets || []) {
+        for (const g of s.ingredientGroups || []) {
+          for (const o of g.options || []) {
+            const cid = o?.match?.componentId || o?.componentId || o?.systemItemId;
+            if (cid) inIds.push(cid);
+          }
+        }
+        for (const i of s.ingredients || []) {
+          const cid = i?.match?.componentId || i?.componentId || i?.systemItemId;
+          if (cid) inIds.push(cid);
+        }
+      }
+      const outIds = [];
+      for (const g of r.resultGroups || []) {
+        for (const res of g.results || []) {
+          const cid = res?.componentId || res?.systemItemId;
+          if (cid) outIds.push(cid);
+        }
+      }
+      return `${r.id}:${r.name}:${r.img || ''}:${r.category || ''}:${inIds.sort().join(',')}>${outIds.sort().join(',')}`;
+    })
+    .sort()
+    .join('|');
+  const cPart = components.map(c => `${c.id}:${c.name}:${c.img || ''}`).sort().join('|');
+  return `${systemId}§${rPart}§${cPart}`;
+}
+
 function _buildSalvageSummary(item, salvageEnabled) {
   if (!salvageEnabled || item?.salvage?.enabled !== true) return null;
 
@@ -275,6 +316,9 @@ function _buildSelectedSystemViewData(selectedSystem, managedItemOptions, essenc
  * @returns {object} Store API — writable stores + action functions
  */
 export function createAdminStore(services) {
+  // --- Graph build cache (invalidated when recipe/component data changes) ---
+  let _graphCache = { key: null, layoutResult: null };
+
   // --- Input writables ---
   const selectedSystemId = writable(services.getSetting('lastManagedCraftingSystem') || '');
   const activeTab = writable('systems');
@@ -376,13 +420,18 @@ export function createAdminStore(services) {
     }
 
     // --- Graph data (lazy, computed only when graph tab is active) ---
+    // buildRecipeGraph + layoutGraph are cached: they only re-run when recipe
+    // or component data has actually changed since the last build.
     let graphData = { nodes: [], edges: [], width: 0, height: 0 };
     if (get(activeTab) === 'graph' && selectedSystem) {
       const allRecipes = recipeManager.getRecipes({ craftingSystemId: selectedSystem.id });
       const components = _getManagedItems(selectedSystem);
-      const rawGraph = buildRecipeGraph(allRecipes, components);
-      const layoutResult = layoutGraph(rawGraph);
-      graphData = filterGraph(layoutResult, { searchTerm: get(graphSearch) });
+      const cacheKey = _makeGraphCacheKey(selectedSystem.id, allRecipes, components);
+      if (_graphCache.key !== cacheKey) {
+        const rawGraph = buildRecipeGraph(allRecipes, components);
+        _graphCache = { key: cacheKey, layoutResult: layoutGraph(rawGraph) };
+      }
+      graphData = filterGraph(_graphCache.layoutResult, { searchTerm: get(graphSearch) });
     }
 
     viewState.set({

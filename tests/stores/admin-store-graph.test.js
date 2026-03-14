@@ -154,4 +154,77 @@ describe('adminStore — graph integration', () => {
     assert.equal(state.graphData.nodes.length, 0);
     assert.equal(state.graphData.edges.length, 0);
   });
+
+  it('5. Graph data is stable after a non-data-changing mutation (cache hit)', async () => {
+    // AC1: item search does not change recipe/component data, so the graph
+    // should be identical after switching away and back to the graph tab.
+    const recipes = [
+      makeRecipe('A', 'Iron Ingot', [], ['c1']),
+      makeRecipe('B', 'Iron Sword', ['c1'], [])
+    ];
+    const services = createMockServices(recipes);
+    const store = createAdminStore(services);
+
+    await store.setTab('graph');
+    const firstState = get(store.viewState);
+    const firstNodeIds = firstState.graphData.nodes.map(n => n.id).sort();
+
+    // Non-data mutation: change item search, then switch back to graph tab
+    await store.setItemSearch('iron');
+    await store.setTab('recipes');
+    await store.setTab('graph');
+
+    const secondState = get(store.viewState);
+    const secondNodeIds = secondState.graphData.nodes.map(n => n.id).sort();
+
+    assert.deepEqual(secondNodeIds, firstNodeIds, 'Graph nodes should be unchanged after non-data mutation');
+    assert.equal(secondState.graphData.edges.length, firstState.graphData.edges.length);
+  });
+
+  it('6. Graph is rebuilt after a new recipe is added (cache miss)', async () => {
+    // AC2: adding a recipe mutates the recipe list, so the graph must reflect it.
+    const recipes = [
+      makeRecipe('A', 'Iron Ingot', [], ['c1'])
+    ];
+    const services = createMockServices(recipes);
+    const store = createAdminStore(services);
+
+    await store.setTab('graph');
+    const firstState = get(store.viewState);
+    assert.equal(firstState.graphData.nodes.length, 1);
+
+    // Simulate a new recipe being persisted — mutate the recipes array in place
+    // (the mock manager returns the same array reference)
+    recipes.push(makeRecipe('B', 'Iron Sword', ['c1'], []));
+
+    // Trigger a refresh (as any action handler would)
+    await store.setTab('graph');
+
+    const secondState = get(store.viewState);
+    assert.equal(secondState.graphData.nodes.length, 2, 'Graph should include the newly added recipe');
+    assert.equal(secondState.graphData.edges.length, 1, 'Edge from A to B should appear after rebuild');
+  });
+
+  it('7. Graph search filtering works after cache hit', async () => {
+    // AC3: filterGraph is still applied to cached layout when the search term changes.
+    const recipes = [
+      makeRecipe('A', 'Iron Ingot', [], ['c1']),
+      makeRecipe('B', 'Iron Sword', ['c1'], []),
+      makeRecipe('C', 'Health Potion', [], [])
+    ];
+    const services = createMockServices(recipes);
+    const store = createAdminStore(services);
+
+    await store.setTab('graph');
+    // No search: all 3 nodes
+    assert.equal(get(store.viewState).graphData.nodes.length, 3);
+
+    // Apply search: only iron recipes
+    await store.setGraphSearch('iron');
+    assert.equal(get(store.viewState).graphData.nodes.length, 2);
+
+    // Clear search: all 3 nodes again (filter cleared, same cached layout)
+    await store.setGraphSearch('');
+    assert.equal(get(store.viewState).graphData.nodes.length, 3);
+  });
 });
