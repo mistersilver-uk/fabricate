@@ -120,8 +120,13 @@
   align-items: center;
   justify-content: center;
   width: 22px;
+  min-width: 22px;
+  max-width: 22px;
   height: 22px;
+  min-height: 22px;
+  max-height: 22px;
   padding: 0;
+  margin: 0;
   border: 0;
   border-radius: 50%;
   background: transparent;
@@ -145,6 +150,12 @@
 .fabricate-search button.fabricate-search-clear i {
   position: static;
   font-size: 11px;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  line-height: 1;
+  text-align: center;
 }
 
 .fabricate-filters {

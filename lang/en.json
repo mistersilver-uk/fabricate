@@ -637,7 +637,9 @@
       "ComponentsMissing": "Some components could not be found: {names}",
       "Palette": {
         "NoComponents": "No components available",
-        "Available": "available"
+        "Available": "available",
+        "SearchPlaceholder": "Search components…",
+        "OwnedOnly": "Owned only"
       }
     },
     "Workbench": {
