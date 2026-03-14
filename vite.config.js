@@ -39,10 +39,17 @@ export default defineConfig(({ command }) => {
 
   return {
     plugins,
+    // Drop developer-only console.log/debug/info calls from production output.
+    // console.error and console.warn are retained for user-visible messages.
+    esbuild: {
+      pure: ['console.log', 'console.debug', 'console.info']
+    },
     build: {
       outDir: 'dist',
       emptyOutDir: true,
       sourcemap: true,
+      // esbuild (default) — fast minification, reasonable output size.
+      minify: true,
       lib: {
         entry: resolve(import.meta.dirname, 'src/main.js'),
         formats: ['es'],
