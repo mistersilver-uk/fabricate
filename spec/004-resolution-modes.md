@@ -120,7 +120,7 @@ Let `remaining = check.value` and `cost = result.component.difficulty`.
 ### Semantics
 
 - Player submits ingredient combinations directly instead of selecting a visible recipe.
-- Recipes remain hidden by default for non-GM users.
+- Recipes remain hidden by default for non-GM users (see `006` for `learnOnCraft` semantics).
 - Result-group selection uses recipe-level providers (`ingredientSet`, `macroOutcome`, `rollTableOutcome`) with the same provider contracts as routed mode.
 - Multi-step recipes are not supported.
 - `consumeOnFail` defaults to true for failed attempts.
@@ -135,6 +135,44 @@ Let `remaining = check.value` and `cost = result.component.difficulty`.
 - If a signature matches but routed outcome/name cannot resolve to a valid `ResultGroup`, treat as crafting-system misconfiguration error:
   - abort without applying player-failure consumption,
   - return actionable diagnostics for GM correction.
+
+### Alchemy UI Interaction Model
+
+#### Component Palette
+
+- Grid of all components in selected alchemy system owned by component source actor(s).
+- Shows: image, name, available quantity (inventory minus workbench count).
+- Zero-quantity components remain visible but visually distinguished.
+- Left-click: add one to workbench (decrement palette quantity).
+- Right-click: remove one from workbench (increment palette quantity), only if component is in workbench.
+- Drag-drop from external sources remains supported.
+
+#### The Workbench
+
+- Session-scoped working set displayed as compact grid with quantity badges (e.g., "Iron Ore x3").
+- Each unique component appears once; adding increments the badge count.
+- Supports: add from palette, remove (right-click or direct action), clear all, submit.
+- Submit triggers signature matching per existing Signature Resolution rules.
+
+#### Alchemy System Selection
+
+- Required when multiple alchemy-mode systems exist.
+- Selector shows only `resolutionMode === "alchemy"` systems.
+- Determines which components appear in palette.
+- Auto-selects if exactly one alchemy system.
+- Persisted in client settings (like `lastCraftingActor` and `lastComponentSources`).
+
+#### Discovered Recipes Panel
+
+- Panel is always visible, even when no recipes have been discovered yet.
+- Shows an encouraging empty state message (e.g., "No recipes discovered yet — experiment with ingredients to discover new recipes").
+- Once recipes are discovered, the empty state is replaced by the searchable list.
+- "Craftable only" filter and auto-fill action are defined in `003` and `006`.
+
+#### Tab Feature Scope
+
+- Includes: palette, workbench, discovered recipes panel (always visible, with craftable-only filter and auto-fill), active runs, history.
+- Excludes: shopping list, recipe browsing, recents, favourites.
 
 ### Validation
 

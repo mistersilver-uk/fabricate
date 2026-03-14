@@ -31,8 +31,26 @@ export class RecipeVisibilityService {
     return Array.isArray(visibility.allowedUserIds) && visibility.allowedUserIds.includes(viewer?.id);
   }
 
+  _getRecipeItemDefinition(recipe) {
+    const system = this._getCraftingSystem(recipe);
+    if (!system || !recipe?.recipeItemId) return null;
+    return this.craftingSystemManager?.getRecipeItemDefinition?.(system.id, recipe.recipeItemId)
+      || (system.recipeItemDefinitions || []).find(def => def.id === recipe.recipeItemId)
+      || null;
+  }
+
+  _getRecipeItemSourceUuid(recipe) {
+    return this._getRecipeItemDefinition(recipe)?.sourceItemUuid
+      || recipe?.linkedRecipeItemUuid
+      || null;
+  }
+
+  _hasRecipeItemReference(recipe) {
+    return Boolean(recipe?.recipeItemId || recipe?.linkedRecipeItemUuid);
+  }
+
   _isMatchingRecipeItem(recipe, item) {
-    const linked = recipe?.linkedRecipeItemUuid;
+    const linked = this._getRecipeItemSourceUuid(recipe);
     if (!linked || !item) return false;
     const sourceId = getSourceUuid(item);
     return item.uuid === linked || sourceId === linked;
@@ -286,7 +304,9 @@ export class RecipeVisibilityService {
       return { visible: false, craftable: false, reason: 'missing-system' };
     }
 
-    // Alchemy mode: recipes hidden from non-GM by default
+    // Alchemy mode: recipes hidden from non-GM by default, but formula items
+    // can make unlearned recipes visible (with a Learn button) when the system
+    // also uses knowledge visibility with a linked recipe item.
     if (system?.resolutionMode === 'alchemy') {
       if (viewer?.isGM) {
         return { visible: true, craftable: true, reason: 'ok', knowledge: null };
@@ -298,6 +318,13 @@ export class RecipeVisibilityService {
       const learnedMap = this._getLearnedMap(craftingActor);
       if (learnedMap?.[recipe.id]) {
         return { visible: true, craftable: true, reason: 'alchemy-learned', knowledge: null };
+      }
+      // Check if the player has a formula item that could teach this recipe
+      if (this._hasRecipeItemReference(recipe)) {
+        const knowledge = this.evaluateKnowledgeAccess({ recipe, viewer, craftingActor, componentSourceActors });
+        if (knowledge.hasMatchedItem) {
+          return { visible: true, craftable: false, reason: 'knowledge', knowledge };
+        }
       }
       return { visible: false, craftable: false, reason: 'alchemy-not-learned', knowledge: null };
     }
@@ -315,7 +342,7 @@ export class RecipeVisibilityService {
       visible = true;
     } else if (listMode === 'knowledge') {
       knowledge = this.evaluateKnowledgeAccess({ recipe, viewer, craftingActor, componentSourceActors });
-      visible = knowledge.granted;
+      visible = knowledge.granted || knowledge.hasMatchedItem;
     } else if (listMode === 'player') {
       visible = this._isRecipeVisibleByPlayerListMode(recipe, viewer);
     } else {
@@ -334,6 +361,10 @@ export class RecipeVisibilityService {
 
     if (!viewer?.isGM && recipe.locked) {
       return { visible: true, craftable: false, reason: 'locked', knowledge };
+    }
+
+    if (knowledge && !knowledge.granted) {
+      return { visible: true, craftable: false, reason: 'knowledge', knowledge };
     }
 
     return { visible: true, craftable: true, reason: 'ok', knowledge };
@@ -366,7 +397,7 @@ export class RecipeVisibilityService {
     if (!['learned', 'itemOrLearned'].includes(mode)) {
       return { success: false, message: LEARN_RECIPE_MESSAGES.learningDisabled };
     }
-    if (!recipe?.linkedRecipeItemUuid) {
+    if (!this._hasRecipeItemReference(recipe)) {
       return { success: false, message: LEARN_RECIPE_MESSAGES.linkedItemRequired };
     }
 

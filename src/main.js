@@ -196,6 +196,18 @@ class Fabricate {
       options
     );
   }
+
+  /**
+   * Delete a recipe by ID.
+   * @param {string} recipeId - The recipe ID to delete
+   */
+  async deleteRecipe(recipeId) {
+    if (!this.ready) {
+      throw new Error('Fabricate not initialized');
+    }
+
+    return await this.recipeManager.deleteRecipe(recipeId);
+  }
 }
 
 // Create global instance
@@ -349,8 +361,6 @@ function addModuleButtonsToItemsDirectory() {
       actionsContainer.insertBefore(managerButton, actionsContainer.firstChild);
     }
   }
-
-  console.log('Fabricate | Fabricate buttons updated in', actionsContainer.className);
 }
 
 /**
@@ -380,18 +390,6 @@ function createHeaderButton(labelText, iconClass, actionId, onClick) {
 
   return button;
 }
-
-// Also add button when Items directory is activated
-Hooks.on('activateItemDirectory', (app) => {
-  console.log('Fabricate | activateItemDirectory hook fired');
-  addModuleButtonsToItemsDirectory();
-});
-
-// Handle D&D 5e specific hook
-Hooks.on('activateItemDirectory5e', (app) => {
-  console.log('Fabricate | activateItemDirectory5e hook fired');
-  addModuleButtonsToItemsDirectory();
-});
 
 // Chat command for quick crafting (for testing)
 Hooks.on('chatMessage', (chatLog, message, chatData) => {
@@ -466,6 +464,13 @@ globalThis.fabricate = {
    */
   listRecipes: (filters = {}) => {
     return game.fabricate.getRecipeManager().getRecipes(filters);
+  },
+
+  /**
+   * Delete a recipe by ID
+   */
+  deleteRecipe: async (recipeId) => {
+    return await game.fabricate.deleteRecipe(recipeId);
   },
 
   /**

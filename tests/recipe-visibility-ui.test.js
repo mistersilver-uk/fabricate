@@ -121,6 +121,21 @@ test('_normalizeRecipeVisibility - knowledge.learn.consumeOnLearn can be set fal
   assert.equal(result.knowledge.learn.consumeOnLearn, false);
 });
 
+test('_normalizeRecipeVisibility - knowledge.learn.dragDropEnabled defaults true', () => {
+  const manager = makeManager();
+  const result = manager._normalizeRecipeVisibility({ listMode: 'knowledge' });
+  assert.equal(result.knowledge.learn.dragDropEnabled, true);
+});
+
+test('_normalizeRecipeVisibility - knowledge.learn.dragDropEnabled can be set false', () => {
+  const manager = makeManager();
+  const result = manager._normalizeRecipeVisibility({
+    listMode: 'knowledge',
+    knowledge: { learn: { dragDropEnabled: false } }
+  });
+  assert.equal(result.knowledge.learn.dragDropEnabled, false);
+});
+
 // ---------------------------------------------------------------------------
 // Group 3: _normalizeSystem — listMode flows through system normalisation
 // ---------------------------------------------------------------------------
@@ -241,6 +256,7 @@ test('_normalizeRecipeVisibility - knowledge mode does not affect item sub-objec
   });
   assert.equal(result.knowledge.item.limitUses, false);
   assert.equal(result.knowledge.item.destroyWhenExhausted, false);
+  assert.equal(result.knowledge.learn.dragDropEnabled, true);
 });
 
 // ---------------------------------------------------------------------------

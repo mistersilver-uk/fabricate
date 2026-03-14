@@ -3,6 +3,7 @@
  */
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
+import { cleanupStalePreferences } from '../config/preferencesCleanup.js';
 import { getSourceUuid, getComponentSourceReferences, getItemSourceReferences } from '../utils/sourceUuid.js';
 import { normalizeCustomRecipeCategories } from '../utils/recipeCategories.js';
 
@@ -20,6 +21,7 @@ export class CraftingSystemManager {
       const normalized = this._normalizeSystem(system);
       this.systems.set(normalized.id, normalized);
     }
+    await this._migrateLegacyRecipeItems();
     this.initialized = true;
   }
 
@@ -33,6 +35,9 @@ export class CraftingSystemManager {
     const features = this._normalizeFeatures(system);
     const essenceDefinitions = this._normalizeEssenceDefinitions(
       system.essenceDefinitions ?? system.essences
+    );
+    const recipeItemDefinitions = this._normalizeRecipeItemDefinitions(
+      system.recipeItemDefinitions ?? system.recipeItems
     );
     const essenceIds = new Set(essenceDefinitions.map(def => def.id));
     const rawManagedItems = Array.isArray(system.components) ? system.components : (Array.isArray(system.managedItems) ? system.managedItems : system.items);
@@ -67,6 +72,7 @@ export class CraftingSystemManager {
       recipeVisibility: this._normalizeRecipeVisibility(system.recipeVisibility),
       requirements: this._normalizeRequirements(system.requirements),
       essenceDefinitions: resolvedEssenceDefinitions,
+      recipeItemDefinitions,
       craftingCheck: this._normalizeCraftingCheck(system.craftingCheck),
       salvageResolutionMode: (function _normalizeSalvageResolutionMode(raw) {
         if (raw === 'tiered') return 'routed'; // legacy alias
@@ -209,7 +215,8 @@ export class CraftingSystemManager {
           destroyWhenExhausted: knowledge?.item?.destroyWhenExhausted === true
         },
         learn: {
-          consumeOnLearn: knowledge?.learn?.consumeOnLearn !== false
+          consumeOnLearn: knowledge?.learn?.consumeOnLearn !== false,
+          dragDropEnabled: knowledge?.learn?.dragDropEnabled !== false
         }
       }
     };
@@ -318,6 +325,39 @@ export class CraftingSystemManager {
     };
   }
 
+  _normalizeRecipeItemDefinitions(value) {
+    if (!Array.isArray(value)) return [];
+
+    const usedIds = new Set();
+    const normalized = [];
+    for (const entry of value) {
+      const def = this._normalizeRecipeItemDefinition(entry, usedIds);
+      if (!def) continue;
+      usedIds.add(def.id);
+      normalized.push(def);
+    }
+    return normalized;
+  }
+
+  _normalizeRecipeItemDefinition(entry, usedIds = new Set()) {
+    if (!entry || typeof entry !== 'object') return null;
+
+    let id = String(entry.id || '').trim();
+    if (!id) id = foundry.utils.randomID();
+    while (usedIds.has(id)) {
+      id = foundry.utils.randomID();
+    }
+
+    const sourceItemUuid = String(entry.sourceItemUuid || '').trim() || null;
+    return {
+      id,
+      name: String(entry.name || '').trim() || this._labelFromUuid(sourceItemUuid) || 'Recipe Item',
+      description: this._normalizeComponentDescription(entry.description),
+      img: String(entry.img || '').trim() || 'icons/svg/item-bag.svg',
+      sourceItemUuid
+    };
+  }
+
   _uniqueKey(seed, usedIds) {
     const cleaned = this._toKey(seed);
     let key = cleaned || 'essence';
@@ -333,6 +373,12 @@ export class CraftingSystemManager {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
+  }
+
+  _labelFromUuid(uuid) {
+    if (!uuid) return '';
+    const parts = String(uuid).split('.');
+    return parts[parts.length - 1] || '';
   }
 
   _normalizeComponentDescription(description) {
@@ -400,6 +446,21 @@ export class CraftingSystemManager {
       sourceUuid: sourceData.currentUuid,
       sourceItemUuid: sourceData.canonicalUuid,
       references: sourceData.references
+    };
+  }
+
+  _buildRecipeItemSourceSnapshot(itemUuid, source = null, fallbackDefinition = null) {
+    const sourceData = this._resolveImportedSourceData(itemUuid, source);
+    const fallbackName = fallbackDefinition?.name || itemUuid?.split('.')?.pop() || 'Recipe Item';
+    const fallbackImg = fallbackDefinition?.img || 'icons/svg/item-bag.svg';
+
+    return {
+      name: source?.name || fallbackName,
+      img: source?.img || fallbackImg,
+      description: source
+        ? this._extractSourceDescription(source)
+        : this._normalizeComponentDescription(fallbackDefinition?.description),
+      sourceItemUuid: sourceData.canonicalUuid
     };
   }
 
@@ -597,6 +658,29 @@ export class CraftingSystemManager {
     return (system.essenceDefinitions || []).find(def => def.id === essenceId) || null;
   }
 
+  getRecipeItemDefinitions(systemId) {
+    const system = this.getSystem(systemId);
+    if (!system) return [];
+    return Array.isArray(system.recipeItemDefinitions) ? [...system.recipeItemDefinitions] : [];
+  }
+
+  getRecipeItemDefinition(systemId, recipeItemId) {
+    const system = this.getSystem(systemId);
+    if (!system || !recipeItemId) return null;
+    return (system.recipeItemDefinitions || []).find(def => def.id === recipeItemId) || null;
+  }
+
+  getRecipesUsingRecipeItemDefinition(systemId, recipeItemId) {
+    const definition = this.getRecipeItemDefinition(systemId, recipeItemId);
+    if (!definition || !this.recipeManager?.getRecipes) return [];
+
+    return this._getRecipeObjectsReferencingRecipeItemDefinition(systemId, definition)
+      .map(recipe => ({
+        id: recipe.id,
+        name: recipe.name || 'Unnamed Recipe'
+      }));
+  }
+
   getItems(systemId, search = '') {
     const system = this.getSystem(systemId);
     if (!system) return [];
@@ -611,12 +695,171 @@ export class CraftingSystemManager {
     );
   }
 
+  async _migrateLegacyRecipeItems() {
+    if (!this.recipeManager?.getRecipes || !this.recipeManager?.save) return false;
+
+    let systemsChanged = false;
+    let recipesChanged = false;
+
+    for (const system of this.getSystems()) {
+      if (!Array.isArray(system.recipeItemDefinitions)) {
+        system.recipeItemDefinitions = [];
+      }
+
+      const definitions = system.recipeItemDefinitions;
+      const usedIds = new Set(definitions.map(def => def.id));
+      const bySource = new Map(
+        definitions
+          .filter(def => def.sourceItemUuid)
+          .map(def => [def.sourceItemUuid, def])
+      );
+
+      const recipes = this.recipeManager.getRecipes({ craftingSystemId: system.id });
+      for (const recipe of recipes) {
+        const hasValidRecipeItemId = recipe?.recipeItemId
+          && definitions.some(def => def.id === recipe.recipeItemId);
+        if (hasValidRecipeItemId) continue;
+
+        const legacyUuid = String(recipe?.linkedRecipeItemUuid || '').trim();
+        if (!legacyUuid) continue;
+
+        let definition = bySource.get(legacyUuid);
+        if (!definition) {
+          let source = null;
+          try {
+            source = typeof fromUuidSync === 'function' ? fromUuidSync(legacyUuid) : null;
+          } catch {
+            source = null;
+          }
+
+          definition = this._normalizeRecipeItemDefinition(
+            this._buildRecipeItemSourceSnapshot(legacyUuid, source, {
+              name: recipe?.name || 'Recipe Item',
+              img: recipe?.img || 'icons/svg/item-bag.svg',
+              description: recipe?.description || ''
+            }),
+            usedIds
+          );
+          if (!definition) continue;
+
+          usedIds.add(definition.id);
+          definitions.push(definition);
+          if (definition.sourceItemUuid) {
+            bySource.set(definition.sourceItemUuid, definition);
+          }
+          systemsChanged = true;
+        }
+
+        if (recipe.recipeItemId !== definition.id) {
+          recipe.recipeItemId = definition.id;
+          recipesChanged = true;
+        }
+      }
+    }
+
+    if (systemsChanged) await this.save();
+    if (recipesChanged) await this.recipeManager.save();
+    return systemsChanged || recipesChanged;
+  }
+
   async createSystem(data = {}) {
     this._assertGM('create crafting system');
     const system = this._normalizeSystem(data);
     this.systems.set(system.id, system);
     await this.save();
     return system;
+  }
+
+  async addRecipeItemFromUuid(systemId, itemUuid) {
+    this._assertGM('add recipe item from uuid');
+    const system = this.getSystem(systemId);
+    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
+
+    let source = null;
+    try {
+      source = await fromUuid(itemUuid);
+    } catch {
+      source = null;
+    }
+
+    if (source && source.documentName && source.documentName !== 'Item') {
+      throw new Error(
+        `Cannot add non-Item document (${source.documentName}) as a recipe item`
+      );
+    }
+
+    const snapshot = this._buildRecipeItemSourceSnapshot(itemUuid, source);
+    const existing = this._findRecipeItemDefinitionBySourceUuid(system, snapshot.sourceItemUuid);
+    if (existing) {
+      const unchanged = existing.name === snapshot.name
+        && existing.img === snapshot.img
+        && existing.description === snapshot.description
+        && existing.sourceItemUuid === snapshot.sourceItemUuid;
+
+      if (unchanged) {
+        return { item: existing, action: 'skipped' };
+      }
+
+      existing.name = snapshot.name;
+      existing.img = snapshot.img;
+      existing.description = snapshot.description;
+      existing.sourceItemUuid = snapshot.sourceItemUuid;
+
+      await this.save();
+      return { item: existing, action: 'updated' };
+    }
+
+    const recipeItemDefinitions = Array.isArray(system.recipeItemDefinitions)
+      ? system.recipeItemDefinitions
+      : [];
+    const item = this._normalizeRecipeItemDefinition(
+      snapshot,
+      new Set(recipeItemDefinitions.map(def => def.id))
+    );
+    recipeItemDefinitions.push(item);
+    system.recipeItemDefinitions = recipeItemDefinitions;
+
+    await this.save();
+    return { item, action: 'added' };
+  }
+
+  async deleteRecipeItemDefinition(systemId, recipeItemId) {
+    this._assertGM('delete recipe item');
+    const system = this.getSystem(systemId);
+    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
+
+    const definition = this.getRecipeItemDefinition(systemId, recipeItemId);
+    if (!definition) {
+      return {
+        deleted: false,
+        affectedRecipes: []
+      };
+    }
+
+    const affectedRecipeObjects = this._getRecipeObjectsReferencingRecipeItemDefinition(systemId, definition);
+    const affectedRecipes = affectedRecipeObjects.map(recipe => ({
+      id: recipe.id,
+      name: recipe.name || 'Unnamed Recipe'
+    }));
+
+    system.recipeItemDefinitions = (system.recipeItemDefinitions || [])
+      .filter(item => item.id !== recipeItemId);
+
+    for (const recipe of affectedRecipeObjects) {
+      recipe.recipeItemId = null;
+      recipe.linkedRecipeItemUuid = null;
+    }
+
+    await this.save();
+    if (affectedRecipeObjects.length > 0 && this.recipeManager?.save) {
+      await this.recipeManager.save();
+    }
+
+    return {
+      deleted: true,
+      definition: { ...definition },
+      affectedRecipes
+    };
   }
 
   async updateSystem(systemId, updates = {}) {
@@ -649,10 +892,21 @@ export class CraftingSystemManager {
         : (Object.prototype.hasOwnProperty.call(updates, 'tags') ? updates.tags : current.itemTags),
       essenceDefinitions: Object.prototype.hasOwnProperty.call(updates, 'essenceDefinitions')
         ? updates.essenceDefinitions
-        : (Object.prototype.hasOwnProperty.call(updates, 'essences') ? updates.essences : current.essenceDefinitions)
+        : (Object.prototype.hasOwnProperty.call(updates, 'essences') ? updates.essences : current.essenceDefinitions),
+      recipeItemDefinitions: Object.prototype.hasOwnProperty.call(updates, 'recipeItemDefinitions')
+        ? updates.recipeItemDefinitions
+        : (Object.prototype.hasOwnProperty.call(updates, 'recipeItems') ? updates.recipeItems : current.recipeItemDefinitions)
     };
 
     const merged = this._normalizeSystem(mergedInput);
+    const resolutionModeChanged = current.resolutionMode !== merged.resolutionMode;
+
+    if (resolutionModeChanged) {
+      const affectedRecipes = this.recipeManager.getRecipes({ craftingSystemId: systemId });
+      for (const recipe of affectedRecipes) {
+        await this.recipeManager.deleteRecipe(recipe.id);
+      }
+    }
 
     // Path 1: Mode change -- disable invalid salvage configs
     const oldMode = current.salvageResolutionMode || 'simple';
@@ -673,6 +927,9 @@ export class CraftingSystemManager {
 
     this.systems.set(systemId, merged);
     await this.save();
+    if (resolutionModeChanged) {
+      await this._cleanupCraftingPreferences();
+    }
     return merged;
   }
 
@@ -739,6 +996,27 @@ export class CraftingSystemManager {
       if (excludeItemId && item.id === excludeItemId) return false;
       return getComponentSourceReferences(item).some(ref => claimedRefs.has(ref));
     }) || null;
+  }
+
+  _findRecipeItemDefinitionBySourceUuid(system, sourceItemUuid, excludeRecipeItemId = null) {
+    if (!sourceItemUuid) return null;
+    return (system.recipeItemDefinitions || []).find(def => {
+      if (excludeRecipeItemId && def.id === excludeRecipeItemId) return false;
+      return def.sourceItemUuid === sourceItemUuid;
+    }) || null;
+  }
+
+  _getRecipeObjectsReferencingRecipeItemDefinition(systemId, definition) {
+    if (!definition || !this.recipeManager?.getRecipes) return [];
+    const definitionId = String(definition.id || '').trim();
+    const sourceItemUuid = String(definition.sourceItemUuid || '').trim();
+
+    return this.recipeManager.getRecipes({ craftingSystemId: systemId }).filter(recipe => {
+      const recipeItemId = String(recipe?.recipeItemId || '').trim();
+      const linkedRecipeItemUuid = String(recipe?.linkedRecipeItemUuid || '').trim();
+      return recipeItemId === definitionId
+        || (!recipeItemId && !!sourceItemUuid && linkedRecipeItemUuid === sourceItemUuid);
+    });
   }
 
   _assertUniqueComponentSources(system, item, excludeItemId = null) {
@@ -1106,5 +1384,11 @@ export class CraftingSystemManager {
         await setFabricateFlag(actor, 'salvageRuns', { ...existing, history: filtered });
       }
     }
+  }
+
+  async _cleanupCraftingPreferences() {
+    const validSystemIds = new Set(this.getSystems().map(system => system.id));
+    const validRecipeIds = new Set(this.recipeManager.getRecipes({}).map(recipe => recipe.id));
+    await cleanupStalePreferences(validSystemIds, validRecipeIds, getSetting, setSetting);
   }
 }

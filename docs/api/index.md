@@ -75,6 +75,7 @@ Fabricate stores data in Foundry's settings and flags:
 | Client setting | `fabricate.lastCraftingActor` | Last selected crafting actor UUID |
 | Client setting | `fabricate.lastComponentSources` | Last selected source actor UUIDs |
 | Client setting | `fabricate.lastManagedCraftingSystem` | Last viewed system in GM admin |
+| Client setting | `fabricate.lastAlchemySystem` | Last selected alchemy system in the Alchemy tab |
 | Client setting | `fabricate.progressiveResultOrder` | Per-recipe player reorder preferences for progressive mode results (Object, default `{}`) |
 | Actor flag | `fabricate.craftingRuns.active` | In-progress crafting runs |
 | Actor flag | `fabricate.craftingRuns.history` | Completed crafting runs |

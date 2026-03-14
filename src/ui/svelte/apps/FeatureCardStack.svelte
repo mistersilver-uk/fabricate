@@ -101,17 +101,47 @@
   let visListMode = $state('global');
   let visKnowledgeMode = $state('itemOrLearned');
   let visConsumeOnLearn = $state(true);
+  let visLimitUses = $state(false);
+  let visMaxUses = $state('');
+  let visDestroyWhenExhausted = $state(false);
+  let visDragDropEnabled = $state(true);
+  let alchemyLearnOnCraft = $state(false);
+  let alchemyConsumeOnFail = $state(true);
+  let alchemyShowAttemptHistoryToPlayers = $state(true);
+  let craftingCheckSaveTimer = null;
+  let visibilitySaveTimer = null;
 
   $effect(() => {
     const vis = selectedSystem?.recipeVisibility || {};
     visListMode = vis.listMode || 'global';
     visKnowledgeMode = vis.knowledge?.mode || 'itemOrLearned';
     visConsumeOnLearn = vis.knowledge?.learn?.consumeOnLearn !== false;
+    visLimitUses = vis.knowledge?.item?.limitUses === true;
+    visMaxUses = Number.isFinite(Number(vis.knowledge?.item?.maxUses))
+      ? Number(vis.knowledge.item.maxUses)
+      : '';
+    visDestroyWhenExhausted = vis.knowledge?.item?.destroyWhenExhausted === true;
+    visDragDropEnabled = vis.knowledge?.learn?.dragDropEnabled !== false;
+  });
+
+  $effect(() => {
+    const alchemy = selectedSystem?.alchemy || {};
+    alchemyLearnOnCraft = alchemy.learnOnCraft === true;
+    alchemyConsumeOnFail = alchemy.consumeOnFail !== false;
+    alchemyShowAttemptHistoryToPlayers = alchemy.showAttemptHistoryToPlayers !== false;
   });
 
   $effect(() => {
     const currentSystemId = selectedSystem?.id || null;
     if (currentSystemId === lastSelectedSystemId) return;
+    if (craftingCheckSaveTimer) {
+      clearTimeout(craftingCheckSaveTimer);
+      craftingCheckSaveTimer = null;
+    }
+    if (visibilitySaveTimer) {
+      clearTimeout(visibilitySaveTimer);
+      visibilitySaveTimer = null;
+    }
     lastSelectedSystemId = currentSystemId;
     resetAddEssenceForm();
     cancelEssenceEdit();
@@ -150,6 +180,87 @@
   async function handleEssenceSourceClear(definition) {
     await store.updateEssence(definition.id, { sourceItemUuid: null });
   }
+
+  function flushCurrencySave() {
+    return store.saveCurrencyConfig(
+      currencyProvider,
+      currencyAdapter,
+      checkCurrencyMacro,
+      decrementCurrencyMacro,
+      formatCurrencyMacro
+    );
+  }
+
+  function flushCraftingCheckSave() {
+    if (craftingCheckSaveTimer) {
+      clearTimeout(craftingCheckSaveTimer);
+      craftingCheckSaveTimer = null;
+    }
+    return store.saveCraftingCheckConfig({
+      mode: checkMode,
+      macroUuid: checkMacroUuid,
+      outcomesText: checkOutcomes
+    });
+  }
+
+  function scheduleCraftingCheckSave() {
+    if (craftingCheckSaveTimer) clearTimeout(craftingCheckSaveTimer);
+    craftingCheckSaveTimer = setTimeout(() => {
+      craftingCheckSaveTimer = null;
+      store.saveCraftingCheckConfig({
+        mode: checkMode,
+        macroUuid: checkMacroUuid,
+        outcomesText: checkOutcomes
+      });
+    }, 250);
+  }
+
+  function flushVisibilitySave() {
+    if (visibilitySaveTimer) {
+      clearTimeout(visibilitySaveTimer);
+      visibilitySaveTimer = null;
+    }
+    return store.saveVisibilityConfig({
+      listMode: visListMode,
+      knowledgeMode: visKnowledgeMode,
+      consumeOnLearn: visConsumeOnLearn,
+      limitUses: visLimitUses,
+      maxUses: visMaxUses,
+      destroyWhenExhausted: visDestroyWhenExhausted,
+      dragDropEnabled: visDragDropEnabled
+    });
+  }
+
+  function scheduleVisibilitySave() {
+    if (visibilitySaveTimer) clearTimeout(visibilitySaveTimer);
+    visibilitySaveTimer = setTimeout(() => {
+      visibilitySaveTimer = null;
+      store.saveVisibilityConfig({
+        listMode: visListMode,
+        knowledgeMode: visKnowledgeMode,
+        consumeOnLearn: visConsumeOnLearn,
+        limitUses: visLimitUses,
+        maxUses: visMaxUses,
+        destroyWhenExhausted: visDestroyWhenExhausted,
+        dragDropEnabled: visDragDropEnabled
+      });
+    }, 250);
+  }
+
+  function flushAlchemySave() {
+    return store.saveAlchemyConfig({
+      learnOnCraft: alchemyLearnOnCraft,
+      consumeOnFail: alchemyConsumeOnFail,
+      showAttemptHistoryToPlayers: alchemyShowAttemptHistoryToPlayers
+    });
+  }
+
+  const showsKnowledgeItemSettings = $derived(
+    visListMode === 'knowledge' && (visKnowledgeMode === 'item' || visKnowledgeMode === 'itemOrLearned')
+  );
+  const showsKnowledgeLearningSettings = $derived(
+    visListMode === 'knowledge' && (visKnowledgeMode === 'learned' || visKnowledgeMode === 'itemOrLearned')
+  );
 </script>
 
 <div class="feature-card-stack">
@@ -348,14 +459,6 @@
     </div>
   </FeatureCard>
 
-  <!-- Complex Recipes -->
-  <FeatureCard
-    title={localize('FABRICATE.Admin.Features.ComplexRecipes.Title')}
-    hint={localize('FABRICATE.Admin.Features.ComplexRecipes.Hint')}
-    enabled={selectedSystem.features.complexRecipes}
-    onToggle={(v) => store.toggleFeature('complexRecipes', v)}
-  />
-
   <!-- Multi-Step Recipes -->
   <FeatureCard
     title={localize('FABRICATE.Admin.Features.MultiStepRecipes.Title')}
@@ -380,38 +483,66 @@
     onToggle={(v) => store.toggleRequirement('currency', v)}
   >
     <div class="panel-toolbar compact">
-      <select bind:value={currencyProvider}>
+      <select
+        value={currencyProvider}
+        onchange={(e) => {
+          currencyProvider = e.target.value || 'macro';
+          flushCurrencySave();
+        }}
+      >
         <option value="macro">{localize('FABRICATE.Admin.Features.CurrencyRequirements.MacroProvider')}</option>
         <option value="system">{localize('FABRICATE.Admin.Features.CurrencyRequirements.SystemAdapter')}</option>
       </select>
-      <select bind:value={currencyAdapter}>
-        <option value="">{localize('FABRICATE.Admin.Features.CurrencyRequirements.SelectAdapter')}</option>
-        <option value="dnd5e">dnd5e</option>
-        <option value="pf2e">pf2e</option>
-      </select>
-    </div>
-    <div class="panel-toolbar compact">
-      <select bind:value={checkCurrencyMacro}>
-        <option value="">{localize('FABRICATE.Admin.Features.CurrencyRequirements.CheckMacro')}</option>
-        {#each selectedSystem.availableScriptMacros as macro}
-          <option value={macro.uuid}>{macro.name}</option>
-        {/each}
-      </select>
-      <select bind:value={decrementCurrencyMacro}>
-        <option value="">{localize('FABRICATE.Admin.Features.CurrencyRequirements.DecrementMacro')}</option>
-        {#each selectedSystem.availableScriptMacros as macro}
-          <option value={macro.uuid}>{macro.name}</option>
-        {/each}
-      </select>
-      <select bind:value={formatCurrencyMacro}>
-        <option value="">{localize('FABRICATE.Admin.Features.CurrencyRequirements.FormatMacro')}</option>
-        {#each selectedSystem.availableScriptMacros as macro}
-          <option value={macro.uuid}>{macro.name}</option>
-        {/each}
-      </select>
-      <button type="button" onclick={() => store.saveCurrencyConfig(currencyProvider, currencyAdapter, checkCurrencyMacro, decrementCurrencyMacro, formatCurrencyMacro)}>
-        <i class="fas fa-save"></i> {localize('FABRICATE.Admin.Features.CurrencyRequirements.SaveConfig')}
-      </button>
+      {#if currencyProvider === 'system'}
+        <select
+          value={currencyAdapter}
+          onchange={(e) => {
+            currencyAdapter = e.target.value || '';
+            flushCurrencySave();
+          }}
+        >
+          <option value="">{localize('FABRICATE.Admin.Features.CurrencyRequirements.SelectAdapter')}</option>
+          <option value="dnd5e">dnd5e</option>
+          <option value="pf2e">pf2e</option>
+        </select>
+      {:else}
+        <select
+          value={checkCurrencyMacro}
+          onchange={(e) => {
+            checkCurrencyMacro = e.target.value || '';
+            flushCurrencySave();
+          }}
+        >
+          <option value="">{localize('FABRICATE.Admin.Features.CurrencyRequirements.CheckMacro')}</option>
+          {#each selectedSystem.availableScriptMacros as macro}
+            <option value={macro.uuid}>{macro.name}</option>
+          {/each}
+        </select>
+        <select
+          value={decrementCurrencyMacro}
+          onchange={(e) => {
+            decrementCurrencyMacro = e.target.value || '';
+            flushCurrencySave();
+          }}
+        >
+          <option value="">{localize('FABRICATE.Admin.Features.CurrencyRequirements.DecrementMacro')}</option>
+          {#each selectedSystem.availableScriptMacros as macro}
+            <option value={macro.uuid}>{macro.name}</option>
+          {/each}
+        </select>
+        <select
+          value={formatCurrencyMacro}
+          onchange={(e) => {
+            formatCurrencyMacro = e.target.value || '';
+            flushCurrencySave();
+          }}
+        >
+          <option value="">{localize('FABRICATE.Admin.Features.CurrencyRequirements.FormatMacro')}</option>
+          {#each selectedSystem.availableScriptMacros as macro}
+            <option value={macro.uuid}>{macro.name}</option>
+          {/each}
+        </select>
+      {/if}
     </div>
   </FeatureCard>
 
@@ -427,34 +558,45 @@
   <FeatureCard
     title={localize('FABRICATE.Admin.Features.CraftingChecks.Title')}
     hint={localize('FABRICATE.Admin.Features.CraftingChecks.Hint')}
-    enabled={selectedSystem.features.craftingChecks}
-    onToggle={(v) => store.toggleFeature('craftingChecks', v)}
+    showToggle={false}
   >
     <div class="panel-toolbar compact">
-      <select bind:value={checkMode}>
+      <select
+        value={checkMode}
+        onchange={(e) => {
+          checkMode = e.target.value || 'passFail';
+          flushCraftingCheckSave();
+        }}
+      >
         <option value="passFail">{localize('FABRICATE.Admin.Features.CraftingChecks.PassFail')}</option>
         <option value="namedOutcomes">{localize('FABRICATE.Admin.Features.CraftingChecks.NamedOutcomes')}</option>
       </select>
-      <select bind:value={checkMacroUuid}>
+      <select
+        value={checkMacroUuid}
+        onchange={(e) => {
+          checkMacroUuid = e.target.value || '';
+          flushCraftingCheckSave();
+        }}
+      >
         <option value="">{localize('FABRICATE.Admin.Features.CraftingChecks.NoCheckMacro')}</option>
         {#each selectedSystem.availableScriptMacros as macro}
           <option value={macro.uuid}>{macro.name}</option>
         {/each}
       </select>
-      <input type="text" bind:value={checkOutcomes} placeholder={localize('FABRICATE.Admin.Features.CraftingChecks.OutcomesPlaceholder')} />
-      <button type="button" onclick={() => store.saveCraftingCheckConfig(checkMode, checkMacroUuid, checkOutcomes)}>
-        <i class="fas fa-save"></i> {localize('FABRICATE.Admin.Features.CraftingChecks.SaveConfig')}
-      </button>
+      {#if checkMode === 'namedOutcomes'}
+        <input
+          type="text"
+          value={checkOutcomes}
+          placeholder={localize('FABRICATE.Admin.Features.CraftingChecks.OutcomesPlaceholder')}
+          oninput={(e) => {
+            checkOutcomes = e.target.value;
+            scheduleCraftingCheckSave();
+          }}
+          onblur={flushCraftingCheckSave}
+        />
+      {/if}
     </div>
   </FeatureCard>
-
-  <!-- Outcome Routing -->
-  <FeatureCard
-    title={localize('FABRICATE.Admin.Features.OutcomeRouting.Title')}
-    hint={localize('FABRICATE.Admin.Features.OutcomeRouting.Hint')}
-    enabled={selectedSystem.features.outcomeRouting}
-    onToggle={(v) => store.toggleFeature('outcomeRouting', v)}
-  />
 
   <!-- Effect Transfer -->
   <FeatureCard
@@ -464,6 +606,48 @@
     onToggle={(v) => store.toggleFeature('effectTransfer', v)}
   />
 
+  {#if selectedSystem.resolutionMode === 'alchemy'}
+    <FeatureCard
+      title={localize('FABRICATE.Admin.Features.Alchemy.Title')}
+      hint={localize('FABRICATE.Admin.Features.Alchemy.Hint')}
+      showToggle={false}
+    >
+      <label class="checkbox-label">
+        <input
+          type="checkbox"
+          checked={alchemyLearnOnCraft}
+          onchange={(e) => {
+            alchemyLearnOnCraft = e.target.checked;
+            flushAlchemySave();
+          }}
+        />
+        {localize('FABRICATE.Admin.Features.Alchemy.LearnOnCraft')}
+      </label>
+      <label class="checkbox-label">
+        <input
+          type="checkbox"
+          checked={alchemyConsumeOnFail}
+          onchange={(e) => {
+            alchemyConsumeOnFail = e.target.checked;
+            flushAlchemySave();
+          }}
+        />
+        {localize('FABRICATE.Admin.Features.Alchemy.ConsumeOnFail')}
+      </label>
+      <label class="checkbox-label">
+        <input
+          type="checkbox"
+          checked={alchemyShowAttemptHistoryToPlayers}
+          onchange={(e) => {
+            alchemyShowAttemptHistoryToPlayers = e.target.checked;
+            flushAlchemySave();
+          }}
+        />
+        {localize('FABRICATE.Admin.Features.Alchemy.ShowAttemptHistoryToPlayers')}
+      </label>
+    </FeatureCard>
+  {/if}
+
   <!-- Recipe Visibility -->
   <FeatureCard
     title={localize('FABRICATE.Admin.Features.RecipeVisibility.Title')}
@@ -471,30 +655,101 @@
     showToggle={false}
   >
     <div class="panel-toolbar compact">
-      <select bind:value={visListMode}>
+      <select
+        value={visListMode}
+        onchange={(e) => {
+          visListMode = e.target.value || 'global';
+          flushVisibilitySave();
+        }}
+      >
         <option value="global">{localize('FABRICATE.Admin.Features.RecipeVisibility.Global')}</option>
         <option value="player">{localize('FABRICATE.Admin.Features.RecipeVisibility.PlayerSpecific')}</option>
         <option value="knowledge">{localize('FABRICATE.Admin.Features.RecipeVisibility.KnowledgeBased')}</option>
       </select>
-      <button type="button" onclick={() => store.saveVisibilityConfig(visListMode, visKnowledgeMode, visConsumeOnLearn)}>
-        <i class="fas fa-save"></i> {localize('FABRICATE.Admin.Features.RecipeVisibility.SaveConfig')}
-      </button>
     </div>
     {#if visListMode === 'player'}
       <p class="hint">{localize('FABRICATE.Admin.Features.RecipeVisibility.PlayerNote')}</p>
     {/if}
     {#if visListMode === 'knowledge'}
       <div class="panel-toolbar compact">
-        <select bind:value={visKnowledgeMode}>
+        <select
+          value={visKnowledgeMode}
+          onchange={(e) => {
+            visKnowledgeMode = e.target.value || 'itemOrLearned';
+            flushVisibilitySave();
+          }}
+        >
           <option value="item">{localize('FABRICATE.Admin.Features.RecipeVisibility.KnowledgeByItem')}</option>
           <option value="learned">{localize('FABRICATE.Admin.Features.RecipeVisibility.KnowledgeByLearning')}</option>
           <option value="itemOrLearned">{localize('FABRICATE.Admin.Features.RecipeVisibility.KnowledgeByEither')}</option>
         </select>
       </div>
-      {#if visKnowledgeMode !== 'item'}
+      {#if showsKnowledgeItemSettings}
         <label class="checkbox-label">
-          <input type="checkbox" bind:checked={visConsumeOnLearn} />
+          <input
+            type="checkbox"
+            checked={visLimitUses}
+            onchange={(e) => {
+              visLimitUses = e.target.checked;
+              if (!visLimitUses) {
+                visMaxUses = '';
+                visDestroyWhenExhausted = false;
+              }
+              flushVisibilitySave();
+            }}
+          />
+          {localize('FABRICATE.Admin.Features.RecipeVisibility.ItemLimitUses')}
+        </label>
+        {#if visLimitUses}
+          <div class="panel-toolbar compact">
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={visMaxUses}
+              placeholder={localize('FABRICATE.Admin.Features.RecipeVisibility.ItemMaxUses')}
+              oninput={(e) => {
+                visMaxUses = e.target.value ? Number(e.target.value) : '';
+                scheduleVisibilitySave();
+              }}
+              onblur={flushVisibilitySave}
+            />
+          </div>
+          <label class="checkbox-label">
+            <input
+              type="checkbox"
+              checked={visDestroyWhenExhausted}
+              onchange={(e) => {
+                visDestroyWhenExhausted = e.target.checked;
+                flushVisibilitySave();
+              }}
+            />
+            {localize('FABRICATE.Admin.Features.RecipeVisibility.ItemDestroyWhenExhausted')}
+          </label>
+        {/if}
+      {/if}
+      {#if showsKnowledgeLearningSettings}
+        <label class="checkbox-label">
+          <input
+            type="checkbox"
+            checked={visConsumeOnLearn}
+            onchange={(e) => {
+              visConsumeOnLearn = e.target.checked;
+              flushVisibilitySave();
+            }}
+          />
           {localize('FABRICATE.Admin.Features.RecipeVisibility.ConsumeOnLearn')}
+        </label>
+        <label class="checkbox-label">
+          <input
+            type="checkbox"
+            checked={visDragDropEnabled}
+            onchange={(e) => {
+              visDragDropEnabled = e.target.checked;
+              flushVisibilitySave();
+            }}
+          />
+          {localize('FABRICATE.Admin.Features.RecipeVisibility.DragDropEnabled')}
         </label>
       {/if}
     {/if}

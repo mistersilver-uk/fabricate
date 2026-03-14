@@ -2443,3 +2443,32 @@
   color: var(--fabricate-danger, #dc3545);
   border-color: var(--fabricate-danger, #dc3545);
 }
+
+/* ==========================================
+   Alchemy Tab Global Styles (Phase E, Task 14)
+   ========================================== */
+
+/* Workbench header: flex row with title on left, actions on right.
+   Used by Workbench.svelte and any panel header following the same pattern. */
+.workbench-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  gap: 6px;
+}
+
+/* Actor selection section sits above the tab bar and is always visible */
+.actor-selection-section {
+  flex-shrink: 0;
+}
+
+/* Flat visual style: palette cells, workbench chips, and discovered recipe rows
+   must not use gradients or glass effects. These are the global fallback
+   rules; component-scoped styles in <style> blocks can override locally. */
+.alchemy-palette-cell,
+.workbench-chip,
+.discovered-recipe-row {
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}

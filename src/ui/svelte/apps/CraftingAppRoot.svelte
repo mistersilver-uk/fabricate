@@ -1,65 +1,25 @@
 <!-- Svelte 5 runes mode -->
 <script>
-  import { localize, renderDialog } from '../util/foundryBridge.js';
+  import { localize } from '../util/foundryBridge.js';
   import ActorSelector from './ActorSelector.svelte';
   import SourceActorPicker from './SourceActorPicker.svelte';
-  import SearchBar from './SearchBar.svelte';
-  import FilterBar from './FilterBar.svelte';
-  import RecipeList from './RecipeList.svelte';
-  import RunSummary from './RunSummary.svelte';
-  import RecentsSection from './RecentsSection.svelte';
-  import AlchemySubmitPanel from './AlchemySubmitPanel.svelte';
-  import ShoppingListPanel from './ShoppingListPanel.svelte';
+  import CraftingTab from './CraftingTab.svelte';
+  import AlchemyTab from './AlchemyTab.svelte';
 
   let { store, services = null } = $props();
 
-  // Subscribe to the Svelte stores.
-  // These are svelte/store writable() instances from craftingStore.js.
-  // The Svelte compiler may warn about capturing prop-derived references at
-  // init time, but store is stable for the app's lifetime so this is safe.
   // svelte-ignore state_referenced_locally
   const viewState = store.viewState;
   // svelte-ignore state_referenced_locally
-  const searchTerm = store.searchTerm;
+  const showTabBar = store.showTabBar;
   // svelte-ignore state_referenced_locally
-  const selectedCategory = store.selectedCategory;
+  const activeTab = store.activeTab;
   // svelte-ignore state_referenced_locally
-  const showOnlyAvailable = store.showOnlyAvailable;
+  const hasAlchemyTab = store.hasAlchemyTab;
   // svelte-ignore state_referenced_locally
-  const showFavouritesOnly = store.showFavouritesOnly;
-  // svelte-ignore state_referenced_locally
-  const isAlchemyMode = store.isAlchemyMode;
-  // svelte-ignore state_referenced_locally
-  const shoppingList = store.shoppingList;
-  // svelte-ignore state_referenced_locally
-  const shoppingListExpanded = store.shoppingListExpanded;
-
-  function handleShowRunDetails(runId, scope) {
-    // TODO: Replace with full run details dialog
-    renderDialog({
-      title: localize('FABRICATE.RunSummary.RunDetails'),
-      content: `<p>Run ${runId} (${scope})</p>`,
-      buttons: [{ action: 'close', label: 'OK', default: true }]
-    });
-  }
-
-  // TODO: Replace with full RecipeDetailsDialog implementation
-  function handleShowDetails(recipeId) {
-    const recipe = $viewState.recipes.find(r => r.id === recipeId);
-    renderDialog({
-      title: recipe?.name ?? recipeId,
-      content: `<p>${recipe?.description ?? ''}</p>`,
-      buttons: [{ action: 'close', label: localize('FABRICATE.RecipeCard.ShowDetails'), default: true }]
-    });
-  }
-  let enrichedShoppingEntries = $derived(
-    ($shoppingList || []).map(entry => {
-      const recipe = ($viewState.recipes || []).find(r => r.id === entry.recipeId);
-      return { ...entry, recipeName: recipe?.name || entry.recipeId };
-    })
-  );
-
+  const hasCraftingTab = store.hasCraftingTab;
 </script>
+
 <div class="fabricate-crafting-app">
   <!-- Actor Selection Section -->
   <section class="actor-selection-section">
@@ -73,105 +33,68 @@
     />
   </section>
 
-  <RunSummary
-    activeRuns={$viewState.activeRuns}
-    runHistory={$viewState.runHistory}
-    hasCraftingActor={$viewState.hasCraftingActor}
-    onCraft={store.craft}
-    onShowRunDetails={handleShowRunDetails}
-    onRestartRun={store.restartRun}
-    onCancelRun={store.cancelRun}
-    onCancelSalvageRun={store.cancelSalvageRun}
-  />
-
-  {#if $viewState.salvageEntries?.length > 0}
-    <section class="run-summary-section">
-      <h4>{localize('FABRICATE.Salvage.Title')}</h4>
-      <ul class="run-list">
-        {#each $viewState.salvageEntries as entry (`salvage-${entry.systemId}-${entry.id}`)}
-          <li class="run-row">
-            <strong>{entry.name}</strong>
-            <span class="badge">{entry.statusLabel}</span>
-            <span class="hint">
-              {entry.systemName} • {localize('FABRICATE.Salvage.AvailableCount')
-                .replace('{have}', String(entry.quantityAvailable))
-                .replace('{need}', String(entry.quantityRequired))}
-            </span>
-            <span class="run-row-actions">
-              <button
-                type="button"
-                class="details-btn"
-                disabled={!entry.allowSalvageAction}
-                onclick={() => store.salvage(entry.systemId, entry.id)}
-                title={localize('FABRICATE.Salvage.Start')}
-              >
-                {entry.buttonLabel}
-              </button>
-            </span>
-          </li>
-        {/each}
-      </ul>
-    </section>
+  {#if $showTabBar}
+    <nav class="fabricate-tab-bar" role="tablist">
+      <button
+        class="fabricate-tab"
+        class:active={$activeTab === 'alchemy'}
+        role="tab"
+        aria-selected={$activeTab === 'alchemy'}
+        onclick={() => store.setActiveTab('alchemy')}
+      >
+        <i class="fas fa-flask"></i> {localize('FABRICATE.Tabs.Alchemy')}
+      </button>
+      <button
+        class="fabricate-tab"
+        class:active={$activeTab === 'crafting'}
+        role="tab"
+        aria-selected={$activeTab === 'crafting'}
+        onclick={() => store.setActiveTab('crafting')}
+      >
+        <i class="fas fa-hammer"></i> {localize('FABRICATE.Tabs.Crafting')}
+      </button>
+    </nav>
   {/if}
 
-  <ShoppingListPanel
-    shoppingListData={$viewState.shoppingListData}
-    shoppingListEntries={enrichedShoppingEntries}
-    expanded={$shoppingListExpanded}
-    onToggleExpanded={store.toggleShoppingListExpanded}
-    onRemoveRecipe={store.removeFromShoppingList}
-    onSetQuantity={store.setShoppingListQuantity}
-    onClearAll={store.clearShoppingList}
-  />
-
-  <!-- Search and Filters Header -->
-  <header class="fabricate-header">
-    <SearchBar
-      value={$searchTerm}
-      onSearch={store.setSearch}
-      placeholder={localize('FABRICATE.Search.Placeholder')}
-    />
-    <FilterBar
-      showCraftableOnly={$showOnlyAvailable}
-      onToggleCraftable={store.toggleAvailable}
-      showFavouritesOnly={$showFavouritesOnly}
-      onToggleFavourites={store.toggleFavouritesOnly}
-      categories={$viewState.categories}
-      selectedCategory={$selectedCategory}
-      onCategoryChange={store.setCategory}
-    />
-  </header>
-
-  <!-- Recipe List / Alchemy Panel -->
-  {#if $isAlchemyMode}
-    <AlchemySubmitPanel {store} />
+  {#if $hasAlchemyTab && ($activeTab === 'alchemy' || !$hasCraftingTab)}
+    <AlchemyTab {store} />
   {:else}
-    <div class="fabricate-recipe-list">
-      {#if !$viewState.hasComponentSources}
-        <div class="fabricate-empty">
-          <i class="fas fa-info-circle"></i>
-          <p>{localize('FABRICATE.SourceActorPicker.NoActors')}</p>
-        </div>
-      {:else}
-        <RecentsSection
-          recipes={$viewState.recentRecipes}
-          onCraft={store.craft}
-          onShowDetails={handleShowDetails}
-        />
-        <RecipeList
-          recipes={$viewState.recipes}
-          search={$searchTerm}
-          onCraft={store.craft}
-          onLearnRecipe={store.learnRecipe}
-          onToggleFavourite={store.toggleFavourite}
-          onShowDetails={handleShowDetails}
-          onRestartRun={store.restartRun}
-          onAddToShoppingList={store.addToShoppingList}
-        />
-        {#if $viewState.totalRecipes > 0}
-          <p class="hint">{localize('FABRICATE.RecipeList.Count').replace('{count}', $viewState.totalRecipes)}</p>
-        {/if}
-      {/if}
-    </div>
+    <CraftingTab {store} {services} />
   {/if}
 </div>
+
+<style>
+  .fabricate-tab-bar {
+    display: flex;
+    gap: 0;
+    padding: 0 12px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+    background: rgba(0, 0, 0, 0.06);
+  }
+
+  .fabricate-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    border-radius: 6px 6px 0 0;
+    border: 1px solid rgba(0, 0, 0, 0.25);
+    border-bottom: none;
+    background: transparent;
+    opacity: 0.7;
+    cursor: pointer;
+  }
+
+  .fabricate-tab:hover {
+    background: rgba(0, 0, 0, 0.08);
+    opacity: 1;
+  }
+
+  .fabricate-tab.active {
+    background: var(--fabricate-primary);
+    color: #fff;
+    border-color: var(--fabricate-primary);
+    opacity: 1;
+  }
+</style>

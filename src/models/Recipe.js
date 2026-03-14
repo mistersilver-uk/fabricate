@@ -20,6 +20,7 @@ export class Recipe {
     this.tags = Array.isArray(data.tags) ? data.tags : [];
     this.enabled = data.enabled !== undefined ? data.enabled : true;
     this.locked = data.locked === true;
+    this.recipeItemId = data.recipeItemId || null;
     this.linkedRecipeItemUuid = data.linkedRecipeItemUuid || null;
     this.visibility = this._normalizeVisibility(data.visibility);
 
@@ -246,6 +247,7 @@ export class Recipe {
       tags: this.tags,
       enabled: this.enabled,
       locked: this.locked,
+      recipeItemId: this.recipeItemId,
       linkedRecipeItemUuid: this.linkedRecipeItemUuid,
       visibility: this.visibility,
       steps: this.steps.map(step => ({

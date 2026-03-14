@@ -53,13 +53,17 @@
 | **Visibility Gate**            | A gathering-task precondition that decides whether a task is visible to an actor before the attempt begins.                                                                                                                                                                                                                                                                                                                                                                                                                      | `GatheringVisibilityGate`                                                            | spec/009                     |
 | **List Mode**                  | System-wide recipe visibility strategy: `global`, `player`, or `knowledge`. `teaser` is a legacy runtime value that should be eliminated.                                                                                                                                                                                                                                                                                                                                                                                        | `recipeVisibility.listMode`                                                          | spec/002, spec/006           |
 | **Knowledge Mode**             | Sub-strategy within `knowledge` list mode: `item`, `learned`, or `itemOrLearned`.                                                                                                                                                                                                                                                                                                                                                                                                                                                | `recipeVisibility.knowledge.mode`                                                    | spec/002, spec/006           |
-| **Recipe Item**                | A Foundry Item linked to a recipe for knowledge matching.                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | `Recipe.linkedRecipeItemUuid`                                                        | spec/002, spec/006           |
+| **Recipe Item Definition**     | A curated crafting-system entry that represents one knowledge item template used for recipe visibility and learning. It is distinct from components and is backed by a `sourceItemUuid`.                                                                                                                                                                                                                                                                                                                                          | `CraftingSystem.recipeItemDefinitions[]`                                             | spec/002, spec/006           |
+| **Recipe Item Reference**      | The recipe-level pointer to a system-managed recipe item definition.                                                                                                                                                                                                                                                                                                                                                                                                                                                             | `Recipe.recipeItemId`                                                                | spec/002, spec/006           |
 | **Learned Recipe**             | Actor-scoped recipe knowledge stored in flags.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | `Actor.flags.fabricate.learnedRecipes`                                               | spec/002, spec/006           |
 | **Recipe Fragment**            | A found item that advances discovery progress toward a recipe under discovery mode. This replaces the legacy `TeaserFragment` name.                                                                                                                                                                                                                                                                                                                                                                                              | Domain decision; runtime still uses `FragmentDiscoveryHook` / `teaserConfig` aliases | issue #119                   |
 | **Discovery Mode**             | A discovery feature layered alongside recipe visibility, not a `listMode` value. This replaces the legacy `teaser` naming family.                                                                                                                                                                                                                                                                                                                                                                                                | Domain decision; runtime still uses `teaserConfig` / `Recipe.teaser` aliases         | issue #119                   |
 | **Source UUID**                | The compendium origin of an owned item, used for recipe-item and component matching.                                                                                                                                                                                                                                                                                                                                                                                                                                             | `getSourceUuid()` in `src/utils/sourceUuid.js`                                       | spec/006                     |
 | **Component Source Actor**     | An actor selected as an inventory source for crafting. Fabricate searches the selected component source actors for ingredients and, when visibility rules allow, recipe-item matches. The crafting actor receives created results, but ingredient consumption may come from any selected component source actor. This is distinct from a component's `sourceItemUuid` or an owned item's source UUID. Component source actors apply to crafting and recipe-knowledge evaluation; they are not the source of gathering catalysts. | `componentSourceActors`, `componentSourceActorUuids`, `lastComponentSources`         | spec/003, spec/005, spec/006 |
 | **Shopping List**              | A session-scoped aggregation of materials needed for queued recipes. It is derived state, not a persisted aggregate.                                                                                                                                                                                                                                                                                                                                                                                                             | `shoppingListAggregator.js`, `craftingStore`                                         | issue #11, issue #12         |
+| **Workbench**                  | Session-scoped, actor-scoped working set of components committed for an alchemy attempt. Displayed as compact entries with quantity badges. Components move between palette and workbench. Derived state, not persisted. Submitting triggers signature matching.                                                                                                                                                                                                                                                                 | `craftingStore.alchemyWorkbench`                                                     | spec/004                     |
+| **Component Palette**          | Grid view of all components in the selected alchemy crafting system owned by component source actor(s). Each entry shows image, name, and available quantity (inventory minus workbench). | Derived from actor inventories + system components | spec/004 |
+| **Auto-Fill**                  | Populating the workbench from a discovered recipe's ingredient requirements by selecting satisfying components from the palette. Reuses the same ingredient expansion logic as signature matching. | New store action | spec/003, spec/006 |
 
 ## Concept Taxonomy
 
@@ -78,6 +82,7 @@ Module Configuration
    |- progressiveResultOrder
    |- favouriteRecipes
    |- recentlyCrafted
+   |- lastAlchemySystem
    |- lastGatheringActor (specced, not yet registered in runtime)
    `- chatOutput (canonical target; still implemented on system features in runtime)
 
@@ -99,6 +104,8 @@ Crafting System
 |  |- essences
 |  |- difficulty
 |  `- salvage definition
+|- recipeItemDefinitions
+|  `- sourceItemUuid
 |- recipeVisibility
 |- craftingCheck
 |- salvageCraftingCheck
@@ -115,7 +122,7 @@ Recipe
 |- steps
 |- resultSelection
 |- visibility
-`- linkedRecipeItemUuid
+`- recipeItemId
 
 Gathering Environment
 |- identity and scene link
@@ -307,6 +314,10 @@ the salvage lifecycle or the crafting lifecycle. There is no separate harvesting
 - Active and historical crafting/salvage run management
 - Result creation, consumption, and catalyst degradation
 - Shopping list derivation
+- Alchemy workbench management (session-scoped working set)
+- Component palette derivation
+- Auto-fill resolution from discovered recipe requirements
+- Alchemy crafting system selection (persisted in client settings)
 
 ### 5. Gathering Execution (Player/Runtime Domain)
 
@@ -365,8 +376,8 @@ None.
 
 - **Key concepts:** Formula (recipe knowledge gate), Craft check (skill check with critical success/failure), batch
   crafting (up to 4 consumables at once), reduced time with formulas.
-- **Fabricate relevance:** PF2e's "formula" concept maps directly to Fabricate's `linkedRecipeItemUuid` + knowledge
-  mode. Batch crafting (quantity multiplier on a single craft action) is not supported by Fabricate but would be
+- **Fabricate relevance:** PF2e's "formula" concept maps directly to Fabricate's recipe item definitions plus
+  knowledge mode. Batch crafting (quantity multiplier on a single craft action) is not supported by Fabricate but would be
   useful — the shopping list aggregates quantities but crafting is still per-recipe. Critical success/failure maps to
   routed mode with `macroOutcome`.
 

@@ -10,10 +10,14 @@ on:
   pull_request_review:
     types: [submitted]
 
+concurrency:
+  group: claude-${{ github.event.pull_request.number || github.event.issue.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   claude:
     if: |
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude') && (!github.event.issue.pull_request || !contains(github.event.comment.body, '/claude-review'))) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
       (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
@@ -36,7 +40,6 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: |
-            --append-system-prompt "IMPORTANT: NEVER remove the 'triage' label from any GitHub issue. Only humans may remove that label."
+            --append-system-prompt "IMPORTANT: NEVER remove the 'triage' label from any GitHub issue. Only humans may remove that label. When invoked from a PR comment or PR review to address feedback, inspect all unresolved review threads and current PR checks first, batch directly related fixes into one change set, rerun the required validation before reporting completion, and avoid overlapping partial-fix summaries on the same PR."
           additional_permissions: |
             actions: read
-

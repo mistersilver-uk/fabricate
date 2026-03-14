@@ -19,6 +19,7 @@ function makeSystem(overrides = {}) {
     id,
     name: overrides.name || `System ${id}`,
     description: overrides.description || '',
+    resolutionMode: overrides.resolutionMode || 'simple',
     features: overrides.features || {},
     advancedOptionsEnabled: overrides.advancedOptionsEnabled !== undefined ? overrides.advancedOptionsEnabled : true,
     categories: overrides.categories || [],
@@ -370,6 +371,50 @@ describe('createAdminStore', () => {
       // selectedSystemId stays '' — never call selectSystem
       await store.saveSystemDetails('Name', 'Desc', true);
       assert.ok(!updateCalled, 'updateSystem should not be called when no system is selected');
+    });
+
+    it('setResolutionMode confirms and persists the new mode', async () => {
+      let confirmCalled = false;
+      let updateArgs = null;
+      const services = createMockServices({
+        confirmDialog: async () => { confirmCalled = true; return true; }
+      });
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => {
+          updateArgs = { id, updates };
+          await origManager.updateSystem(id, updates);
+        }
+      });
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.setResolutionMode('tiered');
+
+      assert.equal(result, true);
+      assert.equal(confirmCalled, true);
+      assert.equal(updateArgs?.id, 'sys1');
+      assert.equal(updateArgs?.updates?.resolutionMode, 'tiered');
+    });
+
+    it('setResolutionMode leaves the system unchanged when the confirmation is declined', async () => {
+      let updateCalled = false;
+      const services = createMockServices({
+        confirmDialog: async () => false
+      });
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async () => { updateCalled = true; }
+      });
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.setResolutionMode('tiered');
+
+      assert.equal(result, false);
+      assert.equal(updateCalled, false);
     });
   });
 
@@ -1250,6 +1295,43 @@ describe('createAdminStore', () => {
       assert.deepEqual(updateArgs.updates.craftingCheck.outcomes, []);
     });
 
+    it('saveCraftingCheckConfig preserves existing canonical check fields', async () => {
+      let updateArgs = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.craftingCheck = {
+          enabled: true,
+          mode: 'passFail',
+          macroUuid: 'macro-old',
+          successMacroUuid: 'macro-success',
+          failureMacroUuid: 'macro-failure',
+          consumption: {
+            consumeIngredientsOnFail: false,
+            consumeCatalystsOnFail: true
+          },
+          progressive: {
+            awardMode: 'partial',
+            allowPlayerReorder: true
+          },
+          outcomes: ['fail', 'pass']
+        };
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.saveCraftingCheckConfig('namedOutcomes', 'macro-new', 'critical, success');
+      assert.ok(updateArgs !== null);
+      assert.equal(updateArgs.updates.craftingCheck.successMacroUuid, 'macro-success');
+      assert.equal(updateArgs.updates.craftingCheck.failureMacroUuid, 'macro-failure');
+      assert.equal(updateArgs.updates.craftingCheck.consumption.consumeIngredientsOnFail, false);
+      assert.equal(updateArgs.updates.craftingCheck.progressive.awardMode, 'partial');
+    });
+
     it('saveCurrencyConfig builds correct requirements object with macro provider', async () => {
       let updateArgs = null;
       const services = createMockServices();
@@ -1287,6 +1369,36 @@ describe('createAdminStore', () => {
       assert.equal(currency.checkCurrencyMacroUuid, null, 'macro UUIDs should be null for system provider');
     });
 
+    it('saveAlchemyConfig persists canonical alchemy settings', async () => {
+      let updateArgs = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.resolutionMode = 'alchemy';
+        sys.alchemy = {
+          learnOnCraft: false,
+          consumeOnFail: true,
+          showAttemptHistoryToPlayers: true
+        };
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.saveAlchemyConfig({
+        learnOnCraft: true,
+        consumeOnFail: false,
+        showAttemptHistoryToPlayers: false
+      });
+      assert.ok(updateArgs !== null);
+      assert.equal(updateArgs.updates.alchemy.learnOnCraft, true);
+      assert.equal(updateArgs.updates.alchemy.consumeOnFail, false);
+      assert.equal(updateArgs.updates.alchemy.showAttemptHistoryToPlayers, false);
+    });
+
     it('saveVisibilityConfig merges with existing visibility config', async () => {
       let updateArgs = null;
       const services = createMockServices();
@@ -1310,6 +1422,47 @@ describe('createAdminStore', () => {
       assert.equal(rv.listMode, 'knowledge');
       assert.equal(rv.knowledge.mode, 'learned');
       assert.equal(rv.knowledge.learn.consumeOnLearn, false);
+    });
+
+    it('saveVisibilityConfig accepts canonical knowledge item and learn fields', async () => {
+      let updateArgs = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.recipeVisibility = {
+          listMode: 'knowledge',
+          knowledge: {
+            mode: 'itemOrLearned',
+            item: { limitUses: false, destroyWhenExhausted: false },
+            learn: { consumeOnLearn: true, dragDropEnabled: true }
+          }
+        };
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => { updateArgs = { id, updates }; await origManager.updateSystem(id, updates); }
+      });
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.saveVisibilityConfig({
+        listMode: 'knowledge',
+        knowledgeMode: 'itemOrLearned',
+        consumeOnLearn: false,
+        limitUses: true,
+        maxUses: 3,
+        destroyWhenExhausted: true,
+        dragDropEnabled: false
+      });
+
+      const rv = updateArgs.updates.recipeVisibility;
+      assert.equal(rv.listMode, 'knowledge');
+      assert.equal(rv.knowledge.item.limitUses, true);
+      assert.equal(rv.knowledge.item.maxUses, 3);
+      assert.equal(rv.knowledge.item.destroyWhenExhausted, true);
+      assert.equal(rv.knowledge.learn.consumeOnLearn, false);
+      assert.equal(rv.knowledge.learn.dragDropEnabled, false);
     });
   });
 

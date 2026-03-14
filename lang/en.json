@@ -182,8 +182,17 @@
         "NoSystemSelectedHint": "Create a new system to configure categories, tags, essences, and rules.",
         "Name": "Name",
         "Description": "Description",
+        "ResolutionMode": "Resolution Mode",
+        "ResolutionModeHint": "Controls how recipes in this system choose results and which advanced editor controls are available.",
+        "ResolutionSimple": "Simple",
+        "ResolutionMapped": "Routed by ingredients",
+        "ResolutionTiered": "Routed by check outcome",
+        "ResolutionProgressive": "Progressive",
+        "ResolutionAlchemy": "Alchemy",
+        "ResolutionModeChangeTitle": "Change Resolution Mode?",
+        "ResolutionModeChangeContent": "Changing resolution mode to {mode} will delete {count} recipe(s) in this crafting system and clean up related runs and learned recipes.",
         "AdvancedOptions": "Show advanced options",
-        "AdvancedOptionsHint": "Advanced options let you configure categories, item tags, essence definitions, complex recipe behaviour, and macro-driven crafting logic.",
+        "AdvancedOptionsHint": "Advanced options let you configure categories, item tags, essence definitions, resolution-driven recipe behaviour, and macro-driven crafting logic.",
         "AdvancedDisabled": "Advanced options are disabled for this system.",
         "SaveDetails": "Save Details"
       },
@@ -260,12 +269,19 @@
         },
         "CraftingChecks": {
           "Title": "Crafting Checks",
-          "Hint": "Run a system-level check macro that returns pass/fail or named outcomes.",
+          "Hint": "Choose a system-level check macro that returns pass/fail or named outcomes. Leave the macro blank to disable crafting checks.",
           "PassFail": "Pass / Fail",
           "NamedOutcomes": "Named Outcomes",
           "NoCheckMacro": "No check macro",
           "OutcomesPlaceholder": "Outcomes (comma separated)",
           "SaveConfig": "Save Check Config"
+        },
+        "Alchemy": {
+          "Title": "Alchemy",
+          "Hint": "Configure the learning and failure behavior used by alchemy attempts in this crafting system.",
+          "LearnOnCraft": "Learn recipes after a successful attempt",
+          "ConsumeOnFail": "Consume submitted ingredients on failed attempts",
+          "ShowAttemptHistoryToPlayers": "Show attempt history to players"
         },
         "OutcomeRouting": {
           "Title": "Outcome Routing",
@@ -286,7 +302,11 @@
           "KnowledgeByItem": "By item (must have recipe item)",
           "KnowledgeByLearning": "By learning (must have learnt recipe)",
           "KnowledgeByEither": "Item or learning (either method)",
-          "ConsumeOnLearn": "Consume item on learn"
+          "ItemLimitUses": "Track limited uses on recipe items",
+          "ItemMaxUses": "Maximum uses",
+          "ItemDestroyWhenExhausted": "Delete exhausted recipe item",
+          "ConsumeOnLearn": "Consume item on learn",
+          "DragDropEnabled": "Learn recipes from actor item drops"
         }
       },
       "Items": {
@@ -384,7 +404,10 @@
         "CategoryLabel": "Category",
         "ImageLabel": "Image",
         "CategoryPlaceholder": "No system categories defined yet",
-        "CategoryHint": "Define categories in Crafting Admin > Systems."
+        "CategoryHint": "Define categories in Crafting Admin > Systems.",
+        "ChooseImage": "Choose recipe image",
+        "SearchImage": "Search icons...",
+        "ImageDialogLabel": "Recipe image picker"
       },
       "Flags": {
         "Availability": "Availability",
@@ -407,14 +430,27 @@
         "NoNonGmUsers": "No non-GM users available."
       },
       "LinkedItem": {
-        "SectionTitle": "Linked Recipe Item",
-        "UuidLabel": "Item UUID",
-        "UuidPlaceholder": "Item.abcdef123456 or Compendium.world.pack.itemId",
-        "BrowseButton": "Browse Items",
-        "CreateButton": "Create Recipe Item",
-        "ClearButton": "Clear linked item",
-        "KnowledgeHint": "Players who own a copy of this item (matched by UUID or flags.core.sourceId) will gain access to this recipe under knowledge-mode visibility.",
-        "MissingWarning": "Linked recipe item UUID is required for this crafting system's visibility mode."
+        "SectionTitle": "Recipe Item",
+        "ClearButton": "Clear recipe item",
+        "KnowledgeHint": "Select or drop a system recipe item here. Players who own a matching copy of that item will gain access to this recipe under knowledge-mode visibility.",
+        "MissingWarning": "A recipe item is required for this crafting system's visibility mode.",
+        "MissingSource": "The source item for this recipe item no longer resolves.",
+        "DropHint": "Drop a recipe item or a world/compendium item here.",
+        "DropInvalid": "Drop a world item, compendium item, or system recipe item here.",
+        "EmptyTitle": "No recipe item selected",
+        "AvailableTitle": "System Recipe Items",
+        "EmptyLibrary": "No recipe items in this system yet. Drop one onto the target above to create it.",
+        "SearchPlaceholder": "Search recipe items...",
+        "SearchLabel": "Search system recipe items",
+        "NoSearchResults": "No recipe items match the current search.",
+        "RefreshButton": "Sync recipe image from recipe item",
+        "RefreshHint": "Click to sync the recipe image.",
+        "ImageLockedHint": "Recipe image is locked to {name} while this recipe item is associated.",
+        "DeleteButton": "Delete recipe item",
+        "DeleteConfirmTitle": "Delete {name}?",
+        "DeleteConfirmNoRecipes": "Delete recipe item \"{name}\" from this crafting system?",
+        "DeleteConfirmWithRecipes": "Delete recipe item \"{name}\"? {count} recipe(s) will lose this association:",
+        "DeleteConfirmMore": "{count} more recipe(s)"
       },
       "Steps": {
         "SectionTitle": "Crafting Steps",
@@ -541,9 +577,11 @@
         "MinOneIngredientOption": "An ingredient group needs at least one option.",
         "MinOneResultGroup": "A recipe needs at least one result group.",
         "MinOneResult": "A result group needs at least one result.",
-        "LinkedItemAlreadySet": "A linked recipe item UUID is already set. Clear it first to create a new one.",
-        "LinkedItemCreated": "Created world item \"{name}\" and linked it to this recipe.",
-        "LinkedItemCreateFailed": "Failed to create recipe item. Check console for details.",
+        "LinkedItemAlreadySet": "A recipe item is already selected for this recipe.",
+        "LinkedItemCreated": "Created recipe item \"{name}\" and linked it to this recipe.",
+        "LinkedItemCreateFailed": "Failed to assign a recipe item. Check console for details.",
+        "LinkedItemDeleted": "Deleted recipe item \"{name}\".",
+        "LinkedItemDeleteFailed": "Failed to delete the recipe item.",
         "SaveFailedNotGm": "Only GMs can manage recipes.",
         "SaveFailedNoSystem": "Recipe must belong to a crafting system.",
         "SaveFailed": "Failed to save recipe."
@@ -582,7 +620,35 @@
       "NoMatch": "The combination didn't produce anything",
       "Consumed": "Ingredients were consumed in the attempt",
       "LearnedRecipe": "You discovered a new recipe!",
-      "MisconfigError": "Crafting system error — contact your GM"
+      "MisconfigError": "Crafting system error — contact your GM",
+      "SelectSystem": "Select alchemy system",
+      "DiscoveredRecipes": "Discovered Recipes",
+      "SearchRecipes": "Search recipes",
+      "SearchPlaceholder": "Search…",
+      "CraftableOnly": "Craftable only",
+      "NoDiscoveredRecipes": "No recipes discovered yet",
+      "NoDiscoveredRecipesHint": "Experiment with components on the workbench to discover new recipes",
+      "StatusAvailable": "Available",
+      "StatusMissing": "Missing materials",
+      "AutoFill": "Auto-fill",
+      "AutoFillPartial": "Auto-fill: {count} ingredient group(s) could not be satisfied",
+      "AutoFillComplete": "Workbench populated from recipe",
+      "ComponentsNotFound": "Could not find any of the workbench components in your inventory",
+      "ComponentsMissing": "Some components could not be found: {names}",
+      "Palette": {
+        "NoComponents": "No components available",
+        "Available": "available"
+      }
+    },
+    "Workbench": {
+      "Title": "Workbench",
+      "Clear": "Clear workbench",
+      "Submit": "Craft",
+      "EmptyHint": "Drop or click components to begin"
+    },
+    "Tabs": {
+      "Alchemy": "Alchemy",
+      "Crafting": "Crafting"
     },
     "Labels": {
       "UnknownComponent": "Unknown Component",

@@ -17,13 +17,13 @@
 
   const showProvider = $derived(
     featureState.showComplexRecipes &&
-    (featureState.isMappedMode || isVariable || featureState.showOutcomeRouting)
+    (featureState.isMappedMode || featureState.isAlchemyMode || isVariable || featureState.showOutcomeRouting)
   );
 
   const outcomes = $derived(featureState.craftingCheckOutcomes || []);
 
   const currentProvider = $derived(resultSelection?.provider || null);
-  const showProviderSelector = $derived(featureState.showComplexRecipes === true);
+  const showProviderSelector = $derived(featureState.isAlchemyMode === true);
 </script>
 
 {#if showProvider}
@@ -46,7 +46,7 @@
       </div>
     {/if}
 
-    {#if !currentProvider && featureState.showComplexRecipes && !featureState.isMappedMode}
+    {#if !currentProvider && featureState.showComplexRecipes && !featureState.isMappedMode && !featureState.isAlchemyMode}
       <label class="checkbox-label">
         <input
           type="checkbox"

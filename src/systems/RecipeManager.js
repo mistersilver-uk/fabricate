@@ -796,9 +796,8 @@ export class RecipeManager {
   resolveRecipeIcon(recipe) {
     const img = recipe?.img || DEFAULT_RECIPE_IMG;
     if (img && img !== DEFAULT_RECIPE_IMG) return img;
-    // Synchronous path cannot resolve linkedRecipeItemUuid — return FALLBACK_RECIPE_IMG
-    // if there might be a linked item, to signal that async resolution is needed.
-    // But since this is a sync API, we just return what we have.
+    // Synchronous path cannot reliably resolve recipe-item definitions — return the
+    // fallback marker if async resolution may still produce a better icon.
     return img === DEFAULT_RECIPE_IMG ? FALLBACK_RECIPE_IMG : img;
   }
 
@@ -806,7 +805,8 @@ export class RecipeManager {
    * Resolve the icon for a recipe with full fallback chain (async).
    * Precedence:
    * 1. recipe.img if it is set AND is not the default bag icon
-   * 2. linkedRecipeItemUuid → resolved item.img
+   * 2. recipeItemId -> recipe item definition -> resolved item.img
+   * 3. linkedRecipeItemUuid → resolved item.img (legacy compatibility)
    * 3. FALLBACK_RECIPE_IMG
    *
    * @param {Recipe} recipe
@@ -816,9 +816,15 @@ export class RecipeManager {
     const img = recipe?.img || DEFAULT_RECIPE_IMG;
     if (img && img !== DEFAULT_RECIPE_IMG) return img;
 
-    if (recipe?.linkedRecipeItemUuid && typeof fromUuid === 'function') {
+    const systemManager = game?.fabricate?.getCraftingSystemManager?.();
+    const recipeItemUuid = recipe?.recipeItemId
+      ? systemManager?.getRecipeItemDefinition?.(recipe.craftingSystemId, recipe.recipeItemId)?.sourceItemUuid
+      : null;
+    const fallbackUuid = recipeItemUuid || recipe?.linkedRecipeItemUuid;
+
+    if (fallbackUuid && typeof fromUuid === 'function') {
       try {
-        const item = await fromUuid(recipe.linkedRecipeItemUuid);
+        const item = await fromUuid(fallbackUuid);
         if (item?.img) return item.img;
       } catch {
         // Broken reference — fall through
