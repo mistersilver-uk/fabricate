@@ -1261,6 +1261,35 @@ describe('createEditorStore', () => {
       assert.equal(get(store.featureState).showComplexRecipes, true);
     });
 
+    it('featureState.showComplexRecipes is true when resolutionMode requires advanced routing controls', () => {
+      const svc = mockServices({
+        getSystem: () => ({
+          advancedOptionsEnabled: true,
+          resolutionMode: 'tiered',
+          features: {}
+        })
+      });
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      assert.equal(get(store.featureState).showComplexRecipes, true);
+      assert.equal(get(store.featureState).showOutcomeRouting, true);
+    });
+
+    it('featureState.showCraftingChecks is true when a crafting check macro is configured without the legacy feature flag', () => {
+      const svc = mockServices({
+        getSystem: () => ({
+          advancedOptionsEnabled: true,
+          features: {},
+          craftingCheck: {
+            enabled: false,
+            macroUuid: 'Macro.check',
+            outcomes: ['fail', 'pass']
+          }
+        })
+      });
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      assert.equal(get(store.featureState).showCraftingChecks, true);
+    });
+
     it('featureState.showMultiStepRecipes is true when system has multiStepRecipes feature', () => {
       const svc = multiStepServices();
       const store = createEditorStore(svc, { craftingSystemId: 'sys1' });

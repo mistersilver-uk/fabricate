@@ -3,6 +3,7 @@
  */
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
+import { cleanupStalePreferences } from '../config/preferencesCleanup.js';
 import { getSourceUuid, getComponentSourceReferences, getItemSourceReferences } from '../utils/sourceUuid.js';
 import { normalizeCustomRecipeCategories } from '../utils/recipeCategories.js';
 
@@ -209,7 +210,8 @@ export class CraftingSystemManager {
           destroyWhenExhausted: knowledge?.item?.destroyWhenExhausted === true
         },
         learn: {
-          consumeOnLearn: knowledge?.learn?.consumeOnLearn !== false
+          consumeOnLearn: knowledge?.learn?.consumeOnLearn !== false,
+          dragDropEnabled: knowledge?.learn?.dragDropEnabled !== false
         }
       }
     };
@@ -653,6 +655,14 @@ export class CraftingSystemManager {
     };
 
     const merged = this._normalizeSystem(mergedInput);
+    const resolutionModeChanged = current.resolutionMode !== merged.resolutionMode;
+
+    if (resolutionModeChanged) {
+      const affectedRecipes = this.recipeManager.getRecipes({ craftingSystemId: systemId });
+      for (const recipe of affectedRecipes) {
+        await this.recipeManager.deleteRecipe(recipe.id);
+      }
+    }
 
     // Path 1: Mode change -- disable invalid salvage configs
     const oldMode = current.salvageResolutionMode || 'simple';
@@ -673,6 +683,9 @@ export class CraftingSystemManager {
 
     this.systems.set(systemId, merged);
     await this.save();
+    if (resolutionModeChanged) {
+      await this._cleanupCraftingPreferences();
+    }
     return merged;
   }
 
@@ -1106,5 +1119,11 @@ export class CraftingSystemManager {
         await setFabricateFlag(actor, 'salvageRuns', { ...existing, history: filtered });
       }
     }
+  }
+
+  async _cleanupCraftingPreferences() {
+    const validSystemIds = new Set(this.getSystems().map(system => system.id));
+    const validRecipeIds = new Set(this.recipeManager.getRecipes({}).map(recipe => recipe.id));
+    await cleanupStalePreferences(validSystemIds, validRecipeIds, getSetting, setSetting);
   }
 }

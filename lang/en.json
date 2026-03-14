@@ -186,8 +186,17 @@
         "NoSystemSelectedHint": "Create a new system to configure categories, tags, essences, and rules.",
         "Name": "Name",
         "Description": "Description",
+        "ResolutionMode": "Resolution Mode",
+        "ResolutionModeHint": "Controls how recipes in this system choose results and which advanced editor controls are available.",
+        "ResolutionSimple": "Simple",
+        "ResolutionMapped": "Routed by ingredients",
+        "ResolutionTiered": "Routed by check outcome",
+        "ResolutionProgressive": "Progressive",
+        "ResolutionAlchemy": "Alchemy",
+        "ResolutionModeChangeTitle": "Change Resolution Mode?",
+        "ResolutionModeChangeContent": "Changing resolution mode to {mode} will delete {count} recipe(s) in this crafting system and clean up related runs and learned recipes.",
         "AdvancedOptions": "Show advanced options",
-        "AdvancedOptionsHint": "Advanced options let you configure categories, item tags, essence definitions, complex recipe behaviour, and macro-driven crafting logic.",
+        "AdvancedOptionsHint": "Advanced options let you configure categories, item tags, essence definitions, resolution-driven recipe behaviour, and macro-driven crafting logic.",
         "AdvancedDisabled": "Advanced options are disabled for this system.",
         "SaveDetails": "Save Details"
       },
@@ -264,12 +273,19 @@
         },
         "CraftingChecks": {
           "Title": "Crafting Checks",
-          "Hint": "Run a system-level check macro that returns pass/fail or named outcomes.",
+          "Hint": "Choose a system-level check macro that returns pass/fail or named outcomes. Leave the macro blank to disable crafting checks.",
           "PassFail": "Pass / Fail",
           "NamedOutcomes": "Named Outcomes",
           "NoCheckMacro": "No check macro",
           "OutcomesPlaceholder": "Outcomes (comma separated)",
           "SaveConfig": "Save Check Config"
+        },
+        "Alchemy": {
+          "Title": "Alchemy",
+          "Hint": "Configure the learning and failure behavior used by alchemy attempts in this crafting system.",
+          "LearnOnCraft": "Learn recipes after a successful attempt",
+          "ConsumeOnFail": "Consume submitted ingredients on failed attempts",
+          "ShowAttemptHistoryToPlayers": "Show attempt history to players"
         },
         "OutcomeRouting": {
           "Title": "Outcome Routing",
@@ -290,7 +306,11 @@
           "KnowledgeByItem": "By item (must have recipe item)",
           "KnowledgeByLearning": "By learning (must have learnt recipe)",
           "KnowledgeByEither": "Item or learning (either method)",
-          "ConsumeOnLearn": "Consume item on learn"
+          "ItemLimitUses": "Track limited uses on recipe items",
+          "ItemMaxUses": "Maximum uses",
+          "ItemDestroyWhenExhausted": "Delete exhausted recipe item",
+          "ConsumeOnLearn": "Consume item on learn",
+          "DragDropEnabled": "Learn recipes from actor item drops"
         }
       },
       "Items": {
@@ -388,7 +408,10 @@
         "CategoryLabel": "Category",
         "ImageLabel": "Image",
         "CategoryPlaceholder": "No system categories defined yet",
-        "CategoryHint": "Define categories in Crafting Admin > Systems."
+        "CategoryHint": "Define categories in Crafting Admin > Systems.",
+        "ChooseImage": "Choose recipe image",
+        "SearchImage": "Search icons...",
+        "ImageDialogLabel": "Recipe image picker"
       },
       "Flags": {
         "Availability": "Availability",

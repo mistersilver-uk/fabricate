@@ -386,6 +386,7 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
     const resolutionMode = system?.resolutionMode || 'simple';
     const listMode = system?.recipeVisibility?.listMode || 'global';
     const knowledgeMode = system?.recipeVisibility?.knowledge?.mode || 'itemOrLearned';
+    const hasConfiguredCraftingCheck = system?.craftingCheck?.enabled === true || !!system?.craftingCheck?.macroUuid;
 
     return {
       system,
@@ -409,7 +410,7 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
       showTimeRequirements: system?.requirements?.time?.enabled === true,
       showCurrencyRequirements: system?.requirements?.currency?.enabled === true,
       showPropertyMacros: advancedEnabled && features.propertyMacros === true,
-      showCraftingChecks: advancedEnabled && features.craftingChecks === true,
+      showCraftingChecks: advancedEnabled && (features.craftingChecks === true || hasConfiguredCraftingCheck),
       showOutcomeRouting: advancedEnabled && features.outcomeRouting === true,
       craftingCheckOutcomes: Array.isArray(system?.craftingCheck?.outcomes) ? system.craftingCheck.outcomes : []
     };

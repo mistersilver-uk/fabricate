@@ -22,6 +22,7 @@ import {
   draftIngredientSetHasRequirement,
   serializeDraftIngredientGroups
 } from '../../recipeIngredientGroups.js';
+import { DEFAULT_RECIPE_IMAGE } from '../util/recipeImageIcons.js';
 
 // ---------------------------------------------------------------------------
 // ID generation helper (injectable for tests)
@@ -232,7 +233,7 @@ function _buildDraft(recipe, craftingSystemId, services) {
     craftingSystemId: data.craftingSystemId || craftingSystemId || null,
     name: data.name || '',
     description: data.description || '',
-    img: data.img || 'icons/svg/item-bag.svg',
+    img: data.img || DEFAULT_RECIPE_IMAGE,
     category: normalizeRecipeCategory(data.category),
     system: data.system || 'all',
     enabled: data.enabled !== false,
@@ -274,11 +275,16 @@ function _getSystemFeatureState(draft, services) {
   const resolutionMode = system?.resolutionMode || 'simple';
   const listMode = system?.recipeVisibility?.listMode || 'global';
   const knowledgeMode = system?.recipeVisibility?.knowledge?.mode || 'itemOrLearned';
+  const routedByIngredientSet = resolutionMode === 'mapped';
+  const routedByOutcome = resolutionMode === 'tiered';
+  const supportsAdvancedRouting = ['mapped', 'tiered', 'alchemy', 'routed'].includes(resolutionMode);
+  const hasConfiguredCraftingCheck = system?.craftingCheck?.enabled === true || !!system?.craftingCheck?.macroUuid;
 
   return {
     system,
     resolutionMode,
-    isMappedMode: resolutionMode === 'mapped',
+    isMappedMode: routedByIngredientSet,
+    isAlchemyMode: resolutionMode === 'alchemy',
     isProgressiveMode: resolutionMode === 'progressive',
     showRecipeVisibilityGlobal: listMode === 'global',
     showRecipeVisibilityPlayer: listMode === 'player',
@@ -288,13 +294,13 @@ function _getSystemFeatureState(draft, services) {
     showCategories: advancedEnabled && features.recipeCategories === true,
     showItemTags: advancedEnabled && features.itemTags === true,
     showEssences: advancedEnabled && (features.essences === true),
-    showComplexRecipes: advancedEnabled && features.complexRecipes === true,
+    showComplexRecipes: advancedEnabled && (features.complexRecipes === true || supportsAdvancedRouting),
     showMultiStepRecipes: advancedEnabled && features.multiStepRecipes === true,
     showTimeRequirements: system?.requirements?.time?.enabled === true,
     showCurrencyRequirements: system?.requirements?.currency?.enabled === true,
     showPropertyMacros: advancedEnabled && features.propertyMacros === true,
-    showCraftingChecks: advancedEnabled && features.craftingChecks === true,
-    showOutcomeRouting: advancedEnabled && features.outcomeRouting === true,
+    showCraftingChecks: advancedEnabled && (features.craftingChecks === true || hasConfiguredCraftingCheck),
+    showOutcomeRouting: advancedEnabled && (features.outcomeRouting === true || routedByOutcome),
     craftingCheckOutcomes: Array.isArray(system?.craftingCheck?.outcomes) ? system.craftingCheck.outcomes : []
   };
 }
@@ -557,7 +563,7 @@ function _buildRecipePayload(draft, featureState, services) {
   return {
     name: draft.name,
     description: draft.description,
-    img: draft.img,
+    img: draft.img || DEFAULT_RECIPE_IMAGE,
     category: enableCategories ? normalizeRecipeCategory(draft.category) : GENERAL_RECIPE_CATEGORY,
     craftingSystemId: draft.craftingSystemId || null,
     system: 'all',
@@ -580,7 +586,8 @@ function _buildRecipePayload(draft, featureState, services) {
     isVariable: enableComplexRecipes ? draft.isVariable : false,
     transferEffects: draft.transferEffects,
     outcomeRouting: topLevelOutcomeRouting,
-    resultSelection: draft.resultSelection || null,
+    resultSelection: draft.resultSelection
+      || (featureState.isAlchemyMode ? { provider: 'ingredientSet', rollTableUuid: null, macroUuid: null } : null),
     metadata: draft.metadata
   };
 }
