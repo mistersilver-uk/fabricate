@@ -952,16 +952,100 @@ export function createAdminStore(services) {
     await refresh();
   }
 
+  // --- Targeted partial refreshes ---
+
+  /**
+   * Recompute only item cards and update viewState.itemCards + itemSearchTerm.
+   * Does not rebuild the recipe list or system view data.
+   */
+  async function _refreshItemCards() {
+    const systemManager = services.getCraftingSystemManager();
+    if (!systemManager) return;
+
+    const currentSystemId = get(selectedSystemId);
+    const allSystems = systemManager.getSystems();
+    const selectedSystem = currentSystemId
+      ? allSystems.find(s => s.id === currentSystemId) || null
+      : null;
+
+    if (!selectedSystem) {
+      viewState.update(vs => ({ ...vs, itemCards: [], itemSearchTerm: get(itemSearch) }));
+      return;
+    }
+
+    const essenceDefinitions = Array.isArray(selectedSystem.essenceDefinitions)
+      ? selectedSystem.essenceDefinitions
+      : [];
+    const essenceDefinitionById = new Map(essenceDefinitions.map(def => [def.id, def]));
+    const advancedEnabled = selectedSystem.advancedOptionsEnabled !== false;
+    const showTags = advancedEnabled && selectedSystem.features?.itemTags === true;
+    const showEssences = advancedEnabled && selectedSystem.features?.essences === true;
+
+    const itemCards = _buildItemCards(
+      systemManager,
+      selectedSystem,
+      get(itemSearch),
+      showTags,
+      showEssences,
+      essenceDefinitionById
+    );
+
+    viewState.update(vs => ({ ...vs, itemCards, itemSearchTerm: get(itemSearch) }));
+  }
+
+  /**
+   * Recompute only the recipe list and update viewState.recipes,
+   * recipeCategories, showVisibilitySummary, and recipeSearchTerm.
+   * Does not rebuild item cards or system view data.
+   */
+  async function _refreshRecipeList() {
+    const systemManager = services.getCraftingSystemManager();
+    const recipeManager = services.getRecipeManager();
+    if (!systemManager || !recipeManager) return;
+
+    const currentSystemId = get(selectedSystemId);
+    const allSystems = systemManager.getSystems();
+    const selectedSystem = currentSystemId
+      ? allSystems.find(s => s.id === currentSystemId) || null
+      : null;
+
+    if (!selectedSystem) {
+      viewState.update(vs => ({
+        ...vs,
+        recipes: [],
+        recipeCategories: [],
+        showVisibilitySummary: false,
+        recipeSearchTerm: get(recipeSearch)
+      }));
+      return;
+    }
+
+    const recipeListData = _buildRecipeList(
+      systemManager,
+      recipeManager,
+      selectedSystem,
+      get(recipeSearch)
+    );
+
+    viewState.update(vs => ({
+      ...vs,
+      recipes: recipeListData.recipes,
+      recipeCategories: recipeListData.recipeCategories,
+      showVisibilitySummary: recipeListData.showVisibilitySummary,
+      recipeSearchTerm: get(recipeSearch)
+    }));
+  }
+
   // --- Search ---
 
   async function setRecipeSearch(term) {
     recipeSearch.set(term);
-    await refresh();
+    await _refreshRecipeList();
   }
 
   async function setItemSearch(term) {
     itemSearch.set(term);
-    await refresh();
+    await _refreshItemCards();
   }
 
   async function setGraphSearch(term) {

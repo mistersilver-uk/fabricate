@@ -1257,6 +1257,106 @@ describe('createAdminStore', () => {
       assert.ok(vs.itemCards.every(i => i.name.toLowerCase().includes('iron')));
       assert.ok(!vs.itemCards.some(i => i.id === 'item2'));
     });
+
+    it('setItemSearch does not call getRecipes() on the recipe manager', async () => {
+      let getRecipesCalled = false;
+      const services = createMockServices();
+      const origRecipeManager = services.getRecipeManager();
+      services.getRecipeManager = () => ({
+        ...origRecipeManager,
+        getRecipes: (filter) => {
+          getRecipesCalled = true;
+          return origRecipeManager.getRecipes(filter);
+        }
+      });
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      if (sys) {
+        sys.items = [
+          makeItem({ id: 'item1', name: 'Iron Ore' }),
+          makeItem({ id: 'item2', name: 'Gold Nugget' })
+        ];
+      }
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      // Reset the flag after selectSystem (which does a full refresh)
+      getRecipesCalled = false;
+      await store.setItemSearch('iron');
+      assert.equal(getRecipesCalled, false, 'setItemSearch should not trigger recipe list recomputation');
+    });
+
+    it('setRecipeSearch does not call getItems() on the system manager', async () => {
+      let getItemsCalled = false;
+      const services = createMockServices();
+      const origSystemManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origSystemManager,
+        getItems: (systemId, searchTerm) => {
+          getItemsCalled = true;
+          return origSystemManager.getItems(systemId, searchTerm);
+        }
+      });
+      const origRecipeManager = services.getRecipeManager();
+      services.getRecipeManager = () => ({
+        ...origRecipeManager,
+        getRecipes: (filter) => [
+          makeRecipe({ id: 'r1', name: 'Healing Potion', craftingSystemId: 'sys1' }),
+          makeRecipe({ id: 'r2', name: 'Fire Sword', craftingSystemId: 'sys1' })
+        ].filter(r => !filter?.craftingSystemId || r.craftingSystemId === filter.craftingSystemId)
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      // Reset the flag after selectSystem (which does a full refresh)
+      getItemsCalled = false;
+      await store.setRecipeSearch('healing');
+      assert.equal(getItemsCalled, false, 'setRecipeSearch should not trigger item card recomputation');
+    });
+
+    it('setItemSearch preserves recipe list in viewState', async () => {
+      const services = createMockServices();
+      const origRecipeManager = services.getRecipeManager();
+      services.getRecipeManager = () => ({
+        ...origRecipeManager,
+        getRecipes: (filter) => [
+          makeRecipe({ id: 'r1', name: 'Healing Potion', craftingSystemId: 'sys1' }),
+          makeRecipe({ id: 'r2', name: 'Fire Sword', craftingSystemId: 'sys1' })
+        ].filter(r => !filter?.craftingSystemId || r.craftingSystemId === filter.craftingSystemId)
+      });
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      if (sys) {
+        sys.items = [makeItem({ id: 'item1', name: 'Iron Ore' })];
+      }
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const recipesBeforeSearch = get(store.viewState).recipes.length;
+      await store.setItemSearch('iron');
+      const vs = get(store.viewState);
+      assert.equal(vs.recipes.length, recipesBeforeSearch, 'recipe list should be unchanged after item search');
+    });
+
+    it('setRecipeSearch preserves item cards in viewState', async () => {
+      const services = createMockServices();
+      const origRecipeManager = services.getRecipeManager();
+      services.getRecipeManager = () => ({
+        ...origRecipeManager,
+        getRecipes: (filter) => [
+          makeRecipe({ id: 'r1', name: 'Healing Potion', craftingSystemId: 'sys1' }),
+          makeRecipe({ id: 'r2', name: 'Fire Sword', craftingSystemId: 'sys1' })
+        ].filter(r => !filter?.craftingSystemId || r.craftingSystemId === filter.craftingSystemId)
+      });
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      if (sys) {
+        sys.items = [
+          makeItem({ id: 'item1', name: 'Iron Ore' }),
+          makeItem({ id: 'item2', name: 'Gold Nugget' })
+        ];
+      }
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const itemCardsBeforeSearch = get(store.viewState).itemCards.length;
+      await store.setRecipeSearch('healing');
+      const vs = get(store.viewState);
+      assert.equal(vs.itemCards.length, itemCardsBeforeSearch, 'item cards should be unchanged after recipe search');
+    });
   });
 
   // -------------------------------------------------------------------------
