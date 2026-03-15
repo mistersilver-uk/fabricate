@@ -260,7 +260,7 @@ async function main() {
   if (!noZip) {
     const zipName = `fabricate-v${version}.zip`;
     console.log(`Creating ${zipName}...`);
-    execSync(`zip -r "${zipName}" . --exclude "*.zip"`, { cwd: distDir, stdio: 'inherit' });
+    execSync(`zip -r "${zipName}" . --exclude "*.zip" --exclude "*.map"`, { cwd: distDir, stdio: 'inherit' });
     console.log(`Created dist/${zipName}`);
   }
 

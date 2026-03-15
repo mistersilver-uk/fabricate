@@ -42,7 +42,7 @@ export default defineConfig(({ command }) => {
     build: {
       outDir: 'dist',
       emptyOutDir: true,
-      sourcemap: true,
+      sourcemap: process.env.SOURCEMAP === '1',
       lib: {
         entry: resolve(import.meta.dirname, 'src/main.js'),
         formats: ['es'],
