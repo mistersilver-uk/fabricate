@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import { resolve } from 'path';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { fabricateDevProxy } from './scripts/vite-foundry-proxy.js';
+import { visualizer } from 'rollup-plugin-visualizer';
 
 /** Resolves the global CSS import to an empty module during production builds. */
 function stripGlobalCss() {
@@ -22,6 +23,7 @@ export default defineConfig(({ command }) => {
   const plugins = [svelte({ compilerOptions: { css: 'injected' } })];
   if (command === 'serve') plugins.push(fabricateDevProxy());
   if (command === 'build') plugins.push(stripGlobalCss());
+  if (command === 'build' && process.env.ANALYZE) plugins.push(visualizer({ open: false, gzipSize: true }));
 
   if (command === 'serve') {
     return {
