@@ -5,9 +5,9 @@
   import { localize } from '../util/foundryBridge.js';
   import {
     DEFAULT_ESSENCE_ICON,
-    ESSENCE_ICON_OPTIONS,
     filterEssenceIconOptions,
     getEssenceIconOption,
+    loadEssenceIconOptions,
     normalizeEssenceIcon
   } from '../util/essenceIcons.js';
   import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
@@ -28,7 +28,7 @@
   let searchInput = $state(null);
   let popoverStyle = $state('');
 
-  const iconOptions = ESSENCE_ICON_OPTIONS;
+  let iconOptions = $state([]);
   const selectedIconClass = $derived(normalizeEssenceIcon(value));
   const selectedOption = $derived(getEssenceIconOption(selectedIconClass, iconOptions));
   const filteredOptions = $derived(filterEssenceIconOptions(iconOptions, searchTerm));
@@ -119,6 +119,11 @@
       verticalPosition
     ].join(' ');
   }
+
+  $effect(() => {
+    if (!pickerOpen || iconOptions.length > 0) return;
+    loadEssenceIconOptions(false).then(opts => { iconOptions = opts; });
+  });
 
   $effect(() => {
     if (!pickerOpen || !searchInput) return;

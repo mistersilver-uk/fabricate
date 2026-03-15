@@ -1,4 +1,4 @@
-import { describe, it } from 'node:test';
+import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
@@ -9,6 +9,7 @@ import {
   filterEssenceIconOptions,
   getEssenceIconOption,
   getEssenceIconPrefix,
+  loadEssenceIconOptions,
   normalizeEssenceIcon
 } from '../src/ui/svelte/util/essenceIcons.js';
 import {
@@ -18,6 +19,13 @@ import {
 } from '../src/ui/svelte/util/fontAwesomeFreeClassicIcons.js';
 
 describe('essenceIcons utility', () => {
+  // Pre-load the FA icon data so ESSENCE_ICON_OPTIONS / ESSENCE_ALL_ICON_OPTIONS
+  // live-binding exports are populated before the synchronous tests run.
+  before(async () => {
+    await loadEssenceIconOptions(false);
+    await loadEssenceIconOptions(true);
+  });
+
   it('normalizes empty icon values to the default essence icon', () => {
     assert.equal(normalizeEssenceIcon(''), DEFAULT_ESSENCE_ICON);
     assert.equal(normalizeEssenceIcon(null), DEFAULT_ESSENCE_ICON);
@@ -279,8 +287,8 @@ describe('essenceIcons utility', () => {
     assert.equal(isFantasySafeFontAwesomeClassicFreeIcon('signs-post'), true);
   });
 
-  it('builds the fantasy-safe picker catalog by default', () => {
-    const options = buildEssenceIconOptions();
+  it('builds the fantasy-safe picker catalog by default', async () => {
+    const options = await buildEssenceIconOptions();
 
     assert.equal(options, ESSENCE_ICON_OPTIONS);
     assert.ok(options.some(option => option.iconClass === 'fas fa-fire'));
@@ -297,8 +305,8 @@ describe('essenceIcons utility', () => {
     assert.ok(!options.some(option => option.iconClass === 'fas fa-upload'));
   });
 
-  it('can still build the full classic free icon catalog when explicitly requested', () => {
-    const options = buildEssenceIconOptions(FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS);
+  it('can still build the full classic free icon catalog when explicitly requested', async () => {
+    const options = await buildEssenceIconOptions(FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS);
 
     assert.ok(options.length > 1500);
     assert.ok(options.some(option => option.iconClass === 'fas fa-computer'));
@@ -311,8 +319,8 @@ describe('essenceIcons utility', () => {
     assert.equal(options, ESSENCE_ALL_ICON_OPTIONS);
   });
 
-  it('builds custom icon definitions into solid and regular picker options', () => {
-    const options = buildEssenceIconOptions([
+  it('builds custom icon definitions into solid and regular picker options', async () => {
+    const options = await buildEssenceIconOptions([
       { iconCode: 'address-book', label: 'Address Book', hasRegular: true },
       { iconCode: 'fire', label: 'Fire', hasRegular: false }
     ]);

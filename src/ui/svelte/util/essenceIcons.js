@@ -1,8 +1,3 @@
-import {
-  FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS,
-  FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS
-} from './fontAwesomeFreeClassicIcons.js';
-
 export const DEFAULT_ESSENCE_ICON = 'fas fa-mortar-pestle';
 
 const DEFAULT_ICON_PREFIX = 'fas';
@@ -146,8 +141,38 @@ function createEssenceIconOptions(iconDefinitions) {
   return Object.freeze(options);
 }
 
-export const ESSENCE_ALL_ICON_OPTIONS = createEssenceIconOptions(FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS);
-export const ESSENCE_ICON_OPTIONS = createEssenceIconOptions(FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS);
+// Lazily populated on first call to loadEssenceIconOptions().
+// These are live-binding exports: once set, all importers see the populated value.
+export let ESSENCE_ALL_ICON_OPTIONS = null;
+export let ESSENCE_ICON_OPTIONS = null;
+
+// Internal references to the loaded definitions, used for cache identity checks
+// in buildEssenceIconOptions().
+let _allIconDefinitions = null;
+let _iconDefinitions = null;
+
+/**
+ * Lazily loads Font Awesome icon definitions and builds the picker option list.
+ * Safe to call multiple times — data is loaded and processed only once per variant.
+ *
+ * @param {boolean} [useAll=false] - When true, returns all 1400+ classic free icons;
+ *   when false (default), returns the fantasy-safe subset (~450 icons).
+ * @returns {Promise<ReadonlyArray>} Frozen array of icon option objects.
+ */
+export async function loadEssenceIconOptions(useAll = false) {
+  if (useAll) {
+    if (ESSENCE_ALL_ICON_OPTIONS) return ESSENCE_ALL_ICON_OPTIONS;
+    const { FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS } = await import('./fontAwesomeFreeClassicIcons.js');
+    _allIconDefinitions = FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS;
+    ESSENCE_ALL_ICON_OPTIONS = createEssenceIconOptions(FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS);
+    return ESSENCE_ALL_ICON_OPTIONS;
+  }
+  if (ESSENCE_ICON_OPTIONS) return ESSENCE_ICON_OPTIONS;
+  const { FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS } = await import('./fontAwesomeFreeClassicIcons.js');
+  _iconDefinitions = FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS;
+  ESSENCE_ICON_OPTIONS = createEssenceIconOptions(FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS);
+  return ESSENCE_ICON_OPTIONS;
+}
 
 export function getEssenceIconPrefix(iconClass) {
   const tokens = String(iconClass || '').trim().split(/\s+/).filter(Boolean);
@@ -167,26 +192,24 @@ export function normalizeEssenceIcon(iconClass) {
   return iconName ? `${prefix} fa-${iconName}` : DEFAULT_ESSENCE_ICON;
 }
 
-export function buildEssenceIconOptions(iconDefinitions = FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS) {
-  if (iconDefinitions === FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS) {
+export async function buildEssenceIconOptions(iconDefinitions = null) {
+  if (!iconDefinitions || !Array.isArray(iconDefinitions) || iconDefinitions.length === 0) {
+    return await loadEssenceIconOptions(false);
+  }
+  if (_iconDefinitions && iconDefinitions === _iconDefinitions) {
     return ESSENCE_ICON_OPTIONS;
   }
-  if (iconDefinitions === FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS) {
+  if (_allIconDefinitions && iconDefinitions === _allIconDefinitions) {
     return ESSENCE_ALL_ICON_OPTIONS;
   }
-
-  const resolvedDefinitions = Array.isArray(iconDefinitions) && iconDefinitions.length > 0
-    ? iconDefinitions
-    : FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS;
-
-  return createEssenceIconOptions(resolvedDefinitions);
+  return createEssenceIconOptions(iconDefinitions);
 }
 
 export function getEssenceIconOption(iconClass, options = ESSENCE_ICON_OPTIONS) {
   const normalizedIcon = normalizeEssenceIcon(iconClass);
   const resolvedOptions = Array.isArray(options) && options.length > 0
     ? options
-    : ESSENCE_ICON_OPTIONS;
+    : (ESSENCE_ICON_OPTIONS || []);
 
   const match = resolvedOptions.find(option => option.iconClass === normalizedIcon);
   if (match) return match;
