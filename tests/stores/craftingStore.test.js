@@ -1513,4 +1513,114 @@ describe('run deduplication — each_key_duplicate guard', () => {
     });
   });
 
+  // --- Performance: memoization ---
+
+  describe('evaluateRecipeAccess memoization', () => {
+    it('calls evaluateRecipeAccess at most once per recipe per refresh()', async () => {
+      const recipe1 = makeRecipe('r1', 'Healing Potion');
+      const recipe2 = makeRecipe('r2', 'Strength Potion');
+      const accessCallsByRecipeId = { r1: 0, r2: 0 };
+
+      const services = createMockServices({
+        getRecipeVisibilityService: () => ({
+          evaluateRecipeAccess: ({ recipe }) => {
+            if (recipe.id in accessCallsByRecipeId) {
+              accessCallsByRecipeId[recipe.id]++;
+            }
+            return { visible: true, craftable: true, reason: 'ok' };
+          },
+          learnRecipe: async () => ({ success: true, message: '' })
+        }),
+        getRecipeManager: () => ({
+          getRecipes: () => [recipe1, recipe2],
+          getRecipe: (id) => [recipe1, recipe2].find(r => r.id === id) || null,
+          evaluateCraftability: () => ({
+            canCraft: true,
+            satisfiableSet: {},
+            missing: { ingredients: [], essences: [], catalysts: [] },
+            ingredientStates: [],
+            essenceStates: [],
+            catalystStates: []
+          })
+        })
+      });
+
+      // Wait for the implicit initial refresh to settle, then reset counters
+      // before the explicit refresh we want to measure.
+      const store = createCraftingStore(services);
+      await store.refresh();
+      accessCallsByRecipeId.r1 = 0;
+      accessCallsByRecipeId.r2 = 0;
+
+      await store.refresh();
+
+      assert.equal(accessCallsByRecipeId.r1, 1, 'evaluateRecipeAccess should be called exactly once for r1');
+      assert.equal(accessCallsByRecipeId.r2, 1, 'evaluateRecipeAccess should be called exactly once for r2');
+    });
+
+    it('does not call evaluateCraftability when only workbench state changes', async () => {
+      let craftabilityCallCount = 0;
+
+      const component1 = { id: 'c1', name: 'Fire Dust', img: null, sourceUuid: null };
+      const alchemySystem = {
+        id: 'alchemy-sys',
+        name: 'Alchemy',
+        resolutionMode: 'alchemy',
+        components: [component1],
+        features: { salvage: false }
+      };
+
+      const actorA = {
+        id: 'a1',
+        name: 'Alice',
+        isOwner: true,
+        items: [{ id: 'i1', uuid: 'Item.i1', name: 'Fire Dust', system: { quantity: 5 }, flags: {} }]
+      };
+
+      const services = createMockServices({
+        getRecipeManager: () => ({
+          getRecipes: () => [],
+          getRecipe: () => null,
+          evaluateCraftability: () => {
+            craftabilityCallCount++;
+            return {
+              canCraft: false,
+              satisfiableSet: null,
+              missing: { ingredients: [], essences: [], catalysts: [] },
+              ingredientStates: [],
+              essenceStates: [],
+              catalystStates: []
+            };
+          }
+        }),
+        getCraftingSystemManager: () => ({
+          getSystems: () => [alchemySystem],
+          getSystem: (id) => id === alchemySystem.id ? alchemySystem : null,
+          getRecipesForSystem: () => []
+        }),
+        getAvailableActors: () => [actorA],
+        getOwnedActors: () => [actorA],
+        getGameUser: () => ({ id: 'u1', character: actorA }),
+        getSetting: (key) => {
+          if (key === 'lastComponentSources') return ['a1'];
+          return null;
+        }
+      });
+
+      const store = createCraftingStore(services);
+      await store.refresh();
+
+      const countAfterRefresh = craftabilityCallCount;
+
+      // Workbench-only changes must NOT call evaluateCraftability
+      store.addToWorkbench('c1');
+      store.addToWorkbench('c1');
+      store.removeFromWorkbench('c1');
+      store.clearWorkbench();
+
+      assert.equal(craftabilityCallCount, countAfterRefresh,
+        'evaluateCraftability must not be called when only workbench state changes');
+    });
+  });
+
 });

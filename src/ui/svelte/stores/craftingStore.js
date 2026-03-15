@@ -385,15 +385,19 @@ function _buildPreparedRecipes(
   // --- Recipes ---
   let recipes = recipeManager.getRecipes({ enabled: true });
 
+  // --- Compute recipe access once per recipe to avoid repeated evaluateRecipeAccess() calls.
+  // Results are reused for the visibility filter, availability filter, and display-data map. ---
+  const accessMap = new Map();
   if (visibilityService && craftingActor) {
-    recipes = recipes.filter(recipe =>
-      visibilityService.evaluateRecipeAccess({
+    for (const recipe of recipes) {
+      accessMap.set(recipe.id, visibilityService.evaluateRecipeAccess({
         recipe,
         viewer: gameUser,
         craftingActor,
         componentSourceActors
-      }).visible
-    );
+      }));
+    }
+    recipes = recipes.filter(recipe => accessMap.get(recipe.id)?.visible);
   }
 
   const showSimpleRecipesOnly = services.getSetting('showSimpleRecipesOnly');
@@ -430,17 +434,10 @@ function _buildPreparedRecipes(
     }
   }
 
-  // --- Availability filter ---
+  // --- Availability filter (reuses accessMap — no second evaluateRecipeAccess() call) ---
   if (showOnlyAvailable && componentSourceActors.length > 0) {
     recipes = recipes.filter(r => {
-      const access = visibilityService
-        ? visibilityService.evaluateRecipeAccess({
-          recipe: r,
-          viewer: gameUser,
-          craftingActor,
-          componentSourceActors
-        })
-        : { craftable: true };
+      const access = accessMap.get(r.id) || { craftable: true };
       if (access.reason === 'teaser') return true;
       if (!access.craftable) return false;
       return evaluations.get(r.id)?.canCraft === true;
@@ -456,19 +453,12 @@ function _buildPreparedRecipes(
   // --- Recents ---
   const recentEntries = services.getSetting('recentlyCrafted') || [];
 
-  // --- Prepare display data ---
+  // --- Prepare display data (reuses accessMap — no third evaluateRecipeAccess() call) ---
   const preparedRecipes = recipes.map(recipe => {
     const evaluation = evaluations.get(recipe.id);
     const canCraft = evaluation?.canCraft ?? false;
 
-    const access = visibilityService
-      ? visibilityService.evaluateRecipeAccess({
-        recipe,
-        viewer: gameUser,
-        craftingActor,
-        componentSourceActors
-      })
-      : { craftable: true, reason: 'ok' };
+    const access = accessMap.get(recipe.id) || { craftable: true, reason: 'ok' };
     const teaserState = access.teaserState || null;
     const isTeaser = teaserState?.isTeaser === true;
     const teaserHiddenFields = teaserState?.hiddenFields ?? [];
