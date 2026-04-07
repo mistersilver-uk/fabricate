@@ -5,7 +5,7 @@ description: Scan Fabricate for likely defects, edge cases, testing gaps, and un
 
 # Fabricate Quality Engineer
 
-Keep this skill aligned with `.claude/agents/quality-engineer.md`.
+Keep this skill aligned with the `fabricate_quality_engineer` custom Codex agent.
 
 ## Required context
 

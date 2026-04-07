@@ -8,8 +8,6 @@ nav_order: 13
 
 This page is for developers who want to contribute to Fabricate, run the integration test suite locally, or understand how releases are published.
 
----
-
 ## Commit conventions
 
 All commits to Fabricate must follow the [Conventional Commits](https://www.conventionalcommits.org/) format. A GitHub Actions workflow validates every commit on a pull request and the PR title itself using `commitlint`.
@@ -123,8 +121,6 @@ After a run, results are written to `test-results/`:
 6. Asserts the Crafting App window is visible.
 7. Fails if any browser console errors were captured during the session.
 
----
-
 ## CI workflows
 
 ### Conventional Commits workflow
@@ -158,27 +154,25 @@ Steps:
 2. Run the Foundry integration smoke test (via the reusable workflow).
 3. Run `semantic-release` to determine the version bump, inject the release version into `module.json`, build and zip the module, and publish a GitHub Release.
 
-### Manual Codex Team B workflow
+### Codex Team B backlog workflow
 
-File: `.github/workflows/codex-team-b-manual.yml`
+File: `.github/workflows/team-b-backlog.yml`
 
-This workflow is a manual-only Codex version of a Team B run for one explicitly selected issue. It does not run on a schedule and does not replace the existing Claude Team A or Team B automation.
+This workflow runs Codex Team B backlog processing on a schedule and can also be started manually with `workflow_dispatch`.
 
 Requirements:
 - Repository secret: `OPENAI_API_KEY`
-- A specific issue number when triggering `workflow_dispatch`
 
 Behavior:
-- Fetches the selected issue body
+- Selects eligible backlog issues automatically on the schedule
+- Accepts a specific issue number through `workflow_dispatch.issue_number`
 - Adds the `in-progress` label
 - Runs Codex against the checked-out repo with local repo instructions
 - Requires `npm test` and `npm run build` before PR creation
 - Opens a PR if changes were produced
 - Marks the issue `agent-failed` if the run fails or produces no code changes
 
-Use this workflow when you want a supervised, explicitly chosen Codex Team B run without changing the scheduled automation lanes.
-
----
+Use the manual dispatch with `issue_number` when you want a supervised, explicitly chosen Codex Team B run outside the scheduled automation lane.
 
 ## Release pipeline
 
@@ -219,8 +213,6 @@ node scripts/release.js --validate-only
 # Inject a specific version into module.json, then build
 node scripts/release.js --version 1.2.3
 ```
-
----
 
 ## See also
 

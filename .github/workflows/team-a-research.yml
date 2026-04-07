@@ -1,9 +1,9 @@
-name: "Team A: Research & Audit"
+name: "Team A: Codex Research & Audit"
 
 on:
   schedule:
-    - cron: '0 6 * * 1'            # Weekly: Monday 06:00 UTC
-  workflow_dispatch:               # Manual trigger
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
 
 concurrency:
   group: team-a-research
@@ -13,105 +13,105 @@ permissions:
   contents: write
   pull-requests: write
   issues: write
-  id-token: write
 
-# ── Shared issue template ──────────────────────────────────────────────
-# All agents use this format so issues are consistent and Team B-ready.
-# Defined here as a YAML anchor, referenced in each phase prompt.
 env:
-  ISSUE_TEMPLATE: |
-    Every issue you create MUST use this exact body format (GitHub-flavoured
-    markdown). Do NOT deviate from this structure:
-
-    ```
-    ### Description
-
-    <1-3 paragraphs explaining what is wrong or what should change.
-    Include file paths with line numbers (e.g. `src/Foo.ts:42`) where relevant.
-    Explain WHY this matters — what breaks, what is inconsistent, or what
-    user-facing problem it causes.>
-
-    ### Acceptance Criteria
-
-    1. <Specific, testable criterion — an implementer must be able to read
-       this and know exactly what "done" looks like.>
-    2. <Another criterion.>
-    3. ...
-
-    ### Suggested Files
-
-    - `path/to/file.ts` — <brief note on what to change>
-    - `path/to/test.js` — <brief note on what to test>
-    ```
-
-    Rules for issue creation:
-    - Title: concise, starts with the affected symbol or area in backticks
-      e.g. "`updateSystem` does not trigger signature revalidation"
-    - Labels: always include `triage` plus the category label(s)
-    - Acceptance criteria MUST be specific enough for an automated agent to
-      implement without asking follow-up questions
-    - NEVER remove the `triage` label from any issue — only humans do that
-    - Before creating an issue, search existing issues to avoid duplicates:
-      `gh issue list --state open --json number,title --limit 100`
+  CODEX_MODEL: gpt-5.4
 
 jobs:
-  # ── Smoke Test (gate for all agents) ────────────────────────────────
   smoke-test:
     uses: ./.github/workflows/foundry-integration.yml
     secrets: inherit
 
-  # ── Phase 1: Domain Expert ───────────────────────────────────────────
   domain-audit:
     needs: [smoke-test]
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Prepare context
+      - name: Create research branch
+        run: git checkout -b "research/domain-audit-${{ github.run_number }}-${{ github.run_attempt }}"
+
+      - name: Configure git author
         run: |
-          mkdir -p /tmp/claude-context
-          cp .claude/agents/domain-expert.md /tmp/claude-context/agent.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - uses: anthropics/claude-code-action@v1
+      - name: Run Codex domain audit
+        uses: openai/codex-action@v1
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: >-
-            --model claude-opus-4-6
-            --max-turns 30
-            --allowedTools "Bash,Edit,Write,Read,Glob,Grep,WebSearch,WebFetch"
-          prompt: |
-            You are the domain-expert agent for Fabricate. Read your agent
-            definition from /tmp/claude-context/agent.md and follow it exactly.
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          model: ${{ env.CODEX_MODEL }}
+          effort: high
+          sandbox: workspace-write
+          safety-strategy: drop-sudo
+          prompt-file: .github/prompts/codex-team-a-domain.md
+          output-file: codex-domain-output.md
 
-            ## Issue Template
+      - name: Push domain update PR if files changed
+        run: |
+          OUT_OF_SCOPE=$(git status --porcelain --untracked-files=normal -- . ':!DOMAIN.md' ':!codex-domain-output.md' ':!pr-body.md')
+          if [ -n "$OUT_OF_SCOPE" ]; then
+            echo "::error::Domain audit left uncommitted changes outside its ownership:"
+            printf '%s\n' "$OUT_OF_SCOPE"
+            exit 1
+          fi
 
-            ${{ env.ISSUE_TEMPLATE }}
+          if git diff --quiet && git diff --cached --quiet && [ "$(git rev-list origin/${{ github.event.repository.default_branch || 'main' }}..HEAD --count)" -eq 0 ]; then
+            echo "No DOMAIN.md changes."
+            exit 0
+          fi
 
-            ## Task
+          if ! git diff --quiet || ! git diff --cached --quiet; then
+            git add DOMAIN.md
+            git commit -m "chore: update domain audit"
+          fi
 
-            1. Read DOMAIN.md and all spec/ files for current state.
-            2. Audit spec-vs-code alignment for naming, structure, and lifecycle.
-            3. UPDATE (do not overwrite) DOMAIN.md with any new findings — append
-               to existing sections, update stale entries, add new open questions.
-            4. For each actionable finding, create a GitHub Issue using the
-               template above with labels: `domain`, `triage`.
-               Add `spec` label too if the finding involves spec changes.
-               Add `i18n` label if it involves i18n key changes.
+          INVALID=$(git diff --name-only "origin/${{ github.event.repository.default_branch || 'main' }}..HEAD" | grep -Ev '^DOMAIN.md$' || true)
+          if [ -n "$INVALID" ]; then
+            echo "::error::Domain audit changed files outside its ownership:"
+            printf '%s\n' "$INVALID"
+            exit 1
+          fi
 
-            Output a summary of findings and issues created.
+          BRANCH=$(git branch --show-current)
+          git push origin "$BRANCH"
 
-  # ── Phase 2: UX Designer ─────────────────────────────────────────────
+          {
+            echo "## Summary"
+            echo
+            echo "Codex Team A domain audit updates."
+            echo
+            echo "## Codex Output"
+            echo
+            cat codex-domain-output.md
+          } > pr-body.md
+
+          gh pr create \
+            --repo "${{ github.repository }}" \
+            --head "$BRANCH" \
+            --title "chore: update domain audit" \
+            --label agent-created \
+            --body-file pr-body.md
+
+      - name: Upload domain audit output
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-domain-audit-${{ github.run_number }}
+          path: codex-domain-output.md
+
   ux-audit:
     needs: [smoke-test]
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Download smoke test screenshots
         uses: actions/download-artifact@v4
@@ -120,64 +120,34 @@ jobs:
           path: test-results/
         continue-on-error: true
 
-      - name: Prepare context
-        run: |
-          mkdir -p /tmp/claude-context
-          cp .claude/agents/ux-designer.md /tmp/claude-context/agent.md
-
-      - uses: anthropics/claude-code-action@v1
+      - name: Run Codex UX audit
+        uses: openai/codex-action@v1
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: >-
-            --model claude-opus-4-6
-            --max-turns 40
-            --allowedTools "Bash,Edit,Write,Read,Glob,Grep"
-          prompt: |
-            You are the ux-designer agent for Fabricate. Read your agent
-            definition from /tmp/claude-context/agent.md and follow it exactly.
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          model: ${{ env.CODEX_MODEL }}
+          effort: high
+          sandbox: workspace-write
+          safety-strategy: drop-sudo
+          prompt-file: .github/prompts/codex-team-a-ux.md
+          output-file: codex-ux-output.md
 
-            The smoke test screenshots have been downloaded to test-results/
-            from the preceding smoke-test job. Do NOT run the smoke harness
-            yourself — use the existing screenshots.
+      - name: Ensure UX audit remained read-only
+        run: git diff --exit-code
 
-            ## Issue Template
+      - name: Upload UX audit output
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-ux-audit-${{ github.run_number }}
+          path: codex-ux-output.md
 
-            ${{ env.ISSUE_TEMPLATE }}
-
-            ## Task
-
-            1. Read spec/003-ui-integration.md and all Svelte components in
-               src/ui/svelte/ to understand the current UI structure.
-            2. Review the screenshots in test-results/ to audit the real rendered UI.
-               The smoke test populates realistic test data (2 actors with inventories,
-               a crafting system with 7 components and 3 recipes, post-craft state)
-               and produces 13 labeled screenshots covering every major UI surface:
-               - Items sidebar with crafting items
-               - Actor character sheets on the inventory tab
-               - Recipe Manager: all 5 tabs (Systems, Components, Recipes, Rules, Graph)
-                 with the "Arcane Forge" system selected
-               - Crafting App with craftable recipes listed
-               - Post-craft inventory showing consumed ingredients and crafted output
-               Read /tmp/claude-context/agent.md for the full screenshot catalog table.
-            3. Audit components against the spec, design principles, and
-               accessibility standards (WCAG AA). Consider both static code review
-               and the live screenshots.
-            4. For each actionable finding, create a GitHub Issue using the
-               template above with labels: `ux`, `triage`.
-            5. If no screenshots are available in test-results/, fall back to
-               static code review only and note this in each issue.
-
-            Output a summary of findings and issues created.
-
-  # ── Phase 3: Quality Engineer ────────────────────────────────────────
   quality-scan:
     needs: [smoke-test]
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -188,119 +158,104 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Prepare context
-        run: |
-          mkdir -p /tmp/claude-context
-          cp .claude/agents/quality-engineer.md /tmp/claude-context/agent.md
-
-      - uses: anthropics/claude-code-action@v1
+      - name: Run Codex quality scan
+        uses: openai/codex-action@v1
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: >-
-            --model claude-sonnet-4-6
-            --max-turns 30
-            --allowedTools "Bash,Edit,Write,Read,Glob,Grep"
-          prompt: |
-            You are the quality-engineer agent for Fabricate. Read your agent
-            definition from /tmp/claude-context/agent.md and follow it exactly.
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          model: ${{ env.CODEX_MODEL }}
+          effort: high
+          sandbox: workspace-write
+          safety-strategy: drop-sudo
+          prompt-file: .github/prompts/codex-team-a-quality.md
+          output-file: codex-quality-output.md
 
-            ## Issue Template
+      - name: Ensure quality scan remained read-only
+        run: git diff --exit-code
 
-            ${{ env.ISSUE_TEMPLATE }}
+      - name: Upload quality scan output
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-quality-scan-${{ github.run_number }}
+          path: codex-quality-output.md
 
-            ## Task
-
-            1. Run `npm test` and `npm run build` to check current state.
-            2. Scan src/, tests/, and styles/ for defects, edge cases, and test gaps.
-            3. For each validated finding, create a GitHub Issue using the
-               template above with labels: `triage` plus one of:
-               - `defect` — confirmed bug or incorrect behaviour
-               - `test-gap` — missing or insufficient test coverage
-               - `enhancement` — improvement opportunity
-
-            Output a summary of findings and issues created.
-
-  # ── Phase 4: Competitive Analyst ─────────────────────────────────────
   competitive-analysis:
     needs: [smoke-test]
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Prepare context
+      - name: Create competitive branch
+        run: git checkout -b "research/competitive-analysis-${{ github.run_number }}-${{ github.run_attempt }}"
+
+      - name: Configure git author
         run: |
-          mkdir -p /tmp/claude-context
-          cp .claude/agents/competitive-analyst.md /tmp/claude-context/agent.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - uses: anthropics/claude-code-action@v1
+      - name: Run Codex competitive analysis
+        uses: openai/codex-action@v1
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: >-
-            --model claude-opus-4-6
-            --max-turns 30
-            --allowedTools "Bash,Edit,Write,Read,Glob,Grep,WebSearch,WebFetch"
-          prompt: |
-            You are the competitive-analyst agent for Fabricate. Read your agent
-            definition from /tmp/claude-context/agent.md and follow it exactly.
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          model: ${{ env.CODEX_MODEL }}
+          effort: high
+          sandbox: workspace-write
+          safety-strategy: drop-sudo
+          prompt-file: .github/prompts/codex-team-a-competitive.md
+          output-file: codex-competitive-output.md
 
-            ## Issue Template
+      - name: Push competitive update PR if files changed
+        run: |
+          OUT_OF_SCOPE=$(git status --porcelain --untracked-files=normal -- . ':!COMPETITIVE_ANALYSIS.md' ':!codex-competitive-output.md' ':!pr-body.md')
+          if [ -n "$OUT_OF_SCOPE" ]; then
+            echo "::error::Competitive analysis left uncommitted changes outside its ownership:"
+            printf '%s\n' "$OUT_OF_SCOPE"
+            exit 1
+          fi
 
-            ${{ env.ISSUE_TEMPLATE }}
+          if git diff --quiet && git diff --cached --quiet && [ "$(git rev-list origin/${{ github.event.repository.default_branch || 'main' }}..HEAD --count)" -eq 0 ]; then
+            echo "No COMPETITIVE_ANALYSIS.md changes."
+            exit 0
+          fi
 
-            ## Task
+          if ! git diff --quiet || ! git diff --cached --quiet; then
+            git add COMPETITIVE_ANALYSIS.md
+            git commit -m "chore: update competitive analysis"
+          fi
 
-            1. Read the existing COMPETITIVE_ANALYSIS.md (if it exists).
-            2. Read Fabricate's docs/, spec/, src/ui/svelte/, and CHANGELOG.md
-               to understand current capabilities.
-            3. Research competitors and monetisation landscape per your agent definition.
-            4. UPDATE (do not overwrite) COMPETITIVE_ANALYSIS.md with new findings.
-               Add a dated changelog entry at the top noting what changed.
-            5. For each actionable recommendation that implies a concrete code or
-               feature change, create a GitHub Issue using the template above
-               with labels: `enhancement`, `triage`.
+          INVALID=$(git diff --name-only "origin/${{ github.event.repository.default_branch || 'main' }}..HEAD" | grep -Ev '^COMPETITIVE_ANALYSIS.md$' || true)
+          if [ -n "$INVALID" ]; then
+            echo "::error::Competitive analysis changed files outside its ownership:"
+            printf '%s\n' "$INVALID"
+            exit 1
+          fi
 
-            Output a summary of findings, report updates, and issues created.
+          BRANCH=$(git branch --show-current)
+          git push origin "$BRANCH"
 
-  # ── Phase 5: Collect results and raise PR ────────────────────────────
-  raise-pr:
-    needs: [domain-audit, ux-audit, quality-scan, competitive-analysis]
-    if: always() && !cancelled()
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
+          {
+            echo "## Summary"
+            echo
+            echo "Codex Team A competitive analysis updates."
+            echo
+            echo "## Codex Output"
+            echo
+            cat codex-competitive-output.md
+          } > pr-body.md
+
+          gh pr create \
+            --repo "${{ github.repository }}" \
+            --head "$BRANCH" \
+            --title "chore: update competitive analysis" \
+            --label agent-created \
+            --body-file pr-body.md
+
+      - name: Upload competitive analysis output
+        uses: actions/upload-artifact@v4
         with:
-          fetch-depth: 0
-
-      - uses: anthropics/claude-code-action@v1
-        with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: >-
-            --model claude-sonnet-4-6
-            --max-turns 15
-            --allowedTools "Bash,Read,Glob,Grep"
-          prompt: |
-            Check if there are any uncommitted changes to DOMAIN.md,
-            COMPETITIVE_ANALYSIS.md, docs/, or spec/ files from the research phases.
-
-            If changes exist:
-            1. Create a branch: `git checkout -b research/weekly-$(date +%Y-%m-%d)`
-            2. Stage and commit only DOMAIN.md, COMPETITIVE_ANALYSIS.md, docs/,
-               and spec/ changes.
-               Commit message: "chore: weekly research audit updates"
-            3. Push and open a PR:
-               ```
-               gh pr create \
-                 --title "Weekly Research Audit — $(date +%Y-%m-%d)" \
-                 --label agent-created \
-                 --body "Automated weekly research updates from Team A.
-                         Review DOMAIN.md, COMPETITIVE_ANALYSIS.md changes and
-                         new triage issues before merging."
-               ```
-
-            If no changes exist, output "No research updates this week." and stop.
-
-            NEVER remove the `triage` label from any issue.
+          name: codex-competitive-analysis-${{ github.run_number }}
+          path: codex-competitive-output.md

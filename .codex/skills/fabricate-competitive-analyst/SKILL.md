@@ -5,7 +5,7 @@ description: Research Fabricate's competitive landscape, product differentiation
 
 # Fabricate Competitive Analyst
 
-Keep this skill aligned with `.claude/agents/competitive-analyst.md`.
+Keep this skill aligned with the `fabricate_competitive_analyst` custom Codex agent.
 
 ## Required context
 

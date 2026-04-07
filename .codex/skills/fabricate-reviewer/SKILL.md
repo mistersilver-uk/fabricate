@@ -5,7 +5,7 @@ description: Perform an independent review of Fabricate changes for correctness,
 
 # Fabricate Reviewer
 
-Keep this skill aligned with `.claude/agents/reviewer.md`.
+Keep this skill aligned with the `fabricate_reviewer` custom Codex agent.
 
 ## Required context
 
