@@ -32,5 +32,38 @@ Review rules:
 
 Output:
 
-- If no material findings exist, output exactly `NO_FINDINGS` on the first line, then one short residual-risk sentence.
-- Otherwise output `NEEDS_CHANGES` on the first line, followed by severity-ordered findings with file:line references and concise remediation guidance.
+- Output only valid JSON. Do not wrap it in Markdown fences.
+- If no material findings exist, output:
+
+```json
+{
+  "event": "COMMENT",
+  "body": "NO_FINDINGS",
+  "comments": []
+}
+```
+
+- If material findings exist, output:
+
+```json
+{
+  "event": "COMMENT",
+  "body": "Optional short overall summary. Put cross-file or unanchored findings here.",
+  "comments": [
+    {
+      "path": "src/example.js",
+      "line": 42,
+      "side": "RIGHT",
+      "body": "Concrete finding and suggested fix."
+    }
+  ]
+}
+```
+
+Inline comment rules:
+
+- Use inline comments only for findings that can be anchored to a line present in `.git/codex-review-context/diff.patch`.
+- Use `side: "RIGHT"` for changed head lines.
+- If a finding cannot be anchored to a changed head line, put it in `body` instead of `comments`.
+- Cap inline comments at 3.
+- Use `event: "COMMENT"` by default. Use `event: "REQUEST_CHANGES"` only for a clear blocker.

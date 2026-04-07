@@ -147,20 +147,18 @@ jobs:
           sandbox: read-only
           safety-strategy: drop-sudo
           prompt-file: .github/prompts/codex-pr-review.md
-          output-file: codex-review-output.md
+          output-file: codex-review.json
 
-      - name: Post Codex review
+      - name: Submit inline Codex review
         run: |
-          if [ ! -s codex-review-output.md ]; then
+          if [ ! -s codex-review.json ]; then
             echo "No Codex review output."
             exit 0
           fi
 
-          if head -1 codex-review-output.md | grep -Fxq "NO_FINDINGS"; then
-            echo "No material findings; skipping PR comment."
-            exit 0
-          fi
-
-          gh pr comment "$PR_NUMBER" \
+          node scripts/github-submit-codex-review.mjs \
             --repo "${{ github.repository }}" \
-            --body-file codex-review-output.md
+            --pr "$PR_NUMBER" \
+            --commit "$(git rev-parse HEAD)" \
+            --input codex-review.json \
+            --patch .git/codex-review-context/diff.patch
