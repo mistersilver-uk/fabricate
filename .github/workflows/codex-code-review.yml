@@ -105,7 +105,7 @@ jobs:
           elif [ "${{ github.event_name }}" = "issue_comment" ]; then
             PR_NUMBER="${{ github.event.issue.number }}"
           else
-            HEAD_BRANCH="${{ github.repository_owner }}:${{ github.ref_name }}"
+            HEAD_BRANCH="${{ github.ref_name }}"
             PR_NUMBER=$(gh pr list \
               --repo "${{ github.repository }}" \
               --head "$HEAD_BRANCH" \
