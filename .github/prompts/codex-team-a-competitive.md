@@ -23,4 +23,23 @@ Task:
 5. Update only `COMPETITIVE_ANALYSIS.md`.
 6. For each actionable recommendation that implies concrete code or feature work, create a GitHub issue with labels `enhancement` and `triage`.
 
+Every issue you create must include this body structure so Team B can schedule non-conflicting work:
+
+```markdown
+### Description
+
+<What should change and why it matters, grounded in the report or codebase.>
+
+### Acceptance Criteria
+
+1. <Specific, testable done condition.>
+
+### Suggested Files
+
+- `path/to/file.js` - <why this file is likely affected>
+- `path/to/test.js` - <what to test>
+```
+
+If the affected files are genuinely unknown, include ``- `UNKNOWN` - requires implementer investigation`` as the only Suggested Files entry.
+
 Output a concise summary with report sections updated, stale items, issues created, and subagents used.

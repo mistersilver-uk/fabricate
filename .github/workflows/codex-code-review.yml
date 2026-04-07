@@ -40,11 +40,11 @@ jobs:
       PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
       REVIEW_TRIGGER: ${{ github.event_name == 'issue_comment' && 'manual comment command (/codex-review)' || 'pull request event' }}
     steps:
-      - name: Checkout pull request merge ref
+      - name: Checkout pull request head
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event_name == 'issue_comment' && format('refs/pull/{0}/merge', github.event.issue.number) || format('refs/pull/{0}/merge', github.event.pull_request.number) }}
+          ref: ${{ github.event_name == 'issue_comment' && format('refs/pull/{0}/head', github.event.issue.number) || github.event.pull_request.head.sha }}
 
       - name: Prepare review context
         run: |
@@ -100,6 +100,42 @@ jobs:
           gh pr view "$PR_NUMBER" \
             --repo "${{ github.repository }}" \
             --comments > .git/codex-review-context/comments.txt || true
+
+          gh api graphql \
+            -f owner="${{ github.repository_owner }}" \
+            -f name="${{ github.event.repository.name }}" \
+            -F number="$PR_NUMBER" \
+            -f query='
+              query($owner: String!, $name: String!, $number: Int!) {
+                repository(owner: $owner, name: $name) {
+                  pullRequest(number: $number) {
+                    reviewThreads(first: 100) {
+                      nodes {
+                        id
+                        isResolved
+                        isOutdated
+                        path
+                        line
+                        originalLine
+                        comments(first: 20) {
+                          nodes {
+                            id
+                            path
+                            line
+                            originalLine
+                            diffHunk
+                            body
+                            author {
+                              login
+                            }
+                            createdAt
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }' > .git/codex-review-context/review-threads.json || true
 
       - name: Run Codex review
         id: run_codex

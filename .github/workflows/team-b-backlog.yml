@@ -83,6 +83,7 @@ jobs:
 
           echo '[]' > /tmp/selected-issues.json
           : > /tmp/selected-paths.txt
+          UNKNOWN_SELECTED=false
 
           while IFS= read -r issue; do
             COUNT=$(jq 'length' /tmp/selected-issues.json)
@@ -91,8 +92,21 @@ jobs:
             fi
 
             BODY=$(jq -r '.body // ""' <<< "$issue")
-            PATHS=$(printf '%s\n' "$BODY" | sed -n 's/^- `\([^`]*\)`.*/\1/p' | sort -u)
+            PATHS=$(
+              {
+                printf '%s\n' "$BODY" | sed -n 's/^- `\([^`]*\)`.*/\1/p'
+                printf '%s\n' "$BODY" | grep -Eo '([A-Za-z0-9_.-]+/)+[A-Za-z0-9_.-]+(\.[A-Za-z0-9_.-]+)?' || true
+              } | grep -Ev '^(https?|app|file)://' | sort -u
+            )
             CONFLICT=false
+
+            if [ -z "$PATHS" ] || printf '%s\n' "$PATHS" | grep -Fxq "UNKNOWN"; then
+              if [ "$UNKNOWN_SELECTED" = "true" ]; then
+                continue
+              fi
+              UNKNOWN_SELECTED=true
+              PATHS="UNKNOWN-${COUNT}"
+            fi
 
             if [ -n "$PATHS" ]; then
               while IFS= read -r path; do

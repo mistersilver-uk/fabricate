@@ -22,4 +22,24 @@ Task:
 4. For each actionable finding, create a GitHub issue with labels `ux` and `triage`; add `accessibility`, `defect`, or `enhancement` when applicable.
 5. Do not implement production UI changes.
 
+Every issue you create must include this body structure so Team B can schedule non-conflicting work:
+
+```markdown
+### Description
+
+<What is wrong or should change, with file:line, selector, viewport, or screenshot evidence when available.>
+
+### Acceptance Criteria
+
+1. <Specific, testable done condition.>
+
+### Suggested Files
+
+- `path/to/file.svelte` - <why this file is likely affected>
+- `path/to/file.css` - <why this file is likely affected>
+- `path/to/test.js` - <what to test>
+```
+
+If the affected files are genuinely unknown, include ``- `UNKNOWN` - requires implementer investigation`` as the only Suggested Files entry.
+
 Output a concise summary with findings, issues created, screenshot evidence used, and subagents used.

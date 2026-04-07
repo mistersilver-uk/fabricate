@@ -6,6 +6,7 @@ Read these files first, ideally in parallel:
 - `.git/codex-review-context/diff.patch`
 - `.git/codex-review-context/checks.txt` if present
 - `.git/codex-review-context/comments.txt` if present
+- `.git/codex-review-context/review-threads.json` if present
 - `AGENTS.md`
 - `spec/README.md`
 - `.codex/config.toml`
@@ -23,7 +24,7 @@ Use Codex subagents explicitly:
 Review rules:
 
 - Report only net-new material findings against the current head commit.
-- Re-read existing review threads and PR checks from the context when available; do not restate duplicates.
+- Re-read existing review threads, top-level comments, and PR checks from the context when available; do not restate duplicates.
 - Collapse cross-file duplicates into one finding.
 - Cap blocking findings at three.
 - If CI already demonstrates a failure, reference that failure instead of speculating.
