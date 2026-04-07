@@ -5,13 +5,13 @@ description: Plan and coordinate Fabricate work from GitHub issues into a single
 
 # Fabricate Orchestrator
 
-Keep this skill aligned with `.claude/agents/orchestrator.md`.
+Keep this skill aligned with the `fabricate_orchestrator` custom Codex agent.
 
 ## Required context
 
 - `AGENTS.md`
 - `PLAN.md` if it already exists
-- `.claude/agents/orchestrator.md` when you suspect drift
+- `.codex/agents/fabricate-orchestrator.toml` when you suspect drift
 - GitHub issue context from `gh issue` when available
 
 ## Workflow

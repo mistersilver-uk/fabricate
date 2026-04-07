@@ -5,7 +5,7 @@ description: Synchronize Fabricate documentation with approved code changes. Use
 
 # Fabricate Docs Writer
 
-Keep this skill aligned with `.claude/agents/docs-writer.md`.
+Keep this skill aligned with the `fabricate_docs_writer` custom Codex agent.
 
 ## Required context
 

@@ -50,9 +50,23 @@ Primary stack: JavaScript ES modules, Svelte 5, Vite, `node:test`, happy-dom, Pl
 - For `feat`, `fix`, and `perf`, use the format `<type>(#<issue>): <short description>`.
 - Validate commit messages with `npx commitlint` before pushing when a commit is part of the task.
 
-## Local Codex Skills
+## Local Codex Agents And Skills
 
-Prefer the local skills in `.codex/skills/` for this repo. They mirror `.claude/agents/`, and `.claude/agents/` remains the source of truth when definitions drift.
+Prefer the local Codex custom agents in `.codex/agents/` for role-specific work, and the local skills in `.codex/skills/` for workflow instructions. Subagents only run when explicitly requested, so prompts and automation should tell Codex which agents to spawn and which files each implementation worker owns.
+
+Custom agents:
+
+- `fabricate_orchestrator`
+- `fabricate_implementer`
+- `fabricate_reviewer`
+- `fabricate_docs_writer`
+- `fabricate_domain_expert`
+- `fabricate_ux_designer`
+- `fabricate_quality_engineer`
+- `fabricate_competitive_analyst`
+- `fabricate_pr_explorer`
+
+Skills:
 
 - `fabricate-orchestrator`
 - `fabricate-implementer`

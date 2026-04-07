@@ -1,0 +1,295 @@
+name: Codex Code Review
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches-ignore:
+      - main
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: codex-review-${{ github.event.pull_request.number || github.event.issue.number || github.ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+env:
+  CODEX_MODEL: gpt-5.4
+
+jobs:
+  codex-review:
+    if: >
+      (
+        github.event_name == 'pull_request_target'
+      ) || (
+        github.event_name == 'issue_comment' &&
+        github.event.issue.pull_request &&
+        github.event.comment.user.type != 'Bot' &&
+        contains(github.event.comment.body, '/codex-review')
+      ) || (
+        github.event_name == 'push' &&
+        github.ref_type == 'branch' &&
+        !github.event.deleted
+      )
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number || '' }}
+      REVIEW_TRIGGER: ${{ github.event_name == 'issue_comment' && 'manual comment command (/codex-review)' || (github.event_name == 'push' && 'branch push with open PR' || 'pull_request_target event') }}
+    steps:
+      - name: Authorize Codex trigger
+        id: trigger_policy
+        env:
+          ACTOR: ${{ github.actor }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request_target" ]; then
+            echo "allowed=true" >> "$GITHUB_OUTPUT"
+            echo "allow_users=*" >> "$GITHUB_OUTPUT"
+            echo "allow_bots=true" >> "$GITHUB_OUTPUT"
+            echo "Automatic pull_request_target review is allowed for actor '${ACTOR}'."
+            exit 0
+          fi
+
+          ERROR_OUTPUT=/tmp/codex-actor-permission-error
+          set +e
+          PERMISSION=$(gh api \
+            "repos/${{ github.repository }}/collaborators/${ACTOR}/permission" \
+            --jq '.permission // ""' 2>"$ERROR_OUTPUT")
+          STATUS=$?
+          set -e
+
+          if [ "$STATUS" -ne 0 ]; then
+            if grep -q "HTTP 404" "$ERROR_OUTPUT"; then
+              echo "allowed=false" >> "$GITHUB_OUTPUT"
+              echo "allow_users=" >> "$GITHUB_OUTPUT"
+              echo "allow_bots=false" >> "$GITHUB_OUTPUT"
+              echo "Actor '${ACTOR}' is not a repository collaborator with write access; skipping Codex review."
+              exit 0
+            fi
+
+            echo "allowed=false" >> "$GITHUB_OUTPUT"
+            echo "allow_users=" >> "$GITHUB_OUTPUT"
+            echo "allow_bots=false" >> "$GITHUB_OUTPUT"
+            echo "::error::Could not verify repository permission for actor '${ACTOR}'."
+            sed 's/^/::error::/' "$ERROR_OUTPUT"
+            exit "$STATUS"
+          fi
+
+          case "$PERMISSION" in
+            admin|maintain|write)
+              echo "allowed=true" >> "$GITHUB_OUTPUT"
+              echo "allow_users=" >> "$GITHUB_OUTPUT"
+              echo "allow_bots=false" >> "$GITHUB_OUTPUT"
+              echo "Actor '${ACTOR}' has ${PERMISSION} access; continuing Codex review."
+              ;;
+            *)
+              echo "allowed=false" >> "$GITHUB_OUTPUT"
+              echo "allow_users=" >> "$GITHUB_OUTPUT"
+              echo "allow_bots=false" >> "$GITHUB_OUTPUT"
+              echo "Actor '${ACTOR}' has '${PERMISSION:-none}' access; skipping Codex review because openai/codex-action@v1 requires write access."
+              ;;
+          esac
+
+      - name: Resolve review target
+        if: steps.trigger_policy.outputs.allowed == 'true'
+        id: target
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request_target" ]; then
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+          elif [ "${{ github.event_name }}" = "issue_comment" ]; then
+            PR_NUMBER="${{ github.event.issue.number }}"
+          else
+            HEAD_BRANCH="${{ github.ref_name }}"
+            PR_NUMBER=$(gh pr list \
+              --repo "${{ github.repository }}" \
+              --head "$HEAD_BRANCH" \
+              --state open \
+              --json number \
+              --jq '.[0].number // empty')
+
+            if [ -z "$PR_NUMBER" ]; then
+              echo "No open PR found for pushed branch ${HEAD_BRANCH}; skipping Codex review."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+
+          PR_JSON=$(gh pr view "$PR_NUMBER" \
+            --repo "${{ github.repository }}" \
+            --json number,baseRefOid,headRefOid,headRepository,headRepositoryOwner)
+          BASE_SHA=$(jq -r '.baseRefOid // empty' <<< "$PR_JSON")
+          HEAD_SHA=$(jq -r '.headRefOid // empty' <<< "$PR_JSON")
+          HEAD_REPO=$(jq -r 'if .headRepository and .headRepositoryOwner then "\(.headRepositoryOwner.login)/\(.headRepository.name)" else empty end' <<< "$PR_JSON")
+
+          if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
+            echo "::error::Could not resolve PR base/head commit for #${PR_NUMBER}."
+            exit 1
+          fi
+
+          if [ -z "$HEAD_REPO" ]; then
+            echo "::error::Could not resolve PR head repository for #${PR_NUMBER}."
+            exit 1
+          fi
+
+          {
+            echo "skip=false"
+            echo "pr_number=$PR_NUMBER"
+            echo "base_sha=$BASE_SHA"
+            echo "head_sha=$HEAD_SHA"
+            echo "head_repo=$HEAD_REPO"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "PR_NUMBER=$PR_NUMBER"
+            echo "REVIEW_COMMIT=$HEAD_SHA"
+          } >> "$GITHUB_ENV"
+
+          echo "Resolved PR #${PR_NUMBER}: base ${BASE_SHA}, head ${HEAD_REPO}@${HEAD_SHA}."
+
+      - name: Checkout trusted review logic
+        if: steps.trigger_policy.outputs.allowed == 'true' && steps.target.outputs.skip != 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ steps.target.outputs.base_sha }}
+          persist-credentials: false
+
+      - name: Checkout reviewed pull request head
+        if: steps.trigger_policy.outputs.allowed == 'true' && steps.target.outputs.skip != 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: pr
+          repository: ${{ steps.target.outputs.head_repo }}
+          ref: ${{ steps.target.outputs.head_sha }}
+          persist-credentials: false
+
+      - name: Prepare review context
+        if: steps.trigger_policy.outputs.allowed == 'true' && steps.target.outputs.skip != 'true'
+        run: |
+          mkdir -p .git/codex-review-context
+
+          gh pr view "$PR_NUMBER" \
+            --repo "${{ github.repository }}" \
+            --json number,title,author,headRefName,baseRefName,body,closingIssuesReferences,url,headRefOid \
+            > .git/codex-review-context/pr.json
+
+          {
+            echo "# Codex Review Context"
+            echo
+            echo "- Trigger: $REVIEW_TRIGGER"
+            echo "- PR: #$(jq -r '.number' .git/codex-review-context/pr.json) $(jq -r '.title' .git/codex-review-context/pr.json)"
+            echo "- URL: $(jq -r '.url' .git/codex-review-context/pr.json)"
+            echo "- Author: $(jq -r '.author.login' .git/codex-review-context/pr.json)"
+            echo "- Head branch: $(jq -r '.headRefName' .git/codex-review-context/pr.json)"
+            echo "- Base branch: $(jq -r '.baseRefName' .git/codex-review-context/pr.json)"
+            echo "- Head commit: ${REVIEW_COMMIT}"
+            echo "- Reviewed checkout: pr/"
+            echo
+            echo "## PR Body"
+            jq -r '.body // "_No PR body provided._"' .git/codex-review-context/pr.json
+            echo
+          } > .git/codex-review-context/pr.md
+
+          ISSUE_COUNT=$(jq '.closingIssuesReferences | length' .git/codex-review-context/pr.json)
+          if [ "$ISSUE_COUNT" -gt 0 ]; then
+            ISSUE_NUMBER=$(jq -r '.closingIssuesReferences[0].number' .git/codex-review-context/pr.json)
+            gh issue view "$ISSUE_NUMBER" --repo "${{ github.repository }}" --json number,title,body,url > .git/codex-review-context/issue.json
+            {
+              echo "## Linked Issue"
+              echo
+              echo "- Issue: #$(jq -r '.number' .git/codex-review-context/issue.json) $(jq -r '.title' .git/codex-review-context/issue.json)"
+              echo "- URL: $(jq -r '.url' .git/codex-review-context/issue.json)"
+              echo
+              jq -r '.body // "_No issue body provided._"' .git/codex-review-context/issue.json
+            } >> .git/codex-review-context/pr.md
+          else
+            {
+              echo "## Linked Issue"
+              echo
+              echo "No linked issue detected."
+            } >> .git/codex-review-context/pr.md
+          fi
+
+          gh pr diff "$PR_NUMBER" \
+            --repo "${{ github.repository }}" \
+            --patch > .git/codex-review-context/diff.patch
+
+          gh pr checks "$PR_NUMBER" \
+            --repo "${{ github.repository }}" > .git/codex-review-context/checks.txt || true
+
+          gh pr view "$PR_NUMBER" \
+            --repo "${{ github.repository }}" \
+            --comments > .git/codex-review-context/comments.txt || true
+
+          gh api graphql \
+            -f owner="${{ github.repository_owner }}" \
+            -f name="${{ github.event.repository.name }}" \
+            -F number="$PR_NUMBER" \
+            -f query='
+              query($owner: String!, $name: String!, $number: Int!) {
+                repository(owner: $owner, name: $name) {
+                  pullRequest(number: $number) {
+                    reviewThreads(first: 100) {
+                      nodes {
+                        id
+                        isResolved
+                        isOutdated
+                        path
+                        line
+                        originalLine
+                        comments(first: 20) {
+                          nodes {
+                            id
+                            path
+                            line
+                            originalLine
+                            diffHunk
+                            body
+                            author {
+                              login
+                            }
+                            createdAt
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }' > .git/codex-review-context/review-threads.json || true
+
+      - name: Run Codex review
+        if: steps.trigger_policy.outputs.allowed == 'true' && steps.target.outputs.skip != 'true'
+        id: run_codex
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          model: ${{ env.CODEX_MODEL }}
+          effort: high
+          sandbox: read-only
+          safety-strategy: drop-sudo
+          prompt-file: .github/prompts/codex-pr-review.md
+          output-file: codex-review.json
+          allow-users: ${{ steps.trigger_policy.outputs.allow_users }}
+          allow-bots: ${{ steps.trigger_policy.outputs.allow_bots }}
+
+      - name: Submit inline Codex review
+        if: steps.trigger_policy.outputs.allowed == 'true' && steps.target.outputs.skip != 'true'
+        run: |
+          if [ ! -s codex-review.json ]; then
+            echo "No Codex review output."
+            exit 0
+          fi
+
+          node scripts/github-submit-codex-review.mjs \
+            --repo "${{ github.repository }}" \
+            --pr "$PR_NUMBER" \
+            --commit "$REVIEW_COMMIT" \
+            --input codex-review.json \
+            --patch .git/codex-review-context/diff.patch

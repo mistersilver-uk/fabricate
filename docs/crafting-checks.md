@@ -235,8 +235,6 @@ The `executeCheck()` return shape:
 | `value` | `number \| null` | Numeric roll total, used by progressive mode to award results by difficulty |
 | `data` | `object` | Arbitrary extra data passed through to success/failure macros |
 
-<!-- TODO: verify whether game.fabricate.getAdapterClasses() is the correct access pattern — confirm with MisterPotts -->
-
 ---
 
 ## What's next?
