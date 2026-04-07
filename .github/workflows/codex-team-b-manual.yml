@@ -107,7 +107,7 @@ jobs:
             git commit -m "chore(#${ISSUE_NUMBER}): stage uncommitted codex changes"
           fi
 
-          npx commitlint --from HEAD~1 --to HEAD --verbose
+          npx commitlint --from "origin/${{ github.event.repository.default_branch || 'main' }}" --to HEAD --verbose
           npm test
           npm run build
 
