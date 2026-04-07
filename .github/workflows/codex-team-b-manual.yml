@@ -161,7 +161,8 @@ jobs:
           SCREENSHOT_NOTE="_No UI files changed._"
           if [ "${{ steps.validate.outputs.ui_changed }}" = "true" ]; then
             if find test-results -type f \( -name '*.png' -o -name '*.jpg' -o -name '*.jpeg' -o -name '*.webp' \) 2>/dev/null | grep -q .; then
-              SCREENSHOT_NOTE="Screenshot artifacts were uploaded as \`codex-manual-ui-evidence-${ISSUE_NUMBER}-${{ github.run_number }}\`."
+              SCREENSHOT_PATHS=$(find test-results -type f \( -name '*.png' -o -name '*.jpg' -o -name '*.jpeg' -o -name '*.webp' \) | sort)
+              SCREENSHOT_NOTE=$(printf 'Screenshot artifacts were uploaded as `codex-manual-ui-evidence-%s-${{ github.run_number }}`.\n\n%s' "$ISSUE_NUMBER" "$SCREENSHOT_PATHS")
             elif grep -q '^SCREENSHOTS_NEEDED:' codex-output.md 2>/dev/null; then
               SCREENSHOT_NOTE="> $(grep '^SCREENSHOTS_NEEDED:' codex-output.md | head -1)"
             else

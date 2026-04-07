@@ -113,7 +113,7 @@ export function buildReviewPayload({ review, patch, commitId }) {
   const filtered = [];
   const dropped = [];
 
-  for (const comment of comments.slice(0, 3)) {
+  for (const comment of comments) {
     const path = typeof comment.path === 'string' ? comment.path.trim() : '';
     const line = Number(comment.line);
     const side = comment.side === 'LEFT' ? 'LEFT' : 'RIGHT';
@@ -126,7 +126,11 @@ export function buildReviewPayload({ review, patch, commitId }) {
       continue;
     }
 
-    filtered.push({ path, line, side, body: commentBody });
+    if (filtered.length < 3) {
+      filtered.push({ path, line, side, body: commentBody });
+    } else {
+      dropped.push({ path, line, side, body: commentBody });
+    }
   }
 
   if (body === 'NO_FINDINGS' && filtered.length === 0) {

@@ -70,6 +70,47 @@ test('buildReviewPayload filters comments that are not anchored to the diff', ()
   assert.match(result.payload.body, /not in the diff/);
 });
 
+test('buildReviewPayload validates anchors before capping inline comments', () => {
+  const result = buildReviewPayload({
+    commitId: 'abc123',
+    patch: PATCH,
+    review: {
+      event: 'COMMENT',
+      body: 'Review summary.',
+      comments: [
+        {
+          path: 'src/example.js',
+          line: 91,
+          side: 'RIGHT',
+          body: 'First stale finding.'
+        },
+        {
+          path: 'src/example.js',
+          line: 92,
+          side: 'RIGHT',
+          body: 'Second stale finding.'
+        },
+        {
+          path: 'src/example.js',
+          line: 93,
+          side: 'RIGHT',
+          body: 'Third stale finding.'
+        },
+        {
+          path: 'src/example.js',
+          line: 11,
+          side: 'RIGHT',
+          body: 'This valid finding must survive the cap.'
+        }
+      ]
+    }
+  });
+
+  assert.equal(result.payload.comments.length, 1);
+  assert.equal(result.payload.comments[0].body, 'This valid finding must survive the cap.');
+  assert.equal(result.dropped.length, 3);
+});
+
 test('buildReviewPayload skips no-finding reviews', () => {
   const result = buildReviewPayload({
     commitId: 'abc123',
