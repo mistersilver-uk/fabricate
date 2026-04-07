@@ -154,25 +154,25 @@ Steps:
 2. Run the Foundry integration smoke test (via the reusable workflow).
 3. Run `semantic-release` to determine the version bump, inject the release version into `module.json`, build and zip the module, and publish a GitHub Release.
 
-### Manual Codex Team B workflow
+### Codex Team B backlog workflow
 
-File: `.github/workflows/codex-team-b-manual.yml`
+File: `.github/workflows/team-b-backlog.yml`
 
-This workflow is a manual-only Codex Team B run for one explicitly selected issue. Scheduled Codex research and backlog-processing lanes live in `.github/workflows/team-a-research.yml` and `.github/workflows/team-b-backlog.yml`.
+This workflow runs Codex Team B backlog processing on a schedule and can also be started manually with `workflow_dispatch`.
 
 Requirements:
 - Repository secret: `OPENAI_API_KEY`
-- A specific issue number when triggering `workflow_dispatch`
 
 Behavior:
-- Fetches the selected issue body
+- Selects eligible backlog issues automatically on the schedule
+- Accepts a specific issue number through `workflow_dispatch.issue_number`
 - Adds the `in-progress` label
 - Runs Codex against the checked-out repo with local repo instructions
 - Requires `npm test` and `npm run build` before PR creation
 - Opens a PR if changes were produced
 - Marks the issue `agent-failed` if the run fails or produces no code changes
 
-Use this workflow when you want a supervised, explicitly chosen Codex Team B run outside the scheduled automation lanes.
+Use the manual dispatch with `issue_number` when you want a supervised, explicitly chosen Codex Team B run outside the scheduled automation lane.
 
 ## Release pipeline
 
