@@ -3,6 +3,9 @@ name: Codex Code Review
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  push:
+    branches-ignore:
+      - main
   issue_comment:
     types: [created]
 
@@ -33,20 +36,49 @@ jobs:
         github.event.issue.pull_request &&
         github.event.comment.user.type != 'Bot' &&
         contains(github.event.comment.body, '/codex-review')
+      ) || (
+        github.event_name == 'push' &&
+        github.ref_type == 'branch' &&
+        !github.event.deleted
       )
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
-      PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
-      REVIEW_TRIGGER: ${{ github.event_name == 'issue_comment' && 'manual comment command (/codex-review)' || 'pull request event' }}
+      PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number || '' }}
+      REVIEW_TRIGGER: ${{ github.event_name == 'issue_comment' && 'manual comment command (/codex-review)' || (github.event_name == 'push' && 'branch push with open PR' || 'pull request event') }}
     steps:
       - name: Checkout pull request head
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event_name == 'issue_comment' && format('refs/pull/{0}/head', github.event.issue.number) || github.event.pull_request.head.sha }}
+          ref: ${{ github.event_name == 'issue_comment' && format('refs/pull/{0}/head', github.event.issue.number) || (github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha) }}
+
+      - name: Resolve pull request number
+        run: |
+          if [ -n "${PR_NUMBER:-}" ]; then
+            echo "Reviewing PR #${PR_NUMBER}."
+            exit 0
+          fi
+
+          HEAD_BRANCH="${{ github.repository_owner }}:${{ github.ref_name }}"
+          PR_NUMBER=$(gh pr list \
+            --repo "${{ github.repository }}" \
+            --head "$HEAD_BRANCH" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')
+
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No open PR found for pushed branch ${HEAD_BRANCH}; skipping Codex review."
+            echo "SKIP_CODEX_REVIEW=true" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          echo "PR_NUMBER=$PR_NUMBER" >> "$GITHUB_ENV"
+          echo "Reviewing PR #${PR_NUMBER} for pushed branch ${HEAD_BRANCH}."
 
       - name: Prepare review context
+        if: env.SKIP_CODEX_REVIEW != 'true'
         run: |
           mkdir -p .git/codex-review-context
 
@@ -138,6 +170,7 @@ jobs:
               }' > .git/codex-review-context/review-threads.json || true
 
       - name: Run Codex review
+        if: env.SKIP_CODEX_REVIEW != 'true'
         id: run_codex
         uses: openai/codex-action@v1
         with:
@@ -150,6 +183,7 @@ jobs:
           output-file: codex-review.json
 
       - name: Submit inline Codex review
+        if: env.SKIP_CODEX_REVIEW != 'true'
         run: |
           if [ ! -s codex-review.json ]; then
             echo "No Codex review output."
