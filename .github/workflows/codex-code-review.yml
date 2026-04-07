@@ -1,0 +1,130 @@
+name: Codex Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: codex-review-${{ github.event.pull_request.number || github.event.issue.number || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+env:
+  CODEX_MODEL: gpt-5.4
+
+jobs:
+  codex-review:
+    if: >
+      (
+        github.event_name == 'pull_request' &&
+        (
+          github.event.pull_request.user.type != 'Bot' ||
+          startsWith(github.event.pull_request.head.ref, 'agent/issue-') ||
+          contains(github.event.pull_request.labels.*.name, 'agent-created')
+        )
+      ) || (
+        github.event_name == 'issue_comment' &&
+        github.event.issue.pull_request &&
+        github.event.comment.user.type != 'Bot' &&
+        contains(github.event.comment.body, '/codex-review')
+      )
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+      REVIEW_TRIGGER: ${{ github.event_name == 'issue_comment' && 'manual comment command (/codex-review)' || 'pull request event' }}
+    steps:
+      - name: Checkout pull request merge ref
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'issue_comment' && format('refs/pull/{0}/merge', github.event.issue.number) || format('refs/pull/{0}/merge', github.event.pull_request.number) }}
+
+      - name: Prepare review context
+        run: |
+          mkdir -p .git/codex-review-context
+
+          gh pr view "$PR_NUMBER" \
+            --repo "${{ github.repository }}" \
+            --json number,title,author,headRefName,baseRefName,body,closingIssuesReferences,url \
+            > .git/codex-review-context/pr.json
+
+          {
+            echo "# Codex Review Context"
+            echo
+            echo "- Trigger: $REVIEW_TRIGGER"
+            echo "- PR: #$(jq -r '.number' .git/codex-review-context/pr.json) $(jq -r '.title' .git/codex-review-context/pr.json)"
+            echo "- URL: $(jq -r '.url' .git/codex-review-context/pr.json)"
+            echo "- Author: $(jq -r '.author.login' .git/codex-review-context/pr.json)"
+            echo "- Head branch: $(jq -r '.headRefName' .git/codex-review-context/pr.json)"
+            echo "- Base branch: $(jq -r '.baseRefName' .git/codex-review-context/pr.json)"
+            echo
+            echo "## PR Body"
+            jq -r '.body // "_No PR body provided._"' .git/codex-review-context/pr.json
+            echo
+          } > .git/codex-review-context/pr.md
+
+          ISSUE_COUNT=$(jq '.closingIssuesReferences | length' .git/codex-review-context/pr.json)
+          if [ "$ISSUE_COUNT" -gt 0 ]; then
+            ISSUE_NUMBER=$(jq -r '.closingIssuesReferences[0].number' .git/codex-review-context/pr.json)
+            gh issue view "$ISSUE_NUMBER" --repo "${{ github.repository }}" --json number,title,body,url > .git/codex-review-context/issue.json
+            {
+              echo "## Linked Issue"
+              echo
+              echo "- Issue: #$(jq -r '.number' .git/codex-review-context/issue.json) $(jq -r '.title' .git/codex-review-context/issue.json)"
+              echo "- URL: $(jq -r '.url' .git/codex-review-context/issue.json)"
+              echo
+              jq -r '.body // "_No issue body provided._"' .git/codex-review-context/issue.json
+            } >> .git/codex-review-context/pr.md
+          else
+            {
+              echo "## Linked Issue"
+              echo
+              echo "No linked issue detected."
+            } >> .git/codex-review-context/pr.md
+          fi
+
+          gh pr diff "$PR_NUMBER" \
+            --repo "${{ github.repository }}" \
+            --patch > .git/codex-review-context/diff.patch
+
+          gh pr checks "$PR_NUMBER" \
+            --repo "${{ github.repository }}" > .git/codex-review-context/checks.txt || true
+
+          gh pr view "$PR_NUMBER" \
+            --repo "${{ github.repository }}" \
+            --comments > .git/codex-review-context/comments.txt || true
+
+      - name: Run Codex review
+        id: run_codex
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          model: ${{ env.CODEX_MODEL }}
+          effort: high
+          sandbox: read-only
+          safety-strategy: drop-sudo
+          prompt-file: .github/prompts/codex-pr-review.md
+          output-file: codex-review-output.md
+
+      - name: Post Codex review
+        run: |
+          if [ ! -s codex-review-output.md ]; then
+            echo "No Codex review output."
+            exit 0
+          fi
+
+          if head -1 codex-review-output.md | grep -Fxq "NO_FINDINGS"; then
+            echo "No material findings; skipping PR comment."
+            exit 0
+          fi
+
+          gh pr comment "$PR_NUMBER" \
+            --repo "${{ github.repository }}" \
+            --body-file codex-review-output.md

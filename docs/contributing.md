@@ -8,8 +8,6 @@ nav_order: 13
 
 This page is for developers who want to contribute to Fabricate, run the integration test suite locally, or understand how releases are published.
 
----
-
 ## Commit conventions
 
 All commits to Fabricate must follow the [Conventional Commits](https://www.conventionalcommits.org/) format. A GitHub Actions workflow validates every commit on a pull request and the PR title itself using `commitlint`.
@@ -123,8 +121,6 @@ After a run, results are written to `test-results/`:
 6. Asserts the Crafting App window is visible.
 7. Fails if any browser console errors were captured during the session.
 
----
-
 ## CI workflows
 
 ### Conventional Commits workflow
@@ -162,7 +158,7 @@ Steps:
 
 File: `.github/workflows/codex-team-b-manual.yml`
 
-This workflow is a manual-only Codex version of a Team B run for one explicitly selected issue. It does not run on a schedule and does not replace the existing Claude Team A or Team B automation.
+This workflow is a manual-only Codex Team B run for one explicitly selected issue. Scheduled Codex research and backlog-processing lanes live in `.github/workflows/team-a-research.yml` and `.github/workflows/team-b-backlog.yml`.
 
 Requirements:
 - Repository secret: `OPENAI_API_KEY`
@@ -176,9 +172,7 @@ Behavior:
 - Opens a PR if changes were produced
 - Marks the issue `agent-failed` if the run fails or produces no code changes
 
-Use this workflow when you want a supervised, explicitly chosen Codex Team B run without changing the scheduled automation lanes.
-
----
+Use this workflow when you want a supervised, explicitly chosen Codex Team B run outside the scheduled automation lanes.
 
 ## Release pipeline
 
@@ -219,8 +213,6 @@ node scripts/release.js --validate-only
 # Inject a specific version into module.json, then build
 node scripts/release.js --version 1.2.3
 ```
-
----
 
 ## See also
 

@@ -1,87 +1,150 @@
-name: "Team B: Backlog Processing"
+name: "Team B: Codex Backlog Processing"
 
 on:
   schedule:
-    - cron: '0 */1 * * *'          # Every 1 hour
-  workflow_dispatch:               # Manual trigger
+    - cron: '0 */1 * * *'
+  workflow_dispatch:
     inputs:
       issue_number:
         description: "Specific issue number to work on (optional)"
         required: false
         type: string
+      max_parallel:
+        description: "Maximum issues to process in parallel when issue_number is omitted"
+        required: false
+        type: string
+        default: "3"
 
 concurrency:
-  group: team-b-backlog
+  group: team-b-backlog-selector
   cancel-in-progress: false
 
 permissions:
   contents: write
   pull-requests: write
   issues: write
-  id-token: write
+
+env:
+  CODEX_MODEL: gpt-5.4
 
 jobs:
-  pick-task:
+  pick-tasks:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     outputs:
-      issue_number: ${{ steps.select.outputs.issue_number }}
-      issue_title: ${{ steps.select.outputs.issue_title }}
+      issues_json: ${{ steps.select.outputs.issues_json }}
+      has_issues: ${{ steps.select.outputs.has_issues }}
     steps:
-      - name: Select highest-priority issue
+      - name: Select eligible issues
         id: select
         env:
           GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+          MAX_PARALLEL: ${{ inputs.max_parallel || '3' }}
         run: |
-          if [ -n "${{ inputs.issue_number }}" ]; then
-            NUMBER="${{ inputs.issue_number }}"
-            TITLE=$(gh issue view "$NUMBER" --repo "${{ github.repository }}" --json title -q .title)
-          else
-            # Find the oldest open issue that:
-            #   - does NOT have the 'triage' label (humans haven't approved it yet)
-            #   - does NOT have the 'in-progress' label (not already being worked)
-            #   - does NOT have the 'agent-failed' label (failed on previous attempt)
-            #   - IS open
-            # gh sorts by created date ascending by default (oldest first = highest priority)
-            # Get issues that already have an open PR (by branch naming convention)
-            ISSUES_WITH_PRS=$(gh pr list \
-              --repo "${{ github.repository }}" \
-              --state open \
-              --json headRefName -q '.[].headRefName' \
-              | sed -n 's/^agent\/issue-//p' \
-              | jq -R -s 'split("\n") | map(select(. != "") | tonumber)')
-
-            ISSUE_JSON=$(gh issue list \
-              --repo "${{ github.repository }}" \
-              --state open \
-              --json number,title,labels \
-              --limit 50 \
-              | jq -r --argjson prs "$ISSUES_WITH_PRS" '[.[] | select(
-                  (.labels | map(.name) | contains(["triage"]) | not) and
-                  (.labels | map(.name) | contains(["in-progress"]) | not) and
-                  (.labels | map(.name) | contains(["agent-failed"]) | not) and
-                  (.number as $n | $prs | index($n) | not)
-                )] | first // empty')
-
-            if [ -z "$ISSUE_JSON" ] || [ "$ISSUE_JSON" = "null" ]; then
-              echo "No eligible issues found."
-              echo "issue_number=" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-
-            NUMBER=$(echo "$ISSUE_JSON" | jq -r '.number')
-            TITLE=$(echo "$ISSUE_JSON" | jq -r '.title')
+          DEFAULT_BRANCH="${{ github.event.repository.default_branch || 'main' }}"
+          echo "Using default branch ${DEFAULT_BRANCH}"
+          case "$MAX_PARALLEL" in
+            ''|*[!0-9]*) MAX_PARALLEL=3 ;;
+          esac
+          if [ "$MAX_PARALLEL" -lt 1 ]; then
+            MAX_PARALLEL=1
+          fi
+          if [ "$MAX_PARALLEL" -gt 6 ]; then
+            MAX_PARALLEL=6
           fi
 
-          echo "issue_number=$NUMBER" >> "$GITHUB_OUTPUT"
-          echo "issue_title=$TITLE" >> "$GITHUB_OUTPUT"
-          echo "Selected issue #$NUMBER: $TITLE"
+          if [ -n "$ISSUE_NUMBER" ]; then
+            TITLE=$(gh issue view "$ISSUE_NUMBER" --repo "${{ github.repository }}" --json title -q .title)
+            ISSUES_JSON=$(jq -cn --argjson number "$ISSUE_NUMBER" --arg title "$TITLE" '[{number: $number, title: $title}]')
+            echo "issues_json=$ISSUES_JSON" >> "$GITHUB_OUTPUT"
+            echo "has_issues=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          ISSUES_WITH_PRS=$(gh pr list \
+            --repo "${{ github.repository }}" \
+            --state open \
+            --json headRefName -q '.[].headRefName' \
+            | sed -n 's|^agent/issue-\([0-9][0-9]*\).*|\1|p' \
+            | jq -R -s 'split("\n") | map(select(. != "") | tonumber)')
+
+          CANDIDATES=$(gh issue list \
+            --repo "${{ github.repository }}" \
+            --state open \
+            --json number,title,labels,body \
+            --limit 100 \
+            | jq -c --argjson prs "$ISSUES_WITH_PRS" '[.[] | select(
+                (.labels | map(.name) | contains(["triage"]) | not) and
+                (.labels | map(.name) | contains(["in-progress"]) | not) and
+                (.labels | map(.name) | contains(["agent-failed"]) | not) and
+                (.number as $n | $prs | index($n) | not)
+              )][0:12]')
+
+          echo '[]' > /tmp/selected-issues.json
+          : > /tmp/selected-paths.txt
+
+          while IFS= read -r issue; do
+            COUNT=$(jq 'length' /tmp/selected-issues.json)
+            if [ "$COUNT" -ge "$MAX_PARALLEL" ]; then
+              break
+            fi
+
+            BODY=$(jq -r '.body // ""' <<< "$issue")
+            PATHS=$(printf '%s\n' "$BODY" | sed -n 's/^- `\([^`]*\)`.*/\1/p' | sort -u)
+            CONFLICT=false
+
+            if [ -n "$PATHS" ]; then
+              while IFS= read -r path; do
+                if [ -n "$path" ] && grep -Fxq "$path" /tmp/selected-paths.txt; then
+                  CONFLICT=true
+                  break
+                fi
+              done <<< "$PATHS"
+            fi
+
+            if [ "$CONFLICT" = "true" ]; then
+              continue
+            fi
+
+            jq --argjson issue "$(jq '{number, title}' <<< "$issue")" '. + [$issue]' /tmp/selected-issues.json > /tmp/selected-issues-next.json
+            mv /tmp/selected-issues-next.json /tmp/selected-issues.json
+
+            if [ -n "$PATHS" ]; then
+              printf '%s\n' "$PATHS" >> /tmp/selected-paths.txt
+              sort -u /tmp/selected-paths.txt -o /tmp/selected-paths.txt
+            fi
+          done < <(jq -c '.[]' <<< "$CANDIDATES")
+
+          ISSUES_JSON=$(jq -c . /tmp/selected-issues.json)
+          if [ "$ISSUES_JSON" = "[]" ]; then
+            echo "No eligible issues found."
+            echo "issues_json=[]" >> "$GITHUB_OUTPUT"
+            echo "has_issues=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Selected issues: $ISSUES_JSON"
+          echo "issues_json=$ISSUES_JSON" >> "$GITHUB_OUTPUT"
+          echo "has_issues=true" >> "$GITHUB_OUTPUT"
 
   implement:
-    needs: pick-task
-    if: needs.pick-task.outputs.issue_number != ''
+    needs: pick-tasks
+    if: needs.pick-tasks.outputs.has_issues == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        issue: ${{ fromJSON(needs.pick-tasks.outputs.issues_json) }}
+    concurrency:
+      group: team-b-issue-${{ matrix.issue.number }}
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ISSUE_NUMBER: ${{ matrix.issue.number }}
+      ISSUE_TITLE: ${{ matrix.issue.title }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -96,166 +159,96 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Prepare context for Claude
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Prepare issue context
         run: |
-          mkdir -p /tmp/claude-context
-
-          # Fetch issue body so Claude doesn't spend a turn on gh issue view
-          gh issue view "${{ needs.pick-task.outputs.issue_number }}" \
+          mkdir -p .git/codex-team-b-context
+          gh issue view "$ISSUE_NUMBER" \
             --repo "${{ github.repository }}" \
-            --json body -q .body > /tmp/claude-context/issue-body.txt
+            --json body \
+            -q .body > .git/codex-team-b-context/issue-body.txt
 
-          # Pre-read agent definitions so Claude doesn't spend turns reading them
-          for agent in orchestrator implementer reviewer docs-writer; do
-            cp ".claude/agents/${agent}.md" "/tmp/claude-context/${agent}.md"
-          done
+          {
+            echo "# Selected Issue"
+            echo
+            echo "- Repository: ${{ github.repository }}"
+            echo "- Issue Number: #${ISSUE_NUMBER}"
+            echo "- Issue Title: ${ISSUE_TITLE}"
+          } > .git/codex-team-b-context/issue-meta.md
 
       - name: Mark issue in-progress
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          gh issue edit "${{ needs.pick-task.outputs.issue_number }}" \
+          gh issue edit "$ISSUE_NUMBER" \
             --repo "${{ github.repository }}" \
             --add-label in-progress
 
       - name: Create working branch
         run: |
-          BRANCH="agent/issue-${{ needs.pick-task.outputs.issue_number }}"
-          if git ls-remote --exit-code origin "refs/heads/$BRANCH" >/dev/null 2>&1; then
-            echo "Branch $BRANCH already exists on remote — checking it out."
-            git checkout -b "$BRANCH" "origin/$BRANCH"
-          else
-            git checkout -b "$BRANCH"
-          fi
+          BRANCH="agent/issue-${ISSUE_NUMBER}-codex-run-${{ github.run_number }}-attempt-${{ github.run_attempt }}"
+          git checkout -b "$BRANCH"
           echo "BRANCH=$BRANCH" >> "$GITHUB_ENV"
 
-      - name: Plan and implement
-        id: implement
-        uses: anthropics/claude-code-action@v1
+      - name: Plan and implement with Codex
+        uses: openai/codex-action@v1
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: >-
-            --model claude-sonnet-4-6
-            --max-turns 125
-            --allowedTools "Bash,Edit,Write,Read,Glob,Grep,Agent"
-          prompt: |
-            You are running the Team B pipeline for Fabricate, a FoundryVTT
-            crafting module. Stack: TypeScript, Svelte 5, Vite, node:test.
-
-            ## Context (pre-loaded — read these files FIRST, in parallel)
-
-            All context has been pre-loaded to /tmp/claude-context/ to save
-            you tool calls. Read ALL of these files in a single parallel
-            tool call before doing anything else:
-
-            - /tmp/claude-context/issue-body.txt — the full issue body
-            - /tmp/claude-context/orchestrator.md — planning rules
-            - /tmp/claude-context/implementer.md — implementation rules
-            - /tmp/claude-context/reviewer.md — review checklist
-            - /tmp/claude-context/docs-writer.md — documentation rules
-
-            ## Issue #${{ needs.pick-task.outputs.issue_number }}: ${{ needs.pick-task.outputs.issue_title }}
-
-            ## Pipeline
-
-            Work through these phases. Be efficient — use parallel tool calls
-            where possible, skip unnecessary steps for simple tasks.
-
-            ### 1. Plan
-            Search the codebase (Grep/Glob) for keywords from the issue to
-            locate relevant files. Read those files. Decide what to change.
-            For simple tasks (e.g. removing a line, renaming a key), skip
-            writing a PLAN.md — just proceed to implementation.
-
-            **Important:** FoundryVTT i18n keys use nested JSON. A dot-path
-            like `FABRICATE.Foo.Bar` maps to `{ "FABRICATE": { "Foo": { "Bar": ... } } }`
-            in `lang/en.json`. When searching for i18n keys, search for the
-            leaf key name (e.g. `"Bar"`) rather than the dot-path.
-
-            ### 2. Implement
-            Follow the rules in /tmp/claude-context/implementer.md.
-            For trivial removals or config-only changes, a test confirming
-            the removal is sufficient — full TDD is not required.
-
-            ### 3. Validate
-            Follow the checklist in /tmp/claude-context/reviewer.md.
-            Run `npm test` and `npm run build` ONCE after all changes are
-            complete. Fix any issues found.
-
-            ### 4. Document
-            Follow the rules in /tmp/claude-context/docs-writer.md.
-            Update relevant documentation if behavior changed.
-
-            ### 5. Commit
-            Stage all changes and commit:
-            `<type>(#${{ needs.pick-task.outputs.issue_number }}): <short description>`
-
-            Types: feat, fix, docs, refactor, test, chore
-            Validate: `npx commitlint --from HEAD~1 --to HEAD --verbose`
-
-            ### 6. Screenshots (UI changes only)
-            If you changed any files matching `src/ui/**`, `styles/**`, `*.svelte`,
-            or `*.css`, you MUST attach before/after screenshots to the PR description.
-            Use Playwright via Bash to capture them:
-            1. `npx playwright install chromium --with-deps`
-            2. Write a short Node script that renders the changed component and
-               screenshots it, or use `npm run test:foundry` if Foundry credentials
-               are available in the environment.
-            3. Upload the screenshot to the PR using `gh api` and embed the
-               resulting URL in the PR body with `![screenshot](url)` syntax.
-            If you cannot capture screenshots (e.g. no display server, no Foundry),
-            add a clearly visible `> ⚠️ SCREENSHOTS NEEDED` callout to the PR body
-            describing the visual changes, so a human reviewer can add them before merge.
-
-            ## Rules
-            - NEVER remove the `triage` label from any issue.
-            - Do NOT close the issue — the PR will reference it.
-            - Do NOT merge anything.
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          model: ${{ env.CODEX_MODEL }}
+          effort: high
+          sandbox: workspace-write
+          safety-strategy: drop-sudo
+          prompt-file: .github/prompts/codex-team-b.md
+          output-file: codex-output.md
 
       - name: Validate before push
+        id: validate
         run: |
-          # Check for commits ahead of main (Claude is instructed to commit)
-          COMMITS_AHEAD=$(git rev-list origin/main..HEAD --count)
-          # Also check for uncommitted changes (in case Claude didn't commit)
+          COMMITS_AHEAD=$(git rev-list origin/${{ github.event.repository.default_branch || 'main' }}..HEAD --count)
           UNCOMMITTED=false
-          if ! git diff --cached --quiet || ! git diff --quiet; then
+
+          if [ -n "$(git status --porcelain --untracked-files=normal -- . ':!codex-output.md' ':!pr-body.md' ':!test-results')" ]; then
             UNCOMMITTED=true
           fi
 
           if [ "$COMMITS_AHEAD" -eq 0 ] && [ "$UNCOMMITTED" = "false" ]; then
             echo "No changes to push."
-            echo "HAS_CHANGES=false" >> "$GITHUB_ENV"
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          # Stage and commit any uncommitted changes Claude left behind
           if [ "$UNCOMMITTED" = "true" ]; then
-            echo "Found uncommitted changes — staging and committing..."
-            git add -A
-            git commit -m "chore(#${{ needs.pick-task.outputs.issue_number }}): stage uncommitted agent changes"
+            git add -A -- . ':!codex-output.md' ':!pr-body.md' ':!test-results'
+            git commit -m "chore(#${ISSUE_NUMBER}): stage uncommitted codex changes"
           fi
 
-          echo "HAS_CHANGES=true" >> "$GITHUB_ENV"
-          echo "Found $COMMITS_AHEAD commit(s) ahead of main."
-
-          echo "Running tests to verify implementation is complete…"
+          npx commitlint --from HEAD~1 --to HEAD --verbose
           npm test
           npm run build
 
+          CHANGED_FILES=$(git diff --name-only "origin/${{ github.event.repository.default_branch || 'main' }}..HEAD")
+          if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(src/ui/|styles/)|\.(svelte|css)$'; then
+            echo "ui_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ui_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "has_changes=true" >> "$GITHUB_OUTPUT"
+
+      - name: Upload screenshot artifacts
+        if: always() && steps.validate.outputs.ui_changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-ui-evidence-${{ matrix.issue.number }}-${{ github.run_number }}
+          path: test-results/
+          if-no-files-found: ignore
+
       - name: Push and create PR
-        if: env.HAS_CHANGES == 'true'
+        if: steps.validate.outputs.has_changes == 'true'
         id: raise_pr
         env:
           PUSH_TOKEN: ${{ secrets.WORKFLOW_GH_TOKEN != '' && secrets.WORKFLOW_GH_TOKEN || github.token }}
           PRIMARY_PR_TOKEN: ${{ github.token }}
           FALLBACK_PR_TOKEN: ${{ secrets.WORKFLOW_GH_TOKEN }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch || 'main' }}
-          ISSUE_NUMBER: ${{ needs.pick-task.outputs.issue_number }}
-          ISSUE_TITLE: ${{ needs.pick-task.outputs.issue_title }}
         run: |
-          # Re-authenticate git — Claude Code Action may have replaced credentials
           push_with_token() {
             local token="$1"
             git remote set-url origin "https://x-access-token:${token}@github.com/${{ github.repository }}.git"
@@ -263,22 +256,56 @@ jobs:
           }
 
           if ! push_with_token "$PUSH_TOKEN"; then
-            echo "::warning::Push failed with primary token — falling back to github.token"
+            echo "::warning::Push failed with primary token; falling back to github.token"
             if [ "$PUSH_TOKEN" != "$PRIMARY_PR_TOKEN" ]; then
               push_with_token "$PRIMARY_PR_TOKEN"
             else
-              echo "::error::Push failed and no fallback token available."
+              echo "::error::Push failed and no fallback token is available."
               exit 1
             fi
           fi
 
-          # Extract PR title from the first commit on the branch (already conventional-commit formatted)
-          PR_TITLE=$(git log origin/main..HEAD --format='%s' --reverse | head -1)
+          PR_TITLE=$(git log "origin/${DEFAULT_BRANCH}..HEAD" --format='%s' --reverse | head -1)
           if [ -z "$PR_TITLE" ] || ! echo "$PR_TITLE" | grep -qE '^[a-z]+(\(.*\))?!?: '; then
             PR_TITLE="chore(#${ISSUE_NUMBER}): ${ISSUE_TITLE}"
           fi
 
-          MANUAL_PR_URL="${{ github.server_url }}/${{ github.repository }}/compare/${DEFAULT_BRANCH}...${BRANCH}?expand=1"
+          SCREENSHOT_NOTE="_No UI files changed._"
+          if [ "${{ steps.validate.outputs.ui_changed }}" = "true" ]; then
+            if find test-results -type f \( -name '*.png' -o -name '*.jpg' -o -name '*.jpeg' -o -name '*.webp' \) 2>/dev/null | grep -q .; then
+              SCREENSHOT_NOTE="Screenshot artifacts were uploaded as \`codex-ui-evidence-${ISSUE_NUMBER}-${{ github.run_number }}\`."
+            elif grep -q '^SCREENSHOTS_NEEDED:' codex-output.md 2>/dev/null; then
+              SCREENSHOT_NOTE="> $(grep '^SCREENSHOTS_NEEDED:' codex-output.md | head -1)"
+            else
+              SCREENSHOT_NOTE="> SCREENSHOTS_NEEDED: UI files changed, but no screenshot artifact was produced by the agent."
+            fi
+          fi
+
+          {
+            echo "## Summary"
+            echo
+            echo "Automated Codex implementation for #${ISSUE_NUMBER}."
+            echo
+            echo "## Codex Output"
+            echo
+            cat codex-output.md
+            echo
+            echo "## Test plan"
+            echo
+            echo "- [x] \`npm test\`"
+            echo "- [x] \`npm run build\`"
+            echo "- [ ] Manual verification if applicable"
+            echo
+            echo "## Screenshots"
+            echo
+            echo "$SCREENSHOT_NOTE"
+            echo
+            echo "Closes #${ISSUE_NUMBER}"
+            echo
+            echo "---"
+            echo "Generated by Team B Codex backlog workflow"
+          } > pr-body.md
+
           PR_OUTPUT="$(mktemp)"
           LAST_PR_ERROR=""
 
@@ -287,51 +314,18 @@ jobs:
             GH_TOKEN="$token" gh pr create \
               --repo "${{ github.repository }}" \
               --head "$BRANCH" \
+              --base "$DEFAULT_BRANCH" \
               --title "$PR_TITLE" \
               --label agent-created \
-              --body "$(cat <<EOF
-          ## Summary
-
-          Automated implementation for #${ISSUE_NUMBER}.
-
-          ## Pipeline
-
-          - [x] Orchestrator: planned
-          - [x] Implementer: built
-          - [x] Reviewer: validated
-          - [x] Docs Writer: documented
-
-          ## Test plan
-
-          - [ ] Review code changes
-          - [ ] Verify tests pass: \`npm test\`
-          - [ ] Verify build: \`npm run build\`
-          - [ ] Manual verification if applicable
-
-          ## Screenshots
-
-          _Added by the agent if UI files were changed, or add manually before merging._
-
-          Closes #${ISSUE_NUMBER}
-
-          ---
-          Generated by Team B automated pipeline
-          EOF
-          )" >"$PR_OUTPUT" 2>&1
+              --body-file pr-body.md >"$PR_OUTPUT" 2>&1
           }
 
           if try_create_pr "$PRIMARY_PR_TOKEN"; then
             cat "$PR_OUTPUT"
             echo "pr_created=true" >> "$GITHUB_OUTPUT"
-          elif grep -q "already exists" "$PR_OUTPUT"; then
-            echo "::notice::PR already exists for branch ${BRANCH} — skipping creation."
-            EXISTING_PR_URL=$(GH_TOKEN="$PRIMARY_PR_TOKEN" gh pr view "$BRANCH" --repo "${{ github.repository }}" --json url -q .url 2>/dev/null || true)
-            echo "Existing PR: ${EXISTING_PR_URL:-unknown}"
-            echo "pr_created=true" >> "$GITHUB_OUTPUT"
           else
             LAST_PR_ERROR="$(cat "$PR_OUTPUT")"
-
-            if [ -n "${FALLBACK_PR_TOKEN}" ] && [ "${FALLBACK_PR_TOKEN}" != "${PRIMARY_PR_TOKEN}" ]; then
+            if [ -n "$FALLBACK_PR_TOKEN" ] && [ "$FALLBACK_PR_TOKEN" != "$PRIMARY_PR_TOKEN" ]; then
               if try_create_pr "$FALLBACK_PR_TOKEN"; then
                 cat "$PR_OUTPUT"
                 echo "pr_created=true" >> "$GITHUB_OUTPUT"
@@ -341,8 +335,8 @@ jobs:
             fi
 
             cat "$PR_OUTPUT"
-
             if grep -Eq "GitHub Actions is not permitted to create or approve pull requests|Resource not accessible by integration|createPullRequest\\.pullRequest" "$PR_OUTPUT"; then
+              MANUAL_PR_URL="${{ github.server_url }}/${{ github.repository }}/compare/${DEFAULT_BRANCH}...${BRANCH}?expand=1"
               echo "::warning::Automatic PR creation is blocked for this token. Open the PR manually: ${MANUAL_PR_URL}"
               echo "pr_created=false" >> "$GITHUB_OUTPUT"
               echo "manual_pr_url=${MANUAL_PR_URL}" >> "$GITHUB_OUTPUT"
@@ -353,48 +347,41 @@ jobs:
           fi
 
       - name: Comment manual PR handoff
-        if: env.HAS_CHANGES == 'true' && steps.raise_pr.outputs.pr_created == 'false'
-        env:
-          GH_TOKEN: ${{ github.token }}
+        if: steps.validate.outputs.has_changes == 'true' && steps.raise_pr.outputs.pr_created == 'false'
         run: |
-          gh issue comment "${{ needs.pick-task.outputs.issue_number }}" \
+          gh issue comment "$ISSUE_NUMBER" \
             --repo "${{ github.repository }}" \
-            --body "Implementation branch \`${BRANCH}\` was pushed successfully, but GitHub Actions could not create a pull request with the configured token. Open it manually: ${{ steps.raise_pr.outputs.manual_pr_url }}"
+            --body "Codex implementation branch \`${BRANCH}\` was pushed successfully, but the workflow could not create a pull request with the configured token. Open it manually: ${{ steps.raise_pr.outputs.manual_pr_url }}"
 
-      - name: Remove in-progress on success (no changes)
-        if: env.HAS_CHANGES == 'false'
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Mark issue agent-failed on no-op
+        if: steps.validate.outputs.has_changes == 'false'
         run: |
-          gh issue edit "${{ needs.pick-task.outputs.issue_number }}" \
+          gh issue edit "$ISSUE_NUMBER" \
             --repo "${{ github.repository }}" \
             --remove-label in-progress \
-            --add-label agent-failed
-          gh issue comment "${{ needs.pick-task.outputs.issue_number }}" \
+            --add-label agent-failed || true
+
+          gh issue comment "$ISSUE_NUMBER" \
             --repo "${{ github.repository }}" \
-            --body "Agent completed pipeline but produced no code changes. Returning to backlog for review."
+            --body "Codex Team B workflow completed but produced no code changes. Returning the issue to the backlog for review."
 
       - name: Cleanup on failure
         if: failure()
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          # Swap in-progress for agent-failed so the issue is not retried automatically
-          gh issue edit "${{ needs.pick-task.outputs.issue_number }}" \
+          gh issue edit "$ISSUE_NUMBER" \
             --repo "${{ github.repository }}" \
             --remove-label in-progress \
-            --add-label agent-failed
+            --add-label agent-failed || true
 
-          # Post a comment with the run link for debugging
-          gh issue comment "${{ needs.pick-task.outputs.issue_number }}" \
+          gh issue comment "$ISSUE_NUMBER" \
             --repo "${{ github.repository }}" \
-            --body "Agent pipeline failed. [View run logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).
-          Remove the \`agent-failed\` label to allow retry."
+            --body "Codex Team B workflow failed. [View run logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).
+          Remove the \`agent-failed\` label to allow retry." || true
 
-          # Delete remote branch if it was pushed (use gh api — git credentials
-          # are revoked by the Claude Code Action post-step before this runs)
-          gh api \
-            --method DELETE \
-            "repos/${{ github.repository }}/git/refs/heads/$BRANCH" \
-            2>/dev/null && echo "Deleted remote branch $BRANCH" \
-            || echo "Branch $BRANCH was not pushed — nothing to delete"
+          if [ -n "${BRANCH:-}" ]; then
+            gh api \
+              --method DELETE \
+              "repos/${{ github.repository }}/git/refs/heads/$BRANCH" \
+              2>/dev/null && echo "Deleted remote branch $BRANCH" \
+              || echo "Branch $BRANCH was not pushed; nothing to delete"
+          fi

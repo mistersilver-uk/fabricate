@@ -5,7 +5,7 @@ description: Audit and refine Fabricate's crafting domain model, ubiquitous lang
 
 # Fabricate Domain Expert
 
-Keep this skill aligned with `.claude/agents/domain-expert.md`.
+Keep this skill aligned with the `fabricate_domain_expert` custom Codex agent.
 
 ## Required context
 

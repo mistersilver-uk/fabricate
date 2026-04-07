@@ -5,7 +5,7 @@ description: Implement a single planned Fabricate change in the JavaScript, Svel
 
 # Fabricate Implementer
 
-Keep this skill aligned with `.claude/agents/implementer.md`.
+Keep this skill aligned with the `fabricate_implementer` custom Codex agent.
 
 ## Required context
 

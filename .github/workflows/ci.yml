@@ -102,12 +102,12 @@ jobs:
 
           echo "UI files changed — checking PR body for screenshots..."
 
-          # Check PR body for image evidence
-          if echo "$PR_BODY" | grep -qiE '!\[.*\]\(.*\)|<img\s|\.png|\.jpg|\.jpeg|\.gif|\.webp|screenshot|screen.shot'; then
-            echo "Screenshots found in PR description."
+          # Check PR body for actual image evidence or an explicit handoff marker.
+          if echo "$PR_BODY" | grep -qiE '!\[.*\]\(.*\)|<img\s|https?://[^[:space:])]+\.(png|jpg|jpeg|gif|webp)|test-results/[^[:space:])]+\.(png|jpg|jpeg|gif|webp)|SCREENSHOTS_NEEDED:'; then
+            echo "Screenshot evidence or explicit handoff marker found in PR description."
             exit 0
           fi
 
-          echo "::error::This PR changes UI files but the description contains no screenshots."
-          echo "Please add before/after screenshots to the PR description showing the visual changes."
+          echo "::error::This PR changes UI files but the description contains no screenshot evidence or SCREENSHOTS_NEEDED marker."
+          echo "Please add before/after screenshots to the PR description, link to screenshot artifacts, or add SCREENSHOTS_NEEDED with a reason."
           exit 1
