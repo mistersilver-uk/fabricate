@@ -201,6 +201,11 @@ jobs:
           git checkout -b "$BRANCH"
           echo "BRANCH=$BRANCH" >> "$GITHUB_ENV"
 
+      - name: Configure git author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
       - name: Plan and implement with Codex
         uses: openai/codex-action@v1
         with:

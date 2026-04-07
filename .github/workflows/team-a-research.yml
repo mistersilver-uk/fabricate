@@ -36,6 +36,11 @@ jobs:
       - name: Create research branch
         run: git checkout -b "research/domain-audit-${{ github.run_number }}-${{ github.run_attempt }}"
 
+      - name: Configure git author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
       - name: Run Codex domain audit
         uses: openai/codex-action@v1
         with:
@@ -49,6 +54,13 @@ jobs:
 
       - name: Push domain update PR if files changed
         run: |
+          OUT_OF_SCOPE=$(git status --porcelain --untracked-files=normal -- . ':!DOMAIN.md' ':!codex-domain-output.md' ':!pr-body.md')
+          if [ -n "$OUT_OF_SCOPE" ]; then
+            echo "::error::Domain audit left uncommitted changes outside its ownership:"
+            printf '%s\n' "$OUT_OF_SCOPE"
+            exit 1
+          fi
+
           if git diff --quiet && git diff --cached --quiet && [ "$(git rev-list origin/${{ github.event.repository.default_branch || 'main' }}..HEAD --count)" -eq 0 ]; then
             echo "No DOMAIN.md changes."
             exit 0
@@ -180,6 +192,11 @@ jobs:
       - name: Create competitive branch
         run: git checkout -b "research/competitive-analysis-${{ github.run_number }}-${{ github.run_attempt }}"
 
+      - name: Configure git author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
       - name: Run Codex competitive analysis
         uses: openai/codex-action@v1
         with:
@@ -193,6 +210,13 @@ jobs:
 
       - name: Push competitive update PR if files changed
         run: |
+          OUT_OF_SCOPE=$(git status --porcelain --untracked-files=normal -- . ':!COMPETITIVE_ANALYSIS.md' ':!codex-competitive-output.md' ':!pr-body.md')
+          if [ -n "$OUT_OF_SCOPE" ]; then
+            echo "::error::Competitive analysis left uncommitted changes outside its ownership:"
+            printf '%s\n' "$OUT_OF_SCOPE"
+            exit 1
+          fi
+
           if git diff --quiet && git diff --cached --quiet && [ "$(git rev-list origin/${{ github.event.repository.default_branch || 'main' }}..HEAD --count)" -eq 0 ]; then
             echo "No COMPETITIVE_ANALYSIS.md changes."
             exit 0

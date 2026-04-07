@@ -61,7 +61,19 @@ export function parseDiffPatch(patch) {
       continue;
     }
 
-    if (line.startsWith('+++ b/')) {
+    if (!inHunk && line.startsWith('--- a/')) {
+      currentPath = line.slice('--- a/'.length);
+      if (!files.has(currentPath)) {
+        files.set(currentPath, { right: new Set(), left: new Set() });
+      }
+      continue;
+    }
+
+    if (!inHunk && (line === '--- /dev/null' || line === '+++ /dev/null')) {
+      continue;
+    }
+
+    if (!inHunk && line.startsWith('+++ b/')) {
       currentPath = line.slice('+++ b/'.length);
       if (!files.has(currentPath)) {
         files.set(currentPath, { right: new Set(), left: new Set() });
