@@ -200,3 +200,60 @@ test('crafting store groups active runs by recipe and prefers the latest active 
   assert.equal(recipeRow.activeRunId, 'run-new');
   assert.equal(recipeRow.craftButtonLabel, 'Waiting');
 });
+
+test('crafting store refresh tolerates multi-step recipes with empty top-level ingredientSets', async () => {
+  const multiStepRecipe = {
+    id: 'r-multi-step',
+    name: 'Complex Potion',
+    description: '',
+    img: 'icons/svg/item-bag.svg',
+    category: 'alchemy',
+    ingredientSets: [],
+    results: [
+      { id: 'i-potion', itemId: 'i-potion', name: 'Potion', quantity: 1 }
+    ],
+    steps: [
+      {
+        id: 'step-1',
+        name: 'Prepare Base',
+        ingredientSets: [
+          { ingredients: [{ id: 'i-herb', itemId: 'i-herb', name: 'Herb', quantity: 1 }] }
+        ],
+        results: []
+      },
+      {
+        id: 'step-2',
+        name: 'Finish Brew',
+        ingredientSets: [
+          { ingredients: [{ id: 'i-water', itemId: 'i-water', name: 'Water', quantity: 1 }] }
+        ],
+        results: [{ id: 'i-potion', itemId: 'i-potion', name: 'Potion', quantity: 1 }]
+      }
+    ],
+    getResultDescription: () => '1x Potion',
+    isSimpleRecipe: () => false
+  };
+
+  const services = makeServices({
+    getRecipeManager: () => ({
+      getRecipes: () => [multiStepRecipe],
+      getRecipe: (id) => id === multiStepRecipe.id ? multiStepRecipe : null,
+      evaluateCraftability: () => ({
+        canCraft: true,
+        satisfiableSet: {},
+        missing: { ingredients: [], essences: [], catalysts: [] },
+        ingredientStates: [],
+        essenceStates: [],
+        catalystStates: []
+      })
+    })
+  });
+  const store = createCraftingStore(services);
+
+  await assert.doesNotReject(async () => {
+    await store.refresh();
+  });
+
+  const viewState = get(store.viewState);
+  assert.ok(viewState.recipes.find(r => r.id === 'r-multi-step'));
+});

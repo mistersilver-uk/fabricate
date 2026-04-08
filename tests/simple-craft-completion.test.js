@@ -145,3 +145,34 @@ test('CraftingRunManager moves one-step completed runs out of active runs', asyn
   assert.equal(manager.getActiveRuns(actor).length, 0);
   assert.equal(manager.getRunHistory(actor)[0].status, 'succeeded');
 });
+
+test('CraftingRunManager uses cache to prevent stale-flag reads after createRun', async () => {
+  const manager = new CraftingRunManager();
+  const actor = makeActor();
+  const recipe = makeRecipe();
+
+  const run = await manager.createRun(actor, recipe, [], 'user-1');
+
+  // Overwrite the flag storage to simulate an external staleness scenario.
+  actor.setFlag('fabricate', 'fabricate.craftingRuns', { active: {}, history: [] });
+
+  // The in-memory cache should still return the created run.
+  assert.equal(manager.getActiveRuns(actor).length, 1);
+  assert.equal(manager.getActiveRuns(actor)[0].id, run.id);
+});
+
+test('CraftingRunManager invalidateCache clears cache so next read re-reads flags', async () => {
+  const manager = new CraftingRunManager();
+  const actor = makeActor();
+  const recipe = makeRecipe();
+
+  await manager.createRun(actor, recipe, [], 'user-1');
+
+  // Overwrite the flag storage to simulate the state that the cache was hiding.
+  actor.setFlag('fabricate', 'fabricate.craftingRuns', { active: {}, history: [] });
+
+  manager.invalidateCache(actor.id);
+
+  // After invalidation the manager re-reads from flags, which are now empty.
+  assert.equal(manager.getActiveRuns(actor).length, 0);
+});

@@ -51,7 +51,7 @@ fabricate.openRecipeManager()
 fabricate.listCraftingSystems()
 ```
 
-### App Accessors
+### Constructors
 
 ```javascript
 const {
@@ -59,7 +59,14 @@ const {
   Catalyst, Result,
   RecipeManager, CraftingEngine, CraftingSystemManager,
   CraftingRunManager, RecipeVisibilityService, ResolutionModeService,
-  SignatureValidator,
+  SignatureValidator
+} = game.fabricate.api;
+```
+
+### App Accessors
+
+```javascript
+const {
   getCraftingAppClass, getRecipeManagerAppClass, getRecipeEditorAppClass
 } = game.fabricate.api;
 ```
