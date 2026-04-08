@@ -5,7 +5,7 @@ description: Audit and improve Fabricate's Svelte UI, Foundry window layouts, an
 
 # Fabricate UX Designer
 
-Keep this skill aligned with `.claude/agents/ux-designer.md`.
+Keep this skill aligned with the `fabricate_ux_designer` custom Codex agent.
 
 ## Required context
 
@@ -13,7 +13,7 @@ Keep this skill aligned with `.claude/agents/ux-designer.md`.
 - relevant files under `src/ui/`, `src/ui/svelte/`, `styles/`, and `lang/`
 - the active Vite dev URL when available, or a prompt to ask the user for it before using container-backed flows
 - existing screenshots in `test-results/` when no live dev session is available
-- `.claude/agents/ux-designer.md` when you need the full audit intent
+- `.codex/agents/fabricate-ux-designer.toml` when you need the full audit intent
 
 ## Workflow
 

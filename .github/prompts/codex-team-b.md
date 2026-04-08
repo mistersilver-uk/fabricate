@@ -1,10 +1,16 @@
-You are running a manually triggered Team B backlog workflow for Fabricate, a FoundryVTT crafting module.
+You are running the scheduled Codex Team B backlog workflow for Fabricate, a FoundryVTT crafting module.
 
 Read these files before doing anything else, ideally in parallel:
 
 - `AGENTS.md`
 - `.git/codex-team-b-context/issue-meta.md`
 - `.git/codex-team-b-context/issue-body.txt`
+- `.codex/config.toml`
+- `.codex/agents/fabricate-orchestrator.toml`
+- `.codex/agents/fabricate-implementer.toml`
+- `.codex/agents/fabricate-reviewer.toml`
+- `.codex/agents/fabricate-docs-writer.toml`
+- `.codex/agents/fabricate-pr-explorer.toml`
 - `.codex/skills/fabricate-orchestrator/SKILL.md`
 - `.codex/skills/fabricate-implementer/SKILL.md`
 - `.codex/skills/fabricate-reviewer/SKILL.md`
@@ -12,6 +18,15 @@ Read these files before doing anything else, ideally in parallel:
 
 The workflow has already selected the issue, fetched its body, and installed dependencies.
 Do not depend on network access.
+
+Use Codex subagents explicitly:
+
+- Spawn `fabricate_pr_explorer` first for non-trivial issues to map affected files, specs, tests, and likely file ownership boundaries.
+- If the issue has disjoint write sets, spawn one `fabricate_implementer` worker per write set and assign exact file ownership. Tell each worker that other agents may be editing in parallel and that it must not revert unrelated changes.
+- If there is only one write set, implement locally after using the explorer result.
+- Spawn `fabricate_reviewer` after implementation to review the final diff. If it returns `NEEDS_CHANGES`, fix the issues and review again.
+- Spawn `fabricate_docs_writer` only when behavior or public API documentation changed.
+- Keep subagent nesting at one level. Do not ask child agents to spawn further agents.
 
 Work through these phases:
 
@@ -44,9 +59,9 @@ Work through these phases:
 
 6. Screenshots (UI changes only)
 - If you changed any files matching `src/ui/**`, `styles/**`, `*.svelte`, or `*.css`, you MUST attach before/after screenshots to the PR description.
-- Write a short Node script that renders the changed component and screenshots it using Playwright, or use `npm run test:foundry` if Foundry credentials are available.
-- Upload the screenshot to the PR using `gh api` and embed the resulting URL in the PR body with `![screenshot](url)` syntax.
-- If you cannot capture screenshots (e.g. no display server, no Foundry, sandbox restrictions), add a clearly visible `> ⚠️ SCREENSHOTS NEEDED` callout to the PR body describing the visual changes, so a human reviewer can add them before merge.
+- Prefer existing `test-results/` screenshots or `npm run test:foundry` when runtime evidence is required.
+- If screenshots are produced, leave them under `test-results/` and mention the paths in your final output.
+- If you cannot capture screenshots, include exactly this line in your final output: `SCREENSHOTS_NEEDED: <short reason and visual change summary>`.
 
 Rules:
 
@@ -54,4 +69,11 @@ Rules:
 - Do not close the issue.
 - Do not merge anything.
 
-Output a concise summary of the changes, validations, and any deferred follow-up work.
+Output a concise summary with:
+
+- `SUMMARY:` changed behavior.
+- `SUBAGENTS:` agents spawned and their outcome.
+- `FILES:` changed files.
+- `VALIDATION:` command results.
+- `SCREENSHOTS:` artifact paths or `SCREENSHOTS_NEEDED: ...` for UI changes without evidence.
+- `FOLLOW_UP:` deferred work, or `none`.
