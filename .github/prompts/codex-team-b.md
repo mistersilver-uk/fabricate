@@ -1,4 +1,4 @@
-You are running the scheduled Codex Team B backlog workflow for Fabricate, a FoundryVTT crafting module.
+You are running the manually triggered Codex Team B backlog workflow for Fabricate, a FoundryVTT crafting module.
 
 Read these files before doing anything else, ideally in parallel:
 

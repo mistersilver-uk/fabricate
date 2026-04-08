@@ -1,8 +1,6 @@
-name: "Team A: Codex Research & Audit"
+name: "Team A: Codex Research & Audit Manual Only"
 
 on:
-  schedule:
-    - cron: '0 6 * * 1'
   workflow_dispatch:
 
 concurrency:
