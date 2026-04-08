@@ -1,16 +1,15 @@
-name: Codex Code Review
+name: Codex Code Review Manual Only
 
 on:
-  pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review]
-  push:
-    branches-ignore:
-      - main
-  issue_comment:
-    types: [created]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Pull request number to review"
+        required: true
+        type: string
 
 concurrency:
-  group: codex-review-${{ github.event.pull_request.number || github.event.issue.number || github.ref || github.run_id }}
+  group: codex-review-${{ inputs.pr_number }}
   cancel-in-progress: true
 
 permissions:
@@ -23,39 +22,17 @@ env:
 
 jobs:
   codex-review:
-    if: >
-      (
-        github.event_name == 'pull_request_target'
-      ) || (
-        github.event_name == 'issue_comment' &&
-        github.event.issue.pull_request &&
-        github.event.comment.user.type != 'Bot' &&
-        contains(github.event.comment.body, '/codex-review')
-      ) || (
-        github.event_name == 'push' &&
-        github.ref_type == 'branch' &&
-        !github.event.deleted
-      )
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
-      PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number || '' }}
-      REVIEW_TRIGGER: ${{ github.event_name == 'issue_comment' && 'manual comment command (/codex-review)' || (github.event_name == 'push' && 'branch push with open PR' || 'pull_request_target event') }}
+      PR_NUMBER: ${{ inputs.pr_number }}
+      REVIEW_TRIGGER: workflow_dispatch
     steps:
       - name: Authorize Codex trigger
         id: trigger_policy
         env:
           ACTOR: ${{ github.actor }}
-          EVENT_NAME: ${{ github.event_name }}
         run: |
-          if [ "$EVENT_NAME" = "pull_request_target" ]; then
-            echo "allowed=true" >> "$GITHUB_OUTPUT"
-            echo "allow_users=*" >> "$GITHUB_OUTPUT"
-            echo "allow_bots=true" >> "$GITHUB_OUTPUT"
-            echo "Automatic pull_request_target review is allowed for actor '${ACTOR}'."
-            exit 0
-          fi
-
           ERROR_OUTPUT=/tmp/codex-actor-permission-error
           set +e
           PERMISSION=$(gh api \
@@ -100,26 +77,7 @@ jobs:
         if: steps.trigger_policy.outputs.allowed == 'true'
         id: target
         run: |
-          if [ "${{ github.event_name }}" = "pull_request_target" ]; then
-            PR_NUMBER="${{ github.event.pull_request.number }}"
-          elif [ "${{ github.event_name }}" = "issue_comment" ]; then
-            PR_NUMBER="${{ github.event.issue.number }}"
-          else
-            HEAD_BRANCH="${{ github.ref_name }}"
-            PR_NUMBER=$(gh pr list \
-              --repo "${{ github.repository }}" \
-              --head "$HEAD_BRANCH" \
-              --state open \
-              --json number \
-              --jq '.[0].number // empty')
-
-            if [ -z "$PR_NUMBER" ]; then
-              echo "No open PR found for pushed branch ${HEAD_BRANCH}; skipping Codex review."
-              echo "skip=true" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-          fi
-
+          PR_NUMBER="${{ inputs.pr_number }}"
           PR_JSON=$(gh pr view "$PR_NUMBER" \
             --repo "${{ github.repository }}" \
             --json number,baseRefOid,headRefOid,headRepository,headRepositoryOwner)

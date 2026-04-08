@@ -1,8 +1,6 @@
-name: "Team B: Codex Backlog Processing"
+name: "Team B: Codex Backlog Processing Manual Only"
 
 on:
-  schedule:
-    - cron: '0 */1 * * *'
   workflow_dispatch:
     inputs:
       issue_number:
@@ -304,7 +302,7 @@ jobs:
           {
             echo "## Summary"
             echo
-            echo "Automated Codex implementation for #${ISSUE_NUMBER}."
+            echo "Manual Codex implementation for #${ISSUE_NUMBER}."
             echo
             echo "## Codex Output"
             echo
