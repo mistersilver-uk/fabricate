@@ -28,6 +28,16 @@ jobs:
       PR_NUMBER: ${{ inputs.pr_number }}
       REVIEW_TRIGGER: workflow_dispatch
     steps:
+      - name: Validate pr_number input
+        run: |
+          RAW_PR="${{ inputs.pr_number }}"
+          PR_NUMBER="${RAW_PR// /}"
+          if ! [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "::error::pr_number must be a positive integer, got: '${RAW_PR}'"
+            exit 1
+          fi
+          echo "PR_NUMBER=$PR_NUMBER" >> "$GITHUB_ENV"
+
       - name: Authorize Codex trigger
         id: trigger_policy
         env:
@@ -77,7 +87,6 @@ jobs:
         if: steps.trigger_policy.outputs.allowed == 'true'
         id: target
         run: |
-          PR_NUMBER="${{ inputs.pr_number }}"
           PR_JSON=$(gh pr view "$PR_NUMBER" \
             --repo "${{ github.repository }}" \
             --json number,baseRefOid,headRefOid,headRepository,headRepositoryOwner)
