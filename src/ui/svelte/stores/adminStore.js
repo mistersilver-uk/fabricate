@@ -1,5 +1,5 @@
 /**
- * adminStore — Svelte store factory for the RecipeManagerApp (T-120)
+ * adminStore — Svelte store factory for the SvelteRecipeManagerApp UI (T-120)
  *
  * All side-effects are injected via `services` so this module never touches
  * `game.*` directly.  Each call to createAdminStore() produces a fresh,

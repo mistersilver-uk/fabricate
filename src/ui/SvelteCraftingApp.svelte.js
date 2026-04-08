@@ -2,7 +2,7 @@ import SvelteApplicationMixin from './svelte/SvelteApplicationMixin.svelte.js';
 import CraftingAppRoot from './svelte/apps/CraftingAppRoot.svelte';
 import { createCraftingStore } from './svelte/stores/craftingStore.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
-import { confirmDialog } from './foundryCompat.js';
+import { confirmDialog } from './svelte/util/foundryBridge.js';
 import { registerSvelteCraftingApp } from './appFactory.js';
 
 export class SvelteCraftingApp extends SvelteApplicationMixin(

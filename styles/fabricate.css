@@ -2320,48 +2320,6 @@
   margin-top: 0.5rem;
 }
 
-/* Teaser progress editor dialog */
-.teaser-progress-editor {
-  padding: 1rem;
-}
-
-.teaser-progress-editor .editor-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1rem;
-}
-
-.teaser-progress-editor .progress-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.teaser-progress-editor .progress-table th,
-.teaser-progress-editor .progress-table td {
-  padding: 0.5rem;
-  border-bottom: 1px solid var(--color-border-light-tertiary, #c9c7b8);
-  text-align: left;
-}
-
-.teaser-progress-editor .fully-discovered {
-  color: var(--color-level-success, #43a047);
-  font-style: italic;
-}
-
-.teaser-progress-editor .action-btns {
-  display: flex;
-  gap: 0.25rem;
-}
-
-.teaser-progress-editor .action-btn {
-  background: none;
-  border: 1px solid var(--color-border-light-primary, #7a7971);
-  border-radius: 3px;
-  padding: 0.1rem 0.4rem;
-  cursor: pointer;
-}
-
 /* =========================================================================
    Alchemy Submit Panel
    ========================================================================= */

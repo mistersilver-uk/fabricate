@@ -1,5 +1,5 @@
 /**
- * craftingStore — Svelte store factory for the CraftingApp (T-110)
+ * craftingStore — Svelte store factory for the SvelteCraftingApp UI (T-110)
  *
  * All side-effects are injected via `services` so this module never touches
  * `game.*` directly.  Each call to createCraftingStore() produces a fresh,
@@ -20,12 +20,12 @@ const RECENTLY_CRAFTED_MAX = 10;
 const _signatureValidator = new SignatureValidator(null);
 
 // ---------------------------------------------------------------------------
-// Module-private helper functions (ported from CraftingApp.js)
+// Module-private helper functions retained from the pre-Svelte crafting implementation.
 // ---------------------------------------------------------------------------
 
 /**
- * Resolve the default crafting actor using the same priority order as
- * CraftingApp._getDefaultCraftingActor().
+ * Resolve the default crafting actor using the same priority order as the
+ * current Svelte crafting app.
  *
  * 1. Saved setting (LAST_CRAFTING_ACTOR)
  * 2. User's assigned character
@@ -47,7 +47,7 @@ function _resolveDefaultCraftingActor(services) {
 
 /**
  * Resolve the default component source actors using the same priority order as
- * CraftingApp._getDefaultComponentSources().
+ * the current Svelte crafting app.
  *
  * 1. Saved setting (LAST_COMPONENT_SOURCES)
  * 2. craftingActor if owned

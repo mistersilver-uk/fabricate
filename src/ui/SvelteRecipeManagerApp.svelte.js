@@ -2,12 +2,11 @@ import SvelteApplicationMixin from './svelte/SvelteApplicationMixin.svelte.js';
 import RecipeManagerRoot from './svelte/apps/RecipeManagerRoot.svelte';
 import { createAdminStore } from './svelte/stores/adminStore.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
-import { confirmDialog } from './foundryCompat.js';
+import { confirmDialog, localize } from './svelte/util/foundryBridge.js';
 import { getRecipeEditorAppClass, registerSvelteRecipeManagerApp } from './appFactory.js';
 import { SvelteComponentEditorApp } from './SvelteComponentEditorApp.svelte.js';
 import { get } from 'svelte/store';
 import { resolveDropUuid, resolveDropData } from './svelte/util/dropUtils.js';
-import { localize } from './svelte/util/foundryBridge.js';
 import { validateImportData, prepareForImport } from '../systems/CraftingSystemExporter.js';
 import { CompendiumImporter } from '../systems/CompendiumImporter.js';
 

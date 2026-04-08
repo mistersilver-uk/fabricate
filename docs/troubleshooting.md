@@ -301,12 +301,12 @@ Folder drops are a special case: Fabricate expands the folder and imports any It
 
 Fabricate's Svelte UI reads drag data using `foundry.applications.ux.TextEditor.implementation.getDragEventData`. In some Foundry versions and environments this API path is absent at the time of the drop, causing Fabricate's drag handler to receive `null` and silently skip the drop callback entirely. Control returns to Foundry's own ApplicationV2 drop handler, which produces the generic error message.
 
-**Fix:** This is resolved in the current version. `getDragEventData` in `foundryBridge.js` now uses a two-strategy approach:
+**Fix:** This is resolved in the current version. `getDragEventData` in `foundryBridge.js` now uses a two-strategy approach shared by the active Svelte UI:
 
 1. If `foundry.applications.ux.TextEditor.implementation.getDragEventData` is available, it is used as before.
 2. Otherwise, the drag data is read directly from `event.dataTransfer.getData('text/plain')` and parsed as JSON. This is the universal drag data format used by Foundry across all versions.
 
-The same fix is applied to `foundryCompat.js` (the legacy Handlebars path). In addition, `foundryCompat.js` now evaluates the `TextEditor` API path at the moment of each drop rather than once at module load time, so it correctly handles cases where the API becomes available after the module first imports.
+Both Svelte shells import this shared bridge, so there is no separate legacy compatibility path to keep in sync.
 
 **If you are still seeing silent drop failures after updating:**
 

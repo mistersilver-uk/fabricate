@@ -30,12 +30,6 @@ globalThis.foundry = {
   utils: {
     randomID: () => `id-${++_idCounter}`,
     getProperty
-  },
-  applications: {
-    api: {
-      HandlebarsApplicationMixin: (Base) => class extends Base {},
-      ApplicationV2: class { async _prepareContext() { return {}; } close() {} }
-    }
   }
 };
 globalThis.game = { user: { isGM: true }, fabricate: null };

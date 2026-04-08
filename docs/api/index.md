@@ -11,7 +11,7 @@ Fabricate exposes its API through two Foundry globals:
 
 - **`game.fabricate`** -- the main Fabricate instance with service accessors and a quick `craft()` helper
 - **`globalThis.fabricate`** (alias: `fabricate`) -- convenience functions for macros
-- **`game.fabricate.api`** -- constructor references for all public classes
+- **`game.fabricate.api`** -- constructor references for public data/model classes and accessors for the Svelte app shells
 
 All APIs are available after the `fabricate.ready` hook fires:
 
@@ -51,7 +51,7 @@ fabricate.openRecipeManager()
 fabricate.listCraftingSystems()
 ```
 
-### Class Constructors
+### App Accessors
 
 ```javascript
 const {
@@ -60,9 +60,11 @@ const {
   RecipeManager, CraftingEngine, CraftingSystemManager,
   CraftingRunManager, RecipeVisibilityService, ResolutionModeService,
   SignatureValidator,
-  CraftingApp, RecipeManagerApp, RecipeEditorApp
+  getCraftingAppClass, getRecipeManagerAppClass, getRecipeEditorAppClass
 } = game.fabricate.api;
 ```
+
+The `get*AppClass` helpers return the registered Svelte `ApplicationV2` classes used by the current UI shell.
 
 ## Data Persistence
 

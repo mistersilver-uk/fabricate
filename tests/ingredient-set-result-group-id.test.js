@@ -17,12 +17,6 @@ globalThis.foundry = {
   utils: {
     randomID: () => `id-${Math.random().toString(36).slice(2, 10)}`,
     getProperty: () => undefined
-  },
-  applications: {
-    api: {
-      HandlebarsApplicationMixin: (Base) => class extends Base {},
-      ApplicationV2: class { async _prepareContext() { return {}; } close() {} }
-    }
   }
 };
 globalThis.game = { user: { isGM: true }, fabricate: null };

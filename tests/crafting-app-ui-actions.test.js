@@ -1,60 +1,45 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { get } from 'svelte/store';
 
-globalThis.foundry = {
-  applications: {
-    api: {
-      HandlebarsApplicationMixin: (Base) => class extends Base {},
-      ApplicationV2: class {
-        async _prepareContext() {
-          return {};
-        }
-      }
-    }
-  }
-};
+import { createCraftingStore } from '../src/ui/svelte/stores/craftingStore.js';
 
 globalThis.game = {
-  user: { id: 'user-1', character: null },
-  time: { worldTime: 1000 },
-  actors: []
-};
-
-globalThis.ui = {
-  notifications: {
-    info: () => {},
-    warn: () => {},
-    error: () => {}
+  i18n: {
+    localize: (key) => `loc:${key}`,
+    format: (key, data) => `loc:${key}:${data?.name || ''}`
   }
 };
 
-globalThis.ChatMessage = {
-  create: () => {},
-  getSpeaker: () => ({})
-};
-
-const { CraftingApp } = await import('../src/ui/CraftingApp.js');
-
-function createAppHarness() {
-  const app = Object.create(CraftingApp.prototype);
-  app.craftingActor = { id: 'a1', name: 'Crafter' };
-  app.componentSourceActors = [{ id: 'a1', name: 'Crafter' }];
-  app.render = async () => {};
-  app._notifyInfo = () => {};
-  app._notifyWarn = () => {};
-  app._notifyError = () => {};
-  app._createChatMessage = () => {};
-  return app;
+function makeActor(id = 'a1', name = 'Crafter') {
+  return {
+    id,
+    uuid: `Actor.${id}`,
+    name,
+    isOwner: true,
+    items: []
+  };
 }
 
-/**
- * Build a standard empty evaluateCraftability result for mocks that don't
- * need specific craftability state.
- */
+function makeRecipe(id = 'r1', name = 'Potion') {
+  return {
+    id,
+    name,
+    description: '',
+    img: 'icons/svg/item-bag.svg',
+    category: 'alchemy',
+    ingredientSets: [],
+    results: [],
+    steps: [],
+    getResultDescription: () => '1x Result',
+    isSimpleRecipe: () => false
+  };
+}
+
 function emptyEvaluation() {
   return {
-    canCraft: false,
-    satisfiableSet: null,
+    canCraft: true,
+    satisfiableSet: {},
     missing: { ingredients: [], essences: [], catalysts: [] },
     ingredientStates: [],
     essenceStates: [],
@@ -62,409 +47,156 @@ function emptyEvaluation() {
   };
 }
 
-test('CraftingApp._onCraft forwards runId and skips confirm when skipConfirm=true', async () => {
-  const app = createAppHarness();
+function makeServices(overrides = {}) {
+  const actor = makeActor();
+  const recipes = [makeRecipe('r1', 'Potion'), makeRecipe('r2', 'Elixir')];
+  const settings = {
+    favouriteRecipes: [],
+    recentlyCrafted: [],
+    autoCraft: false,
+    showSimpleRecipesOnly: false,
+    lastCraftingActor: actor.id,
+    lastComponentSources: [actor.id]
+  };
+  const runManager = {
+    getActiveRuns: () => [],
+    getRunHistory: () => [],
+    getActiveRun: () => null,
+    cancelRun: async () => true
+  };
+
+  const services = {
+    getSetting: (key) => settings[key] ?? null,
+    setSetting: async (key, value) => { settings[key] = value; },
+    getRecipeManager: () => ({
+      getRecipes: () => recipes,
+      getRecipe: (id) => recipes.find(recipe => recipe.id === id) || null,
+      evaluateCraftability: () => emptyEvaluation()
+    }),
+    getRecipeVisibilityService: () => null,
+    getCraftingRunManager: () => runManager,
+    getSalvageRunManager: () => ({
+      getActiveRuns: () => [],
+      getRunHistory: () => [],
+      getActiveRun: () => null,
+      cancelRun: async () => true
+    }),
+    getCraftingEngine: () => ({
+      craft: async () => ({ success: true, message: 'Crafted!' })
+    }),
+    getCraftingSystemManager: () => ({ getSystems: () => [], getSystem: () => null }),
+    getAvailableActors: () => [actor],
+    getOwnedActors: () => [actor],
+    getGameUser: () => ({ id: 'user-1', character: actor }),
+    getWorldTime: () => 1000,
+    notify: { info: () => {}, warn: () => {}, error: () => {} },
+    confirmDialog: async () => true,
+    createChatMessage: async () => ({}),
+    getChatSpeaker: () => ({})
+  };
+
+  return { ...services, ...overrides, _settings: settings, _actor: actor, _recipes: recipes, _runManager: runManager };
+}
+
+test('crafting store forwards runId and skips confirmation when skipConfirm is true', async () => {
   let confirmCalls = 0;
   let craftArgs = null;
   let errorMessage = null;
-
-  const recipe = { id: 'r1', name: 'Potion' };
-  app._getRecipeManager = () => ({ getRecipe: () => recipe });
-  app._getSetting = () => false; // would normally require confirm
-  app._confirmDialog = async () => {
-    confirmCalls += 1;
-    return true;
-  };
-  app._getCraftingEngine = () => ({
-    craft: async (...args) => {
-      craftArgs = args;
-      return { success: false, message: 'blocked for test' };
+  const services = makeServices({
+    confirmDialog: async () => {
+      confirmCalls += 1;
+      return true;
+    },
+    getCraftingEngine: () => ({
+      craft: async (...args) => {
+        craftArgs = args;
+        return { success: false, message: 'blocked for test' };
+      }
+    }),
+    notify: {
+      info: () => {},
+      warn: () => {},
+      error: (message) => { errorMessage = message; }
     }
   });
-  app._notifyError = (msg) => {
-    errorMessage = msg;
-  };
+  const store = createCraftingStore(services);
 
-  await CraftingApp._onCraft.call(app, {}, {
-    dataset: {
-      recipeId: 'r1',
-      runId: 'run-42',
-      skipConfirm: 'true'
-    }
-  });
+  await store.craft('r1', { runId: 'run-42', skipConfirm: true });
 
   assert.equal(confirmCalls, 0);
-  assert.ok(Array.isArray(craftArgs));
-  assert.equal(craftArgs[4]?.runId, 'run-42');
+  assert.equal(craftArgs[4].runId, 'run-42');
   assert.equal(errorMessage, 'blocked for test');
 });
 
-test('CraftingApp._onRestartRun cancels active run and re-invokes craft with skipConfirm', async () => {
-  const app = createAppHarness();
+test('crafting store restartRun cancels the active run and re-crafts without a continuation runId', async () => {
   let cancelRunArgs = null;
-  let craftInvocation = null;
-
-  app._resolveRunEntry = () => ({ id: 'run-9', recipeId: 'r1' });
-  app._getRecipeManager = () => ({
-    getRecipe: () => ({ id: 'r1', name: 'Potion' })
-  });
-  app._confirmDialog = async () => true;
-  app._getRunManager = () => ({
-    cancelRun: async (...args) => {
-      cancelRunArgs = args;
-      return { id: 'run-9', status: 'cancelled' };
-    }
-  });
-  app._onCraft = async (event, target) => {
-    craftInvocation = { event, target };
+  let craftArgs = null;
+  const services = makeServices();
+  services._runManager.getActiveRun = () => ({ id: 'run-9', recipeId: 'r1', status: 'inProgress' });
+  services._runManager.cancelRun = async (...args) => {
+    cancelRunArgs = args;
+    return { id: 'run-9', status: 'cancelled' };
   };
-
-  await CraftingApp._onRestartRun.call(app, {}, {
-    dataset: {
-      recipeId: 'r1',
-      runId: 'run-9'
+  services.getCraftingEngine = () => ({
+    craft: async (...args) => {
+      craftArgs = args;
+      return { success: true, message: 'Crafted!' };
     }
   });
+  const store = createCraftingStore(services);
 
-  assert.ok(Array.isArray(cancelRunArgs));
-  assert.equal(cancelRunArgs[0], app.craftingActor);
+  await store.restartRun('r1', 'run-9');
+
+  assert.equal(cancelRunArgs[0], services._actor);
   assert.equal(cancelRunArgs[1], 'run-9');
-  assert.ok(craftInvocation);
-  assert.equal(craftInvocation.target.dataset.recipeId, 'r1');
-  assert.equal(craftInvocation.target.dataset.runId, '');
-  assert.equal(craftInvocation.target.dataset.skipConfirm, 'true');
+  assert.equal(craftArgs[2].id, 'r1');
+  assert.equal(craftArgs[4].runId, null);
 });
 
-test('CraftingApp._onLearnRecipe localizes success notifications from visibility service keys', async () => {
-  const app = createAppHarness();
+test('crafting store learnRecipe localizes visibility service messages', async () => {
   let infoMessage = null;
-  let renderCalls = 0;
-
-  const previousI18n = game.i18n;
-  game.i18n = {
-    localize: (key) => `loc:${key}`,
-    format: (key, data) => `loc:${key}:${data.name}`
-  };
-
-  app.render = async () => {
-    renderCalls += 1;
-  };
-  app._notifyInfo = (message) => {
-    infoMessage = message;
-  };
-  app._getRecipeManager = () => ({
-    getRecipe: () => ({ id: 'r1', name: 'Healing Potion' })
-  });
-  app._getRecipeVisibilityService = () => ({
-    learnRecipe: async () => ({
-      success: true,
-      message: 'FABRICATE.Knowledge.LearnedRecipe',
-      messageData: { name: 'Healing Potion' }
-    })
-  });
-
-  try {
-    await CraftingApp._onLearnRecipe.call(app, {}, {
-      dataset: { recipeId: 'r1' }
-    });
-  } finally {
-    game.i18n = previousI18n;
-  }
-
-  assert.equal(infoMessage, 'loc:FABRICATE.Knowledge.LearnedRecipe:Healing Potion');
-  assert.equal(renderCalls, 1);
-});
-
-test('CraftingApp._onShowRunDetails renders dialog with resolved step IO names', async () => {
-  const app = createAppHarness();
-  let rendered = null;
-
-  app._resolveRunEntry = () => ({
-    id: 'run-1',
-    recipeId: 'r1',
-    status: 'inProgress',
-    currentStepIndex: 0,
-    startedAt: 900,
-    finishedAt: null,
-    steps: [{
-      stepName: 'Mix',
-      status: 'inProgress',
-      consumedIngredients: [{ actorUuid: 'Actor.A', itemUuid: 'Item.Herb', quantity: 2 }],
-      usedCatalysts: [{ actorUuid: 'Actor.A', itemUuid: 'Item.Mortar', quantity: 1 }],
-      createdResults: [{ actorUuid: 'Actor.A', itemUuid: 'Item.Potion', quantity: 1 }]
-    }]
-  });
-  app._getRecipeManager = () => ({
-    getRecipe: () => ({ id: 'r1', name: 'Potion Recipe' })
-  });
-  app._resolveRunEntityName = async (uuid, fallback) => {
-    const map = {
-      'Actor.A': 'Alchemist',
-      'Item.Herb': 'Herb',
-      'Item.Mortar': 'Mortar',
-      'Item.Potion': 'Potion'
-    };
-    return map[uuid] || fallback;
-  };
-  app._renderDialog = (options) => {
-    rendered = options;
-  };
-
-  await CraftingApp._onShowRunDetails.call(app, {}, {
-    dataset: {
-      runId: 'run-1',
-      runScope: 'active'
+  const services = makeServices({
+    getRecipeVisibilityService: () => ({
+      evaluateRecipeAccess: () => ({ visible: true, craftable: true, reason: 'ok' }),
+      learnRecipe: async () => ({
+        success: true,
+        message: 'FABRICATE.Knowledge.LearnedRecipe',
+        messageData: { name: 'Potion' }
+      })
+    }),
+    notify: {
+      info: (message) => { infoMessage = message; },
+      warn: () => {},
+      error: () => {}
     }
   });
+  const store = createCraftingStore(services);
 
-  assert.ok(rendered);
-  assert.match(rendered.title, /Run Details/i);
-  assert.match(rendered.content, /Herb/);
-  assert.match(rendered.content, /Mortar/);
-  assert.match(rendered.content, /Potion/);
-  assert.match(rendered.content, /Alchemist/);
+  await store.learnRecipe('r1');
+
+  assert.equal(infoMessage, 'loc:FABRICATE.Knowledge.LearnedRecipe:Potion');
 });
 
-test('CraftingApp._prepareContext groups active runs by recipe and prefers latest run', async () => {
-  const app = createAppHarness();
-  game.time.worldTime = 1000;
-  app.searchTerm = '';
-  app.selectedCategory = '';
-  app.showOnlyAvailable = false;
+test('crafting store groups active runs by recipe and prefers the latest active run', async () => {
+  const services = makeServices();
+  services._runManager.getActiveRuns = () => [
+    { id: 'run-old', recipeId: 'r1', status: 'inProgress', startedAt: 100, currentStepIndex: 0, steps: [{ stepName: 'Step 1', status: 'inProgress' }] },
+    { id: 'run-new', recipeId: 'r1', status: 'waitingTime', startedAt: 200, currentStepIndex: 0, steps: [{ stepName: 'Step 1', status: 'waitingTime', timeGate: { availableAt: 2000 } }] }
+  ];
+  services._runManager.getRunHistory = () => [
+    { id: 'run-history', recipeId: 'r1', status: 'succeeded', startedAt: 10, finishedAt: 20, currentStepIndex: null, steps: [{ stepName: 'Step 1', status: 'succeeded' }] }
+  ];
+  const store = createCraftingStore(services);
 
-  const sourceActor = {
-    id: 'a1',
-    name: 'Crafter',
-    items: []
-  };
-  app.craftingActor = sourceActor;
-  app.componentSourceActors = [sourceActor];
-  app._getAvailableActors = () => [sourceActor];
-  app._getOwnedActors = () => [sourceActor];
-  app._getSetting = (key) => key === 'showSimpleRecipesOnly' ? false : false;
-  app._getRecipeVisibilityService = () => null;
+  await store.refresh();
 
-  const recipeA = {
-    id: 'r1',
-    name: 'Recipe One',
-    description: '',
-    img: 'icons/svg/item-bag.svg',
-    category: 'alchemy',
-    ingredientSets: [{
-      ingredientGroups: [{
-        options: [{
-          quantity: 1,
-          getDescription: () => '1x Herb'
-        }]
-      }],
-      essences: {}
-    }],
-    getResultDescription: () => '1x Result',
-    isSimpleRecipe: () => false
-  };
-  const recipeB = {
-    id: 'r2',
-    name: 'Recipe Two',
-    description: '',
-    img: 'icons/svg/item-bag.svg',
-    category: 'alchemy',
-    ingredientSets: [{
-      ingredientGroups: [{
-        options: [{
-          quantity: 1,
-          getDescription: () => '1x Ore'
-        }]
-      }],
-      essences: {}
-    }],
-    getResultDescription: () => '1x Result',
-    isSimpleRecipe: () => false
-  };
-
-  app._getRecipeManager = () => ({
-    getRecipes: () => [recipeA, recipeB],
-    getRecipe: (id) => ({ r1: recipeA, r2: recipeB }[id] || null),
-    canCraft: () => ({ canCraft: true, satisfiableSet: recipeA.ingredientSets[0] }),
-    evaluateCraftability: () => ({
-      canCraft: true,
-      satisfiableSet: recipeA.ingredientSets[0],
-      missing: { ingredients: [], essences: [], catalysts: [] },
-      ingredientStates: [],
-      essenceStates: [],
-      catalystStates: []
-    }),
-    getCatalystsForSet: () => [],
-    ingredientMatchesItem: () => false,
-    catalystMatchesItem: () => false
-  });
-
-  app._getRunManager = () => ({
-    getActiveRuns: () => ([
-      {
-        id: 'run-old',
-        recipeId: 'r1',
-        status: 'inProgress',
-        startedAt: 100,
-        currentStepIndex: 0,
-        steps: [{ stepName: 'Step 1', status: 'inProgress' }]
-      },
-      {
-        id: 'run-new',
-        recipeId: 'r1',
-        status: 'waitingTime',
-        startedAt: 200,
-        currentStepIndex: 0,
-        steps: [{ stepName: 'Step 1', status: 'waitingTime', timeGate: { availableAt: 2000 } }]
-      }
-    ]),
-    getRunHistory: () => ([
-      {
-        id: 'run-history',
-        recipeId: 'r1',
-        status: 'succeeded',
-        startedAt: 10,
-        finishedAt: 20,
-        currentStepIndex: null,
-        steps: [{ stepName: 'Step 1', status: 'succeeded' }]
-      }
-    ])
-  });
-
-  const context = await CraftingApp.prototype._prepareContext.call(app, {});
-  assert.equal(context.activeRuns.length, 2);
-  assert.equal(context.activeRuns[0].id, 'run-new');
-  assert.equal(context.runHistory.length, 1);
-
-  const rowA = context.recipes.find(r => r.id === 'r1');
-  assert.ok(rowA);
-  assert.equal(rowA.activeRunCount, 2);
-  assert.equal(rowA.hasMultipleActiveRuns, true);
-  assert.equal(rowA.activeRunId, 'run-new');
-  assert.equal(rowA.craftButtonLabel, 'Waiting');
-
-  const rowB = context.recipes.find(r => r.id === 'r2');
-  assert.ok(rowB);
-  assert.equal(rowB.activeRunCount, 0);
-  assert.equal(rowB.hasMultipleActiveRuns, false);
-  assert.equal(rowB.craftButtonLabel, 'Craft');
-});
-
-test('CraftingApp._prepareContext does not throw for multi-step recipe with empty top-level ingredientSets', async () => {
-  const app = createAppHarness();
-  game.time.worldTime = 1000;
-  app.searchTerm = '';
-  app.selectedCategory = '';
-  app.showOnlyAvailable = false;
-
-  const sourceActor = {
-    id: 'a1',
-    name: 'Crafter',
-    items: []
-  };
-  app.craftingActor = sourceActor;
-  app.componentSourceActors = [sourceActor];
-  app._getAvailableActors = () => [sourceActor];
-  app._getOwnedActors = () => [sourceActor];
-  app._getSetting = () => false;
-  app._getRecipeVisibilityService = () => null;
-
-  // Multi-step recipe: top-level ingredientSets is empty; sets live in steps
-  const multiStepRecipe = {
-    id: 'r-multi',
-    name: 'Multi-Step Brew',
-    description: '',
-    img: 'icons/svg/item-bag.svg',
-    category: 'alchemy',
-    ingredientSets: [],
-    steps: [
-      {
-        ingredientSets: [
-          {
-            ingredientGroups: [{ options: [{ quantity: 2, getDescription: () => '2x Herb' }] }],
-            essences: {},
-            catalysts: []
-          }
-        ]
-      }
-    ],
-    getResultDescription: () => '1x Elixir',
-    isSimpleRecipe: () => false
-  };
-
-  app._getRecipeManager = () => ({
-    getRecipes: () => [multiStepRecipe],
-    getRecipe: () => multiStepRecipe,
-    // evaluateCraftability returns empty result for multi-step recipes with empty ingredientSets
-    evaluateCraftability: () => emptyEvaluation(),
-    // canCraft retained for backward compat; not called by _prepareContext after T-082 fix
-    canCraft: () => ({ canCraft: false, satisfiableSet: null }),
-    getCatalystsForSet: () => [],
-    ingredientMatchesItem: () => false,
-    catalystMatchesItem: () => false
-  });
-
-  app._getRunManager = () => ({
-    getActiveRuns: () => [],
-    getRunHistory: () => []
-  });
-
-  // Should not throw even though ingredientSets is empty
-  let context;
-  await assert.doesNotReject(async () => {
-    context = await CraftingApp.prototype._prepareContext.call(app, {});
-  });
-
-  const row = context.recipes.find(r => r.id === 'r-multi');
-  assert.ok(row, 'multi-step recipe row should be present in context');
-  // The fallback sentinel produces an empty ingredients list
-  assert.ok(Array.isArray(row.ingredients), 'ingredients should be an array');
-});
-test('CraftingApp._onShowDetails does not throw and renders step ingredient sets for multi-step recipe', async () => {
-  const app = createAppHarness();
-  // Override componentSourceActors to include items array (required by _onShowDetails rendering)
-  app.componentSourceActors = [{ id: 'a1', name: 'Crafter', items: [] }];
-
-  // Multi-step recipe: top-level ingredientSets is empty; sets live inside steps
-  const multiStepRecipe = {
-    id: 'r-multi',
-    name: 'Multi-Step Elixir',
-    description: 'A complex recipe',
-    ingredientSets: [],
-    steps: [
-      {
-        ingredientSets: [
-          {
-            name: 'Step 1 ingredients',
-            ingredientGroups: [{ options: [{ quantity: 1, getDescription: () => '1x Root' }] }],
-            essences: {},
-            catalysts: []
-          }
-        ]
-      }
-    ],
-    results: [{ quantity: 1 }],
-    isVariable: false
-  };
-
-  app._getRecipeManager = () => ({
-    getRecipe: () => multiStepRecipe,
-    // evaluateCraftability returns empty result for multi-step with empty top-level ingredientSets
-    evaluateCraftability: () => emptyEvaluation(),
-    // canCraft no longer called by _onShowDetails after T-082 fix
-    canCraft: () => ({ canCraft: false, satisfiableSet: null }),
-    getCatalystsForSet: () => [],
-    ingredientMatchesItem: () => false,
-    catalystMatchesItem: () => false
-  });
-
-  let rendered = null;
-  app._renderDialog = (opts) => { rendered = opts; };
-
-  await assert.doesNotReject(async () => {
-    await CraftingApp._onShowDetails.call(app, {}, { dataset: { recipeId: 'r-multi' } });
-  }, 'should not throw for multi-step recipe with empty top-level ingredientSets');
-
-  assert.ok(rendered, 'dialog should have been rendered');
-  assert.match(rendered.content, /Step 1 ingredients/, 'step ingredient set label should appear in content');
-  assert.match(rendered.content, /Root/, 'ingredient description should appear in content');
+  const viewState = get(store.viewState);
+  assert.equal(viewState.activeRuns.length, 2);
+  assert.equal(viewState.activeRuns[0].id, 'run-new');
+  assert.equal(viewState.runHistory.length, 1);
+  const recipeRow = viewState.recipes.find(recipe => recipe.id === 'r1');
+  assert.equal(recipeRow.activeRunCount, 2);
+  assert.equal(recipeRow.hasMultipleActiveRuns, true);
+  assert.equal(recipeRow.activeRunId, 'run-new');
+  assert.equal(recipeRow.craftButtonLabel, 'Waiting');
 });

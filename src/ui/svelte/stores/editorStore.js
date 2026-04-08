@@ -1,5 +1,5 @@
 /**
- * editorStore — Svelte store factory for the RecipeEditorApp (T-140)
+ * editorStore — Svelte store factory for the SvelteRecipeEditorApp UI (T-140)
  *
  * All side-effects are injected via `services` so this module never touches
  * `game.*` directly.  Each call to createEditorStore() produces a fresh,
@@ -116,7 +116,7 @@ function _escapeHtml(value) {
 }
 
 // ---------------------------------------------------------------------------
-// Draft builder helpers (ported from RecipeEditorApp.js)
+// Draft builder helpers retained from the pre-Svelte editor implementation.
 // ---------------------------------------------------------------------------
 
 function _newIngredientOption(data = {}, services) {
