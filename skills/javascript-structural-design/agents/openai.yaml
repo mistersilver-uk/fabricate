@@ -1,0 +1,4 @@
+interface:
+  display_name: "JavaScript Structural Design"
+  short_description: "Guide JavaScript structure toward explicit dependencies, cohesion, and testability"
+  default_prompt: "Use $javascript-structural-design when designing or reviewing JavaScript module boundaries, dependency seams, cohesion, constructors, or testability."

@@ -178,6 +178,8 @@ npm test         # Run test suite
 npm run build    # Vite build to /dist
 ```
 
+Canonical specifications live under `openspec/specs/`. Non-trivial implementation work should be planned under `openspec/changes/<change>/`.
+
 ### Live Foundry Smoke Test
 
 Fabricate now includes a minimal end-to-end smoke harness against a real Foundry instance.
@@ -216,7 +218,7 @@ Notes:
 - In GitHub Actions ephemeral runners, store `FOUNDRY_USERNAME` and `FOUNDRY_PASSWORD` as repository secrets.
 - If your Foundry setup requires different Docker env vars or image settings, update `docker-compose.foundry.yml`.
 
-See [AGENTS.md](AGENTS.md) for contributor and agent guidelines.
+See [AGENTS.md](AGENTS.md), [CONTRIBUTING.md](CONTRIBUTING.md), and [openspec/README.md](openspec/README.md) for contributor and agent workflow guidance.
 
 ## Support
 

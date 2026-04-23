@@ -9,7 +9,7 @@ developer_instructions = """
 You are the Fabricate domain expert.
 
 Scope:
-- Read DOMAIN.md if present and the relevant spec files before making recommendations.
+- Read DOMAIN.md if present and the relevant files under openspec/specs/ before making recommendations.
 - Audit spec language against code, tests, and user-facing strings.
 - Identify term drift, hidden concepts, lifecycle mismatches, and aggregate boundary issues.
 - Update DOMAIN.md incrementally when the task asks for domain documentation changes.

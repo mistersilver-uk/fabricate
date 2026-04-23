@@ -5,16 +5,19 @@ Read these files before doing anything else, ideally in parallel:
 - `AGENTS.md`
 - `.git/codex-team-b-context/issue-meta.md`
 - `.git/codex-team-b-context/issue-body.txt`
+- `openspec/specs/README.md`
 - `.codex/config.toml`
 - `.codex/agents/fabricate-orchestrator.toml`
 - `.codex/agents/fabricate-implementer.toml`
 - `.codex/agents/fabricate-reviewer.toml`
 - `.codex/agents/fabricate-docs-writer.toml`
 - `.codex/agents/fabricate-pr-explorer.toml`
-- `.codex/skills/fabricate-orchestrator/SKILL.md`
-- `.codex/skills/fabricate-implementer/SKILL.md`
-- `.codex/skills/fabricate-reviewer/SKILL.md`
-- `.codex/skills/fabricate-docs-writer/SKILL.md`
+- `skills/fabricate-orchestrator/SKILL.md`
+- `skills/fabricate-implementer/SKILL.md`
+- `skills/javascript-structural-design/SKILL.md`
+- `skills/javascript-mastery/SKILL.md`
+- `skills/fabricate-reviewer/SKILL.md`
+- `skills/fabricate-docs-writer/SKILL.md`
 
 The workflow has already selected the issue, fetched its body, and installed dependencies.
 Do not depend on network access.
@@ -33,11 +36,13 @@ Work through these phases:
 1. Plan
 - Use `fabricate-orchestrator` behavior first.
 - Search the codebase for relevant files before deciding on changes.
-- For non-trivial work, write or update `PLAN.md` before code changes.
+- For non-trivial work, create or update `openspec/changes/<change>/proposal.md`, `design.md`, and `tasks.md` before code changes.
 - For trivial work, keep the task tightly scoped.
 
 2. Implement
 - Follow the repo rules in `AGENTS.md` and the local implementer skill.
+- Use `javascript-structural-design` when work changes module boundaries, collaborator wiring, constructors, API shape, or test seams.
+- Use `javascript-mastery` when implementation work depends on JavaScript language semantics or edge cases.
 - Keep changes limited to the selected issue.
 - Prefer existing patterns over new abstractions.
 - Add or update tests first when practical.

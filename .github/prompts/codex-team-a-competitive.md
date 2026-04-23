@@ -6,7 +6,7 @@ Read first:
 - `COMPETITIVE_ANALYSIS.md` if present
 - `.codex/agents/fabricate-competitive-analyst.toml`
 - `.codex/agents/fabricate-pr-explorer.toml`
-- `.codex/skills/fabricate-competitive-analyst/SKILL.md`
+- `skills/fabricate-competitive-analyst/SKILL.md`
 
 Use Codex subagents explicitly:
 
@@ -17,7 +17,7 @@ Use Codex subagents explicitly:
 Task:
 
 1. Read the existing report first and update it incrementally.
-2. Understand Fabricate from `docs/`, `spec/`, `src/ui/svelte/`, and `CHANGELOG.md` before competitor analysis.
+2. Understand Fabricate from `docs/`, `openspec/specs/`, `src/ui/svelte/`, and `CHANGELOG.md` before competitor analysis.
 3. Research competitors and monetization landscape when network access is available.
 4. If current pricing, policy, or competitor data cannot be verified, mark the section stale with a dated note rather than guessing.
 5. Update only `COMPETITIVE_ANALYSIS.md`.

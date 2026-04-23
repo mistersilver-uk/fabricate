@@ -6,7 +6,7 @@ Read first:
 - `DOMAIN.md` if present
 - `.codex/agents/fabricate-domain-expert.toml`
 - `.codex/agents/fabricate-pr-explorer.toml`
-- `.codex/skills/fabricate-domain-expert/SKILL.md`
+- `skills/fabricate-domain-expert/SKILL.md`
 
 Use Codex subagents explicitly:
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review Implementing"
+  short_description: "Apply code review feedback systematically"
+  default_prompt: "Use $review-implementing to address concrete review comments or requested follow-up changes."

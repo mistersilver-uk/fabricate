@@ -4,31 +4,34 @@
 
 ### Mandatory Process for ALL Code Changes
 
-**All code changes must follow this spec-first workflow:**
+**All non-trivial code changes must follow this OpenSpec workflow:**
 
-1. **Read the Specification** – Start by reading the relevant spec file(s) in `spec/` directory
-2. **Update the Specification** – Propose changes to the spec that reflect the planned changes
-3. **Await Approval** – Wait for a maintainer to accept the spec updates before proceeding
-4. **Implement** – Write code following the updated specification
-5. **Reference Specs** – Link to relevant spec sections during implementation (e.g., `spec/002-data-models.md`)
+1. **Read the Canonical Spec** – Start with the relevant file(s) in `openspec/specs/*/spec.md`
+2. **Create Or Update A Change Folder** – Put the task under `openspec/changes/<change>/`
+3. **Write The Change Docs** – Maintain `proposal.md`, `design.md`, and `tasks.md` before implementation
+4. **Await Approval** – Wait for a maintainer to accept the change spec when the work needs review
+5. **Implement** – Write code following the accepted change and canonical specs
+6. **Reference Canonical Specs** – Link to canonical spec paths during implementation (for example `openspec/specs/data-models/spec.md`)
 
-### Specifications
+### OpenSpec Layout
 
-All technical specifications are located in the `spec/` directory.
-These are living documents that define system behaviour before implementation.
+Canonical technical specifications live under `openspec/specs/`.
+Each non-trivial task gets its own per-change folder under `openspec/changes/`.
+The legacy `spec/` directory is retained only as compatibility links and should not be edited directly.
 
-See `spec/README.md` for:
+See `openspec/README.md` and `openspec/specs/README.md` for:
 
-- Specification structure
-- List of all spec files
-- How to read and use specifications
+- OpenSpec structure
+- The canonical spec index
+- How to create and maintain per-change specs
 
 ### Specification-Driven Development
 
-We follow a **spec-driven approach** for development with Agents:
+We follow a **spec-driven approach** for development with agents:
 
 - **Specifications define behaviour** – Features are specified before implementation
 - **Code implements specs** – Implementation follows the specification
+- **Per-change specs capture intent** – Each change folder records scope, design, and execution steps
 - **Specs are living documents** - Updated as features evolve
 - **Specs guide testing** – Test scenarios are derived from specifications
 

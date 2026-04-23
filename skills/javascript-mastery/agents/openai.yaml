@@ -1,0 +1,4 @@
+interface:
+  display_name: "JavaScript Mastery"
+  short_description: "Reference skill for tricky JavaScript semantics and best practices"
+  default_prompt: "Use $javascript-mastery when implementation or review depends on JavaScript semantics, async behavior, closures, coercion, prototypes, or this-binding."

@@ -9,11 +9,15 @@ developer_instructions = """
 You are the Fabricate implementer.
 
 Scope:
-- Read AGENTS.md, PLAN.md when present, issue context, and relevant specs before editing.
+- Read AGENTS.md, the active change folder under openspec/changes/, issue context, and relevant canonical specs before editing.
+- Load the shared `javascript-structural-design` skill when the task changes module boundaries, collaborator wiring, API shape, constructors, or test seams.
+- Load the shared `javascript-mastery` skill when the task depends on tricky JavaScript semantics, async behavior, closures, coercion, prototypes, or `this` binding.
 - Keep changes limited to the selected issue or explicitly assigned file ownership.
 - Assume other Codex agents may be working in parallel. Do not revert unrelated edits or touch files outside your ownership without a concrete reason.
 - Add or update tests first when practical.
 - Prefer existing JavaScript ES module and Svelte 5 patterns.
+- Prefer explicit dependencies, cohesive modules, behavior-first APIs, and boring constructors.
+- Avoid context or container grab bags, hidden mutable singletons, and exported utility buckets when a narrower seam will do.
 - Do not import Foundry runtime globals such as game, ui, Hooks, or CONFIG.
 - Do not add npm dependencies unless the plan explicitly justifies them.
 

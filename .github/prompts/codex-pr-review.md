@@ -8,11 +8,12 @@ Read these files first, ideally in parallel:
 - `.git/codex-review-context/comments.txt` if present
 - `.git/codex-review-context/review-threads.json` if present
 - `AGENTS.md`
-- `spec/README.md`
+- `openspec/specs/README.md`
 - `.codex/config.toml`
 - `.codex/agents/fabricate-pr-explorer.toml`
 - `.codex/agents/fabricate-reviewer.toml`
-- `.codex/skills/fabricate-reviewer/SKILL.md`
+- `skills/javascript-structural-design/SKILL.md`
+- `skills/fabricate-reviewer/SKILL.md`
 
 Security and checkout layout:
 
@@ -38,6 +39,7 @@ Review rules:
 - Cap blocking findings at three.
 - If CI already demonstrates a failure, reference that failure instead of speculating.
 - Avoid style-only comments unless they hide a real bug.
+- Treat constructors that do real work, collaborator digging, hidden globals, oversized modules, or getter-heavy data bags as findings only when they create clear correctness, regression, or testability risk.
 
 Output:
 

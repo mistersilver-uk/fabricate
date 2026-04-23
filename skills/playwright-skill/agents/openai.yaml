@@ -1,0 +1,4 @@
+interface:
+  display_name: "Playwright Browser Automation"
+  short_description: "Run Playwright-based browser automation from the shared repo skill"
+  default_prompt: "Use $playwright-skill when browser automation, screenshot capture, or local web app validation is needed."

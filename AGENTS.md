@@ -8,8 +8,11 @@ Primary stack: JavaScript ES modules, Svelte 5, Vite, `node:test`, happy-dom, Pl
 ## Planning & Workflow
 
 - Use the orchestrator flow first for any non-trivial task.
+- Use OpenSpec as the planning system of record for non-trivial work.
+- Create or update `openspec/changes/<change>/proposal.md`, `design.md`, and `tasks.md` before implementation starts.
 - Read your assigned issue using the GitHub CLI before implementation work starts.
 - Use GitHub issue numbers such as `#42` when an issue exists; treat legacy `T-XXX` IDs as reference only.
+- Treat `openspec/specs/*/spec.md` as the canonical specification source of truth. The legacy `spec/` directory is compatibility-only.
 - Route quick-start documentation changes to `docs/quickstart.md` only.
 
 ## Build & Test
@@ -23,6 +26,11 @@ Primary stack: JavaScript ES modules, Svelte 5, Vite, `node:test`, happy-dom, Pl
 ## Code Conventions
 
 - The runtime codebase is JavaScript, but typed surfaces must stay explicit; avoid `any` without justification where types are used.
+- Keep modules and objects small and cohesive; if a unit naturally does X and Y, split it.
+- Keep constructors and factories boring; avoid hidden I/O, service lookup, and object graph assembly inside them.
+- Inject specific collaborators instead of passing context or container grab bags and digging through them later.
+- Prefer behavior-first APIs over getter or setter-heavy data bags.
+- Isolate global mutable state and runtime lookups at thin edges that are easy to test.
 - Svelte is the only UI templating system. Do not add or reintroduce Handlebars templates.
 - UI shells live in `src/ui/*.js` and `src/ui/*.svelte.js`.
 - Svelte UI components live in `src/ui/svelte/apps/` and `src/ui/svelte/components/`.
@@ -52,7 +60,7 @@ Primary stack: JavaScript ES modules, Svelte 5, Vite, `node:test`, happy-dom, Pl
 
 ## Local Codex Agents And Skills
 
-Prefer the local Codex custom agents in `.codex/agents/` for role-specific work, and the local skills in `.codex/skills/` for workflow instructions. Subagents only run when explicitly requested, so prompts and automation should tell Codex which agents to spawn and which files each implementation worker owns.
+Prefer the local Codex custom agents in `.codex/agents/` for role-specific work, and the shared skills in `skills/` for workflow instructions. Subagents only run when explicitly requested, so prompts and automation should tell Codex which agents to spawn and which files each implementation worker owns.
 
 Custom agents:
 
@@ -76,6 +84,10 @@ Skills:
 - `fabricate-ux-designer`
 - `fabricate-quality-engineer`
 - `fabricate-competitive-analyst`
+- `javascript-mastery`
+- `javascript-structural-design`
+- `playwright-skill`
+- `review-implementing`
 
 ## What Agents Must Not Do
 
