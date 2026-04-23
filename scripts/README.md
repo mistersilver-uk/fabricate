@@ -22,11 +22,15 @@ npm run test:foundry:down      # Stop Docker container
 node scripts/foundry-test-run.mjs
 ```
 
+`npm run test:foundry` pins the Docker image to Foundry V13 and will auto-select a free
+host port in the `30000-30020` range unless `FOUNDRY_HOST_PORT` is set explicitly.
+
 ### Environment Variables
 
 | Variable | Default | Description |
 |---|---|---|
-| `FOUNDRY_URL` | `http://localhost:30000` | Base URL of the Foundry instance |
+| `FOUNDRY_HOST_PORT` | first free port in `30000-30020` | Host port mapped to Foundry's internal port `30000` |
+| `FOUNDRY_URL` | `http://localhost:${FOUNDRY_HOST_PORT}` | Base URL of the Foundry instance |
 | `FOUNDRY_ADMIN_KEY` | `fabricate-test-admin` | Admin password for the setup/auth page |
 
 ### Test Phases

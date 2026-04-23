@@ -91,7 +91,7 @@ async function main() {
   process.stdout.write(`Container user: ${process.env.FOUNDRY_HOST_UID}:${process.env.FOUNDRY_HOST_GID}\n`);
 
   // Pull latest image silently
-  process.stdout.write('Pulling Docker image felddy/foundryvtt:release...\n');
+  process.stdout.write('Pulling Docker image felddy/foundryvtt:13...\n');
   execSync('docker compose -f docker-compose.foundry.yml pull --quiet', {
     cwd: ROOT,
     stdio: 'inherit',

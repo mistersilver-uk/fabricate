@@ -25,7 +25,8 @@
  *
  * Environment variables:
  *   FOUNDRY_ADMIN_KEY     — admin password (default: fabricate-test-admin)
- *   FOUNDRY_URL           — base URL (default: http://localhost:30000)
+ *   FOUNDRY_HOST_PORT     — host port mapped to Foundry's internal port 30000
+ *   FOUNDRY_URL           — base URL (default: http://localhost:${FOUNDRY_HOST_PORT || 30000})
  */
 
 import { chromium } from 'playwright';
@@ -37,7 +38,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const RESULTS_DIR = join(ROOT, 'test-results');
 
-const FOUNDRY_URL = process.env.FOUNDRY_URL ?? 'http://localhost:30000';
+const FOUNDRY_HOST_PORT = process.env.FOUNDRY_HOST_PORT ?? '30000';
+const FOUNDRY_URL = process.env.FOUNDRY_URL ?? `http://localhost:${FOUNDRY_HOST_PORT}`;
 const ADMIN_KEY = process.env.FOUNDRY_ADMIN_KEY ?? 'fabricate-test-admin';
 const WORLD_ID = 'fabricate-smoke';
 const JOIN_BUTTON_SELECTOR = 'button:has-text("Join Game Session"), button[name="join"]';
@@ -210,8 +212,9 @@ async function dismissFirstRunDialogs(page, results) {
   try {
     await page.waitForTimeout(2_000); // Allow tours to start
     const dismissed = await page.evaluate(() => {
-      if (typeof Tour !== 'undefined' && Tour.activeTour) {
-        Tour.activeTour.exit();
+      const activeTour = globalThis.foundry?.nue?.Tour?.activeTour ?? globalThis.Tour?.activeTour;
+      if (activeTour) {
+        activeTour.exit();
         return true;
       }
       return false;
@@ -643,8 +646,28 @@ async function main() {
       const launchBtn = worldCard.locator('[data-action="worldLaunch"]');
       await launchBtn.waitFor({ state: 'visible', timeout: 5_000 });
       await launchBtn.click();
-      // After launch, Foundry navigates to /join (player selection) or /game
-      await page.waitForURL(/\/(join|game)/, { timeout: 60_000 });
+      const migrationButton = page.locator('button:has-text("Begin Migration")').first();
+      const migrationDetected = await migrationButton
+        .waitFor({ state: 'visible', timeout: 10_000 })
+        .then(() => true)
+        .catch(() => false);
+      if (migrationDetected && getPathname(page.url()) === '/setup') {
+        process.stdout.write('World migration dialog detected. Beginning migration...\n');
+        await migrationButton.click();
+        const backupButton = page.locator('button:has-text("Backup")').first();
+        const backupDetected = await backupButton
+          .waitFor({ state: 'visible', timeout: 10_000 })
+          .then(() => true)
+          .catch(() => false);
+        if (backupDetected && getPathname(page.url()) === '/setup') {
+          process.stdout.write('World backup dialog detected. Confirming backup...\n');
+          await backupButton.click();
+        }
+        await page.waitForURL(/\/(join|game)/, { timeout: 180_000, waitUntil: 'load' });
+      } else {
+        // After launch, Foundry navigates to /join (player selection) or /game
+        await page.waitForURL(/\/(join|game)/, { timeout: 50_000, waitUntil: 'load' });
+      }
       await screenshot(page, 'world-launching');
       results.steps.push({ step: 'launch-world', passed: true });
     } else {
@@ -1214,8 +1237,13 @@ async function main() {
       // ── Phase E: Craft an item ──────────────────────────────────────────────
       process.stdout.write('Phase E: Crafting a Healing Potion...\n');
       try {
-        // Open Crafting App programmatically (avoids viewport/overlay issues)
+        // Open Crafting App through the registered class first, with a header-button fallback.
         await page.evaluate(() => {
+          const appClass = globalThis.game?.fabricate?.api?.getCraftingAppClass?.();
+          if (appClass?.show) {
+            appClass.show();
+            return;
+          }
           document.querySelector('[data-fabricate-action="craft"]')?.click();
         });
         await page.waitForTimeout(2_000);
