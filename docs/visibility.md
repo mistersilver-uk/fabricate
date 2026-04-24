@@ -154,7 +154,7 @@ You configure `consumeOnLearn` in the **Recipe Visibility** card on the System t
 
 ### Drag-and-Drop Learning
 
-Dragging a recipe item onto a crafting actor's sheet is a required learning pathway. Fabricate registers a drop handler on all actor sheets: when a valid recipe item is dropped onto an actor, it triggers recipe learning automatically — no button click required.
+Dragging a recipe item onto a crafting actor's sheet is a required learning pathway. When a valid recipe item is dropped onto an actor, Fabricate automatically learns every matched recipe whose own crafting system has auto-learn enabled (`knowledge.learn.dragDropEnabled: true`) — no button click required for that auto-learning subset.
 
 Only actor-bound drop targets are considered for learning. If the drop target cannot be resolved to an actor, or the current user lacks permission to update that actor, the learning path is skipped silently.
 
@@ -171,6 +171,26 @@ All three fields are always evaluated. A match on any one is sufficient. This me
 #### Recipe Book Items
 
 A single dropped item can match more than one recipe. When this happens, the actor learns every matched recipe in a single operation. This makes it straightforward to create "recipe book" items — one Alchemist's Compendium, for example, might unlock Healing Salve, Antitoxin, and Smokestick all at once.
+
+#### Mixed-System Behavior
+
+Recipe-item learning is evaluated per matched recipe, not once for the item as a whole. In a world with multiple crafting systems:
+
+- Recipes from systems where `knowledge.learn.dragDropEnabled` is `true` auto-learn when the item is dropped onto the actor.
+- Recipes from systems where `knowledge.learn.dragDropEnabled` is `false` are excluded from auto-learning, even if the same owned item matches them.
+
+This means the same owned item can auto-learn some recipes immediately and still offer manual learning for other matched recipes from differently configured systems.
+
+### Manual Learning On Owned Item Sheets
+
+When a matched recipe belongs to a system where auto-learn is disabled (`knowledge.learn.dragDropEnabled: false`), Fabricate adds a **Learn Recipe** action to the actor-owned item sheet instead of auto-learning on drop.
+
+- The action appears only on actor-owned item sheets.
+- It appears only when the current user can update the owning actor and at least one matched recipe is manually learnable.
+- The action learns only the manual-learning subset: matched recipes from systems where auto-learn is disabled.
+- If the same owned item also matches recipes from auto-learn-enabled systems, those recipes still learn automatically on drop while the remaining manual-only recipes stay available from the item sheet action.
+
+After clicking **Learn Recipe**, Fabricate asks for confirmation and then applies the same consume-on-learn behavior used by drag-and-drop learning.
 
 #### Notifications
 

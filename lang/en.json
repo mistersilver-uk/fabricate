@@ -150,7 +150,14 @@
       "AlreadyLearned": "Recipe is already learned",
       "NoMatchingItem": "No matching recipe item available to learn",
       "LearnedRecipe": "Learned recipe: {name}",
-      "CouldNotLearnRecipe": "Could not learn recipe"
+      "LearnedRecipes": "{actor} learned {count} recipes: {recipes}",
+      "LearnedRecipesPartial": "{actor} learned {count} new recipes: {recipes}",
+      "NoNewRecipesLearned": "{actor} already knows the matched recipe item recipes.",
+      "CouldNotLearnRecipe": "Could not learn recipe",
+      "ManualLearnAction": "Learn Recipe",
+      "ManualLearnConfirmTitle": "Learn Recipes",
+      "ManualLearnConfirmBody": "{actor} will learn {count} recipe(s) from {item}: {recipes}.",
+      "ManualLearnConsumeWarning": "This will consume {item}."
     },
     "Admin": {
       "Title": "Crafting Admin",

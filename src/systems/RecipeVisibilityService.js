@@ -7,7 +7,10 @@ const LEARN_RECIPE_MESSAGES = {
   linkedItemRequired: 'FABRICATE.Knowledge.LinkedItemRequired',
   alreadyLearned: 'FABRICATE.Knowledge.AlreadyLearned',
   noMatchingItem: 'FABRICATE.Knowledge.NoMatchingItem',
-  learnedRecipe: 'FABRICATE.Knowledge.LearnedRecipe'
+  learnedRecipe: 'FABRICATE.Knowledge.LearnedRecipe',
+  learnedRecipes: 'FABRICATE.Knowledge.LearnedRecipes',
+  learnedRecipesPartial: 'FABRICATE.Knowledge.LearnedRecipesPartial',
+  noNewRecipesLearned: 'FABRICATE.Knowledge.NoNewRecipesLearned'
 };
 
 /**
@@ -56,13 +59,21 @@ export class RecipeVisibilityService {
     return item.uuid === linked || sourceId === linked;
   }
 
+  _isActorOwnedItem(ownedItem, actor) {
+    if (!ownedItem || !actor) return false;
+    return ownedItem.parent === actor ||
+      ownedItem.actor === actor ||
+      actor.items?.has?.(ownedItem.id) ||
+      (Array.isArray(actor.items) && actor.items.includes(ownedItem));
+  }
+
   _getLearnedMap(actor) {
     const learned = getFabricateFlag(actor, 'learnedRecipes', {});
     return learned && typeof learned === 'object' ? learned : {};
   }
 
   async _setLearnedMap(actor, learned) {
-    await setFabricateFlag(actor, 'learnedRecipes', learned);
+    return await setFabricateFlag(actor, 'learnedRecipes', learned);
   }
 
   _getRecipeItemUsage(item) {
@@ -430,6 +441,180 @@ export class RecipeVisibilityService {
       message: LEARN_RECIPE_MESSAGES.learnedRecipe,
       messageData: { name: recipe.name }
     };
+  }
+
+  _isRecipeEligibleForOwnedItemLearning(recipe, mode = 'auto') {
+    if (!recipe || recipe.enabled === false) return false;
+
+    const system = this._getCraftingSystem(recipe);
+    if (!system) return false;
+    if ((system?.recipeVisibility?.listMode || 'global') !== 'knowledge') return false;
+
+    const knowledge = this._getKnowledgeConfig(system);
+    if (!['learned', 'itemOrLearned'].includes(knowledge?.mode || 'itemOrLearned')) return false;
+
+    const dragDropEnabled = knowledge?.learn?.dragDropEnabled !== false;
+    if (mode === 'manual') return dragDropEnabled === false;
+    return dragDropEnabled === true;
+  }
+
+  _getOwnedItemLearningCandidates({ ownedItem, mode = 'auto' } = {}) {
+    if (!ownedItem) return [];
+    const recipes = this.recipeManager?.getRecipes?.({ enabled: true }) || [];
+    return recipes.filter(recipe =>
+      this._isRecipeEligibleForOwnedItemLearning(recipe, mode) &&
+      this._hasRecipeItemReference(recipe) &&
+      this._isMatchingRecipeItem(recipe, ownedItem)
+    );
+  }
+
+  _buildOwnedItemLearningResult({
+    actor,
+    ownedItem,
+    mode,
+    matchedRecipes = [],
+    learnedRecipes = [],
+    alreadyLearnedRecipes = [],
+    consumedItem = false,
+    silent = false
+  }) {
+    let notificationKind = 'silent';
+    let message = null;
+    const shouldNotify = silent !== true && matchedRecipes.length > 0;
+
+    if (shouldNotify) {
+      if (learnedRecipes.length > 0 && alreadyLearnedRecipes.length > 0) {
+        notificationKind = 'partial';
+        message = LEARN_RECIPE_MESSAGES.learnedRecipesPartial;
+      } else if (learnedRecipes.length > 0) {
+        notificationKind = 'success';
+        message = LEARN_RECIPE_MESSAGES.learnedRecipes;
+      } else {
+        notificationKind = 'alreadyKnown';
+        message = LEARN_RECIPE_MESSAGES.noNewRecipesLearned;
+      }
+    }
+
+    const recipeNames = learnedRecipes.map(recipe => recipe.name).filter(Boolean);
+    const matchedRecipeNames = matchedRecipes.map(recipe => recipe.name).filter(Boolean);
+    return {
+      actor,
+      ownedItem,
+      mode,
+      matchedRecipes,
+      learnedRecipes,
+      alreadyLearnedRecipes,
+      learnableRecipes: learnedRecipes,
+      consumedItem,
+      shouldNotify,
+      notificationKind,
+      message,
+      messageData: {
+        actor: actor?.name || actor?.id || '',
+        item: ownedItem?.name || ownedItem?.uuid || '',
+        name: recipeNames[0] || matchedRecipeNames[0] || '',
+        recipes: recipeNames.join(', '),
+        matchedRecipes: matchedRecipeNames.join(', '),
+        count: learnedRecipes.length,
+        matchedCount: matchedRecipes.length
+      }
+    };
+  }
+
+  previewOwnedItemLearning({ ownedItem, actor = ownedItem?.parent || ownedItem?.actor || null, mode = 'auto' } = {}) {
+    if (!this._isActorOwnedItem(ownedItem, actor)) {
+      return this._buildOwnedItemLearningResult({ actor, ownedItem, mode, silent: true });
+    }
+
+    const matchedRecipes = this._getOwnedItemLearningCandidates({ ownedItem, mode });
+    const learnedMap = this._getLearnedMap(actor);
+    const alreadyLearnedRecipes = [];
+    const learnableRecipes = [];
+
+    for (const recipe of matchedRecipes) {
+      if (learnedMap?.[recipe.id]) {
+        alreadyLearnedRecipes.push(recipe);
+      } else {
+        learnableRecipes.push(recipe);
+      }
+    }
+
+    const consumedItem = learnableRecipes.some(recipe => {
+      const system = this._getCraftingSystem(recipe);
+      const knowledge = this._getKnowledgeConfig(system);
+      return knowledge?.learn?.consumeOnLearn === true;
+    });
+
+    return this._buildOwnedItemLearningResult({
+      actor,
+      ownedItem,
+      mode,
+      matchedRecipes,
+      learnedRecipes: learnableRecipes,
+      alreadyLearnedRecipes,
+      consumedItem
+    });
+  }
+
+  async learnRecipesFromOwnedItem({ ownedItem, actor = ownedItem?.parent || ownedItem?.actor || null, viewer = null, mode = 'auto' } = {}) {
+    const preview = this.previewOwnedItemLearning({ ownedItem, actor, viewer, mode });
+    if (preview.matchedRecipes.length === 0 || preview.learnedRecipes.length === 0) {
+      return {
+        ...preview,
+        learnedRecipes: [],
+        consumedItem: false,
+        message: preview.message,
+        messageData: {
+          ...preview.messageData,
+          count: 0,
+          recipes: ''
+        }
+      };
+    }
+
+    const learnedMap = this._getLearnedMap(actor);
+    const learnedAt = Date.now();
+    const next = { ...learnedMap };
+
+    for (const recipe of preview.learnedRecipes) {
+      next[recipe.id] = {
+        learnedAt,
+        sourceItemUuid: ownedItem.uuid
+      };
+    }
+
+    await this._setLearnedMap(actor, next);
+
+    const confirmedLearnedMap = this._getLearnedMap(actor);
+    const writeSucceeded = preview.learnedRecipes.every(recipe =>
+      confirmedLearnedMap?.[recipe.id]?.sourceItemUuid === ownedItem.uuid
+    );
+    if (!writeSucceeded) {
+      return this._buildOwnedItemLearningResult({
+        actor,
+        ownedItem,
+        mode,
+        matchedRecipes: preview.matchedRecipes,
+        learnedRecipes: [],
+        alreadyLearnedRecipes: preview.alreadyLearnedRecipes,
+        consumedItem: false,
+        silent: true
+      });
+    }
+
+    if (preview.consumedItem === true) {
+      await ownedItem.delete?.();
+    }
+
+    return this._buildOwnedItemLearningResult({
+      actor,
+      ownedItem,
+      mode,
+      matchedRecipes: preview.matchedRecipes,
+      learnedRecipes: preview.learnedRecipes,
+      alreadyLearnedRecipes: preview.alreadyLearnedRecipes,
+      consumedItem: preview.consumedItem === true
+    });
   }
 
   async applyRecipeItemUseOnCraft({ recipe, craftingActor, componentSourceActors = [] }) {

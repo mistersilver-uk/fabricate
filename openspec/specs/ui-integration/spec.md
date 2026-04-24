@@ -135,6 +135,7 @@ For actor-owned items, Fabricate may add item sheet header controls tied to reci
 
 - When `learn.dragDropEnabled === false` and knowledge mode supports learning, show a header icon/button to manually learn matching recipes from that owned item.
 - The manual learn control is shown only when the current user can update the owning actor and at least one matched recipe is learnable.
+- When an owned item matches recipes from multiple systems, the header control reflects only the manual-learning subset: matching recipes whose systems have `learn.dragDropEnabled === false`.
 - Clicking the control opens a confirmation prompt before learning.
 - On confirmation, run the learning flow from `006`, including `consumeOnLearn` behavior and item removal when required.
 - If `learn.dragDropEnabled === true`, the manual header learn control is hidden by default.

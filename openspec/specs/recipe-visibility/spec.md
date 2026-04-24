@@ -266,8 +266,9 @@ When `dragDropEnabled === true`, dropping a matched recipe item onto an actor mu
 
 - Evaluate only enabled recipes whose crafting system visibility mode is `knowledge`.
 - Learning-by-drop is only valid when `knowledge.mode` is `learned` or `itemOrLearned`.
+- Auto-learning eligibility is evaluated per matched recipe using that recipe's own `knowledge.learn.dragDropEnabled` setting.
 - Systems in `global` or `player` list mode are not evaluated for drag-and-drop learning.
-- In multi-system worlds, all eligible knowledge-mode recipes are considered, and matching is based solely on the resolved recipe item definition identity rules below.
+- In multi-system worlds, all eligible knowledge-mode recipes are considered. Recipes from systems where `dragDropEnabled !== true` are excluded from auto-learning even when the same owned item matches them. Matching is otherwise based solely on the resolved recipe item definition identity rules below.
 
 #### Matching Rules
 
@@ -306,6 +307,7 @@ When `dragDropEnabled === false`:
 - The manual learning affordance is an item-sheet header learn icon/button, as specified in `003-ui-integration.md`.
 - Clicking the manual learn action prompts the user to confirm learning for the owning actor and, on confirmation, runs the same learning operation used by drag-and-drop.
 - The manual path must apply `consumeOnLearn` and remove the item when required.
+- Manual-learning eligibility is also evaluated per matched recipe using that recipe's own `knowledge.learn.dragDropEnabled` setting. In mixed-system worlds, the manual path only includes recipes from systems where `dragDropEnabled === false`.
 
 ## Edge Cases
 

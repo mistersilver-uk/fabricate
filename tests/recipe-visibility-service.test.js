@@ -111,9 +111,10 @@ class FakeDocument {
 // ---------------------------------------------------------------------------
 
 class FakeItem extends FakeDocument {
-  constructor({ uuid = 'item-uuid', sourceId = null, compendiumSource = null, flagsArg = {} } = {}) {
+  constructor({ uuid = 'item-uuid', name = 'Recipe Item', sourceId = null, compendiumSource = null, flagsArg = {} } = {}) {
     super(flagsArg);
     this.uuid = uuid;
+    this.name = name;
     // flags.core.sourceId is read by _isMatchingRecipeItem via the legacy fallback path
     this.flags = sourceId ? { core: { sourceId } } : {};
     // _stats.compendiumSource is the Foundry v12+ canonical field
@@ -121,10 +122,12 @@ class FakeItem extends FakeDocument {
       this._stats = { compendiumSource };
     }
     this.deleted = false;
+    this.deleteCount = 0;
   }
 
   async delete() {
     this.deleted = true;
+    this.deleteCount += 1;
   }
 }
 
@@ -133,10 +136,14 @@ class FakeItem extends FakeDocument {
 // ---------------------------------------------------------------------------
 
 class FakeActor extends FakeDocument {
-  constructor({ id = 'actor-1', items = [], flagsArg = {} } = {}) {
+  constructor({ id = 'actor-1', name = 'Test Actor', items = [], flagsArg = {} } = {}) {
     super(flagsArg);
     this.id = id;
+    this.name = name;
     this.items = items;
+    for (const item of items) {
+      if (item && !item.parent) item.parent = this;
+    }
   }
 }
 
@@ -172,12 +179,15 @@ function buildMockSystem(overrides = {}) {
   };
 }
 
-function buildService({ system = null, recipes = [] } = {}) {
+function buildService({ system = null, systems = null, recipes = [] } = {}) {
   const recipeManager = {
     getRecipes: () => recipes
   };
   const craftingSystemManager = {
-    getSystem: (id) => system
+    getSystem: (id) => {
+      if (systems) return systems[id] || null;
+      return system;
+    }
   };
   return new RecipeVisibilityService(recipeManager, craftingSystemManager);
 }
@@ -761,6 +771,219 @@ test('AC6.7 - learnRecipe rejects with a localization key when the crafting syst
 
   assert.equal(result.success, false);
   assert.equal(result.message, 'FABRICATE.Knowledge.SystemNotFound');
+});
+
+test('AC6.8 - learnRecipesFromOwnedItem anchors learning and deletion to the exact owned item', async () => {
+  const system = buildMockSystem({
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: {
+        mode: 'learned',
+        item: { limitUses: false },
+        learn: { consumeOnLearn: true, dragDropEnabled: true }
+      }
+    },
+    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'Compendium.world.items.book' }]
+  });
+  const recipe = buildMockRecipe({ id: 'recipe-1', recipeItemId: 'book', linkedRecipeItemUuid: null });
+  const firstCopy = new FakeItem({ uuid: 'Actor.actor-1.Item.copy-1', sourceId: 'Compendium.world.items.book' });
+  const droppedCopy = new FakeItem({ uuid: 'Actor.actor-1.Item.copy-2', sourceId: 'Compendium.world.items.book' });
+  const craftingActor = new FakeActor({ id: 'actor-1', items: [firstCopy, droppedCopy] });
+  const service = buildService({ system, recipes: [recipe] });
+
+  const result = await service.learnRecipesFromOwnedItem({
+    ownedItem: droppedCopy,
+    actor: craftingActor,
+    viewer: { isGM: false, id: 'user-1' },
+    mode: 'auto'
+  });
+
+  assert.equal(result.notificationKind, 'success');
+  const learned = craftingActor.getFlag('fabricate', 'fabricate.learnedRecipes');
+  assert.equal(learned['recipe-1'].sourceItemUuid, 'Actor.actor-1.Item.copy-2');
+  assert.equal(firstCopy.deleted, false);
+  assert.equal(droppedCopy.deleted, true);
+  assert.equal(droppedCopy.deleteCount, 1);
+});
+
+test('AC6.9 - learnRecipesFromOwnedItem learns multiple recipes and deletes once after writes', async () => {
+  const system = buildMockSystem({
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: {
+        mode: 'itemOrLearned',
+        item: { limitUses: false },
+        learn: { consumeOnLearn: true, dragDropEnabled: true }
+      }
+    },
+    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'Compendium.world.items.book' }]
+  });
+  const recipes = [
+    buildMockRecipe({ id: 'recipe-a', name: 'Recipe A', recipeItemId: 'book', linkedRecipeItemUuid: null }),
+    buildMockRecipe({ id: 'recipe-b', name: 'Recipe B', recipeItemId: 'book', linkedRecipeItemUuid: null }),
+    buildMockRecipe({ id: 'recipe-c', name: 'Recipe C', recipeItemId: 'book', linkedRecipeItemUuid: null })
+  ];
+  const item = new FakeItem({ uuid: 'Actor.actor-1.Item.book', sourceId: 'Compendium.world.items.book' });
+  const actor = new FakeActor({
+    id: 'actor-1',
+    items: [item],
+    flagsArg: { fabricate: { learnedRecipes: { 'recipe-b': { learnedAt: 1000, sourceItemUuid: 'old' } } } }
+  });
+  const service = buildService({ system, recipes });
+
+  const result = await service.learnRecipesFromOwnedItem({ ownedItem: item, actor, mode: 'auto' });
+
+  assert.equal(result.notificationKind, 'partial');
+  assert.deepEqual(result.learnedRecipes.map(recipe => recipe.id), ['recipe-a', 'recipe-c']);
+  assert.deepEqual(result.alreadyLearnedRecipes.map(recipe => recipe.id), ['recipe-b']);
+  const learned = actor.getFlag('fabricate', 'fabricate.learnedRecipes');
+  assert.equal(learned['recipe-a'].sourceItemUuid, item.uuid);
+  assert.equal(learned['recipe-b'].sourceItemUuid, 'old');
+  assert.equal(learned['recipe-c'].sourceItemUuid, item.uuid);
+  assert.equal(item.deleteCount, 1);
+});
+
+test('AC6.10 - learnRecipesFromOwnedItem does not delete when every matched recipe is already learned', async () => {
+  const system = buildMockSystem({
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: {
+        mode: 'learned',
+        item: { limitUses: false },
+        learn: { consumeOnLearn: true, dragDropEnabled: true }
+      }
+    },
+    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'Compendium.world.items.book' }]
+  });
+  const recipe = buildMockRecipe({ id: 'recipe-1', recipeItemId: 'book', linkedRecipeItemUuid: null });
+  const item = new FakeItem({ uuid: 'Actor.actor-1.Item.book', sourceId: 'Compendium.world.items.book' });
+  const actor = new FakeActor({
+    id: 'actor-1',
+    items: [item],
+    flagsArg: { fabricate: { learnedRecipes: { 'recipe-1': { learnedAt: 1000, sourceItemUuid: 'old' } } } }
+  });
+  const service = buildService({ system, recipes: [recipe] });
+
+  const result = await service.learnRecipesFromOwnedItem({ ownedItem: item, actor, mode: 'auto' });
+
+  assert.equal(result.notificationKind, 'alreadyKnown');
+  assert.equal(result.learnedRecipes.length, 0);
+  assert.equal(result.alreadyLearnedRecipes.length, 1);
+  assert.equal(item.deleted, false);
+});
+
+test('AC6.10b - learnRecipesFromOwnedItem does not delete when learned-flag write fails', async () => {
+  const system = buildMockSystem({
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: {
+        mode: 'learned',
+        item: { limitUses: false },
+        learn: { consumeOnLearn: true, dragDropEnabled: true }
+      }
+    },
+    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'Compendium.world.items.book' }]
+  });
+  const recipe = buildMockRecipe({ id: 'recipe-1', recipeItemId: 'book', linkedRecipeItemUuid: null });
+  const item = new FakeItem({ uuid: 'Actor.actor-1.Item.book', sourceId: 'Compendium.world.items.book' });
+  const actor = new FakeActor({ id: 'actor-1', items: [item] });
+  actor.setFlag = async () => {
+    throw new Error('write failed');
+  };
+  const service = buildService({ system, recipes: [recipe] });
+
+  const result = await service.learnRecipesFromOwnedItem({ ownedItem: item, actor, mode: 'auto' });
+
+  assert.equal(result.notificationKind, 'silent');
+  assert.equal(item.deleted, false);
+});
+
+test('AC6.11 - owned-item learning matches canonical recipeItemId definitions and source UUID variants', async () => {
+  const system = buildMockSystem({
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: {
+        mode: 'learned',
+        item: { limitUses: false },
+        learn: { consumeOnLearn: false, dragDropEnabled: true }
+      }
+    },
+    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'Compendium.world.items.book' }]
+  });
+  const recipe = buildMockRecipe({ id: 'recipe-1', recipeItemId: 'book', linkedRecipeItemUuid: null });
+  const item = new FakeItem({ uuid: 'Actor.actor-1.Item.book', compendiumSource: 'Compendium.world.items.book' });
+  const actor = new FakeActor({ id: 'actor-1', items: [item] });
+  const service = buildService({ system, recipes: [recipe] });
+
+  const result = await service.learnRecipesFromOwnedItem({ ownedItem: item, actor, mode: 'auto' });
+
+  assert.equal(result.notificationKind, 'success');
+  assert.equal(result.learnedRecipes[0].id, 'recipe-1');
+});
+
+test('AC6.12 - owned-item learning retains legacy linkedRecipeItemUuid compatibility', async () => {
+  const system = buildMockSystem({
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: {
+        mode: 'learned',
+        item: { limitUses: false },
+        learn: { consumeOnLearn: false, dragDropEnabled: true }
+      }
+    }
+  });
+  const recipe = buildMockRecipe({ id: 'recipe-1', recipeItemId: null, linkedRecipeItemUuid: 'legacy-source' });
+  const item = new FakeItem({ uuid: 'Actor.actor-1.Item.book', sourceId: 'legacy-source' });
+  const actor = new FakeActor({ id: 'actor-1', items: [item] });
+  const service = buildService({ system, recipes: [recipe] });
+
+  const result = await service.learnRecipesFromOwnedItem({ ownedItem: item, actor, mode: 'auto' });
+
+  assert.equal(result.notificationKind, 'success');
+  assert.equal(result.learnedRecipes[0].id, 'recipe-1');
+});
+
+test('AC6.13 - owned-item learning splits auto and manual scopes by dragDropEnabled', async () => {
+  const autoSystem = buildMockSystem({
+    id: 'auto-system',
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: {
+        mode: 'learned',
+        item: { limitUses: false },
+        learn: { consumeOnLearn: false, dragDropEnabled: true }
+      }
+    },
+    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'shared-source' }]
+  });
+  const manualSystem = buildMockSystem({
+    id: 'manual-system',
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: {
+        mode: 'learned',
+        item: { limitUses: false },
+        learn: { consumeOnLearn: false, dragDropEnabled: false }
+      }
+    },
+    recipeItemDefinitions: [{ id: 'book', sourceItemUuid: 'shared-source' }]
+  });
+  const recipes = [
+    buildMockRecipe({ id: 'auto-recipe', craftingSystemId: 'auto-system', recipeItemId: 'book', linkedRecipeItemUuid: null }),
+    buildMockRecipe({ id: 'manual-recipe', craftingSystemId: 'manual-system', recipeItemId: 'book', linkedRecipeItemUuid: null })
+  ];
+  const item = new FakeItem({ uuid: 'Actor.actor-1.Item.book', sourceId: 'shared-source' });
+  const actor = new FakeActor({ id: 'actor-1', items: [item] });
+  const service = buildService({
+    systems: { 'auto-system': autoSystem, 'manual-system': manualSystem },
+    recipes
+  });
+
+  const autoPreview = service.previewOwnedItemLearning({ ownedItem: item, actor, mode: 'auto' });
+  const manualPreview = service.previewOwnedItemLearning({ ownedItem: item, actor, mode: 'manual' });
+
+  assert.deepEqual(autoPreview.learnedRecipes.map(recipe => recipe.id), ['auto-recipe']);
+  assert.deepEqual(manualPreview.learnedRecipes.map(recipe => recipe.id), ['manual-recipe']);
 });
 
 // ---------------------------------------------------------------------------

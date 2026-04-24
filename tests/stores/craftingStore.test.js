@@ -411,6 +411,83 @@ describe('createCraftingStore', () => {
     });
   });
 
+  describe('inventory hook refresh', () => {
+    it('keeps palette and workbench sane through hook-driven create/delete events', async () => {
+      const previousHooks = globalThis.Hooks;
+      const hookHandlers = new Map();
+      globalThis.Hooks = {
+        on: (event, handler) => {
+          hookHandlers.set(event, handler);
+          return handler;
+        },
+        off: () => {}
+      };
+
+      const actor = makeActor('a1', 'Alice');
+      const alchemySystem = {
+        id: 'alchemy-system',
+        name: 'Alchemy',
+        resolutionMode: 'alchemy',
+        components: [{
+          id: 'formula-paper',
+          name: 'Formula Paper',
+          sourceUuid: 'Compendium.fabricate.Item.formula-paper'
+        }]
+      };
+      const ownedItems = [];
+      actor.items = {
+        size: 0,
+        [Symbol.iterator]: function* () {
+          yield* ownedItems;
+        }
+      };
+
+      const services = createMockServices({
+        getAvailableActors: () => [actor],
+        getOwnedActors: () => [actor],
+        getGameUser: () => ({ id: 'u1', character: actor }),
+        getCraftingSystemManager: () => ({
+          getSystems: () => [alchemySystem],
+          getSystem: (id) => id === alchemySystem.id ? alchemySystem : null
+        })
+      });
+
+      try {
+        const store = createCraftingStore(services);
+        await store.refresh();
+        await store.selectAlchemySystem(alchemySystem.id);
+        assert.equal(get(store.palette)[0].inventoryQuantity, 0);
+
+        const createdItem = {
+          id: 'formula-1',
+          uuid: 'Actor.a1.Item.formula-1',
+          name: 'Formula Paper',
+          parent: actor,
+          system: { quantity: 2 },
+          flags: { core: { sourceId: 'Compendium.fabricate.Item.formula-paper' } }
+        };
+        ownedItems.push(createdItem);
+        actor.items.size = ownedItems.length;
+        hookHandlers.get('createItem')?.(createdItem);
+
+        assert.equal(get(store.palette)[0].inventoryQuantity, 2);
+        store.addToWorkbench('formula-paper');
+        store.addToWorkbench('formula-paper');
+        assert.equal(get(store.workbench)[0].quantity, 2);
+
+        ownedItems.splice(ownedItems.indexOf(createdItem), 1);
+        actor.items.size = ownedItems.length;
+        hookHandlers.get('deleteItem')?.(createdItem);
+
+        assert.equal(get(store.palette)[0].inventoryQuantity, 0);
+        assert.equal(get(store.workbench).length, 0);
+        store.destroy();
+      } finally {
+        globalThis.Hooks = previousHooks;
+      }
+    });
+  });
+
   // --- Favourites ---
 
   describe('toggleFavourite', () => {
