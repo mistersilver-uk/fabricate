@@ -499,7 +499,7 @@ The Gathering App must include a dedicated active-runs section.
 Each active run entry shows:
 
 - environment name
-- task name
+- task name for `targeted` environments, or a localized generic label for `blind` environments
 - actor name
 - status (`inProgress` or `waitingTime`)
 - started time
@@ -507,6 +507,7 @@ Each active run entry shows:
 
 The app must not allow starting a second active run for the same actor and `taskId`.
 Instead it should show the existing run and an actionable blocking reason.
+For `blind` environments, duplicate-run blockers, notifications, and terminal feedback must also use localized generic labels instead of the real task name.
 
 ### Completion and Refresh
 
@@ -529,10 +530,12 @@ The Gathering App should expose recent gathering history for the selected actor.
 Each history row shows:
 
 - environment
-- task
+- task for `targeted` environments, or a localized generic label for `blind` environments
 - terminal status
 - completion time
 - summary of results or failure outcome
+
+In `blind` environments, real task names remain GM-only in player-facing active runs, history rows, duplicate-run blockers, notifications, and terminal feedback.
 
 ## Data Storage (UI-relevant)
 
