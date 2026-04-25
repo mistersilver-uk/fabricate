@@ -66,7 +66,7 @@ test('rewriteModuleJson preserves languages paths unchanged', () => {
   assert.deepEqual(result.languages[0].path, 'lang/en.json');
 });
 
-test('rewriteModuleJson drops .db suffix from pack paths', () => {
+test('rewriteModuleJson normalizes legacy .db pack paths', () => {
   const manifest = {
     esmodules: [],
     styles: [],
@@ -198,13 +198,25 @@ test('getRequiredFiles returns all entries from full manifest', () => {
     esmodules: ['main.js'],
     styles: ['styles/fabricate.css'],
     languages: [{ path: 'lang/en.json' }],
-    packs: []
+    packs: [{ path: 'packs/alchemists-supplies-v16' }]
   };
   const files = getRequiredFiles(manifest);
   assert.ok(files.includes('main.js'));
   assert.ok(files.includes('styles/fabricate.css'));
   assert.ok(files.includes('lang/en.json'));
+  assert.ok(files.includes('packs/alchemists-supplies-v16'));
   assert.ok(files.includes('module.json'));
+});
+
+test('getRequiredFiles returns pack paths', () => {
+  const manifest = {
+    esmodules: [],
+    styles: [],
+    languages: [],
+    packs: [{ path: 'packs/alchemists-supplies-v16' }]
+  };
+  const files = getRequiredFiles(manifest);
+  assert.ok(files.includes('packs/alchemists-supplies-v16'), 'should include pack path');
 });
 
 test('getRequiredFiles handles multiple esmodules', () => {
@@ -245,14 +257,32 @@ test('validateDist returns success when all required files are present', async (
     esmodules: ['main.js'],
     styles: ['styles/fabricate.css'],
     languages: [{ path: 'lang/en.json' }],
-    packs: []
+    packs: [{ path: 'packs/alchemists-supplies-v16' }]
   };
   const distManifest = { ...manifest, id: 'fabricate', version: '0.1.0' };
-  const dir = await makeTempDist(['main.js', 'styles/fabricate.css', 'lang/en.json'], distManifest);
+  const dir = await makeTempDist(['main.js', 'styles/fabricate.css', 'lang/en.json', 'packs/alchemists-supplies-v16/CURRENT'], distManifest);
   try {
     const result = await validateDist(dir, manifest);
     assert.equal(result.valid, true);
     assert.equal(result.missing.length, 0);
+  } finally {
+    await rm(dir, { recursive: true });
+  }
+});
+
+test('validateDist returns failure when a pack path is missing', async () => {
+  const manifest = {
+    esmodules: ['main.js'],
+    styles: [],
+    languages: [],
+    packs: [{ path: 'packs/alchemists-supplies-v16' }]
+  };
+  const distManifest = { ...manifest, id: 'fabricate', version: '0.1.0' };
+  const dir = await makeTempDist(['main.js'], distManifest);
+  try {
+    const result = await validateDist(dir, manifest);
+    assert.equal(result.valid, false);
+    assert.ok(result.missing.some(f => f.includes('alchemists-supplies-v16')), `Expected missing to include pack path, got: ${result.missing}`);
   } finally {
     await rm(dir, { recursive: true });
   }

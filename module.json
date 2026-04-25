@@ -30,7 +30,7 @@
     {
       "name": "alchemists-supplies",
       "label": "Alchemist's Supplies",
-      "path": "packs/alchemists-supplies-v16.db",
+      "path": "packs/alchemists-supplies-v16",
       "type": "Item",
       "system": "dnd5e"
     }

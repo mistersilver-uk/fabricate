@@ -38,7 +38,7 @@ const ROOT = join(__dirname, '..');
  * - esmodules[]: strip leading 'dist/' prefix
  * - styles[]: keep unchanged
  * - languages[].path: keep unchanged
- * - packs[].path: drop '.db' suffix (for LevelDB dirs)
+ * - packs[].path: normalize legacy '.db' suffixes to LevelDB directory paths
  * - All other fields: preserved
  *
  * @param {object} manifest - Parsed module.json object
@@ -81,6 +81,9 @@ export function getRequiredFiles(manifest) {
   }
   for (const lang of manifest.languages ?? []) {
     if (lang.path) files.push(lang.path);
+  }
+  for (const pack of manifest.packs ?? []) {
+    if (pack.path) files.push(pack.path);
   }
 
   return files;
