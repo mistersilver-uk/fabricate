@@ -233,6 +233,36 @@ describe('createCraftingStore', () => {
       assert.equal(sources.length, 1);
       assert.equal(sources[0].id, 'a1');
     });
+
+    it('adds craftingActor to saved component sources when saved setting excludes it', () => {
+      const services = createMockServices({
+        getSetting: (key) => {
+          if (key === 'lastComponentSources') return ['a2'];
+          return null;
+        }
+      });
+      const store = createCraftingStore(services);
+      const sources = get(store.componentSourceActors);
+
+      assert.deepEqual(sources.map(a => a.id), ['a1', 'a2']);
+    });
+
+    it('adds actor images to available and owned actor view models', () => {
+      const actorA = { ...makeActor('a1', 'Alice'), img: 'alice.webp' };
+      const actorB = { ...makeActor('a2', 'Bob'), img: '' };
+      const services = createMockServices({
+        getAvailableActors: () => [actorA, actorB],
+        getOwnedActors: () => [actorA, actorB],
+        getGameUser: () => ({ id: 'u1', character: actorA })
+      });
+      const store = createCraftingStore(services);
+      const vs = get(store.viewState);
+
+      assert.equal(vs.availableActors[0].img, 'alice.webp');
+      assert.equal(vs.ownedActors[0].img, 'alice.webp');
+      assert.equal(vs.availableActors[1].img, 'icons/svg/mystery-man.svg');
+      assert.equal(vs.ownedActors[1].img, 'icons/svg/mystery-man.svg');
+    });
   });
 
   // --- selectActor ---
@@ -265,6 +295,34 @@ describe('createCraftingStore', () => {
       const vs = get(store.viewState);
       assert.ok(vs.hasCraftingActor);
     });
+
+    it('switches the required component source when crafting actor changes', async () => {
+      const services = createMockServices();
+      const store = createCraftingStore(services);
+
+      await store.selectActor('a2');
+      const sources = get(store.componentSourceActors);
+
+      assert.deepEqual(sources.map(a => a.id), ['a2']);
+    });
+
+    it('preserves extra component sources when the required source switches', async () => {
+      const actorA = makeActor('a1', 'Alice');
+      const actorB = makeActor('a2', 'Bob');
+      const actorC = makeActor('a3', 'Cara');
+      const services = createMockServices({
+        getAvailableActors: () => [actorA, actorB, actorC],
+        getOwnedActors: () => [actorA, actorB, actorC],
+        getGameUser: () => ({ id: 'u1', character: actorA })
+      });
+      const store = createCraftingStore(services);
+
+      await store.toggleSourceActor('a3', true);
+      await store.selectActor('a2');
+      const sources = get(store.componentSourceActors);
+
+      assert.deepEqual(sources.map(a => a.id), ['a2', 'a3']);
+    });
   });
 
   // --- toggleSourceActor ---
@@ -285,13 +343,23 @@ describe('createCraftingStore', () => {
       assert.ok(sources.some(a => a.id === 'a2'));
     });
 
-    it('removes actor from componentSourceActors when checked=false', async () => {
+    it('removes non-required actor from componentSourceActors when checked=false', async () => {
       const services = createMockServices();
       const store = createCraftingStore(services);
-      // a1 is included by default
+      await store.toggleSourceActor('a2', true);
+      await store.toggleSourceActor('a2', false);
+      const sources = get(store.componentSourceActors);
+      assert.ok(!sources.some(a => a.id === 'a2'));
+    });
+
+    it('does not remove the selected crafting actor from componentSourceActors', async () => {
+      const services = createMockServices();
+      const store = createCraftingStore(services);
+
       await store.toggleSourceActor('a1', false);
       const sources = get(store.componentSourceActors);
-      assert.ok(!sources.some(a => a.id === 'a1'));
+
+      assert.ok(sources.some(a => a.id === 'a1'));
     });
 
     it('does not duplicate actor when toggled on twice', async () => {

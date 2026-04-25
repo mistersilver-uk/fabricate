@@ -14,6 +14,7 @@ import { SignatureValidator } from '../../../systems/SignatureValidator.js';
 import { resolveAutoFill } from '../util/autoFillResolver.js';
 
 const RECENTLY_CRAFTED_MAX = 10;
+const DEFAULT_ACTOR_IMAGE = 'icons/svg/mystery-man.svg';
 
 // Shared instance — expandGroupToComponentIds / expandIngredientToComponentIds
 // do not use this._csm, so null is safe for these operations.
@@ -66,6 +67,35 @@ function _resolveDefaultComponentSources(services, craftingActor) {
   }
 
   return [];
+}
+
+function _dedupeActors(actors = []) {
+  const seen = new Set();
+  const deduped = [];
+  for (const actor of actors) {
+    if (!actor?.id || seen.has(actor.id)) continue;
+    seen.add(actor.id);
+    deduped.push(actor);
+  }
+  return deduped;
+}
+
+function _sameActorIds(left = [], right = []) {
+  if (left.length !== right.length) return false;
+  return left.every((actor, index) => actor?.id === right[index]?.id);
+}
+
+function _ensureCraftingActorSource(craftingActor, sourceActors = []) {
+  if (!craftingActor) return _dedupeActors(sourceActors);
+  const sourceActor = sourceActors.find(actor => actor?.id === craftingActor.id) || craftingActor;
+  return _dedupeActors([sourceActor, ...sourceActors]);
+}
+
+function _replaceRequiredCraftingSource(previousActor, nextActor, sourceActors = []) {
+  const remainingSources = previousActor?.id && previousActor.id !== nextActor?.id
+    ? sourceActors.filter(actor => actor?.id !== previousActor.id)
+    : sourceActors;
+  return _ensureCraftingActorSource(nextActor, remainingSources);
 }
 
 /**
@@ -310,14 +340,21 @@ function _buildPreparedRecipes(
   const availableActors = services.getAvailableActors().map(actor => ({
     id: actor.id,
     name: actor.name,
+    img: actor.img || DEFAULT_ACTOR_IMAGE,
     selected: craftingActor?.id === actor.id,
     isAssignedCharacter: gameUser?.character?.id === actor.id
   }));
 
-  const ownedActors = services.getOwnedActors().map(actor => ({
+  const selectableSourceActors = _dedupeActors([
+    ...services.getOwnedActors(),
+    ...componentSourceActors
+  ]);
+  const ownedActors = selectableSourceActors.map(actor => ({
     id: actor.id,
     name: actor.name,
+    img: actor.img || DEFAULT_ACTOR_IMAGE,
     selected: componentSourceActors.some(a => a.id === actor.id),
+    locked: craftingActor?.id === actor.id,
     itemCount: actor.items?.size ?? 0
   }));
 
@@ -760,7 +797,10 @@ export function createCraftingStore(services) {
   // --- Input writables ---
   const craftingActor = writable(_resolveDefaultCraftingActor(services));
   const componentSourceActors = writable(
-    _resolveDefaultComponentSources(services, get(craftingActor))
+    _ensureCraftingActorSource(
+      get(craftingActor),
+      _resolveDefaultComponentSources(services, get(craftingActor))
+    )
   );
   const searchTerm = writable('');
   const selectedCategory = writable('');
@@ -910,10 +950,18 @@ export function createCraftingStore(services) {
       return;
     }
 
+    const normalizedSources = _ensureCraftingActorSource(
+      get(craftingActor),
+      get(componentSourceActors)
+    );
+    if (!_sameActorIds(normalizedSources, get(componentSourceActors))) {
+      componentSourceActors.set(normalizedSources);
+    }
+
     const computed = _buildPreparedRecipes(
       services,
       get(craftingActor),
-      get(componentSourceActors),
+      normalizedSources,
       get(searchTerm),
       get(selectedCategory),
       get(showOnlyAvailable),
@@ -1011,13 +1059,22 @@ export function createCraftingStore(services) {
   // --- Actions ---
 
   async function selectActor(actorId) {
+    const previousActor = get(craftingActor);
     const actor = services.getAvailableActors().find(a => a.id === actorId) || null;
     craftingActor.set(actor);
+    const updatedSources = _replaceRequiredCraftingSource(
+      previousActor,
+      actor,
+      get(componentSourceActors)
+    );
+    componentSourceActors.set(updatedSources);
     await services.setSetting('lastCraftingActor', actorId);
+    await services.setSetting('lastComponentSources', updatedSources.map(a => a.id));
     await refresh();
   }
 
   async function toggleSourceActor(actorId, checked) {
+    const currentCraftingActor = get(craftingActor);
     const current = get(componentSourceActors);
     let updated;
     if (checked) {
@@ -1032,8 +1089,11 @@ export function createCraftingStore(services) {
         updated = current;
       }
     } else {
-      updated = current.filter(a => a.id !== actorId);
+      updated = currentCraftingActor?.id === actorId
+        ? current
+        : current.filter(a => a.id !== actorId);
     }
+    updated = _ensureCraftingActorSource(currentCraftingActor, updated);
     componentSourceActors.set(updated);
     await services.setSetting('lastComponentSources', updated.map(a => a.id));
     await refresh();

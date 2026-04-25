@@ -267,26 +267,27 @@ describe('CraftingAppRoot Layout', () => {
     assert.ok(root.classList.contains('fabricate-crafting-app'));
   });
 
-  it('actor selection section is always rendered with both sub-selectors', () => {
+  it('actor crafting header replaces the old selector section', () => {
     const root = document.createElement('div');
     root.className = 'fabricate-crafting-app';
 
-    const section = document.createElement('section');
-    section.className = 'actor-selection-section';
+    const header = document.createElement('header');
+    header.className = 'actor-crafting-header';
 
-    const actorSelector = document.createElement('div');
-    actorSelector.className = 'crafting-actor-selector';
+    const craftingActor = document.createElement('button');
+    craftingActor.className = 'selected-crafting-actor';
 
-    const sourceSelector = document.createElement('div');
-    sourceSelector.className = 'component-sources-selector';
+    const sourceAvatars = document.createElement('div');
+    sourceAvatars.className = 'component-source-avatars';
 
-    section.appendChild(actorSelector);
-    section.appendChild(sourceSelector);
-    root.appendChild(section);
+    header.appendChild(craftingActor);
+    header.appendChild(sourceAvatars);
+    root.appendChild(header);
 
-    assert.ok(root.querySelector('.actor-selection-section'), 'actor-selection-section should exist');
-    assert.ok(root.querySelector('.crafting-actor-selector'), 'crafting-actor-selector should exist');
-    assert.ok(root.querySelector('.component-sources-selector'), 'component-sources-selector should exist');
+    assert.ok(root.querySelector('.actor-crafting-header'), 'actor-crafting-header should exist');
+    assert.ok(root.querySelector('.selected-crafting-actor'), 'selected crafting actor button should exist');
+    assert.ok(root.querySelector('.component-source-avatars'), 'source avatar row should exist');
+    assert.equal(root.querySelector('.actor-selection-section'), null, 'old selector section should not be rendered');
   });
 
   it('run summary section is hidden when no crafting actor', () => {

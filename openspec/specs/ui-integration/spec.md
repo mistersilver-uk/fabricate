@@ -321,8 +321,26 @@ The UI must expose required data fields from `004`, but mode logic itself is def
 
 ### Actor and Sources
 
-- Select crafting actor
-- Select component source actors
+- A persistent app header appears above the tab content and replaces separate
+  `Craft With` and `Using Components From` form controls.
+- The left side of the header shows the currently selected crafting actor's
+  image/avatar and name. The default and last-selection resolution order is the
+  same as the crafting store selection behavior.
+- Clicking the selected crafting actor image or name opens a searchable,
+  scrollable dropdown of available crafting actors. Each row shows actor image
+  and name.
+- The right side of the header shows `Component Sources` and a row of selected
+  component source actor images/avatars.
+- Component source names are hidden by default and revealed on hover over each
+  selected source avatar.
+- Right-clicking a selected component source avatar removes that source.
+- The selected crafting actor is always included as a component source and
+  cannot be removed from component sources.
+- Changing the selected crafting actor moves this required component source
+  from the previous crafting actor to the newly selected crafting actor.
+- An edit control beside the source avatars opens a searchable, scrollable
+  dropdown of owned actors for selecting or deselecting component sources. Each
+  row shows actor image and name.
 - Persist last selections in client settings
 - Actor/source selection is shared across both tabs (rendered above tab content)
 

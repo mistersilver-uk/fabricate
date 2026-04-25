@@ -1,8 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../util/foundryBridge.js';
-  import ActorSelector from './ActorSelector.svelte';
-  import SourceActorPicker from './SourceActorPicker.svelte';
+  import ActorCraftingHeader from './ActorCraftingHeader.svelte';
   import CraftingTab from './CraftingTab.svelte';
   import AlchemyTab from './AlchemyTab.svelte';
 
@@ -21,20 +20,15 @@
 </script>
 
 <div class="fabricate-crafting-app">
-  <!-- Actor Selection Section -->
-  <section class="actor-selection-section">
-    <ActorSelector
-      availableActors={$viewState.availableActors}
-      onSelectActor={store.selectActor}
-    />
-    <SourceActorPicker
-      ownedActors={$viewState.ownedActors}
-      onToggleSource={store.toggleSourceActor}
-    />
-  </section>
+  <ActorCraftingHeader
+    availableActors={$viewState.availableActors}
+    ownedActors={$viewState.ownedActors}
+    onSelectActor={store.selectActor}
+    onToggleSource={store.toggleSourceActor}
+  />
 
   {#if $showTabBar}
-    <nav class="fabricate-tab-bar" role="tablist">
+    <div class="fabricate-tab-bar" role="tablist">
       <button
         class="fabricate-tab"
         class:active={$activeTab === 'alchemy'}
@@ -53,7 +47,7 @@
       >
         <i class="fas fa-hammer"></i> {localize('FABRICATE.Tabs.Crafting')}
       </button>
-    </nav>
+    </div>
   {/if}
 
   {#if $hasAlchemyTab && ($activeTab === 'alchemy' || !$hasCraftingTab)}

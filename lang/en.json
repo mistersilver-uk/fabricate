@@ -33,6 +33,18 @@
       "ResultHint": "Results will be added to this actor's inventory",
       "AssignedMarker": "*"
     },
+    "CraftingHeader": {
+      "ChangeCraftingActor": "Change crafting actor",
+      "ComponentSources": "Component Sources",
+      "EditComponentSources": "Edit component sources",
+      "NoActorsFound": "No actors found.",
+      "NoCraftingActor": "No crafting actor selected",
+      "NoSources": "None selected",
+      "RequiredSource": "The selected crafting actor is always a component source.",
+      "RemoveSource": "Remove {name} from component sources",
+      "SearchActors": "Search actors...",
+      "SearchSources": "Search sources..."
+    },
     "SourceActorPicker": {
       "Label": "Using components from:",
       "NoActors": "No owned actors available for component sources."
