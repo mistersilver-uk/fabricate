@@ -1,6 +1,6 @@
 name = "fabricate_domain_expert"
 description = "Audit and refine Fabricate crafting domain language, model boundaries, and spec-code alignment."
-model = "gpt-5.4"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
 nickname_candidates = ["Domain", "Glossary", "Modeler"]

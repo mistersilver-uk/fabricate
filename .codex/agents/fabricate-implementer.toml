@@ -1,6 +1,6 @@
 name = "fabricate_implementer"
 description = "Implement a scoped Fabricate change with tests and validation."
-model = "gpt-5.4"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
 nickname_candidates = ["Builder", "Patch", "Forge"]

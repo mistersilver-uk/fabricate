@@ -1,6 +1,6 @@
 name = "fabricate_reviewer"
 description = "Review Fabricate diffs for correctness, regression risk, tests, and Foundry V13 compatibility."
-model = "gpt-5.4"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 nickname_candidates = ["Reviewer", "Gatekeeper", "Verifier"]
