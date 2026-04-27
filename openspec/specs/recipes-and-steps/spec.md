@@ -140,7 +140,7 @@ Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
 
 When `recipe.transferEffects === true` and essences are enabled:
 
-1. Determine contributing essence IDs from resolved ingredients.
+1. Determine contributing essence IDs from resolved ingredients using the same item-flag-first, component-definition-fallback essence resolution used by craftability checks.
 2. For each contributing essence, if `EssenceDefinition.sourceItemUuid` resolves, collect active effects from that item.
 3. Transfer collected effects to created result items using the standard effect-transfer pipeline.
 

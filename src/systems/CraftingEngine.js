@@ -2,9 +2,9 @@ import { Recipe } from '../models/Recipe.js';
 import { ItemPilesIntegration } from '../integrations/ItemPilesIntegration.js';
 import { MacroExecutor } from '../utils/MacroExecutor.js';
 import { CraftingCheckAdapterRegistry } from './CraftingCheckAdapter.js';
-import { getFabricateFlag } from '../config/flags.js';
 import { getItemSourceReferences, getComponentSourceReferences, itemMatchesComponentSource } from '../utils/sourceUuid.js';
 import { SignatureValidator } from './SignatureValidator.js';
+import { accumulateItemEssences, resolveItemEssences } from '../utils/essenceResolver.js';
 
 /**
  * Handles the actual crafting process
@@ -632,13 +632,7 @@ export class CraftingEngine {
     // Accumulate essences from ALL submitted items (duplicates count multiple times)
     let submittedEssences = null;
     if (essencesEnabled) {
-      submittedEssences = {};
-      for (const item of submittedItems) {
-        const itemEssences = getFabricateFlag(item, 'essences', {});
-        for (const [essenceType, qty] of Object.entries(itemEssences)) {
-          submittedEssences[essenceType] = (submittedEssences[essenceType] || 0) + qty;
-        }
-      }
+      submittedEssences = accumulateItemEssences(submittedItems, { components });
     }
 
     for (const recipe of recipes) {
@@ -956,7 +950,7 @@ export class CraftingEngine {
     if (!system?.features?.essences) return;
 
     // 2. Build essence context — resolvedEssences maps essenceId -> total quantity contributed
-    const { resolvedEssences } = this._buildEssenceContext(consumedItems);
+    const { resolvedEssences } = this._buildEssenceContext(consumedItems, recipe);
     const contributingEssenceIds = Object.keys(resolvedEssences);
     if (contributingEssenceIds.length === 0) return;
 
@@ -1415,7 +1409,8 @@ export class CraftingEngine {
       }))
     );
     const resolvedEssences = this._accumulateEssencesFromItems(
-      ingredientPool.map(entry => entry.item)
+      ingredientPool.map(entry => entry.item),
+      recipe
     );
 
     let result;
@@ -1580,7 +1575,7 @@ export class CraftingEngine {
     const enabled = advancedEnabled && features.propertyMacros === true;
     if (!enabled) return null;
 
-    const essenceContext = this._buildEssenceContext(consumedItems);
+    const essenceContext = this._buildEssenceContext(consumedItems, recipe);
     const context = {
       recipe: recipe?.toJSON?.() || recipe,
       craftingSystem,
@@ -1621,12 +1616,13 @@ export class CraftingEngine {
     }
   }
 
-  _buildEssenceContext(consumedItems) {
+  _buildEssenceContext(consumedItems, recipe = null) {
     const resolvedEssences = {};
     const essenceSources = {};
+    const components = this._getSystemComponents(recipe);
 
     for (const { item, quantity } of consumedItems) {
-      const itemEssences = getFabricateFlag(item, 'essences', {});
+      const itemEssences = resolveItemEssences(item, components);
       for (const [essenceId, perUnit] of Object.entries(itemEssences)) {
         const value = Number(perUnit);
         if (!Number.isFinite(value) || value <= 0) continue;
@@ -1646,17 +1642,19 @@ export class CraftingEngine {
     return { resolvedEssences, essenceSources };
   }
 
-  _accumulateEssencesFromItems(items) {
-    const resolved = {};
-    for (const item of items) {
-      const itemEssences = getFabricateFlag(item, 'essences', {});
-      for (const [essenceId, qty] of Object.entries(itemEssences)) {
-        const value = Number(qty);
-        if (!Number.isFinite(value) || value <= 0) continue;
-        resolved[essenceId] = (resolved[essenceId] || 0) + value;
-      }
-    }
-    return resolved;
+  _accumulateEssencesFromItems(items, recipe = null) {
+    return accumulateItemEssences(items, {
+      components: this._getSystemComponents(recipe),
+      multiplyByQuantity: true
+    });
+  }
+
+  _getSystemComponents(recipe) {
+    const systemId = recipe?.craftingSystemId;
+    if (!systemId) return [];
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const system = systemManager?.getSystem(systemId);
+    return Array.isArray(system?.components) ? system.components : [];
   }
 
   /**

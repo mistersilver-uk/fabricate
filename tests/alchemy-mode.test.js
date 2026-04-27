@@ -627,6 +627,115 @@ test('_matchAlchemySignature matches pure-essence recipe when submitted items sa
   assert.equal(result.recipe.id, 'fire-potion');
 });
 
+test('_matchAlchemySignature matches pure-essence recipe from component-defined essences', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const essenceId = 'restorative';
+  const components = [
+    {
+      id: 'red-herb',
+      name: 'Red Herb',
+      sourceUuid: 'Compendium.test.red-herb',
+      sourceItemUuid: 'Compendium.test.red-herb',
+      essences: { [essenceId]: 1 }
+    },
+    {
+      id: 'silverleaf',
+      name: 'Silverleaf',
+      sourceUuid: 'Compendium.test.silverleaf',
+      sourceItemUuid: 'Compendium.test.silverleaf',
+      essences: { [essenceId]: 1 }
+    }
+  ];
+  const recipe = buildRecipe(
+    'healing-potion',
+    [buildIngredientSet([], { [essenceId]: 2 })],
+    [{ id: 'rg1', name: 'Healing Potion', results: [] }],
+    { resultSelection: { provider: 'ingredientSet' } }
+  );
+  const validator = new SignatureValidator({
+    getSystem: () => null,
+    getRecipesForSystem: () => [],
+    getComponentsForSystem: () => components
+  });
+
+  const redHerb = buildSubmittedItem('Item.red-herb', {});
+  redHerb._stats = { compendiumSource: 'Compendium.test.red-herb' };
+  const silverleaf = buildSubmittedItem('Item.silverleaf', {});
+  silverleaf._stats = { compendiumSource: 'Compendium.test.silverleaf' };
+
+  const result = engine._matchAlchemySignature(
+    [redHerb, silverleaf], [recipe], components, validator, { system: essenceSystem }
+  );
+
+  assert.equal(result.matched, true);
+  assert.equal(result.recipe.id, 'healing-potion');
+});
+
+test('_matchAlchemySignature uses item-flag essences before component fallback', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const essenceId = 'restorative';
+  const components = [{
+    id: 'red-herb',
+    name: 'Red Herb',
+    sourceUuid: 'Compendium.test.red-herb',
+    sourceItemUuid: 'Compendium.test.red-herb',
+    essences: { [essenceId]: 5 }
+  }];
+  const recipe = buildRecipe(
+    'healing-potion',
+    [buildIngredientSet([], { [essenceId]: 2 })],
+    [{ id: 'rg1', name: 'Healing Potion', results: [] }],
+    { resultSelection: { provider: 'ingredientSet' } }
+  );
+  const validator = new SignatureValidator({
+    getSystem: () => null,
+    getRecipesForSystem: () => [],
+    getComponentsForSystem: () => components
+  });
+
+  const redHerb = buildSubmittedItem('Item.red-herb', { [essenceId]: 1 });
+  redHerb._stats = { compendiumSource: 'Compendium.test.red-herb' };
+
+  const result = engine._matchAlchemySignature(
+    [redHerb], [recipe], components, validator, { system: essenceSystem }
+  );
+
+  assert.equal(result.matched, false, 'item flag value should override the larger component fallback');
+});
+
+test('_matchAlchemySignature does not multiply component essences by stack quantity for submitted refs', () => {
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const essenceId = 'restorative';
+  const components = [{
+    id: 'red-herb',
+    name: 'Red Herb',
+    sourceUuid: 'Compendium.test.red-herb',
+    sourceItemUuid: 'Compendium.test.red-herb',
+    essences: { [essenceId]: 1 }
+  }];
+  const recipe = buildRecipe(
+    'healing-potion',
+    [buildIngredientSet([], { [essenceId]: 2 })],
+    [{ id: 'rg1', name: 'Healing Potion', results: [] }],
+    { resultSelection: { provider: 'ingredientSet' } }
+  );
+  const validator = new SignatureValidator({
+    getSystem: () => null,
+    getRecipesForSystem: () => [],
+    getComponentsForSystem: () => components
+  });
+
+  const redHerb = buildSubmittedItem('Item.red-herb', {});
+  redHerb._stats = { compendiumSource: 'Compendium.test.red-herb' };
+  redHerb.system = { quantity: 5 };
+
+  const result = engine._matchAlchemySignature(
+    [redHerb], [recipe], components, validator, { system: essenceSystem }
+  );
+
+  assert.equal(result.matched, false, 'one submitted stack ref should count once because the workbench expands quantity');
+});
+
 test('_matchAlchemySignature rejects pure-essence recipe when essences are insufficient', () => {
   const engine = new CraftingEngine({ getRecipes: () => [] });
   const essenceId = 'essence-fire';
@@ -729,6 +838,41 @@ test('_matchAlchemySignature rejects mixed recipe when groups match but essences
   );
 
   assert.equal(result.matched, false);
+});
+
+test('_buildEssenceContext resolves component-defined essences for effect transfer context', () => {
+  const essenceId = 'restorative';
+  const system = buildAlchemySystem({
+    id: 'alchemy-sys',
+    features: { essences: true },
+    components: [{
+      id: 'red-herb',
+      name: 'Red Herb',
+      sourceUuid: 'Compendium.test.red-herb',
+      sourceItemUuid: 'Compendium.test.red-herb',
+      essences: { [essenceId]: 1 }
+    }]
+  });
+  game.fabricate.getCraftingSystemManager = () => ({
+    getSystem: (id) => id === 'alchemy-sys' ? system : null
+  });
+  const engine = new CraftingEngine({ getRecipes: () => [] });
+  const item = {
+    id: 'red-herb-item',
+    name: 'Red Herb',
+    uuid: 'Item.red-herb',
+    _stats: { compendiumSource: 'Compendium.test.red-herb' },
+    getFlag: () => undefined
+  };
+
+  const context = engine._buildEssenceContext(
+    [{ item, quantity: 2 }],
+    { craftingSystemId: 'alchemy-sys' }
+  );
+
+  assert.equal(context.resolvedEssences[essenceId], 2);
+  assert.equal(context.essenceSources[essenceId][0].essencePerItem, 1);
+  assert.equal(context.essenceSources[essenceId][0].essenceTotal, 2);
 });
 
 // ============================================================================

@@ -168,12 +168,12 @@ function makeRecipeManagerWithSystem(systemId, components) {
 /**
  * Build a system manager that also supports essences.
  */
-function makeRecipeManagerWithEssences(systemId, essenceDefinitions) {
+function makeRecipeManagerWithEssences(systemId, essenceDefinitions, components = []) {
   const system = {
     id: systemId,
     advancedOptionsEnabled: true,
     features: { itemTags: false, essences: true },
-    components: [],
+    components,
     managedItems: [],
     essenceDefinitions
   };
@@ -540,7 +540,124 @@ test('TC9: evaluateCraftability essenceStates show satisfied when essences avail
   assert.equal(result.essenceStates[0].satisfied, true);
 });
 
-test('TC9b: evaluateCraftability essenceStates show unsatisfied when essences insufficient', () => {
+test('TC9a: evaluateCraftability counts essences from matched component definitions', () => {
+  const systemId = 'sys-tc9a';
+  const essenceId = 'restorative';
+  const components = [
+    {
+      id: 'red-herb',
+      name: 'Red Herb',
+      sourceUuid: 'Compendium.test.red-herb',
+      sourceItemUuid: 'Compendium.test.red-herb',
+      essences: { [essenceId]: 1 }
+    },
+    {
+      id: 'silverleaf',
+      name: 'Silverleaf',
+      sourceUuid: 'Compendium.test.silverleaf',
+      sourceItemUuid: 'Compendium.test.silverleaf',
+      essences: { [essenceId]: 1 }
+    }
+  ];
+  const redHerb = makeComponentItem('red-herb-item', 'Compendium.test.red-herb', 1);
+  const silverleaf = makeComponentItem('silverleaf-item', 'Compendium.test.silverleaf', 1);
+  const set = makeIngredientSet([], { [essenceId]: 2 });
+
+  const manager = makeRecipeManagerWithEssences(systemId, [
+    { id: essenceId, name: 'Restorative' }
+  ], components);
+
+  const recipe = new Recipe({
+    name: 'Healing Potion',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    resultGroups: [{ id: 'rg-1', results: [] }]
+  });
+
+  const actor = makeActor([redHerb, silverleaf]);
+  const result = manager.evaluateCraftability([actor], recipe);
+
+  assert.equal(result.canCraft, true, 'should be craftable when component-defined essences satisfy the recipe');
+  assert.equal(result.essenceStates.length, 1);
+  assert.equal(result.essenceStates[0].type, essenceId);
+  assert.equal(result.essenceStates[0].have, 2);
+  assert.equal(result.essenceStates[0].need, 2);
+  assert.equal(result.essenceStates[0].satisfied, true);
+});
+
+test('TC9b: evaluateCraftability multiplies component-defined essences by stack quantity', () => {
+  const systemId = 'sys-tc9b-stack';
+  const essenceId = 'restorative';
+  const components = [{
+    id: 'red-herb',
+    name: 'Red Herb',
+    sourceUuid: 'Compendium.test.red-herb',
+    sourceItemUuid: 'Compendium.test.red-herb',
+    essences: { [essenceId]: 1 }
+  }];
+  const redHerbStack = makeComponentItem('red-herb-stack', 'Compendium.test.red-herb', 2);
+  const set = makeIngredientSet([], { [essenceId]: 2 });
+
+  const manager = makeRecipeManagerWithEssences(systemId, [
+    { id: essenceId, name: 'Restorative' }
+  ], components);
+
+  const recipe = new Recipe({
+    name: 'Healing Potion',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    resultGroups: [{ id: 'rg-1', results: [] }]
+  });
+
+  const actor = makeActor([redHerbStack]);
+  const result = manager.evaluateCraftability([actor], recipe);
+
+  assert.equal(result.canCraft, true);
+  assert.equal(result.essenceStates[0].have, 2);
+});
+
+test('TC9c: evaluateCraftability uses item-flag essences before component fallback', () => {
+  const systemId = 'sys-tc9c-precedence';
+  const essenceId = 'restorative';
+  const components = [{
+    id: 'red-herb',
+    name: 'Red Herb',
+    sourceUuid: 'Compendium.test.red-herb',
+    sourceItemUuid: 'Compendium.test.red-herb',
+    essences: { [essenceId]: 5 }
+  }];
+  const redHerb = {
+    uuid: 'red-herb-flagged',
+    id: 'red-herb-flagged',
+    name: 'Red Herb',
+    system: { quantity: 1 },
+    flags: { core: { sourceId: 'Compendium.test.red-herb' } },
+    getFlag: (scope, key) => {
+      if (scope === 'fabricate' && key === 'fabricate.essences') return { [essenceId]: 1 };
+      return undefined;
+    }
+  };
+  const set = makeIngredientSet([], { [essenceId]: 2 });
+
+  const manager = makeRecipeManagerWithEssences(systemId, [
+    { id: essenceId, name: 'Restorative' }
+  ], components);
+
+  const recipe = new Recipe({
+    name: 'Healing Potion',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    resultGroups: [{ id: 'rg-1', results: [] }]
+  });
+
+  const actor = makeActor([redHerb]);
+  const result = manager.evaluateCraftability([actor], recipe);
+
+  assert.equal(result.canCraft, false, 'item flag value should override the larger component fallback');
+  assert.equal(result.essenceStates[0].have, 1);
+});
+
+test('TC9d: evaluateCraftability essenceStates show unsatisfied when essences insufficient', () => {
   const systemId = 'sys-tc9b';
 
   // Item provides only 1 fire essence, but recipe needs 3

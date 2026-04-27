@@ -2,6 +2,7 @@ import { Recipe } from '../models/Recipe.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { getFabricateFlag } from '../config/flags.js';
 import { itemMatchesComponentSource } from '../utils/sourceUuid.js';
+import { accumulateItemEssences } from '../utils/essenceResolver.js';
 import { SignatureValidator } from './SignatureValidator.js';
 
 const DEFAULT_RECIPE_IMG = 'icons/svg/item-bag.svg';
@@ -282,7 +283,7 @@ export class RecipeManager {
       // Check essences for this set.
       let essencesMet = true;
       if (features.enableEssences && Object.keys(ingredientSet.essences || {}).length > 0) {
-        const accumulatedEssences = this._accumulateEssences(availableItems);
+        const accumulatedEssences = this._accumulateEssences(availableItems, recipe);
         for (const [essenceType, requiredQty] of Object.entries(ingredientSet.essences)) {
           if ((accumulatedEssences[essenceType] || 0) < requiredQty) {
             essencesMet = false;
@@ -476,7 +477,7 @@ export class RecipeManager {
     const essences = ingredientSet.essences || {};
     if (Object.keys(essences).length === 0) return [];
 
-    const accumulatedEssences = this._accumulateEssences(availableItems);
+    const accumulatedEssences = this._accumulateEssences(availableItems, recipe);
     return Object.entries(essences).map(([type, need]) => {
       const have = accumulatedEssences[type] || 0;
       return { type, need, have, satisfied: have >= need };
@@ -543,7 +544,7 @@ export class RecipeManager {
 
     // Check essences
     if (features.enableEssences && Object.keys(ingredientSet.essences || {}).length > 0) {
-      const accumulatedEssences = this._accumulateEssences(availableItems);
+      const accumulatedEssences = this._accumulateEssences(availableItems, recipe);
 
       for (const [essenceType, requiredQty] of Object.entries(ingredientSet.essences)) {
         const availableQty = accumulatedEssences[essenceType] || 0;
@@ -840,17 +841,19 @@ export class RecipeManager {
    * @returns {Object} - Accumulated essences { 'light': 3, 'fire': 2 }
    * @private
    */
-  _accumulateEssences(items) {
-    const accumulated = {};
+  _accumulateEssences(items, recipe = null) {
+    return accumulateItemEssences(items, {
+      components: this._getSystemComponents(recipe),
+      multiplyByQuantity: true
+    });
+  }
 
-    for (const item of items) {
-      const itemEssences = getFabricateFlag(item, 'essences', {});
-      for (const [essenceType, quantity] of Object.entries(itemEssences)) {
-        accumulated[essenceType] = (accumulated[essenceType] || 0) + quantity;
-      }
-    }
-
-    return accumulated;
+  _getSystemComponents(recipe) {
+    const systemId = recipe?.craftingSystemId;
+    if (!systemId) return [];
+    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const system = systemManager?.getSystem(systemId);
+    return Array.isArray(system?.components) ? system.components : [];
   }
 
   /**

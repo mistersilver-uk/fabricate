@@ -10,6 +10,7 @@ import { aggregateShoppingList } from '../util/shoppingListAggregator.js';
 import { localize } from '../util/foundryBridge.js';
 import { itemMatchesComponentSource } from '../../../utils/sourceUuid.js';
 import { normalizeRecipeCategory } from '../../../utils/recipeCategories.js';
+import { accumulateItemEssences } from '../../../utils/essenceResolver.js';
 import { SignatureValidator } from '../../../systems/SignatureValidator.js';
 import { resolveAutoFill } from '../util/autoFillResolver.js';
 
@@ -682,13 +683,19 @@ function _buildPalette(system, sourceActors, workbenchEntries) {
  * @param {object} recipe - Recipe with ingredientSets
  * @param {object[]} systemComponents - All components in system
  * @param {object[]} palette - Full palette entries (inventoryQuantity is full inventory)
+ * @param {object[]} sourceActors - Component source actors
  * @returns {boolean} True if any ingredient set is fully satisfiable
  */
-function _evaluateDiscoveredCraftability(recipe, systemComponents, palette) {
+function _evaluateDiscoveredCraftability(recipe, systemComponents, palette, sourceActors = []) {
   const sets = Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : [];
   if (sets.length === 0) return true; // No ingredients required
 
   const paletteMap = new Map(palette.map(e => [e.componentId, e.inventoryQuantity]));
+  const sourceItems = sourceActors.flatMap(actor => Array.from(actor?.items || []));
+  const availableEssences = accumulateItemEssences(sourceItems, {
+    components: systemComponents,
+    multiplyByQuantity: true
+  });
 
   for (const set of sets) {
     const groups = Array.isArray(set.ingredientGroups) ? set.ingredientGroups : [];
@@ -715,6 +722,21 @@ function _evaluateDiscoveredCraftability(recipe, systemComponents, palette) {
       }
     }
 
+    if (!fulfilled) continue;
+
+    const essenceRequirements = set.essences || {};
+    for (const [essenceId, requiredQty] of Object.entries(essenceRequirements)) {
+      const need = Number(requiredQty);
+      if (!Number.isFinite(need) || need <= 0) continue;
+
+      const have = availableEssences[essenceId] || 0;
+
+      if (have < need) {
+        fulfilled = false;
+        break;
+      }
+    }
+
     if (fulfilled) return true;
   }
 
@@ -727,6 +749,7 @@ function _evaluateDiscoveredCraftability(recipe, systemComponents, palette) {
  * @param {object|null} system - Selected alchemy system
  * @param {object[]} systemComponents - Components in the system
  * @param {object[]} paletteEntries - Current palette (using inventoryQuantity for craftability)
+ * @param {object[]} sourceActors - Component source actors
  * @param {object|null} craftingActor - Current crafting actor (has learnedRecipes flag)
  * @param {boolean} isGM - Whether the user is a GM
  * @param {string} searchTerm - Search filter
@@ -738,6 +761,7 @@ function _buildDiscoveredRecipes(
   system,
   systemComponents,
   paletteEntries,
+  sourceActors,
   craftingActor,
   isGM,
   searchTerm,
@@ -764,7 +788,7 @@ function _buildDiscoveredRecipes(
 
   // Build display entries with craftability
   const entries = visible.map(recipe => {
-    const canCraft = _evaluateDiscoveredCraftability(recipe, systemComponents, paletteEntries);
+    const canCraft = _evaluateDiscoveredCraftability(recipe, systemComponents, paletteEntries, sourceActors);
     return {
       id: recipe.id,
       name: recipe.name,
@@ -918,6 +942,7 @@ export function createCraftingStore(services) {
 
     const systemComponents = Array.isArray(system.components) ? system.components : [];
     const paletteEntries = get(palette);
+    const sources = get(componentSourceActors);
     const actor = get(craftingActor);
     const gameUser = services.getGameUser();
     const isGM = gameUser?.isGM === true;
@@ -932,6 +957,7 @@ export function createCraftingStore(services) {
       system,
       systemComponents,
       paletteEntries,
+      sources,
       actor,
       isGM,
       search,

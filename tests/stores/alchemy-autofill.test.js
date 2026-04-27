@@ -38,8 +38,8 @@ function makeInventoryItem(id, name, quantity = 1, flags = {}) {
   return { id, uuid: `Item.${id}`, name, img: 'item-icon.png', system: { quantity }, flags };
 }
 
-function makeComponent(id, name = `Component-${id}`, tags = []) {
-  return { id, name, img: `icons/${id}.png`, tags, sourceUuid: `Item.source-${id}` };
+function makeComponent(id, name = `Component-${id}`, tags = [], essences = {}) {
+  return { id, name, img: `icons/${id}.png`, tags, essences, sourceUuid: `Item.source-${id}` };
 }
 
 function makeAlchemySystem(id = 'alchemy-sys', components = [], recipes = []) {
@@ -65,8 +65,8 @@ function makeIngredientGroup(options = [], quantity = 1) {
   return { options, quantity };
 }
 
-function makeIngredientSet(groups = []) {
-  return { id: `set-${Math.random().toString(36).slice(2)}`, ingredientGroups: groups };
+function makeIngredientSet(groups = [], essences = {}) {
+  return { id: `set-${Math.random().toString(36).slice(2)}`, ingredientGroups: groups, essences };
 }
 
 function makeAlchemyRecipe(id, craftingSystemId, name = `Recipe-${id}`, ingredientSets = []) {
@@ -306,6 +306,142 @@ test('discovered recipes shows only learned recipes for non-GM', async () => {
   const discovered = get(store.discoveredRecipes);
   assert.equal(discovered.length, 1, 'non-GM should only see learned recipes');
   assert.equal(discovered[0].id, 'r1', 'should see the learned recipe');
+});
+
+test('discovered recipes marks learned essence-only recipe uncraftable when essences are missing', async () => {
+  const alchemy = makeAlchemySystem('a1', []);
+  const recipe = makeAlchemyRecipe(
+    'r1',
+    'a1',
+    'Restorative Potion',
+    [makeIngredientSet([], { restorative: 2 })]
+  );
+  const actorA = {
+    id: 'a1',
+    name: 'Alice',
+    isOwner: true,
+    items: [],
+    flags: { fabricate: { learnedRecipes: { r1: true } } }
+  };
+
+  const services = createMockServices({
+    getCraftingSystemManager: () => ({
+      getSystems: () => [alchemy],
+      getRecipesForSystem: (id) => id === 'a1' ? [recipe] : []
+    }),
+    getAvailableActors: () => [actorA],
+    getOwnedActors: () => [actorA],
+    getGameUser: () => ({ id: 'u1', character: actorA, isGM: false }),
+    getSetting: (key) => {
+      if (key === 'lastComponentSources') return ['a1'];
+      if (key === 'lastAlchemySystem') return 'a1';
+      return null;
+    }
+  });
+
+  const store = createCraftingStore(services);
+  await store.refresh();
+
+  const discovered = get(store.discoveredRecipes);
+  assert.equal(discovered.length, 1);
+  assert.equal(discovered[0].id, 'r1');
+  assert.equal(
+    discovered[0].canCraft,
+    false,
+    'essence-only recipe should not be craftable when required essences are missing'
+  );
+
+  store.toggleDiscoveredCraftableOnly();
+  assert.deepEqual(
+    get(store.discoveredRecipes),
+    [],
+    'craftable-only filter should hide a learned recipe whose essence requirement is unmet'
+  );
+});
+
+test('discovered recipes counts component-defined essences for pure-essence recipes', async () => {
+  const comp = makeComponent('red-herb', 'Red Herb', [], { restorative: 1 });
+  const alchemy = makeAlchemySystem('a1', [comp]);
+  const recipe = makeAlchemyRecipe(
+    'r1',
+    'a1',
+    'Restorative Potion',
+    [makeIngredientSet([], { restorative: 2 })]
+  );
+  const invItem = makeInventoryItem('item1', 'Red Herb', 2, { core: { sourceId: 'Item.source-red-herb' } });
+  const actorA = makeActorWithItems('a1', 'Alice', [invItem]);
+
+  const services = createMockServices({
+    getCraftingSystemManager: () => ({
+      getSystems: () => [alchemy],
+      getRecipesForSystem: (id) => id === 'a1' ? [recipe] : []
+    }),
+    getAvailableActors: () => [actorA],
+    getOwnedActors: () => [actorA],
+    getGameUser: () => ({ id: 'u1', character: actorA, isGM: true }),
+    getSetting: (key) => {
+      if (key === 'lastComponentSources') return ['a1'];
+      if (key === 'lastAlchemySystem') return 'a1';
+      return null;
+    }
+  });
+
+  const store = createCraftingStore(services);
+  await store.refresh();
+
+  const discovered = get(store.discoveredRecipes);
+  assert.equal(discovered.length, 1);
+  assert.equal(discovered[0].canCraft, true);
+});
+
+test('discovered recipes uses item-flag essences before component fallback', async () => {
+  const comp = makeComponent('red-herb', 'Red Herb', [], { restorative: 5 });
+  const alchemy = makeAlchemySystem('a1', [comp]);
+  const recipe = makeAlchemyRecipe(
+    'r1',
+    'a1',
+    'Restorative Potion',
+    [makeIngredientSet([], { restorative: 2 })]
+  );
+  const flaggedItem = {
+    id: 'item1',
+    uuid: 'Item.item1',
+    name: 'Red Herb',
+    img: 'item-icon.png',
+    system: { quantity: 1 },
+    flags: { core: { sourceId: 'Item.source-red-herb' } },
+    getFlag: (scope, key) => {
+      if (scope === 'fabricate' && key === 'fabricate.essences') return { restorative: 1 };
+      return undefined;
+    }
+  };
+  const actorA = makeActorWithItems('a1', 'Alice', [flaggedItem]);
+
+  const services = createMockServices({
+    getCraftingSystemManager: () => ({
+      getSystems: () => [alchemy],
+      getRecipesForSystem: (id) => id === 'a1' ? [recipe] : []
+    }),
+    getAvailableActors: () => [actorA],
+    getOwnedActors: () => [actorA],
+    getGameUser: () => ({ id: 'u1', character: actorA, isGM: true }),
+    getSetting: (key) => {
+      if (key === 'lastComponentSources') return ['a1'];
+      if (key === 'lastAlchemySystem') return 'a1';
+      return null;
+    }
+  });
+
+  const store = createCraftingStore(services);
+  await store.refresh();
+
+  const discovered = get(store.discoveredRecipes);
+  assert.equal(discovered.length, 1);
+  assert.equal(
+    discovered[0].canCraft,
+    false,
+    'item flag essence should override larger component fallback'
+  );
 });
 
 // ============================================================================

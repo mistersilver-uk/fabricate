@@ -238,8 +238,9 @@ Component = {
 3. Each essence key must exist in `CraftingSystem.essences` when essences are enabled.
 4. `salvage` is only valid when `CraftingSystem.features.salvage` is true.
 5. When `salvage.enabled` is true, `salvage.resultGroups` must contain at least one result group.
-6. `salvage.outcomeRouting` is only valid when `salvageResolutionMode` is `"routed"`.
-7. `salvage.ingredientQuantity` must be a positive integer.
+6. Runtime essence matching, craftability checks, discovered-recipe craftability, crafting-check contexts, and effect-transfer contexts must count `Component.essences` for actor items that match the component by source reference or name. Explicit `fabricate.essences` item flags remain a compatibility override for that item.
+7. `salvage.outcomeRouting` is only valid when `salvageResolutionMode` is `"routed"`.
+8. `salvage.ingredientQuantity` must be a positive integer.
 
 ## Recipe
 
@@ -424,7 +425,7 @@ IngredientSet = {
 
 ### Requirements
 
-1. `ingredientGroups` must contain at least one `IngredientGroup`.
+1. `ingredientGroups` must contain at least one `IngredientGroup`, unless `essences` contains one or more positive requirements.
 2. Ingredient-set evaluation is always OR-across-sets at recipe/step level.
 3. AND-across-ingredient-sets is not supported.
 
