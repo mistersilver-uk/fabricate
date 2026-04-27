@@ -23,7 +23,7 @@ permissions:
   issues: write
 
 env:
-  CODEX_MODEL: gpt-5.4
+  CODEX_MODEL: gpt-5.5
 
 jobs:
   pick-tasks:
