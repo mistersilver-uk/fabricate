@@ -1,0 +1,30 @@
+# Tasks
+
+- [ ] Confirm the runtime path that leaves a successful one-step run visible as active, including whether the source is stale actor flags, run-manager cache, or Svelte store/view normalization.
+- [ ] Harden `CraftingRunManager` so terminal runs cannot remain in `active` after last-step success.
+- [ ] Update `CraftingRunManager` active lookup helpers so terminal or internally completed entries in `container.active` are not returned as actionable active runs.
+- [ ] Add a repair or normalization guard for inconsistent active entries whose executable steps are all succeeded.
+- [ ] Ensure repaired or normalized active-source terminal entries are visible in history and do not disappear from both run-summary columns.
+- [ ] Harden active-run lookup and action seams so `getActiveRun`, `findActiveRunForRecipe`, `cancelRun`, store `cancelRun`, store `restartRun`, and engine resume reject internally completed active-source records.
+- [ ] Apply the same terminal-action guard to any still-reachable legacy `CraftingApp` active-run actions.
+- [ ] Update `craftingStore.js` run display models with explicit `isTerminal`, `canRestart`, `canCancel`, and `canContinue` action flags.
+- [ ] Prevent terminal or internally completed active-source records from populating recipe-card `activeRunId`, continue actions, or restart actions.
+- [ ] Update `RunSummary.svelte` to render restart/cancel/continue only from explicit action flags, including hiding restart for `waitingTime`, and details only when a handler exists or the button is disabled.
+- [ ] Replace the Svelte run-details placeholder with a real active/history details flow.
+- [ ] Prefer a pure run-details formatter with injected lookup/dialog dependencies unless implementation context shows a simpler equally testable seam.
+- [ ] Wire run details for both Crafting and Alchemy tab run summaries.
+- [ ] Preserve alchemy secrecy in run details, including generic no-signature attempts and hidden-recipe metadata for non-GM users.
+- [ ] Add or update localization keys for new run-details and action-disabled copy, including disabled details title/aria-label text.
+- [ ] Ensure the run-details view uses localized labels, escaped/resolved item and actor/source names, quantities, and formatted world-time values when helpers are available.
+- [ ] Ensure run-summary layout remains usable in narrow Foundry app widths, with stacked columns and no text/action overlap.
+- [ ] Add run manager, store, and crafting engine regression tests proving internally completed active-source records cannot be cancelled, restarted, resumed, or duplicated.
+- [ ] Add a regression test where `getActiveRuns()` returns a terminal-status run and `getRunHistory()` is empty; expected UI/store result is zero active rows and one history/details row.
+- [ ] Add a regression test where `getActiveRuns()` returns an `inProgress` run whose executable steps are all `succeeded`; expected UI/store result is zero active rows, no recipe-card active-run affordance, and one history/details row or a persisted repaired history entry.
+- [ ] Add Svelte component-level tests for `RunSummary` action flags and null/missing details-handler behavior.
+- [ ] Add Crafting tab and Alchemy tab wiring tests proving visible run-details buttons call a real handler.
+- [ ] Add recipe-card tests proving active/continue/restart affordances require normalized non-terminal run state.
+- [ ] Add responsive component or screenshot coverage for narrow run-summary layouts when feasible; otherwise document why unit-level layout checks are the available validation.
+- [ ] Add regression tests for one-step successful completion, inconsistent active terminal entries appearing in history, action visibility, run-details behavior, alchemy details secrecy, newest-first history ordering, and the 50-entry history cap.
+- [ ] Add localization coverage for new run-details and disabled-button strings.
+- [ ] Run `npm test`.
+- [ ] Run `npm run build`.
