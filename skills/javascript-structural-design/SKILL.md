@@ -7,10 +7,26 @@ description: Structure JavaScript modules, objects, and collaborators so code is
 
 Use this skill when a change touches JavaScript module boundaries, collaborator wiring, object responsibilities, API shape, or testability.
 
-## Read Only The Reference You Need
+## Execution Protocol
 
-- `references/elegant-objects.md` for behavior-first APIs, cohesion, naming, composition, immutability, and avoiding static or global utility design.
-- `references/testable-code.md` for concrete testability smells such as constructors that do work, collaborator digging, global state, and modules that do too much.
+1. Name the behavior that must change and the smallest public boundary that should own it.
+2. Choose the boundary shape before coding: ES module API, plain object, closure/factory, class, Svelte store, or Foundry adapter.
+3. Make dependencies explicit at that boundary and keep runtime/global lookup at the edge.
+4. Check the design against the object checklist below.
+5. Load only the reference needed for the problem you are solving.
+
+## Topic Router
+
+| Topic | Trigger | Quick move | Reference |
+| --- | --- | --- | --- |
+| Behavior-first API | callers fetch data then orchestrate work | move the behavior behind the owning boundary | `references/elegant-objects.md` |
+| Boundary shape | unclear class/function/store/module choice | choose by ownership, state, lifecycle, and dependencies | `references/elegant-objects.md` |
+| Utility growth | exported helpers become a broad bucket | extract a named domain abstraction or keep helpers private | `references/elegant-objects.md` |
+| Naming and cohesion | names end in `Manager`, `Service`, `Helper`, or contain "and" | rename around the owned concept or split responsibilities | `references/elegant-objects.md` |
+| Constructor work | creation performs I/O, lookup, setup, or branching | move work to composition or an explicit method | `references/testable-code.md` |
+| Collaborator digging | code receives a context/container to fetch another object | inject the specific collaborator directly | `references/testable-code.md` |
+| Global/runtime leakage | `game`, `ui`, `Hooks`, `CONFIG`, clocks, or randomness spread inward | localize access behind a narrow runtime edge | `references/testable-code.md` |
+| Brittle tests | setup needs mocks returning mocks or global resets | redesign the public seam before adding more test plumbing | `references/testable-code.md` |
 
 ## Design Workflow
 
@@ -34,7 +50,16 @@ Use this skill when a change touches JavaScript module boundaries, collaborator 
    - Write tests against public behavior and narrow collaborator contracts.
    - Avoid designs that require mocks returning mocks or tests that reach through multiple layers.
 
-## Review Heuristics
+## Boundary Shape Rubric
+
+- Use an ES module API for cohesive stateless behavior with a small stable exported contract.
+- Use a plain object for immutable values, configuration, or a narrow strategy; avoid getter/setter data bags.
+- Use a closure or factory when a small collaborator set should be captured without exposing mutable internals.
+- Use a class when identity, lifecycle, state transitions, or several injected collaborators make behavior clearer.
+- Use a Svelte store for UI state and derived view state, not as a domain service container.
+- Use a Foundry adapter or localized call site for runtime globals and third-party statics.
+
+## Elegant JavaScript Object Checklist
 
 Flag or refactor these patterns when they create real risk:
 
@@ -58,6 +83,7 @@ Elegant Objects is stricter than this codebase needs. Apply the direction, not d
 
 When you use this skill, explain the structural decision in terms of:
 
+- selected boundary shape and any material rejected alternative
 - owned behavior
 - explicit dependencies
 - cohesion and split points
