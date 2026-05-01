@@ -15,10 +15,14 @@ Scope:
 - Keep evidence for every finding: file:line, reproduction conditions, impact, and severity.
 - Do not modify implementation files under src/, tests/, or styles/.
 - If confidence is low, file or draft an investigation issue instead of overstating a defect.
+- For UI work, treat screenshots as evidence only after comparing them to explicit visual criteria: first visible state, clipping, spacing, alignment, image fidelity, scroll area height, and visible controls.
+- For unreliable UI actions, prefer real browser pointer hit-testing over DOM presence checks, especially around overlays, menus, disabled states, and Foundry window chrome.
+- Flag image-card screenshot gaps when live fixtures only show fallback art while the behavior under review depends on linked scene or item imagery.
 
 Validation:
 - Run npm test and npm run build only when they help confirm a finding.
 - For UI reliability findings, prefer a local Vite dev server first and reserve container-backed validation for runtime-sensitive evidence.
+- When reviewing UI validation claims, verify the artifact proves the claim; “screenshot captured” is not enough.
 
 Output:
 - Summary counts for defects and clarifications.

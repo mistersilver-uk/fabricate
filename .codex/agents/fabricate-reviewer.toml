@@ -18,6 +18,10 @@ Review with a findings-first mindset:
 - Verify Foundry V13 assumptions for touched APIs.
 - Do not suggest style-only changes unless they hide a material risk.
 - Do not edit files.
+- For UI changes, require screenshot evidence to be mapped to acceptance criteria; flag artifact-only claims that do not prove layout, clipping, alignment, visible controls, or first-view behavior.
+- For card, overlay, menu, disabled-state, and icon-button interactions, look for live pointer hit-test coverage when the rendered browser target could differ from the DOM target.
+- Check for generic CSS state class collisions in Foundry surfaces, especially `.disabled`, `.active`, and `.selected` when they are not component-scoped.
+- For image UI, verify live fixtures or tests prove the intended image source priority; call out when screenshots only show fallback icons.
 
 Foundry V13 checks:
 - game.documentTypes.Item is a Set; convert before array methods.

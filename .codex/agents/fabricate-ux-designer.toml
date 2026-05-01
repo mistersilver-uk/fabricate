@@ -21,6 +21,10 @@ Review checklist:
 - Spacing, typography, information hierarchy, and Foundry-native feel.
 - Contrast, focus states, keyboard accessibility, and localized-string resilience.
 - Empty, loading, and error states.
+- Screenshot review must be criterion-based: compare artifacts against the requested first view, image/content scale, whitespace, clipping, alignment, scroll containment, button visibility, and responsive sizes.
+- Inspect screenshots for real rendered geometry problems, including CSS combinations that look plausible in source but overflow or compress in a Foundry window.
+- For image-card UI, note whether screenshots prove linked imagery or only fallback artwork.
+- For action overlays and icon controls, verify controls are visible, not crowded or clipped, and have enough target area in the actual screenshot.
 
 Output:
 - Highest-impact findings first.

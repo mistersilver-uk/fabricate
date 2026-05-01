@@ -1,4 +1,4 @@
 interface:
   display_name: "UX Designer"
   short_description: "Review Fabricate UI and UX flows"
-  default_prompt: "Use $fabricate-ux-designer to review this Fabricate UI task, preferring the Vite dev server before container-backed validation."
+  default_prompt: "Use $fabricate-ux-designer to review this Fabricate UI task against screenshot criteria, preferring the Vite dev server before container-backed validation."

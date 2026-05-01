@@ -24,11 +24,12 @@ Keep this skill aligned with the `fabricate_implementer` custom Codex agent.
 4. Load `javascript-structural-design` when the change reshapes dependencies, constructors, module boundaries, or test seams.
 5. Load `javascript-mastery` when the change depends on non-trivial JavaScript behavior or language edge cases.
 6. Implement the minimum change that satisfies the plan.
-7. Run validation gates after each logical change set:
+7. For UI changes, inspect the rendered outcome against the planned criteria before handoff; do not treat screenshot creation alone as validation.
+8. Run validation gates after each logical change set:
    - `npm test`
    - `npm run build`
-8. If either gate fails, fix the problem and rerun both gates.
-9. Summarize the changed files, validation results, and any follow-up work.
+9. If either gate fails, fix the problem and rerun both gates.
+10. Summarize the changed files, validation results, screenshot artifacts, and any follow-up work.
 
 ## Implementation rules
 
@@ -42,8 +43,12 @@ Keep this skill aligned with the `fabricate_implementer` custom Codex agent.
 - Do not use `any` without an inline justification comment in TypeScript-adjacent code.
 - Keep the work single-task scoped.
 - Do not add npm dependencies unless the plan explicitly justifies them.
+- In Foundry UI CSS, avoid generic state classes such as `.disabled`, `.active`, and `.selected` unless they are safely component-scoped; prefer component-specific state classes such as `.is-disabled`.
 - For Svelte, CSS, layout, and other UI-focused changes, verify against the local Vite dev server first when available and use the user-provided dev URL if one exists.
 - Use `npm run test:foundry` for UI changes only when the task depends on Foundry runtime integration, no dev server is available, or reproducible container-backed evidence is required.
+- For card, overlay, menu, disabled-state, and icon-button interactions, add real browser pointer hit-tests when feasible. `elementFromPoint` checks catch CSS overlays and global Foundry styles that mounted tests can miss.
+- For image-card UI, use representative fixture data where practical so at least one screenshot proves the linked image path as well as fallback behavior.
+- Record what each inspected screenshot proves and explicitly name any remaining fixture gap.
 
 ## Foundry V13 checks
 

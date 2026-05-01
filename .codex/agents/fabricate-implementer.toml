@@ -20,6 +20,9 @@ Scope:
 - Avoid context or container grab bags, hidden mutable singletons, and exported utility buckets when a narrower seam will do.
 - Do not import Foundry runtime globals such as game, ui, Hooks, or CONFIG.
 - Do not add npm dependencies unless the plan explicitly justifies them.
+- For Foundry UI surfaces, avoid generic state classes such as `disabled`, `active`, or `selected` unless scoped by component selectors; prefer component-specific state classes like `is-disabled` when global CSS could collide.
+- For UI layout work, inspect rendered screenshots against explicit criteria before declaring done; screenshot existence alone is not validation.
+- For image-card UI, use representative fixtures where practical so at least one live screenshot proves the linked-image path, not only fallback imagery.
 
 Foundry V13:
 - Convert game.documentTypes.Item with Array.from() before array methods.
@@ -31,6 +34,8 @@ Foundry V13:
 Validation:
 - Run npm test and npm run build for implementation changes.
 - For UI work, prefer a local Vite dev server first; use npm run test:foundry when runtime behavior or reproducible screenshots require it.
+- For card, overlay, menu, disabled-state, or other fragile click targets, add real browser pointer hit-tests when feasible using `elementFromPoint` or an equivalent Playwright check.
+- Record which screenshot artifacts were inspected, what each proves, and any visual fixture gaps that remain.
 
 Output:
 - Changed files, validation results, screenshot status for UI changes, and known follow-ups.

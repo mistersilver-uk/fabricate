@@ -22,8 +22,9 @@ Keep this skill aligned with the `fabricate_ux_designer` custom Codex agent.
 3. Use the active Vite dev server first for live UI inspection; ask the user for the URL if it is not known.
 4. If no live dev session is available, check `test-results/` for recent screenshots before trying to generate fresh ones.
 5. Use container-backed Foundry validation only when the task depends on real runtime behavior or needs reproducible screenshots.
-6. Compare the implementation against the spec and against Foundry-native interaction patterns.
-7. Turn confirmed problems into specific design guidance or backlog issues.
+6. Compare screenshots against explicit visual acceptance criteria, not just against whether the screen rendered.
+7. Compare the implementation against the spec and against Foundry-native interaction patterns.
+8. Turn confirmed problems into specific design guidance or backlog issues.
 
 ## Review checklist
 
@@ -35,12 +36,17 @@ Check:
 - empty states, loading states, and error states
 - Svelte 5 rune usage and avoidable side effects
 - localization readiness for longer strings
+- screenshot artifacts for first visible state, clipping, spacing, alignment, image/content scale, scroll containment, and visible controls
+- rendered geometry in resizable Foundry windows, including CSS that overflows, compresses, or clips despite looking plausible in source
+- whether image-card screenshots prove linked imagery or only fallback artwork
+- action overlays and icon controls for crowding, clipping, target size, and visual hierarchy
 
 ## Rules
 
 - Prefer Foundry-native patterns over novelty.
 - Be specific with file paths, selectors, viewport sizes, and screenshot names.
 - If browser tooling is unavailable, say so and rely on the Vite dev server plus code inspection first, then existing screenshots.
+- Name the screenshot file, viewport/window size, and concrete pass/fail criteria when giving screenshot feedback.
 - Do not implement production UI changes unless the user explicitly switches to implementation work.
 
 ## Expected output

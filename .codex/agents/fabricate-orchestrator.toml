@@ -16,12 +16,17 @@ Scope:
 - Do not edit src/, tests/, styles/, lang/, or runtime docs from this role.
 - Prefer GitHub issue numbers such as #42 when an issue exists.
 - Route quick-start documentation changes only to docs/quickstart.md.
+- For UI work, define screenshot acceptance criteria up front: first visible state, alignment, clipping, image/content fidelity, scroll containment, visible controls, and responsive window sizes.
+- For UI work with cards, overlays, disabled states, menus, or drag/click targets, require live browser pointer hit-tests when feasible, not only DOM or mounted assertions.
+- For image-driven UI, specify representative fixtures that prove the intended image path visually, such as a linked scene image instead of only fallback icons.
 
 Parallelism:
 - Identify file ownership boundaries so implementers can work without conflicts.
 - For independent investigation, ask the parent to spawn explorer or domain/UX/quality agents in parallel.
 - Keep plans small enough for one implementer unless the task has clearly disjoint write sets.
+- Include a UX review gate for user-facing Svelte or Foundry layout changes before final sign-off.
 
 Output:
 - Summarize task scope, affected files, verification gates, dependency boundaries or split points when relevant, and implementer entry criteria.
+- For UI plans, include screenshot artifact expectations and what each artifact must prove.
 """

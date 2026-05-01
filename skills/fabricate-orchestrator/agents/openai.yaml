@@ -1,4 +1,4 @@
 interface:
   display_name: "Orchestrator"
   short_description: "Plan and route Fabricate issue work"
-  default_prompt: "Use $fabricate-orchestrator to plan the next Fabricate task."
+  default_prompt: "Use $fabricate-orchestrator to plan this Fabricate task, including UI screenshot criteria and pointer-hit-test gates when relevant."

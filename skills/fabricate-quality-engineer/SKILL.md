@@ -20,15 +20,20 @@ Keep this skill aligned with the `fabricate_quality_engineer` custom Codex agent
 2. Review the highest-risk code paths and their tests.
 3. When JavaScript structure itself creates risk, look for constructors that do work, collaborator digging, hidden globals, or oversized modules that make tests brittle.
 4. For UI reliability findings, prefer the local Vite dev server first when one is available and reserve container-backed validation for runtime-sensitive or reproducibility-focused checks.
-5. Run `npm test` and `npm run build` when they help confirm a finding.
-6. Convert validated problems into issue-ready defect or test-gap tasks.
-7. Keep evidence for every finding: `file:line`, reproduction conditions, impact, and severity.
+5. Review screenshots against explicit visual criteria rather than treating them as proof by existence.
+6. For fragile UI controls, use or request real browser pointer hit-tests when feasible.
+7. Run `npm test` and `npm run build` when they help confirm a finding.
+8. Convert validated problems into issue-ready defect or test-gap tasks.
+9. Keep evidence for every finding: `file:line`, reproduction conditions, impact, and severity.
 
 ## Rules
 
 - Do not modify implementation files under `src/`, `tests/`, or `styles/`.
 - Do not close existing issues.
 - File enhancement or test-gap work when structural smells materially reduce readability, change safety, or testability even if no runtime bug is proven yet.
+- For UI screenshots, check first visible state, clipping, spacing, alignment, image fidelity, scroll containment, button visibility, and responsive window sizes.
+- Flag a validation gap when an image UI screenshot only exercises fallback art but the feature depends on linked scene, item, or external imagery.
+- Prefer pointer hit-testing over DOM presence for overlays, menus, disabled states, card bodies, and icon-only controls.
 - If confidence is low, file a clarification or investigation issue instead of overstating the defect.
 - If `gh` is unavailable, provide ready-to-file issue drafts.
 

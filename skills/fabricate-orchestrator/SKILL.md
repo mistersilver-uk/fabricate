@@ -30,6 +30,7 @@ Keep this skill aligned with the `fabricate_orchestrator` custom Codex agent.
    - affected files
    - verification plan
    - acceptance criteria
+   - for UI work: screenshot acceptance criteria, representative fixtures, pointer hit-test needs, and a UX review gate
 5. Update the visible plan with `update_plan`.
 6. Hand the task to the implementation stage only when the plan is actionable.
 
@@ -39,6 +40,9 @@ Keep this skill aligned with the `fabricate_orchestrator` custom Codex agent.
 - Use GitHub issue numbers such as `#42`, not legacy task IDs, when the issue exists.
 - For quick-start docs work, route changes only to `docs/quickstart.md`.
 - For tasks centered on `src/ui/`, `styles/`, or UX behavior, make the plan prefer the local Vite dev server first and reserve `npm run test:foundry` for runtime-sensitive or reproducibility-focused validation.
+- For UI work, do not let “screenshot captured” stand as acceptance. Define what screenshots must prove: first visible state, image/content fidelity, clipping, spacing, alignment, scroll containment, visible controls, and relevant window sizes.
+- For card grids, overlays, disabled states, menus, and icon-button workflows, plan real browser pointer hit-tests when feasible.
+- For image-driven UI, plan at least one representative fixture that exercises the linked image path, not only fallback artwork.
 - For tasks centered on JavaScript structure or testability, use `javascript-structural-design` to make the handoff explicit about collaborator seams, boring constructors, and responsibility splits.
 - If `gh` is unavailable or unauthenticated, record the block in the active change folder instead of guessing issue state.
 - In Default collaboration mode, do not stop for extra user input unless the task is genuinely blocked.

@@ -1,4 +1,4 @@
 interface:
   display_name: "Implementer"
   short_description: "Implement a planned Fabricate change"
-  default_prompt: "Use $fabricate-implementer to execute this Fabricate plan."
+  default_prompt: "Use $fabricate-implementer to execute this Fabricate plan and record rendered UI evidence when the change is visual."

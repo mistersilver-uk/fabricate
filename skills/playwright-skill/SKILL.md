@@ -277,6 +277,43 @@ const TARGET_URL = 'http://localhost:3001'; // Auto-detected
 })();
 ```
 
+### Verify Real Pointer Targets
+
+Use browser hit-testing when CSS overlays, disabled styles, fixed headers, menus, or icon buttons could intercept clicks. DOM presence is not enough for these cases.
+
+```javascript
+async function assertPointerTarget(page, locator, targetSelector, label) {
+  await locator.scrollIntoViewIfNeeded();
+  await locator.waitFor({ state: 'visible', timeout: 5000 });
+  const box = await locator.boundingBox();
+  if (!box) throw new Error(`No pointer box found for ${label}`);
+
+  const hit = await page.evaluate(({ x, y, targetSelector }) => {
+    const element = document.elementFromPoint(x, y);
+    return {
+      tag: element?.tagName || '',
+      className: String(element?.className || ''),
+      matched: Boolean(element?.closest?.(targetSelector)),
+    };
+  }, {
+    x: box.x + box.width / 2,
+    y: box.y + box.height / 2,
+    targetSelector,
+  });
+
+  if (!hit.matched) {
+    throw new Error(
+      `${label} pointer target missed ${targetSelector}; ` +
+      `hit ${hit.tag || 'none'} ${hit.className}`,
+    );
+  }
+}
+
+await assertPointerTarget(page, page.locator('.card .edit-button').first(), '.edit-button', 'card edit');
+```
+
+For screenshot review, record what each image proves: first visible state, clipping, spacing, alignment, image fidelity, scroll containment, visible controls, and relevant viewport or app-window size.
+
 ## Inline Execution (Simple Tasks)
 
 For quick one-off tasks, you can execute code inline without creating files:
