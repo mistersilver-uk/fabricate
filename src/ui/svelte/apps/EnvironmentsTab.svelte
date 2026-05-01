@@ -103,6 +103,7 @@
   let expandedTaskSections = $state({});
   let expandedResultGroups = $state({});
   let lastValidationFocusAttempt = $state(0);
+  let lastEnvironmentDraftSystemId = $state(null);
   const activeVisibilityKey = $derived(`${environmentDraft?.id || 'new'}:${environmentDraft?.craftingSystemId || ''}:${activeTaskId}`);
   const editorVisibility = $derived(pendingVisibility || activeTaskVisibility);
   const normalizedValidationErrors = $derived(validationErrors.map(error => normalizedValidationTarget(error)));
@@ -139,6 +140,18 @@
       Boolean(activeTaskResultSelection?.rollTableUuid) &&
       !rollTableOptionList.some(table => table.uuid === activeTaskResultSelection.rollTableUuid)
   );
+
+  $effect(() => {
+    const nextSystemId = environmentDraft?.craftingSystemId || '';
+    if (lastEnvironmentDraftSystemId === null) {
+      lastEnvironmentDraftSystemId = nextSystemId;
+      return;
+    }
+    if (lastEnvironmentDraftSystemId && nextSystemId && nextSystemId !== lastEnvironmentDraftSystemId) {
+      editorOpen = false;
+    }
+    lastEnvironmentDraftSystemId = nextSystemId;
+  });
 
   $effect(() => {
     if (tasks.length === 0) {

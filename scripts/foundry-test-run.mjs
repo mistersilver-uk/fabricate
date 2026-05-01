@@ -817,6 +817,112 @@ async function exerciseGmEnvironmentCardPointerActions(page) {
 }
 
 /**
+ * Assert a named GM Environments card uses linked scene imagery and does not
+ * let the media frame overflow the card at the current admin window size.
+ * @param {import('playwright').Page} page
+ * @param {string} environmentName
+ * @param {{ label: string, tolerance?: number }} options
+ */
+async function assertGmEnvironmentCardMediaContained(page, environmentName, { label, tolerance = 1 }) {
+  const card = page.locator('.fabricate-admin .environment-card').filter({ hasText: environmentName }).first();
+  await card.waitFor({ state: 'visible', timeout: 10_000 });
+  await card.locator('.environment-card-media').waitFor({ state: 'visible', timeout: 5_000 });
+  await card.locator('.environment-card-image-frame').waitFor({ state: 'visible', timeout: 5_000 });
+  await card.locator('img.environment-card-image').waitFor({ state: 'visible', timeout: 5_000 });
+
+  await page.waitForFunction(({ cardSelector, environmentName }) => {
+    const cards = Array.from(document.querySelectorAll(cardSelector));
+    const card = cards.find(candidate => candidate.textContent?.includes(environmentName));
+    const image = card?.querySelector?.('img.environment-card-image');
+    return image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0;
+  }, { cardSelector: '.fabricate-admin .environment-card', environmentName }, { timeout: 10_000 });
+
+  const diagnostics = await card.evaluate((cardElement, { label, tolerance }) => {
+    const rectData = rect => ({
+      left: Number(rect.left.toFixed(2)),
+      right: Number(rect.right.toFixed(2)),
+      top: Number(rect.top.toFixed(2)),
+      bottom: Number(rect.bottom.toFixed(2)),
+      width: Number(rect.width.toFixed(2)),
+      height: Number(rect.height.toFixed(2))
+    });
+    const edgeOverflow = (inner, outer) => ({
+      left: Number((outer.left - inner.left).toFixed(2)),
+      right: Number((inner.right - outer.right).toFixed(2)),
+      top: Number((outer.top - inner.top).toFixed(2)),
+      bottom: Number((inner.bottom - outer.bottom).toFixed(2))
+    });
+    const within = (inner, outer) =>
+      inner.left >= outer.left - tolerance &&
+      inner.right <= outer.right + tolerance &&
+      inner.top >= outer.top - tolerance &&
+      inner.bottom <= outer.bottom + tolerance;
+
+    const media = cardElement.querySelector('.environment-card-media');
+    const frame = cardElement.querySelector('.environment-card-image-frame');
+    const image = cardElement.querySelector('img.environment-card-image');
+    const admin = cardElement.closest('.fabricate-admin');
+    const app = admin?.closest('.application, .app') || document.querySelector('#fabricate-recipe-manager');
+
+    if (!(media instanceof HTMLElement) || !(frame instanceof HTMLElement) || !(image instanceof HTMLImageElement)) {
+      return {
+        ok: false,
+        label,
+        reason: 'missing required environment card media elements',
+        hasMedia: media instanceof HTMLElement,
+        hasFrame: frame instanceof HTMLElement,
+        hasImage: image instanceof HTMLImageElement
+      };
+    }
+
+    const cardRect = cardElement.getBoundingClientRect();
+    const mediaRect = media.getBoundingClientRect();
+    const frameRect = frame.getBoundingClientRect();
+    const appRect = app?.getBoundingClientRect?.() ?? null;
+    const imageClasses = Array.from(image.classList);
+    const imageIsLoaded = image.complete && image.naturalWidth > 0;
+    const imageIsFallback = image.classList.contains('fallback') || image.currentSrc.includes('icons/svg/item-bag.svg');
+    const mediaWithinCard = within(mediaRect, cardRect);
+    const frameWithinCard = within(frameRect, cardRect);
+    const frameWithinMedia = within(frameRect, mediaRect);
+
+    return {
+      ok: imageIsLoaded && !imageIsFallback && mediaWithinCard && frameWithinCard && frameWithinMedia,
+      label,
+      tolerance,
+      imageIsLoaded,
+      imageIsFallback,
+      imageSrc: image.currentSrc || image.src || '',
+      imageNaturalSize: { width: image.naturalWidth, height: image.naturalHeight },
+      imageClasses,
+      mediaWithinCard,
+      frameWithinCard,
+      frameWithinMedia,
+      overflow: {
+        mediaVsCard: edgeOverflow(mediaRect, cardRect),
+        frameVsCard: edgeOverflow(frameRect, cardRect),
+        frameVsMedia: edgeOverflow(frameRect, mediaRect)
+      },
+      rects: {
+        app: appRect ? rectData(appRect) : null,
+        card: rectData(cardRect),
+        media: rectData(mediaRect),
+        frame: rectData(frameRect)
+      }
+    };
+  }, { label, tolerance });
+
+  if (!diagnostics.ok) {
+    throw new Error(
+      `Environment card media containment failed for "${environmentName}" at ${label}: ` +
+      JSON.stringify(diagnostics, null, 2)
+    );
+  }
+
+  process.stdout.write(`  Verified "${environmentName}" linked scene media containment at ${label}.\n`);
+}
+
+/**
  * Attach browser console capture to a Playwright page.
  * @param {import('playwright').Page} page
  * @param {RegExp[]} ignoredErrorPatterns
@@ -961,6 +1067,7 @@ const cleanup = {
   actorIds: [],
   itemIds: [],
   userIds: [],
+  sceneIds: [],
   systemId: null,
   recipeIds: []
 };
@@ -1138,6 +1245,14 @@ async function main() {
         if (staleItems.length > 0) {
           console.log(`Cleaning ${staleItems.length} stale test items`);
           await Item.deleteDocuments(staleItems.map(i => i.id));
+        }
+
+        const staleScenes = game.scenes.contents.filter(scene =>
+          ['Fabricate Azure Grove Scene'].includes(scene.name)
+        );
+        if (staleScenes.length > 0) {
+          console.log(`Cleaning ${staleScenes.length} stale test scenes`);
+          await Scene.deleteDocuments(staleScenes.map(scene => scene.id));
         }
 
         // Discover valid document types — try multiple Foundry API locations
@@ -1331,6 +1446,11 @@ async function main() {
           description: 'A mystical forge capable of transmuting raw materials into powerful artifacts.'
         });
         const systemId = system.id;
+        const azureGroveScene = await Scene.create({
+          name: 'Fabricate Azure Grove Scene',
+          active: false,
+          background: { src: 'icons/consumables/plants/leaf-herb-green.webp' }
+        });
 
         // Register all 7 world items as managed components
         const worldItems = game.items.contents;
@@ -1483,7 +1603,7 @@ async function main() {
           description: 'A compact validation fixture for GM gathering environment authoring.',
           enabled: true,
           selectionMode: 'targeted',
-          sceneUuid: 'Scene.fabricateMissingScene',
+          sceneUuid: azureGroveScene.uuid,
           tasks: [{
             name: 'Forage Verdant Reagents',
             description: 'Collect useful plants and incidental ore from a controlled test clearing.',
@@ -1686,6 +1806,7 @@ async function main() {
           componentMap,
           recipeIds: [recipe1.id, recipe2.id, recipe3.id],
           healingPotionRecipeId: recipe2.id,
+          sceneIds: [azureGroveScene.id],
           gatheringEnvironmentId: gatheringEnvironment.id,
           playerGatheringEnvironmentIds: playerGatheringFixtures.map(environment => environment.id)
         };
@@ -1693,6 +1814,7 @@ async function main() {
 
       cleanup.systemId = craftingSetup.systemId;
       cleanup.recipeIds = craftingSetup.recipeIds;
+      cleanup.sceneIds = craftingSetup.sceneIds;
       process.stdout.write(`  Created crafting system and ${craftingSetup.recipeIds.length} recipes.\n`);
 
       results.steps.push({ step: 'create-crafting-system', passed: true });
@@ -1808,6 +1930,13 @@ async function main() {
                 }
               }
 
+              await setRecipeManagerWindowSize(page, { width: 1000, height: 700 });
+              await assertGmEnvironmentCardMediaContained(page, 'Azure Grove', { label: 'normal admin width' });
+
+              await setRecipeManagerWindowSize(page, { width: 640, height: 700 });
+              await assertGmEnvironmentCardMediaContained(page, 'Azure Grove', { label: 'narrow admin width' });
+
+              await setRecipeManagerWindowSize(page, { width: 1000, height: 700 });
               await exerciseGmEnvironmentCardPointerActions(page);
 
               await page.locator('.environment-card').filter({ hasText: 'Azure Grove' }).first()
@@ -2302,6 +2431,11 @@ async function main() {
         // Delete world items
         if (cleanupData.itemIds.length > 0) {
           try { await Item.deleteDocuments(cleanupData.itemIds); } catch { /* ok */ }
+        }
+
+        // Delete smoke scenes
+        if (cleanupData.sceneIds.length > 0) {
+          try { await Scene.deleteDocuments(cleanupData.sceneIds); } catch { /* ok */ }
         }
       }, cleanup);
       process.stdout.write('Cleanup: test data removed.\n');

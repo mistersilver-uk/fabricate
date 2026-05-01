@@ -1529,6 +1529,7 @@
   position: relative;
   overflow: visible;
   width: 100%;
+  min-width: 0;
   aspect-ratio: 3 / 2;
   min-height: 0;
   border-radius: 6px;
@@ -1580,12 +1581,28 @@
   cursor: pointer;
 }
 
-.fabricate-admin .environment-card-image-action:hover,
 .fabricate-admin .environment-card-image-action:focus-visible,
-.fabricate-admin .environment-card-name-action:hover,
 .fabricate-admin .environment-card-name-action:focus-visible {
-  outline: 1px solid rgba(120, 160, 255, 0.72);
-  outline-offset: 2px;
+  outline: 0;
+}
+
+.fabricate-admin .environment-card-image-action:focus-visible::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: rgba(120, 160, 255, 0.18);
+}
+
+.fabricate-admin .environment-card-name-action:focus-visible .environment-name {
+  color: #d7e2ff;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.fabricate-admin .environment-card-name-action:focus-visible .environment-summary {
+  color: rgba(215, 226, 255, 0.82);
 }
 
 .fabricate-admin .environment-select {
@@ -1728,6 +1745,25 @@
 .fabricate-admin .environment-row-actions .btn-icon:focus-visible {
   opacity: 1;
   background: rgba(255, 255, 255, 0.1);
+}
+
+.fabricate-admin .environment-card-actions .environment-action-menu-trigger:hover,
+.fabricate-admin .environment-card-actions .environment-action-menu-trigger:focus-visible,
+.fabricate-admin .environment-card-actions .btn-icon:hover,
+.fabricate-admin .environment-card-actions .btn-icon:focus-visible {
+  opacity: 1;
+  color: rgba(255, 255, 255, 0.96);
+  background: rgba(18, 22, 32, 0.96);
+  border-color: rgba(120, 160, 255, 0.65);
+  box-shadow:
+    0 0 0 1px rgba(120, 160, 255, 0.22),
+    0 2px 6px rgba(0, 0, 0, 0.42);
+}
+
+.fabricate-admin .environment-card-actions .environment-card-delete:hover,
+.fabricate-admin .environment-card-actions .environment-card-delete:focus-visible {
+  background: rgba(92, 24, 28, 0.96);
+  border-color: rgba(220, 80, 80, 0.72);
 }
 
 .fabricate-admin .environment-action-menu-list {

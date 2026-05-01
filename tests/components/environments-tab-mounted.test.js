@@ -83,6 +83,11 @@ function writeHostComponent() {
         return calls;
       }
 
+      export function setEnvironmentContext(nextDraft, nextEnvironments) {
+        draft = nextDraft;
+        environments = nextEnvironments;
+      }
+
       function record(name, ...args) {
         calls = [...calls, { name, args }];
       }
@@ -521,6 +526,52 @@ describe('GM environments tab mounted validation reveal', () => {
       mountedTarget = null;
       document.body.innerHTML = '';
     }
+  });
+
+  it('returns to the overview grid when the selected crafting system changes while editing', async () => {
+    const forest = makeEnvironment();
+    const cavern = {
+      ...makeEnvironment(),
+      id: 'environment-b',
+      craftingSystemId: 'system-b',
+      name: 'Cavern',
+      tasks: [{
+        ...makeEnvironment().tasks[0],
+        id: 'task-b',
+        name: 'Prospect'
+      }]
+    };
+    const target = await mountCustomFixture({
+      environmentDraft: forest,
+      environments: [forest]
+    }, { openEditor: false });
+
+    target.querySelector('.environment-card-edit').click();
+    await tick();
+    await tick();
+    assert.ok(target.querySelector('.environment-draft-editor'), 'test setup should have the first system editor open');
+
+    mountedComponent.setEnvironmentContext(cavern, [cavern]);
+    flushSync();
+    await tick();
+
+    assert.ok(target.querySelector('.environment-card-grid'), 'system switch should return to the new system overview');
+    assert.equal(
+      target.querySelector('.environment-draft-editor'),
+      null,
+      'system switch should not keep the editor open for the new system first environment'
+    );
+    assert.equal(target.querySelector('.environment-card .environment-name')?.textContent, 'Cavern');
+
+    target.querySelector('.environment-card-edit').click();
+    await tick();
+    await tick();
+
+    assert.deepEqual(mountedComponent.getCalls().at(-1), {
+      name: 'selectEnvironment',
+      args: ['environment-b']
+    });
+    assert.ok(target.querySelector('.environment-draft-editor'), 'new system cards should still open the editor normally');
   });
 
   it('shows grid-mode save errors when a card action fails while the editor is hidden', async () => {

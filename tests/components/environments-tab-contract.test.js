@@ -632,8 +632,8 @@ describe('GM environments tab source contract', () => {
     );
     assert.match(
       styleSource,
-      /\.fabricate-admin \.environment-card-media\s*\{[^}]*position:\s*relative;[^}]*overflow:\s*visible;[^}]*width:\s*100%;[^}]*aspect-ratio:\s*3 \/ 2;[^}]*min-height:\s*0;/s,
-      'environment card media should reserve a stable large image area without overflowing the card column'
+      /\.fabricate-admin \.environment-card-media\s*\{[^}]*position:\s*relative;[^}]*overflow:\s*visible;[^}]*width:\s*100%;[^}]*min-width:\s*0;[^}]*aspect-ratio:\s*3 \/ 2;[^}]*min-height:\s*0;/s,
+      'environment card media should keep menu-friendly visible overflow while allowing the media column to shrink inside the card'
     );
     assert.match(
       styleSource,
@@ -689,6 +689,44 @@ describe('GM environments tab source contract', () => {
     assert.ok(
       environmentsComponentSource.includes('class:is-disabled={environment.enabled !== true}'),
       'environment cards should use a component-scoped disabled state class'
+    );
+  });
+
+  it('keeps environment card hover states readable without hover border outlines', () => {
+    assert.doesNotMatch(
+      styleSource,
+      /\.fabricate-admin \.environment-card-image-action:hover[\s\S]*?outline:/,
+      'environment card image hover should not draw an outline or border-like ring'
+    );
+    assert.doesNotMatch(
+      styleSource,
+      /\.fabricate-admin \.environment-card-name-action:hover[\s\S]*?outline:/,
+      'environment card name/summary hover should not draw an outline or border-like ring'
+    );
+    assert.match(
+      styleSource,
+      /\.fabricate-admin \.environment-card-image-action:focus-visible,\s*\.fabricate-admin \.environment-card-name-action:focus-visible\s*\{[^}]*outline:\s*0;/s,
+      'keyboard focus on image and name/summary edit targets should avoid border-like outlines'
+    );
+    assert.match(
+      styleSource,
+      /\.fabricate-admin \.environment-card-image-action:focus-visible::after\s*\{[^}]*background:\s*rgba\(120,\s*160,\s*255,\s*0\.18\);/s,
+      'keyboard focus on the image edit target should use a non-border tint overlay'
+    );
+    assert.match(
+      styleSource,
+      /\.fabricate-admin \.environment-card-name-action:focus-visible \.environment-name\s*\{[^}]*text-decoration:\s*underline;[^}]*text-decoration-thickness:\s*2px;/s,
+      'keyboard focus on the name/summary edit target should use non-border text emphasis'
+    );
+    assert.match(
+      styleSource,
+      /\.fabricate-admin \.environment-card-actions \.environment-action-menu-trigger:hover,\s*\.fabricate-admin \.environment-card-actions \.environment-action-menu-trigger:focus-visible,\s*\.fabricate-admin \.environment-card-actions \.btn-icon:hover,\s*\.fabricate-admin \.environment-card-actions \.btn-icon:focus-visible\s*\{[^}]*background:\s*rgba\(18,\s*22,\s*32,\s*0\.96\);[^}]*border-color:\s*rgba\(120,\s*160,\s*255,\s*0\.65\);[^}]*box-shadow:/s,
+      'environment card action hover/focus should keep an opaque readable chip instead of a clear wash'
+    );
+    assert.match(
+      styleSource,
+      /\.fabricate-admin \.environment-card-actions \.environment-card-delete:hover,\s*\.fabricate-admin \.environment-card-actions \.environment-card-delete:focus-visible\s*\{[^}]*background:\s*rgba\(92,\s*24,\s*28,\s*0\.96\);[^}]*border-color:\s*rgba\(220,\s*80,\s*80,\s*0\.72\);/s,
+      'environment card delete hover/focus should keep an opaque danger chip'
     );
   });
 
