@@ -2,11 +2,16 @@
 // from side-effect imports in main.js. This avoids a static import
 // chain that requires the Svelte compiler in Node test environments.
 let _svelteCraftingApp = null;
+let _svelteGatheringApp = null;
 let _svelteRecipeManagerApp = null;
 let _svelteRecipeEditorApp = null;
 
 export function registerSvelteCraftingApp(cls) {
   _svelteCraftingApp = cls;
+}
+
+export function registerSvelteGatheringApp(cls) {
+  _svelteGatheringApp = cls;
 }
 
 export function registerSvelteRecipeManagerApp(cls) {
@@ -22,6 +27,13 @@ export function getCraftingAppClass() {
     throw new Error('Fabricate | SvelteCraftingApp not registered. Ensure SvelteCraftingApp.svelte.js is imported.');
   }
   return _svelteCraftingApp;
+}
+
+export function getGatheringAppClass() {
+  if (!_svelteGatheringApp) {
+    throw new Error('Fabricate | SvelteGatheringApp not registered. Ensure SvelteGatheringApp.svelte.js is imported.');
+  }
+  return _svelteGatheringApp;
 }
 
 export function getRecipeManagerAppClass() {

@@ -7,6 +7,7 @@
   import RecipesTab from './RecipesTab.svelte';
   import RulesTab from './RulesTab.svelte';
   import RecipeGraphTab from './RecipeGraphTab.svelte';
+  import EnvironmentsTab from './EnvironmentsTab.svelte';
 
   let { store, services = null } = $props();
 
@@ -19,6 +20,7 @@
     { id: 'systems', icon: 'fas fa-layer-group', label: 'FABRICATE.Admin.Tabs.Systems' },
     { id: 'items', icon: 'fas fa-boxes', label: 'FABRICATE.Admin.Tabs.Items' },
     { id: 'recipes', icon: 'fas fa-scroll', label: 'FABRICATE.Admin.Tabs.Recipes' },
+    { id: 'environments', icon: 'fas fa-seedling', label: 'FABRICATE.Admin.Tabs.Environments' },
     { id: 'rules', icon: 'fas fa-sliders-h', label: 'FABRICATE.Admin.Tabs.Rules' },
     { id: 'graph', icon: 'fas fa-project-diagram', label: 'FABRICATE.Admin.Tabs.Graph' }
   ];
@@ -28,13 +30,15 @@
   <header class="admin-header">
     <nav class="admin-tabs">
       {#each tabs as tab}
-        <button
-          type="button"
-          class:active={$activeTab === tab.id}
-          onclick={() => store.setTab(tab.id)}
-        >
-          <i class={tab.icon}></i> {localize(tab.label)}
-        </button>
+        {#if tab.id !== 'environments' || $viewState.canShowEnvironmentsTab}
+          <button
+            type="button"
+            class:active={$activeTab === tab.id}
+            onclick={() => store.setTab(tab.id)}
+          >
+            <i class={tab.icon}></i> {localize(tab.label)}
+          </button>
+        {/if}
       {/each}
     </nav>
 
@@ -85,6 +89,56 @@
           onToggleRecipeEnabled={store.toggleRecipeEnabled}
           onImportRecipes={store.importRecipes}
           onExportRecipes={store.exportRecipes}
+        />
+      {:else if $activeTab === 'environments' && $viewState.canShowEnvironmentsTab}
+        <EnvironmentsTab
+          environments={$viewState.environments}
+          environmentDraft={$viewState.environmentDraft}
+          dirty={$viewState.environmentDraftDirty}
+          isNew={$viewState.environmentDraftIsNew}
+          saving={$viewState.environmentSaving}
+          saveError={$viewState.environmentSaveError}
+          validationState={$viewState.environmentValidationState}
+          loading={$viewState.environmentsLoading}
+          error={$viewState.environmentsError}
+          selectedTaskId={$viewState.selectedEnvironmentTaskId}
+          managedItemOptions={$viewState.selectedSystem?.managedItemOptions || []}
+          availableScriptMacros={$viewState.selectedSystem?.availableScriptMacros || []}
+          sceneOptions={$viewState.selectedSystem?.sceneOptions || []}
+          rollTableOptions={$viewState.selectedSystem?.rollTableOptions || []}
+          onPickImagePath={services?.pickImagePath}
+          onSelectEnvironment={store.selectEnvironment}
+          onCreateEnvironment={store.createEnvironmentDraft}
+          onUpdateEnvironment={store.updateEnvironmentDraft}
+          onCancelEnvironment={store.cancelEnvironmentDraft}
+          onSaveEnvironment={store.saveEnvironmentDraft}
+          onDuplicateEnvironment={store.duplicateEnvironmentDraft}
+          onDeleteEnvironment={store.deleteEnvironmentDraft}
+          onMoveEnvironment={store.moveEnvironmentDraft}
+          onToggleEnvironmentEnabled={store.toggleEnvironmentEnabled}
+          onAddTask={store.addEnvironmentTask}
+          onSelectTask={store.selectEnvironmentTask}
+          onUpdateTask={store.updateEnvironmentTask}
+          onDuplicateTask={store.duplicateEnvironmentTask}
+          onDeleteTask={store.deleteEnvironmentTask}
+          onMoveTask={store.moveEnvironmentTask}
+          onAddResultGroup={store.addEnvironmentTaskResultGroup}
+          onUpdateResultGroup={store.updateEnvironmentTaskResultGroup}
+          onDeleteResultGroup={store.deleteEnvironmentTaskResultGroup}
+          onMoveResultGroup={store.moveEnvironmentTaskResultGroup}
+          onAddResult={store.addEnvironmentTaskResult}
+          onUpdateResult={store.updateEnvironmentTaskResult}
+          onDeleteResult={store.deleteEnvironmentTaskResult}
+          onMoveResult={store.moveEnvironmentTaskResult}
+          onAddCatalyst={store.addEnvironmentTaskCatalyst}
+          onUpdateCatalyst={store.updateEnvironmentTaskCatalyst}
+          onDeleteCatalyst={store.deleteEnvironmentTaskCatalyst}
+          onUpdateVisibility={store.updateEnvironmentTaskVisibility}
+          onUpdateResultSelection={store.updateEnvironmentTaskResultSelection}
+          onUpdateProgressive={store.updateEnvironmentTaskProgressive}
+          onUpdateCheck={store.updateEnvironmentTaskCheck}
+          onUpdateTimeRequirement={store.updateEnvironmentTaskTimeRequirement}
+          onUpdateFailureOutcome={store.updateEnvironmentTaskFailureOutcome}
         />
       {:else if $activeTab === 'rules'}
         <RulesTab system={$viewState.selectedSystem} onUpdateTeaserConfig={store.saveTeaserConfig} />

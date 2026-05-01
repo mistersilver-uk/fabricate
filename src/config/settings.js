@@ -3,10 +3,12 @@ export const FABRICATE_SETTINGS_NAMESPACE = 'fabricate';
 export const SETTING_KEYS = Object.freeze({
   RECIPES: 'recipes',
   CRAFTING_SYSTEMS: 'craftingSystems',
+  GATHERING_ENVIRONMENTS: 'gatheringEnvironments',
   ENABLED: 'enabled',
   SHOW_SIMPLE_RECIPES_ONLY: 'showSimpleRecipesOnly',
   AUTO_CRAFT: 'autoCraft',
   LAST_CRAFTING_ACTOR: 'lastCraftingActor',
+  LAST_GATHERING_ACTOR: 'lastGatheringActor',
   LAST_COMPONENT_SOURCES: 'lastComponentSources',
   LAST_MANAGED_CRAFTING_SYSTEM: 'lastManagedCraftingSystem',
   PROGRESSIVE_RESULT_ORDER: 'progressiveResultOrder',
@@ -26,6 +28,13 @@ const BASE_DEFINITIONS = Object.freeze({
   },
   [SETTING_KEYS.CRAFTING_SYSTEMS]: {
     name: 'Crafting Systems',
+    scope: 'world',
+    config: false,
+    type: Array,
+    default: []
+  },
+  [SETTING_KEYS.GATHERING_ENVIRONMENTS]: {
+    name: 'Gathering Environments',
     scope: 'world',
     config: false,
     type: Array,
@@ -57,6 +66,13 @@ const BASE_DEFINITIONS = Object.freeze({
   },
   [SETTING_KEYS.LAST_CRAFTING_ACTOR]: {
     name: 'Last Crafting Actor',
+    scope: 'client',
+    config: false,
+    type: String,
+    default: ''
+  },
+  [SETTING_KEYS.LAST_GATHERING_ACTOR]: {
+    name: 'Last Gathering Actor',
     scope: 'client',
     config: false,
     type: String,

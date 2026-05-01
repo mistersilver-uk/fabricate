@@ -5,14 +5,18 @@
  * Uses injectable getSetting/setSetting mocks.
  *
  * Group 1: lastManagedCraftingSystem validation (3 tests)
- * Group 2: Progressive-order preferences cleanup (3 tests)
- * Group 3: Combined behaviour (2 tests)
+ * Group 2: lastGatheringActor cleanup (3 tests)
+ * Group 3: Progressive-order preferences cleanup (3 tests)
+ * Group 4: Combined behaviour (2 tests)
  */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { cleanupStalePreferences } from '../src/config/preferencesCleanup.js';
+import {
+  cleanupStalePreferences,
+  isGatheringActorSelectableByUser
+} from '../src/config/preferencesCleanup.js';
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -20,6 +24,7 @@ import { cleanupStalePreferences } from '../src/config/preferencesCleanup.js';
 
 function makeSettings(initial = {}) {
   const store = new Map(Object.entries({
+    lastGatheringActor: '',
     lastManagedCraftingSystem: '',
     progressiveResultOrder: {},
     ...initial
@@ -38,6 +43,15 @@ function makeSettings(initial = {}) {
   }
 
   return { store, calls, getSetting, setSetting };
+}
+
+function makeGatheringActorResolvers({ actorsById = {}, selectableActorIds = [] } = {}) {
+  const selectable = new Set(selectableActorIds);
+
+  return {
+    resolveGatheringActor: (actorId) => actorsById[actorId] ?? null,
+    isSelectableGatheringActor: (actor) => selectable.has(actor?.id)
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -82,7 +96,116 @@ test('leaves lastManagedCraftingSystem unchanged when it is already empty', asyn
 });
 
 // ---------------------------------------------------------------------------
-// Group 2: Progressive-order preferences cleanup
+// Group 2: lastGatheringActor cleanup
+// ---------------------------------------------------------------------------
+
+test('resets lastGatheringActor when the remembered actor no longer resolves', async () => {
+  const { store, calls, getSetting, setSetting } = makeSettings({
+    lastGatheringActor: 'actor-gone'
+  });
+
+  await cleanupStalePreferences(
+    new Set(),
+    new Set(),
+    getSetting,
+    setSetting,
+    makeGatheringActorResolvers()
+  );
+
+  assert.equal(store.get('lastGatheringActor'), '');
+  const setCall = calls.set.find(c => c.key === 'lastGatheringActor');
+  assert.ok(setCall, 'setSetting should be called for lastGatheringActor');
+  assert.equal(setCall.value, '');
+});
+
+test('resets lastGatheringActor when the remembered actor is no longer selectable', async () => {
+  const rememberedActor = { id: 'actor-1', name: 'Gatherer' };
+  const { store, calls, getSetting, setSetting } = makeSettings({
+    lastGatheringActor: rememberedActor.id
+  });
+
+  await cleanupStalePreferences(
+    new Set(),
+    new Set(),
+    getSetting,
+    setSetting,
+    makeGatheringActorResolvers({
+      actorsById: { [rememberedActor.id]: rememberedActor },
+      selectableActorIds: []
+    })
+  );
+
+  assert.equal(store.get('lastGatheringActor'), '');
+  const setCall = calls.set.find(c => c.key === 'lastGatheringActor');
+  assert.ok(setCall, 'setSetting should be called for an unselectable remembered actor');
+  assert.equal(setCall.value, '');
+});
+
+test('preserves lastGatheringActor when the remembered actor still resolves and is selectable', async () => {
+  const rememberedActor = { id: 'actor-1', name: 'Gatherer' };
+  const { store, calls, getSetting, setSetting } = makeSettings({
+    lastGatheringActor: rememberedActor.id
+  });
+
+  await cleanupStalePreferences(
+    new Set(),
+    new Set(),
+    getSetting,
+    setSetting,
+    makeGatheringActorResolvers({
+      actorsById: { [rememberedActor.id]: rememberedActor },
+      selectableActorIds: [rememberedActor.id]
+    })
+  );
+
+  assert.equal(store.get('lastGatheringActor'), rememberedActor.id);
+  const setCall = calls.set.find(c => c.key === 'lastGatheringActor');
+  assert.equal(setCall, undefined, 'setSetting should not be called for a valid remembered actor');
+});
+
+test('preserves lastGatheringActor when cleanup runs without gathering actor resolver options', async () => {
+  const { store, calls, getSetting, setSetting } = makeSettings({
+    lastGatheringActor: 'actor-1',
+    lastManagedCraftingSystem: 'dead-system'
+  });
+
+  await cleanupStalePreferences(
+    new Set(),
+    new Set(),
+    getSetting,
+    setSetting
+  );
+
+  assert.equal(store.get('lastGatheringActor'), 'actor-1');
+  assert.equal(store.get('lastManagedCraftingSystem'), '');
+  assert.equal(
+    calls.set.find(c => c.key === 'lastGatheringActor'),
+    undefined,
+    'setSetting should not be called for lastGatheringActor without resolver seams'
+  );
+  assert.ok(
+    calls.set.find(c => c.key === 'lastManagedCraftingSystem'),
+    'stale system cleanup should still run'
+  );
+});
+
+test('gathering actor selectability is based on actor existence and ownership only', () => {
+  assert.equal(isGatheringActorSelectableByUser(null, { isGM: true }), false);
+  assert.equal(isGatheringActorSelectableByUser({ id: 'npc-1', type: 'npc' }, { isGM: true }), true);
+  assert.equal(isGatheringActorSelectableByUser({ id: 'group-1', type: 'group', isOwner: true }, { isGM: false }), true);
+  assert.equal(
+    isGatheringActorSelectableByUser({
+      id: 'npc-2',
+      type: 'npc',
+      testUserPermission: (_user, permission) => permission === 'OWNER'
+    }, { isGM: false }),
+    true
+  );
+  assert.equal(isGatheringActorSelectableByUser({ id: 'actor-1', type: 'character' }, { isGM: false }), false);
+});
+
+// ---------------------------------------------------------------------------
+// Group 3: Progressive-order preferences cleanup
 // ---------------------------------------------------------------------------
 
 test('removes progressive-order entries for missing recipes', async () => {
@@ -124,7 +247,7 @@ test('does not call setSetting for progressiveResultOrder when no entries need r
 });
 
 // ---------------------------------------------------------------------------
-// Group 3: Combined behaviour
+// Group 4: Combined behaviour
 // ---------------------------------------------------------------------------
 
 test('cleans both stale system and stale recipe preferences in one call', async () => {

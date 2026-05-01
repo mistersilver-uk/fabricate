@@ -3,7 +3,7 @@
  */
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
-import { cleanupStalePreferences } from '../config/preferencesCleanup.js';
+import { cleanupStalePreferences, isGatheringActorSelectableByUser } from '../config/preferencesCleanup.js';
 import { getSourceUuid, getComponentSourceReferences, getItemSourceReferences } from '../utils/sourceUuid.js';
 import { normalizeCustomRecipeCategories } from '../utils/recipeCategories.js';
 
@@ -116,6 +116,7 @@ export class CraftingSystemManager {
       craftingChecks: has('craftingChecks') ? features.craftingChecks === true : false,
       outcomeRouting: has('outcomeRouting') ? features.outcomeRouting === true : false,
       effectTransfer: has('effectTransfer') ? features.effectTransfer === true : false,
+      gathering: has('gathering') ? features.gathering === true : false,
       salvage: has('salvage') ? features.salvage === true : false,
       chatOutput: has('chatOutput') ? features.chatOutput === true : true,
       itemPiles: has('itemPiles') ? features.itemPiles === true : false
@@ -767,6 +768,7 @@ export class CraftingSystemManager {
     const system = this._normalizeSystem(data);
     this.systems.set(system.id, system);
     await this.save();
+    this._notifySystemsChanged();
     return system;
   }
 
@@ -927,6 +929,7 @@ export class CraftingSystemManager {
 
     this.systems.set(systemId, merged);
     await this.save();
+    this._notifySystemsChanged();
     if (resolutionModeChanged) {
       await this._cleanupCraftingPreferences();
     }
@@ -947,6 +950,11 @@ export class CraftingSystemManager {
 
     this.systems.delete(systemId);
     await this.save();
+    this._notifySystemsChanged();
+  }
+
+  _notifySystemsChanged() {
+    globalThis.Hooks?.callAll?.('fabricate.craftingSystemsChanged', this.getSystems());
   }
 
   async createItem(systemId, data = {}) {
@@ -1389,6 +1397,9 @@ export class CraftingSystemManager {
   async _cleanupCraftingPreferences() {
     const validSystemIds = new Set(this.getSystems().map(system => system.id));
     const validRecipeIds = new Set(this.recipeManager.getRecipes({}).map(recipe => recipe.id));
-    await cleanupStalePreferences(validSystemIds, validRecipeIds, getSetting, setSetting);
+    await cleanupStalePreferences(validSystemIds, validRecipeIds, getSetting, setSetting, {
+      resolveGatheringActor: (actorId) => game.actors?.get?.(actorId) ?? null,
+      isSelectableGatheringActor: (actor) => isGatheringActorSelectableByUser(actor, game.user)
+    });
   }
 }

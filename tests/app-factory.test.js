@@ -17,9 +17,11 @@ globalThis.game = { settings: { get: () => undefined } };
 
 const {
   getCraftingAppClass,
+  getGatheringAppClass,
   getRecipeManagerAppClass,
   getRecipeEditorAppClass,
   registerSvelteCraftingApp,
+  registerSvelteGatheringApp,
   registerSvelteRecipeManagerApp,
   registerSvelteRecipeEditorApp
 } = await import('../src/ui/appFactory.js');
@@ -36,6 +38,20 @@ test('getCraftingAppClass returns registered Svelte class', () => {
   registerSvelteCraftingApp(MockSvelteCraftingApp);
   assert.equal(getCraftingAppClass(), MockSvelteCraftingApp);
   registerSvelteCraftingApp(null);
+});
+
+// --- getGatheringAppClass ---
+
+test('getGatheringAppClass throws when no Svelte class registered', () => {
+  registerSvelteGatheringApp(null);
+  assert.throws(() => getGatheringAppClass(), /SvelteGatheringApp not registered/);
+});
+
+test('getGatheringAppClass returns registered Svelte class', () => {
+  class MockSvelteGatheringApp {}
+  registerSvelteGatheringApp(MockSvelteGatheringApp);
+  assert.equal(getGatheringAppClass(), MockSvelteGatheringApp);
+  registerSvelteGatheringApp(null);
 });
 
 // --- getRecipeManagerAppClass ---

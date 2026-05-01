@@ -27,7 +27,9 @@ node scripts/foundry-test-run.mjs
 | Variable | Default | Description |
 |---|---|---|
 | `FOUNDRY_URL` | `http://localhost:30000` | Base URL of the Foundry instance |
+| `FOUNDRY_HOST_PORT` | `30000` | Host port used by the Docker harness; set this with `FOUNDRY_URL` when port 30000 is already occupied |
 | `FOUNDRY_ADMIN_KEY` | `fabricate-test-admin` | Admin password for the setup/auth page |
+| `FOUNDRY_IMAGE` | `felddy/foundryvtt:13` | Docker image used by the compose harness. Defaults to Foundry V13 for the V13 smoke world. |
 
 ### Test Phases
 
@@ -55,6 +57,7 @@ stable part of each filename is the trailing label, not the numeric prefix.
 | `items-sidebar` | Items sidebar with 7 crafting items (`.webp` icons) |
 | `actor-sheet-*` | Actor inventory sheets with embedded test items |
 | `recipe-manager-default`, `recipe-manager-systems`, `recipe-manager-items`, `recipe-manager-recipes`, `recipe-manager-rules`, `recipe-manager-graph` | Recipe Manager checkpoints across the admin tabs |
+| `recipe-manager-environments`, `gm-environments-*` | GM Environments tab and responsive validation/authoring checkpoints |
 | `crafting-app-opened`, `post-craft`, `alara-post-craft-inventory` | Crafting flow checkpoints after opening the app and completing the craft |
 | `join-selection-failed`, `join-submit-failed`, `craft-failure`, `screenshot-failure.png` | Failure diagnostics captured when the harness aborts |
 

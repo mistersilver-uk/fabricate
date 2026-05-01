@@ -7,8 +7,10 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const systemSettingsPath = resolve(__dirname, '../../src/ui/svelte/apps/SystemSettings.svelte');
 const featureCardStackPath = resolve(__dirname, '../../src/ui/svelte/apps/FeatureCardStack.svelte');
+const langPath = resolve(__dirname, '../../lang/en.json');
 const systemSettingsSource = readFileSync(systemSettingsPath, 'utf8');
 const featureCardStackSource = readFileSync(featureCardStackPath, 'utf8');
+const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
 describe('Crafting system settings UI contract', () => {
   it('exposes a resolution-mode selector in base system settings', () => {
@@ -34,6 +36,30 @@ describe('Crafting system settings UI contract', () => {
     assert.ok(
       !featureCardStackSource.includes("store.toggleFeature('outcomeRouting'"),
       'feature card stack should no longer expose the legacy outcomeRouting toggle'
+    );
+  });
+
+  it('exposes the gathering feature toggle that unlocks the Environments tab', () => {
+    assert.ok(
+      featureCardStackSource.includes("store.toggleFeature('gathering'"),
+      'feature card stack should let GMs enable gathering for the selected system'
+    );
+    assert.ok(
+      featureCardStackSource.includes('FABRICATE.Admin.Features.Gathering.Title'),
+      'gathering toggle should use localized title copy'
+    );
+    assert.ok(
+      featureCardStackSource.includes('FABRICATE.Admin.Features.Gathering.Hint'),
+      'gathering toggle should use localized hint copy'
+    );
+    assert.equal(
+      lang.FABRICATE.Admin.Features.Gathering.Title,
+      'Gathering',
+      'English localization should define the gathering feature title'
+    );
+    assert.ok(
+      lang.FABRICATE.Admin.Features.Gathering.Hint,
+      'English localization should define the gathering feature hint'
     );
   });
 

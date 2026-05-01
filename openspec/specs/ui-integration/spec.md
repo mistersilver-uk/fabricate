@@ -23,6 +23,16 @@ Fabricate's Foundry-facing product UI must use a clean flat visual style.
 - Shared tokens in `styles/fabricate.css` and app-local editor tokens should be the source of truth for reusable surface treatments.
 - Generated documentation output and third-party/vendor theme assets are out of scope for this rule unless they are explicitly restyled as Fabricate product UI.
 
+## Responsive Product UI
+
+Foundry ApplicationV2 windows can be resized independently of the browser viewport.
+Responsive layout rules for application bodies must therefore be keyed to the app or shell container width, not only to viewport media queries.
+
+- Use CSS container queries for application-specific narrow-window layout changes.
+- The GM `Environments` editor responds to the admin main container width: list/editor panes stack, nested task/result/catalyst layouts collapse, independently scrollable regions remain usable, and save actions stay reachable.
+- The player `Gathering` app responds to its own app container width: active/history regions collapse to one column, task rows reserve icon width, and row metadata stacks without horizontal overflow.
+- These responsive rules are presentation-only. They must not change gathering runtime semantics, validation behavior, task visibility, attemptability, or persistence.
+
 ## Integration Points
 
 ### Items Directory
@@ -63,6 +73,10 @@ Display list + detail editor for crafting systems.
 - Resolution mode (`simple`, `routed`, `progressive`, `alchemy`)
 
 Changing resolution mode is destructive and must follow `007` confirmation/cleanup rules.
+
+#### Feature Toggles
+
+- Gathering: persists `features.gathering` and makes the selected system's gated `Environments` tab reachable when enabled.
 
 #### Feature Controls
 
@@ -185,23 +199,41 @@ Actions:
 
 Only shown when `features.gathering === true` for the selected crafting system.
 
-Capabilities:
+Current GM editor behavior:
 
-- Create, edit, duplicate, enable/disable, and delete environments for the selected system
-- Reorder environments in the GM list view
-- Configure environment-level fields:
-  - name
-  - description
-  - `selectionMode` (`targeted` or `blind`)
-  - optional `sceneUuid`
-- Configure task list per environment:
-  - add/remove tasks
-  - enable/disable tasks
-  - edit task name, description, and image
-  - edit visibility gate
-  - edit catalysts
-  - edit `timeRequirement`
-  - edit resolution-specific fields (`resultSelection`, `progressive`, `resultGroups`, `failureOutcome`)
+- The tab is hidden when the selected system does not enable gathering.
+- The admin shell falls back to a visible tab when system or feature changes make `Environments` unavailable.
+- The tab loads the selected system's environment list from the gathering environment store.
+- Environment list and draft records are cloned before exposure to the Svelte view.
+- The selected draft can edit environment name, description, enabled state, `selectionMode`, and optional `sceneUuid`.
+- The selected draft can add, select, duplicate, delete, and reorder tasks.
+- The selected task can edit `name`, `description`, `img`, `enabled`, and `resolutionMode`.
+- The selected task can add, rename, delete, and reorder result groups.
+- The selected task can add, edit, delete, and reorder component-based results within a result group.
+- Editable result fields are `componentId` and `quantity`.
+- The selected task can add, edit, and delete catalysts.
+- Editable catalyst fields are `componentId`, `degradesOnUse`, `destroyWhenExhausted`, and nullable `maxUses`.
+- Catalyst `maxUses` is validation- and runtime-relevant only when `degradesOnUse === true`; when degradation is disabled, `maxUses` is ignored.
+- The selected task can enable, edit, and clear a visibility gate.
+- Visibility-gate authoring supports the canonical `macro`, `dnd5e`, and `pf2e` providers: `macro` uses an available script macro, while `dnd5e` and `pf2e` use `formula` and `threshold`.
+- Incomplete visibility provider input is local UI state only and must not be sent to the environment store until the provider-required fields are present. Clearing visibility calls the store only when a committed visibility gate exists.
+- The selected routed task can edit `resultSelection.provider` as `macroOutcome` or `rollTableOutcome`.
+- Routed `macroOutcome` authoring uses available script macro options for `macroUuid`.
+- Routed `rollTableOutcome` authoring uses a UUID text input for `rollTableUuid`.
+- The selected progressive task can edit `progressive.awardMode` as `equal`, `partial`, or `exceed`.
+- Progressive check authoring supports `macro`, `dnd5e`, and `pf2e` providers: `macro` uses an available script macro, while `dnd5e` and `pf2e` use `formula` and optional `threshold`.
+- Progressive difficulty is displayed from the selected managed component difficulty; result-level inline difficulty is not persisted.
+- Managed item options are prepared by the admin store/root and passed into the environments tab; the tab does not perform Foundry lookups.
+- Task, result-group, result, catalyst, visibility, result-selection, progressive, check, time-requirement, and failure-outcome mutations preserve other nested task configuration.
+- Dirty state is tracked for the selected draft, and save/cancel affordances are visible.
+- Creating a new environment persists a disabled draft shell with one disabled placeholder task for validation compatibility. New draft placeholder result groups receive immediate IDs so they can be edited before save/reload. This shell is not a configured player-visible gathering path until configured and enabled by the GM.
+- Duplicate, delete, and reorder actions use gathering environment store methods.
+- Delete requires confirmation and cleans referenced active and historical gathering runs through the store.
+- Store-owned task/result/catalyst/visibility/result-selection/progressive/check/time-requirement/failure-outcome callbacks are delegated through the admin store and remain inside the environment draft save/cancel flow.
+- The selected-task time-requirement editor supports clearing `timeRequirement` for immediate resolution and editing minutes, hours, days, months, and years for timed tasks.
+- The selected-task failure-outcome editor supports clearing to default failure feedback plus text and macro custom outcomes, with provider switching clearing stale provider fields.
+- Save-blocking validation exposes a localized summary, inline field-addressable errors, `aria-invalid`, `aria-describedby`, keyboard focus to the first invalid field after failed save, and persistent stale-reference warnings.
+- Narrow-window layout behavior is implemented with app/container-width rules so list/editor panes and advanced controls remain reachable in resized Foundry windows.
 
 Validation rules from `009-gathering-and-harvesting.md` must be enforced before save.
 
@@ -460,6 +492,7 @@ It is opened from the `Gathering` header action in the Items directory and must 
 - Select the gathering actor.
 - Persist the last selected actor in `fabricate.lastGatheringActor`.
 - Only actors the user owns are selectable for non-GM users.
+- Actor selection is permission-based, not actor-type-based; actor types such as `npc`, `group`, or `character` are valid when the user has the required ownership/permission.
 
 ### Environment List
 
@@ -499,8 +532,9 @@ Before creating a run, the UI must check:
 
 If `task.timeRequirement` is absent:
 
-- execute the gathering attempt immediately
-- show the terminal result in the same interaction flow
+- show the terminal `startAttempt` result in the same interaction flow
+- present success with created result summary when details are visible
+- present failure without implying any gathered result items were created
 - refresh task and run state
 
 If `task.timeRequirement` is present:
@@ -509,6 +543,7 @@ If `task.timeRequirement` is present:
 - show it immediately in the app's active-runs area with `waitingTime` status
 - show the expected completion time derived from the world-time target
 - notify the user that gathering has started rather than completed
+- do not show terminal feedback until the timed-completion slice resolves the run
 
 ### Active Runs
 

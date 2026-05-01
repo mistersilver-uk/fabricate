@@ -40,11 +40,61 @@ export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
       setSetting: async (key, value) => setSetting(key, value),
       getCraftingSystemManager: () => game?.fabricate?.getCraftingSystemManager?.() ?? null,
       getRecipeManager: () => game?.fabricate?.getRecipeManager?.() ?? null,
+      getGatheringEnvironmentStore: () => game?.fabricate?.getGatheringEnvironmentStore?.() ?? null,
       getScriptMacros: () =>
         Array.from(game.macros?.contents || [])
           .filter(m => (m.type || '').toLowerCase() === 'script')
           .map(m => ({ uuid: m.uuid, name: m.name }))
           .sort((a, b) => a.name.localeCompare(b.name)),
+      getSceneOptions: () =>
+        Array.from(game.scenes?.contents || [])
+          .map(scene => ({
+            uuid: scene.uuid,
+            name: scene.name,
+            img: scene.background?.src || scene.img || '',
+            thumbnail: scene.thumbnail || scene.thumb || ''
+          }))
+          .filter(scene => scene.uuid && scene.name)
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      getRollTableOptions: () =>
+        Array.from(game.tables?.contents || [])
+          .map(table => ({
+            uuid: table.uuid,
+            name: table.name,
+            img: table.img || ''
+          }))
+          .filter(table => table.uuid && table.name)
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      pickImagePath: async (currentPath = '') => {
+        const FilePickerClass = foundry?.applications?.apps?.FilePicker?.implementation
+          || foundry?.applications?.apps?.FilePicker
+          || globalThis.FilePicker;
+        if (!FilePickerClass) {
+          ui.notifications.warn(localize('FABRICATE.Admin.Environments.ImagePickerUnavailable'));
+          return null;
+        }
+
+        return new Promise((resolve) => {
+          let settled = false;
+          const settle = (path) => {
+            if (settled) return;
+            settled = true;
+            resolve(path || null);
+          };
+          try {
+            const picker = new FilePickerClass({
+              type: 'image',
+              current: currentPath || '',
+              callback: (path) => settle(path),
+              close: () => settle(null)
+            });
+            picker.render(true);
+          } catch (err) {
+            ui.notifications.warn(err?.message || localize('FABRICATE.Admin.Environments.ImagePickerUnavailable'));
+            settle(null);
+          }
+        });
+      },
       notify: {
         info: (msg) => ui.notifications.info(msg),
         warn: (msg) => ui.notifications.warn(msg),
@@ -248,6 +298,7 @@ export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
       store: this._adminStore,
       services: {
         importSingleManagedItemFromDrop,
+        pickImagePath: this._services.pickImagePath,
         onDropItem: async (data) => {
           const systemManager = game.fabricate.getCraftingSystemManager();
           const systemId = get(this._adminStore.selectedSystemId) || '';
@@ -355,6 +406,9 @@ export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
 
   async close(options) {
     if (this._adminStore) {
+      const canClose = await this._adminStore.confirmDiscardDirtyEnvironmentDraft?.();
+      if (!canClose) return this;
+
       this._adminStore.destroy();
       this._adminStore = null;
       this._services = null;

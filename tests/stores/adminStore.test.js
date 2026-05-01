@@ -148,6 +148,8 @@ function createMockServices(overrides = {}) {
     getCraftingSystemManager: () => mockSystemManager,
     getRecipeManager: () => mockRecipeManager,
     getScriptMacros: () => [],
+    getSceneOptions: () => [],
+    getRollTableOptions: () => [],
     notify: {
       info: () => {},
       warn: () => {},
@@ -451,7 +453,8 @@ describe('createAdminStore', () => {
         propertyMacros: 'propertyMacros',
         craftingChecks: 'craftingChecks',
         outcomeRouting: 'outcomeRouting',
-        effectTransfer: 'effectTransfer'
+        effectTransfer: 'effectTransfer',
+        gathering: 'gathering'
       };
 
       for (const [featureName, expectedKey] of Object.entries(expectedMappings)) {
@@ -1598,7 +1601,7 @@ describe('createAdminStore', () => {
         'categories', 'itemTags', 'essenceDefinitions', 'managedItemOptions',
         'requirements', 'craftingCheck', 'recipeVisibility',
         'showRecipeVisibilityKnowledgeOptions', 'showRecipeVisibilityPlayerNote',
-        'showTags', 'showEssences', 'availableScriptMacros'
+        'showTags', 'showEssences', 'availableScriptMacros', 'sceneOptions', 'rollTableOptions'
       ];
       for (const key of requiredKeys) {
         assert.ok(key in sys, `selectedSystem should have key: ${key}`);
@@ -1615,10 +1618,24 @@ describe('createAdminStore', () => {
       for (const key of [
         'recipeCategories', 'itemTags', 'essences', 'complexRecipes',
         'multiStepRecipes', 'propertyMacros', 'craftingChecks',
-        'outcomeRouting', 'effectTransfer'
+        'outcomeRouting', 'effectTransfer', 'gathering'
       ]) {
         assert.ok(key in features, `features should have key: ${key}`);
       }
+    });
+
+    it('viewState.selectedSystem.features preserves gathering when enabled', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      if (sys) {
+        sys.features = { gathering: true };
+      }
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const vs = get(store.viewState);
+      assert.equal(vs.selectedSystem?.features.gathering, true);
     });
 
     it('viewState.selectedSystem.craftingCheck.outcomesText is comma-separated string from outcomes array', async () => {
@@ -1643,6 +1660,22 @@ describe('createAdminStore', () => {
       await store.selectSystem('sys1');
       const vs = get(store.viewState);
       assert.deepEqual(vs.selectedSystem?.availableScriptMacros, macros);
+    });
+
+    it('viewState.selectedSystem exposes injected scene and roll-table picker options', async () => {
+      const sceneOptions = [{ uuid: 'Scene.forest', name: 'Forest', img: 'forest.webp' }];
+      const rollTableOptions = [{ uuid: 'RollTable.forage', name: 'Forage', img: 'table.svg' }];
+      const services = createMockServices({
+        getSceneOptions: () => sceneOptions,
+        getRollTableOptions: () => rollTableOptions
+      });
+      const store = createAdminStore(services);
+
+      await store.selectSystem('sys1');
+
+      const selectedSystem = get(store.viewState).selectedSystem;
+      assert.deepEqual(selectedSystem?.sceneOptions, sceneOptions);
+      assert.deepEqual(selectedSystem?.rollTableOptions, rollTableOptions);
     });
 
     it('viewState.selectedSystem.showTags and showEssences are true when features and advancedOptions are both enabled', async () => {

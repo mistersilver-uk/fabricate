@@ -528,7 +528,7 @@ Catalyst = {
 
 ### Requirements
 
-If present in the specification for a recipe, step, or ingredient set a catalyst is always required.
+If present in the specification for a recipe, step, ingredient set, salvage definition, or gathering task, a catalyst is always required.
 
 1. `componentId` is required.
 2. If `degradesOnUse` is true, catalyst usage must be tracked on the owned item instance.
@@ -785,7 +785,7 @@ Requirements:
 
 1. `timesUsed` must be a non-negative integer.
 2. Usage is tracked per owned item instance.
-3. Maximum uses is configured in `Catalyst.maxUses` for each catalyst (on the recipe, step, or ingredient set). Usage tracking and exhaustion only apply when `degradesOnUse` is true.
+3. Maximum uses is configured in `Catalyst.maxUses` for each catalyst (on the recipe, step, ingredient set, salvage definition, or gathering task). Usage tracking and exhaustion only apply when `degradesOnUse` is true.
 4. When `degradesOnUse` is true and `maxUses` is not null: the item is exhausted when `timesUsed >= maxUses`.
 5. If `destroyWhenExhausted` is true, the item is destroyed when exhausted.
 6. When `degradesOnUse` is false, catalyst item usage flags are not written or evaluated.

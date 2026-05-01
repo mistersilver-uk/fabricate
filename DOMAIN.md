@@ -22,11 +22,11 @@
 | **General Recipe Category** | The reserved recipe category present in every crafting system. It is effective even when no custom categories exist and is not stored as a deletable custom category entry. | `general`, `src/utils/recipeCategories.js`, recipe/admin editor category helpers        | openspec/specs/data-models/spec.md, openspec/specs/ui-integration/spec.md           |
 | **Component**             | A curated library entry in a crafting system that references a Foundry Item via `sourceItemUuid` and may carry tags, essences, difficulty, fallback item IDs, and optional salvage configuration. Recipes, catalysts, salvage definitions, and gathering results reference components by Fabricate component identity, not by raw Foundry Item identity. | `_normalizeComponent()` in `CraftingSystemManager`, `system.components`                 | openspec/specs/data-models/spec.md, openspec/specs/recipes-and-steps/spec.md, openspec/specs/gathering-and-harvesting/spec.md |
 | **Step**                  | One phase of a multi-step recipe, with its own ingredients, results, and optional time or currency requirements.                                       | `recipe.steps[]`                                                                        | openspec/specs/data-models/spec.md, openspec/specs/recipes-and-steps/spec.md           |
-| **Gathering Environment** | A configured place where gathering occurs for one crafting system. It contains one or more attemptable gathering tasks.                                | Specced world setting `fabricate.gatheringEnvironments`; runtime implementation pending | openspec/specs/overview/spec.md, openspec/specs/gathering-and-harvesting/spec.md           |
-| **Gathering Task**        | One attemptable gathering activity inside an environment, with catalysts, visibility, resolution rules, optional time gating, and result groups.       | Spec-defined data shape; runtime implementation pending                                 | openspec/specs/gathering-and-harvesting/spec.md                     |
+| **Gathering Environment** | A configured place where gathering occurs for one crafting system. It contains one or more attemptable gathering tasks.                                | Registered world setting `fabricate.gatheringEnvironments`; normalized and validated by `GatheringEnvironmentStore`; listed for players through viewer-enforcing `game.fabricate.listGatheringForActor()` backed by an internally constructed `GatheringEngine`; backend immediate resolution, timed waiting-run creation, timed world-time completion/resume, bootstrap wiring, and global accessor facade implemented; GM admin editor supports environment fields, task-list CRUD/base fields, selected-task result-group/catalyst/visibility-gate authoring, routed result-selection provider authoring, progressive check/award-mode authoring, selected-task time-requirement authoring, and selected-task failure-outcome authoring through store-owned draft callbacks; save failures expose structured validation state and keep the dirty draft unpersisted; stale scene/macro references remain visible and preserved until changed; new environment shells remain disabled placeholders until configured and enabled; dirty draft discard confirmation protects navigation, replacement, and close; dedicated player app shell, app registration, Items Directory entry, active/history rows, terminal feedback surfaces, container-query responsive polish for narrow ApplicationV2 windows, scene-linked runtime integration coverage, hook-driven timed completion coverage, and harvesting boundary regression coverage implemented; live Foundry validation remains conditional for future runtime-specific or screenshot-required work | openspec/specs/overview/spec.md, openspec/specs/gathering-and-harvesting/spec.md           |
+| **Gathering Task**        | One attemptable gathering activity inside an environment, with catalysts, visibility, resolution rules, optional time gating, failure feedback, and result groups. Result-group authoring currently edits group order/name and component-result `componentId`/`quantity`; catalyst authoring currently edits `componentId`, `degradesOnUse`, `destroyWhenExhausted`, and nullable `maxUses`; visibility-gate authoring currently edits `macro`, `dnd5e`, and `pf2e` provider fields; routed authoring currently edits `macroOutcome.macroUuid` or `rollTableOutcome.rollTableUuid`; progressive authoring currently edits `awardMode` and `macro`/`dnd5e`/`pf2e` checks; time-requirement authoring clears `timeRequirement` for immediate tasks or edits duration units for timed tasks; failure-outcome authoring clears to default feedback or edits text/macro outcomes. Progressive gathering thresholds come from referenced component difficulty, not inline result difficulty. | Normalized and validated by `GatheringEnvironmentStore`; selected-task visibility gate edits use store-owned draft mutation only after provider-required fields are complete; incomplete provider input is local UI state, not persisted model state; disabled draft shells skip routed/progressive completeness but still validate any present `failureOutcome`; validation errors are field-addressable and include result-group/result collection anchors; dnd5e/pf2e check `threshold` is optional and distinct from the required visibility-gate threshold; result-selection, check, time, and failure provider/mode switching clears stale provider fields; listed with visibility and attemptability through viewer-enforcing global methods; scene/token, duplicate-run, catalyst, and other attemptability blockers keep otherwise visible entries listable with localized reasons; non-GM blind listings expose a generic action instead of real task identity; tasks without `timeRequirement` resolve routed/progressive terminal outcomes immediately, while tasks with `timeRequirement` create a guarded `waitingTime` run and are completed by the module-private `GatheringEngine.processWorldTime(worldTime)` dispatcher when mature | openspec/specs/gathering-and-harvesting/spec.md                     |
 | **Crafting Run**          | An actor-scoped execution record for recipe crafting, including active step state and terminal history.                                                | `CraftingRunManager`                                                                    | openspec/specs/data-models/spec.md, openspec/specs/recipes-and-steps/spec.md           |
 | **Salvage Run**           | An actor-scoped execution record for decomposing a component into salvage results.                                                                     | `SalvageRunManager`                                                                     | openspec/specs/data-models/spec.md, openspec/specs/recipes-and-steps/spec.md           |
-| **Gathering Run**         | An actor-scoped execution record for a gathering attempt against one environment task.                                                                 | `Actor.flags.fabricate.gatheringRuns` in spec; runtime implementation pending           | openspec/specs/overview/spec.md, openspec/specs/data-models/spec.md, openspec/specs/gathering-and-harvesting/spec.md |
+| **Gathering Run**         | An actor-scoped execution record for a gathering attempt against one environment task, including active waiting runs and terminal history. Runtime listing projects UI-safe active/history rows for the selected actor, including empty or blocked browsing states: non-GM blind and missing-environment rows stay generic, while targeted rows can expose useful labels and terminal metadata. | `GatheringRunManager`; persisted at `Actor.flags.fabricate.gatheringRuns`; projected by `GatheringEngine.listForActor()` as `activeRuns` and recent `history` | openspec/specs/overview/spec.md, openspec/specs/data-models/spec.md, openspec/specs/gathering-and-harvesting/spec.md |
 
 ### Acquisition, Knowledge, and Resolution Terms
 
@@ -49,8 +49,14 @@
 | **Environment Selection Mode** | Gathering-only choice between `targeted` and `blind` environment behavior.                                                                                                                                                                                                                                                                                                                                                                                                                                                       | `GatheringEnvironment.selectionMode`                                                 | openspec/specs/gathering-and-harvesting/spec.md                     |
 | **Task Resolution Mode**       | Gathering-only choice between `routed` and `progressive` task resolution.                                                                                                                                                                                                                                                                                                                                                                                                                                                        | `GatheringTask.resolutionMode`                                                       | openspec/specs/gathering-and-harvesting/spec.md                     |
 | **Result Selection Provider**  | The mechanism that resolves a routed/alchemy result group: `ingredientSet`, `macroOutcome`, or `rollTableOutcome`. Gathering tasks reuse the routed provider subset without `ingredientSet`.                                                                                                                                                                                                                                                                                                                                     | `resultSelection.provider`                                                           | openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md, openspec/specs/gathering-and-harvesting/spec.md |
-| **Special Outcome**            | The canonical failure keyword family for gathering task failure. `fail` is preferred; older aliases remain accepted for compatibility.                                                                                                                                                                                                                                                                                                                                                                                           | `GatheringTask.failureOutcome`                                                       | openspec/specs/gathering-and-harvesting/spec.md                     |
+| **Failure Outcome**            | Optional task-level failure feedback for gathering. Absence means default feedback; authored values may be text or macro outcomes. Invalid failure-outcome configuration is task misconfiguration, not a terminal player failure outcome.                                                                                                                                                                                                                                                                                         | `GatheringTask.failureOutcome`, `SpecialOutcome`                                     | openspec/specs/gathering-and-harvesting/spec.md                     |
+| **Reserved Failure Keyword**   | Provider output keyword that routes a gathering task to failure instead of a result group. `fail` is the preferred authored keyword; older miss/hazard aliases remain accepted for compatibility.                                                                                                                                                                                                                                                                                                                                  | routed gathering provider outcome normalization                                      | openspec/specs/gathering-and-harvesting/spec.md                     |
 | **Visibility Gate**            | A gathering-task precondition that decides whether a task is visible to an actor before the attempt begins.                                                                                                                                                                                                                                                                                                                                                                                                                      | `GatheringVisibilityGate`                                                            | openspec/specs/gathering-and-harvesting/spec.md                     |
+| **Gathering Time Requirement** | Task duration declaration for gathering. Absence means immediate resolution during `startAttempt`; presence means a timed active `waitingTime` run that completes after world time reaches the derived gate.                                                                                                                                                                                                                                                                                                                       | `GatheringTask.timeRequirement`, `GatheringRun.timeGate`                             | openspec/specs/gathering-and-harvesting/spec.md                     |
+| **Gathering Evaluator Result** | The normalized output from gathering visibility and check evaluation. Check results may be neutral value-only results, terminal success/failure results that still retain the numeric value, or diagnostics for provider/configuration problems. Diagnostics are not terminal player failure outcomes.                                                                                                                                                                                                                              | `GatheringGateAndCheckEvaluator`                                                     | openspec/specs/gathering-and-harvesting/spec.md                     |
+| **Environment Validation State** | GM-admin draft save feedback for gathering environment/task validation. It contains localized summary text, field-addressable errors, a first-invalid target, and an attempt counter used to move focus after failed saves. Save failures are validation or misconfiguration boundaries: draft edits remain dirty and are not persisted until corrected.                                                                                                                                                                           | `adminStore.environmentValidationState`, `EnvironmentsTab.validationState`            | openspec/specs/ui-integration/spec.md, issue #179                   |
+| **Dirty Environment Draft**    | A GM-admin environment draft with unsaved edits. It is protected by discard confirmation before navigation, replacement by another environment/new/duplicate/system selection, gathering feature disable, or app close. Declining preserves the dirty draft; accepting intentionally discards it or proceeds with the replacement/close. Concurrent navigation shares one in-flight discard confirmation. Persisted environment delete uses delete confirmation instead; unsaved new drafts use discard confirmation because no persisted environment exists to delete. | `adminStore.environmentDraftDirty`, `confirmDiscardDirtyEnvironmentDraft()`, `SvelteRecipeManagerApp.close()` | openspec/specs/ui-integration/spec.md, issue #179                   |
+| **Player Gathering Store**     | Svelte UI state boundary for the dedicated player gathering app. It owns selected-actor UI state, `lastGatheringActor` preference writes, listing refresh state, start-in-flight state, `activeRuns`/`history` display state, and `lastResult` terminal feedback state; it delegates listing and attempts to runtime APIs and must not duplicate gathering domain rules or act as a domain service. Immediate failed terminal attempts rely on runtime/configured failure feedback, so the store does not emit a second generic failure warning. | `createGatheringStore()`, `SvelteGatheringApp`, `GatheringAppRoot`                    | openspec/specs/ui-integration/spec.md, issue #179                   |
 | **List Mode**                  | System-wide recipe visibility strategy: `global`, `player`, or `knowledge`. `teaser` is a legacy runtime value that should be eliminated.                                                                                                                                                                                                                                                                                                                                                                                        | `recipeVisibility.listMode`                                                          | openspec/specs/data-models/spec.md, openspec/specs/recipe-visibility/spec.md           |
 | **Knowledge Mode**             | Sub-strategy within `knowledge` list mode: `item`, `learned`, or `itemOrLearned`.                                                                                                                                                                                                                                                                                                                                                                                                                                                | `recipeVisibility.knowledge.mode`                                                    | openspec/specs/data-models/spec.md, openspec/specs/recipe-visibility/spec.md           |
 | **Recipe Item Definition**     | A curated crafting-system entry that represents one knowledge item template used for recipe visibility and learning. It is distinct from components and is backed by a `sourceItemUuid`.                                                                                                                                                                                                                                                                                                                                          | `CraftingSystem.recipeItemDefinitions[]`                                             | openspec/specs/data-models/spec.md, openspec/specs/recipe-visibility/spec.md           |
@@ -60,6 +66,7 @@
 | **Discovery Mode**             | A discovery feature layered alongside recipe visibility, not a `listMode` value. This replaces the legacy `teaser` naming family.                                                                                                                                                                                                                                                                                                                                                                                                | Domain decision; runtime still uses `teaserConfig` / `Recipe.teaser` aliases         | issue #119                   |
 | **Source UUID**                | The compendium origin of an owned item, used for recipe-item and component matching.                                                                                                                                                                                                                                                                                                                                                                                                                                             | `getSourceUuid()` in `src/utils/sourceUuid.js`                                       | openspec/specs/recipe-visibility/spec.md                     |
 | **Component Source Actor**     | An actor selected as an inventory source for crafting. Fabricate searches the selected component source actors for ingredients and, when visibility rules allow, recipe-item matches. The crafting actor receives created results, but ingredient consumption may come from any selected component source actor. This is distinct from a component's `sourceItemUuid` or an owned item's source UUID. Component source actors apply to crafting and recipe-knowledge evaluation; they are not the source of gathering catalysts. | `componentSourceActors`, `componentSourceActorUuids`, `lastComponentSources`         | openspec/specs/ui-integration/spec.md, openspec/specs/recipes-and-steps/spec.md, openspec/specs/recipe-visibility/spec.md |
+| **Gathering Actor**            | The selected acting actor for a gathering attempt. Gathering actor selectability is based on actor resolution and Foundry ownership/permission only; Fabricate does not exclude actor document types such as NPCs or groups by type. Gathering catalysts and results are resolved against this actor, not against component source actors. The remembered `lastGatheringActor` preference is cleared only when the actor no longer resolves or is no longer selectable for the current user. | `lastGatheringActor`, `isGatheringActorSelectableByUser()`, `cleanupStalePreferences()` | openspec/specs/gathering-and-harvesting/spec.md, openspec/specs/ui-integration/spec.md |
 | **Shopping List**              | A session-scoped aggregation of materials needed for queued recipes. It is derived state, not a persisted aggregate.                                                                                                                                                                                                                                                                                                                                                                                                             | `shoppingListAggregator.js`, `craftingStore`                                         | issue #11, issue #12         |
 | **Workbench**                  | Session-scoped, actor-scoped working set of components committed for an alchemy attempt. Displayed as compact entries with quantity badges. Components move between palette and workbench. Derived state, not persisted. Submitting triggers signature matching.                                                                                                                                                                                                                                                                 | `craftingStore.alchemyWorkbench`                                                     | openspec/specs/resolution-modes/spec.md                     |
 | **Component Palette**          | Grid view of all components in the selected alchemy crafting system owned by component source actor(s). Each entry shows image, name, and available quantity (inventory minus workbench). | Derived from actor inventories + system components | openspec/specs/resolution-modes/spec.md |
@@ -74,7 +81,7 @@ Module Configuration
 |  |- craftingSystems
 |  |- enabled
 |  |- migrationVersion
-|  `- gatheringEnvironments (specced, not yet registered in runtime)
+|  `- gatheringEnvironments
 `- Client settings
    |- lastCraftingActor
    |- lastComponentSources
@@ -83,7 +90,7 @@ Module Configuration
    |- favouriteRecipes
    |- recentlyCrafted
    |- lastAlchemySystem
-   |- lastGatheringActor (specced, not yet registered in runtime)
+   |- lastGatheringActor
    `- chatOutput (canonical target; still implemented on system features in runtime)
 
 Crafting System
@@ -282,6 +289,102 @@ stateDiagram-v2
 Harvesting note: when the user-facing activity is "harvest a corpse" or "harvest bark", the lifecycle is still either
 the salvage lifecycle or the crafting lifecycle. There is no separate harvesting lifecycle.
 
+Issue `#179` backend timed-lifecycle and GM-tab foundation checkpoint: `GatheringEngine.startAttempt` validates the selected environment/task
+path before execution. Non-timed tasks resolve routed/progressive terminal outcomes after pause, reference, system,
+enabled-state, ownership, scene/token, visibility, duplicate-run, catalyst-availability, and selected-task-configuration
+guards pass; invalid `failureOutcome` configuration aborts as task misconfiguration before resolver calls or terminal side
+effects. Immediate terminal attempts first plan gathered-result refs for success and catalyst refs for both success and
+failure, then write newest-first terminal gathering history with those planned refs before committing item creation,
+catalyst usage, or failure feedback. If terminal history persistence fails, no result, catalyst, or failure-feedback commit
+occurs. Successful immediate attempts then create gathered results on the selected actor and apply terminal catalyst usage
+against that actor only. Failed immediate attempts create no gathered results but still apply terminal catalyst usage and
+failure feedback after terminal history persistence succeeds. Timed tasks run the same guards, then create exactly one
+awaited `waitingTime` run through `GatheringRunManager.createWaitingRun` without result, catalyst, or terminal history side
+effects.
+
+`GatheringEngine.processWorldTime(worldTime)` now processes matured `waitingTime` runs returned by
+`GatheringRunManager.getMaturedWaitingRuns()`. On successful or failed timed completion it re-resolves the task, plans
+terminal result/catalyst/check refs, calls `completeRun`, and commits result, catalyst, or failure-feedback side effects
+only after terminal history is written; `completeRun` returning `null` or throwing blocks those side effects and reports an
+error. If the run's actor, system, environment, or task reference disappears before resume, the engine cancels the run into
+terminal history instead of silently deleting it. Deliberate environment-store cleanup for deleted systems, environments,
+or tasks remains destructive record cleanup and does not create cancellation history. If GM edits make the task
+misconfigured before resume, the engine clears the active run without terminal player history, results, catalysts, or
+failure feedback, which removes duplicate-run blocking and requires a fresh manual start after repair. Non-GM blind
+blocked, cancellation, and terminal responses keep task identity, catalyst details, result details, provider diagnostics,
+and check internals redacted; persisted blind terminal history uses the generic `taskId: "blind"` marker and redacted
+payloads.
+
+Bootstrap now constructs the gathering environment store, run manager, evaluator, and engine internally during module
+initialization after crafting systems load. `game.fabricate` exposes the persistence/support seams needed by UI callers
+(`getGatheringEnvironmentStore()`, `getGatheringRunManager()`, and `getGatheringGateAndCheckEvaluator()`) plus the narrow
+viewer-enforcing runtime methods `listGatheringForActor(options)` and `startGatheringAttempt(options)`. These runtime
+methods replace any caller-supplied `viewer` with the current Foundry user before delegating, so public API callers cannot
+spoof GM visibility. The raw `GatheringEngine` instance is not exposed as a public `game.fabricate` getter or property.
+Ready and `updateWorldTime` dispatch to a guarded world-time processor that calls the module-private
+`GatheringEngine.processWorldTime(worldTime)` without coupling gathering failures to crafting or salvage processing.
+The GM admin now has a gated `Environments` editor. It lists environments for the selected
+gathering-enabled system, exposes a cloned selected draft, resets draft state on system changes, and falls back to a valid
+tab when `features.gathering` is disabled or the selected system cannot show environments. The selected draft can edit
+environment name, description, enabled state, selection mode, and scene UUID; dirty state exists for that draft, and
+save/cancel affordances are visible. New environment creation persists a disabled draft shell with one disabled placeholder
+task for validation compatibility; that shell is not a configured player-visible gathering path until configured and
+enabled by the GM. Duplicate, delete, and reorder use environment-store methods; delete requires confirmation and cleans
+referenced gathering runs through the store. The selected draft supports task-list CRUD (add, select, duplicate, delete,
+and reorder), base task fields (`name`, `description`, `img`, `enabled`, `resolutionMode`), selected-task result-group
+authoring (add, rename, delete, reorder), component-based result authoring (add, edit `componentId`/`quantity`, delete,
+reorder), and selected-task catalyst authoring (add, delete, edit `componentId`, `degradesOnUse`,
+`destroyWhenExhausted`, and nullable `maxUses`), and selected-task visibility-gate authoring (enable/clear plus `macro`,
+`dnd5e`, and `pf2e` provider fields). Incomplete visibility provider input remains local to the Environments tab until the
+provider-required fields are present; clearing calls the store only when a committed visibility gate exists. Store-owned
+task/result/catalyst/visibility/result-selection/progressive/check callbacks are wired from the root into
+the tab, and the component delegates mutations to the admin store. Base task, result, catalyst, visibility,
+result-selection, progressive, and check edits preserve nested task configuration outside edited collections and persist
+only through the environment-store validation boundary. Routed result-selection authoring edits `macroOutcome.macroUuid`
+from available script macro options or `rollTableOutcome.rollTableUuid` as UUID text input. Progressive authoring edits
+`awardMode` values `equal`, `partial`, and `exceed` plus `macro`, `dnd5e`, and `pf2e` checks; dnd5e/pf2e check threshold
+is optional and is not the same rule as a required visibility-gate threshold. Time-requirement authoring clears
+`timeRequirement` for immediate tasks or edits minutes, hours, days, months, and years for timed tasks. Failure-outcome
+authoring clears to default failure feedback or edits text and macro custom outcomes; provider switching clears stale
+provider fields. Disabled draft tasks may save without routed/progressive provider targets, but a present malformed
+`failureOutcome` is still rejected as task misconfiguration, not as a player failure outcome. Save failures expose
+`environmentValidationState` with localized summary text, field-addressable errors, a first-invalid target used for focus,
+and an attempt counter; these failures keep the selected draft dirty and leave persisted environment data unchanged.
+Result-group validation maps duplicate/reserved-name failures to group-name fields, while collection-level missing group or
+missing result failures map to focusable result-group/result anchors. Stale scene UUID and macro UUID references remain
+visible in the editor and preserve the saved UUID until the GM changes the field. New draft placeholder result groups
+receive immediate IDs so they can be edited before save/reload. Managed item options are prepared by the admin store/root
+and passed into the tab; the tab does not perform Foundry lookups. Progressive difficulty is displayed from the selected
+managed component difficulty and is not persisted on individual result rows. Catalyst `maxUses` is validation- and
+runtime-relevant only when `degradesOnUse` is enabled. Dirty environment drafts now require discard confirmation before
+GM navigation, selected-system changes, environment replacement by select/new/duplicate, gathering feature disable, and
+app close. Declining the prompt preserves the dirty draft and blocks the attempted transition; accepting intentionally
+discards the draft or proceeds with the replacement or close. Concurrent navigation attempts share a single in-flight
+discard confirmation. Persisted environment delete uses its destructive delete confirmation directly, including when the
+selected persisted draft is dirty, and does not stack a separate dirty-discard prompt; unsaved new drafts still use discard
+confirmation because there is no persisted environment record to delete.
+
+Player gathering app entry/store foundation checkpoint: Fabricate now registers a dedicated `SvelteGatheringApp` through
+`appFactory` and opens it from a feature-gated Items Directory `Gathering` action when at least one normalized crafting
+system has `features.gathering === true`; it does not route through the crafting app shell. `createGatheringStore` is a UI
+state boundary over injected services. It selects and persists `lastGatheringActor`, clears invalid remembered actor state
+when the actor no longer resolves or is no longer selectable, refreshes runtime listings through
+`game.fabricate.listGatheringForActor({ actor })`, and starts attempts through
+`game.fabricate.startGatheringAttempt({ actor, environmentId, taskId })`. Actor options come from permission/resolution
+checks, not actor-type exclusions. The player list keeps otherwise visible blocked scene/token entries visible with
+localized reasons, and runtime listings include UI-safe active timed runs plus recent history for the selected actor even
+when browsing is empty or blocked. Non-GM blind rows and missing-environment run rows stay opaque/generic; targeted rows
+can show useful labels, status, time-gate data, and terminal metadata. `createGatheringStore` carries those `activeRuns`,
+`history`, and `lastResult` feedback values as UI state while the runtime remains the domain source of truth. Immediate
+terminal failures rely on the runtime/configured failure feedback path, with default failure feedback localized through
+`FABRICATE.Gathering.FailureDefault`, so the store intentionally avoids emitting a duplicate generic failed-attempt
+warning. Responsive behavior for the GM environments editor and player gathering app now keys off each app/container's
+inline size with CSS container queries rather than browser viewport width, so narrow Foundry ApplicationV2 windows can
+stack editor panes and player active/history rows without changing gathering runtime semantics or validation behavior.
+Runtime integration coverage now includes scene-linked gathering, hook-driven timed completion, and the harvesting
+boundary regression guard. Validation/accessibility polish is implemented; live Foundry validation remains conditional
+for future runtime-specific or screenshot-required work.
+
 ## Bounded Contexts
 
 ### 1. Module Configuration
@@ -305,6 +408,7 @@ the salvage lifecycle or the crafting lifecycle. There is no separate harvesting
 - Task authoring, validation, and ordering
 - Scene linkage and visibility gate configuration
 - Targeted versus blind environment semantics
+- Structured save-blocking validation state for environment/task draft misconfiguration
 
 ### 4. Crafting and Salvage Execution (Player/Runtime Domain)
 
@@ -322,9 +426,12 @@ the salvage lifecycle or the crafting lifecycle. There is no separate harvesting
 ### 5. Gathering Execution (Player/Runtime Domain)
 
 - Environment and task listing
-- Access checks for pause state, scene, ownership, and visibility
-- Time-gated gathering attempts
-- Active and historical gathering run management
+- Gathering actor selection by ownership/permission, not actor type
+- Attemptability reporting with localized blocked reasons for scene/token, duplicate-run, catalyst, and empty-state blockers
+- Start-attempt acceptance for pause state, selected task, scene, ownership, visibility, duplicate active runs, catalyst availability, and task configuration; immediate tasks resolve terminal outcomes, plan terminal result/catalyst refs, and write actor history before committing result creation, catalyst usage, or failure feedback, while timed tasks create a guarded `waitingTime` run without catalyst/result/terminal-history side effects
+- Time-gated gathering attempts and backend world-time completion/resume for matured `waitingTime` runs
+- Active timed run and recent terminal history listing for the selected actor, including UI-safe rows when browsing is empty or blocked
+- Active, terminal, cancelled, and misconfiguration-cleared gathering run management
 - Routed/progressive gathering result resolution
 
 ### 6. Knowledge and Discovery (Cross-cutting)
@@ -349,8 +456,7 @@ the salvage lifecycle or the crafting lifecycle. There is no separate harvesting
 
 ## Remaining Drift to Track
 
-- Issue `#2`: the gathering domain is spec-complete, but runtime managers, settings registration, and UI flows are still
-  pending.
+- Issue `#2`: the gathering domain is spec-complete and backend listing/attemptability, immediate terminal resolution, timed waiting-run creation, timed world-time completion/resume, bootstrap/ready/updateWorldTime hook wiring, narrow global accessors, a gated GM `Environments` editor, save-blocking validation/accessibility presentation, dedicated player gathering app registration, player gathering store foundation with active/history/terminal feedback state, the feature-gated Items Directory `Gathering` action, container-query responsive polish for GM/player gathering surfaces, scene-linked runtime integration coverage, hook-driven timed completion coverage, and harvesting boundary regression coverage exist. Live Foundry validation remains conditional for future runtime-specific or screenshot-required work.
 - Issue `#117`: `DOMAIN.md` now models `Module Setting`, but `openspec/specs/overview/spec.md` and runtime settings still need the same
   boundary applied consistently.
 - Issue `#111`: built-in crafting checks (`checkSource: "builtIn"`, `CraftingCheckAdapter`) exist in runtime but remain

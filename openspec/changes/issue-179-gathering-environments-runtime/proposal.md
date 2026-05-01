@@ -17,7 +17,7 @@ Implement the canonical gathering environment workflow by adding the missing set
 - Add settings and normalization needed to persist gathering environments and remember the last gathering actor.
 - Add a dedicated gathering environment persistence/validation seam for GM CRUD, duplicate, reorder, and cleanup operations.
 - Add a dedicated gathering runtime seam for player listing, attemptability evaluation, start, immediate resolution, timed completion, and actor run history.
-- Add the GM `Environments` admin tab for systems with `features.gathering === true`.
+- Add a GM system-settings toggle for `features.gathering` and the GM `Environments` admin tab for systems with `features.gathering === true`.
 - Add the player-facing gathering app and Items Directory button when at least one system exposes gathering.
 - Add focused coverage for model normalization, environment validation, runtime gating, task resolution, persistence, and UI gating.
 
@@ -62,7 +62,7 @@ This can land in one implementer-owned change or as backend-first plus UI follow
 
 - `npm test`
 - `npm run build`
-- `npm run test:foundry` only when the implementation needs live Foundry confirmation for scene/token gating, world-time completion wiring, or reproducible UI screenshots
+- `npm run test:foundry` only when the implementation needs live Foundry confirmation for scene/token gating, world-time completion wiring, or reproducible UI screenshots; container-query responsive contract coverage does not require live screenshots by itself
 
 ## Implementer Entry Criteria
 

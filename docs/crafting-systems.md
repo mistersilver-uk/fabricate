@@ -38,6 +38,7 @@ Each system can independently enable or disable features. Most features default 
 | `effectTransfer` | `false` | Transfer active effects from essence source items to crafted results |
 | `multiStepRecipes` | `false` | Allow recipes with multiple sequential steps |
 | `salvage` | `false` | Allow components to be broken down into constituent parts |
+| `gathering` | `false` | Show the Environments tab for authoring gathering locations and tasks; any enabled system also exposes the player Gathering action in the Items Directory |
 | `chatOutput` | `true` | Automatically post a chat message summarising crafting results after each craft action |
 | `itemPiles` | `false` | Enable the Item Piles integration: currency costs, merchant stock, and container inventory. Requires Item Piles v3.1.0 or later. |
 
@@ -130,6 +131,14 @@ When the salvage feature is enabled, players can dismantle components to recover
 
 ---
 
+## Gathering
+
+When the gathering feature is enabled, GMs can author environments and gathering tasks for the system's managed components. If at least one crafting system has gathering enabled, players see a separate **Gathering** action in the Items Directory that opens the player Gathering app. The action is removed again when no systems have gathering enabled.
+
+See [Gathering Environments]({% link gathering-environments.md %}) for the current GM editor fields, routed/progressive task authoring, player app behavior, active/history surfaces, catalyst-row rules, and validation behavior.
+
+---
+
 ## Startup and Preferences Cleanup
 
 Each time the module loads, Fabricate automatically cleans up stale client preferences that reference crafting systems or recipes that no longer exist. You do not need to trigger this manually — it runs during module initialisation before the `fabricate.ready` hook fires.
@@ -139,6 +148,7 @@ Each time the module loads, Fabricate automatically cleans up stale client prefe
 | Preference | Setting key | Cleanup behaviour |
 |:-----------|:------------|:------------------|
 | Last viewed system in GM admin | `fabricate.lastManagedCraftingSystem` | Cleared to `""` if the stored system ID is not present in the current set of crafting systems |
+| Last selected gathering actor | `fabricate.lastGatheringActor` | Cleared to `""` when the remembered actor no longer resolves or is no longer selectable by the current user |
 | Progressive result order preferences | `fabricate.progressiveResultOrder` | Any entry whose recipe ID no longer exists is removed from the stored object |
 
 ### Why this matters

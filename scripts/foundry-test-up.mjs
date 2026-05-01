@@ -21,6 +21,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const COMPOSE_FILE = join(ROOT, 'docker-compose.foundry.yml');
 const ENV_FILE = join(ROOT, '.env.foundry');
+const DEFAULT_FOUNDRY_IMAGE = 'felddy/foundryvtt:13';
 
 /** Parse a simple KEY=VALUE env file, ignoring comments and blanks. */
 async function loadEnvFile(filePath) {
@@ -53,6 +54,9 @@ async function main() {
   }
 
   process.stdout.write('Starting Foundry test harness...\n');
+  if (!process.env.FOUNDRY_IMAGE) {
+    process.env.FOUNDRY_IMAGE = DEFAULT_FOUNDRY_IMAGE;
+  }
 
   // Ensure game systems are downloaded
   process.stdout.write('Fetching game systems...\n');
@@ -90,13 +94,21 @@ async function main() {
   }
   process.stdout.write(`Container user: ${process.env.FOUNDRY_HOST_UID}:${process.env.FOUNDRY_HOST_GID}\n`);
 
-  // Pull latest image silently
-  process.stdout.write('Pulling Docker image felddy/foundryvtt:release...\n');
-  execSync('docker compose -f docker-compose.foundry.yml pull --quiet', {
-    cwd: ROOT,
-    stdio: 'inherit',
-    env: process.env
+  // Prefer the local fixed-version image when available. Compose will still use
+  // the configured FOUNDRY_IMAGE and pull it when this host does not have it.
+  const imageInspect = spawnSync('docker', ['image', 'inspect', process.env.FOUNDRY_IMAGE], {
+    stdio: 'ignore'
   });
+  if (imageInspect.status === 0) {
+    process.stdout.write(`Using local Docker image ${process.env.FOUNDRY_IMAGE}.\n`);
+  } else {
+    process.stdout.write(`Pulling Docker image ${process.env.FOUNDRY_IMAGE}...\n`);
+    execSync('docker compose -f docker-compose.foundry.yml pull --quiet', {
+      cwd: ROOT,
+      stdio: 'inherit',
+      env: process.env
+    });
+  }
 
   // Start containers in detached mode
   process.stdout.write('Starting containers...\n');

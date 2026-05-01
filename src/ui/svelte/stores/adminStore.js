@@ -3,7 +3,24 @@
  *
  * All side-effects are injected via `services` so this module never touches
  * `game.*` directly.  Each call to createAdminStore() produces a fresh,
- * isolated set of writable() instances.
+ * isolated set of writable() instances. Gathering environment admin state is
+ * read from an injected environment store, cloned before exposure, gated by the
+ * selected system's `features.gathering` flag, and edited through explicit
+ * environment draft actions. Selected-task result, catalyst, committed
+ * visibility, routed result-selection, progressive award-mode, check, time
+ * requirement, and failure-outcome edits stay store-owned so Svelte components
+ * only render state and call injected callbacks. Failed environment saves keep
+ * the dirty draft in place and expose a validation summary, field-addressable
+ * inline errors, collection anchors for result groups/results, and a
+ * first-invalid focus target. Provider and mode switches strip stale fields for
+ * the inactive branch before the draft is saved; unresolved scene and macro
+ * UUIDs stay visible and are preserved until the GM changes them. Assisted
+ * environment picker options are injected as plain edge-owned records shaped
+ * like `{ uuid, name, img?, stale? }`; this store never resolves Foundry
+ * documents directly. Dirty environment drafts ask for discard confirmation before tab navigation, system
+ * selection, environment selection, draft replacement, gathering disablement,
+ * and app close. Declining keeps the draft dirty, accepting proceeds, and
+ * concurrent callers share the same in-flight confirmation promise.
  */
 import { writable, get } from 'svelte/store';
 import { buildRecipeGraph, layoutGraph, filterGraph } from '../util/recipeGraphBuilder.js';
@@ -33,7 +50,8 @@ const FEATURE_MAP = {
   propertyMacros: 'propertyMacros',
   craftingChecks: 'craftingChecks',
   outcomeRouting: 'outcomeRouting',
-  effectTransfer: 'effectTransfer'
+  effectTransfer: 'effectTransfer',
+  gathering: 'gathering'
 };
 
 const RESOLUTION_MODE_LABEL_KEYS = {
@@ -43,6 +61,17 @@ const RESOLUTION_MODE_LABEL_KEYS = {
   progressive: 'FABRICATE.Admin.SystemSettings.ResolutionProgressive',
   alchemy: 'FABRICATE.Admin.SystemSettings.ResolutionAlchemy'
 };
+
+const BASE_TABS = new Set(['systems', 'items', 'recipes', 'rules', 'graph']);
+const ENVIRONMENTS_TAB = 'environments';
+const TASK_RESOLUTION_MODES = new Set(['routed', 'progressive']);
+const TASK_VISIBILITY_PROVIDERS = new Set(['macro', 'dnd5e', 'pf2e']);
+const TASK_RESULT_SELECTION_PROVIDERS = new Set(['macroOutcome', 'rollTableOutcome']);
+const TASK_CHECK_PROVIDERS = new Set(['macro', 'dnd5e', 'pf2e']);
+const TASK_PROGRESSIVE_AWARD_MODES = new Set(['equal', 'partial', 'exceed']);
+const TASK_TIME_UNITS = ['minutes', 'hours', 'days', 'months', 'years'];
+const TASK_FAILURE_OUTCOME_MODES = new Set(['text', 'macro']);
+const DEFAULT_GATHERING_TASK_IMG = 'icons/svg/item-bag.svg';
 
 // ---------------------------------------------------------------------------
 // Module-private helper functions
@@ -82,7 +111,8 @@ function _buildManagedItemOptions(managedItems = []) {
   return managedItems.map(item => ({
     id: item.id,
     name: item.name,
-    img: item.img || 'icons/svg/item-bag.svg'
+    img: item.img || 'icons/svg/item-bag.svg',
+    ...(Object.prototype.hasOwnProperty.call(item, 'difficulty') ? { difficulty: item.difficulty } : {})
   }));
 }
 
@@ -106,6 +136,405 @@ function _buildSalvageSummary(item, salvageEnabled) {
     hasTimeRequirement: !!salvage.timeRequirement,
     hasCurrencyRequirement: !!salvage.currencyRequirement,
     outcomeCount: outcomeRouting
+  };
+}
+
+function _clonePlain(value) {
+  if (value === null || value === undefined) return value;
+  return JSON.parse(JSON.stringify(value));
+}
+
+function _escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, character => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[character]));
+}
+
+function _canShowEnvironmentsTab(selectedSystem) {
+  return selectedSystem?.features?.gathering === true;
+}
+
+function _resolveVisibleTab(tabName, selectedSystem) {
+  if (BASE_TABS.has(tabName)) return tabName;
+  if (tabName === ENVIRONMENTS_TAB && _canShowEnvironmentsTab(selectedSystem)) {
+    return ENVIRONMENTS_TAB;
+  }
+  return 'systems';
+}
+
+function _emptyEnvironmentState(canShowEnvironmentsTab = false, error = null) {
+  return {
+    canShowEnvironmentsTab,
+    environmentsLoading: false,
+    environmentsError: error,
+    environments: [],
+    selectedEnvironmentId: '',
+    environmentDraft: null,
+    environmentDraftDirty: false,
+    environmentDraftIsNew: false,
+    environmentSaving: false,
+    environmentSaveError: null,
+    environmentValidationState: null
+  };
+}
+
+function _environmentErrorMessage(err) {
+  if (!err) return null;
+  if (Array.isArray(err.errors) && err.errors.length > 0) {
+    return err.errors.join('\n');
+  }
+  return err.message || String(err);
+}
+
+function _environmentValidationMessages(err) {
+  if (!err) return [];
+  if (Array.isArray(err.errors)) {
+    return err.errors.map(error => typeof error === 'string' ? error : error?.message).filter(Boolean);
+  }
+  const message = _environmentErrorMessage(err);
+  return message ? [message] : [];
+}
+
+function _fieldSelectorForPath(path) {
+  if (!path) return null;
+  const escaped = String(path).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  return `[data-environment-field="${escaped}"]`;
+}
+
+function _validationSummary(count, localizeFn) {
+  const key = count === 1
+    ? 'FABRICATE.Admin.Environments.ValidationSummaryOne'
+    : 'FABRICATE.Admin.Environments.ValidationSummary';
+  return localizeFn?.(key, { count })
+    || (count === 1 ? 'Resolve 1 validation issue before saving.' : `Resolve ${count} validation issues before saving.`);
+}
+
+function _buildEnvironmentValidationState(err, draft, localizeFn, attempt) {
+  const messages = _environmentValidationMessages(err);
+  if (messages.length === 0) return null;
+
+  const structuredErrors = Array.isArray(err?.fieldErrors) ? err.fieldErrors : [];
+  const inferenceContext = _createEnvironmentValidationInferenceContext();
+  const errors = messages.map((message, index) => {
+    const structured = structuredErrors[index] || {};
+    const inferred = _inferEnvironmentValidationTarget(message, draft, inferenceContext);
+    const path = structured.path || structured.fieldPath || structured.field || inferred?.path || null;
+    const taskId = structured.taskId || inferred?.taskId || null;
+    const fieldSelector = structured.fieldSelector || _fieldSelectorForPath(path);
+    return {
+      message,
+      path,
+      taskId,
+      fieldSelector,
+      id: path ? `environment-validation-${_domIdFromPath(path)}-${index}` : `environment-validation-${index}`
+    };
+  });
+
+  return {
+    summary: _validationSummary(errors.length, localizeFn),
+    errors,
+    firstInvalidField: errors.find(error => error.fieldSelector) || errors[0] || null,
+    attempt
+  };
+}
+
+function _createEnvironmentValidationInferenceContext() {
+  return {
+    groupNameOccurrences: new Map()
+  };
+}
+
+function _inferEnvironmentValidationTarget(message, draft, context = _createEnvironmentValidationInferenceContext()) {
+  const task = _findTaskForValidationMessage(message, draft);
+  const lower = String(message || '').toLowerCase();
+
+  if (/selection requires|selectionmode/.test(lower)) return { path: 'environment.selectionMode' };
+  if (/craftingsystemid/.test(lower)) return { path: 'environment.craftingSystemId' };
+
+  if (!task) return null;
+  const prefix = `task.${task.id}`;
+
+  if (/routed resolution requires resultselection|resultselection\.provider/.test(lower)) {
+    return { taskId: task.id, path: `${prefix}.resultSelection.provider` };
+  }
+  if (/macrooutcome provider requires macrouuid/.test(lower)) {
+    return { taskId: task.id, path: `${prefix}.resultSelection.macroUuid` };
+  }
+  if (/rolltableoutcome provider requires rolltableuuid/.test(lower)) {
+    return { taskId: task.id, path: `${prefix}.resultSelection.rollTableUuid` };
+  }
+
+  if (/progressive\.awardmode/.test(lower) || /progressive resolution requires progressive config/.test(lower)) {
+    return { taskId: task.id, path: `${prefix}.progressive.awardMode` };
+  }
+  if (/progressive resolution requires check|check provider must/.test(lower)) {
+    return { taskId: task.id, path: `${prefix}.check.provider` };
+  }
+  if (/check macro provider requires macrouuid/.test(lower)) {
+    return { taskId: task.id, path: `${prefix}.check.macroUuid` };
+  }
+  if (/check (dnd5e|pf2e) provider requires formula/.test(lower)) {
+    return { taskId: task.id, path: `${prefix}.check.formula` };
+  }
+
+  if (/visibility macro provider requires macrouuid/.test(lower)) {
+    return { taskId: task.id, path: `${prefix}.visibility.macroUuid` };
+  }
+  if (/visibility (dnd5e|pf2e) provider requires formula/.test(lower)) {
+    return { taskId: task.id, path: `${prefix}.visibility.formula` };
+  }
+  if (/visibility (dnd5e|pf2e) provider requires threshold/.test(lower)) {
+    return { taskId: task.id, path: `${prefix}.visibility.threshold` };
+  }
+
+  const timeUnit = lower.match(/timerequirement\.(minutes|hours|days|months|years)/)?.[1];
+  if (timeUnit) return { taskId: task.id, path: `${prefix}.timeRequirement.${timeUnit}` };
+  if (/timerequirement must include a positive duration/.test(lower)) {
+    return { taskId: task.id, path: `${prefix}.timeRequirement.minutes` };
+  }
+
+  if (/failureoutcome\.mode/.test(lower)) {
+    return { taskId: task.id, path: `${prefix}.failureOutcome.mode` };
+  }
+  if (/failureoutcome text mode requires text/.test(lower)) {
+    return { taskId: task.id, path: `${prefix}.failureOutcome.text` };
+  }
+  if (/failureoutcome macro mode requires macrouuid/.test(lower)) {
+    return { taskId: task.id, path: `${prefix}.failureOutcome.macroUuid` };
+  }
+
+  const catalystIndex = lower.match(/catalyst (\d+)/)?.[1];
+  if (catalystIndex) {
+    const index = Math.max(0, Number(catalystIndex) - 1);
+    const field = /maxuses/.test(lower) ? 'maxUses' : 'componentId';
+    return { taskId: task.id, path: `${prefix}.catalysts.${index}.${field}` };
+  }
+
+  const resultGroupName = message.match(/result group "([^"]+)"/)?.[1];
+  if (resultGroupName) {
+    const group = _resolveResultGroupValidationTarget({
+      task,
+      groupName: resultGroupName,
+      duplicate: / duplicates "/i.test(message),
+      context
+    });
+    return { taskId: task.id, path: group ? `${prefix}.resultGroups.${group.id}.name` : `${prefix}.resultGroups` };
+  }
+  if (/result groups require names/.test(lower)) {
+    const group = _resolveResultGroupValidationTarget({
+      task,
+      groupName: '',
+      context
+    });
+    return { taskId: task.id, path: group ? `${prefix}.resultGroups.${group.id}.name` : `${prefix}.resultGroups` };
+  }
+  if (/requires at least one result group|exactly one result group/.test(lower)) {
+    return { taskId: task.id, path: `${prefix}.resultGroups` };
+  }
+  if (/progressive result group requires at least one result/.test(lower)) {
+    const group = Array.isArray(task.resultGroups) ? task.resultGroups[0] : null;
+    return { taskId: task.id, path: group ? `${prefix}.resultGroups.${group.id}.results` : `${prefix}.resultGroups` };
+  }
+
+  const resultId = message.match(/progressive result "([^"]+)"/)?.[1];
+  if (resultId) return { taskId: task.id, path: `${prefix}.result.${resultId}.componentId` };
+
+  return { taskId: task.id, path: `${prefix}.name` };
+}
+
+function _resolveResultGroupValidationTarget({ task, groupName, duplicate = false, context }) {
+  const groups = Array.isArray(task?.resultGroups) ? task.resultGroups : [];
+  const normalizedName = _normalizeValidationGroupName(groupName);
+  const matches = groups.filter(group => _normalizeValidationGroupName(group?.name) === normalizedName);
+  if (matches.length === 0) return null;
+
+  const occurrenceKey = `${task?.id || 'task'}:${duplicate ? 'duplicate' : 'named'}:${normalizedName}`;
+  const previous = context.groupNameOccurrences.get(occurrenceKey);
+  const defaultIndex = duplicate && matches.length > 1 ? 1 : 0;
+  const index = previous === undefined ? defaultIndex : previous + 1;
+  context.groupNameOccurrences.set(occurrenceKey, index);
+  return matches[Math.min(index, matches.length - 1)] || matches[0];
+}
+
+function _normalizeValidationGroupName(value) {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function _findTaskForValidationMessage(message, draft) {
+  const tasks = Array.isArray(draft?.tasks) ? draft.tasks : [];
+  const taskName = String(message || '').match(/Task "([^"]+)"/)?.[1];
+  if (taskName) {
+    return tasks.find(task => task?.name === taskName) || tasks[0] || null;
+  }
+  return tasks[0] || null;
+}
+
+function _domIdFromPath(path) {
+  return String(path || 'field').replace(/[^a-zA-Z0-9_-]+/g, '-');
+}
+
+function _taskCopyName(name, localizeFn) {
+  const sourceName = String(name || '').trim() || 'Gather';
+  return localizeFn?.('FABRICATE.Admin.Environments.TaskCopySuffix', { name: sourceName })
+    || `${sourceName} Copy`;
+}
+
+function _normalizePositiveQuantity(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) return 1;
+  return Math.max(1, Math.floor(numeric));
+}
+
+function _normalizeNullablePositiveInteger(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) return null;
+  return Math.max(1, Math.floor(numeric));
+}
+
+function _normalizeTimeUnitValue(value) {
+  if (value === null || value === undefined || value === '') return 0;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : String(value ?? '').trim();
+}
+
+/**
+ * Normalize a selected task visibility gate for the admin draft.
+ *
+ * Provider switches intentionally keep only the fields needed by the selected
+ * provider: macro gates store `macroUuid`, while dnd5e/pf2e gates store
+ * `formula` and `threshold`.
+ */
+function _normalizeEnvironmentTaskVisibility(currentVisibility = null, updates = {}) {
+  const currentProvider = TASK_VISIBILITY_PROVIDERS.has(currentVisibility?.provider)
+    ? currentVisibility.provider
+    : 'macro';
+  const provider = TASK_VISIBILITY_PROVIDERS.has(updates?.provider) ? updates.provider : currentProvider;
+
+  if (provider === 'macro') {
+    const macroUuid = Object.prototype.hasOwnProperty.call(updates, 'macroUuid')
+      ? updates.macroUuid
+      : currentVisibility?.macroUuid;
+    return {
+      provider,
+      macroUuid: String(macroUuid ?? '').trim()
+    };
+  }
+
+  const formula = Object.prototype.hasOwnProperty.call(updates, 'formula')
+    ? updates.formula
+    : currentVisibility?.formula;
+  const threshold = Object.prototype.hasOwnProperty.call(updates, 'threshold')
+    ? updates.threshold
+    : currentVisibility?.threshold;
+
+  return {
+    provider,
+    formula: String(formula ?? '').trim(),
+    threshold: String(threshold ?? '').trim()
+  };
+}
+
+function _normalizeEnvironmentTaskResultSelection(currentResultSelection = null, updates = {}) {
+  const currentProvider = TASK_RESULT_SELECTION_PROVIDERS.has(currentResultSelection?.provider)
+    ? currentResultSelection.provider
+    : 'macroOutcome';
+  const provider = TASK_RESULT_SELECTION_PROVIDERS.has(updates?.provider) ? updates.provider : currentProvider;
+
+  if (provider === 'rollTableOutcome') {
+    const rollTableUuid = Object.prototype.hasOwnProperty.call(updates, 'rollTableUuid')
+      ? updates.rollTableUuid
+      : currentResultSelection?.rollTableUuid;
+    const normalized = String(rollTableUuid ?? '').trim();
+    return normalized
+      ? { provider, rollTableUuid: normalized }
+      : { provider, rollTableUuid: '' };
+  }
+
+  const macroUuid = Object.prototype.hasOwnProperty.call(updates, 'macroUuid')
+    ? updates.macroUuid
+    : currentResultSelection?.macroUuid;
+  const normalized = String(macroUuid ?? '').trim();
+  return normalized
+    ? { provider: 'macroOutcome', macroUuid: normalized }
+    : { provider: 'macroOutcome', macroUuid: '' };
+}
+
+function _normalizeEnvironmentTaskProgressive(currentProgressive = null, updates = {}) {
+  const awardMode = TASK_PROGRESSIVE_AWARD_MODES.has(updates?.awardMode)
+    ? updates.awardMode
+    : (TASK_PROGRESSIVE_AWARD_MODES.has(currentProgressive?.awardMode) ? currentProgressive.awardMode : 'equal');
+  return { awardMode };
+}
+
+function _normalizeEnvironmentTaskCheck(currentCheck = null, updates = {}) {
+  const currentProvider = TASK_CHECK_PROVIDERS.has(currentCheck?.provider) ? currentCheck.provider : 'macro';
+  const provider = TASK_CHECK_PROVIDERS.has(updates?.provider) ? updates.provider : currentProvider;
+
+  if (provider === 'macro') {
+    const macroUuid = Object.prototype.hasOwnProperty.call(updates, 'macroUuid')
+      ? updates.macroUuid
+      : currentCheck?.macroUuid;
+    return {
+      provider,
+      macroUuid: String(macroUuid ?? '').trim()
+    };
+  }
+
+  const formula = Object.prototype.hasOwnProperty.call(updates, 'formula')
+    ? updates.formula
+    : currentCheck?.formula;
+  const threshold = Object.prototype.hasOwnProperty.call(updates, 'threshold')
+    ? updates.threshold
+    : currentCheck?.threshold;
+  const normalized = {
+    provider,
+    formula: String(formula ?? '').trim()
+  };
+  const normalizedThreshold = String(threshold ?? '').trim();
+  if (normalizedThreshold) {
+    normalized.threshold = normalizedThreshold;
+  }
+  return normalized;
+}
+
+function _normalizeEnvironmentTaskTimeRequirement(currentTimeRequirement = null, updates = {}) {
+  const normalized = TASK_TIME_UNITS.reduce((timeRequirement, unit) => {
+    const sourceValue = Object.prototype.hasOwnProperty.call(updates, unit)
+      ? updates[unit]
+      : currentTimeRequirement?.[unit];
+    timeRequirement[unit] = _normalizeTimeUnitValue(sourceValue);
+    return timeRequirement;
+  }, {});
+  return normalized;
+}
+
+function _normalizeEnvironmentTaskFailureOutcome(currentFailureOutcome = null, updates = {}) {
+  const currentMode = TASK_FAILURE_OUTCOME_MODES.has(currentFailureOutcome?.mode)
+    ? currentFailureOutcome.mode
+    : 'text';
+  const mode = TASK_FAILURE_OUTCOME_MODES.has(updates?.mode) ? updates.mode : currentMode;
+
+  if (mode === 'macro') {
+    const macroUuid = Object.prototype.hasOwnProperty.call(updates, 'macroUuid')
+      ? updates.macroUuid
+      : currentFailureOutcome?.macroUuid;
+    return {
+      mode,
+      macroUuid: String(macroUuid ?? '').trim()
+    };
+  }
+
+  const text = Object.prototype.hasOwnProperty.call(updates, 'text')
+    ? updates.text
+    : currentFailureOutcome?.text;
+  return {
+    mode: 'text',
+    text: String(text ?? '').trim()
   };
 }
 
@@ -196,7 +625,14 @@ function _buildItemCards(systemManager, selectedSystem, itemSearchTerm, showTags
  * Build the full selectedSystem view data object.
  * Mirrors RecipeManagerApp._prepareContext() selectedSystem section.
  */
-function _buildSelectedSystemViewData(selectedSystem, managedItemOptions, essenceDefinitions, availableScriptMacros) {
+function _buildSelectedSystemViewData(
+  selectedSystem,
+  managedItemOptions,
+  essenceDefinitions,
+  availableScriptMacros,
+  sceneOptions,
+  rollTableOptions
+) {
   if (!selectedSystem) return null;
 
   const advancedEnabled = selectedSystem.advancedOptionsEnabled !== false;
@@ -223,7 +659,8 @@ function _buildSelectedSystemViewData(selectedSystem, managedItemOptions, essenc
       propertyMacros: selectedSystem.features?.propertyMacros === true,
       craftingChecks: selectedSystem.features?.craftingChecks === true,
       outcomeRouting: selectedSystem.features?.outcomeRouting === true,
-      effectTransfer: selectedSystem.features?.effectTransfer === true
+      effectTransfer: selectedSystem.features?.effectTransfer === true,
+      gathering: selectedSystem.features?.gathering === true
     },
 
     categories: selectedSystem.categories || [],
@@ -260,7 +697,9 @@ function _buildSelectedSystemViewData(selectedSystem, managedItemOptions, essenc
 
     showTags,
     showEssences,
-    availableScriptMacros
+    availableScriptMacros,
+    sceneOptions,
+    rollTableOptions
   };
 }
 
@@ -271,8 +710,9 @@ function _buildSelectedSystemViewData(selectedSystem, managedItemOptions, essenc
 /**
  * Create a new adminStore.
  *
- * @param {object} services - Injected service accessors (never game.* directly)
- * @returns {object} Store API — writable stores + action functions
+ * @param {object} services - Injected service accessors (never game.* directly).
+ * @param {Function} [services.getGatheringEnvironmentStore] - Returns the gathering environment store used by the Environments tab draft editor.
+ * @returns {object} Store API — writable stores, derived admin view state, and action functions.
  */
 export function createAdminStore(services) {
   // --- Input writables ---
@@ -281,6 +721,18 @@ export function createAdminStore(services) {
   const recipeSearch = writable('');
   const itemSearch = writable('');
   const graphSearch = writable('');
+  const selectedEnvironmentId = writable('');
+  const selectedEnvironmentSystemId = writable('');
+  const selectedEnvironmentTaskId = writable('');
+  const environmentDraft = writable(null);
+  const persistedEnvironmentDraft = writable(null);
+  const environmentDraftDirty = writable(false);
+  const environmentDraftIsNew = writable(false);
+  const environmentSaving = writable(false);
+  const environmentSaveError = writable(null);
+  const environmentValidationState = writable(null);
+  let environmentValidationAttempt = 0;
+  let dirtyEnvironmentDiscardConfirmation = null;
 
   // --- Computed state ---
   const viewState = writable({
@@ -295,8 +747,275 @@ export function createAdminStore(services) {
     recipeSearchTerm: '',
     itemSearchTerm: '',
     graphData: { nodes: [], edges: [], width: 0, height: 0 },
-    graphSearchTerm: ''
+    graphSearchTerm: '',
+    ..._emptyEnvironmentState(false)
   });
+
+  function _setEnvironmentDraftState(draft, {
+    persistedDraft = draft,
+    dirty = false,
+    isNew = false,
+    saveError = null,
+    selectedTaskId = null
+  } = {}) {
+    const draftClone = _clonePlain(draft);
+    environmentDraft.set(draftClone);
+    persistedEnvironmentDraft.set(_clonePlain(persistedDraft));
+    selectedEnvironmentTaskId.set(_resolveEnvironmentTaskSelection(
+      draftClone,
+      selectedTaskId ?? get(selectedEnvironmentTaskId)
+    ));
+    environmentDraftDirty.set(dirty);
+    environmentDraftIsNew.set(isNew);
+    environmentSaveError.set(saveError);
+    environmentValidationState.set(null);
+  }
+
+  function _clearEnvironmentDraftState({ canShowEnvironmentsTab = false, error = null } = {}) {
+    selectedEnvironmentId.set('');
+    _setEnvironmentDraftState(null, {
+      persistedDraft: null,
+      dirty: false,
+      isNew: false,
+      saveError: null
+    });
+    return _emptyEnvironmentState(canShowEnvironmentsTab, error);
+  }
+
+  function _currentEnvironmentViewPatch() {
+    return {
+      selectedEnvironmentId: get(selectedEnvironmentId),
+      selectedEnvironmentTaskId: get(selectedEnvironmentTaskId),
+      environmentDraft: _clonePlain(get(environmentDraft)),
+      environmentDraftDirty: get(environmentDraftDirty),
+      environmentDraftIsNew: get(environmentDraftIsNew),
+      environmentSaving: get(environmentSaving),
+      environmentSaveError: get(environmentSaveError),
+      environmentValidationState: _clonePlain(get(environmentValidationState))
+    };
+  }
+
+  function _patchEnvironmentViewState() {
+    viewState.update(state => ({
+      ...state,
+      ..._currentEnvironmentViewPatch()
+    }));
+  }
+
+  function _getEnvironmentStore() {
+    return services.getGatheringEnvironmentStore?.() || null;
+  }
+
+  function _randomID() {
+    if (typeof services.randomID === 'function') return services.randomID();
+    if (typeof globalThis.foundry?.utils?.randomID === 'function') return globalThis.foundry.utils.randomID();
+    if (typeof globalThis.crypto?.randomUUID === 'function') return globalThis.crypto.randomUUID();
+    return Math.random().toString(36).slice(2, 14);
+  }
+
+  function _resolveEnvironmentTaskSelection(draft, preferredTaskId = '') {
+    const tasks = Array.isArray(draft?.tasks) ? draft.tasks : [];
+    if (preferredTaskId && tasks.some(task => task.id === preferredTaskId)) {
+      return preferredTaskId;
+    }
+    return tasks[0]?.id || '';
+  }
+
+  function _newEnvironmentPlaceholderTask() {
+    return {
+      id: _randomID(),
+      name: services.localize?.('FABRICATE.Admin.Environments.NewTaskName') || 'Configure gathering task',
+      description: '',
+      img: DEFAULT_GATHERING_TASK_IMG,
+      enabled: false,
+      resolutionMode: 'routed',
+      catalysts: [],
+      resultSelection: {
+        provider: 'macroOutcome',
+        macroUuid: ''
+      },
+      resultGroups: [
+        {
+          id: _randomID(),
+          name: services.localize?.('FABRICATE.Admin.Environments.NewResultGroupName') || 'Results',
+          results: []
+        }
+      ]
+    };
+  }
+
+  function _selectedManagedItemOptions() {
+    const systemManager = services.getCraftingSystemManager();
+    const selectedSystem = systemManager?.getSystem?.(get(selectedSystemId)) || null;
+    return _buildManagedItemOptions(_getManagedItems(selectedSystem));
+  }
+
+  function _newEnvironmentResultGroup(existingGroups = []) {
+    const baseName = services.localize?.('FABRICATE.Admin.Environments.NewResultGroupName') || 'Results';
+    const existingNames = new Set((Array.isArray(existingGroups) ? existingGroups : [])
+      .map(group => String(group?.name || '').trim().toLowerCase())
+      .filter(Boolean));
+    let name = baseName;
+    let suffix = 2;
+    while (existingNames.has(name.trim().toLowerCase())) {
+      name = `${baseName} ${suffix}`;
+      suffix += 1;
+    }
+    return {
+      id: _randomID(),
+      name,
+      results: []
+    };
+  }
+
+  function _newEnvironmentResult() {
+    const firstComponent = _selectedManagedItemOptions()[0];
+    return {
+      id: _randomID(),
+      componentId: firstComponent?.id || null,
+      quantity: 1,
+      propertyMacroUuid: null
+    };
+  }
+
+  function _newEnvironmentCatalyst() {
+    const firstComponent = _selectedManagedItemOptions()[0];
+    return {
+      componentId: firstComponent?.id || null,
+      degradesOnUse: false,
+      destroyWhenExhausted: false,
+      maxUses: null
+    };
+  }
+
+  function _newEnvironmentDraft(systemId) {
+    return {
+      craftingSystemId: systemId,
+      name: services.localize?.('FABRICATE.Admin.Environments.NewEnvironmentName') || 'New Gathering Environment',
+      description: '',
+      enabled: false,
+      selectionMode: 'targeted',
+      sceneUuid: null,
+      tasks: [_newEnvironmentPlaceholderTask()]
+    };
+  }
+
+  function _hasDirtyEnvironmentDraft() {
+    return get(environmentDraftDirty) === true && !!get(environmentDraft);
+  }
+
+  async function confirmDiscardDirtyEnvironmentDraft() {
+    if (!_hasDirtyEnvironmentDraft()) return true;
+    if (dirtyEnvironmentDiscardConfirmation) return dirtyEnvironmentDiscardConfirmation;
+
+    const localizeFn = services.localize;
+    dirtyEnvironmentDiscardConfirmation = (async () => {
+      try {
+        const confirmed = await services.confirmDialog?.({
+          title: localizeFn?.('FABRICATE.Admin.Environments.DiscardDirtyTitle')
+            || 'Discard unsaved environment changes?',
+          content: `<p>${
+            localizeFn?.('FABRICATE.Admin.Environments.DiscardDirtyContent')
+              || 'The current gathering environment has unsaved changes. Discard them and continue?'
+          }</p>`,
+          yes: {
+            label: localizeFn?.('FABRICATE.Admin.Environments.DiscardDirtyConfirm') || 'Discard Changes',
+            callback: () => true
+          },
+          no: {
+            label: localizeFn?.('FABRICATE.Admin.Environments.DiscardDirtyCancel') || 'Keep Editing',
+            callback: () => false
+          }
+        });
+        return confirmed === true;
+      } finally {
+        dirtyEnvironmentDiscardConfirmation = null;
+      }
+    })();
+
+    return dirtyEnvironmentDiscardConfirmation;
+  }
+
+  async function _discardDirtyEnvironmentDraftForNavigation() {
+    if (!_hasDirtyEnvironmentDraft()) return true;
+    const confirmed = await confirmDiscardDirtyEnvironmentDraft();
+    if (!confirmed) return false;
+    await cancelEnvironmentDraft();
+    return true;
+  }
+
+  async function _buildEnvironmentState(selectedSystem) {
+    if (!_canShowEnvironmentsTab(selectedSystem)) {
+      selectedEnvironmentId.set('');
+      selectedEnvironmentSystemId.set(selectedSystem?.id || '');
+      return _clearEnvironmentDraftState();
+    }
+
+    if (get(selectedEnvironmentSystemId) !== selectedSystem.id) {
+      selectedEnvironmentId.set('');
+      selectedEnvironmentSystemId.set(selectedSystem.id);
+      _setEnvironmentDraftState(null, { persistedDraft: null });
+    }
+
+    const environmentStore = _getEnvironmentStore();
+    if (!environmentStore?.listBySystem) {
+      return _clearEnvironmentDraftState({
+        canShowEnvironmentsTab: true,
+        error:
+        services.localize?.('FABRICATE.Admin.Environments.StoreUnavailable')
+          || 'Gathering environment store is not available.'
+      });
+    }
+
+    try {
+      const rawEnvironments = await environmentStore.listBySystem(selectedSystem.id);
+      const environments = _clonePlain(Array.isArray(rawEnvironments) ? rawEnvironments : []);
+      let environmentId = get(selectedEnvironmentId);
+      const canKeepNewDraft = get(environmentDraftIsNew)
+        && get(environmentDraftDirty)
+        && get(environmentDraft)?.craftingSystemId === selectedSystem.id;
+
+      if (canKeepNewDraft) {
+        environmentId = '';
+      } else if (!environments.some(environment => environment.id === environmentId)) {
+        environmentId = environments[0]?.id || '';
+        selectedEnvironmentId.set(environmentId);
+      }
+
+      if (!canKeepNewDraft) {
+        const persistedDraft = environmentId
+          ? _clonePlain(environments.find(environment => environment.id === environmentId) || null)
+          : null;
+        const canPreserveDirtyDraft = get(environmentDraftDirty)
+          && get(environmentDraft)?.id === environmentId
+          && get(environmentDraft)?.craftingSystemId === selectedSystem.id;
+
+        if (!canPreserveDirtyDraft) {
+          _setEnvironmentDraftState(persistedDraft, {
+            persistedDraft,
+            dirty: false,
+            isNew: false,
+            saveError: null
+          });
+        } else {
+          persistedEnvironmentDraft.set(_clonePlain(persistedDraft));
+        }
+      }
+
+      return {
+        canShowEnvironmentsTab: true,
+        environmentsLoading: false,
+        environmentsError: null,
+        environments,
+        ..._currentEnvironmentViewPatch()
+      };
+    } catch (err) {
+      return _clearEnvironmentDraftState({
+        canShowEnvironmentsTab: true,
+        error: _environmentErrorMessage(err)
+      });
+    }
+  }
 
   // --- refresh ---
   async function refresh() {
@@ -327,7 +1046,14 @@ export function createAdminStore(services) {
       ? allSystems.find(s => s.id === resolvedSystemId) || null
       : null;
 
-    const availableScriptMacros = services.getScriptMacros();
+    const visibleTab = _resolveVisibleTab(get(activeTab), selectedSystem);
+    if (visibleTab !== get(activeTab)) {
+      activeTab.set(visibleTab);
+    }
+
+    const availableScriptMacros = services.getScriptMacros?.() || [];
+    const sceneOptions = services.getSceneOptions?.() || [];
+    const rollTableOptions = services.getRollTableOptions?.() || [];
 
     let selectedSystemData = null;
     let itemCards = [];
@@ -355,7 +1081,9 @@ export function createAdminStore(services) {
         selectedSystem,
         managedItemOptions,
         essenceDefinitions,
-        availableScriptMacros
+        availableScriptMacros,
+        sceneOptions,
+        rollTableOptions
       );
 
       itemCards = _buildItemCards(
@@ -374,6 +1102,8 @@ export function createAdminStore(services) {
         get(recipeSearch)
       );
     }
+
+    const environmentState = await _buildEnvironmentState(selectedSystem);
 
     // --- Graph data (lazy, computed only when graph tab is active) ---
     let graphData = { nodes: [], edges: [], width: 0, height: 0 };
@@ -397,7 +1127,8 @@ export function createAdminStore(services) {
       recipeSearchTerm: get(recipeSearch),
       itemSearchTerm: get(itemSearch),
       graphData,
-      graphSearchTerm: get(graphSearch)
+      graphSearchTerm: get(graphSearch),
+      ...environmentState
     });
   }
 
@@ -408,12 +1139,21 @@ export function createAdminStore(services) {
   // --- System selection ---
 
   async function selectSystem(systemId) {
+    if (systemId === get(selectedSystemId)) return true;
+    if (!await confirmDiscardDirtyEnvironmentDraft()) return false;
+
     selectedSystemId.set(systemId);
+    selectedEnvironmentId.set('');
+    selectedEnvironmentSystemId.set(systemId || '');
+    _setEnvironmentDraftState(null, { persistedDraft: null });
     await services.setSetting('lastManagedCraftingSystem', systemId);
     await refresh();
+    return true;
   }
 
   async function createSystem() {
+    if (!await confirmDiscardDirtyEnvironmentDraft()) return null;
+
     const systemManager = services.getCraftingSystemManager();
     const name = _nextSystemName(systemManager);
     const description = 'Configure categories, item tags, essences, and crafting behaviour for this system.';
@@ -441,6 +1181,9 @@ export function createAdminStore(services) {
     const remaining = systemManager.getSystems();
     const nextId = remaining[0]?.id || '';
     selectedSystemId.set(nextId);
+    selectedEnvironmentId.set('');
+    selectedEnvironmentSystemId.set(nextId);
+    _setEnvironmentDraftState(null, { persistedDraft: null });
     await services.setSetting('lastManagedCraftingSystem', nextId);
     await refresh();
   }
@@ -491,8 +1234,851 @@ export function createAdminStore(services) {
   // --- Tab navigation ---
 
   async function setTab(tabName) {
-    activeTab.set(tabName);
+    const systemManager = services.getCraftingSystemManager();
+    const selectedSystem = systemManager?.getSystem?.(get(selectedSystemId)) || null;
+    const nextTab = _resolveVisibleTab(tabName, selectedSystem);
+    if (nextTab === get(activeTab)) return true;
+    if (get(activeTab) === ENVIRONMENTS_TAB && nextTab !== ENVIRONMENTS_TAB) {
+      if (!await _discardDirtyEnvironmentDraftForNavigation()) return false;
+    }
+    activeTab.set(nextTab);
     await refresh();
+    return true;
+  }
+
+  async function selectEnvironment(environmentId) {
+    const nextEnvironmentId = environmentId || '';
+    if (nextEnvironmentId === get(selectedEnvironmentId)) return true;
+    if (!await confirmDiscardDirtyEnvironmentDraft()) return false;
+
+    selectedEnvironmentId.set(nextEnvironmentId);
+    environmentDraftDirty.set(false);
+    environmentDraftIsNew.set(false);
+    environmentSaveError.set(null);
+    environmentValidationState.set(null);
+    await refresh();
+    return true;
+  }
+
+  async function createEnvironmentDraft() {
+    const systemManager = services.getCraftingSystemManager();
+    const system = systemManager?.getSystem?.(get(selectedSystemId)) || null;
+    if (!_canShowEnvironmentsTab(system)) return null;
+    if (!await confirmDiscardDirtyEnvironmentDraft()) return null;
+
+    selectedEnvironmentId.set('');
+    _setEnvironmentDraftState(_newEnvironmentDraft(system.id), {
+      persistedDraft: null,
+      dirty: true,
+      isNew: true,
+      saveError: null
+    });
+    _patchEnvironmentViewState();
+    return _clonePlain(get(environmentDraft));
+  }
+
+  function updateEnvironmentDraft(updates = {}) {
+    const current = get(environmentDraft);
+    if (!current || typeof updates !== 'object' || updates === null) return false;
+
+    const allowed = new Set(['name', 'description', 'enabled', 'selectionMode', 'sceneUuid', 'tasks']);
+    const next = _clonePlain(current);
+    for (const [field, value] of Object.entries(updates)) {
+      if (!allowed.has(field)) continue;
+      if (field === 'enabled') {
+        next.enabled = value === true;
+      } else if (field === 'sceneUuid') {
+        const normalized = String(value ?? '').trim();
+        next.sceneUuid = normalized || null;
+      } else if (field === 'tasks') {
+        next.tasks = Array.isArray(value) ? _clonePlain(value) : [];
+        selectedEnvironmentTaskId.set(_resolveEnvironmentTaskSelection(next, get(selectedEnvironmentTaskId)));
+      } else {
+        next[field] = String(value ?? '');
+      }
+    }
+
+    environmentDraft.set(next);
+    environmentDraftDirty.set(true);
+    environmentSaveError.set(null);
+    environmentValidationState.set(null);
+    _patchEnvironmentViewState();
+    return true;
+  }
+
+  function _setEnvironmentTasks(nextTasks, selectedTaskId = get(selectedEnvironmentTaskId)) {
+    const current = get(environmentDraft);
+    if (!current) return false;
+
+    const next = {
+      ..._clonePlain(current),
+      tasks: Array.isArray(nextTasks) ? _clonePlain(nextTasks) : []
+    };
+    environmentDraft.set(next);
+    selectedEnvironmentTaskId.set(_resolveEnvironmentTaskSelection(next, selectedTaskId));
+    environmentDraftDirty.set(true);
+    environmentSaveError.set(null);
+    environmentValidationState.set(null);
+    _patchEnvironmentViewState();
+    return true;
+  }
+
+  function selectEnvironmentTask(taskId) {
+    const current = get(environmentDraft);
+    if (!current) return false;
+    const nextTaskId = _resolveEnvironmentTaskSelection(current, taskId);
+    if (!nextTaskId) return false;
+    selectedEnvironmentTaskId.set(nextTaskId);
+    _patchEnvironmentViewState();
+    return true;
+  }
+
+  function addEnvironmentTask() {
+    const current = get(environmentDraft);
+    if (!current) return null;
+    const tasks = Array.isArray(current.tasks) ? _clonePlain(current.tasks) : [];
+    const task = _newEnvironmentPlaceholderTask();
+    _setEnvironmentTasks([...tasks, task], task.id);
+    return _clonePlain(task);
+  }
+
+  function updateEnvironmentTask(taskId = get(selectedEnvironmentTaskId), updates = {}) {
+    const current = get(environmentDraft);
+    if (!current || !taskId || typeof updates !== 'object' || updates === null) return false;
+
+    const tasks = Array.isArray(current.tasks) ? _clonePlain(current.tasks) : [];
+    const index = tasks.findIndex(task => task.id === taskId);
+    if (index < 0) return false;
+
+    const nextTask = { ...tasks[index] };
+    for (const [field, value] of Object.entries(updates)) {
+      if (field === 'name' || field === 'description') {
+        nextTask[field] = String(value ?? '');
+      } else if (field === 'img') {
+        const normalized = String(value ?? '').trim();
+        nextTask.img = normalized || DEFAULT_GATHERING_TASK_IMG;
+      } else if (field === 'enabled') {
+        nextTask.enabled = value === true;
+      } else if (field === 'resolutionMode' && TASK_RESOLUTION_MODES.has(value)) {
+        nextTask.resolutionMode = value;
+      }
+    }
+
+    tasks[index] = nextTask;
+    return _setEnvironmentTasks(tasks, taskId);
+  }
+
+  function _updateEnvironmentTaskDraft(taskId = get(selectedEnvironmentTaskId), updater) {
+    const current = get(environmentDraft);
+    if (!current || !taskId || typeof updater !== 'function') return null;
+
+    const tasks = Array.isArray(current.tasks) ? _clonePlain(current.tasks) : [];
+    const index = tasks.findIndex(task => task.id === taskId);
+    if (index < 0) return null;
+
+    const nextTask = updater(_clonePlain(tasks[index]));
+    if (!nextTask) return null;
+
+    tasks[index] = nextTask;
+    _setEnvironmentTasks(tasks, taskId);
+    return _clonePlain(nextTask);
+  }
+
+  function addEnvironmentTaskResultGroup(taskId = get(selectedEnvironmentTaskId)) {
+    let added = null;
+    _updateEnvironmentTaskDraft(taskId, task => {
+      const resultGroups = Array.isArray(task.resultGroups) ? task.resultGroups : [];
+      added = _newEnvironmentResultGroup(resultGroups);
+      return {
+        ...task,
+        resultGroups: [...resultGroups, added]
+      };
+    });
+    return _clonePlain(added);
+  }
+
+  function updateEnvironmentTaskResultGroup(taskId = get(selectedEnvironmentTaskId), groupId, updates = {}) {
+    if (!groupId || typeof updates !== 'object' || updates === null) return false;
+
+    const updated = _updateEnvironmentTaskDraft(taskId, task => {
+      const resultGroups = Array.isArray(task.resultGroups) ? _clonePlain(task.resultGroups) : [];
+      const index = resultGroups.findIndex(group => group.id === groupId);
+      if (index < 0) return null;
+
+      const nextGroup = { ...resultGroups[index] };
+      if (Object.prototype.hasOwnProperty.call(updates, 'name')) {
+        nextGroup.name = String(updates.name ?? '');
+      }
+      resultGroups[index] = nextGroup;
+      return { ...task, resultGroups };
+    });
+    return !!updated;
+  }
+
+  function deleteEnvironmentTaskResultGroup(taskId = get(selectedEnvironmentTaskId), groupId) {
+    if (!groupId) return false;
+
+    const updated = _updateEnvironmentTaskDraft(taskId, task => {
+      const resultGroups = Array.isArray(task.resultGroups) ? _clonePlain(task.resultGroups) : [];
+      if (!resultGroups.some(group => group.id === groupId)) return null;
+      return {
+        ...task,
+        resultGroups: resultGroups.filter(group => group.id !== groupId)
+      };
+    });
+    return !!updated;
+  }
+
+  function reorderEnvironmentTaskResultGroups(taskId = get(selectedEnvironmentTaskId), orderedGroupIds = []) {
+    let reordered = [];
+    _updateEnvironmentTaskDraft(taskId, task => {
+      const resultGroups = Array.isArray(task.resultGroups) ? _clonePlain(task.resultGroups) : [];
+      const byId = new Map(resultGroups.map(group => [group.id, group]));
+      const emitted = new Set();
+      reordered = [];
+
+      for (const id of Array.isArray(orderedGroupIds) ? orderedGroupIds : []) {
+        if (!byId.has(id) || emitted.has(id)) continue;
+        reordered.push(byId.get(id));
+        emitted.add(id);
+      }
+
+      for (const group of resultGroups) {
+        if (emitted.has(group.id)) continue;
+        reordered.push(group);
+      }
+
+      return { ...task, resultGroups: reordered };
+    });
+    return _clonePlain(reordered);
+  }
+
+  function moveEnvironmentTaskResultGroup(taskId = get(selectedEnvironmentTaskId), groupId, direction = 'down') {
+    const current = get(environmentDraft);
+    const task = (Array.isArray(current?.tasks) ? current.tasks : []).find(candidate => candidate.id === taskId);
+    const resultGroups = Array.isArray(task?.resultGroups) ? task.resultGroups : [];
+    const index = resultGroups.findIndex(group => group.id === groupId);
+    if (index < 0) return _clonePlain(resultGroups);
+
+    const nextIndex = direction === 'up' ? index - 1 : index + 1;
+    if (nextIndex < 0 || nextIndex >= resultGroups.length) return _clonePlain(resultGroups);
+
+    const ordered = resultGroups.map(group => group.id);
+    const [moved] = ordered.splice(index, 1);
+    ordered.splice(nextIndex, 0, moved);
+    return reorderEnvironmentTaskResultGroups(taskId, ordered);
+  }
+
+  function addEnvironmentTaskResult(taskId = get(selectedEnvironmentTaskId), groupId) {
+    if (!groupId) return null;
+
+    let added = null;
+    _updateEnvironmentTaskDraft(taskId, task => {
+      const resultGroups = Array.isArray(task.resultGroups) ? _clonePlain(task.resultGroups) : [];
+      const groupIndex = resultGroups.findIndex(group => group.id === groupId);
+      if (groupIndex < 0) return null;
+
+      added = _newEnvironmentResult();
+      const group = resultGroups[groupIndex];
+      resultGroups[groupIndex] = {
+        ...group,
+        results: [...(Array.isArray(group.results) ? group.results : []), added]
+      };
+      return { ...task, resultGroups };
+    });
+    return _clonePlain(added);
+  }
+
+  function updateEnvironmentTaskResult(taskId = get(selectedEnvironmentTaskId), groupId, resultId, updates = {}) {
+    if (!groupId || !resultId || typeof updates !== 'object' || updates === null) return false;
+
+    const updated = _updateEnvironmentTaskDraft(taskId, task => {
+      const resultGroups = Array.isArray(task.resultGroups) ? _clonePlain(task.resultGroups) : [];
+      const groupIndex = resultGroups.findIndex(group => group.id === groupId);
+      if (groupIndex < 0) return null;
+
+      const group = resultGroups[groupIndex];
+      const results = Array.isArray(group.results) ? _clonePlain(group.results) : [];
+      const resultIndex = results.findIndex(result => result.id === resultId);
+      if (resultIndex < 0) return null;
+
+      const nextResult = { ...results[resultIndex] };
+      if (Object.prototype.hasOwnProperty.call(updates, 'componentId')) {
+        const componentId = String(updates.componentId ?? '').trim();
+        nextResult.componentId = componentId || null;
+      }
+      if (Object.prototype.hasOwnProperty.call(updates, 'quantity')) {
+        nextResult.quantity = _normalizePositiveQuantity(updates.quantity);
+      }
+      if (Object.prototype.hasOwnProperty.call(updates, 'propertyMacroUuid')) {
+        const propertyMacroUuid = String(updates.propertyMacroUuid ?? '').trim();
+        nextResult.propertyMacroUuid = propertyMacroUuid || null;
+      } else if (!Object.prototype.hasOwnProperty.call(nextResult, 'propertyMacroUuid')) {
+        nextResult.propertyMacroUuid = null;
+      }
+
+      results[resultIndex] = nextResult;
+      resultGroups[groupIndex] = { ...group, results };
+      return { ...task, resultGroups };
+    });
+    return !!updated;
+  }
+
+  function deleteEnvironmentTaskResult(taskId = get(selectedEnvironmentTaskId), groupId, resultId) {
+    if (!groupId || !resultId) return false;
+
+    const updated = _updateEnvironmentTaskDraft(taskId, task => {
+      const resultGroups = Array.isArray(task.resultGroups) ? _clonePlain(task.resultGroups) : [];
+      const groupIndex = resultGroups.findIndex(group => group.id === groupId);
+      if (groupIndex < 0) return null;
+
+      const group = resultGroups[groupIndex];
+      const results = Array.isArray(group.results) ? _clonePlain(group.results) : [];
+      if (!results.some(result => result.id === resultId)) return null;
+
+      resultGroups[groupIndex] = {
+        ...group,
+        results: results.filter(result => result.id !== resultId)
+      };
+      return { ...task, resultGroups };
+    });
+    return !!updated;
+  }
+
+  function reorderEnvironmentTaskResults(taskId = get(selectedEnvironmentTaskId), groupId, orderedResultIds = []) {
+    if (!groupId) return [];
+
+    let reordered = [];
+    _updateEnvironmentTaskDraft(taskId, task => {
+      const resultGroups = Array.isArray(task.resultGroups) ? _clonePlain(task.resultGroups) : [];
+      const groupIndex = resultGroups.findIndex(group => group.id === groupId);
+      if (groupIndex < 0) return null;
+
+      const group = resultGroups[groupIndex];
+      const results = Array.isArray(group.results) ? _clonePlain(group.results) : [];
+      const byId = new Map(results.map(result => [result.id, result]));
+      const emitted = new Set();
+      reordered = [];
+
+      for (const id of Array.isArray(orderedResultIds) ? orderedResultIds : []) {
+        if (!byId.has(id) || emitted.has(id)) continue;
+        reordered.push(byId.get(id));
+        emitted.add(id);
+      }
+
+      for (const result of results) {
+        if (emitted.has(result.id)) continue;
+        reordered.push(result);
+      }
+
+      resultGroups[groupIndex] = { ...group, results: reordered };
+      return { ...task, resultGroups };
+    });
+    return _clonePlain(reordered);
+  }
+
+  function moveEnvironmentTaskResult(taskId = get(selectedEnvironmentTaskId), groupId, resultId, direction = 'down') {
+    const current = get(environmentDraft);
+    const task = (Array.isArray(current?.tasks) ? current.tasks : []).find(candidate => candidate.id === taskId);
+    const group = (Array.isArray(task?.resultGroups) ? task.resultGroups : []).find(candidate => candidate.id === groupId);
+    const results = Array.isArray(group?.results) ? group.results : [];
+    const index = results.findIndex(result => result.id === resultId);
+    if (index < 0) return _clonePlain(results);
+
+    const nextIndex = direction === 'up' ? index - 1 : index + 1;
+    if (nextIndex < 0 || nextIndex >= results.length) return _clonePlain(results);
+
+    const ordered = results.map(result => result.id);
+    const [moved] = ordered.splice(index, 1);
+    ordered.splice(nextIndex, 0, moved);
+    return reorderEnvironmentTaskResults(taskId, groupId, ordered);
+  }
+
+  function addEnvironmentTaskCatalyst(taskId = get(selectedEnvironmentTaskId)) {
+    let added = null;
+    _updateEnvironmentTaskDraft(taskId, task => {
+      const catalysts = Array.isArray(task.catalysts) ? _clonePlain(task.catalysts) : [];
+      added = _newEnvironmentCatalyst();
+      return {
+        ...task,
+        catalysts: [...catalysts, added]
+      };
+    });
+    return _clonePlain(added);
+  }
+
+  function updateEnvironmentTaskCatalyst(taskId = get(selectedEnvironmentTaskId), catalystIndex, updates = {}) {
+    const index = Number(catalystIndex);
+    if (!Number.isInteger(index) || index < 0 || typeof updates !== 'object' || updates === null) return false;
+
+    const updated = _updateEnvironmentTaskDraft(taskId, task => {
+      const catalysts = Array.isArray(task.catalysts) ? _clonePlain(task.catalysts) : [];
+      if (index >= catalysts.length) return null;
+
+      const nextCatalyst = {
+        componentId: catalysts[index]?.componentId || null,
+        degradesOnUse: catalysts[index]?.degradesOnUse === true,
+        destroyWhenExhausted: catalysts[index]?.destroyWhenExhausted === true,
+        maxUses: _normalizeNullablePositiveInteger(catalysts[index]?.maxUses)
+      };
+
+      if (Object.prototype.hasOwnProperty.call(updates, 'componentId')) {
+        const componentId = String(updates.componentId ?? '').trim();
+        nextCatalyst.componentId = componentId || null;
+      }
+      if (Object.prototype.hasOwnProperty.call(updates, 'degradesOnUse')) {
+        nextCatalyst.degradesOnUse = updates.degradesOnUse === true;
+      }
+      if (Object.prototype.hasOwnProperty.call(updates, 'destroyWhenExhausted')) {
+        nextCatalyst.destroyWhenExhausted = updates.destroyWhenExhausted === true;
+      }
+      if (Object.prototype.hasOwnProperty.call(updates, 'maxUses')) {
+        nextCatalyst.maxUses = _normalizeNullablePositiveInteger(updates.maxUses);
+      }
+
+      catalysts[index] = nextCatalyst;
+      return { ...task, catalysts };
+    });
+    return !!updated;
+  }
+
+  function deleteEnvironmentTaskCatalyst(taskId = get(selectedEnvironmentTaskId), catalystIndex) {
+    const index = Number(catalystIndex);
+    if (!Number.isInteger(index) || index < 0) return false;
+
+    const updated = _updateEnvironmentTaskDraft(taskId, task => {
+      const catalysts = Array.isArray(task.catalysts) ? _clonePlain(task.catalysts) : [];
+      if (index >= catalysts.length) return null;
+      return {
+        ...task,
+        catalysts: catalysts.filter((_, candidateIndex) => candidateIndex !== index)
+      };
+    });
+    return !!updated;
+  }
+
+  function updateEnvironmentTaskVisibility(taskId = get(selectedEnvironmentTaskId), updatesOrNull = {}) {
+    if (!taskId) return false;
+
+    const updated = _updateEnvironmentTaskDraft(taskId, task => {
+      if (updatesOrNull === null) {
+        const { visibility, ...rest } = task;
+        return rest;
+      }
+      if (typeof updatesOrNull !== 'object') return null;
+      return {
+        ...task,
+        visibility: _normalizeEnvironmentTaskVisibility(task.visibility, updatesOrNull)
+      };
+    });
+    return !!updated;
+  }
+
+  function updateEnvironmentTaskResultSelection(taskId = get(selectedEnvironmentTaskId), updates = {}) {
+    if (!taskId || typeof updates !== 'object' || updates === null) return false;
+
+    const updated = _updateEnvironmentTaskDraft(taskId, task => ({
+      ...task,
+      resultSelection: _normalizeEnvironmentTaskResultSelection(task.resultSelection, updates)
+    }));
+    return !!updated;
+  }
+
+  function updateEnvironmentTaskProgressive(taskId = get(selectedEnvironmentTaskId), updates = {}) {
+    if (!taskId || typeof updates !== 'object' || updates === null) return false;
+
+    const updated = _updateEnvironmentTaskDraft(taskId, task => ({
+      ...task,
+      progressive: _normalizeEnvironmentTaskProgressive(task.progressive, updates)
+    }));
+    return !!updated;
+  }
+
+  function updateEnvironmentTaskCheck(taskId = get(selectedEnvironmentTaskId), updatesOrNull = {}) {
+    if (!taskId) return false;
+
+    const updated = _updateEnvironmentTaskDraft(taskId, task => {
+      if (updatesOrNull === null) {
+        const { check, ...rest } = task;
+        return rest;
+      }
+      if (typeof updatesOrNull !== 'object') return null;
+      return {
+        ...task,
+        check: _normalizeEnvironmentTaskCheck(task.check, updatesOrNull)
+      };
+    });
+    return !!updated;
+  }
+
+  function updateEnvironmentTaskTimeRequirement(taskId = get(selectedEnvironmentTaskId), updatesOrNull = {}) {
+    if (!taskId) return false;
+
+    const updated = _updateEnvironmentTaskDraft(taskId, task => {
+      if (updatesOrNull === null) {
+        const { timeRequirement, ...rest } = task;
+        return rest;
+      }
+      if (typeof updatesOrNull !== 'object') return null;
+      return {
+        ...task,
+        timeRequirement: _normalizeEnvironmentTaskTimeRequirement(task.timeRequirement, updatesOrNull)
+      };
+    });
+    return !!updated;
+  }
+
+  function updateEnvironmentTaskFailureOutcome(taskId = get(selectedEnvironmentTaskId), updatesOrNull = {}) {
+    if (!taskId) return false;
+
+    const updated = _updateEnvironmentTaskDraft(taskId, task => {
+      if (updatesOrNull === null) {
+        const { failureOutcome, ...rest } = task;
+        return rest;
+      }
+      if (typeof updatesOrNull !== 'object') return null;
+      return {
+        ...task,
+        failureOutcome: _normalizeEnvironmentTaskFailureOutcome(task.failureOutcome, updatesOrNull)
+      };
+    });
+    return !!updated;
+  }
+
+  function duplicateEnvironmentTask(taskId = get(selectedEnvironmentTaskId)) {
+    const current = get(environmentDraft);
+    if (!current || !taskId) return null;
+
+    const tasks = Array.isArray(current.tasks) ? _clonePlain(current.tasks) : [];
+    const index = tasks.findIndex(task => task.id === taskId);
+    if (index < 0) return null;
+
+    const duplicate = {
+      ..._clonePlain(tasks[index]),
+      id: _randomID(),
+      name: _taskCopyName(tasks[index].name, services.localize)
+    };
+    tasks.splice(index + 1, 0, duplicate);
+    _setEnvironmentTasks(tasks, duplicate.id);
+    return _clonePlain(duplicate);
+  }
+
+  function deleteEnvironmentTask(taskId = get(selectedEnvironmentTaskId)) {
+    const current = get(environmentDraft);
+    if (!current || !taskId) return false;
+
+    const tasks = Array.isArray(current.tasks) ? _clonePlain(current.tasks) : [];
+    const index = tasks.findIndex(task => task.id === taskId);
+    if (index < 0) return false;
+
+    const nextTasks = tasks.filter(task => task.id !== taskId);
+    const nextSelected = nextTasks[Math.min(index, nextTasks.length - 1)]?.id || '';
+    return _setEnvironmentTasks(nextTasks, nextSelected);
+  }
+
+  function reorderEnvironmentTasks(orderedTaskIds = []) {
+    const current = get(environmentDraft);
+    if (!current) return [];
+
+    const tasks = Array.isArray(current.tasks) ? _clonePlain(current.tasks) : [];
+    const byId = new Map(tasks.map(task => [task.id, task]));
+    const emitted = new Set();
+    const reordered = [];
+
+    for (const id of Array.isArray(orderedTaskIds) ? orderedTaskIds : []) {
+      if (!byId.has(id) || emitted.has(id)) continue;
+      reordered.push(byId.get(id));
+      emitted.add(id);
+    }
+
+    for (const task of tasks) {
+      if (emitted.has(task.id)) continue;
+      reordered.push(task);
+    }
+
+    _setEnvironmentTasks(reordered, get(selectedEnvironmentTaskId));
+    return _clonePlain(reordered);
+  }
+
+  function moveEnvironmentTask(taskId = get(selectedEnvironmentTaskId), direction = 'down') {
+    const current = get(environmentDraft);
+    if (!current || !taskId) return [];
+
+    const tasks = Array.isArray(current.tasks) ? _clonePlain(current.tasks) : [];
+    const index = tasks.findIndex(task => task.id === taskId);
+    if (index < 0) return tasks;
+
+    const nextIndex = direction === 'up' ? index - 1 : index + 1;
+    if (nextIndex < 0 || nextIndex >= tasks.length) return tasks;
+
+    const [moved] = tasks.splice(index, 1);
+    tasks.splice(nextIndex, 0, moved);
+    _setEnvironmentTasks(tasks, taskId);
+    return _clonePlain(tasks);
+  }
+
+  async function cancelEnvironmentDraft() {
+    const persistedDraft = get(persistedEnvironmentDraft);
+    if (persistedDraft) {
+      selectedEnvironmentId.set(persistedDraft.id || '');
+      _setEnvironmentDraftState(persistedDraft, {
+        persistedDraft,
+        dirty: false,
+        isNew: false,
+        saveError: null
+      });
+    } else {
+      const environments = get(viewState).environments || [];
+      const fallback = environments[0] || null;
+      selectedEnvironmentId.set(fallback?.id || '');
+      _setEnvironmentDraftState(fallback, {
+        persistedDraft: fallback,
+        dirty: false,
+        isNew: false,
+        saveError: null
+      });
+    }
+    _patchEnvironmentViewState();
+    return _clonePlain(get(environmentDraft));
+  }
+
+  async function saveEnvironmentDraft() {
+    const current = get(environmentDraft);
+    if (!current) return { ok: false, error: 'No environment draft is selected.' };
+
+    const environmentStore = _getEnvironmentStore();
+    if (!environmentStore) {
+      const message = services.localize?.('FABRICATE.Admin.Environments.StoreUnavailable')
+        || 'Gathering environment data is not available.';
+      environmentSaveError.set(message);
+      environmentValidationState.set(null);
+      _patchEnvironmentViewState();
+      return { ok: false, error: message };
+    }
+
+    environmentSaving.set(true);
+    environmentSaveError.set(null);
+    environmentValidationState.set(null);
+    _patchEnvironmentViewState();
+
+    try {
+      const payload = _clonePlain(current);
+      let saved;
+      if (get(environmentDraftIsNew) || !payload.id) {
+        if (!environmentStore.create) {
+          throw new Error('Gathering environment store cannot create environments.');
+        }
+        if (!payload.id) delete payload.id;
+        saved = await environmentStore.create(payload);
+      } else {
+        if (!environmentStore.update) {
+          throw new Error('Gathering environment store cannot update environments.');
+        }
+        saved = await environmentStore.update(payload.id, payload);
+      }
+
+      const savedDraft = _clonePlain(saved || payload);
+      selectedEnvironmentId.set(savedDraft?.id || payload.id || '');
+      _setEnvironmentDraftState(savedDraft, {
+        persistedDraft: savedDraft,
+        dirty: false,
+        isNew: false,
+        saveError: null
+      });
+      environmentSaving.set(false);
+      await refresh();
+      return { ok: true, environment: _clonePlain(get(environmentDraft)) };
+    } catch (err) {
+      const message = _environmentErrorMessage(err);
+      const validationState = _buildEnvironmentValidationState(
+        err,
+        get(environmentDraft),
+        services.localize,
+        ++environmentValidationAttempt
+      );
+      environmentSaving.set(false);
+      environmentSaveError.set(message);
+      environmentValidationState.set(validationState);
+      _patchEnvironmentViewState();
+      return { ok: false, error: message, validation: _clonePlain(validationState) };
+    }
+  }
+
+  async function duplicateEnvironmentDraft(environmentId = get(selectedEnvironmentId)) {
+    const sourceId = environmentId || get(environmentDraft)?.id || '';
+    if (!sourceId) return null;
+    if (!await confirmDiscardDirtyEnvironmentDraft()) return null;
+
+    const environmentStore = _getEnvironmentStore();
+    if (!environmentStore?.duplicate) return null;
+
+    try {
+      const duplicate = await environmentStore.duplicate(sourceId);
+      if (!duplicate) return null;
+      selectedEnvironmentId.set(duplicate.id || '');
+      _setEnvironmentDraftState(duplicate, {
+        persistedDraft: duplicate,
+        dirty: false,
+        isNew: false,
+        saveError: null
+      });
+      await refresh();
+      return _clonePlain(get(environmentDraft));
+    } catch (err) {
+      environmentSaveError.set(_environmentErrorMessage(err));
+      environmentValidationState.set(null);
+      _patchEnvironmentViewState();
+      return null;
+    }
+  }
+
+  async function deleteEnvironmentDraft(environmentId = get(selectedEnvironmentId)) {
+    const targetId = environmentId || get(environmentDraft)?.id || '';
+    if (!targetId) {
+      if (!await confirmDiscardDirtyEnvironmentDraft()) return false;
+      await cancelEnvironmentDraft();
+      return false;
+    }
+
+    const environmentStore = _getEnvironmentStore();
+    if (!environmentStore?.delete) return false;
+
+    const currentEnvironments = get(viewState).environments || [];
+    const selectedIdBeforeDelete = get(selectedEnvironmentId);
+    const deletingSelectedDraft = targetId === selectedIdBeforeDelete || targetId === get(environmentDraft)?.id;
+    const targetIndex = currentEnvironments.findIndex(environment => environment.id === targetId);
+    const targetEnvironment = currentEnvironments.find(environment => environment.id === targetId)
+      || get(environmentDraft);
+    const environmentName = targetEnvironment?.name || targetId;
+    const escapedEnvironmentName = _escapeHtml(environmentName);
+    const confirmed = await services.confirmDialog?.({
+      title: services.localize?.('FABRICATE.Admin.Environments.DeleteTitle', { name: escapedEnvironmentName })
+        || `Delete ${escapedEnvironmentName}?`,
+      content: `<p>${
+        services.localize?.('FABRICATE.Admin.Environments.DeleteContent', { name: escapedEnvironmentName })
+          || `Delete gathering environment <strong>${escapedEnvironmentName}</strong>? This also cleans active and historical gathering runs that reference it.`
+      }</p>`,
+      yes: () => true,
+      no: () => false
+    });
+    if (!confirmed) return false;
+
+    try {
+      const deleted = await environmentStore.delete(targetId);
+      if (!deleted) return false;
+      const remaining = currentEnvironments.filter(environment => environment.id !== targetId);
+      if (deletingSelectedDraft) {
+        const next = remaining[Math.min(Math.max(targetIndex, 0), Math.max(remaining.length - 1, 0))] || null;
+        selectedEnvironmentId.set(next?.id || '');
+        _setEnvironmentDraftState(next, {
+          persistedDraft: next,
+          dirty: false,
+          isNew: false,
+          saveError: null
+        });
+      } else {
+        selectedEnvironmentId.set(selectedIdBeforeDelete);
+        environmentSaveError.set(null);
+        environmentValidationState.set(null);
+      }
+      await refresh();
+      return true;
+    } catch (err) {
+      environmentSaveError.set(_environmentErrorMessage(err));
+      environmentValidationState.set(null);
+      _patchEnvironmentViewState();
+      return false;
+    }
+  }
+
+  async function reorderEnvironments(orderedEnvironmentIds = []) {
+    const systemId = get(selectedSystemId);
+    const environmentStore = _getEnvironmentStore();
+    if (!systemId || !environmentStore?.reorder) return [];
+
+    try {
+      const reordered = await environmentStore.reorder(systemId, orderedEnvironmentIds);
+      const environments = Array.isArray(reordered) ? reordered : [];
+      const selectedId = get(selectedEnvironmentId);
+      if (selectedId && !environments.some(environment => environment.id === selectedId)) {
+        selectedEnvironmentId.set(environments[0]?.id || '');
+        environmentDraftDirty.set(false);
+        environmentDraftIsNew.set(false);
+      }
+      environmentSaveError.set(null);
+      environmentValidationState.set(null);
+      await refresh();
+      return _clonePlain(get(viewState).environments || []);
+    } catch (err) {
+      environmentSaveError.set(_environmentErrorMessage(err));
+      environmentValidationState.set(null);
+      _patchEnvironmentViewState();
+      return [];
+    }
+  }
+
+  async function moveEnvironmentDraft(environmentId, direction) {
+    const environments = get(viewState).environments || [];
+    const index = environments.findIndex(environment => environment.id === environmentId);
+    if (index < 0) return [];
+
+    const nextIndex = direction === 'up' ? index - 1 : index + 1;
+    if (nextIndex < 0 || nextIndex >= environments.length) return environments;
+
+    const ordered = environments.map(environment => environment.id);
+    const [moved] = ordered.splice(index, 1);
+    ordered.splice(nextIndex, 0, moved);
+    return reorderEnvironments(ordered);
+  }
+
+  async function toggleEnvironmentEnabled(environmentId, enabled) {
+    const targetId = environmentId || '';
+    if (!targetId) return false;
+
+    const environmentStore = _getEnvironmentStore();
+    if (!environmentStore?.update) return false;
+
+    const environments = get(viewState).environments || [];
+    const target = environments.find(environment => environment.id === targetId);
+    if (!target) return false;
+
+    const nextEnabled = typeof enabled === 'boolean' ? enabled : target.enabled !== true;
+    const payload = {
+      ..._clonePlain(target),
+      enabled: nextEnabled
+    };
+
+    try {
+      const saved = _clonePlain(await environmentStore.update(targetId, payload) || payload);
+      if (get(selectedEnvironmentId) === targetId || get(environmentDraft)?.id === targetId) {
+        if (get(environmentDraftDirty)) {
+          const currentDraft = _clonePlain(get(environmentDraft));
+          if (currentDraft?.id === targetId) {
+            environmentDraft.set({
+              ...currentDraft,
+              enabled: saved.enabled === true
+            });
+            persistedEnvironmentDraft.set(saved);
+          }
+        } else {
+          _setEnvironmentDraftState(saved, {
+            persistedDraft: saved,
+            dirty: false,
+            isNew: false,
+            saveError: null
+          });
+        }
+      }
+      environmentSaveError.set(null);
+      environmentValidationState.set(null);
+      await refresh();
+      return true;
+    } catch (err) {
+      environmentSaveError.set(_environmentErrorMessage(err));
+      environmentValidationState.set(null);
+      _patchEnvironmentViewState();
+      return false;
+    }
   }
 
   // --- Feature toggles ---
@@ -503,8 +2089,10 @@ export function createAdminStore(services) {
     if (!sysId) return;
     const key = FEATURE_MAP[feature];
     if (!key) return;
+    if (key === 'gathering' && enabled !== true && !await confirmDiscardDirtyEnvironmentDraft()) return false;
     await systemManager.updateSystem(sysId, { features: { [key]: enabled } });
     await refresh();
+    return true;
   }
 
   async function toggleAdvancedOptions(enabled) {
@@ -982,6 +2570,8 @@ export function createAdminStore(services) {
     activeTab,
     recipeSearch,
     itemSearch,
+    selectedEnvironmentId,
+    selectedEnvironmentTaskId,
     // Computed state
     viewState,
     // Actions
@@ -991,6 +2581,43 @@ export function createAdminStore(services) {
     saveSystemDetails,
     setResolutionMode,
     setTab,
+    selectEnvironment,
+    createEnvironmentDraft,
+    updateEnvironmentDraft,
+    selectEnvironmentTask,
+    addEnvironmentTask,
+    updateEnvironmentTask,
+    duplicateEnvironmentTask,
+    deleteEnvironmentTask,
+    reorderEnvironmentTasks,
+    moveEnvironmentTask,
+    addEnvironmentTaskResultGroup,
+    updateEnvironmentTaskResultGroup,
+    deleteEnvironmentTaskResultGroup,
+    reorderEnvironmentTaskResultGroups,
+    moveEnvironmentTaskResultGroup,
+    addEnvironmentTaskResult,
+    updateEnvironmentTaskResult,
+    deleteEnvironmentTaskResult,
+    reorderEnvironmentTaskResults,
+    moveEnvironmentTaskResult,
+    addEnvironmentTaskCatalyst,
+    updateEnvironmentTaskCatalyst,
+    deleteEnvironmentTaskCatalyst,
+    updateEnvironmentTaskVisibility,
+    updateEnvironmentTaskResultSelection,
+    updateEnvironmentTaskProgressive,
+    updateEnvironmentTaskCheck,
+    updateEnvironmentTaskTimeRequirement,
+    updateEnvironmentTaskFailureOutcome,
+    confirmDiscardDirtyEnvironmentDraft,
+    cancelEnvironmentDraft,
+    saveEnvironmentDraft,
+    duplicateEnvironmentDraft,
+    deleteEnvironmentDraft,
+    reorderEnvironments,
+    moveEnvironmentDraft,
+    toggleEnvironmentEnabled,
     toggleFeature,
     toggleAdvancedOptions,
     toggleRequirement,

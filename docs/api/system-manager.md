@@ -48,6 +48,7 @@ The `features` object controls which optional behaviours are active. Every key d
 | `effectTransfer` | `boolean` | `false` | Copy active effects from ingredients to crafted results. Also requires `recipe.transferEffects: true` on each recipe. See [Effect Transfer]({% link effect-transfer.md %}). |
 | `multiStepRecipes` | `boolean` | `false` | Multi-step recipes |
 | `salvage` | `boolean` | `false` | Allow components to be broken down into constituent parts. When `true`, each normalised component gains a `salvage` sub-object. See [Salvage]({% link salvage.md %}). |
+| `gathering` | `boolean` | `false` | Enable GM authoring for gathering environments and tasks. See [Gathering Environments]({% link gathering-environments.md %}). |
 
 ```javascript
 const mgr = game.fabricate.getCraftingSystemManager();

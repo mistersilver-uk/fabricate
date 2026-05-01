@@ -153,7 +153,7 @@ async function acceptLicenseIfPresent(page, results) {
   const agreeButton = agreeButtonCandidates.first();
   await agreeButton.waitFor({ state: 'visible', timeout: 10_000 });
   await Promise.all([
-    page.waitForURL(/\/(setup|auth)(?:\?.*)?$/, { timeout: 20_000 }),
+    page.waitForURL(/\/(setup|auth)(?:\?.*)?$/, { timeout: 60_000 }),
     agreeButton.click()
   ]);
 
@@ -179,7 +179,7 @@ async function authenticateIfRequired(page, results) {
 
   const submitBtn = page.locator('button[type="submit"], button:has-text("Submit"), button:has-text("Log In")').first();
   await Promise.all([
-    page.waitForURL(/\/setup(?:\?.*)?$/, { timeout: 20_000 }),
+    page.waitForURL(/\/setup(?:\?.*)?$/, { timeout: 60_000 }),
     submitBtn.click()
   ]);
 
@@ -210,8 +210,9 @@ async function dismissFirstRunDialogs(page, results) {
   try {
     await page.waitForTimeout(2_000); // Allow tours to start
     const dismissed = await page.evaluate(() => {
-      if (typeof Tour !== 'undefined' && Tour.activeTour) {
-        Tour.activeTour.exit();
+      const tour = globalThis.foundry?.nue?.Tour;
+      if (tour?.activeTour) {
+        tour.activeTour.exit();
         return true;
       }
       return false;
@@ -555,10 +556,411 @@ async function joinWorldSession(page, results, options = {}) {
   }
 }
 
+/**
+ * Resize the rendered Recipe Manager application frame for responsive
+ * screenshots without changing the browser viewport used by other phases.
+ * @param {import('playwright').Page} page
+ * @param {{ width: number, height: number }} size
+ */
+async function setRecipeManagerWindowSize(page, { width, height }) {
+  await page.setViewportSize({
+    width: Math.max(1366, width + 80),
+    height: Math.max(768, height + 80)
+  });
+  await page.evaluate(({ width, height }) => {
+    const admin = document.querySelector('.fabricate-admin');
+    const app = admin?.closest('.application, .app') || document.querySelector('#fabricate-recipe-manager');
+    if (!app) return null;
+    Object.assign(app.style, {
+      width: `${width}px`,
+      height: `${height}px`,
+      left: '20px',
+      top: '20px'
+    });
+    return {
+      width: app.getBoundingClientRect().width,
+      height: app.getBoundingClientRect().height
+    };
+  }, { width, height });
+  await page.waitForTimeout(500);
+}
+
+/**
+ * Dismiss global Foundry notifications that can cover screenshot targets.
+ * @param {import('playwright').Page} page
+ */
+async function dismissFoundryNotifications(page) {
+  await page.evaluate(() => {
+    document
+      .querySelectorAll('#notifications .notification, body > .notification, .notification')
+      .forEach(notification => {
+        try { notification.remove(); } catch { /* ignore */ }
+      });
+  });
+  await page.waitForTimeout(300);
+}
+
+/**
+ * Close Foundry application windows across ApplicationV1 and ApplicationV2.
+ * @param {import('playwright').Page} page
+ */
+async function closeOpenApplications(page) {
+  const closeSelector = [
+    '.application:not(#sidebar) button[data-action="close"]',
+    '.application:not(#sidebar) button[aria-label="Close"]',
+    '.application:not(#sidebar) button[title="Close"]',
+    '.application:not(#sidebar) .header-button.close',
+    '.application:not(#sidebar) .window-header .close',
+    '.app.window-app .close',
+    '#fabricate-recipe-manager button[data-action="close"]',
+    '#fabricate-gathering button[data-action="close"]'
+  ].join(', ');
+
+  async function discardDirtyDraft() {
+    const discardButton = page.locator('button:has-text("Discard Changes")').first();
+    if (await discardButton.count() > 0) {
+      try {
+        await discardButton.click({ timeout: 2_000, force: true });
+        await page.waitForTimeout(500);
+      } catch { /* ignore */ }
+    }
+  }
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    await discardDirtyDraft();
+    await page.evaluate((selector) => {
+      const closePromises = [];
+      let closedApplicationV2 = false;
+
+      if (ui.windows) {
+        for (const app of Object.values(ui.windows)) {
+          try { closePromises.push(Promise.resolve(app.close())); } catch { /* ignore */ }
+        }
+      }
+
+      const instances = foundry?.applications?.instances;
+      const applicationV2s = instances?.values
+        ? Array.from(instances.values())
+        : (instances ? Array.from(instances) : []);
+      for (const app of applicationV2s) {
+        const element = app?.element ?? app?._element ?? null;
+        if (!element || element.id === 'sidebar') continue;
+        if (element.querySelector?.('.fabricate-admin, .fabricate-gathering-app') || element.id?.startsWith?.('fabricate-')) {
+          try {
+            closedApplicationV2 = true;
+            app.close({ force: true });
+          } catch { /* ignore */ }
+        }
+      }
+
+      Promise.allSettled(closePromises);
+
+      if (!closedApplicationV2) {
+        document.querySelectorAll(selector).forEach(btn => {
+          try { btn.click(); } catch { /* ignore */ }
+        });
+      }
+    }, closeSelector);
+    await page.waitForTimeout(500);
+    await discardDirtyDraft();
+
+    const closeButtons = page.locator(closeSelector);
+    for (let i = 0; i < await closeButtons.count(); i++) {
+      try { await closeButtons.nth(i).click({ timeout: 1_000, force: true }); } catch { /* ignore */ }
+    }
+    await page.waitForTimeout(500);
+    await discardDirtyDraft();
+
+    const remaining = await page.locator('.fabricate-admin, .fabricate-gathering-app, button:has-text("Discard Changes")').count();
+    if (remaining === 0) break;
+  }
+}
+
+/**
+ * Put the Environments editor in a validation-rich draft state for screenshot
+ * inspection while leaving persistence behavior untouched.
+ * @param {import('playwright').Page} page
+ */
+async function prepareGmEnvironmentsScreenshotState(page) {
+  await page.locator('.environment-draft-editor').first().waitFor({ state: 'visible', timeout: 10_000 });
+
+  const catalystComponent = page
+    .locator('.environment-catalyst-row select[data-environment-field*=".catalysts.0.componentId"]')
+    .first();
+  if (await catalystComponent.count() > 0) {
+    await catalystComponent.selectOption('');
+    await page.waitForTimeout(500);
+  }
+
+  const saveButton = page.locator('.environment-save-actions button[type="submit"]').first();
+  if (await saveButton.count() > 0) {
+    await saveButton.click();
+    await page.locator('.environment-validation-summary').first().waitFor({ state: 'visible', timeout: 5_000 });
+  }
+}
+
+/**
+ * Scroll the Environments editor to a useful authoring inspection target.
+ * @param {import('playwright').Page} page
+ * @param {string} selector
+ */
+async function scrollEnvironmentEditorTo(page, selector) {
+  await page.evaluate((selector) => {
+    const editor = document.querySelector('.environment-draft-editor');
+    const target = document.querySelector(selector);
+    if (!editor || !target) return;
+    const editorRect = editor.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    editor.scrollTop += targetRect.top - editorRect.top - 24;
+  }, selector);
+  await page.waitForTimeout(500);
+}
+
+/**
+ * Reset the Environments editor scroll position for top-of-editor screenshots.
+ * @param {import('playwright').Page} page
+ */
+async function scrollEnvironmentEditorToTop(page) {
+  await page.evaluate(() => {
+    const editor = document.querySelector('.environment-draft-editor');
+    if (editor) editor.scrollTop = 0;
+  });
+  await page.waitForTimeout(500);
+}
+
+/**
+ * Assert the browser's real pointer hit-test reaches the expected card control.
+ * @param {import('playwright').Page} page
+ * @param {import('playwright').Locator} locator
+ * @param {string} targetSelector
+ * @param {string} label
+ */
+async function assertPointerTarget(page, locator, targetSelector, label) {
+  await locator.scrollIntoViewIfNeeded();
+  await locator.waitFor({ state: 'visible', timeout: 5_000 });
+  const box = await locator.boundingBox();
+  if (!box) throw new Error(`No pointer box found for ${label}`);
+
+  const hit = await page.evaluate(({ x, y, targetSelector }) => {
+    const element = document.elementFromPoint(x, y);
+    return {
+      hitClass: element?.className || '',
+      hitTag: element?.tagName || '',
+      matched: Boolean(element?.closest?.(targetSelector))
+    };
+  }, {
+    x: box.x + box.width / 2,
+    y: box.y + box.height / 2,
+    targetSelector
+  });
+
+  if (!hit.matched) {
+    throw new Error(
+      `Pointer hit-test for ${label} missed ${targetSelector}; ` +
+      `hit ${hit.hitTag || 'none'} ${String(hit.hitClass || '')}`
+    );
+  }
+}
+
+/**
+ * Exercise real pointer targets for the GM Environments card grid before
+ * opening the editor for screenshots.
+ * @param {import('playwright').Page} page
+ */
+async function exerciseGmEnvironmentCardPointerActions(page) {
+  const azureCard = page.locator('.environment-card').filter({ hasText: 'Azure Grove' }).first();
+  await azureCard.waitFor({ state: 'visible', timeout: 10_000 });
+
+  await assertPointerTarget(page, azureCard.locator('.environment-card-body-action'), '.environment-card-body-action', 'environment card body');
+  await assertPointerTarget(page, azureCard.locator('.environment-card-image-action'), '.environment-card-image-action', 'environment card image');
+  await assertPointerTarget(page, azureCard.locator('.environment-card-edit'), '.environment-card-edit', 'environment card edit button');
+  await assertPointerTarget(page, azureCard.locator('.environment-card-toggle'), '.environment-card-toggle', 'environment card toggle button');
+  await assertPointerTarget(page, azureCard.locator('.environment-card-delete'), '.environment-card-delete', 'environment card delete button');
+
+  const toggle = azureCard.locator('.environment-card-toggle');
+  await toggle.click();
+  await page.locator('.environment-card').filter({ hasText: 'Azure Grove' }).filter({ hasText: 'Disabled' })
+    .waitFor({ state: 'visible', timeout: 5_000 });
+  if (await page.locator('.environment-draft-editor').count() > 0) {
+    throw new Error('Environment toggle opened the editor instead of staying on the card grid');
+  }
+
+  await page.locator('.environment-card').filter({ hasText: 'Azure Grove' }).first()
+    .locator('.environment-card-toggle')
+    .click();
+  await page.locator('.environment-card').filter({ hasText: 'Azure Grove' }).filter({ hasText: 'Enabled' })
+    .waitFor({ state: 'visible', timeout: 5_000 });
+  if (await page.locator('.environment-draft-editor').count() > 0) {
+    throw new Error('Environment toggle re-enable opened the editor instead of staying on the card grid');
+  }
+
+  await azureCard.locator('.environment-action-menu-trigger').click();
+  const moveDown = page.locator('.environment-action-menu-item[data-environment-action="move-down"]').first();
+  await assertPointerTarget(page, moveDown, '.environment-action-menu-item[data-environment-action="move-down"]', 'environment card move down menu item');
+  await moveDown.click();
+  await page.waitForTimeout(500);
+  const firstAfterMoveDown = await page.locator('.environment-card .environment-name').first().textContent();
+  if (String(firstAfterMoveDown || '').trim() === 'Azure Grove') {
+    throw new Error('Environment move-down action did not reorder the first card');
+  }
+
+  const movedAzureCard = page.locator('.environment-card').filter({ hasText: 'Azure Grove' }).first();
+  await movedAzureCard.locator('.environment-action-menu-trigger').click();
+  const moveUp = page.locator('.environment-action-menu-item[data-environment-action="move-up"]').first();
+  await assertPointerTarget(page, moveUp, '.environment-action-menu-item[data-environment-action="move-up"]', 'environment card move up menu item');
+  await moveUp.click();
+  await page.waitForTimeout(500);
+  const firstAfterMoveUp = await page.locator('.environment-card .environment-name').first().textContent();
+  if (String(firstAfterMoveUp || '').trim() !== 'Azure Grove') {
+    throw new Error('Environment move-up action did not restore the first card');
+  }
+}
+
+/**
+ * Attach browser console capture to a Playwright page.
+ * @param {import('playwright').Page} page
+ * @param {RegExp[]} ignoredErrorPatterns
+ */
+function attachConsoleCapture(page, ignoredErrorPatterns = []) {
+  page.on('console', msg => {
+    const entry = `[${msg.type()}] ${msg.text()}`;
+    consoleLog.push(entry);
+    if (msg.type() === 'error') {
+      const text = msg.text();
+      const isIgnored = ignoredErrorPatterns.some(p => p.test(text));
+      if (!isIgnored) {
+        consoleErrors.push(text);
+      }
+    }
+  });
+
+  page.on('pageerror', err => {
+    const entry = `[pageerror] ${err.message}`;
+    consoleLog.push(entry);
+    const isIgnored = ignoredErrorPatterns.some(p => p.test(err.message));
+    if (!isIgnored) {
+      consoleErrors.push(`pageerror: ${err.message}`);
+    }
+  });
+}
+
+/**
+ * Open the player Gathering app from the Items Directory action and assert it rendered.
+ * @param {import('playwright').Page} page
+ */
+async function openGatheringAppFromDirectory(page) {
+  const itemsTab = page.locator('#sidebar [data-tab="items"]').first();
+  await itemsTab.click({ force: true });
+  await page.waitForTimeout(1_000);
+  const gatheringButton = page.locator('button[data-fabricate-action="gathering"]').first();
+  await gatheringButton.waitFor({ state: 'visible', timeout: 10_000 });
+  if (!await gatheringButton.isEnabled()) {
+    throw new Error('Gathering directory action is visible but disabled.');
+  }
+  await gatheringButton.evaluate(button => button.click());
+  const app = page.locator('.fabricate-gathering-app').first();
+  await app.waitFor({ state: 'visible', timeout: 10_000 });
+  return app;
+}
+
+/**
+ * Resize the rendered Gathering application frame for container-query screenshots.
+ * @param {import('playwright').Page} page
+ * @param {{ width: number, height: number }} size
+ */
+async function setGatheringWindowSize(page, { width, height }) {
+  await page.setViewportSize({
+    width: Math.max(1366, width + 120),
+    height: Math.max(768, height + 120)
+  });
+  await page.evaluate(({ width, height }) => {
+    const gathering = document.querySelector('.fabricate-gathering-app');
+    const app = gathering?.closest('.application, .app') || document.querySelector('#fabricate-gathering');
+    if (!app) return null;
+    Object.assign(app.style, {
+      width: `${width}px`,
+      height: `${height}px`,
+      left: '20px',
+      top: '20px'
+    });
+    return {
+      width: app.getBoundingClientRect().width,
+      height: app.getBoundingClientRect().height
+    };
+  }, { width, height });
+  await page.waitForTimeout(500);
+}
+
+/**
+ * Select an actor in the Gathering app by visible actor name.
+ * @param {import('playwright').Page} page
+ * @param {string} actorName
+ */
+async function selectGatheringActor(page, actorName) {
+  const actorSelect = page.locator('.gathering-actor-select select').first();
+  await actorSelect.waitFor({ state: 'visible', timeout: 10_000 });
+  await actorSelect.selectOption({ label: actorName });
+  await page.waitForTimeout(1_000);
+  await page.locator('.gathering-selected-actor').filter({ hasText: actorName }).first()
+    .waitFor({ state: 'visible', timeout: 10_000 });
+}
+
+/**
+ * Click a visible Gathering app task button by task label.
+ * @param {import('playwright').Page} page
+ * @param {string} taskLabel
+ */
+async function startGatheringTaskByLabel(page, taskLabel) {
+  const taskRow = page.locator('.gathering-task-row').filter({ hasText: taskLabel }).first();
+  await taskRow.waitFor({ state: 'visible', timeout: 10_000 });
+  const startButton = taskRow.locator('.gathering-start-button').first();
+  await startButton.waitFor({ state: 'visible', timeout: 10_000 });
+  await startButton.click();
+}
+
+async function scrollGatheringAppTo(page, selector) {
+  await page.evaluate((selector) => {
+    const app = document.querySelector('.fabricate-gathering-app');
+    const target = document.querySelector(selector);
+    if (!app || !target) return;
+    const appRect = app.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    app.scrollTop += targetRect.top - appRect.top - 18;
+  }, selector);
+  await page.waitForTimeout(400);
+}
+
+async function scrollGatheringAppToText(page, text) {
+  await page.evaluate((text) => {
+    const app = document.querySelector('.fabricate-gathering-app');
+    const targets = Array.from(document.querySelectorAll(
+      '.gathering-environment-card, .gathering-task-row, .gathering-run-section, .gathering-feedback-panel, .gathering-history-list'
+    ));
+    const target = targets.find(element => element.textContent?.includes(text));
+    if (!app || !target) return;
+    const appRect = app.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    app.scrollTop += targetRect.top - appRect.top - 18;
+  }, text);
+  await page.waitForTimeout(400);
+}
+
+async function assertNoScreenshotOverlays(page) {
+  await dismissFoundryNotifications(page);
+  const overlays = page.locator(
+    '.dialog.application, .window-app.dialog, .application.dialog, .app.dialog, #notifications .notification'
+  );
+  const count = await overlays.count();
+  if (count > 0) {
+    throw new Error(`Screenshot target is covered by ${count} modal or notification overlay(s).`);
+  }
+}
+
 // ── Cleanup tracking ──────────────────────────────────────────────────────
 const cleanup = {
   actorIds: [],
   itemIds: [],
+  userIds: [],
   systemId: null,
   recipeIds: []
 };
@@ -577,24 +979,7 @@ async function main() {
     /favicon/i
   ];
 
-  // Capture all console output
-  page.on('console', msg => {
-    const entry = `[${msg.type()}] ${msg.text()}`;
-    consoleLog.push(entry);
-    if (msg.type() === 'error') {
-      const text = msg.text();
-      const isIgnored = ignoredErrorPatterns.some(p => p.test(text));
-      if (!isIgnored) {
-        consoleErrors.push(text);
-      }
-    }
-  });
-
-  page.on('pageerror', err => {
-    const entry = `[pageerror] ${err.message}`;
-    consoleLog.push(entry);
-    consoleErrors.push(`pageerror: ${err.message}`);
-  });
+  attachConsoleCapture(page, ignoredErrorPatterns);
 
   const results = {
     passed: false,
@@ -644,7 +1029,7 @@ async function main() {
       await launchBtn.waitFor({ state: 'visible', timeout: 5_000 });
       await launchBtn.click();
       // After launch, Foundry navigates to /join (player selection) or /game
-      await page.waitForURL(/\/(join|game)/, { timeout: 60_000 });
+      await page.waitForURL(/\/(join|game)/, { timeout: 120_000 });
       await screenshot(page, 'world-launching');
       results.steps.push({ step: 'launch-world', passed: true });
     } else {
@@ -698,7 +1083,8 @@ async function main() {
       // Unpause the game if paused (the "Game Paused" overlay blocks all sidebar clicks)
       if (game.paused) game.togglePause(false);
       // Dismiss any active tour
-      if (typeof Tour !== 'undefined' && Tour.activeTour) Tour.activeTour.exit();
+      const tour = globalThis.foundry?.nue?.Tour;
+      if (tour?.activeTour) tour.activeTour.exit();
     });
     await page.waitForTimeout(500);
 
@@ -710,10 +1096,12 @@ async function main() {
         // 1. Clean stale crafting systems and their recipes first
         const csm = game.fabricate.getCraftingSystemManager();
         const rm = game.fabricate.getRecipeManager();
+        const environmentStore = game.fabricate.getGatheringEnvironmentStore?.();
         const allSystems = csm.getSystems();
         const staleSystems = allSystems.filter(s => s.name === 'Arcane Forge');
         for (const sys of staleSystems) {
           console.log(`Cleaning stale crafting system: ${sys.name} (${sys.id})`);
+          try { await environmentStore?.cleanupByCraftingSystem?.(sys.id); } catch { /* ok */ }
           // Delete all recipes in this system
           const recipes = rm.getRecipesForSystem?.(sys.id) ?? [];
           for (const r of recipes) {
@@ -724,11 +1112,22 @@ async function main() {
 
         // 2. Clean stale actors
         const staleActors = game.actors.contents.filter(a =>
-          a.name === 'Alara the Alchemist' || a.name === 'Brom the Blacksmith'
+          [
+            'Alara the Alchemist',
+            'Brom the Blacksmith'
+          ].includes(a.name)
         );
         if (staleActors.length > 0) {
           console.log(`Cleaning ${staleActors.length} stale test actors`);
           await Actor.deleteDocuments(staleActors.map(a => a.id));
+        }
+
+        const staleUsers = game.users.contents.filter(u =>
+          ['Fabricate Gatherer', 'Fabricate Observer'].includes(u.name)
+        );
+        if (staleUsers.length > 0) {
+          console.log(`Cleaning ${staleUsers.length} stale test users`);
+          await User.deleteDocuments(staleUsers.map(u => u.id));
         }
 
         // 3. Clean stale items
@@ -790,6 +1189,16 @@ async function main() {
 
         const alara = actors.find(a => a.name === 'Alara the Alchemist');
         const brom = actors.find(a => a.name === 'Brom the Blacksmith');
+        const users = await User.createDocuments([
+          { name: 'Fabricate Gatherer', role: CONST.USER_ROLES.PLAYER, password: '' },
+          { name: 'Fabricate Observer', role: CONST.USER_ROLES.PLAYER, password: '' }
+        ]);
+        const gathererUser = users.find(user => user.name === 'Fabricate Gatherer');
+        const ownerLevel = CONST.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3;
+        const noneLevel = CONST.DOCUMENT_OWNERSHIP_LEVELS?.NONE ?? 0;
+        await alara.update({ ownership: { default: noneLevel, [gathererUser.id]: ownerLevel } });
+        await brom.update({ ownership: { default: noneLevel } });
+        const userIds = users.map(user => user.id);
 
         // Build inventory copies from world items
         // Include flags.core.sourceId so the crafting engine can match
@@ -820,12 +1229,15 @@ async function main() {
           ...copies(byName('Dragon Scale'), 1)
         ]);
 
-        return { itemIds, actorIds, alaraId: alara.id, bromId: brom.id, itemsByName };
+        return { itemIds, actorIds, userIds, gathererUserId: gathererUser.id, alaraId: alara.id, bromId: brom.id, itemsByName };
       });
 
       cleanup.itemIds = createdDocs.itemIds;
       cleanup.actorIds = createdDocs.actorIds;
+      cleanup.userIds = createdDocs.userIds;
       cleanup.alaraId = createdDocs.alaraId;
+      cleanup.bromId = createdDocs.bromId;
+      cleanup.gathererUserId = createdDocs.gathererUserId;
       process.stdout.write(`  Created ${createdDocs.itemIds.length} items and ${createdDocs.actorIds.length} actors with inventories.\n`);
 
       // Screenshot the Items sidebar (force: true bypasses overlays like "Game Paused")
@@ -928,9 +1340,12 @@ async function main() {
           const result = await csm.addItemFromUuid(systemId, item.uuid);
           componentMap[item.name] = result.item.id;
         }
+        for (const componentId of Object.values(componentMap)) {
+          await csm.updateItem(systemId, componentId, { difficulty: 1 });
+        }
 
         await csm.updateSystem(systemId, {
-          features: { essences: true },
+          features: { essences: true, gathering: true },
           essenceDefinitions: [
             {
               name: 'Verdant',
@@ -1061,11 +1476,218 @@ async function main() {
           }]
         });
 
+        const environmentStore = game.fabricate.getGatheringEnvironmentStore();
+        const gatheringEnvironment = await environmentStore.create({
+          craftingSystemId: systemId,
+          name: 'Azure Grove',
+          description: 'A compact validation fixture for GM gathering environment authoring.',
+          enabled: true,
+          selectionMode: 'targeted',
+          sceneUuid: 'Scene.fabricateMissingScene',
+          tasks: [{
+            name: 'Forage Verdant Reagents',
+            description: 'Collect useful plants and incidental ore from a controlled test clearing.',
+            img: 'icons/consumables/plants/leaf-herb-green.webp',
+            enabled: false,
+            resolutionMode: 'routed',
+            resultSelection: {
+              provider: 'rollTableOutcome',
+              rollTableUuid: 'RollTable.fabricateMissingTable'
+            },
+            timeRequirement: {
+              minutes: 10,
+              hours: 0,
+              days: 0,
+              months: 0,
+              years: 0
+            },
+            failureOutcome: {
+              mode: 'text',
+              text: 'The grove yields only damp leaves.'
+            },
+            visibility: {
+              provider: 'dnd5e',
+              formula: '1d20',
+              threshold: '10'
+            },
+            catalysts: [
+              {
+                componentId: componentMap['Empty Vial'],
+                degradesOnUse: false,
+                destroyWhenExhausted: true,
+                maxUses: null
+              },
+              {
+                componentId: componentMap['Dragon Scale'],
+                degradesOnUse: true,
+                destroyWhenExhausted: true,
+                maxUses: 3
+              }
+            ],
+            resultGroups: [
+              {
+                name: 'Common Finds',
+                results: [
+                  { componentId: componentMap['Mystic Herb'], quantity: 2 },
+                  { componentId: componentMap['Iron Ore'], quantity: 1 }
+                ]
+              },
+              {
+                name: 'Rare Finds',
+                results: []
+              }
+            ]
+          }]
+        });
+
+        const playerGatheringFixtures = [];
+        playerGatheringFixtures.push(await environmentStore.create({
+          craftingSystemId: systemId,
+          name: 'Verdant Meadow',
+          description: 'A clear player-facing gathering site with an immediate successful task.',
+          enabled: true,
+          selectionMode: 'targeted',
+          sceneUuid: '',
+          tasks: [{
+            name: 'Gather Meadow Herbs',
+            description: 'Collect fresh herbs for a quick brewing session.',
+            img: 'icons/consumables/plants/leaf-herb-green.webp',
+            enabled: true,
+            resolutionMode: 'progressive',
+            progressive: { awardMode: 'equal' },
+            check: { provider: 'dnd5e', formula: '20', threshold: '10' },
+            resultGroups: [{
+              name: 'Meadow Herbs',
+              results: [{ componentId: componentMap['Mystic Herb'], quantity: 1 }]
+            }]
+          }]
+        }));
+
+        playerGatheringFixtures.push(await environmentStore.create({
+          craftingSystemId: systemId,
+          name: 'Sunken Ruins',
+          description: 'A scene-linked site that stays visible while blocked.',
+          enabled: true,
+          selectionMode: 'targeted',
+          sceneUuid: 'Scene.fabricateMissingGatheringScene',
+          tasks: [{
+            name: 'Survey Sunken Reagents',
+            description: 'This task is visible but cannot be attempted away from its linked scene.',
+            img: 'icons/svg/item-bag.svg',
+            enabled: true,
+            resolutionMode: 'progressive',
+            progressive: { awardMode: 'equal' },
+            check: { provider: 'dnd5e', formula: '20', threshold: '10' },
+            resultGroups: [{
+              name: 'Ruins Finds',
+              results: [{ componentId: componentMap['Iron Ore'], quantity: 1 }]
+            }]
+          }]
+        }));
+
+        playerGatheringFixtures.push(await environmentStore.create({
+          craftingSystemId: systemId,
+          name: 'Crystal Thicket',
+          description: 'Requires a vial catalyst so Brom demonstrates a blocked task.',
+          enabled: true,
+          selectionMode: 'targeted',
+          sceneUuid: '',
+          tasks: [{
+            name: 'Bottle Crystal Dew',
+            description: 'A vial is required before the dew can be gathered.',
+            img: 'icons/consumables/potions/vial-cork-empty.webp',
+            enabled: true,
+            resolutionMode: 'progressive',
+            progressive: { awardMode: 'equal' },
+            check: { provider: 'dnd5e', formula: '20', threshold: '10' },
+            catalysts: [{
+              componentId: componentMap['Empty Vial'],
+              degradesOnUse: false,
+              destroyWhenExhausted: false,
+              maxUses: null
+            }],
+            resultGroups: [{
+              name: 'Crystal Dew',
+              results: [{ componentId: componentMap['Mystic Herb'], quantity: 1 }]
+            }]
+          }]
+        }));
+
+        playerGatheringFixtures.push(await environmentStore.create({
+          craftingSystemId: systemId,
+          name: 'Timed Orchard',
+          description: 'A timed gathering site that creates an active run before completion.',
+          enabled: true,
+          selectionMode: 'targeted',
+          sceneUuid: '',
+          tasks: [{
+            name: 'Tend Slow Bloom',
+            description: 'The bloom matures after a short world-time delay.',
+            img: 'icons/consumables/plants/leaf-herb-green.webp',
+            enabled: true,
+            resolutionMode: 'progressive',
+            progressive: { awardMode: 'equal' },
+            check: { provider: 'dnd5e', formula: '20', threshold: '10' },
+            timeRequirement: { minutes: 1, hours: 0, days: 0, months: 0, years: 0 },
+            resultGroups: [{
+              name: 'Slow Bloom',
+              results: [{ componentId: componentMap['Mystic Herb'], quantity: 1 }]
+            }]
+          }]
+        }));
+
+        playerGatheringFixtures.push(await environmentStore.create({
+          craftingSystemId: systemId,
+          name: 'Withered Patch',
+          description: 'A deterministic failure task for failure feedback screenshots.',
+          enabled: true,
+          selectionMode: 'targeted',
+          sceneUuid: '',
+          tasks: [{
+            name: 'Search Withered Patch',
+            description: 'The patch is exhausted and should fail cleanly.',
+            img: 'icons/consumables/plants/leaf-herb-green.webp',
+            enabled: true,
+            resolutionMode: 'progressive',
+            progressive: { awardMode: 'equal' },
+            check: { provider: 'dnd5e', formula: '1', threshold: '10' },
+            failureOutcome: { mode: 'text', text: 'The patch yields only brittle stems.' },
+            resultGroups: [{
+              name: 'Withered Finds',
+              results: [{ componentId: componentMap['Mystic Herb'], quantity: 1 }]
+            }]
+          }]
+        }));
+
+        playerGatheringFixtures.push(await environmentStore.create({
+          craftingSystemId: systemId,
+          name: 'Moonlit Blind Grove',
+          description: 'A blind environment that must hide task details from non-GM users.',
+          enabled: true,
+          selectionMode: 'blind',
+          sceneUuid: '',
+          tasks: [{
+            name: 'Secret Moonpetal Harvest',
+            description: 'This real task name should remain GM-only in player blind views.',
+            img: 'icons/consumables/plants/leaf-herb-green.webp',
+            enabled: true,
+            resolutionMode: 'progressive',
+            progressive: { awardMode: 'equal' },
+            check: { provider: 'dnd5e', formula: '20', threshold: '10' },
+            resultGroups: [{
+              name: 'Moonpetals',
+              results: [{ componentId: componentMap['Mystic Herb'], quantity: 1 }]
+            }]
+          }]
+        }));
+
         return {
           systemId,
           componentMap,
           recipeIds: [recipe1.id, recipe2.id, recipe3.id],
-          healingPotionRecipeId: recipe2.id
+          healingPotionRecipeId: recipe2.id,
+          gatheringEnvironmentId: gatheringEnvironment.id,
+          playerGatheringEnvironmentIds: playerGatheringFixtures.map(environment => environment.id)
         };
       });
 
@@ -1075,6 +1697,36 @@ async function main() {
 
       results.steps.push({ step: 'create-crafting-system', passed: true });
       process.stdout.write(`Phase C complete: System "${craftingSetup.systemId}" with ${craftingSetup.recipeIds.length} recipes.\n`);
+
+      try {
+        const otherGatheringSystemsEnabled = await page.evaluate((systemId) => {
+          const csm = game.fabricate.getCraftingSystemManager();
+          return csm.getSystems()
+            .some(system => system.id !== systemId && system.features?.gathering === true);
+        }, craftingSetup.systemId);
+        await page.evaluate(async (systemId) => {
+          const csm = game.fabricate.getCraftingSystemManager();
+          await csm.updateSystem(systemId, { features: { essences: true, gathering: false } });
+        }, craftingSetup.systemId);
+        await page.locator('#sidebar [data-tab="items"]').first().click({ force: true });
+        await page.waitForTimeout(750);
+        if (!otherGatheringSystemsEnabled && await page.locator('button[data-fabricate-action="gathering"]').count() > 0) {
+          throw new Error('Gathering action is visible when no system enables gathering.');
+        }
+        if (otherGatheringSystemsEnabled) {
+          results.steps.push({ step: 'gathering-feature-gate-negative', passed: true, skipped: true });
+        } else {
+          results.steps.push({ step: 'gathering-feature-gate-negative', passed: true });
+        }
+      } catch (err) {
+        results.steps.push({ step: 'gathering-feature-gate-negative', passed: false, error: err.message });
+      } finally {
+        await page.evaluate(async (systemId) => {
+          const csm = game.fabricate.getCraftingSystemManager();
+          await csm.updateSystem(systemId, { features: { essences: true, gathering: true } });
+        }, craftingSetup.systemId);
+        await page.waitForTimeout(750);
+      }
 
       // ── Phase D: Screenshot Recipe Manager ──────────────────────────────────
       process.stdout.write('Phase D: Opening Recipe Manager...\n');
@@ -1102,12 +1754,14 @@ async function main() {
           process.stdout.write('Selected "Arcane Forge" system in sidebar.\n');
         }
 
+        await assertNoScreenshotOverlays(page);
         await screenshot(page, 'recipe-manager-default');
         process.stdout.write('  Screenshotted Recipe Manager default view.\n');
 
         // Click through tabs using button text (Svelte tabs have no data-tab attributes)
         // Tab labels from lang/en.json: Systems, Components, Recipes, Rules, Graph
         const adminTabs = [
+          { label: 'Environments', slug: 'environments' },
           { label: 'Systems', slug: 'systems' },
           { label: 'Components', slug: 'items' },
           { label: 'Recipes', slug: 'recipes' },
@@ -1117,13 +1771,88 @@ async function main() {
         for (const { label, slug } of adminTabs) {
           try {
             const tab = page.locator(`.admin-tabs button:has-text("${label}")`).first();
-            if (await tab.count() > 0) {
-              await tab.click();
-              await page.waitForTimeout(1_000);
-              await screenshot(page, `recipe-manager-${slug}`);
-              process.stdout.write(`  Screenshotted Recipe Manager "${label}" tab.\n`);
+            if (await tab.count() === 0) {
+              if (slug === 'environments') {
+                const availableTabs = await page.locator('.admin-tabs button').evaluateAll(buttons =>
+                  buttons.map(button => button.textContent?.trim()).filter(Boolean)
+                );
+                throw new Error(
+                  `Environments tab was not available for screenshot validation. ` +
+                  `Available tabs: ${availableTabs.join(', ') || 'none'}.`
+                );
+              }
+              continue;
+            }
 
-              if (slug === 'systems') {
+            await tab.click();
+            await page.waitForTimeout(1_000);
+            await assertNoScreenshotOverlays(page);
+            await screenshot(page, `recipe-manager-${slug}`);
+            process.stdout.write(`  Screenshotted Recipe Manager "${label}" tab.\n`);
+
+            if (slug === 'environments') {
+              await page.locator('.environment-card').filter({ hasText: 'Azure Grove' }).first()
+                .waitFor({ state: 'visible', timeout: 10_000 });
+              const environmentListText = await page.locator('.environment-list').first().textContent();
+              for (const expectedEnvironmentName of [
+                'Azure Grove',
+                'Verdant Meadow',
+                'Sunken Ruins',
+                'Crystal Thicket',
+                'Timed Orchard',
+                'Withered Patch',
+                'Moonlit Blind Grove'
+              ]) {
+                if (!String(environmentListText || '').includes(expectedEnvironmentName)) {
+                  throw new Error(`GM Environments list did not show environment name: ${expectedEnvironmentName}`);
+                }
+              }
+
+              await exerciseGmEnvironmentCardPointerActions(page);
+
+              await page.locator('.environment-card').filter({ hasText: 'Azure Grove' }).first()
+                .locator('.environment-card-edit')
+                .click();
+              await page.locator('.environment-draft-editor').first().waitFor({ state: 'visible', timeout: 10_000 });
+              await prepareGmEnvironmentsScreenshotState(page);
+
+              await setRecipeManagerWindowSize(page, { width: 1000, height: 700 });
+              await scrollEnvironmentEditorToTop(page);
+              await dismissFoundryNotifications(page);
+              await screenshot(page, 'gm-environments-normal-validation');
+              process.stdout.write('  Screenshotted GM Environments validation state at normal admin size.\n');
+
+              await scrollEnvironmentEditorTo(page, '.environment-catalyst-authoring');
+              await dismissFoundryNotifications(page);
+              await screenshot(page, 'gm-environments-normal-authoring');
+              process.stdout.write('  Screenshotted GM Environments result/catalyst authoring at normal admin size.\n');
+
+              await scrollEnvironmentEditorTo(page, '.environment-result-authoring');
+              await dismissFoundryNotifications(page);
+              await screenshot(page, 'gm-environments-normal-results');
+              process.stdout.write('  Screenshotted GM Environments result rows at normal admin size.\n');
+
+              await setRecipeManagerWindowSize(page, { width: 640, height: 700 });
+              await scrollEnvironmentEditorTo(page, '.environment-catalyst-authoring');
+              await dismissFoundryNotifications(page);
+              await screenshot(page, 'gm-environments-narrow-authoring');
+              process.stdout.write('  Screenshotted GM Environments narrow container-query authoring state.\n');
+
+              await scrollEnvironmentEditorTo(page, '.environment-result-authoring');
+              await dismissFoundryNotifications(page);
+              await screenshot(page, 'gm-environments-narrow-results');
+              process.stdout.write('  Screenshotted GM Environments narrow container-query result rows.\n');
+
+              const cancelDraft = page.locator('.environment-save-actions button:has-text("Cancel")').first();
+              if (await cancelDraft.count() > 0) {
+                await cancelDraft.evaluate(button => button.click());
+                await page.waitForTimeout(500);
+              }
+
+              await page.setViewportSize({ width: 1920, height: 1080 });
+            }
+
+            if (slug === 'systems') {
                 await page.evaluate(() => {
                   document.querySelector('.essence-creation-toolbar')?.scrollIntoView({
                     behavior: 'auto',
@@ -1136,12 +1865,14 @@ async function main() {
                 await pickerTrigger.click();
                 await page.locator('.essence-icon-picker-popover').first().waitFor({ state: 'visible', timeout: 5_000 });
                 await page.waitForTimeout(300);
+                await assertNoScreenshotOverlays(page);
                 await screenshot(page, 'recipe-manager-systems-essence-picker');
                 process.stdout.write('  Screenshotted Systems tab essence picker.\n');
 
                 const pickerSearch = page.locator('.essence-icon-picker-search input').first();
                 await pickerSearch.fill('backward fast');
                 await page.waitForTimeout(300);
+                await assertNoScreenshotOverlays(page);
                 await screenshot(page, 'recipe-manager-systems-essence-picker-filtered');
                 process.stdout.write('  Screenshotted filtered essence picker state.\n');
 
@@ -1161,6 +1892,7 @@ async function main() {
                   await editPickerTrigger.click();
                   await page.locator('.essence-icon-picker-popover').first().waitFor({ state: 'visible', timeout: 5_000 });
                   await page.waitForTimeout(300);
+                  await assertNoScreenshotOverlays(page);
                   await screenshot(page, 'recipe-manager-systems-essence-edit-picker');
                   process.stdout.write('  Screenshotted inline essence edit picker.\n');
 
@@ -1176,32 +1908,14 @@ async function main() {
                   }
                 }
               }
-            }
-          } catch {
+          } catch (err) {
+            if (slug === 'environments') throw err;
             // Tab may not exist in this version
           }
         }
 
         // Close all open application windows (try both V1 and V2 APIs)
-        await page.evaluate(() => {
-          // V1 ApplicationV1 windows
-          if (ui.windows) {
-            for (const [, app] of Object.entries(ui.windows)) {
-              try { app.close(); } catch { /* ignore */ }
-            }
-          }
-          // V2 ApplicationV2 windows — close via DOM
-          document.querySelectorAll('.application .header-button.close, .application .close').forEach(btn => {
-            try { btn.click(); } catch { /* ignore */ }
-          });
-        });
-        await page.waitForTimeout(1_500);
-        // Also click any remaining close buttons via Playwright
-        const closeButtons = page.locator('.application .header-button.close');
-        for (let i = 0; i < await closeButtons.count(); i++) {
-          try { await closeButtons.nth(i).click({ timeout: 2_000 }); } catch { /* ignore */ }
-        }
-        await page.waitForTimeout(500);
+        await closeOpenApplications(page);
 
         process.stdout.write('  Closing Recipe Manager windows...\n');
         results.steps.push({ step: 'screenshot-recipe-manager', passed: true });
@@ -1209,6 +1923,190 @@ async function main() {
       } catch (err) {
         results.steps.push({ step: 'screenshot-recipe-manager', passed: false, error: err.message });
         process.stderr.write(`Phase D failed: ${err.message}\n`);
+      }
+
+      // ── Phase D2: Screenshot Gathering app live states ─────────────────────
+      process.stdout.write('Phase D2: Exercising Gathering app live states...\n');
+      try {
+        await closeOpenApplications(page);
+        await page.setViewportSize({ width: 1920, height: 1080 });
+        await page.waitForTimeout(500);
+        const itemsTab = page.locator('#sidebar [data-tab="items"]').first();
+        await itemsTab.click({ force: true });
+        await page.waitForTimeout(1_000);
+        const gatheringButton = page.locator('button[data-fabricate-action="gathering"]').first();
+        await gatheringButton.waitFor({ state: 'visible', timeout: 10_000 });
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'items-sidebar-gathering-enabled');
+
+        await openGatheringAppFromDirectory(page);
+        await page.locator('.fabricate-gathering-app').first().waitFor({ state: 'visible', timeout: 10_000 });
+        await selectGatheringActor(page, 'Alara the Alchemist');
+        await page.locator('.gathering-environment-card').filter({ hasText: 'Verdant Meadow' }).first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await page.locator('.gathering-task-row').filter({ hasText: 'Gather Meadow Herbs' }).first()
+          .locator('.gathering-start-button').waitFor({ state: 'visible', timeout: 10_000 });
+        await screenshot(page, 'gathering-targeted-ready');
+
+        const sceneBlockedCard = page.locator('.gathering-environment-card.is-blocked').filter({ hasText: 'Sunken Ruins' }).first();
+        await sceneBlockedCard.waitFor({ state: 'visible', timeout: 10_000 });
+        await sceneBlockedCard.locator('.gathering-chip').first().waitFor({ state: 'visible', timeout: 5_000 });
+        if (await sceneBlockedCard.locator('.gathering-start-button').first().isEnabled()) {
+          throw new Error('Scene-blocked gathering task start button should be disabled.');
+        }
+        await scrollGatheringAppToText(page, 'Sunken Ruins');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'gathering-scene-blocked');
+
+        await selectGatheringActor(page, 'Brom the Blacksmith');
+        const catalystBlockedRow = page.locator('.gathering-task-row.is-blocked').filter({ hasText: 'Bottle Crystal Dew' }).first();
+        await catalystBlockedRow.waitFor({ state: 'visible', timeout: 10_000 });
+        if (await catalystBlockedRow.locator('.gathering-start-button').first().isEnabled()) {
+          throw new Error('Catalyst-blocked gathering task start button should be disabled.');
+        }
+        const bromVialCountBefore = await page.evaluate((bromId) => {
+          const brom = game.actors.get(bromId);
+          return brom?.items?.contents?.filter(item => item.name === 'Empty Vial').length ?? 0;
+        }, cleanup.bromId);
+        await scrollGatheringAppToText(page, 'Bottle Crystal Dew');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'gathering-catalyst-blocked');
+        const bromVialCountAfter = await page.evaluate((bromId) => {
+          const brom = game.actors.get(bromId);
+          return brom?.items?.contents?.filter(item => item.name === 'Empty Vial').length ?? 0;
+        }, cleanup.bromId);
+        if (bromVialCountAfter !== bromVialCountBefore) {
+          throw new Error('Blocked catalyst attempt changed the selected actor catalyst inventory.');
+        }
+
+        await selectGatheringActor(page, 'Alara the Alchemist');
+        await startGatheringTaskByLabel(page, 'Gather Meadow Herbs');
+        await page.locator('.gathering-feedback-panel.success').first().waitFor({ state: 'visible', timeout: 10_000 });
+        await page.locator('.gathering-history-row').filter({ hasText: 'Gather Meadow Herbs' }).first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'gathering-immediate-success');
+
+        await dismissFoundryNotifications(page);
+        const herbCountBeforeFailure = await page.evaluate((alaraId) => {
+          const alara = game.actors.get(alaraId);
+          return alara?.items?.contents?.filter(item => item.name === 'Mystic Herb').length ?? 0;
+        }, cleanup.alaraId);
+        await startGatheringTaskByLabel(page, 'Search Withered Patch');
+        await page.locator('.gathering-feedback-panel.warning').first().waitFor({ state: 'visible', timeout: 10_000 });
+        await page.locator('.gathering-history-row').filter({ hasText: 'Search Withered Patch' }).first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        const herbCountAfterFailure = await page.evaluate((alaraId) => {
+          const alara = game.actors.get(alaraId);
+          return alara?.items?.contents?.filter(item => item.name === 'Mystic Herb').length ?? 0;
+        }, cleanup.alaraId);
+        if (herbCountAfterFailure !== herbCountBeforeFailure) {
+          throw new Error('Failed gathering attempt created result items.');
+        }
+        await scrollGatheringAppToText(page, 'The patch yields only brittle stems.');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'gathering-failure-feedback');
+
+        await startGatheringTaskByLabel(page, 'Tend Slow Bloom');
+        await page.locator('.gathering-run-row').filter({ hasText: 'Tend Slow Bloom' }).first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await scrollGatheringAppToText(page, 'Active Gathering');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'gathering-timed-active');
+
+        await setGatheringWindowSize(page, { width: 500, height: 720 });
+        await scrollGatheringAppToText(page, 'Active Gathering');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'gathering-narrow-active-history');
+
+        await page.evaluate(async () => {
+          await game.time.advance(120);
+        });
+        await page.waitForTimeout(2_000);
+        await closeOpenApplications(page);
+        await openGatheringAppFromDirectory(page);
+        await selectGatheringActor(page, 'Alara the Alchemist');
+        await page.locator('.gathering-history-row').filter({ hasText: 'Tend Slow Bloom' }).first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        const firstHistoryText = await page.locator('.gathering-history-row').first().textContent();
+        if (!String(firstHistoryText || '').includes('Tend Slow Bloom')) {
+          throw new Error('Completed timed gathering run was not prepended to history.');
+        }
+        const timedState = await page.evaluate((alaraId) => {
+          const actor = game.actors.get(alaraId);
+          const runs = actor?.getFlag?.('fabricate', 'gatheringRuns') ?? {};
+          const activeRuns = Array.isArray(runs.active)
+            ? runs.active
+            : Object.values(runs.active || {});
+          return {
+            active: activeRuns.filter(run => run?.taskId && run.taskId !== 'blind'),
+            firstHistoryTaskId: Array.isArray(runs.history) ? runs.history[0]?.taskId ?? null : null
+          };
+        }, cleanup.alaraId);
+        if (timedState.active.some(run => run.status === 'waitingTime')) {
+          throw new Error('Timed gathering run remained active after world-time advancement.');
+        }
+        await scrollGatheringAppToText(page, 'Recent History');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'gathering-timed-complete');
+
+        results.steps.push({ step: 'gathering-gm-live-states', passed: true });
+        process.stdout.write('Phase D2 complete: GM/player Gathering states screenshotted.\n');
+      } catch (err) {
+        results.steps.push({ step: 'gathering-gm-live-states', passed: false, error: err.message });
+        process.stderr.write(`Phase D2 failed: ${err.message}\n`);
+        await screenshot(page, 'gathering-gm-live-states-failure');
+      }
+
+      // ── Phase D3: Screenshot non-GM gathering redaction and empty states ───
+      process.stdout.write('Phase D3: Exercising non-GM Gathering app states...\n');
+      try {
+        const playerContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+        const playerPage = await playerContext.newPage();
+        attachConsoleCapture(playerPage, ignoredErrorPatterns);
+        await playerPage.goto(`${FOUNDRY_URL}/join`, { waitUntil: 'domcontentloaded' });
+        await joinWorldSession(playerPage, results, { userLabel: 'Fabricate Gatherer', stepName: null });
+        await playerPage.waitForFunction(() => typeof game !== 'undefined' && game.ready, { timeout: 30_000 });
+        await playerPage.waitForFunction(() => game.fabricate?.ready === true, { timeout: 15_000 });
+        await openGatheringAppFromDirectory(playerPage);
+        await playerPage.locator('.fabricate-gathering-app').first().waitFor({ state: 'visible', timeout: 10_000 });
+        await playerPage.locator('.gathering-environment-card').filter({ hasText: 'Moonlit Blind Grove' }).first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await playerPage.locator('.gathering-task-row').filter({ hasText: 'Gather' }).first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        const blindLeaks = await playerPage.evaluate(() => {
+          const blindCard = Array.from(document.querySelectorAll('.gathering-environment-card'))
+            .find(card => card.textContent?.includes('Moonlit Blind Grove'));
+          const appText = blindCard?.textContent || '';
+          return [
+            'Secret Moonpetal Harvest',
+            'This real task name should remain GM-only',
+            'Moonpetals',
+            'Mystic Herb',
+            'progressive',
+            'dnd5e',
+            'threshold',
+            'catalyst'
+          ].filter(secret => appText.includes(secret));
+        });
+        if (blindLeaks.length > 0) {
+          throw new Error(`Blind gathering leaked GM-only details: ${blindLeaks.join(', ')}`);
+        }
+        await scrollGatheringAppToText(playerPage, 'Moonlit Blind Grove');
+        await assertNoScreenshotOverlays(playerPage);
+        await screenshot(playerPage, 'gathering-blind-redacted');
+        await setGatheringWindowSize(playerPage, { width: 500, height: 720 });
+        await scrollGatheringAppToText(playerPage, 'Moonlit Blind Grove');
+        await assertNoScreenshotOverlays(playerPage);
+        await screenshot(playerPage, 'gathering-player-narrow');
+        await playerContext.close();
+
+        results.steps.push({ step: 'gathering-non-gm-states', passed: true });
+        process.stdout.write('Phase D3 complete: Non-GM Gathering states screenshotted.\n');
+      } catch (err) {
+        results.steps.push({ step: 'gathering-non-gm-states', passed: false, error: err.message });
+        process.stderr.write(`Phase D3 failed: ${err.message}\n`);
+        await screenshot(page, 'gathering-non-gm-states-failure');
       }
 
       // ── Phase E: Craft an item ──────────────────────────────────────────────
@@ -1303,6 +2201,41 @@ async function main() {
         await screenshot(page, 'craft-failure');
       }
 
+      // ── Phase E2: No selectable actors player state after actor cleanup ───
+      process.stdout.write('Phase E2: Exercising no-selectable-actors Gathering state...\n');
+      try {
+        await closeOpenApplications(page);
+        await page.evaluate(async (actorIds) => {
+          if (actorIds.length > 0) {
+            await Actor.deleteDocuments(actorIds);
+          }
+        }, cleanup.actorIds);
+        cleanup.actorIds = [];
+        cleanup.alaraId = null;
+        cleanup.bromId = null;
+
+        const observerContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+        const observerPage = await observerContext.newPage();
+        attachConsoleCapture(observerPage, ignoredErrorPatterns);
+        await observerPage.goto(`${FOUNDRY_URL}/join`, { waitUntil: 'domcontentloaded' });
+        await joinWorldSession(observerPage, results, { userLabel: 'Fabricate Observer', stepName: null });
+        await observerPage.waitForFunction(() => typeof game !== 'undefined' && game.ready, { timeout: 30_000 });
+        await observerPage.waitForFunction(() => game.fabricate?.ready === true, { timeout: 15_000 });
+        await openGatheringAppFromDirectory(observerPage);
+        await observerPage.locator('.gathering-empty-state').filter({ hasText: 'No Selectable Actors' }).first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await assertNoScreenshotOverlays(observerPage);
+        await screenshot(observerPage, 'gathering-no-selectable-actors');
+        await observerContext.close();
+
+        results.steps.push({ step: 'gathering-no-selectable-actors-state', passed: true });
+        process.stdout.write('Phase E2 complete: No-selectable-actors state screenshotted.\n');
+      } catch (err) {
+        results.steps.push({ step: 'gathering-no-selectable-actors-state', passed: false, error: err.message });
+        process.stderr.write(`Phase E2 failed: ${err.message}\n`);
+        await screenshot(page, 'gathering-no-selectable-actors-failure');
+      }
+
     } catch (err) {
       results.steps.push({ step: 'create-crafting-system', passed: false, error: err.message });
       process.stderr.write(`Phase C failed: ${err.message}\n`);
@@ -1347,6 +2280,9 @@ async function main() {
 
         // Delete crafting system
         if (cleanupData.systemId) {
+          const environmentStore = game.fabricate?.getGatheringEnvironmentStore?.();
+          try { await environmentStore?.cleanupByCraftingSystem?.(cleanupData.systemId); } catch { /* ok */ }
+
           const csm = game.fabricate?.getCraftingSystemManager?.();
           if (csm) {
             try { await csm.deleteSystem(cleanupData.systemId); } catch { /* already deleted */ }
@@ -1356,6 +2292,11 @@ async function main() {
         // Delete actors
         if (cleanupData.actorIds.length > 0) {
           try { await Actor.deleteDocuments(cleanupData.actorIds); } catch { /* ok */ }
+        }
+
+        // Delete smoke users after actors so ownership references do not matter.
+        if (cleanupData.userIds.length > 0) {
+          try { await User.deleteDocuments(cleanupData.userIds); } catch { /* ok */ }
         }
 
         // Delete world items

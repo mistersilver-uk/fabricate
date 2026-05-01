@@ -467,6 +467,14 @@
     onToggle={(v) => store.toggleFeature('multiStepRecipes', v)}
   />
 
+  <!-- Gathering -->
+  <FeatureCard
+    title={localize('FABRICATE.Admin.Features.Gathering.Title')}
+    hint={localize('FABRICATE.Admin.Features.Gathering.Hint')}
+    enabled={selectedSystem.features.gathering}
+    onToggle={(v) => store.toggleFeature('gathering', v)}
+  />
+
   <!-- Time Requirements -->
   <FeatureCard
     title={localize('FABRICATE.Admin.Features.TimeRequirements.Title')}

@@ -164,10 +164,11 @@ GatheringTask = {
 
 1. `resolutionMode` must be either `"progressive"` or `"routed"`.
 2. Gathering tasks have no ingredients. Any configuration that depends on `IngredientSet` or `ingredientSet` routing is invalid.
-3. `failureOutcome` is optional, but task failure must still be supported at runtime even when default feedback is used.
+3. `failureOutcome` is optional, but task failure must still be supported at runtime by applying default failure feedback when no special outcome is configured.
 4. `failureOutcome` applies whenever routed or progressive resolution ends in failure, including when a provider returns compatibility aliases from the former miss-family or hazard-family keyword sets.
-5. GM-facing helper text should document `fail` as the canonical special outcome keyword. Older aliases remain accepted for compatibility but are not the preferred authored form.
-6. Disabled tasks are ignored for normal player listing and may not be attempted.
+5. Invalid `failureOutcome` configuration must abort start-attempt validation before provider resolution, terminal history, result creation, catalyst usage, or failure feedback side effects.
+6. GM-facing helper text should document `fail` as the canonical special outcome keyword. Older aliases remain accepted for compatibility but are not the preferred authored form.
+7. Disabled tasks are ignored for normal player listing and may not be attempted.
 
 ## TimeRequirement
 
@@ -192,8 +193,9 @@ TimeRequirement = {
 1. `timeRequirement` is a duration declaration, not an absolute timestamp.
 2. If present, at least one of `minutes`, `hours`, `days`, `months`, or `years` must be a positive number.
 3. Runtime execution normalizes duration fields to a world-time target timestamp for gate evaluation.
-4. A gathering task with no `timeRequirement` resolves immediately.
-5. A gathering task with `timeRequirement` creates an in-progress gathering run and resolves when the world-time target is reached.
+4. A gathering task with no `timeRequirement` is an immediate-resolution task. After start guards and selected-task configuration validation pass, Fabricate resolves its routed or progressive terminal outcome during `startAttempt`.
+5. Immediate-resolution tasks do not create active runs. Terminal outcomes are written directly to acting-actor history as `succeeded` or `failed`: planned `createdResults`, `usedCatalysts`, and `checkResult` are persisted in terminal history before post-history commits; success then creates result items; failure creates no result items and then applies terminal catalyst behavior plus configured or default failure feedback. If terminal history persistence fails, result creation, catalyst usage, and failure feedback must not commit.
+6. A gathering task with `timeRequirement` creates an active `waitingTime` gathering run after start guards pass. Backend terminal completion is processed when the module-private `GatheringEngine.processWorldTime(worldTime)` receives a world time at or after the run's `timeGate.availableAt` through guarded ready/updateWorldTime dispatch; player-facing active-run and history presentation is provided by the dedicated Gathering app.
 
 ## GatheringVisibilityGate
 
@@ -260,6 +262,8 @@ GatheringCheck = {
 4. Progressive checks must resolve to a numeric value and may additionally carry a terminal status (`success` or `failure`).
 5. Routed tasks using `macroOutcome` do not require `check`; the macro outcome provider resolves the result directly.
 6. Routed tasks using `rollTableOutcome` do not require `check` unless a future implementation adds an extra pre-roll check layer.
+7. A check result with a numeric value and no terminal status is neutral. The runtime must use the value for progressive award evaluation and must not treat the result as success or failure by itself.
+8. Check evaluator diagnostics for unsupported providers, provider exceptions, missing required fields, or malformed return values are GM-fix-required diagnostics, not terminal player failure outcomes.
 
 For `dnd5e` and `pf2e`, `formula` and optional `threshold` use the same actor-aware formula/expression syntax those systems already expose to users. Fabricate must not invent a parallel formula language for them.
 
@@ -293,6 +297,7 @@ SpecialOutcome = {
 2. `mode === "macro"` requires `macroUuid`.
 3. If a special outcome is omitted, Fabricate must still produce default user feedback for that outcome state.
 4. Failure outcomes never create gathered result items.
+5. Invalid special outcome configuration is a GM-fix-required task misconfiguration, not a terminal player failure.
 
 ## Selection Semantics
 
@@ -341,6 +346,7 @@ If `environment.sceneUuid` is absent, the environment is not scene-gated by this
 - GMs may view and configure all environments and tasks.
 - GMs may bypass player-facing visibility restrictions for inspection, testing, and administration.
 - Non-GM users may gather only with actors they own and only when all scene and visibility guards pass.
+- Gathering actor selectability is based on actor resolution and Foundry ownership/permission, not actor document type. Fabricate must not exclude Actor types such as `npc`, `group`, or `character` by type.
 
 ## Task Visibility
 
@@ -353,8 +359,10 @@ For a given `viewer`, `actor`, and `environment`:
 5. If a task has a `visibility` gate, evaluate it for the selected actor.
 6. If the gate evaluates truthy, the task is visible.
 7. If the gate evaluates falsy, the task is hidden from normal player selection.
+8. Listing output separates visibility from attemptability so scene/token, duplicate active run, and catalyst blockers can keep otherwise visible entries listable with localized blocked reasons.
 
 In `blind` environments, if the sole task is hidden for an actor, that actor cannot gather from the environment.
+For non-GM users, a visible blind task must remain opaque in listing output: generic localized labels replace task identity, images, visibility diagnostics, resolution metadata, and catalyst details. GMs may inspect the real blind task metadata.
 
 ## Catalyst Semantics
 
@@ -363,7 +371,8 @@ In `blind` environments, if the sole task is hidden for an actor, that actor can
 - A catalyst is considered "used" only for a terminal attempt (`succeeded` or `failed`).
 - Blocked or misconfiguration-aborted attempts do not degrade or destroy catalysts.
 - Catalyst degradation and exhaustion follow the configured `degradesOnUse`, `destroyWhenExhausted`, and `maxUses` semantics.
-- Gathering tasks do not draw catalysts from component source actors; catalysts are validated against the acting actor.
+- Gathering tasks do not draw catalysts from component source actors; catalyst availability and terminal catalyst usage are both evaluated against the selected acting actor.
+- Terminal catalyst usage is applied only after the gathering outcome has resolved to `succeeded` or `failed`.
 
 ## Routed Task Resolution
 
@@ -439,7 +448,8 @@ Resolve ordered gathering results from a numeric check value.
 
 ### Semantics
 
-- A progressive task has exactly one `resultGroup` whose ordered `results` are evaluated by increasing difficulty.
+- A progressive task has exactly one `resultGroup` whose ordered `results` are evaluated by the referenced `Component.difficulty`.
+- Result rows do not carry their own progressive difficulty; inline result-level difficulty is invalid drift from the component-canonical validation model.
 - The task must have a `check` capable of returning a numeric `value`.
 - The task may optionally return a terminal `status` of `success` or `failure`.
 - If `status === "failure"`, no gathered results are created and the failure path is taken immediately.
@@ -468,6 +478,8 @@ Macro-based progressive checks return:
 ```
 
 Adapter-based progressive checks must resolve to an equivalent numeric result, with optional terminal status if the adapter supports it.
+Value-only check results are neutral and remain eligible for progressive award evaluation. They do not force a terminal success or failure status.
+Provider diagnostics from the check evaluator abort resolution as misconfiguration/provider errors; they do not create failed gathering history, failure feedback, catalyst usage, or result items.
 
 ### Validation
 
@@ -491,33 +503,51 @@ There is no multi-step gathering state in this phase.
 4. Enforce scene access rules when `sceneUuid` is present.
 5. Evaluate task visibility for the selected actor.
 6. Reject if the actor already has an active gathering run for the same `taskId`.
-7. Validate required catalysts.
-8. Validate task configuration for the chosen resolution mode.
+7. Validate required catalysts against the selected acting actor.
+8. Validate the selected task's configuration for the chosen resolution mode, including `failureOutcome`, before invoking providers or writing terminal side effects.
 9. If `task.timeRequirement` is absent:
-   - resolve the terminal outcome immediately,
-   - write the terminal run entry directly to history,
-   - return the resolved result to the UI.
-10. If `task.timeRequirement` is present:
-   - create an active gathering run,
+   - return `accepted: true`,
+   - return `started: true`,
+   - resolve the routed or progressive terminal outcome,
+   - do not create an active run,
+   - plan `createdResults`, `usedCatalysts`, and `checkResult` before post-history commits,
+   - write exactly one terminal history entry for `succeeded` or `failed` outcomes with those planned refs,
+   - abort without result creation, catalyst usage, or failure feedback if terminal history persistence fails,
+   - create gathered result items on the selected actor only when the outcome is `succeeded` after terminal history persists,
+   - do not create gathered result items when the outcome is `failed`,
+   - apply catalyst degradation or destruction for the terminal attempt after the outcome is known, terminal history persists, and only against the selected actor,
+   - apply configured or default failure feedback on failed outcomes after terminal history persists,
+   - for non-GM blind attempts, redact task identity, result details, catalyst details, provider diagnostics, and check internals from player-facing responses and persisted terminal history.
+10. If `task.timeRequirement` is present after all start guards and task validation pass:
+   - create exactly one active gathering run,
    - set run status to `waitingTime`,
    - persist a time gate derived from the declared duration,
-   - return the in-progress run state to the UI.
+   - return the in-progress run state to the UI,
+   - do not pass `usedCatalysts` or `createdResults` into waiting-run creation,
+   - do not write terminal history,
+   - do not consume, degrade, or destroy catalysts,
+   - do not create result items.
+
+Immediate terminal outcome resolution is current `startAttempt` behavior for non-timed tasks. Timed backend completion/resolution, timed result creation, timed catalyst side effects, timed terminal history writes, timed cancellation for missing references, and misconfiguration cleanup are current module-private `GatheringEngine.processWorldTime(worldTime)` behavior. Module bootstrap constructs and loads the gathering runtime internally after systems load, wires environment-store cleanup callbacks to `GatheringRunManager`, exposes the store/run/evaluator getters plus narrow viewer-enforcing `listGatheringForActor(options)` and `startGatheringAttempt(options)` methods, and dispatches ready/updateWorldTime processing to `processWorldTime(worldTime)` with error isolation. The raw engine instance is not public. The current GM admin `Environments` editor is gated by the selected system's `features.gathering`, lists cloned environment records from the store, exposes a cloned selected draft, edits name, description, enabled state, selection mode, and scene UUID, tracks selected-draft dirty state, provides visible save/cancel actions, and falls back to a valid active tab when the environment tab is no longer visible. Creating an environment persists a disabled draft shell with one disabled placeholder task for validation compatibility; that shell is not a configured player-visible gathering path until configured and enabled by the GM. Duplicate, delete, and reorder use environment-store methods, and delete requires confirmation before the store cleans referenced gathering runs. Store-owned task/result/catalyst/visibility/result-selection/progressive/check/time/failure callbacks are wired from the root into the tab, and the tab delegates those mutations to the admin store. The selected draft supports task-list CRUD (add, select, duplicate, delete, and reorder), base task field edits for `name`, `description`, `img`, `enabled`, and `resolutionMode`, selected-task result-group authoring, selected-task catalyst authoring, selected-task visibility-gate authoring, routed result-selection provider authoring, progressive check/award-mode authoring, selected-task time-requirement authoring, and selected-task failure-outcome authoring. Result-group authoring includes group add/rename/delete/reorder plus component-based result add/edit/delete/reorder for `componentId` and `quantity`. Catalyst authoring includes catalyst add/delete plus editing `componentId`, `degradesOnUse`, `destroyWhenExhausted`, and nullable `maxUses`; the environment-store validation boundary rejects blank catalyst components and rejects non-positive or fractional `maxUses` when degradation is enabled. Visibility authoring supports enable/clear plus `macro`, `dnd5e`, and `pf2e` provider fields, with incomplete provider input kept local until required fields are available for a valid draft mutation. Routed result-selection authoring supports `macroOutcome.macroUuid` from available script macro options and `rollTableOutcome.rollTableUuid` as UUID text input. Progressive authoring supports `progressive.awardMode` values `equal`, `partial`, and `exceed`, plus `macro`, `dnd5e`, and `pf2e` checks with optional thresholds for dnd5e/pf2e. Time-requirement authoring supports immediate tasks by clearing `timeRequirement` and timed tasks by editing minutes, hours, days, months, and years. Failure-outcome authoring supports clearing to default failure feedback plus text and macro custom outcomes, with provider switching clearing stale provider fields. Task/result/catalyst/visibility/result-selection/progressive/check/time/failure edits preserve nested task configuration outside the edited collection and continue to save through the environment-store validation boundary. New draft placeholder result groups receive immediate IDs so they can be edited before save/reload. Managed item options are prepared by the admin store/root and passed into the environments tab; the tab does not perform Foundry lookups. Progressive difficulty is displayed from selected managed component difficulty and is not persisted inline on result rows because canonical store validation uses managed component difficulty. Dirty environment draft confirmation, save-blocking validation/accessibility presentation, the player-facing gathering app, the Items Directory `Gathering` action, dedicated gathering app registration, scene-linked runtime integration coverage, hook-driven timed completion coverage, and harvesting boundary regression coverage are implemented. Live Foundry validation remains conditional for future runtime-specific or screenshot-required work.
 
 ### Completion Flow
 
-When world time advances past the run's `timeGate.availableAt`, Fabricate must resume the run:
+When world time advances to or past a run's `timeGate.availableAt`, the backend gathering runtime resumes matured `waitingTime` runs through `GatheringEngine.processWorldTime(worldTime)`:
 
 1. Re-resolve the environment, task, crafting system, and actor.
-2. If required references are missing, cancel the run and move it to history with a terminal status.
-3. Resolve the terminal outcome:
+2. If required references are missing, cancel the run and move it to history with a terminal status, with blind redaction where an opaque blind environment can still be resolved.
+3. If the task is misconfigured at resume time, clear the active run without terminal player history, result items, catalyst usage, or failure feedback, and require a fresh manual start after the task is repaired.
+4. Resolve the terminal outcome:
    - routed result group
    - progressive awarded results
    - failure
-4. If the outcome is `succeeded`, create the resolved result items on the actor.
-5. If the outcome is `failed`, do not create gathered items.
-6. Execute configured special-outcome text or macros for failure paths.
-7. Degrade or destroy used catalysts for the terminal attempt.
-8. Remove the run from `active`, prepend it to `history`, and return the terminal result.
+5. Plan terminal `createdResults`, `usedCatalysts`, and `checkResult`.
+6. Remove the run from `active`, prepend it to `history`, and return the terminal result by calling `GatheringRunManager.completeRun()`.
+7. If `completeRun()` returns `null` or throws, report a completion error and do not create result items, apply catalyst usage, or run failure feedback.
+8. If the outcome is `succeeded`, create the resolved result items on the actor only after terminal history persists.
+9. If the outcome is `failed`, do not create gathered items, and execute configured special-outcome text or macros only after terminal history persists.
+10. Degrade or destroy used catalysts for the terminal attempt only after terminal history persists.
+11. For non-GM blind timed completions and cancellations, redact real task identity, result details, catalyst details, provider diagnostics, and check internals from player-facing responses and persisted terminal history; persisted terminal history may use a generic blind marker instead of the real `taskId`.
 
 ### Misconfiguration Errors
 
@@ -527,12 +557,15 @@ The following are GM-fix-required errors, not player-facing failure outcomes:
 - unresolved result-group name routing
 - invalid component references
 - invalid progressive difficulty configuration
+- invalid `failureOutcome` configuration
 
 Misconfiguration-aborted attempts:
 
 - do not create or advance active runs
 - do not degrade catalysts
 - do not create history entries as terminal player attempts
+
+Resume-time misconfiguration for an existing waiting run additionally removes the active run so the actor is not permanently blocked by one-active-run-per-task semantics. After the GM repairs the task, the player must start a fresh gathering attempt; the cleared run is not resumed.
 
 ## Run Tracking and Persistence
 
@@ -586,6 +619,7 @@ GatheringRun = {
 - `gatheringRuns.history` is ordered most-recent-first.
 - `gatheringRuns.history` is capped at **50** entries per actor.
 - When the 51st terminal entry is written, the oldest entry is discarded immediately.
+- For non-GM blind immediate and timed attempts, persisted terminal history must avoid real task identity, result details, catalyst details, provider diagnostics, and check internals. GM-started blind attempts may retain real task/result details for inspection.
 
 ### Active Run Constraints
 
@@ -603,12 +637,26 @@ When an environment is deleted:
 
 1. Remove actor active runs and history entries referencing the deleted `environmentId`.
 2. Remove or ignore any stale task references nested under that environment.
+3. This environment-store cleanup is destructive record cleanup, not terminal player cancellation history.
 
 ### Delete Task
 
 When a task is deleted from an environment:
 
 1. Remove actor active runs and history entries referencing the deleted `taskId`.
+2. This task cleanup is destructive record cleanup, not terminal player cancellation history.
+
+### Resume Missing References
+
+If a waiting run reaches its time gate and the backend runtime can no longer resolve the actor, crafting system,
+environment, or task needed to complete it, that runtime completion path treats the run as terminal cancellation:
+
+1. Remove the run from `active`.
+2. Prepend a `cancelled` history entry.
+3. Do not resolve results, apply catalyst usage, or run failure feedback.
+
+This cancellation path is distinct from deliberate environment-store destructive cleanup, which removes records for deleted
+systems, environments, or tasks.
 
 ### Change Selection Mode
 
@@ -633,7 +681,8 @@ If a linked scene is deleted:
 - Unit tests for visibility-gate evaluation using `dnd5e`, `pf2e`, and macro providers
 - Unit tests for pause-state rejection
 - Unit tests for scene gating and actor/token presence checks
-- Unit tests for immediate gathering when `timeRequirement` is absent
+- Unit tests for start-attempt guard ordering: rejected starts create no runs, immediate accepted starts write terminal history only after guards pass, terminal history persistence failures prevent post-history side effects, and timed accepted starts create `waitingTime` runs only after guards pass
+- Unit tests for immediate terminal gathering resolution when `timeRequirement` is absent, including success result creation, failed terminal history without result creation, terminal catalyst usage, configured/default failure feedback, invalid `failureOutcome` aborts, selected-task result-group validation, and blind non-GM terminal redaction
 - Unit tests for time-gated gathering run creation when `timeRequirement` is present
 - Unit tests for world-time completion of `waitingTime` gathering runs
 - Unit tests confirming misconfiguration-aborted attempts do not create active runs or history entries
@@ -648,6 +697,8 @@ If a linked scene is deleted:
   - explicit failure short-circuit
   - zero-award failure behavior
 - Unit tests for catalyst degradation on terminal attempts only
+- Unit tests confirming gathering catalyst availability and terminal usage are scoped to the selected acting actor only
+- Unit tests for non-GM blind terminal redaction and GM blind terminal inspectability
 - Unit tests for cleanup of active gathering runs when tasks or environments are deleted
 - Unit tests for actor history ordering and 50-entry retention
 - Integration tests for player gathering from a scene-linked environment
