@@ -53,7 +53,7 @@ Each step can define:
 - Within an `IngredientGroup`, any one option in `options` satisfies the group (OR within group).
 - AND-across-ingredient-sets is not supported.
 - OR groups are always enabled and are not feature-toggled.
-- Tag-placeholder ingredients (`Ingredient.match.type === "tags"`) are supported when `features.itemTags` is enabled, including simple recipes.
+- Tag-placeholder ingredients (`Ingredient.match.type === "tags"`) are always supported, including simple recipes, when their tag IDs exist in the crafting system's `itemTags` list.
 - Catalysts are defined at the recipe level, step level, and inside each `IngredientSet.catalysts`.
 - Catalyst degradation/usage is tracked on owned item instances.
 

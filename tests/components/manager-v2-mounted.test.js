@@ -540,7 +540,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
 
     assert.deepEqual(
       Array.from(target.querySelectorAll('.manager-v2-nav-label')).map(label => label.textContent.trim()),
-      ['System settings', 'Recipes', 'Components', 'Rules', 'Graph']
+      ['System settings', 'Recipes', 'Components', 'Tags & Categories', 'Rules', 'Graph']
     );
 
     const environmentFact = target.querySelector('[data-count-id="environments"]');

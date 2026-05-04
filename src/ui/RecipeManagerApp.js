@@ -169,9 +169,9 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
       requirements: s.requirements || { time: { enabled: false }, currency: { enabled: false, provider: 'macro' } },
       features: s.features || {},
       advancedOptionsEnabled: s.advancedOptionsEnabled !== false,
-      enableTags: s.features?.itemTags === true,
+      enableTags: true,
       enableEssences: s.features?.essences === true,
-      enableCategories: s.features?.recipeCategories === true,
+      enableCategories: true,
       enableComplexRecipes: s.features?.complexRecipes === true,
       enableMultiStepRecipes: s.features?.multiStepRecipes === true,
       enablePropertyMacros: s.features?.propertyMacros === true,
@@ -187,7 +187,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
       .sort((a, b) => a.name.localeCompare(b.name));
 
     const advancedEnabled = selectedSystem?.advancedOptionsEnabled !== false;
-    const showTags = advancedEnabled && selectedSystem?.enableTags === true;
+    const showTags = !!selectedSystem;
     const showEssences = advancedEnabled && selectedSystem?.enableEssences === true;
     const managedItemOptions = (selectedSystem?.items || []).map(item => ({
       id: item.id,
@@ -232,9 +232,9 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
           features: selectedSystem.features || {},
           requirements: selectedSystem.requirements || { time: { enabled: false }, currency: { enabled: false, provider: 'macro' } },
           advancedOptionsEnabled: selectedSystem.advancedOptionsEnabled !== false,
-          enableTags: selectedSystem.features?.itemTags === true,
+          enableTags: true,
           enableEssences: selectedSystem.features?.essences === true,
-          enableCategories: selectedSystem.features?.recipeCategories === true,
+          enableCategories: true,
           enableComplexRecipes: selectedSystem.features?.complexRecipes === true,
           enableMultiStepRecipes: selectedSystem.features?.multiStepRecipes === true,
           enablePropertyMacros: selectedSystem.features?.propertyMacros === true,
@@ -552,7 +552,7 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     if (!item) return;
 
     const advancedEnabled = system.advancedOptionsEnabled !== false;
-    const showTags = advancedEnabled && (system.features?.itemTags === true);
+    const showTags = true;
     const showEssences = advancedEnabled && (system.features?.essences === true);
 
     const tagOptions = (system.itemTags || system.tags || []).map(tag => ({
@@ -751,8 +751,6 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     if (!this.constructor._requireGM()) return;
     const system = this._selectedSystem();
     if (!system) return;
-    const tagsEnabled = system.features?.itemTags === true;
-    if (system.advancedOptionsEnabled === false || !tagsEnabled) return;
     const value = this._readInput('newSystemTag').toLowerCase();
     if (!value) return;
     const tags = Array.from(new Set([...(system.itemTags || system.tags || []), value]));
@@ -816,9 +814,6 @@ export class RecipeManagerApp extends foundry.applications.api.HandlebarsApplica
     if (!this.constructor._requireGM()) return;
     const system = this._selectedSystem();
     if (!system) return;
-    const categoriesEnabled =
-      system.features?.recipeCategories === true;
-    if (system.advancedOptionsEnabled === false || !categoriesEnabled) return;
     const value = this._readInput('newSystemCategory');
     if (!value || isGeneralRecipeCategory(value)) return;
     const categories = normalizeCustomRecipeCategories([...(system.categories || []), value]);

@@ -398,12 +398,8 @@ export class RecipeEditorApp extends foundry.applications.api.HandlebarsApplicat
       showRecipeVisibilityKnowledge: listMode === 'knowledge',
       requiresLinkedRecipeItem: listMode === 'knowledge' && ['item', 'learned', 'itemOrLearned'].includes(knowledgeMode),
       knowledgeMode,
-      showCategories: advancedEnabled && (
-        features.recipeCategories === true
-      ),
-      showItemTags: advancedEnabled && (
-        features.itemTags === true
-      ),
+      showCategories: !!system,
+      showItemTags: !!system,
       showEssences: advancedEnabled && (features.essences === true || system?.enableEssences === true),
       showComplexRecipes: advancedEnabled && features.complexRecipes === true,
       showMultiStepRecipes: advancedEnabled && features.multiStepRecipes === true,

@@ -105,9 +105,8 @@ Changing resolution mode is destructive and must follow `007` confirmation/clean
 
 #### Feature Controls
 
-- Recipe categories toggle (`features.recipeCategories`)
 - Category list editor for custom categories only; reserved `General` is always present and not removable
-- Item tags toggle (`features.itemTags`)
+- Item tag list editor
 - Essences toggle (`features.essences`)
 - Property macros toggle (`features.propertyMacros`)
 - Effect transfer toggle (`features.effectTransfer`)

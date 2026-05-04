@@ -697,11 +697,10 @@ export class RecipeManager {
     }
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(systemId);
-    const advancedEnabled = system?.advancedOptionsEnabled !== false;
     const features = system?.features || {};
     return {
-      enableTags: advancedEnabled && features.itemTags === true,
-      enableEssences: advancedEnabled && features.essences === true
+      enableTags: !!system,
+      enableEssences: system?.advancedOptionsEnabled !== false && features.essences === true
     };
   }
 
@@ -1033,9 +1032,6 @@ export class RecipeManager {
       return { valid: true, errors };
     }
 
-    const advancedEnabled = system.advancedOptionsEnabled !== false;
-    const features = system.features || {};
-    const itemTagsEnabled = advancedEnabled && features.itemTags === true;
     const validTags = new Set([
       ...((system.itemTags || []).map(tag => String(tag || '').trim())),
       ...((system.tags || []).map(tag => String(tag || '').trim()))
@@ -1056,13 +1052,6 @@ export class RecipeManager {
             const isTagPlaceholder = match?.type === 'tags';
             if (!isTagPlaceholder) continue;
             const tagIds = Array.isArray(match.tags) ? match.tags : [];
-
-            if (!itemTagsEnabled) {
-              errors.push(
-                `Ingredient group "${group.name || group.id}" uses tag placeholders but item tags are disabled for this crafting system`
-              );
-              continue;
-            }
 
             for (const tagId of tagIds) {
               const normalized = String(tagId || '').trim();

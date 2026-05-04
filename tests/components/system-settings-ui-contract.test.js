@@ -63,6 +63,25 @@ describe('Crafting system settings UI contract', () => {
     );
   });
 
+  it('renders categories and item tags as always-on configuration sections', () => {
+    assert.ok(
+      !featureCardStackSource.includes("store.toggleFeature('categories'"),
+      'feature card stack should not expose a recipe categories toggle'
+    );
+    assert.ok(
+      !featureCardStackSource.includes("store.toggleFeature('itemTags'"),
+      'feature card stack should not expose an item tags toggle'
+    );
+    assert.ok(
+      featureCardStackSource.includes('FABRICATE.Admin.Features.Categories.Title'),
+      'category configuration should still be rendered'
+    );
+    assert.ok(
+      featureCardStackSource.includes('FABRICATE.Admin.Features.ItemTags.Title'),
+      'item tag configuration should still be rendered'
+    );
+  });
+
   it('autosaves recipe visibility and crafting-check changes without save buttons', () => {
     assert.ok(
       featureCardStackSource.includes('flushCraftingCheckSave'),

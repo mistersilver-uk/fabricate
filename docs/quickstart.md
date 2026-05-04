@@ -34,7 +34,7 @@ Open the **Items** sidebar on the left side of Foundry. You'll see two new heade
 2. In the **Systems** tab, click **Create System**
 3. Give it a name (e.g. "Alchemy") and a description
 4. Set the **Resolution Mode** to "Simple" for now
-5. Enable any features you want (categories, essences, multi-step, etc.)
+5. Enable any optional features you want (essences, multi-step, etc.); categories and item tags are always available.
 6. Save
 
 ## Step 3: Add Components

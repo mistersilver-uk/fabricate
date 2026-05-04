@@ -268,8 +268,8 @@
   <FeatureCard
     title={localize('FABRICATE.Admin.Features.Categories.Title')}
     hint={localize('FABRICATE.Admin.Features.Categories.Hint')}
-    enabled={selectedSystem.features.recipeCategories}
-    onToggle={(v) => store.toggleFeature('categories', v)}
+    enabled={true}
+    showToggle={false}
   >
     <TokenList
       items={selectedSystem.categories}
@@ -289,8 +289,8 @@
   <FeatureCard
     title={localize('FABRICATE.Admin.Features.ItemTags.Title')}
     hint={localize('FABRICATE.Admin.Features.ItemTags.Hint')}
-    enabled={selectedSystem.features.itemTags}
-    onToggle={(v) => store.toggleFeature('itemTags', v)}
+    enabled={true}
+    showToggle={false}
   >
     <TokenList
       items={selectedSystem.itemTags}

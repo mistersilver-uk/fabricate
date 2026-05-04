@@ -425,7 +425,7 @@ describe('createAdminStore', () => {
   // -------------------------------------------------------------------------
 
   describe('feature toggles', () => {
-    it('toggleFeature("categories", true) calls updateSystem with recipeCategories: true', async () => {
+    it('toggleFeature("categories", false) sends the legacy compatibility update shape', async () => {
       let updateArgs = null;
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
@@ -438,15 +438,13 @@ describe('createAdminStore', () => {
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
-      await store.toggleFeature('categories', true);
+      await store.toggleFeature('categories', false);
       assert.ok(updateArgs, 'updateSystem should be called');
-      assert.deepEqual(updateArgs.updates.features, { recipeCategories: true });
+      assert.deepEqual(updateArgs.updates.features, { recipeCategories: false });
     });
 
-    it('toggleFeature maps all feature names correctly', async () => {
+    it('toggleFeature maps optional feature names correctly', async () => {
       const expectedMappings = {
-        categories: 'recipeCategories',
-        itemTags: 'itemTags',
         essences: 'essences',
         complexRecipes: 'complexRecipes',
         multiStepRecipes: 'multiStepRecipes',
@@ -1698,7 +1696,7 @@ describe('createAdminStore', () => {
       assert.equal(vs.selectedSystem?.showEssences, true);
     });
 
-    it('viewState.selectedSystem.showTags is false when advancedOptionsEnabled is false, even if feature is on', async () => {
+    it('viewState.selectedSystem.showTags remains true when advancedOptionsEnabled is false', async () => {
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
       const sys = origManager.getSystem('sys1');
@@ -1709,7 +1707,7 @@ describe('createAdminStore', () => {
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       const vs = get(store.viewState);
-      assert.equal(vs.selectedSystem?.showTags, false);
+      assert.equal(vs.selectedSystem?.showTags, true);
       assert.equal(vs.selectedSystem?.showEssences, false);
     });
 

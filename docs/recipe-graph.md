@@ -72,7 +72,7 @@ Two filter controls appear above the graph:
 
 **Search by name.** Type any text in the search box to show only recipes whose names contain that text. Connected edges are also filtered: an edge is only shown if both the source and target recipe pass the filter.
 
-**Filter by category.** If your system has recipe categories enabled, a category dropdown lets you show only recipes in a specific category. Select the blank option to show all categories.
+**Filter by category.** A category dropdown lets you show only recipes in a specific category. Select the blank option to show all categories.
 
 You can combine search and category filtering at the same time.
 

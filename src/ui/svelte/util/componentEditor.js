@@ -50,7 +50,7 @@ export function getComponentEditorHintKey({ showTags = false, showEssences = fal
 
 export function buildComponentEditorState(system, item) {
   const advancedEnabled = system?.advancedOptionsEnabled !== false;
-  const showTags = advancedEnabled && system?.features?.itemTags === true;
+  const showTags = !!system;
   const showEssences = advancedEnabled && system?.features?.essences === true;
 
   const tagSource = Array.isArray(system?.itemTags) ? system.itemTags : (Array.isArray(system?.tags) ? system.tags : []);

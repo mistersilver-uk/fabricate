@@ -27,8 +27,8 @@ CraftingSystem = {
   resolutionMode: "simple" | "routed" | "progressive" | "alchemy",
 
   features: {
-    recipeCategories: boolean,
-    itemTags: boolean,
+    recipeCategories: true, // compatibility alias; always enabled
+    itemTags: true, // compatibility alias; always enabled
     essences: boolean,
     propertyMacros: boolean,
     effectTransfer: boolean,
@@ -139,8 +139,8 @@ CraftingSystem = {
 1. Every crafting system has a reserved effective recipe category named `general` (`General` in UI copy). It is always enabled and cannot be removed.
 2. `CraftingSystem.categories` stores only additional user-defined recipe categories. The reserved `general` category must not be persisted in that array.
 3. `Recipe.category` defaults to `general`.
-4. If `features.recipeCategories` is false, custom recipe categories are ignored at runtime and recipes resolve under `general`.
-5. If `features.itemTags` is false, tag-based ingredient placeholders are invalid.
+4. Recipe categories are always enabled. Legacy persisted `features.recipeCategories`, `features.categories`, and `enableCategories` values are compatibility inputs only; normalization must emit enabled category aliases.
+5. Item tags are always enabled. Legacy persisted `features.itemTags` and `enableTags` values are compatibility inputs only; normalization must emit enabled item-tag aliases.
 6. `categories` and `itemTags` should be normalized to unique, trimmed strings.
 7. `resolutionMode` must be one of `"simple"`, `"routed"`, `"progressive"`, or `"alchemy"`.
 8. If `resolutionMode === "alchemy"`:
@@ -485,7 +485,7 @@ Ingredient = {
 3. If `match.type === "component"`, `match.componentId` is required.
 4. If `match.type === "tags"`, `match.tags` must contain one or more tag IDs.
 5. Tag IDs in `match.tags` must exist in `CraftingSystem.itemTags`.
-6. When `features.itemTags` is true, tag placeholder ingredients are valid in all resolution modes, including `simple`.
+6. Tag placeholder ingredients are valid in all resolution modes, including `simple`.
 
 ## Alchemy Signature Uniqueness (Validation Contract)
 

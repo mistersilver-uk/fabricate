@@ -8,9 +8,11 @@ globalThis.foundry = {
 };
 
 globalThis.game = {
+  user: { isGM: true },
   settings: {
     register: () => {},
-    get: () => undefined
+    get: () => undefined,
+    set: async () => undefined
   }
 };
 
@@ -68,4 +70,55 @@ test('features.gathering safely normalizes absent or legacy feature objects', ()
 
   assert.equal(manager._normalizeFeatures({ features: null, enableTags: true }).gathering, false);
   assert.equal(manager._normalizeSystem({ name: 'Legacy System', enableCategories: true }).features.gathering, false);
+});
+
+test('recipe categories and item tags normalize on despite legacy disabled flags', () => {
+  const manager = makeManager();
+  const normalized = manager._normalizeSystem({
+    name: 'Legacy Disabled System',
+    enableCategories: false,
+    enableTags: false,
+    features: {
+      recipeCategories: false,
+      categories: false,
+      itemTags: false
+    }
+  });
+
+  assert.equal(normalized.features.recipeCategories, true);
+  assert.equal(normalized.features.categories, true);
+  assert.equal(normalized.features.itemTags, true);
+  assert.equal(normalized.enableCategories, true);
+  assert.equal(normalized.enableTags, true);
+});
+
+test('updateSystem ignores recipe category and item tag disable attempts', async () => {
+  const manager = makeManager();
+  const system = await manager.createSystem({
+    id: 'sys-tags',
+    name: 'Tags',
+    features: {
+      recipeCategories: false,
+      itemTags: false
+    }
+  });
+
+  assert.equal(system.features.recipeCategories, true);
+  assert.equal(system.features.itemTags, true);
+
+  const updated = await manager.updateSystem('sys-tags', {
+    enableCategories: false,
+    enableTags: false,
+    features: {
+      recipeCategories: false,
+      categories: false,
+      itemTags: false
+    }
+  });
+
+  assert.equal(updated.features.recipeCategories, true);
+  assert.equal(updated.features.categories, true);
+  assert.equal(updated.features.itemTags, true);
+  assert.equal(updated.enableCategories, true);
+  assert.equal(updated.enableTags, true);
 });

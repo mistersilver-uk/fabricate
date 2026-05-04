@@ -1448,26 +1448,37 @@ describe('createEditorStore', () => {
       assert.equal(get(store.featureState).showMultiStepRecipes, false);
     });
 
-    it('featureState.showCategories is true when recipeCategories feature is enabled', () => {
+    it('featureState.showCategories is true for a selected system even when legacy recipeCategories flag is disabled', () => {
       const svc = mockServices({
         getSystem: () => ({
           advancedOptionsEnabled: true,
-          features: { recipeCategories: true }
+          features: { recipeCategories: false }
         })
       });
       const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
       assert.equal(get(store.featureState).showCategories, true);
     });
 
-    it('featureState.showCategories is false when advancedOptionsEnabled is false', () => {
+    it('featureState.showCategories remains true when advancedOptionsEnabled is false', () => {
       const svc = mockServices({
         getSystem: () => ({
           advancedOptionsEnabled: false,
-          features: { recipeCategories: true }
+          features: { recipeCategories: false }
         })
       });
       const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
-      assert.equal(get(store.featureState).showCategories, false);
+      assert.equal(get(store.featureState).showCategories, true);
+    });
+
+    it('featureState.showItemTags is true for a selected system even when legacy itemTags flag is disabled', () => {
+      const svc = mockServices({
+        getSystem: () => ({
+          advancedOptionsEnabled: false,
+          features: { itemTags: false }
+        })
+      });
+      const store = createEditorStore(svc, { craftingSystemId: 'sys1' });
+      assert.equal(get(store.featureState).showItemTags, true);
     });
 
     it('systemCategories includes the reserved general category before custom categories', () => {

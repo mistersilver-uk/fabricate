@@ -29,14 +29,12 @@
 
   const placeholderViews = [
     { id: 'essences', icon: 'fas fa-mortar-pestle', labelKey: 'FABRICATE.Admin.ManagerV2.Nav.Essences', fallback: 'Essences', feature: 'essences' },
-    { id: 'tags', icon: 'fas fa-tags', labelKey: 'FABRICATE.Admin.ManagerV2.Nav.TagsCategories', fallback: 'Tags & Categories', feature: 'tags' },
+    { id: 'tags', icon: 'fas fa-tags', labelKey: 'FABRICATE.Admin.ManagerV2.Nav.TagsCategories', fallback: 'Tags & Categories' },
     { id: 'rules', icon: 'fas fa-sliders-h', labelKey: 'FABRICATE.Admin.ManagerV2.Nav.Rules', fallback: 'Rules' },
     { id: 'graph', icon: 'fas fa-project-diagram', labelKey: 'FABRICATE.Admin.ManagerV2.Nav.Graph', fallback: 'Graph' }
   ];
   const systemEditFeatureDefinitions = [
     { systemKey: 'gathering', storeKey: 'gathering', labelKey: 'FABRICATE.Admin.ManagerV2.Feature.Gathering', fallback: 'Gathering', hintKey: 'FABRICATE.Admin.ManagerV2.SystemEdit.FeatureHint.Gathering', hintFallback: 'Shows gathering environments and player gathering flows for this system.' },
-    { systemKey: 'recipeCategories', storeKey: 'categories', labelKey: 'FABRICATE.Admin.ManagerV2.Feature.RecipeCategories', fallback: 'Recipe categories', hintKey: 'FABRICATE.Admin.ManagerV2.SystemEdit.FeatureHint.RecipeCategories', hintFallback: 'Adds category organization to recipe browsing and authoring.' },
-    { systemKey: 'itemTags', storeKey: 'itemTags', labelKey: 'FABRICATE.Admin.ManagerV2.Feature.ItemTags', fallback: 'Item tags', hintKey: 'FABRICATE.Admin.ManagerV2.SystemEdit.FeatureHint.ItemTags', hintFallback: 'Enables managed component tags and tag-based ingredient options.' },
     { systemKey: 'essences', storeKey: 'essences', labelKey: 'FABRICATE.Admin.ManagerV2.Feature.Essences', fallback: 'Essences', hintKey: 'FABRICATE.Admin.ManagerV2.SystemEdit.FeatureHint.Essences', hintFallback: 'Enables essence definitions and essence requirements.' },
     { systemKey: 'multiStepRecipes', storeKey: 'multiStepRecipes', labelKey: 'FABRICATE.Admin.ManagerV2.Feature.MultiStepRecipes', fallback: 'Multi-step recipes', hintKey: 'FABRICATE.Admin.ManagerV2.SystemEdit.FeatureHint.MultiStepRecipes', hintFallback: 'Enables explicit recipe steps and step-level requirements.' },
     { systemKey: 'propertyMacros', storeKey: 'propertyMacros', labelKey: 'FABRICATE.Admin.ManagerV2.Feature.PropertyMacros', fallback: 'Property macros', hintKey: 'FABRICATE.Admin.ManagerV2.SystemEdit.FeatureHint.PropertyMacros', hintFallback: 'Allows macro-backed component property behavior.' },
@@ -78,7 +76,7 @@
     ? placeholderViews.filter(view => isViewAvailableForSystem(view, selectedSystem))
     : []
   );
-  const showRecipeCategories = $derived(selectedSystem?.features?.recipeCategories === true);
+  const showRecipeCategories = $derived(!!selectedSystem);
   const filteredRecipes = $derived(($viewState.recipes || []).filter(recipe => {
     const matchesStatus = recipeStatusFilter === 'all'
       || (recipeStatusFilter === 'active' && recipe.enabled !== false)
@@ -195,8 +193,6 @@
     if (!system?.features) return [];
     const featureMap = [
       ['gathering', 'FABRICATE.Admin.ManagerV2.Feature.Gathering', 'Gathering'],
-      ['recipeCategories', 'FABRICATE.Admin.ManagerV2.Feature.RecipeCategories', 'Recipe categories'],
-      ['itemTags', 'FABRICATE.Admin.ManagerV2.Feature.ItemTags', 'Item tags'],
       ['essences', 'FABRICATE.Admin.ManagerV2.Feature.Essences', 'Essences'],
       ['complexRecipes', 'FABRICATE.Admin.ManagerV2.Feature.ComplexRecipes', 'Complex recipes'],
       ['multiStepRecipes', 'FABRICATE.Admin.ManagerV2.Feature.MultiStepRecipes', 'Multi-step recipes'],
@@ -288,9 +284,6 @@
 
   function isViewAvailableForSystem(view, system) {
     if (!view.feature) return true;
-    if (view.feature === 'tags') {
-      return system?.features?.itemTags === true || system?.features?.recipeCategories === true;
-    }
     return system?.features?.[view.feature] === true;
   }
 

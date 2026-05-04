@@ -34,9 +34,9 @@ function makeItem(overrides = {}) {
   };
 }
 
-test('buildComponentEditorState exposes tag and essence sections when both features are enabled', () => {
+test('buildComponentEditorState exposes tag and essence sections when essences are enabled', () => {
   const system = makeSystem({
-    features: { itemTags: true, essences: true },
+    features: { itemTags: false, essences: true },
     itemTags: ['fire', 'flora'],
     essenceDefinitions: [
       { id: 'ess-shadow', name: 'Shadow', icon: '' },
@@ -97,7 +97,7 @@ test('buildComponentEditorState sorts essence options alphabetically by display 
 
 test('buildComponentEditorState only refers to tags when essences are disabled', () => {
   const system = makeSystem({
-    features: { itemTags: true, essences: false },
+    features: { itemTags: false, essences: false },
     itemTags: ['rare']
   });
 
@@ -109,21 +109,22 @@ test('buildComponentEditorState only refers to tags when essences are disabled',
   assert.deepEqual(state.essenceOptions, []);
 });
 
-test('buildComponentEditorState only refers to essences when tags are disabled', () => {
+test('buildComponentEditorState still refers to tags when legacy item tags flag is disabled', () => {
   const system = makeSystem({
     features: { itemTags: false, essences: true },
+    itemTags: ['water'],
     essenceDefinitions: [{ id: 'ess-water', name: 'Water', icon: 'fas fa-tint' }]
   });
 
-  const state = buildComponentEditorState(system, makeItem({ essences: { 'ess-water': 3 } }));
+  const state = buildComponentEditorState(system, makeItem({ tags: ['water'], essences: { 'ess-water': 3 } }));
 
-  assert.equal(state.showTags, false);
+  assert.equal(state.showTags, true);
   assert.equal(state.showEssences, true);
-  assert.equal(state.hintKey, 'FABRICATE.Admin.Items.Editor.HintEssencesOnly');
-  assert.deepEqual(state.tagOptions, []);
+  assert.equal(state.hintKey, 'FABRICATE.Admin.Items.Editor.HintTagsAndEssences');
+  assert.deepEqual(state.tagOptions, [{ tag: 'water', checked: true }]);
 });
 
-test('buildComponentEditorState returns a generic no-fields hint when advanced options are disabled', () => {
+test('buildComponentEditorState keeps tags editable when advanced options are disabled', () => {
   const system = makeSystem({
     advancedOptionsEnabled: false,
     features: { itemTags: true, essences: true },
@@ -133,10 +134,10 @@ test('buildComponentEditorState returns a generic no-fields hint when advanced o
 
   const state = buildComponentEditorState(system, makeItem());
 
-  assert.equal(state.showTags, false);
+  assert.equal(state.showTags, true);
   assert.equal(state.showEssences, false);
-  assert.equal(state.hasEditableFields, false);
-  assert.equal(state.hintKey, 'FABRICATE.Admin.Items.Editor.NoEditableFields');
+  assert.equal(state.hasEditableFields, true);
+  assert.equal(state.hintKey, 'FABRICATE.Admin.Items.Editor.HintTagsOnly');
 });
 
 test('buildComponentEditorUpdates clamps quantities and omits disabled features', () => {

@@ -87,9 +87,9 @@ export class CraftingSystemManager {
       tags: this._normalizeStringList(system.tags ?? system.itemTags),
       essences: resolvedEssenceDefinitions.map(def => def.id),
       advancedOptionsEnabled: system.advancedOptionsEnabled !== false,
-      enableTags: features.itemTags === true,
+      enableTags: true,
       enableEssences: features.essences === true,
-      enableCategories: features.recipeCategories === true,
+      enableCategories: true,
       enableMultiStepRecipes: features.multiStepRecipes === true,
       components: items
     };
@@ -98,17 +98,14 @@ export class CraftingSystemManager {
   _normalizeFeatures(system = {}) {
     const features = system.features || {};
     const has = (k) => Object.prototype.hasOwnProperty.call(features, k);
-    const categoryEnabled = has('recipeCategories')
-      ? features.recipeCategories === true
-      : (has('categories') ? features.categories === true : system.enableCategories === true);
     const multiStepEnabled = has('multiStepRecipes')
       ? features.multiStepRecipes === true
       : (has('complexRecipes') ? features.complexRecipes === true : false);
     return {
-      recipeCategories: categoryEnabled,
+      recipeCategories: true,
       // Transitional alias
-      categories: categoryEnabled,
-      itemTags: has('itemTags') ? features.itemTags === true : system.enableTags === true,
+      categories: true,
+      itemTags: true,
       essences: has('essences') ? features.essences === true : system.enableEssences === true,
       complexRecipes: has('complexRecipes') ? features.complexRecipes === true : false,
       multiStepRecipes: multiStepEnabled,
@@ -870,13 +867,9 @@ export class CraftingSystemManager {
     if (!current) throw new Error(`Crafting system not found: ${systemId}`);
 
     const mergedFeatures = { ...(current.features || {}), ...(updates.features || {}) };
-    if (Object.prototype.hasOwnProperty.call(updates, 'enableCategories')) {
-      mergedFeatures.recipeCategories = updates.enableCategories === true;
-      mergedFeatures.categories = updates.enableCategories === true;
-    }
-    if (Object.prototype.hasOwnProperty.call(updates, 'enableTags')) {
-      mergedFeatures.itemTags = updates.enableTags === true;
-    }
+    mergedFeatures.recipeCategories = true;
+    mergedFeatures.categories = true;
+    mergedFeatures.itemTags = true;
     if (Object.prototype.hasOwnProperty.call(updates, 'enableEssences')) {
       mergedFeatures.essences = updates.enableEssences === true;
     }

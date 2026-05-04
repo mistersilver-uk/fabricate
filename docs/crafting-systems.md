@@ -25,14 +25,16 @@ Open the GM admin panel (**Manage Crafting Systems** in the Items sidebar) and c
 | **Description** | Optional flavour text |
 | **Resolution Mode** | How recipes produce results: `simple`, `routed`, `progressive`, or `alchemy`. See [Resolution Modes]({% link recipes/index.md %}#resolution-modes) |
 
+### Tags And Categories
+
+Recipe categories and item tags are always available. Custom recipe categories organize recipe browsing and authoring, and item tags allow component labeling plus tag-based ingredient matching. The reserved `General` recipe category is always present and is not stored in the custom category list.
+
 ### Feature Toggles
 
-Each system can independently enable or disable features. Most features default to `false` and must be explicitly enabled by a GM. The exception is `chatOutput`, which defaults to `true`.
+Each system can independently enable or disable optional features. Most optional features default to `false` and must be explicitly enabled by a GM. The exception is `chatOutput`, which defaults to `true`.
 
 | Feature | Default | Description |
 |:--------|:--------|:------------|
-| `recipeCategories` | `false` | Organise recipes into named categories |
-| `itemTags` | `false` | Allow tag-based ingredient matching instead of exact items |
 | `essences` | `false` | Enable the essences system for abstract ingredient properties |
 | `propertyMacros` | `false` | Allow result items to have their properties set by a macro |
 | `effectTransfer` | `false` | Transfer active effects from essence source items to crafted results |
@@ -42,7 +44,7 @@ Each system can independently enable or disable features. Most features default 
 | `chatOutput` | `true` | Automatically post a chat message summarising crafting results after each craft action |
 | `itemPiles` | `false` | Enable the Item Piles integration: currency costs, merchant stock, and container inventory. Requires Item Piles v3.1.0 or later. |
 
-Toggle features in the **Features** card on the System tab of the Crafting Admin panel. Each toggle takes effect immediately for all future crafting attempts in that system.
+Toggle optional features in the **Features** card on the System tab of the Crafting Admin panel. Each toggle takes effect immediately for all future crafting attempts in that system.
 
 {: .warning }
 > Changing the **resolution mode** is a destructive operation. All recipes in the system will be deleted because they may be invalid under the new mode. You will be asked to confirm.
@@ -247,7 +249,7 @@ See [CraftingSystemManager API]({% link api/system-manager.md %}#additemsfrompac
 |:---------|:------------|
 | `name` | Display name |
 | `sourceItemUuid` | The Foundry Item document this component represents |
-| `tags` | Array of string tags (when `itemTags` feature is enabled) |
+| `tags` | Array of string tags |
 | `essences` | Map of essence ID to quantity (when `essences` feature is enabled) |
 | `difficulty` | Numeric difficulty rating (used by progressive mode) |
 | `salvage` | Salvage configuration sub-object (when `salvage` feature is enabled) |

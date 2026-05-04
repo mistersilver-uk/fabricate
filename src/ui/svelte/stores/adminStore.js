@@ -726,7 +726,7 @@ function _buildSelectedSystemViewData(
   if (!selectedSystem) return null;
 
   const advancedEnabled = selectedSystem.advancedOptionsEnabled !== false;
-  const showTags = advancedEnabled && selectedSystem.features?.itemTags === true;
+  const showTags = true;
   const showEssences = advancedEnabled && selectedSystem.features?.essences === true;
 
   const listMode = selectedSystem.recipeVisibility?.listMode || 'global';
@@ -742,8 +742,8 @@ function _buildSelectedSystemViewData(
     advancedOptionsEnabled: advancedEnabled,
 
     features: {
-      recipeCategories: selectedSystem.features?.recipeCategories === true,
-      itemTags: selectedSystem.features?.itemTags === true,
+      recipeCategories: true,
+      itemTags: true,
       essences: selectedSystem.features?.essences === true,
       complexRecipes: selectedSystem.features?.complexRecipes === true,
       multiStepRecipes: selectedSystem.features?.multiStepRecipes === true,
@@ -1170,7 +1170,7 @@ export function createAdminStore(services) {
 
       const essenceDefinitionById = new Map(essenceDefinitions.map(def => [def.id, def]));
       const advancedEnabled = selectedSystem.advancedOptionsEnabled !== false;
-      const showTags = advancedEnabled && selectedSystem.features?.itemTags === true;
+      const showTags = true;
       const showEssences = advancedEnabled && selectedSystem.features?.essences === true;
 
       selectedSystemData = _buildSelectedSystemViewData(
