@@ -40,6 +40,46 @@ globalThis.ui = {
 globalThis.fromUuid = async () => null;
 globalThis.fromUuidSync = () => null;
 
+test('_normalizeComponentDescription extracts plain text from Foundry-style description objects', () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+
+  assert.equal(
+    manager._normalizeComponentDescription({ value: '<p>Fresh <strong>silverweed</strong>.</p>' }),
+    'Fresh silverweed.'
+  );
+});
+
+test('_normalizeComponentDescription does not stringify unknown objects', () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+
+  assert.equal(manager._normalizeComponentDescription({ unexpected: 'shape' }), '');
+});
+
+test('_extractSourceDescription skips object fallback text instead of returning object strings', () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+
+  assert.equal(
+    manager._extractSourceDescription({
+      system: {
+        description: {
+          value: '<p>Dreamleaf petals.</p>'
+        }
+      }
+    }),
+    'Dreamleaf petals.'
+  );
+  assert.equal(
+    manager._extractSourceDescription({
+      system: {
+        description: {
+          unexpected: '<p>Should not stringify the object.</p>'
+        }
+      }
+    }),
+    ''
+  );
+});
+
 test('addRecipeItemFromUuid adds a recipe item definition without creating a component', async () => {
   globalThis.fromUuid = async (uuid) => ({
     documentName: 'Item',

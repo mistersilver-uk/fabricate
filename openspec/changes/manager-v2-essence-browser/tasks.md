@@ -1,0 +1,21 @@
+# Manager V2 Essence Browser Tasks
+
+- [x] Review canonical `ui-integration` and `data-models` specs before implementation.
+- [x] Update `openspec/specs/data-models/spec.md` to canonicalize `essenceDefinitions[]`, source-component identity, and legacy aliases.
+- [x] Update `openspec/specs/ui-integration/spec.md` with the durable manager-v2 Essence browser behavior.
+- [ ] Update effect-transfer/source-link spec text where needed so source components resolve to source item UUIDs consistently.
+- [ ] Add compatibility normalization for `sourceComponentId`, `associatedSystemItemId`, and legacy `sourceItemUuid` values without dropping stale source evidence.
+- [x] Add display-only `viewState.essenceCards` with source state and usage counts.
+- [x] Replace the disabled manager-v2 Essences placeholder with a real feature-gated route.
+- [x] Add focused `EssenceBrowserView.svelte` for browser state, derived filters, main view, and selected-essence inspector.
+- [x] Keep `CraftingSystemManagerV2Root.svelte` limited to routing/nav/high-level data wiring for the Essences route.
+- [ ] Reuse existing `IconPicker`, `EssenceSourceSelector`, essence icon normalization, and admin-store essence actions.
+- [ ] Make `IconPicker` and `EssenceSourceSelector` portal/bounds/style behavior work inside `.fabricate-manager-v2`.
+- [x] Block or disable manager-v2 essence deletion while usage references exist; show localized usage evidence.
+- [x] Add manager-v2 Essence localization keys.
+- [x] Add or update CSS for essence rows, create/edit controls, inspector evidence, and responsive/stacked layout.
+- [x] Update source/contract, mounted behavior, layout, and admin-store tests.
+- [ ] Update Foundry smoke harness to exercise the Essences route, picker controls, and visual states.
+- [ ] Capture/inspect normal, stacked, and narrow manager-v2 Essence browser screenshots or record why a live browser harness was unavailable.
+- [x] Run `npm test`.
+- [x] Run `npm run build`.

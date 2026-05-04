@@ -699,7 +699,7 @@ async function exerciseManagerV2PointerTargets(page) {
   await page.locator('.fabricate-manager-v2 .manager-v2-nav-button:has-text("Recipes")').first().click();
   await page.locator('.fabricate-manager-v2 .manager-v2-breadcrumbs button:has-text("The Herbalist")').first().click({ trial: true });
   await page.locator('.fabricate-manager-v2 .manager-v2-breadcrumbs button:has-text("Crafting Systems")').first().click();
-  await page.locator('.fabricate-manager-v2 .manager-v2-scope-button').first().click({ trial: true });
+  await page.locator('.fabricate-manager-v2 .manager-v2-scope-return').first().click({ trial: true });
   await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Import")').first().click({ trial: true });
   await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Open current admin")').first().click({ trial: true });
   await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Export")').first().click({ trial: true });
@@ -767,14 +767,19 @@ async function exerciseManagerV2RecipePointerTargets(page) {
     await categoryFilter.selectOption({ index: 1 });
     await page.waitForTimeout(250);
     await categoryFilter.selectOption('all');
+    await page.waitForTimeout(250);
   }
 
-  const brewRow = page.locator('.fabricate-manager-v2 .manager-v2-recipe-row:has-text("Brew Healing Potion")').first();
-  await brewRow.locator('.manager-v2-recipe-identity').click();
-  await brewRow.locator('.manager-v2-toggle input').click({ trial: true });
-  await brewRow.locator('.manager-v2-icon-button').nth(0).click({ trial: true });
-  await brewRow.locator('.manager-v2-icon-button').nth(1).click({ trial: true });
-  await brewRow.locator('.manager-v2-icon-button').nth(2).click({ trial: true });
+  await search.fill('');
+  await page.locator('.fabricate-manager-v2 select[aria-label="Filter recipes by status"]').first().selectOption('all');
+  await page.waitForTimeout(250);
+  const recipeRow = page.locator('.fabricate-manager-v2 .manager-v2-recipe-row').first();
+  await recipeRow.waitFor({ state: 'visible', timeout: 5_000 });
+  await recipeRow.locator('.manager-v2-recipe-identity').click();
+  await recipeRow.locator('.manager-v2-toggle input').click({ trial: true });
+  await recipeRow.locator('.manager-v2-icon-button').nth(0).click({ trial: true });
+  await recipeRow.locator('.manager-v2-icon-button').nth(1).click({ trial: true });
+  await recipeRow.locator('.manager-v2-icon-button').nth(2).click({ trial: true });
 
   await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Import")').first().click({ trial: true });
   await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Export")').first().click({ trial: true });
@@ -804,15 +809,16 @@ async function exerciseManagerV2EnvironmentPointerTargets(page) {
   await page.locator('.fabricate-manager-v2 select[aria-label="Filter environments by selection mode"]').first().selectOption('all');
 
   const azureRow = page.locator('.fabricate-manager-v2 .manager-v2-environment-row:has-text("Azure Grove")').first();
+  await azureRow.waitFor({ state: 'visible', timeout: 5_000 });
   await azureRow.locator('.manager-v2-environment-identity').click();
-  await azureRow.locator('.manager-v2-toggle input').click({ trial: true });
+  await azureRow.locator('.manager-v2-status-toggle').click({ trial: true });
   await azureRow.locator('.manager-v2-icon-button').nth(0).click({ trial: true });
-  const moveUp = azureRow.locator('.manager-v2-icon-button').nth(1);
+  await azureRow.locator('.manager-v2-icon-button').nth(1).click({ trial: true });
+  await azureRow.locator('.manager-v2-icon-button').nth(2).click({ trial: true });
+  const moveUp = azureRow.locator('.manager-v2-icon-button').nth(3);
   if (await moveUp.isEnabled()) await moveUp.click({ trial: true });
-  const moveDown = azureRow.locator('.manager-v2-icon-button').nth(2);
+  const moveDown = azureRow.locator('.manager-v2-icon-button').nth(4);
   if (await moveDown.isEnabled()) await moveDown.click({ trial: true });
-  await azureRow.locator('.manager-v2-icon-button').nth(3).click({ trial: true });
-  await azureRow.locator('.manager-v2-icon-button').nth(4).click({ trial: true });
   await page.locator('.fabricate-manager-v2 .manager-v2-inspector-actions .manager-v2-button:has-text("Edit environment")').first().click({ trial: true });
   await page.locator('.fabricate-manager-v2 .manager-v2-inspector-actions .manager-v2-button:has-text("Duplicate environment")').first().click({ trial: true });
   await page.locator('.fabricate-manager-v2 .manager-v2-inspector-actions .manager-v2-button:has-text("Disable environment")').first().click({ trial: true });
@@ -2129,15 +2135,18 @@ async function main() {
         let navLabels = await page.locator('.fabricate-manager-v2 .manager-v2-nav-label').evaluateAll(labels =>
           labels.map(label => label.textContent?.trim()).filter(Boolean)
         );
-        if (navLabels.length !== 0) {
-          throw new Error(`Manager V2 no-selection nav should not expose selected-system tabs. Saw: ${navLabels.join(', ')}`);
+        if (navLabels.at(0) !== 'System settings') {
+          throw new Error(`Manager V2 default selection should keep System settings first. Saw: ${navLabels.join(', ')}`);
+        }
+        if (await page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist")[aria-selected="true"]').count() === 0) {
+          throw new Error('Manager V2 default selection did not select the first available system.');
         }
         if (await page.locator('.fabricate-manager-v2 .manager-v2-breadcrumbs button:has-text("Crafting Systems")').count() === 0) {
           throw new Error('Manager V2 root breadcrumb is missing.');
         }
-        await assertManagerV2LayoutStable(page, 'normal no selection');
+        await assertManagerV2LayoutStable(page, 'normal default selection');
         await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-v2-no-selection');
+        await screenshot(page, 'manager-v2-default-selection');
 
         await page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist") .manager-v2-system-identity').first().click();
         await page.waitForTimeout(750);
@@ -2155,8 +2164,11 @@ async function main() {
             throw new Error(`Manager V2 selected nav missing ${expected}. Saw: ${navLabels.join(', ')}`);
           }
         }
-        if (await page.locator('.fabricate-manager-v2 .manager-v2-scope-button .manager-v2-scope-clear').count() === 0) {
-          throw new Error('Manager V2 selected-system scope is missing its clear affordance.');
+        if (await page.locator('.fabricate-manager-v2 .manager-v2-scope-card .manager-v2-scope-name:has-text("The Herbalist")').count() === 0) {
+          throw new Error('Manager V2 selected-system scope is missing static selected-system text.');
+        }
+        if (await page.locator('.fabricate-manager-v2 .manager-v2-scope-return[aria-label="Return to System Library"]').count() === 0) {
+          throw new Error('Manager V2 selected-system scope is missing the return-to-library action.');
         }
         if (await page.locator('.fabricate-manager-v2 .manager-v2-section-header .manager-v2-button:has-text("Import")').count() > 0) {
           throw new Error('Manager V2 duplicated Import in the System library header.');
@@ -2172,19 +2184,22 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-v2-selected-normal');
 
-        await page.locator('.fabricate-manager-v2 .manager-v2-scope-button').first().click();
+        await page.locator('.fabricate-manager-v2 .manager-v2-scope-return').first().click();
         await page.waitForTimeout(750);
         navLabels = await page.locator('.fabricate-manager-v2 .manager-v2-nav-label').evaluateAll(labels =>
           labels.map(label => label.textContent?.trim()).filter(Boolean)
         );
-        if (navLabels.length !== 0) {
-          throw new Error(`Manager V2 clear selected system should return to the no-selection browser. Saw nav: ${navLabels.join(', ')}`);
+        if (navLabels.at(0) !== 'System settings') {
+          throw new Error(`Manager V2 return to library should preserve selected-system nav. Saw nav: ${navLabels.join(', ')}`);
         }
-        if (await page.locator('.fabricate-manager-v2 .manager-v2-scope-button').count() > 0) {
-          throw new Error('Manager V2 clear selected system left the rail scope visible.');
+        if (await page.locator('.fabricate-manager-v2 .manager-v2-scope-card').count() === 0) {
+          throw new Error('Manager V2 return to library should leave the rail scope visible.');
         }
         if (await page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist")').count() === 0) {
-          throw new Error('Manager V2 clear selected system did not return to the systems browser.');
+          throw new Error('Manager V2 return to library did not return to the systems browser.');
+        }
+        if (await page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist")[aria-selected="true"]').count() === 0) {
+          throw new Error('Manager V2 return to library should preserve the selected system row.');
         }
 
         await closeOpenApplications(page);
@@ -2251,7 +2266,7 @@ async function main() {
         await setManagerV2WindowSize(page, { width: 1200, height: 790 });
         await page.locator('.fabricate-manager-v2 .manager-v2-nav-button:has-text("Recipes")').first().click();
         await page.locator('.fabricate-manager-v2 .manager-v2-breadcrumbs button:has-text("The Herbalist")').first().click();
-        await page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist")').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await page.locator('.fabricate-manager-v2[data-manager-v2-view="system-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await exerciseManagerV2SystemEditPointerTargets(page);
         if (await page.locator('.fabricate-manager-v2[data-manager-v2-view="system-edit"]').count() === 0) {
           throw new Error('Manager V2 system Edit did not stay inside the v2 edit route.');
@@ -2281,7 +2296,7 @@ async function main() {
         if (await page.locator('.fabricate-manager-v2 .manager-v2-recipe-row').count() < 2) {
           throw new Error('Manager V2 recipes browser rendered fewer than two recipe rows.');
         }
-        if (await page.locator('.fabricate-manager-v2 .manager-v2-recipe-row.is-selected:has-text("Brew Healing Potion")').count() === 0) {
+        if (await page.locator('.fabricate-manager-v2 .manager-v2-recipe-row.is-selected').count() === 0) {
           throw new Error('Manager V2 recipes browser did not show selected recipe row state.');
         }
         if (await page.locator('.fabricate-manager-v2 .manager-v2-inspector:has-text("Requirements")').count() === 0) {

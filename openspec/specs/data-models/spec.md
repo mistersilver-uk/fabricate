@@ -173,9 +173,18 @@ EssenceDefinition = {
   name: string,
   icon: string,
   description?: string,
-  sourceItemUuid?: string,
+  sourceComponentId?: string | null,
+  sourceItemUuid?: string | null, // compatibility alias; may contain a legacy component id
+  associatedSystemItemId?: string | null, // compatibility alias for sourceComponentId
 }
 ```
+
+### Requirements
+
+1. `sourceComponentId` is the canonical in-system managed component reference for an essence source.
+2. `associatedSystemItemId` is a compatibility alias for `sourceComponentId`.
+3. Legacy `sourceItemUuid` values that match a managed component id are treated as source component ids during normalization and display.
+4. If an essence source component cannot be resolved, stored source evidence is retained so GM UI can show a stale-but-readable source state.
 
 ## RecipeItemDefinition
 

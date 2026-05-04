@@ -119,6 +119,32 @@ This corrective slice addresses review feedback after the systems and recipes br
 - [x] Render the gathering-disabled state as `Gathering environments Off`, with `Off` retaining value emphasis.
 - [x] Update focused mounted and layout tests for count-pill ordering and no-wrap CSS.
 
+## Corrective Implementation Plan: Systems Row Status Toggles
+
+- [x] Replace static system status chips in the systems library rows with interactive on/off toggle buttons.
+- [x] Persist row status changes through a focused admin-store `toggleSystemEnabled(systemId, enabled)` action.
+- [x] Use distinct active/off colors and stable compact toggle geometry that fits the systems table status column.
+- [x] Stop row-selection event propagation from the status toggle so toggling does not unexpectedly select a different system.
+- [x] Add focused mounted, layout, source/localization, and admin-store tests for system status toggles.
+
+## Corrective Implementation Plan: Component Description Normalization
+
+- [x] Diagnose `[object Object]` in the components browser as object-shaped Foundry description data being coerced with `String(...)`.
+- [x] Update component description normalization to extract plain text from Foundry-style objects such as `{ value: "<p>...</p>" }`.
+- [x] Ensure unknown object-shaped descriptions resolve to empty display text rather than `[object Object]`.
+- [x] Add an admin-store defensive normalization layer for manager-v2 `itemCards` so raw or stale component data cannot leak object strings into the browser.
+- [x] Add focused system-manager and admin-store regression tests for object-shaped descriptions.
+
+## Corrective Implementation Plan: Environment Browse Row Layout
+
+- [x] Replace the environment browse checkbox status with the shared compact manager-v2 on/off toggle.
+- [x] Render the tasks column as a plain numeric task count only.
+- [x] Remove result and catalyst evidence from environment browse rows.
+- [x] Remove the linked-scene table column and rely on the environment thumbnail plus inspector for scene evidence.
+- [x] Make environment row thumbnails wider and scene-proportional.
+- [x] Rework environment row actions so edit, duplicate, and delete sit in a compact grid left of a top/bottom move-up/down stack.
+- [x] Update focused layout and mounted tests for the revised environment browse contract.
+
 ## Concrete Implementation Plan: System Edit View
 
 This slice replaces the temporary manager-v2 Edit action bridge to the current admin with a real in-manager-v2 system edit view. It remains deliberately narrow and reuses the current admin store for all writes.

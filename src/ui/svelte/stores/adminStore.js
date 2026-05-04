@@ -200,6 +200,8 @@ function _buildManagedItemOptions(managedItems = []) {
     id: item.id,
     name: item.name,
     img: item.img || 'icons/svg/item-bag.svg',
+    ...(item.sourceItemUuid ? { sourceItemUuid: item.sourceItemUuid } : {}),
+    ...(item.sourceUuid ? { sourceUuid: item.sourceUuid } : {}),
     ...(Object.prototype.hasOwnProperty.call(item, 'difficulty') ? { difficulty: item.difficulty } : {})
   }));
 }
@@ -689,26 +691,132 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
 function _buildItemCards(systemManager, selectedSystem, itemSearchTerm, showTags, showEssences, essenceDefinitionById) {
   if (!selectedSystem) return [];
   const showSalvage = selectedSystem.features?.salvage === true;
-  return systemManager.getItems(selectedSystem.id, itemSearchTerm).map(item => ({
-    ...item,
-    img: item.img || 'icons/svg/item-bag.svg',
-    description: String(item.description || '').trim(),
-    hasDescription: String(item.description || '').trim().length > 0,
-    tags: showTags ? (item.tags || []) : [],
-    essences: showEssences
-      ? Object.entries(item.essences || {}).map(([id, quantity]) => ({
-        id,
-        name: essenceDefinitionById.get(id)?.name || id,
-        icon: essenceDefinitionById.get(id)?.icon || 'fas fa-mortar-pestle',
-        quantity
-      }))
-      : [],
-    sourceUuidDisplay: item.sourceItemUuid || item.sourceUuid || '',
-    hasSourceUuid: Boolean(item.sourceItemUuid || item.sourceUuid),
-    salvageSummary: _buildSalvageSummary(item, showSalvage),
-    showTags,
-    showEssences
-  }));
+  return systemManager.getItems(selectedSystem.id, itemSearchTerm).map(item => {
+    const description = _plainTextDescription(item.description);
+    return {
+      ...item,
+      img: item.img || 'icons/svg/item-bag.svg',
+      description,
+      hasDescription: description.length > 0,
+      tags: showTags ? (item.tags || []) : [],
+      essences: showEssences
+        ? Object.entries(item.essences || {}).map(([id, quantity]) => ({
+          id,
+          name: essenceDefinitionById.get(id)?.name || id,
+          icon: essenceDefinitionById.get(id)?.icon || 'fas fa-mortar-pestle',
+          quantity
+        }))
+        : [],
+      sourceUuidDisplay: item.sourceItemUuid || item.sourceUuid || '',
+      hasSourceUuid: Boolean(item.sourceItemUuid || item.sourceUuid),
+      salvageSummary: _buildSalvageSummary(item, showSalvage),
+      showTags,
+      showEssences
+    };
+  });
+}
+
+function _sourceComponentIdForEssence(def, managedItemById) {
+  const explicitComponentId = def?.sourceComponentId || def?.associatedSystemItemId || '';
+  if (explicitComponentId) return explicitComponentId;
+  return managedItemById.has(def?.sourceItemUuid) ? def.sourceItemUuid : '';
+}
+
+function _essenceUsageCount(essenceId, managedItems) {
+  return managedItems.reduce((count, item) => {
+    const essences = item?.essences;
+    if (Array.isArray(essences)) {
+      return count + (essences.some(entry => entry?.id === essenceId && Number(entry.quantity) > 0) ? 1 : 0);
+    }
+    return count + (Number(essences?.[essenceId]) > 0 ? 1 : 0);
+  }, 0);
+}
+
+function _essenceSourceState({ sourceComponentId, sourceItemUuid, associatedItem }) {
+  if (!sourceComponentId && !sourceItemUuid) return 'none';
+  if (!associatedItem) return 'stale';
+  if (associatedItem.sourceItemUuid || associatedItem.sourceUuid || sourceItemUuid) return 'linked';
+  return 'missing';
+}
+
+function _buildEssenceCards(essenceDefinitions, managedItems, managedItemOptions) {
+  const managedItemById = new Map(managedItemOptions.map(item => [item.id, item]));
+  return essenceDefinitions.map(def => {
+    const sourceComponentId = _sourceComponentIdForEssence(def, managedItemById);
+    const associatedItem = managedItemById.get(sourceComponentId) || null;
+    const sourceItemUuid = def.sourceItemUuid || associatedItem?.sourceItemUuid || associatedItem?.sourceUuid || null;
+    const componentUsageCount = _essenceUsageCount(def.id, managedItems);
+    const sourceState = _essenceSourceState({ sourceComponentId, sourceItemUuid, associatedItem });
+    return {
+      ...def,
+      icon: normalizeEssenceIcon(def.icon || DEFAULT_ESSENCE_ICON),
+      sourceComponentId,
+      sourceItemUuid,
+      associatedSystemItemId: sourceComponentId || null,
+      associatedItem,
+      associatedItemName: associatedItem?.name || null,
+      sourceName: associatedItem?.name || (sourceState === 'stale' ? (sourceComponentId || sourceItemUuid) : ''),
+      sourceState,
+      componentUsageCount,
+      deleteBlocked: componentUsageCount > 0
+    };
+  });
+}
+
+function _plainTextDescription(value) {
+  const raw = _descriptionTextCandidate(value);
+  if (!raw) return '';
+
+  if (globalThis.document?.createElement) {
+    const template = globalThis.document.createElement('template');
+    template.innerHTML = raw;
+    return String(template.content?.textContent || '')
+      .replace(/\s+/g, ' ')
+      .replace(/\s+([,.;:!?])/g, '$1')
+      .trim();
+  }
+
+  return raw
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<\/(p|div|li|h[1-6]|tr|section|article)>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, '\'')
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([,.;:!?])/g, '$1')
+    .trim();
+}
+
+function _descriptionTextCandidate(value, seen = new Set()) {
+  if (value == null) return '';
+
+  const valueType = typeof value;
+  if (valueType === 'string') return value.trim();
+  if (valueType === 'number' || valueType === 'boolean' || valueType === 'bigint') {
+    return String(value).trim();
+  }
+  if (Array.isArray(value)) {
+    return value
+      .map(entry => _descriptionTextCandidate(entry, seen))
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+  }
+  if (valueType !== 'object') return '';
+  if (seen.has(value)) return '';
+  seen.add(value);
+
+  for (const key of ['value', 'enriched', 'html', 'text', 'content', 'short', 'long', 'unidentified', 'chat']) {
+    if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+    const candidate = _descriptionTextCandidate(value[key], seen);
+    if (candidate) return candidate;
+  }
+
+  return '';
 }
 
 /**
@@ -832,6 +940,7 @@ export function createAdminStore(services) {
     selectedSystemName: '',
     selectedSystem: null,
     itemCards: [],
+    essenceCards: [],
     recipes: [],
     recipeCategories: [],
     showVisibilitySummary: false,
@@ -1116,8 +1225,14 @@ export function createAdminStore(services) {
 
     const allSystems = systemManager.getSystems();
     const currentSystemId = get(selectedSystemId);
+    const fallbackSystemId = allSystems[0]?.id || '';
+    let resolvedSystemId = currentSystemId;
+    if (!currentSystemId || !allSystems.find(s => s.id === currentSystemId)) {
+      resolvedSystemId = fallbackSystemId;
+      if (resolvedSystemId !== currentSystemId) selectedSystemId.set(resolvedSystemId);
+    }
 
-    // Build system list and ensure selection is valid
+    // Build system list after resolving selection so the library row highlight matches view state.
     const systemList = allSystems.map(s => ({
       id: s.id,
       name: s.name,
@@ -1127,16 +1242,8 @@ export function createAdminStore(services) {
       featureCount: Object.values(s.features || {}).filter(value => value === true).length,
       componentCount: _getManagedItems(s).length,
       recipeCount: recipeManager.getRecipes({ craftingSystemId: s.id }).length,
-      selected: s.id === currentSystemId
+      selected: s.id === resolvedSystemId
     }));
-
-    let resolvedSystemId = currentSystemId;
-    if (currentSystemId && !allSystems.find(s => s.id === currentSystemId)) {
-      resolvedSystemId = allSystems[0]?.id || '';
-      selectedSystemId.set(resolvedSystemId);
-    } else if (!currentSystemId && allSystems.length > 0) {
-      // Don't auto-select; leave it empty unless something was set
-    }
 
     const selectedSystem = resolvedSystemId
       ? allSystems.find(s => s.id === resolvedSystemId) || null
@@ -1153,6 +1260,7 @@ export function createAdminStore(services) {
 
     let selectedSystemData = null;
     let itemCards = [];
+    let essenceCards = [];
     let recipeListData = { recipes: [], recipeCategories: [], showVisibilitySummary: false };
 
     if (selectedSystem) {
@@ -1160,13 +1268,21 @@ export function createAdminStore(services) {
       const managedItemOptions = _buildManagedItemOptions(managedItems);
       const managedItemById = new Map(managedItemOptions.map(item => [item.id, item]));
 
-      const essenceDefinitions = Array.isArray(selectedSystem.essenceDefinitions)
-        ? selectedSystem.essenceDefinitions.map(def => ({
-          ...def,
-          associatedItem: managedItemById.get(def.sourceItemUuid || def.associatedSystemItemId) || null,
-          associatedItemName: managedItemById.get(def.sourceItemUuid || def.associatedSystemItemId)?.name || null
-        }))
+      const rawEssenceDefinitions = Array.isArray(selectedSystem.essenceDefinitions)
+        ? selectedSystem.essenceDefinitions
         : [];
+      const essenceDefinitions = rawEssenceDefinitions.map(def => {
+        const sourceComponentId = _sourceComponentIdForEssence(def, managedItemById);
+        const associatedItem = managedItemById.get(sourceComponentId) || null;
+        return {
+          ...def,
+          sourceComponentId,
+          associatedSystemItemId: sourceComponentId || null,
+          associatedItem,
+          associatedItemName: associatedItem?.name || null
+        };
+      });
+      essenceCards = _buildEssenceCards(essenceDefinitions, managedItems, managedItemOptions);
 
       const essenceDefinitionById = new Map(essenceDefinitions.map(def => [def.id, def]));
       const advancedEnabled = selectedSystem.advancedOptionsEnabled !== false;
@@ -1217,6 +1333,7 @@ export function createAdminStore(services) {
       selectedSystemName: selectedSystem?.name || '',
       selectedSystem: selectedSystemData,
       itemCards,
+      essenceCards,
       recipes: recipeListData.recipes,
       recipeCategories: recipeListData.recipeCategories,
       showVisibilitySummary: recipeListData.showVisibilitySummary,
@@ -1235,7 +1352,10 @@ export function createAdminStore(services) {
   // --- System selection ---
 
   async function selectSystem(systemId) {
-    if (systemId === get(selectedSystemId)) return true;
+    if (systemId === get(selectedSystemId)) {
+      await refresh();
+      return true;
+    }
     if (!await confirmDiscardDirtyEnvironmentDraft()) return false;
 
     selectedSystemId.set(systemId);
@@ -2199,6 +2319,15 @@ export function createAdminStore(services) {
     await refresh();
   }
 
+  async function toggleSystemEnabled(systemId, enabled) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = systemId || get(selectedSystemId);
+    if (!sysId) return;
+    await systemManager.updateSystem(sysId, { enabled: enabled === true });
+    await refresh();
+    return true;
+  }
+
   async function toggleRequirement(requirement, enabled) {
     if (!['time', 'currency'].includes(requirement)) return;
     const systemManager = services.getCraftingSystemManager();
@@ -2276,7 +2405,7 @@ export function createAdminStore(services) {
 
   // --- Essence management ---
 
-  async function addEssence(name, description, icon, sourceItemUuid) {
+  async function addEssence(name, description, icon, sourceComponentId) {
     const normalizedName = String(name || '').trim();
     if (!normalizedName) return false;
     const systemManager = services.getCraftingSystemManager();
@@ -2301,8 +2430,9 @@ export function createAdminStore(services) {
         name: normalizedName,
         description: String(description || ''),
         icon: normalizeEssenceIcon(icon || DEFAULT_ESSENCE_ICON),
-        sourceItemUuid: sourceItemUuid || null,
-        associatedSystemItemId: sourceItemUuid || null
+        sourceComponentId: sourceComponentId || null,
+        sourceItemUuid: sourceComponentId || null,
+        associatedSystemItemId: sourceComponentId || null
       }
     ];
     await systemManager.updateSystem(sysId, { essenceDefinitions });
@@ -2342,9 +2472,11 @@ export function createAdminStore(services) {
     const nextIcon = Object.prototype.hasOwnProperty.call(updates, 'icon')
       ? normalizeEssenceIcon(updates.icon)
       : normalizeEssenceIcon(current.icon);
-    const nextSourceItemUuid = Object.prototype.hasOwnProperty.call(updates, 'sourceItemUuid')
-      ? (updates.sourceItemUuid || null)
-      : (current.sourceItemUuid || current.associatedSystemItemId || null);
+    const nextSourceComponentId = Object.prototype.hasOwnProperty.call(updates, 'sourceComponentId')
+      ? (updates.sourceComponentId || null)
+      : (Object.prototype.hasOwnProperty.call(updates, 'sourceItemUuid')
+        ? (updates.sourceItemUuid || null)
+        : (current.sourceComponentId || current.associatedSystemItemId || current.sourceItemUuid || null));
 
     const essenceDefinitions = existing.map(def => {
       if (def.id !== essenceId) return def;
@@ -2353,8 +2485,9 @@ export function createAdminStore(services) {
         name: nextName,
         description: nextDescription,
         icon: nextIcon,
-        sourceItemUuid: nextSourceItemUuid,
-        associatedSystemItemId: nextSourceItemUuid
+        sourceComponentId: nextSourceComponentId,
+        sourceItemUuid: nextSourceComponentId,
+        associatedSystemItemId: nextSourceComponentId
       };
     });
 
@@ -2714,6 +2847,7 @@ export function createAdminStore(services) {
     reorderEnvironments,
     moveEnvironmentDraft,
     toggleEnvironmentEnabled,
+    toggleSystemEnabled,
     toggleFeature,
     toggleAdvancedOptions,
     toggleRequirement,

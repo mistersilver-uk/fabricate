@@ -66,18 +66,31 @@ Header hierarchy:
 
 Selected-system navigation:
 
-- When no crafting system is selected, selected-system feature tabs are hidden and the systems browser is the active management surface.
+- When at least one crafting system exists, manager v2 always has a selected crafting system. An empty or stale persisted selection resolves to the first available crafting system.
+- When no crafting systems exist, selected-system feature tabs are hidden and the systems browser is the active management surface.
 - When a crafting system is selected, `System settings` is the first left-nav item and stays in that position regardless of feature gates.
 - Feature-scoped left-nav items are visible only when their feature is enabled or otherwise available for the selected system.
 - The root `Crafting Systems` breadcrumb returns to the systems browser. The selected-system breadcrumb opens that system's in-manager System settings route.
-- The selected-system rail scope is a clear-selection control: activating it clears the real selected-system store state and returns to the unselected systems browser.
+- The selected-system rail scope shows the selected system name as static text plus a `Return to System Library` icon button. Activating that button returns to the systems browser without clearing the real selected-system store state.
 
 Rail and count layout:
 
 - The selected-system rail scope has stable geometry. Long system names are visually prominent but are capped or truncated before they can overflow the rail or move nav buttons below it.
+- Systems library row status is an interactive on/off toggle button bound to the crafting system's `enabled` state. It is color-coded, keyboard reachable, and must not trigger row selection when toggled.
 - Count facts in the right inspector use a grid. Enabled facts render as an inline phrase that keeps the value and first label word together when wrapping, for example `3 Gathering` on the first line and `environments` on the next.
 - Disabled feature counts are label-first with the disabled value emphasized, for example `Gathering environments Off`, not `Off Gathering environments`.
 - Count fact labels wrap at word boundaries and are not clipped or ellipsized except where a fixed navigation/control region explicitly requires truncation.
+
+Component browser display data:
+
+- Component descriptions are display-safe plain text. Foundry-style description objects must be normalized from their textual fields, and unknown object-shaped descriptions must render as empty text rather than object coercion strings.
+
+Environment browser layout:
+
+- Environment browse rows use a wide scene-proportional thumbnail in the identity cell and do not include a separate linked-scene column.
+- The task column renders the numeric task count only. Result and catalyst evidence belongs in the selected-environment inspector, not the browse row.
+- Environment browse status uses the same compact on/off toggle pattern as systems rows.
+- Environment browse row actions place edit, duplicate, and delete in a compact grid left of move-up and move-down buttons stacked at the top-right and bottom-right of the actions column.
 
 Tabs:
 
@@ -197,7 +210,10 @@ Capabilities:
 
 - Create, edit, delete essence definitions.
 - Set a FontAwesome icon for an essence (or fall-back to the default, `fas fa-mortar-pestle`)
-- Set optional `sourceItemUuid` by picker/drag-drop.
+- Set optional source component identity by picker/drag-drop. The source component may in turn expose a source item UUID.
+- In Manager V2, the Essences left-nav item is a real route, not a disabled placeholder, whenever the selected system has `features.essences === true`.
+- Manager V2 shows source-link state and component usage evidence for essence definitions.
+- Manager V2 prevents essence deletion while one or more managed components reference that essence with a positive quantity.
 
 ### Recipes Tab
 

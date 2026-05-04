@@ -384,7 +384,7 @@ export class CraftingSystemManager {
   }
 
   _plainTextDescription(value) {
-    const raw = String(value || '').trim();
+    const raw = this._descriptionTextCandidate(value);
     if (!raw) return '';
 
     if (globalThis.document?.createElement) {
@@ -409,6 +409,34 @@ export class CraftingSystemManager {
       .replace(/\s+/g, ' ')
       .replace(/\s+([,.;:!?])/g, '$1')
       .trim();
+  }
+
+  _descriptionTextCandidate(value, seen = new Set()) {
+    if (value == null) return '';
+
+    const valueType = typeof value;
+    if (valueType === 'string') return value.trim();
+    if (valueType === 'number' || valueType === 'boolean' || valueType === 'bigint') {
+      return String(value).trim();
+    }
+    if (Array.isArray(value)) {
+      return value
+        .map(entry => this._descriptionTextCandidate(entry, seen))
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+    }
+    if (valueType !== 'object') return '';
+    if (seen.has(value)) return '';
+    seen.add(value);
+
+    for (const key of ['value', 'enriched', 'html', 'text', 'content', 'short', 'long', 'unidentified', 'chat']) {
+      if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+      const candidate = this._descriptionTextCandidate(value[key], seen);
+      if (candidate) return candidate;
+    }
+
+    return '';
   }
 
   _extractSourceDescription(source = null) {

@@ -43,6 +43,7 @@ function rewriteClientImports(code) {
 function compileManagerV2Root() {
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/CraftingSystemManagerV2Root.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EnvironmentEditView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EssenceBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/EnvironmentsTab.svelte');
   for (const componentName of environmentComponentNames) {
     writeCompiledSvelte(`src/ui/svelte/apps/environments/${componentName}.svelte`);
@@ -99,8 +100,16 @@ function createStore(calls = [], options = {}) {
       resolutionMode: 'alchemy',
       advancedOptionsEnabled: true,
       features: selectedFeatures,
-      managedItemOptions: [{ id: 'c1' }, { id: 'c2' }, { id: 'c3' }, { id: 'c4' }],
-      essenceDefinitions: [{ id: 'e1' }],
+      managedItemOptions: [
+        { id: 'c1', name: 'Iron Ore', img: 'icons/commodities/metal/ore-chunk-grey.webp', sourceItemUuid: 'Compendium.fabricate.items.iron-ore' },
+        { id: 'c2', name: 'Glass Vial', img: 'icons/containers/kitchenware/vase-clay-blue.webp' },
+        { id: 'c3', name: 'Nightshade', img: 'icons/consumables/plants/nightshade.jpg' },
+        { id: 'c4', name: 'Coal', img: 'icons/commodities/materials/bowl-powder-black.webp' }
+      ],
+      essenceDefinitions: [
+        { id: 'earth', name: 'Earth', description: 'Stone and root.', icon: 'fas fa-mountain', sourceComponentId: 'c1', sourceItemUuid: 'c1', associatedSystemItemId: 'c1' },
+        { id: 'water', name: 'Water', description: 'Clear current.', icon: 'fas fa-water', sourceComponentId: null, sourceItemUuid: null, associatedSystemItemId: null }
+      ],
       itemTags: ['herb', 'mineral'],
       categories: ['potions'],
       sceneOptions: [
@@ -219,9 +228,44 @@ function createStore(calls = [], options = {}) {
       }]
     }
   ];
-  const selectedSystem = options.selected === false ? null : systemDetails.alchemy;
+  const selectedSystem = options.noSystems || options.selected === false ? null : systemDetails.alchemy;
+  const essenceCardsBySystem = {
+    alchemy: [
+      {
+        id: 'earth',
+        name: 'Earth',
+        description: 'Stone and root.',
+        icon: 'fas fa-mountain',
+        sourceComponentId: 'c1',
+        sourceItemUuid: 'c1',
+        associatedSystemItemId: 'c1',
+        associatedItem: { id: 'c1', name: 'Iron Ore', img: 'icons/commodities/metal/ore-chunk-grey.webp' },
+        associatedItemName: 'Iron Ore',
+        sourceName: 'Iron Ore',
+        sourceState: 'linked',
+        componentUsageCount: 1,
+        deleteBlocked: true
+      },
+      {
+        id: 'water',
+        name: 'Water',
+        description: 'Clear current.',
+        icon: 'fas fa-water',
+        sourceComponentId: '',
+        sourceItemUuid: null,
+        associatedSystemItemId: null,
+        associatedItem: null,
+        associatedItemName: null,
+        sourceName: '',
+        sourceState: 'none',
+        componentUsageCount: 0,
+        deleteBlocked: false
+      }
+    ],
+    smithing: []
+  };
   const viewState = writable({
-    systems: [
+    systems: options.noSystems ? [] : [
       {
         id: 'alchemy',
         name: 'Alchemy',
@@ -294,6 +338,7 @@ function createStore(calls = [], options = {}) {
     recipeSearchTerm: '',
     itemSearchTerm: '',
     itemCards: selectedSystem ? componentItems[selectedSystem.id] : [],
+    essenceCards: selectedSystem ? essenceCardsBySystem[selectedSystem.id] : [],
     showVisibilitySummary: true,
     canShowEnvironmentsTab: selectedFeatures.gathering === true,
     environments,
@@ -315,12 +360,28 @@ function createStore(calls = [], options = {}) {
       ...state,
       selectedSystem: nextSelected,
       itemCards: componentItems[id] || [],
+      essenceCards: essenceCardsBySystem[id] || [],
       itemSearchTerm: '',
       canShowEnvironmentsTab: nextSelected?.features?.gathering === true,
       systems: state.systems.map(system => ({
         ...system,
         selected: system.id === id
       }))
+    }));
+  }
+
+  function applySystemEnabled(id, enabled) {
+    if (systemDetails[id]) {
+      systemDetails[id] = { ...systemDetails[id], enabled };
+    }
+    viewState.update(state => ({
+      ...state,
+      selectedSystem: state.selectedSystem?.id === id
+        ? { ...state.selectedSystem, enabled }
+        : state.selectedSystem,
+      systems: state.systems.map(system =>
+        system.id === id ? { ...system, enabled } : system
+      )
     }));
   }
 
@@ -335,6 +396,10 @@ function createStore(calls = [], options = {}) {
     importSystem: () => calls.push(['importSystem']),
     exportSystem: (id) => calls.push(['exportSystem', id]),
     deleteSystem: (id) => calls.push(['deleteSystem', id]),
+    toggleSystemEnabled: (id, enabled) => {
+      calls.push(['toggleSystemEnabled', id, enabled]);
+      applySystemEnabled(id, enabled);
+    },
     saveSystemDetails: (name, description, advancedOptionsEnabled) => calls.push(['saveSystemDetails', name, description, advancedOptionsEnabled]),
     setResolutionMode: async (mode) => {
       calls.push(['setResolutionMode', mode]);
@@ -357,6 +422,15 @@ function createStore(calls = [], options = {}) {
     deleteRecipe: (id) => calls.push(['deleteRecipe', id]),
     setItemSearch: (term) => calls.push(['setItemSearch', term]),
     deleteComponent: (id) => calls.push(['deleteComponent', id]),
+    addEssence: (name, description, icon, sourceComponentId) => {
+      calls.push(['addEssence', name, description, icon, sourceComponentId]);
+      return true;
+    },
+    updateEssence: (id, updates) => {
+      calls.push(['updateEssence', id, updates]);
+      return true;
+    },
+    removeEssence: (id) => calls.push(['removeEssence', id]),
     selectEnvironment: (id) => {
       calls.push(['selectEnvironment', id]);
       viewState.update(state => ({
@@ -493,7 +567,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(target.textContent.includes('Quick actions'), false);
     assert.deepEqual(
       Array.from(target.querySelectorAll('.manager-v2-nav-label')).map(label => label.textContent.trim()),
-      ['System settings', 'Recipes', 'Components', 'Environments', 'Essences', 'Tags & Categories', 'Rules', 'Graph']
+      ['System settings', 'Recipes', 'Components', 'Essences', 'Environments', 'Tags & Categories', 'Rules', 'Graph']
     );
     assert.ok(target.textContent.includes('Alchemy'));
     assert.ok(target.textContent.includes('Potion and essence work'));
@@ -506,13 +580,13 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(environmentFact.querySelector('.manager-v2-fact-label')?.textContent.trim(), 'environments');
   });
 
-  it('hides selected-system placeholder navigation until a system is selected', () => {
+  it('shows the unselected systems library only when no crafting systems exist', () => {
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(Component, {
       target,
       props: {
-        store: createStore([], { selected: false }),
+        store: createStore([], { noSystems: true }),
         services: { openCurrentAdmin: () => {} }
       }
     });
@@ -520,10 +594,45 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
 
     const navLabels = Array.from(target.querySelectorAll('.manager-v2-nav-label')).map(label => label.textContent.trim());
     assert.deepEqual(navLabels, []);
-    assert.equal(navLabels.includes('Components'), false);
-    assert.equal(navLabels.includes('Recipes'), false);
     assert.ok(target.textContent.includes('Crafting Systems'));
-    assert.ok(target.textContent.includes('Select a system'));
+    assert.ok(target.textContent.includes('No crafting systems yet'));
+  });
+
+  it('toggles systems library row status without selecting the row', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    const smithingToggle = target.querySelector('[aria-label="Enable Smithing"]');
+    assert.ok(smithingToggle, 'disabled system row should expose an enable toggle');
+    assert.equal(smithingToggle.getAttribute('aria-pressed'), 'false');
+    assert.ok(smithingToggle.classList.contains('is-off'));
+
+    smithingToggle.click();
+    await tick();
+    flushSync();
+
+    assert.deepEqual(calls.slice(-1), [['toggleSystemEnabled', 'smithing', true]]);
+    assert.equal(target.querySelector('[data-system-id="alchemy"]').getAttribute('aria-selected'), 'true');
+    assert.equal(target.querySelector('[data-system-id="smithing"]').getAttribute('aria-selected'), 'false');
+    assert.equal(target.querySelector('[aria-label="Disable Smithing"]').getAttribute('aria-pressed'), 'true');
+
+    const alchemyToggle = target.querySelector('[aria-label="Disable Alchemy"]');
+    assert.ok(alchemyToggle, 'active system row should expose a disable toggle');
+    alchemyToggle.click();
+    await tick();
+    flushSync();
+
+    assert.deepEqual(calls.slice(-1), [['toggleSystemEnabled', 'alchemy', false]]);
+    assert.equal(target.querySelector('[aria-label="Enable Alchemy"]').getAttribute('aria-pressed'), 'false');
   });
 
   it('feature-gates selected-system placeholder navigation', () => {
@@ -549,7 +658,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(environmentFact.querySelector('strong.is-disabled')?.textContent.trim(), 'Off');
   });
 
-  it('routes selected-system breadcrumb to settings and clears selection from the rail scope', async () => {
+  it('routes selected-system breadcrumb to settings and returns to system library without clearing selection', async () => {
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -577,24 +686,37 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'system-edit');
     assert.ok(target.querySelector('.manager-v2-system-edit-form'));
 
-    const scopeButton = target.querySelector('.manager-v2-scope-button');
-    assert.ok(scopeButton, 'selected system scope button should render');
-    assert.ok(scopeButton.querySelector('.manager-v2-scope-clear'), 'selected system scope button should expose a clear icon');
-    assert.equal(scopeButton.getAttribute('aria-label'), 'Clear selected system: Alchemy');
+    const scopeCard = target.querySelector('.manager-v2-scope-card');
+    assert.ok(scopeCard, 'selected system scope card should render');
+    assert.equal(scopeCard.querySelector('.manager-v2-scope-name')?.textContent.trim(), 'Alchemy');
+    assert.equal(scopeCard.querySelector('.manager-v2-scope-name')?.tagName, 'SPAN');
+    const returnButton = scopeCard.querySelector('.manager-v2-scope-return');
+    assert.ok(returnButton, 'selected system scope should expose a return-to-library button');
+    assert.equal(returnButton.getAttribute('aria-label'), 'Return to System Library');
+    assert.equal(returnButton.getAttribute('title'), 'Return to System Library');
 
-    scopeButton.click();
+    const callsBeforeScopeNameClick = calls.length;
+    scopeCard.querySelector('.manager-v2-scope-name').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(calls.length, callsBeforeScopeNameClick, 'clicking the selected system name should not route or clear selection');
+    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'system-edit');
+
+    const callsBeforeReturn = calls.length;
+    returnButton.click();
     await Promise.resolve();
     await tick();
     flushSync();
 
-    assert.deepEqual(calls.slice(-1), [['selectSystem', '']]);
+    assert.equal(calls.length, callsBeforeReturn, 'returning to system library should not call selectSystem');
     assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'systems');
-    assert.equal(target.querySelector('.manager-v2-scope-button'), null);
+    assert.ok(target.querySelector('.manager-v2-scope-card'), 'selected system scope should remain visible');
+    assert.equal(target.querySelector('[data-system-id="alchemy"]').getAttribute('aria-selected'), 'true');
     assert.deepEqual(
       Array.from(target.querySelectorAll('.manager-v2-nav-label')).map(label => label.textContent.trim()),
-      []
+      ['System settings', 'Recipes', 'Components', 'Essences', 'Environments', 'Tags & Categories', 'Rules', 'Graph']
     );
-    assert.ok(target.textContent.includes('Select a system'));
+    assert.ok(target.textContent.includes('System library'));
   });
 
   it('routes to the recipes browser with selected recipe inspector and actions', async () => {
@@ -736,6 +858,81 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(calls.some(call => call[0] === 'deleteComponent' && call[1] === 'c1'));
   });
 
+  it('routes to the essence browser with source filtering, selection, and inline actions', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    const essenceButton = navButton('Essences');
+    assert.ok(essenceButton, 'essence nav button should render when the feature is enabled');
+    assert.equal(essenceButton.disabled, false);
+    essenceButton.click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'essences');
+    assert.ok(target.textContent.includes('Essence browser'));
+    assert.equal(target.querySelectorAll('.manager-v2-essence-row').length, 2);
+    assert.ok(target.textContent.includes('Earth'));
+    assert.ok(target.textContent.includes('Linked source'));
+    assert.ok(target.textContent.includes('Iron Ore'));
+    assert.ok(target.textContent.includes('Deletion blocked'));
+
+    target.querySelector('[data-essence-id="water"]').click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-essence-id="water"]').classList.contains('is-selected'));
+    assert.ok(target.textContent.includes('Clear current.'));
+
+    const sourceFilter = target.querySelector('[aria-label="Filter essences by source state"]');
+    sourceFilter.value = 'none';
+    sourceFilter.dispatchEvent(new Event('change', { bubbles: true }));
+    sourceFilter.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(target.querySelectorAll('.manager-v2-essence-row').length, 1);
+    assert.ok(target.textContent.includes('Water'));
+
+    const nameInput = target.querySelector('#manager-v2-essence-create-name');
+    nameInput.value = 'Air';
+    nameInput.dispatchEvent(new Event('input', { bubbles: true }));
+    target.querySelector('#manager-v2-essence-create-source').value = 'c2';
+    target.querySelector('#manager-v2-essence-create-source').dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    target.querySelector('.manager-v2-essence-create-band .manager-v2-button').click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'addEssence' && call[1] === 'Air' && call[4] === 'c2'));
+
+    target.querySelector('[data-essence-id="water"] [aria-label="Edit Water"]').click();
+    await tick();
+    flushSync();
+    const editName = target.querySelector('[data-essence-id="water"] .manager-v2-essence-edit-row input[aria-label="Name"]');
+    editName.value = 'Rain';
+    editName.dispatchEvent(new Event('input', { bubbles: true }));
+    target.querySelector('[data-essence-id="water"] [aria-label="Save Water"]').click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateEssence' && call[1] === 'water' && call[2].name === 'Rain'));
+
+    target.querySelector('[data-essence-id="water"] [aria-label="Delete Water"]').click();
+    assert.ok(calls.some(call => call[0] === 'removeEssence' && call[1] === 'water'));
+    sourceFilter.value = 'all';
+    sourceFilter.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('[data-essence-id="earth"] [aria-label="Delete Earth"]').disabled, true);
+  });
+
   it('routes to the environments browser and opens the forced v2 editor route', async () => {
     const calls = [];
     target = document.createElement('div');
@@ -758,8 +955,22 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Gathering environments'));
     assert.ok(target.textContent.includes('Moonlit Forest'));
     assert.ok(target.textContent.includes('Quiet Cavern'));
-    assert.ok(target.textContent.includes('Linked scene'));
-    assert.ok(target.textContent.includes('Scene unresolved'));
+
+    const environmentTable = target.querySelector('.manager-v2-environments-table');
+    assert.deepEqual(
+      Array.from(environmentTable.querySelectorAll('[role="columnheader"]')).map(header => header.textContent.trim()),
+      ['Environment', 'Selection mode', 'Tasks', 'Status', 'Actions']
+    );
+    assert.equal(environmentTable.textContent.includes('Linked scene'), false);
+    assert.equal(environmentTable.textContent.includes('Scene unresolved'), false);
+    const forestRow = target.querySelector('[data-environment-id="env-forest"]');
+    assert.equal(forestRow.querySelector('.manager-v2-environment-task-count').textContent.trim(), '1');
+    assert.equal(forestRow.textContent.includes('results'), false);
+    assert.equal(forestRow.textContent.includes('catalysts'), false);
+    assert.equal(forestRow.querySelector('.manager-v2-environment-task-count.manager-v2-chip'), null);
+    assert.ok(forestRow.querySelector('.manager-v2-status-toggle'));
+    assert.ok(forestRow.querySelector('.manager-v2-environment-action-grid'));
+    assert.ok(forestRow.querySelector('.manager-v2-environment-reorder-stack'));
 
     const search = target.querySelector('.manager-v2-toolbar input[type="search"]');
     search.value = 'cavern';
@@ -769,16 +980,30 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(target.querySelectorAll('.manager-v2-environment-row').length, 1);
     assert.ok(target.textContent.includes('Quiet Cavern'));
     assert.equal(
-      target.querySelector('[data-environment-id="env-cavern"] .manager-v2-icon-button:nth-of-type(2)').disabled,
+      target.querySelector('[data-environment-id="env-cavern"] .manager-v2-environment-reorder-stack [aria-label="Move up"]').disabled,
       false,
       'filtered environment move-up should use full list order, not filtered row position'
     );
+
+    const cavernToggle = target.querySelector('[data-environment-id="env-cavern"] .manager-v2-status-toggle');
+    cavernToggle.click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'toggleEnvironmentEnabled' && call[1] === 'env-cavern' && call[2] === true));
+    assert.equal(calls.some(call => call[0] === 'selectEnvironment' && call[1] === 'env-cavern'), false);
 
     target.querySelector('[data-environment-id="env-cavern"] .manager-v2-environment-identity').click();
     await tick();
     flushSync();
     assert.ok(target.querySelector('[data-environment-id="env-cavern"]').classList.contains('is-selected'));
     assert.ok(calls.some(call => call[0] === 'selectEnvironment' && call[1] === 'env-cavern'));
+
+    target.querySelector('[data-environment-id="env-cavern"] [aria-label="Move up"]').click();
+    target.querySelector('[data-environment-id="env-cavern"] [aria-label="Duplicate Quiet Cavern"]').click();
+    target.querySelector('[data-environment-id="env-cavern"] [aria-label="Delete Quiet Cavern"]').click();
+    assert.ok(calls.some(call => call[0] === 'moveEnvironmentDraft' && call[1] === 'env-cavern' && call[2] === 'up'));
+    assert.ok(calls.some(call => call[0] === 'duplicateEnvironmentDraft' && call[1] === 'env-cavern'));
+    assert.ok(calls.some(call => call[0] === 'deleteEnvironmentDraft' && call[1] === 'env-cavern'));
 
     target.querySelector('[aria-label="Edit Quiet Cavern"]').click();
     await Promise.resolve();

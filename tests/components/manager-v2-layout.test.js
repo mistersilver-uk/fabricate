@@ -44,7 +44,7 @@ test('manager-v2 body starts as a three-region grid and stacks at narrow width',
     'narrow manager-v2 layout should stack to one column'
   );
   assert.ok(
-    css.includes('grid-template-columns: minmax(0, 1.5fr) minmax(92px, 0.45fr) minmax(92px, 0.45fr) 118px;'),
+    css.includes('grid-template-columns: minmax(0, 1.55fr) minmax(92px, 0.42fr) 72px 118px;'),
     'normal systems table should use compact System, Resolution, Status, and Actions columns'
   );
   assert.ok(
@@ -75,19 +75,42 @@ test('manager-v2 systems text and action cells are constrained at normal widths'
   assert.ok(css.includes('overflow-wrap: break-word;'), 'text should avoid single-letter wrapping unless needed for long strings');
 });
 
-test('manager-v2 selected system scope is a clear-selection card with accessible focus', () => {
-  const scopeBlock = blockFor('.fabricate-manager-v2 .manager-v2-scope-button');
-  const scopeFocusBlock = blockFor('.fabricate-manager-v2 .manager-v2-scope-button:hover,\n.fabricate-manager-v2 .manager-v2-scope-button:focus-visible');
-  const scopeTitleBlock = blockFor('.fabricate-manager-v2 .manager-v2-scope-button .manager-v2-title');
-  const clearBlock = blockFor('.fabricate-manager-v2 .manager-v2-scope-clear');
+test('manager-v2 systems status cells use stable interactive on-off toggles', () => {
+  const toggleBlock = blockFor('.fabricate-manager-v2 .manager-v2-status-toggle');
+  const onBlock = blockFor('.fabricate-manager-v2 .manager-v2-status-toggle.is-on');
+  const offBlock = blockFor('.fabricate-manager-v2 .manager-v2-status-toggle.is-off');
+  const trackBlock = blockFor('.fabricate-manager-v2 .manager-v2-status-toggle-track');
+  const knobBlock = blockFor('.fabricate-manager-v2 .manager-v2-status-toggle-knob');
+  const onKnobBlock = blockFor('.fabricate-manager-v2 .manager-v2-status-toggle.is-on .manager-v2-status-toggle-knob');
+  const focusBlock = blockFor('.fabricate-manager-v2 .manager-v2-status-toggle:focus');
+  const focusVisibleBlock = blockFor('.fabricate-manager-v2 .manager-v2-status-toggle:focus-visible');
+
+  assert.ok(toggleBlock.includes('appearance: none;'), 'system status toggles should normalize host button styles');
+  assert.ok(toggleBlock.includes('width: auto;'), 'system status toggles should size to their On/Off label instead of filling the status column');
+  assert.ok(toggleBlock.includes('max-width: 64px;'), 'system status toggles should keep compact geometry');
+  assert.ok(toggleBlock.includes('border-radius: 999px;'), 'system status toggles should read as toggle buttons');
+  assert.ok(focusBlock.includes('outline: none;') && focusBlock.includes('box-shadow: none;'), 'mouse focus should not inherit the host orange focus ring');
+  assert.ok(focusVisibleBlock.includes('outline: 2px solid var(--fab-mv2-accent);'), 'keyboard focus should keep a manager-v2 focus-visible ring');
+  assert.ok(onBlock.includes('rgba(92, 184, 92'), 'enabled status should use the manager-v2 green accent family');
+  assert.ok(offBlock.includes('rgba(255, 192, 120'), 'disabled status should use a distinct muted warning/off color');
+  assert.ok(trackBlock.includes('width: 24px;'), 'toggle track should reserve only enough space for the compact state control');
+  assert.ok(knobBlock.includes('transition: transform'), 'toggle knob should expose a clear state change');
+  assert.ok(onKnobBlock.includes('transform: translateX(10px);'), 'enabled status should move the toggle knob on');
+});
+
+test('manager-v2 selected system scope is static text with a return-to-library control', () => {
+  const scopeBlock = blockFor('.fabricate-manager-v2 .manager-v2-scope-card');
+  const scopeTitleBlock = blockFor('.fabricate-manager-v2 .manager-v2-scope-name');
+  const returnBlock = blockFor('.fabricate-manager-v2 .manager-v2-scope-return');
+  const returnFocusBlock = blockFor('.fabricate-manager-v2 .manager-v2-scope-return:hover,\n.fabricate-manager-v2 .manager-v2-scope-return:focus-visible');
   const focusBlock = blockFor('.fabricate-manager-v2 button:focus-visible,\n.fabricate-manager-v2 input:focus-visible,\n.fabricate-manager-v2 select:focus-visible,\n.fabricate-manager-v2 [tabindex]:focus-visible');
 
-  assert.ok(scopeBlock.includes('display: grid;'), 'selected system scope should reserve space for the clear icon');
-  assert.ok(scopeBlock.includes('grid-template-columns: minmax(0, 1fr) 28px;'), 'scope button should keep name and x icon aligned');
-  assert.ok(scopeBlock.includes('height: 64px;'), 'scope button should keep a stable fixed height');
-  assert.ok(scopeBlock.includes('white-space: normal;'), 'scope button should not inherit host nowrap rules');
-  assert.ok(scopeBlock.includes('overflow: hidden;'), 'scope button should prevent long names from affecting nav layout');
-  assert.ok(scopeBlock.includes('border: 1px solid var(--fab-mv2-border);'), 'scope button should render as a visible rail card');
+  assert.ok(scopeBlock.includes('display: grid;'), 'selected system scope should reserve space for the return icon');
+  assert.ok(scopeBlock.includes('grid-template-columns: minmax(0, 1fr) 28px;'), 'scope card should keep name and return icon aligned');
+  assert.ok(scopeBlock.includes('height: 64px;'), 'scope card should keep a stable fixed height');
+  assert.ok(scopeBlock.includes('white-space: normal;'), 'scope card should not inherit host nowrap rules');
+  assert.ok(scopeBlock.includes('overflow: hidden;'), 'scope card should prevent long names from affecting nav layout');
+  assert.ok(scopeBlock.includes('border: 1px solid var(--fab-mv2-border);'), 'scope card should render as a visible rail card');
   assert.ok(scopeTitleBlock.includes('min-width: 0;'), 'scope title should be allowed to shrink inside the grid');
   assert.ok(scopeTitleBlock.includes('max-width: 100%;'), 'scope title should not overflow the scope card');
   assert.ok(scopeTitleBlock.includes('max-height: 2.36em;'), 'scope title should have a hard two-line height cap');
@@ -96,12 +119,12 @@ test('manager-v2 selected system scope is a clear-selection card with accessible
   assert.ok(scopeTitleBlock.includes('overflow: hidden;'), 'scope title should not overflow its parent');
   assert.ok(scopeTitleBlock.includes('overflow-wrap: anywhere;'), 'scope title should break very long system names before overflow');
   assert.ok(scopeTitleBlock.includes('white-space: normal;'), 'scope title should not inherit host nowrap rules');
-  assert.ok(clearBlock.includes('width: 28px;'), 'clear icon should have a stable hit target inside the scope card');
-  assert.ok(clearBlock.includes('color: var(--fab-mv2-text-muted);'), 'clear icon should avoid danger styling');
-  assert.ok(scopeFocusBlock.includes('border-color: var(--fab-mv2-border-strong);'), 'scope focus should stay within manager-v2 styling');
+  assert.ok(returnBlock.includes('width: 28px;'), 'return icon should have a stable hit target inside the scope card');
+  assert.ok(returnBlock.includes('color: var(--fab-mv2-text-muted);'), 'return icon should avoid danger styling');
+  assert.ok(returnFocusBlock.includes('border-color: var(--fab-mv2-border-strong);'), 'return focus should stay within manager-v2 styling');
   assert.ok(focusBlock.includes('outline: 2px solid var(--fab-mv2-accent);'), 'manager-v2 focus should remain visible');
-  assert.equal(scopeBlock.includes('orange'), false, 'scope button should not use orange focus styling');
-  assert.equal(scopeBlock.includes('red'), false, 'scope button should not use red focus styling');
+  assert.equal(scopeBlock.includes('orange'), false, 'scope card should not use orange focus styling');
+  assert.equal(scopeBlock.includes('red'), false, 'scope card should not use red focus styling');
 });
 
 test('manager-v2 inspector count labels wrap without truncation', () => {
@@ -142,8 +165,8 @@ test('manager-v2 recipes browser defines compact responsive table geometry', () 
     'recipes table should have a no-category grid variant'
   );
   assert.ok(
-    css.includes('.fabricate-manager-v2 .manager-v2-recipe-row,\n.fabricate-manager-v2 .manager-v2-component-row,\n.fabricate-manager-v2 .manager-v2-environment-row {\n  width: 100%;\n  min-height: 76px;'),
-    'recipe, component, and environment rows should have stable row height'
+    css.includes('.fabricate-manager-v2 .manager-v2-recipe-row,\n.fabricate-manager-v2 .manager-v2-component-row,\n.fabricate-manager-v2 .manager-v2-environment-row,\n.fabricate-manager-v2 .manager-v2-essence-row {\n  width: 100%;\n  min-height: 76px;'),
+    'recipe, component, environment, and essence rows should have stable row height'
   );
   assert.ok(
     identityBlock.includes('grid-template-columns: 46px minmax(0, 1fr);')
@@ -202,16 +225,63 @@ test('manager-v2 components browser defines drop target and compact responsive t
   );
 });
 
+test('manager-v2 essence browser defines compact responsive table geometry', () => {
+  const tableBlock = blockFor('.fabricate-manager-v2 .manager-v2-essences-table');
+  const createBlock = blockFor('.fabricate-manager-v2 .manager-v2-essence-create-band');
+  const identityBlock = blockFor('.fabricate-manager-v2 .manager-v2-essence-identity');
+  const mediumQuery = css.slice(css.indexOf('@container fabricate-manager-v2 (max-width: 1120px)'));
+
+  assert.ok(
+    css.includes('.fabricate-manager-v2[data-manager-v2-view="essences"] .manager-v2-main'),
+    'essences route should reserve rows for header, create controls, toolbar, and table'
+  );
+  assert.ok(
+    tableBlock.includes('--fab-mv2-essence-grid: minmax(0, 1.45fr)'),
+    'essences table should define shrinkable compact columns for normal Foundry manager widths'
+  );
+  assert.ok(
+    createBlock.includes('grid-template-columns: minmax(130px, 0.72fr)'),
+    'essence create controls should use stable responsive grid columns'
+  );
+  assert.ok(identityBlock.includes('grid-template-columns: 44px minmax(0, 1fr);'), 'essence identity should reserve icon space');
+  assert.ok(
+    mediumQuery.includes('.fabricate-manager-v2 .manager-v2-essence-row') && mediumQuery.includes('grid-template-columns: minmax(0, 1fr);'),
+    'medium manager-v2 layout should stack essence rows before columns become cramped'
+  );
+});
+
 test('manager-v2 environments browser and edit route define compact responsive geometry', () => {
   const tableBlock = blockFor('.fabricate-manager-v2 .manager-v2-environments-table');
+  const taskCountBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-task-count');
+  const actionsBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-actions');
+  const actionGridBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-action-grid');
   const editorShellBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-editor-shell');
   const editorViewBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-edit-view');
   const workspaceBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-workspace');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager-v2 (max-width: 1120px)'));
 
   assert.ok(
-    tableBlock.includes('--fab-mv2-environment-grid: minmax(0, 1.35fr)'),
-    'environments table should define shrinkable compact columns for normal Foundry manager widths'
+    tableBlock.includes('--fab-mv2-environment-grid: minmax(0, 1.72fr) minmax(86px, 0.42fr) 46px 72px 116px;'),
+    'environments table should define five compact columns without a linked-scene column'
+  );
+  assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-environment-identity {\n  grid-template-columns: 72px minmax(0, 1fr);'),
+    'environment identity should reserve a wider scene thumbnail'
+  );
+  assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-environment-thumb {\n  width: 72px;\n  height: 48px;'),
+    'environment thumbnails should use scene-like proportions'
+  );
+  assert.ok(taskCountBlock.includes('font-weight: 800;'), 'environment task count should render as plain emphasized text');
+  assert.ok(actionsBlock.includes('grid-template-columns: 72px 34px;'), 'environment row actions should reserve edit/delete grid plus reorder stack');
+  assert.ok(actionGridBlock.includes('grid-template-columns: repeat(2, 34px);'), 'environment edit duplicate delete buttons should sit in a compact grid');
+  assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-environment-reorder-stack {\n  grid-template-rows: repeat(2, 34px);'),
+    'environment move up/down buttons should stack at the right edge'
+  );
+  assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-environment-row .manager-v2-status-cell'),
+    'environment status cells should align the shared compact status toggle'
   );
   assert.ok(
     css.includes('.fabricate-manager-v2[data-manager-v2-view="environment-edit"] .manager-v2-main'),

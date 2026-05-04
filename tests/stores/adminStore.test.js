@@ -198,6 +198,18 @@ describe('createAdminStore', () => {
       assert.equal(vs.systems[0].id, 'sys1');
     });
 
+    it('defaults to first system when no saved system is set', async () => {
+      const services = createMockServices({
+        getSetting: () => ''
+      });
+      const store = createAdminStore(services);
+      await store.refresh();
+      const vs = get(store.viewState);
+      assert.equal(get(store.selectedSystemId), 'sys1');
+      assert.equal(vs.selectedSystem?.id, 'sys1');
+      assert.equal(vs.systems[0].selected, true);
+    });
+
     it('restores selected system from lastManagedCraftingSystem setting', () => {
       const services = createMockServices({
         getSetting: (key) => key === 'lastManagedCraftingSystem' ? 'sys1' : ''
@@ -214,6 +226,26 @@ describe('createAdminStore', () => {
       await store.refresh();
       // sys-gone does not exist, sys1 does — should fall back to first system
       assert.equal(get(store.selectedSystemId), 'sys1');
+      assert.equal(get(store.viewState).systems[0].selected, true);
+    });
+
+    it('leaves selection empty when no systems exist', async () => {
+      const services = createMockServices({
+        getSetting: () => ''
+      });
+      const originalManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...originalManager,
+        getSystems: () => [],
+        getSystem: () => null,
+        getItems: () => []
+      });
+      const store = createAdminStore(services);
+      await store.refresh();
+      const vs = get(store.viewState);
+      assert.equal(get(store.selectedSystemId), '');
+      assert.equal(vs.selectedSystem, null);
+      assert.deepEqual(vs.systems, []);
     });
   });
 
@@ -227,10 +259,11 @@ describe('createAdminStore', () => {
       const services = createMockServices({
         setSetting: async (key, value) => { if (key === 'lastManagedCraftingSystem') persisted = value; }
       });
+      services._getSystemsMutable().push(makeSystem({ id: 'sys2', name: 'System Two' }));
       const store = createAdminStore(services);
-      await store.selectSystem('sys1');
-      assert.equal(get(store.selectedSystemId), 'sys1');
-      assert.equal(persisted, 'sys1');
+      await store.selectSystem('sys2');
+      assert.equal(get(store.selectedSystemId), 'sys2');
+      assert.equal(persisted, 'sys2');
     });
 
     it('selectSystem refreshes viewState with new system data', async () => {
@@ -367,12 +400,32 @@ describe('createAdminStore', () => {
       const origManager = services.getCraftingSystemManager();
       services.getCraftingSystemManager = () => ({
         ...origManager,
+        getSystems: () => [],
+        getSystem: () => null,
         updateSystem: async () => { updateCalled = true; }
       });
       const store = createAdminStore(services);
-      // selectedSystemId stays '' — never call selectSystem
       await store.saveSystemDetails('Name', 'Desc', true);
       assert.ok(!updateCalled, 'updateSystem should not be called when no system is selected');
+    });
+
+    it('toggleSystemEnabled calls systemManager.updateSystem for the target system', async () => {
+      let updateArgs = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => {
+          updateArgs = { id, updates };
+          await origManager.updateSystem(id, updates);
+        }
+      });
+      const store = createAdminStore(services);
+      const result = await store.toggleSystemEnabled('sys1', false);
+      assert.equal(result, true);
+      assert.ok(updateArgs !== null, 'updateSystem should be called');
+      assert.equal(updateArgs.id, 'sys1');
+      assert.equal(updateArgs.updates.enabled, false);
     });
 
     it('setResolutionMode confirms and persists the new mode', async () => {
@@ -769,6 +822,7 @@ describe('createAdminStore', () => {
 
       const newEssence = savedEssences?.find(e => e.name === 'Radiance');
       assert.ok(newEssence, 'new essence should be persisted');
+      assert.equal(newEssence.sourceComponentId, 'comp-1');
       assert.equal(newEssence.sourceItemUuid, 'comp-1');
       assert.equal(newEssence.associatedSystemItemId, 'comp-1');
     });
@@ -875,6 +929,7 @@ describe('createAdminStore', () => {
         name: 'Volatile',
         description: 'Explosive energy',
         icon: 'fas fa-bolt',
+        sourceComponentId: 'item-1',
         sourceItemUuid: 'item-1',
         associatedSystemItemId: 'item-1'
       });
@@ -1063,8 +1118,13 @@ describe('createAdminStore', () => {
           error: () => {}
         }
       });
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        getSystems: () => [],
+        getSystem: () => null
+      });
       const store = createAdminStore(services);
-      // No selectSystem — selectedSystemId stays ''
       await store.createRecipe();
       assert.ok(warnMsg !== null, 'warn should be called when no system selected');
       assert.ok(!editorCalled, 'openRecipeEditor should not be called when no system selected');
@@ -1120,8 +1180,13 @@ describe('createAdminStore', () => {
         notify: { info: () => {}, warn: (m) => { warnMsg = m; }, error: () => {} },
         downloadFile: async () => { downloadCalled = true; }
       });
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        getSystems: () => [],
+        getSystem: () => null
+      });
       const store = createAdminStore(services);
-      // No selectSystem call
       await store.exportSystem();
       assert.ok(warnMsg !== null, 'should warn');
       assert.ok(!downloadCalled, 'downloadFile should not be called');
@@ -1534,7 +1599,7 @@ describe('createAdminStore', () => {
         'viewState',
         'selectSystem', 'createSystem', 'deleteSystem', 'saveSystemDetails',
         'setTab',
-        'toggleFeature', 'toggleAdvancedOptions', 'toggleRequirement',
+        'toggleSystemEnabled', 'toggleFeature', 'toggleAdvancedOptions', 'toggleRequirement',
         'addCategory', 'removeCategory',
         'addTag', 'removeTag',
         'addEssence', 'removeEssence',
@@ -1968,8 +2033,15 @@ describe('createAdminStore', () => {
       assert.equal(r?.visibilitySummary, 'Restricted (2)');
     });
 
-    it('viewState.hasSystem is false and selectedSystem is null when no system is selected', async () => {
+    it('viewState.hasSystem is false and selectedSystem is null when no systems exist', async () => {
       const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        getSystems: () => [],
+        getSystem: () => null,
+        getItems: () => []
+      });
       const store = createAdminStore(services);
       await store.refresh();
       const vs = get(store.viewState);
@@ -2046,6 +2118,37 @@ describe('createAdminStore', () => {
       });
     });
 
+    it('viewState.itemCards normalize object-shaped descriptions without object strings', async () => {
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.components = [
+          makeItem({
+            id: 'comp-object-description',
+            name: 'Silverweed',
+            description: { value: '<p>Bright <strong>moonlit</strong> leaves.</p>' }
+          }),
+          makeItem({
+            id: 'comp-unknown-description',
+            name: 'Voidbloom',
+            description: { unexpected: 'shape' }
+          })
+        ];
+        delete sys.items;
+      }
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const vs = get(store.viewState);
+
+      assert.equal(vs.itemCards[0].description, 'Bright moonlit leaves.');
+      assert.equal(vs.itemCards[0].hasDescription, true);
+      assert.equal(vs.itemCards[1].description, '');
+      assert.equal(vs.itemCards[1].hasDescription, false);
+      assert.ok(!JSON.stringify(vs.itemCards).includes('[object Object]'));
+    });
+
     it('viewState.selectedSystem exposes managed item images and resolved essence source item metadata', async () => {
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
@@ -2094,6 +2197,65 @@ describe('createAdminStore', () => {
       assert.equal(linkedEssence.associatedItemName, 'Blazing Herb');
       assert.equal(unlinkedEssence.associatedItem, null);
       assert.equal(unlinkedEssence.associatedItemName, null);
+    });
+
+    it('viewState.essenceCards expose source state and component usage for manager v2', async () => {
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.features = { essences: true };
+        sys.advancedOptionsEnabled = true;
+        sys.components = [
+          makeItem({
+            id: 'comp-1',
+            name: 'Blazing Herb',
+            img: 'blazing-herb.png',
+            sourceItemUuid: 'Compendium.fabricate.items.blazing-herb',
+            essences: { 'ess-fire': 2 }
+          }),
+          makeItem({
+            id: 'comp-2',
+            name: 'Moon Salt',
+            img: '',
+            essences: {}
+          })
+        ];
+        sys.essenceDefinitions = [
+          {
+            id: 'ess-fire',
+            name: 'Fire',
+            description: 'Hot stuff',
+            icon: 'fas fa-fire',
+            sourceComponentId: 'comp-1',
+            sourceItemUuid: 'comp-1',
+            associatedSystemItemId: 'comp-1'
+          },
+          {
+            id: 'ess-moon',
+            name: 'Moon',
+            description: '',
+            icon: '',
+            sourceComponentId: null,
+            sourceItemUuid: null,
+            associatedSystemItemId: null
+          }
+        ];
+      }
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const cards = get(store.viewState).essenceCards;
+
+      assert.equal(cards.length, 2);
+      assert.equal(cards[0].sourceComponentId, 'comp-1');
+      assert.equal(cards[0].sourceName, 'Blazing Herb');
+      assert.equal(cards[0].sourceState, 'linked');
+      assert.equal(cards[0].componentUsageCount, 1);
+      assert.equal(cards[0].deleteBlocked, true);
+      assert.equal(cards[1].sourceState, 'none');
+      assert.equal(cards[1].icon, DEFAULT_ESSENCE_ICON);
+      assert.equal(cards[1].deleteBlocked, false);
     });
 
     it('viewState.recipeSearchTerm and itemSearchTerm echo the current search values', async () => {

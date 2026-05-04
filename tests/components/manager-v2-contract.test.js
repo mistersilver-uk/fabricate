@@ -62,6 +62,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'class={componentTableClass}',
       'manager-v2-component-row',
       'class="manager-v2-component-identity"',
+      'EssenceBrowserView',
       'EnvironmentEditView',
       'manager-v2-environment-edit-main',
       'manager-v2-system-edit-form',
@@ -83,8 +84,11 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.equal(lang.FABRICATE.Admin.ManagerV2.OpenCurrentAdmin, 'Open current admin');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Breadcrumbs, 'Breadcrumbs');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.EditSystem, 'Edit system');
-    assert.equal(lang.FABRICATE.Admin.ManagerV2.ClearSelectedSystem, 'Clear selected system');
-    assert.equal(lang.FABRICATE.Admin.ManagerV2.ClearSelectedSystemNamed, 'Clear selected system: {name}');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.ReturnToSystemLibrary, 'Return to System Library');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.StatusOn, 'On');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.StatusOff, 'Off');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.EnableSystemNamed, 'Enable {name}');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.DisableSystemNamed, 'Disable {name}');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.SystemEdit.Title, 'System settings');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.SystemEdit.SaveDetails, 'Save details');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Recipe.Title, 'Recipes');
@@ -92,6 +96,9 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Component.Title, 'Components');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Component.DropZoneTitle, 'Drop items to add components');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Component.SourceLinked, 'Linked source');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Essence.Title, 'Essences');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Essence.Library, 'Essence browser');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Essence.SourceLinked, 'Linked source');
   });
 
   it('routes system Edit to the in-place v2 edit view and existing store callbacks', () => {
@@ -123,8 +130,16 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'root should derive selected-system placeholder nav from selection and feature gates'
     );
     assert.ok(rootSource.includes('selectSystemAndShowBrowser'), 'root should keep an explicit systems-browser route');
-    assert.ok(rootSource.includes('clearSelectedSystem'), 'root should expose a selected-system clear route');
-    assert.ok(rootSource.includes("selectSystem('', 'systems')"), 'selected-system clear should clear real store selection');
+    assert.ok(rootSource.includes('manager-v2-scope-card'), 'root should render selected system scope as static rail text');
+    assert.ok(rootSource.includes('manager-v2-scope-return'), 'root should expose a return-to-system-library rail action');
+    assert.ok(rootSource.includes('FABRICATE.Admin.ManagerV2.ReturnToSystemLibrary'), 'return-to-library action should be localized');
+    assert.ok(rootSource.includes("setView('essences')"), 'essences should be exposed as a real selected-system route');
+    assert.ok(!rootSource.includes("{ id: 'essences'"), 'essences should not remain a disabled placeholder route');
+    assert.ok(!rootSource.includes('clearSelectedSystem'), 'root should not expose a selected-system clear route');
+    assert.ok(!rootSource.includes("selectSystem('', 'systems')"), 'selected-system rail should not clear real store selection');
+    assert.ok(!rootSource.includes('manager-v2-scope-clear'), 'selected-system rail should not render the old x clear icon');
+    assert.ok(rootSource.includes('toggleSystemEnabled'), 'systems browser should expose interactive row status toggles');
+    assert.ok(rootSource.includes('manager-v2-status-toggle'), 'systems browser should render status as a toggle control');
     assert.ok(!rootSource.includes("setView('systems')"), 'systems should not be exposed as a left-rail tab');
     assert.ok(!rootSource.includes('manager-v2-count-cluster'), 'system rows should not duplicate inspector counts inline');
     assert.ok(!rootSource.includes('FABRICATE.Admin.ManagerV2.QuickActions'), 'inspector should not duplicate row actions');

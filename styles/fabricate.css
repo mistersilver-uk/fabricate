@@ -4041,6 +4041,10 @@
   grid-template-rows: auto auto auto minmax(0, 1fr);
 }
 
+.fabricate-manager-v2[data-manager-v2-view="essences"] .manager-v2-main {
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+}
+
 .fabricate-manager-v2[data-manager-v2-view="environment-edit"] .manager-v2-main {
   grid-template-rows: minmax(0, 1fr);
 }
@@ -4169,7 +4173,15 @@
 }
 
 .fabricate-manager-v2 .manager-v2-environments-table {
-  --fab-mv2-environment-grid: minmax(0, 1.35fr) minmax(0, 0.48fr) minmax(0, 0.72fr) minmax(0, 0.56fr) minmax(0, 0.54fr) 178px;
+  --fab-mv2-environment-grid: minmax(0, 1.72fr) minmax(86px, 0.42fr) 46px 72px 116px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-essences-table {
+  --fab-mv2-essence-grid: minmax(0, 1.45fr) minmax(0, 0.82fr) minmax(92px, 0.42fr) 92px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -4179,7 +4191,7 @@
 .fabricate-manager-v2 .manager-v2-table-head,
 .fabricate-manager-v2 .manager-v2-system-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(92px, 0.45fr) minmax(92px, 0.45fr) 118px;
+  grid-template-columns: minmax(0, 1.55fr) minmax(92px, 0.42fr) 72px 118px;
   gap: 8px;
   align-items: center;
   min-width: 0;
@@ -4220,12 +4232,23 @@
   min-width: 0;
 }
 
+.fabricate-manager-v2 .manager-v2-essence-table-head,
+.fabricate-manager-v2 .manager-v2-essence-row {
+  display: grid;
+  grid-template-columns: var(--fab-mv2-essence-grid);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
 .fabricate-manager-v2 .manager-v2-recipe-table-head > *,
 .fabricate-manager-v2 .manager-v2-recipe-row > *,
 .fabricate-manager-v2 .manager-v2-component-table-head > *,
 .fabricate-manager-v2 .manager-v2-component-row > *,
 .fabricate-manager-v2 .manager-v2-environment-table-head > *,
-.fabricate-manager-v2 .manager-v2-environment-row > * {
+.fabricate-manager-v2 .manager-v2-environment-row > *,
+.fabricate-manager-v2 .manager-v2-essence-table-head > *,
+.fabricate-manager-v2 .manager-v2-essence-row > * {
   min-width: 0;
 }
 
@@ -4244,9 +4267,94 @@
   justify-self: stretch;
 }
 
+.fabricate-manager-v2 .manager-v2-system-row .manager-v2-status-cell,
+.fabricate-manager-v2 .manager-v2-environment-row .manager-v2-status-cell {
+  justify-self: start;
+}
+
 .fabricate-manager-v2 .manager-v2-system-row .manager-v2-action-group {
   width: 100%;
   cursor: default;
+}
+
+.fabricate-manager-v2 .manager-v2-status-toggle {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 5px;
+  width: auto;
+  min-width: 0;
+  max-width: 64px;
+  height: 24px;
+  padding: 3px 7px 3px 3px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 999px;
+  color: var(--fab-mv2-text);
+  background: rgba(0, 0, 0, 0.18);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.fabricate-manager-v2 .manager-v2-status-toggle.is-on {
+  border-color: rgba(92, 184, 92, 0.72);
+  background: rgba(92, 184, 92, 0.16);
+}
+
+.fabricate-manager-v2 .manager-v2-status-toggle.is-off {
+  border-color: rgba(255, 192, 120, 0.5);
+  color: var(--fab-mv2-text-muted);
+  background: rgba(255, 192, 120, 0.09);
+}
+
+.fabricate-manager-v2 .manager-v2-status-toggle:hover {
+  border-color: var(--fab-mv2-border-strong);
+}
+
+.fabricate-manager-v2 .manager-v2-status-toggle:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.fabricate-manager-v2 .manager-v2-status-toggle:focus-visible {
+  outline: 2px solid var(--fab-mv2-accent);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+.fabricate-manager-v2 .manager-v2-status-toggle-track {
+  display: inline-flex;
+  align-items: center;
+  width: 24px;
+  height: 14px;
+  flex: 0 0 24px;
+  padding: 2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.fabricate-manager-v2 .manager-v2-status-toggle-knob {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--fab-mv2-text-muted);
+  transition: transform 120ms ease, background-color 120ms ease;
+}
+
+.fabricate-manager-v2 .manager-v2-status-toggle.is-on .manager-v2-status-toggle-knob {
+  transform: translateX(10px);
+  background: var(--fab-mv2-accent);
+}
+
+.fabricate-manager-v2 .manager-v2-status-toggle-label {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1;
+  text-overflow: ellipsis;
 }
 
 .fabricate-manager-v2 .manager-v2-system-row:hover {
@@ -4275,7 +4383,8 @@
 
 .fabricate-manager-v2 .manager-v2-recipe-row,
 .fabricate-manager-v2 .manager-v2-component-row,
-.fabricate-manager-v2 .manager-v2-environment-row {
+.fabricate-manager-v2 .manager-v2-environment-row,
+.fabricate-manager-v2 .manager-v2-essence-row {
   width: 100%;
   min-height: 76px;
   padding: 9px 10px;
@@ -4287,14 +4396,16 @@
 
 .fabricate-manager-v2 .manager-v2-recipe-row:hover,
 .fabricate-manager-v2 .manager-v2-component-row:hover,
-.fabricate-manager-v2 .manager-v2-environment-row:hover {
+.fabricate-manager-v2 .manager-v2-environment-row:hover,
+.fabricate-manager-v2 .manager-v2-essence-row:hover {
   border-color: var(--fab-mv2-border-strong);
   background: var(--fab-mv2-surface-3);
 }
 
 .fabricate-manager-v2 .manager-v2-recipe-row.is-selected,
 .fabricate-manager-v2 .manager-v2-component-row.is-selected,
-.fabricate-manager-v2 .manager-v2-environment-row.is-selected {
+.fabricate-manager-v2 .manager-v2-environment-row.is-selected,
+.fabricate-manager-v2 .manager-v2-essence-row.is-selected {
   border-color: var(--fab-mv2-border-strong);
   background: rgba(92, 184, 92, 0.12);
   box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
@@ -4338,9 +4449,7 @@
   border-radius: 6px;
 }
 
-.fabricate-manager-v2 .manager-v2-scope-button {
-  appearance: none;
-  -webkit-appearance: none;
+.fabricate-manager-v2 .manager-v2-scope-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 28px;
   align-items: start;
@@ -4356,16 +4465,9 @@
   text-align: left;
   white-space: normal;
   overflow: hidden;
-  cursor: pointer;
 }
 
-.fabricate-manager-v2 .manager-v2-scope-button:hover,
-.fabricate-manager-v2 .manager-v2-scope-button:focus-visible {
-  border-color: var(--fab-mv2-border-strong);
-  background: rgba(92, 184, 92, 0.12);
-}
-
-.fabricate-manager-v2 .manager-v2-scope-button .manager-v2-title {
+.fabricate-manager-v2 .manager-v2-scope-name {
   display: -webkit-box;
   min-width: 0;
   max-width: 100%;
@@ -4381,21 +4483,26 @@
   word-break: break-word;
 }
 
-.fabricate-manager-v2 .manager-v2-scope-clear {
+.fabricate-manager-v2 .manager-v2-scope-return {
+  appearance: none;
+  -webkit-appearance: none;
   display: inline-grid;
   place-items: center;
   width: 28px;
   height: 28px;
+  padding: 0;
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   color: var(--fab-mv2-text-muted);
   background: rgba(0, 0, 0, 0.14);
+  cursor: pointer;
 }
 
-.fabricate-manager-v2 .manager-v2-scope-button:hover .manager-v2-scope-clear,
-.fabricate-manager-v2 .manager-v2-scope-button:focus-visible .manager-v2-scope-clear {
+.fabricate-manager-v2 .manager-v2-scope-return:hover,
+.fabricate-manager-v2 .manager-v2-scope-return:focus-visible {
   color: var(--fab-mv2-text);
   border-color: var(--fab-mv2-border-strong);
+  background: rgba(92, 184, 92, 0.12);
 }
 
 .fabricate-manager-v2 .manager-v2-recipe-identity,
@@ -4415,6 +4522,10 @@
   background: transparent;
   text-align: left;
   cursor: pointer;
+}
+
+.fabricate-manager-v2 .manager-v2-environment-identity {
+  grid-template-columns: 72px minmax(0, 1fr);
 }
 
 .fabricate-manager-v2 .manager-v2-system-icon,
@@ -4450,6 +4561,11 @@
 .fabricate-manager-v2 .manager-v2-component-preview {
   width: 52px;
   height: 52px;
+}
+
+.fabricate-manager-v2 .manager-v2-environment-thumb {
+  width: 72px;
+  height: 48px;
 }
 
 .fabricate-manager-v2 .manager-v2-environment-preview {
@@ -4636,6 +4752,61 @@
   line-height: 1.35;
 }
 
+.fabricate-manager-v2 .manager-v2-essence-create-band {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.72fr) minmax(116px, 0.52fr) minmax(140px, 0.62fr) minmax(180px, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  min-width: 0;
+  padding: 12px;
+  border-bottom: 1px solid var(--fab-mv2-border);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.fabricate-manager-v2 .manager-v2-essence-create-band .manager-v2-field {
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-essence-identity {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-essence-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  color: var(--fab-mv2-accent);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.fabricate-manager-v2 .manager-v2-essence-row {
+  cursor: pointer;
+}
+
+.fabricate-manager-v2 .manager-v2-essence-edit-row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(140px, 0.74fr) minmax(116px, 0.52fr) minmax(150px, 0.62fr) minmax(180px, 1fr);
+  gap: 8px;
+  min-width: 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--fab-mv2-border);
+  cursor: default;
+}
+
+.fabricate-manager-v2 .manager-v2-essence-edit-row input,
+.fabricate-manager-v2 .manager-v2-essence-edit-row select {
+  min-width: 0;
+}
+
 .fabricate-manager-v2 .manager-v2-component-evidence,
 .fabricate-manager-v2 .manager-v2-environment-evidence {
   display: flex;
@@ -4643,6 +4814,37 @@
   gap: 6px;
   flex-wrap: wrap;
   min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-environment-task-count {
+  color: var(--fab-mv2-text);
+  font-size: 0.86rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.fabricate-manager-v2 .manager-v2-environment-actions {
+  display: grid;
+  grid-template-columns: 72px 34px;
+  gap: 6px;
+  align-items: stretch;
+  justify-content: end;
+  width: 100%;
+}
+
+.fabricate-manager-v2 .manager-v2-environment-action-grid,
+.fabricate-manager-v2 .manager-v2-environment-reorder-stack {
+  display: grid;
+  gap: 4px;
+}
+
+.fabricate-manager-v2 .manager-v2-environment-action-grid {
+  grid-template-columns: repeat(2, 34px);
+  grid-auto-rows: 34px;
+}
+
+.fabricate-manager-v2 .manager-v2-environment-reorder-stack {
+  grid-template-rows: repeat(2, 34px);
 }
 
 .fabricate-manager-v2 .manager-v2-toggle {
@@ -5597,7 +5799,8 @@
 
   .fabricate-manager-v2 .manager-v2-recipe-row,
   .fabricate-manager-v2 .manager-v2-component-row,
-  .fabricate-manager-v2 .manager-v2-environment-row {
+  .fabricate-manager-v2 .manager-v2-environment-row,
+  .fabricate-manager-v2 .manager-v2-essence-row {
     grid-template-columns: minmax(0, 1fr);
     min-width: 0;
     align-items: stretch;
@@ -5606,7 +5809,8 @@
   .fabricate-manager-v2 .manager-v2-system-row > *,
   .fabricate-manager-v2 .manager-v2-recipe-row > *,
   .fabricate-manager-v2 .manager-v2-component-row > *,
-  .fabricate-manager-v2 .manager-v2-environment-row > * {
+  .fabricate-manager-v2 .manager-v2-environment-row > *,
+  .fabricate-manager-v2 .manager-v2-essence-row > * {
     min-width: 0;
   }
 
@@ -5673,6 +5877,8 @@
   .fabricate-manager-v2 .manager-v2-edit-card-heading,
   .fabricate-manager-v2 .manager-v2-edit-grid,
   .fabricate-manager-v2 .manager-v2-form-grid,
+  .fabricate-manager-v2 .manager-v2-essence-create-band,
+  .fabricate-manager-v2 .manager-v2-essence-edit-row,
   .fabricate-manager-v2 .environment-fields {
     grid-template-columns: minmax(0, 1fr);
   }
