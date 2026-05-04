@@ -19,6 +19,8 @@ Scope:
 - Route quick-start documentation changes only to docs/quickstart.md.
 - For UI work, define screenshot acceptance criteria up front: first visible state, alignment, clipping, image/content fidelity, scroll containment, visible controls, and responsive window sizes.
 - For UI work, identify which canonical spec or active design document owns the visual/behavioral contract before assigning implementation.
+- For Manager V2 feature routes, plan placeholder promotion explicitly: remove disabled placeholder data, add feature-gated nav, route normalization, breadcrumbs/copy, focused route component, inspector state, localization/CSS, and mounted/source-contract tests.
+- For an unclickable Manager V2 feature nav item, check placeholder/deferred-view rendering and feature gates before planning event-handler or pointer-overlay work.
 - For UI work with cards, overlays, disabled states, menus, or drag/click targets, require live browser pointer hit-tests when feasible, not only DOM or mounted assertions.
 - For image-driven UI, specify representative fixtures that prove the intended image path visually, such as a linked scene image instead of only fallback icons.
 

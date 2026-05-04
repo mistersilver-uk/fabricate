@@ -51,6 +51,12 @@ test('_normalizeEssenceDefinition - string entry gets null associatedSystemItemI
   assert.equal(result.associatedSystemItemId, null);
 });
 
+test('_normalizeEssenceDefinition - string entry gets null sourceComponentId', () => {
+  const manager = makeManager();
+  const result = manager._normalizeEssenceDefinition('Water');
+  assert.equal(result.sourceComponentId, null);
+});
+
 test('_normalizeEssenceDefinition - object entry with icon preserves icon', () => {
   const manager = makeManager();
   const result = manager._normalizeEssenceDefinition({ name: 'Fire', icon: 'fas fa-fire' });
@@ -67,7 +73,8 @@ test('_normalizeEssenceDefinition - object entry with sourceItemUuid uses it as 
   const manager = makeManager();
   const result = manager._normalizeEssenceDefinition({ name: 'Fire', sourceItemUuid: 'item-123' });
   assert.equal(result.sourceItemUuid, 'item-123');
-  assert.equal(result.associatedSystemItemId, 'item-123');
+  assert.equal(result.sourceComponentId, null);
+  assert.equal(result.associatedSystemItemId, null);
 });
 
 // ---------------------------------------------------------------------------
@@ -110,11 +117,12 @@ test('_normalizeSystem - sourceItemUuid preserved when item exists in managedIte
       { name: 'Water', sourceItemUuid: 'managed-item-id' }
     ],
     managedItems: [
-      { id: 'managed-item-id', name: 'Water Vial' }
+      { id: 'managed-item-id', name: 'Water Vial', sourceItemUuid: 'Compendium.fabricate.items.water-vial' }
     ]
   });
   const essence = system.essenceDefinitions[0];
-  assert.equal(essence.sourceItemUuid, 'managed-item-id');
+  assert.equal(essence.sourceComponentId, 'managed-item-id');
+  assert.equal(essence.sourceItemUuid, 'Compendium.fabricate.items.water-vial');
   assert.equal(essence.associatedSystemItemId, 'managed-item-id');
 });
 
@@ -126,12 +134,69 @@ test('_normalizeSystem - legacy system with only associatedSystemItemId migrates
       { name: 'Earth', associatedSystemItemId: 'legacy-item-id' }
     ],
     managedItems: [
-      { id: 'legacy-item-id', name: 'Earth Stone' }
+      { id: 'legacy-item-id', name: 'Earth Stone', sourceItemUuid: 'Compendium.fabricate.items.earth-stone' }
     ]
   });
   const essence = system.essenceDefinitions[0];
-  assert.equal(essence.sourceItemUuid, 'legacy-item-id');
+  assert.equal(essence.sourceComponentId, 'legacy-item-id');
+  assert.equal(essence.sourceItemUuid, 'Compendium.fabricate.items.earth-stone');
   assert.equal(essence.associatedSystemItemId, 'legacy-item-id');
+});
+
+test('_normalizeSystem - v2 sourceComponentId survives with resolved sourceItemUuid', () => {
+  const manager = makeManager();
+  const system = manager._normalizeSystem({
+    id: 'sys-1',
+    essenceDefinitions: [
+      {
+        name: 'Radiance',
+        sourceComponentId: 'comp-1',
+        sourceItemUuid: 'Compendium.fabricate.items.old-source',
+        associatedSystemItemId: 'comp-1'
+      }
+    ],
+    managedItems: [
+      { id: 'comp-1', name: 'Sunleaf', sourceItemUuid: 'Compendium.fabricate.items.sunleaf' }
+    ]
+  });
+  const essence = system.essenceDefinitions[0];
+  assert.equal(essence.sourceComponentId, 'comp-1');
+  assert.equal(essence.sourceItemUuid, 'Compendium.fabricate.items.sunleaf');
+  assert.equal(essence.associatedSystemItemId, 'comp-1');
+});
+
+test('_normalizeSystem - stale sourceComponentId is preserved but skips legacy sourceItemUuid', () => {
+  const manager = makeManager();
+  const system = manager._normalizeSystem({
+    id: 'sys-1',
+    essenceDefinitions: [
+      {
+        name: 'Void',
+        sourceComponentId: 'missing-component',
+        sourceItemUuid: 'Compendium.fabricate.items.old-source'
+      }
+    ],
+    managedItems: []
+  });
+  const essence = system.essenceDefinitions[0];
+  assert.equal(essence.sourceComponentId, 'missing-component');
+  assert.equal(essence.sourceItemUuid, null);
+  assert.equal(essence.associatedSystemItemId, 'missing-component');
+});
+
+test('_normalizeSystem - raw document sourceItemUuid is preserved when no source component is configured', () => {
+  const manager = makeManager();
+  const system = manager._normalizeSystem({
+    id: 'sys-1',
+    essenceDefinitions: [
+      { name: 'Fire', sourceItemUuid: 'Compendium.fabricate.items.fire-core' }
+    ],
+    managedItems: []
+  });
+  const essence = system.essenceDefinitions[0];
+  assert.equal(essence.sourceComponentId, null);
+  assert.equal(essence.sourceItemUuid, 'Compendium.fabricate.items.fire-core');
+  assert.equal(essence.associatedSystemItemId, null);
 });
 
 // ---------------------------------------------------------------------------

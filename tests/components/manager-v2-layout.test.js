@@ -263,8 +263,8 @@ test('manager-v2 essence edit route defines picker-based responsive geometry', (
   const sourceTriggerBlock = blockFor('.fabricate-manager-v2 .essence-source-trigger');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager-v2 (max-width: 680px)'));
 
-  assert.ok(mainBlock.includes('grid-template-rows: auto minmax(0, 1fr);'), 'essence edit route should reserve a header and scrolling editor');
-  assert.ok(editGridBlock.includes('grid-template-columns: 180px minmax(0, 1fr);'), 'essence edit identity fields should reserve stable icon picker space');
+  assert.ok(mainBlock.includes('grid-template-rows: minmax(0, 1fr);'), 'essence edit route should let the identity card be the first main content');
+  assert.ok(editGridBlock.includes('grid-template-columns: 172px minmax(0, 1fr);'), 'essence edit identity fields should reserve stable icon picker space');
   assert.ok(sourceBlock.includes('grid-template-columns: 150px minmax(0, 1fr);'), 'essence source selector should reserve stable picker and evidence columns');
   assert.ok(iconTriggerBlock.includes('grid-template-columns: 28px minmax(0, 1fr) 16px;'), 'icon picker trigger should be a real picker control, not a raw text field');
   assert.ok(sourceTriggerBlock.includes('aspect-ratio: 1 / 1;'), 'source picker should keep a stable drop target');

@@ -45,15 +45,19 @@ export class CraftingSystemManager {
       ? rawManagedItems.map(i => this._normalizeComponent(i, essenceIds, features.salvage))
       : [];
     const itemIds = new Set(items.map(i => i.id));
+    const itemById = new Map(items.map(i => [i.id, i]));
 
     const resolvedEssenceDefinitions = essenceDefinitions.map(def => {
-      // sourceItemUuid is authoritative; associatedSystemItemId is the transitional alias.
-      // Resolve against the actual component IDs so stale UUIDs are cleared.
-      const resolvedItemId = itemIds.has(def.sourceItemUuid) ? def.sourceItemUuid : null;
+      const sourceComponentId = def.sourceComponentId || def.associatedSystemItemId || (itemIds.has(def.sourceItemUuid) ? def.sourceItemUuid : null);
+      const sourceComponent = sourceComponentId ? itemById.get(sourceComponentId) || null : null;
+      const sourceItemUuid = sourceComponentId
+        ? (sourceComponent?.sourceItemUuid || sourceComponent?.sourceUuid || null)
+        : (this._looksLikeDocumentUuid(def.sourceItemUuid) ? def.sourceItemUuid : null);
       return {
         ...def,
-        sourceItemUuid: resolvedItemId,
-        associatedSystemItemId: resolvedItemId  // transitional alias kept in sync
+        sourceComponentId,
+        sourceItemUuid,
+        associatedSystemItemId: sourceComponentId  // transitional alias kept in sync
       };
     });
 
@@ -298,6 +302,7 @@ export class CraftingSystemManager {
         name: base,
         description: '',
         icon: 'fas fa-mortar-pestle',
+        sourceComponentId: null,
         sourceItemUuid: null,
         associatedSystemItemId: null  // transitional alias
       };
@@ -311,16 +316,22 @@ export class CraftingSystemManager {
     if (!seed) return null;
 
     const id = this._uniqueKey(seed, usedIds);
-    // sourceItemUuid is authoritative; fall back to associatedSystemItemId for legacy data.
-    const resolvedSourceItemUuid = entry.sourceItemUuid || entry.associatedSystemItemId || null;
+    const sourceComponentId = entry.sourceComponentId || entry.associatedSystemItemId || null;
+    const sourceItemUuid = entry.sourceItemUuid || null;
     return {
       id,
       name: rawName || id,
       description: String(entry.description || '').trim(),
       icon: String(entry.icon || '').trim() || 'fas fa-mortar-pestle',
-      sourceItemUuid: resolvedSourceItemUuid,
-      associatedSystemItemId: resolvedSourceItemUuid  // transitional alias
+      sourceComponentId,
+      sourceItemUuid,
+      associatedSystemItemId: sourceComponentId  // transitional alias
     };
+  }
+
+  _looksLikeDocumentUuid(value) {
+    if (!value || typeof value !== 'string') return false;
+    return /^(Actor|Item|Scene|JournalEntry|Macro|RollTable|Compendium)\./.test(value);
   }
 
   _normalizeRecipeItemDefinitions(value) {

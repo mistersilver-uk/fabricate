@@ -9,6 +9,7 @@ const repoRoot = resolve(__dirname, '../..');
 const rootPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/CraftingSystemManagerV2Root.svelte');
 const essenceBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/EssenceBrowserView.svelte');
 const essenceEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/EssenceEditView.svelte');
+const tagsCategoriesPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/TagsCategoriesView.svelte');
 const appPath = resolve(repoRoot, 'src/ui/SvelteCraftingSystemManagerV2App.svelte.js');
 const mainPath = resolve(repoRoot, 'src/main.js');
 const langPath = resolve(repoRoot, 'lang/en.json');
@@ -16,6 +17,7 @@ const langPath = resolve(repoRoot, 'lang/en.json');
 const rootSource = readFileSync(rootPath, 'utf8');
 const essenceBrowserSource = readFileSync(essenceBrowserPath, 'utf8');
 const essenceEditSource = readFileSync(essenceEditPath, 'utf8');
+const tagsCategoriesSource = readFileSync(tagsCategoriesPath, 'utf8');
 const appSource = readFileSync(appPath, 'utf8');
 const mainSource = readFileSync(mainPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
@@ -68,6 +70,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'class="manager-v2-component-identity"',
       'EssenceBrowserView',
       'EssenceEditView',
+      'TagsCategoriesView',
       'EnvironmentEditView',
       'manager-v2-environment-edit-main',
       'manager-v2-system-edit-form',
@@ -101,10 +104,14 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Component.Title, 'Components');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Component.DropZoneTitle, 'Drop items to add components');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Component.SourceLinked, 'Linked source');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.TagsCategories.Title, 'Tags & Categories');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.TagsCategories.Library, 'Tags & Categories');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.TagsCategories.GeneralReservedFeedback, 'General is already available as the base category.');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Essence.Title, 'Essences');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Essence.Library, 'Essence browser');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Essence.EditTitle, 'Edit essence');
-    assert.equal(lang.FABRICATE.Admin.ManagerV2.Essence.EditBreadcrumb, 'Edit Essence');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Essence.EditBreadcrumb, 'Edit essence');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Essence.CreateBreadcrumb, 'Create essence');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Essence.SourceLinked, 'Linked source');
   });
 
@@ -141,8 +148,10 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(rootSource.includes('manager-v2-scope-return'), 'root should expose a return-to-system-library rail action');
     assert.ok(rootSource.includes('FABRICATE.Admin.ManagerV2.ReturnToSystemLibrary'), 'return-to-library action should be localized');
     assert.ok(rootSource.includes("setView('essences')"), 'essences should be exposed as a real selected-system route');
+    assert.ok(rootSource.includes("setView('tags')"), 'tags and categories should be exposed as a real selected-system route');
     assert.ok(rootSource.includes("activeView = 'essence-edit'"), 'essence edit actions should transition to the local edit route');
     assert.ok(!rootSource.includes("{ id: 'essences'"), 'essences should not remain a disabled placeholder route');
+    assert.ok(!rootSource.includes("{ id: 'tags'"), 'tags should not remain a disabled placeholder route');
     assert.ok(!rootSource.includes('clearSelectedSystem'), 'root should not expose a selected-system clear route');
     assert.ok(!rootSource.includes("selectSystem('', 'systems')"), 'selected-system rail should not clear real store selection');
     assert.ok(!rootSource.includes('manager-v2-scope-clear'), 'selected-system rail should not render the old x clear icon');
@@ -156,6 +165,21 @@ describe('CraftingSystemManagerV2 source contract', () => {
       lang.FABRICATE.Admin.ManagerV2.InspectorHint,
       'The inspector shows counts, resolution mode, and enabled features for the selected system.'
     );
+  });
+
+  it('keeps manager-v2 tags and categories route focused and store-wired', () => {
+    assert.ok(
+      rootSource.includes("import TagsCategoriesView from './TagsCategoriesView.svelte';"),
+      'root should import the focused tags/categories page'
+    );
+    assert.ok(rootSource.includes('store.addCategory?.(value)'), 'category add should delegate to the admin store');
+    assert.ok(rootSource.includes('store.removeCategory?.(category)'), 'category remove should delegate to the admin store');
+    assert.ok(rootSource.includes('store.addTag?.(value)'), 'tag add should delegate to the admin store');
+    assert.ok(rootSource.includes('store.removeTag?.(tag)'), 'tag remove should delegate to the admin store');
+    assert.ok(rootSource.includes('confirmTagCategoryRemoval'), 'in-use removals should flow through a confirmation seam');
+    assert.ok(tagsCategoriesSource.includes('onConfirmRemove'), 'focused route should ask the root before removing in-use vocabulary');
+    assert.ok(tagsCategoriesSource.includes('GeneralReservedFeedback'), 'focused route should keep reserved General feedback visible');
+    assert.ok(!/\b(?:game|ui|Hooks|CONFIG)\b/.test(tagsCategoriesSource), 'tags/categories route should not directly reference Foundry globals');
   });
 
   it('keeps manager-v2 essence browsing browser-only and source UI feature-gated', () => {
@@ -179,7 +203,27 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(essenceEditSource.includes('showSourceUi'), 'edit route should gate source controls by effect transfer');
     assert.ok(essenceEditSource.includes('onDirtyChange(dirty)'), 'edit route should expose dirty state to route-exit protection');
     assert.ok(essenceEditSource.includes('onSave(draftId || null, updates)'), 'edit route should delegate create and update persistence to the root/store seam');
+    assert.ok(essenceEditSource.includes('id="manager-v2-essence-edit-form"'), 'edit route should expose a form target for route-header save actions');
+    assert.ok(!essenceEditSource.includes('EditKicker'), 'edit route should not render a duplicate inner route header');
+    assert.ok(!essenceEditSource.includes('IconClassHint'), 'edit route should not expose raw icon class copy');
+    assert.ok(rootSource.includes('form="manager-v2-essence-edit-form"'), 'root header should own the primary save action for the edit form');
+    assert.ok(rootSource.includes("currentView !== 'essence-edit'"), 'inspector should hide edit actions while already editing');
     assert.ok(!essenceEditSource.includes('game.'), 'edit route should not reference Foundry runtime globals');
+  });
+
+  it('wires production essence dirty confirmation and manager-v2 app close guard', () => {
+    assert.ok(appSource.includes('confirmDiscardEssenceDraft: () => confirmDialog'), 'v2 app should provide a production discard confirmation service');
+    for (const key of [
+      'DiscardDirtyTitle',
+      'DiscardDirtyContent',
+      'DiscardDirtyConfirm',
+      'DiscardDirtyCancel'
+    ]) {
+      assert.equal(typeof lang.FABRICATE.Admin.ManagerV2.Essence[key], 'string', `en.json should define Essence.${key}`);
+    }
+    assert.ok(appSource.includes('registerEssenceDirtyGuard'), 'v2 app should accept the route dirty guard');
+    assert.ok(appSource.includes('async close(options)'), 'v2 app should guard window close');
+    assert.ok(appSource.includes('canCloseEssence === false'), 'v2 app close should stay open when discard is declined');
   });
 
   it('keeps the recipes browser browser-only and wired to existing callbacks', () => {

@@ -99,13 +99,14 @@ function makeSourceItem(uuid, effects = []) {
  * Configure globalThis.game with a system whose essenceDefinitions are provided.
  * essences flag controls features.essences.
  */
-function setupGame({ essencesEnabled = true, essenceDefinitions = [] } = {}) {
+function setupGame({ essencesEnabled = true, essenceDefinitions = [], components = [] } = {}) {
   const system = {
     features: {
       essences: essencesEnabled,
       effectTransfer: true
     },
     essenceDefinitions,
+    components,
     craftingCheck: { enabled: false }
   };
   globalThis.game = {
@@ -154,6 +155,76 @@ test('T-009-G1-1: effects transferred from essence sourceItemUuid when essences 
 
   assert.equal(capturedEffects.length, 1, 'exactly one effect should be transferred');
   assert.equal(capturedEffects[0].name, 'Fire Resist');
+});
+
+test('effects transfer resolves sourceComponentId through the managed component source UUID', async () => {
+  const effect = makeEffect('Stone Skin');
+  const sourceItem = makeSourceItem('uuid-earth-source', [effect]);
+
+  setupGame({
+    essencesEnabled: true,
+    components: [
+      { id: 'component-earth', sourceItemUuid: 'uuid-earth-source' }
+    ],
+    essenceDefinitions: [
+      { id: 'essence-earth', sourceComponentId: 'component-earth', sourceItemUuid: 'legacy-component-earth' }
+    ]
+  });
+
+  const resolvedUuids = [];
+  globalThis.fromUuid = async (uuid) => {
+    resolvedUuids.push(uuid);
+    return uuid === 'uuid-earth-source' ? sourceItem : null;
+  };
+
+  const engine = makeEngine();
+  const consumedItems = [makeConsumedItem('ing-1', { 'essence-earth': 1 })];
+  const capturedEffects = [];
+  const resultItem = {
+    createEmbeddedDocuments: async (type, data) => {
+      capturedEffects.push(...data);
+      return data;
+    }
+  };
+
+  await engine._transferEffects(resultItem, consumedItems, { craftingSystemId: 'sys-1', transferEffects: true });
+
+  assert.deepEqual(resolvedUuids, ['uuid-earth-source']);
+  assert.equal(capturedEffects.length, 1);
+  assert.equal(capturedEffects[0].name, 'Stone Skin');
+});
+
+test('effects transfer skips stale sourceComponentId instead of falling back to legacy sourceItemUuid', async () => {
+  const legacySourceItem = makeSourceItem('uuid-legacy-source', [makeEffect('Legacy Effect')]);
+
+  setupGame({
+    essencesEnabled: true,
+    components: [],
+    essenceDefinitions: [
+      { id: 'essence-stale', sourceComponentId: 'missing-component', sourceItemUuid: 'uuid-legacy-source' }
+    ]
+  });
+
+  const resolvedUuids = [];
+  globalThis.fromUuid = async (uuid) => {
+    resolvedUuids.push(uuid);
+    return uuid === 'uuid-legacy-source' ? legacySourceItem : null;
+  };
+
+  const engine = makeEngine();
+  const consumedItems = [makeConsumedItem('ing-1', { 'essence-stale': 1 })];
+  let createCalled = false;
+  const resultItem = {
+    createEmbeddedDocuments: async () => {
+      createCalled = true;
+      return [];
+    }
+  };
+
+  await engine._transferEffects(resultItem, consumedItems, { craftingSystemId: 'sys-1', transferEffects: true });
+
+  assert.deepEqual(resolvedUuids, []);
+  assert.equal(createCalled, false);
 });
 
 test('T-009-G1-2: no effects transferred when essences feature is disabled', async () => {

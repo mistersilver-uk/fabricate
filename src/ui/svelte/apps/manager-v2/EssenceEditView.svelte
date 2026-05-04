@@ -2,7 +2,7 @@
 <script>
   import EssenceSourceSelector from '../../components/EssenceSourceSelector.svelte';
   import IconPicker from '../../components/IconPicker.svelte';
-  import { DEFAULT_ESSENCE_ICON, normalizeEssenceIcon } from '../../util/essenceIcons.js';
+  import { DEFAULT_ESSENCE_ICON, getEssenceIconOption, normalizeEssenceIcon } from '../../util/essenceIcons.js';
   import { localize } from '../../util/foundryBridge.js';
 
   let {
@@ -11,8 +11,8 @@
     showSourceUi = false,
     saving = false,
     onSave = () => {},
-    onCancel = () => {},
     onDirtyChange = () => {},
+    onDraftChange = () => {},
     onImportSourceDrop = null
   } = $props();
 
@@ -21,16 +21,34 @@
   let description = $state('');
   let icon = $state(DEFAULT_ESSENCE_ICON);
   let sourceComponentId = $state('');
+  let sourceTouched = $state(false);
   let saveFailed = $state(false);
   let lastEssenceId = $state(null);
   let lastDirty = $state(false);
+  let lastDraftSignature = $state('');
 
   const isNew = $derived(!essence?.id);
   const selectedSource = $derived(sourceComponentId
     ? managedItemOptions.find(item => item.id === sourceComponentId) || null
     : null);
-  const sourceState = $derived(essenceSourceState(essence));
+  const selectedIconOption = $derived(getEssenceIconOption(normalizeEssenceIcon(icon)));
+  const selectedIconLabel = $derived(selectedIconOption?.label || text('FABRICATE.Admin.ManagerV2.Essence.CustomIcon', 'Custom icon'));
+  const sourceState = $derived(essenceSourceState());
   const dirty = $derived(isDirty());
+  const validName = $derived(Boolean(name.trim()));
+  const draftSummary = $derived(buildDraftSummary());
+  const draftSignature = $derived([
+    draftSummary.id,
+    draftSummary.name,
+    draftSummary.description,
+    draftSummary.icon,
+    draftSummary.sourceComponentId,
+    draftSummary.sourceName,
+    draftSummary.sourceState,
+    draftSummary.dirty ? 'dirty' : 'clean',
+    draftSummary.validName ? 'valid' : 'invalid',
+    showSourceUi ? 'source' : 'no-source'
+  ].join('\u001f'));
 
   $effect(() => {
     const nextEssenceId = essence?.id || '__new__';
@@ -40,6 +58,7 @@
     description = essence?.description || '';
     icon = normalizeEssenceIcon(essence?.icon || DEFAULT_ESSENCE_ICON);
     sourceComponentId = sourceIdentity(essence);
+    sourceTouched = false;
     saveFailed = false;
     lastEssenceId = nextEssenceId;
   });
@@ -48,6 +67,12 @@
     if (dirty === lastDirty) return;
     lastDirty = dirty;
     onDirtyChange(dirty);
+  });
+
+  $effect(() => {
+    if (draftSignature === lastDraftSignature) return;
+    lastDraftSignature = draftSignature;
+    onDraftChange(draftSummary);
   });
 
   function text(key, fallback) {
@@ -59,8 +84,12 @@
     return definition?.sourceComponentId || definition?.associatedSystemItemId || '';
   }
 
-  function essenceSourceState(definition) {
-    const state = definition?.sourceState || 'none';
+  function hasStoredSourceEvidence() {
+    return Boolean(essence?.sourceName || essence?.sourceItemUuid || essence?.sourceComponentId || essence?.associatedSystemItemId);
+  }
+
+  function essenceSourceState() {
+    const state = draftSourceState();
     if (state === 'linked') {
       return {
         label: text('FABRICATE.Admin.ManagerV2.Essence.SourceLinked', 'Linked source'),
@@ -85,6 +114,38 @@
     };
   }
 
+  function draftSourceState() {
+    if (!showSourceUi) return 'none';
+    if (!sourceComponentId) {
+      return !sourceTouched && hasStoredSourceEvidence() ? essence?.sourceState || 'stale' : 'none';
+    }
+    if (!selectedSource) return 'stale';
+    if (selectedSource.sourceItemUuid || selectedSource.sourceUuid) return 'linked';
+    return 'missing';
+  }
+
+  function buildDraftSummary() {
+    const normalizedIcon = normalizeEssenceIcon(icon);
+    const sourceStateId = draftSourceState();
+    return {
+      id: draftId || '',
+      name: name.trim() || text('FABRICATE.Admin.ManagerV2.Essence.CreateInspectorTitle', 'New essence draft'),
+      description,
+      icon: normalizedIcon,
+      sourceComponentId: showSourceUi ? sourceComponentId || '' : '',
+      sourceName: showSourceUi
+        ? selectedSource?.name || (sourceComponentId ? sourceComponentId : !sourceTouched ? (essence?.sourceName || essence?.sourceItemUuid || '') : '')
+        : '',
+      sourceState: showSourceUi && !sourceComponentId && !sourceTouched && hasStoredSourceEvidence()
+        ? essence?.sourceState || 'stale'
+        : (showSourceUi ? sourceStateId : 'none'),
+      componentUsageCount: essence?.componentUsageCount || 0,
+      deleteBlocked: essence?.deleteBlocked === true,
+      dirty,
+      validName
+    };
+  }
+
   function isDirty() {
     if (isNew) {
       return Boolean(name.trim() || description.trim() || normalizeEssenceIcon(icon) !== DEFAULT_ESSENCE_ICON || (showSourceUi && sourceComponentId));
@@ -92,29 +153,27 @@
     return name !== (essence?.name || '')
       || description !== (essence?.description || '')
       || normalizeEssenceIcon(icon) !== normalizeEssenceIcon(essence?.icon || DEFAULT_ESSENCE_ICON)
-      || (showSourceUi && sourceComponentId !== sourceIdentity(essence));
-  }
-
-  function saveLabel() {
-    if (saving) return text('FABRICATE.Admin.ManagerV2.Essence.Saving', 'Saving...');
-    return isNew
-      ? text('FABRICATE.Admin.ManagerV2.Essence.Create', 'Create essence')
-      : text('FABRICATE.Admin.ManagerV2.Essence.Save', 'Save essence');
+      || (showSourceUi && (sourceTouched || sourceComponentId !== sourceIdentity(essence)));
   }
 
   async function handleSave(event) {
     event.preventDefault();
-    if (!name.trim()) return;
+    if (!validName || saving) return;
     saveFailed = false;
     const updates = {
       name: name.trim(),
       description,
       icon: normalizeEssenceIcon(icon)
     };
-    if (showSourceUi) {
+    if (showSourceUi && (isNew || sourceTouched)) {
       updates.sourceComponentId = sourceComponentId || null;
     }
-    const result = await onSave(draftId || null, updates);
+    let result = false;
+    try {
+      result = await onSave(draftId || null, updates);
+    } catch (err) {
+      result = false;
+    }
     if (result === false) {
       saveFailed = true;
     }
@@ -125,59 +184,54 @@
     const item = await onImportSourceDrop(data);
     if (item?.id) {
       sourceComponentId = item.id;
+      sourceTouched = true;
     }
   }
 </script>
 
-<main class="manager-v2-main manager-v2-essence-edit-main" aria-label={text('FABRICATE.Admin.ManagerV2.Essence.EditTitle', 'Edit essence')}>
-  <section class="manager-v2-section-header">
-    <div class="manager-v2-heading">
-      <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Essence.EditKicker', 'Essence editor')}</p>
-      <h2 class="manager-v2-title">{isNew ? text('FABRICATE.Admin.ManagerV2.Essence.CreateTitle', 'Create essence') : text('FABRICATE.Admin.ManagerV2.Essence.EditTitle', 'Edit essence')}</h2>
-      <p class="manager-v2-subtitle">{text('FABRICATE.Admin.ManagerV2.Essence.EditHint', 'Edit identity, icon, and source linkage for the selected essence definition.')}</p>
-    </div>
-    {#if dirty}
-      <span class="manager-v2-chip is-warning">{text('FABRICATE.Admin.ManagerV2.Essence.Dirty', 'Unsaved')}</span>
-    {/if}
-  </section>
-
-  <form class="manager-v2-essence-edit-view" onsubmit={handleSave}>
+<main class="manager-v2-main manager-v2-essence-edit-main" aria-label={isNew
+  ? text('FABRICATE.Admin.ManagerV2.Essence.CreateTitle', 'Create essence')
+  : text('FABRICATE.Admin.ManagerV2.Essence.EditTitle', 'Edit essence')}>
+  <form id="manager-v2-essence-edit-form" class="manager-v2-essence-edit-view" onsubmit={handleSave}>
     <section class="manager-v2-edit-card manager-v2-essence-identity-card">
       <div class="manager-v2-edit-card-heading">
         <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Essence.Identity', 'Identity')}</h3>
-        <div class="manager-v2-action-group">
-          <button type="button" class="manager-v2-button" onclick={onCancel} disabled={saving}>
-            <i class="fas fa-times" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.ManagerV2.Essence.Cancel', 'Cancel')}</span>
-          </button>
-          <button type="submit" class="manager-v2-button is-primary" disabled={!name.trim() || saving}>
-            <i class={saving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
-            <span>{saveLabel()}</span>
-          </button>
-        </div>
       </div>
 
       <div class="manager-v2-essence-edit-grid">
-        <div class="manager-v2-essence-icon-control">
+        <div class="manager-v2-essence-icon-panel">
           <span class="manager-v2-essence-icon-preview" aria-hidden="true">
             <i class={normalizeEssenceIcon(icon)}></i>
           </span>
-          <IconPicker
-            value={icon}
-            buttonTitle={text('FABRICATE.Admin.ManagerV2.Essence.ChooseIcon', 'Choose icon')}
-            onChange={(iconClass) => { icon = iconClass; }}
-          />
-          <small>{text('FABRICATE.Admin.ManagerV2.Essence.IconClassHint', 'Current icon: {icon}').replace('{icon}', normalizeEssenceIcon(icon))}</small>
+          <span class="manager-v2-essence-icon-copy">
+            <strong>{selectedIconLabel}</strong>
+            <small>{normalizeEssenceIcon(icon) === DEFAULT_ESSENCE_ICON
+              ? text('FABRICATE.Admin.ManagerV2.Essence.DefaultIconLabel', 'Default essence icon')
+              : text('FABRICATE.Admin.ManagerV2.Essence.IconLabel', 'Selected icon')}</small>
+          </span>
+          <div class="manager-v2-essence-icon-actions">
+            <span class="manager-v2-essence-picker-label">{text('FABRICATE.Admin.ManagerV2.Essence.ChangeIcon', 'Change icon')}</span>
+            <IconPicker
+              value={icon}
+              disabled={saving}
+              buttonTitle={text('FABRICATE.Admin.ManagerV2.Essence.ChangeIcon', 'Change icon')}
+              onChange={(iconClass) => { icon = iconClass; }}
+            />
+            <button type="button" class="manager-v2-button" onclick={() => { icon = DEFAULT_ESSENCE_ICON; }} disabled={saving || normalizeEssenceIcon(icon) === DEFAULT_ESSENCE_ICON}>
+              <i class="fas fa-undo" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.ManagerV2.Essence.ClearIcon', 'Clear icon')}</span>
+            </button>
+          </div>
         </div>
 
         <label class="manager-v2-field" for="manager-v2-essence-edit-name">
           <span>{text('FABRICATE.Admin.ManagerV2.Essence.Name', 'Name')}</span>
-          <input id="manager-v2-essence-edit-name" type="text" value={name} oninput={(event) => name = event.currentTarget.value} placeholder={text('FABRICATE.Admin.ManagerV2.Essence.NamePlaceholder', 'Essence name')} />
+          <input id="manager-v2-essence-edit-name" type="text" value={name} oninput={(event) => name = event.currentTarget.value} placeholder={text('FABRICATE.Admin.ManagerV2.Essence.NamePlaceholder', 'Essence name')} disabled={saving} required />
         </label>
 
         <label class="manager-v2-field is-wide" for="manager-v2-essence-edit-description">
           <span>{text('FABRICATE.Admin.ManagerV2.Essence.Description', 'Description')}</span>
-          <textarea id="manager-v2-essence-edit-description" rows="5" value={description} oninput={(event) => description = event.currentTarget.value} placeholder={text('FABRICATE.Admin.ManagerV2.Essence.DescriptionPlaceholder', 'Description')}></textarea>
+          <textarea id="manager-v2-essence-edit-description" rows="4" value={description} oninput={(event) => description = event.currentTarget.value} placeholder={text('FABRICATE.Admin.ManagerV2.Essence.DescriptionPlaceholder', 'Description')} disabled={saving}></textarea>
         </label>
       </div>
 
@@ -197,8 +251,8 @@
             value={selectedSource}
             items={managedItemOptions}
             onDrop={handleSourceDrop}
-            onSelect={(itemId) => { sourceComponentId = itemId || ''; }}
-            onClear={() => { sourceComponentId = ''; }}
+            onSelect={(itemId) => { sourceComponentId = itemId || ''; sourceTouched = true; }}
+            onClear={() => { sourceComponentId = ''; sourceTouched = true; }}
           />
           <div class="manager-v2-essence-source-copy">
             {#if selectedSource}
@@ -207,8 +261,8 @@
             {:else if essence?.sourceName || essence?.sourceItemUuid || essence?.sourceComponentId}
               <strong>{essence.sourceName || essence.sourceComponentId || essence.sourceItemUuid}</strong>
               <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Essence.SourceEvidenceHint', 'Stored source evidence remains readable until you clear or repair it.')}</p>
-              {#if sourceComponentId}
-                <button type="button" class="manager-v2-button" onclick={() => { sourceComponentId = ''; }}>
+              {#if sourceComponentId || hasStoredSourceEvidence()}
+                <button type="button" class="manager-v2-button" onclick={() => { sourceComponentId = ''; sourceTouched = true; }}>
                   <i class="fas fa-times" aria-hidden="true"></i>
                   <span>{text('FABRICATE.Admin.Features.Essences.ClearSourceItem', 'Clear source item')}</span>
                 </button>

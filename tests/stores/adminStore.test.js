@@ -801,13 +801,18 @@ describe('createAdminStore', () => {
       assert.equal(newEssence.icon, DEFAULT_ESSENCE_ICON);
     });
 
-    it('addEssence persists the selected source item id on both essence source fields', async () => {
+    it('addEssence persists the selected component id and resolved source item UUID', async () => {
       let savedEssences = null;
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
       const sys = origManager.getSystem('sys1');
       if (sys) {
-        sys.components = [makeItem({ id: 'comp-1', name: 'Sunleaf', img: 'sunleaf.png' })];
+        sys.components = [makeItem({
+          id: 'comp-1',
+          name: 'Sunleaf',
+          img: 'sunleaf.png',
+          sourceItemUuid: 'Compendium.fabricate.items.sunleaf'
+        })];
       }
       services.getCraftingSystemManager = () => ({
         ...origManager,
@@ -823,7 +828,7 @@ describe('createAdminStore', () => {
       const newEssence = savedEssences?.find(e => e.name === 'Radiance');
       assert.ok(newEssence, 'new essence should be persisted');
       assert.equal(newEssence.sourceComponentId, 'comp-1');
-      assert.equal(newEssence.sourceItemUuid, 'comp-1');
+      assert.equal(newEssence.sourceItemUuid, 'Compendium.fabricate.items.sunleaf');
       assert.equal(newEssence.associatedSystemItemId, 'comp-1');
     });
 
@@ -929,10 +934,138 @@ describe('createAdminStore', () => {
         name: 'Volatile',
         description: 'Explosive energy',
         icon: 'fas fa-bolt',
-        sourceComponentId: 'item-1',
         sourceItemUuid: 'item-1',
         associatedSystemItemId: 'item-1'
       });
+    });
+
+    it('updateEssence preserves source evidence when no source update is provided', async () => {
+      let savedEssences = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.features = { essences: true, effectTransfer: false };
+        sys.essenceDefinitions = [
+          {
+            id: 'ess1',
+            name: 'Fire',
+            description: 'Burning essence',
+            icon: 'fas fa-fire',
+            sourceItemUuid: 'Compendium.fabricate.items.fire-core',
+            associatedSystemItemId: 'legacy-component'
+          }
+        ];
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => {
+          if (updates.essenceDefinitions) savedEssences = updates.essenceDefinitions;
+          await origManager.updateSystem(id, updates);
+        }
+      });
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.updateEssence('ess1', {
+        name: 'Ember',
+        description: 'Warmth',
+        icon: 'fas fa-fire-flame-curved'
+      });
+
+      assert.deepEqual(savedEssences?.[0], {
+        id: 'ess1',
+        name: 'Ember',
+        description: 'Warmth',
+        icon: 'fas fa-fire-flame-curved',
+        sourceItemUuid: 'Compendium.fabricate.items.fire-core',
+        associatedSystemItemId: 'legacy-component'
+      });
+    });
+
+    it('updateEssence rewrites source fields only when sourceComponentId is provided', async () => {
+      let savedEssences = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.components = [makeItem({
+          id: 'new-component',
+          name: 'New Component',
+          sourceItemUuid: 'Compendium.fabricate.items.new-component'
+        })];
+        sys.essenceDefinitions = [
+          {
+            id: 'ess1',
+            name: 'Fire',
+            description: 'Burning essence',
+            icon: 'fas fa-fire',
+            sourceItemUuid: 'old-component',
+            associatedSystemItemId: 'old-component'
+          }
+        ];
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => {
+          if (updates.essenceDefinitions) savedEssences = updates.essenceDefinitions;
+          await origManager.updateSystem(id, updates);
+        }
+      });
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.updateEssence('ess1', {
+        name: 'Fire',
+        sourceComponentId: 'new-component'
+      });
+
+      assert.equal(savedEssences?.[0].sourceComponentId, 'new-component');
+      assert.equal(savedEssences?.[0].sourceItemUuid, 'Compendium.fabricate.items.new-component');
+      assert.equal(savedEssences?.[0].associatedSystemItemId, 'new-component');
+    });
+
+    it('updateEssence clears source evidence only when the source field is explicitly cleared', async () => {
+      let savedEssences = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.essenceDefinitions = [
+          {
+            id: 'ess1',
+            name: 'Fire',
+            description: 'Burning essence',
+            icon: 'fas fa-fire',
+            sourceComponentId: null,
+            sourceItemUuid: 'Compendium.fabricate.items.stale-fire',
+            associatedSystemItemId: null
+          }
+        ];
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => {
+          if (updates.essenceDefinitions) savedEssences = updates.essenceDefinitions;
+          await origManager.updateSystem(id, updates);
+        }
+      });
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.updateEssence('ess1', {
+        name: 'Ember'
+      });
+
+      assert.equal(savedEssences?.[0].sourceItemUuid, 'Compendium.fabricate.items.stale-fire');
+      await store.updateEssence('ess1', {
+        name: 'Ember',
+        sourceComponentId: null
+      });
+
+      assert.equal(savedEssences?.[0].sourceComponentId, null);
+      assert.equal(savedEssences?.[0].sourceItemUuid, null);
+      assert.equal(savedEssences?.[0].associatedSystemItemId, null);
     });
 
     it('updateEssence rejects duplicate names from another essence', async () => {

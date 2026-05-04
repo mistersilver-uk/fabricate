@@ -739,6 +739,34 @@ function _essenceSourceState({ sourceComponentId, sourceItemUuid, associatedItem
   return 'missing';
 }
 
+function _sourceFieldsForEssenceSelection(system, sourceComponentId, sourceItemUuid = null) {
+  const managedItemOptions = _buildManagedItemOptions(_getManagedItems(system));
+  const managedItemById = new Map(managedItemOptions.map(item => [item.id, item]));
+  if (sourceComponentId) {
+    const associatedItem = managedItemById.get(sourceComponentId) || null;
+    return {
+      sourceComponentId,
+      sourceItemUuid: associatedItem?.sourceItemUuid || associatedItem?.sourceUuid || null,
+      associatedSystemItemId: sourceComponentId
+    };
+  }
+  if (sourceItemUuid) {
+    const associatedItem = managedItemOptions.find(item =>
+      item.sourceItemUuid === sourceItemUuid || item.sourceUuid === sourceItemUuid
+    );
+    return {
+      sourceComponentId: associatedItem?.id || null,
+      sourceItemUuid,
+      associatedSystemItemId: associatedItem?.id || null
+    };
+  }
+  return {
+    sourceComponentId: null,
+    sourceItemUuid: null,
+    associatedSystemItemId: null
+  };
+}
+
 function _buildEssenceCards(essenceDefinitions, managedItems, managedItemOptions) {
   const managedItemById = new Map(managedItemOptions.map(item => [item.id, item]));
   return essenceDefinitions.map(def => {
@@ -2423,6 +2451,7 @@ export function createAdminStore(services) {
       return false;
     }
 
+    const sourceFields = _sourceFieldsForEssenceSelection(system, sourceComponentId || null);
     const essenceDefinitions = [
       ...existing,
       {
@@ -2430,9 +2459,7 @@ export function createAdminStore(services) {
         name: normalizedName,
         description: String(description || ''),
         icon: normalizeEssenceIcon(icon || DEFAULT_ESSENCE_ICON),
-        sourceComponentId: sourceComponentId || null,
-        sourceItemUuid: sourceComponentId || null,
-        associatedSystemItemId: sourceComponentId || null
+        ...sourceFields
       }
     ];
     await systemManager.updateSystem(sysId, { essenceDefinitions });
@@ -2472,22 +2499,28 @@ export function createAdminStore(services) {
     const nextIcon = Object.prototype.hasOwnProperty.call(updates, 'icon')
       ? normalizeEssenceIcon(updates.icon)
       : normalizeEssenceIcon(current.icon);
-    const nextSourceComponentId = Object.prototype.hasOwnProperty.call(updates, 'sourceComponentId')
-      ? (updates.sourceComponentId || null)
-      : (Object.prototype.hasOwnProperty.call(updates, 'sourceItemUuid')
-        ? (updates.sourceItemUuid || null)
-        : (current.sourceComponentId || current.associatedSystemItemId || current.sourceItemUuid || null));
+    const hasSourceUpdate = Object.prototype.hasOwnProperty.call(updates, 'sourceComponentId')
+      || Object.prototype.hasOwnProperty.call(updates, 'sourceItemUuid');
+    const nextSourceFields = hasSourceUpdate
+      ? _sourceFieldsForEssenceSelection(
+        system,
+        Object.prototype.hasOwnProperty.call(updates, 'sourceComponentId') ? updates.sourceComponentId || null : null,
+        Object.prototype.hasOwnProperty.call(updates, 'sourceItemUuid') ? updates.sourceItemUuid || null : null
+      )
+      : null;
 
     const essenceDefinitions = existing.map(def => {
       if (def.id !== essenceId) return def;
-      return {
+      const nextDefinition = {
         ...def,
         name: nextName,
         description: nextDescription,
-        icon: nextIcon,
-        sourceComponentId: nextSourceComponentId,
-        sourceItemUuid: nextSourceComponentId,
-        associatedSystemItemId: nextSourceComponentId
+        icon: nextIcon
+      };
+      if (!hasSourceUpdate) return nextDefinition;
+      return {
+        ...nextDefinition,
+        ...nextSourceFields
       };
     });
 

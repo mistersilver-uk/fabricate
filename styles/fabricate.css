@@ -4046,7 +4046,7 @@
 }
 
 .fabricate-manager-v2[data-manager-v2-view="essence-edit"] .manager-v2-main {
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .fabricate-manager-v2[data-manager-v2-view="environment-edit"] .manager-v2-main {
@@ -4790,6 +4790,95 @@
   line-height: 1.35;
 }
 
+.fabricate-manager-v2 .manager-v2-tags-categories-workspace {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+}
+
+.fabricate-manager-v2 .manager-v2-vocabulary-panel {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+  padding: 12px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-mv2-surface-2);
+}
+
+.fabricate-manager-v2 .manager-v2-vocabulary-heading,
+.fabricate-manager-v2 .manager-v2-vocabulary-form,
+.fabricate-manager-v2 .manager-v2-vocabulary-row {
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-vocabulary-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.fabricate-manager-v2 .manager-v2-vocabulary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  overflow: auto;
+}
+
+.fabricate-manager-v2 .manager-v2-vocabulary-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 32px;
+  gap: 8px;
+  align-items: center;
+  min-height: 52px;
+  padding: 9px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.fabricate-manager-v2 .manager-v2-vocabulary-row.is-locked {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  background: rgba(92, 184, 92, 0.08);
+}
+
+.fabricate-manager-v2 .manager-v2-vocabulary-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-vocabulary-main strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+
+.fabricate-manager-v2 .manager-v2-vocabulary-empty {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px dashed var(--fab-mv2-border);
+  border-radius: 8px;
+  color: var(--fab-mv2-text-muted);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.fabricate-manager-v2 .manager-v2-vocabulary-empty strong,
+.fabricate-manager-v2 .manager-v2-vocabulary-empty span {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
 .fabricate-manager-v2 .manager-v2-essence-identity {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr);
@@ -4821,40 +4910,72 @@
 
 .fabricate-manager-v2 .manager-v2-essence-edit-view {
   display: grid;
-  gap: 12px;
+  align-content: start;
+  gap: 10px;
   min-width: 0;
-  padding: 12px;
+  padding: 10px;
   overflow: auto;
 }
 
 .fabricate-manager-v2 .manager-v2-essence-edit-grid {
   display: grid;
-  grid-template-columns: 180px minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: 172px minmax(0, 1fr);
+  gap: 10px 12px;
   min-width: 0;
 }
 
-.fabricate-manager-v2 .manager-v2-essence-icon-control {
+.fabricate-manager-v2 .manager-v2-essence-icon-panel {
   display: flex;
   flex-direction: column;
   gap: 8px;
   min-width: 0;
+  grid-row: span 2;
 }
 
 .fabricate-manager-v2 .manager-v2-essence-icon-preview {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 64px;
-  height: 64px;
+  width: 88px;
+  height: 88px;
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   color: var(--fab-mv2-accent);
   background: rgba(255, 255, 255, 0.06);
-  font-size: 1.5rem;
+  font-size: 2rem;
 }
 
-.fabricate-manager-v2 .manager-v2-essence-icon-control small,
+.fabricate-manager-v2 .manager-v2-essence-icon-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-essence-icon-copy strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fab-mv2-text);
+  font-size: 0.84rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager-v2 .manager-v2-essence-icon-actions {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-essence-picker-label {
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.fabricate-manager-v2 .manager-v2-essence-icon-copy small,
 .fabricate-manager-v2 .manager-v2-form-warning {
   color: var(--fab-mv2-text-muted);
   font-size: 0.76rem;
@@ -6050,6 +6171,7 @@
   }
 
   .fabricate-manager-v2 .manager-v2-environment-workspace,
+  .fabricate-manager-v2 .manager-v2-tags-categories-workspace,
   .fabricate-manager-v2 .manager-v2-environment-details-grid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -6153,8 +6275,15 @@
   .fabricate-manager-v2 .manager-v2-essence-action-band,
   .fabricate-manager-v2 .manager-v2-essence-edit-grid,
   .fabricate-manager-v2 .manager-v2-essence-source-edit,
+  .fabricate-manager-v2 .manager-v2-vocabulary-form,
+  .fabricate-manager-v2 .manager-v2-vocabulary-row,
+  .fabricate-manager-v2 .manager-v2-vocabulary-row.is-locked,
   .fabricate-manager-v2 .environment-fields {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fabricate-manager-v2 .manager-v2-essence-icon-panel {
+    grid-row: auto;
   }
 
   .fabricate-manager-v2 .manager-v2-edit-card-heading {

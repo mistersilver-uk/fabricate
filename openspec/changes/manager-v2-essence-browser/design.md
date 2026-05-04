@@ -72,6 +72,7 @@ The legacy current-admin implementation in `FeatureCardStack.svelte` uses `IconP
 - Duplicate names or blank names: rely on existing store return value and warning behavior; UI buttons should disable blank submit/save.
 - Source component with stale/missing managed item: keep persisted component id and any raw source item UUID visible as text evidence when `associatedItem` is absent, and allow clearing.
 - `features.effectTransfer !== true`: hide source UI entirely, including browse source columns/filters, inspector source sections, edit-route source controls, source warnings, and source mutation affordances. Preserve stored source evidence in data, but do not display or mutate it from manager-v2 essence screens while effect transfer is disabled.
+- Essence save payloads that omit source fields preserve stored source evidence exactly. Manager v2 only includes source identity updates when the edit route's effect-transfer source UI is visible and the source control owns the submitted value.
 - Long names/descriptions/source labels: clamp/wrap inside row and inspector geometry without horizontal overflow.
 - Icon picker and source picker popovers must be reachable in manager-v2. Extend their host/bounds logic to recognize `.fabricate-manager-v2`, `.manager-v2-main`, and the relevant manager-v2 scroll container; do not rely on legacy `.fabricate-admin` styling.
 

@@ -23,6 +23,9 @@ Scope:
 - Do not add npm dependencies unless the plan explicitly justifies them.
 - For Foundry UI surfaces, avoid generic state classes such as `disabled`, `active`, or `selected` unless scoped by component selectors; prefer component-specific state classes like `is-disabled` when global CSS could collide.
 - For UI layout work, inspect rendered screenshots against explicit criteria before declaring done; screenshot existence alone is not validation.
+- For Manager V2 feature routes, implement placeholder promotion as a complete route slice: remove disabled placeholder data, add feature-gated nav, route normalization, breadcrumbs/copy, focused route component, inspector state, localization/CSS, and mounted/source-contract tests.
+- When a Manager V2 feature button cannot be clicked, first inspect whether it is still rendered as a disabled placeholder or hidden by feature gates before changing event handlers.
+- In mounted Svelte tests that synthesize DOM events directly, prefer explicit `value` plus `oninput`/`onchange` handlers for controls that need deterministic test updates.
 - For fixed navigation, rails, cards, and compact facts, test long localized/content strings so truncation, wrapping, and stable geometry are proven rather than assumed.
 - For image-card UI, use representative fixtures where practical so at least one live screenshot proves the linked-image path, not only fallback imagery.
 

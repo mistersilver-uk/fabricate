@@ -47,6 +47,7 @@ function compileManagerV2Root() {
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EnvironmentEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EssenceBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EssenceEditView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/TagsCategoriesView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/EnvironmentsTab.svelte');
   for (const componentName of environmentComponentNames) {
     writeCompiledSvelte(`src/ui/svelte/apps/environments/${componentName}.svelte`);
@@ -118,7 +119,7 @@ function createStore(calls = [], options = {}) {
         { id: 'earth', name: 'Earth', description: 'Stone and root.', icon: 'fas fa-mountain', sourceComponentId: 'c1', sourceItemUuid: 'c1', associatedSystemItemId: 'c1' },
         { id: 'water', name: 'Water', description: 'Clear current.', icon: 'fas fa-water', sourceComponentId: null, sourceItemUuid: null, associatedSystemItemId: null }
       ],
-      itemTags: ['herb', 'mineral'],
+      itemTags: ['herb', 'mineral', 'ore'],
       categories: ['potions'],
       sceneOptions: [
         { uuid: 'Scene.forest', name: 'Moonlit Forest', background: { src: 'forest-full.webp' }, img: 'forest-medium.webp', thumbnail: 'forest-thumb.webp' }
@@ -432,13 +433,27 @@ function createStore(calls = [], options = {}) {
     deleteComponent: (id) => calls.push(['deleteComponent', id]),
     addEssence: (name, description, icon, sourceComponentId) => {
       calls.push(['addEssence', name, description, icon, sourceComponentId]);
-      return true;
+      if (options.addEssenceReject) return Promise.reject(new Error('add failed'));
+      return options.addEssenceResult ?? true;
     },
     updateEssence: (id, updates) => {
       calls.push(['updateEssence', id, updates]);
-      return true;
+      if (options.updateEssenceReject) return Promise.reject(new Error('update failed'));
+      return options.updateEssenceResult ?? true;
     },
     removeEssence: (id) => calls.push(['removeEssence', id]),
+    addCategory: (value) => {
+      calls.push(['addCategory', value]);
+      if (options.addCategoryReject) return Promise.reject(new Error('add category failed'));
+      return options.addCategoryResult ?? true;
+    },
+    removeCategory: (value) => calls.push(['removeCategory', value]),
+    addTag: (value) => {
+      calls.push(['addTag', value]);
+      if (options.addTagReject) return Promise.reject(new Error('add tag failed'));
+      return options.addTagResult ?? true;
+    },
+    removeTag: (value) => calls.push(['removeTag', value]),
     confirmDiscardDirtyEssenceDraft: () => {
       calls.push(['confirmDiscardDirtyEssenceDraft']);
       return options.confirmDiscardEssenceResult ?? true;
@@ -579,7 +594,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(target.textContent.includes('Quick actions'), false);
     assert.deepEqual(
       Array.from(target.querySelectorAll('.manager-v2-nav-label')).map(label => label.textContent.trim()),
-      ['System settings', 'Recipes', 'Components', 'Essences', 'Environments', 'Tags & Categories', 'Rules', 'Graph']
+      ['System settings', 'Recipes', 'Components', 'Tags & Categories', 'Essences', 'Environments', 'Rules', 'Graph']
     );
     assert.ok(target.textContent.includes('Alchemy'));
     assert.ok(target.textContent.includes('Potion and essence work'));
@@ -726,7 +741,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(target.querySelector('[data-system-id="alchemy"]').getAttribute('aria-selected'), 'true');
     assert.deepEqual(
       Array.from(target.querySelectorAll('.manager-v2-nav-label')).map(label => label.textContent.trim()),
-      ['System settings', 'Recipes', 'Components', 'Essences', 'Environments', 'Tags & Categories', 'Rules', 'Graph']
+      ['System settings', 'Recipes', 'Components', 'Tags & Categories', 'Essences', 'Environments', 'Rules', 'Graph']
     );
     assert.ok(target.textContent.includes('System library'));
   });
@@ -870,6 +885,140 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(calls.some(call => call[0] === 'deleteComponent' && call[1] === 'c1'));
   });
 
+  it('routes to tags and categories with add feedback, usage warnings, and store delegation', async () => {
+    const calls = [];
+    const confirmations = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls),
+        services: {
+          openCurrentAdmin: () => {},
+          confirmVocabularyRemoval: (kind, row, message) => {
+            confirmations.push([kind, row.name, message]);
+            return false;
+          }
+        }
+      }
+    });
+    flushSync();
+
+    const tagsButton = navButton('Tags & Categories');
+    assert.ok(tagsButton, 'tags/categories nav button should render for selected systems');
+    assert.equal(tagsButton.disabled, false);
+    tagsButton.click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'tags');
+    assert.ok(target.textContent.includes('Recipe categories'));
+    assert.ok(target.textContent.includes('Item tags'));
+    assert.ok(target.textContent.includes('General'));
+    assert.ok(target.textContent.includes('potions'));
+    assert.ok(target.textContent.includes('ore'));
+    assert.ok(target.textContent.includes('Vocabulary counts'));
+    assert.ok(target.querySelector('[data-category-id="general"]').textContent.includes('Locked'));
+
+    const categoryInput = target.querySelector('#manager-v2-category-add');
+    categoryInput.value = 'General';
+    categoryInput.dispatchEvent(new Event('input', { bubbles: true }));
+    target.querySelector('[aria-label="Recipe categories"] form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await tick();
+    flushSync();
+    assert.ok(target.textContent.includes('General is already available as the base category.'));
+    assert.ok(!calls.some(call => call[0] === 'addCategory'));
+
+    categoryInput.value = 'Elixirs';
+    categoryInput.dispatchEvent(new Event('input', { bubbles: true }));
+    target.querySelector('[aria-label="Recipe categories"] form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await tick();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'addCategory' && call[1] === 'Elixirs'));
+    assert.equal(categoryInput.value, '');
+    assert.equal(document.activeElement, categoryInput);
+
+    const tagInput = target.querySelector('#manager-v2-tag-add');
+    tagInput.value = 'SPICE';
+    tagInput.dispatchEvent(new Event('input', { bubbles: true }));
+    target.querySelector('[aria-label="Item tags"] form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await tick();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'addTag' && call[1] === 'spice'));
+    assert.ok(target.textContent.includes('Tag added with cleaned-up lowercase text.'));
+    assert.equal(tagInput.value, '');
+    assert.equal(document.activeElement, tagInput);
+
+    target.querySelector('[aria-label="Remove category potions"]').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(confirmations[0]?.slice(0, 2), ['category', 'potions']);
+    assert.ok(!calls.some(call => call[0] === 'removeCategory' && call[1] === 'potions'));
+
+    target.querySelector('[aria-label="Remove tag ore"]').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(confirmations[1]?.slice(0, 2), ['tag', 'ore']);
+    assert.ok(!calls.some(call => call[0] === 'removeTag' && call[1] === 'ore'));
+
+    const search = target.querySelector('.manager-v2-toolbar input[type="search"]');
+    search.value = 'zzzz';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.ok(target.textContent.includes('No custom categories match this search.'));
+    assert.ok(target.textContent.includes('No item tags match this search.'));
+    assert.ok(target.textContent.includes('General'));
+  });
+
+  it('keeps tags and categories add inputs when store add callbacks fail', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          addCategoryResult: false,
+          addTagReject: true
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Tags & Categories').click();
+    await tick();
+    flushSync();
+
+    const categoryInput = target.querySelector('#manager-v2-category-add');
+    categoryInput.value = 'Elixirs';
+    categoryInput.dispatchEvent(new Event('input', { bubbles: true }));
+    target.querySelector('[aria-label="Recipe categories"] form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await tick();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'addCategory' && call[1] === 'Elixirs'));
+    assert.equal(categoryInput.value, 'Elixirs');
+    assert.equal(document.activeElement, categoryInput);
+    assert.ok(target.textContent.includes('Category could not be added.'));
+
+    const tagInput = target.querySelector('#manager-v2-tag-add');
+    tagInput.value = 'SPICE';
+    tagInput.dispatchEvent(new Event('input', { bubbles: true }));
+    target.querySelector('[aria-label="Item tags"] form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await tick();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'addTag' && call[1] === 'spice'));
+    assert.equal(tagInput.value, 'SPICE');
+    assert.equal(document.activeElement, tagInput);
+    assert.ok(target.textContent.includes('Tag could not be added.'));
+  });
+
   it('routes to the essence browser and dedicated edit route without inline editing', async () => {
     const calls = [];
     target = document.createElement('div');
@@ -924,22 +1073,33 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'essence-edit');
-    assert.ok(target.textContent.includes('Edit Essence'));
+    assert.ok(target.textContent.includes('Edit essence'));
+    assert.ok(!target.textContent.includes('Essence editor'));
+    assert.ok(!target.querySelector('.manager-v2-essence-edit-view .manager-v2-action-group'), 'identity card should not duplicate route save/cancel actions');
+    assert.ok(target.textContent.includes('Basic information'));
+    assert.ok(target.textContent.includes('Essence ID'));
+    assert.ok(!target.querySelector('.manager-v2-inspector [aria-label="Edit Water"]'), 'inspector should not show an edit action while already editing');
     assert.ok(target.querySelector('.essence-icon-picker-trigger'), 'edit route should use the shared icon picker trigger');
+    assert.ok(target.textContent.includes('Change icon'));
+    assert.ok(target.textContent.includes('Clear icon'));
     assert.ok(target.querySelector('.essence-source-trigger'), 'effect-transfer systems should show source picker controls');
+    assert.equal(target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').disabled, true);
 
     const editName = target.querySelector('#manager-v2-essence-edit-name');
     editName.value = 'Rain';
     editName.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
+    assert.equal(target.querySelector('.manager-v2-inspector-name').textContent.trim(), 'Rain');
+    assert.equal(target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').disabled, false);
     target.querySelector('.essence-source-trigger').click();
     await tick();
     flushSync();
     document.querySelector('.essence-source-picker-option[title="Glass Vial"]').click();
     await tick();
     flushSync();
-    target.querySelector('.manager-v2-essence-edit-view .manager-v2-button.is-primary').click();
+    assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Glass Vial'));
+    target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').click();
     await tick();
     flushSync();
     assert.ok(calls.some(call => call[0] === 'updateEssence' && call[1] === 'water' && call[2].name === 'Rain' && call[2].sourceComponentId === 'c2'));
@@ -955,24 +1115,28 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'essence-edit');
+    assert.equal(target.querySelector('.manager-v2-inspector-name').textContent.trim(), 'New essence draft');
+    assert.equal(target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').disabled, true);
     const createName = target.querySelector('#manager-v2-essence-edit-name');
     createName.value = 'Air';
     createName.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
-    target.querySelector('.manager-v2-essence-edit-view .manager-v2-button.is-primary').click();
+    assert.equal(target.querySelector('.manager-v2-inspector-name').textContent.trim(), 'Air');
+    target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').click();
     await tick();
     flushSync();
     assert.ok(calls.some(call => call[0] === 'addEssence' && call[1] === 'Air'));
   });
 
   it('hides manager-v2 essence source UI when effect transfer is disabled', async () => {
+    const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(Component, {
       target,
       props: {
-        store: createStore([], {
+        store: createStore(calls, {
           selectedFeatures: {
             essences: true,
             effectTransfer: false,
@@ -1001,6 +1165,20 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
 
     assert.equal(target.querySelector('.essence-source-trigger'), null);
     assert.equal(target.textContent.includes('Source unresolved'), false);
+    assert.equal(target.textContent.includes('source linkage'), false);
+
+    const editName = target.querySelector('#manager-v2-essence-edit-name');
+    editName.value = 'Rain';
+    editName.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').click();
+    await tick();
+    flushSync();
+
+    const updateCall = calls.find(call => call[0] === 'updateEssence');
+    assert.ok(updateCall, 'identity save should delegate an essence update');
+    assert.equal(Object.prototype.hasOwnProperty.call(updateCall[2], 'sourceComponentId'), false);
   });
 
   it('protects dirty essence edit drafts when leaving the route', async () => {
@@ -1036,6 +1214,110 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(calls.some(call => call[0] === 'confirmDiscardDirtyEssenceDraft'));
     assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'essence-edit');
     assert.equal(target.querySelector('#manager-v2-essence-edit-name').value, 'Rain');
+  });
+
+  it('keeps essence edit drafts on failed and rejected saves', async () => {
+    const failedCalls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(failedCalls, { updateEssenceResult: false }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Essences').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-essence-id="water"] [aria-label="Edit Water"]').click();
+    await tick();
+    flushSync();
+    const failedName = target.querySelector('#manager-v2-essence-edit-name');
+    failedName.value = 'Rain';
+    failedName.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').click();
+    await tick();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'essence-edit');
+    assert.equal(target.querySelector('#manager-v2-essence-edit-name').value, 'Rain');
+    assert.ok(target.textContent.includes('Save failed.'));
+
+    unmount(mounted);
+    target.remove();
+
+    const rejectedCalls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(rejectedCalls, { updateEssenceReject: true }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Essences').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-essence-id="water"] [aria-label="Edit Water"]').click();
+    await tick();
+    flushSync();
+    const rejectedName = target.querySelector('#manager-v2-essence-edit-name');
+    rejectedName.value = 'Storm';
+    rejectedName.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').click();
+    await tick();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'essence-edit');
+    assert.equal(target.querySelector('#manager-v2-essence-edit-name').value, 'Storm');
+    assert.ok(target.textContent.includes('Save failed.'));
+
+    unmount(mounted);
+    target.remove();
+
+    const createFailedCalls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(createFailedCalls, { addEssenceResult: false }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Essences').click();
+    await tick();
+    flushSync();
+    target.querySelector('.manager-v2-essence-action-band .manager-v2-button').click();
+    await tick();
+    flushSync();
+    const createName = target.querySelector('#manager-v2-essence-edit-name');
+    createName.value = 'Air';
+    createName.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').click();
+    await tick();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'essence-edit');
+    assert.equal(target.querySelector('#manager-v2-essence-edit-name').value, 'Air');
+    assert.ok(target.textContent.includes('Save failed.'));
   });
 
   it('routes to the environments browser and opens the forced v2 editor route', async () => {

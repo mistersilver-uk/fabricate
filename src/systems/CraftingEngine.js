@@ -960,9 +960,10 @@ export class CraftingEngine {
 
     for (const essenceId of contributingEssenceIds) {
       const definition = essenceDefinitions.find(d => d.id === essenceId);
-      if (!definition?.sourceItemUuid) continue;
+      const sourceItemUuid = this._sourceUuidForEssenceDefinition(definition, system);
+      if (!sourceItemUuid) continue;
 
-      const sourceItem = await fromUuid(definition.sourceItemUuid);
+      const sourceItem = await fromUuid(sourceItemUuid);
       if (!sourceItem) continue;
 
       const itemEffects = sourceItem.effects || [];
@@ -974,6 +975,22 @@ export class CraftingEngine {
     // 4. Transfer all collected effects to the result item
     if (effectsData.length === 0) return;
     await resultItem.createEmbeddedDocuments('ActiveEffect', effectsData);
+  }
+
+  _sourceUuidForEssenceDefinition(definition, system) {
+    if (!definition) return null;
+    const sourceComponentId = definition.sourceComponentId || definition.associatedSystemItemId || '';
+    if (sourceComponentId) {
+      const components = Array.isArray(system?.components)
+        ? system.components
+        : (Array.isArray(system?.items) ? system.items : []);
+      const component = components.find(item => item?.id === sourceComponentId) || null;
+      if (component?.sourceItemUuid || component?.sourceUuid) {
+        return component.sourceItemUuid || component.sourceUuid;
+      }
+      return null;
+    }
+    return definition.sourceItemUuid || null;
   }
 
   _getCurrencyRequirementConfig(recipe) {
