@@ -268,15 +268,6 @@
     return view;
   }
 
-  function viewKicker() {
-    if (currentView === 'recipes') return text('FABRICATE.Admin.ManagerV2.Recipe.Kicker', 'Recipes View');
-    if (currentView === 'components') return text('FABRICATE.Admin.ManagerV2.Component.Kicker', 'Components View');
-    if (currentView === 'environments') return text('FABRICATE.Admin.ManagerV2.Environment.Kicker', 'Environments View');
-    if (currentView === 'environment-edit') return text('FABRICATE.Admin.ManagerV2.Environment.EditKicker', 'Environment Edit');
-    if (currentView === 'system-edit') return text('FABRICATE.Admin.ManagerV2.SystemEdit.Kicker', 'System Edit');
-    return text('FABRICATE.Admin.ManagerV2.Kicker', 'Systems View');
-  }
-
   function viewTitle() {
     if (currentView === 'recipes') return text('FABRICATE.Admin.ManagerV2.Recipe.Title', 'Recipes');
     if (currentView === 'components') return text('FABRICATE.Admin.ManagerV2.Component.Title', 'Components');
@@ -906,6 +897,16 @@
     return `${text(key, fallback)}:`;
   }
 
+  function countLabelParts(label) {
+    const normalized = String(label ?? '').trim().replace(/\s+/g, ' ');
+    const firstSpace = normalized.indexOf(' ');
+    if (firstSpace === -1) return { lead: normalized, rest: '' };
+    return {
+      lead: normalized.slice(0, firstSpace),
+      rest: normalized.slice(firstSpace + 1)
+    };
+  }
+
 </script>
 
 <div class="fabricate-manager-v2" data-manager-v2-view={currentView}>
@@ -940,7 +941,6 @@
           <span>{text('FABRICATE.Admin.ManagerV2.SystemEdit.Breadcrumb', 'System settings')}</span>
         {/if}
       </nav>
-      <p class="manager-v2-kicker">{viewKicker()}</p>
       <h1 class="manager-v2-title">{viewTitle()}</h1>
       <p class="manager-v2-subtitle">{viewSubtitle()}</p>
     </div>
@@ -2101,13 +2101,17 @@
           <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Counts', 'Counts')}</h3>
           <div class="manager-v2-fact-grid">
             {#each selectedCountFacts as fact}
+              {@const labelParts = countLabelParts(fact.label)}
               <div class="manager-v2-fact" class:is-off={fact.isOff} data-count-id={fact.id}>
                 {#if fact.isOff}
-                  <span>{fact.label}</span>
-                  <strong class="is-disabled">{fact.value}</strong>
+                  <span class="manager-v2-fact-line">
+                    <span class="manager-v2-fact-label">{fact.label}</span>
+                    <strong class="is-disabled">{fact.value}</strong>
+                  </span>
                 {:else}
-                  <strong>{fact.value}</strong>
-                  <span>{fact.label}</span>
+                  <span class="manager-v2-fact-line">
+                    <span class="manager-v2-fact-leading"><strong>{fact.value}</strong> {labelParts.lead}</span>{#if labelParts.rest}{' '}<span class="manager-v2-fact-label">{labelParts.rest}</span>{/if}
+                  </span>
                 {/if}
               </div>
             {/each}

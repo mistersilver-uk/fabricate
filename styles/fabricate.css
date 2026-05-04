@@ -4347,13 +4347,15 @@
   gap: 8px;
   width: 100%;
   min-width: 0;
-  min-height: 40px;
-  padding: 8px;
+  height: 64px;
+  padding: 10px;
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   color: inherit;
   background: rgba(92, 184, 92, 0.08);
   text-align: left;
+  white-space: normal;
+  overflow: hidden;
   cursor: pointer;
 }
 
@@ -4365,9 +4367,18 @@
 
 .fabricate-manager-v2 .manager-v2-scope-button .manager-v2-title {
   display: -webkit-box;
+  min-width: 0;
+  max-width: 100%;
+  max-height: 2.36em;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.18;
   overflow: hidden;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .fabricate-manager-v2 .manager-v2-scope-clear {
@@ -5388,11 +5399,7 @@
 }
 
 .fabricate-manager-v2 .manager-v2-fact {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: flex-start;
-  gap: 6px;
+  display: block;
   min-width: 0;
   width: 100%;
   max-width: 100%;
@@ -5406,17 +5413,22 @@
   grid-column: 1 / -1;
 }
 
-.fabricate-manager-v2 .manager-v2-fact strong,
-.fabricate-manager-v2 .manager-v2-fact span {
+.fabricate-manager-v2 .manager-v2-fact-line {
   display: inline;
   min-width: 0;
   max-width: 100%;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.72rem;
+  line-height: 1.25;
   overflow-wrap: break-word;
 }
 
-.fabricate-manager-v2 .manager-v2-fact span {
-  color: var(--fab-mv2-text-muted);
-  font-size: 0.72rem;
+.fabricate-manager-v2 .manager-v2-fact-leading {
+  white-space: nowrap;
+}
+
+.fabricate-manager-v2 .manager-v2-fact strong {
+  color: var(--fab-mv2-text);
 }
 
 .fabricate-manager-v2 .manager-v2-fact strong.is-disabled {

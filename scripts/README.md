@@ -16,7 +16,10 @@ npm run test:foundry
 npm run test:foundry:install   # Install Playwright Chromium
 npm run test:foundry:up        # Start Foundry Docker container
 npm run test:foundry:run       # Run smoke test (requires running Foundry)
-npm run test:foundry:down      # Stop Docker container
+npm run test:foundry:down      # Stop Docker container and keep cached install
+
+# Full reset when the cached Foundry container should be discarded
+node scripts/foundry-test-down.mjs --clean
 
 # Against an already-running Foundry instance
 node scripts/foundry-test-run.mjs
@@ -30,6 +33,16 @@ node scripts/foundry-test-run.mjs
 | `FOUNDRY_HOST_PORT` | `30000` | Host port used by the Docker harness; set this with `FOUNDRY_URL` when port 30000 is already occupied |
 | `FOUNDRY_ADMIN_KEY` | `fabricate-test-admin` | Admin password for the setup/auth page |
 | `FOUNDRY_IMAGE` | `felddy/foundryvtt:13` | Docker image used by the compose harness. Defaults to Foundry V13 for the V13 smoke world. |
+| `FOUNDRY_RELEASE_URL` | unset | Optional explicit Foundry release URL. When unset, `test:foundry:up` uses a matching local cached zip if one exists. |
+| `FOUNDRY_RECREATE` | unset | Set to `1` before `npm run test:foundry:up` to discard and recreate the cached container. |
+
+### Foundry Download Cache
+
+The harness first looks for `.foundry-e2e/cache/foundryvtt-<version>.zip`. When the archive exists, `test:foundry:up` passes it to the container as a local `FOUNDRY_RELEASE_URL`, which avoids requesting a presigned release URL from Foundry during clean installs.
+
+The harness also preserves the stopped Docker container between normal smoke-test runs. This keeps the extracted Foundry application cached in the container filesystem, so reruns do not repeat installation work.
+
+Use `node scripts/foundry-test-down.mjs --clean` or `FOUNDRY_RECREATE=1 npm run test:foundry:up` when you need to refresh the cached container after changing Docker image, port, or container-level configuration.
 
 ### Test Phases
 

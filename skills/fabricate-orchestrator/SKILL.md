@@ -11,6 +11,7 @@ Keep this skill aligned with the `fabricate_orchestrator` custom Codex agent.
 
 - `AGENTS.md`
 - `openspec/changes/` if a relevant change already exists
+- relevant canonical specs under `openspec/specs/`
 - `.codex/agents/fabricate-orchestrator.toml` when you suspect drift
 - `skills/javascript-structural-design/SKILL.md` when the task changes JavaScript module boundaries, collaborator wiring, or test seams
 - GitHub issue context from `gh issue` when available
@@ -30,6 +31,7 @@ Keep this skill aligned with the `fabricate_orchestrator` custom Codex agent.
    - affected files
    - verification plan
    - acceptance criteria
+   - the spec or design document that owns any durable product behavior
    - for UI work: screenshot acceptance criteria, representative fixtures, pointer hit-test needs, and a UX review gate
 5. Update the visible plan with `update_plan`.
 6. Hand the task to the implementation stage only when the plan is actionable.
@@ -41,6 +43,7 @@ Keep this skill aligned with the `fabricate_orchestrator` custom Codex agent.
 - For quick-start docs work, route changes only to `docs/quickstart.md`.
 - For tasks centered on `src/ui/`, `styles/`, or UX behavior, make the plan prefer the local Vite dev server first and reserve `npm run test:foundry` for runtime-sensitive or reproducibility-focused validation.
 - For UI work, do not let “screenshot captured” stand as acceptance. Define what screenshots must prove: first visible state, image/content fidelity, clipping, spacing, alignment, scroll containment, visible controls, and relevant window sizes.
+- Keep screen-specific UI behavior in canonical specs or active design docs. Skills and agents should point to those documents instead of carrying detailed product contracts.
 - For card grids, overlays, disabled states, menus, and icon-button workflows, plan real browser pointer hit-tests when feasible.
 - For image-driven UI, plan at least one representative fixture that exercises the linked image path, not only fallback artwork.
 - For tasks centered on JavaScript structure or testability, use `javascript-structural-design` to make the handoff explicit about collaborator seams, boring constructors, and responsibility splits.

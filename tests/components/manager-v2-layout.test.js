@@ -78,12 +78,24 @@ test('manager-v2 systems text and action cells are constrained at normal widths'
 test('manager-v2 selected system scope is a clear-selection card with accessible focus', () => {
   const scopeBlock = blockFor('.fabricate-manager-v2 .manager-v2-scope-button');
   const scopeFocusBlock = blockFor('.fabricate-manager-v2 .manager-v2-scope-button:hover,\n.fabricate-manager-v2 .manager-v2-scope-button:focus-visible');
+  const scopeTitleBlock = blockFor('.fabricate-manager-v2 .manager-v2-scope-button .manager-v2-title');
   const clearBlock = blockFor('.fabricate-manager-v2 .manager-v2-scope-clear');
   const focusBlock = blockFor('.fabricate-manager-v2 button:focus-visible,\n.fabricate-manager-v2 input:focus-visible,\n.fabricate-manager-v2 select:focus-visible,\n.fabricate-manager-v2 [tabindex]:focus-visible');
 
   assert.ok(scopeBlock.includes('display: grid;'), 'selected system scope should reserve space for the clear icon');
   assert.ok(scopeBlock.includes('grid-template-columns: minmax(0, 1fr) 28px;'), 'scope button should keep name and x icon aligned');
+  assert.ok(scopeBlock.includes('height: 64px;'), 'scope button should keep a stable fixed height');
+  assert.ok(scopeBlock.includes('white-space: normal;'), 'scope button should not inherit host nowrap rules');
+  assert.ok(scopeBlock.includes('overflow: hidden;'), 'scope button should prevent long names from affecting nav layout');
   assert.ok(scopeBlock.includes('border: 1px solid var(--fab-mv2-border);'), 'scope button should render as a visible rail card');
+  assert.ok(scopeTitleBlock.includes('min-width: 0;'), 'scope title should be allowed to shrink inside the grid');
+  assert.ok(scopeTitleBlock.includes('max-width: 100%;'), 'scope title should not overflow the scope card');
+  assert.ok(scopeTitleBlock.includes('max-height: 2.36em;'), 'scope title should have a hard two-line height cap');
+  assert.ok(scopeTitleBlock.includes('font-size: 1.05rem;'), 'scope title should be prominent in the rail card');
+  assert.ok(scopeTitleBlock.includes('-webkit-line-clamp: 2;'), 'scope title should clamp long selected system names');
+  assert.ok(scopeTitleBlock.includes('overflow: hidden;'), 'scope title should not overflow its parent');
+  assert.ok(scopeTitleBlock.includes('overflow-wrap: anywhere;'), 'scope title should break very long system names before overflow');
+  assert.ok(scopeTitleBlock.includes('white-space: normal;'), 'scope title should not inherit host nowrap rules');
   assert.ok(clearBlock.includes('width: 28px;'), 'clear icon should have a stable hit target inside the scope card');
   assert.ok(clearBlock.includes('color: var(--fab-mv2-text-muted);'), 'clear icon should avoid danger styling');
   assert.ok(scopeFocusBlock.includes('border-color: var(--fab-mv2-border-strong);'), 'scope focus should stay within manager-v2 styling');
@@ -94,19 +106,20 @@ test('manager-v2 selected system scope is a clear-selection card with accessible
 
 test('manager-v2 inspector count labels wrap without truncation', () => {
   const factBlock = blockFor('.fabricate-manager-v2 .manager-v2-fact');
-  const factTextBlock = blockFor('.fabricate-manager-v2 .manager-v2-fact strong,\n.fabricate-manager-v2 .manager-v2-fact span');
+  const factLineBlock = blockFor('.fabricate-manager-v2 .manager-v2-fact-line');
+  const factLeadingBlock = blockFor('.fabricate-manager-v2 .manager-v2-fact-leading');
   const featureListBlock = blockFor('.fabricate-manager-v2 .manager-v2-feature-list');
 
   assert.ok(css.includes('grid-template-columns: repeat(2, minmax(0, 1fr));'), 'count facts should use a two-column inspector grid');
-  assert.ok(factBlock.includes('display: flex;'), 'count facts should keep value and label in one compact row when space allows');
-  assert.ok(factBlock.includes('flex-wrap: wrap;'), 'count facts should allow labels such as Recipe categories to wrap instead of truncating');
-  assert.ok(factBlock.includes('align-items: baseline;'), 'count facts should align numeric values with labels');
+  assert.ok(factBlock.includes('display: block;'), 'count facts should render one phrase instead of wrapping separate flex children');
+  assert.ok(!factBlock.includes('display: flex;'), 'count facts should not split values and labels into separate flex items');
+  assert.ok(factLineBlock.includes('display: inline;'), 'count facts should keep value and label in normal inline text flow');
+  assert.ok(factLeadingBlock.includes('white-space: nowrap;'), 'count facts should keep the value and first label word together');
   assert.ok(!factBlock.includes('white-space: nowrap;'), 'count fact cards should not force single-line labels');
-  assert.ok(factTextBlock.includes('overflow-wrap: break-word;'), 'count fact text should wrap at word boundaries with long-word fallback');
-  assert.ok(!factTextBlock.includes('overflow: hidden;'), 'count fact text should not clip full labels');
-  assert.ok(!factTextBlock.includes('text-overflow: ellipsis;'), 'count fact text should not ellipsize full labels');
-  assert.ok(!factTextBlock.includes('white-space: nowrap;'), 'count fact text should not suppress label wrapping');
-  assert.ok(!factTextBlock.includes('overflow-wrap: anywhere;'), 'count facts should not allow character-level wrapping');
+  assert.ok(factLineBlock.includes('overflow-wrap: break-word;'), 'count fact text should wrap at word boundaries with long-word fallback');
+  assert.ok(!factLineBlock.includes('overflow: hidden;'), 'count fact text should not clip full labels');
+  assert.ok(!factLineBlock.includes('text-overflow: ellipsis;'), 'count fact text should not ellipsize full labels');
+  assert.ok(!factLineBlock.includes('overflow-wrap: anywhere;'), 'count facts should not allow character-level wrapping');
   assert.ok(css.includes('.fabricate-manager-v2 .manager-v2-fact.is-off'), 'disabled count facts should span the count grid');
   assert.ok(css.includes('grid-column: 1 / -1;'), 'disabled count facts should have enough width for label-first text');
   assert.ok(css.includes('.fabricate-manager-v2 .manager-v2-fact strong.is-disabled'), 'disabled count values should preserve emphasis');

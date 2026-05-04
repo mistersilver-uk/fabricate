@@ -543,7 +543,11 @@ Required corrections:
 
 - Rows must keep system names, descriptions, chips, counts, and action buttons inside their row geometry at normal Foundry window widths. Identity text should clamp to concise lines, while unbroken strings may break only as a last resort.
 - The left rail should always expose `Systems`, but deferred feature/admin tabs should not be visible until a crafting system is selected. Once selected, feature-scoped placeholders should follow canonical feature gates: gathering controls environments, essences controls essences, and item tags or recipe categories control tags/categories.
-- The left rail must not duplicate the selected-state evidence already provided by the row selection and right inspector. Any selected-system rail summary should be compact, secondary, and non-overflowing.
+- `System settings` is always the first selected-system rail item. It must not move when other feature-gated items appear or disappear.
+- The selected-system rail scope is a clear-selection card. The system name is prominent, but the card has stable height and long names truncate/clamp before they can overflow or push navigation buttons down.
+- The root `Crafting Systems` breadcrumb returns to the systems browser. The selected-system breadcrumb opens that system's in-manager System settings view.
+- The top manager-v2 header should not include duplicate view kickers such as `Systems View`, `Recipes View`, or `Components View`; keep the current title and subtitle.
+- Count facts in the right inspector should read as compact inline facts. Enabled counts keep the number and first label word together when wrapping, while disabled facts read label-first with emphasized `Off`, e.g. `Gathering environments Off`.
 - The systems section header should describe the table and filters only. Import and create actions belong in the top-right application header for this slice.
 - The right inspector should be a readable system summary with icon, name, resolution, enabled state, description, counts, and enabled features. It should not include a separate quick-actions card while row actions and header actions already cover the implemented commands.
 - At medium and narrow widths, the layout should stack before table columns become unreadable, and primary actions, row actions, search, filter, selected-row state, and inspector content should remain reachable.

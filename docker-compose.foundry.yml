@@ -3,7 +3,7 @@
 # Usage:
 #   npm run test:foundry:up      # start containers
 #   npm run test:foundry:run     # run Playwright smoke test
-#   npm run test:foundry:down    # stop and remove containers
+#   npm run test:foundry:down    # stop container and keep cached install
 #   npm run test:foundry         # up + run + down (CI mode)
 #
 # Prerequisites:
@@ -16,9 +16,10 @@
 # The Foundry image is felddy/foundryvtt — a well-known community image that
 # handles license activation automatically via credentials.
 #
-# Note on volumes: a single bind mount at /data provides the full user data
-# directory including modules, worlds, and systems. The container_cache mount
-# persists the Foundry VTT installation archive to avoid re-downloading.
+# Note on caching: foundry-test-down stops the container by default instead of
+# removing it, preserving the extracted Foundry application and avoiding repeat
+# release-service requests. Use --clean when a full reset is required. The
+# container_cache mount also persists the installation archive.
 
 services:
   foundry:
@@ -34,8 +35,10 @@ services:
     environment:
       FOUNDRY_USERNAME: "${FOUNDRY_USERNAME}"
       FOUNDRY_PASSWORD: "${FOUNDRY_PASSWORD}"
+      FOUNDRY_RELEASE_URL: "${FOUNDRY_RELEASE_URL:-}"
       FOUNDRY_ADMIN_KEY: "fabricate-test-admin"
       CONTAINER_PRESERVE_CONFIG: "true"
+      CONTAINER_CACHE: "/data/container_cache"
       FOUNDRY_WORLD: "fabricate-smoke"
     volumes:
       # Full user data directory (assembled by foundry-setup-data.mjs)

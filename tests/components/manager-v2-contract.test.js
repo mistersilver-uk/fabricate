@@ -116,6 +116,8 @@ describe('CraftingSystemManagerV2 source contract', () => {
   });
 
   it('keeps first-slice action and navigation hierarchy focused', () => {
+    assert.ok(!rootSource.includes('function viewKicker'), 'top-bar view kickers should not duplicate the page title');
+    assert.ok(!rootSource.includes('{viewKicker()}'), 'top-bar header should render only the page title and subtitle');
     assert.ok(
       rootSource.includes('visiblePlaceholderViews'),
       'root should derive selected-system placeholder nav from selection and feature gates'

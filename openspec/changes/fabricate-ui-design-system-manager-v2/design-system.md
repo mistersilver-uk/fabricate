@@ -501,6 +501,8 @@ Existing Fabricate applications may migrate incrementally, but all new UI work s
 
 Use the full shell: left rail, main list/editor, right inspector. Primary management screens use tables. Editors use composition plus evidence.
 
+Keep shell hierarchy terse. The app header should show breadcrumbs, title, optional subtitle, and actions; do not add redundant "View" eyebrow labels above titles. Rail scope controls and other fixed navigation areas must reserve stable dimensions and truncate long names before they can shift navigation. Inspector fact cards should read as short inline facts and wrap at word boundaries instead of splitting values from labels.
+
 ### Recipe Editor
 
 Adopt the same editor system: compact object header, workflow navigation, primary composition, validation/evidence panel. Keep recipe semantics unchanged.

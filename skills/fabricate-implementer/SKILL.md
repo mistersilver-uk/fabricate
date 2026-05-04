@@ -25,11 +25,12 @@ Keep this skill aligned with the `fabricate_implementer` custom Codex agent.
 5. Load `javascript-mastery` when the change depends on non-trivial JavaScript behavior or language edge cases.
 6. Implement the minimum change that satisfies the plan.
 7. For UI changes, inspect the rendered outcome against the planned criteria before handoff; do not treat screenshot creation alone as validation.
-8. Run validation gates after each logical change set:
+8. If implementation reveals a durable product rule, update the relevant canonical spec or active change design doc.
+9. Run validation gates after each logical change set:
    - `npm test`
    - `npm run build`
-9. If either gate fails, fix the problem and rerun both gates.
-10. Summarize the changed files, validation results, screenshot artifacts, and any follow-up work.
+10. If either gate fails, fix the problem and rerun both gates.
+11. Summarize the changed files, validation results, screenshot artifacts, and any follow-up work.
 
 ## Implementation rules
 
@@ -46,7 +47,10 @@ Keep this skill aligned with the `fabricate_implementer` custom Codex agent.
 - In Foundry UI CSS, avoid generic state classes such as `.disabled`, `.active`, and `.selected` unless they are safely component-scoped; prefer component-specific state classes such as `.is-disabled`.
 - For Svelte, CSS, layout, and other UI-focused changes, verify against the local Vite dev server first when available and use the user-provided dev URL if one exists.
 - Use `npm run test:foundry` for UI changes only when the task depends on Foundry runtime integration, no dev server is available, or reproducible container-backed evidence is required.
+- If `npm run test:foundry` conflicts with a local Foundry on port `30000`, use matching alternate environment variables such as `FOUNDRY_HOST_PORT=30001 FOUNDRY_URL=http://localhost:30001`.
+- Treat Docker startup conflicts, launch reconnects, and stale container-name failures as harness infrastructure unless the app loaded and failed a product assertion.
 - For card, overlay, menu, disabled-state, and icon-button interactions, add real browser pointer hit-tests when feasible. `elementFromPoint` checks catch CSS overlays and global Foundry styles that mounted tests can miss.
+- For compact rails, headers, fact cards, buttons, and fixed navigation areas, test long localized/content strings so wrapping, truncation, and stable geometry are explicit.
 - For image-card UI, use representative fixture data where practical so at least one screenshot proves the linked image path as well as fallback behavior.
 - Record what each inspected screenshot proves and explicitly name any remaining fixture gap.
 

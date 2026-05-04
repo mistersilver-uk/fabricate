@@ -1,13 +1,14 @@
 /**
  * foundry-test-down.mjs
  *
- * Stops and removes the Foundry VTT Docker Compose test harness.
- * Volumes are preserved between runs to speed up re-runs.
- * Pass --clean to also remove the named volume (full reset).
+ * Stops the Foundry VTT Docker Compose test harness.
+ * The container is preserved between normal runs so the extracted Foundry
+ * application remains cached and the next run does not have to request a
+ * release URL again. Pass --clean for a full reset.
  *
  * Usage:
- *   node scripts/foundry-test-down.mjs          # stop containers
- *   node scripts/foundry-test-down.mjs --clean  # stop containers + remove volume
+ *   node scripts/foundry-test-down.mjs          # stop container, keep cache
+ *   node scripts/foundry-test-down.mjs --clean  # remove container + volumes
  */
 
 import { execSync } from 'node:child_process';
@@ -20,17 +21,22 @@ const ROOT = join(__dirname, '..');
 async function main() {
   const clean = process.argv.includes('--clean');
 
-  process.stdout.write('Stopping Foundry test harness...\n');
+  process.stdout.write(clean
+    ? 'Removing Foundry test harness and cached container...\n'
+    : 'Stopping Foundry test harness and preserving cached container...\n');
 
-  const args = clean ? '--volumes' : '';
-  execSync(`docker compose -f docker-compose.foundry.yml down ${args}`.trim(), {
+  const command = clean
+    ? 'docker compose -f docker-compose.foundry.yml down --volumes --remove-orphans'
+    : 'docker compose -f docker-compose.foundry.yml stop';
+
+  execSync(command, {
     cwd: ROOT,
     stdio: 'inherit',
     env: process.env
   });
 
   if (clean) {
-    process.stdout.write('Volumes removed (clean reset).\n');
+    process.stdout.write('Container and volumes removed (clean reset).\n');
   }
 
   process.stdout.write('Foundry test harness stopped.\n');

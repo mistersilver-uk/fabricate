@@ -22,6 +22,8 @@ const ROOT = join(__dirname, '..');
 const COMPOSE_FILE = join(ROOT, 'docker-compose.foundry.yml');
 const ENV_FILE = join(ROOT, '.env.foundry');
 const DEFAULT_FOUNDRY_IMAGE = 'felddy/foundryvtt:13';
+const CONTAINER_NAME = 'fabricate-foundry-test';
+const CACHE_DIR = join(ROOT, '.foundry-e2e', 'cache');
 
 /** Parse a simple KEY=VALUE env file, ignoring comments and blanks. */
 async function loadEnvFile(filePath) {
@@ -37,6 +39,89 @@ async function loadEnvFile(filePath) {
       process.env[key] = value;
     }
   }
+}
+
+function compose(args) {
+  execSync(`docker compose -f docker-compose.foundry.yml ${args}`, {
+    cwd: ROOT,
+    stdio: 'inherit',
+    env: process.env
+  });
+}
+
+function getContainerStatus() {
+  const result = spawnSync('docker', [
+    'inspect',
+    '--format',
+    '{{.State.Status}}',
+    CONTAINER_NAME
+  ], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore']
+  });
+
+  if (result.status !== 0) return null;
+  return (result.stdout ?? '').trim() || null;
+}
+
+function getContainerHostPort() {
+  const result = spawnSync('docker', [
+    'inspect',
+    '--format',
+    '{{json .NetworkSettings.Ports}}',
+    CONTAINER_NAME
+  ], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore']
+  });
+
+  if (result.status !== 0) return null;
+
+  try {
+    const ports = JSON.parse((result.stdout ?? '').trim() || '{}');
+    return ports?.['30000/tcp']?.[0]?.HostPort ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function getImageFoundryVersion(image) {
+  const result = spawnSync('docker', [
+    'image',
+    'inspect',
+    image,
+    '--format',
+    '{{ index .Config.Labels "com.foundryvtt.version" }}'
+  ], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore']
+  });
+
+  if (result.status !== 0) return null;
+  return (result.stdout ?? '').trim() || null;
+}
+
+function configureCachedReleaseUrl() {
+  if (process.env.FOUNDRY_RELEASE_URL) {
+    process.stdout.write('Using explicit FOUNDRY_RELEASE_URL.\n');
+    return;
+  }
+
+  const foundryVersion = process.env.FOUNDRY_VERSION || getImageFoundryVersion(process.env.FOUNDRY_IMAGE);
+  if (!foundryVersion) {
+    process.stdout.write('Unable to determine Foundry version; clean starts may request a release URL.\n');
+    return;
+  }
+
+  const archiveName = `foundryvtt-${foundryVersion}.zip`;
+  const archivePath = join(CACHE_DIR, archiveName);
+  if (!existsSync(archivePath)) {
+    process.stdout.write(`No cached Foundry archive found for ${foundryVersion}; clean starts may request a release URL.\n`);
+    return;
+  }
+
+  process.env.FOUNDRY_RELEASE_URL = `file:///data/container_cache/${archiveName}`;
+  process.stdout.write(`Using cached Foundry archive ${archiveName}.\n`);
 }
 
 async function main() {
@@ -103,20 +188,44 @@ async function main() {
     process.stdout.write(`Using local Docker image ${process.env.FOUNDRY_IMAGE}.\n`);
   } else {
     process.stdout.write(`Pulling Docker image ${process.env.FOUNDRY_IMAGE}...\n`);
-    execSync('docker compose -f docker-compose.foundry.yml pull --quiet', {
-      cwd: ROOT,
-      stdio: 'inherit',
-      env: process.env
-    });
+    compose('pull --quiet');
   }
 
-  // Start containers in detached mode
-  process.stdout.write('Starting containers...\n');
-  execSync('docker compose -f docker-compose.foundry.yml up -d', {
-    cwd: ROOT,
-    stdio: 'inherit',
-    env: process.env
-  });
+  configureCachedReleaseUrl();
+
+  // Reuse the stopped container by default. The felddy image stores the
+  // extracted Foundry application in the container filesystem, so preserving
+  // the container avoids repeated release-service requests that can hit 429s.
+  let existingStatus = getContainerStatus();
+  const recreate = process.env.FOUNDRY_RECREATE === '1';
+  if (recreate && existingStatus) {
+    process.stdout.write('FOUNDRY_RECREATE=1 set; removing cached Foundry container...\n');
+    compose('down --remove-orphans');
+    existingStatus = null;
+  }
+
+  if (existingStatus) {
+    const desiredHostPort = process.env.FOUNDRY_HOST_PORT || '30000';
+    const cachedHostPort = getContainerHostPort();
+    if (cachedHostPort && cachedHostPort !== desiredHostPort) {
+      process.stdout.write(
+        `Cached Foundry container uses host port ${cachedHostPort}; recreating for ${desiredHostPort}.\n`
+      );
+      compose('down --remove-orphans');
+      existingStatus = null;
+    }
+  }
+
+  const cachedStatus = existingStatus;
+  if (cachedStatus === 'running') {
+    process.stdout.write(`Reusing running Foundry container ${CONTAINER_NAME}.\n`);
+  } else if (cachedStatus) {
+    process.stdout.write(`Starting cached Foundry container ${CONTAINER_NAME} (${cachedStatus}).\n`);
+    compose('start');
+  } else {
+    process.stdout.write('Creating Foundry container...\n');
+    compose('up -d');
+  }
 
   // Wait for health check (max 120 seconds)
   process.stdout.write('Waiting for Foundry to become healthy...\n');
@@ -125,7 +234,7 @@ async function main() {
     const result = spawnSync('docker', [
       'inspect',
       '--format', '{{.State.Health.Status}}',
-      'fabricate-foundry-test'
+      CONTAINER_NAME
     ], { encoding: 'utf8' });
 
     const status = (result.stdout ?? '').trim();
@@ -135,11 +244,7 @@ async function main() {
     }
     if (status === 'unhealthy') {
       process.stderr.write('Container reported unhealthy. Check logs:\n');
-      execSync('docker compose -f docker-compose.foundry.yml logs --tail 50', {
-        cwd: ROOT,
-        stdio: 'inherit',
-        env: process.env
-      });
+      compose('logs --tail 50');
       process.exit(1);
     }
 
@@ -149,11 +254,7 @@ async function main() {
   }
 
   process.stderr.write('Timeout waiting for Foundry to become healthy.\n');
-  execSync('docker compose -f docker-compose.foundry.yml logs --tail 50', {
-    cwd: ROOT,
-    stdio: 'inherit',
-    env: process.env
-  });
+  compose('logs --tail 50');
   process.exit(1);
 }
 

@@ -32,6 +32,7 @@ Check:
 
 - layout resilience in resizable Foundry windows
 - spacing, typography, and information hierarchy
+- compact navigation, headers, cards, and fact components with long names or localized strings
 - contrast, focus states, and keyboard accessibility
 - empty states, loading states, and error states
 - Svelte 5 rune usage and avoidable side effects
@@ -44,6 +45,7 @@ Check:
 ## Rules
 
 - Prefer Foundry-native patterns over novelty.
+- Keep product-specific UI contracts in `openspec/specs/ui-integration/spec.md` or active design docs; UX guidance should cite those contracts rather than rely on memory.
 - Be specific with file paths, selectors, viewport sizes, and screenshot names.
 - If browser tooling is unavailable, say so and rely on the Vite dev server plus code inspection first, then existing screenshots.
 - Name the screenshot file, viewport/window size, and concrete pass/fail criteria when giving screenshot feedback.

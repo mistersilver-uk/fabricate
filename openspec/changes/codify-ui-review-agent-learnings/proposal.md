@@ -12,9 +12,12 @@ The Gathering Environments card-grid iteration showed that agents can pass a UI 
 - Require representative visual fixtures for image-card UI, including linked scene imagery when scene-image behavior is in scope.
 - Make UX review a standard part of UI implementation sign-off.
 - Record screenshot artifacts, what they prove, and remaining gaps in OpenSpec task logs.
+- Keep product-specific UI rules in canonical specs and active design docs rather than expanding agent prompts with screen-by-screen behavior.
+- Capture Foundry/Playwright harness caveats as validation workflow guidance so agents distinguish infrastructure failures from app regressions.
 
 ## Non-Goals
 
 - No runtime application changes.
 - No new npm dependencies.
 - No changes to model settings or agent names.
+- No duplication of manager-v2 product contracts across every agent or skill prompt.

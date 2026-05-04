@@ -6,9 +6,15 @@
 - [x] Run lightweight validation for formatting/parsing.
 - [x] Record validation results.
 
+## Follow-up: Manager V2 Session Learnings
+
+- [x] Add concise agent guidance for spec-first UI decisions and Foundry harness caveats.
+- [x] Add matching shared skill guidance without copying product rules into every skill.
+- [x] Move manager-v2 behavioral contracts into canonical UI/design docs.
+- [x] Validate instruction/config formatting and whitespace.
+
 ## Validation
 
-- `python3 -c "... tomllib ..."` parsed all `.codex/agents/fabricate-*.toml` files successfully and confirmed skill metadata keys are present.
-- `git diff --check -- .codex/agents skills openspec/changes/codify-ui-review-agent-learnings` passed.
-- `rg` inspection confirmed the new guidance covers screenshot criteria, pointer hit-testing, generic Foundry state-class collisions, linked-image fixtures, and fallback-image gaps.
-- Validation commands were run with escalation because the sandbox wrapper failed before shell execution with `unexpected argument '--sandbox-policy'`; no production code or external network access was used.
+- `python3 - <<'PY' ... tomllib ... PY` parsed all `.codex/agents/fabricate-*.toml` files successfully.
+- `ruby -e 'require "yaml"; Dir["skills/*/agents/openai.yaml"].sort.each { |f| YAML.load_file(f) }'` parsed skill OpenAI metadata successfully.
+- `git diff --check -- .codex/agents skills openspec/changes/codify-ui-review-agent-learnings openspec/changes/fabricate-ui-design-system-manager-v2 openspec/specs/agentic-workflow/spec.md openspec/specs/ui-integration/spec.md` passed.

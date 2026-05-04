@@ -23,8 +23,9 @@ Keep this skill aligned with the `fabricate_reviewer` custom Codex agent.
 4. Check test quality and whether coverage matches the risk.
 5. Verify Foundry compatibility assumptions for touched APIs.
 6. For UI changes, verify screenshots are evaluated against acceptance criteria, not just generated.
-7. Run `npm test` and `npm run build` if validation is missing, stale, or suspicious.
-8. Return one gate status on the first line:
+7. Check durable product behavior is documented in canonical specs or active design docs, not only in tests, agent prompts, or conversation history.
+8. Run `npm test` and `npm run build` if validation is missing, stale, or suspicious.
+9. Return one gate status on the first line:
    - `APPROVED`
    - `NEEDS_CHANGES`
    - `BLOCKED`
@@ -43,7 +44,9 @@ Keep this skill aligned with the `fabricate_reviewer` custom Codex agent.
 - Validation passes without warnings that matter.
 - UI-only changes use Vite-first verification when available, with container-based validation reserved for runtime-sensitive or reproducibility-focused checks.
 - UI screenshot claims identify what the artifact proves: first view, clipping, spacing, alignment, image fidelity, scroll containment, visible controls, and relevant responsive sizes.
+- Compact rails, headers, cards, buttons, and fact components are tested with long names or localized strings where overflow could move controls or break layout.
 - Card, overlay, menu, disabled-state, and icon-button workflows have live pointer hit-test coverage when rendered hit targets could differ from DOM structure.
+- Foundry/Playwright infrastructure failures are separated from app regressions in the residual risk notes.
 - Foundry UI CSS avoids unscoped generic state classes such as `.disabled`, `.active`, and `.selected` where global styles could interfere.
 - Image UI tests or fixtures prove linked-image priority, or the remaining screenshot gap is explicitly called out.
 

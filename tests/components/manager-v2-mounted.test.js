@@ -487,6 +487,8 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(target.querySelectorAll('.manager-v2-table-head [role="columnheader"]').length, 4);
     assert.equal(target.querySelectorAll('.manager-v2-count-cluster').length, 0);
     assert.ok(target.querySelector('.manager-v2-breadcrumbs'));
+    assert.equal(target.querySelector('.manager-v2-header .manager-v2-heading > .manager-v2-kicker'), null);
+    assert.equal(target.textContent.includes('Systems View'), false);
     assert.equal(target.querySelector('.manager-v2-section-header .manager-v2-action-group'), null);
     assert.equal(target.textContent.includes('Quick actions'), false);
     assert.deepEqual(
@@ -497,6 +499,11 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Potion and essence work'));
     assert.ok(target.textContent.includes('4'));
     assert.ok(target.textContent.includes('2'));
+
+    const environmentFact = target.querySelector('[data-count-id="environments"]');
+    assert.equal(environmentFact.textContent.trim().replace(/\s+/g, ' '), '2 Gathering environments');
+    assert.equal(environmentFact.querySelector('.manager-v2-fact-leading')?.textContent.trim(), '2 Gathering');
+    assert.equal(environmentFact.querySelector('.manager-v2-fact-label')?.textContent.trim(), 'environments');
   });
 
   it('hides selected-system placeholder navigation until a system is selected', () => {
@@ -538,7 +545,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
 
     const environmentFact = target.querySelector('[data-count-id="environments"]');
     assert.equal(environmentFact.textContent.trim().replace(/\s+/g, ' '), 'Gathering environments Off');
-    assert.equal(environmentFact.querySelector('span')?.textContent.trim(), 'Gathering environments');
+    assert.equal(environmentFact.querySelector('.manager-v2-fact-label')?.textContent.trim(), 'Gathering environments');
     assert.equal(environmentFact.querySelector('strong.is-disabled')?.textContent.trim(), 'Off');
   });
 

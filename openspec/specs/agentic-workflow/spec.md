@@ -34,6 +34,22 @@ Shared reusable skills MUST live under the repository `skills/` directory.
 - **WHEN** a provider-specific skill root is needed
 - **THEN** it points back to the canonical `skills/` directory instead of carrying a divergent copy
 
+### Requirement: Product contracts stay in specs
+
+Agents and skills MUST keep durable product behavior in canonical specs or active OpenSpec design docs, not in role prompts.
+
+#### Scenario: UI learning becomes durable
+
+- **WHEN** an implementation or review uncovers a reusable product UI rule
+- **THEN** the agent updates the relevant `openspec/specs/*/spec.md` or active `openspec/changes/<change>/design.md`
+- **AND** role prompts or skills may add only concise workflow guidance that points agents to those documents
+
+#### Scenario: validation infrastructure fails
+
+- **WHEN** browser or Foundry validation fails before the relevant app surface loads
+- **THEN** the agent records the failure as validation infrastructure
+- **AND** the agent does not report it as an app regression unless a loaded app surface violates the relevant spec or acceptance criteria
+
 ### Requirement: Provider-specific skill metadata
 
 Skills SHOULD include provider-specific metadata under the skill directory when that provider benefits from explicit discovery hints.

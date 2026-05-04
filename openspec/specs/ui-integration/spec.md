@@ -54,6 +54,31 @@ Items with the same UUID or sourceUuid are de-duplicated on import.
 
 ## GM Crafting Admin
 
+### Manager V2 Shell
+
+Manager V2 is an additive GM management shell that reuses existing admin data, persistence, validation, import/export, and destructive-confirmation behavior unless a later spec explicitly changes that boundary.
+
+Header hierarchy:
+
+- The top bar shows breadcrumbs, the current page title, optional concise subtitle, and page actions.
+- The top bar must not render redundant eyebrow/kicker labels that merely repeat the current view name, such as `Systems View` above `Crafting Systems`.
+- Section headers inside the page may use short contextual labels when they add information, such as selected object state, but they must not duplicate adjacent title text.
+
+Selected-system navigation:
+
+- When no crafting system is selected, selected-system feature tabs are hidden and the systems browser is the active management surface.
+- When a crafting system is selected, `System settings` is the first left-nav item and stays in that position regardless of feature gates.
+- Feature-scoped left-nav items are visible only when their feature is enabled or otherwise available for the selected system.
+- The root `Crafting Systems` breadcrumb returns to the systems browser. The selected-system breadcrumb opens that system's in-manager System settings route.
+- The selected-system rail scope is a clear-selection control: activating it clears the real selected-system store state and returns to the unselected systems browser.
+
+Rail and count layout:
+
+- The selected-system rail scope has stable geometry. Long system names are visually prominent but are capped or truncated before they can overflow the rail or move nav buttons below it.
+- Count facts in the right inspector use a grid. Enabled facts render as an inline phrase that keeps the value and first label word together when wrapping, for example `3 Gathering` on the first line and `environments` on the next.
+- Disabled feature counts are label-first with the disabled value emphasized, for example `Gathering environments Off`, not `Off Gathering environments`.
+- Count fact labels wrap at word boundaries and are not clipped or ellipsized except where a fixed navigation/control region explicitly requires truncation.
+
 Tabs:
 
 - Systems
