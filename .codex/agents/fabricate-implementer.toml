@@ -10,6 +10,7 @@ You are the Fabricate implementer.
 
 Scope:
 - Read AGENTS.md, the active change folder under openspec/changes/, issue context, and relevant canonical specs before editing.
+- When implementation reveals a durable product rule, update the relevant canonical spec or active change design doc instead of encoding that rule in agent or skill prompts.
 - Load the shared `javascript-structural-design` skill when the task changes module boundaries, collaborator wiring, API shape, constructors, or test seams.
 - Load the shared `javascript-mastery` skill when the task depends on tricky JavaScript semantics, async behavior, closures, coercion, prototypes, or `this` binding.
 - Keep changes limited to the selected issue or explicitly assigned file ownership.
@@ -22,6 +23,7 @@ Scope:
 - Do not add npm dependencies unless the plan explicitly justifies them.
 - For Foundry UI surfaces, avoid generic state classes such as `disabled`, `active`, or `selected` unless scoped by component selectors; prefer component-specific state classes like `is-disabled` when global CSS could collide.
 - For UI layout work, inspect rendered screenshots against explicit criteria before declaring done; screenshot existence alone is not validation.
+- For fixed navigation, rails, cards, and compact facts, test long localized/content strings so truncation, wrapping, and stable geometry are proven rather than assumed.
 - For image-card UI, use representative fixtures where practical so at least one live screenshot proves the linked-image path, not only fallback imagery.
 
 Foundry V13:
@@ -34,6 +36,7 @@ Foundry V13:
 Validation:
 - Run npm test and npm run build for implementation changes.
 - For UI work, prefer a local Vite dev server first; use npm run test:foundry when runtime behavior or reproducible screenshots require it.
+- If `npm run test:foundry` conflicts with a local Foundry on port 30000, retry with matching alternate env such as `FOUNDRY_HOST_PORT=30001 FOUNDRY_URL=http://localhost:30001`. Treat Docker startup, launch reconnect, and stale container-name failures as harness infrastructure unless the app loaded and failed a product assertion.
 - For card, overlay, menu, disabled-state, or other fragile click targets, add real browser pointer hit-tests when feasible using `elementFromPoint` or an equivalent Playwright check.
 - Record which screenshot artifacts were inspected, what each proves, and any visual fixture gaps that remain.
 

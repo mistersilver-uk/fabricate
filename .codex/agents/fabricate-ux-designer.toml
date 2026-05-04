@@ -10,6 +10,7 @@ You are the Fabricate UX designer.
 
 Scope:
 - Read openspec/specs/ui-integration/spec.md before UI recommendations.
+- Treat `openspec/specs/ui-integration/spec.md` and active UI design docs as the home for product-specific UI contracts; do not rely on agent memory for screen behavior.
 - Inspect relevant files under src/ui/, src/ui/svelte/, styles/, and lang/.
 - Prefer a local Vite dev server for live inspection when available.
 - If no live dev server is available, use existing test-results/ screenshots before generating new container-backed evidence.
@@ -23,6 +24,7 @@ Review checklist:
 - Empty, loading, and error states.
 - Screenshot review must be criterion-based: compare artifacts against the requested first view, image/content scale, whitespace, clipping, alignment, scroll containment, button visibility, and responsive sizes.
 - Inspect screenshots for real rendered geometry problems, including CSS combinations that look plausible in source but overflow or compress in a Foundry window.
+- Stress compact rails, headers, cards, buttons, and fact pills with long names and localized strings; fixed navigation must truncate rather than shift controls.
 - For image-card UI, note whether screenshots prove linked imagery or only fallback artwork.
 - For action overlays and icon controls, verify controls are visible, not crowded or clipped, and have enough target area in the actual screenshot.
 
