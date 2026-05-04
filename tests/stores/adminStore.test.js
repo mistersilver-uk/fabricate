@@ -1560,7 +1560,7 @@ describe('createAdminStore', () => {
   // -------------------------------------------------------------------------
 
   describe('viewState data contracts', () => {
-    it('viewState.systems entries include id, name, description, and selected flag', async () => {
+    it('viewState.systems entries include manager-v2 summary fields', async () => {
       const services = createMockServices();
       const store = createAdminStore(services);
       await store.refresh();
@@ -1569,6 +1569,11 @@ describe('createAdminStore', () => {
         assert.ok('id' in sys, 'system entry should have id');
         assert.ok('name' in sys, 'system entry should have name');
         assert.ok('description' in sys, 'system entry should have description');
+        assert.ok('enabled' in sys, 'system entry should have enabled status');
+        assert.ok('resolutionMode' in sys, 'system entry should have resolution mode');
+        assert.ok('featureCount' in sys, 'system entry should have enabled feature count');
+        assert.ok('componentCount' in sys, 'system entry should have component count');
+        assert.ok('recipeCount' in sys, 'system entry should have recipe count');
         assert.ok('selected' in sys, 'system entry should have selected flag');
       }
     });
@@ -1597,7 +1602,7 @@ describe('createAdminStore', () => {
       const sys = vs.selectedSystem;
       assert.ok(sys !== null, 'selectedSystem should not be null');
       const requiredKeys = [
-        'id', 'name', 'description', 'advancedOptionsEnabled', 'features',
+        'id', 'name', 'description', 'enabled', 'advancedOptionsEnabled', 'features',
         'categories', 'itemTags', 'essenceDefinitions', 'managedItemOptions',
         'requirements', 'craftingCheck', 'recipeVisibility',
         'showRecipeVisibilityKnowledgeOptions', 'showRecipeVisibilityPlayerNote',
@@ -1715,10 +1720,175 @@ describe('createAdminStore', () => {
       const vs = get(store.viewState);
       assert.ok(vs.recipes.length > 0, 'should have at least one recipe');
       for (const recipe of vs.recipes) {
-        for (const field of ['id', 'name', 'img', 'category', 'enabled', 'locked', 'isSimple', 'visibilitySummary', 'ingredients', 'catalysts']) {
+        for (const field of [
+          'id', 'name', 'img', 'description', 'category', 'enabled', 'locked',
+          'isSimple', 'visibilitySummary', 'stepCount', 'resultGroupCount',
+          'ingredientCount', 'catalystCount', 'structureKey', 'structureLabel',
+          'requirementsPreview', 'ingredients', 'catalysts'
+        ]) {
           assert.ok(field in recipe, `recipe entry should have field: ${field}`);
         }
       }
+    });
+
+    it('viewState.recipes derives browser display counts from execution steps', async () => {
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      const multiStepRecipe = makeRecipe({
+        id: 'r-multi',
+        name: 'Layered Potion',
+        description: 'Brew in two phases.',
+        craftingSystemId: 'sys1',
+        ingredientSets: [],
+        resultGroups: [],
+        catalysts: [{ componentId: 'cauldron' }],
+        steps: [
+          {
+            id: 'step-mix',
+            name: 'Mix',
+            catalysts: [{ componentId: 'stirring-rod' }],
+            ingredientSets: [{
+              id: 'set-herbs',
+              ingredientGroups: [
+                { id: 'group-herb', options: [{ componentId: 'mint' }, { componentId: 'sage' }] },
+                { id: 'group-water', options: [{ componentId: 'water' }] }
+              ],
+              catalysts: [{ componentId: 'mortar' }]
+            }],
+            resultGroups: [{ id: 'mix-success' }, { id: 'mix-critical' }]
+          },
+          {
+            id: 'step-finish',
+            name: 'Finish',
+            ingredientSets: [{
+              id: 'set-finish',
+              ingredients: [{ componentId: 'ash' }, { componentId: 'salt' }],
+              catalysts: [{ componentId: 'filter' }, { componentId: 'vial' }]
+            }],
+            resultGroups: [{ id: 'finish-success' }]
+          }
+        ],
+        isSimpleRecipe: () => false,
+        getExecutionSteps() {
+          return this.steps;
+        }
+      });
+
+      services.getRecipeManager = () => ({
+        ...origManager,
+        getRecipes: (filter) => [multiStepRecipe]
+          .filter(r => !filter?.craftingSystemId || r.craftingSystemId === filter.craftingSystemId)
+      });
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const recipe = get(store.viewState).recipes.find(r => r.id === 'r-multi');
+      assert.ok(recipe, 'multi-step recipe should be present');
+      assert.equal(recipe.description, 'Brew in two phases.');
+      assert.equal(recipe.stepCount, 2);
+      assert.equal(recipe.resultGroupCount, 3);
+      assert.equal(recipe.ingredientCount, 5);
+      assert.equal(recipe.catalystCount, 6);
+      assert.equal(recipe.structureKey, 'multiStep');
+      assert.equal(recipe.structureLabel, 'Multi-step');
+      assert.equal(recipe.ingredients.length, 5, 'legacy ingredients array should track derived count');
+      assert.equal(recipe.catalysts.length, 6, 'legacy catalysts array should track derived count');
+      assert.deepEqual(recipe.requirementsPreview, [
+        {
+          id: 'step-mix',
+          name: 'Mix',
+          ingredientSetCount: 1,
+          ingredientCount: 3,
+          catalystCount: 3,
+          resultGroupCount: 2,
+          hasAlternatives: false,
+          ingredientSetSummaries: [{
+            id: 'set-herbs',
+            name: 'Set 1',
+            ingredientCount: 3,
+            catalystCount: 1
+          }]
+        },
+        {
+          id: 'step-finish',
+          name: 'Finish',
+          ingredientSetCount: 1,
+          ingredientCount: 2,
+          catalystCount: 3,
+          resultGroupCount: 1,
+          hasAlternatives: false,
+          ingredientSetSummaries: [{
+            id: 'set-finish',
+            name: 'Set 1',
+            ingredientCount: 2,
+            catalystCount: 2
+          }]
+        }
+      ]);
+    });
+
+    it('viewState.recipes falls back to recipe-level ingredientSets and preserves alternatives for requirementsPreview', async () => {
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      const fallbackRecipe = makeRecipe({
+        id: 'r-single',
+        name: 'Fallback Stew',
+        craftingSystemId: 'sys1',
+        ingredientSets: [{
+          id: 'set-main',
+          ingredientGroups: [
+            { id: 'group-main', options: [{ componentId: 'root' }, { componentId: 'mushroom' }] }
+          ],
+          catalysts: [{ componentId: 'pot' }]
+        }, {
+          id: 'set-alt',
+          ingredients: [{ componentId: 'fish' }, { componentId: 'salt' }, { componentId: 'herb' }],
+          catalysts: []
+        }],
+        resultGroups: [{ id: 'success' }, { id: 'bonus' }],
+        catalysts: [{ componentId: 'ladle' }]
+      });
+
+      services.getRecipeManager = () => ({
+        ...origManager,
+        getRecipes: (filter) => [fallbackRecipe]
+          .filter(r => !filter?.craftingSystemId || r.craftingSystemId === filter.craftingSystemId)
+      });
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const recipe = get(store.viewState).recipes.find(r => r.id === 'r-single');
+      assert.ok(recipe, 'fallback recipe should be present');
+      assert.equal(recipe.stepCount, 1);
+      assert.equal(recipe.resultGroupCount, 2);
+      assert.equal(recipe.ingredientCount, 3);
+      assert.equal(recipe.catalystCount, 2);
+      assert.equal(recipe.structureKey, 'simple');
+      assert.deepEqual(recipe.requirementsPreview, [{
+        id: 'implicit-step',
+        name: 'Step 1',
+        ingredientSetCount: 2,
+        ingredientCount: 3,
+        catalystCount: 2,
+        resultGroupCount: 2,
+        hasAlternatives: true,
+        ingredientSetSummaries: [
+          {
+            id: 'set-main',
+            name: 'Set 1',
+            ingredientCount: 2,
+            catalystCount: 1
+          },
+          {
+            id: 'set-alt',
+            name: 'Set 2',
+            ingredientCount: 3,
+            catalystCount: 0
+          }
+        ]
+      }]);
     });
 
     it('viewState.recipeCategories groups recipes by category with counts', async () => {

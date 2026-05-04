@@ -101,6 +101,94 @@ function _visibilitySummary(recipe) {
   return `Restricted (${allowed.length})`;
 }
 
+function _ingredientCountForSet(ingredientSet) {
+  const groups = Array.isArray(ingredientSet?.ingredientGroups) && ingredientSet.ingredientGroups.length > 0
+    ? ingredientSet.ingredientGroups
+    : (ingredientSet?.ingredients || []).map(ingredient => ({ options: [ingredient] }));
+  return groups.reduce((sum, group) => sum + ((group.options || []).length || 0), 0);
+}
+
+function _getRecipeExecutionSteps(recipe) {
+  const methodSteps = typeof recipe?.getExecutionSteps === 'function'
+    ? recipe.getExecutionSteps()
+    : null;
+  if (Array.isArray(methodSteps) && methodSteps.length > 0) return methodSteps;
+  if (Array.isArray(recipe?.steps) && recipe.steps.length > 0) return recipe.steps;
+
+  return [{
+    id: 'implicit-step',
+    name: 'Step 1',
+    ingredientSets: Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : [],
+    resultGroups: Array.isArray(recipe?.resultGroups) ? recipe.resultGroups : [],
+    catalysts: Array.isArray(recipe?.catalysts) ? recipe.catalysts : []
+  }];
+}
+
+function _usesExplicitRecipeSteps(recipe, executionSteps) {
+  return (Array.isArray(recipe?.steps) && recipe.steps.length > 0) || executionSteps.length > 1;
+}
+
+function _buildRequirementPreviewStep(step, index, sharedRecipeCatalysts = []) {
+  const ingredientSets = Array.isArray(step?.ingredientSets) ? step.ingredientSets : [];
+  const ingredientSetSummaries = ingredientSets.map((set, setIndex) => ({
+    id: set?.id || `set-${setIndex + 1}`,
+    name: set?.name || `Set ${setIndex + 1}`,
+    ingredientCount: _ingredientCountForSet(set),
+    catalystCount: Array.isArray(set?.catalysts) ? set.catalysts.length : 0
+  }));
+  const stepCatalystCount = Array.isArray(step?.catalysts) ? step.catalysts.length : 0;
+  const previewIngredientCount = ingredientSetSummaries.length > 0
+    ? Math.max(...ingredientSetSummaries.map(set => set.ingredientCount))
+    : 0;
+  const previewSetCatalystCount = ingredientSetSummaries.length > 0
+    ? Math.max(...ingredientSetSummaries.map(set => set.catalystCount))
+    : 0;
+
+  return {
+    id: step?.id || `step-${index + 1}`,
+    name: step?.name || `Step ${index + 1}`,
+    ingredientSetCount: ingredientSets.length,
+    ingredientCount: previewIngredientCount,
+    catalystCount: sharedRecipeCatalysts.length + stepCatalystCount + previewSetCatalystCount,
+    resultGroupCount: Array.isArray(step?.resultGroups) ? step.resultGroups.length : 0,
+    hasAlternatives: ingredientSetSummaries.length > 1,
+    ingredientSetSummaries
+  };
+}
+
+function _recipeStructure(isSimple, stepCount) {
+  if (stepCount > 1) {
+    return { structureKey: 'multiStep', structureLabel: 'Multi-step' };
+  }
+  if (isSimple) {
+    return { structureKey: 'simple', structureLabel: 'Simple' };
+  }
+  return { structureKey: 'singleStep', structureLabel: 'Single step' };
+}
+
+function _buildRecipeBrowserDisplay(recipe) {
+  const executionSteps = _getRecipeExecutionSteps(recipe);
+  const isSimple = typeof recipe.isSimpleRecipe === 'function' ? recipe.isSimpleRecipe() : true;
+  const sharedRecipeCatalysts = _usesExplicitRecipeSteps(recipe, executionSteps) && Array.isArray(recipe?.catalysts)
+    ? recipe.catalysts
+    : [];
+  const requirementsPreview = executionSteps.map((step, index) =>
+    _buildRequirementPreviewStep(step, index, sharedRecipeCatalysts)
+  );
+  const structure = _recipeStructure(isSimple, requirementsPreview.length);
+
+  return {
+    description: String(recipe.description || '').trim(),
+    stepCount: requirementsPreview.length,
+    resultGroupCount: requirementsPreview.reduce((sum, step) => sum + step.resultGroupCount, 0),
+    ingredientCount: requirementsPreview.reduce((sum, step) => sum + step.ingredientCount, 0),
+    catalystCount: requirementsPreview.reduce((sum, step) => sum + step.catalystCount, 0),
+    ...structure,
+    requirementsPreview,
+    isSimple
+  };
+}
+
 function _getManagedItems(system) {
   if (Array.isArray(system?.components)) return system.components;
   if (Array.isArray(system?.items)) return system.items;
@@ -568,24 +656,26 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const prepared = recipes.map(recipe => {
-    const ingredientCount = (recipe.ingredientSets || []).reduce((sum, set) => {
-      const groupCount = Array.isArray(set.ingredientGroups) && set.ingredientGroups.length > 0
-        ? set.ingredientGroups.reduce((gs, group) => gs + ((group.options || []).length || 0), 0)
-        : (set.ingredients || []).length;
-      return sum + groupCount;
-    }, 0);
-    const catalystCount = (recipe.ingredientSets || []).reduce((sum, set) => sum + (set.catalysts?.length || 0), 0);
+    const display = _buildRecipeBrowserDisplay(recipe);
     return {
       id: recipe.id,
       name: recipe.name,
       img: recipe.img,
+      description: display.description,
       category: normalizeRecipeCategory(recipe.category),
       visibilitySummary: _visibilitySummary(recipe),
       locked: recipe.locked === true,
-      enabled: recipe.enabled,
-      isSimple: typeof recipe.isSimpleRecipe === 'function' ? recipe.isSimpleRecipe() : true,
-      ingredients: new Array(ingredientCount),
-      catalysts: new Array(catalystCount)
+      enabled: recipe.enabled !== false,
+      isSimple: display.isSimple,
+      stepCount: display.stepCount,
+      resultGroupCount: display.resultGroupCount,
+      ingredientCount: display.ingredientCount,
+      catalystCount: display.catalystCount,
+      structureKey: display.structureKey,
+      structureLabel: display.structureLabel,
+      requirementsPreview: display.requirementsPreview,
+      ingredients: new Array(display.ingredientCount),
+      catalysts: new Array(display.catalystCount)
     };
   });
 
@@ -647,6 +737,7 @@ function _buildSelectedSystemViewData(
     id: selectedSystem.id,
     name: selectedSystem.name,
     description: selectedSystem.description,
+    enabled: selectedSystem.enabled !== false,
     resolutionMode: selectedSystem.resolutionMode || 'simple',
     advancedOptionsEnabled: advancedEnabled,
 
@@ -1031,6 +1122,11 @@ export function createAdminStore(services) {
       id: s.id,
       name: s.name,
       description: s.description,
+      enabled: s.enabled !== false,
+      resolutionMode: s.resolutionMode || 'simple',
+      featureCount: Object.values(s.features || {}).filter(value => value === true).length,
+      componentCount: _getManagedItems(s).length,
+      recipeCount: recipeManager.getRecipes({ craftingSystemId: s.id }).length,
       selected: s.id === currentSystemId
     }));
 

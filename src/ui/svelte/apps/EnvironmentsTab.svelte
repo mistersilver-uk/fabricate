@@ -63,7 +63,9 @@
     onUpdateProgressive,
     onUpdateCheck,
     onUpdateTimeRequirement,
-    onUpdateFailureOutcome
+    onUpdateFailureOutcome,
+    forceEditorOpen = false,
+    onRequestEnvironmentBrowse
   } = $props();
 
   const timeUnits = [
@@ -75,9 +77,10 @@
   ];
 
   let localSelectedTaskId = $state('');
-  let editorOpen = $state(false);
+  let localEditorOpen = $state(false);
 
   const tasks = $derived(Array.isArray(environmentDraft?.tasks) ? environmentDraft.tasks : []);
+  const editorOpen = $derived(forceEditorOpen === true || localEditorOpen);
   const backToGridLabel = $derived(localize('FABRICATE.Admin.Environments.BackToEnvironmentGrid') || 'Back to environments');
   const activeTaskId = $derived(selectedTaskId || localSelectedTaskId);
   const activeTask = $derived(tasks.find(task => task.id === activeTaskId) || null);
@@ -148,7 +151,7 @@
       return;
     }
     if (lastEnvironmentDraftSystemId && nextSystemId && nextSystemId !== lastEnvironmentDraftSystemId) {
-      editorOpen = false;
+      localEditorOpen = false;
     }
     lastEnvironmentDraftSystemId = nextSystemId;
   });
@@ -187,12 +190,12 @@
     const draft = onCreateEnvironment?.();
     if (draft && typeof draft.then === 'function') {
       draft.then(result => {
-        if (result !== null && result !== false) editorOpen = true;
+        if (result !== null && result !== false) localEditorOpen = true;
       });
       return;
     }
     if (draft !== null && draft !== false) {
-      editorOpen = true;
+      localEditorOpen = true;
     }
   }
 
@@ -201,17 +204,21 @@
     const selected = onSelectEnvironment?.(environmentId);
     if (selected && typeof selected.then === 'function') {
       selected.then(result => {
-        if (result !== false) editorOpen = true;
+        if (result !== false) localEditorOpen = true;
       });
       return;
     }
     if (selected !== false) {
-      editorOpen = true;
+      localEditorOpen = true;
     }
   }
 
   function showEnvironmentGrid() {
-    editorOpen = false;
+    if (forceEditorOpen === true) {
+      onRequestEnvironmentBrowse?.();
+      return;
+    }
+    localEditorOpen = false;
   }
 
   function taskResultCount(task) {

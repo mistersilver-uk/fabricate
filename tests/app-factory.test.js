@@ -18,10 +18,12 @@ globalThis.game = { settings: { get: () => undefined } };
 const {
   getCraftingAppClass,
   getGatheringAppClass,
+  getCraftingSystemManagerV2AppClass,
   getRecipeManagerAppClass,
   getRecipeEditorAppClass,
   registerSvelteCraftingApp,
   registerSvelteGatheringApp,
+  registerCraftingSystemManagerV2App,
   registerSvelteRecipeManagerApp,
   registerSvelteRecipeEditorApp
 } = await import('../src/ui/appFactory.js');
@@ -52,6 +54,20 @@ test('getGatheringAppClass returns registered Svelte class', () => {
   registerSvelteGatheringApp(MockSvelteGatheringApp);
   assert.equal(getGatheringAppClass(), MockSvelteGatheringApp);
   registerSvelteGatheringApp(null);
+});
+
+// --- getCraftingSystemManagerV2AppClass ---
+
+test('getCraftingSystemManagerV2AppClass throws when no v2 manager class registered', () => {
+  registerCraftingSystemManagerV2App(null);
+  assert.throws(() => getCraftingSystemManagerV2AppClass(), /CraftingSystemManagerV2App not registered/);
+});
+
+test('getCraftingSystemManagerV2AppClass returns registered v2 manager class', () => {
+  class MockCraftingSystemManagerV2App {}
+  registerCraftingSystemManagerV2App(MockCraftingSystemManagerV2App);
+  assert.equal(getCraftingSystemManagerV2AppClass(), MockCraftingSystemManagerV2App);
+  registerCraftingSystemManagerV2App(null);
 });
 
 // --- getRecipeManagerAppClass ---

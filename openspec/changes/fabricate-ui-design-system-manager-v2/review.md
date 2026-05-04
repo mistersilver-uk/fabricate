@@ -113,6 +113,35 @@ After review, the docs were adjusted to make these points explicit:
 - The design system applies to all Fabricate apps without forcing player apps into GM management chrome.
 - Existing apps may migrate incrementally, but future UI work must move toward this system.
 
+## Implementation Plan Review
+
+The first implementation slice should be deliberately narrower than the full delta. The reviewed plan is approved for implementation when it creates a parallel `CraftingSystemManagerV2` shell with a real Systems view, then changes the GM Items Directory `Manage Crafting Systems` button to open v2. This delivers the strongest parts of the conceptual systems-manager reference: dark product shell, left rail, table-first central work area, selected-row emphasis, right inspector, compact toolbar, and clear create/import/export/delete actions.
+
+Plan feedback:
+
+- Keep the current `SvelteRecipeManagerApp` registered and available. The item-directory button may open v2 once the basic shell exists, but the old app must not be deleted or behavior-replaced internally.
+- Reuse `createAdminStore()` and the existing service callbacks as the implementation contract. Store additions, if any, should be read-only derived display data only.
+- For the first slice, show real existing data only: system name, description, enabled state, resolution mode, feature flags, component count, recipe count, gathering environment count, and supported actions.
+- Defer components, essences, tags/categories, recipe editor, graph, and environment editor v2 screens. Placeholders may exist in the left rail, but they must not imply unsupported new behavior.
+- Keep presentational Svelte components free of direct Foundry globals. Foundry access belongs in the ApplicationV2 wrapper services.
+- Use scoped manager-v2 selectors and shared `--fab-*` tokens so the palette can migrate across apps without destabilizing current admin styles.
+- Do not add npm dependencies.
+
+Domain caveats captured during review:
+
+- Do not invent version, timestamps, biome, size, source-state metadata, recipe tags, required stations, skill requirements, output quality, byproducts, or recipe-local resolution mode.
+- Do not add recipe `dnd5e`/`pf2e` crafting-check provider UI in this implementation; the canonical recipe check contract is macro-oriented today.
+- Do not implement essence source-item editing until current runtime/source-link semantics are reconciled with the delta.
+- Treat `mapped` and `tiered` as legacy compatibility labels if encountered, while new v2 copy should move toward canonical `routed` language.
+
+First-slice acceptance should prove structure and usability rather than pixel copying:
+
+- normal-width shell has left rail, systems table, selected row, right inspector, compact header, search/filter toolbar, and action group
+- empty state is compact and actionable
+- long names/descriptions do not overlap row actions or inspector controls
+- narrow container rules avoid horizontal overflow and keep primary actions reachable
+- row selection, search, create, import, export, delete, and inspector quick actions are keyboard and pointer reachable where implemented
+
 ## Pass 2 Recipe Findings
 
 ### Recipe Browser
@@ -407,3 +436,48 @@ Spec additions:
 ## Final Iteration Outcome
 
 No further design-system gaps are blocking at the specification level. Implementation should proceed only after this OpenSpec change is accepted.
+
+## Implementation Plan Review: Recipes Browser Slice
+
+The second implementation slice is approved as a browser-only `Recipes` view inside `CraftingSystemManagerV2`.
+
+Plan feedback:
+
+- Promote `Recipes` from a disabled placeholder to a real route only after a crafting system is selected.
+- Keep create and edit routed through the existing recipe editor and service callbacks; this slice must not implement inline editing or the manager-v2 recipe editor shell.
+- Use existing recipe actions from the admin store for create, import, export, duplicate, delete, and enabled toggle so persistence, cleanup, and validation ownership stay centralized.
+- Add only derived display data to `adminStore` where needed for the browser: description, counts, structure labels, and requirements preview. Do not add a second recipe behavior path.
+- Keep the table compact at `1200x790`: recipe identity, category when backed by the selected system, structure, status, requirements, and actions.
+- Omit unsupported conceptual fields from the reference image until backed by data contracts: station, minimum skill, output quality, byproduct, XP, rarity, owner, recipe-local resolution mode, and invented timestamps.
+
+Domain caveats captured during review:
+
+- Recipe rows must remain scoped to the selected crafting system.
+- Requirements preview must respect explicit multi-step recipes. Use execution-step semantics when available, not only top-level `ingredientSets`.
+- `locked` is not hidden; keep locked/unlocked distinct from enabled/disabled and visibility.
+- Do not apply player-facing alchemy discovered-recipe rules to the GM manager browser.
+- Do not show knowledge-mode visibility summaries unless a later derived-view-state task adds canonical support.
+
+Screenshot and pointer acceptance:
+
+- Capture `manager-v2-recipes-normal` at `1200x790` with the Recipes nav active, at least two recipe rows, a selected recipe row, and a populated inspector.
+- Capture `manager-v2-recipes-stacked` at `1000x700` proving rail, main list, and inspector stack without horizontal overflow or clipped action controls.
+- Prove at least one data-backed recipe image where the smoke fixture provides one.
+- Pointer hit tests must cover Recipes nav, search, status/category filters, row selection, enabled toggle, create, import, export, edit, duplicate, and delete targets.
+
+## Implementation Plan Review: Systems Browser Corrective Slice
+
+The systems browser needs a corrective pass before broader manager-v2 rollout continues.
+
+Plan feedback:
+
+- Add breadcrumbs as a first-class navigation element, not as decorative header text. The root breadcrumb should return to the systems browser, and selected-system breadcrumbs should make the current system scope visible.
+- Remove `Systems` from the left feature rail. Systems browser navigation belongs to the selected system scope control and the root breadcrumb.
+- Keep the systems list as a browser surface. It should show identity, resolution/status, and row actions; counts belong in the right inspector to avoid duplicate information density.
+- Add an Edit row action for systems, but route it through the existing system editor behavior until a manager-v2 system editor is separately planned.
+- Preserve accessible focus-visible state while removing the unwanted orange host focus ring on system-name clicks.
+
+Screenshot and pointer acceptance:
+
+- Normal-width systems screenshot must show breadcrumbs, no `Systems` left-rail tab, contained system names/descriptions/badges, no duplicate row counts, and a tidy inspector header.
+- Pointer hit tests must cover root breadcrumb, selected-system scope click, system row selection, system Edit, Export, Delete, and the existing recipe navigation.

@@ -70,6 +70,12 @@ Color consistency is a specific risk. Fabricate UI apps should not accumulate on
 - Keep the first manager-v2 implementation mostly UI-only and store-compatible.
 - Make the design system apply to all Fabricate Svelte applications: GM admin, recipe editor, player crafting app, player gathering app, and supporting pickers/dialogs.
 - Define review gates that compare screenshots against the design intent, not only against DOM presence.
+- Correct first-slice manager-v2 systems-view layout defects found in screenshot review: row text containment, selected-summary hierarchy, inspector readability, duplicate actions, and feature-tab visibility before later manager-v2 views are implemented.
+- Continue manager-v2 implementation with a browser-only recipes slice that delivers the recipe table, selected-recipe inspector, search/filter controls, and existing recipe actions without introducing the full v2 recipe editor.
+- Continue manager-v2 implementation with a system edit slice that keeps the user inside manager-v2 when the system Edit button is clicked and exposes the base system settings: name, description, resolution mode, advanced-option visibility, and optional feature toggles.
+- Continue manager-v2 implementation with a Components page that delivers the component directory table, drop-to-add import affordance, search/filter controls, selected-component inspector, source/usage evidence, and existing component actions without introducing new component persistence paths.
+- Continue manager-v2 implementation with an Environments browse/edit slice that delivers the gathering environments page and in-v2 environment edit route by reusing the existing environment store/draft actions, validation, dirty protection, and save/cancel flow.
+- Correct the manager-v2 environment edit route so it follows the updated `Edit Gathering Environment` reference instead of embedding the legacy `EnvironmentsTab` form stack. The corrective slice keeps existing gathering semantics, but replaces the editor presentation with a purpose-built v2 task-authoring layout: compact environment details, scene card, task list, tabbed task editor, validation/evidence column, and top-level save/cancel actions.
 
 ## Non-Goals
 
@@ -121,4 +127,9 @@ Future implementation is expected to touch:
 - The essences requirements reflect the later essence direction image while preserving EssenceDefinition, source item, and component-usage semantics.
 - The tags/categories requirements reflect the later system-level direction image while preserving Fabricate item-tag, flat recipe-category, reserved `General`, and single-category recipe semantics.
 - The recipe resolution and visibility tab requirements reflect their later direction images while preserving system-owned mode context and recipe/domain-specific behavior.
+- The first-slice systems view keeps actions in one clear header location, avoids duplicate quick-action panels, hides future feature/admin tabs until a system is selected, and preserves readable row and inspector text at normal Foundry window sizes.
+- The second-slice recipes browser preserves selected-system scoping, uses existing recipe manager behavior for all actions, shows only data-backed recipe fields, and proves selected-row, inspector, requirements-preview, filter, action, and responsive behavior in tests and Foundry smoke screenshots.
+- The manager-v2 system Edit action transitions to an in-v2 edit view instead of opening the current admin, reusing existing admin-store persistence methods for system details, destructive resolution-mode confirmation, advanced-options state, and optional feature toggles.
+- The manager-v2 Components page preserves selected-system scoping, uses existing admin-store item-card data and existing component import/edit/delete/source-replacement behavior, shows only data-backed component fields, and proves drop zone, filters, selected-row, inspector, source state, usage evidence, action, and responsive behavior in tests and Foundry smoke screenshots.
+- The manager-v2 Environments page preserves selected-system scoping and gathering feature gating, uses existing admin-store environment list/draft/action contracts as the only persistence path, shows only gathering-environment data backed by the current store, and proves browse, edit, validation, linked scene imagery, pointer targets, and responsive behavior in Playwright smoke screenshots.
 - Formatting validation passes for the new OpenSpec change files.

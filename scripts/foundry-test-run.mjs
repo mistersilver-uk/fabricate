@@ -586,6 +586,240 @@ async function setRecipeManagerWindowSize(page, { width, height }) {
 }
 
 /**
+ * Resize the rendered Crafting System Manager V2 application frame for
+ * responsive screenshots and hit testing.
+ * @param {import('playwright').Page} page
+ * @param {{ width: number, height: number }} size
+ */
+async function setManagerV2WindowSize(page, { width, height }) {
+  await page.setViewportSize({
+    width: Math.max(1366, width + 80),
+    height: Math.max(768, height + 80)
+  });
+  await page.evaluate(({ width, height }) => {
+    const manager = document.querySelector('.fabricate-manager-v2');
+    const app = manager?.closest('.application, .app') || document.querySelector('#fabricate-crafting-system-manager-v2');
+    if (!app) return null;
+    Object.assign(app.style, {
+      width: `${width}px`,
+      height: `${height}px`,
+      left: '20px',
+      top: '20px'
+    });
+    return {
+      width: app.getBoundingClientRect().width,
+      height: app.getBoundingClientRect().height
+    };
+  }, { width, height });
+  await page.waitForTimeout(500);
+}
+
+/**
+ * Assert manager-v2 table rows and summary regions do not horizontally overflow.
+ * @param {import('playwright').Page} page
+ * @param {string} label
+ */
+async function assertManagerV2LayoutStable(page, label) {
+  const metrics = await page.evaluate(() => {
+    const selectors = [
+      '.fabricate-manager-v2',
+      '.manager-v2-main',
+      '.manager-v2-table-scroll',
+      '.manager-v2-system-row',
+      '.manager-v2-system-identity',
+      '.manager-v2-recipes-table',
+      '.manager-v2-recipe-row',
+      '.manager-v2-recipe-identity',
+      '.manager-v2-environments-table',
+      '.manager-v2-environment-row',
+      '.manager-v2-environment-identity',
+      '.manager-v2-environment-editor-shell',
+      '.manager-v2-inspector-card',
+      '.manager-v2-system-edit-form',
+      '.manager-v2-edit-card',
+      '.manager-v2-toggle-row',
+      '.environment-draft-editor',
+      '.manager-v2-environment-edit-view',
+      '.manager-v2-environment-workspace',
+      '.environment-fields',
+      '.environment-task-layout',
+      '.manager-v2-fact'
+    ];
+    return selectors.flatMap(selector => Array.from(document.querySelectorAll(selector)).map((element, index) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        selector,
+        index,
+        width: rect.width,
+        height: rect.height,
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+        text: element.textContent?.replace(/\s+/g, ' ').trim().slice(0, 80) || ''
+      };
+    }));
+  });
+
+  const overflowing = metrics.filter(metric => metric.scrollWidth > metric.clientWidth + 2);
+  if (overflowing.length > 0) {
+    throw new Error(`Manager V2 horizontal overflow at ${label}: ${JSON.stringify(overflowing.slice(0, 5))}`);
+  }
+
+  const rowCount = metrics.filter(metric =>
+    metric.selector === '.manager-v2-system-row'
+      || metric.selector === '.manager-v2-recipe-row'
+      || metric.selector === '.manager-v2-environment-row'
+  ).length;
+  const editFormCount = metrics.filter(metric =>
+    metric.selector === '.manager-v2-system-edit-form'
+      || metric.selector === '.manager-v2-environment-editor-shell'
+      || metric.selector === '.manager-v2-environment-edit-view'
+      || metric.selector === '.environment-draft-editor'
+  ).length;
+  if (rowCount === 0 && editFormCount === 0) {
+    throw new Error(`Manager V2 rendered no table rows at ${label}`);
+  }
+}
+
+/**
+ * Exercise manager-v2 pointer targets without triggering destructive actions.
+ * @param {import('playwright').Page} page
+ */
+async function exerciseManagerV2PointerTargets(page) {
+  const search = page.locator('.fabricate-manager-v2 input[type="search"]').first();
+  await search.fill('forge');
+  await page.waitForTimeout(250);
+  await search.fill('');
+  await page.waitForTimeout(250);
+
+  await page.locator('.fabricate-manager-v2 .manager-v2-filter select').first().selectOption('active');
+  await page.waitForTimeout(250);
+  await page.locator('.fabricate-manager-v2 .manager-v2-filter select').first().selectOption('all');
+
+  await page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist") .manager-v2-system-identity').first().click();
+  await page.locator('.fabricate-manager-v2 .manager-v2-nav-button:has-text("Recipes")').first().click();
+  await page.locator('.fabricate-manager-v2 .manager-v2-breadcrumbs button:has-text("The Herbalist")').first().click({ trial: true });
+  await page.locator('.fabricate-manager-v2 .manager-v2-breadcrumbs button:has-text("Crafting Systems")').first().click();
+  await page.locator('.fabricate-manager-v2 .manager-v2-scope-button').first().click({ trial: true });
+  await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Import")').first().click({ trial: true });
+  await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Open current admin")').first().click({ trial: true });
+  await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Export")').first().click({ trial: true });
+  await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Create")').first().click({ trial: true });
+  const rowActionButtons = page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist") .manager-v2-icon-button');
+  for (let index = 0; index < await rowActionButtons.count(); index += 1) {
+    await rowActionButtons.nth(index).click({ trial: true });
+  }
+}
+
+/**
+ * Exercise manager-v2 system edit controls without saving destructive changes.
+ * @param {import('playwright').Page} page
+ */
+async function exerciseManagerV2SystemEditPointerTargets(page) {
+  if (await page.locator('.fabricate-manager-v2 #manager-v2-system-name').count() === 0) {
+    let editButton = page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist") .manager-v2-icon-button').nth(0);
+    if (await editButton.count() === 0) {
+      const systemsBreadcrumb = page.locator('.fabricate-manager-v2 .manager-v2-breadcrumbs button:has-text("Crafting Systems")').first();
+      if (await systemsBreadcrumb.count() > 0) {
+        await systemsBreadcrumb.click();
+        await page.waitForTimeout(500);
+      }
+      const search = page.locator('.fabricate-manager-v2 input[type="search"]').first();
+      if (await search.count() > 0) {
+        await search.fill('');
+        await page.waitForTimeout(250);
+      }
+      await page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist")').first().waitFor({ state: 'visible', timeout: 5_000 });
+      editButton = page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist") .manager-v2-icon-button').nth(0);
+    }
+    await editButton.click();
+  }
+  await page.locator('.fabricate-manager-v2[data-manager-v2-view="system-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+  await page.locator('.fabricate-manager-v2 #manager-v2-system-name').first().fill('The Herbalist');
+  await page.locator('.fabricate-manager-v2 #manager-v2-system-description').first().fill('A field alchemy system for gathering herbs and brewing reliable remedies.');
+  await page.locator('.fabricate-manager-v2 #manager-v2-system-resolution-mode').first().selectOption('mapped');
+  await page.locator('.dialog button:has-text("No")').first().click();
+  await page.locator('.fabricate-manager-v2 [data-edit-control="advanced-options"] input').first().click({ trial: true });
+  await page.locator('.fabricate-manager-v2 [data-feature-key="gathering"] input').first().click({ trial: true });
+  await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Open current admin")').first().click({ trial: true });
+  await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Back to systems")').first().click({ trial: true });
+}
+
+/**
+ * Exercise manager-v2 recipe browser pointer targets without mutating recipes.
+ * @param {import('playwright').Page} page
+ */
+async function exerciseManagerV2RecipePointerTargets(page) {
+  await page.locator('.fabricate-manager-v2 .manager-v2-nav-button:has-text("Recipes")').first().click();
+  await page.locator('.fabricate-manager-v2 .manager-v2-recipe-row').first().waitFor({ state: 'visible', timeout: 5_000 });
+
+  const search = page.locator('.fabricate-manager-v2 input[aria-label="Search recipes"]').first();
+  await search.fill('Brew');
+  await page.waitForTimeout(250);
+  await search.fill('');
+  await page.waitForTimeout(250);
+
+  await page.locator('.fabricate-manager-v2 select[aria-label="Filter recipes by status"]').first().selectOption('active');
+  await page.waitForTimeout(250);
+  await page.locator('.fabricate-manager-v2 select[aria-label="Filter recipes by status"]').first().selectOption('all');
+
+  const categoryFilter = page.locator('.fabricate-manager-v2 select[aria-label="Filter recipes by category"]').first();
+  if (await categoryFilter.count() > 0) {
+    await categoryFilter.selectOption({ index: 1 });
+    await page.waitForTimeout(250);
+    await categoryFilter.selectOption('all');
+  }
+
+  const brewRow = page.locator('.fabricate-manager-v2 .manager-v2-recipe-row:has-text("Brew Healing Potion")').first();
+  await brewRow.locator('.manager-v2-recipe-identity').click();
+  await brewRow.locator('.manager-v2-toggle input').click({ trial: true });
+  await brewRow.locator('.manager-v2-icon-button').nth(0).click({ trial: true });
+  await brewRow.locator('.manager-v2-icon-button').nth(1).click({ trial: true });
+  await brewRow.locator('.manager-v2-icon-button').nth(2).click({ trial: true });
+
+  await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Import")').first().click({ trial: true });
+  await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Export")').first().click({ trial: true });
+  await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Create Recipe")').first().click({ trial: true });
+}
+
+/**
+ * Exercise manager-v2 environment browser pointer targets without mutating
+ * environments.
+ * @param {import('playwright').Page} page
+ */
+async function exerciseManagerV2EnvironmentPointerTargets(page) {
+  await page.locator('.fabricate-manager-v2 .manager-v2-nav-button:has-text("Environments")').first().click();
+  await page.locator('.fabricate-manager-v2 .manager-v2-environment-row').first().waitFor({ state: 'visible', timeout: 5_000 });
+
+  const search = page.locator('.fabricate-manager-v2 input[aria-label="Search environments"]').first();
+  await search.fill('Azure');
+  await page.waitForTimeout(250);
+  await search.fill('');
+  await page.waitForTimeout(250);
+
+  await page.locator('.fabricate-manager-v2 select[aria-label="Filter environments by status"]').first().selectOption('active');
+  await page.waitForTimeout(250);
+  await page.locator('.fabricate-manager-v2 select[aria-label="Filter environments by status"]').first().selectOption('all');
+  await page.locator('.fabricate-manager-v2 select[aria-label="Filter environments by selection mode"]').first().selectOption('targeted');
+  await page.waitForTimeout(250);
+  await page.locator('.fabricate-manager-v2 select[aria-label="Filter environments by selection mode"]').first().selectOption('all');
+
+  const azureRow = page.locator('.fabricate-manager-v2 .manager-v2-environment-row:has-text("Azure Grove")').first();
+  await azureRow.locator('.manager-v2-environment-identity').click();
+  await azureRow.locator('.manager-v2-toggle input').click({ trial: true });
+  await azureRow.locator('.manager-v2-icon-button').nth(0).click({ trial: true });
+  const moveUp = azureRow.locator('.manager-v2-icon-button').nth(1);
+  if (await moveUp.isEnabled()) await moveUp.click({ trial: true });
+  const moveDown = azureRow.locator('.manager-v2-icon-button').nth(2);
+  if (await moveDown.isEnabled()) await moveDown.click({ trial: true });
+  await azureRow.locator('.manager-v2-icon-button').nth(3).click({ trial: true });
+  await azureRow.locator('.manager-v2-icon-button').nth(4).click({ trial: true });
+  await page.locator('.fabricate-manager-v2 .manager-v2-inspector-actions .manager-v2-button:has-text("Edit environment")').first().click({ trial: true });
+  await page.locator('.fabricate-manager-v2 .manager-v2-inspector-actions .manager-v2-button:has-text("Duplicate environment")').first().click({ trial: true });
+  await page.locator('.fabricate-manager-v2 .manager-v2-inspector-actions .manager-v2-button:has-text("Disable environment")').first().click({ trial: true });
+  await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Create environment")').first().click({ trial: true });
+}
+
+/**
  * Dismiss global Foundry notifications that can cover screenshot targets.
  * @param {import('playwright').Page} page
  */
@@ -613,6 +847,7 @@ async function closeOpenApplications(page) {
     '.application:not(#sidebar) .window-header .close',
     '.app.window-app .close',
     '#fabricate-recipe-manager button[data-action="close"]',
+    '#fabricate-crafting-system-manager-v2 button[data-action="close"]',
     '#fabricate-gathering button[data-action="close"]'
   ].join(', ');
 
@@ -628,7 +863,7 @@ async function closeOpenApplications(page) {
 
   for (let attempt = 0; attempt < 4; attempt += 1) {
     await discardDirtyDraft();
-    await page.evaluate((selector) => {
+    await page.evaluate(async (selector) => {
       const closePromises = [];
       let closedApplicationV2 = false;
 
@@ -653,7 +888,7 @@ async function closeOpenApplications(page) {
         }
       }
 
-      Promise.allSettled(closePromises);
+      await Promise.allSettled(closePromises);
 
       if (!closedApplicationV2) {
         document.querySelectorAll(selector).forEach(btn => {
@@ -682,8 +917,13 @@ async function closeOpenApplications(page) {
  * @param {import('playwright').Page} page
  */
 async function prepareGmEnvironmentsScreenshotState(page) {
-  await page.locator('.environment-draft-editor').first().waitFor({ state: 'visible', timeout: 10_000 });
+  await page.locator('.environment-draft-editor, .manager-v2-environment-edit-view').first().waitFor({ state: 'visible', timeout: 10_000 });
 
+  const catalystTab = page.locator('.manager-v2-task-tabs [role="tab"]:has-text("Catalysts")').first();
+  if (await catalystTab.count() > 0) {
+    await catalystTab.click();
+    await page.waitForTimeout(250);
+  }
   const catalystComponent = page
     .locator('.environment-catalyst-row select[data-environment-field*=".catalysts.0.componentId"]')
     .first();
@@ -692,10 +932,10 @@ async function prepareGmEnvironmentsScreenshotState(page) {
     await page.waitForTimeout(500);
   }
 
-  const saveButton = page.locator('.environment-save-actions button[type="submit"]').first();
+  const saveButton = page.locator('.environment-save-actions button[type="submit"], .fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button.is-primary:has-text("Save")').first();
   if (await saveButton.count() > 0) {
     await saveButton.click();
-    await page.locator('.environment-validation-summary').first().waitFor({ state: 'visible', timeout: 5_000 });
+    await page.locator('.environment-validation-summary, .manager-v2-validation-group').first().waitFor({ state: 'visible', timeout: 5_000 });
   }
 }
 
@@ -706,7 +946,7 @@ async function prepareGmEnvironmentsScreenshotState(page) {
  */
 async function scrollEnvironmentEditorTo(page, selector) {
   await page.evaluate((selector) => {
-    const editor = document.querySelector('.environment-draft-editor');
+    const editor = document.querySelector('.manager-v2-environment-editor-shell') || document.querySelector('.environment-draft-editor');
     const target = document.querySelector(selector);
     if (!editor || !target) return;
     const editorRect = editor.getBoundingClientRect();
@@ -722,7 +962,7 @@ async function scrollEnvironmentEditorTo(page, selector) {
  */
 async function scrollEnvironmentEditorToTop(page) {
   await page.evaluate(() => {
-    const editor = document.querySelector('.environment-draft-editor');
+    const editor = document.querySelector('.manager-v2-environment-editor-shell') || document.querySelector('.environment-draft-editor');
     if (editor) editor.scrollTop = 0;
   });
   await page.waitForTimeout(500);
@@ -1136,7 +1376,16 @@ async function main() {
       await launchBtn.waitFor({ state: 'visible', timeout: 5_000 });
       await launchBtn.click();
       // After launch, Foundry navigates to /join (player selection) or /game
-      await page.waitForURL(/\/(join|game)/, { timeout: 120_000 });
+      try {
+        await page.waitForURL(/\/(join|game)/, { timeout: 120_000 });
+      } catch (err) {
+        if (!String(err?.message ?? '').includes('ERR_CONNECTION_REFUSED')) {
+          throw err;
+        }
+        await page.waitForTimeout(10_000);
+        await page.goto(`${FOUNDRY_URL}/join`, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+        await page.waitForURL(/\/(join|game)/, { timeout: 60_000 });
+      }
       await screenshot(page, 'world-launching');
       results.steps.push({ step: 'launch-world', passed: true });
     } else {
@@ -1304,10 +1553,19 @@ async function main() {
 
         const alara = actors.find(a => a.name === 'Alara the Alchemist');
         const brom = actors.find(a => a.name === 'Brom the Blacksmith');
-        const users = await User.createDocuments([
+        const testUserData = [
           { name: 'Fabricate Gatherer', role: CONST.USER_ROLES.PLAYER, password: '' },
           { name: 'Fabricate Observer', role: CONST.USER_ROLES.PLAYER, password: '' }
-        ]);
+        ];
+        const existingTestUsers = game.users.contents.filter(user =>
+          testUserData.some(data => data.name === user.name)
+        );
+        const missingTestUsers = testUserData.filter(data =>
+          !existingTestUsers.some(user => user.name === data.name)
+        );
+        const users = existingTestUsers.concat(
+          missingTestUsers.length > 0 ? await User.createDocuments(missingTestUsers) : []
+        );
         const gathererUser = users.find(user => user.name === 'Fabricate Gatherer');
         const ownerLevel = CONST.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3;
         const noneLevel = CONST.DOCUMENT_OWNERSHIP_LEVELS?.NONE ?? 0;
@@ -1848,6 +2106,301 @@ async function main() {
           await csm.updateSystem(systemId, { features: { essences: true, gathering: true } });
         }, craftingSetup.systemId);
         await page.waitForTimeout(750);
+      }
+
+      // ── Phase D0: Screenshot Crafting System Manager V2 ─────────────────────
+      process.stdout.write('Phase D0: Opening Crafting System Manager V2...\n');
+      try {
+        await page.evaluate(async (sysId) => {
+          await game.settings.set('fabricate', 'lastManagedCraftingSystem', '');
+          const csm = game.fabricate.getCraftingSystemManager();
+          await csm.updateSystem(sysId, {
+            name: "The Herbalist's Compendium",
+            description: 'Configure categories, item tags, essences, and crafting behaviour for this system.'
+          });
+        }, craftingSetup.systemId);
+
+        await page.evaluate(() => {
+          game.fabricate.api.getCraftingSystemManagerV2AppClass().show();
+        });
+        await page.locator('.fabricate-manager-v2').first().waitFor({ state: 'visible', timeout: 10_000 });
+
+        await setManagerV2WindowSize(page, { width: 1200, height: 790 });
+        let navLabels = await page.locator('.fabricate-manager-v2 .manager-v2-nav-label').evaluateAll(labels =>
+          labels.map(label => label.textContent?.trim()).filter(Boolean)
+        );
+        if (navLabels.length !== 0) {
+          throw new Error(`Manager V2 no-selection nav should not expose selected-system tabs. Saw: ${navLabels.join(', ')}`);
+        }
+        if (await page.locator('.fabricate-manager-v2 .manager-v2-breadcrumbs button:has-text("Crafting Systems")').count() === 0) {
+          throw new Error('Manager V2 root breadcrumb is missing.');
+        }
+        await assertManagerV2LayoutStable(page, 'normal no selection');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-v2-no-selection');
+
+        await page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist") .manager-v2-system-identity').first().click();
+        await page.waitForTimeout(750);
+        navLabels = await page.locator('.fabricate-manager-v2 .manager-v2-nav-label').evaluateAll(labels =>
+          labels.map(label => label.textContent?.trim()).filter(Boolean)
+        );
+        if (navLabels.includes('Systems')) {
+          throw new Error(`Manager V2 selected nav should not expose a Systems tab. Saw: ${navLabels.join(', ')}`);
+        }
+        if (navLabels.at(0) !== 'System settings') {
+          throw new Error(`Manager V2 selected nav should keep System settings first. Saw: ${navLabels.join(', ')}`);
+        }
+        for (const expected of ['System settings', 'Components', 'Recipes', 'Environments', 'Essences', 'Rules', 'Graph']) {
+          if (!navLabels.includes(expected)) {
+            throw new Error(`Manager V2 selected nav missing ${expected}. Saw: ${navLabels.join(', ')}`);
+          }
+        }
+        if (await page.locator('.fabricate-manager-v2 .manager-v2-scope-button .manager-v2-scope-clear').count() === 0) {
+          throw new Error('Manager V2 selected-system scope is missing its clear affordance.');
+        }
+        if (await page.locator('.fabricate-manager-v2 .manager-v2-section-header .manager-v2-button:has-text("Import")').count() > 0) {
+          throw new Error('Manager V2 duplicated Import in the System library header.');
+        }
+        if (await page.locator('.fabricate-manager-v2 .manager-v2-section-header .manager-v2-button:has-text("Create")').count() > 0) {
+          throw new Error('Manager V2 duplicated Create in the System library header.');
+        }
+        if (await page.locator('.fabricate-manager-v2 .manager-v2-card-title:has-text("Quick actions")').count() > 0) {
+          throw new Error('Manager V2 inspector still shows duplicate Quick actions.');
+        }
+        await assertManagerV2LayoutStable(page, 'normal selected');
+        await exerciseManagerV2PointerTargets(page);
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-v2-selected-normal');
+
+        await page.locator('.fabricate-manager-v2 .manager-v2-scope-button').first().click();
+        await page.waitForTimeout(750);
+        navLabels = await page.locator('.fabricate-manager-v2 .manager-v2-nav-label').evaluateAll(labels =>
+          labels.map(label => label.textContent?.trim()).filter(Boolean)
+        );
+        if (navLabels.length !== 0) {
+          throw new Error(`Manager V2 clear selected system should return to the no-selection browser. Saw nav: ${navLabels.join(', ')}`);
+        }
+        if (await page.locator('.fabricate-manager-v2 .manager-v2-scope-button').count() > 0) {
+          throw new Error('Manager V2 clear selected system left the rail scope visible.');
+        }
+        if (await page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist")').count() === 0) {
+          throw new Error('Manager V2 clear selected system did not return to the systems browser.');
+        }
+
+        await closeOpenApplications(page);
+        await page.evaluate(async (sysId) => {
+          const csm = game.fabricate.getCraftingSystemManager();
+          await csm.updateSystem(sysId, { features: { essences: true, gathering: false } });
+        }, craftingSetup.systemId);
+        await page.evaluate(() => {
+          game.fabricate.api.getCraftingSystemManagerV2AppClass().show();
+        });
+        await page.locator('.fabricate-manager-v2').first().waitFor({ state: 'visible', timeout: 10_000 });
+        await setManagerV2WindowSize(page, { width: 1200, height: 790 });
+        await page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist") .manager-v2-system-identity').first().click();
+        await page.waitForTimeout(750);
+        const gatheringOffFact = await page.locator('.fabricate-manager-v2 [data-count-id="environments"]').first().evaluate(element => {
+          const rect = element.getBoundingClientRect();
+          const strong = element.querySelector('strong');
+          const style = getComputedStyle(element);
+          return {
+            text: element.textContent?.replace(/\s+/g, ' ').trim(),
+            strongText: strong?.textContent?.trim(),
+            className: element.className,
+            gridColumn: style.gridColumn,
+            width: rect.width,
+            clientWidth: element.clientWidth,
+            scrollWidth: element.scrollWidth,
+            strongTagName: strong?.tagName
+          };
+        });
+        if (gatheringOffFact.text === 'Gathering environments Off') {
+          if (gatheringOffFact.strongText !== 'Off' || gatheringOffFact.strongTagName !== 'STRONG') {
+            throw new Error(`Manager V2 gathering-off fact does not preserve Off emphasis: ${JSON.stringify(gatheringOffFact)}`);
+          }
+          if (!String(gatheringOffFact.className).includes('is-off')) {
+            throw new Error(`Manager V2 gathering-off fact should use the full-grid special case: ${JSON.stringify(gatheringOffFact)}`);
+          }
+        } else if (!/^\d+ Gathering environments$/.test(gatheringOffFact.text || '')) {
+          throw new Error(`Manager V2 gathering fact text is wrong: ${JSON.stringify(gatheringOffFact)}`);
+        }
+        if (gatheringOffFact.scrollWidth > gatheringOffFact.clientWidth + 2) {
+          throw new Error(`Manager V2 gathering-off fact overflows: ${JSON.stringify(gatheringOffFact)}`);
+        }
+        await assertManagerV2LayoutStable(page, 'normal selected gathering off');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-v2-selected-gathering-off');
+        await closeOpenApplications(page);
+        await page.evaluate(async (sysId) => {
+          const csm = game.fabricate.getCraftingSystemManager();
+          await csm.updateSystem(sysId, { features: { essences: true, gathering: true } });
+        }, craftingSetup.systemId);
+        await page.evaluate(() => {
+          game.fabricate.api.getCraftingSystemManagerV2AppClass().show();
+        });
+        await page.locator('.fabricate-manager-v2').first().waitFor({ state: 'visible', timeout: 10_000 });
+        await setManagerV2WindowSize(page, { width: 1200, height: 790 });
+        await page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist") .manager-v2-system-identity').first().click();
+        await page.waitForTimeout(750);
+
+        await setManagerV2WindowSize(page, { width: 1000, height: 700 });
+        await assertManagerV2LayoutStable(page, 'stacked selected');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-v2-selected-stacked');
+
+        await setManagerV2WindowSize(page, { width: 1200, height: 790 });
+        await page.locator('.fabricate-manager-v2 .manager-v2-nav-button:has-text("Recipes")').first().click();
+        await page.locator('.fabricate-manager-v2 .manager-v2-breadcrumbs button:has-text("The Herbalist")').first().click();
+        await page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist")').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await exerciseManagerV2SystemEditPointerTargets(page);
+        if (await page.locator('.fabricate-manager-v2[data-manager-v2-view="system-edit"]').count() === 0) {
+          throw new Error('Manager V2 system Edit did not stay inside the v2 edit route.');
+        }
+        for (const selector of [
+          '#manager-v2-system-name',
+          '#manager-v2-system-description',
+          '#manager-v2-system-resolution-mode',
+          '[data-edit-control="advanced-options"]',
+          '[data-feature-key="gathering"]'
+        ]) {
+          if (await page.locator(`.fabricate-manager-v2 ${selector}`).count() === 0) {
+            throw new Error(`Manager V2 system edit is missing required control: ${selector}`);
+          }
+        }
+        await assertManagerV2LayoutStable(page, 'system edit normal');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-v2-system-edit-normal');
+
+        await setManagerV2WindowSize(page, { width: 900, height: 700 });
+        await assertManagerV2LayoutStable(page, 'system edit narrow');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-v2-system-edit-narrow');
+
+        await setManagerV2WindowSize(page, { width: 1200, height: 790 });
+        await exerciseManagerV2RecipePointerTargets(page);
+        if (await page.locator('.fabricate-manager-v2 .manager-v2-recipe-row').count() < 2) {
+          throw new Error('Manager V2 recipes browser rendered fewer than two recipe rows.');
+        }
+        if (await page.locator('.fabricate-manager-v2 .manager-v2-recipe-row.is-selected:has-text("Brew Healing Potion")').count() === 0) {
+          throw new Error('Manager V2 recipes browser did not show selected recipe row state.');
+        }
+        if (await page.locator('.fabricate-manager-v2 .manager-v2-inspector:has-text("Requirements")').count() === 0) {
+          throw new Error('Manager V2 recipes inspector did not show requirements preview.');
+        }
+        await assertManagerV2LayoutStable(page, 'recipes normal');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-v2-recipes-normal');
+
+        await setManagerV2WindowSize(page, { width: 1000, height: 700 });
+        await page.locator('.fabricate-manager-v2 .manager-v2-recipe-row:has-text("Brew Healing Potion")').first().scrollIntoViewIfNeeded();
+        await page.waitForTimeout(250);
+        await assertManagerV2LayoutStable(page, 'recipes stacked');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-v2-recipes-stacked');
+
+        await setManagerV2WindowSize(page, { width: 1200, height: 790 });
+        await exerciseManagerV2EnvironmentPointerTargets(page);
+        if (await page.locator('.fabricate-manager-v2 .manager-v2-environment-row').count() < 1) {
+          throw new Error('Manager V2 environments browser rendered no environment rows.');
+        }
+        if (await page.locator('.fabricate-manager-v2 .manager-v2-environment-row.is-selected:has-text("Azure Grove")').count() === 0) {
+          throw new Error('Manager V2 environments browser did not show selected environment row state.');
+        }
+        if (await page.locator('.fabricate-manager-v2 .manager-v2-inspector:has-text("Linked scene")').count() === 0) {
+          throw new Error('Manager V2 environments inspector did not show linked scene evidence.');
+        }
+        await assertManagerV2LayoutStable(page, 'environments normal');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-v2-environments-browse-normal');
+
+        await setManagerV2WindowSize(page, { width: 1000, height: 700 });
+        await page.locator('.fabricate-manager-v2 .manager-v2-environment-row:has-text("Azure Grove")').first().scrollIntoViewIfNeeded();
+        await page.waitForTimeout(250);
+        await assertManagerV2LayoutStable(page, 'environments stacked');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-v2-environments-browse-stacked');
+
+        await setManagerV2WindowSize(page, { width: 1200, height: 790 });
+        await page.locator('.fabricate-manager-v2 .manager-v2-environment-row:has-text("Azure Grove") .manager-v2-icon-button').nth(0).click();
+        await page.locator('.fabricate-manager-v2[data-manager-v2-view="environment-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await page.locator('.fabricate-manager-v2 .manager-v2-environment-edit-view').first().waitFor({ state: 'visible', timeout: 10_000 });
+        if (await page.locator('.fabricate-manager-v2 .environment-draft-editor, .fabricate-manager-v2 .environment-foundation').count() > 0) {
+          throw new Error('Manager V2 environments edit route still rendered the legacy environment editor.');
+        }
+        for (const selector of [
+          '.manager-v2-environment-details-band',
+          '.manager-v2-environment-scene-card',
+          '.manager-v2-environment-task-rail',
+          '.manager-v2-environment-task-editor',
+          '.manager-v2-environment-evidence-column',
+          '[data-environment-field="environment.name"]',
+          '[data-environment-field="environment.sceneUuid"]',
+          '.manager-v2-task-tabs'
+        ]) {
+          if (await page.locator(`.fabricate-manager-v2 ${selector}`).count() === 0) {
+            throw new Error(`Manager V2 environment edit is missing required control: ${selector}`);
+          }
+        }
+        await page.locator('.fabricate-manager-v2 .manager-v2-task-rail-row').first().click();
+        await page.locator('.fabricate-manager-v2 .manager-v2-task-rail-row .environment-action-menu-trigger').first().click();
+        await page.locator('.fabricate-manager-v2 .environment-action-menu-item:not([disabled])').first().click({ trial: true });
+        await page.keyboard.press('Escape');
+        await page.locator('.fabricate-manager-v2 .manager-v2-task-tabs [role="tab"]:has-text("Results")').first().click({ trial: true });
+        await page.locator('.fabricate-manager-v2 .manager-v2-scene-actions select').first().click({ trial: true });
+        const firstStateSaveButton = page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button.is-primary:has-text("Save")').first();
+        if (await firstStateSaveButton.isEnabled()) await firstStateSaveButton.click({ trial: true });
+        const firstStateCancelButton = page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Cancel")').first();
+        if (await firstStateCancelButton.isEnabled()) await firstStateCancelButton.click({ trial: true });
+        await page.locator('.fabricate-manager-v2 .manager-v2-breadcrumbs button:has-text("Environments")').first().click({ trial: true });
+        await assertManagerV2LayoutStable(page, 'environment edit first state');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-v2-environments-edit-first-state');
+
+        await prepareGmEnvironmentsScreenshotState(page);
+        const validationLink = page.locator('.fabricate-manager-v2 .environment-validation-link').first();
+        if (await validationLink.count() > 0) {
+          await validationLink.click({ trial: true });
+        }
+        await scrollEnvironmentEditorToTop(page);
+        await assertManagerV2LayoutStable(page, 'environment edit validation');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-v2-environments-edit-validation');
+
+        const catalystsTab = page.locator('.fabricate-manager-v2 .manager-v2-task-tabs [role="tab"]:has-text("Catalysts")').first();
+        if (await catalystsTab.count() > 0) await catalystsTab.click();
+        await scrollEnvironmentEditorTo(page, '.environment-catalyst-authoring');
+        await assertManagerV2LayoutStable(page, 'environment edit authoring');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-v2-environments-edit-authoring');
+
+        await setManagerV2WindowSize(page, { width: 900, height: 700 });
+        const resultsTab = page.locator('.fabricate-manager-v2 .manager-v2-task-tabs [role="tab"]:has-text("Results")').first();
+        if (await resultsTab.count() > 0) await resultsTab.click();
+        await scrollEnvironmentEditorTo(page, '.environment-result-authoring');
+        await assertManagerV2LayoutStable(page, 'environment edit stacked');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-v2-environments-edit-stacked');
+
+        const cancelEnvironmentDraft = page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Cancel")').first();
+        if (await cancelEnvironmentDraft.count() > 0 && await cancelEnvironmentDraft.isEnabled()) {
+          await cancelEnvironmentDraft.click();
+          await page.waitForTimeout(500);
+        }
+
+        await page.evaluate(async (sysId) => {
+          const csm = game.fabricate.getCraftingSystemManager();
+          await csm.updateSystem(sysId, {
+            name: 'Arcane Forge',
+            description: 'A mystical forge capable of transmuting raw materials into powerful artifacts.'
+          });
+          await game.settings.set('fabricate', 'lastManagedCraftingSystem', sysId);
+        }, craftingSetup.systemId);
+        await closeOpenApplications(page);
+        results.steps.push({ step: 'screenshot-manager-v2', passed: true });
+        process.stdout.write('Phase D0 complete: Crafting System Manager V2 screenshotted and hit-tested.\n');
+      } catch (err) {
+        results.steps.push({ step: 'screenshot-manager-v2', passed: false, error: err.message });
+        throw err;
       }
 
       // ── Phase D: Screenshot Recipe Manager ──────────────────────────────────

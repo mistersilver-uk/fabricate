@@ -31,7 +31,7 @@ Reference decisions:
 - [Browse Gathering Environments](<references/Browse Gathering Environments.png>): keep the environment index hierarchy and image-backed inspector; discard fake summary/help dashboards.
 - [Browse Recipes](<references/Browse Recipes.png>): keep the recipe table and selected-recipe inspector; derive requirements preview from real ingredient sets.
 - [Edit Crafting System Tags and Categories](<references/Edit Crafting System Tags and Categories.png>): keep the split management layout, usage counts, search/add flows, cleanup actions, and right evidence panels; discard hierarchical categories, inherited subcategories, and multiple categories per recipe unless later data-model work adds them.
-- [Edit Gathering Environment](<references/Edit Gathering Environment.png>): keep the compact editor and evidence-column structure; discard unsupported gathering fields.
+- [Edit Gathering Environment](<references/Edit Gathering Environment.png>): keep the compact editor, top save/cancel strip, tabbed task workflow, left task list, scene image card, validation/evidence column, and selected-task summary. Discard unsupported gathering fields and labels, but do not accept the legacy admin `EnvironmentsTab` form stack as the v2 visual surface.
 - [Edit Recipe Overview](<references/Edit Recipe Overview.png>): keep the editor shell, tabs, save actions, and evidence column; discard generic recipe fields outside Fabricate contracts.
 - [Edit Recipe Resolution](<references/Edit Recipe Resolution.png>): keep provider cards, mapping table, result summaries, help, and failure outcome; add the missing crafting-check section, discard duplicate mapping as an error unless a later rule adds it, and treat provider ownership according to the written data contract.
 - [Edit Recipe Results](<references/Edit Recipe Results.png>): keep result-group authoring and source palette; keep provider mapping in Resolution.
@@ -118,6 +118,23 @@ Inspector:
 - created/updated metadata
 - quick actions: edit, duplicate, export, delete
 
+System edit view:
+
+- The systems row Edit action opens an in-manager-v2 edit route, not the current admin shell.
+- The edit route stays scoped to the selected crafting system and keeps the left rail/breadcrumb context.
+- The first edit slice exposes only base settings already owned by the current admin store:
+  - name
+  - description
+  - resolution mode
+  - advanced-option visibility
+  - optional feature toggles
+- Persistence must reuse existing admin-store actions such as `saveSystemDetails`, `setResolutionMode`, `toggleAdvancedOptions`, and `toggleFeature`; manager-v2 must not add a second system update path.
+- Resolution mode changes keep the existing destructive confirmation and cleanup behavior.
+- Until the runtime persistence layer accepts canonical `routed`, the edit control must keep using the current runtime-backed `mapped` and `tiered` routed values for selectable routed modes.
+- Optional feature controls are direct toggles only in this slice. Do not reintroduce legacy toggles removed from the current system settings UI, including `complexRecipes`, `craftingChecks`, and `outcomeRouting`. Deeper editors for categories, tags, essences, crafting checks, requirements, visibility, and alchemy settings remain owned by later manager-v2 views or the current admin.
+- The edit view should show compact guidance/evidence in the inspector: selected system, current resolution mode, enabled feature count, and a note that deeper configuration remains outside this slice.
+- A back affordance returns to the systems browser for the selected system.
+
 ### Environments
 
 Use the fourth image as the index target and the editor images as the edit target.
@@ -147,6 +164,32 @@ Editor:
 - evidence column for preview, expected results, balance summary, validation
 - advanced behavior after primary composition
 
+Environments page implementation slice:
+
+- This slice promotes `Environments` from a selected-system placeholder to a real manager-v2 page and edit route. It is available only when the selected crafting system has `features.gathering === true`; disabling gathering must make the route unreachable and return to a visible manager-v2 route through the existing store/tab fallback behavior.
+- The page must use existing admin-store environment contracts as the only source of persistence and validation: `store.viewState.environments`, `selectedEnvironmentId`, `environmentDraft`, `environmentDraftDirty`, `environmentDraftIsNew`, `environmentSaving`, `environmentSaveError`, `environmentValidationState`, `selectedEnvironmentTaskId`, and the existing `selectEnvironment`, `createEnvironmentDraft`, `updateEnvironmentDraft`, task/result/catalyst/visibility/result-selection/progressive/check/time/failure callbacks, `saveEnvironmentDraft`, `cancelEnvironmentDraft`, `duplicateEnvironmentDraft`, `deleteEnvironmentDraft`, `moveEnvironmentDraft`, and `toggleEnvironmentEnabled` actions.
+- Manager-v2 may derive display-only environment facts locally or in the store when needed, such as scene image, selection mode, task count, enabled state, routed/progressive task counts, catalyst/result totals, validation count, and stale scene/macro/table reference indicators. These derived facts must not add persistence, validation, source-resolution, import/export, or cleanup behavior.
+- The browse route should use the manager-v2 shell, breadcrumbs, and rail. Main content should include a search control, status filter, selection-mode filter, compact create action, environment table/list rows, selected-row state, and empty/error/loading states. Row fields are limited to image, name, enabled/disabled, description, targeted/blind selection mode, task count, result/catalyst evidence, linked-scene state when available, and actions.
+- The selected-environment inspector should prefer linked scene imagery from `sceneOptions` and fallback only when no linked image is available. It should show environment identity, status, description, selection mode, scene/source state, task/result/catalyst counts, validation or dirty evidence when selected, and quick actions for edit, duplicate, enable/disable, move, and delete where the existing store supports them.
+- The edit route should keep the user inside manager-v2 after create or row Edit. It may reuse existing `EnvironmentsTab` child components or extract shared behavior from them, but the manager-v2 edit route must not simply mount the legacy tab as the visible editor. If a wrapper is needed, keep it thin and do not fork editor behavior. If visual integration requires small child components, they must receive named callbacks rather than a broad service/container grab bag.
+- The corrected edit slice must preserve the current editor's fields and behavior while replacing the presentation: environment identity, enabled state, selection mode, scene UUID, task add/select/duplicate/delete/reorder, task base fields, time requirement, failure outcome, routed result selection, progressive/check settings, visibility, catalysts, result groups/results, save/cancel, stale-reference warnings, and first-invalid focus.
+- The manager-v2 environment editor visual target is the updated [Edit Gathering Environment](<references/Edit Gathering Environment.png>) reference:
+  - Top shell: breadcrumbs, `Edit Environment` title, short subtitle, dirty indicator, `Cancel`, and primary `Save Environment` button in the application header region.
+  - Environment details band: tab strip or segmented control with `Environment Details` and `Advanced`; identity fields at left; linked scene image/card in the center; enabled/availability and player visibility controls at right.
+  - Task work area: left task list with validity/status icons, task names, concise mode labels, drag/reorder handle affordance, row action menu, add/duplicate/delete/move actions, and a drag-to-reorder drop zone.
+  - Center editor: selected task header with status chip and tab strip. Tabs should be mapped to Fabricate semantics rather than copied literally: `Task Details`, `Results`, `Catalysts`, `Visibility`, `Timing`, and `Advanced` or equivalent grouping.
+  - Task details tab: task name/description, enabled/repeatable state where backed, resolution mode, time requirement, failure outcome, result-selection provider, progressive/check controls where relevant, and player visibility controls. Keep unsupported concepts out.
+  - Results/Catalysts tabs: result groups/results and catalysts become primary tabbed authoring surfaces instead of long stacked details panels.
+  - Right evidence column: environment summary, validation grouped by task/warning, selected task summary, stale-reference warnings, and quick links that select the relevant task and tab.
+  - Bottom/meta strip: last-saved or dirty state only when backed by store/runtime data; do not invent timestamps.
+- The old `EnvironmentsTab` grid/list affordances should not appear inside `currentView === "environment-edit"` because the v2 browse route already owns environment selection and creation.
+- The current manager-v2 screenshot artifacts from the first pass demonstrate runtime wiring but fail the visual reference: duplicated headings, old fantasy display typography, generic form stack, hidden task authoring below the fold, manual scene UUID prominence, and a right inspector that is separate from rather than integrated with the editor evidence column. The corrective implementation must replace those defects, not style around them.
+- Do not add unsupported environment concepts from the reference image, including biome, size, difficulty, resource rarity, map/travel authoring, invented last-updated timestamps, decorative metrics, ingredient-set-based gathering, or a harvesting subsystem. Gathering tasks have no ingredients.
+- Dirty-draft protection remains store-owned. Browse navigation, selected-system changes, environment selection, create/edit transitions, cancel, delete, move, and feature-gathering disablement must continue to ask for discard confirmation through existing admin-store actions when needed.
+- Representative fixtures for implementation should include at least two environments for the selected system, one enabled targeted environment with linked scene imagery, one disabled or blind environment, a draft with routed and progressive task evidence where practical, and at least one stale linked reference warning. Screenshots must prove a real linked scene image path, not only fallback icons.
+- Browser pointer hit-tests should cover Environments nav, search, filters, row selection, row image/name edit target, enable toggle, move menu items, duplicate/delete actions, create, edit-route back, task selection, task/result/catalyst action menus, save, cancel, validation-link first-invalid focus, and inspector quick actions where present.
+- Normal browse screenshot target: `1200x790`. Stacked browse target: `1000x700`. Edit screenshots should include first visible editor state at `1200x790`, validation state with first invalid focus target visible, result/catalyst authoring state, and a narrow stacked editor at `1000x700` or smaller with save/cancel and validation reachable.
+
 ### Recipes
 
 Use the later recipe browser and editor images as the visual target, but keep Fabricate's canonical recipe semantics.
@@ -155,10 +198,11 @@ Browser main list columns:
 
 - recipe with image, name, status, and description
 - category
-- type or recipe classification when available
+- structure or recipe classification when available
 - status with toggle and label
-- craft time summary
-- last updated
+- requirements summary
+- craft time summary when backed by existing data
+- last updated when backed by existing data
 - row actions
 
 Browser inspector:
@@ -166,9 +210,16 @@ Browser inspector:
 - recipe image
 - recipe name and status
 - description
-- category, type, craft time, experience, tags, created/updated metadata
-- requirements preview derived from the first satisfiable ingredient set or selected preview set
+- category, structure, craft time, tags, and created/updated metadata when backed by existing data
+- requirements preview derived from Fabricate execution-step semantics; explicit multi-step recipes must not be summarized only from top-level ingredient sets
 - quick actions: edit, duplicate, delete
+
+Second-slice browser boundary:
+
+- implement only the recipes browser route, table, inspector, filters, and existing actions
+- create and edit continue to open the existing recipe editor
+- do not introduce inline recipe editing, recipe editor tabs, recipe-local resolution mode, visibility authoring, required station, minimum skill, output quality, byproduct, XP, rarity, owner, or invented timestamps
+- hide or omit optional browser fields when the current recipe/store contract does not provide them
 
 Editor shell:
 
@@ -355,6 +406,21 @@ Inspector:
 
 The component view should preserve the artistic direction in the image: image-led rows, compact tags and essence chips, dense usage columns, source state, selected-row emphasis, usage legend, and a right inspector with tabs. It must not collapse components, recipe items, and general Foundry items into one undifferentiated object type.
 
+Components page implementation slice:
+
+- This slice promotes `Components` from a selected-system placeholder to a real manager-v2 page. It is directory/browser focused; deep component editing continues to use the existing component editor app and current admin-store/service callbacks.
+- The public UI boundary should stay in the manager-v2 Svelte root or a small manager-v2 child component if the root becomes unwieldy. The owning behavior is selecting, filtering, presenting, importing, editing, replacing source, and deleting components for the selected system.
+- Dependencies must stay explicit: use `store.viewState.itemCards`, `store.setItemSearch`, `store.deleteComponent`, and existing service callbacks for drop import, edit component, replace source, and copy source UUID. Do not pass a broad service bag deeper than the current root boundary unless the child component receives named callbacks.
+- Store changes are allowed only for derived, display-only component facts that cannot be honestly derived in the component view. Any such derived data must be computed from existing selected-system, recipe, environment, essence, and item-card data and must not add persistence, validation, import/export, or source-resolution behavior.
+- The page should show data-backed fields only: component image, name, description, tags when item tags are enabled, essences when essences are enabled, progressive difficulty when present, salvage summary when present, source UUID/source state when available, and usage counts only where they can be derived from current admin-store data.
+- Drop-to-add import must reuse the existing manager drop behavior that imports world or compendium items into the selected system. If the implementation can distinguish a drop that could become either a component or a recipe item, it must require an explicit action choice; otherwise keep the existing component import path and do not invent recipe-item import behavior.
+- Component edit actions must open the existing component editor. Delete must call `store.deleteComponent` so the existing confirmation and recipe cleanup behavior remain canonical. Source replacement must use the existing replace-source callback and must not erase unresolved source references merely because they fail to resolve.
+- The selected-component inspector should contain identity, status/source evidence, tags, essences, progressive difficulty, salvage summary, usage evidence, source UUID copy/open/replace affordances when supported, and edit/delete actions. It should use sections or lightweight tabs only if they fit normal Foundry window widths without nested card stacks.
+- Component, recipe item, essence, and generic Foundry item concepts must stay visually and semantically distinct. Component rows must not imply that recipe items or arbitrary dropped items are already managed components before the existing import action succeeds.
+- Representative fixtures for implementation should include at least one component with a linked image/source UUID, one component with tags, one with essence assignments, and one with salvage or usage references where current fixtures can support it. Screenshots must prove the linked image/source path instead of only fallback item-bag icons.
+- Browser pointer hit-tests should cover Components nav, drop zone hover/drop where feasible, search, filters, clear filters, row selection, edit, delete, source copy/replace affordances where present, and inspector action targets.
+- Normal screenshot size target: `1200x790`. Stacked/narrow target: `1000x700` and one narrower container/window where the table stacks without horizontal overflow.
+
 ### Tags And Categories
 
 Use [Edit Crafting System Tags and Categories](<references/Edit Crafting System Tags and Categories.png>) as the visual target for the system-level tags and categories management view.
@@ -468,6 +534,19 @@ Manager V2 must be additive.
 - No runtime API is removed.
 - Existing tests for the current manager continue to pass.
 - A later implementation plan must define how GMs open manager-v2: setting, dev flag, alternate app factory entry point, or explicit menu action.
+
+## First-Slice Corrective Pass
+
+Screenshot review of the first manager-v2 systems implementation found polish and hierarchy defects rather than runtime defects. The corrective pass stays inside the Systems view and keeps the existing store, services, launch path, and import/export/create/delete behavior unchanged.
+
+Required corrections:
+
+- Rows must keep system names, descriptions, chips, counts, and action buttons inside their row geometry at normal Foundry window widths. Identity text should clamp to concise lines, while unbroken strings may break only as a last resort.
+- The left rail should always expose `Systems`, but deferred feature/admin tabs should not be visible until a crafting system is selected. Once selected, feature-scoped placeholders should follow canonical feature gates: gathering controls environments, essences controls essences, and item tags or recipe categories control tags/categories.
+- The left rail must not duplicate the selected-state evidence already provided by the row selection and right inspector. Any selected-system rail summary should be compact, secondary, and non-overflowing.
+- The systems section header should describe the table and filters only. Import and create actions belong in the top-right application header for this slice.
+- The right inspector should be a readable system summary with icon, name, resolution, enabled state, description, counts, and enabled features. It should not include a separate quick-actions card while row actions and header actions already cover the implemented commands.
+- At medium and narrow widths, the layout should stack before table columns become unreadable, and primary actions, row actions, search, filter, selected-row state, and inspector content should remain reachable.
 
 ## Localization
 

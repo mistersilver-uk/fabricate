@@ -47,6 +47,7 @@ const DOM_GLOBALS = [
   'HTMLFormElement',
   'HTMLAnchorElement',
   'HTMLImageElement',
+  'HTMLMediaElement',
   'HTMLSelectElement',
   'HTMLTextAreaElement',
   'Element',

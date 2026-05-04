@@ -63,6 +63,23 @@ The manager-v2 systems view MUST follow the systems-manager redesign hierarchy.
 7. Import and export actions MUST remain available from the view header or action group.
 8. Empty state MUST be compact and must provide a create-system action.
 
+### Requirement: Manager V2 system edit view
+
+The manager-v2 system Edit action MUST keep GMs inside manager-v2 for base crafting-system settings.
+
+1. Clicking a systems row Edit action MUST select that crafting system and transition to an in-v2 system edit route. It MUST NOT launch the current admin shell.
+2. The edit route MUST preserve manager-v2 shell context, including breadcrumbs, left rail scope, right inspector evidence, and a return path to the systems browser.
+3. The first edit slice MUST expose only base settings already owned by existing admin-store behavior: name, description, resolution mode, advanced-option visibility, and supported optional feature toggles.
+4. Name and description persistence MUST delegate to the existing admin-store `saveSystemDetails` callback.
+5. Resolution-mode changes MUST delegate to the existing admin-store `setResolutionMode` callback so destructive confirmation and cleanup behavior remain canonical.
+6. Until the runtime persistence layer accepts canonical `routed`, the edit control MUST use the current runtime-backed `mapped` and `tiered` routed values for selectable routed modes.
+7. Advanced-option visibility MUST delegate to the existing admin-store `toggleAdvancedOptions` callback.
+8. Optional feature toggles MUST delegate to the existing admin-store `toggleFeature` callback.
+9. The edit view MUST NOT reintroduce legacy optional feature toggles removed from current system settings UI, including `complexRecipes`, `craftingChecks`, and `outcomeRouting`.
+10. The explicit `Open current admin` fallback MAY remain available while v2 is incomplete, but it MUST be separate from the row Edit action.
+11. The edit view MUST NOT add a second crafting-system persistence path, new runtime behavior, new schema fields, or direct Foundry global access from presentational Svelte.
+12. Mounted or browser tests MUST prove row Edit route entry, store-callback wiring, rejection/cancellation rollback for destructive or cancelable controls, and the absence of unintended current-admin launch from row Edit.
+
 ### Requirement: Manager V2 recipes browser
 
 The manager-v2 recipes browser MUST follow the recipe-browser redesign hierarchy while preserving recipe semantics.
@@ -245,15 +262,29 @@ The manager-v2 essences view and editor MUST follow the essence-browser redesign
 
 The manager-v2 environments view and editor MUST follow the environment-index and environment-editor redesign hierarchy while preserving gathering semantics.
 
-1. The environments index MUST present a searchable/filterable environment table or list as the primary work surface at normal widths.
-2. Environment rows SHOULD show image, name, status, description, biome, size, difficulty, resource count, last updated, and row actions when data is available.
-3. Environment imagery MUST prefer linked scene/environment imagery and MUST use fallback icons only when no image is available.
-4. Selecting an environment MUST populate a right inspector with image, status, description, biome, size, difficulty, resource count, updated date, and quick actions.
-5. The environment editor MUST use a compact object header, section tabs or workflow navigation, primary resource/result authoring, and a live evidence column.
-6. The resource/result authoring area MUST be visually dominant once base environment/task setup exists.
-7. Evidence panels MAY include preview, expected output, balance summary, validation, stale-reference warnings, and configured-output summaries, but each panel MUST be backed by current draft data.
-8. Advanced behavior sections MAY collapse, but collapsed state MUST expose semantic summaries and reveal invalid fields before focus.
-9. The environments view and editor MUST keep save/cancel, validation access, row actions, and selected-object context reachable at narrow container widths.
+1. The environments route MUST be available only for a selected crafting system with `features.gathering === true`.
+2. The environments route MUST use existing admin-store environment view state and actions as the only persistence, validation, and dirty-draft path.
+3. The environments route MUST NOT introduce a second gathering-environment store, direct Foundry global access from presentational Svelte, new schema fields, new cleanup behavior, or new validation ownership.
+4. The environments index MUST present a searchable/filterable environment table or list as the primary work surface at normal widths.
+5. Environment search and filters MAY be manager-v2 local display state, but they MUST NOT change the existing store search or persistence contract.
+6. Environment rows SHOULD show only data-backed fields: linked scene/fallback image, name, enabled/disabled state, description, targeted/blind selection mode, task count, result/catalyst evidence, linked-scene state when available, and row actions.
+7. Environment rows MUST NOT show unsupported fields such as biome, size, difficulty, rarity, map/travel state, invented timestamps, or resource metrics unless current store data provides them.
+8. Environment imagery MUST prefer linked scene/environment imagery from injected scene options and MUST use fallback icons only when no linked image is available.
+9. Selecting an environment MUST populate a right inspector with environment image, status, description, selection mode, scene/source state, task/result/catalyst counts, validation/dirty evidence when available, and quick actions supported by existing store actions.
+10. Create and row Edit MUST transition to an in-manager-v2 environment edit route instead of launching the current admin shell.
+11. The edit route SHOULD reuse existing `EnvironmentsTab` behavior or child components where that reduces risk, but it MUST NOT render the legacy `EnvironmentsTab` form stack as the manager-v2 visual editor. Any wrapper MUST be presentation-only and MUST NOT fork draft mutation, save, cancel, validation, stale-reference, or dirty-confirmation behavior.
+12. The edit route MUST preserve current environment editor capabilities: environment identity, enabled state, selection mode, scene UUID, task add/select/duplicate/delete/reorder, task base fields, time requirements, failure outcome, routed result selection, progressive/check settings, visibility, catalysts, result groups/results, stale-reference warnings, save/cancel, save-blocking validation, and first-invalid focus.
+13. Environment save/cancel, duplicate, delete, enable/disable, move/reorder, system-selection navigation, and feature-gathering disablement MUST preserve existing environment store behavior and dirty-draft protection.
+14. The editor MUST NOT introduce standalone harvesting semantics, ingredient-set-based gathering, or unsupported biome/travel/map data unless a separate OpenSpec change adds those contracts.
+15. Environment screenshots MUST prove linked scene imagery, selected-row/inspector state, filters, row action menus, create/edit route entry, editor save/cancel, validation state, task/result/catalyst authoring, stale-reference warning when fixture data supports it, and narrow-width stacking.
+16. Browser pointer hit tests MUST cover Environments nav, search/filter controls, row selection, row edit/image target, enable toggle, move/duplicate/delete actions, create, edit-route back, task selection, action menus, save, cancel, validation links, and inspector quick actions where present.
+17. The environments view and editor MUST keep save/cancel, validation access, row actions, and selected-object context reachable at narrow container widths without horizontal overflow.
+18. The manager-v2 environment editor MUST present a purpose-built v2 task-authoring layout with a compact environment-details band, linked-scene image/card, task list, selected-task tabbed editor, and right evidence/validation column at normal widths.
+19. The manager-v2 environment editor MUST map reference tabs and panels to Fabricate semantics. It MUST NOT introduce unsupported biome, rarity, travel, standalone harvesting, ingredient-set gathering, or invented timestamp fields.
+20. Environment details controls MUST prioritize human workflows over UUID editing. Scene selection SHOULD be card/picker-oriented when services allow it, while the stored scene UUID remains available as advanced or secondary evidence for stale-reference recovery.
+21. The selected-task editor MUST expose task details, results, catalysts, visibility, timing/failure, and progressive/routed behavior in tabbed or segmented groups so primary authoring is visible without scrolling through a long stacked form.
+22. Validation UI MUST group errors and warnings by environment/task, provide quick links that select the relevant task and editor section, and preserve existing first-invalid focus behavior.
+23. Screenshots for the manager-v2 environment editor MUST be compared against the updated `Edit Gathering Environment` reference for hierarchy, density, evidence-column integration, and first-visible task authoring. A screenshot that only proves the old admin editor renders is insufficient.
 
 ## MODIFIED Requirements
 

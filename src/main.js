@@ -27,7 +27,13 @@ import {
   evaluateGatheringExpression,
   processWorldTimeCallbacksSafely,
 } from './gatheringBootstrapAdapters.js';
-import { getCraftingAppClass, getGatheringAppClass, getRecipeManagerAppClass, getRecipeEditorAppClass } from './ui/appFactory.js';
+import {
+  getCraftingAppClass,
+  getGatheringAppClass,
+  getCraftingSystemManagerV2AppClass,
+  getRecipeManagerAppClass,
+  getRecipeEditorAppClass
+} from './ui/appFactory.js';
 import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from './ui/itemsDirectoryButtons.js';
 import { registerFabricateSettings, getSetting, setSetting } from './config/settings.js';
 import { MigrationRunner } from './migration/MigrationRunner.js';
@@ -41,6 +47,7 @@ import * as CraftingSystemExporter from './systems/CraftingSystemExporter.js';
 import './ui/SvelteCraftingApp.svelte.js';
 import './ui/SvelteGatheringApp.svelte.js';
 import './ui/SvelteRecipeManagerApp.svelte.js';
+import './ui/SvelteCraftingSystemManagerV2App.svelte.js';
 import './ui/SvelteRecipeEditorApp.svelte.js';
 
 let gatheringEngine = null;
@@ -665,6 +672,7 @@ Hooks.once('init', async () => {
     CraftingEngine,
     getCraftingAppClass,
     getGatheringAppClass,
+    getCraftingSystemManagerV2AppClass,
     getRecipeManagerAppClass,
     getRecipeEditorAppClass,
     CraftingSystemManager,
@@ -786,7 +794,7 @@ function addModuleButtonsToItemsDirectory() {
         'Manage Crafting Systems',
         'fas fa-book',
         'manage',
-        () => getRecipeManagerAppClass().show()
+        () => getCraftingSystemManagerV2AppClass().show()
       );
       actionsContainer.insertBefore(managerButton, actionsContainer.firstChild);
     }
