@@ -26,7 +26,9 @@ const environmentComponentNames = [
   'VisibilityFields'
 ];
 const sharedComponentNames = [
-  'ImagePathPicker'
+  'ImagePathPicker',
+  'IconPicker',
+  'EssenceSourceSelector'
 ];
 
 let tempRoot;
@@ -44,6 +46,7 @@ function compileManagerV2Root() {
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/CraftingSystemManagerV2Root.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EnvironmentEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EssenceBrowserView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EssenceEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/EnvironmentsTab.svelte');
   for (const componentName of environmentComponentNames) {
     writeCompiledSvelte(`src/ui/svelte/apps/environments/${componentName}.svelte`);
@@ -52,19 +55,23 @@ function compileManagerV2Root() {
     writeCompiledSvelte(`src/ui/svelte/components/${componentName}.svelte`);
   }
 
-  const utilDestination = join(tempRoot, 'src/ui/svelte/util/foundryBridge.js');
-  mkdirSync(dirname(utilDestination), { recursive: true });
-  writeFileSync(
-    utilDestination,
-    readFileSync(resolve(repoRoot, 'src/ui/svelte/util/foundryBridge.js'), 'utf8')
-  );
+  for (const utilPath of ['foundryBridge.js', 'essenceIcons.js', 'fontAwesomeFreeClassicIcons.js', 'iconPickerPopover.js']) {
+    const utilDestination = join(tempRoot, `src/ui/svelte/util/${utilPath}`);
+    mkdirSync(dirname(utilDestination), { recursive: true });
+    writeFileSync(
+      utilDestination,
+      readFileSync(resolve(repoRoot, `src/ui/svelte/util/${utilPath}`), 'utf8')
+    );
+  }
 
-  const actionDestination = join(tempRoot, 'src/ui/svelte/actions/dragDrop.js');
-  mkdirSync(dirname(actionDestination), { recursive: true });
-  writeFileSync(
-    actionDestination,
-    readFileSync(resolve(repoRoot, 'src/ui/svelte/actions/dragDrop.js'), 'utf8')
-  );
+  for (const actionPath of ['dragDrop.js', 'dismissOnOutsideClick.js', 'portal.js']) {
+    const actionDestination = join(tempRoot, `src/ui/svelte/actions/${actionPath}`);
+    mkdirSync(dirname(actionDestination), { recursive: true });
+    writeFileSync(
+      actionDestination,
+      readFileSync(resolve(repoRoot, `src/ui/svelte/actions/${actionPath}`), 'utf8')
+    );
+  }
 }
 
 function navButton(labelText) {
@@ -88,6 +95,7 @@ function writeCompiledSvelte(sourcePath) {
 function createStore(calls = [], options = {}) {
   const selectedFeatures = options.selectedFeatures || {
     essences: true,
+    effectTransfer: true,
     itemTags: true,
     gathering: true,
     recipeCategories: true
@@ -431,6 +439,10 @@ function createStore(calls = [], options = {}) {
       return true;
     },
     removeEssence: (id) => calls.push(['removeEssence', id]),
+    confirmDiscardDirtyEssenceDraft: () => {
+      calls.push(['confirmDiscardDirtyEssenceDraft']);
+      return options.confirmDiscardEssenceResult ?? true;
+    },
     selectEnvironment: (id) => {
       calls.push(['selectEnvironment', id]);
       viewState.update(state => ({
@@ -858,7 +870,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(calls.some(call => call[0] === 'deleteComponent' && call[1] === 'c1'));
   });
 
-  it('routes to the essence browser with source filtering, selection, and inline actions', async () => {
+  it('routes to the essence browser and dedicated edit route without inline editing', async () => {
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -885,6 +897,8 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Linked source'));
     assert.ok(target.textContent.includes('Iron Ore'));
     assert.ok(target.textContent.includes('Deletion blocked'));
+    assert.equal(target.querySelectorAll('.manager-v2-essence-edit-row').length, 0);
+    assert.equal(target.querySelectorAll('#manager-v2-essence-create-name').length, 0);
 
     target.querySelector('[data-essence-id="water"]').click();
     await tick();
@@ -901,36 +915,127 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(target.querySelectorAll('.manager-v2-essence-row').length, 1);
     assert.ok(target.textContent.includes('Water'));
 
-    const nameInput = target.querySelector('#manager-v2-essence-create-name');
-    nameInput.value = 'Air';
-    nameInput.dispatchEvent(new Event('input', { bubbles: true }));
-    target.querySelector('#manager-v2-essence-create-source').value = 'c2';
-    target.querySelector('#manager-v2-essence-create-source').dispatchEvent(new Event('change', { bubbles: true }));
-    await tick();
-    flushSync();
-    target.querySelector('.manager-v2-essence-create-band .manager-v2-button').click();
-    await tick();
-    flushSync();
-    assert.ok(calls.some(call => call[0] === 'addEssence' && call[1] === 'Air' && call[4] === 'c2'));
-
-    target.querySelector('[data-essence-id="water"] [aria-label="Edit Water"]').click();
-    await tick();
-    flushSync();
-    const editName = target.querySelector('[data-essence-id="water"] .manager-v2-essence-edit-row input[aria-label="Name"]');
-    editName.value = 'Rain';
-    editName.dispatchEvent(new Event('input', { bubbles: true }));
-    target.querySelector('[data-essence-id="water"] [aria-label="Save Water"]').click();
-    await tick();
-    flushSync();
-    assert.ok(calls.some(call => call[0] === 'updateEssence' && call[1] === 'water' && call[2].name === 'Rain'));
-
-    target.querySelector('[data-essence-id="water"] [aria-label="Delete Water"]').click();
-    assert.ok(calls.some(call => call[0] === 'removeEssence' && call[1] === 'water'));
     sourceFilter.value = 'all';
     sourceFilter.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
     flushSync();
+
+    target.querySelector('[data-essence-id="water"] [aria-label="Edit Water"]').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'essence-edit');
+    assert.ok(target.textContent.includes('Edit Essence'));
+    assert.ok(target.querySelector('.essence-icon-picker-trigger'), 'edit route should use the shared icon picker trigger');
+    assert.ok(target.querySelector('.essence-source-trigger'), 'effect-transfer systems should show source picker controls');
+
+    const editName = target.querySelector('#manager-v2-essence-edit-name');
+    editName.value = 'Rain';
+    editName.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    target.querySelector('.essence-source-trigger').click();
+    await tick();
+    flushSync();
+    document.querySelector('.essence-source-picker-option[title="Glass Vial"]').click();
+    await tick();
+    flushSync();
+    target.querySelector('.manager-v2-essence-edit-view .manager-v2-button.is-primary').click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateEssence' && call[1] === 'water' && call[2].name === 'Rain' && call[2].sourceComponentId === 'c2'));
+    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'essences');
+
+    target.querySelector('[data-essence-id="water"] [aria-label="Delete Water"]').click();
+    assert.ok(calls.some(call => call[0] === 'removeEssence' && call[1] === 'water'));
+    await tick();
+    flushSync();
     assert.equal(target.querySelector('[data-essence-id="earth"] [aria-label="Delete Earth"]').disabled, true);
+
+    target.querySelector('.manager-v2-essence-action-band .manager-v2-button').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'essence-edit');
+    const createName = target.querySelector('#manager-v2-essence-edit-name');
+    createName.value = 'Air';
+    createName.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    target.querySelector('.manager-v2-essence-edit-view .manager-v2-button.is-primary').click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'addEssence' && call[1] === 'Air'));
+  });
+
+  it('hides manager-v2 essence source UI when effect transfer is disabled', async () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], {
+          selectedFeatures: {
+            essences: true,
+            effectTransfer: false,
+            itemTags: true,
+            gathering: true,
+            recipeCategories: true
+          }
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Essences').click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('[aria-label="Filter essences by source state"]'), null);
+    assert.equal(target.querySelector('.manager-v2-essences-table').classList.contains('has-no-source'), true);
+    assert.equal(target.textContent.includes('Linked source'), false);
+    assert.equal(target.textContent.includes('Source evidence'), false);
+
+    target.querySelector('[data-essence-id="water"] [aria-label="Edit Water"]').click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.essence-source-trigger'), null);
+    assert.equal(target.textContent.includes('Source unresolved'), false);
+  });
+
+  it('protects dirty essence edit drafts when leaving the route', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { confirmDiscardEssenceResult: false }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Essences').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-essence-id="water"] [aria-label="Edit Water"]').click();
+    await tick();
+    flushSync();
+
+    const editName = target.querySelector('#manager-v2-essence-edit-name');
+    editName.value = 'Rain';
+    editName.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+
+    navButton('Recipes').click();
+    await tick();
+    flushSync();
+
+    assert.ok(calls.some(call => call[0] === 'confirmDiscardDirtyEssenceDraft'));
+    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'essence-edit');
+    assert.equal(target.querySelector('#manager-v2-essence-edit-name').value, 'Rain');
   });
 
   it('routes to the environments browser and opens the forced v2 editor route', async () => {

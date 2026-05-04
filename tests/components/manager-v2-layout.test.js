@@ -227,26 +227,51 @@ test('manager-v2 components browser defines drop target and compact responsive t
 
 test('manager-v2 essence browser defines compact responsive table geometry', () => {
   const tableBlock = blockFor('.fabricate-manager-v2 .manager-v2-essences-table');
-  const createBlock = blockFor('.fabricate-manager-v2 .manager-v2-essence-create-band');
+  const noSourceBlock = blockFor('.fabricate-manager-v2 .manager-v2-essences-table.has-no-source');
+  const actionBlock = blockFor('.fabricate-manager-v2 .manager-v2-essence-action-band');
   const identityBlock = blockFor('.fabricate-manager-v2 .manager-v2-essence-identity');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager-v2 (max-width: 1120px)'));
 
   assert.ok(
     css.includes('.fabricate-manager-v2[data-manager-v2-view="essences"] .manager-v2-main'),
-    'essences route should reserve rows for header, create controls, toolbar, and table'
+    'essences route should reserve rows for header, create action, toolbar, and table'
   );
   assert.ok(
     tableBlock.includes('--fab-mv2-essence-grid: minmax(0, 1.45fr)'),
     'essences table should define shrinkable compact columns for normal Foundry manager widths'
   );
   assert.ok(
-    createBlock.includes('grid-template-columns: minmax(130px, 0.72fr)'),
-    'essence create controls should use stable responsive grid columns'
+    noSourceBlock.includes('--fab-mv2-essence-grid: minmax(0, 1.7fr)'),
+    'essences table should have a no-source grid variant when effect transfer is disabled'
+  );
+  assert.ok(
+    actionBlock.includes('grid-template-columns: minmax(0, 1fr) auto;'),
+    'essence browser action band should keep copy and create button in stable columns'
   );
   assert.ok(identityBlock.includes('grid-template-columns: 44px minmax(0, 1fr);'), 'essence identity should reserve icon space');
   assert.ok(
     mediumQuery.includes('.fabricate-manager-v2 .manager-v2-essence-row') && mediumQuery.includes('grid-template-columns: minmax(0, 1fr);'),
     'medium manager-v2 layout should stack essence rows before columns become cramped'
+  );
+});
+
+test('manager-v2 essence edit route defines picker-based responsive geometry', () => {
+  const mainBlock = blockFor('.fabricate-manager-v2[data-manager-v2-view="essence-edit"] .manager-v2-main');
+  const editGridBlock = blockFor('.fabricate-manager-v2 .manager-v2-essence-edit-grid');
+  const sourceBlock = blockFor('.fabricate-manager-v2 .manager-v2-essence-source-edit');
+  const iconTriggerBlock = blockFor('.fabricate-manager-v2 .essence-icon-picker-trigger');
+  const sourceTriggerBlock = blockFor('.fabricate-manager-v2 .essence-source-trigger');
+  const mediumQuery = css.slice(css.indexOf('@container fabricate-manager-v2 (max-width: 680px)'));
+
+  assert.ok(mainBlock.includes('grid-template-rows: auto minmax(0, 1fr);'), 'essence edit route should reserve a header and scrolling editor');
+  assert.ok(editGridBlock.includes('grid-template-columns: 180px minmax(0, 1fr);'), 'essence edit identity fields should reserve stable icon picker space');
+  assert.ok(sourceBlock.includes('grid-template-columns: 150px minmax(0, 1fr);'), 'essence source selector should reserve stable picker and evidence columns');
+  assert.ok(iconTriggerBlock.includes('grid-template-columns: 28px minmax(0, 1fr) 16px;'), 'icon picker trigger should be a real picker control, not a raw text field');
+  assert.ok(sourceTriggerBlock.includes('aspect-ratio: 1 / 1;'), 'source picker should keep a stable drop target');
+  assert.ok(
+    mediumQuery.includes('.fabricate-manager-v2 .manager-v2-essence-edit-grid')
+      && mediumQuery.includes('.fabricate-manager-v2 .manager-v2-essence-source-edit'),
+    'narrow manager-v2 layout should stack essence edit controls'
   );
 });
 

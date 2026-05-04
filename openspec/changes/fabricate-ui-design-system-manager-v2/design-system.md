@@ -150,6 +150,25 @@ Rules:
 - selected row uses green border or green-tinted row fill, not large motion
 - hover/focus must not shift row geometry
 
+### Manager V2 Browser Route
+
+Feature browsers promoted from placeholders use one durable page pattern:
+
+1. Compact section header with selected-system context.
+2. Optional create/import band when the route owns creation.
+3. Toolbar with search, filters, and a count chip.
+4. Scrollable table/list using stable row geometry.
+5. Selected-row inspector with evidence and actions.
+
+Promotion checklist:
+
+- remove the feature from disabled placeholder/deferred-view collections
+- add feature-gated left-nav button and active state
+- add route normalization for feature-disabled systems
+- add breadcrumbs, title, subtitle, and header action labels
+- render a focused route component rather than adding another oversized branch to the root shell
+- add mounted and source-contract tests proving the route is enabled, clickable, and no longer a placeholder
+
 ### Inspector
 
 Inspectors provide selected-object evidence and quick actions.
@@ -222,8 +241,32 @@ Required status vocabulary:
 - `Draft`: blue
 - `Invalid`: red
 - `Warning` or `Stale`: amber
+- `Linked`: green
+- `Missing`: amber
+- `None`: muted/disabled
 
 Chips should be compact, with radius `5px` to `6px`.
+
+### Source State
+
+Source-linked management views use consistent source-state language:
+
+- `linked`: the configured source resolves and can be used.
+- `missing`: the managed source exists but lacks the source item/template evidence required by the feature.
+- `stale`: stored source evidence exists but no longer resolves to the expected managed source.
+- `none`: no source has been configured.
+
+Do not silently erase stale source evidence from UI display data. Show enough text evidence for the GM to recognize and clear or repair the link.
+
+### Delete-Blocked State
+
+Destructive actions that are blocked by derived usage evidence use a consistent pattern:
+
+- the destructive icon/button is disabled or guarded
+- the tooltip/title explains the blocking condition
+- a warning chip appears near the selected object or row action
+- the inspector includes the usage evidence and a short remediation hint
+- clicking the blocked control must not call the destructive store/service action
 
 ### Toggles
 
@@ -350,8 +393,11 @@ Essence editors manage lightweight system-owned definitions, not inventory items
 Required patterns:
 
 - Essence identity is icon-first: icon, name, description, and id.
-- Source item linkage is visible as a stateful relationship: linked, stale, missing, or none.
+- Browse screens are not edit forms. Essence create/edit mutations use dedicated manager-v2 routes, while browse rows and inspectors remain selection, evidence, and navigation surfaces.
+- Essence icon editing uses a pop-over icon picker, not a raw FontAwesome class text field as the primary interaction.
+- Source item linkage is visible as a stateful relationship only when effect transfer is enabled: linked, stale, missing, or none.
 - Source linking uses drag/drop or picker workflows; manual UUID entry is not the primary path.
+- Source UI is shown only when the selected system has effect transfer enabled. When effect transfer is disabled, browse and edit surfaces hide source columns, source filters, source sections, source warnings, and source controls rather than showing disabled source UI.
 - Usage summaries count components and recipe structures that reference the essence.
 - Deleting or changing an essence must surface component-usage impact.
 - Effect-transfer readiness is shown only from real source-item resolution when effect transfer is enabled.

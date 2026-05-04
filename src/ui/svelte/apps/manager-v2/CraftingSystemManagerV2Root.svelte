@@ -4,6 +4,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import EnvironmentEditView from './EnvironmentEditView.svelte';
   import EssenceBrowserView from './EssenceBrowserView.svelte';
+  import EssenceEditView from './EssenceEditView.svelte';
 
   let { store, services = null } = $props();
 
@@ -26,6 +27,8 @@
   let selectedEssenceId = $state('');
   let lastComponentSystemId = $state('');
   let lastEssenceSystemId = $state('');
+  let essenceEditDirty = $state(false);
+  let essenceEditSaving = $state(false);
   let systemNameValue = $state('');
   let systemDescriptionValue = $state('');
   let systemResolutionModeValue = $state('simple');
@@ -54,6 +57,7 @@
   const selectedSystemId = $derived(selectedSystem?.id || '');
   const canShowEnvironments = $derived(selectedSystem?.features?.gathering === true);
   const canShowEssences = $derived(selectedSystem?.features?.essences === true);
+  const showEssenceSourceUi = $derived(selectedSystem?.features?.effectTransfer === true);
   const currentView = $derived(normalizedActiveView(activeView, selectedSystem, canShowEnvironments, canShowEssences));
   const normalizedSystemSearchTerm = $derived(systemSearchTerm.trim().toLowerCase());
   const filteredSystems = $derived(($viewState.systems || []).filter(system => {
@@ -114,11 +118,13 @@
       || null
   );
   const essenceCards = $derived($viewState.essenceCards || selectedSystem?.essenceDefinitions || []);
+  const selectedEssenceStrict = $derived(essenceCards.find(essence => essence.id === selectedEssenceId) || null);
   const selectedEssence = $derived(
-    essenceCards.find(essence => essence.id === selectedEssenceId)
+    selectedEssenceStrict
       || essenceCards[0]
       || null
   );
+  const selectedEssenceForInspector = $derived(currentView === 'essence-edit' ? selectedEssenceStrict : selectedEssence);
   const componentTableClass = $derived([
     'manager-v2-components-table',
     showComponentTags ? '' : 'has-no-tags',
@@ -178,7 +184,14 @@
   $effect(() => {
     if (selectedSystemId === lastEssenceSystemId) return;
     selectedEssenceId = '';
+    essenceEditDirty = false;
+    essenceEditSaving = false;
     lastEssenceSystemId = selectedSystemId;
+  });
+
+  $effect(() => {
+    services?.registerEssenceDirtyGuard?.(() => confirmEssenceRouteExit('close'));
+    return () => services?.registerEssenceDirtyGuard?.(null);
   });
 
   function text(key, fallback) {
@@ -276,7 +289,7 @@
   function normalizedActiveView(view, system, environmentsAvailable, essencesAvailable) {
     if (!system) return 'systems';
     if ((view === 'environments' || view === 'environment-edit') && !environmentsAvailable) return 'systems';
-    if (view === 'essences' && !essencesAvailable) return 'systems';
+    if ((view === 'essences' || view === 'essence-edit') && !essencesAvailable) return 'systems';
     return view;
   }
 
@@ -284,6 +297,7 @@
     if (currentView === 'recipes') return text('FABRICATE.Admin.ManagerV2.Recipe.Title', 'Recipes');
     if (currentView === 'components') return text('FABRICATE.Admin.ManagerV2.Component.Title', 'Components');
     if (currentView === 'essences') return text('FABRICATE.Admin.ManagerV2.Essence.Title', 'Essences');
+    if (currentView === 'essence-edit') return text('FABRICATE.Admin.ManagerV2.Essence.EditTitle', 'Edit essence');
     if (currentView === 'environments') return text('FABRICATE.Admin.ManagerV2.Environment.Title', 'Environments');
     if (currentView === 'environment-edit') return text('FABRICATE.Admin.ManagerV2.Environment.EditTitle', 'Edit environment');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.ManagerV2.SystemEdit.Title', 'System settings');
@@ -294,6 +308,7 @@
     if (currentView === 'recipes') return text('FABRICATE.Admin.ManagerV2.Recipe.Subtitle', 'Manage recipes for the selected crafting system.');
     if (currentView === 'components') return text('FABRICATE.Admin.ManagerV2.Component.Subtitle', 'Manage item-backed components for the selected crafting system.');
     if (currentView === 'essences') return text('FABRICATE.Admin.ManagerV2.Essence.Subtitle', 'Manage essence definitions for the selected crafting system.');
+    if (currentView === 'essence-edit') return text('FABRICATE.Admin.ManagerV2.Essence.EditSubtitle', 'Create or edit an essence definition without inline browser controls.');
     if (currentView === 'environments') return text('FABRICATE.Admin.ManagerV2.Environment.Subtitle', 'Manage gathering environments for the selected crafting system.');
     if (currentView === 'environment-edit') return text('FABRICATE.Admin.ManagerV2.Environment.EditSubtitle', 'Edit scene linkage, environment details, tasks, results, catalysts, visibility, timing, and validation in the v2 workspace.');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.ManagerV2.SystemEdit.Subtitle', 'Edit base settings for the selected crafting system without leaving manager v2.');
@@ -339,6 +354,12 @@
     return true;
   }
 
+  function finishEssenceRouteExit(confirmed) {
+    if (confirmed === false) return false;
+    essenceEditDirty = false;
+    return true;
+  }
+
   function confirmEnvironmentRouteExit(nextView) {
     if (activeView !== 'environment-edit' || nextView === 'environment-edit') return true;
     if ($viewState.environmentDraftDirty !== true) return true;
@@ -347,11 +368,32 @@
     return finishEnvironmentRouteExit(confirmed);
   }
 
+  function confirmEssenceRouteExit(nextView) {
+    if (activeView !== 'essence-edit') return true;
+    if (essenceEditDirty !== true) return true;
+    const confirmed = store.confirmDiscardDirtyEssenceDraft?.()
+      ?? services?.confirmDiscardEssenceDraft?.()
+      ?? (typeof globalThis.confirm === 'function'
+        ? globalThis.confirm(text('FABRICATE.Admin.ManagerV2.Essence.DiscardDirtyContent', 'The current essence has unsaved changes. Discard them and continue?'))
+        : false);
+    if (isPromise(confirmed)) return confirmed.then(finishEssenceRouteExit);
+    return finishEssenceRouteExit(confirmed);
+  }
+
+  function confirmRouteExit(nextView) {
+    const environmentConfirmed = confirmEnvironmentRouteExit(nextView);
+    if (isPromise(environmentConfirmed)) {
+      return environmentConfirmed.then(value => value === false ? false : confirmEssenceRouteExit(nextView));
+    }
+    if (environmentConfirmed === false) return false;
+    return confirmEssenceRouteExit(nextView);
+  }
+
   function setView(view) {
     if ((view === 'recipes' || view === 'components' || view === 'system-edit') && !selectedSystem) return;
     if ((view === 'environments' || view === 'environment-edit') && !canShowEnvironments) return;
-    if (view === 'essences' && !canShowEssences) return;
-    afterTruthyResult(confirmEnvironmentRouteExit(view), () => { activeView = view; });
+    if ((view === 'essences' || view === 'essence-edit') && !canShowEssences) return;
+    afterTruthyResult(confirmRouteExit(view), () => { activeView = view; });
   }
 
   function selectSystem(systemId, nextView = 'systems') {
@@ -361,7 +403,7 @@
       return selected !== false;
     };
     if (systemId === selectedSystemId) {
-      const confirmed = confirmEnvironmentRouteExit(nextView);
+      const confirmed = confirmRouteExit(nextView);
       if (isPromise(confirmed)) return confirmed.then(value => value === false ? false : runSelection());
       if (confirmed === false) return false;
     }
@@ -369,7 +411,7 @@
   }
 
   function selectSystemAndShowBrowser(systemId = selectedSystemId) {
-    const selected = systemId ? selectSystem(systemId, 'systems') : confirmEnvironmentRouteExit('systems');
+    const selected = systemId ? selectSystem(systemId, 'systems') : confirmRouteExit('systems');
     afterTruthyResult(selected, () => { activeView = 'systems'; });
   }
 
@@ -379,12 +421,18 @@
   }
 
   function backToSystemsBrowser() {
-    afterTruthyResult(confirmEnvironmentRouteExit('systems'), () => { activeView = 'systems'; });
+    afterTruthyResult(confirmRouteExit('systems'), () => { activeView = 'systems'; });
   }
 
   function backToEnvironmentsBrowse() {
-    afterTruthyResult(confirmEnvironmentRouteExit('environments'), () => {
+    afterTruthyResult(confirmRouteExit('environments'), () => {
       activeView = canShowEnvironments ? 'environments' : 'systems';
+    });
+  }
+
+  function backToEssencesBrowse() {
+    afterTruthyResult(confirmRouteExit('essences'), () => {
+      activeView = canShowEssences ? 'essences' : 'systems';
     });
   }
 
@@ -447,6 +495,25 @@
 
   function selectEssence(essenceId) {
     selectedEssenceId = essenceId;
+  }
+
+  function createEssenceDraft() {
+    if (!canShowEssences) return;
+    afterTruthyResult(confirmRouteExit('essence-edit'), () => {
+      selectedEssenceId = '';
+      essenceEditDirty = false;
+      activeView = 'essence-edit';
+    });
+  }
+
+  function editEssence(essenceId = selectedEssence?.id) {
+    if (!essenceId || !canShowEssences) return;
+    if (currentView === 'essence-edit' && essenceId === selectedEssenceId) return;
+    afterTruthyResult(confirmRouteExit('essence-edit'), () => {
+      selectedEssenceId = essenceId;
+      essenceEditDirty = false;
+      activeView = 'essence-edit';
+    });
   }
 
   function selectSystemRow(systemId) {
@@ -553,17 +620,44 @@
     store.deleteComponent?.(itemId);
   }
 
-  function createEssence(name, description, icon, sourceComponentId) {
-    return store.addEssence?.(name, description, icon, sourceComponentId);
+  async function saveEssenceEdit(essenceId, updates) {
+    if (essenceEditSaving) return false;
+    essenceEditSaving = true;
+    try {
+      const result = essenceId
+        ? await store.updateEssence?.(essenceId, updates)
+        : await store.addEssence?.(
+          updates.name,
+          updates.description,
+          updates.icon,
+          showEssenceSourceUi ? updates.sourceComponentId || null : null
+        );
+      if (result === false) return false;
+      essenceEditDirty = false;
+      activeView = canShowEssences ? 'essences' : 'systems';
+      return result;
+    } catch (err) {
+      return false;
+    } finally {
+      essenceEditSaving = false;
+    }
   }
 
-  function updateEssence(essenceId, updates) {
-    return store.updateEssence?.(essenceId, updates);
+  function cancelEssenceEdit() {
+    afterTruthyResult(confirmRouteExit('essences'), () => {
+      activeView = canShowEssences ? 'essences' : 'systems';
+    });
   }
 
   function removeEssence(essenceId = selectedEssence?.id) {
     if (!essenceId) return;
+    const essence = essenceCards.find(card => card.id === essenceId);
+    if (essence?.deleteBlocked) return;
     store.removeEssence?.(essenceId);
+  }
+
+  function importEssenceSourceDrop(data) {
+    return services?.importSingleManagedItemFromDrop?.(data) ?? null;
   }
 
   function selectEnvironment(environmentId = selectedEnvironment?.id) {
@@ -990,6 +1084,12 @@
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.ManagerV2.Nav.Essences', 'Essences')}</span>
         {/if}
+        {#if currentView === 'essence-edit'}
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <button type="button" onclick={backToEssencesBrowse}>{text('FABRICATE.Admin.ManagerV2.Nav.Essences', 'Essences')}</button>
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.ManagerV2.Essence.EditBreadcrumb', 'Edit Essence')}</span>
+        {/if}
         {#if currentView === 'environments'}
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.ManagerV2.Nav.Environments', 'Environments')}</span>
@@ -1008,7 +1108,7 @@
       <h1 class="manager-v2-title">{viewTitle()}</h1>
       <p class="manager-v2-subtitle">{viewSubtitle()}</p>
     </div>
-    <div class="manager-v2-header-actions" aria-label={currentView === 'recipes' ? text('FABRICATE.Admin.ManagerV2.Recipe.Actions', 'Recipe actions') : currentView === 'components' ? text('FABRICATE.Admin.ManagerV2.Component.Actions', 'Component actions') : currentView === 'essences' ? text('FABRICATE.Admin.ManagerV2.Essence.Actions', 'Essence actions') : currentView === 'environments' || currentView === 'environment-edit' ? text('FABRICATE.Admin.ManagerV2.Environment.Actions', 'Environment actions') : currentView === 'system-edit' ? text('FABRICATE.Admin.ManagerV2.SystemEdit.Actions', 'System edit actions') : text('FABRICATE.Admin.ManagerV2.SystemActions', 'System actions')}>
+    <div class="manager-v2-header-actions" aria-label={currentView === 'recipes' ? text('FABRICATE.Admin.ManagerV2.Recipe.Actions', 'Recipe actions') : currentView === 'components' ? text('FABRICATE.Admin.ManagerV2.Component.Actions', 'Component actions') : currentView === 'essences' || currentView === 'essence-edit' ? text('FABRICATE.Admin.ManagerV2.Essence.Actions', 'Essence actions') : currentView === 'environments' || currentView === 'environment-edit' ? text('FABRICATE.Admin.ManagerV2.Environment.Actions', 'Environment actions') : currentView === 'system-edit' ? text('FABRICATE.Admin.ManagerV2.SystemEdit.Actions', 'System edit actions') : text('FABRICATE.Admin.ManagerV2.SystemActions', 'System actions')}>
       {#if currentView === 'recipes'}
         <button type="button" class="manager-v2-button" onclick={importRecipes} disabled={!selectedSystemId}>
           <i class="fas fa-file-import" aria-hidden="true"></i>
@@ -1028,9 +1128,17 @@
           <span>{text('FABRICATE.Admin.ManagerV2.OpenCurrentAdmin', 'Open current admin')}</span>
         </button>
       {:else if currentView === 'essences'}
-        <button type="button" class="manager-v2-button" onclick={openCurrentAdmin}>
-          <i class="fas fa-book" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.ManagerV2.OpenCurrentAdmin', 'Open current admin')}</span>
+        <button type="button" class="manager-v2-button is-primary" onclick={createEssenceDraft}>
+          <i class="fas fa-plus" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.ManagerV2.Essence.Create', 'Create essence')}</span>
+        </button>
+      {:else if currentView === 'essence-edit'}
+        {#if essenceEditDirty}
+          <span class="manager-v2-chip is-warning">{text('FABRICATE.Admin.ManagerV2.Essence.Dirty', 'Unsaved')}</span>
+        {/if}
+        <button type="button" class="manager-v2-button" onclick={cancelEssenceEdit}>
+          <i class="fas fa-arrow-left" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.ManagerV2.Essence.BackToBrowse', 'Back to essences')}</span>
         </button>
       {:else if currentView === 'environments'}
         <button type="button" class="manager-v2-button is-primary" onclick={createEnvironment} disabled={!canShowEnvironments}>
@@ -1120,7 +1228,7 @@
             <span class="manager-v2-nav-count">{selectedCounts.components}</span>
           </button>
           {#if canShowEssences}
-            <button type="button" class={`manager-v2-nav-button ${currentView === 'essences' ? 'is-active' : ''}`} aria-current={currentView === 'essences' ? 'page' : undefined} onclick={() => setView('essences')}>
+            <button type="button" class={`manager-v2-nav-button ${currentView === 'essences' || currentView === 'essence-edit' ? 'is-active' : ''}`} aria-current={currentView === 'essences' || currentView === 'essence-edit' ? 'page' : undefined} onclick={() => setView('essences')}>
               <i class="fas fa-mortar-pestle" aria-hidden="true"></i>
               <span class="manager-v2-nav-label">{text('FABRICATE.Admin.ManagerV2.Nav.Essences', 'Essences')}</span>
               <span class="manager-v2-nav-count">{selectedCounts.essences}</span>
@@ -1355,12 +1463,23 @@
     {:else if currentView === 'essences' && selectedSystem}
       <EssenceBrowserView
         {essenceCards}
-        managedItemOptions={selectedSystem.managedItemOptions || []}
+        showSourceUi={showEssenceSourceUi}
         selectedEssenceId={selectedEssence?.id || selectedEssenceId}
         onSelectEssence={selectEssence}
-        onCreateEssence={createEssence}
-        onUpdateEssence={updateEssence}
+        onCreateEssence={createEssenceDraft}
+        onEditEssence={editEssence}
         onRemoveEssence={removeEssence}
+      />
+    {:else if currentView === 'essence-edit' && selectedSystem}
+      <EssenceEditView
+        essence={selectedEssenceId ? selectedEssenceForInspector : null}
+        managedItemOptions={selectedSystem.managedItemOptions || []}
+        showSourceUi={showEssenceSourceUi}
+        saving={essenceEditSaving}
+        onSave={saveEssenceEdit}
+        onCancel={cancelEssenceEdit}
+        onDirtyChange={(dirty) => { essenceEditDirty = dirty; }}
+        onImportSourceDrop={importEssenceSourceDrop}
       />
     {:else if currentView === 'components'}
       <main class="manager-v2-main" aria-label={text('FABRICATE.Admin.ManagerV2.Nav.Components', 'Components')}>
@@ -1860,7 +1979,7 @@
     {/if}
 
     {#if currentView !== 'environment-edit'}
-    <aside class="manager-v2-inspector" aria-label={currentView === 'recipes' ? text('FABRICATE.Admin.ManagerV2.Recipe.Inspector', 'Selected recipe inspector') : currentView === 'components' ? text('FABRICATE.Admin.ManagerV2.Component.Inspector', 'Selected component inspector') : currentView === 'essences' ? text('FABRICATE.Admin.ManagerV2.Essence.Inspector', 'Selected essence inspector') : currentView === 'environments' ? text('FABRICATE.Admin.ManagerV2.Environment.Inspector', 'Selected environment inspector') : currentView === 'system-edit' ? text('FABRICATE.Admin.ManagerV2.SystemEdit.Inspector', 'System edit evidence') : text('FABRICATE.Admin.ManagerV2.SelectedSystemInspector', 'Selected system inspector')}>
+    <aside class="manager-v2-inspector" aria-label={currentView === 'recipes' ? text('FABRICATE.Admin.ManagerV2.Recipe.Inspector', 'Selected recipe inspector') : currentView === 'components' ? text('FABRICATE.Admin.ManagerV2.Component.Inspector', 'Selected component inspector') : currentView === 'essences' || currentView === 'essence-edit' ? text('FABRICATE.Admin.ManagerV2.Essence.Inspector', 'Selected essence inspector') : currentView === 'environments' ? text('FABRICATE.Admin.ManagerV2.Environment.Inspector', 'Selected environment inspector') : currentView === 'system-edit' ? text('FABRICATE.Admin.ManagerV2.SystemEdit.Inspector', 'System edit evidence') : text('FABRICATE.Admin.ManagerV2.SelectedSystemInspector', 'Selected system inspector')}>
       {#if currentView === 'environments' || currentView === 'environment-edit'}
         {#if selectedEnvironment}
           <section class="manager-v2-inspector-card">
@@ -1953,55 +2072,81 @@
             </div>
           </div>
         {/if}
-      {:else if currentView === 'essences'}
-        {#if selectedEssence}
+      {:else if currentView === 'essences' || currentView === 'essence-edit'}
+        {#if selectedEssenceForInspector}
           <section class="manager-v2-inspector-card">
             <div class="manager-v2-inspector-title-row">
               <span class="manager-v2-inspector-icon" aria-hidden="true">
-                <i class={selectedEssence.icon || 'fas fa-mortar-pestle'}></i>
+                <i class={selectedEssenceForInspector.icon || 'fas fa-mortar-pestle'}></i>
               </span>
               <div class="manager-v2-inspector-copy">
                 <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Essence.Selected', 'Selected essence')}</p>
-                <h2 class="manager-v2-inspector-name" title={selectedEssence.name}>{selectedEssence.name}</h2>
+                <h2 class="manager-v2-inspector-name" title={selectedEssenceForInspector.name}>{selectedEssenceForInspector.name}</h2>
                 <div class="manager-v2-chip-row">
-                  <span class={`manager-v2-chip ${essenceSourceState(selectedEssence).className}`}>{essenceSourceState(selectedEssence).label}</span>
-                  {#if selectedEssence.deleteBlocked}
+                  {#if showEssenceSourceUi}
+                    <span class={`manager-v2-chip ${essenceSourceState(selectedEssenceForInspector).className}`}>{essenceSourceState(selectedEssenceForInspector).label}</span>
+                  {/if}
+                  {#if selectedEssenceForInspector.deleteBlocked}
                     <span class="manager-v2-chip is-warning">{text('FABRICATE.Admin.ManagerV2.Essence.DeleteBlockedShort', 'In use')}</span>
                   {/if}
                 </div>
               </div>
             </div>
             <p class="manager-v2-muted">
-              {selectedEssence.description || text('FABRICATE.Admin.ManagerV2.NoDescriptionAdded', 'No description has been added.')}
+              {selectedEssenceForInspector.description || text('FABRICATE.Admin.ManagerV2.NoDescriptionAdded', 'No description has been added.')}
             </p>
           </section>
 
+          {#if showEssenceSourceUi}
           <section class="manager-v2-inspector-card">
             <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Essence.SourceEvidence', 'Source evidence')}</h3>
             <div class="manager-v2-requirements-list">
               <div class="manager-v2-requirement-row">
                 <span>{text('FABRICATE.Admin.ManagerV2.Essence.Source', 'Source')}</span>
-                <strong>{selectedEssence.sourceName || essenceSourceState(selectedEssence).label}</strong>
+                <strong>{selectedEssenceForInspector.sourceName || essenceSourceState(selectedEssenceForInspector).label}</strong>
               </div>
+            </div>
+          </section>
+          {/if}
+
+          <section class="manager-v2-inspector-card">
+            <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Essence.Usage', 'Usage')}</h3>
+            <div class="manager-v2-requirements-list">
               <div class="manager-v2-requirement-row">
                 <span>{text('FABRICATE.Admin.ManagerV2.Essence.Usage', 'Usage')}</span>
-                <strong>{text('FABRICATE.Admin.ManagerV2.Essence.ComponentUsageCount', '{count} components').replace('{count}', selectedEssence.componentUsageCount || 0)}</strong>
+                <strong>{text('FABRICATE.Admin.ManagerV2.Essence.ComponentUsageCount', '{count} components').replace('{count}', selectedEssenceForInspector.componentUsageCount || 0)}</strong>
               </div>
             </div>
           </section>
 
-          {#if selectedEssence.deleteBlocked}
+          {#if selectedEssenceForInspector.deleteBlocked}
             <section class="manager-v2-inspector-card">
               <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Essence.UsageBlockedTitle', 'Deletion blocked')}</h3>
               <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Essence.UsageBlockedHint', 'Remove this essence from components before deleting the definition.')}</p>
             </section>
           {/if}
+
+          <section class="manager-v2-inspector-card">
+            <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Essence.Actions', 'Essence actions')}</h3>
+            <div class="manager-v2-inspector-actions">
+              <button type="button" class="manager-v2-button" onclick={() => editEssence()}>
+                <i class="fas fa-edit" aria-hidden="true"></i>
+                <span>{text('FABRICATE.Admin.ManagerV2.Essence.Edit', 'Edit essence')}</span>
+              </button>
+              <button type="button" class="manager-v2-button is-danger" onclick={() => removeEssence()} disabled={selectedEssenceForInspector.deleteBlocked}>
+                <i class="fas fa-trash" aria-hidden="true"></i>
+                <span>{text('FABRICATE.Admin.ManagerV2.Essence.Delete', 'Delete essence')}</span>
+              </button>
+            </div>
+          </section>
         {:else}
           <div class="manager-v2-empty">
             <div>
               <i class="fas fa-mortar-pestle" aria-hidden="true"></i>
               <h3>{text('FABRICATE.Admin.ManagerV2.Essence.SelectEssence', 'Select an essence')}</h3>
-              <p>{text('FABRICATE.Admin.ManagerV2.Essence.InspectorHint', 'The inspector shows source linkage and component usage for the selected essence.')}</p>
+              <p>{showEssenceSourceUi
+                ? text('FABRICATE.Admin.ManagerV2.Essence.InspectorHint', 'The inspector shows source linkage and component usage for the selected essence.')
+                : text('FABRICATE.Admin.ManagerV2.Essence.InspectorNoSourceHint', 'The inspector shows identity and component usage for the selected essence.')}</p>
             </div>
           </div>
         {/if}

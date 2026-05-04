@@ -70,6 +70,7 @@ Selected-system navigation:
 - When no crafting systems exist, selected-system feature tabs are hidden and the systems browser is the active management surface.
 - When a crafting system is selected, `System settings` is the first left-nav item and stays in that position regardless of feature gates.
 - Feature-scoped left-nav items are visible only when their feature is enabled or otherwise available for the selected system.
+- Feature-scoped routes that have been implemented must be enabled navigation controls, not disabled placeholders. If a route is still planned only, it may remain in the placeholder/deferred-view set.
 - The root `Crafting Systems` breadcrumb returns to the systems browser. The selected-system breadcrumb opens that system's in-manager System settings route.
 - The selected-system rail scope shows the selected system name as static text plus a `Return to System Library` icon button. Activating that button returns to the systems browser without clearing the real selected-system store state.
 
@@ -208,12 +209,16 @@ Only shown when essences are enabled.
 
 Capabilities:
 
-- Create, edit, delete essence definitions.
+- Browse, create, edit, duplicate when supported, and delete essence definitions.
 - Set a FontAwesome icon for an essence (or fall-back to the default, `fas fa-mortar-pestle`)
-- Set optional source component identity by picker/drag-drop. The source component may in turn expose a source item UUID.
+- Set optional source component identity by picker/drag-drop only when effect transfer is enabled. The source component may in turn expose a source item UUID.
 - In Manager V2, the Essences left-nav item is a real route, not a disabled placeholder, whenever the selected system has `features.essences === true`.
-- Manager V2 shows source-link state and component usage evidence for essence definitions.
+- Manager V2 shows component usage evidence for essence definitions and shows source-link state only when `features.effectTransfer === true`.
+- Manager V2 does not allow inline editing on the browse essences page; the row Edit action opens a dedicated edit essence view.
+- Manager V2 essence icon editing uses a pop-over icon picker instead of requiring raw icon class entry.
+- Manager V2 hides source columns, source filters, source inspector sections, source warnings, and source edit controls unless `features.effectTransfer === true`.
 - Manager V2 prevents essence deletion while one or more managed components reference that essence with a positive quantity.
+- Manager V2 source-state language is `linked`, `missing`, `stale`, and `none`; stale source evidence must remain readable until the GM clears or repairs it.
 
 ### Recipes Tab
 

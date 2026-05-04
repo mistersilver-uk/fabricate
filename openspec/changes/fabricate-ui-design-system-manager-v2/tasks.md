@@ -368,6 +368,20 @@ The first v2 environment edit route is behaviorally wired but visually wrong. It
 - [x] Pointer hit tests cover row selection, row action menus, toggles, search/filter controls, view toggles, primary actions, and inspector quick actions.
 - [x] Focus-visible states remain clear after styling.
 
+## Corrective Implementation Plan: Edit Essence View
+
+- [x] Review [Edit Essence](<references/Edit Essence.png>) against current essence browser implementation and Fabricate essence semantics.
+- [x] Update the manager-v2 UI delta and canonical UI integration spec so browse essences is browse-only and editing moves to a dedicated route.
+- [ ] Add a manager-v2 `edit-essence` route with breadcrumb trail `Crafting Systems > {system} > Essences > Edit Essence`.
+- [ ] Change essence row Edit and inspector Edit actions to select the essence and open the `edit-essence` route instead of toggling inline edit controls.
+- [ ] Remove inline edit state and controls from the browse essences page; retain row selection, filters, source-state evidence, usage evidence, and non-inline actions.
+- [ ] Build a focused edit essence component owned by the manager-v2 route. It should expose identity fields, dirty-state tracking, save/cancel, validation, and route-exit protection using existing admin-store essence actions.
+- [ ] Use the existing icon picker as a pop-over for essence icon selection; do not expose raw icon class entry as the primary edit control.
+- [ ] Show all source UI only when the selected system has `features.effectTransfer === true`; hide source columns, filters, source item card, source inspector sections, drop zone, replace/clear controls, and source warnings when effect transfer is disabled.
+- [ ] When effect transfer is enabled, source selection must use picker and drag/drop flows, preserve stale source evidence, and surface whether the linked source resolves and can provide effects.
+- [ ] Preserve the right evidence rail from the reference: identity preview, details/usage/source evidence where applicable, validation, duplicate/delete actions, and no unsupported decorative metrics.
+- [ ] Update localization, mounted tests, layout tests, and Foundry/Playwright smoke coverage for browse-only essences, edit-route navigation, pop-over icon picker, conditional source panel, dirty save/cancel, and responsive screenshots.
+
 ## Verification For This Planning Change
 
 - [x] `git diff --check -- openspec/changes/fabricate-ui-design-system-manager-v2`

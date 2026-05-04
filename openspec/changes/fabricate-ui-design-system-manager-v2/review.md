@@ -481,3 +481,23 @@ Screenshot and pointer acceptance:
 
 - Normal-width systems screenshot must show breadcrumbs, no `Systems` left-rail tab, contained system names/descriptions/badges, no duplicate row counts, and a tidy inspector header.
 - Pointer hit tests must cover root breadcrumb, selected-system scope click, system row selection, system Edit, Export, Delete, and the existing recipe navigation.
+
+## Design Review: Edit Essence Reference
+
+The new [Edit Essence](<references/Edit Essence.png>) reference is a dedicated edit-route concept, not an inline expansion of the browse essences table.
+
+Accepted direction:
+
+- Route hierarchy: `Crafting Systems > {system} > Essences > Edit Essence`.
+- Top save/cancel strip with dirty-state evidence.
+- Primary identity card with icon, name, and description.
+- Pop-over icon selection opened from a `Change Icon` style control.
+- Conditional effect source card with linked source item evidence, open/replace actions, drag/drop or browse linking, and stale-impact warnings.
+- Right evidence rail with identity preview, details/usage/source sections, validation, duplicate, and delete actions.
+
+Corrections before implementation:
+
+- The browse essences page must not contain inline edit fields. Row Edit opens this route.
+- Source UI appears only when effect transfer is enabled for the selected system. When disabled, hide source columns, filters, source sections, warnings, and controls rather than showing inert source UI.
+- The icon picker must be a pop-over picker. Raw FontAwesome class entry may exist only as an advanced fallback, not the primary interaction.
+- Usage tiles must be derived from real Fabricate references; do not add unsupported created/updated/user metadata unless the store can supply it.

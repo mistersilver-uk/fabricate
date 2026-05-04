@@ -941,7 +941,8 @@ The following canonical field names must be used in all new writes:
 | IngredientSet | `ingredientGroups` | Array of ingredient group objects |
 | Recipe | `resultGroups` | Array of result group objects |
 | Recipe | `recipeItemId` | Recipe item definition reference |
-| EssenceDefinition | `sourceItemUuid` | Template item reference |
+| EssenceDefinition | `sourceComponentId` | Managed component source reference |
+| EssenceDefinition | `sourceItemUuid` | Resolved or legacy template item evidence for effect transfer |
 | Component | `sourceItemUuid` | Template item reference |
 | RecipeItemDefinition | `sourceItemUuid` | Template item reference |
 | CraftingSystem | `itemTags` | Array of tag strings |
@@ -959,7 +960,8 @@ The following legacy aliases are accepted by constructors and normalization func
 | `managedItems` | `components` | CraftingSystem | Normalization and migration rename to `components` |
 | `ingredients` (flat array) | `ingredientGroups` | IngredientSet | Constructor wraps each ingredient into a single-option group |
 | `results` (flat array) | `resultGroups` | Recipe | Constructor wraps into a single result group |
-| `associatedSystemItemId` | `sourceItemUuid` | EssenceDefinition, Component | Constructor reads as fallback for `sourceItemUuid` |
+| `associatedSystemItemId` | `sourceComponentId` | EssenceDefinition | Normalization reads as fallback for the managed source component reference |
+| `associatedSystemItemId` | `sourceItemUuid` | Component | Constructor reads as fallback for `sourceItemUuid` |
 | `tags` | `itemTags` | CraftingSystem | Normalization reads `tags` as fallback for `itemTags` |
 | `catalystUses` (bare number) | `catalystItemUsage.timesUsed` | Item flag | Runtime reads legacy flag and converts to `{ timesUsed }` shape |
 | `sourceUuid` | `sourceItemUuid` | Component | Normalization reads as fallback |
@@ -972,7 +974,7 @@ The following aliases are currently emitted in `toJSON()` / normalization output
 - `systemItemId` (emitted alongside `componentId` in Catalyst, Ingredient, Result)
 - `ingredients` (emitted alongside `ingredientGroups` in IngredientSet)
 - `results` (emitted alongside `resultGroups` in Recipe)
-- `associatedSystemItemId` (emitted alongside `sourceItemUuid` in EssenceDefinition, Component)
+- `associatedSystemItemId` (emitted alongside `sourceComponentId` in EssenceDefinition and alongside `sourceItemUuid` in Component)
 - `tags` (emitted alongside `itemTags` in CraftingSystem normalization)
 - `sourceUuid` (emitted alongside `sourceItemUuid` in Component normalization)
 - UI convenience aliases (`enableTags`, `enableEssences`, `enableCategories`, `enableMultiStepRecipes`, `advancedOptionsEnabled`)

@@ -4,32 +4,29 @@
 
   let {
     essenceCards = [],
-    managedItemOptions = [],
+    showSourceUi = false,
     selectedEssenceId = '',
     onSelectEssence = () => {},
     onCreateEssence = () => {},
-    onUpdateEssence = () => {},
+    onEditEssence = () => {},
     onRemoveEssence = () => {}
   } = $props();
 
   let searchTerm = $state('');
   let sourceFilter = $state('all');
-  let createName = $state('');
-  let createDescription = $state('');
-  let createIcon = $state('fas fa-mortar-pestle');
-  let createSourceComponentId = $state('');
-  let editingEssenceId = $state('');
-  let editName = $state('');
-  let editDescription = $state('');
-  let editIcon = $state('fas fa-mortar-pestle');
-  let editSourceComponentId = $state('');
 
   const normalizedSearchTerm = $derived(searchTerm.trim().toLowerCase());
   const filteredEssences = $derived((essenceCards || []).filter(essence => {
     const matchesSearch = !normalizedSearchTerm
-      || `${essence.name || ''} ${essence.description || ''} ${essence.sourceName || ''} ${essence.id || ''}`.toLowerCase().includes(normalizedSearchTerm);
+      || [
+        essence.name || '',
+        essence.description || '',
+        showSourceUi ? essence.sourceName || '' : '',
+        essence.id || ''
+      ].join(' ').toLowerCase().includes(normalizedSearchTerm);
     const state = essence.sourceState || 'none';
-    const matchesSource = sourceFilter === 'all'
+    const matchesSource = !showSourceUi
+      || sourceFilter === 'all'
       || (sourceFilter === 'linked' && state === 'linked')
       || (sourceFilter === 'needs-attention' && (state === 'stale' || state === 'missing'))
       || (sourceFilter === 'none' && state === 'none');
@@ -56,43 +53,9 @@
     return 'is-disabled';
   }
 
-  async function createEssence() {
-    const result = await onCreateEssence(createName, createDescription, createIcon, createSourceComponentId || null);
-    if (result === false) return;
-    createName = '';
-    createDescription = '';
-    createIcon = 'fas fa-mortar-pestle';
-    createSourceComponentId = '';
-  }
-
-  function beginEdit(essence, event) {
+  function editEssence(essence, event) {
     event?.stopPropagation();
-    editingEssenceId = essence.id;
-    editName = essence.name || '';
-    editDescription = essence.description || '';
-    editIcon = essence.icon || 'fas fa-mortar-pestle';
-    editSourceComponentId = essence.sourceComponentId || '';
-  }
-
-  function cancelEdit(event) {
-    event?.stopPropagation();
-    editingEssenceId = '';
-    editName = '';
-    editDescription = '';
-    editIcon = 'fas fa-mortar-pestle';
-    editSourceComponentId = '';
-  }
-
-  async function saveEdit(essence, event) {
-    event?.stopPropagation();
-    const result = await onUpdateEssence(essence.id, {
-      name: editName,
-      description: editDescription,
-      icon: editIcon,
-      sourceComponentId: editSourceComponentId || null
-    });
-    if (result === false) return;
-    cancelEdit();
+    onEditEssence(essence.id);
   }
 
   function removeEssence(essence, event) {
@@ -122,29 +85,12 @@
     </div>
   </section>
 
-  <section class="manager-v2-essence-create-band" aria-label={text('FABRICATE.Admin.ManagerV2.Essence.Create', 'Create essence')}>
-    <label class="manager-v2-field" for="manager-v2-essence-create-name">
-      <span>{text('FABRICATE.Admin.ManagerV2.Essence.Name', 'Name')}</span>
-      <input id="manager-v2-essence-create-name" type="text" value={createName} oninput={(event) => createName = event.currentTarget.value} placeholder={text('FABRICATE.Admin.ManagerV2.Essence.NamePlaceholder', 'Essence name')} />
-    </label>
-    <label class="manager-v2-field" for="manager-v2-essence-create-icon">
-      <span>{text('FABRICATE.Admin.ManagerV2.Essence.Icon', 'Icon')}</span>
-      <input id="manager-v2-essence-create-icon" type="text" value={createIcon} oninput={(event) => createIcon = event.currentTarget.value} placeholder="fas fa-mortar-pestle" />
-    </label>
-    <label class="manager-v2-field" for="manager-v2-essence-create-source">
-      <span>{text('FABRICATE.Admin.ManagerV2.Essence.Source', 'Source')}</span>
-      <select id="manager-v2-essence-create-source" value={createSourceComponentId} onchange={(event) => createSourceComponentId = event.currentTarget.value}>
-        <option value="">{text('FABRICATE.Admin.ManagerV2.Essence.SourceNone', 'No source')}</option>
-        {#each managedItemOptions as item}
-          <option value={item.id}>{item.name}</option>
-        {/each}
-      </select>
-    </label>
-    <label class="manager-v2-field is-wide" for="manager-v2-essence-create-description">
-      <span>{text('FABRICATE.Admin.ManagerV2.Essence.Description', 'Description')}</span>
-      <input id="manager-v2-essence-create-description" type="text" value={createDescription} oninput={(event) => createDescription = event.currentTarget.value} placeholder={text('FABRICATE.Admin.ManagerV2.Essence.DescriptionPlaceholder', 'Description')} />
-    </label>
-    <button type="button" class="manager-v2-button is-primary" onclick={createEssence} disabled={!createName.trim()}>
+  <section class="manager-v2-essence-action-band" aria-label={text('FABRICATE.Admin.ManagerV2.Essence.Create', 'Create essence')}>
+    <span>
+      <strong>{text('FABRICATE.Admin.ManagerV2.Essence.CreateBandTitle', 'Add an essence definition')}</strong>
+      <small>{text('FABRICATE.Admin.ManagerV2.Essence.CreateBandHint', 'Create and edit essences in the dedicated editor so browse rows stay selection-only.')}</small>
+    </span>
+    <button type="button" class="manager-v2-button is-primary" onclick={onCreateEssence}>
       <i class="fas fa-plus" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.ManagerV2.Essence.Create', 'Create essence')}</span>
     </button>
@@ -161,15 +107,17 @@
         aria-label={text('FABRICATE.Admin.ManagerV2.Essence.SearchLabel', 'Search essences')}
       />
     </label>
-    <label class="manager-v2-filter">
-      <span>{text('FABRICATE.Admin.ManagerV2.Essence.SourceFilter', 'Source')}</span>
-      <select value={sourceFilter} onchange={(event) => sourceFilter = event.currentTarget.value} aria-label={text('FABRICATE.Admin.ManagerV2.Essence.SourceFilterLabel', 'Filter essences by source state')}>
-        <option value="all">{text('FABRICATE.Admin.ManagerV2.Essence.SourceAll', 'All sources')}</option>
-        <option value="linked">{text('FABRICATE.Admin.ManagerV2.Essence.SourceLinked', 'Linked source')}</option>
-        <option value="needs-attention">{text('FABRICATE.Admin.ManagerV2.Essence.SourceNeedsAttention', 'Needs attention')}</option>
-        <option value="none">{text('FABRICATE.Admin.ManagerV2.Essence.SourceNone', 'No source')}</option>
-      </select>
-    </label>
+    {#if showSourceUi}
+      <label class="manager-v2-filter">
+        <span>{text('FABRICATE.Admin.ManagerV2.Essence.SourceFilter', 'Source')}</span>
+        <select value={sourceFilter} onchange={(event) => sourceFilter = event.currentTarget.value} aria-label={text('FABRICATE.Admin.ManagerV2.Essence.SourceFilterLabel', 'Filter essences by source state')}>
+          <option value="all">{text('FABRICATE.Admin.ManagerV2.Essence.SourceAll', 'All sources')}</option>
+          <option value="linked">{text('FABRICATE.Admin.ManagerV2.Essence.SourceLinked', 'Linked source')}</option>
+          <option value="needs-attention">{text('FABRICATE.Admin.ManagerV2.Essence.SourceNeedsAttention', 'Needs attention')}</option>
+          <option value="none">{text('FABRICATE.Admin.ManagerV2.Essence.SourceNone', 'No source')}</option>
+        </select>
+      </label>
+    {/if}
     <span class="manager-v2-chip">{text('FABRICATE.Admin.ManagerV2.SearchCount', '{shown} of {total}').replace('{shown}', filteredEssences.length).replace('{total}', essenceCards.length)}</span>
   </section>
 
@@ -192,10 +140,12 @@
         </div>
       </div>
     {:else}
-      <div class="manager-v2-essences-table" role="table" aria-label={text('FABRICATE.Admin.ManagerV2.Essence.TableShort', 'Essences')}>
+      <div class={`manager-v2-essences-table ${showSourceUi ? '' : 'has-no-source'}`} role="table" aria-label={text('FABRICATE.Admin.ManagerV2.Essence.TableShort', 'Essences')}>
         <div class="manager-v2-table-head manager-v2-essence-table-head" role="row">
           <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Essence.ColumnEssence', 'Essence')}</span>
-          <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Essence.Source', 'Source')}</span>
+          {#if showSourceUi}
+            <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Essence.Source', 'Source')}</span>
+          {/if}
           <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Essence.Usage', 'Usage')}</span>
           <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Column.Actions', 'Actions')}</span>
         </div>
@@ -216,47 +166,27 @@
                 <span class="manager-v2-system-description" title={essence.description || essence.id}>{essence.description || essence.id}</span>
               </span>
             </span>
-            <span role="cell" class="manager-v2-labeled-cell" data-label={text('FABRICATE.Admin.ManagerV2.Essence.Source', 'Source')}>
-              <span class={`manager-v2-chip ${sourceStateClass(essence)}`}>{sourceStateLabel(essence)}</span>
-              {#if essence.sourceName}
-                <span class="manager-v2-muted">{essence.sourceName}</span>
-              {/if}
-            </span>
+            {#if showSourceUi}
+              <span role="cell" class="manager-v2-labeled-cell" data-label={text('FABRICATE.Admin.ManagerV2.Essence.Source', 'Source')}>
+                <span class={`manager-v2-chip ${sourceStateClass(essence)}`}>{sourceStateLabel(essence)}</span>
+                {#if essence.sourceName}
+                  <span class="manager-v2-muted">{essence.sourceName}</span>
+                {/if}
+              </span>
+            {/if}
             <span role="cell" class="manager-v2-labeled-cell" data-label={text('FABRICATE.Admin.ManagerV2.Essence.Usage', 'Usage')}>
               <span class={essence.deleteBlocked ? 'manager-v2-chip is-warning' : 'manager-v2-chip'}>
                 {text('FABRICATE.Admin.ManagerV2.Essence.ComponentUsageCount', '{count} components').replace('{count}', essence.componentUsageCount || 0)}
               </span>
             </span>
             <span role="cell" class="manager-v2-action-group manager-v2-labeled-cell" data-label={text('FABRICATE.Admin.ManagerV2.Column.Actions', 'Actions')}>
-              {#if editingEssenceId === essence.id}
-                <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Essence.SaveNamed', 'Save {name}').replace('{name}', essence.name)} title={text('FABRICATE.Admin.ManagerV2.Essence.Save', 'Save essence')} disabled={!editName.trim()} onclick={(event) => saveEdit(essence, event)}>
-                  <i class="fas fa-save" aria-hidden="true"></i>
-                </button>
-                <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Essence.CancelEdit', 'Cancel editing')} title={text('FABRICATE.Admin.ManagerV2.Essence.CancelEdit', 'Cancel editing')} onclick={cancelEdit}>
-                  <i class="fas fa-times" aria-hidden="true"></i>
-                </button>
-              {:else}
-                <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Essence.EditNamed', 'Edit {name}').replace('{name}', essence.name)} title={text('FABRICATE.Admin.ManagerV2.Essence.Edit', 'Edit essence')} onclick={(event) => beginEdit(essence, event)}>
-                  <i class="fas fa-edit" aria-hidden="true"></i>
-                </button>
-                <button type="button" class="manager-v2-icon-button is-danger" aria-label={text('FABRICATE.Admin.ManagerV2.Essence.DeleteNamed', 'Delete {name}').replace('{name}', essence.name)} title={essence.deleteBlocked ? text('FABRICATE.Admin.ManagerV2.Essence.DeleteBlocked', 'Remove component usage before deleting this essence.') : text('FABRICATE.Admin.ManagerV2.Essence.Delete', 'Delete essence')} disabled={essence.deleteBlocked} onclick={(event) => removeEssence(essence, event)}>
-                  <i class="fas fa-trash" aria-hidden="true"></i>
-                </button>
-              {/if}
+              <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Essence.EditNamed', 'Edit {name}').replace('{name}', essence.name)} title={text('FABRICATE.Admin.ManagerV2.Essence.Edit', 'Edit essence')} onclick={(event) => editEssence(essence, event)}>
+                <i class="fas fa-edit" aria-hidden="true"></i>
+              </button>
+              <button type="button" class="manager-v2-icon-button is-danger" aria-label={text('FABRICATE.Admin.ManagerV2.Essence.DeleteNamed', 'Delete {name}').replace('{name}', essence.name)} title={essence.deleteBlocked ? text('FABRICATE.Admin.ManagerV2.Essence.DeleteBlocked', 'Remove component usage before deleting this essence.') : text('FABRICATE.Admin.ManagerV2.Essence.Delete', 'Delete essence')} disabled={essence.deleteBlocked} onclick={(event) => removeEssence(essence, event)}>
+                <i class="fas fa-trash" aria-hidden="true"></i>
+              </button>
             </span>
-            {#if editingEssenceId === essence.id}
-              <span class="manager-v2-essence-edit-row" role="cell">
-                <input type="text" value={editName} oninput={(event) => editName = event.currentTarget.value} aria-label={text('FABRICATE.Admin.ManagerV2.Essence.Name', 'Name')} />
-                <input type="text" value={editIcon} oninput={(event) => editIcon = event.currentTarget.value} aria-label={text('FABRICATE.Admin.ManagerV2.Essence.Icon', 'Icon')} />
-                <select value={editSourceComponentId} onchange={(event) => editSourceComponentId = event.currentTarget.value} aria-label={text('FABRICATE.Admin.ManagerV2.Essence.Source', 'Source')}>
-                  <option value="">{text('FABRICATE.Admin.ManagerV2.Essence.SourceNone', 'No source')}</option>
-                  {#each managedItemOptions as item}
-                    <option value={item.id}>{item.name}</option>
-                  {/each}
-                </select>
-                <input type="text" value={editDescription} oninput={(event) => editDescription = event.currentTarget.value} aria-label={text('FABRICATE.Admin.ManagerV2.Essence.Description', 'Description')} />
-              </span>
-            {/if}
           </div>
         {/each}
       </div>

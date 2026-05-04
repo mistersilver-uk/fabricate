@@ -63,13 +63,13 @@
 
   function getPopoverHost() {
     if (!selectorRoot || typeof document === 'undefined') return null;
-    return selectorRoot.closest('.fabricate-admin');
+    return selectorRoot.closest('.fabricate-admin, .fabricate-manager-v2');
   }
 
   function getPopoverHorizontalBounds(hostRect) {
     if (!selectorRoot) return {};
 
-    const mainPanel = selectorRoot.closest('.admin-main');
+    const mainPanel = selectorRoot.closest('.admin-main, .manager-v2-main, .manager-v2-table-scroll');
     const mainPanelRect = mainPanel?.getBoundingClientRect?.();
     if (!mainPanelRect) return {};
 

@@ -50,6 +50,28 @@ Agents and skills MUST keep durable product behavior in canonical specs or activ
 - **THEN** the agent records the failure as validation infrastructure
 - **AND** the agent does not report it as an app regression unless a loaded app surface violates the relevant spec or acceptance criteria
 
+### Requirement: Manager V2 route planning
+
+Agents planning or implementing Manager V2 feature routes MUST account for placeholder promotion, route wiring, display seams, and tests as a single workflow.
+
+#### Scenario: promoting a placeholder route
+
+- **WHEN** a Manager V2 feature route moves from planned placeholder to implemented UI
+- **THEN** the agent removes the feature from disabled placeholder/deferred-view data
+- **AND** adds feature-gated navigation, route normalization, breadcrumbs, title/subtitle/header labels, main route rendering, inspector routing, localization, CSS, and focused mounted/source-contract coverage
+
+#### Scenario: diagnosing an unclickable Manager V2 feature button
+
+- **WHEN** a Manager V2 feature button cannot be clicked
+- **THEN** the agent first checks whether the button is rendered from placeholder/deferred-view data or has a feature gate that intentionally disables/hides it
+- **AND** only then debugs event handlers or pointer-overlay problems
+
+#### Scenario: Svelte mounted event simulation
+
+- **WHEN** mounted Svelte tests synthesize `input` or `change` DOM events directly
+- **THEN** route/component code may prefer explicit `value` plus `oninput`/`onchange` handlers for controls under test
+- **AND** tests should dispatch the event that the component actually handles before asserting state
+
 ### Requirement: Provider-specific skill metadata
 
 Skills SHOULD include provider-specific metadata under the skill directory when that provider benefits from explicit discovery hints.

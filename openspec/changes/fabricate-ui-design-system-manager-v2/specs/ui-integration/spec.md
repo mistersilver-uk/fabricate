@@ -49,6 +49,10 @@ Fabricate MUST allow a redesigned crafting system manager app to be introduced a
 6. Manager V2 MUST provide container-query responsive layouts that stack or collapse the rail and inspector without horizontal overflow.
 7. Manager V2 MUST preserve localization, keyboard accessibility, focus-visible states, validation linking, and pointer access to menus/toggles/actions.
 8. The implementation plan for Manager V2 MUST define the explicit launch path, such as a setting, alternate app factory entry point, or GM-only menu action.
+9. Manager V2 feature routes MUST NOT remain disabled placeholders once implemented. Route promotion MUST remove placeholder data and add feature-gated navigation, route normalization, breadcrumbs/copy, focused main rendering, inspector routing, localization/CSS, and mounted/source-contract coverage.
+10. Manager V2 browser routes SHOULD follow the shared browser pattern: compact section header, optional create/import band, toolbar with search/filter/count, stable table/list rows, selected-row state, and selected-object inspector.
+11. Manager V2 source-state UI MUST use consistent `linked`, `missing`, `stale`, and `none` semantics and MUST retain stale source evidence for GM inspection instead of silently erasing it from display data.
+12. Manager V2 delete-blocked states MUST disable or guard destructive controls, explain the block near the control, and show usage evidence in the inspector.
 
 ### Requirement: Manager V2 systems view
 
@@ -245,18 +249,22 @@ The manager-v2 essences view and editor MUST follow the essence-browser redesign
 
 1. The essences view MUST be shown only when the selected crafting system has `features.essences === true`.
 2. The essences view MUST present a searchable essence table or list as the primary work surface at normal widths.
-3. Essence rows SHOULD include essence icon, name, description, source item summary, source-link state, component usage count, last updated when available, and row actions.
-4. Source item state MUST distinguish linked, stale/unresolved, missing, and no-source states when that information is available.
-5. Source item linking MUST use drag/drop or picker workflows as the primary interaction. Manual UUID entry MUST NOT be the canonical flow.
-6. Selecting an essence MUST populate a right inspector with essence icon, name, description, essence id, source item status, usage summary, warnings, and quick actions.
-7. The inspector SHOULD expose `Details`, `Usage`, and `Source` views or equivalent sections.
-8. The usage summary MUST be derived from current system data and SHOULD identify component usage plus ingredient, catalyst, result, gathering, and salvage-output references where those relationships can be derived.
-9. The source section MUST allow replacing, clearing, and opening the linked source item when supported by existing services.
-10. Stale or unresolved source items MUST remain readable and warn rather than deleting the stored `sourceItemUuid`.
-11. Deleting an essence MUST warn when components or other authored structures reference that essence.
-12. The essence editor MUST expose name, icon, description, and optional source item link. It MUST NOT treat essences as components, recipe items, or general item tags.
-13. If effect transfer is enabled, the view SHOULD surface whether the linked source item resolves and can provide effects. This display MUST be evidence from current source resolution, not a decorative metric.
-14. Essence screenshots MUST prove icon-led identity, source-link states, source drop/replace affordance, usage summary, warnings, row action menus, and narrow-width stacking.
+3. Essence rows SHOULD include essence icon, name, description, component usage count, last updated when available, and row actions.
+4. The essences browse view MUST NOT expose inline edit controls for essence name, icon, description, or source linkage.
+5. The row Edit action MUST open a dedicated manager-v2 edit essence route for that essence.
+6. Source item state MUST distinguish linked, stale/unresolved, missing, and no-source states when that information is available and `features.effectTransfer === true`.
+7. Source item linking MUST use drag/drop or picker workflows as the primary interaction. Manual UUID entry MUST NOT be the canonical flow.
+8. Selecting an essence MUST populate a right inspector with essence icon, name, description, essence id, usage summary, warnings, and quick actions.
+9. The inspector SHOULD expose `Details`, `Usage`, and, when effect transfer is enabled, `Source` views or equivalent sections.
+10. The usage summary MUST be derived from current system data and SHOULD identify component usage plus ingredient, catalyst, result, gathering, and salvage-output references where those relationships can be derived.
+11. The source section MUST allow replacing, clearing, and opening the linked source item when supported by existing services and when effect transfer is enabled.
+12. Stale or unresolved source items MUST remain readable and warn rather than deleting the stored `sourceItemUuid`.
+13. Deleting an essence MUST warn when components or other authored structures reference that essence.
+14. The essence editor MUST expose name, icon, description, and optional source item link. It MUST NOT treat essences as components, recipe items, or general item tags.
+15. Essence icon editing MUST use a pop-over icon picker as the primary interaction and MUST NOT require raw icon class entry.
+16. Source UI, including source columns, filters, inspector sections, warnings, and edit controls, MUST appear only when the selected crafting system has `features.effectTransfer === true`.
+17. If effect transfer is enabled, the view SHOULD surface whether the linked source item resolves and can provide effects. This display MUST be evidence from current source resolution, not a decorative metric.
+18. Essence screenshots MUST prove icon-led identity, browse-only rows, edit-route navigation, pop-over icon picker, source-link states when effect transfer is enabled, usage summary, warnings, row action menus, and narrow-width stacking.
 
 ### Requirement: Manager V2 environments view and editor
 

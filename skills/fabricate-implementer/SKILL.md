@@ -46,6 +46,9 @@ Keep this skill aligned with the `fabricate_implementer` custom Codex agent.
 - Do not add npm dependencies unless the plan explicitly justifies them.
 - In Foundry UI CSS, avoid generic state classes such as `.disabled`, `.active`, and `.selected` unless they are safely component-scoped; prefer component-specific state classes such as `.is-disabled`.
 - For Svelte, CSS, layout, and other UI-focused changes, verify against the local Vite dev server first when available and use the user-provided dev URL if one exists.
+- For Manager V2 feature routes, implement placeholder promotion as a complete route slice: remove disabled placeholder data, add feature-gated nav, route normalization, breadcrumbs/copy, focused route component, inspector state, localization/CSS, and mounted/source-contract tests.
+- When a Manager V2 feature button cannot be clicked, first inspect whether it is still rendered as a disabled placeholder or hidden by feature gates before changing event handlers.
+- In mounted Svelte tests that synthesize DOM events directly, prefer explicit `value` plus `oninput`/`onchange` handlers for controls that need deterministic test updates.
 - Use `npm run test:foundry` for UI changes only when the task depends on Foundry runtime integration, no dev server is available, or reproducible container-backed evidence is required.
 - If `npm run test:foundry` conflicts with a local Foundry on port `30000`, use matching alternate environment variables such as `FOUNDRY_HOST_PORT=30001 FOUNDRY_URL=http://localhost:30001`.
 - Treat Docker startup conflicts, launch reconnects, and stale container-name failures as harness infrastructure unless the app loaded and failed a product assertion.

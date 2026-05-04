@@ -2,9 +2,12 @@ import CraftingSystemManagerV2Root from './svelte/apps/manager-v2/CraftingSystem
 import { registerCraftingSystemManagerV2App } from './appFactory.js';
 import { SvelteRecipeManagerApp } from './SvelteRecipeManagerApp.svelte.js';
 import { localize } from './svelte/util/foundryBridge.js';
+import { confirmDialog } from './foundryCompat.js';
 
 export class SvelteCraftingSystemManagerV2App extends SvelteRecipeManagerApp {
   static SVELTE_COMPONENT = CraftingSystemManagerV2Root;
+
+  _confirmDiscardDirtyEssenceDraft = null;
 
   static DEFAULT_OPTIONS = {
     ...SvelteRecipeManagerApp.DEFAULT_OPTIONS,
@@ -27,6 +30,21 @@ export class SvelteCraftingSystemManagerV2App extends SvelteRecipeManagerApp {
       ...props,
       services: {
         ...props.services,
+        confirmDiscardEssenceDraft: () => confirmDialog({
+          title: localize('FABRICATE.Admin.ManagerV2.Essence.DiscardDirtyTitle'),
+          content: `<p>${localize('FABRICATE.Admin.ManagerV2.Essence.DiscardDirtyContent')}</p>`,
+          yes: {
+            label: localize('FABRICATE.Admin.ManagerV2.Essence.DiscardDirtyConfirm'),
+            callback: () => true
+          },
+          no: {
+            label: localize('FABRICATE.Admin.ManagerV2.Essence.DiscardDirtyCancel'),
+            callback: () => false
+          }
+        }),
+        registerEssenceDirtyGuard: (guard) => {
+          this._confirmDiscardDirtyEssenceDraft = typeof guard === 'function' ? guard : null;
+        },
         openCurrentAdmin: () => {
           const app = new SvelteRecipeManagerApp();
           app.render(true);
@@ -34,6 +52,13 @@ export class SvelteCraftingSystemManagerV2App extends SvelteRecipeManagerApp {
         }
       }
     };
+  }
+
+  async close(options) {
+    const canCloseEssence = await this._confirmDiscardDirtyEssenceDraft?.();
+    if (canCloseEssence === false) return this;
+    this._confirmDiscardDirtyEssenceDraft = null;
+    return super.close(options);
   }
 
   static show() {

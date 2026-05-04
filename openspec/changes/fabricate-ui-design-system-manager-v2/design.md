@@ -11,6 +11,7 @@ Reference screenshots live in `references/`:
 - [Browse Crafting Systems](<references/Browse Crafting Systems.png>)
 - [Browse Components](<references/Browse Components.png>)
 - [Browse Essences](<references/Browse Essences.png>)
+- [Edit Essence](<references/Edit Essence.png>)
 - [Browse Gathering Environments](<references/Browse Gathering Environments.png>)
 - [Browse Recipes](<references/Browse Recipes.png>)
 - [Edit Crafting System Tags and Categories](<references/Edit Crafting System Tags and Categories.png>)
@@ -27,7 +28,8 @@ Reference decisions:
 
 - [Browse Crafting Systems](<references/Browse Crafting Systems.png>): keep as the manager shell anchor; discard decorative or non-data-backed metrics.
 - [Browse Components](<references/Browse Components.png>): keep the component table, drag/drop import, filters, usage legend, and inspector; change labels/data to Fabricate component semantics and keep recipe items distinct.
-- [Browse Essences](<references/Browse Essences.png>): keep the essence table, source linking, usage summary, drop zones, and inspector; show only when essences are enabled and do not treat essences as components.
+- [Browse Essences](<references/Browse Essences.png>): keep the essence table, source-state evidence, usage summary, row selection, and inspector; show only when essences are enabled and do not treat essences as components. Do not keep inline editing in the browse view.
+- [Edit Essence](<references/Edit Essence.png>): keep the dedicated edit route, identity form, pop-over icon selection, conditional effect source panel, save/cancel strip, right summary rail, and destructive actions. Source UI appears only when effect transfer is enabled for the selected system.
 - [Browse Gathering Environments](<references/Browse Gathering Environments.png>): keep the environment index hierarchy and image-backed inspector; discard fake summary/help dashboards.
 - [Browse Recipes](<references/Browse Recipes.png>): keep the recipe table and selected-recipe inspector; derive requirements preview from real ingredient sets.
 - [Edit Crafting System Tags and Categories](<references/Edit Crafting System Tags and Categories.png>): keep the split management layout, usage counts, search/add flows, cleanup actions, and right evidence panels; discard hierarchical categories, inherited subcategories, and multiple categories per recipe unless later data-model work adds them.
@@ -478,10 +480,18 @@ Main list columns:
 - updated
 - row actions
 
+Browse-page behavior:
+
+- The essences browse view is a read/browse surface plus row selection. It must not show inline name, icon, description, or source edit controls.
+- Creating or editing an essence opens a dedicated manager-v2 editor route rather than expanding a row or editing inside the browse table.
+- The row Edit action opens the edit route for that essence and preserves the selected crafting-system context.
+- The browse inspector may show details, usage, source state, and warnings, but its action buttons must navigate to the edit route for mutations other than delete/duplicate where those actions are supported.
+- Source columns, source filters, source inspector sections, source cards, and source warnings are shown only when `features.effectTransfer === true`.
+
 Toolbar:
 
 - search
-- status/source-state filter
+- status/source-state filter only when effect transfer is enabled; otherwise omit source-state filtering
 - clear filters
 - list/grid view toggle if useful
 - create essence primary action
@@ -493,18 +503,21 @@ Inspector:
 - essence name and active/available state
 - tabs for details, usage, and source
 - basic information: name, description, essence id with copy action
-- source item card with resolved/stale status, open action when available, unlink action, and drop zone for replacement
+- source item card with resolved/stale status, open action when available, unlink action, and drop zone for replacement only when effect transfer is enabled
 - usage summary covering ingredients, catalysts, results, gathering, and salvage output when those references can be derived
 - warnings for missing/stale source item and destructive usage impact
 - quick actions: edit, duplicate, delete
 
-Editor:
+Dedicated edit route:
 
 - name
-- icon picker using the existing essence icon behavior
+- icon picker using the existing essence icon behavior as a pop-over picker; do not expose raw icon class editing as the primary interaction
 - description
-- optional source item link from drag/drop or picker
-- stale source warning and clear/replace source actions
+- optional source item link from drag/drop or picker only when `features.effectTransfer === true`
+- no source controls, source card, source tab, source filters, or source warnings when effect transfer is disabled; in that case the editor should focus on identity and usage evidence only
+- stale source warning and clear/replace source actions when the effect-transfer source panel is visible
+- save/cancel actions in the header strip with dirty-state indication and route-exit protection
+- right summary rail with current identity preview, details/usage/source tabs or equivalent sections, validation, duplicate/delete actions, and no unsupported decorative metrics
 
 The essence view should preserve the artistic direction in the image: icon-led rows, source-item linkage in the table, green linked state, dashed drop zones, compact usage summary tiles, and an inspector that separates details, usage, and source. It must not treat essences as components, recipes, or general item tags.
 

@@ -4045,6 +4045,10 @@
   grid-template-rows: auto auto auto minmax(0, 1fr);
 }
 
+.fabricate-manager-v2[data-manager-v2-view="essence-edit"] .manager-v2-main {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
 .fabricate-manager-v2[data-manager-v2-view="environment-edit"] .manager-v2-main {
   grid-template-rows: minmax(0, 1fr);
 }
@@ -4186,6 +4190,10 @@
   flex-direction: column;
   gap: 8px;
   min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-essences-table.has-no-source {
+  --fab-mv2-essence-grid: minmax(0, 1.7fr) minmax(92px, 0.46fr) 92px;
 }
 
 .fabricate-manager-v2 .manager-v2-table-head,
@@ -4752,19 +4760,34 @@
   line-height: 1.35;
 }
 
-.fabricate-manager-v2 .manager-v2-essence-create-band {
+.fabricate-manager-v2 .manager-v2-essence-action-band {
   display: grid;
-  grid-template-columns: minmax(130px, 0.72fr) minmax(116px, 0.52fr) minmax(140px, 0.62fr) minmax(180px, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
-  align-items: end;
+  align-items: center;
   min-width: 0;
   padding: 12px;
   border-bottom: 1px solid var(--fab-mv2-border);
   background: rgba(255, 255, 255, 0.025);
 }
 
-.fabricate-manager-v2 .manager-v2-essence-create-band .manager-v2-field {
+.fabricate-manager-v2 .manager-v2-essence-action-band span,
+.fabricate-manager-v2 .manager-v2-essence-action-band small {
+  display: block;
   min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.fabricate-manager-v2 .manager-v2-essence-action-band strong {
+  font-size: 0.86rem;
+  line-height: 1.25;
+}
+
+.fabricate-manager-v2 .manager-v2-essence-action-band small {
+  margin-top: 2px;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.76rem;
+  line-height: 1.35;
 }
 
 .fabricate-manager-v2 .manager-v2-essence-identity {
@@ -4791,20 +4814,270 @@
   cursor: pointer;
 }
 
-.fabricate-manager-v2 .manager-v2-essence-edit-row {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: minmax(140px, 0.74fr) minmax(116px, 0.52fr) minmax(150px, 0.62fr) minmax(180px, 1fr);
-  gap: 8px;
-  min-width: 0;
-  padding-top: 8px;
-  border-top: 1px solid var(--fab-mv2-border);
-  cursor: default;
+.fabricate-manager-v2 .manager-v2-essence-edit-main {
+  min-height: 0;
+  overflow: auto;
 }
 
-.fabricate-manager-v2 .manager-v2-essence-edit-row input,
-.fabricate-manager-v2 .manager-v2-essence-edit-row select {
+.fabricate-manager-v2 .manager-v2-essence-edit-view {
+  display: grid;
+  gap: 12px;
   min-width: 0;
+  padding: 12px;
+  overflow: auto;
+}
+
+.fabricate-manager-v2 .manager-v2-essence-edit-grid {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-essence-icon-control {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-essence-icon-preview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  color: var(--fab-mv2-accent);
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 1.5rem;
+}
+
+.fabricate-manager-v2 .manager-v2-essence-icon-control small,
+.fabricate-manager-v2 .manager-v2-form-warning {
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.76rem;
+  line-height: 1.35;
+  overflow-wrap: break-word;
+}
+
+.fabricate-manager-v2 .manager-v2-essence-source-edit {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-essence-source-copy {
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-essence-source-copy strong {
+  display: block;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.fabricate-manager-v2 .essence-icon-picker,
+.fabricate-manager-v2 .essence-source-selector {
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .essence-icon-picker-trigger,
+.fabricate-manager-v2 .essence-icon-picker-option,
+.fabricate-manager-v2 .essence-source-trigger,
+.fabricate-manager-v2 .essence-source-clear,
+.fabricate-manager-v2 .essence-source-picker-option {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  color: var(--fab-mv2-text);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.fabricate-manager-v2 .essence-icon-picker-trigger {
+  display: inline-grid;
+  grid-template-columns: 28px minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 4px 8px;
+}
+
+.fabricate-manager-v2 .essence-icon-picker-trigger-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager-v2 .essence-icon-picker-preview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: var(--fab-mv2-accent);
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.fabricate-manager-v2 .essence-source-selector-shell {
+  position: relative;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .essence-source-trigger {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 140px;
+  max-width: 100%;
+  aspect-ratio: 1 / 1;
+  padding: 8px;
+  overflow: hidden;
+}
+
+.fabricate-manager-v2 .essence-source-trigger.has-value {
+  padding: 0;
+}
+
+.fabricate-manager-v2 .essence-source-trigger-image,
+.fabricate-manager-v2 .essence-source-picker-option img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.fabricate-manager-v2 .essence-source-trigger-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.76rem;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.fabricate-manager-v2 .essence-source-trigger-corner {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.48);
+}
+
+.fabricate-manager-v2 .essence-source-clear {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+}
+
+.fabricate-manager-v2 .essence-source-selector-shell.drop-active .essence-source-trigger {
+  border-color: rgba(92, 184, 92, 0.8);
+  background: rgba(92, 184, 92, 0.16);
+}
+
+.fabricate-manager-v2 .essence-icon-picker-popover,
+.fabricate-manager-v2 .essence-source-picker-popover {
+  position: absolute;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--fab-mv2-border-strong);
+  border-radius: 8px;
+  background: var(--fab-mv2-surface-2);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.34);
+  overflow: hidden;
+}
+
+.fabricate-manager-v2 .essence-icon-picker-search input,
+.fabricate-manager-v2 .essence-source-picker-search input {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-bg);
+}
+
+.fabricate-manager-v2 .essence-icon-picker-options,
+.fabricate-manager-v2 .essence-source-picker-grid {
+  display: grid;
+  gap: 6px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.fabricate-manager-v2 .essence-source-picker-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.fabricate-manager-v2 .essence-icon-picker-option {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  min-height: 34px;
+  padding: 4px 8px;
+  text-align: left;
+}
+
+.fabricate-manager-v2 .essence-source-picker-option {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  min-height: 44px;
+  padding: 5px;
+  text-align: left;
+}
+
+.fabricate-manager-v2 .essence-source-picker-option img {
+  width: 34px;
+  height: 34px;
+  border-radius: 5px;
+}
+
+.fabricate-manager-v2 .essence-icon-picker-option span:last-child,
+.fabricate-manager-v2 .essence-source-picker-option span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager-v2 .essence-icon-picker-option.selected,
+.fabricate-manager-v2 .essence-source-picker-option.selected,
+.fabricate-manager-v2 .essence-icon-picker-option:hover,
+.fabricate-manager-v2 .essence-source-picker-option:hover,
+.fabricate-manager-v2 .essence-icon-picker-option:focus-visible,
+.fabricate-manager-v2 .essence-source-picker-option:focus-visible {
+  border-color: var(--fab-mv2-border-strong);
+  background: rgba(92, 184, 92, 0.14);
 }
 
 .fabricate-manager-v2 .manager-v2-component-evidence,
@@ -5877,8 +6150,9 @@
   .fabricate-manager-v2 .manager-v2-edit-card-heading,
   .fabricate-manager-v2 .manager-v2-edit-grid,
   .fabricate-manager-v2 .manager-v2-form-grid,
-  .fabricate-manager-v2 .manager-v2-essence-create-band,
-  .fabricate-manager-v2 .manager-v2-essence-edit-row,
+  .fabricate-manager-v2 .manager-v2-essence-action-band,
+  .fabricate-manager-v2 .manager-v2-essence-edit-grid,
+  .fabricate-manager-v2 .manager-v2-essence-source-edit,
   .fabricate-manager-v2 .environment-fields {
     grid-template-columns: minmax(0, 1fr);
   }

@@ -7,11 +7,15 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 const rootPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/CraftingSystemManagerV2Root.svelte');
+const essenceBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/EssenceBrowserView.svelte');
+const essenceEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/EssenceEditView.svelte');
 const appPath = resolve(repoRoot, 'src/ui/SvelteCraftingSystemManagerV2App.svelte.js');
 const mainPath = resolve(repoRoot, 'src/main.js');
 const langPath = resolve(repoRoot, 'lang/en.json');
 
 const rootSource = readFileSync(rootPath, 'utf8');
+const essenceBrowserSource = readFileSync(essenceBrowserPath, 'utf8');
+const essenceEditSource = readFileSync(essenceEditPath, 'utf8');
 const appSource = readFileSync(appPath, 'utf8');
 const mainSource = readFileSync(mainPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
@@ -63,6 +67,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'manager-v2-component-row',
       'class="manager-v2-component-identity"',
       'EssenceBrowserView',
+      'EssenceEditView',
       'EnvironmentEditView',
       'manager-v2-environment-edit-main',
       'manager-v2-system-edit-form',
@@ -98,6 +103,8 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Component.SourceLinked, 'Linked source');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Essence.Title, 'Essences');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Essence.Library, 'Essence browser');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Essence.EditTitle, 'Edit essence');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Essence.EditBreadcrumb, 'Edit Essence');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Essence.SourceLinked, 'Linked source');
   });
 
@@ -134,6 +141,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(rootSource.includes('manager-v2-scope-return'), 'root should expose a return-to-system-library rail action');
     assert.ok(rootSource.includes('FABRICATE.Admin.ManagerV2.ReturnToSystemLibrary'), 'return-to-library action should be localized');
     assert.ok(rootSource.includes("setView('essences')"), 'essences should be exposed as a real selected-system route');
+    assert.ok(rootSource.includes("activeView = 'essence-edit'"), 'essence edit actions should transition to the local edit route');
     assert.ok(!rootSource.includes("{ id: 'essences'"), 'essences should not remain a disabled placeholder route');
     assert.ok(!rootSource.includes('clearSelectedSystem'), 'root should not expose a selected-system clear route');
     assert.ok(!rootSource.includes("selectSystem('', 'systems')"), 'selected-system rail should not clear real store selection');
@@ -148,6 +156,30 @@ describe('CraftingSystemManagerV2 source contract', () => {
       lang.FABRICATE.Admin.ManagerV2.InspectorHint,
       'The inspector shows counts, resolution mode, and enabled features for the selected system.'
     );
+  });
+
+  it('keeps manager-v2 essence browsing browser-only and source UI feature-gated', () => {
+    assert.ok(
+      rootSource.includes("import EssenceEditView from './EssenceEditView.svelte';"),
+      'root should import the dedicated essence edit route'
+    );
+    assert.ok(rootSource.includes('showEssenceSourceUi'), 'root should derive the effect-transfer source UI gate');
+    assert.ok(rootSource.includes("currentView === 'essence-edit'"), 'root should route the dedicated edit view');
+    assert.ok(rootSource.includes('confirmDiscardDirtyEssenceDraft'), 'root should protect dirty essence edit drafts when a confirm seam is available');
+    assert.ok(essenceBrowserSource.includes('onEditEssence'), 'browser row edit should ask the root to route to edit');
+    assert.ok(essenceBrowserSource.includes('showSourceUi'), 'browser should receive the source UI feature gate');
+    assert.ok(!essenceBrowserSource.includes('onUpdateEssence'), 'browser should not own essence update persistence');
+    assert.ok(!essenceBrowserSource.includes('manager-v2-essence-edit-row'), 'browser should not render inline edit rows');
+    assert.ok(!essenceBrowserSource.includes('manager-v2-essence-create-name'), 'browser should not render inline create fields');
+  });
+
+  it('uses shared manager-v2 essence picker controls on the dedicated edit route', () => {
+    assert.ok(essenceEditSource.includes("import IconPicker from '../../components/IconPicker.svelte';"), 'edit route should use the shared IconPicker');
+    assert.ok(essenceEditSource.includes("import EssenceSourceSelector from '../../components/EssenceSourceSelector.svelte';"), 'edit route should use the shared source selector');
+    assert.ok(essenceEditSource.includes('showSourceUi'), 'edit route should gate source controls by effect transfer');
+    assert.ok(essenceEditSource.includes('onDirtyChange(dirty)'), 'edit route should expose dirty state to route-exit protection');
+    assert.ok(essenceEditSource.includes('onSave(draftId || null, updates)'), 'edit route should delegate create and update persistence to the root/store seam');
+    assert.ok(!essenceEditSource.includes('game.'), 'edit route should not reference Foundry runtime globals');
   });
 
   it('keeps the recipes browser browser-only and wired to existing callbacks', () => {
