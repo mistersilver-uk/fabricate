@@ -258,19 +258,26 @@ test('manager-v2 essence browser defines compact responsive table geometry', () 
 test('manager-v2 essence edit route defines picker-based responsive geometry', () => {
   const mainBlock = blockFor('.fabricate-manager-v2[data-manager-v2-view="essence-edit"] .manager-v2-main');
   const editGridBlock = blockFor('.fabricate-manager-v2 .manager-v2-essence-edit-grid');
-  const sourceBlock = blockFor('.fabricate-manager-v2 .manager-v2-essence-source-edit');
+  const sourceSummaryBlock = blockFor('.fabricate-manager-v2 .manager-v2-essence-source-summary');
+  const sourceDropBlock = blockFor('.fabricate-manager-v2 .manager-v2-essence-source-drop-zone .essence-source-trigger');
+  const usageGridBlock = blockFor('.fabricate-manager-v2 .manager-v2-essence-usage-grid');
+  const usageItemBlock = blockFor('.fabricate-manager-v2 .manager-v2-essence-usage-item');
   const iconTriggerBlock = blockFor('.fabricate-manager-v2 .essence-icon-picker-trigger');
   const sourceTriggerBlock = blockFor('.fabricate-manager-v2 .essence-source-trigger');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager-v2 (max-width: 680px)'));
 
   assert.ok(mainBlock.includes('grid-template-rows: minmax(0, 1fr);'), 'essence edit route should let the identity card be the first main content');
-  assert.ok(editGridBlock.includes('grid-template-columns: 172px minmax(0, 1fr);'), 'essence edit identity fields should reserve stable icon picker space');
-  assert.ok(sourceBlock.includes('grid-template-columns: 150px minmax(0, 1fr);'), 'essence source selector should reserve stable picker and evidence columns');
+  assert.ok(editGridBlock.includes('grid-template-columns: var(--fab-mv2-essence-icon-column, 156px) minmax(0, 1fr);'), 'essence edit identity fields should reserve stable icon picker space');
+  assert.ok(sourceSummaryBlock.includes('grid-template-columns: 54px minmax(0, 1fr) 34px;'), 'essence source summary should reserve source image, evidence, and clear action columns');
+  assert.ok(sourceDropBlock.includes('width: 100%;'), 'essence source drop target should use the full source panel width');
+  assert.ok(sourceDropBlock.includes('height: 84px;'), 'essence source drop target should have a stable wide drop-zone height');
   assert.ok(iconTriggerBlock.includes('grid-template-columns: 28px minmax(0, 1fr) 16px;'), 'icon picker trigger should be a real picker control, not a raw text field');
   assert.ok(sourceTriggerBlock.includes('aspect-ratio: 1 / 1;'), 'source picker should keep a stable drop target');
+  assert.ok(usageGridBlock.includes('max-height: 132px;'), 'essence usage thumbnails should stay scroll-contained in the inspector');
+  assert.ok(usageItemBlock.includes('aspect-ratio: 1 / 1;'), 'essence usage thumbnails should be square image-only controls');
   assert.ok(
     mediumQuery.includes('.fabricate-manager-v2 .manager-v2-essence-edit-grid')
-      && mediumQuery.includes('.fabricate-manager-v2 .manager-v2-essence-source-edit'),
+      && mediumQuery.includes('.fabricate-manager-v2 .manager-v2-essence-source-summary'),
     'narrow manager-v2 layout should stack essence edit controls'
   );
 });

@@ -200,17 +200,11 @@
 
       <div class="manager-v2-essence-edit-grid">
         <div class="manager-v2-essence-icon-panel">
+          <span class="manager-v2-essence-field-label">{text('FABRICATE.Admin.ManagerV2.Essence.Icon', 'Icon')}</span>
           <span class="manager-v2-essence-icon-preview" aria-hidden="true">
             <i class={normalizeEssenceIcon(icon)}></i>
           </span>
-          <span class="manager-v2-essence-icon-copy">
-            <strong>{selectedIconLabel}</strong>
-            <small>{normalizeEssenceIcon(icon) === DEFAULT_ESSENCE_ICON
-              ? text('FABRICATE.Admin.ManagerV2.Essence.DefaultIconLabel', 'Default essence icon')
-              : text('FABRICATE.Admin.ManagerV2.Essence.IconLabel', 'Selected icon')}</small>
-          </span>
           <div class="manager-v2-essence-icon-actions">
-            <span class="manager-v2-essence-picker-label">{text('FABRICATE.Admin.ManagerV2.Essence.ChangeIcon', 'Change icon')}</span>
             <IconPicker
               value={icon}
               disabled={saving}
@@ -222,58 +216,77 @@
               <span>{text('FABRICATE.Admin.ManagerV2.Essence.ClearIcon', 'Clear icon')}</span>
             </button>
           </div>
+          <span class="manager-v2-essence-icon-copy">
+            <strong>{selectedIconLabel}</strong>
+            <small>{normalizeEssenceIcon(icon) === DEFAULT_ESSENCE_ICON
+              ? text('FABRICATE.Admin.ManagerV2.Essence.DefaultIconLabel', 'Default essence icon')
+              : text('FABRICATE.Admin.ManagerV2.Essence.IconLabel', 'Selected icon')}</small>
+          </span>
         </div>
 
-        <label class="manager-v2-field" for="manager-v2-essence-edit-name">
-          <span>{text('FABRICATE.Admin.ManagerV2.Essence.Name', 'Name')}</span>
-          <input id="manager-v2-essence-edit-name" type="text" value={name} oninput={(event) => name = event.currentTarget.value} placeholder={text('FABRICATE.Admin.ManagerV2.Essence.NamePlaceholder', 'Essence name')} disabled={saving} required />
-        </label>
+        <div class="manager-v2-essence-core-fields">
+          <label class="manager-v2-field" for="manager-v2-essence-edit-name">
+            <span>{text('FABRICATE.Admin.ManagerV2.Essence.Name', 'Name')}</span>
+            <input id="manager-v2-essence-edit-name" type="text" value={name} oninput={(event) => name = event.currentTarget.value} placeholder={text('FABRICATE.Admin.ManagerV2.Essence.NamePlaceholder', 'Essence name')} disabled={saving} required />
+          </label>
 
-        <label class="manager-v2-field is-wide" for="manager-v2-essence-edit-description">
-          <span>{text('FABRICATE.Admin.ManagerV2.Essence.Description', 'Description')}</span>
-          <textarea id="manager-v2-essence-edit-description" rows="4" value={description} oninput={(event) => description = event.currentTarget.value} placeholder={text('FABRICATE.Admin.ManagerV2.Essence.DescriptionPlaceholder', 'Description')} disabled={saving}></textarea>
-        </label>
+          <label class="manager-v2-field" for="manager-v2-essence-edit-description">
+            <span>{text('FABRICATE.Admin.ManagerV2.Essence.Description', 'Description')}</span>
+            <textarea id="manager-v2-essence-edit-description" rows="5" value={description} oninput={(event) => description = event.currentTarget.value} placeholder={text('FABRICATE.Admin.ManagerV2.Essence.DescriptionPlaceholder', 'Description')} disabled={saving}></textarea>
+          </label>
+        </div>
       </div>
+
+      {#if showSourceUi}
+        <div class="manager-v2-essence-source-panel">
+          <div class="manager-v2-edit-card-heading">
+            <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Essence.Source', 'Source')}</h3>
+            <span class={`manager-v2-chip ${sourceState.className}`}>{sourceState.label}</span>
+          </div>
+          <div class="manager-v2-essence-source-stack">
+            <div class="manager-v2-essence-source-summary">
+              {#if selectedSource}
+                <img class="manager-v2-essence-source-thumb" src={selectedSource.img || 'icons/svg/item-bag.svg'} alt="" />
+              {:else}
+                <span class="manager-v2-essence-source-thumb is-empty" aria-hidden="true">
+                  <i class="fas fa-link"></i>
+                </span>
+              {/if}
+              <div class="manager-v2-essence-source-copy">
+                {#if selectedSource}
+                  <strong>{selectedSource.name}</strong>
+                  <p class="manager-v2-muted">{selectedSource.sourceItemUuid || text('FABRICATE.Admin.ManagerV2.Essence.SourceNoUuid', 'This component has no source item UUID.')}</p>
+                {:else if essence?.sourceName || essence?.sourceItemUuid || essence?.sourceComponentId}
+                  <strong>{essence.sourceName || essence.sourceComponentId || essence.sourceItemUuid}</strong>
+                  <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Essence.SourceEvidenceHint', 'Stored source evidence remains readable until you clear or repair it.')}</p>
+                {:else}
+                  <strong>{text('FABRICATE.Admin.ManagerV2.Essence.SourceNone', 'No source')}</strong>
+                  <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Essence.SourceEditHint', 'Pick or drop a managed component to provide the effect-transfer source.')}</p>
+                {/if}
+              </div>
+              {#if selectedSource || sourceComponentId || hasStoredSourceEvidence()}
+                <button type="button" class="manager-v2-icon-button" onclick={() => { sourceComponentId = ''; sourceTouched = true; }} aria-label={text('FABRICATE.Admin.Features.Essences.ClearSourceItem', 'Clear source item')} title={text('FABRICATE.Admin.Features.Essences.ClearSourceItem', 'Clear source item')}>
+                  <i class="fas fa-times" aria-hidden="true"></i>
+                </button>
+              {/if}
+            </div>
+
+            <div class="manager-v2-essence-source-drop-zone">
+              <EssenceSourceSelector
+                value={null}
+                items={managedItemOptions}
+                onDrop={handleSourceDrop}
+                onSelect={(itemId) => { sourceComponentId = itemId || ''; sourceTouched = true; }}
+                onClear={() => { sourceComponentId = ''; sourceTouched = true; }}
+              />
+            </div>
+          </div>
+        </div>
+      {/if}
 
       {#if saveFailed}
         <p class="manager-v2-muted manager-v2-form-warning">{text('FABRICATE.Admin.ManagerV2.Essence.SaveFailed', 'Save failed. Check for duplicate or blank names and try again.')}</p>
       {/if}
     </section>
-
-    {#if showSourceUi}
-      <section class="manager-v2-edit-card manager-v2-essence-source-card">
-        <div class="manager-v2-edit-card-heading">
-          <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Essence.Source', 'Source')}</h3>
-          <span class={`manager-v2-chip ${sourceState.className}`}>{sourceState.label}</span>
-        </div>
-        <div class="manager-v2-essence-source-edit">
-          <EssenceSourceSelector
-            value={selectedSource}
-            items={managedItemOptions}
-            onDrop={handleSourceDrop}
-            onSelect={(itemId) => { sourceComponentId = itemId || ''; sourceTouched = true; }}
-            onClear={() => { sourceComponentId = ''; sourceTouched = true; }}
-          />
-          <div class="manager-v2-essence-source-copy">
-            {#if selectedSource}
-              <strong>{selectedSource.name}</strong>
-              <p class="manager-v2-muted">{selectedSource.sourceItemUuid || text('FABRICATE.Admin.ManagerV2.Essence.SourceNoUuid', 'This component has no source item UUID.')}</p>
-            {:else if essence?.sourceName || essence?.sourceItemUuid || essence?.sourceComponentId}
-              <strong>{essence.sourceName || essence.sourceComponentId || essence.sourceItemUuid}</strong>
-              <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Essence.SourceEvidenceHint', 'Stored source evidence remains readable until you clear or repair it.')}</p>
-              {#if sourceComponentId || hasStoredSourceEvidence()}
-                <button type="button" class="manager-v2-button" onclick={() => { sourceComponentId = ''; sourceTouched = true; }}>
-                  <i class="fas fa-times" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.Features.Essences.ClearSourceItem', 'Clear source item')}</span>
-                </button>
-              {/if}
-            {:else}
-              <strong>{text('FABRICATE.Admin.ManagerV2.Essence.SourceNone', 'No source')}</strong>
-              <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Essence.SourceEditHint', 'Pick or drop a managed component to provide the effect-transfer source.')}</p>
-            {/if}
-          </div>
-        </div>
-      </section>
-    {/if}
   </form>
 </main>

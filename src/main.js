@@ -728,6 +728,9 @@ Hooks.once('ready', async () => {
   addModuleButtonsToItemsDirectory();
   Hooks.on('fabricate.craftingSystemsChanged', () => addModuleButtonsToItemsDirectory());
   Hooks.on('renderItemDirectory', () => addModuleButtonsToItemsDirectory());
+  Hooks.on('updateItem', (item, changes) => {
+    void fabricate.craftingSystemManager?.refreshComponentMetadataForUpdatedItem(item, changes);
+  });
 
   Hooks.callAll('fabricate.ready');
 });

@@ -253,6 +253,9 @@ function createStore(calls = [], options = {}) {
         sourceName: 'Iron Ore',
         sourceState: 'linked',
         componentUsageCount: 1,
+        componentUsageItems: [
+          { id: 'c1', name: 'Iron Ore', img: 'icons/commodities/metal/ore-chunk-grey.webp' }
+        ],
         deleteBlocked: true
       },
       {
@@ -268,6 +271,7 @@ function createStore(calls = [], options = {}) {
         sourceName: '',
         sourceState: 'none',
         componentUsageCount: 0,
+        componentUsageItems: [],
         deleteBlocked: false
       }
     ],
@@ -1021,13 +1025,14 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
 
   it('routes to the essence browser and dedicated edit route without inline editing', async () => {
     const calls = [];
+    const editedComponents = [];
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(Component, {
       target,
       props: {
         store: createStore(calls),
-        services: { openCurrentAdmin: () => {} }
+        services: { openCurrentAdmin: () => {}, onEditComponent: (id) => editedComponents.push(id) }
       }
     });
     flushSync();
@@ -1046,6 +1051,10 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Linked source'));
     assert.ok(target.textContent.includes('Iron Ore'));
     assert.ok(target.textContent.includes('Deletion blocked'));
+    assert.equal(target.querySelectorAll('.manager-v2-essence-usage-item').length, 1);
+    assert.equal(target.querySelector('.manager-v2-essence-usage-item').title, 'Iron Ore');
+    target.querySelector('.manager-v2-essence-usage-item').click();
+    assert.deepEqual(editedComponents, ['c1']);
     assert.equal(target.querySelectorAll('.manager-v2-essence-edit-row').length, 0);
     assert.equal(target.querySelectorAll('#manager-v2-essence-create-name').length, 0);
 
@@ -1076,13 +1085,15 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Edit essence'));
     assert.ok(!target.textContent.includes('Essence editor'));
     assert.ok(!target.querySelector('.manager-v2-essence-edit-view .manager-v2-action-group'), 'identity card should not duplicate route save/cancel actions');
-    assert.ok(target.textContent.includes('Basic information'));
-    assert.ok(target.textContent.includes('Essence ID'));
+    assert.equal(target.textContent.includes('Basic information'), false);
+    assert.equal(target.textContent.includes('Essence ID'), false);
     assert.ok(!target.querySelector('.manager-v2-inspector [aria-label="Edit Water"]'), 'inspector should not show an edit action while already editing');
     assert.ok(target.querySelector('.essence-icon-picker-trigger'), 'edit route should use the shared icon picker trigger');
     assert.ok(target.textContent.includes('Change icon'));
     assert.ok(target.textContent.includes('Clear icon'));
     assert.ok(target.querySelector('.essence-source-trigger'), 'effect-transfer systems should show source picker controls');
+    assert.ok(target.querySelector('.manager-v2-essence-source-summary'), 'edit route should show selected source summary inside the form');
+    assert.ok(target.querySelector('.manager-v2-essence-source-drop-zone .essence-source-trigger'), 'edit route should show a full-width source drop/pick target');
     assert.equal(target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').disabled, true);
 
     const editName = target.querySelector('#manager-v2-essence-edit-name');
@@ -1164,6 +1175,8 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     flushSync();
 
     assert.equal(target.querySelector('.essence-source-trigger'), null);
+    assert.equal(target.querySelector('.manager-v2-essence-source-summary'), null);
+    assert.equal(target.querySelector('.manager-v2-essence-source-drop-zone'), null);
     assert.equal(target.textContent.includes('Source unresolved'), false);
     assert.equal(target.textContent.includes('source linkage'), false);
 

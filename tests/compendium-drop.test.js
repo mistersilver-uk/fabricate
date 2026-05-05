@@ -754,6 +754,203 @@ test('replaceItemSource — rejects changing a component to a source reference a
   globalThis.fromUuid = async () => null;
 });
 
+test('refreshComponentMetadataForUpdatedItem — updates component image for direct source UUID match', async () => {
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-herb',
+      name: 'Herb',
+      img: 'icons/herb-old.webp',
+      sourceUuid: 'Item.herb'
+    }]
+  }]);
+  let saveCount = 0;
+  let notifyCount = 0;
+  const previousHooks = globalThis.Hooks;
+  mgr.save = async () => { saveCount++; };
+  globalThis.Hooks = {
+    callAll: (hookName) => {
+      if (hookName === 'fabricate.craftingSystemsChanged') notifyCount++;
+    }
+  };
+
+  try {
+    const result = await mgr.refreshComponentMetadataForUpdatedItem(
+      { uuid: 'Item.herb', img: 'icons/herb-new.webp' },
+      { img: 'icons/herb-new.webp' }
+    );
+
+    assert.equal(result.updated, 1);
+    assert.equal(mgr.getSystem('sys1').components[0].img, 'icons/herb-new.webp');
+    assert.equal(saveCount, 1);
+    assert.equal(notifyCount, 1);
+  } finally {
+    globalThis.Hooks = previousHooks;
+  }
+});
+
+test('refreshComponentMetadataForUpdatedItem — updates component name for direct source UUID match', async () => {
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-herb',
+      name: 'Old Herb',
+      img: 'icons/herb.webp',
+      sourceUuid: 'Item.herb'
+    }]
+  }]);
+  let saveCount = 0;
+  mgr.save = async () => { saveCount++; };
+
+  const result = await mgr.refreshComponentMetadataForUpdatedItem(
+    { uuid: 'Item.herb', name: 'Fresh Herb', img: 'icons/herb.webp' },
+    { name: 'Fresh Herb' }
+  );
+
+  assert.equal(result.updated, 1);
+  assert.equal(mgr.getSystem('sys1').components[0].name, 'Fresh Herb');
+  assert.equal(saveCount, 1);
+});
+
+test('refreshComponentMetadataForUpdatedItem — updates component image for canonical source UUID match', async () => {
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-ore',
+      name: 'Iron Ore',
+      img: 'icons/ore-old.webp',
+      sourceUuid: 'Item.world-copy',
+      sourceItemUuid: 'Compendium.source.items.iron-ore'
+    }]
+  }]);
+  let saveCount = 0;
+  mgr.save = async () => { saveCount++; };
+
+  const result = await mgr.refreshComponentMetadataForUpdatedItem(
+    {
+      uuid: 'Actor.actor-1.Item.ore-copy',
+      img: 'icons/ore-new.webp',
+      _stats: { compendiumSource: 'Compendium.source.items.iron-ore' }
+    },
+    { img: 'icons/ore-new.webp' }
+  );
+
+  assert.equal(result.updated, 1);
+  assert.equal(mgr.getSystem('sys1').components[0].img, 'icons/ore-new.webp');
+  assert.equal(saveCount, 1);
+});
+
+test('refreshComponentMetadataForUpdatedItem — updates component description for direct source UUID match', async () => {
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-herb',
+      name: 'Herb',
+      img: 'icons/herb.webp',
+      description: 'Old herb description.',
+      sourceUuid: 'Item.herb'
+    }]
+  }]);
+  let saveCount = 0;
+  mgr.save = async () => { saveCount++; };
+
+  const result = await mgr.refreshComponentMetadataForUpdatedItem(
+    {
+      uuid: 'Item.herb',
+      img: 'icons/herb.webp',
+      system: { description: { value: '<p>Bright <strong>green</strong> leaves.</p>' } }
+    },
+    { 'system.description.value': '<p>Bright <strong>green</strong> leaves.</p>' }
+  );
+
+  assert.equal(result.updated, 1);
+  assert.equal(mgr.getSystem('sys1').components[0].description, 'Bright green leaves.');
+  assert.equal(saveCount, 1);
+});
+
+test('refreshComponentMetadataForUpdatedItem — clears component description for canonical source UUID match', async () => {
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-ore',
+      name: 'Iron Ore',
+      img: 'icons/ore.webp',
+      description: 'Old ore description.',
+      sourceUuid: 'Item.world-copy',
+      sourceItemUuid: 'Compendium.source.items.iron-ore'
+    }]
+  }]);
+  let saveCount = 0;
+  mgr.save = async () => { saveCount++; };
+
+  const result = await mgr.refreshComponentMetadataForUpdatedItem(
+    {
+      uuid: 'Actor.actor-1.Item.ore-copy',
+      img: 'icons/ore.webp',
+      system: { description: { value: '' } },
+      _stats: { compendiumSource: 'Compendium.source.items.iron-ore' }
+    },
+    { system: { description: { value: '' } } }
+  );
+
+  assert.equal(result.updated, 1);
+  assert.equal(mgr.getSystem('sys1').components[0].description, '');
+  assert.equal(saveCount, 1);
+});
+
+test('refreshComponentMetadataForUpdatedItem — ignores updates without synced metadata changes', async () => {
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-herb',
+      name: 'Herb',
+      img: 'icons/herb-old.webp',
+      sourceUuid: 'Item.herb'
+    }]
+  }]);
+  let saveCount = 0;
+  mgr.save = async () => { saveCount++; };
+
+  const result = await mgr.refreshComponentMetadataForUpdatedItem(
+    { uuid: 'Item.herb', img: 'icons/herb-new.webp' },
+    { type: 'loot' }
+  );
+
+  assert.equal(result.updated, 0);
+  assert.equal(mgr.getSystem('sys1').components[0].img, 'icons/herb-old.webp');
+  assert.equal(saveCount, 0);
+});
+
+test('refreshComponentMetadataForUpdatedItem — skips save when matched metadata is unchanged', async () => {
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-herb',
+      name: 'Herb',
+      img: 'icons/herb.webp',
+      sourceUuid: 'Item.herb'
+    }]
+  }]);
+  let saveCount = 0;
+  mgr.save = async () => { saveCount++; };
+
+  const result = await mgr.refreshComponentMetadataForUpdatedItem(
+    { uuid: 'Item.herb', img: 'icons/herb.webp' },
+    { img: 'icons/herb.webp' }
+  );
+
+  assert.equal(result.updated, 0);
+  assert.equal(mgr.getSystem('sys1').components[0].img, 'icons/herb.webp');
+  assert.equal(saveCount, 0);
+});
+
 // ---------------------------------------------------------------------------
 // Defect 2: resolveDropData unit tests
 // ---------------------------------------------------------------------------

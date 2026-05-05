@@ -2313,18 +2313,6 @@
             </p>
           </section>
 
-          {#if selectedEssenceForInspector.id}
-            <section class="manager-v2-inspector-card">
-              <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Essence.BasicInformation', 'Basic information')}</h3>
-              <div class="manager-v2-requirements-list">
-                <div class="manager-v2-requirement-row">
-                  <span>{text('FABRICATE.Admin.ManagerV2.Essence.EssenceId', 'Essence ID')}</span>
-                  <strong>{selectedEssenceForInspector.id}</strong>
-                </div>
-              </div>
-            </section>
-          {/if}
-
           {#if currentView === 'essence-edit' && (essenceEditDirty || essenceEditSaving)}
             <section class="manager-v2-inspector-card">
               <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Essence.DraftState', 'Draft state')}</h3>
@@ -2359,6 +2347,15 @@
                 <strong>{text('FABRICATE.Admin.ManagerV2.Essence.ComponentUsageCount', '{count} components').replace('{count}', selectedEssenceForInspector.componentUsageCount || 0)}</strong>
               </div>
             </div>
+            {#if Array.isArray(selectedEssenceForInspector.componentUsageItems) && selectedEssenceForInspector.componentUsageItems.length > 0}
+              <div class="manager-v2-essence-usage-grid" aria-label={text('FABRICATE.Admin.ManagerV2.Essence.ComponentUsageGrid', 'Components using this essence')}>
+                {#each selectedEssenceForInspector.componentUsageItems as component (component.id)}
+                  <button type="button" class="manager-v2-essence-usage-item" title={component.name} aria-label={text('FABRICATE.Admin.ManagerV2.Component.EditNamed', 'Edit {name}').replace('{name}', component.name)} onclick={() => editComponent(component.id)}>
+                    <img src={componentImage(component)} alt="" />
+                  </button>
+                {/each}
+              </div>
+            {/if}
           </section>
 
           {#if selectedEssenceForInspector.deleteBlocked}

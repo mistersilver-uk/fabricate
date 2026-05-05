@@ -2385,8 +2385,12 @@ describe('createAdminStore', () => {
       assert.equal(cards[0].sourceName, 'Blazing Herb');
       assert.equal(cards[0].sourceState, 'linked');
       assert.equal(cards[0].componentUsageCount, 1);
+      assert.deepEqual(cards[0].componentUsageItems, [
+        { id: 'comp-1', name: 'Blazing Herb', img: 'blazing-herb.png' }
+      ]);
       assert.equal(cards[0].deleteBlocked, true);
       assert.equal(cards[1].sourceState, 'none');
+      assert.deepEqual(cards[1].componentUsageItems, []);
       assert.equal(cards[1].icon, DEFAULT_ESSENCE_ICON);
       assert.equal(cards[1].deleteBlocked, false);
     });

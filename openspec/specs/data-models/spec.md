@@ -220,11 +220,13 @@ Represent one curated item entry available to recipes and salvage operations.
 ### Properties
 
 ```js
-Component = {
-  id: string,
-  name: string,
-  sourceItemUuid: string | null,
-  tags: string[],
+  Component = {
+    id: string,
+    name: string,
+    img: string,
+    description?: string,
+    sourceItemUuid: string | null,
+    tags: string[],
   essences: { [essenceId: string]: number },
   difficulty?: number, // only used in progressive mode
 
@@ -250,6 +252,7 @@ Component = {
 6. Runtime essence matching, craftability checks, discovered-recipe craftability, crafting-check contexts, and effect-transfer contexts must count `Component.essences` for actor items that match the component by source reference or name. Explicit `fabricate.essences` item flags remain a compatibility override for that item.
 7. `salvage.outcomeRouting` is only valid when `salvageResolutionMode` is `"routed"`.
 8. `salvage.ingredientQuantity` must be a positive integer.
+9. If a linked source item updates its name, image, or description, managed components that match the item's live UUID, canonical source UUID, or fallback source references must refresh their stored `name`, `img`, and display-safe plain-text `description` from the linked item.
 
 ## Recipe
 

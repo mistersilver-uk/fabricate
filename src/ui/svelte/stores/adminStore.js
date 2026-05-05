@@ -724,12 +724,26 @@ function _sourceComponentIdForEssence(def, managedItemById) {
 
 function _essenceUsageCount(essenceId, managedItems) {
   return managedItems.reduce((count, item) => {
-    const essences = item?.essences;
-    if (Array.isArray(essences)) {
-      return count + (essences.some(entry => entry?.id === essenceId && Number(entry.quantity) > 0) ? 1 : 0);
-    }
-    return count + (Number(essences?.[essenceId]) > 0 ? 1 : 0);
+    return count + (_itemUsesEssence(item, essenceId) ? 1 : 0);
   }, 0);
+}
+
+function _itemUsesEssence(item, essenceId) {
+  const essences = item?.essences;
+  if (Array.isArray(essences)) {
+    return essences.some(entry => entry?.id === essenceId && Number(entry.quantity) > 0);
+  }
+  return Number(essences?.[essenceId]) > 0;
+}
+
+function _essenceUsageItems(essenceId, managedItems) {
+  return managedItems
+    .filter(item => _itemUsesEssence(item, essenceId))
+    .map(item => ({
+      id: item.id,
+      name: item.name || item.id,
+      img: item.img || 'icons/svg/item-bag.svg'
+    }));
 }
 
 function _essenceSourceState({ sourceComponentId, sourceItemUuid, associatedItem }) {
@@ -774,6 +788,7 @@ function _buildEssenceCards(essenceDefinitions, managedItems, managedItemOptions
     const associatedItem = managedItemById.get(sourceComponentId) || null;
     const sourceItemUuid = def.sourceItemUuid || associatedItem?.sourceItemUuid || associatedItem?.sourceUuid || null;
     const componentUsageCount = _essenceUsageCount(def.id, managedItems);
+    const componentUsageItems = _essenceUsageItems(def.id, managedItems);
     const sourceState = _essenceSourceState({ sourceComponentId, sourceItemUuid, associatedItem });
     return {
       ...def,
@@ -786,6 +801,7 @@ function _buildEssenceCards(essenceDefinitions, managedItems, managedItemOptions
       sourceName: associatedItem?.name || (sourceState === 'stale' ? (sourceComponentId || sourceItemUuid) : ''),
       sourceState,
       componentUsageCount,
+      componentUsageItems,
       deleteBlocked: componentUsageCount > 0
     };
   });

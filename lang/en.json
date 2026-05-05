@@ -546,6 +546,7 @@
           "ColumnEssence": "Essence",
           "Usage": "Usage",
           "ComponentUsageCount": "{count} components",
+          "ComponentUsageGrid": "Components using this essence",
           "EmptyTitle": "No essences yet",
           "EmptyHint": "Create an essence definition to start assigning essence quantities to components.",
           "EmptySearchTitle": "No essences match these filters",

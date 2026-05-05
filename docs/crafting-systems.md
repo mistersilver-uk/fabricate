@@ -186,6 +186,8 @@ Drag any Item document from the **Items sidebar** or from an open **compendium b
 
 If the item is already registered in the system by either its live UUID or its canonical source UUID, the drop reuses the existing component instead of creating a duplicate. If the stored name, image, or live UUID is stale, Fabricate updates the component in place and records the previous live UUID in `fallbackItemIds`.
 
+After import, Fabricate also listens for linked Foundry Item updates from a GM client. When a linked item changes its name, image, or description, matching components refresh their stored name, image, and display-safe plain-text description automatically.
+
 If the dropped document is an Actor, JournalEntry, Scene, or any other non-Item type, a warning notification is shown and nothing is imported. If the drag data cannot be resolved to any UUID, the same warning is shown.
 
 #### Bulk compendium pack drop

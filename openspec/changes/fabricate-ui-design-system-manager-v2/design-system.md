@@ -4,6 +4,9 @@
 
 The visual reference screenshots for this change are:
 
+- [Actor Crafting App - Alchemy Mode](<references/Actor Crafting App - Alchemy Mode.png>)
+- [Actor Crafting App - Crafting Mode - Complex Recipes](<references/Actor Crafting App - Crafting Mode - Complex Recipes.png>)
+- [Actor Crafting App - Crafting Mode - Simple recipes](<references/Actor Crafting App - Crafting Mode - Simple recipes.png>)
 - [Browse Crafting Systems](<references/Browse Crafting Systems.png>)
 - [Browse Components](<references/Browse Components.png>)
 - [Browse Essences](<references/Browse Essences.png>)
@@ -23,6 +26,9 @@ Reference interpretation:
 
 | Reference | Decision | Keep | Change Or Discard |
 |-----------|----------|------|-------------------|
+| [Actor Crafting App - Alchemy Mode](<references/Actor Crafting App - Alchemy Mode.png>) | Accept as actor alchemy reference | Shared actor/source header, mode tabs, alchemy-system selector, component palette, central workbench, discovered recipes panel, active/history bands | Preserve hidden-recipe and no-signature secrecy rules; do not add shopping list, favourites, or normal recipe browser to alchemy |
+| [Actor Crafting App - Crafting Mode - Complex Recipes](<references/Actor Crafting App - Crafting Mode - Complex Recipes.png>) | Accept as complex crafting reference | Crafting browse list, complexity chips, summary columns, craft-plan inspector, path selector, ingredient groups, source allocation, outcome card, active-run timeline | Requirements/result columns must remain summaries; full alternatives, routed/progressive outcomes, step detail, and source allocation belong in the inspector |
+| [Actor Crafting App - Crafting Mode - Simple recipes](<references/Actor Crafting App - Crafting Mode - Simple recipes.png>) | Accept as simple crafting baseline | Actor/source header, active/history panels, shopping list, searchable recipe table, selected-recipe inspector, continue/start actions | Do not let the simple flat requirement/result layout become the only design; complex recipes need the craft-plan inspector pattern |
 | [Browse Crafting Systems](<references/Browse Crafting Systems.png>) | Accept as manager shell reference | Left rail, systems table, selected-row state, inspector, import/export actions | Discard any decorative metrics not backed by current system data |
 | [Browse Components](<references/Browse Components.png>) | Accept with domain corrections | Drop-to-add affordance, component table, tag/essence/source filters, usage legend, selected component inspector | Use Fabricate component semantics; do not confuse components, recipe items, resources, or generic items |
 | [Browse Essences](<references/Browse Essences.png>) | Accept with domain corrections | Icon-led essence table, source item linking, dashed drop zones, usage summary, warnings, inspector tabs | Show only when essences are enabled; do not treat essences as components or item tags |
@@ -353,6 +359,54 @@ Required patterns:
 - Keep validation near the edited recipe-local visibility data, such as missing linked recipe item or invalid allowed-user shape.
 - Do not introduce environments, roles, item/component tag include/exclude rules, skill requirements, progression gates, or world-state gates into recipe visibility unless a later approved data contract adds them.
 
+### Actor Crafting Apps
+
+Actor crafting apps are player-facing work surfaces. They use the product tokens and evidence language, but they do not use GM management chrome such as system rails, admin breadcrumbs, import/export actions, or destructive authoring controls.
+
+Shared patterns:
+
+- The persistent header owns crafting actor selection, component source actors, mode tabs, and mode-specific system selection.
+- Actor and source controls are compact image-led controls with searchable menus. The selected crafting actor remains a required component source.
+- Active runs and recent history sit near the top of the app so resume/cancel/review actions are visible before browsing.
+- The main action area changes by mode: Crafting is browse-first; Alchemy is workbench-first.
+- Right-side evidence panels explain the selected recipe, selected attempt, current run, or discovered recipe using live actor/source inventory data.
+- Player apps must keep start, continue, cancel, details, add-to-list, favourite, auto-fill, and attempt actions reachable without scrolling at normal Foundry window sizes.
+- Status and complexity chips use the same semantic color system as manager-v2, but they must describe player-facing state: craftable, available, missing materials, locked, learnable, in progress, complete, complex, multi-step, routed, progressive, or low quantity.
+- Player-facing panels must not expose hidden recipe metadata, GM-only diagnostics, stale admin references, or implementation ids unless the viewer is a GM and the runtime contract permits that detail.
+
+### Actor Crafting Mode
+
+Crafting mode is a browse-to-craft workflow for non-alchemy systems.
+
+Required patterns:
+
+- Use the simple crafting reference as the baseline for actor/source header, active run panel, recent history, shopping list, recipe search/filter toolbar, selected row state, and selected-recipe inspector.
+- Use the complex crafting reference whenever a recipe has multiple steps, multiple ingredient sets, OR options, optional essences/catalysts, routed outcomes, progressive outcomes, or source-allocation decisions.
+- Recipe rows summarize complexity instead of rendering the full recipe tree. Preferred row summaries are counts and chips such as `3 required`, `1 optional`, `2 paths`, `1 choice`, `fixed result`, `routed outcomes`, or `result depends on check`.
+- The requirements column is a summary surface. It must not try to display every ingredient set, group, OR option, catalyst, essence, time requirement, and source actor inline.
+- The result column is a summary surface. It must distinguish fixed results, learn-recipe outcomes, routed outcomes, progressive/quality-variable results, and locked/unknown results without implying all possible result groups are awarded.
+- The selected-recipe inspector carries the full craft plan at normal widths: mode/complexity chips, path selector, ingredient-set/group breakdown, OR choices, optional essences, catalysts/tools, source allocation, time/currency, outcome explanation, and active-run controls.
+- Path selection represents ingredient-set alternatives. It should show which path is selected, which paths are satisfiable, and what each path changes. Switching paths updates requirements, source allocation, and routed result evidence where relevant.
+- Ingredient groups show AND groups as stacked blocks and OR options as choose-one rows. Source actor allocation appears at the row level when inventory is drawn from multiple actors.
+- Active run detail shows the current step, remaining time/progress, and a step timeline for multi-step recipes. It should make completed/current/pending steps visually distinct.
+- Shopping list aggregation remains Crafting-only and must account for the selected path or clearly state when it aggregates the currently selected/satisfiable path.
+
+### Actor Alchemy Mode
+
+Alchemy mode is an experiment/workbench workflow, not a normal recipe browser.
+
+Required patterns:
+
+- Use the alchemy reference as the baseline for shared actor/source header, mode tabs, alchemy-system selector, active/history bands, component palette, central workbench, and discovered recipes panel.
+- The component palette shows selected-system components owned by the selected component sources, with available quantity calculated as inventory minus the workbench quantity.
+- Palette state uses clear availability treatments: available, low quantity, and unavailable/zero quantity. Zero-quantity components may remain visible but cannot look craftable.
+- The workbench is the primary composition surface. It supports click-to-add, right-click/direct remove, drag/drop, quantity grouping, clear all, and a single primary attempt action.
+- The discovered recipes panel is always visible. It shows learned/discovered recipes only according to the canonical visibility rules; non-GM users must not see undiscovered recipe rows.
+- Discovered recipe rows can offer auto-fill into the workbench. Auto-fill must follow the canonical first-satisfiable-set algorithm and report unfulfilled groups when no complete set can be filled.
+- Selected discovered recipe detail may show expected result, required components, required essences, and missing state because the actor has discovered the recipe. Hidden or failed attempts must not disclose this detail.
+- Alchemy excludes the Crafting shopping list, normal recipe browse list, recents list, and favourites. Active runs and history are filtered to alchemy systems only.
+- Attempt feedback must distinguish success, normal failed/no-signature attempt, and GM-fix misconfiguration without leaking hidden recipe identity to non-GM users.
+
 ### Component Directory Editors
 
 Component directory editors manage Fabricate components: the item-backed ingredients/results/catalysts used by recipes, gathering, and salvage.
@@ -555,7 +609,7 @@ Adopt the same editor system: compact object header, workflow navigation, primar
 
 ### Player Crafting App
 
-Use the same color, spacing, row, and inspector language, but reduce GM-only management chrome. Player surfaces prioritize available actions, requirements, run status, and result evidence.
+Use the Actor Crafting Mode and Actor Alchemy Mode patterns above. Player surfaces prioritize available actions, requirements, source allocation, run status, attempt composition, and result evidence.
 
 ### Player Gathering App
 

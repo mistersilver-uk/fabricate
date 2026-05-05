@@ -13,6 +13,9 @@ These screenshots are visual direction, not executable specification. They are i
 
 Reference files:
 
+- [Actor Crafting App - Alchemy Mode](<references/Actor Crafting App - Alchemy Mode.png>)
+- [Actor Crafting App - Crafting Mode - Complex Recipes](<references/Actor Crafting App - Crafting Mode - Complex Recipes.png>)
+- [Actor Crafting App - Crafting Mode - Simple recipes](<references/Actor Crafting App - Crafting Mode - Simple recipes.png>)
 - [Browse Crafting Systems](<references/Browse Crafting Systems.png>)
 - [Browse Components](<references/Browse Components.png>)
 - [Browse Essences](<references/Browse Essences.png>)
@@ -43,6 +46,9 @@ This proposal has also been iterated with the later recipe direction images:
 - Component browser/editor: component table with tags, essences, source state, usage legend, drag/drop import, and selected component inspector.
 - Essence browser/editor: searchable essence table, source-item linking, usage summary, right inspector, and essence actions.
 - Tags and categories editor: split system-level management for item tags and recipe categories, with usage counts, cleanup actions, right-side guidance, and domain corrections for Fabricate's flat category model.
+- Actor Crafting app simple mode: actor/source header, active/history bands, shopping list, searchable recipe table, selected recipe inspector, and continue/start actions.
+- Actor Crafting app complex mode: browse-first recipe list with compact complexity summaries, craft-plan inspector, path selector, source allocation, outcome evidence, and step timeline.
+- Actor Alchemy app: workbench-first composition with component palette, alchemy-system selector, discovered recipes panel, selected discovered-recipe evidence, and attempt feedback.
 
 ## Problem
 
@@ -76,6 +82,9 @@ Color consistency is a specific risk. Fabricate UI apps should not accumulate on
 - Continue manager-v2 implementation with a Components page that delivers the component directory table, drop-to-add import affordance, search/filter controls, selected-component inspector, source/usage evidence, and existing component actions without introducing new component persistence paths.
 - Continue manager-v2 implementation with an Environments browse/edit slice that delivers the gathering environments page and in-v2 environment edit route by reusing the existing environment store/draft actions, validation, dirty protection, and save/cancel flow.
 - Correct the manager-v2 environment edit route so it follows the updated `Edit Gathering Environment` reference instead of embedding the legacy `EnvironmentsTab` form stack. The corrective slice keeps existing gathering semantics, but replaces the editor presentation with a purpose-built v2 task-authoring layout: compact environment details, scene card, task list, tabbed task editor, validation/evidence column, and top-level save/cancel actions.
+- Extend the design direction to the actor Crafting and Alchemy apps so player-facing surfaces share the same product language without adopting GM management chrome.
+- Define the Crafting mode split between simple recipe display and complex craft-plan inspection, including path alternatives, source allocation, routed/progressive outcome summaries, and multi-step run timelines.
+- Define the Alchemy mode as a workbench-first surface with component palette, discovered recipes, auto-fill, attempt action, and strict hidden-recipe information-disclosure boundaries.
 
 ## Non-Goals
 

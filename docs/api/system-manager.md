@@ -279,7 +279,7 @@ Each item is processed via `addItemFromUuid()`, so the same source-chain dedupli
 **Returns:** `Promise<{ added: number, updated: number, skipped: number, total: number }>`
 
 - `added` — number of items created as new components on this call.
-- `updated` — number of items already registered whose name or image was refreshed from the source.
+- `updated` — number of items already registered whose name, image, or description was refreshed from the source.
 - `skipped` — number of items already registered and already up to date; no changes written.
 - `total` — total number of Item documents found in the pack.
 

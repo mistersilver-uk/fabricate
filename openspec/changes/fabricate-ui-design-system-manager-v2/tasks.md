@@ -17,6 +17,9 @@
 - [x] Fold the crafting-check versus successful-provider resolution model into the manager-v2 recipe editor delta.
 - [x] Review the added component, essence, resolution, and visibility reference screenshots and record explicit keep/change/discard decisions.
 - [x] Review the added tags/categories reference screenshot and add system-level item-tag/category guidance.
+- [x] Review the added actor Crafting app simple and complex references and add player-facing Crafting mode design direction.
+- [x] Review the added actor Alchemy app reference and add workbench-first Alchemy mode design direction.
+- [x] Add Actor Crafting/Alchemy references to the proposal, design system, design notes, review notes, and UI delta.
 
 ## Implementer Entry Criteria
 
@@ -361,6 +364,9 @@ The first v2 environment edit route is behaviorally wired but visually wrong. It
 - [ ] Visibility tab adapts to system-owned global, player, knowledge, and alchemy modes; shows linked recipe item workflows only when relevant; and uses effective visibility, validation, example scenarios, and docs panels backed by real mode data.
 - [ ] Steps / Ingredients tab preserves compact step cards, ingredient-set cards, active set editor, group blocks, typed option rows, compact OR dividers, mapped-result chips, collapsed requirement summaries, left-side validation, and right-side Components/Essences/Tags source palette with search, filters, drag target, and drag/drop behavior.
 - [ ] Essences view matches the reference hierarchy: system rail, essence table, source item linking, selected essence inspector, usage summary, warnings, filters, import/export, and quick actions.
+- [ ] Actor Crafting app simple state matches the reference hierarchy: shared actor/source header, mode tabs, active/history bands, shopping list, searchable recipe list, selected-recipe inspector, and reachable start/continue/details actions.
+- [ ] Actor Crafting app complex state matches the reference hierarchy while preserving Fabricate semantics: compact row summaries, complexity chips, craft-plan inspector, path selector, ingredient groups/options, source allocation, optional essences/catalysts, outcome evidence, and multi-step timeline.
+- [ ] Actor Alchemy app matches the reference hierarchy while preserving hidden-recipe rules: shared actor/source header, alchemy system selector, component palette, central workbench, discovered recipes panel, selected discovered-recipe detail, active/history bands, auto-fill, and attempt feedback.
 - [ ] Environment editor shows compact object context, tabs/workflow, primary resource/result authoring, and live evidence column.
 - [ ] Environments browse/edit Playwright smoke artifacts prove linked scene image fidelity, first visible state, alignment, clipping, scroll containment, visible controls, responsive widths, and live pointer hit-tests.
 - [x] All image-backed screenshots include representative linked images, not only fallback icons.

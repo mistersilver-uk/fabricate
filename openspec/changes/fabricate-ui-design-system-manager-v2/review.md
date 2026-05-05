@@ -2,6 +2,9 @@
 
 ## Review Inputs
 
+- [Actor Crafting App - Alchemy Mode](<references/Actor Crafting App - Alchemy Mode.png>): actor alchemy app with shared actor/source header, alchemy system selector, component palette, central workbench, discovered recipes, selected discovered-recipe detail, and active/history bands.
+- [Actor Crafting App - Crafting Mode - Complex Recipes](<references/Actor Crafting App - Crafting Mode - Complex Recipes.png>): actor crafting app with complex recipe summaries, craft-plan inspector, ingredient paths, source allocation, outcome evidence, active run progress, and step timeline.
+- [Actor Crafting App - Crafting Mode - Simple recipes](<references/Actor Crafting App - Crafting Mode - Simple recipes.png>): actor crafting app baseline with shared actor/source header, active/history panels, shopping list, recipe browser, selected recipe inspector, and continue/start actions.
 - [Browse Crafting Systems](<references/Browse Crafting Systems.png>): systems manager with left rail, systems table, selected-system inspector, import/export actions.
 - [Browse Components](<references/Browse Components.png>): component browser with drop-to-add affordance, filters for tags/essences/source, usage legend, selected-component inspector, and component/source actions.
 - [Browse Essences](<references/Browse Essences.png>): essence browser/editor with essence table, source-item linking, selected-essence inspector, usage summary, warnings, and actions.
@@ -432,6 +435,76 @@ Spec additions:
 - added the tags/categories reference to proposal, design-system, design, review, and UI delta reference lists
 - added a dedicated manager-v2 `Tags and Categories` requirement
 - added design-system guidance for item tags, flat categories, reserved `General`, usage counts, disabled feature states, and cleanup behavior
+
+## Pass 9 Actor Crafting And Alchemy App Findings
+
+The actor app references extend the same product language to player-facing surfaces without turning them into GM manager pages.
+
+### Crafting Mode
+
+The simple crafting reference is accepted as the baseline browse-to-craft layout.
+
+Keep:
+
+- shared actor/source header
+- Alchemy/Crafting mode tabs
+- active run and recent history bands
+- Crafting-only shopping list
+- searchable/filterable recipe table
+- selected-row state
+- right selected-recipe inspector
+- continue/start, details, add-to-list, and favourite actions
+
+The complex crafting reference is accepted as the required iteration for Fabricate's richer recipe model.
+
+Keep:
+
+- complexity chips for complex, multi-step, path count, and choice count
+- compact row summaries for requirements and results
+- selected-recipe craft-plan inspector
+- path selector for ingredient-set alternatives
+- ingredient group and OR-choice breakdown
+- source actor allocation per satisfied requirement
+- optional essences and catalysts/tools as separate sections
+- fixed/routed/progressive outcome explanation
+- active-run card and step timeline
+
+Change or discard:
+
+- do not render the full ingredient tree inside table rows
+- do not imply every possible result group is awarded
+- do not flatten multi-step, routed, or progressive recipes into a single simple requirements/result panel
+- do not expose hidden recipe data or GM diagnostics to non-GM users
+
+### Alchemy Mode
+
+The alchemy reference is accepted as the workbench-first player app layout.
+
+Keep:
+
+- shared actor/source header
+- alchemy system selector
+- active alchemy run and recent alchemy history bands
+- component palette with availability states
+- central workbench with grouped quantities
+- clear-all and primary attempt action
+- discovered recipes panel
+- selected discovered-recipe detail
+- auto-fill action per discovered recipe
+
+Change or discard:
+
+- do not add the Crafting shopping list, normal recipe browser, recents, or favourites to Alchemy
+- do not reveal undiscovered recipe names, results, ingredient signatures, or diagnostics to non-GM users
+- no-signature attempts remain normal failed attempts with appropriate feedback and consumption
+- matched-but-unresolvable attempts are GM-fix misconfiguration states, not ordinary player failures
+
+Spec additions:
+
+- added actor app references to proposal, design-system, design, review, and UI delta reference lists
+- added design-system guidance for Actor Crafting Mode and Actor Alchemy Mode
+- added dedicated UI delta requirements for Actor Crafting App and Actor Alchemy App design direction
+- added screenshot acceptance for simple crafting, complex crafting, and alchemy player states
 
 ## Final Iteration Outcome
 

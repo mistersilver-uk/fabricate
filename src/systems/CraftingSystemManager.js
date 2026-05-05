@@ -1098,7 +1098,7 @@ export class CraftingSystemManager {
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
 
-    // Resolve the source document (needed for type guard and name/img refresh in all paths)
+    // Resolve the source document (needed for type guard and metadata refresh in all paths)
     let source = null;
     try {
       source = await fromUuid(itemUuid);
@@ -1238,6 +1238,76 @@ export class CraftingSystemManager {
     }
 
     return { added, updated, skipped, total: items.length };
+  }
+
+  _hasChangedPath(changes = {}, path = []) {
+    if (!changes || typeof changes !== 'object' || path.length === 0) return false;
+
+    const dotted = path.join('.');
+    if (Object.prototype.hasOwnProperty.call(changes, dotted)) return true;
+    if (Object.keys(changes).some(key => key.startsWith(`${dotted}.`))) return true;
+
+    let cursor = changes;
+    for (const segment of path) {
+      if (!cursor || typeof cursor !== 'object' || !Object.prototype.hasOwnProperty.call(cursor, segment)) {
+        return false;
+      }
+      cursor = cursor[segment];
+    }
+
+    return true;
+  }
+
+  _hasUpdatedItemDescription(changes = {}) {
+    return this._hasChangedPath(changes, ['system', 'description'])
+      || this._hasChangedPath(changes, ['description']);
+  }
+
+  async refreshComponentMetadataForUpdatedItem(item, changes = {}) {
+    if (!game.user?.isGM) return { updated: 0 };
+
+    const refreshName = this._hasChangedPath(changes, ['name']);
+    const refreshImg = !!changes && Object.prototype.hasOwnProperty.call(changes, 'img');
+    const refreshDescription = this._hasUpdatedItemDescription(changes);
+    if (!refreshName && !refreshImg && !refreshDescription) return { updated: 0 };
+
+    const itemRefs = new Set(getItemSourceReferences(item));
+    if (itemRefs.size === 0) return { updated: 0 };
+
+    const nextName = refreshName ? (item?.name || changes.name || 'Unnamed Item') : null;
+    const nextImg = refreshImg ? (item?.img || changes.img || 'icons/svg/item-bag.svg') : null;
+    const nextDescription = refreshDescription ? this._extractSourceDescription(item) : null;
+    let updated = 0;
+
+    for (const system of this.systems.values()) {
+      const components = Array.isArray(system.components) ? system.components : [];
+      for (const component of components) {
+        const matches = getComponentSourceReferences(component).some(ref => itemRefs.has(ref));
+        if (!matches) continue;
+
+        let changed = false;
+        if (refreshName && component.name !== nextName) {
+          component.name = nextName;
+          changed = true;
+        }
+        if (refreshImg && component.img !== nextImg) {
+          component.img = nextImg;
+          changed = true;
+        }
+        if (refreshDescription && component.description !== nextDescription) {
+          component.description = nextDescription;
+          changed = true;
+        }
+        if (changed) updated++;
+      }
+    }
+
+    if (updated > 0) {
+      await this.save();
+      this._notifySystemsChanged();
+    }
+
+    return { updated };
   }
 
   async updateItem(systemId, itemId, updates = {}) {
