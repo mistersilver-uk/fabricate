@@ -42,6 +42,8 @@ Environments can have GM-controlled current conditions:
 
 Conditions may modify task availability, yield, risk, stamina cost, or check difficulty through declarative modifiers. They must not require hardcoded game-system logic in core.
 
+Expression-backed conditions, checks, stamina rules, and recharge rules should use natural game-system formulas where available. For dnd5e this includes roll expressions such as `1d20 + @skills.prc.total + @prof` when those paths are valid for the installed system version. PF2e should use its own actor-aware expression syntax. Every expression-backed feature should also have a macro-provider alternative for GMs who need custom logic.
+
 ### Resource Nodes
 
 A gathering task can represent a node type with a configured available count.
@@ -66,6 +68,18 @@ Respawn can be one of:
 
 World-time respawn should be deterministic enough to test and inspect. Random/probabilistic respawn decisions must be persisted once evaluated so repeated UI refreshes do not reroll availability.
 
+### Attempt Limits
+
+Attempt limits control how often a task can be tried, independent of node availability.
+
+Examples:
+
+- A meadow allows each actor to forage berries twice per day.
+- A rare flower task allows one global attempt per dawn, then recharges on a 30% chance each following dawn.
+- A GM manually reopens a dangerous cave search after restocking encounters.
+
+Attempt limits can be scoped to actor, user, party/source group, task, environment, or globally. They can reset on elapsed world time, recharge probabilistically, be manually reset by the GM, or combine manual and automatic recharge.
+
 ### Risk And Encounters
 
 Risk level describes how dangerous an environment or task is. It is player-facing.
@@ -79,6 +93,26 @@ Stamina is an optional gathering economy.
 When enabled, actors spend stamina to attempt gathering tasks. Stamina regenerates over world time, rest events, manual GM adjustment, or provider-specific formulas. It can replace long task durations and node-respawn waiting for groups that want an expedition resource loop.
 
 Stamina is actor-scoped, not component-source-scoped.
+
+The GM must be able to choose whether stamina regenerates over time or is manual-only. Manual-only stamina is useful for expedition clocks, downtime rewards, or systems where the GM wants to grant stamina deliberately. When Fabricate owns stamina, GMs can set current stamina directly; when a provider owns stamina, the UI can expose provider-supported adjustments or read-only evidence.
+
+### Blind Discovery
+
+Blind environments can contain multiple hidden tasks. Players see an environment-level gather action until the configured reveal rules expose one or more tasks.
+
+Progressive reveal can make blind gathering feel exploratory:
+
+- an actor discovers `Harvest Wild Herbs` after successfully finding herbs once
+- a party unlocks `Search for Insects` after a ranger succeeds in the region
+- the GM manually reveals `Mine Moonstone Veins` after a rumor or quest
+
+Reveal scope should be configurable as actor, user, party/source group, or global. Unrevealed tasks remain hidden and use generic labels in active runs, logs, chat messages, blockers, and history.
+
+### Hooks, APIs, And Chat
+
+Rich gathering should be integration-friendly. Runtime APIs and hooks should cover listing, visibility, condition modifiers, stamina, node availability, attempt limits, encounters, history, chat, and blind discovery.
+
+Chat messages are part of the play experience. GMs should be able to configure which gathering lifecycle events create chat messages, with player-safe redaction for blind or hidden data and GM-only diagnostics restricted to GMs.
 
 ## Mode Fit
 
@@ -113,6 +147,10 @@ The GM environment editor should become a rich place-authoring surface:
 - task/node list with availability counts, max counts, depletion rules, respawn policy, and manual restock controls
 - result/routing/progressive authoring remains the task resolution surface
 - encounter table configuration and trigger hooks
+- blind task selection, progressive reveal rules, and manual reveal/reset controls
+- attempt limit counts, time windows, recharge policies, and manual recharge controls
+- natural dnd5e/pf2e expression fields and custom macro alternatives for supported checks/modifiers/economy rules
+- chat message settings and developer/integration notes in advanced automation panels
 - preview/evidence column showing player-facing summary, available nodes, modified yields/costs, risk, and validation
 
 The GM browse view should make environments searchable by name, region, biome, risk, availability, and current condition.
@@ -126,6 +164,9 @@ The Actor Gathering app should feel like choosing where and how to gather in the
 - center task list for the selected environment, including task image, name, description, requirement/tool summary, stamina cost/time cost/node state, and start/select action
 - right environment detail with image, region, biome, risk, time of day, weather, visibility, active task, potential results where visible, notes, and start action
 - active/log surfaces show started tasks, completed attempts, failures, encounter events, stamina spending/regeneration where relevant, and blind redaction
+- blind environments show generic gather actions until tasks are revealed for the viewer
+- attempt-limit blockers show remaining attempts or redaction-safe recharge state
+- chat/log evidence shows what happened without leaking hidden task details
 
 The Actor app must present strong fantasy while staying honest about hidden information. Potential result previews are allowed only when the task is targeted and visible, or when GM visibility permits them.
 
@@ -139,7 +180,9 @@ Legacy environments without the new fields should continue to load as:
 - scene link remains optional
 - current timeRequirement behavior remains unchanged
 - no node count or respawn gating
+- no attempt-limit gating
 - no stamina cost
+- stamina regeneration mode defaults to disabled/manual absent unless the system enables stamina
 - risk defaults to `safe` or equivalent neutral display state
 
 Migration strategy should be additive: new fields get defaults, old fields are not rewritten unless the GM saves the environment through the new editor.
@@ -150,3 +193,4 @@ Migration strategy should be additive: new fields get defaults, old fields are n
 - Should stamina be a Fabricate actor flag by default, or always delegated to a provider when a game system has a native resource?
 - Should encounter outcomes create chat messages, journal links, scene notes, or only return structured data to a provider/integration?
 - Should weather/time conditions be per environment, shared globally, or optionally inherited from a calendar/weather integration?
+- Which exact hook names and API method names should become stable public developer contracts?

@@ -39,6 +39,20 @@ Gathering environments MUST support GM-controlled condition state for time of da
 6. Player-facing UI MAY show beneficial or harmful condition notes only when those notes are not hidden by blind task or visibility rules.
 7. Changing current environment conditions MUST NOT retroactively rewrite completed gathering history.
 
+### Requirement: Natural gathering expressions and macros
+
+Gathering checks, condition modifiers, stamina formulas, and attempt-limit formulas MUST allow natural game-system expressions where a supported system exposes them.
+
+1. `dnd5e` expression fields MUST allow natural dnd5e roll/formula syntax with actor data references, such as `1d20 + @skills.prc.total + @prof`, subject to the selected dnd5e version's supported data paths.
+2. `pf2e` expression fields MUST allow natural pf2e roll/formula syntax with actor data references, subject to the selected pf2e version's supported data paths.
+3. Expression evaluation MUST use the selected gathering actor as the primary actor context.
+4. Expression fields MUST support roll terms where the owning provider supports rolls, not only static numeric expressions.
+5. Fabricate core MUST NOT invent a parallel replacement formula language for dnd5e or pf2e.
+6. A GM MUST be able to choose a custom macro provider instead of a dnd5e or pf2e expression provider where the relevant feature supports provider choice.
+7. Macro providers MUST receive enough context to make equivalent decisions: environment, task, actor, current conditions, stamina state where enabled, node/attempt state where enabled, risk, and triggering lifecycle event.
+8. Provider diagnostics from invalid expressions, unsupported data paths, macro exceptions, or malformed macro return values MUST be GM-fix-required diagnostics, not normal player failure outcomes.
+9. Player-facing UI MUST show safe failure/blocking copy for provider diagnostics without exposing macro internals, expression source, or GM-only data to non-GM users.
+
 ### Requirement: Gathering resource nodes
 
 Gathering tasks MAY represent resource node types with availability counts.
@@ -69,6 +83,22 @@ Gathering task nodes MUST support configurable respawn policies.
 9. Respawn and restock events SHOULD be visible in GM logs or audit-style UI where practical.
 10. Player-facing UI SHOULD show availability and next respawn hints only when those hints do not violate hidden/blind environment rules.
 
+### Requirement: Gathering task attempt limits
+
+Gathering tasks MAY define attempt limits separately from node availability.
+
+1. A task MAY define a maximum number of accepted attempts per actor, per environment, per task, per user, or globally, as selected by GM configuration.
+2. A task MAY define an attempt-limit time window, such as per hour, per day, per rest period, or a custom world-time duration.
+3. A task MAY define probabilistic attempt recharge triggered by elapsed world time.
+4. A task MAY define manual GM recharge of attempts.
+5. A task MAY define both manual and elapsed/probabilistic recharge.
+6. Attempt limits MUST be evaluated after visibility and access guards but before stamina spend, node depletion, provider execution, terminal history, or result creation.
+7. Probabilistic attempt recharge MUST persist evaluated recharge outcomes so repeated UI refreshes do not reroll the same recharge interval.
+8. Attempt-limit counters and recharge state MUST be scoped according to the configured limit scope.
+9. GM users MUST be able to inspect and manually adjust attempt counters and recharge state.
+10. Player-facing UI SHOULD show remaining attempts or generic exhausted/recharging copy when doing so does not violate blind or hidden-task rules.
+11. Attempt limits MUST NOT replace node availability. A task may have node limits, attempt limits, both, or neither.
+
 ### Requirement: Gathering economy mode
 
 Crafting systems with gathering enabled MUST be able to define which gathering economy is primary.
@@ -90,11 +120,33 @@ Gathering stamina MUST be optional and actor-scoped.
 3. A start attempt MUST be blocked if the selected actor lacks the required stamina and no GM override is used.
 4. Stamina spend MUST occur only after start guards pass.
 5. Stamina spend, refund, and rollback semantics MUST be explicit in implementation design before production code changes.
-6. Stamina MAY regenerate by elapsed world time, rest event, manual GM adjustment, or provider-specific formula.
-7. System-specific stamina formulas MUST be provider-driven or configured; Fabricate core MUST NOT hardcode system-specific resource paths.
-8. Actor stamina state MAY be stored in Fabricate actor flags when no external provider owns stamina.
-9. Actor stamina display MUST include current and maximum values when known.
-10. Stamina history SHOULD record enough evidence for players and GMs to understand spend and regeneration events.
+6. A crafting system MUST let the GM choose whether stamina regenerates over time, regenerates from explicit rest/provider events, is manual-only, or uses a hybrid of manual and automatic regeneration.
+7. Manual-only stamina means stamina changes only through explicit GM adjustment, approved API calls, or provider events configured by the GM.
+8. Automatic elapsed-time regeneration MUST define an interval and amount, or a provider expression/macro that calculates amount from actor and world-time context.
+9. Rest/provider-event regeneration MUST identify the provider event or hook contract that grants stamina.
+10. GMs MUST be able to manually set current stamina for an actor when they have permission to manage that actor's gathering state.
+11. GMs SHOULD be able to manually set or override maximum stamina when the selected stamina provider is Fabricate-owned. External provider maximums may be read-only.
+12. Stamina MAY regenerate by elapsed world time, rest event, manual GM adjustment, API call, or provider-specific formula.
+13. System-specific stamina formulas MUST be provider-driven or configured; Fabricate core MUST NOT hardcode system-specific resource paths.
+14. Actor stamina state MAY be stored in Fabricate actor flags when no external provider owns stamina.
+15. Actor stamina display MUST include current and maximum values when known.
+16. Stamina history SHOULD record enough evidence for players and GMs to understand spend, manual adjustment, and regeneration events.
+
+### Requirement: Blind gathering discovery
+
+Blind environments MUST support multiple hidden gathering tasks and optional progressive discovery.
+
+1. A blind environment MAY contain more than one enabled gathering task.
+2. Non-GM player listings for blind environments MUST NOT display individual task rows by default.
+3. Non-GM player listings for blind environments MUST present a generic gather action or equivalent environment-level action unless progressive discovery has revealed one or more tasks to the selected actor.
+4. Blind task selection for an unrevealed blind attempt MUST be resolved by configured provider logic, such as weighted random selection, roll table, macro, condition-based selection, node availability, or first-available strategy.
+5. A blind environment MAY enable progressive task reveal.
+6. Progressive reveal MAY be scoped per actor, per user, per party/source group, or globally, as configured by the GM.
+7. Progressive reveal MAY occur on attempt, success, failure, specific result, encounter outcome, GM manual reveal, API call, or macro/provider decision.
+8. Revealed blind tasks MAY become visible as named task rows for the reveal scope, but unrevealed tasks MUST remain hidden.
+9. Revealed task history MUST preserve enough evidence to keep the task visible for the configured reveal scope unless the GM clears or resets discovery.
+10. Blind task active runs, history, chat messages, and duplicate/attempt-limit blockers MUST use generic labels until the task is revealed for that viewer or the viewer is a GM.
+11. GM users MUST be able to inspect all blind tasks, reveal state, reveal triggers, and reset/revoke reveal state.
 
 ### Requirement: Gathering risk and encounters
 
@@ -123,8 +175,38 @@ Gathering start and completion MUST account for rich environment features when t
 6. History entries SHOULD include redaction-safe summaries of stamina spent, node availability changes, condition modifiers, risk, and encounter outcomes.
 7. Blind environments MUST continue to redact real task identity, hidden results, provider diagnostics, and sensitive encounter details for non-GM users.
 
+### Requirement: Rich gathering hooks and programming interfaces
+
+Rich gathering MUST expose stable hooks and programming interfaces for integration developers.
+
+1. Fabricate MUST expose documented APIs for listing rich gathering environments for an actor, starting a gathering attempt, inspecting GM-only environment state, manually restocking nodes, manually recharging attempt limits, manually setting stamina, and revealing or clearing blind-task discovery where permissions allow.
+2. Public player APIs MUST enforce the same visibility, scene/access, blind redaction, stamina, node, attempt-limit, and provider-diagnostic secrecy rules as the UI.
+3. GM APIs MAY expose full diagnostic and hidden task state when called by an authorized GM context.
+4. Hook points SHOULD exist before and after major lifecycle events: environment listing, task visibility evaluation, condition modifier resolution, stamina calculation, stamina spend, attempt-limit evaluation, node availability evaluation, node depletion, attempt start, provider resolution, encounter resolution, result creation, history write, chat message creation, respawn/recharge, manual restock, manual stamina adjustment, and blind reveal.
+5. Hooks MUST be able to observe or modify only the phases explicitly documented as mutable. Read-only phases MUST not allow mutation.
+6. Hook payloads MUST include stable ids and redaction-safe display data for player-facing hooks, plus full GM data only for GM-authorized hooks.
+7. Hooks and APIs MUST have clear error handling. Integration errors MUST be isolated and reported as diagnostics without corrupting gathering state.
+8. APIs that mutate stamina, node counts, attempt limits, or reveal state MUST validate permissions and write auditable history or GM log evidence where practical.
+9. Developer-facing contracts MUST avoid direct dependency on Foundry globals from presentational Svelte components; Foundry access remains in runtime/service boundaries.
+
+### Requirement: Gathering chat messages
+
+Gathering attempts MUST support chat message output.
+
+1. A crafting system or gathering environment SHOULD allow GMs to configure whether gathering attempt chat messages are created.
+2. Chat output MAY be configured for attempt started, immediate success, immediate failure, timed completion, cancellation, encounter outcome, node depletion/restock, stamina spend/regeneration, and blind discovery.
+3. Chat messages MUST respect blind task redaction and non-GM information disclosure limits.
+4. Chat messages SHOULD include actor, environment, task label or blind-safe generic label, condition summary, stamina spend where visible, risk where visible, and result/failure/encounter summary where visible.
+5. GM-only diagnostics MAY be whispered or otherwise restricted to GMs.
+6. Chat message creation MUST occur only after the relevant state transition is accepted or persisted enough to avoid announcing events that later fail to commit.
+7. Chat output MUST be customizable by localization and MAY be customizable by macro/provider where approved.
+
 ## MODIFIED Requirements
 
 ### Requirement: Gathering scope
 
 The existing gathering scope is expanded to include rich environment metadata, resource-node availability, respawn, conditions, risk, encounters, and optional stamina. This change still does not introduce standalone harvesting, map travel simulation, or hardcoded system-specific skill logic.
+
+### Requirement: Blind environments
+
+The existing blind environment requirement is modified. Blind environments are no longer limited to exactly one task under the rich gathering model. They may contain multiple hidden tasks, selected by configured blind-selection logic, and may optionally reveal tasks progressively to actors, users, parties, or the world.

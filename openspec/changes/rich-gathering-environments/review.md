@@ -37,15 +37,24 @@ The image suggests several domain improvements beyond presentation:
 - Risk levels make gathering choices meaningful.
 - Encounter tables can add consequences without forcing Fabricate to become travel automation.
 - Stamina can serve as a faster expedition economy for systems that do not want long timed runs or strict node respawn pacing.
+- Natural game-system expressions make dnd5e and pf2e gathering feel native instead of forcing GMs into generic numeric fields.
+- Custom macros remain necessary for tables with house rules or unsupported systems.
+- Blind environments can support true exploration when they contain multiple hidden tasks and reveal discoveries over time.
+- Attempt limits are a useful pacing tool distinct from resource node counts.
+- Hooks, APIs, and chat messages are necessary for integration modules and for making attempts visible at the table.
 
 ## Corrections Before Implementation
 
 - Do not expose potential results for blind or hidden tasks to non-GM users.
 - Do not make stamina mandatory. It is an optional gathering economy.
+- Do not make stamina regeneration mandatory. Manual-only stamina must be valid.
+- Do not require blind environments to have only one task under the rich model.
+- Do not require progressive reveal for blind environments. It is optional.
 - Do not make environment scene linkage mandatory.
 - Do not make encounter tables mandatory.
 - Do not hardcode dnd5e, pf2e, or any other system's stamina resource paths in core.
 - Do not let probabilistic respawn reroll on every UI refresh; evaluated outcomes must persist.
+- Do not let probabilistic attempt recharge reroll on every UI refresh; evaluated outcomes must persist.
 - Do not let node count directly replace result quantity; result groups still define gathered outputs.
 - Do not introduce standalone harvesting. Harvesting remains recipe or salvage data.
 
@@ -54,4 +63,5 @@ The image suggests several domain improvements beyond presentation:
 This review produced:
 
 - `specs/gathering-and-harvesting/spec.md` requirements for rich environments, regions/biomes, conditions, resource nodes, respawn, gathering economy mode, stamina, risk/encounters, and rich attempt lifecycle.
-- `specs/ui-integration/spec.md` requirements for GM rich environment management, Actor Gathering app browsing, stamina presentation, and rich information disclosure.
+- `specs/gathering-and-harvesting/spec.md` requirements for natural expressions/macros, attempt limits, multi-task blind environments, progressive reveal, hooks/APIs, and chat messages.
+- `specs/ui-integration/spec.md` requirements for GM rich environment management, Actor Gathering app browsing, stamina presentation, rich information disclosure, developer/integration configuration, and chat settings.
