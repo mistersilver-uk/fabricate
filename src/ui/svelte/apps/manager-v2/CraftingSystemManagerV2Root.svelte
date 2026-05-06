@@ -1695,6 +1695,32 @@
               </div>
             </section>
           {/if}
+        {:else if currentView === 'essences' && essenceCards.length === 0}
+          <section class="manager-v2-setup-card" aria-label={text('FABRICATE.Admin.ManagerV2.Essence.EmptySetup.Title', 'Set up essences')}>
+            <div class="manager-v2-setup-card-header">
+              <i class="fas fa-mortar-pestle" aria-hidden="true"></i>
+              <div>
+                <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Essence.EmptySetup.Kicker', 'Essence setup')}</p>
+                <h3>{text('FABRICATE.Admin.ManagerV2.Essence.EmptySetup.Title', 'Set up essences')}</h3>
+              </div>
+            </div>
+            <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Essence.EmptySetup.Hint', 'Create the first essence definition for this system, then assign quantities to components that should contribute that essence.')}</p>
+            <ol class="manager-v2-setup-list">
+              <li>{text('FABRICATE.Admin.ManagerV2.Essence.EmptySetup.StepCreate', 'Create an essence with a clear name, icon, and description.')}</li>
+              <li>{text('FABRICATE.Admin.ManagerV2.Essence.EmptySetup.StepAssign', 'Edit components to assign essence quantities that recipes can require.')}</li>
+              <li>{text('FABRICATE.Admin.ManagerV2.Essence.EmptySetup.StepTransfer', 'If effect transfer is enabled, link source components whose effects should carry to crafted results.')}</li>
+            </ol>
+            <div class="manager-v2-setup-links" aria-label={text('FABRICATE.Admin.ManagerV2.Essence.EmptySetup.Resources', 'Essence resources')}>
+              <a class="manager-v2-button" href="https://misterpotts.github.io/fabricate/essences/" target="_blank" rel="noreferrer">
+                <i class="fas fa-book-open" aria-hidden="true"></i>
+                <span>{text('FABRICATE.Admin.ManagerV2.Essence.EmptySetup.EssenceDocs', 'Essence docs')}</span>
+              </a>
+              <a class="manager-v2-button" href="https://misterpotts.github.io/fabricate/effect-transfer/" target="_blank" rel="noreferrer">
+                <i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>
+                <span>{text('FABRICATE.Admin.ManagerV2.Essence.EmptySetup.EffectTransferDocs', 'Effect transfer')}</span>
+              </a>
+            </div>
+          </section>
         {:else}
           <div class="manager-v2-empty">
             <div>
@@ -1795,6 +1821,32 @@
               </button>
             </div>
           </section>
+        {:else if itemCards.length === 0}
+          <section class="manager-v2-setup-card" aria-label={text('FABRICATE.Admin.ManagerV2.Component.EmptySetup.Title', 'Set up components')}>
+            <div class="manager-v2-setup-card-header">
+              <i class="fas fa-box-open" aria-hidden="true"></i>
+              <div>
+                <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Component.EmptySetup.Kicker', 'Component setup')}</p>
+                <h3>{text('FABRICATE.Admin.ManagerV2.Component.EmptySetup.Title', 'Set up components')}</h3>
+              </div>
+            </div>
+            <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Component.EmptySetup.Hint', 'Import item-backed components before recipes can reference ingredients, catalysts, results, or essence sources.')}</p>
+            <ol class="manager-v2-setup-list">
+              <li>{text('FABRICATE.Admin.ManagerV2.Component.EmptySetup.StepImport', 'Drop world, compendium, pack, or folder items into the component browser.')}</li>
+              <li>{text('FABRICATE.Admin.ManagerV2.Component.EmptySetup.StepOrganize', 'Add tags, essences, source links, and difficulty metadata where the selected system uses them.')}</li>
+              <li>{text('FABRICATE.Admin.ManagerV2.Component.EmptySetup.StepRecipes', 'Use the managed components as recipe requirements, catalysts, and results.')}</li>
+            </ol>
+            <div class="manager-v2-setup-links" aria-label={text('FABRICATE.Admin.ManagerV2.Component.EmptySetup.Resources', 'Component resources')}>
+              <a class="manager-v2-button" href="https://misterpotts.github.io/fabricate/crafting-systems/#components" target="_blank" rel="noreferrer">
+                <i class="fas fa-book-open" aria-hidden="true"></i>
+                <span>{text('FABRICATE.Admin.ManagerV2.Component.EmptySetup.ComponentDocs', 'Component docs')}</span>
+              </a>
+              <a class="manager-v2-button" href="https://misterpotts.github.io/fabricate/quickstart/" target="_blank" rel="noreferrer">
+                <i class="fas fa-circle-question" aria-hidden="true"></i>
+                <span>{text('FABRICATE.Admin.ManagerV2.Component.EmptySetup.Quickstart', 'Quickstart')}</span>
+              </a>
+            </div>
+          </section>
         {:else}
           <div class="manager-v2-empty">
             <div>
@@ -1886,6 +1938,32 @@
                 <i class="fas fa-trash" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.ManagerV2.Recipe.Delete', 'Delete recipe')}</span>
               </button>
+            </div>
+          </section>
+        {:else if ($viewState.recipes || []).length === 0}
+          <section class="manager-v2-setup-card" aria-label={text('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.Title', 'Set up recipes')}>
+            <div class="manager-v2-setup-card-header">
+              <i class="fas fa-scroll" aria-hidden="true"></i>
+              <div>
+                <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.Kicker', 'Recipe setup')}</p>
+                <h3>{text('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.Title', 'Set up recipes')}</h3>
+              </div>
+            </div>
+            <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.Hint', 'Create the first recipe for this system after its reusable components are available.')}</p>
+            <ol class="manager-v2-setup-list">
+              <li>{text('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.StepStructure', 'Choose the recipe structure supported by the selected system.')}</li>
+              <li>{text('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.StepRequirements', 'Add ingredient sets, catalysts, and any visibility or timing requirements.')}</li>
+              <li>{text('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.StepResults', 'Define result groups and enable the recipe when it is ready for players.')}</li>
+            </ol>
+            <div class="manager-v2-setup-links" aria-label={text('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.Resources', 'Recipe resources')}>
+              <a class="manager-v2-button" href="https://misterpotts.github.io/fabricate/recipes/" target="_blank" rel="noreferrer">
+                <i class="fas fa-book-open" aria-hidden="true"></i>
+                <span>{text('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.RecipeDocs', 'Recipe docs')}</span>
+              </a>
+              <a class="manager-v2-button" href="https://misterpotts.github.io/fabricate/quickstart/" target="_blank" rel="noreferrer">
+                <i class="fas fa-circle-question" aria-hidden="true"></i>
+                <span>{text('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.Quickstart', 'Quickstart')}</span>
+              </a>
             </div>
           </section>
         {:else}

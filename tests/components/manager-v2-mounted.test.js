@@ -313,7 +313,7 @@ function createStore(calls = [], options = {}) {
       }
     ],
     selectedSystem,
-    recipes: [
+    recipes: options.emptyRecipes ? [] : [
       {
         id: 'r1',
         name: 'Healing Draught',
@@ -356,8 +356,8 @@ function createStore(calls = [], options = {}) {
     recipeCategories: [{ name: 'elixirs', count: 1 }, { name: 'potions', count: 1 }],
     recipeSearchTerm: '',
     itemSearchTerm: '',
-    itemCards: selectedSystem ? componentItems[selectedSystem.id] : [],
-    essenceCards: selectedSystem ? essenceCardsBySystem[selectedSystem.id] : [],
+    itemCards: selectedSystem ? (options.emptyComponents ? [] : componentItems[selectedSystem.id]) : [],
+    essenceCards: selectedSystem ? (options.emptyEssences ? [] : essenceCardsBySystem[selectedSystem.id]) : [],
     showVisibilitySummary: true,
     canShowEnvironmentsTab: selectedFeatures.gathering === true,
     environments,
@@ -1531,6 +1531,91 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
 
     assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'environment-edit');
     assert.ok(calls.some(call => call[0] === 'createEnvironmentDraft'));
+  });
+
+  it('shows setup guidance and keeps create routing when a system has no recipes', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { emptyRecipes: true }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Recipes').click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'recipes');
+    assert.ok(target.textContent.includes('No recipes yet'));
+    assert.ok(target.textContent.includes('Set up recipes'));
+    assert.ok(target.textContent.includes('Choose the recipe structure supported by the selected system.'));
+    assert.ok(target.textContent.includes('Recipe docs'));
+    assert.equal(target.textContent.includes('Select a recipe'), false);
+
+    target.querySelector('.manager-v2-table-scroll .manager-v2-button.is-primary').click();
+    assert.ok(calls.some(call => call[0] === 'createRecipe'));
+  });
+
+  it('shows setup guidance and keeps import affordance when a system has no components', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { emptyComponents: true }),
+        services: { openCurrentAdmin: () => {}, onDropItem: (data) => calls.push(['dropItem', data]) }
+      }
+    });
+    flushSync();
+
+    navButton('Components').click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'components');
+    assert.ok(target.textContent.includes('No components yet'));
+    assert.ok(target.textContent.includes('Set up components'));
+    assert.ok(target.textContent.includes('Drop world, compendium, pack, or folder items into the component browser.'));
+    assert.ok(target.textContent.includes('Component docs'));
+    assert.ok(target.querySelector('.manager-v2-component-drop-zone'));
+    assert.equal(target.textContent.includes('Select a component'), false);
+  });
+
+  it('shows setup guidance and keeps create routing when a system has no essences', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { emptyEssences: true }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Essences').click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'essences');
+    assert.ok(target.textContent.includes('No essences yet'));
+    assert.ok(target.textContent.includes('Set up essences'));
+    assert.ok(target.textContent.includes('Create an essence with a clear name, icon, and description.'));
+    assert.ok(target.textContent.includes('Essence docs'));
+    assert.equal(target.textContent.includes('Select an essence'), false);
+
+    target.querySelector('.manager-v2-essence-action-band .manager-v2-button.is-primary').click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'essence-edit');
   });
 
   it('creates a new environment draft with draft-backed title and inspector context', async () => {

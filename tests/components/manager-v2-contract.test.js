@@ -219,6 +219,18 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.EmptyTitle, 'No gathering environments yet');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Title, 'Set up environments');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.EmptySetup.GatheringDocs, 'Gathering docs');
+    assert.ok(rootSource.includes('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.Title'), 'empty recipes inspector should use localized setup copy');
+    assert.ok(rootSource.includes('https://misterpotts.github.io/fabricate/recipes/'), 'empty recipes inspector should link to published recipe docs');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.Title, 'Set up recipes');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.RecipeDocs, 'Recipe docs');
+    assert.ok(rootSource.includes('FABRICATE.Admin.ManagerV2.Component.EmptySetup.Title'), 'empty components inspector should use localized setup copy');
+    assert.ok(rootSource.includes('https://misterpotts.github.io/fabricate/crafting-systems/#components'), 'empty components inspector should link to published component docs');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Component.EmptySetup.Title, 'Set up components');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Component.EmptySetup.ComponentDocs, 'Component docs');
+    assert.ok(rootSource.includes('FABRICATE.Admin.ManagerV2.Essence.EmptySetup.Title'), 'empty essences inspector should use localized setup copy');
+    assert.ok(rootSource.includes('https://misterpotts.github.io/fabricate/essences/'), 'empty essences inspector should link to published essence docs');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Essence.EmptySetup.Title, 'Set up essences');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Essence.EmptySetup.EssenceDocs, 'Essence docs');
   });
 
   it('keeps manager-v2 tags and categories route focused and store-wired', () => {
