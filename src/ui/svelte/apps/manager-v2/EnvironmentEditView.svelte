@@ -414,6 +414,15 @@
     onUpdateEnvironment?.({ [field]: value });
   }
 
+  function updateCondition(field, value) {
+    onUpdateEnvironment?.({
+      conditions: {
+        ...(environmentDraft?.conditions || {}),
+        [field]: value
+      }
+    });
+  }
+
   function selectTask(taskId) {
     localSelectedTaskId = taskId;
     onSelectTask?.(taskId);
@@ -423,6 +432,47 @@
     const taskId = activeTask?.id;
     if (!taskId) return;
     onUpdateTask?.(taskId, { [field]: value });
+  }
+
+  function updateTaskNodes(field, value) {
+    const taskId = activeTask?.id;
+    if (!taskId) return;
+    const existing = activeTask.nodes || { enabled: true, max: 0, current: 0, depletionTiming: 'onStart', respawn: { policy: 'none' } };
+    onUpdateTask?.(taskId, {
+      nodes: {
+        ...existing,
+        enabled: true,
+        [field]: value
+      }
+    });
+  }
+
+  function updateTaskRespawn(field, value) {
+    const taskId = activeTask?.id;
+    if (!taskId) return;
+    const existing = activeTask.nodes || { enabled: true, max: 0, current: 0, depletionTiming: 'onStart', respawn: { policy: 'none' } };
+    onUpdateTask?.(taskId, {
+      nodes: {
+        ...existing,
+        enabled: true,
+        respawn: {
+          ...(existing.respawn || { policy: 'none' }),
+          [field]: value
+        }
+      }
+    });
+  }
+
+  function updateAttemptLimit(field, value) {
+    const taskId = activeTask?.id;
+    if (!taskId) return;
+    onUpdateTask?.(taskId, {
+      attemptLimit: {
+        ...(activeTask.attemptLimit || { enabled: true, scope: 'actor', max: 1, windowSeconds: 0, recharge: { policy: 'none' } }),
+        enabled: true,
+        [field]: value
+      }
+    });
   }
 
   async function pickTaskImagePath(currentPath) {
@@ -795,6 +845,78 @@
                 <span>{localize('FABRICATE.Admin.Environments.Description')}</span>
                 <textarea rows="3" value={environmentDraft.description} oninput={(event) => updateField('description', event.target.value)}></textarea>
               </label>
+              <label class="manager-v2-field span-2">
+                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Image', 'Environment image')}</span>
+                <input
+                  type="text"
+                  value={environmentDraft.img || ''}
+                  placeholder="icons/environment/wilderness/cave-entrance.webp"
+                  data-environment-field={environmentField('img')}
+                  oninput={(event) => updateField('img', event.target.value)}
+                />
+              </label>
+              <label class="manager-v2-field">
+                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Region', 'Region')}</span>
+                <input
+                  type="text"
+                  value={environmentDraft.region || ''}
+                  data-environment-field={environmentField('region')}
+                  oninput={(event) => updateField('region', event.target.value)}
+                />
+              </label>
+              <label class="manager-v2-field">
+                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Biome', 'Biome')}</span>
+                <input
+                  type="text"
+                  value={environmentDraft.biome || ''}
+                  data-environment-field={environmentField('biome')}
+                  oninput={(event) => updateField('biome', event.target.value)}
+                />
+              </label>
+              <label class="manager-v2-field">
+                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Risk', 'Risk')}</span>
+                <select
+                  value={environmentDraft.risk || 'safe'}
+                  data-environment-field={environmentField('risk')}
+                  onchange={(event) => updateField('risk', event.target.value)}
+                >
+                  <option value="safe">{text('FABRICATE.Admin.ManagerV2.Environment.RiskSafe', 'Safe')}</option>
+                  <option value="hazardous">{text('FABRICATE.Admin.ManagerV2.Environment.RiskHazardous', 'Hazardous')}</option>
+                  <option value="unsafe">{text('FABRICATE.Admin.ManagerV2.Environment.RiskUnsafe', 'Unsafe')}</option>
+                  <option value="extreme">{text('FABRICATE.Admin.ManagerV2.Environment.RiskExtreme', 'Extreme')}</option>
+                </select>
+              </label>
+              <label class="manager-v2-field">
+                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Economy', 'Economy')}</span>
+                <select
+                  value={environmentDraft.economyMode || 'time'}
+                  data-environment-field={environmentField('economyMode')}
+                  onchange={(event) => updateField('economyMode', event.target.value)}
+                >
+                  <option value="time">{text('FABRICATE.Admin.ManagerV2.Environment.EconomyTime', 'Time')}</option>
+                  <option value="nodes">{text('FABRICATE.Admin.ManagerV2.Environment.EconomyNodes', 'Nodes')}</option>
+                  <option value="stamina">{text('FABRICATE.Admin.ManagerV2.Environment.EconomyStamina', 'Stamina')}</option>
+                  <option value="hybrid">{text('FABRICATE.Admin.ManagerV2.Environment.EconomyHybrid', 'Hybrid')}</option>
+                </select>
+              </label>
+              <label class="manager-v2-field">
+                <span>{text('FABRICATE.Admin.ManagerV2.Environment.TimeOfDay', 'Time of day')}</span>
+                <input
+                  type="text"
+                  value={environmentDraft.conditions?.timeOfDay || ''}
+                  data-environment-field={environmentField('conditions.timeOfDay')}
+                  oninput={(event) => updateCondition('timeOfDay', event.target.value)}
+                />
+              </label>
+              <label class="manager-v2-field">
+                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Weather', 'Weather')}</span>
+                <input
+                  type="text"
+                  value={environmentDraft.conditions?.weather || ''}
+                  data-environment-field={environmentField('conditions.weather')}
+                  oninput={(event) => updateCondition('weather', event.target.value)}
+                />
+              </label>
               <label class="manager-v2-toggle-row span-2">
                 <input type="checkbox" checked={environmentDraft.enabled} onchange={(event) => updateField('enabled', event.target.checked)} />
                 <span>
@@ -978,6 +1100,69 @@
                 {fieldErrors}
                 {fieldErrorId}
               />
+              <section class="environment-editor-section">
+                <div class="environment-editor-section-header">
+                  <div>
+                    <h4>{text('FABRICATE.Admin.ManagerV2.Environment.RichTaskEconomy', 'Rich task economy')}</h4>
+                    <p>{text('FABRICATE.Admin.ManagerV2.Environment.RichTaskEconomyHint', 'Configure node availability, stamina cost, risk, and attempt pacing for this gathering task.')}</p>
+                  </div>
+                </div>
+                <div class="manager-v2-form-grid">
+                  <label class="manager-v2-field">
+                    <span>{text('FABRICATE.Admin.ManagerV2.Environment.TaskRisk', 'Task risk')}</span>
+                    <select value={activeTask.riskOverride || ''} onchange={(event) => updateTask('riskOverride', event.target.value)}>
+                      <option value="">{text('FABRICATE.Admin.ManagerV2.Environment.UseEnvironmentRisk', 'Use environment')}</option>
+                      <option value="safe">{text('FABRICATE.Admin.ManagerV2.Environment.RiskSafe', 'Safe')}</option>
+                      <option value="hazardous">{text('FABRICATE.Admin.ManagerV2.Environment.RiskHazardous', 'Hazardous')}</option>
+                      <option value="unsafe">{text('FABRICATE.Admin.ManagerV2.Environment.RiskUnsafe', 'Unsafe')}</option>
+                      <option value="extreme">{text('FABRICATE.Admin.ManagerV2.Environment.RiskExtreme', 'Extreme')}</option>
+                    </select>
+                  </label>
+                  <label class="manager-v2-field">
+                    <span>{text('FABRICATE.Admin.ManagerV2.Environment.StaminaCost', 'Stamina cost')}</span>
+                    <input type="number" min="0" step="1" value={activeTask.staminaCost || 0} oninput={(event) => updateTask('staminaCost', Number(event.target.value || 0))} />
+                  </label>
+                  <label class="manager-v2-field">
+                    <span>{text('FABRICATE.Admin.ManagerV2.Environment.NodeCurrent', 'Available nodes')}</span>
+                    <input type="number" min="0" step="1" value={activeTask.nodes?.current || 0} oninput={(event) => updateTaskNodes('current', Number(event.target.value || 0))} />
+                  </label>
+                  <label class="manager-v2-field">
+                    <span>{text('FABRICATE.Admin.ManagerV2.Environment.NodeMax', 'Max nodes')}</span>
+                    <input type="number" min="0" step="1" value={activeTask.nodes?.max || 0} oninput={(event) => updateTaskNodes('max', Number(event.target.value || 0))} />
+                  </label>
+                  <label class="manager-v2-field">
+                    <span>{text('FABRICATE.Admin.ManagerV2.Environment.DepletionTiming', 'Depletion timing')}</span>
+                    <select value={activeTask.nodes?.depletionTiming || 'onStart'} onchange={(event) => updateTaskNodes('depletionTiming', event.target.value)}>
+                      <option value="onStart">{text('FABRICATE.Admin.ManagerV2.Environment.DepleteOnStart', 'On start')}</option>
+                      <option value="onSuccess">{text('FABRICATE.Admin.ManagerV2.Environment.DepleteOnSuccess', 'On success')}</option>
+                    </select>
+                  </label>
+                  <label class="manager-v2-field">
+                    <span>{text('FABRICATE.Admin.ManagerV2.Environment.RespawnPolicy', 'Respawn policy')}</span>
+                    <select value={activeTask.nodes?.respawn?.policy || 'none'} onchange={(event) => updateTaskRespawn('policy', event.target.value)}>
+                      <option value="none">{text('FABRICATE.Admin.ManagerV2.Environment.RespawnNone', 'None')}</option>
+                      <option value="manual">{text('FABRICATE.Admin.ManagerV2.Environment.RespawnManual', 'Manual')}</option>
+                      <option value="elapsedTime">{text('FABRICATE.Admin.ManagerV2.Environment.RespawnElapsed', 'Elapsed time')}</option>
+                      <option value="probability">{text('FABRICATE.Admin.ManagerV2.Environment.RespawnProbability', 'Probability')}</option>
+                      <option value="manualAndElapsedTime">{text('FABRICATE.Admin.ManagerV2.Environment.RespawnHybrid', 'Manual and elapsed')}</option>
+                    </select>
+                  </label>
+                  <label class="manager-v2-field">
+                    <span>{text('FABRICATE.Admin.ManagerV2.Environment.AttemptLimit', 'Attempt limit')}</span>
+                    <input type="number" min="0" step="1" value={activeTask.attemptLimit?.max || 0} oninput={(event) => updateAttemptLimit('max', Number(event.target.value || 0))} />
+                  </label>
+                  <label class="manager-v2-field">
+                    <span>{text('FABRICATE.Admin.ManagerV2.Environment.AttemptScope', 'Attempt scope')}</span>
+                    <select value={activeTask.attemptLimit?.scope || 'actor'} onchange={(event) => updateAttemptLimit('scope', event.target.value)}>
+                      <option value="actor">{text('FABRICATE.Admin.ManagerV2.Environment.ScopeActor', 'Actor')}</option>
+                      <option value="user">{text('FABRICATE.Admin.ManagerV2.Environment.ScopeUser', 'User')}</option>
+                      <option value="task">{text('FABRICATE.Admin.ManagerV2.Environment.ScopeTask', 'Task')}</option>
+                      <option value="environment">{text('FABRICATE.Admin.ManagerV2.Environment.ScopeEnvironment', 'Environment')}</option>
+                      <option value="global">{text('FABRICATE.Admin.ManagerV2.Environment.ScopeGlobal', 'Global')}</option>
+                    </select>
+                  </label>
+                </div>
+              </section>
             {:else if activeTaskTab === 'results'}
               {#if activeTask.resolutionMode === 'routed'}
                 <ResultSelectionFields

@@ -1362,6 +1362,21 @@
       "Starting": "Starting...",
       "BlockedAction": "Blocked",
       "SceneLinked": "Scene linked",
+      "Filters": "Gathering filters",
+      "SearchPlaceholder": "Search environments...",
+      "RiskFilter": "Filter by risk",
+      "RegionFilter": "Filter by region",
+      "BiomeFilter": "Filter by biome",
+      "AllRisks": "All risks",
+      "AllRegions": "All regions",
+      "AllBiomes": "All biomes",
+      "Stamina": "Gathering stamina",
+      "StaminaSummary": "Stamina {current}/{max}",
+      "StaminaCost": "{cost} stamina",
+      "NodeCount": "{current}/{max} nodes",
+      "NodesAvailable": "Nodes available",
+      "NodesDepleted": "Depleted",
+      "AttemptsRemaining": "{remaining}/{max} attempts",
       "BlindTaskLabel": "Gather",
       "FailureDefault": "Gathering produced no results.",
       "ErrorTitle": "Could Not Load Gathering",
@@ -1421,7 +1436,16 @@
         "TaskDisabled": "This gathering task is disabled.",
         "TaskHidden": "This gathering task is not visible to the selected actor.",
         "TaskMisconfigured": "This gathering task needs GM configuration before it can be used.",
-        "RunCreationFailed": "Gathering could not create an active run."
+        "RunCreationFailed": "Gathering could not create an active run.",
+        "NodeDepleted": "This resource is depleted.",
+        "AttemptLimitExhausted": "No attempts remain for this gathering task.",
+        "StaminaBlocked": "The selected actor does not have enough gathering stamina."
+      },
+      "Risk": {
+        "safe": "Safe",
+        "hazardous": "Hazardous",
+        "unsafe": "Unsafe",
+        "extreme": "Extreme"
       }
     },
     "Workbench": {

@@ -17,6 +17,10 @@ const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
   TASK_HIDDEN: 'FABRICATE.Gathering.Blocked.TaskHidden',
   TASK_MISCONFIGURED: 'FABRICATE.Gathering.Blocked.TaskMisconfigured',
   RUN_CREATION_FAILED: 'FABRICATE.Gathering.Blocked.RunCreationFailed'
+  ,
+  NODE_DEPLETED: 'FABRICATE.Gathering.Blocked.NodeDepleted',
+  ATTEMPT_LIMIT_EXHAUSTED: 'FABRICATE.Gathering.Blocked.AttemptLimitExhausted',
+  STAMINA_BLOCKED: 'FABRICATE.Gathering.Blocked.StaminaBlocked'
 });
 
 const BLIND_TASK_LABEL_KEY = 'FABRICATE.Gathering.BlindTaskLabel';
@@ -56,6 +60,7 @@ export class GatheringEngine {
   constructor({
     environmentStore,
     runManager,
+    richState = null,
     evaluator,
     systemManager = null,
     getSystems = null,
@@ -73,6 +78,7 @@ export class GatheringEngine {
   } = {}) {
     this.environmentStore = environmentStore;
     this.runManager = runManager;
+    this.richState = richState;
     this.evaluator = evaluator;
     this.systemManager = systemManager;
     this.getSystems = getSystems;
@@ -283,6 +289,23 @@ export class GatheringEngine {
       }
     }
 
+    const richAttempt = await this._evaluateRichAttempt({
+      actor: selectedActor,
+      viewer,
+      system,
+      environment,
+      task
+    });
+    if (richAttempt.blockedReasons.length > 0) {
+      return this._blockedStart({
+        viewer,
+        actor: selectedActor,
+        environment,
+        task,
+        reason: richAttempt.blockedReasons[0]
+      });
+    }
+
     const configuration = this._validateStartTask(task);
     if (configuration.valid !== true) {
       return this._blockedStart({
@@ -299,10 +322,10 @@ export class GatheringEngine {
     }
 
     if (hasTimeRequirement(task)) {
-      return this._startWaitingAttempt({ viewer, actor: selectedActor, system, environment, task });
+      return this._startWaitingAttempt({ viewer, actor: selectedActor, system, environment, task, richAttempt });
     }
 
-    return this._resolveImmediateAttempt({ viewer, actor: selectedActor, system, environment, task });
+    return this._resolveImmediateAttempt({ viewer, actor: selectedActor, system, environment, task, richAttempt });
   }
 
   async _processMaturedWaitingRun({ actor, run }) {
@@ -371,6 +394,17 @@ export class GatheringEngine {
       });
     }
 
+    const richEvidence = await this._commitRichAttempt({ actor, system, environment, task, outcome });
+    const completedRunWithRichEvidence = richEvidence && typeof richEvidence === 'object'
+      ? {
+          ...completedRun,
+          economyEvidence: {
+            ...(completedRun.economyEvidence || {}),
+            ...richEvidence
+          }
+        }
+      : completedRun;
+
     await this._commitTerminalSideEffects({
       viewer,
       actor,
@@ -388,7 +422,7 @@ export class GatheringEngine {
       environment,
       task,
       status: outcome.status,
-      run: completedRun,
+      run: completedRunWithRichEvidence,
       createdResults: plan.createdResults,
       usedCatalysts: plan.usedCatalysts,
       checkResult
@@ -517,6 +551,18 @@ export class GatheringEngine {
 
     const timeGate = plainObjectOrNull(run.timeGate);
     if (timeGate) model.timeGate = timeGate;
+    if (run.economyEvidence && typeof run.economyEvidence === 'object') {
+      model.economyEvidence = opaqueBlind ? redactRichEvidence(run.economyEvidence) : cloneJson(run.economyEvidence);
+    }
+    if (run.conditionSnapshot && typeof run.conditionSnapshot === 'object') {
+      model.conditions = cloneJson(run.conditionSnapshot);
+    }
+    if (run.riskLevel) {
+      model.risk = stringOrNull(run.riskLevel);
+    }
+    if (!opaqueBlind && Array.isArray(run.chatMessageIds)) {
+      model.chatMessageIds = cloneJson(run.chatMessageIds);
+    }
 
     if (terminal) {
       model.completedAtWorldTime = numberOrNull(run.completedAtWorldTime);
@@ -661,6 +707,7 @@ export class GatheringEngine {
       taskModels.push(this._taskModel({
         task: visibleTask.task,
         environment,
+        actor,
         viewer,
         visibility: visibleTask.visibility,
         blockedReasons: taskBlockedReasons
@@ -677,6 +724,12 @@ export class GatheringEngine {
       craftingSystemId: stringOrNull(environment.craftingSystemId),
       name: stringOrEmpty(environment.name),
       description: stringOrEmpty(environment.description),
+      img: stringOrNull(environment.img),
+      region: stringOrEmpty(environment.region),
+      biome: stringOrEmpty(environment.biome),
+      risk: stringOrNull(environment.risk) || 'safe',
+      economyMode: stringOrNull(environment.economyMode) || 'time',
+      conditions: plainObjectOrNull(environment.conditions) || {},
       selectionMode: environment.selectionMode === 'blind' ? 'blind' : 'targeted',
       sceneUuid: stringOrNull(environment.sceneUuid),
       visible: true,
@@ -771,6 +824,9 @@ export class GatheringEngine {
       }
     }
 
+    const richAttempt = await this._evaluateRichAttempt({ actor, viewer, system, environment, task });
+    blockedReasons.push(...richAttempt.blockedReasons);
+
     return blockedReasons;
   }
 
@@ -790,9 +846,10 @@ export class GatheringEngine {
       : { available: false, missing: catalysts };
   }
 
-  _taskModel({ task, environment, viewer, visibility, blockedReasons }) {
+  _taskModel({ task, environment, actor = null, viewer, visibility, blockedReasons }) {
     const blind = environment.selectionMode === 'blind';
     const opaqueBlind = this._isOpaqueBlindTask({ environment, viewer });
+    const rich = this._richListingMetadata({ environment, task, actor, viewer });
 
     if (opaqueBlind) {
       return {
@@ -804,6 +861,7 @@ export class GatheringEngine {
         visible: true,
         attemptable: blockedReasons.length === 0,
         blockedReasons,
+        rich,
         visibility: {
           reasonCode: null,
           description: '',
@@ -829,7 +887,41 @@ export class GatheringEngine {
       },
       resolutionMode: stringOrNull(task.resolutionMode),
       hasTimeRequirement: Boolean(task.timeRequirement),
-      catalystCount: normalizeList(task.catalysts).length
+      catalystCount: normalizeList(task.catalysts).length,
+      rich
+    };
+  }
+
+  _richListingMetadata({ environment, task, actor = null, viewer = null }) {
+    if (typeof this.richState?.buildListingMetadata === 'function') {
+      return this.richState.buildListingMetadata({ environment, task, actor, viewer });
+    }
+    return {
+      nodes: task?.nodes ? {
+        enabled: true,
+        available: Number(task.nodes.current || 0) > 0,
+        current: Number(task.nodes.current || 0),
+        max: Number(task.nodes.max || 0)
+      } : null,
+      stamina: Number(task?.staminaCost || 0) > 0 ? { cost: Number(task.staminaCost) } : null,
+      attemptLimit: task?.attemptLimit ? { max: Number(task.attemptLimit.max || 1) } : null,
+      risk: task?.riskOverride || environment?.risk || 'safe',
+      conditions: plainObjectOrNull(environment?.conditions) || {}
+    };
+  }
+
+  async _evaluateRichAttempt({ actor, viewer, system, environment, task }) {
+    if (typeof this.richState?.evaluateStart !== 'function') {
+      return { blockedReasons: [], evidence: this._richListingMetadata({ environment, task, actor, viewer }) };
+    }
+    const result = await this.richState.evaluateStart({ actor, viewer, system, environment, task });
+    return {
+      blockedReasons: normalizeList(result?.blockedReasons).map(reason => this._blockedReason(reason.code || 'BLOCKED', {
+        messageKey: reason.messageKey,
+        message: reason.message,
+        data: this._isOpaqueBlindTask({ environment, viewer }) ? null : reason.data
+      })),
+      evidence: plainObjectOrNull(result?.evidence) || {}
     };
   }
 
@@ -921,7 +1013,7 @@ export class GatheringEngine {
     };
   }
 
-  async _startWaitingAttempt({ viewer, actor, system, environment, task }) {
+  async _startWaitingAttempt({ viewer, actor, system, environment, task, richAttempt = null }) {
     if (typeof this.runManager?.createWaitingRun !== 'function') {
       return this._blockedStart({
         viewer,
@@ -939,6 +1031,9 @@ export class GatheringEngine {
       environmentId: stringOrNull(environment.id),
       taskId: stringOrNull(task.id)
     };
+    if (hasRichGatheringData(environment, task)) {
+      Object.assign(runData, this._richHistoryPayload({ environment, task, richAttempt }));
+    }
     const timeRequirement = normalizeTimeRequirement(task.timeRequirement);
 
     try {
@@ -961,7 +1056,17 @@ export class GatheringEngine {
         });
       }
 
-      return this._startedWaitingStart({ viewer, actor, system, environment, task, run });
+      const richEvidence = await this._commitRichAttempt({ actor, system, environment, task, outcome: { status: 'waitingTime' } });
+      const waitingRun = richEvidence && typeof richEvidence === 'object'
+        ? {
+            ...run,
+            economyEvidence: {
+              ...(run.economyEvidence || {}),
+              ...richEvidence
+            }
+          }
+        : run;
+      return this._startedWaitingStart({ viewer, actor, system, environment, task, run: waitingRun });
     } catch (error) {
       return this._blockedStart({
         viewer,
@@ -980,7 +1085,7 @@ export class GatheringEngine {
     }
   }
 
-  async _resolveImmediateAttempt({ viewer, actor, system, environment, task }) {
+  async _resolveImmediateAttempt({ viewer, actor, system, environment, task, richAttempt = null }) {
     const outcome = task.resolutionMode === 'progressive'
       ? await this._resolveProgressiveOutcome({ viewer, actor, system, environment, task })
       : await this._resolveRoutedOutcome({ viewer, actor, system, environment, task });
@@ -1033,6 +1138,9 @@ export class GatheringEngine {
       checkResult,
       plan
     });
+    const richPayload = this._richHistoryPayload({ environment, task, richAttempt });
+    Object.assign(runData, richPayload);
+    Object.assign(payload, richPayload);
     let run;
     try {
       run = await this.runManager.createTerminalRun(actor, runData, outcome.status, payload);
@@ -1051,6 +1159,17 @@ export class GatheringEngine {
           })
         })
       });
+    }
+
+    const richEvidence = await this._commitRichAttempt({ actor, system, environment, task, outcome });
+    if (richEvidence && typeof richEvidence === 'object') {
+      run = {
+        ...run,
+        economyEvidence: {
+          ...(run.economyEvidence || {}),
+          ...richEvidence
+        }
+      };
     }
 
     await this._commitTerminalSideEffects({
@@ -1120,7 +1239,8 @@ export class GatheringEngine {
         payload: {
           createdResults: [],
           usedCatalysts: [],
-          checkResult: { blind: true, status: outcome.status }
+          checkResult: { blind: true, status: outcome.status },
+          ...this._richHistoryPayload({ environment, task })
         }
       };
     }
@@ -1130,6 +1250,7 @@ export class GatheringEngine {
       usedCatalysts: plan.usedCatalysts
     };
     if (checkResult !== undefined) payload.checkResult = checkResult;
+    Object.assign(payload, this._richHistoryPayload({ environment, task }));
 
     return {
       runData: {
@@ -1139,6 +1260,20 @@ export class GatheringEngine {
       },
       payload
     };
+  }
+
+  _richHistoryPayload({ environment, task, richAttempt = null }) {
+    if (!hasRichGatheringData(environment, task)) return {};
+    return {
+      economyEvidence: plainObjectOrNull(richAttempt?.evidence) || this._richListingMetadata({ environment, task }),
+      conditionSnapshot: plainObjectOrNull(environment?.conditions) || {},
+      riskLevel: stringOrNull(task?.riskOverride) || stringOrNull(environment?.risk) || 'safe'
+    };
+  }
+
+  async _commitRichAttempt({ actor, system, environment, task, outcome }) {
+    if (typeof this.richState?.commitAcceptedAttempt !== 'function') return null;
+    return this.richState.commitAcceptedAttempt({ actor, system, environment, task, outcome });
   }
 
   async _commitTerminalSideEffects({ viewer, actor, system, environment, task, outcome, checkResult }) {
@@ -1990,6 +2125,34 @@ function enrichPublicTerminalRun(run, { createdResults, usedCatalysts, checkResu
   };
   if (checkResult !== undefined) enriched.checkResult = checkResult;
   return enriched;
+}
+
+function redactRichEvidence(evidence = {}) {
+  const redacted = cloneJson(evidence) || {};
+  if (redacted.node) {
+    redacted.node = { available: Number(redacted.node.remaining ?? redacted.node.current ?? 0) > 0 };
+  }
+  delete redacted.encounterOutcome;
+  delete redacted.revealEvents;
+  return redacted;
+}
+
+function hasRichGatheringData(environment, task) {
+  return Boolean(
+    stringOrNull(environment?.img) ||
+    stringOrNull(environment?.region) ||
+    stringOrNull(environment?.biome) ||
+    (stringOrNull(environment?.risk) && environment.risk !== 'safe') ||
+    (stringOrNull(environment?.economyMode) && environment.economyMode !== 'time') ||
+    Object.values(plainObjectOrNull(environment?.conditions) || {}).some(value => stringOrNull(value)) ||
+    task?.nodes ||
+    task?.attemptLimit ||
+    Number(task?.staminaCost || 0) > 0 ||
+    stringOrNull(task?.riskOverride) ||
+    task?.encounters ||
+    task?.reveal ||
+    task?.blindSelection
+  );
 }
 
 async function callMaybe(fn, payload) {

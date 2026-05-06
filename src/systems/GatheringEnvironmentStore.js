@@ -6,6 +6,14 @@ const VALID_RESOLUTION_MODES = new Set(['progressive', 'routed']);
 const VALID_RESULT_SELECTION_PROVIDERS = new Set(['macroOutcome', 'rollTableOutcome']);
 const VALID_CHECK_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
 const VALID_PROGRESSIVE_AWARD_MODES = new Set(['partial', 'equal', 'exceed']);
+const VALID_RISK_LEVELS = new Set(['safe', 'hazardous', 'unsafe', 'extreme']);
+const VALID_ECONOMY_MODES = new Set(['time', 'nodes', 'stamina', 'hybrid']);
+const VALID_DEPLETION_TIMINGS = new Set(['onStart', 'onSuccess']);
+const VALID_RESPAWN_POLICIES = new Set(['none', 'manual', 'elapsedTime', 'probability', 'manualAndElapsedTime']);
+const VALID_ATTEMPT_LIMIT_SCOPES = new Set(['actor', 'user', 'task', 'environment', 'global']);
+const VALID_RECHARGE_POLICIES = new Set(['none', 'manual', 'elapsedTime', 'probability', 'manualAndElapsedTime']);
+const VALID_BLIND_SELECTION_STRATEGIES = new Set(['firstAvailable', 'weightedRandom', 'rollTable', 'macro']);
+const VALID_REVEAL_SCOPES = new Set(['actor', 'user', 'party', 'global']);
 const TIME_UNITS = ['minutes', 'hours', 'days', 'months', 'years'];
 
 export const GATHERING_FAILURE_KEYWORDS = Object.freeze([
@@ -272,6 +280,13 @@ export class GatheringEnvironmentStore {
       craftingSystemId: stringOrEmpty(data?.craftingSystemId),
       name: trimmedOrDefault(data?.name, 'New Gathering Environment'),
       description: stringOrEmpty(data?.description),
+      img: normalizeOptionalString(data?.img),
+      region: stringOrEmpty(data?.region),
+      biome: stringOrEmpty(data?.biome),
+      risk: VALID_RISK_LEVELS.has(data?.risk) ? data.risk : 'safe',
+      economyMode: VALID_ECONOMY_MODES.has(data?.economyMode) ? data.economyMode : 'time',
+      conditions: normalizeConditions(data?.conditions),
+      chatMessages: normalizeChatMessages(data?.chatMessages),
       enabled: data?.enabled !== false,
       selectionMode,
       sceneUuid: normalizeOptionalString(data?.sceneUuid),
@@ -299,6 +314,20 @@ export class GatheringEnvironmentStore {
       resultGroups: Array.isArray(data?.resultGroups) ? data.resultGroups.map(group => this._normalizeResultGroup(group)) : []
     };
 
+    const nodes = normalizeNodeConfig(data?.nodes);
+    const attemptLimit = normalizeAttemptLimit(data?.attemptLimit);
+    const blindSelection = normalizeBlindSelection(data?.blindSelection);
+    const reveal = normalizeRevealConfig(data?.reveal);
+    const encounters = normalizeEncounterConfig(data?.encounters);
+    const chatMessages = normalizeChatMessages(data?.chatMessages);
+    if (nodes) task.nodes = nodes;
+    if (attemptLimit) task.attemptLimit = attemptLimit;
+    if (Number.isFinite(Number(data?.staminaCost)) && Number(data.staminaCost) > 0) task.staminaCost = Number(data.staminaCost);
+    if (VALID_RISK_LEVELS.has(data?.riskOverride)) task.riskOverride = data.riskOverride;
+    if (blindSelection) task.blindSelection = blindSelection;
+    if (reveal) task.reveal = reveal;
+    if (encounters) task.encounters = encounters;
+    if (chatMessages) task.chatMessages = chatMessages;
     if (visibility) task.visibility = visibility;
     if (timeRequirement) task.timeRequirement = timeRequirement;
     if (check) task.check = check;
@@ -388,9 +417,16 @@ export class GatheringEnvironmentStore {
     if (normalized.selectionMode === 'targeted' && normalized.tasks.length < 1) {
       errors.push(`Environment "${label}" targeted selection requires at least one task`);
     }
-    if (normalized.selectionMode === 'blind' && normalized.tasks.length !== 1) {
-      errors.push(`Environment "${label}" blind selection requires exactly one task`);
+    if (normalized.selectionMode === 'blind' && normalized.tasks.length < 1) {
+      errors.push(`Environment "${label}" blind selection requires at least one task`);
     }
+    if (!VALID_RISK_LEVELS.has(original?.risk ?? normalized.risk)) {
+      errors.push(`Environment "${label}" risk must be safe, hazardous, unsafe, or extreme`);
+    }
+    if (!VALID_ECONOMY_MODES.has(original?.economyMode ?? normalized.economyMode)) {
+      errors.push(`Environment "${label}" economyMode must be time, nodes, stamina, or hybrid`);
+    }
+    errors.push(...validateConditions(normalized.conditions, `Environment "${label}" conditions`));
 
     normalized.tasks.forEach((task, index) => {
       const originalTask = Array.isArray(original?.tasks) ? original.tasks[index] : task;
@@ -431,6 +467,19 @@ export class GatheringEnvironmentStore {
     if (task.failureOutcome) {
       errors.push(...validateFailureOutcome(task.failureOutcome, `Task "${label}" failureOutcome`));
     }
+    errors.push(...validateNodeConfig(task.nodes, `Task "${label}" nodes`));
+    errors.push(...validateAttemptLimit(task.attemptLimit, `Task "${label}" attemptLimit`));
+    if (hasOwn(originalTask, 'staminaCost')) {
+      const staminaCost = Number(originalTask?.staminaCost);
+      if (!Number.isFinite(staminaCost) || staminaCost < 0) {
+        errors.push(`Task "${label}" staminaCost must be a non-negative number`);
+      }
+    }
+    if (task.riskOverride && !VALID_RISK_LEVELS.has(task.riskOverride)) {
+      errors.push(`Task "${label}" riskOverride must be safe, hazardous, unsafe, or extreme`);
+    }
+    errors.push(...validateBlindSelection(task.blindSelection, `Task "${label}" blindSelection`));
+    errors.push(...validateRevealConfig(task.reveal, `Task "${label}" reveal`));
 
     if (task.enabled !== true) {
       return errors;
@@ -694,6 +743,197 @@ function validateFailureOutcome(outcome, label) {
   return errors;
 }
 
+function normalizeConditions(data = null) {
+  if (!data || typeof data !== 'object') return {};
+  return {
+    timeOfDay: stringOrEmpty(data.timeOfDay),
+    weather: stringOrEmpty(data.weather),
+    visibility: stringOrEmpty(data.visibility),
+    notes: stringOrEmpty(data.notes)
+  };
+}
+
+function validateConditions(conditions, label) {
+  if (!conditions || typeof conditions !== 'object') return [];
+  return [];
+}
+
+function normalizeChatMessages(data = null) {
+  if (!data || typeof data !== 'object') return null;
+  const events = {};
+  for (const [event, enabled] of Object.entries(data.events || {})) {
+    events[String(event)] = enabled === true;
+  }
+  return {
+    enabled: data.enabled === true,
+    gmDiagnostics: data.gmDiagnostics === true,
+    events
+  };
+}
+
+function normalizeNodeConfig(data = null) {
+  if (!data || typeof data !== 'object') return null;
+  const max = numberOrNull(data.max ?? data.maxCount);
+  const current = numberOrNull(data.current ?? data.availableCount);
+  const config = {
+    enabled: data.enabled === true || max !== null || current !== null,
+    max: max ?? 0,
+    current: current ?? max ?? 0,
+    depletionTiming: VALID_DEPLETION_TIMINGS.has(data.depletionTiming) ? data.depletionTiming : 'onStart',
+    respawn: normalizeRespawn(data.respawn)
+  };
+  if (data.showCountsToPlayers === true) config.showCountsToPlayers = true;
+  return config.enabled ? config : null;
+}
+
+function normalizeRespawn(data = null) {
+  if (!data || typeof data !== 'object') return { policy: 'none' };
+  const policy = VALID_RESPAWN_POLICIES.has(data.policy) ? data.policy : 'none';
+  const intervalSeconds = numberOrNull(data.intervalSeconds);
+  const chance = numberOrNull(data.chance);
+  return {
+    policy,
+    intervalSeconds: intervalSeconds ?? 0,
+    chance: chance ?? 0,
+    lastEvaluatedWorldTime: numberOrNull(data.lastEvaluatedWorldTime),
+    nextEvaluationWorldTime: numberOrNull(data.nextEvaluationWorldTime),
+    lastRoll: data.lastRoll && typeof data.lastRoll === 'object' ? cloneJson(data.lastRoll) : null
+  };
+}
+
+function validateNodeConfig(nodes, label) {
+  if (!nodes) return [];
+  const errors = [];
+  if (!Number.isInteger(Number(nodes.max)) || Number(nodes.max) < 0) {
+    errors.push(`${label}.max must be a non-negative integer`);
+  }
+  if (!Number.isInteger(Number(nodes.current)) || Number(nodes.current) < 0) {
+    errors.push(`${label}.current must be a non-negative integer`);
+  }
+  if (Number(nodes.current) > Number(nodes.max)) {
+    errors.push(`${label}.current must not exceed max`);
+  }
+  if (!VALID_DEPLETION_TIMINGS.has(nodes.depletionTiming)) {
+    errors.push(`${label}.depletionTiming must be onStart or onSuccess`);
+  }
+  if (!VALID_RESPAWN_POLICIES.has(nodes.respawn?.policy)) {
+    errors.push(`${label}.respawn.policy is invalid`);
+  }
+  if (['elapsedTime', 'probability', 'manualAndElapsedTime'].includes(nodes.respawn?.policy) && Number(nodes.respawn?.intervalSeconds || 0) <= 0) {
+    errors.push(`${label}.respawn.intervalSeconds must be positive for timed respawn`);
+  }
+  if (nodes.respawn?.policy === 'probability' || nodes.respawn?.policy === 'manualAndElapsedTime') {
+    const chance = Number(nodes.respawn?.chance);
+    if (!Number.isFinite(chance) || chance < 0 || chance > 1) {
+      errors.push(`${label}.respawn.chance must be between 0 and 1`);
+    }
+  }
+  return errors;
+}
+
+function normalizeAttemptLimit(data = null) {
+  if (!data || typeof data !== 'object') return null;
+  const max = numberOrNull(data.max ?? data.maxAttempts);
+  const enabled = data.enabled === true || max !== null;
+  if (!enabled) return null;
+  return {
+    enabled: true,
+    scope: VALID_ATTEMPT_LIMIT_SCOPES.has(data.scope) ? data.scope : 'actor',
+    max: max ?? 1,
+    windowSeconds: numberOrNull(data.windowSeconds) ?? 0,
+    recharge: normalizeRecharge(data.recharge)
+  };
+}
+
+function normalizeRecharge(data = null) {
+  if (!data || typeof data !== 'object') return { policy: 'none' };
+  return {
+    policy: VALID_RECHARGE_POLICIES.has(data.policy) ? data.policy : 'none',
+    intervalSeconds: numberOrNull(data.intervalSeconds) ?? 0,
+    chance: numberOrNull(data.chance) ?? 0,
+    lastEvaluatedWorldTime: numberOrNull(data.lastEvaluatedWorldTime),
+    lastRoll: data.lastRoll && typeof data.lastRoll === 'object' ? cloneJson(data.lastRoll) : null
+  };
+}
+
+function validateAttemptLimit(limit, label) {
+  if (!limit) return [];
+  const errors = [];
+  if (!VALID_ATTEMPT_LIMIT_SCOPES.has(limit.scope)) {
+    errors.push(`${label}.scope must be actor, user, task, environment, or global`);
+  }
+  if (!Number.isInteger(Number(limit.max)) || Number(limit.max) < 1) {
+    errors.push(`${label}.max must be a positive integer`);
+  }
+  if (Number(limit.windowSeconds) < 0) {
+    errors.push(`${label}.windowSeconds must be non-negative`);
+  }
+  if (!VALID_RECHARGE_POLICIES.has(limit.recharge?.policy)) {
+    errors.push(`${label}.recharge.policy is invalid`);
+  }
+  if (['elapsedTime', 'probability', 'manualAndElapsedTime'].includes(limit.recharge?.policy) && Number(limit.recharge?.intervalSeconds || 0) <= 0) {
+    errors.push(`${label}.recharge.intervalSeconds must be positive for timed recharge`);
+  }
+  return errors;
+}
+
+function normalizeBlindSelection(data = null) {
+  if (!data || typeof data !== 'object') return null;
+  return {
+    strategy: VALID_BLIND_SELECTION_STRATEGIES.has(data.strategy) ? data.strategy : 'firstAvailable',
+    macroUuid: normalizeOptionalString(data.macroUuid),
+    rollTableUuid: normalizeOptionalString(data.rollTableUuid),
+    weights: data.weights && typeof data.weights === 'object' ? cloneJson(data.weights) : {}
+  };
+}
+
+function validateBlindSelection(selection, label) {
+  if (!selection) return [];
+  const errors = [];
+  if (!VALID_BLIND_SELECTION_STRATEGIES.has(selection.strategy)) {
+    errors.push(`${label}.strategy is invalid`);
+  }
+  if (selection.strategy === 'macro' && !selection.macroUuid) {
+    errors.push(`${label}.macroUuid is required for macro selection`);
+  }
+  if (selection.strategy === 'rollTable' && !selection.rollTableUuid) {
+    errors.push(`${label}.rollTableUuid is required for roll table selection`);
+  }
+  return errors;
+}
+
+function normalizeRevealConfig(data = null) {
+  if (!data || typeof data !== 'object') return null;
+  return {
+    enabled: data.enabled === true,
+    scope: VALID_REVEAL_SCOPES.has(data.scope) ? data.scope : 'actor',
+    triggers: Array.isArray(data.triggers) ? data.triggers.map(trigger => stringOrEmpty(trigger)).filter(Boolean) : []
+  };
+}
+
+function validateRevealConfig(reveal, label) {
+  if (!reveal) return [];
+  if (!VALID_REVEAL_SCOPES.has(reveal.scope)) {
+    return [`${label}.scope must be actor, user, party, or global`];
+  }
+  return [];
+}
+
+function normalizeEncounterConfig(data = null) {
+  if (!data || typeof data !== 'object') return null;
+  const hooks = Array.isArray(data.hooks) ? data.hooks : [];
+  return {
+    hooks: hooks
+      .filter(hook => hook && typeof hook === 'object')
+      .map(hook => ({
+        event: stringOrEmpty(hook.event),
+        rollTableUuid: normalizeOptionalString(hook.rollTableUuid),
+        macroUuid: normalizeOptionalString(hook.macroUuid),
+        chance: numberOrNull(hook.chance) ?? 1
+      }))
+  };
+}
+
 function cloneJson(value) {
   return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
@@ -713,6 +953,12 @@ function normalizeOptionalString(value) {
 function stringOrEmpty(value) {
   if (value === null || value === undefined) return '';
   return String(value).trim();
+}
+
+function numberOrNull(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
 }
 
 function trimmedOrDefault(value, fallback) {

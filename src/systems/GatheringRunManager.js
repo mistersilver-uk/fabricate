@@ -300,6 +300,24 @@ export class GatheringRunManager {
     if (record.checkResult && typeof record.checkResult === 'object') {
       run.checkResult = cloneJson(record.checkResult);
     }
+    if (record.economyEvidence && typeof record.economyEvidence === 'object') {
+      run.economyEvidence = cloneJson(record.economyEvidence);
+    }
+    if (record.conditionSnapshot && typeof record.conditionSnapshot === 'object') {
+      run.conditionSnapshot = cloneJson(record.conditionSnapshot);
+    }
+    if (record.riskLevel) {
+      run.riskLevel = stringOrNull(record.riskLevel);
+    }
+    if (record.encounterOutcome && typeof record.encounterOutcome === 'object') {
+      run.encounterOutcome = cloneJson(record.encounterOutcome);
+    }
+    if (Array.isArray(record.chatMessageIds)) {
+      run.chatMessageIds = record.chatMessageIds.map(stringOrNull).filter(Boolean);
+    }
+    if (Array.isArray(record.revealEvents)) {
+      run.revealEvents = cloneJson(record.revealEvents);
+    }
 
     run.usedCatalysts = normalizeRunItems(record.usedCatalysts);
     run.createdResults = terminal && status !== 'succeeded' ? [] : normalizeRunItems(record.createdResults);
@@ -377,6 +395,12 @@ export class GatheringRunManager {
       terminalPayload.timeGate = payload.timeGate;
     }
     if (payload.checkResult !== undefined) terminalPayload.checkResult = payload.checkResult;
+    if (payload.economyEvidence !== undefined) terminalPayload.economyEvidence = payload.economyEvidence;
+    if (payload.conditionSnapshot !== undefined) terminalPayload.conditionSnapshot = payload.conditionSnapshot;
+    if (payload.riskLevel !== undefined) terminalPayload.riskLevel = payload.riskLevel;
+    if (payload.encounterOutcome !== undefined) terminalPayload.encounterOutcome = payload.encounterOutcome;
+    if (payload.chatMessageIds !== undefined) terminalPayload.chatMessageIds = payload.chatMessageIds;
+    if (payload.revealEvents !== undefined) terminalPayload.revealEvents = payload.revealEvents;
     if (payload.usedCatalysts !== undefined) terminalPayload.usedCatalysts = payload.usedCatalysts;
     terminalPayload.createdResults = status === 'succeeded' ? payload.createdResults : [];
     return terminalPayload;
@@ -426,6 +450,12 @@ function pickRunPayload(data = {}) {
     'taskId',
     'timeGate',
     'checkResult',
+    'economyEvidence',
+    'conditionSnapshot',
+    'riskLevel',
+    'encounterOutcome',
+    'chatMessageIds',
+    'revealEvents',
     'usedCatalysts',
     'createdResults'
   ]) {

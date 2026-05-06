@@ -192,7 +192,7 @@ test('validation covers selection modes, providers, progressive requirements, gr
   const invalid = [
     environment({ craftingSystemId: 'missing-system' }),
     environment({ selectionMode: 'targeted', tasks: [] }),
-    environment({ selectionMode: 'blind', tasks: [routedTask({ id: 'a' }), routedTask({ id: 'b' })] }),
+    environment({ selectionMode: 'blind', tasks: [] }),
     environment({ selectionMode: 'other' }),
     environment({
       tasks: [routedTask({ resultSelection: { provider: 'macroOutcome' } })]
@@ -290,6 +290,52 @@ test('validation covers selection modes, providers, progressive requirements, gr
 
   assert.equal(store.validate(environment({ tasks: [routedTask()] })).valid, true);
   assert.equal(store.validate(environment({ tasks: [progressiveTask()] })).valid, true);
+  assert.equal(store.validate(environment({ selectionMode: 'blind', tasks: [routedTask({ id: 'a' }), routedTask({ id: 'b' })] })).valid, true);
+});
+
+test('rich gathering metadata and task economy fields normalize and validate additively', async () => {
+  const { store } = makeMemoryStore();
+  store.load();
+
+  const richEnvironment = environment({
+    img: 'icons/environment/forest.webp',
+    region: 'Elderglen Valley',
+    biome: 'Forest',
+    risk: 'hazardous',
+    economyMode: 'hybrid',
+    conditions: {
+      timeOfDay: 'Dawn',
+      weather: 'Light rain'
+    },
+    tasks: [routedTask({
+      nodes: {
+        current: 2,
+        max: 4,
+        depletionTiming: 'onSuccess',
+        respawn: { policy: 'probability', intervalSeconds: 86400, chance: 0.5 }
+      },
+      staminaCost: 3,
+      riskOverride: 'unsafe',
+      attemptLimit: { scope: 'actor', max: 2, windowSeconds: 86400 },
+      blindSelection: { strategy: 'firstAvailable' },
+      reveal: { enabled: true, scope: 'actor', triggers: ['success'] }
+    })]
+  });
+
+  const result = store.validate(richEnvironment);
+  assert.equal(result.valid, true, result.errors.join('; '));
+
+  await store.save([richEnvironment]);
+  const saved = store.list()[0];
+  assert.equal(saved.region, 'Elderglen Valley');
+  assert.equal(saved.biome, 'Forest');
+  assert.equal(saved.risk, 'hazardous');
+  assert.equal(saved.economyMode, 'hybrid');
+  assert.deepEqual(saved.conditions, { timeOfDay: 'Dawn', weather: 'Light rain', visibility: '', notes: '' });
+  assert.equal(saved.tasks[0].nodes.current, 2);
+  assert.equal(saved.tasks[0].nodes.max, 4);
+  assert.equal(saved.tasks[0].staminaCost, 3);
+  assert.equal(saved.tasks[0].attemptLimit.max, 2);
 });
 
 test('validation permits disabled draft placeholder tasks but blocks enabled missing outcome providers', async () => {

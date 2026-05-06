@@ -29,6 +29,7 @@ function makeEngine({
   progressiveOutcome = null,
   createdResults = [],
   usedCatalysts = [],
+  richState = null,
   calls = {}
 } = {}) {
   calls.steps = [];
@@ -55,6 +56,7 @@ function makeEngine({
         return validation ?? { valid: true, errors: [] };
       }
     },
+    richState,
     getSystems: () => systems,
     getSelectableActors: () => selectableActors,
     isActorSelectable: ({ actor: candidate }) => selectableActors.some(entry => sameActor(entry, candidate)),
@@ -621,6 +623,42 @@ test('startAttempt rejects missing catalysts before task misconfiguration valida
   assert.equal('componentSourceActors' in calls.catalysts[0], false);
   assert.deepEqual(calls.validate, []);
   assertNoRunMutation(calls);
+});
+
+test('startAttempt evaluates rich node, stamina, and attempt-limit blockers before task validation', async () => {
+  const calls = {};
+  const richTask = task({
+    nodes: { current: 0, max: 2, depletionTiming: 'onStart', respawn: { policy: 'manual' } },
+    staminaCost: 5,
+    attemptLimit: { scope: 'actor', max: 1 }
+  });
+  const richState = {
+    evaluateStart: async () => ({
+      blockedReasons: [
+        { code: 'NODE_DEPLETED', messageKey: 'FABRICATE.Gathering.Blocked.NodeDepleted' },
+        { code: 'STAMINA_BLOCKED', messageKey: 'FABRICATE.Gathering.Blocked.StaminaBlocked' }
+      ],
+      evidence: {
+        nodes: { current: 0, max: 2 },
+        stamina: { cost: 5, state: { current: 0, max: 10 } }
+      }
+    })
+  };
+  const engine = makeEngine({
+    environments: [environment({ tasks: [richTask] })],
+    richState,
+    validation: () => {
+      throw new Error('validation should not run after rich blockers');
+    },
+    calls
+  });
+
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+
+  assert.equal(result.accepted, false);
+  assert.deepEqual(codes(result), ['NODE_DEPLETED']);
+  assertNoRunMutation(calls);
+  assert.equal(calls.validate.length, 0);
 });
 
 test('startAttempt rejects timed task with missing catalysts before waiting run creation', async () => {

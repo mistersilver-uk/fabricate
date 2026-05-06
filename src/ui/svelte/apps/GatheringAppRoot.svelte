@@ -7,6 +7,21 @@
 
   // svelte-ignore state_referenced_locally
   const viewState = store.viewState;
+  let searchTerm = $state('');
+  let riskFilter = $state('all');
+  let regionFilter = $state('all');
+  let biomeFilter = $state('all');
+
+  const filteredEnvironments = $derived(($viewState.environments || []).filter(environment => {
+    const query = searchTerm.trim().toLowerCase();
+    const matchesSearch = !query || `${environment.name || ''} ${environment.description || ''} ${environment.region || ''} ${environment.biome || ''}`.toLowerCase().includes(query);
+    const matchesRisk = riskFilter === 'all' || (environment.risk || 'safe') === riskFilter;
+    const matchesRegion = regionFilter === 'all' || (environment.region || '') === regionFilter;
+    const matchesBiome = biomeFilter === 'all' || (environment.biome || '') === biomeFilter;
+    return matchesSearch && matchesRisk && matchesRegion && matchesBiome;
+  }));
+  const regionOptions = $derived(uniqueSorted(($viewState.environments || []).map(environment => environment.region)));
+  const biomeOptions = $derived(uniqueSorted(($viewState.environments || []).map(environment => environment.biome)));
 
   onMount(() => {
     store.refresh();
@@ -77,6 +92,33 @@
     }
     return displayTaskLabel(task);
   }
+
+  function uniqueSorted(values) {
+    return Array.from(new Set(values.map(value => String(value || '').trim()).filter(Boolean)))
+      .sort((a, b) => a.localeCompare(b));
+  }
+
+  function taskEconomySummary(task) {
+    const parts = [];
+    if (task?.rich?.stamina?.cost) parts.push(localize('FABRICATE.Gathering.StaminaCost', { cost: task.rich.stamina.cost }));
+    if (task?.rich?.nodes) {
+      const nodes = task.rich.nodes.current === null
+        ? localize(task.rich.nodes.available ? 'FABRICATE.Gathering.NodesAvailable' : 'FABRICATE.Gathering.NodesDepleted')
+        : localize('FABRICATE.Gathering.NodeCount', { current: task.rich.nodes.current, max: task.rich.nodes.max });
+      parts.push(nodes);
+    }
+    if (task?.rich?.attemptLimit?.remaining !== null && task?.rich?.attemptLimit?.remaining !== undefined) {
+      parts.push(localize('FABRICATE.Gathering.AttemptsRemaining', { remaining: task.rich.attemptLimit.remaining, max: task.rich.attemptLimit.max }));
+    }
+    return parts.join(' · ');
+  }
+
+  function staminaSummary() {
+    const task = ($viewState.environments || []).flatMap(environment => environment.tasks || []).find(task => task?.rich?.stamina?.state);
+    const state = task?.rich?.stamina?.state;
+    if (!state || state.current === null) return '';
+    return localize('FABRICATE.Gathering.StaminaSummary', { current: state.current, max: state.max ?? '?' });
+  }
 </script>
 
 <div class="fabricate-gathering-app">
@@ -98,6 +140,12 @@
         {/each}
       </select>
     </label>
+    {#if staminaSummary()}
+      <div class="gathering-stamina-summary" aria-label={localize('FABRICATE.Gathering.Stamina')}>
+        <i class="fas fa-bolt" aria-hidden="true"></i>
+        <span>{staminaSummary()}</span>
+      </div>
+    {/if}
   </header>
 
   {#if $viewState.selectedActor}
@@ -171,15 +219,50 @@
       {/each}
     </div>
   {:else}
+    <section class="gathering-filter-bar" aria-label={localize('FABRICATE.Gathering.Filters')}>
+      <label>
+        <i class="fas fa-search" aria-hidden="true"></i>
+        <input type="search" bind:value={searchTerm} placeholder={localize('FABRICATE.Gathering.SearchPlaceholder')} />
+      </label>
+      <select bind:value={riskFilter} aria-label={localize('FABRICATE.Gathering.RiskFilter')}>
+        <option value="all">{localize('FABRICATE.Gathering.AllRisks')}</option>
+        <option value="safe">{localize('FABRICATE.Gathering.Risk.safe')}</option>
+        <option value="hazardous">{localize('FABRICATE.Gathering.Risk.hazardous')}</option>
+        <option value="unsafe">{localize('FABRICATE.Gathering.Risk.unsafe')}</option>
+        <option value="extreme">{localize('FABRICATE.Gathering.Risk.extreme')}</option>
+      </select>
+      <select bind:value={regionFilter} aria-label={localize('FABRICATE.Gathering.RegionFilter')}>
+        <option value="all">{localize('FABRICATE.Gathering.AllRegions')}</option>
+        {#each regionOptions as region (region)}
+          <option value={region}>{region}</option>
+        {/each}
+      </select>
+      <select bind:value={biomeFilter} aria-label={localize('FABRICATE.Gathering.BiomeFilter')}>
+        <option value="all">{localize('FABRICATE.Gathering.AllBiomes')}</option>
+        {#each biomeOptions as biome (biome)}
+          <option value={biome}>{biome}</option>
+        {/each}
+      </select>
+    </section>
     <main class="gathering-environment-list">
-      {#each $viewState.environments as environment (environment.id)}
+      {#each filteredEnvironments as environment (environment.id)}
         <section class="gathering-environment-card" class:is-blocked={environment.attemptable !== true}>
           <div class="gathering-environment-card-header">
+            {#if environment.img}
+              <img class="gathering-environment-image" src={environment.img} alt="" />
+            {/if}
             <div>
               <h3>{environment.name}</h3>
               {#if environment.description}
                 <p>{environment.description}</p>
               {/if}
+              <div class="gathering-chip-row">
+                {#if environment.region}<span class="gathering-chip">{environment.region}</span>{/if}
+                {#if environment.biome}<span class="gathering-chip">{environment.biome}</span>{/if}
+                <span class="gathering-chip">{localize(`FABRICATE.Gathering.Risk.${environment.risk || 'safe'}`)}</span>
+                {#if environment.conditions?.timeOfDay}<span class="gathering-chip">{environment.conditions.timeOfDay}</span>{/if}
+                {#if environment.conditions?.weather}<span class="gathering-chip">{environment.conditions.weather}</span>{/if}
+              </div>
             </div>
             {#if environment.sceneUuid}
               <span class="gathering-chip">{localize('FABRICATE.Gathering.SceneLinked')}</span>
@@ -209,6 +292,9 @@
                   <strong>{displayTaskLabel(task)}</strong>
                   {#if task.description}
                     <span>{task.description}</span>
+                  {/if}
+                  {#if taskEconomySummary(task)}
+                    <span class="gathering-task-economy">{taskEconomySummary(task)}</span>
                   {/if}
                   {#if task.blockedReasons?.length}
                     <ul class="gathering-blocked-reasons">

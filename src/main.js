@@ -12,6 +12,7 @@ import { SalvageRunManager } from './systems/SalvageRunManager.js';
 import { GatheringEnvironmentStore } from './systems/GatheringEnvironmentStore.js';
 import { GatheringRunManager } from './systems/GatheringRunManager.js';
 import { GatheringGateAndCheckEvaluator } from './systems/GatheringGateAndCheckEvaluator.js';
+import { GatheringRichStateService } from './systems/GatheringRichStateService.js';
 import { GatheringEngine } from './systems/GatheringEngine.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { ResolutionModeService } from './systems/ResolutionModeService.js';
@@ -380,6 +381,7 @@ class Fabricate {
     this.craftingRunManager = null;
     this.salvageRunManager = null;
     this.gatheringEnvironmentStore = null;
+    this.gatheringRichStateService = null;
     this.gatheringRunManager = null;
     this.gatheringGateAndCheckEvaluator = null;
     this.recipeVisibilityService = null;
@@ -434,9 +436,16 @@ class Fabricate {
       }
     });
     this.gatheringEnvironmentStore.load();
+    this.gatheringRichStateService = new GatheringRichStateService({
+      environmentStore: this.gatheringEnvironmentStore,
+      nowWorldTime: () => Number(game.time?.worldTime || 0),
+      getUserId: () => game.user?.id || null,
+      hooks: Hooks
+    });
     gatheringEngine = new GatheringEngine({
       environmentStore: this.gatheringEnvironmentStore,
       runManager: this.gatheringRunManager,
+      richState: this.gatheringRichStateService,
       evaluator: this.gatheringGateAndCheckEvaluator,
       systemManager: this.craftingSystemManager,
       getSelectableActors: getGatheringSelectableActors,
@@ -552,6 +561,10 @@ class Fabricate {
     return this.gatheringGateAndCheckEvaluator;
   }
 
+  getGatheringRichStateService() {
+    return this.gatheringRichStateService;
+  }
+
   /**
    * Get the recipe visibility service instance
    */
@@ -603,6 +616,56 @@ class Fabricate {
     }
 
     return callGatheringRuntimeWithCurrentViewer(gatheringEngine, 'startAttempt', options, () => game.user);
+  }
+
+  inspectGatheringEnvironmentState(options = {}) {
+    this._requireReady();
+    this._requireGM();
+    return this.gatheringRichStateService?.inspectEnvironment(options.environmentId) ?? null;
+  }
+
+  restockGatheringNode(options = {}) {
+    this._requireReady();
+    this._requireGM();
+    return this.gatheringRichStateService?.restockNode(options);
+  }
+
+  updateGatheringConditions(options = {}) {
+    this._requireReady();
+    this._requireGM();
+    return this.gatheringRichStateService?.updateConditions(options);
+  }
+
+  setGatheringStamina(options = {}) {
+    this._requireReady();
+    this._requireGM();
+    return this.gatheringRichStateService?.setActorStamina(options.actor, options);
+  }
+
+  adjustGatheringStamina(options = {}) {
+    this._requireReady();
+    this._requireGM();
+    return this.gatheringRichStateService?.adjustActorStamina(options.actor, options);
+  }
+
+  revealGatheringTask(options = {}) {
+    this._requireReady();
+    this._requireGM();
+    return this.gatheringRichStateService?.revealTask(options.actor, options);
+  }
+
+  clearGatheringTaskReveal(options = {}) {
+    this._requireReady();
+    this._requireGM();
+    return this.gatheringRichStateService?.clearReveal(options.actor, options);
+  }
+
+  _requireReady() {
+    if (!this.ready) throw new Error('Fabricate not initialized');
+  }
+
+  _requireGM() {
+    if (game.user?.isGM !== true) throw new Error('Gathering rich state changes require a GM user');
   }
 
   /**

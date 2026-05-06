@@ -23,6 +23,9 @@
   let environmentSearchTerm = $state('');
   let environmentStatusFilter = $state('all');
   let environmentSelectionFilter = $state('all');
+  let environmentRiskFilter = $state('all');
+  let environmentRegionFilter = $state('all');
+  let environmentBiomeFilter = $state('all');
   let selectedRecipeId = $state('');
   let selectedComponentId = $state('');
   let selectedEssenceId = $state('');
@@ -146,6 +149,8 @@
     showComponentEssences ? '' : 'has-no-essences'
   ].filter(Boolean).join(' '));
   const environmentList = $derived($viewState.environments || []);
+  const environmentRegionOptions = $derived(uniqueSorted(environmentList.map(environment => environment.region)));
+  const environmentBiomeOptions = $derived(uniqueSorted(environmentList.map(environment => environment.biome)));
   const normalizedEnvironmentSearchTerm = $derived(environmentSearchTerm.trim().toLowerCase());
   const environmentValidationCount = $derived(Array.isArray($viewState.environmentValidationState?.errors)
     ? $viewState.environmentValidationState.errors.length
@@ -161,7 +166,10 @@
       || (environmentStatusFilter === 'invalid' && selectedEnvironmentId === environment.id && environmentValidationCount > 0);
     const matchesSelection = environmentSelectionFilter === 'all'
       || environment.selectionMode === environmentSelectionFilter;
-    return matchesSearch && matchesStatus && matchesSelection;
+    const matchesRisk = environmentRiskFilter === 'all' || (environment.risk || 'safe') === environmentRiskFilter;
+    const matchesRegion = environmentRegionFilter === 'all' || (environment.region || '') === environmentRegionFilter;
+    const matchesBiome = environmentBiomeFilter === 'all' || (environment.biome || '') === environmentBiomeFilter;
+    return matchesSearch && matchesStatus && matchesSelection && matchesRisk && matchesRegion && matchesBiome;
   }));
   const environmentDraftForDisplay = $derived($viewState.environmentDraft || null);
   const shouldUseEnvironmentDraftForDisplay = $derived(Boolean(environmentDraftForDisplay)
@@ -1021,6 +1029,9 @@
     environmentSearchTerm = '';
     environmentStatusFilter = 'all';
     environmentSelectionFilter = 'all';
+    environmentRiskFilter = 'all';
+    environmentRegionFilter = 'all';
+    environmentBiomeFilter = 'all';
   }
 
   function componentSourceState(item) {
@@ -1449,6 +1460,34 @@
               <option value="all">{text('FABRICATE.Admin.ManagerV2.Environment.SelectionAll', 'All modes')}</option>
               <option value="targeted">{text('FABRICATE.Admin.Environments.SelectionTargeted', 'Targeted')}</option>
               <option value="blind">{text('FABRICATE.Admin.Environments.SelectionBlind', 'Blind')}</option>
+            </select>
+          </label>
+          <label class="manager-v2-filter">
+            <span>{text('FABRICATE.Admin.ManagerV2.Environment.Risk', 'Risk')}</span>
+            <select bind:value={environmentRiskFilter} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.RiskFilterLabel', 'Filter environments by risk')}>
+              <option value="all">{text('FABRICATE.Admin.ManagerV2.Environment.RiskAll', 'All risks')}</option>
+              <option value="safe">{text('FABRICATE.Admin.ManagerV2.Environment.RiskSafe', 'Safe')}</option>
+              <option value="hazardous">{text('FABRICATE.Admin.ManagerV2.Environment.RiskHazardous', 'Hazardous')}</option>
+              <option value="unsafe">{text('FABRICATE.Admin.ManagerV2.Environment.RiskUnsafe', 'Unsafe')}</option>
+              <option value="extreme">{text('FABRICATE.Admin.ManagerV2.Environment.RiskExtreme', 'Extreme')}</option>
+            </select>
+          </label>
+          <label class="manager-v2-filter">
+            <span>{text('FABRICATE.Admin.ManagerV2.Environment.Region', 'Region')}</span>
+            <select bind:value={environmentRegionFilter} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.RegionFilterLabel', 'Filter environments by region')}>
+              <option value="all">{text('FABRICATE.Admin.ManagerV2.Environment.RegionAll', 'All regions')}</option>
+              {#each environmentRegionOptions as region (region)}
+                <option value={region}>{region}</option>
+              {/each}
+            </select>
+          </label>
+          <label class="manager-v2-filter">
+            <span>{text('FABRICATE.Admin.ManagerV2.Environment.Biome', 'Biome')}</span>
+            <select bind:value={environmentBiomeFilter} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.BiomeFilterLabel', 'Filter environments by biome')}>
+              <option value="all">{text('FABRICATE.Admin.ManagerV2.Environment.BiomeAll', 'All biomes')}</option>
+              {#each environmentBiomeOptions as biome (biome)}
+                <option value={biome}>{biome}</option>
+              {/each}
             </select>
           </label>
           <span class="manager-v2-chip">{text('FABRICATE.Admin.ManagerV2.SearchCount', '{shown} of {total}').replace('{shown}', filteredEnvironments.length).replace('{total}', environmentList.length)}</span>
