@@ -1089,7 +1089,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(target.textContent.includes('Essence ID'), false);
     assert.ok(!target.querySelector('.manager-v2-inspector [aria-label="Edit Water"]'), 'inspector should not show an edit action while already editing');
     assert.ok(target.querySelector('.essence-icon-picker-trigger'), 'edit route should use the shared icon picker trigger');
-    assert.ok(target.textContent.includes('Change icon'));
+    assert.equal(target.querySelector('.essence-icon-picker-trigger').title, 'Change icon');
     assert.ok(target.textContent.includes('Clear icon'));
     assert.ok(target.querySelector('.essence-source-trigger'), 'effect-transfer systems should show source picker controls');
     assert.ok(target.querySelector('.manager-v2-essence-source-summary'), 'edit route should show selected source summary inside the form');
