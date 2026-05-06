@@ -1,3 +1,3 @@
-2026/05/04-19:04:50.587008 75be4dd6f6c0 Recovering log #54
-2026/05/04-19:04:50.723950 75be4dd6f6c0 Delete type=0 #54
-2026/05/04-19:04:50.723964 75be4dd6f6c0 Delete type=3 #53
+2026/05/06-15:33:52.629 1510 Table #11: 45 entries OK
+2026/05/06-15:33:52.633 1510 Archiving C:\Users\mjkpo\AppData\Local\FoundryVTT\Data\modules\fabricate\packs\alchemists-supplies-v16/MANIFEST-000057: OK
+2026/05/06-15:33:52.636 1510 **** Repaired leveldb C:\Users\mjkpo\AppData\Local\FoundryVTT\Data\modules\fabricate\packs\alchemists-supplies-v16; recovered 1 files; 31242 bytes. Some data may have been lost. ****
