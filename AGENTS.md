@@ -17,6 +17,13 @@ Primary stack: JavaScript ES modules, Svelte 5, Vite, `node:test`, happy-dom, Pl
 
 ## Build & Test
 
+### Prereqs
+
+- Node.js 22+ (see `.nvmrc` / `.node-version`). On Windows with `nvm-windows`, run `nvm use` manually — it does not auto-switch on directory change.
+- npm (ships with Node).
+- Docker Desktop only required for `npm run test:foundry`. Not required for `npm test`, `npm run build`, or `npm run dev`.
+- No extra shell tools required. `npm run release:build` uses Windows' built-in `tar.exe` for zip creation; on Ubuntu it uses `zip`.
+
 - `npm test` — required validation gate for implementation changes.
 - `npm run build` — required build gate for implementation changes.
 - `npm run test:foundry` — use when a task needs live Foundry UI or screenshot validation.

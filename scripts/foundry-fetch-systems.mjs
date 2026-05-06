@@ -10,11 +10,11 @@
  * release URL for its zip archive. Add new systems here as needed.
  */
 
-import { existsSync, mkdirSync, createWriteStream } from 'node:fs';
+import { existsSync, mkdirSync, createWriteStream, readdirSync, renameSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pipeline } from 'node:stream/promises';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -50,18 +50,28 @@ async function fetchSystem({ id, version, url }) {
   const fileStream = createWriteStream(tmpZip);
   await pipeline(response.body, fileStream);
 
-  // Extract — unzip into dest, stripping top-level dir if present
-  execSync(`unzip -o -q "${tmpZip}" -d "${dest}"`, { cwd: ROOT });
+  // Extract — unzip into dest, stripping top-level dir if present.
+  // Windows ships bsdtar at C:\Windows\System32\tar.exe (build 17063+) which
+  // transparently reads zip archives. Ubuntu keeps the existing unzip path so
+  // the CI command line is byte-identical.
+  if (process.platform === 'win32') {
+    execFileSync('tar', ['-xf', tmpZip, '-C', dest], { cwd: ROOT, stdio: 'inherit' });
+  } else {
+    execFileSync('unzip', ['-o', '-q', tmpZip, '-d', dest], { cwd: ROOT });
+  }
 
   // Some zips nest inside a subdirectory; detect and flatten
-  const nestedManifest = join(dest, id, 'system.json');
+  const nestedDir = join(dest, id);
+  const nestedManifest = join(nestedDir, 'system.json');
   if (!existsSync(manifest) && existsSync(nestedManifest)) {
-    execSync(`mv "${join(dest, id)}"/* "${dest}"/`, { cwd: ROOT });
-    execSync(`rmdir "${join(dest, id)}"`, { cwd: ROOT });
+    for (const entry of readdirSync(nestedDir)) {
+      renameSync(join(nestedDir, entry), join(dest, entry));
+    }
+    rmSync(nestedDir, { recursive: true, force: true });
   }
 
   // Clean up zip
-  execSync(`rm -f "${tmpZip}"`, { cwd: ROOT });
+  rmSync(tmpZip, { force: true });
 
   if (!existsSync(manifest)) {
     throw new Error(`Downloaded ${id} but system.json not found at ${manifest}`);

@@ -263,7 +263,11 @@ async function main() {
   if (!noZip) {
     const zipName = `fabricate-v${version}.zip`;
     console.log(`Creating ${zipName}...`);
-    execSync(`zip -r "${zipName}" . --exclude "*.zip"`, { cwd: distDir, stdio: 'inherit' });
+    if (process.platform === 'win32') {
+      execSync(`tar -a -c -f "${zipName}" --exclude="*.zip" .`, { cwd: distDir, stdio: 'inherit' });
+    } else {
+      execSync(`zip -r "${zipName}" . --exclude "*.zip"`, { cwd: distDir, stdio: 'inherit' });
+    }
     console.log(`Created dist/${zipName}`);
   }
 

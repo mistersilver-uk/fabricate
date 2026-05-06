@@ -17,6 +17,9 @@
     "docs": "cd docs && bundle exec jekyll serve --livereload",
     "docs:install": "cd docs && bundle install"
   },
+  "engines": {
+    "node": ">=22"
+  },
   "devDependencies": {
     "@commitlint/cli": "^20.4.3",
     "@commitlint/config-conventional": "^20.4.3",

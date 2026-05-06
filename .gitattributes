@@ -1,0 +1,23 @@
+# Ensure consistent line endings across platforms.
+# Tests scan source files (CSS, Svelte, JS, JSON) for literal \n boundaries,
+# so the working tree must be LF on every OS regardless of core.autocrlf.
+* text=auto eol=lf
+
+# Binary types (explicit for safety against the text=auto heuristic)
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.ico   binary
+*.zip   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.pdf   binary
+
+# LevelDB pack data
+*.db    binary
+*.ldb   binary
+*.sst   binary

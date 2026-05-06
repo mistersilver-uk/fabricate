@@ -549,7 +549,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
       }
     };
     tempRoot = mkdtempSync(join(tmpdir(), 'fabricate-manager-v2-'));
-    symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'dir');
+    symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
     compileManagerV2Root();
     Component = (await import(pathToFileURL(join(
       tempRoot,

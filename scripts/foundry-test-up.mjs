@@ -163,19 +163,19 @@ async function main() {
   // The v13 felddy/foundryvtt image runs as 1000:1000 by default and no longer
   // supports FOUNDRY_UID/FOUNDRY_GID. We use Docker's native `user:` directive
   // via FOUNDRY_HOST_UID/FOUNDRY_HOST_GID env vars in docker-compose.foundry.yml.
+  // On Windows, Docker Desktop bind mounts go through a translation layer that
+  // ignores the host UID; the felddy/foundryvtt:13 image's pre-created `foundry`
+  // user is uid 1000, which is what the daemon expects. Hardcoding skips the
+  // noisy "id not found" stderr from the previous try/catch path.
   if (!process.env.FOUNDRY_HOST_UID) {
-    try {
-      process.env.FOUNDRY_HOST_UID = execSync('id -u', { encoding: 'utf8' }).trim();
-    } catch {
-      process.env.FOUNDRY_HOST_UID = '1000';
-    }
+    process.env.FOUNDRY_HOST_UID = process.platform === 'win32'
+      ? '1000'
+      : execSync('id -u', { encoding: 'utf8' }).trim();
   }
   if (!process.env.FOUNDRY_HOST_GID) {
-    try {
-      process.env.FOUNDRY_HOST_GID = execSync('id -g', { encoding: 'utf8' }).trim();
-    } catch {
-      process.env.FOUNDRY_HOST_GID = '1000';
-    }
+    process.env.FOUNDRY_HOST_GID = process.platform === 'win32'
+      ? '1000'
+      : execSync('id -g', { encoding: 'utf8' }).trim();
   }
   process.stdout.write(`Container user: ${process.env.FOUNDRY_HOST_UID}:${process.env.FOUNDRY_HOST_GID}\n`);
 

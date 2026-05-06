@@ -194,7 +194,7 @@ function writeHostComponent() {
 
 async function compileMountedFixture() {
   tempRoot = mkdtempSync(join(tmpdir(), 'fabricate-environments-mounted-'));
-  symlinkSync(join(root, 'node_modules'), join(tempRoot, 'node_modules'), 'dir');
+  symlinkSync(join(root, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
   writeCompiledSvelte('src/ui/svelte/apps/EnvironmentsTab.svelte', 'src/ui/svelte/apps/EnvironmentsTab.svelte.js');
   for (const componentName of environmentComponentNames) {
     writeCompiledSvelte(
