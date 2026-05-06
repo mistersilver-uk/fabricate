@@ -230,6 +230,16 @@
         "EmptySearchHint": "Clear the search to show all configured systems.",
         "ClearSearch": "Clear search",
         "ClearFilters": "Clear filters",
+        "Pagination": {
+          "Label": "Pagination",
+          "Navigation": "Page navigation",
+          "Range": "Showing {first}–{last} of {total}",
+          "PageOf": "Page {page} of {total}",
+          "Previous": "Previous page",
+          "Next": "Next page",
+          "PerPage": "Per page",
+          "PerPageLabel": "Rows per page"
+        },
         "Create": "Create",
         "CreateSystem": "Create system",
         "Import": "Import",
@@ -370,6 +380,17 @@
           "Details": "Recipe details",
           "SelectRecipe": "Select a recipe",
           "InspectorHint": "The inspector shows recipe status, structure, and requirements for the selected row.",
+          "EmptySetup": {
+            "Kicker": "Recipe setup",
+            "Title": "Set up recipes",
+            "Hint": "Create the first recipe for this system after its reusable components are available.",
+            "StepStructure": "Choose the recipe structure supported by the selected system.",
+            "StepRequirements": "Add ingredient sets, catalysts, and any visibility or timing requirements.",
+            "StepResults": "Define result groups and enable the recipe when it is ready for players.",
+            "Resources": "Recipe resources",
+            "RecipeDocs": "Recipe docs",
+            "Quickstart": "Quickstart"
+          },
           "ToggleNamed": "Toggle {name}",
           "Edit": "Edit recipe",
           "Duplicate": "Duplicate recipe",
@@ -437,6 +458,17 @@
           "UsageEvidence": "Usage evidence",
           "SelectComponent": "Select a component",
           "InspectorHint": "The inspector shows component identity, source evidence, tags, essences, and existing actions for the selected row.",
+          "EmptySetup": {
+            "Kicker": "Component setup",
+            "Title": "Set up components",
+            "Hint": "Import item-backed components before recipes can reference ingredients, catalysts, results, or essence sources.",
+            "StepImport": "Drop world, compendium, pack, or folder items into the component browser.",
+            "StepOrganize": "Add tags, essences, source links, and difficulty metadata where the selected system uses them.",
+            "StepRecipes": "Use the managed components as recipe requirements, catalysts, and results.",
+            "Resources": "Component resources",
+            "ComponentDocs": "Component docs",
+            "Quickstart": "Quickstart"
+          },
           "Edit": "Edit component",
           "Delete": "Delete component",
           "EditNamed": "Edit {name}",
@@ -600,7 +632,18 @@
           "InspectorHint": "The inspector shows source linkage and component usage for the selected essence.",
           "InspectorNoSourceHint": "The inspector shows identity and component usage for the selected essence.",
           "CreateInspectorTitle": "New essence draft",
-          "CreateInspectorHint": "The inspector will show the essence ID after the draft is saved."
+          "CreateInspectorHint": "The inspector will show the essence ID after the draft is saved.",
+          "EmptySetup": {
+            "Kicker": "Essence setup",
+            "Title": "Set up essences",
+            "Hint": "Create the first essence definition for this system, then assign quantities to components that should contribute that essence.",
+            "StepCreate": "Create an essence with a clear name, icon, and description.",
+            "StepAssign": "Edit components to assign essence quantities that recipes can require.",
+            "StepTransfer": "If effect transfer is enabled, link source components whose effects should carry to crafted results.",
+            "Resources": "Essence resources",
+            "EssenceDocs": "Essence docs",
+            "EffectTransferDocs": "Effect transfer"
+          }
         },
         "Environment": {
           "Kicker": "Environments View",

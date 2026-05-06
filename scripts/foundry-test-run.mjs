@@ -2131,7 +2131,7 @@ async function main() {
         });
         await page.locator('.fabricate-manager-v2').first().waitFor({ state: 'visible', timeout: 10_000 });
 
-        await setManagerV2WindowSize(page, { width: 1200, height: 790 });
+        await setManagerV2WindowSize(page, { width: 1280, height: 820 });
         let navLabels = await page.locator('.fabricate-manager-v2 .manager-v2-nav-label').evaluateAll(labels =>
           labels.map(label => label.textContent?.trim()).filter(Boolean)
         );
@@ -2211,7 +2211,7 @@ async function main() {
           game.fabricate.api.getCraftingSystemManagerV2AppClass().show();
         });
         await page.locator('.fabricate-manager-v2').first().waitFor({ state: 'visible', timeout: 10_000 });
-        await setManagerV2WindowSize(page, { width: 1200, height: 790 });
+        await setManagerV2WindowSize(page, { width: 1280, height: 820 });
         await page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist") .manager-v2-system-identity').first().click();
         await page.waitForTimeout(750);
         const gatheringOffFact = await page.locator('.fabricate-manager-v2 [data-count-id="environments"]').first().evaluate(element => {
@@ -2254,7 +2254,7 @@ async function main() {
           game.fabricate.api.getCraftingSystemManagerV2AppClass().show();
         });
         await page.locator('.fabricate-manager-v2').first().waitFor({ state: 'visible', timeout: 10_000 });
-        await setManagerV2WindowSize(page, { width: 1200, height: 790 });
+        await setManagerV2WindowSize(page, { width: 1280, height: 820 });
         await page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist") .manager-v2-system-identity').first().click();
         await page.waitForTimeout(750);
 
@@ -2263,7 +2263,7 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-v2-selected-stacked');
 
-        await setManagerV2WindowSize(page, { width: 1200, height: 790 });
+        await setManagerV2WindowSize(page, { width: 1280, height: 820 });
         await page.locator('.fabricate-manager-v2 .manager-v2-nav-button:has-text("Recipes")').first().click();
         await page.locator('.fabricate-manager-v2 .manager-v2-breadcrumbs button:has-text("The Herbalist")').first().click();
         await page.locator('.fabricate-manager-v2[data-manager-v2-view="system-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
@@ -2291,7 +2291,7 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-v2-system-edit-narrow');
 
-        await setManagerV2WindowSize(page, { width: 1200, height: 790 });
+        await setManagerV2WindowSize(page, { width: 1280, height: 820 });
         await exerciseManagerV2RecipePointerTargets(page);
         if (await page.locator('.fabricate-manager-v2 .manager-v2-recipe-row').count() < 2) {
           throw new Error('Manager V2 recipes browser rendered fewer than two recipe rows.');
@@ -2313,7 +2313,73 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-v2-recipes-stacked');
 
-        await setManagerV2WindowSize(page, { width: 1200, height: 790 });
+        await setManagerV2WindowSize(page, { width: 1280, height: 820 });
+        await page.locator('.fabricate-manager-v2 .manager-v2-nav-button:has-text("Components")').first().click();
+        await page.locator('.fabricate-manager-v2[data-manager-v2-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await page.waitForTimeout(500);
+        if (await page.locator('.fabricate-manager-v2 .manager-v2-component-drop-zone').count() === 0) {
+          throw new Error('Manager V2 components browser did not show the drop-to-add affordance.');
+        }
+        await assertManagerV2LayoutStable(page, 'components normal');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-v2-components-normal');
+
+        await setManagerV2WindowSize(page, { width: 1000, height: 700 });
+        await assertManagerV2LayoutStable(page, 'components stacked');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-v2-components-stacked');
+
+        await setManagerV2WindowSize(page, { width: 1280, height: 820 });
+        await page.locator('.fabricate-manager-v2 .manager-v2-nav-button:has-text("Tags")').first().click();
+        await page.locator('.fabricate-manager-v2[data-manager-v2-view="tags"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await page.waitForTimeout(500);
+        if (await page.locator('.fabricate-manager-v2 [data-tags-evidence="how-it-works"]').count() === 0) {
+          throw new Error('Manager V2 tags inspector did not render the How-it-works evidence card.');
+        }
+        await assertManagerV2LayoutStable(page, 'tags-categories normal');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-v2-tags-categories-normal');
+
+        await setManagerV2WindowSize(page, { width: 1000, height: 700 });
+        await assertManagerV2LayoutStable(page, 'tags-categories stacked');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-v2-tags-categories-stacked');
+
+        await setManagerV2WindowSize(page, { width: 1280, height: 820 });
+        const essenceNav = page.locator('.fabricate-manager-v2 .manager-v2-nav-button:has-text("Essences")');
+        if (await essenceNav.count() > 0 && !(await essenceNav.first().isDisabled())) {
+          await essenceNav.first().click();
+          await page.locator('.fabricate-manager-v2[data-manager-v2-view="essences"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+          await page.waitForTimeout(500);
+          await assertManagerV2LayoutStable(page, 'essences normal');
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'manager-v2-essences-normal');
+
+          await setManagerV2WindowSize(page, { width: 1000, height: 700 });
+          await assertManagerV2LayoutStable(page, 'essences stacked');
+          await assertNoScreenshotOverlays(page);
+          await screenshot(page, 'manager-v2-essences-stacked');
+
+          await setManagerV2WindowSize(page, { width: 1280, height: 820 });
+          const essenceRow = page.locator('.fabricate-manager-v2 .manager-v2-essence-row');
+          if (await essenceRow.count() > 0) {
+            const editButton = essenceRow.first().locator('.manager-v2-icon-button[title*="Edit" i]');
+            if (await editButton.count() > 0) {
+              await editButton.first().click();
+              await page.locator('.fabricate-manager-v2[data-manager-v2-view="essence-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+              await page.waitForTimeout(500);
+              await assertManagerV2LayoutStable(page, 'essence-edit first state');
+              await assertNoScreenshotOverlays(page);
+              await screenshot(page, 'manager-v2-essence-edit-first-state');
+              await page.locator('.fabricate-manager-v2 .manager-v2-button:has-text("Cancel"), .fabricate-manager-v2 .manager-v2-button:has-text("Back")').first().click({ trial: false }).catch(() => {});
+              await page.waitForTimeout(250);
+            }
+          }
+        }
+
+        await setManagerV2WindowSize(page, { width: 1280, height: 820 });
+        await page.locator('.fabricate-manager-v2 .manager-v2-nav-button:has-text("Recipes")').first().click();
+        await page.waitForTimeout(250);
         await exerciseManagerV2EnvironmentPointerTargets(page);
         if (await page.locator('.fabricate-manager-v2 .manager-v2-environment-row').count() < 1) {
           throw new Error('Manager V2 environments browser rendered no environment rows.');
@@ -2335,7 +2401,7 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-v2-environments-browse-stacked');
 
-        await setManagerV2WindowSize(page, { width: 1200, height: 790 });
+        await setManagerV2WindowSize(page, { width: 1280, height: 820 });
         await page.locator('.fabricate-manager-v2 .manager-v2-environment-row:has-text("Azure Grove") .manager-v2-icon-button').nth(0).click();
         await page.locator('.fabricate-manager-v2[data-manager-v2-view="environment-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await page.locator('.fabricate-manager-v2 .manager-v2-environment-edit-view').first().waitFor({ state: 'visible', timeout: 10_000 });

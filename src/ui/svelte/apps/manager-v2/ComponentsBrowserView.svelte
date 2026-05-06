@@ -2,6 +2,7 @@
 <script>
   import { dragDrop } from '../../actions/dragDrop.js';
   import { localize } from '../../util/foundryBridge.js';
+  import Pagination from './Pagination.svelte';
 
   let {
     itemCards = [],
@@ -23,6 +24,8 @@
   let tagFilter = $state('all');
   let essenceFilter = $state('all');
   let lastSystemId = $state('');
+  let pageIndex = $state(0);
+  let pageSize = $state(10);
 
   $effect(() => {
     if (selectedSystemId === lastSystemId) return;
@@ -57,6 +60,13 @@
     showComponentTags ? '' : 'has-no-tags',
     showComponentEssences ? '' : 'has-no-essences'
   ].filter(Boolean).join(' '));
+  const paginatedComponents = $derived(filteredComponents.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize));
+
+  $effect(() => {
+    if (pageIndex > 0 && pageIndex * pageSize >= filteredComponents.length) {
+      pageIndex = 0;
+    }
+  });
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -260,7 +270,7 @@
           <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Component.Evidence', 'Evidence')}</span>
           <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Column.Actions', 'Actions')}</span>
         </div>
-        {#each filteredComponents as item (item.id)}
+        {#each paginatedComponents as item (item.id)}
           <div class={`manager-v2-component-row ${isSelectedComponent(item) ? 'is-selected' : ''}`} role="row" aria-selected={isSelectedComponent(item)} data-component-id={item.id}>
             <button type="button" class="manager-v2-component-identity" onclick={() => onSelectComponent(item.id)} role="cell">
               <img class="manager-v2-component-thumb" src={componentImage(item)} alt="" />
@@ -325,4 +335,12 @@
       </div>
     {/if}
   </section>
+
+  <Pagination
+    totalCount={filteredComponents.length}
+    {pageSize}
+    {pageIndex}
+    onPageChange={(next) => pageIndex = next}
+    onPageSizeChange={(next) => { pageSize = next; pageIndex = 0; }}
+  />
 </main>

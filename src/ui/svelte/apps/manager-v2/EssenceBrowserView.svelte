@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import Pagination from './Pagination.svelte';
 
   let {
     essenceCards = [],
@@ -14,6 +15,8 @@
 
   let searchTerm = $state('');
   let sourceFilter = $state('all');
+  let pageIndex = $state(0);
+  let pageSize = $state(10);
 
   const normalizedSearchTerm = $derived(searchTerm.trim().toLowerCase());
   const filtersActive = $derived(normalizedSearchTerm.length > 0 || sourceFilter !== 'all');
@@ -33,6 +36,13 @@
       || (sourceFilter === 'none' && state === 'none');
     return matchesSearch && matchesSource;
   }));
+  const paginatedEssences = $derived(filteredEssences.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize));
+
+  $effect(() => {
+    if (pageIndex > 0 && pageIndex * pageSize >= filteredEssences.length) {
+      pageIndex = 0;
+    }
+  });
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -156,7 +166,7 @@
           <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Essence.Usage', 'Usage')}</span>
           <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Column.Actions', 'Actions')}</span>
         </div>
-        {#each filteredEssences as essence (essence.id)}
+        {#each paginatedEssences as essence (essence.id)}
           <div
             class={`manager-v2-essence-row ${selectedEssenceId === essence.id ? 'is-selected' : ''}`}
             role="row"
@@ -199,4 +209,12 @@
       </div>
     {/if}
   </section>
+
+  <Pagination
+    totalCount={filteredEssences.length}
+    {pageSize}
+    {pageIndex}
+    onPageChange={(next) => pageIndex = next}
+    onPageSizeChange={(next) => { pageSize = next; pageIndex = 0; }}
+  />
 </main>

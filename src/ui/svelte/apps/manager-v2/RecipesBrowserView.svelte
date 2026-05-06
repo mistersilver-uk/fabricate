@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import Pagination from './Pagination.svelte';
 
   let {
     recipes = [],
@@ -20,6 +21,8 @@
 
   let statusFilter = $state('all');
   let categoryFilter = $state('all');
+  let pageIndex = $state(0);
+  let pageSize = $state(10);
 
   const filteredRecipes = $derived((recipes || []).filter(recipe => {
     const matchesStatus = statusFilter === 'all'
@@ -34,6 +37,13 @@
     || statusFilter !== 'all'
     || categoryFilter !== 'all'
   );
+  const paginatedRecipes = $derived(filteredRecipes.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize));
+
+  $effect(() => {
+    if (pageIndex > 0 && pageIndex * pageSize >= filteredRecipes.length) {
+      pageIndex = 0;
+    }
+  });
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -207,7 +217,7 @@
           <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Recipe.Status', 'Status')}</span>
           <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Column.Actions', 'Actions')}</span>
         </div>
-        {#each filteredRecipes as recipe (recipe.id)}
+        {#each paginatedRecipes as recipe (recipe.id)}
           <div class={`manager-v2-recipe-row ${isSelectedRecipe(recipe) ? 'is-selected' : ''}`} role="row" aria-selected={isSelectedRecipe(recipe)} data-recipe-id={recipe.id}>
             <button type="button" class="manager-v2-recipe-identity" onclick={() => onSelectRecipe(recipe.id)} role="cell">
               <img class="manager-v2-recipe-thumb" src={recipeImage(recipe)} alt="" />
@@ -261,4 +271,12 @@
       </div>
     {/if}
   </section>
+
+  <Pagination
+    totalCount={filteredRecipes.length}
+    {pageSize}
+    {pageIndex}
+    onPageChange={(next) => pageIndex = next}
+    onPageSizeChange={(next) => { pageSize = next; pageIndex = 0; }}
+  />
 </main>

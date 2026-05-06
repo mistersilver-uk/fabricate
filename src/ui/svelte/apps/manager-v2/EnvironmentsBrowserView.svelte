@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import Pagination from './Pagination.svelte';
 
   let {
     environments = [],
@@ -30,6 +31,8 @@
   let regionFilter = $state('all');
   let biomeFilter = $state('all');
   let lastSystemId = $state('');
+  let pageIndex = $state(0);
+  let pageSize = $state(10);
 
   $effect(() => {
     if (selectedSystemId === lastSystemId) return;
@@ -69,6 +72,13 @@
     || regionFilter !== 'all'
     || biomeFilter !== 'all'
   );
+  const paginatedEnvironments = $derived(filteredEnvironments.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize));
+
+  $effect(() => {
+    if (pageIndex > 0 && pageIndex * pageSize >= filteredEnvironments.length) {
+      pageIndex = 0;
+    }
+  });
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -279,7 +289,7 @@
           <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.StatusFilter', 'Status')}</span>
           <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Column.Actions', 'Actions')}</span>
         </div>
-        {#each filteredEnvironments as environment (environment.id)}
+        {#each paginatedEnvironments as environment (environment.id)}
           {@const displayEnvironment = environmentDisplay(environment)}
           <div class={`manager-v2-environment-row ${selectedEnvironmentId === environment.id ? 'is-selected' : ''}`} role="row" aria-selected={selectedEnvironmentId === environment.id} data-environment-id={environment.id}>
             <button type="button" class="manager-v2-environment-identity" onclick={() => onSelectEnvironment(environment.id)} role="cell">
@@ -350,4 +360,12 @@
       </div>
     {/if}
   </section>
+
+  <Pagination
+    totalCount={filteredEnvironments.length}
+    {pageSize}
+    {pageIndex}
+    onPageChange={(next) => pageIndex = next}
+    onPageSizeChange={(next) => { pageSize = next; pageIndex = 0; }}
+  />
 </main>

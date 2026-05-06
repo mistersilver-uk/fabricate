@@ -572,6 +572,24 @@ Phase 4 fifth slice (final). The environments browser was the last inline route 
 - [x] No admin-store contract changes, no new persistence paths, no new dependencies.
 - [x] All five extracted views own their filter state and emit explicit, named callbacks through narrow prop surfaces.
 
+## Concrete Implementation Plan: Screenshot-Driven Re-Audit Slice
+
+Re-audit follow-up after the previous source-vs-spec audit shipped as commit `a4821c8`. Existing Playwright screenshot artifacts predated the polish work and were stale. This slice applies the gaps identified by the screenshot-driven re-audit at `~/.claude/plans/audit-the-v2-gm-bubbly-lampson.md`: window sizing, missing route coverage, pagination footer, and the F4 verification that `risk` / `economyMode` / `timeOfDay` are real persisted contracts (not invented decorative metrics).
+
+- [x] **F1 — bump default window size.** `SvelteCraftingSystemManagerV2App.svelte.js` raised from `1180×760` → `1280×820`. Body grid widened from `210px / 1fr / 280px` → `220px / 1fr / 300px` for a more comfortable rail and inspector. Environment-edit's two-column body grid bumped rail from 210→220 to match. Updated `tests/components/manager-v2-layout.test.js` assertions and the `setManagerV2WindowSize(1200, 790)` calls in `scripts/foundry-test-run.mjs` to `1280×820`.
+- [x] **F4 — verify environment editor fields against runtime contract.** `risk`, `economyMode`, and `timeOfDay` are validated and persisted in `src/systems/GatheringEnvironmentStore.js` (lines 286-287, 749) with explicit `VALID_RISK_LEVELS` and `VALID_ECONOMY_MODES` allow-lists. The screenshot suspicion was misplaced; markup stays as-is, no code change.
+- [x] **F3 — extend Playwright coverage.** Added seven new captures to `scripts/foundry-test-run.mjs` between recipes-stacked and environments-browse-normal: `manager-v2-components-normal/stacked`, `manager-v2-tags-categories-normal/stacked`, `manager-v2-essences-normal/stacked` (when feature gated on), and `manager-v2-essence-edit-first-state` (when essence rows are present). Each capture asserts a defining selector (drop zone, How-it-works evidence, etc.) before screenshotting.
+- [x] **F5 — pagination footer.** New `src/ui/svelte/apps/manager-v2/Pagination.svelte` shared component with `totalCount` / `pageSize` / `pageIndex` / `pageSizeOptions` / `onPageChange` / `onPageSizeChange` props. Renders only when `totalCount > pageSize`. Integrated into `SystemsBrowserView`, `RecipesBrowserView`, `ComponentsBrowserView`, `EnvironmentsBrowserView`, `EssenceBrowserView` with default `pageSize=10`. Each view clamps `pageIndex` back to 0 via a view-local `$effect` when filters narrow the result count below the current page. New CSS in `styles/fabricate.css` (`manager-v2-pagination` band with summary / nav / per-page selector). Nine new lang strings under `FABRICATE.Admin.ManagerV2.Pagination.*`. Layout test asserts the scoped chrome; the existing recipes-browser mounted test asserts the footer hides at default `pageSize=10` with the 2-row fixture.
+- [x] Validate with `npm test` (2306/2306 pass) and `npm run build` (clean).
+
+### Screenshot-Driven Re-Audit Scope Decisions
+
+- [x] Pagination is local view state only. No admin-store mutator, no settings persistence, no per-system per-page memory.
+- [x] Auto-clamp resets `pageIndex` to 0 when filters narrow the result count below the current page; do not clamp to the final valid page because the user's intent is unclear in that moment.
+- [x] Default `pageSize=10` matches the mock; selector offers `10 / 25 / 50`. No "All" option to keep the contract simple.
+- [x] `risk` / `economyMode` / `timeOfDay` are persisted environment fields validated by `GatheringEnvironmentStore.js`; do not remove them as the audit initially suspected. The canonical `gathering-and-harvesting/spec.md` does not currently document them, but the runtime contract is real.
+- [x] F2 (stacked-layout cramping) and F7 (environment toolbar wrap) are deferred until the regenerated post-F1 screenshots show whether the layout fixes resolve them.
+
 ## Future Implementation Sequence
 
 - [ ] Add manager-v2 app wrapper and root component behind an explicit launch path or setting.

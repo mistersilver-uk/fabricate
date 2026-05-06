@@ -49,6 +49,7 @@ function compileManagerV2Root() {
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EnvironmentsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EssenceBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EssenceEditView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/Pagination.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/RecipesBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/SystemEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/SystemsBrowserView.svelte');
@@ -803,6 +804,8 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.querySelector('[data-recipe-id="r2"]').classList.contains('is-selected'));
     assert.ok(target.textContent.includes('Locked Elixir'));
     assert.ok(target.textContent.includes('Restricted (none selected)'));
+
+    assert.equal(target.querySelector('.manager-v2-pagination'), null, 'pagination should hide while filtered row count is below the page size');
 
     assert.equal(target.querySelector('[data-clear-filters="recipes"]'), null, 'Clear filters should hide while no filter is active');
     const recipeStatusFilterSelect = target.querySelector('[aria-label="Filter recipes by status"]');

@@ -28,7 +28,7 @@ test('manager-v2 body starts as a three-region grid and stacks at narrow width',
   const bodyBlock = blockFor('.fabricate-manager-v2 .manager-v2-body');
 
   assert.ok(
-    bodyBlock.includes('grid-template-columns: 210px minmax(0, 1fr) 280px;'),
+    bodyBlock.includes('grid-template-columns: 220px minmax(0, 1fr) 300px;'),
     'normal manager-v2 layout should have rail, main region, and inspector'
   );
   assert.ok(
@@ -354,7 +354,7 @@ test('manager-v2 environments browser and edit route define compact responsive g
   );
   assert.ok(editorShellBlock.includes('overflow: auto;'), 'environment editor shell should own scroll containment at normal widths');
   assert.ok(
-    css.includes('.fabricate-manager-v2[data-manager-v2-view="environment-edit"] .manager-v2-body') && css.includes('grid-template-columns: 210px minmax(0, 1fr);'),
+    css.includes('.fabricate-manager-v2[data-manager-v2-view="environment-edit"] .manager-v2-body') && css.includes('grid-template-columns: 220px minmax(0, 1fr);'),
     'environment edit route should replace the browse inspector with a two-region rail/editor grid'
   );
   assert.ok(editorViewBlock.includes('grid-template-rows: auto minmax(0, 1fr);'), 'environment editor should reserve details band plus scrollable workspace');
@@ -401,6 +401,23 @@ test('manager-v2 system edit view defines scoped stable form and toggle layout',
   assert.ok(
     narrowQuery.includes('.fabricate-manager-v2 .manager-v2-edit-card-heading') && narrowQuery.includes('flex-direction: column;'),
     'narrow edit card headings should stack actions under titles'
+  );
+});
+
+test('manager-v2 pagination footer uses scoped chrome with stable summary, nav, and per-page controls', () => {
+  const block = blockFor('.fabricate-manager-v2 .manager-v2-pagination');
+
+  assert.ok(block.includes('display: flex;'), 'pagination footer should layout horizontally');
+  assert.ok(block.includes('justify-content: space-between;'), 'pagination footer should distribute summary, nav, per-page across the row');
+  assert.ok(block.includes('flex-wrap: wrap;'), 'pagination footer should wrap on narrow widths');
+  assert.ok(block.includes('border-top: 1px solid var(--fab-mv2-border);'), 'pagination footer should anchor to the table with a manager-v2 border');
+  assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-pagination-page'),
+    'pagination should expose a stable Page-of label for keyboard users'
+  );
+  assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-pagination-size select'),
+    'pagination should style the per-page selector inside the manager-v2 scope'
   );
 });
 

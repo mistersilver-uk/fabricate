@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import Pagination from './Pagination.svelte';
 
   let {
     systems = [],
@@ -15,6 +16,8 @@
 
   let searchTerm = $state('');
   let statusFilter = $state('all');
+  let pageIndex = $state(0);
+  let pageSize = $state(10);
 
   const normalizedSearchTerm = $derived(searchTerm.trim().toLowerCase());
   const filteredSystems = $derived((systems || []).filter(system => {
@@ -26,6 +29,13 @@
     return matchesSearch && matchesStatus;
   }));
   const filtersActive = $derived(normalizedSearchTerm.length > 0 || statusFilter !== 'all');
+  const paginatedSystems = $derived(filteredSystems.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize));
+
+  $effect(() => {
+    if (pageIndex > 0 && pageIndex * pageSize >= filteredSystems.length) {
+      pageIndex = 0;
+    }
+  });
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -140,7 +150,7 @@
           <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.StatusFilter', 'Status')}</span>
           <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Column.Actions', 'Actions')}</span>
         </div>
-        {#each filteredSystems as system (system.id)}
+        {#each paginatedSystems as system (system.id)}
           <div
             class={`manager-v2-system-row ${isSelectedSystem(system) ? 'is-selected' : ''}`}
             role="row"
@@ -201,4 +211,12 @@
       </div>
     {/if}
   </section>
+
+  <Pagination
+    totalCount={filteredSystems.length}
+    {pageSize}
+    {pageIndex}
+    onPageChange={(next) => pageIndex = next}
+    onPageSizeChange={(next) => { pageSize = next; pageIndex = 0; }}
+  />
 </main>
