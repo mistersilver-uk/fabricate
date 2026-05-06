@@ -127,6 +127,19 @@ test('manager-v2 selected system scope is static text with a return-to-library c
   assert.equal(scopeBlock.includes('red'), false, 'scope card should not use red focus styling');
 });
 
+test('manager-v2 nav buttons clear host mouse focus and keep green keyboard focus', () => {
+  const navFocusBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-button:focus');
+  const activeNavFocusBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-button.is-active:focus');
+  const navFocusVisibleBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-button:focus-visible');
+
+  assert.ok(navFocusBlock.includes('outline: none;'), 'mouse focus on nav buttons should not inherit the host outline');
+  assert.ok(navFocusBlock.includes('box-shadow: none;'), 'mouse focus on nav buttons should not inherit the host orange focus shadow');
+  assert.ok(activeNavFocusBlock.includes('box-shadow: inset 3px 0 0 var(--fab-mv2-accent);'), 'active nav focus should keep the active left accent');
+  assert.ok(navFocusVisibleBlock.includes('outline: 2px solid var(--fab-mv2-accent);'), 'keyboard focus on nav buttons should use the manager-v2 accent');
+  assert.equal(navFocusBlock.includes('orange'), false, 'nav focus should not use orange');
+  assert.equal(navFocusVisibleBlock.includes('orange'), false, 'nav keyboard focus should not use orange');
+});
+
 test('manager-v2 inspector count labels wrap without truncation', () => {
   const factBlock = blockFor('.fabricate-manager-v2 .manager-v2-fact');
   const factLineBlock = blockFor('.fabricate-manager-v2 .manager-v2-fact-line');
@@ -148,6 +161,26 @@ test('manager-v2 inspector count labels wrap without truncation', () => {
   assert.ok(css.includes('.fabricate-manager-v2 .manager-v2-fact strong.is-disabled'), 'disabled count values should preserve emphasis');
   assert.ok(featureListBlock.includes('align-items: flex-start;'), 'feature pills should align to the top of the card');
   assert.ok(featureListBlock.includes('justify-content: flex-start;'), 'feature pills should align to the left of the card');
+});
+
+test('manager-v2 empty states use refined heading and setup-panel styling', () => {
+  const emptyIconBlock = blockFor('.fabricate-manager-v2 .manager-v2-empty > div > i');
+  const emptyLayerIconBlock = blockFor('.fabricate-manager-v2 .manager-v2-empty > div > i.fa-layer-group');
+  const emptyHeadingBlock = blockFor('.fabricate-manager-v2 .manager-v2-empty h3');
+  const setupCardBlock = blockFor('.fabricate-manager-v2 .manager-v2-setup-card');
+  const setupHeaderBlock = blockFor('.fabricate-manager-v2 .manager-v2-setup-card-header');
+  const setupListBlock = blockFor('.fabricate-manager-v2 .manager-v2-setup-list');
+  const setupLinksBlock = blockFor('.fabricate-manager-v2 .manager-v2-setup-links');
+
+  assert.ok(emptyIconBlock.includes('font-size: 1.55rem;'), 'generic empty-state icons should be larger than body text');
+  assert.ok(emptyLayerIconBlock.includes('font-size: 1.9rem;'), 'no-systems empty icon should be more prominent');
+  assert.ok(emptyHeadingBlock.includes('font-weight: 600;'), 'empty-state headings should be lighter than heavy admin titles');
+  assert.ok(emptyHeadingBlock.includes('font-size: 0.98rem;'), 'empty-state headings should stay compact');
+  assert.ok(setupCardBlock.includes('display: grid;'), 'no-systems inspector setup panel should use compact grid layout');
+  assert.ok(setupCardBlock.includes('border: 1px solid var(--fab-mv2-border);'), 'setup panel should use manager-v2 flat borders');
+  assert.ok(setupHeaderBlock.includes('grid-template-columns: 38px minmax(0, 1fr);'), 'setup panel should reserve icon space');
+  assert.ok(setupListBlock.includes('line-height: 1.35;'), 'setup tips should stay dense and readable');
+  assert.ok(setupLinksBlock.includes('flex-wrap: wrap;'), 'setup links should wrap in narrow inspectors');
 });
 
 test('manager-v2 recipes browser defines compact responsive table geometry', () => {

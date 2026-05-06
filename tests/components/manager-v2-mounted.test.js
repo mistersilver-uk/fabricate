@@ -600,6 +600,10 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
       Array.from(target.querySelectorAll('.manager-v2-nav-label')).map(label => label.textContent.trim()),
       ['System settings', 'Recipes', 'Components', 'Tags & Categories', 'Essences', 'Environments', 'Rules', 'Graph']
     );
+    const systemSettingsNav = Array.from(target.querySelectorAll('.manager-v2-nav-button'))
+      .find(button => button.querySelector('.manager-v2-nav-label')?.textContent.trim() === 'System settings');
+    assert.ok(systemSettingsNav, 'system settings nav button should render');
+    assert.equal(systemSettingsNav.querySelector('.manager-v2-nav-count'), null, 'system settings nav should not show an Edit badge');
     assert.ok(target.textContent.includes('Alchemy'));
     assert.ok(target.textContent.includes('Potion and essence work'));
     assert.ok(target.textContent.includes('4'));
@@ -627,6 +631,11 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.deepEqual(navLabels, []);
     assert.ok(target.textContent.includes('Crafting Systems'));
     assert.ok(target.textContent.includes('No crafting systems yet'));
+    assert.ok(target.textContent.includes('Set up your first system'));
+    assert.ok(target.textContent.includes('Create a system for one crafting discipline or ruleset.'));
+    assert.ok(target.textContent.includes('Quickstart'));
+    assert.equal(target.textContent.includes('Select a system'), false);
+    assert.equal(target.querySelectorAll('.manager-v2-setup-card').length, 1);
   });
 
   it('toggles systems library row status without selecting the row', async () => {

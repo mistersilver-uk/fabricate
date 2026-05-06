@@ -1372,7 +1372,6 @@
           <button type="button" class={`manager-v2-nav-button ${currentView === 'system-edit' ? 'is-active' : ''}`} aria-current={currentView === 'system-edit' ? 'page' : undefined} onclick={() => editSystem(selectedSystem.id)}>
             <i class="fas fa-cog" aria-hidden="true"></i>
             <span class="manager-v2-nav-label">{text('FABRICATE.Admin.ManagerV2.SystemEdit.Nav', 'System settings')}</span>
-            <span class="manager-v2-nav-count">{text('FABRICATE.Admin.ManagerV2.SystemEdit.EditBadge', 'Edit')}</span>
           </button>
           <button type="button" class={`manager-v2-nav-button ${currentView === 'recipes' ? 'is-active' : ''}`} aria-current={currentView === 'recipes' ? 'page' : undefined} onclick={() => setView('recipes')}>
             <i class="fas fa-scroll" aria-hidden="true"></i>
@@ -2679,6 +2678,32 @@
           {:else}
             <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.NoOptionalFeatures', 'No optional features enabled.')}</p>
           {/if}
+        </section>
+      {:else if ($viewState.systems || []).length === 0}
+        <section class="manager-v2-setup-card" aria-label={text('FABRICATE.Admin.ManagerV2.EmptySetup.Title', 'Set up your first system')}>
+          <div class="manager-v2-setup-card-header">
+            <i class="fas fa-compass" aria-hidden="true"></i>
+            <div>
+              <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.EmptySetup.Kicker', 'First run')}</p>
+              <h3>{text('FABRICATE.Admin.ManagerV2.EmptySetup.Title', 'Set up your first system')}</h3>
+            </div>
+          </div>
+          <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.EmptySetup.Hint', 'Create a crafting system, add item-backed components, then build recipes from those components.')}</p>
+          <ol class="manager-v2-setup-list">
+            <li>{text('FABRICATE.Admin.ManagerV2.EmptySetup.StepSystem', 'Create a system for one crafting discipline or ruleset.')}</li>
+            <li>{text('FABRICATE.Admin.ManagerV2.EmptySetup.StepComponents', 'Import world or compendium items as reusable components.')}</li>
+            <li>{text('FABRICATE.Admin.ManagerV2.EmptySetup.StepRecipes', 'Add recipes that consume components and award results.')}</li>
+          </ol>
+          <div class="manager-v2-setup-links" aria-label={text('FABRICATE.Admin.ManagerV2.EmptySetup.Resources', 'Resources')}>
+            <a class="manager-v2-button" href="https://misterpotts.github.io/fabricate/quickstart/" target="_blank" rel="noreferrer">
+              <i class="fas fa-book-open" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.ManagerV2.EmptySetup.Quickstart', 'Quickstart')}</span>
+            </a>
+            <a class="manager-v2-button" href="https://misterpotts.github.io/fabricate/" target="_blank" rel="noreferrer">
+              <i class="fas fa-circle-question" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.ManagerV2.EmptySetup.Docs', 'Docs')}</span>
+            </a>
+          </div>
         </section>
       {:else}
         <div class="manager-v2-empty">

@@ -99,6 +99,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.equal(lang.FABRICATE.Admin.ManagerV2.DisableSystemNamed, 'Disable {name}');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.SystemEdit.Title, 'System settings');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.SystemEdit.SaveDetails, 'Save details');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.SystemEdit.EditBadge, undefined);
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Recipe.Title, 'Recipes');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Recipe.Requirements, 'Requirements');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Component.Title, 'Components');
@@ -147,6 +148,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(rootSource.includes('manager-v2-scope-card'), 'root should render selected system scope as static rail text');
     assert.ok(rootSource.includes('manager-v2-scope-return'), 'root should expose a return-to-system-library rail action');
     assert.ok(rootSource.includes('FABRICATE.Admin.ManagerV2.ReturnToSystemLibrary'), 'return-to-library action should be localized');
+    assert.ok(!rootSource.includes('SystemEdit.EditBadge'), 'system settings nav should not render the former Edit badge');
     assert.ok(rootSource.includes("setView('essences')"), 'essences should be exposed as a real selected-system route');
     assert.ok(rootSource.includes("setView('tags')"), 'tags and categories should be exposed as a real selected-system route');
     assert.ok(rootSource.includes("activeView = 'essence-edit'"), 'essence edit actions should transition to the local edit route');
@@ -165,6 +167,12 @@ describe('CraftingSystemManagerV2 source contract', () => {
       lang.FABRICATE.Admin.ManagerV2.InspectorHint,
       'The inspector shows counts, resolution mode, and enabled features for the selected system.'
     );
+    assert.ok(rootSource.includes("FABRICATE.Admin.ManagerV2.EmptySetup.Title"), 'no-systems inspector should use localized setup copy');
+    assert.ok(rootSource.includes("https://misterpotts.github.io/fabricate/quickstart/"), 'no-systems inspector should link to the published quickstart');
+    assert.ok(rootSource.includes("https://misterpotts.github.io/fabricate/"), 'no-systems inspector should link to the published docs');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.EmptySetup.Title, 'Set up your first system');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.EmptySetup.Quickstart, 'Quickstart');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.EmptySetup.Docs, 'Docs');
   });
 
   it('keeps manager-v2 tags and categories route focused and store-wired', () => {

@@ -6078,6 +6078,20 @@
   box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
 }
 
+.fabricate-manager-v2 .manager-v2-nav-button:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.fabricate-manager-v2 .manager-v2-nav-button.is-active:focus {
+  box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
+}
+
+.fabricate-manager-v2 .manager-v2-nav-button:focus-visible {
+  outline: 2px solid var(--fab-mv2-accent);
+  outline-offset: 2px;
+}
+
 .fabricate-manager-v2 .manager-v2-nav-button:disabled {
   color: var(--fab-mv2-text-muted);
   cursor: default;
@@ -6227,9 +6241,102 @@
   background: rgba(255, 255, 255, 0.03);
 }
 
+.fabricate-manager-v2 .manager-v2-empty > div > i {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  margin-bottom: 12px;
+  color: var(--fab-mv2-text);
+  font-size: 1.55rem;
+}
+
+.fabricate-manager-v2 .manager-v2-empty > div > i.fa-layer-group {
+  width: 54px;
+  height: 54px;
+  font-size: 1.9rem;
+}
+
 .fabricate-manager-v2 .manager-v2-empty h3,
 .fabricate-manager-v2 .manager-v2-empty p {
   margin: 0 0 8px;
+}
+
+.fabricate-manager-v2 .manager-v2-empty h3 {
+  color: var(--fab-mv2-text);
+  font-size: 0.98rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.fabricate-manager-v2 .manager-v2-empty p {
+  line-height: 1.4;
+}
+
+.fabricate-manager-v2 .manager-v2-setup-card {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  padding: 16px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.fabricate-manager-v2 .manager-v2-setup-card-header {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-setup-card-header > i {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  color: var(--fab-mv2-accent);
+  background: rgba(92, 184, 92, 0.1);
+}
+
+.fabricate-manager-v2 .manager-v2-setup-card h3 {
+  margin: 0;
+  color: var(--fab-mv2-text);
+  font-size: 0.98rem;
+  font-weight: 650;
+  line-height: 1.25;
+  overflow-wrap: break-word;
+}
+
+.fabricate-manager-v2 .manager-v2-setup-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.fabricate-manager-v2 .manager-v2-setup-list li {
+  padding-left: 2px;
+}
+
+.fabricate-manager-v2 .manager-v2-setup-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fabricate-manager-v2 .manager-v2-setup-links .manager-v2-button {
+  flex: 1 1 112px;
+  justify-content: center;
+  text-decoration: none;
 }
 
 @container fabricate-manager-v2 (max-width: 1120px) {
