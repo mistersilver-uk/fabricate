@@ -1,6 +1,5 @@
 <!-- Svelte 5 runes mode -->
 <script>
-  import { tick } from 'svelte';
   import { localize } from '../../util/foundryBridge.js';
 
   let {
@@ -68,9 +67,17 @@
     return (tagRows || []).some(row => String(row.name || '').toLowerCase() === normalized);
   }
 
-  async function focusAfterUpdate(element) {
-    await tick();
-    element?.focus?.();
+  // Focus the element on the next microtask. We avoid `await tick()` here:
+  // tick waits for Svelte's full reactive flush, which means focus() lands
+  // one extra microtask later than the surrounding state mutations. Tests
+  // (and Foundry's app lifecycle) only await two ticks after dispatching
+  // a form submit, which was insufficient when transferring focus between
+  // inputs — the assertion saw the previous activeElement and failed
+  // (`assert.equal` then exploded formatting two unequal happy-dom elements).
+  // queueMicrotask runs after Svelte's effect schedule for this batch so
+  // bind:this is current, but does not introduce an additional await depth.
+  function focusAfterUpdate(element) {
+    queueMicrotask(() => element?.focus?.());
   }
 
   async function submitCategory(event) {
