@@ -1474,8 +1474,8 @@
             <div class="manager-v2-empty">
               <div>
                 <i class="fas fa-seedling" aria-hidden="true"></i>
-                <h3>{text('FABRICATE.Admin.Environments.EmptyTitle', 'No Environments Yet')}</h3>
-                <p>{text('FABRICATE.Admin.Environments.EmptyHint', 'Create a gathering environment to start configuring where players can gather.')}</p>
+                <h3>{text('FABRICATE.Admin.ManagerV2.Environment.EmptyTitle', 'No gathering environments yet')}</h3>
+                <p>{text('FABRICATE.Admin.ManagerV2.Environment.EmptyHint', 'Environments define where gathering happens, which scene or location they represent, what tasks players can attempt, and which results those tasks can produce.')}</p>
                 <button type="button" class="manager-v2-button is-primary" onclick={createEnvironment}>
                   <i class="fas fa-plus" aria-hidden="true"></i>
                   <span>{text('FABRICATE.Admin.ManagerV2.Environment.Create', 'Create environment')}</span>
@@ -2276,6 +2276,32 @@
                 <i class="fas fa-trash" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.ManagerV2.Environment.Delete', 'Delete environment')}</span>
               </button>
+            </div>
+          </section>
+        {:else if environmentList.length === 0}
+          <section class="manager-v2-setup-card" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Title', 'Set up environments')}>
+            <div class="manager-v2-setup-card-header">
+              <i class="fas fa-seedling" aria-hidden="true"></i>
+              <div>
+                <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Kicker', 'Gathering setup')}</p>
+                <h3>{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Title', 'Set up environments')}</h3>
+              </div>
+            </div>
+            <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Hint', 'Create the first environment for this gathering-enabled system, then describe the location and add the tasks players can attempt there.')}</p>
+            <ol class="manager-v2-setup-list">
+              <li>{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.StepCreate', 'Create an environment for a biome, room, region, or scene.')}</li>
+              <li>{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.StepLocation', 'Link a Foundry scene or write enough location detail for GMs and players.')}</li>
+              <li>{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.StepTasks', 'Add gathering tasks, result groups, catalysts, checks, timing, and failure outcomes.')}</li>
+            </ol>
+            <div class="manager-v2-setup-links" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Resources', 'Environment resources')}>
+              <a class="manager-v2-button" href="https://misterpotts.github.io/fabricate/gathering-environments/" target="_blank" rel="noreferrer">
+                <i class="fas fa-book-open" aria-hidden="true"></i>
+                <span>{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.GatheringDocs', 'Gathering docs')}</span>
+              </a>
+              <a class="manager-v2-button" href="https://misterpotts.github.io/fabricate/quickstart/" target="_blank" rel="noreferrer">
+                <i class="fas fa-circle-question" aria-hidden="true"></i>
+                <span>{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Quickstart', 'Quickstart')}</span>
+              </a>
             </div>
           </section>
         {:else}

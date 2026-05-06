@@ -173,6 +173,12 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.equal(lang.FABRICATE.Admin.ManagerV2.EmptySetup.Title, 'Set up your first system');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.EmptySetup.Quickstart, 'Quickstart');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.EmptySetup.Docs, 'Docs');
+    assert.ok(rootSource.includes('FABRICATE.Admin.ManagerV2.Environment.EmptyTitle'), 'empty environments browser should use Manager V2 localized copy');
+    assert.ok(rootSource.includes('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Title'), 'empty environments inspector should use localized setup copy');
+    assert.ok(rootSource.includes('https://misterpotts.github.io/fabricate/gathering-environments/'), 'empty environments inspector should link to published gathering docs');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.EmptyTitle, 'No gathering environments yet');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Title, 'Set up environments');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.EmptySetup.GatheringDocs, 'Gathering docs');
   });
 
   it('keeps manager-v2 tags and categories route focused and store-wired', () => {

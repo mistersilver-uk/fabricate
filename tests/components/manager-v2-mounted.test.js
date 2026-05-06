@@ -213,7 +213,7 @@ function createStore(calls = [], options = {}) {
       }]
     }]
   };
-  const environments = [
+  const environments = options.emptyEnvironments ? [] : [
     environmentDraft,
     {
       id: 'env-cavern',
@@ -357,8 +357,8 @@ function createStore(calls = [], options = {}) {
     environments,
     environmentsLoading: false,
     environmentsError: null,
-    selectedEnvironmentId: 'env-forest',
-    environmentDraft,
+    selectedEnvironmentId: options.emptyEnvironments ? '' : 'env-forest',
+    environmentDraft: options.emptyEnvironments ? null : environmentDraft,
     environmentDraftDirty: options.environmentDraftDirty === true,
     environmentDraftIsNew: false,
     environmentSaving: false,
@@ -1434,6 +1434,39 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
 
     assert.ok(calls.some(call => call[0] === 'addEnvironmentTask'));
     assert.ok(calls.some(call => call[0] === 'saveEnvironmentDraft'));
+  });
+
+  it('shows setup guidance and keeps create routing when a gathering system has no environments', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { emptyEnvironments: true }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Environments').click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'environments');
+    assert.ok(target.textContent.includes('No gathering environments yet'));
+    assert.ok(target.textContent.includes('Environments define where gathering happens'));
+    assert.ok(target.textContent.includes('Set up environments'));
+    assert.ok(target.textContent.includes('Create an environment for a biome, room, region, or scene.'));
+    assert.ok(target.textContent.includes('Gathering docs'));
+    assert.equal(target.textContent.includes('Select an environment'), false);
+
+    target.querySelector('.manager-v2-table-scroll .manager-v2-button.is-primary').click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'environment-edit');
+    assert.ok(calls.some(call => call[0] === 'createEnvironmentDraft'));
   });
 
   it('creates a new environment draft with draft-backed title and inspector context', async () => {

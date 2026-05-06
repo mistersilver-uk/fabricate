@@ -615,6 +615,8 @@
           "SelectionAll": "All modes",
           "Table": "Environments table",
           "TableShort": "Environments",
+          "EmptyTitle": "No gathering environments yet",
+          "EmptyHint": "Environments define where gathering happens, which scene or location they represent, what tasks players can attempt, and which results those tasks can produce.",
           "EmptySearchTitle": "No environments match these filters",
           "EmptySearchHint": "Clear search and filters to show all environments in this system.",
           "Column": {
@@ -634,6 +636,17 @@
           "ValidationCount": "{count} validation issues",
           "SelectEnvironment": "Select an environment",
           "InspectorHint": "The inspector shows scene imagery, task evidence, draft state, and existing actions for the selected row.",
+          "EmptySetup": {
+            "Kicker": "Gathering setup",
+            "Title": "Set up environments",
+            "Hint": "Create the first environment for this gathering-enabled system, then describe the location and add the tasks players can attempt there.",
+            "StepCreate": "Create an environment for a biome, room, region, or scene.",
+            "StepLocation": "Link a Foundry scene or write enough location detail for GMs and players.",
+            "StepTasks": "Add gathering tasks, result groups, catalysts, checks, timing, and failure outcomes.",
+            "Resources": "Environment resources",
+            "GatheringDocs": "Gathering docs",
+            "Quickstart": "Quickstart"
+          },
           "EditHint": "Edit scene linkage, environment details, tasks, results, catalysts, visibility, timing, and validation through the existing draft callbacks.",
           "Edit": "Edit environment",
           "Duplicate": "Duplicate environment",
