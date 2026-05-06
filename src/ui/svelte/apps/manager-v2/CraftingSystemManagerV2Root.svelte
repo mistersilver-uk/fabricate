@@ -1,10 +1,14 @@
 <!-- Svelte 5 runes mode -->
 <script>
-  import { dragDrop } from '../../actions/dragDrop.js';
   import { localize } from '../../util/foundryBridge.js';
+  import ComponentsBrowserView from './ComponentsBrowserView.svelte';
   import EnvironmentEditView from './EnvironmentEditView.svelte';
+  import EnvironmentsBrowserView from './EnvironmentsBrowserView.svelte';
   import EssenceBrowserView from './EssenceBrowserView.svelte';
   import EssenceEditView from './EssenceEditView.svelte';
+  import RecipesBrowserView from './RecipesBrowserView.svelte';
+  import SystemEditView from './SystemEditView.svelte';
+  import SystemsBrowserView from './SystemsBrowserView.svelte';
   import TagsCategoriesView from './TagsCategoriesView.svelte';
 
   let { store, services = null } = $props();
@@ -13,19 +17,6 @@
   const viewState = store.viewState;
 
   let activeView = $state('systems');
-  let systemSearchTerm = $state('');
-  let systemStatusFilter = $state('all');
-  let recipeStatusFilter = $state('all');
-  let recipeCategoryFilter = $state('all');
-  let componentSourceFilter = $state('all');
-  let componentTagFilter = $state('all');
-  let componentEssenceFilter = $state('all');
-  let environmentSearchTerm = $state('');
-  let environmentStatusFilter = $state('all');
-  let environmentSelectionFilter = $state('all');
-  let environmentRiskFilter = $state('all');
-  let environmentRegionFilter = $state('all');
-  let environmentBiomeFilter = $state('all');
   let selectedRecipeId = $state('');
   let selectedComponentId = $state('');
   let selectedEssenceId = $state('');
@@ -34,27 +25,9 @@
   let essenceEditDirty = $state(false);
   let essenceEditSaving = $state(false);
   let essenceEditDraft = $state(null);
-  let systemNameValue = $state('');
-  let systemDescriptionValue = $state('');
-  let systemResolutionModeValue = $state('simple');
-
   const placeholderViews = [
     { id: 'rules', icon: 'fas fa-sliders-h', labelKey: 'FABRICATE.Admin.ManagerV2.Nav.Rules', fallback: 'Rules' },
     { id: 'graph', icon: 'fas fa-project-diagram', labelKey: 'FABRICATE.Admin.ManagerV2.Nav.Graph', fallback: 'Graph' }
-  ];
-  const systemEditFeatureDefinitions = [
-    { systemKey: 'gathering', storeKey: 'gathering', labelKey: 'FABRICATE.Admin.ManagerV2.Feature.Gathering', fallback: 'Gathering', hintKey: 'FABRICATE.Admin.ManagerV2.SystemEdit.FeatureHint.Gathering', hintFallback: 'Shows gathering environments and player gathering flows for this system.' },
-    { systemKey: 'essences', storeKey: 'essences', labelKey: 'FABRICATE.Admin.ManagerV2.Feature.Essences', fallback: 'Essences', hintKey: 'FABRICATE.Admin.ManagerV2.SystemEdit.FeatureHint.Essences', hintFallback: 'Enables essence definitions and essence requirements.' },
-    { systemKey: 'multiStepRecipes', storeKey: 'multiStepRecipes', labelKey: 'FABRICATE.Admin.ManagerV2.Feature.MultiStepRecipes', fallback: 'Multi-step recipes', hintKey: 'FABRICATE.Admin.ManagerV2.SystemEdit.FeatureHint.MultiStepRecipes', hintFallback: 'Enables explicit recipe steps and step-level requirements.' },
-    { systemKey: 'propertyMacros', storeKey: 'propertyMacros', labelKey: 'FABRICATE.Admin.ManagerV2.Feature.PropertyMacros', fallback: 'Property macros', hintKey: 'FABRICATE.Admin.ManagerV2.SystemEdit.FeatureHint.PropertyMacros', hintFallback: 'Allows macro-backed component property behavior.' },
-    { systemKey: 'effectTransfer', storeKey: 'effectTransfer', labelKey: 'FABRICATE.Admin.ManagerV2.Feature.EffectTransfer', fallback: 'Effect transfer', hintKey: 'FABRICATE.Admin.ManagerV2.SystemEdit.FeatureHint.EffectTransfer', hintFallback: 'Allows crafted results to inherit effects from source components.' }
-  ];
-  const resolutionModeOptions = [
-    { value: 'simple', labelKey: 'FABRICATE.Admin.SystemSettings.ResolutionSimple', fallback: 'Simple' },
-    { value: 'mapped', labelKey: 'FABRICATE.Admin.SystemSettings.ResolutionMapped', fallback: 'Routed by ingredients' },
-    { value: 'tiered', labelKey: 'FABRICATE.Admin.SystemSettings.ResolutionTiered', fallback: 'Routed by check outcome' },
-    { value: 'progressive', labelKey: 'FABRICATE.Admin.SystemSettings.ResolutionProgressive', fallback: 'Progressive' },
-    { value: 'alchemy', labelKey: 'FABRICATE.Admin.SystemSettings.ResolutionAlchemy', fallback: 'Alchemy' }
   ];
 
   const selectedSystem = $derived($viewState.selectedSystem);
@@ -63,15 +36,6 @@
   const canShowEssences = $derived(selectedSystem?.features?.essences === true);
   const showEssenceSourceUi = $derived(selectedSystem?.features?.effectTransfer === true);
   const currentView = $derived(normalizedActiveView(activeView, selectedSystem, canShowEnvironments, canShowEssences));
-  const normalizedSystemSearchTerm = $derived(systemSearchTerm.trim().toLowerCase());
-  const filteredSystems = $derived(($viewState.systems || []).filter(system => {
-    const matchesSearch = !normalizedSystemSearchTerm
-      || `${system.name || ''} ${system.description || ''}`.toLowerCase().includes(normalizedSystemSearchTerm);
-    const matchesStatus = systemStatusFilter === 'all'
-      || (systemStatusFilter === 'active' && system.enabled !== false)
-      || (systemStatusFilter === 'disabled' && system.enabled === false);
-    return matchesSearch && matchesStatus;
-  }));
   const selectedCounts = $derived({
     components: selectedSystem?.managedItemOptions?.length || 0,
     recipes: $viewState.recipes?.length || 0,
@@ -91,44 +55,33 @@
     categoryReferences: tagCategoryUsage.categoryReferenceCount,
     tagReferences: tagCategoryUsage.tagReferenceCount
   });
+  const topUsedCategoryExample = $derived(
+    categoryRows
+      .filter(row => row.id !== 'general' && (row.count || 0) > 0)
+      .sort((a, b) => (b.count || 0) - (a.count || 0))[0] || null
+  );
+  const topUsedTagExample = $derived(
+    tagRows
+      .filter(row => (row.count || 0) > 0)
+      .sort((a, b) => (b.count || 0) - (a.count || 0))[0] || null
+  );
   const selectedCountFacts = $derived(buildSelectedCountFacts(selectedCounts));
   const enabledFeatureLabels = $derived(featureLabels(selectedSystem));
-  const visibleSystemEditFeatures = $derived(systemEditFeatureDefinitions.filter(feature => hasFeatureKey(selectedSystem, feature.systemKey)));
   const visiblePlaceholderViews = $derived(selectedSystem
     ? placeholderViews.filter(view => isViewAvailableForSystem(view, selectedSystem))
     : []
   );
   const showRecipeCategories = $derived(!!selectedSystem);
-  const filteredRecipes = $derived(($viewState.recipes || []).filter(recipe => {
-    const matchesStatus = recipeStatusFilter === 'all'
-      || (recipeStatusFilter === 'active' && recipe.enabled !== false)
-      || (recipeStatusFilter === 'disabled' && recipe.enabled === false)
-      || (recipeStatusFilter === 'locked' && recipe.locked === true);
-    const matchesCategory = recipeCategoryFilter === 'all' || recipe.category === recipeCategoryFilter;
-    return matchesStatus && matchesCategory;
-  }));
   const selectedRecipe = $derived(
-    filteredRecipes.find(recipe => recipe.id === selectedRecipeId)
-      || filteredRecipes[0]
+    ($viewState.recipes || []).find(recipe => recipe.id === selectedRecipeId)
+      || ($viewState.recipes || [])[0]
       || null
   );
   const showComponentTags = $derived(itemCards.some(item => item.showTags || (Array.isArray(item.tags) && item.tags.length > 0)));
   const showComponentEssences = $derived(itemCards.some(item => item.showEssences || (Array.isArray(item.essences) && item.essences.length > 0)));
-  const componentTagOptions = $derived(uniqueSorted(itemCards.flatMap(item => Array.isArray(item.tags) ? item.tags : [])));
-  const componentEssenceOptions = $derived(uniqueSorted(itemCards.flatMap(item => Array.isArray(item.essences) ? item.essences.map(essence => essence.name || essence.id) : [])));
-  const filteredComponents = $derived(itemCards.filter(item => {
-    const matchesSource = componentSourceFilter === 'all'
-      || (componentSourceFilter === 'linked' && item.hasSourceUuid === true)
-      || (componentSourceFilter === 'none' && item.hasSourceUuid !== true);
-    const matchesTag = componentTagFilter === 'all'
-      || (Array.isArray(item.tags) && item.tags.includes(componentTagFilter));
-    const matchesEssence = componentEssenceFilter === 'all'
-      || (Array.isArray(item.essences) && item.essences.some(essence => (essence.name || essence.id) === componentEssenceFilter));
-    return matchesSource && matchesTag && matchesEssence;
-  }));
   const selectedComponent = $derived(
-    filteredComponents.find(item => item.id === selectedComponentId)
-      || filteredComponents[0]
+    itemCards.find(item => item.id === selectedComponentId)
+      || itemCards[0]
       || null
   );
   const essenceCards = $derived($viewState.essenceCards || selectedSystem?.essenceDefinitions || []);
@@ -143,34 +96,11 @@
   const canSaveEssenceEdit = $derived(essenceEditDirty === true
     && essenceEditDraft?.validName === true
     && essenceEditSaving !== true);
-  const componentTableClass = $derived([
-    'manager-v2-components-table',
-    showComponentTags ? '' : 'has-no-tags',
-    showComponentEssences ? '' : 'has-no-essences'
-  ].filter(Boolean).join(' '));
   const environmentList = $derived($viewState.environments || []);
-  const environmentRegionOptions = $derived(uniqueSorted(environmentList.map(environment => environment.region)));
-  const environmentBiomeOptions = $derived(uniqueSorted(environmentList.map(environment => environment.biome)));
-  const normalizedEnvironmentSearchTerm = $derived(environmentSearchTerm.trim().toLowerCase());
   const environmentValidationCount = $derived(Array.isArray($viewState.environmentValidationState?.errors)
     ? $viewState.environmentValidationState.errors.length
     : 0);
   const selectedEnvironmentId = $derived($viewState.selectedEnvironmentId || $viewState.environmentDraft?.id || '');
-  const filteredEnvironments = $derived(environmentList.filter(environment => {
-    const matchesSearch = !normalizedEnvironmentSearchTerm
-      || `${environmentName(environment)} ${environment.description || ''}`.toLowerCase().includes(normalizedEnvironmentSearchTerm);
-    const matchesStatus = environmentStatusFilter === 'all'
-      || (environmentStatusFilter === 'active' && environment.enabled !== false)
-      || (environmentStatusFilter === 'disabled' && environment.enabled === false)
-      || (environmentStatusFilter === 'dirty' && selectedEnvironmentId === environment.id && $viewState.environmentDraftDirty === true)
-      || (environmentStatusFilter === 'invalid' && selectedEnvironmentId === environment.id && environmentValidationCount > 0);
-    const matchesSelection = environmentSelectionFilter === 'all'
-      || environment.selectionMode === environmentSelectionFilter;
-    const matchesRisk = environmentRiskFilter === 'all' || (environment.risk || 'safe') === environmentRiskFilter;
-    const matchesRegion = environmentRegionFilter === 'all' || (environment.region || '') === environmentRegionFilter;
-    const matchesBiome = environmentBiomeFilter === 'all' || (environment.biome || '') === environmentBiomeFilter;
-    return matchesSearch && matchesStatus && matchesSelection && matchesRisk && matchesRegion && matchesBiome;
-  }));
   const environmentDraftForDisplay = $derived($viewState.environmentDraft || null);
   const shouldUseEnvironmentDraftForDisplay = $derived(Boolean(environmentDraftForDisplay)
     && (currentView === 'environment-edit'
@@ -182,24 +112,14 @@
       ? environmentDraftForDisplay
       : (environmentList.find(environment => environment.id === selectedEnvironmentId)
         || environmentList.find(environment => environment.id === environmentDraftForDisplay?.id)
-        || filteredEnvironments[0]
+        || environmentList[0]
         || null)
   );
   const selectedEnvironmentFacts = $derived(environmentFacts(selectedEnvironment));
-  const environmentTableClass = $derived('manager-v2-environments-table');
   const selectedEnvironmentSceneState = $derived(environmentSceneState(selectedEnvironment));
 
   $effect(() => {
-    systemNameValue = selectedSystem?.name ?? '';
-    systemDescriptionValue = selectedSystem?.description ?? '';
-    systemResolutionModeValue = selectedSystem?.resolutionMode ?? 'simple';
-  });
-
-  $effect(() => {
     if (selectedSystemId === lastComponentSystemId) return;
-    componentSourceFilter = 'all';
-    componentTagFilter = 'all';
-    componentEssenceFilter = 'all';
     selectedComponentId = '';
     lastComponentSystemId = selectedSystemId;
   });
@@ -306,10 +226,6 @@
     ];
   }
 
-  function hasFeatureKey(system, featureKey) {
-    return Object.prototype.hasOwnProperty.call(system?.features || {}, featureKey);
-  }
-
   function normalizedActiveView(view, system, environmentsAvailable, essencesAvailable) {
     if (!system) return 'systems';
     if ((view === 'environments' || view === 'environment-edit') && !environmentsAvailable) return 'systems';
@@ -351,16 +267,8 @@
     return system?.features?.[view.feature] === true;
   }
 
-  function isSelectedSystem(system) {
-    return system.selected === true || (!!selectedSystemId && system.id === selectedSystemId);
-  }
-
   function isSelectedRecipe(recipe) {
     return selectedRecipe?.id === recipe.id;
-  }
-
-  function isSelectedComponent(item) {
-    return selectedComponent?.id === item.id;
   }
 
   function isPromise(value) {
@@ -486,43 +394,6 @@
       : text('FABRICATE.Admin.ManagerV2.Essence.Save', 'Save essence');
   }
 
-  function saveSystemDetails() {
-    store.saveSystemDetails?.(
-      systemNameValue,
-      systemDescriptionValue,
-      selectedSystem?.advancedOptionsEnabled ?? true
-    );
-  }
-
-  function handleSystemDetailsSubmit(event) {
-    event.preventDefault();
-    saveSystemDetails();
-  }
-
-  async function handleSystemResolutionModeChange(event) {
-    const nextMode = event.currentTarget.value || 'simple';
-    systemResolutionModeValue = nextMode;
-    const didApply = await store.setResolutionMode?.(nextMode);
-    if (!didApply) {
-      systemResolutionModeValue = selectedSystem?.resolutionMode ?? 'simple';
-    }
-  }
-
-  async function toggleAdvancedOptions(event) {
-    const checkbox = event.currentTarget;
-    const didApply = await store.toggleAdvancedOptions?.(checkbox.checked);
-    if (didApply === false) {
-      checkbox.checked = selectedSystem?.advancedOptionsEnabled !== false;
-    }
-  }
-
-  async function toggleSystemFeature(feature, event) {
-    const checkbox = event.currentTarget;
-    const didApply = await store.toggleFeature?.(feature.storeKey, checkbox.checked);
-    if (didApply === false) {
-      checkbox.checked = selectedSystem?.features?.[feature.systemKey] === true;
-    }
-  }
 
   function selectRecipe(recipeId) {
     selectedRecipeId = recipeId;
@@ -560,12 +431,6 @@
   function selectSystemRow(systemId) {
     if (!systemId) return;
     selectSystem(systemId);
-  }
-
-  function selectSystemRowFromKeyboard(event, systemId) {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    event.preventDefault();
-    selectSystemRow(systemId);
   }
 
   function createSystem() {
@@ -615,36 +480,6 @@
 
   function toggleRecipeEnabled(recipeId, enabled) {
     store.toggleRecipeEnabled?.(recipeId, enabled);
-  }
-
-  function toggleSystemEnabled(systemId, enabled, event) {
-    event?.stopPropagation();
-    store.toggleSystemEnabled?.(systemId, enabled);
-  }
-
-  function setRecipeSearch(event) {
-    store.setRecipeSearch?.(event.currentTarget.value);
-  }
-
-  function setComponentSearch(event) {
-    store.setItemSearch?.(event.currentTarget.value);
-  }
-
-  function clearRecipeSearch() {
-    store.setRecipeSearch?.('');
-  }
-
-  function clearRecipeFilters() {
-    recipeStatusFilter = 'all';
-    recipeCategoryFilter = 'all';
-    clearRecipeSearch();
-  }
-
-  function clearComponentFilters() {
-    componentSourceFilter = 'all';
-    componentTagFilter = 'all';
-    componentEssenceFilter = 'all';
-    store.setItemSearch?.('');
   }
 
   function dropComponent(data) {
@@ -1023,15 +858,6 @@
       return environmentDraftForDisplay;
     }
     return environment;
-  }
-
-  function clearEnvironmentFilters() {
-    environmentSearchTerm = '';
-    environmentStatusFilter = 'all';
-    environmentSelectionFilter = 'all';
-    environmentRiskFilter = 'all';
-    environmentRegionFilter = 'all';
-    environmentBiomeFilter = 'all';
   }
 
   function componentSourceState(item) {
@@ -1425,192 +1251,26 @@
     </aside>
 
     {#if currentView === 'environments'}
-      <main class="manager-v2-main" aria-label={text('FABRICATE.Admin.ManagerV2.Nav.Environments', 'Environments')}>
-        <section class="manager-v2-section-header">
-          <div class="manager-v2-heading">
-            <p class="manager-v2-kicker">{selectedSystem?.name || text('FABRICATE.Admin.ManagerV2.SelectSystem', 'Select a system')}</p>
-            <h2 class="manager-v2-title">{text('FABRICATE.Admin.ManagerV2.Environment.Library', 'Gathering environments')}</h2>
-            <p class="manager-v2-subtitle">{text('FABRICATE.Admin.ManagerV2.Environment.LibraryHint', 'Browse scene-linked gathering environments and open the existing editor for task authoring.')}</p>
-          </div>
-        </section>
-
-        <section class="manager-v2-toolbar" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Filters', 'Environment filters')}>
-          <label class="manager-v2-search">
-            <i class="fas fa-search" aria-hidden="true"></i>
-            <input
-              type="search"
-              bind:value={environmentSearchTerm}
-              placeholder={text('FABRICATE.Admin.ManagerV2.Environment.SearchPlaceholder', 'Search environments...')}
-              aria-label={text('FABRICATE.Admin.ManagerV2.Environment.SearchLabel', 'Search environments')}
-            />
-          </label>
-          <label class="manager-v2-filter">
-            <span>{text('FABRICATE.Admin.ManagerV2.StatusFilter', 'Status')}</span>
-            <select bind:value={environmentStatusFilter} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.StatusFilterLabel', 'Filter environments by status')}>
-              <option value="all">{text('FABRICATE.Admin.ManagerV2.Environment.StatusAll', 'All environments')}</option>
-              <option value="active">{text('FABRICATE.Admin.ManagerV2.StatusActive', 'Active')}</option>
-              <option value="disabled">{text('FABRICATE.Admin.ManagerV2.StatusDisabled', 'Disabled')}</option>
-              <option value="dirty">{text('FABRICATE.Admin.ManagerV2.Environment.Dirty', 'Unsaved')}</option>
-              <option value="invalid">{text('FABRICATE.Admin.ManagerV2.Environment.Invalid', 'Invalid')}</option>
-            </select>
-          </label>
-          <label class="manager-v2-filter">
-            <span>{text('FABRICATE.Admin.Environments.SelectionMode', 'Selection mode')}</span>
-            <select bind:value={environmentSelectionFilter} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.SelectionFilterLabel', 'Filter environments by selection mode')}>
-              <option value="all">{text('FABRICATE.Admin.ManagerV2.Environment.SelectionAll', 'All modes')}</option>
-              <option value="targeted">{text('FABRICATE.Admin.Environments.SelectionTargeted', 'Targeted')}</option>
-              <option value="blind">{text('FABRICATE.Admin.Environments.SelectionBlind', 'Blind')}</option>
-            </select>
-          </label>
-          <label class="manager-v2-filter">
-            <span>{text('FABRICATE.Admin.ManagerV2.Environment.Risk', 'Risk')}</span>
-            <select bind:value={environmentRiskFilter} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.RiskFilterLabel', 'Filter environments by risk')}>
-              <option value="all">{text('FABRICATE.Admin.ManagerV2.Environment.RiskAll', 'All risks')}</option>
-              <option value="safe">{text('FABRICATE.Admin.ManagerV2.Environment.RiskSafe', 'Safe')}</option>
-              <option value="hazardous">{text('FABRICATE.Admin.ManagerV2.Environment.RiskHazardous', 'Hazardous')}</option>
-              <option value="unsafe">{text('FABRICATE.Admin.ManagerV2.Environment.RiskUnsafe', 'Unsafe')}</option>
-              <option value="extreme">{text('FABRICATE.Admin.ManagerV2.Environment.RiskExtreme', 'Extreme')}</option>
-            </select>
-          </label>
-          <label class="manager-v2-filter">
-            <span>{text('FABRICATE.Admin.ManagerV2.Environment.Region', 'Region')}</span>
-            <select bind:value={environmentRegionFilter} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.RegionFilterLabel', 'Filter environments by region')}>
-              <option value="all">{text('FABRICATE.Admin.ManagerV2.Environment.RegionAll', 'All regions')}</option>
-              {#each environmentRegionOptions as region (region)}
-                <option value={region}>{region}</option>
-              {/each}
-            </select>
-          </label>
-          <label class="manager-v2-filter">
-            <span>{text('FABRICATE.Admin.ManagerV2.Environment.Biome', 'Biome')}</span>
-            <select bind:value={environmentBiomeFilter} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.BiomeFilterLabel', 'Filter environments by biome')}>
-              <option value="all">{text('FABRICATE.Admin.ManagerV2.Environment.BiomeAll', 'All biomes')}</option>
-              {#each environmentBiomeOptions as biome (biome)}
-                <option value={biome}>{biome}</option>
-              {/each}
-            </select>
-          </label>
-          <span class="manager-v2-chip">{text('FABRICATE.Admin.ManagerV2.SearchCount', '{shown} of {total}').replace('{shown}', filteredEnvironments.length).replace('{total}', environmentList.length)}</span>
-        </section>
-
-        <section class="manager-v2-table-scroll" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Table', 'Environments table')}>
-          {#if $viewState.environmentsLoading}
-            <div class="manager-v2-empty">
-              <div>
-                <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
-                <h3>{text('FABRICATE.Admin.Environments.Loading', 'Loading environments...')}</h3>
-              </div>
-            </div>
-          {:else if $viewState.environmentsError}
-            <div class="manager-v2-empty">
-              <div>
-                <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
-                <h3>{text('FABRICATE.Admin.Environments.ErrorTitle', 'Could Not Load Environments')}</h3>
-                <p>{$viewState.environmentsError}</p>
-              </div>
-            </div>
-          {:else if environmentList.length === 0}
-            <div class="manager-v2-empty">
-              <div>
-                <i class="fas fa-seedling" aria-hidden="true"></i>
-                <h3>{text('FABRICATE.Admin.ManagerV2.Environment.EmptyTitle', 'No gathering environments yet')}</h3>
-                <p>{text('FABRICATE.Admin.ManagerV2.Environment.EmptyHint', 'Environments define where gathering happens, which scene or location they represent, what tasks players can attempt, and which results those tasks can produce.')}</p>
-                <button type="button" class="manager-v2-button is-primary" onclick={createEnvironment}>
-                  <i class="fas fa-plus" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Create', 'Create environment')}</span>
-                </button>
-              </div>
-            </div>
-          {:else if filteredEnvironments.length === 0}
-            <div class="manager-v2-empty">
-              <div>
-                <i class="fas fa-search" aria-hidden="true"></i>
-                <h3>{text('FABRICATE.Admin.ManagerV2.Environment.EmptySearchTitle', 'No environments match these filters')}</h3>
-                <p>{text('FABRICATE.Admin.ManagerV2.Environment.EmptySearchHint', 'Clear search and filters to show all environments in this system.')}</p>
-                <button type="button" class="manager-v2-button" onclick={clearEnvironmentFilters}>{text('FABRICATE.Admin.ManagerV2.ClearSearch', 'Clear search')}</button>
-              </div>
-            </div>
-          {:else}
-            <div class={environmentTableClass} role="table" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.TableShort', 'Environments')}>
-              <div class="manager-v2-table-head manager-v2-environment-table-head" role="row">
-                <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Environment.Column.Environment', 'Environment')}</span>
-                <span role="columnheader">{text('FABRICATE.Admin.Environments.SelectionMode', 'Selection mode')}</span>
-                <span role="columnheader">{text('FABRICATE.Admin.Environments.Tasks', 'Tasks')}</span>
-                <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.StatusFilter', 'Status')}</span>
-                <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Column.Actions', 'Actions')}</span>
-              </div>
-              {#each filteredEnvironments as environment (environment.id)}
-                {@const displayEnvironment = environmentDisplay(environment)}
-                <div class={`manager-v2-environment-row ${selectedEnvironment?.id === environment.id ? 'is-selected' : ''}`} role="row" aria-selected={selectedEnvironment?.id === environment.id} data-environment-id={environment.id}>
-                  <button type="button" class="manager-v2-environment-identity" onclick={() => selectEnvironment(environment.id)} role="cell">
-                    <img class={`manager-v2-environment-thumb ${hasEnvironmentSceneImage(displayEnvironment) ? '' : 'is-fallback'}`} src={environmentImage(displayEnvironment)} alt="" />
-                    <span class="manager-v2-system-copy">
-                      <span class="manager-v2-system-name" title={environmentName(displayEnvironment)}>{environmentName(displayEnvironment)}</span>
-                      {#if displayEnvironment.description}
-                        <span class="manager-v2-system-description" title={displayEnvironment.description}>{displayEnvironment.description}</span>
-                      {:else}
-                        <span class="manager-v2-system-description">{text('FABRICATE.Admin.ManagerV2.NoDescription', 'No description')}</span>
-                      {/if}
-                      <span class="manager-v2-chip-row">
-                        {#if environmentDirtyFor(environment)}
-                          <span class="manager-v2-chip is-warning">{text('FABRICATE.Admin.ManagerV2.Environment.Dirty', 'Unsaved')}</span>
-                        {/if}
-                        {#if environmentInvalidFor(environment)}
-                          <span class="manager-v2-chip is-danger">{text('FABRICATE.Admin.ManagerV2.Environment.Invalid', 'Invalid')}</span>
-                        {/if}
-                      </span>
-                    </span>
-                  </button>
-                  <span role="cell" class="manager-v2-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Environments.SelectionMode', 'Selection mode')}>
-                    <span class="manager-v2-chip">{environmentSelectionModeLabel(displayEnvironment)}</span>
-                  </span>
-                  <span role="cell" class="manager-v2-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Environments.Tasks', 'Tasks')}>
-                    <strong class="manager-v2-environment-task-count">{environmentTaskCount(displayEnvironment)}</strong>
-                  </span>
-                  <span role="cell" class="manager-v2-labeled-cell manager-v2-status-cell" data-label={stackedLabel('FABRICATE.Admin.ManagerV2.StatusFilter', 'Status')}>
-                    <button
-                      type="button"
-                      class={`manager-v2-status-toggle ${displayEnvironment.enabled === false ? 'is-off' : 'is-on'}`}
-                      aria-pressed={displayEnvironment.enabled !== false}
-                      aria-label={text('FABRICATE.Admin.ManagerV2.Environment.ToggleNamed', 'Toggle {name}').replace('{name}', environmentName(displayEnvironment))}
-                      onclick={(event) => { event.stopPropagation(); toggleEnvironmentEnabled(environment.id, displayEnvironment.enabled === false); }}
-                      onkeydown={(event) => event.stopPropagation()}
-                    >
-                      <span class="manager-v2-status-toggle-track" aria-hidden="true">
-                        <span class="manager-v2-status-toggle-knob"></span>
-                      </span>
-                      <span class="manager-v2-status-toggle-label">
-                        {displayEnvironment.enabled === false ? text('FABRICATE.Admin.ManagerV2.StatusOff', 'Off') : text('FABRICATE.Admin.ManagerV2.StatusOn', 'On')}
-                      </span>
-                    </button>
-                  </span>
-                  <span role="cell" class="manager-v2-action-group manager-v2-environment-actions manager-v2-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.ManagerV2.Column.Actions', 'Actions')}>
-                    <span class="manager-v2-environment-action-grid">
-                      <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.EditNamed', 'Edit {name}').replace('{name}', environmentName(displayEnvironment))} title={text('FABRICATE.Admin.ManagerV2.Environment.Edit', 'Edit environment')} onclick={() => editEnvironment(environment.id)}>
-                        <i class="fas fa-edit" aria-hidden="true"></i>
-                      </button>
-                      <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.DuplicateNamed', 'Duplicate {name}').replace('{name}', environmentName(displayEnvironment))} title={text('FABRICATE.Admin.ManagerV2.Environment.Duplicate', 'Duplicate environment')} onclick={() => duplicateEnvironment(environment.id)}>
-                        <i class="fas fa-copy" aria-hidden="true"></i>
-                      </button>
-                      <button type="button" class="manager-v2-icon-button is-danger" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.DeleteNamed', 'Delete {name}').replace('{name}', environmentName(displayEnvironment))} title={text('FABRICATE.Admin.ManagerV2.Environment.Delete', 'Delete environment')} onclick={() => deleteEnvironment(environment.id)}>
-                        <i class="fas fa-trash" aria-hidden="true"></i>
-                      </button>
-                    </span>
-                    <span class="manager-v2-environment-reorder-stack">
-                      <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.Environments.MoveUp', 'Move up')} title={text('FABRICATE.Admin.Environments.MoveUp', 'Move up')} disabled={!canMoveEnvironmentUp(environment.id)} onclick={() => moveEnvironment(environment.id, 'up')}>
-                        <i class="fas fa-arrow-up" aria-hidden="true"></i>
-                      </button>
-                      <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.Environments.MoveDown', 'Move down')} title={text('FABRICATE.Admin.Environments.MoveDown', 'Move down')} disabled={!canMoveEnvironmentDown(environment.id)} onclick={() => moveEnvironment(environment.id, 'down')}>
-                        <i class="fas fa-arrow-down" aria-hidden="true"></i>
-                      </button>
-                    </span>
-                  </span>
-                </div>
-              {/each}
-            </div>
-          {/if}
-        </section>
-      </main>
+      <EnvironmentsBrowserView
+        environments={environmentList}
+        environmentsLoading={$viewState.environmentsLoading}
+        environmentsError={$viewState.environmentsError}
+        environmentDraft={environmentDraftForDisplay}
+        environmentDraftDirty={$viewState.environmentDraftDirty}
+        {environmentValidationCount}
+        {selectedEnvironmentId}
+        selectedSystemName={selectedSystem?.name || ''}
+        {selectedSystemId}
+        sceneOptions={selectedSystem?.sceneOptions || []}
+        {shouldUseEnvironmentDraftForDisplay}
+        onSelectEnvironment={(id) => selectEnvironment(id)}
+        onEditEnvironment={(id) => editEnvironment(id)}
+        onCreateEnvironment={createEnvironment}
+        onDuplicateEnvironment={(id) => duplicateEnvironment(id)}
+        onDeleteEnvironment={(id) => deleteEnvironment(id)}
+        onMoveEnvironment={(id, direction) => moveEnvironment(id, direction)}
+        onToggleEnvironmentEnabled={(id, enabled) => toggleEnvironmentEnabled(id, enabled)}
+      />
     {:else if currentView === 'environment-edit' && selectedSystem}
       <main class="manager-v2-main manager-v2-environment-edit-main" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.EditTitle', 'Edit environment')}>
         <section class="manager-v2-environment-editor-shell">
@@ -1693,500 +1353,56 @@
         onConfirmRemove={confirmTagCategoryRemoval}
       />
     {:else if currentView === 'components'}
-      <main class="manager-v2-main" aria-label={text('FABRICATE.Admin.ManagerV2.Nav.Components', 'Components')}>
-        <section class="manager-v2-section-header">
-          <div class="manager-v2-heading">
-            <p class="manager-v2-kicker">{selectedSystem?.name || text('FABRICATE.Admin.ManagerV2.SelectSystem', 'Select a system')}</p>
-            <h2 class="manager-v2-title">{text('FABRICATE.Admin.ManagerV2.Component.Library', 'Component directory')}</h2>
-            <p class="manager-v2-subtitle">{text('FABRICATE.Admin.ManagerV2.Component.LibraryHint', 'Browse item-backed components and open the existing component editor for changes.')}</p>
-          </div>
-        </section>
-
-        <section
-          class="manager-v2-component-drop-zone"
-          use:dragDrop={{ onDrop: dropComponent, disabled: !selectedSystemId || !services?.onDropItem, activeClass: 'is-drop-active' }}
-          aria-label={text('FABRICATE.Admin.ManagerV2.Component.DropZoneLabel', 'Drop Foundry items to add components')}
-        >
-          <i class="fas fa-download" aria-hidden="true"></i>
-          <span>
-            <strong>{text('FABRICATE.Admin.ManagerV2.Component.DropZoneTitle', 'Drop items to add components')}</strong>
-            <small>{text('FABRICATE.Admin.ManagerV2.Component.DropZoneHint', 'World, compendium, pack, or folder drops use the existing component import flow for the selected system.')}</small>
-          </span>
-        </section>
-
-        <section class="manager-v2-toolbar" aria-label={text('FABRICATE.Admin.ManagerV2.Component.Filters', 'Component filters')}>
-          <label class="manager-v2-search">
-            <i class="fas fa-search" aria-hidden="true"></i>
-            <input
-              type="search"
-              value={$viewState.itemSearchTerm || ''}
-              oninput={setComponentSearch}
-              placeholder={text('FABRICATE.Admin.ManagerV2.Component.SearchPlaceholder', 'Search components...')}
-              aria-label={text('FABRICATE.Admin.ManagerV2.Component.SearchLabel', 'Search components')}
-            />
-          </label>
-          <label class="manager-v2-filter">
-            <span>{text('FABRICATE.Admin.ManagerV2.Component.SourceFilter', 'Source')}</span>
-            <select value={componentSourceFilter} onchange={(event) => componentSourceFilter = event.currentTarget.value} aria-label={text('FABRICATE.Admin.ManagerV2.Component.SourceFilterLabel', 'Filter components by source state')}>
-              <option value="all">{text('FABRICATE.Admin.ManagerV2.Component.SourceAll', 'All sources')}</option>
-              <option value="linked">{text('FABRICATE.Admin.ManagerV2.Component.SourceLinked', 'Linked source')}</option>
-              <option value="none">{text('FABRICATE.Admin.ManagerV2.Component.SourceNone', 'No source')}</option>
-            </select>
-          </label>
-          {#if showComponentTags && componentTagOptions.length > 0}
-            <label class="manager-v2-filter">
-              <span>{text('FABRICATE.Admin.ManagerV2.Component.Tags', 'Tags')}</span>
-              <select value={componentTagFilter} onchange={(event) => componentTagFilter = event.currentTarget.value} aria-label={text('FABRICATE.Admin.ManagerV2.Component.TagFilterLabel', 'Filter components by tag')}>
-                <option value="all">{text('FABRICATE.Admin.ManagerV2.Component.TagAll', 'All tags')}</option>
-                {#each componentTagOptions as tag}
-                  <option value={tag}>{tag}</option>
-                {/each}
-              </select>
-            </label>
-          {/if}
-          {#if showComponentEssences && componentEssenceOptions.length > 0}
-            <label class="manager-v2-filter">
-              <span>{text('FABRICATE.Admin.ManagerV2.Component.Essences', 'Essences')}</span>
-              <select value={componentEssenceFilter} onchange={(event) => componentEssenceFilter = event.currentTarget.value} aria-label={text('FABRICATE.Admin.ManagerV2.Component.EssenceFilterLabel', 'Filter components by essence')}>
-                <option value="all">{text('FABRICATE.Admin.ManagerV2.Component.EssenceAll', 'All essences')}</option>
-                {#each componentEssenceOptions as essence}
-                  <option value={essence}>{essence}</option>
-                {/each}
-              </select>
-            </label>
-          {/if}
-          <span class="manager-v2-chip">{text('FABRICATE.Admin.ManagerV2.SearchCount', '{shown} of {total}').replace('{shown}', filteredComponents.length).replace('{total}', selectedCounts.components)}</span>
-        </section>
-
-        <section class="manager-v2-table-scroll" aria-label={text('FABRICATE.Admin.ManagerV2.Component.Table', 'Components table')}>
-          {#if itemCards.length === 0}
-            <div class="manager-v2-empty">
-              <div>
-                <i class="fas fa-box-open" aria-hidden="true"></i>
-                <h3>{text('FABRICATE.Admin.ManagerV2.Component.EmptyTitle', 'No components yet')}</h3>
-                <p>{text('FABRICATE.Admin.ManagerV2.Component.EmptyHint', 'Drop Foundry items into this page to add components to the selected system.')}</p>
-              </div>
-            </div>
-          {:else if filteredComponents.length === 0}
-            <div class="manager-v2-empty">
-              <div>
-                <i class="fas fa-search" aria-hidden="true"></i>
-                <h3>{text('FABRICATE.Admin.ManagerV2.Component.EmptySearchTitle', 'No components match these filters')}</h3>
-                <p>{text('FABRICATE.Admin.ManagerV2.Component.EmptySearchHint', 'Clear search and filters to show all components in this system.')}</p>
-                <button type="button" class="manager-v2-button" onclick={clearComponentFilters}>{text('FABRICATE.Admin.ManagerV2.ClearSearch', 'Clear search')}</button>
-              </div>
-            </div>
-          {:else}
-            <div class={componentTableClass} role="table" aria-label={text('FABRICATE.Admin.ManagerV2.Component.TableShort', 'Components')}>
-              <div class="manager-v2-table-head manager-v2-component-table-head" role="row">
-                <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Component.Column.Component', 'Component')}</span>
-                {#if showComponentTags}
-                  <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Component.Tags', 'Tags')}</span>
-                {/if}
-                {#if showComponentEssences}
-                  <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Component.Essences', 'Essences')}</span>
-                {/if}
-                <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Component.Source', 'Source')}</span>
-                <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Component.Evidence', 'Evidence')}</span>
-                <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Column.Actions', 'Actions')}</span>
-              </div>
-              {#each filteredComponents as item (item.id)}
-                <div class={`manager-v2-component-row ${isSelectedComponent(item) ? 'is-selected' : ''}`} role="row" aria-selected={isSelectedComponent(item)} data-component-id={item.id}>
-                  <button type="button" class="manager-v2-component-identity" onclick={() => selectComponent(item.id)} role="cell">
-                    <img class="manager-v2-component-thumb" src={componentImage(item)} alt="" />
-                    <span class="manager-v2-system-copy">
-                      <span class="manager-v2-system-name" title={item.name}>{item.name}</span>
-                      {#if item.description}
-                        <span class="manager-v2-system-description" title={item.description}>{item.description}</span>
-                      {:else}
-                        <span class="manager-v2-system-description">{text('FABRICATE.Admin.ManagerV2.NoDescription', 'No description')}</span>
-                      {/if}
-                    </span>
-                  </button>
-                  {#if showComponentTags}
-                    <span role="cell" class="manager-v2-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.ManagerV2.Component.Tags', 'Tags')}>
-                      <span class="manager-v2-chip-row">
-                        {#each item.tags || [] as tag}
-                          <span class="manager-v2-chip">{tag}</span>
-                        {:else}
-                          <span class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Component.NoTags', 'No tags')}</span>
-                        {/each}
-                      </span>
-                    </span>
-                  {/if}
-                  {#if showComponentEssences}
-                    <span role="cell" class="manager-v2-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.ManagerV2.Component.Essences', 'Essences')}>
-                      <span class="manager-v2-chip-row">
-                        {#each item.essences || [] as essence}
-                          <span class="manager-v2-chip"><i class={essence.icon || 'fas fa-mortar-pestle'} aria-hidden="true"></i>{essence.name || essence.id} {essence.quantity}</span>
-                        {:else}
-                          <span class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Component.NoEssences', 'No essences')}</span>
-                        {/each}
-                      </span>
-                    </span>
-                  {/if}
-                  <span role="cell" class="manager-v2-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.ManagerV2.Component.Source', 'Source')}>
-                    <span class={`manager-v2-chip ${componentSourceState(item).className}`}>{componentSourceState(item).label}</span>
-                  </span>
-                  <span role="cell" class="manager-v2-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.ManagerV2.Component.Evidence', 'Evidence')}>
-                    <span class="manager-v2-component-evidence">
-                      {#each componentEvidenceItems(item) as fact}
-                        <span class="manager-v2-chip">{fact.label}: {fact.value}</span>
-                      {:else}
-                        <span class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Component.NoEvidence', 'No extra facts')}</span>
-                      {/each}
-                    </span>
-                  </span>
-                  <span role="cell" class="manager-v2-action-group manager-v2-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.ManagerV2.Column.Actions', 'Actions')}>
-                    {#if item.hasSourceUuid}
-                      <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Component.CopySourceNamed', 'Copy source UUID for {name}').replace('{name}', item.name)} title={item.sourceUuidDisplay} onclick={() => copyComponentSource(item.sourceUuidDisplay)}>
-                        <i class="fas fa-copy" aria-hidden="true"></i>
-                      </button>
-                    {/if}
-                    <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Component.EditNamed', 'Edit {name}').replace('{name}', item.name)} title={text('FABRICATE.Admin.ManagerV2.Component.Edit', 'Edit component')} onclick={() => editComponent(item.id)}>
-                      <i class="fas fa-edit" aria-hidden="true"></i>
-                    </button>
-                    <button type="button" class="manager-v2-icon-button is-danger" aria-label={text('FABRICATE.Admin.ManagerV2.Component.DeleteNamed', 'Delete {name}').replace('{name}', item.name)} title={text('FABRICATE.Admin.ManagerV2.Component.Delete', 'Delete component')} onclick={() => deleteComponent(item.id)}>
-                      <i class="fas fa-trash" aria-hidden="true"></i>
-                    </button>
-                  </span>
-                </div>
-              {/each}
-            </div>
-          {/if}
-        </section>
-      </main>
+      <ComponentsBrowserView
+        {itemCards}
+        totalComponentsCount={selectedCounts.components}
+        itemSearchTerm={$viewState.itemSearchTerm || ''}
+        selectedComponentId={selectedComponent?.id || ''}
+        selectedSystemName={selectedSystem?.name || ''}
+        {selectedSystemId}
+        dropEnabled={!!selectedSystemId && !!services?.onDropItem}
+        onSearchChange={(term) => store.setItemSearch?.(term)}
+        onSelectComponent={(id) => selectComponent(id)}
+        onDropComponent={(data) => dropComponent(data)}
+        onEditComponent={(id) => editComponent(id)}
+        onDeleteComponent={(id) => deleteComponent(id)}
+        onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
+      />
     {:else if currentView === 'recipes'}
-      <main class="manager-v2-main" aria-label={text('FABRICATE.Admin.ManagerV2.Nav.Recipes', 'Recipes')}>
-        <section class="manager-v2-section-header">
-          <div class="manager-v2-heading">
-            <p class="manager-v2-kicker">{selectedSystem?.name || text('FABRICATE.Admin.ManagerV2.SelectSystem', 'Select a system')}</p>
-            <h2 class="manager-v2-title">{text('FABRICATE.Admin.ManagerV2.Recipe.Library', 'Recipe library')}</h2>
-            <p class="manager-v2-subtitle">{text('FABRICATE.Admin.ManagerV2.Recipe.LibraryHint', 'Browse recipes for the selected system and open the existing editor for changes.')}</p>
-          </div>
-        </section>
-
-        <section class="manager-v2-toolbar" aria-label={text('FABRICATE.Admin.ManagerV2.Recipe.Filters', 'Recipe filters')}>
-          <label class="manager-v2-search">
-            <i class="fas fa-search" aria-hidden="true"></i>
-            <input
-              type="search"
-              value={$viewState.recipeSearchTerm || ''}
-              oninput={setRecipeSearch}
-              placeholder={text('FABRICATE.Admin.ManagerV2.Recipe.SearchPlaceholder', 'Search recipes...')}
-              aria-label={text('FABRICATE.Admin.ManagerV2.Recipe.SearchLabel', 'Search recipes')}
-            />
-          </label>
-          <label class="manager-v2-filter">
-            <span>{text('FABRICATE.Admin.ManagerV2.StatusFilter', 'Status')}</span>
-            <select bind:value={recipeStatusFilter} aria-label={text('FABRICATE.Admin.ManagerV2.Recipe.StatusFilterLabel', 'Filter recipes by status')}>
-              <option value="all">{text('FABRICATE.Admin.ManagerV2.Recipe.StatusAll', 'All recipes')}</option>
-              <option value="active">{text('FABRICATE.Admin.ManagerV2.StatusActive', 'Active')}</option>
-              <option value="disabled">{text('FABRICATE.Admin.ManagerV2.StatusDisabled', 'Disabled')}</option>
-              <option value="locked">{text('FABRICATE.Admin.ManagerV2.Recipe.Locked', 'Locked')}</option>
-            </select>
-          </label>
-          {#if showRecipeCategories}
-            <label class="manager-v2-filter">
-              <span>{text('FABRICATE.Admin.ManagerV2.Recipe.Category', 'Category')}</span>
-              <select bind:value={recipeCategoryFilter} aria-label={text('FABRICATE.Admin.ManagerV2.Recipe.CategoryFilterLabel', 'Filter recipes by category')}>
-                <option value="all">{text('FABRICATE.Admin.ManagerV2.Recipe.CategoryAll', 'All categories')}</option>
-                {#each $viewState.recipeCategories || [] as category}
-                  <option value={category.name}>{category.name} ({category.count})</option>
-                {/each}
-              </select>
-            </label>
-          {/if}
-          <span class="manager-v2-chip">{text('FABRICATE.Admin.ManagerV2.SearchCount', '{shown} of {total}').replace('{shown}', filteredRecipes.length).replace('{total}', $viewState.recipes?.length || 0)}</span>
-        </section>
-
-        <section class="manager-v2-table-scroll" aria-label={text('FABRICATE.Admin.ManagerV2.Recipe.Table', 'Recipes table')}>
-          {#if ($viewState.recipes || []).length === 0}
-            <div class="manager-v2-empty">
-              <div>
-                <i class="fas fa-scroll" aria-hidden="true"></i>
-                <h3>{text('FABRICATE.Admin.ManagerV2.Recipe.EmptyTitle', 'No recipes yet')}</h3>
-                <p>{text('FABRICATE.Admin.ManagerV2.Recipe.EmptyHint', 'Create recipes for the selected crafting system.')}</p>
-                <button type="button" class="manager-v2-button is-primary" onclick={createRecipe}>
-                  <i class="fas fa-plus" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.ManagerV2.Recipe.Create', 'Create Recipe')}</span>
-                </button>
-              </div>
-            </div>
-          {:else if filteredRecipes.length === 0}
-            <div class="manager-v2-empty">
-              <div>
-                <i class="fas fa-search" aria-hidden="true"></i>
-                <h3>{text('FABRICATE.Admin.ManagerV2.Recipe.EmptySearchTitle', 'No recipes match these filters')}</h3>
-                <p>{text('FABRICATE.Admin.ManagerV2.Recipe.EmptySearchHint', 'Clear search and filters to show all recipes in this system.')}</p>
-                <button type="button" class="manager-v2-button" onclick={clearRecipeFilters}>{text('FABRICATE.Admin.ManagerV2.ClearSearch', 'Clear search')}</button>
-              </div>
-            </div>
-          {:else}
-            <div class:has-no-category={!showRecipeCategories} class="manager-v2-recipes-table" role="table" aria-label={text('FABRICATE.Admin.ManagerV2.Recipe.TableShort', 'Recipes')}>
-              <div class="manager-v2-table-head manager-v2-recipe-table-head" role="row">
-                <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Recipe.Column.Recipe', 'Recipe')}</span>
-                {#if showRecipeCategories}
-                  <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Recipe.Category', 'Category')}</span>
-                {/if}
-                <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Recipe.Structure', 'Structure')}</span>
-                <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Recipe.Requirements', 'Requirements')}</span>
-                <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Recipe.Status', 'Status')}</span>
-                <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Column.Actions', 'Actions')}</span>
-              </div>
-              {#each filteredRecipes as recipe (recipe.id)}
-                <div class={`manager-v2-recipe-row ${isSelectedRecipe(recipe) ? 'is-selected' : ''}`} role="row" aria-selected={isSelectedRecipe(recipe)} data-recipe-id={recipe.id}>
-                  <button type="button" class="manager-v2-recipe-identity" onclick={() => selectRecipe(recipe.id)} role="cell">
-                    <img class="manager-v2-recipe-thumb" src={recipeImage(recipe)} alt="" />
-                    <span class="manager-v2-system-copy">
-                      <span class="manager-v2-system-name" title={recipe.name}>{recipe.name}</span>
-                      {#if recipe.description}
-                        <span class="manager-v2-system-description" title={recipe.description}>{recipe.description}</span>
-                      {:else}
-                        <span class="manager-v2-system-description">{text('FABRICATE.Admin.ManagerV2.NoDescription', 'No description')}</span>
-                      {/if}
-                      {#if recipe.locked}
-                        <span class="manager-v2-chip is-disabled">{text('FABRICATE.Admin.ManagerV2.Recipe.Locked', 'Locked')}</span>
-                      {/if}
-                    </span>
-                  </button>
-                  {#if showRecipeCategories}
-                    <span role="cell" class="manager-v2-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.ManagerV2.Recipe.Category', 'Category')}>
-                      <span class="manager-v2-chip">{recipe.category || text('FABRICATE.Admin.ManagerV2.Recipe.General', 'General')}</span>
-                    </span>
-                  {/if}
-                  <span role="cell" class="manager-v2-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.ManagerV2.Recipe.Structure', 'Structure')}>
-                    <span class="manager-v2-chip">{structureLabel(recipe)}</span>
-                  </span>
-                  <span role="cell" class="manager-v2-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.ManagerV2.Recipe.Requirements', 'Requirements')}>
-                    <span class="manager-v2-muted">{requirementsSummary(recipe)}</span>
-                  </span>
-                  <span role="cell" class="manager-v2-recipe-status manager-v2-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.ManagerV2.Recipe.Status', 'Status')}>
-                    <label class="manager-v2-toggle">
-                      <input
-                        type="checkbox"
-                        checked={recipe.enabled !== false}
-                        aria-label={text('FABRICATE.Admin.ManagerV2.Recipe.ToggleNamed', 'Toggle {name}').replace('{name}', recipe.name)}
-                        onchange={(event) => toggleRecipeEnabled(recipe.id, event.currentTarget.checked)}
-                      />
-                      <span>{recipe.enabled === false ? text('FABRICATE.Admin.ManagerV2.StatusDisabled', 'Disabled') : text('FABRICATE.Admin.ManagerV2.StatusActive', 'Active')}</span>
-                    </label>
-                  </span>
-                  <span role="cell" class="manager-v2-action-group manager-v2-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.ManagerV2.Column.Actions', 'Actions')}>
-                    <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Recipe.EditNamed', 'Edit {name}').replace('{name}', recipe.name)} title={text('FABRICATE.Admin.ManagerV2.Recipe.Edit', 'Edit recipe')} onclick={() => editRecipe(recipe.id)}>
-                      <i class="fas fa-edit" aria-hidden="true"></i>
-                    </button>
-                    <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Recipe.DuplicateNamed', 'Duplicate {name}').replace('{name}', recipe.name)} title={text('FABRICATE.Admin.ManagerV2.Recipe.Duplicate', 'Duplicate recipe')} onclick={() => duplicateRecipe(recipe.id)}>
-                      <i class="fas fa-copy" aria-hidden="true"></i>
-                    </button>
-                    <button type="button" class="manager-v2-icon-button is-danger" aria-label={text('FABRICATE.Admin.ManagerV2.Recipe.DeleteNamed', 'Delete {name}').replace('{name}', recipe.name)} title={text('FABRICATE.Admin.ManagerV2.Recipe.Delete', 'Delete recipe')} onclick={() => deleteRecipe(recipe.id)}>
-                      <i class="fas fa-trash" aria-hidden="true"></i>
-                    </button>
-                  </span>
-                </div>
-              {/each}
-            </div>
-          {/if}
-        </section>
-      </main>
+      <RecipesBrowserView
+        recipes={$viewState.recipes || []}
+        recipeCategories={$viewState.recipeCategories || []}
+        recipeSearchTerm={$viewState.recipeSearchTerm || ''}
+        selectedRecipeId={selectedRecipe?.id || ''}
+        {showRecipeCategories}
+        selectedSystemName={selectedSystem?.name || ''}
+        onSearchChange={(term) => store.setRecipeSearch?.(term)}
+        onSelectRecipe={(id) => selectRecipe(id)}
+        onCreateRecipe={createRecipe}
+        onEditRecipe={(id) => editRecipe(id)}
+        onDuplicateRecipe={(id) => duplicateRecipe(id)}
+        onDeleteRecipe={(id) => deleteRecipe(id)}
+        onToggleEnabled={(id, enabled) => store.toggleRecipeEnabled?.(id, enabled)}
+      />
     {:else if currentView === 'system-edit' && selectedSystem}
-      <main class="manager-v2-main manager-v2-system-edit-main" aria-label={text('FABRICATE.Admin.ManagerV2.SystemEdit.Title', 'System settings')}>
-        <section class="manager-v2-section-header">
-          <div class="manager-v2-heading">
-            <p class="manager-v2-kicker">{selectedSystem.name}</p>
-            <h2 class="manager-v2-title">{text('FABRICATE.Admin.ManagerV2.SystemEdit.EditBaseSettings', 'Edit base settings')}</h2>
-            <p class="manager-v2-subtitle">{text('FABRICATE.Admin.ManagerV2.SystemEdit.EditBaseSettingsHint', 'Changes use the existing admin store persistence and confirmation flows.')}</p>
-          </div>
-        </section>
-
-        <form class="manager-v2-system-edit-form" onsubmit={handleSystemDetailsSubmit}>
-          <section class="manager-v2-edit-card">
-            <div class="manager-v2-edit-card-heading">
-              <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.SystemEdit.Identity', 'Identity')}</h3>
-              <button type="submit" class="manager-v2-button is-primary">
-                <i class="fas fa-save" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.ManagerV2.SystemEdit.SaveDetails', 'Save details')}</span>
-              </button>
-            </div>
-            <div class="manager-v2-edit-grid">
-              <label class="manager-v2-field" for="manager-v2-system-name">
-                <span>{text('FABRICATE.Admin.SystemSettings.Name', 'Name')}</span>
-                <input id="manager-v2-system-name" type="text" bind:value={systemNameValue} />
-              </label>
-              <label class="manager-v2-field is-wide" for="manager-v2-system-description">
-                <span>{text('FABRICATE.Admin.SystemSettings.Description', 'Description')}</span>
-                <textarea id="manager-v2-system-description" rows="4" bind:value={systemDescriptionValue}></textarea>
-              </label>
-              <label class="manager-v2-field" for="manager-v2-system-resolution-mode">
-                <span>{text('FABRICATE.Admin.SystemSettings.ResolutionMode', 'Resolution mode')}</span>
-                <select id="manager-v2-system-resolution-mode" value={systemResolutionModeValue} onchange={handleSystemResolutionModeChange}>
-                  {#each resolutionModeOptions as option}
-                    <option value={option.value}>{text(option.labelKey, option.fallback)}</option>
-                  {/each}
-                </select>
-                <small>{text('FABRICATE.Admin.ManagerV2.SystemEdit.ResolutionModeHint', 'Changing resolution mode uses the current destructive confirmation and cleanup behavior.')}</small>
-              </label>
-            </div>
-          </section>
-
-          <section class="manager-v2-edit-card">
-            <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.SystemEdit.Visibility', 'Advanced visibility')}</h3>
-            <label class="manager-v2-toggle-row" data-edit-control="advanced-options">
-              <input type="checkbox" checked={selectedSystem.advancedOptionsEnabled !== false} onchange={toggleAdvancedOptions} />
-              <span class="manager-v2-toggle-copy">
-                <strong>{text('FABRICATE.Admin.SystemSettings.AdvancedOptions', 'Show advanced options')}</strong>
-                <small>{text('FABRICATE.Admin.SystemSettings.AdvancedOptionsHint', 'Show advanced configuration panels for the selected system.')}</small>
-              </span>
-            </label>
-          </section>
-
-          <section class="manager-v2-edit-card">
-            <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.SystemEdit.OptionalFeatures', 'Optional features')}</h3>
-            {#if visibleSystemEditFeatures.length > 0}
-              <div class="manager-v2-toggle-list">
-                {#each visibleSystemEditFeatures as feature}
-                  <label class="manager-v2-toggle-row" data-feature-key={feature.systemKey}>
-                    <input
-                      type="checkbox"
-                      checked={selectedSystem.features?.[feature.systemKey] === true}
-                      onchange={(event) => toggleSystemFeature(feature, event)}
-                    />
-                    <span class="manager-v2-toggle-copy">
-                      <strong>{text(feature.labelKey, feature.fallback)}</strong>
-                      <small>{text(feature.hintKey, feature.hintFallback)}</small>
-                    </span>
-                  </label>
-                {/each}
-              </div>
-            {:else}
-              <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.SystemEdit.NoFeatureToggles', 'No optional feature toggles are present on this system.')}</p>
-            {/if}
-          </section>
-        </form>
-      </main>
+      <SystemEditView
+        {selectedSystem}
+        onSaveDetails={(name, description, advancedOptionsEnabled) => store.saveSystemDetails?.(name, description, advancedOptionsEnabled)}
+        onSetResolutionMode={(nextMode) => store.setResolutionMode?.(nextMode)}
+        onToggleAdvancedOptions={(checked) => store.toggleAdvancedOptions?.(checked)}
+        onToggleFeature={(storeKey, checked) => store.toggleFeature?.(storeKey, checked)}
+      />
     {:else}
-      <main class="manager-v2-main" aria-label={text('FABRICATE.Admin.ManagerV2.Nav.SystemsShort', 'Systems')}>
-        <section class="manager-v2-section-header">
-          <div class="manager-v2-heading">
-            <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Browse', 'Browse')}</p>
-            <h2 class="manager-v2-title">{text('FABRICATE.Admin.ManagerV2.SystemLibrary', 'System library')}</h2>
-            <p class="manager-v2-subtitle">{text('FABRICATE.Admin.ManagerV2.SystemLibraryHint', 'Select a row to view counts and enabled features.')}</p>
-          </div>
-        </section>
-
-        <section class="manager-v2-toolbar" aria-label={text('FABRICATE.Admin.ManagerV2.SystemFilters', 'System filters')}>
-          <label class="manager-v2-search">
-            <i class="fas fa-search" aria-hidden="true"></i>
-            <input
-              type="search"
-              bind:value={systemSearchTerm}
-              placeholder={text('FABRICATE.Admin.ManagerV2.SearchPlaceholder', 'Search by name or description')}
-              aria-label={text('FABRICATE.Admin.ManagerV2.SearchLabel', 'Search systems')}
-            />
-          </label>
-          <label class="manager-v2-filter">
-            <span>{text('FABRICATE.Admin.ManagerV2.StatusFilter', 'Status')}</span>
-            <select bind:value={systemStatusFilter} aria-label={text('FABRICATE.Admin.ManagerV2.StatusFilterLabel', 'Filter systems by status')}>
-              <option value="all">{text('FABRICATE.Admin.ManagerV2.StatusAll', 'All systems')}</option>
-              <option value="active">{text('FABRICATE.Admin.ManagerV2.StatusActive', 'Active')}</option>
-              <option value="disabled">{text('FABRICATE.Admin.ManagerV2.StatusDisabled', 'Disabled')}</option>
-            </select>
-          </label>
-          <span class="manager-v2-chip">{text('FABRICATE.Admin.ManagerV2.SearchCount', '{shown} of {total}').replace('{shown}', filteredSystems.length).replace('{total}', $viewState.systems?.length || 0)}</span>
-        </section>
-
-        <section class="manager-v2-table-scroll" aria-label={text('FABRICATE.Admin.ManagerV2.SystemsTable', 'Crafting systems table')}>
-          {#if ($viewState.systems || []).length === 0}
-            <div class="manager-v2-empty">
-              <div>
-                <i class="fas fa-layer-group" aria-hidden="true"></i>
-                <h3>{text('FABRICATE.Admin.ManagerV2.EmptyTitle', 'No crafting systems yet')}</h3>
-                <p>{text('FABRICATE.Admin.ManagerV2.EmptyHint', 'Create a system to start organizing components and recipes.')}</p>
-                <button type="button" class="manager-v2-button is-primary" onclick={createSystem}>
-                  <i class="fas fa-plus" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.ManagerV2.CreateSystem', 'Create system')}</span>
-                </button>
-              </div>
-            </div>
-          {:else if filteredSystems.length === 0}
-            <div class="manager-v2-empty">
-              <div>
-                <i class="fas fa-search" aria-hidden="true"></i>
-                <h3>{text('FABRICATE.Admin.ManagerV2.EmptySearchTitle', 'No systems match this search')}</h3>
-                <p>{text('FABRICATE.Admin.ManagerV2.EmptySearchHint', 'Clear the search to show all configured systems.')}</p>
-                <button type="button" class="manager-v2-button" onclick={() => systemSearchTerm = ''}>{text('FABRICATE.Admin.ManagerV2.ClearSearch', 'Clear search')}</button>
-              </div>
-            </div>
-          {:else}
-            <div class="manager-v2-systems-table" role="table" aria-label={text('FABRICATE.Admin.ManagerV2.SystemsTableShort', 'Crafting systems')}>
-              <div class="manager-v2-table-head" role="row">
-                <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Column.System', 'System')}</span>
-                <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Column.Resolution', 'Resolution')}</span>
-                <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.StatusFilter', 'Status')}</span>
-                <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Column.Actions', 'Actions')}</span>
-              </div>
-              {#each filteredSystems as system (system.id)}
-                <div
-                  class={`manager-v2-system-row ${isSelectedSystem(system) ? 'is-selected' : ''}`}
-                  role="row"
-                  tabindex="0"
-                  aria-selected={isSelectedSystem(system)}
-                  data-system-id={system.id}
-                  onclick={() => selectSystemRow(system.id)}
-                  onkeydown={(event) => selectSystemRowFromKeyboard(event, system.id)}
-                >
-                  <span class="manager-v2-system-identity" role="cell">
-                    <span class="manager-v2-system-icon" aria-hidden="true">
-                      <i class="fas fa-layer-group"></i>
-                    </span>
-                    <span class="manager-v2-system-copy">
-                      <span class="manager-v2-system-name" title={system.name}>{system.name}</span>
-                      {#if system.description}
-                        <span class="manager-v2-system-description" title={system.description}>{system.description}</span>
-                      {:else}
-                        <span class="manager-v2-system-description">{text('FABRICATE.Admin.ManagerV2.NoDescription', 'No description')}</span>
-                      {/if}
-                    </span>
-                  </span>
-                  <span role="cell" class="manager-v2-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.ManagerV2.Column.Resolution', 'Resolution')}>
-                    <span class="manager-v2-chip">{resolutionModeLabel(system.resolutionMode)}</span>
-                  </span>
-                  <span role="cell" class="manager-v2-labeled-cell manager-v2-status-cell" data-label={stackedLabel('FABRICATE.Admin.ManagerV2.StatusFilter', 'Status')}>
-                    <button
-                      type="button"
-                      class={`manager-v2-status-toggle ${system.enabled === false ? 'is-off' : 'is-on'}`}
-                      aria-pressed={system.enabled !== false}
-                      aria-label={system.enabled === false
-                        ? text('FABRICATE.Admin.ManagerV2.EnableSystemNamed', 'Enable {name}').replace('{name}', system.name)
-                        : text('FABRICATE.Admin.ManagerV2.DisableSystemNamed', 'Disable {name}').replace('{name}', system.name)}
-                      onclick={(event) => toggleSystemEnabled(system.id, system.enabled === false, event)}
-                      onkeydown={(event) => event.stopPropagation()}
-                    >
-                      <span class="manager-v2-status-toggle-track" aria-hidden="true">
-                        <span class="manager-v2-status-toggle-knob"></span>
-                      </span>
-                      <span class="manager-v2-status-toggle-label">
-                        {system.enabled === false ? text('FABRICATE.Admin.ManagerV2.StatusOff', 'Off') : text('FABRICATE.Admin.ManagerV2.StatusOn', 'On')}
-                      </span>
-                    </button>
-                  </span>
-                  <span role="cell" class="manager-v2-action-group manager-v2-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.ManagerV2.Column.Actions', 'Actions')}>
-                    <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.EditNamed', 'Edit {name}').replace('{name}', system.name)} title={text('FABRICATE.Admin.ManagerV2.EditSystem', 'Edit system')} onclick={(event) => { event.stopPropagation(); editSystem(system.id); }}>
-                      <i class="fas fa-edit" aria-hidden="true"></i>
-                    </button>
-                    <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.ExportNamed', 'Export {name}').replace('{name}', system.name)} title={text('FABRICATE.Admin.ManagerV2.ExportSystem', 'Export system')} onclick={(event) => { event.stopPropagation(); exportSystem(system.id); }}>
-                      <i class="fas fa-file-export" aria-hidden="true"></i>
-                    </button>
-                    <button type="button" class="manager-v2-icon-button is-danger" aria-label={text('FABRICATE.Admin.ManagerV2.DeleteNamed', 'Delete {name}').replace('{name}', system.name)} title={text('FABRICATE.Admin.ManagerV2.DeleteSystem', 'Delete system')} onclick={(event) => { event.stopPropagation(); deleteSystem(system.id); }}>
-                      <i class="fas fa-trash" aria-hidden="true"></i>
-                    </button>
-                  </span>
-                </div>
-              {/each}
-            </div>
-          {/if}
-        </section>
-      </main>
+      <SystemsBrowserView
+        systems={$viewState.systems || []}
+        {selectedSystemId}
+        onSelectSystem={(id) => selectSystemRow(id)}
+        onCreateSystem={createSystem}
+        onEditSystem={(id) => editSystem(id)}
+        onExportSystem={(id) => exportSystem(id)}
+        onDeleteSystem={(id) => deleteSystem(id)}
+        onToggleSystemEnabled={(id, enabled) => store.toggleSystemEnabled?.(id, enabled)}
+      />
     {/if}
 
     {#if currentView !== 'environment-edit'}
@@ -2206,6 +1422,15 @@
             </div>
           </div>
           <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.TagsCategories.InspectorHint', 'Define the vocabulary GMs use when assigning recipe categories and component tags.')}</p>
+        </section>
+
+        <section class="manager-v2-inspector-card" data-tags-evidence="how-it-works">
+          <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.TagsCategories.HowItWorksTitle', 'How it works')}</h3>
+          <ul class="manager-v2-evidence-list">
+            <li>{text('FABRICATE.Admin.ManagerV2.TagsCategories.HowItWorksFlat', 'Categories are flat — each recipe picks one, with no parent or child folders.')}</li>
+            <li>{text('FABRICATE.Admin.ManagerV2.TagsCategories.HowItWorksGeneral', 'General is the reserved fallback for recipes without a custom category.')}</li>
+            <li>{text('FABRICATE.Admin.ManagerV2.TagsCategories.HowItWorksTags', 'Item tags appear on components and on tag-placeholder ingredients in recipes.')}</li>
+          </ul>
         </section>
 
         <section class="manager-v2-inspector-card">
@@ -2228,6 +1453,32 @@
               <span>{text('FABRICATE.Admin.ManagerV2.TagsCategories.References', 'References')}</span>
             </div>
           </div>
+        </section>
+
+        <section class="manager-v2-inspector-card" data-tags-evidence="examples">
+          <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.TagsCategories.ExamplesTitle', 'Examples')}</h3>
+          {#if topUsedCategoryExample || topUsedTagExample}
+            <ul class="manager-v2-evidence-list">
+              {#if topUsedCategoryExample}
+                <li data-tags-example="category">
+                  {(topUsedCategoryExample.count === 1
+                    ? text('FABRICATE.Admin.ManagerV2.TagsCategories.ExampleCategorySingular', '"{name}" is used by 1 recipe.')
+                    : text('FABRICATE.Admin.ManagerV2.TagsCategories.ExampleCategory', '"{name}" is used by {count} recipes.')
+                  ).replace('{name}', topUsedCategoryExample.name).replace('{count}', topUsedCategoryExample.count)}
+                </li>
+              {/if}
+              {#if topUsedTagExample}
+                <li data-tags-example="tag">
+                  {(topUsedTagExample.count === 1
+                    ? text('FABRICATE.Admin.ManagerV2.TagsCategories.ExampleTagSingular', '"{name}" appears on 1 component.')
+                    : text('FABRICATE.Admin.ManagerV2.TagsCategories.ExampleTag', '"{name}" appears on {count} components.')
+                  ).replace('{name}', topUsedTagExample.name).replace('{count}', topUsedTagExample.count)}
+                </li>
+              {/if}
+            </ul>
+          {:else}
+            <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.TagsCategories.ExamplesEmptyHint', 'Add a category or tag, then assign it to a recipe or component to see it appear here.')}</p>
+          {/if}
         </section>
 
         <section class="manager-v2-inspector-card">
@@ -2355,8 +1606,8 @@
       {:else if currentView === 'essences' || currentView === 'essence-edit'}
         {#if selectedEssenceForInspector}
           <section class="manager-v2-inspector-card">
-            <div class="manager-v2-inspector-title-row">
-              <span class="manager-v2-inspector-icon" aria-hidden="true">
+            <div class="manager-v2-inspector-title-row is-hero-large">
+              <span class="manager-v2-inspector-icon is-hero-large" aria-hidden="true">
                 <i class={selectedEssenceForInspector.icon || 'fas fa-mortar-pestle'}></i>
               </span>
               <div class="manager-v2-inspector-copy">
@@ -2392,7 +1643,7 @@
           {/if}
 
           {#if showEssenceSourceUi}
-          <section class="manager-v2-inspector-card">
+          <section class="manager-v2-inspector-card" data-essence-section="source">
             <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Essence.SourceEvidence', 'Source evidence')}</h3>
             <div class="manager-v2-requirements-list">
               <div class="manager-v2-requirement-row">
@@ -2403,7 +1654,7 @@
           </section>
           {/if}
 
-          <section class="manager-v2-inspector-card">
+          <section class="manager-v2-inspector-card" data-essence-section="usage">
             <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Essence.Usage', 'Usage')}</h3>
             <div class="manager-v2-requirements-list">
               <div class="manager-v2-requirement-row">
@@ -2433,11 +1684,11 @@
             <section class="manager-v2-inspector-card">
               <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Essence.Actions', 'Essence actions')}</h3>
               <div class="manager-v2-inspector-actions">
-                <button type="button" class="manager-v2-button" onclick={() => editEssence()}>
+                <button type="button" class="manager-v2-button is-primary" data-essence-action="edit" onclick={() => editEssence()}>
                   <i class="fas fa-edit" aria-hidden="true"></i>
                   <span>{text('FABRICATE.Admin.ManagerV2.Essence.Edit', 'Edit essence')}</span>
                 </button>
-                <button type="button" class="manager-v2-button is-danger" onclick={() => removeEssence()} disabled={selectedEssenceForInspector.deleteBlocked}>
+                <button type="button" class="manager-v2-button is-danger" data-essence-action="delete" onclick={() => removeEssence()} disabled={selectedEssenceForInspector.deleteBlocked}>
                   <i class="fas fa-trash" aria-hidden="true"></i>
                   <span>{text('FABRICATE.Admin.ManagerV2.Essence.Delete', 'Delete essence')}</span>
                 </button>
@@ -2462,7 +1713,7 @@
       {:else if currentView === 'components'}
         {#if selectedComponent}
           <section class="manager-v2-inspector-card">
-            <div class="manager-v2-inspector-title-row">
+            <div class="manager-v2-inspector-title-row is-hero-large">
               <img class="manager-v2-component-preview" src={componentImage(selectedComponent)} alt="" />
               <div class="manager-v2-inspector-copy">
                 <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Component.Selected', 'Selected component')}</p>
@@ -2479,7 +1730,7 @@
           </section>
 
           {#if showComponentTags}
-            <section class="manager-v2-inspector-card">
+            <section class="manager-v2-inspector-card" data-component-section="tags">
               <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Component.Tags', 'Tags')}</h3>
               <div class="manager-v2-feature-list">
                 {#each selectedComponent.tags || [] as tag}
@@ -2492,7 +1743,7 @@
           {/if}
 
           {#if showComponentEssences}
-            <section class="manager-v2-inspector-card">
+            <section class="manager-v2-inspector-card" data-component-section="essences">
               <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Component.Essences', 'Essences')}</h3>
               <div class="manager-v2-feature-list">
                 {#each selectedComponent.essences || [] as essence}
@@ -2504,11 +1755,11 @@
             </section>
           {/if}
 
-          <section class="manager-v2-inspector-card">
+          <section class="manager-v2-inspector-card" data-component-section="source">
             <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Component.Source', 'Source')}</h3>
             {#if selectedComponent.hasSourceUuid}
               <p class="manager-v2-muted">{selectedComponent.sourceUuidDisplay}</p>
-              <button type="button" class="manager-v2-button" onclick={() => copyComponentSource(selectedComponent.sourceUuidDisplay)}>
+              <button type="button" class="manager-v2-button" data-component-action="copy-source" onclick={() => copyComponentSource(selectedComponent.sourceUuidDisplay)}>
                 <i class="fas fa-copy" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.ManagerV2.Component.CopySource', 'Copy source UUID')}</span>
               </button>
@@ -2518,7 +1769,7 @@
           </section>
 
           {#if componentEvidenceItems(selectedComponent).length > 0}
-            <section class="manager-v2-inspector-card">
+            <section class="manager-v2-inspector-card" data-component-section="usage">
               <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Component.UsageEvidence', 'Usage evidence')}</h3>
               <div class="manager-v2-requirements-list">
                 {#each componentEvidenceItems(selectedComponent) as fact}
@@ -2534,11 +1785,11 @@
           <section class="manager-v2-inspector-card">
             <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Component.Actions', 'Component actions')}</h3>
             <div class="manager-v2-inspector-actions">
-              <button type="button" class="manager-v2-button" onclick={() => editComponent()}>
+              <button type="button" class="manager-v2-button is-primary" data-component-action="edit" onclick={() => editComponent()}>
                 <i class="fas fa-edit" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.ManagerV2.Component.Edit', 'Edit component')}</span>
               </button>
-              <button type="button" class="manager-v2-button is-danger" onclick={() => deleteComponent()}>
+              <button type="button" class="manager-v2-button is-danger" data-component-action="delete" onclick={() => deleteComponent()}>
                 <i class="fas fa-trash" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.ManagerV2.Component.Delete', 'Delete component')}</span>
               </button>
@@ -2556,7 +1807,7 @@
       {:else if currentView === 'recipes'}
         {#if selectedRecipe}
           <section class="manager-v2-inspector-card">
-            <div class="manager-v2-inspector-title-row">
+            <div class="manager-v2-inspector-title-row is-hero-large">
               <img class="manager-v2-recipe-preview" src={recipeImage(selectedRecipe)} alt="" />
               <div class="manager-v2-inspector-copy">
                 <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Recipe.Selected', 'Selected recipe')}</p>
@@ -2581,20 +1832,20 @@
             <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Recipe.Details', 'Recipe details')}</h3>
             <div class="manager-v2-fact-grid">
               {#if showRecipeCategories}
-                <div class="manager-v2-fact">
+                <div class="manager-v2-fact" data-recipe-fact="category">
                   <strong>{selectedRecipe.category || text('FABRICATE.Admin.ManagerV2.Recipe.General', 'General')}</strong>
                   <span>{text('FABRICATE.Admin.ManagerV2.Recipe.Category', 'Category')}</span>
                 </div>
               {/if}
-              <div class="manager-v2-fact">
+              <div class="manager-v2-fact" data-recipe-fact="structure">
                 <strong>{structureLabel(selectedRecipe)}</strong>
                 <span>{text('FABRICATE.Admin.ManagerV2.Recipe.Structure', 'Structure')}</span>
               </div>
-              <div class="manager-v2-fact">
+              <div class="manager-v2-fact" data-recipe-fact="steps">
                 <strong>{stepCount(selectedRecipe)}</strong>
                 <span>{text('FABRICATE.Admin.ManagerV2.Recipe.Steps', 'Steps')}</span>
               </div>
-              <div class="manager-v2-fact">
+              <div class="manager-v2-fact" data-recipe-fact="result-groups">
                 <strong>{resultGroupCount(selectedRecipe)}</strong>
                 <span>{text('FABRICATE.Admin.ManagerV2.Recipe.ResultGroups', 'Result groups')}</span>
               </div>
@@ -2623,15 +1874,15 @@
           <section class="manager-v2-inspector-card">
             <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Recipe.Actions', 'Recipe actions')}</h3>
             <div class="manager-v2-inspector-actions">
-              <button type="button" class="manager-v2-button" onclick={() => editRecipe()}>
+              <button type="button" class="manager-v2-button is-primary" data-recipe-action="edit" onclick={() => editRecipe()}>
                 <i class="fas fa-edit" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.ManagerV2.Recipe.Edit', 'Edit recipe')}</span>
               </button>
-              <button type="button" class="manager-v2-button" onclick={() => duplicateRecipe()}>
+              <button type="button" class="manager-v2-button" data-recipe-action="duplicate" onclick={() => duplicateRecipe()}>
                 <i class="fas fa-copy" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.ManagerV2.Recipe.Duplicate', 'Duplicate recipe')}</span>
               </button>
-              <button type="button" class="manager-v2-button is-danger" onclick={() => deleteRecipe()}>
+              <button type="button" class="manager-v2-button is-danger" data-recipe-action="delete" onclick={() => deleteRecipe()}>
                 <i class="fas fa-trash" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.ManagerV2.Recipe.Delete', 'Delete recipe')}</span>
               </button>
@@ -2648,7 +1899,10 @@
         {/if}
       {:else if currentView === 'system-edit' && selectedSystem}
         <section class="manager-v2-inspector-card">
-          <div class="manager-v2-system-inspector-heading">
+          <div class="manager-v2-inspector-title-row is-hero-large">
+            <span class="manager-v2-inspector-icon is-hero-large" aria-hidden="true">
+              <i class="fas fa-layer-group"></i>
+            </span>
             <div class="manager-v2-inspector-copy">
               <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.SystemEdit.Editing', 'Editing')}</p>
               <h2 class="manager-v2-inspector-name" title={selectedSystem.name}>{selectedSystem.name}</h2>
@@ -2693,7 +1947,10 @@
         </section>
       {:else if selectedSystem}
         <section class="manager-v2-inspector-card">
-          <div class="manager-v2-system-inspector-heading">
+          <div class="manager-v2-inspector-title-row is-hero-large">
+            <span class="manager-v2-inspector-icon is-hero-large" aria-hidden="true">
+              <i class="fas fa-layer-group"></i>
+            </span>
             <div class="manager-v2-inspector-copy">
               <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Column.System', 'System')}</p>
               <h2 class="manager-v2-inspector-name" title={selectedSystem.name}>{selectedSystem.name}</h2>

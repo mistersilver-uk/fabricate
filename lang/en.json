@@ -229,6 +229,7 @@
         "EmptySearchTitle": "No systems match this search",
         "EmptySearchHint": "Clear the search to show all configured systems.",
         "ClearSearch": "Clear search",
+        "ClearFilters": "Clear filters",
         "Create": "Create",
         "CreateSystem": "Create system",
         "Import": "Import",
@@ -499,7 +500,17 @@
           "Selected": "Selected vocabulary",
           "AlwaysOn": "Always available",
           "InspectorHint": "Define the vocabulary GMs use when assigning recipe categories and component tags.",
-          "Counts": "Vocabulary counts"
+          "Counts": "Vocabulary counts",
+          "HowItWorksTitle": "How it works",
+          "HowItWorksFlat": "Categories are flat — each recipe picks one, with no parent or child folders.",
+          "HowItWorksGeneral": "General is the reserved fallback for recipes without a custom category.",
+          "HowItWorksTags": "Item tags appear on components and on tag-placeholder ingredients in recipes.",
+          "ExamplesTitle": "Examples",
+          "ExamplesEmptyHint": "Add a category or tag, then assign it to a recipe or component to see it appear here.",
+          "ExampleCategory": "\"{name}\" is used by {count} recipes.",
+          "ExampleCategorySingular": "\"{name}\" is used by 1 recipe.",
+          "ExampleTag": "\"{name}\" appears on {count} components.",
+          "ExampleTagSingular": "\"{name}\" appears on 1 component."
         },
         "Essence": {
           "Kicker": "Essence definitions",

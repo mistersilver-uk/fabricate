@@ -16,6 +16,7 @@
   let sourceFilter = $state('all');
 
   const normalizedSearchTerm = $derived(searchTerm.trim().toLowerCase());
+  const filtersActive = $derived(normalizedSearchTerm.length > 0 || sourceFilter !== 'all');
   const filteredEssences = $derived((essenceCards || []).filter(essence => {
     const matchesSearch = !normalizedSearchTerm
       || [
@@ -119,6 +120,12 @@
       </label>
     {/if}
     <span class="manager-v2-chip">{text('FABRICATE.Admin.ManagerV2.SearchCount', '{shown} of {total}').replace('{shown}', filteredEssences.length).replace('{total}', essenceCards.length)}</span>
+    {#if filtersActive}
+      <button type="button" class="manager-v2-button manager-v2-clear-filters" data-clear-filters="essences" onclick={clearSearch}>
+        <i class="fas fa-times" aria-hidden="true"></i>
+        <span>{text('FABRICATE.Admin.ManagerV2.ClearFilters', 'Clear filters')}</span>
+      </button>
+    {/if}
   </section>
 
   <section class="manager-v2-table-scroll" aria-label={text('FABRICATE.Admin.ManagerV2.Essence.Table', 'Essences table')}>

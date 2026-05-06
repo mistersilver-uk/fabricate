@@ -328,6 +328,250 @@ The first v2 environment edit route is behaviorally wired but visually wrong. It
 - [ ] After implementation, run a reviewer pass focused on behavior preservation and dirty/validation semantics.
 - [ ] Run a UX pass comparing the new screenshots against the reference before marking the editor acceptance criteria complete.
 
+## Concrete Implementation Plan: Design-System Token Foundation
+
+Phase 1 of the manager-v2 audit follow-up. The agreed design-system tokens were never declared at stylesheet root; manager-v2 only had its private `--fab-mv2-*` namespace with hard-coded hex/rgba and px values. This slice establishes the canonical token layer at `:root` so future polish work can consume `var(--fab-accent)`, `var(--fab-space-3)`, etc., as the source of truth.
+
+- [x] Declare the full `design-system.md` token set at `:root` in `styles/fabricate.css`: `--fab-bg-0..3`, `--fab-surface`, `--fab-surface-soft`, `--fab-surface-raised`, `--fab-border[-strong]`, `--fab-text[-muted/-subtle]`, `--fab-accent[-hover/-strong/-soft]`, `--fab-info[-soft]`, `--fab-warning[-soft]`, `--fab-danger[-soft]`, `--fab-purple[-soft]`, `--fab-space-1..6`.
+- [x] Keep manager-v2 internal `--fab-mv2-*` token values unchanged in this slice so existing screenshot baselines, hard-coded color assertions, and rendered hierarchy do not shift unexpectedly.
+- [x] Add a focused CSS contract test asserting every spec-required token is present in the `:root` declaration.
+- [x] Validate with `npm test` and `npm run build`.
+
+### Token Foundation Scope Decisions
+
+- [x] Declare globals additively. Do not migrate manager-v2 internal tokens to consume globals in this slice; that is a follow-up that needs intentional screenshot baseline updates.
+- [x] Do not redefine Foundry's existing `--fabricate-primary/success/warning/danger/dark/light` tokens.
+- [x] Do not extend tokens beyond what `design-system.md` specifies.
+
+## Concrete Implementation Plan: Tags & Categories Evidence Panels
+
+Phase 2 first slice. The reference [Edit Crafting System Tags and Categories](<references/Edit Crafting System Tags and Categories.png>) shows a richer right rail than the manager-v2 implementation: `How it works` guidance, `System Summary`, `Examples`, and a documentation link. The corrected spec § Tags And Categories Editors permits these *as long as they reflect Fabricate semantics*. The shipped inspector had only the intro card, vocabulary counts, and General hint. This slice adds two new evidence cards that surface real Fabricate semantics without inventing data.
+
+- [x] Add a `How it works` inspector card with three flat-language bullets explaining flat categories, reserved General, and item-tag references on components plus tag-placeholder ingredients.
+- [x] Add an `Examples` inspector card that surfaces the most-used custom category (excluding General) and the most-used item tag derived from real `categoryRows` / `tagRows` usage data.
+- [x] Render an empty-state hint inside the `Examples` card when no usage references exist yet.
+- [x] Localize all new copy under `FABRICATE.Admin.ManagerV2.TagsCategories.*`, including singular/plural variants for the example strings.
+- [x] Add `manager-v2-evidence-list` styling for compact bulleted lists inside inspector cards.
+- [x] Extend the existing tags/categories mounted test to assert the new evidence cards render and contain the expected explanatory copy.
+- [x] Validate with `npm test` and `npm run build`.
+
+### Tags & Categories Evidence Scope Decisions
+
+- [x] Do not add a documentation link card until the canonical docs URL exists.
+- [x] Do not invent hierarchical, multi-category, or category-description content.
+- [x] Top-used examples must be derived from real `tagCategoryUsage` data; never invented or seeded with placeholders.
+- [x] Singular/plural variants must remain literal copy; do not introduce a templating dependency.
+
+## Concrete Implementation Plan: Recipe Inspector Polish
+
+Phase 2 second slice. The reference [Browse Recipes](<references/Browse Recipes.png>) shows the selected-recipe inspector with a prominent hero image, a fact grid for category/structure, a requirements list, and a clearly green primary `Edit Recipe` CTA followed by secondary `Duplicate` and `Delete Recipe` actions. The shipped inspector had the right structure but rendered Edit/Duplicate/Delete as three identical neutral buttons and used a small 44px hero. This slice tightens the visual hierarchy without introducing any new derived data or persistence path.
+
+- [x] Promote `Edit recipe` to the primary inspector action with green fill (`is-primary`); keep `Duplicate recipe` neutral and `Delete recipe` danger.
+- [x] Add a `is-hero-large` modifier to the recipe inspector title row so the recipe preview renders at a more prominent 56px square (matching the mock's hero weighting).
+- [x] Add explicit `.manager-v2-recipe-preview` CSS so the recipe image consistently uses the manager-v2 border, radius, and `object-fit: cover` treatment.
+- [x] Add `data-recipe-fact` and `data-recipe-action` attributes to the inspector facts and action buttons for testability without coupling to copy.
+- [x] Extend the recipes-browser mounted test to assert the primary Edit CTA, the new hero modifier, and the structure/result-groups facts render as expected.
+- [x] Validate with `npm test` and `npm run build`.
+
+### Recipe Inspector Polish Scope Decisions
+
+- [x] Do not add ingredient-image rows to the requirements list; the spec keeps the requirements preview as execution-step summaries derived from existing data, not per-ingredient images.
+- [x] Do not invent recipe fields (difficulty, craft time, last updated, output quantity) that the reference image shows but the recipe contract does not back.
+- [x] Do not change the recipe action callbacks; Edit continues to delegate through `services.onEditRecipe` to the legacy editor as the spec requires for this slice.
+- [x] The `is-hero-large` title-row modifier is reusable. Future inspector polish (Components, Essences, Systems) may opt into it but this slice does not retro-apply it elsewhere.
+
+## Concrete Implementation Plan: Component Inspector Polish
+
+Phase 2 third slice. The reference [Browse Components](<references/Browse Components.png>) shows the selected-component inspector with a prominent hero image, a Component / Usage / Source structure, and a green primary `Edit Component` CTA paired with a `Delete Component` danger action. The shipped inspector had the right sections (identity, tags, essences, source, usage evidence, actions) but rendered Edit and Delete as identical neutral buttons and used a small 44px hero. This slice tightens visual hierarchy and adds testable section markers without adding any new derived data, persistence path, or callback.
+
+- [x] Apply the existing `is-hero-large` modifier to the components inspector title row so the component preview gets the same 56px hero weighting as recipes.
+- [x] Promote `Edit component` to the primary inspector action (`is-primary`); keep `Delete component` danger.
+- [x] Consolidate the recipe and component preview CSS into a single multi-selector rule so future image-led inspectors share the same 56px square treatment.
+- [x] Add `data-component-section` markers (`tags`, `essences`, `source`, `usage`) and `data-component-action` markers (`edit`, `delete`, `copy-source`) for testability without coupling tests to copy.
+- [x] Extend the components-browser mounted test to assert the primary Edit CTA, the new hero modifier, and the source section render as expected.
+- [x] Validate with `npm test` and `npm run build`.
+
+### Component Inspector Polish Scope Decisions
+
+- [x] Do not add a `Duplicate component` action; the spec restricts manager-v2 component callbacks to drop import, edit, copy source UUID, and delete. Duplicate would need a new admin-store action.
+- [x] Do not add Component / Usage / Source as interactive tabs; the spec permits sections-or-lightweight-tabs and the existing section stack already meets the readability target.
+- [x] Do not invent component fields (last used, owner, progressive difficulty when not data-backed) that the reference image shows but the current admin store does not provide.
+- [x] Preserve unresolved source UUID display; never delete or hide stale source evidence.
+
+## Concrete Implementation Plan: Essence Inspector Polish
+
+Phase 2 fourth slice. The reference [Browse Essences](<references/Browse Essences.png>) shows the selected-essence inspector with a prominent icon hero, status chips, source/usage sections, and a green primary `Edit Essence` CTA paired with a `Delete Essence` danger action. The shipped browse-mode inspector had the right sections (identity, source evidence under the effect-transfer gate, usage with component thumbnail grid, deletion-blocked notice, browse actions) but used a 44px icon container and rendered Edit/Delete as identical neutral buttons.
+
+- [x] Apply `is-hero-large` to the essence inspector title row so the icon container gets a 56px hero treatment, with a slightly larger icon glyph inside.
+- [x] Promote `Edit essence` to the primary inspector action (`is-primary`) in the browse view; keep `Delete essence` danger and preserve the existing usage-blocked disabled state.
+- [x] Reuse the existing `manager-v2-inspector-icon` rule by adding an additive `.is-hero-large` modifier so other icon-led inspectors can opt in without a new selector family.
+- [x] Add `data-essence-section` markers (`source`, `usage`) and `data-essence-action` markers (`edit`, `delete`) for testability without coupling tests to copy.
+- [x] Extend the essences-browser mounted test to assert the primary Edit CTA, the new hero modifier, and the Usage section render as expected.
+- [x] Validate with `npm test` and `npm run build`.
+
+### Essence Inspector Polish Scope Decisions
+
+- [x] Keep the source-evidence section gated by `showEssenceSourceUi` (which mirrors `features.effectTransfer === true`); do not surface source UI when effect transfer is disabled.
+- [x] Do not add `Edit essence` / `Delete essence` to the `essence-edit` route inspector; the route owns its own save/cancel header strip.
+- [x] Do not invent author, created/updated timestamps, or rarity fields when current admin data does not back them.
+- [x] Preserve the deletion-blocked disabled state and the in-use chip; visual hierarchy changes must not bypass usage protection.
+
+## Concrete Implementation Plan: Systems Inspector Polish
+
+Phase 2 fifth slice. The reference [Browse Crafting Systems](<references/Browse Crafting Systems.png>) and the design § Systems inspector both call for an `icon, name, resolution, enabled state, description, counts, and enabled features` summary in the right inspector. The shipped inspector had counts, features, and identity, but the prior corrective slice removed the icon entirely (because it was disrupting layout) and the identity card became a plain text block. This slice restores icon presence using the new `is-hero-large` modifier so the icon contributes visual scan-anchor without the disruptive layout it caused before.
+
+- [x] Apply `manager-v2-inspector-title-row.is-hero-large` to the systems inspector identity card (both the regular `selectedSystem` view and the `system-edit` view).
+- [x] Render a `manager-v2-inspector-icon.is-hero-large` `fa-layer-group` glyph that mirrors the system row icon family.
+- [x] Drop the now-redundant `manager-v2-system-inspector-heading` wrapper in favour of the shared title-row grid.
+- [x] Preserve the corrective-slice rules: keep counts, enabled features, and the legacy-fallback action card; do not reintroduce a `Quick actions` card or duplicate row commands.
+- [x] Extend the systems-shell mounted test to assert the prominent hero title row + icon render in the inspector.
+- [x] Validate with `npm test` and `npm run build`.
+
+### Systems Inspector Polish Scope Decisions
+
+- [x] Do not invent a system image field; the current admin store does not expose one. The shared icon glyph stays the canonical visual until a future slice adds image support to the system data model.
+- [x] Do not reintroduce a separate `Quick actions` card on the systems inspector. Edit, Duplicate, Export, and Delete remain available inline on each row and in the application header.
+- [x] Do not retro-apply hero treatment to the no-systems setup card; that surface intentionally uses a different first-run shape.
+- [x] Keep the legacy-fallback `Open current admin` button on the `system-edit` inspector during additive rollout.
+
+## Concrete Implementation Plan: Toolbar And Action Chrome Polish
+
+Phase 3 first slice. The mock toolbars include a `Clear Filters` affordance that is missing from the shipped manager-v2 toolbars; clear actions only existed inside empty-state messages. The mock action buttons also use semantic hover treatments — primary green deepens, danger red tints — while the shipped buttons uniformly used a generic white hover tint that overrode the semantic colors. This slice closes both gaps.
+
+- [x] Add a `manager-v2-clear-filters` button to the systems, recipes, components, environments, and essences toolbars; render only when at least one filter (search or any select) is non-default.
+- [x] Add per-route `$derived` flags (`systemFiltersActive`, `recipeFiltersActive`, `componentFiltersActive`, `environmentFiltersActive`, `filtersActive` in EssenceBrowserView) that key the visibility.
+- [x] Add a `clearSystemFilters` action that resets the systems route's local search and status filter; existing `clearRecipeFilters`, `clearComponentFilters`, `clearEnvironmentFilters`, and `clearSearch` (essences) continue to own the per-route reset.
+- [x] Replace the recipes route's `bind:value` selects with the same explicit `value=` + `onchange=` pattern used by components so `change`-event-based test interactions exercise reactivity consistently.
+- [x] Add semantic hover treatments to manager-v2 buttons: `.manager-v2-button.is-primary:hover` deepens the green; `.manager-v2-button.is-danger:hover` and `.manager-v2-icon-button.is-danger:hover` use a red soft tint instead of the generic white tint.
+- [x] Style `.manager-v2-clear-filters` as an outline-only secondary affordance right-aligned via `margin-left: auto` so it never competes with primary create/import actions.
+- [x] Localize `FABRICATE.Admin.ManagerV2.ClearFilters`.
+- [x] Extend the recipes-browser mounted test to assert the Clear filters button shows/hides correctly and resets the filter state.
+- [x] Validate with `npm test` and `npm run build`.
+
+### Toolbar And Action Chrome Polish Scope Decisions
+
+- [x] Clear filters resets local route filter state only; it does not call any new admin-store mutator and does not change the existing `setRecipeSearch` / `setItemSearch` contracts.
+- [x] Hover treatments use literal rgba values that resolve to the manager-v2 internal accent/danger family. Migrating to `var(--fab-accent-soft)` etc. is reserved for the future global-token migration slice.
+- [x] Do not retro-apply the toolbar Clear-filters button to the Tags & Categories view; that view's vocabulary panels manage their own search/feedback state and the spec does not call for this affordance there.
+- [x] Do not introduce pagination footers in this slice; row counts in current fixtures stay below typical page-size thresholds and the existing `{shown} of {total}` count chip already provides scan evidence.
+
+## Concrete Implementation Plan: SystemEditView Extraction
+
+Phase 4 first slice. The 2,785-line `CraftingSystemManagerV2Root.svelte` inlines five route bodies while the other four (Essence browse + edit, Tags & Categories, Environment edit) live in dedicated `*View.svelte` files. The system-edit body is the smallest of the inline routes and a clean candidate for the first extraction; it has a moderate prop surface and no shared derivations beyond the existing `selectedSystem` data.
+
+- [x] Add `src/ui/svelte/apps/manager-v2/SystemEditView.svelte` containing the previously inline system-edit form: identity card (name/description/resolution mode), advanced visibility toggle, optional features card.
+- [x] Move the local form state (`systemNameValue`, `systemDescriptionValue`, `systemResolutionModeValue`), the `featureDefinitions` and `resolutionModeOptions` constants, and the form helpers (`handleSubmit`, `handleResolutionModeChange`, `handleToggleAdvancedOptions`, `handleToggleFeature`, `hasFeatureKey`) into the new component.
+- [x] Define a clean prop surface: `selectedSystem` data plus four named callbacks (`onSaveDetails`, `onSetResolutionMode`, `onToggleAdvancedOptions`, `onToggleFeature`). No service grab-bag.
+- [x] Mount `<SystemEditView ... />` in the root for the `system-edit` route, passing through admin-store calls via narrow inline arrow functions.
+- [x] Delete the now-unused root state, the `$effect` that synced form values, the constants, the helper functions, and `hasFeatureKey` from `CraftingSystemManagerV2Root.svelte`.
+- [x] Register the new file with the test harness (`writeCompiledSvelte` registration in `manager-v2-mounted.test.js`).
+- [x] Update the source-contract test: combine `rootSource`, the existing extracted views, and the new `SystemEditView` source into a `managerV2Source` so feature-level invariants (form selectors, `mapped`/`tiered` resolution mode values, no-legacy-toggles) can be asserted against the manager-v2 surface as a whole rather than coupling them to a specific file.
+- [x] Validate with `npm test` (2305/2305 pass) and `npm run build` (clean).
+
+### SystemEditView Extraction Scope Decisions
+
+- [x] Extract one route per slice. SystemsBrowserView, RecipesBrowserView, ComponentsBrowserView, and EnvironmentsBrowserView remain inline pending follow-up slices.
+- [x] Pass admin-store callbacks through inline arrow functions in the mount call; do not pass the `store` reference into the view. Keeps the component's prop surface narrow and testable.
+- [x] Preserve the existing form-state sync semantics: `$effect` re-syncs name/description/resolution-mode values whenever the underlying `selectedSystem` fields change, so external admin-store updates remain visible inside the form.
+- [x] Do not change the form's accessible structure, IDs, names, or data attributes; existing layout and pointer tests continue to apply.
+- [x] Do not introduce a new admin-store mutator; the four callbacks map 1:1 to `saveSystemDetails`, `setResolutionMode`, `toggleAdvancedOptions`, `toggleFeature`.
+
+## Concrete Implementation Plan: SystemsBrowserView Extraction
+
+Phase 4 second slice. The systems browser was the largest of the inline route bodies (~130 lines of markup plus filter state, derivations, and helpers). This slice promotes it to a dedicated `SystemsBrowserView.svelte` matching the existing extracted pattern.
+
+- [x] Add `src/ui/svelte/apps/manager-v2/SystemsBrowserView.svelte` containing the systems table, search/status toolbar, status-toggle row controls, action buttons, and empty/no-match states.
+- [x] Move local filter state (`searchTerm`, `statusFilter`) and derivations (`normalizedSearchTerm`, `filteredSystems`, `filtersActive`) into the view.
+- [x] Move helper functions into the view: `text`, `stackedLabel`, `resolutionModeLabel` (small enough to duplicate without a shared util module), `isSelectedSystem`, `selectRow`, `selectRowFromKeyboard`, `clearFilters`, `toggleEnabled`.
+- [x] Define a clean prop surface: `systems`, `selectedSystemId`, plus six named callbacks (`onSelectSystem`, `onCreateSystem`, `onEditSystem`, `onExportSystem`, `onDeleteSystem`, `onToggleSystemEnabled`).
+- [x] Mount `<SystemsBrowserView ... />` in the root systems route and remove the now-unused `systemSearchTerm`, `systemStatusFilter`, `normalizedSystemSearchTerm`, `filteredSystems`, `systemFiltersActive`, `clearSystemFilters`, `selectSystemRowFromKeyboard`, `toggleSystemEnabled`, and `isSelectedSystem` from `CraftingSystemManagerV2Root.svelte`.
+- [x] Register the new file with `manager-v2-mounted.test.js` `compileManagerV2Root` and append the source to `managerV2Source` in the contract test.
+- [x] Update the contract assertions: shell-render checks for `manager-v2-systems-table` move to `systemsBrowserSource`; the localized `EditSystem` lookup moves to `managerV2Source`.
+- [x] Validate with `npm test` (2305/2305 pass) and `npm run build` (clean).
+
+### SystemsBrowserView Extraction Scope Decisions
+
+- [x] Duplicate the small `text` / `stackedLabel` / `resolutionModeLabel` helpers in the new view rather than introducing a shared util module; the duplication is minimal and the view stays self-contained.
+- [x] Pass `selectSystemRow` through `onSelectSystem` so the root keeps owning the `selectSystem(id, 'systems')` route-confirm semantics; do not call `store.selectSystem?.` directly from the view.
+- [x] Preserve all existing data attributes, ARIA labels, and CSS class names so layout and mounted tests continue to pass without modification.
+- [x] Do not introduce a new admin-store mutator. `onToggleSystemEnabled` maps directly to `store.toggleSystemEnabled?.` via the inline arrow function in the mount.
+
+## Concrete Implementation Plan: RecipesBrowserView Extraction
+
+Phase 4 third slice. The recipes browser was the next-most-complex inline route after the systems table. It owns its own status + category filter state, derives a filtered list, calls into the admin-store search contract, and exposes per-row actions for edit / duplicate / delete / toggle-enabled. This slice promotes it to a dedicated `RecipesBrowserView.svelte` while keeping the recipe inspector aside in the root.
+
+- [x] Add `src/ui/svelte/apps/manager-v2/RecipesBrowserView.svelte` containing the recipes table, search/status/category filter toolbar, status toggles, action buttons, and empty/no-match states.
+- [x] Move local filter state (`statusFilter`, `categoryFilter`) and derivations (`filteredRecipes`, `filtersActive`) into the view.
+- [x] Duplicate the small recipe-table helpers (`text`, `stackedLabel`, `recipeImage`, `ingredientCount`, `catalystCount`, `formatCount`, `stepRequirementSummary`, `requirementsSummary`, `structureLabel`, `isSelectedRecipe`) inside the view; the root keeps its own copies for the inspector aside.
+- [x] Define a clean prop surface: `recipes`, `recipeCategories`, `recipeSearchTerm`, `selectedRecipeId`, `showRecipeCategories`, `selectedSystemName`, plus seven named callbacks (`onSearchChange`, `onSelectRecipe`, `onCreateRecipe`, `onEditRecipe`, `onDuplicateRecipe`, `onDeleteRecipe`, `onToggleEnabled`).
+- [x] Mount `<RecipesBrowserView ... />` in the root recipes route and remove the now-unused `recipeStatusFilter`, `recipeCategoryFilter`, `recipeFiltersActive`, `filteredRecipes`, `setRecipeSearch`, `clearRecipeSearch`, and `clearRecipeFilters` from `CraftingSystemManagerV2Root.svelte`.
+- [x] Adjust the root's `selectedRecipe` derivation to fall back to the first recipe in `$viewState.recipes` instead of the previously-filtered list. The inspector preview keeps showing the active recipe even when filters change in the table; auto-selection of the first recipe on first render is preserved.
+- [x] Register the new file with `manager-v2-mounted.test.js` `compileManagerV2Root` and append the source to `managerV2Source` in the contract test.
+- [x] Update the contract assertions: shell-render checks for `manager-v2-recipes-table`, `manager-v2-recipe-row`, `manager-v2-recipe-identity`, and `manager-v2-recipe-status` move to `recipesBrowserSource`.
+- [x] Validate with `npm test` (2305/2305 pass) and `npm run build` (clean).
+
+### RecipesBrowserView Extraction Scope Decisions
+
+- [x] Search remains a store-owned contract; the view receives the current `recipeSearchTerm` and emits debounced-style updates via `onSearchChange`. Do not let the view mirror the search term in local state.
+- [x] Auto-selection fallback runs against the unfiltered `$viewState.recipes` rather than the view-local filtered list. Hiding the selected recipe via filters does not deselect it; the inspector keeps the previous selection until the user picks another row.
+- [x] Duplicate the recipe-table helper functions inside the view rather than extracting a shared util module; the duplication is contained and the inspector still needs them in the root.
+- [x] Do not introduce a new admin-store mutator. `onSearchChange`, `onToggleEnabled` map directly to `store.setRecipeSearch?.` and `store.toggleRecipeEnabled?.`; `onCreateRecipe`, `onEditRecipe`, `onDuplicateRecipe`, `onDeleteRecipe` go through the existing root helpers that already wrap admin-store and service callbacks.
+
+## Concrete Implementation Plan: ComponentsBrowserView Extraction
+
+Phase 4 fourth slice. The components browser was the third-largest inline route. It carries a triple filter (source, tag, essence), drop-zone wiring with a Foundry drag/drop action, the `componentTableClass` derivation, and a per-row evidence column with source-state, salvage, and usage-count helpers. The view-internal filter state must auto-reset when the selected system changes so hidden facets do not silently filter away a different system's components.
+
+- [x] Add `src/ui/svelte/apps/manager-v2/ComponentsBrowserView.svelte` containing the components table, drop-zone, search/source/tag/essence toolbar, action buttons, and empty/no-match states.
+- [x] Move local filter state (`sourceFilter`, `tagFilter`, `essenceFilter`) and derivations (`filteredComponents`, `filtersActive`, `componentTagOptions`, `componentEssenceOptions`, `showComponentTags`, `showComponentEssences`, `componentTableClass`) into the view.
+- [x] Duplicate the row-level helpers (`text`, `stackedLabel`, `componentImage`, `uniqueSorted`, `componentSourceState`, `componentEvidenceItems`, `usageEvidenceItems`, `salvageSummaryLabel`, `isSelectedComponent`) inside the view; the root keeps its own copies for the inspector aside.
+- [x] Move the `dragDrop` action import and drop-zone markup into the view; remove the now-unused `dragDrop` import from `CraftingSystemManagerV2Root.svelte`.
+- [x] Add a `selectedSystemId` prop and an `$effect` that resets the three local filters whenever it changes, preserving the previous root-side reset behavior.
+- [x] Define a clean prop surface: `itemCards`, `totalComponentsCount`, `itemSearchTerm`, `selectedComponentId`, `selectedSystemName`, `selectedSystemId`, `dropEnabled`, plus six named callbacks (`onSearchChange`, `onSelectComponent`, `onDropComponent`, `onEditComponent`, `onDeleteComponent`, `onCopySourceUuid`).
+- [x] Mount `<ComponentsBrowserView ... />` in the root components route and remove the now-unused `componentSourceFilter`, `componentTagFilter`, `componentEssenceFilter`, `componentFiltersActive`, `componentTagOptions`, `componentEssenceOptions`, `componentTableClass`, `filteredComponents`, `setComponentSearch`, `clearComponentFilters`, and `isSelectedComponent` from `CraftingSystemManagerV2Root.svelte`.
+- [x] Adjust the root's `selectedComponent` derivation to fall back to the first item in `itemCards` instead of the previously-filtered list, mirroring the recipe pattern.
+- [x] Trim the system-change reset effect to only clear `selectedComponentId`; filter resets now live inside the view.
+- [x] Register the new file with `manager-v2-mounted.test.js` `compileManagerV2Root` and append the source to `managerV2Source` in the contract test.
+- [x] Update the contract assertions: `manager-v2-component-drop-zone`, `componentTableClass`, `manager-v2-component-row`, `manager-v2-component-identity` move to `componentsBrowserSource`.
+- [x] Validate with `npm test` (2305/2305 pass) and `npm run build` (clean).
+
+### ComponentsBrowserView Extraction Scope Decisions
+
+- [x] The view owns drop-zone wiring through `dragDrop` directly; the root no longer imports the action. Drop intent stays a callback (`onDropComponent`) so the root continues to delegate to `services.onDropItem` without exposing the service through the view.
+- [x] System-change filter reset moved from a root `$effect` to a view-local `$effect` keyed on `selectedSystemId`. Behavior is identical from the user's perspective: switching systems clears stale tag/essence/source filters before the next render.
+- [x] Auto-selection fallback runs against unfiltered `itemCards`, mirroring the recipes browser change. The inspector keeps the active selection even when filters hide it.
+- [x] Duplicate the component-evidence helpers in the view rather than introducing a shared module. The inspector keeps its own copies; the duplication is contained.
+- [x] Do not introduce a new admin-store mutator. `onSearchChange`, `onSelectComponent`, `onDropComponent`, `onEditComponent`, `onDeleteComponent`, `onCopySourceUuid` map directly to existing store/service callbacks via inline arrow functions in the mount.
+
+## Concrete Implementation Plan: EnvironmentsBrowserView Extraction
+
+Phase 4 fifth slice (final). The environments browser was the last inline route in the root. It carries six filters (status, selection mode, risk, region, biome, search), draft-aware row rendering via `environmentDisplay`, dirty/invalid badge derivations, scene-image lookups against the selected system's `sceneOptions`, and per-row reorder controls.
+
+- [x] Add `src/ui/svelte/apps/manager-v2/EnvironmentsBrowserView.svelte` containing the environments table, six-filter toolbar, status toggles, action grid + reorder stack, and loading/error/empty/no-match states.
+- [x] Move local filter state (`searchTerm`, `statusFilter`, `selectionFilter`, `riskFilter`, `regionFilter`, `biomeFilter`) and derivations (`regionOptions`, `biomeOptions`, `normalizedSearchTerm`, `filteredEnvironments`, `filtersActive`) into the view.
+- [x] Duplicate the environment helpers (`text`, `stackedLabel`, `uniqueSorted`, `linkedSceneForEnvironment`, `environmentName`, `environmentImage`, `hasEnvironmentSceneImage`, `environmentSelectionModeLabel`, `environmentTaskCount`, `environmentDirtyFor`, `environmentInvalidFor`, `environmentDisplay`, `environmentListIndex`, `canMoveEnvironmentUp`, `canMoveEnvironmentDown`) inside the view; the root keeps its own copies for the inspector aside.
+- [x] Add a `selectedSystemId` prop and an `$effect` that resets the six local filters whenever it changes, preserving the previous root-side reset semantics.
+- [x] Define a clean prop surface: `environments`, `environmentsLoading`, `environmentsError`, `environmentDraft`, `environmentDraftDirty`, `environmentValidationCount`, `selectedEnvironmentId`, `selectedSystemName`, `selectedSystemId`, `sceneOptions`, `shouldUseEnvironmentDraftForDisplay`, plus seven named callbacks (`onSelectEnvironment`, `onEditEnvironment`, `onCreateEnvironment`, `onDuplicateEnvironment`, `onDeleteEnvironment`, `onMoveEnvironment`, `onToggleEnvironmentEnabled`).
+- [x] Mount `<EnvironmentsBrowserView ... />` in the root environments route and remove the now-unused `environmentSearchTerm`, `environmentStatusFilter`, `environmentSelectionFilter`, `environmentRiskFilter`, `environmentRegionFilter`, `environmentBiomeFilter`, `environmentRegionOptions`, `environmentBiomeOptions`, `normalizedEnvironmentSearchTerm`, `filteredEnvironments`, `environmentTableClass`, `environmentFiltersActive`, and `clearEnvironmentFilters` from `CraftingSystemManagerV2Root.svelte`.
+- [x] Adjust the root's `selectedEnvironment` derivation to fall back to the first item in `environmentList` instead of the previously-filtered list, mirroring the recipes/components pattern.
+- [x] Register the new file with `manager-v2-mounted.test.js` `compileManagerV2Root` and append the source to `managerV2Source` in the contract test.
+- [x] Update the contract assertions: `class="manager-v2-main"` / `class="manager-v2-toolbar"` / `class="manager-v2-filter"` / `class="manager-v2-empty"` shell-render checks now run against `managerV2Source`; the `EnvironmentsBrowserView` import lookup runs against `rootSource`; the `manager-v2-status-toggle`, `Environment.EmptyTitle`, and `toggleSystemEnabled` lookups also move to view/aggregate sources where they now live.
+- [x] Validate with `npm test` (2305/2305 pass) and `npm run build` (clean).
+
+### EnvironmentsBrowserView Extraction Scope Decisions
+
+- [x] Auto-selection fallback runs against unfiltered `environmentList`, mirroring the recipes/components pattern. The inspector keeps the active selection even when filters hide it.
+- [x] System-change filter reset moves from the inline view's behavior into a view-local `$effect` keyed on `selectedSystemId`. Behavior is preserved for users.
+- [x] Duplicate environment helpers in the view rather than introducing a shared module. The inspector keeps its own copies, including draft-aware `environmentDisplay`, scene-image lookup, and dirty/invalid badge logic.
+- [x] Pass `shouldUseEnvironmentDraftForDisplay` from root to view so draft-vs-saved row rendering stays consistent. The view does not derive the boolean itself because it depends on `currentView === 'environment-edit'`, which only the root knows.
+- [x] Do not introduce a new admin-store mutator. All seven callbacks map to existing root helpers (`selectEnvironment`, `editEnvironment`, `createEnvironment`, `duplicateEnvironment`, `deleteEnvironment`, `moveEnvironment`, `toggleEnvironmentEnabled`) which already wrap the canonical admin-store environment actions.
+
+### Phase 4 Summary
+
+- [x] All five inline route bodies extracted to dedicated `*View.svelte` files: `SystemEditView`, `SystemsBrowserView`, `RecipesBrowserView`, `ComponentsBrowserView`, `EnvironmentsBrowserView`.
+- [x] `CraftingSystemManagerV2Root.svelte` shrunk from 2,785 lines to 2,042 lines (-743 lines, -27%). The root is now a router + shell + inspector, in line with the existing per-view component pattern (`EssenceBrowserView`, `EssenceEditView`, `TagsCategoriesView`, `EnvironmentEditView`).
+- [x] No admin-store contract changes, no new persistence paths, no new dependencies.
+- [x] All five extracted views own their filter state and emit explicit, named callbacks through narrow prop surfaces.
+
 ## Future Implementation Sequence
 
 - [ ] Add manager-v2 app wrapper and root component behind an explicit launch path or setting.

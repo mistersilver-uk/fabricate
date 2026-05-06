@@ -10,6 +10,11 @@ const rootPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/CraftingSystem
 const essenceBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/EssenceBrowserView.svelte');
 const essenceEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/EssenceEditView.svelte');
 const tagsCategoriesPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/TagsCategoriesView.svelte');
+const systemEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/SystemEditView.svelte');
+const systemsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/SystemsBrowserView.svelte');
+const recipesBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/RecipesBrowserView.svelte');
+const componentsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/ComponentsBrowserView.svelte');
+const environmentsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/EnvironmentsBrowserView.svelte');
 const appPath = resolve(repoRoot, 'src/ui/SvelteCraftingSystemManagerV2App.svelte.js');
 const mainPath = resolve(repoRoot, 'src/main.js');
 const langPath = resolve(repoRoot, 'lang/en.json');
@@ -18,9 +23,16 @@ const rootSource = readFileSync(rootPath, 'utf8');
 const essenceBrowserSource = readFileSync(essenceBrowserPath, 'utf8');
 const essenceEditSource = readFileSync(essenceEditPath, 'utf8');
 const tagsCategoriesSource = readFileSync(tagsCategoriesPath, 'utf8');
+const systemEditSource = readFileSync(systemEditPath, 'utf8');
+const systemsBrowserSource = readFileSync(systemsBrowserPath, 'utf8');
+const recipesBrowserSource = readFileSync(recipesBrowserPath, 'utf8');
+const componentsBrowserSource = readFileSync(componentsBrowserPath, 'utf8');
+const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
 const appSource = readFileSync(appPath, 'utf8');
 const mainSource = readFileSync(mainPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
+
+const managerV2Source = [rootSource, essenceBrowserSource, essenceEditSource, tagsCategoriesSource, systemEditSource, systemsBrowserSource, recipesBrowserSource, componentsBrowserSource, environmentsBrowserSource].join('\n');
 
 describe('CraftingSystemManagerV2 source contract', () => {
   it('self-registers as a parallel manager app without replacing the legacy manager', () => {
@@ -54,29 +66,56 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'class="manager-v2-breadcrumbs"',
       'class="manager-v2-body"',
       'class="manager-v2-rail"',
-      'class="manager-v2-main"',
       'class="manager-v2-inspector"',
-      'class="manager-v2-toolbar"',
-      'class="manager-v2-filter"',
-      'class="manager-v2-systems-table"',
-      'class="manager-v2-empty"',
-      'class="manager-v2-recipes-table"',
-      'manager-v2-recipe-row',
-      'class="manager-v2-recipe-identity"',
-      'manager-v2-recipe-status',
-      'class="manager-v2-component-drop-zone"',
-      'class={componentTableClass}',
-      'manager-v2-component-row',
-      'class="manager-v2-component-identity"',
+      'ComponentsBrowserView',
+      'EnvironmentsBrowserView',
       'EssenceBrowserView',
       'EssenceEditView',
       'TagsCategoriesView',
       'EnvironmentEditView',
-      'manager-v2-environment-edit-main',
+      'RecipesBrowserView',
+      'SystemEditView',
+      'SystemsBrowserView',
+      'manager-v2-environment-edit-main'
+    ]) {
+      assert.ok(rootSource.includes(snippet), `root should include ${snippet}`);
+    }
+    for (const snippet of [
+      'class="manager-v2-main"',
+      'class="manager-v2-toolbar"',
+      'class="manager-v2-filter"',
+      'class="manager-v2-empty"'
+    ]) {
+      assert.ok(managerV2Source.includes(snippet), `manager-v2 source should include ${snippet}`);
+    }
+    for (const snippet of [
+      'class="manager-v2-component-drop-zone"',
+      'class={componentTableClass}',
+      'manager-v2-component-row',
+      'class="manager-v2-component-identity"'
+    ]) {
+      assert.ok(componentsBrowserSource.includes(snippet), `ComponentsBrowserView should include ${snippet}`);
+    }
+    for (const snippet of [
       'manager-v2-system-edit-form',
       'manager-v2-toggle-row'
     ]) {
-      assert.ok(rootSource.includes(snippet), `root should include ${snippet}`);
+      assert.ok(systemEditSource.includes(snippet), `SystemEditView should include ${snippet}`);
+    }
+    for (const snippet of [
+      'class="manager-v2-systems-table"',
+      'manager-v2-system-row',
+      'manager-v2-system-identity'
+    ]) {
+      assert.ok(systemsBrowserSource.includes(snippet), `SystemsBrowserView should include ${snippet}`);
+    }
+    for (const snippet of [
+      'class="manager-v2-recipes-table"',
+      'manager-v2-recipe-row',
+      'class="manager-v2-recipe-identity"',
+      'manager-v2-recipe-status'
+    ]) {
+      assert.ok(recipesBrowserSource.includes(snippet), `RecipesBrowserView should include ${snippet}`);
     }
   });
 
@@ -120,18 +159,19 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(!rootSource.includes('openLegacySystemSettings'), 'root should not keep dead legacy edit routing');
     assert.ok(!rootSource.includes('Edit details'), 'root should not show the former dead edit details label');
     assert.ok(!rootSource.includes('services?.onEditSystem'), 'root should not launch the current admin for system row Edit');
-    assert.ok(rootSource.includes('FABRICATE.Admin.ManagerV2.EditSystem'), 'root should expose a localized system edit action');
+    assert.ok(managerV2Source.includes('FABRICATE.Admin.ManagerV2.EditSystem'), 'manager-v2 should expose a localized system edit action');
     assert.ok(rootSource.includes("activeView = 'system-edit'"), 'system row Edit should transition to the local edit route');
-    assert.ok(rootSource.includes('store.saveSystemDetails?.('), 'system edit should save details through the admin store');
-    assert.ok(rootSource.includes('store.setResolutionMode?.(nextMode)'), 'system edit should delegate resolution changes to the admin store');
-    assert.ok(!rootSource.includes("value: 'routed'"), 'system edit should not offer unsupported routed persistence values before runtime support exists');
-    assert.ok(rootSource.includes("value: 'mapped'"), 'system edit should retain the existing routed-by-ingredients persistence value');
-    assert.ok(rootSource.includes("value: 'tiered'"), 'system edit should retain the existing routed-by-check persistence value');
-    assert.ok(rootSource.includes('store.toggleAdvancedOptions?.'), 'system edit should delegate advanced visibility changes to the admin store');
-    assert.ok(rootSource.includes('store.toggleFeature?.(feature.storeKey'), 'system edit should delegate feature toggles to the admin store');
-    assert.ok(!rootSource.includes("storeKey: 'complexRecipes'"), 'system edit should not reintroduce the legacy complex recipes toggle');
-    assert.ok(!rootSource.includes("storeKey: 'craftingChecks'"), 'system edit should not reintroduce the legacy crafting checks toggle');
-    assert.ok(!rootSource.includes("storeKey: 'outcomeRouting'"), 'system edit should not reintroduce the legacy outcome routing toggle');
+    assert.ok(managerV2Source.includes('store.saveSystemDetails?.('), 'system edit should save details through the admin store');
+    assert.ok(managerV2Source.includes('onSetResolutionMode(nextMode)') || managerV2Source.includes('store.setResolutionMode?.(nextMode)'), 'system edit should delegate resolution changes to the admin store');
+    assert.ok(rootSource.includes('store.setResolutionMode?.'), 'root should pass the resolution-mode callback through to the system-edit view');
+    assert.ok(!managerV2Source.includes("value: 'routed'"), 'system edit should not offer unsupported routed persistence values before runtime support exists');
+    assert.ok(managerV2Source.includes("value: 'mapped'"), 'system edit should retain the existing routed-by-ingredients persistence value');
+    assert.ok(managerV2Source.includes("value: 'tiered'"), 'system edit should retain the existing routed-by-check persistence value');
+    assert.ok(rootSource.includes('store.toggleAdvancedOptions?.'), 'root should delegate advanced visibility changes to the admin store');
+    assert.ok(rootSource.includes('store.toggleFeature?.'), 'root should delegate feature toggles to the admin store');
+    assert.ok(!managerV2Source.includes("storeKey: 'complexRecipes'"), 'system edit should not reintroduce the legacy complex recipes toggle');
+    assert.ok(!managerV2Source.includes("storeKey: 'craftingChecks'"), 'system edit should not reintroduce the legacy crafting checks toggle');
+    assert.ok(!managerV2Source.includes("storeKey: 'outcomeRouting'"), 'system edit should not reintroduce the legacy outcome routing toggle');
     assert.ok(!appSource.includes('onEditSystem'), 'v2 wrapper should not provide a row edit service for this action');
     assert.ok(appSource.includes('openCurrentAdmin'), 'v2 wrapper should keep the explicit legacy fallback');
     assert.ok(!appSource.includes('LAST_MANAGED_CRAFTING_SYSTEM'), 'v2 row edit should not seed and launch the current admin');
@@ -157,8 +197,8 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(!rootSource.includes('clearSelectedSystem'), 'root should not expose a selected-system clear route');
     assert.ok(!rootSource.includes("selectSystem('', 'systems')"), 'selected-system rail should not clear real store selection');
     assert.ok(!rootSource.includes('manager-v2-scope-clear'), 'selected-system rail should not render the old x clear icon');
-    assert.ok(rootSource.includes('toggleSystemEnabled'), 'systems browser should expose interactive row status toggles');
-    assert.ok(rootSource.includes('manager-v2-status-toggle'), 'systems browser should render status as a toggle control');
+    assert.ok(managerV2Source.includes('toggleSystemEnabled'), 'systems browser should expose interactive row status toggles');
+    assert.ok(systemsBrowserSource.includes('manager-v2-status-toggle'), 'systems browser should render status as a toggle control');
     assert.ok(!rootSource.includes("setView('systems')"), 'systems should not be exposed as a left-rail tab');
     assert.ok(!rootSource.includes('manager-v2-count-cluster'), 'system rows should not duplicate inspector counts inline');
     assert.ok(!rootSource.includes('FABRICATE.Admin.ManagerV2.QuickActions'), 'inspector should not duplicate row actions');
@@ -173,7 +213,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.equal(lang.FABRICATE.Admin.ManagerV2.EmptySetup.Title, 'Set up your first system');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.EmptySetup.Quickstart, 'Quickstart');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.EmptySetup.Docs, 'Docs');
-    assert.ok(rootSource.includes('FABRICATE.Admin.ManagerV2.Environment.EmptyTitle'), 'empty environments browser should use Manager V2 localized copy');
+    assert.ok(managerV2Source.includes('FABRICATE.Admin.ManagerV2.Environment.EmptyTitle'), 'empty environments browser should use Manager V2 localized copy');
     assert.ok(rootSource.includes('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Title'), 'empty environments inspector should use localized setup copy');
     assert.ok(rootSource.includes('https://misterpotts.github.io/fabricate/gathering-environments/'), 'empty environments inspector should link to published gathering docs');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.EmptyTitle, 'No gathering environments yet');

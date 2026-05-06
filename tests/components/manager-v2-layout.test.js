@@ -404,6 +404,46 @@ test('manager-v2 system edit view defines scoped stable form and toggle layout',
   );
 });
 
+test('design-system tokens are declared at :root as the agreed source of truth', () => {
+  const rootMatches = Array.from(css.matchAll(/:root\s*\{[\s\S]*?\}/g));
+  const rootBlock = rootMatches.map(match => match[0]).join('\n');
+
+  for (const token of [
+    '--fab-bg-0:',
+    '--fab-bg-1:',
+    '--fab-bg-2:',
+    '--fab-bg-3:',
+    '--fab-surface:',
+    '--fab-surface-soft:',
+    '--fab-surface-raised:',
+    '--fab-border:',
+    '--fab-border-strong:',
+    '--fab-text:',
+    '--fab-text-muted:',
+    '--fab-text-subtle:',
+    '--fab-accent:',
+    '--fab-accent-hover:',
+    '--fab-accent-strong:',
+    '--fab-accent-soft:',
+    '--fab-info:',
+    '--fab-info-soft:',
+    '--fab-warning:',
+    '--fab-warning-soft:',
+    '--fab-danger:',
+    '--fab-danger-soft:',
+    '--fab-purple:',
+    '--fab-purple-soft:',
+    '--fab-space-1:',
+    '--fab-space-2:',
+    '--fab-space-3:',
+    '--fab-space-4:',
+    '--fab-space-5:',
+    '--fab-space-6:'
+  ]) {
+    assert.ok(rootBlock.includes(token), `:root should declare design-system token ${token.replace(':', '')}`);
+  }
+});
+
 test('manager-v2 icon buttons normalize host button defaults and keep pointer targets stable', () => {
   const block = blockFor('.fabricate-manager-v2 .manager-v2-button,\n.fabricate-manager-v2 .manager-v2-icon-button');
   const iconBlocks = Array.from(css.matchAll(/\.fabricate-manager-v2 \.manager-v2-icon-button\s*\{[\s\S]*?\}/g));

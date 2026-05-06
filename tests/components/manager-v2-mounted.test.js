@@ -44,9 +44,14 @@ function rewriteClientImports(code) {
 
 function compileManagerV2Root() {
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/CraftingSystemManagerV2Root.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/ComponentsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EnvironmentEditView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EnvironmentsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EssenceBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EssenceEditView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/RecipesBrowserView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/SystemEditView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/SystemsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/TagsCategoriesView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/EnvironmentsTab.svelte');
   for (const componentName of environmentComponentNames) {
@@ -613,6 +618,10 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(environmentFact.textContent.trim().replace(/\s+/g, ' '), '2 Gathering environments');
     assert.equal(environmentFact.querySelector('.manager-v2-fact-leading')?.textContent.trim(), '2 Gathering');
     assert.equal(environmentFact.querySelector('.manager-v2-fact-label')?.textContent.trim(), 'environments');
+
+    const systemHeroRow = target.querySelector('.manager-v2-inspector .manager-v2-inspector-title-row.is-hero-large');
+    assert.ok(systemHeroRow, 'systems inspector should use the prominent hero title row');
+    assert.ok(systemHeroRow.querySelector('.manager-v2-inspector-icon.is-hero-large'), 'systems inspector hero should render the icon at hero-large size');
   });
 
   it('shows the unselected systems library only when no crafting systems exist', () => {
@@ -795,6 +804,31 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Locked Elixir'));
     assert.ok(target.textContent.includes('Restricted (none selected)'));
 
+    assert.equal(target.querySelector('[data-clear-filters="recipes"]'), null, 'Clear filters should hide while no filter is active');
+    const recipeStatusFilterSelect = target.querySelector('[aria-label="Filter recipes by status"]');
+    recipeStatusFilterSelect.value = 'disabled';
+    recipeStatusFilterSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    const recipeClearButton = target.querySelector('[data-clear-filters="recipes"]');
+    assert.ok(recipeClearButton, 'Clear filters should appear when a recipe filter is active');
+    recipeClearButton.click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('[data-clear-filters="recipes"]'), null, 'Clear filters should hide after resetting filters');
+    assert.equal(target.querySelector('[aria-label="Filter recipes by status"]').value, 'all');
+
+    const editAction = target.querySelector('[data-recipe-action="edit"]');
+    assert.ok(editAction, 'recipe inspector should expose an Edit action');
+    assert.ok(editAction.classList.contains('is-primary'), 'Edit recipe should be the primary inspector action');
+    assert.ok(target.querySelector('[data-recipe-action="duplicate"]'), 'recipe inspector should expose a Duplicate action');
+    assert.ok(target.querySelector('[data-recipe-action="delete"]'), 'recipe inspector should expose a Delete action');
+    assert.ok(target.querySelector('[data-recipe-fact="structure"]'), 'recipe inspector should expose a Structure fact');
+    assert.ok(target.querySelector('[data-recipe-fact="result-groups"]'), 'recipe inspector should expose a Result groups fact');
+    const heroRow = target.querySelector('.manager-v2-inspector-title-row.is-hero-large');
+    assert.ok(heroRow, 'recipe inspector should use the prominent hero title row');
+    assert.ok(heroRow.querySelector('.manager-v2-recipe-preview'), 'recipe inspector hero should render the recipe preview image');
+
     const search = target.querySelector('.manager-v2-toolbar input[type="search"]');
     search.value = 'elixir';
     search.dispatchEvent(new Event('input', { bubbles: true }));
@@ -881,6 +915,15 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.querySelector('[data-component-id="c1"]').classList.contains('is-selected'));
     assert.ok(target.textContent.includes('Compendium.fabricate.items.iron-ore'));
 
+    const componentEditAction = target.querySelector('[data-component-action="edit"]');
+    assert.ok(componentEditAction, 'component inspector should expose an Edit action');
+    assert.ok(componentEditAction.classList.contains('is-primary'), 'Edit component should be the primary inspector action');
+    assert.ok(target.querySelector('[data-component-action="delete"]'), 'component inspector should expose a Delete action');
+    assert.ok(target.querySelector('[data-component-section="source"]'), 'component inspector should expose a Source section');
+    const componentHeroRow = target.querySelector('.manager-v2-inspector-title-row.is-hero-large');
+    assert.ok(componentHeroRow, 'component inspector should use the prominent hero title row');
+    assert.ok(componentHeroRow.querySelector('.manager-v2-component-preview'), 'component inspector hero should render the component preview image');
+
     const dropEvent = new Event('drop', { bubbles: true, cancelable: true });
     Object.defineProperty(dropEvent, 'dataTransfer', {
       value: { getData: () => JSON.stringify({ type: 'Item', uuid: 'Item.dropped' }) }
@@ -933,6 +976,15 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('ore'));
     assert.ok(target.textContent.includes('Vocabulary counts'));
     assert.ok(target.querySelector('[data-category-id="general"]').textContent.includes('Locked'));
+
+    const howItWorksCard = target.querySelector('[data-tags-evidence="how-it-works"]');
+    assert.ok(howItWorksCard, 'tags inspector should render a How-it-works evidence card');
+    assert.ok(howItWorksCard.textContent.includes('flat'), 'How-it-works should explain that categories are flat');
+    assert.ok(howItWorksCard.textContent.includes('General'), 'How-it-works should explain reserved General');
+    assert.ok(howItWorksCard.textContent.includes('tag'), 'How-it-works should mention item tags');
+
+    const examplesCard = target.querySelector('[data-tags-evidence="examples"]');
+    assert.ok(examplesCard, 'tags inspector should render an Examples evidence card');
 
     const categoryInput = target.querySelector('#manager-v2-category-add');
     categoryInput.value = 'General';
@@ -1072,6 +1124,15 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     flushSync();
     assert.ok(target.querySelector('[data-essence-id="water"]').classList.contains('is-selected'));
     assert.ok(target.textContent.includes('Clear current.'));
+
+    const essenceEditAction = target.querySelector('[data-essence-action="edit"]');
+    assert.ok(essenceEditAction, 'essence inspector should expose an Edit action');
+    assert.ok(essenceEditAction.classList.contains('is-primary'), 'Edit essence should be the primary inspector action');
+    assert.ok(target.querySelector('[data-essence-action="delete"]'), 'essence inspector should expose a Delete action');
+    assert.ok(target.querySelector('[data-essence-section="usage"]'), 'essence inspector should expose a Usage section');
+    const essenceHeroRow = target.querySelector('.manager-v2-inspector-title-row.is-hero-large');
+    assert.ok(essenceHeroRow, 'essence inspector should use the prominent hero title row');
+    assert.ok(essenceHeroRow.querySelector('.manager-v2-inspector-icon.is-hero-large'), 'essence inspector hero should render the icon at hero-large size');
 
     const sourceFilter = target.querySelector('[aria-label="Filter essences by source state"]');
     sourceFilter.value = 'none';

@@ -7,6 +7,42 @@
   --fabricate-danger: #d9534f;
   --fabricate-dark: #2c3e50;
   --fabricate-light: #ecf0f1;
+
+  /* Fabricate product UI design-system tokens.
+     See openspec/changes/fabricate-ui-design-system-manager-v2/design-system.md.
+     These are the source of truth for new manager-v2 surfaces; existing
+     `--fab-mv2-*` aliases continue to map to internal manager-v2 values
+     until each component migrates intentionally. */
+  --fab-bg-0: #071116;
+  --fab-bg-1: #0b1720;
+  --fab-bg-2: #101d27;
+  --fab-bg-3: #152633;
+  --fab-surface: rgba(16, 29, 39, 0.94);
+  --fab-surface-soft: rgba(255, 255, 255, 0.035);
+  --fab-surface-raised: rgba(255, 255, 255, 0.06);
+  --fab-border: rgba(153, 191, 204, 0.16);
+  --fab-border-strong: rgba(153, 191, 204, 0.28);
+  --fab-text: #f2f7f5;
+  --fab-text-muted: #a9b8bd;
+  --fab-text-subtle: #7f9299;
+  --fab-accent: #63d47b;
+  --fab-accent-hover: #72df89;
+  --fab-accent-strong: #3eb95f;
+  --fab-accent-soft: rgba(99, 212, 123, 0.16);
+  --fab-info: #58b7e8;
+  --fab-info-soft: rgba(88, 183, 232, 0.16);
+  --fab-warning: #f4c04f;
+  --fab-warning-soft: rgba(244, 192, 79, 0.16);
+  --fab-danger: #ff5252;
+  --fab-danger-soft: rgba(255, 82, 82, 0.14);
+  --fab-purple: #a875ff;
+  --fab-purple-soft: rgba(168, 117, 255, 0.16);
+  --fab-space-1: 4px;
+  --fab-space-2: 8px;
+  --fab-space-3: 12px;
+  --fab-space-4: 16px;
+  --fab-space-5: 20px;
+  --fab-space-6: 24px;
 }
 
 /* ==========================================
@@ -4195,6 +4231,16 @@
   pointer-events: none;
 }
 
+.fabricate-manager-v2 .manager-v2-clear-filters {
+  margin-left: auto;
+  padding: 0 10px;
+  min-height: 30px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--fab-mv2-text-muted);
+  background: transparent;
+}
+
 .fabricate-manager-v2 .manager-v2-table-scroll {
   min-height: 0;
   min-width: 0;
@@ -4493,6 +4539,12 @@
   min-width: 0;
 }
 
+.fabricate-manager-v2 .manager-v2-inspector-title-row.is-hero-large {
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+}
+
 .fabricate-manager-v2 .manager-v2-system-identity {
   appearance: none;
   -webkit-appearance: none;
@@ -4615,6 +4667,12 @@
   flex: 0 0 auto;
 }
 
+.fabricate-manager-v2 .manager-v2-inspector-icon.is-hero-large {
+  width: 56px;
+  height: 56px;
+  font-size: 1.4rem;
+}
+
 .fabricate-manager-v2 .manager-v2-recipe-thumb,
 .fabricate-manager-v2 .manager-v2-recipe-preview,
 .fabricate-manager-v2 .manager-v2-component-thumb,
@@ -4632,8 +4690,13 @@
 
 .fabricate-manager-v2 .manager-v2-recipe-preview,
 .fabricate-manager-v2 .manager-v2-component-preview {
-  width: 52px;
-  height: 52px;
+  width: 56px;
+  height: 56px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  object-fit: cover;
+  flex: 0 0 auto;
 }
 
 .fabricate-manager-v2 .manager-v2-environment-thumb {
@@ -6182,6 +6245,22 @@
   gap: 8px;
 }
 
+.fabricate-manager-v2 .manager-v2-evidence-list {
+  margin: 6px 0 0;
+  padding: 0 0 0 18px;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.fabricate-manager-v2 .manager-v2-evidence-list > li {
+  margin: 0 0 4px;
+}
+
+.fabricate-manager-v2 .manager-v2-evidence-list > li:last-child {
+  margin-bottom: 0;
+}
+
 .fabricate-manager-v2 .manager-v2-fact {
   display: block;
   min-width: 0;
@@ -6290,6 +6369,18 @@
 .fabricate-manager-v2 .manager-v2-icon-button:not(:disabled):hover {
   border-color: var(--fab-mv2-border-strong);
   background: rgba(255, 255, 255, 0.1);
+}
+
+.fabricate-manager-v2 .manager-v2-button.is-primary:not(:disabled):hover {
+  border-color: rgba(92, 184, 92, 0.78);
+  background: rgba(92, 184, 92, 0.84);
+}
+
+.fabricate-manager-v2 .manager-v2-button.is-danger:not(:disabled):hover,
+.fabricate-manager-v2 .manager-v2-icon-button.is-danger:not(:disabled):hover {
+  border-color: rgba(217, 83, 79, 0.78);
+  color: #ffd1ce;
+  background: rgba(217, 83, 79, 0.18);
 }
 
 .fabricate-manager-v2 .manager-v2-icon-button {
