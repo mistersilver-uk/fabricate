@@ -11,6 +11,7 @@
     selectedComponentId = '',
     selectedSystemName = '',
     selectedSystemId = '',
+    selectedSystemResolutionMode = 'simple',
     dropEnabled = false,
     onSearchChange = () => {},
     onSelectComponent = () => {},
@@ -20,7 +21,6 @@
     onCopySourceUuid = () => {}
   } = $props();
 
-  let sourceFilter = $state('all');
   let tagFilter = $state('all');
   let essenceFilter = $state('all');
   let lastSystemId = $state('');
@@ -29,7 +29,6 @@
 
   $effect(() => {
     if (selectedSystemId === lastSystemId) return;
-    sourceFilter = 'all';
     tagFilter = 'all';
     essenceFilter = 'all';
     lastSystemId = selectedSystemId;
@@ -40,25 +39,26 @@
   const componentTagOptions = $derived(uniqueSorted((itemCards || []).flatMap(item => Array.isArray(item.tags) ? item.tags : [])));
   const componentEssenceOptions = $derived(uniqueSorted((itemCards || []).flatMap(item => Array.isArray(item.essences) ? item.essences.map(essence => essence.name || essence.id) : [])));
   const filteredComponents = $derived((itemCards || []).filter(item => {
-    const matchesSource = sourceFilter === 'all'
-      || (sourceFilter === 'linked' && item.hasSourceUuid === true)
-      || (sourceFilter === 'none' && item.hasSourceUuid !== true);
     const matchesTag = tagFilter === 'all'
       || (Array.isArray(item.tags) && item.tags.includes(tagFilter));
     const matchesEssence = essenceFilter === 'all'
       || (Array.isArray(item.essences) && item.essences.some(essence => (essence.name || essence.id) === essenceFilter));
-    return matchesSource && matchesTag && matchesEssence;
+    return matchesTag && matchesEssence;
   }));
+  const showProgressiveDifficulty = $derived(
+    selectedSystemResolutionMode === 'progressive'
+    && filteredComponents.some(item => Object.prototype.hasOwnProperty.call(item, 'difficulty'))
+  );
   const filtersActive = $derived(
     (itemSearchTerm || '').trim().length > 0
-    || sourceFilter !== 'all'
     || tagFilter !== 'all'
     || essenceFilter !== 'all'
   );
   const componentTableClass = $derived([
     'manager-v2-components-table',
     showComponentTags ? '' : 'has-no-tags',
-    showComponentEssences ? '' : 'has-no-essences'
+    showComponentEssences ? '' : 'has-no-essences',
+    showProgressiveDifficulty ? 'has-progressive-difficulty' : ''
   ].filter(Boolean).join(' '));
   const paginatedComponents = $derived(filteredComponents.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize));
 
@@ -86,17 +86,32 @@
       .sort((a, b) => a.localeCompare(b));
   }
 
-  function componentSourceState(item) {
-    if (item?.hasSourceUuid) {
+  function componentSourceOrigin(item) {
+    if (item?.sourceMissing) {
       return {
-        id: 'linked',
-        label: text('FABRICATE.Admin.ManagerV2.Component.SourceLinked', 'Linked source'),
+        id: 'missing',
+        label: text('FABRICATE.Admin.ManagerV2.Component.SourceOriginMissing', 'Missing'),
+        className: 'is-warning'
+      };
+    }
+    const origin = item?.sourceOrigin || '';
+    if (origin === 'compendium') {
+      return {
+        id: 'compendium',
+        label: item?.sourceOriginLabel || text('FABRICATE.Admin.ManagerV2.Component.SourceOriginCompendium', 'Compendium'),
+        className: 'is-active'
+      };
+    }
+    if (origin === 'world') {
+      return {
+        id: 'world',
+        label: item?.sourceOriginLabel || text('FABRICATE.Admin.ManagerV2.Component.SourceOriginWorld', 'Items Directory'),
         className: 'is-active'
       };
     }
     return {
-      id: 'none',
-      label: text('FABRICATE.Admin.ManagerV2.Component.SourceNone', 'No source'),
+      id: 'unknown',
+      label: item?.sourceOriginLabel || text('FABRICATE.Admin.ManagerV2.Component.SourceOriginUnknown', 'Unknown'),
       className: 'is-disabled'
     };
   }
@@ -160,7 +175,6 @@
   }
 
   function clearFilters() {
-    sourceFilter = 'all';
     tagFilter = 'all';
     essenceFilter = 'all';
     onSearchChange('');
@@ -198,14 +212,6 @@
         placeholder={text('FABRICATE.Admin.ManagerV2.Component.SearchPlaceholder', 'Search components...')}
         aria-label={text('FABRICATE.Admin.ManagerV2.Component.SearchLabel', 'Search components')}
       />
-    </label>
-    <label class="manager-v2-filter">
-      <span>{text('FABRICATE.Admin.ManagerV2.Component.SourceFilter', 'Source')}</span>
-      <select value={sourceFilter} onchange={(event) => sourceFilter = event.currentTarget.value} aria-label={text('FABRICATE.Admin.ManagerV2.Component.SourceFilterLabel', 'Filter components by source state')}>
-        <option value="all">{text('FABRICATE.Admin.ManagerV2.Component.SourceAll', 'All sources')}</option>
-        <option value="linked">{text('FABRICATE.Admin.ManagerV2.Component.SourceLinked', 'Linked source')}</option>
-        <option value="none">{text('FABRICATE.Admin.ManagerV2.Component.SourceNone', 'No source')}</option>
-      </select>
     </label>
     {#if showComponentTags && componentTagOptions.length > 0}
       <label class="manager-v2-filter">
@@ -266,8 +272,10 @@
           {#if showComponentEssences}
             <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Component.Essences', 'Essences')}</span>
           {/if}
-          <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Component.Source', 'Source')}</span>
-          <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Component.Evidence', 'Evidence')}</span>
+          <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Component.Origin', 'Origin')}</span>
+          {#if showProgressiveDifficulty}
+            <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Component.ProgressiveDifficulty', 'Progressive difficulty')}</span>
+          {/if}
           <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Column.Actions', 'Actions')}</span>
         </div>
         {#each paginatedComponents as item (item.id)}
@@ -298,25 +306,27 @@
               <span role="cell" class="manager-v2-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.ManagerV2.Component.Essences', 'Essences')}>
                 <span class="manager-v2-chip-row">
                   {#each item.essences || [] as essence}
-                    <span class="manager-v2-chip"><i class={essence.icon || 'fas fa-mortar-pestle'} aria-hidden="true"></i>{essence.name || essence.id} {essence.quantity}</span>
+                    <span class="manager-v2-chip manager-v2-essence-compact-chip" title={`${essence.name || essence.id} ${essence.quantity}`} aria-label={`${essence.name || essence.id} ${essence.quantity}`}>
+                      <i class={essence.icon || 'fas fa-mortar-pestle'} aria-hidden="true"></i>{essence.quantity}
+                    </span>
                   {:else}
                     <span class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Component.NoEssences', 'No essences')}</span>
                   {/each}
                 </span>
               </span>
             {/if}
-            <span role="cell" class="manager-v2-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.ManagerV2.Component.Source', 'Source')}>
-              <span class={`manager-v2-chip ${componentSourceState(item).className}`}>{componentSourceState(item).label}</span>
+            <span role="cell" class="manager-v2-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.ManagerV2.Component.Origin', 'Origin')}>
+              <span class={`manager-v2-chip ${componentSourceOrigin(item).className}`}>{componentSourceOrigin(item).label}</span>
             </span>
-            <span role="cell" class="manager-v2-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.ManagerV2.Component.Evidence', 'Evidence')}>
-              <span class="manager-v2-component-evidence">
-                {#each componentEvidenceItems(item) as fact}
-                  <span class="manager-v2-chip">{fact.label}: {fact.value}</span>
+            {#if showProgressiveDifficulty}
+              <span role="cell" class="manager-v2-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.ManagerV2.Component.ProgressiveDifficulty', 'Progressive difficulty')}>
+                {#if Object.prototype.hasOwnProperty.call(item, 'difficulty')}
+                  <span class="manager-v2-chip">{item.difficulty}</span>
                 {:else}
-                  <span class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Component.NoEvidence', 'No extra facts')}</span>
-                {/each}
+                  <span class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Component.NoDifficulty', 'No difficulty')}</span>
+                {/if}
               </span>
-            </span>
+            {/if}
             <span role="cell" class="manager-v2-action-group manager-v2-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.ManagerV2.Column.Actions', 'Actions')}>
               {#if item.hasSourceUuid}
                 <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Component.CopySourceNamed', 'Copy source UUID for {name}').replace('{name}', item.name)} title={item.sourceUuidDisplay} onclick={() => onCopySourceUuid(item.sourceUuidDisplay)}>

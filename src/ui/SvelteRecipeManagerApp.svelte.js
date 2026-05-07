@@ -11,6 +11,46 @@ import { localize } from './svelte/util/foundryBridge.js';
 import { validateImportData, prepareForImport } from '../systems/CraftingSystemExporter.js';
 import { CompendiumImporter } from '../systems/CompendiumImporter.js';
 
+function getFolderCollectionValues(folders) {
+  if (!folders) return [];
+  if (Array.isArray(folders)) return folders;
+  if (folders instanceof Map) return Array.from(folders.values());
+  if (typeof folders.values === 'function') return Array.from(folders.values());
+  if (Array.isArray(folders.contents)) return folders.contents;
+  return [];
+}
+
+function getFolderById(folders, id) {
+  if (!folders || !id) return null;
+  if (typeof folders.get === 'function') return folders.get(id) || null;
+  return getFolderCollectionValues(folders).find(folder => folder?.id === id) || null;
+}
+
+function folderDocumentType(folder) {
+  return folder?.documentType || folder?.type || folder?.folderDocumentType || '';
+}
+
+function folderChildFolders(folder, folders) {
+  const explicitChildren = Array.isArray(folder?.children) ? folder.children : [];
+  const explicitFolderChildren = explicitChildren
+    .map(child => child?.folder || child)
+    .filter(child => child && child !== folder);
+  const collectionChildren = getFolderCollectionValues(folders)
+    .filter(candidate => candidate?.folder?.id === folder?.id || candidate?.parent?.id === folder?.id || candidate?.parent === folder?.id);
+  return [...explicitFolderChildren, ...collectionChildren];
+}
+
+function collectFolderItems(folder, folders, visited = new Set()) {
+  if (!folder?.id || visited.has(folder.id)) return [];
+  visited.add(folder.id);
+  if (folderDocumentType(folder) && folderDocumentType(folder) !== 'Item') return [];
+
+  const directItems = (folder.contents || []).filter(document => document?.documentName === 'Item' && document?.uuid);
+  const nestedItems = folderChildFolders(folder, folders)
+    .flatMap(child => collectFolderItems(child, folders, visited));
+  return [...directItems, ...nestedItems];
+}
+
 export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
   foundry.applications.api.ApplicationV2
 ) {
@@ -328,12 +368,11 @@ export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
               ui.notifications.warn(localize('FABRICATE.Admin.Items.DropNoSystemSelected'));
               return;
             }
-            const folder = game.folders?.get(data.id);
+            const folder = getFolderById(game.folders, data.id);
             if (!folder) return;
-            // folder.contents contains the documents in the folder
-            const folderItems = (folder.contents || []).filter(
-              d => d.documentName === 'Item'
-            );
+            const folderItems = folderDocumentType(folder) && folderDocumentType(folder) !== 'Item'
+              ? []
+              : collectFolderItems(folder, game.folders);
             if (folderItems.length === 0) {
               ui.notifications.info(localize('FABRICATE.Admin.Items.FolderEmpty', {
                 name: folder.name || data.id
@@ -351,6 +390,9 @@ export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
             }
             ui.notifications.info(localize('FABRICATE.Admin.Items.FolderImportSummary', {
               added,
+              updated,
+              skipped,
+              total: folderItems.length,
               name: folder.name || data.id
             }));
             await this._adminStore.refresh();

@@ -688,11 +688,59 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
  * Build the item cards list for the items tab.
  * Mirrors _prepareContext item logic from RecipeManagerApp.
  */
-function _buildItemCards(systemManager, selectedSystem, itemSearchTerm, showTags, showEssences, essenceDefinitionById) {
+function _sourceUuidForItemCard(item) {
+  return item?.sourceItemUuid || item?.sourceUuid || '';
+}
+
+function _sourceOriginForUuid(uuid, sourceMissing = false) {
+  if (sourceMissing) {
+    return {
+      sourceOrigin: 'missing',
+      sourceOriginLabel: 'Missing'
+    };
+  }
+  if (!uuid) {
+    return {
+      sourceOrigin: 'unknown',
+      sourceOriginLabel: 'Unknown'
+    };
+  }
+  if (uuid.startsWith('Compendium.')) {
+    return {
+      sourceOrigin: 'compendium',
+      sourceOriginLabel: 'Compendium'
+    };
+  }
+  if (uuid.startsWith('Item.')) {
+    return {
+      sourceOrigin: 'world',
+      sourceOriginLabel: 'Items Directory'
+    };
+  }
+  return {
+    sourceOrigin: 'unknown',
+    sourceOriginLabel: 'Unknown'
+  };
+}
+
+async function _sourceMissingForUuid(uuid) {
+  if (!uuid || typeof globalThis.fromUuid !== 'function') return false;
+  try {
+    return !(await globalThis.fromUuid(uuid));
+  } catch (_) {
+    return true;
+  }
+}
+
+async function _buildItemCards(systemManager, selectedSystem, itemSearchTerm, showTags, showEssences, essenceDefinitionById) {
   if (!selectedSystem) return [];
   const showSalvage = selectedSystem.features?.salvage === true;
-  return systemManager.getItems(selectedSystem.id, itemSearchTerm).map(item => {
+  const items = systemManager.getItems(selectedSystem.id, itemSearchTerm);
+  return Promise.all(items.map(async item => {
     const description = _plainTextDescription(item.description);
+    const sourceUuidDisplay = _sourceUuidForItemCard(item);
+    const sourceMissing = await _sourceMissingForUuid(sourceUuidDisplay);
+    const sourceOrigin = _sourceOriginForUuid(sourceUuidDisplay, sourceMissing);
     return {
       ...item,
       img: item.img || 'icons/svg/item-bag.svg',
@@ -707,13 +755,15 @@ function _buildItemCards(systemManager, selectedSystem, itemSearchTerm, showTags
           quantity
         }))
         : [],
-      sourceUuidDisplay: item.sourceItemUuid || item.sourceUuid || '',
-      hasSourceUuid: Boolean(item.sourceItemUuid || item.sourceUuid),
+      sourceUuidDisplay,
+      hasSourceUuid: Boolean(sourceUuidDisplay),
+      sourceMissing,
+      ...sourceOrigin,
       salvageSummary: _buildSalvageSummary(item, showSalvage),
       showTags,
       showEssences
     };
-  });
+  }));
 }
 
 function _sourceComponentIdForEssence(def, managedItemById) {
@@ -1342,7 +1392,7 @@ export function createAdminStore(services) {
         rollTableOptions
       );
 
-      itemCards = _buildItemCards(
+      itemCards = await _buildItemCards(
         systemManager,
         selectedSystem,
         get(itemSearch),

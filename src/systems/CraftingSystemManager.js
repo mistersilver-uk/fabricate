@@ -724,12 +724,22 @@ export class CraftingSystemManager {
     const managedItems = system.components || [];
     if (!search) return [...managedItems];
     const q = search.toLowerCase();
-    return managedItems.filter(item =>
-      item.name.toLowerCase().includes(q) ||
-      (item.description || '').toLowerCase().includes(q) ||
-      (item.sourceUuid || '').toLowerCase().includes(q) ||
-      (item.sourceItemUuid || '').toLowerCase().includes(q)
-    );
+    return managedItems.filter(item => {
+      const sourceUuid = item.sourceItemUuid || item.sourceUuid || '';
+      const sourceOrigin = sourceUuid.startsWith('Compendium.')
+        ? 'compendium'
+        : sourceUuid.startsWith('Item.')
+          ? 'items directory'
+          : sourceUuid
+            ? 'unknown'
+            : '';
+      return item.name.toLowerCase().includes(q) ||
+        (item.description || '').toLowerCase().includes(q) ||
+        (item.sourceUuid || '').toLowerCase().includes(q) ||
+        (item.sourceItemUuid || '').toLowerCase().includes(q) ||
+        (Array.isArray(item.tags) && item.tags.some(tag => String(tag || '').toLowerCase().includes(q))) ||
+        sourceOrigin.includes(q);
+    });
   }
 
   async _migrateLegacyRecipeItems() {

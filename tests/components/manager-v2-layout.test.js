@@ -221,7 +221,7 @@ test('manager-v2 components browser defines drop target and compact responsive t
   const tableBlock = blockFor('.fabricate-manager-v2 .manager-v2-components-table');
   const dropBlock = blockFor('.fabricate-manager-v2 .manager-v2-component-drop-zone');
   const identityBlock = blockFor('.fabricate-manager-v2 .manager-v2-component-identity');
-  const evidenceBlock = blockFor('.fabricate-manager-v2 .manager-v2-component-evidence');
+  const componentCopyBlock = blockFor('.fabricate-manager-v2 .manager-v2-component-identity .manager-v2-system-copy');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager-v2 (max-width: 1120px)'));
 
   assert.ok(
@@ -229,14 +229,15 @@ test('manager-v2 components browser defines drop target and compact responsive t
     'components route should reserve rows for header, drop target, toolbar, and table'
   );
   assert.ok(
-    tableBlock.includes('--fab-mv2-component-grid: minmax(0, 1.25fr)'),
+    tableBlock.includes('--fab-mv2-component-grid: minmax(0, 1.42fr)'),
     'components table should define shrinkable compact columns for normal Foundry manager widths'
   );
   assert.ok(
-    css.includes('.fabricate-manager-v2 .manager-v2-components-table.has-no-tags.has-no-essences'),
-    'components table should have a no-tags/no-essences grid variant'
+    css.includes('.fabricate-manager-v2 .manager-v2-components-table.has-no-tags.has-no-essences.has-progressive-difficulty'),
+    'components table should have a no-tags/no-essences progressive grid variant'
   );
   assert.ok(dropBlock.includes('grid-template-columns: 42px minmax(0, 1fr);'), 'component drop zone should reserve icon and copy space');
+  assert.ok(dropBlock.includes('margin: 12px;'), 'component drop zone should keep balanced vertical spacing around the toolbar');
   assert.ok(css.includes('.fabricate-manager-v2 .manager-v2-component-drop-zone.is-drop-active'), 'component drop zone should expose an active drag state');
   assert.ok(
     identityBlock.includes('grid-template-columns: 46px minmax(0, 1fr);')
@@ -244,9 +245,8 @@ test('manager-v2 components browser defines drop target and compact responsive t
     'component identity should reserve thumbnail space'
   );
   assert.ok(
-    evidenceBlock.includes('flex-wrap: wrap;')
-      || css.includes('.fabricate-manager-v2 .manager-v2-component-evidence,\n.fabricate-manager-v2 .manager-v2-environment-evidence'),
-    'component evidence chips should wrap instead of overflowing'
+    componentCopyBlock.includes('max-height: 52px;') && componentCopyBlock.includes('overflow: hidden;'),
+    'component identity copy should clamp inside the row instead of overflowing below the thumbnail'
   );
   assert.ok(
     mediumQuery.includes('.fabricate-manager-v2 .manager-v2-component-row') && mediumQuery.includes('grid-template-columns: minmax(0, 1fr);'),

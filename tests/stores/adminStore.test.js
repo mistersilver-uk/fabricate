@@ -2236,6 +2236,9 @@ describe('createAdminStore', () => {
       assert.equal(card.hasDescription, true);
       assert.equal(card.sourceUuidDisplay, 'Compendium.source.items.blazing-herb');
       assert.equal(card.hasSourceUuid, true);
+      assert.equal(card.sourceOrigin, 'compendium');
+      assert.equal(card.sourceOriginLabel, 'Compendium');
+      assert.equal(card.sourceMissing, false);
       assert.deepEqual(card.tags, ['fire']);
       assert.deepEqual(card.essences, [
         { id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire', quantity: 2 },

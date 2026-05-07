@@ -4314,23 +4314,39 @@
 }
 
 .fabricate-manager-v2 .manager-v2-components-table {
-  --fab-mv2-component-grid: minmax(0, 1.25fr) minmax(0, 0.56fr) minmax(0, 0.62fr) minmax(0, 0.52fr) minmax(0, 0.72fr) 118px;
+  --fab-mv2-component-grid: minmax(0, 1.42fr) minmax(0, 0.55fr) minmax(0, 0.58fr) minmax(0, 0.48fr) 118px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   min-width: 0;
 }
 
+.fabricate-manager-v2 .manager-v2-components-table.has-progressive-difficulty {
+  --fab-mv2-component-grid: minmax(0, 1.28fr) minmax(0, 0.5fr) minmax(0, 0.54fr) minmax(0, 0.45fr) minmax(0, 0.56fr) 118px;
+}
+
 .fabricate-manager-v2 .manager-v2-components-table.has-no-tags {
-  --fab-mv2-component-grid: minmax(0, 1.35fr) minmax(0, 0.68fr) minmax(0, 0.55fr) minmax(0, 0.78fr) 118px;
+  --fab-mv2-component-grid: minmax(0, 1.5fr) minmax(0, 0.66fr) minmax(0, 0.52fr) 118px;
 }
 
 .fabricate-manager-v2 .manager-v2-components-table.has-no-essences {
-  --fab-mv2-component-grid: minmax(0, 1.35fr) minmax(0, 0.62fr) minmax(0, 0.55fr) minmax(0, 0.78fr) 118px;
+  --fab-mv2-component-grid: minmax(0, 1.5fr) minmax(0, 0.6fr) minmax(0, 0.52fr) 118px;
 }
 
 .fabricate-manager-v2 .manager-v2-components-table.has-no-tags.has-no-essences {
-  --fab-mv2-component-grid: minmax(0, 1.45fr) minmax(0, 0.58fr) minmax(0, 0.86fr) 118px;
+  --fab-mv2-component-grid: minmax(0, 1.7fr) minmax(0, 0.54fr) 118px;
+}
+
+.fabricate-manager-v2 .manager-v2-components-table.has-no-tags.has-progressive-difficulty {
+  --fab-mv2-component-grid: minmax(0, 1.42fr) minmax(0, 0.62fr) minmax(0, 0.48fr) minmax(0, 0.58fr) 118px;
+}
+
+.fabricate-manager-v2 .manager-v2-components-table.has-no-essences.has-progressive-difficulty {
+  --fab-mv2-component-grid: minmax(0, 1.42fr) minmax(0, 0.58fr) minmax(0, 0.48fr) minmax(0, 0.58fr) 118px;
+}
+
+.fabricate-manager-v2 .manager-v2-components-table.has-no-tags.has-no-essences.has-progressive-difficulty {
+  --fab-mv2-component-grid: minmax(0, 1.58fr) minmax(0, 0.52fr) minmax(0, 0.58fr) 118px;
 }
 
 .fabricate-manager-v2 .manager-v2-environments-table {
@@ -4734,6 +4750,10 @@
   flex: 0 0 auto;
 }
 
+.fabricate-manager-v2 .manager-v2-component-thumb {
+  align-self: center;
+}
+
 .fabricate-manager-v2 .manager-v2-recipe-preview,
 .fabricate-manager-v2 .manager-v2-component-preview {
   width: 56px;
@@ -4806,6 +4826,13 @@
 .fabricate-manager-v2 .manager-v2-system-copy,
 .fabricate-manager-v2 .manager-v2-inspector-copy {
   min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-component-identity .manager-v2-system-copy {
+  display: grid;
+  align-content: center;
+  max-height: 52px;
+  overflow: hidden;
 }
 
 .fabricate-manager-v2 .manager-v2-system-inspector-heading {
@@ -4889,12 +4916,18 @@
   gap: 10px;
   align-items: center;
   min-width: 0;
-  margin: 12px 12px 0;
+  margin: 12px;
   padding: 11px 12px;
   border: 1px dashed var(--fab-mv2-border-strong);
   border-radius: 8px;
   color: var(--fab-mv2-text);
   background: rgba(92, 184, 92, 0.08);
+}
+
+.fabricate-manager-v2 .manager-v2-essence-compact-chip {
+  min-width: 34px;
+  justify-content: center;
+  white-space: nowrap;
 }
 
 .fabricate-manager-v2 .manager-v2-component-drop-zone.is-drop-active {

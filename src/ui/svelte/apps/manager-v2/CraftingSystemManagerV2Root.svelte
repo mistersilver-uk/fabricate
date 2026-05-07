@@ -861,16 +861,30 @@
   }
 
   function componentSourceState(item) {
-    if (item?.hasSourceUuid) {
+    if (item?.sourceMissing) {
       return {
-        id: 'linked',
-        label: text('FABRICATE.Admin.ManagerV2.Component.SourceLinked', 'Linked source'),
+        id: 'missing',
+        label: text('FABRICATE.Admin.ManagerV2.Component.SourceOriginMissing', 'Missing'),
+        className: 'is-warning'
+      };
+    }
+    if (item?.sourceOrigin === 'compendium') {
+      return {
+        id: 'compendium',
+        label: item.sourceOriginLabel || text('FABRICATE.Admin.ManagerV2.Component.SourceOriginCompendium', 'Compendium'),
+        className: 'is-active'
+      };
+    }
+    if (item?.sourceOrigin === 'world') {
+      return {
+        id: 'world',
+        label: item.sourceOriginLabel || text('FABRICATE.Admin.ManagerV2.Component.SourceOriginWorld', 'Items Directory'),
         className: 'is-active'
       };
     }
     return {
-      id: 'none',
-      label: text('FABRICATE.Admin.ManagerV2.Component.SourceNone', 'No source'),
+      id: 'unknown',
+      label: item?.sourceOriginLabel || text('FABRICATE.Admin.ManagerV2.Component.SourceOriginUnknown', 'Unknown'),
       className: 'is-disabled'
     };
   }
@@ -1360,6 +1374,7 @@
         selectedComponentId={selectedComponent?.id || ''}
         selectedSystemName={selectedSystem?.name || ''}
         {selectedSystemId}
+        selectedSystemResolutionMode={selectedSystem?.resolutionMode || 'simple'}
         dropEnabled={!!selectedSystemId && !!services?.onDropItem}
         onSearchChange={(term) => store.setItemSearch?.(term)}
         onSelectComponent={(id) => selectComponent(id)}
@@ -1773,7 +1788,9 @@
               <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Component.Essences', 'Essences')}</h3>
               <div class="manager-v2-feature-list">
                 {#each selectedComponent.essences || [] as essence}
-                  <span class="manager-v2-chip"><i class={essence.icon || 'fas fa-mortar-pestle'} aria-hidden="true"></i>{essence.name || essence.id} {essence.quantity}</span>
+                  <span class="manager-v2-chip manager-v2-essence-compact-chip" title={`${essence.name || essence.id} ${essence.quantity}`} aria-label={`${essence.name || essence.id} ${essence.quantity}`}>
+                    <i class={essence.icon || 'fas fa-mortar-pestle'} aria-hidden="true"></i>{essence.quantity}
+                  </span>
                 {:else}
                   <span class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Component.NoEssences', 'No essences')}</span>
                 {/each}
@@ -1784,8 +1801,11 @@
           <section class="manager-v2-inspector-card" data-component-section="source">
             <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Component.Source', 'Source')}</h3>
             {#if selectedComponent.hasSourceUuid}
-              <p class="manager-v2-muted">{selectedComponent.sourceUuidDisplay}</p>
-              <button type="button" class="manager-v2-button" data-component-action="copy-source" onclick={() => copyComponentSource(selectedComponent.sourceUuidDisplay)}>
+              <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Component.SourceHint', 'This component keeps a stored source ID for import matching and replacement.')}</p>
+              {#if selectedComponent.sourceMissing}
+                <p class="environment-stale-warning" data-component-source-missing>{text('FABRICATE.Admin.ManagerV2.Component.SourceMissingHint', 'The stored source no longer resolves. Replace the component source or verify the original compendium/world item still exists.')}</p>
+              {/if}
+              <button type="button" class="manager-v2-button" data-component-action="copy-source" title={selectedComponent.sourceUuidDisplay} onclick={() => copyComponentSource(selectedComponent.sourceUuidDisplay)}>
                 <i class="fas fa-copy" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.ManagerV2.Component.CopySource', 'Copy source UUID')}</span>
               </button>
@@ -1794,33 +1814,6 @@
             {/if}
           </section>
 
-          {#if componentEvidenceItems(selectedComponent).length > 0}
-            <section class="manager-v2-inspector-card" data-component-section="usage">
-              <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Component.UsageEvidence', 'Usage evidence')}</h3>
-              <div class="manager-v2-requirements-list">
-                {#each componentEvidenceItems(selectedComponent) as fact}
-                  <div class="manager-v2-requirement-row">
-                    <span>{fact.label}</span>
-                    <strong>{fact.value}</strong>
-                  </div>
-                {/each}
-              </div>
-            </section>
-          {/if}
-
-          <section class="manager-v2-inspector-card">
-            <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Component.Actions', 'Component actions')}</h3>
-            <div class="manager-v2-inspector-actions">
-              <button type="button" class="manager-v2-button is-primary" data-component-action="edit" onclick={() => editComponent()}>
-                <i class="fas fa-edit" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.ManagerV2.Component.Edit', 'Edit component')}</span>
-              </button>
-              <button type="button" class="manager-v2-button is-danger" data-component-action="delete" onclick={() => deleteComponent()}>
-                <i class="fas fa-trash" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.ManagerV2.Component.Delete', 'Delete component')}</span>
-              </button>
-            </div>
-          </section>
         {:else if itemCards.length === 0}
           <section class="manager-v2-setup-card" aria-label={text('FABRICATE.Admin.ManagerV2.Component.EmptySetup.Title', 'Set up components')}>
             <div class="manager-v2-setup-card-header">
@@ -1949,13 +1942,28 @@
                 <h3>{text('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.Title', 'Set up recipes')}</h3>
               </div>
             </div>
-            <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.Hint', 'Create the first recipe for this system after its reusable components are available.')}</p>
-            <ol class="manager-v2-setup-list">
-              <li>{text('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.StepStructure', 'Choose the recipe structure supported by the selected system.')}</li>
-              <li>{text('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.StepRequirements', 'Add ingredient sets, catalysts, and any visibility or timing requirements.')}</li>
-              <li>{text('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.StepResults', 'Define result groups and enable the recipe when it is ready for players.')}</li>
-            </ol>
+            {#if selectedCounts.components > 0}
+              <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.Hint', 'Create the first recipe for this system after its reusable components are available.')}</p>
+              <ol class="manager-v2-setup-list">
+                <li>{text('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.StepStructure', 'Choose the recipe structure supported by the selected system.')}</li>
+                <li>{text('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.StepRequirements', 'Add ingredient sets, catalysts, and any visibility or timing requirements.')}</li>
+                <li>{text('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.StepResults', 'Define result groups and enable the recipe when it is ready for players.')}</li>
+              </ol>
+            {:else}
+              <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.NoComponentsHint', 'Add components before creating recipes so ingredients, catalysts, and results have reusable items to reference.')}</p>
+              <ol class="manager-v2-setup-list">
+                <li>{text('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.NoComponentsStepComponents', 'Open Components and drop world, compendium, pack, or folder items into this system.')}</li>
+                <li>{text('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.NoComponentsStepOrganize', 'Review component names, source links, tags, essences, and difficulty metadata.')}</li>
+                <li>{text('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.NoComponentsStepRecipes', 'Return to Recipes and build requirements and results from those components.')}</li>
+              </ol>
+            {/if}
             <div class="manager-v2-setup-links" aria-label={text('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.Resources', 'Recipe resources')}>
+              {#if selectedCounts.components <= 0}
+                <button type="button" class="manager-v2-button is-primary" onclick={() => setView('components')}>
+                  <i class="fas fa-boxes" aria-hidden="true"></i>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.AddComponents', 'Add components')}</span>
+                </button>
+              {/if}
               <a class="manager-v2-button" href="https://misterpotts.github.io/fabricate/recipes/" target="_blank" rel="noreferrer">
                 <i class="fas fa-book-open" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.RecipeDocs', 'Recipe docs')}</span>

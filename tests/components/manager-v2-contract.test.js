@@ -143,7 +143,8 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Recipe.Requirements, 'Requirements');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Component.Title, 'Components');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Component.DropZoneTitle, 'Drop items to add components');
-    assert.equal(lang.FABRICATE.Admin.ManagerV2.Component.SourceLinked, 'Linked source');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Component.Origin, 'Origin');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Component.SourceOriginCompendium, 'Compendium');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.TagsCategories.Title, 'Tags & Categories');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.TagsCategories.Library, 'Tags & Categories');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.TagsCategories.GeneralReservedFeedback, 'General is already available as the base category.');
@@ -221,7 +222,14 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.EmptySetup.GatheringDocs, 'Gathering docs');
     assert.ok(rootSource.includes('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.Title'), 'empty recipes inspector should use localized setup copy');
     assert.ok(rootSource.includes('https://misterpotts.github.io/fabricate/recipes/'), 'empty recipes inspector should link to published recipe docs');
+    assert.ok(rootSource.includes('selectedCounts.components > 0'), 'empty recipes inspector should branch on selected-system component count');
+    assert.ok(rootSource.includes("setView('components')"), 'empty recipes inspector should route zero-component setup to Components');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.Title, 'Set up recipes');
+    assert.equal(
+      lang.FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.NoComponentsHint,
+      'Add components before creating recipes so ingredients, catalysts, and results have reusable items to reference.'
+    );
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.AddComponents, 'Add components');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.RecipeDocs, 'Recipe docs');
     assert.ok(rootSource.includes('FABRICATE.Admin.ManagerV2.Component.EmptySetup.Title'), 'empty components inspector should use localized setup copy');
     assert.ok(rootSource.includes('https://misterpotts.github.io/fabricate/crafting-systems/#components'), 'empty components inspector should link to published component docs');

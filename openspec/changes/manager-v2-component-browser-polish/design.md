@@ -7,10 +7,11 @@ The component browser remains a dense directory view. Rows should show:
 - component image, name, and plain-text description
 - tags, when component tags are enabled
 - compact essence badges, when essences are enabled
+- source origin as Compendium, Items Directory, Missing, or Unknown
 - progressive difficulty, only for progressive systems with difficulty values
 - row actions: copy source UUID when available, edit, delete
 
-The table should not include source-state or generic evidence columns. The component image is the visual source cue, and usage/salvage facts are not needed in this browser slice.
+The table should not include a generic evidence column. Source origin is a visible, non-interactive, searchable column because it answers a common scan question without exposing long UUID strings.
 
 ## Description Text
 
@@ -30,9 +31,24 @@ This preserves scan density without losing discoverability.
 
 Progressive difficulty is useful only when the selected system is in `resolutionMode: "progressive"`. In that state, and only when at least one visible component exposes `difficulty`, add a dedicated table column. Do not keep progressive difficulty in a generic Evidence column.
 
+## Source Origin
+
+Item-card data should include `sourceOrigin`, `sourceOriginLabel`, and `sourceMissing`.
+
+- `Compendium`: stored source UUID starts with `Compendium.`
+- `Items Directory`: stored source UUID starts with `Item.`
+- `Missing`: a stored source UUID is present but no longer resolves
+- `Unknown`: no stored source UUID is available, or the UUID uses an unsupported shape
+
+The table shows the origin label as plain text/chip content so existing browser search can match it. Source UUID copy remains an action button only when a stored UUID exists; the raw UUID belongs in the button tooltip/title.
+
 ## Search And Tags
 
-When component tags are enabled, the component search should match component names, descriptions, and tags. The tag select remains useful for exact filtering, but search must accept tag text directly.
+When component tags are enabled, the component search should match component names, descriptions, tags, and source-origin labels. The tag select remains useful for exact filtering, but search must accept tag text directly.
+
+## Folder Drops
+
+Folder drops should import every direct and nested Item document under the dropped folder. Non-item documents are skipped. The import flow should call the existing `addItemFromUuid` behavior for each item, refresh the admin store once after the loop, and report added, updated, and skipped totals in one summary notification. Empty or non-item folders should show the existing empty-folder notification.
 
 ## Inspector
 
@@ -43,9 +59,10 @@ For source UUID:
 - do not print the raw UUID as standalone small text
 - explain what the source ID represents
 - keep the raw UUID in the copy button `title`
+- show a warning/error callout only when the stored source UUID no longer resolves
 
 ## Risks
 
-- Removing the source column reduces explicit source state visibility. The row image and inspector source card remain enough for this slice; the copy source action only appears when source evidence exists.
+- Resolving source UUIDs during admin-store refresh adds async lookups to item-card preparation. Resolution failures must be treated as missing source state without blocking the manager.
 - Progressive difficulty column must not appear for non-progressive systems, otherwise it wastes space.
 - Table CSS grid variants must account for tags/essences/progressive combinations without overflow.

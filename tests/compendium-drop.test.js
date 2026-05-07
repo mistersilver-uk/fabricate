@@ -990,6 +990,31 @@ test('resolveDropData — null input returns nulls', () => {
  * SvelteRecipeManagerApp._prepareSvelteProps, usable without the Svelte app.
  */
 function buildFullOnDropItem({ systemId, systemManager, notifyWarn, notifyInfo, folders }) {
+  function folderValues() {
+    if (!folders) return [];
+    if (folders instanceof Map) return Array.from(folders.values());
+    if (typeof folders.values === 'function') return Array.from(folders.values());
+    if (Array.isArray(folders.contents)) return folders.contents;
+    return [];
+  }
+
+  function folderChildren(folder) {
+    const explicit = Array.isArray(folder.children) ? folder.children.map(child => child.folder || child) : [];
+    const fromCollection = folderValues().filter(candidate =>
+      candidate?.folder?.id === folder?.id || candidate?.parent?.id === folder?.id || candidate?.parent === folder?.id
+    );
+    return [...explicit, ...fromCollection];
+  }
+
+  function collectItems(folder, visited = new Set()) {
+    if (!folder?.id || visited.has(folder.id)) return [];
+    visited.add(folder.id);
+    return [
+      ...(folder.contents || []).filter(d => d.documentName === 'Item' && d.uuid),
+      ...folderChildren(folder).flatMap(child => collectItems(child, visited))
+    ];
+  }
+
   return async (data) => {
     // Bulk compendium pack drop
     if (data?.type === 'Compendium' && data?.collection && !data?.uuid) {
@@ -1010,7 +1035,9 @@ function buildFullOnDropItem({ systemId, systemManager, notifyWarn, notifyInfo, 
       }
       const folder = folders?.get(data.id);
       if (!folder) return;
-      const folderItems = (folder.contents || []).filter(d => d.documentName === 'Item');
+      const folderItems = folder.documentType && folder.documentType !== 'Item'
+        ? []
+        : collectItems(folder);
       if (folderItems.length === 0) {
         notifyInfo('FolderEmpty', { name: folder.name });
         return;
@@ -1024,7 +1051,7 @@ function buildFullOnDropItem({ systemId, systemManager, notifyWarn, notifyInfo, 
         else if (res.action === 'updated') updated++;
         else skipped++;
       }
-      notifyInfo('FolderImportSummary', { added, name: folder.name });
+      notifyInfo('FolderImportSummary', { added, updated, skipped, total: folderItems.length, name: folder.name });
       return;
     }
 
@@ -1088,6 +1115,7 @@ test('onDropItem integration — Folder with Items imports each and shows summar
 
   const folders = new Map([
     ['folder1', {
+      id: 'folder1',
       name: 'My Folder',
       contents: [
         { documentName: 'Item', uuid: 'Item.item-x' },
@@ -1113,6 +1141,98 @@ test('onDropItem integration — Folder with Items imports each and shows summar
   assert.equal(infos.length, 1);
   assert.equal(infos[0].key, 'FolderImportSummary');
   assert.equal(infos[0].params.added, 2);
+  assert.equal(infos[0].params.updated, 0);
+  assert.equal(infos[0].params.skipped, 0);
+  assert.equal(infos[0].params.total, 2);
+});
+
+test('onDropItem integration — Folder import includes nested item folders and summary counts', async () => {
+  const addCalls = [];
+  const infos = [];
+  const actions = new Map([
+    ['Item.direct', 'added'],
+    ['Item.nested-updated', 'updated'],
+    ['Item.deep-skipped', 'skipped']
+  ]);
+
+  const mgr = {
+    addItemFromUuid: async (_sysId, uuid) => {
+      addCalls.push(uuid);
+      return { item: { name: uuid }, action: actions.get(uuid) || 'skipped' };
+    },
+    addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0 })
+  };
+
+  const folders = new Map([
+    ['root', {
+      id: 'root',
+      name: 'Root Folder',
+      documentType: 'Item',
+      contents: [
+        { documentName: 'Item', uuid: 'Item.direct' },
+        { documentName: 'Actor', uuid: 'Actor.ignored' }
+      ],
+      children: [{ folder: { id: 'nested', name: 'Nested', documentType: 'Item', contents: [{ documentName: 'Item', uuid: 'Item.nested-updated' }] } }]
+    }],
+    ['deep', {
+      id: 'deep',
+      name: 'Deep',
+      documentType: 'Item',
+      parent: 'nested',
+      contents: [{ documentName: 'Item', uuid: 'Item.deep-skipped' }]
+    }]
+  ]);
+
+  const handler = buildFullOnDropItem({
+    systemId: 'sys1',
+    systemManager: mgr,
+    notifyWarn: () => {},
+    notifyInfo: (key, params) => { infos.push({ key, params }); },
+    folders
+  });
+
+  await handler({ type: 'Folder', id: 'root', documentType: 'Item' });
+
+  assert.deepEqual(addCalls, ['Item.direct', 'Item.nested-updated', 'Item.deep-skipped']);
+  assert.equal(infos[0].key, 'FolderImportSummary');
+  assert.deepEqual(infos[0].params, {
+    added: 1,
+    updated: 1,
+    skipped: 1,
+    total: 3,
+    name: 'Root Folder'
+  });
+});
+
+test('onDropItem integration — Non-item folder shows empty notification and skips import', async () => {
+  const addCalls = [];
+  const infos = [];
+  const mgr = {
+    addItemFromUuid: async (...args) => { addCalls.push(args); return { item: {}, action: 'added' }; },
+    addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0 })
+  };
+  const folders = new Map([
+    ['actors', {
+      id: 'actors',
+      name: 'Actors',
+      documentType: 'Actor',
+      contents: [{ documentName: 'Item', uuid: 'Item.should-not-import' }]
+    }]
+  ]);
+
+  const handler = buildFullOnDropItem({
+    systemId: 'sys1',
+    systemManager: mgr,
+    notifyWarn: () => {},
+    notifyInfo: (key, params) => { infos.push({ key, params }); },
+    folders
+  });
+
+  await handler({ type: 'Folder', id: 'actors', documentType: 'Actor' });
+
+  assert.equal(addCalls.length, 0);
+  assert.equal(infos[0].key, 'FolderEmpty');
+  assert.equal(infos[0].params.name, 'Actors');
 });
 
 test('onDropItem integration — Folder with no Items shows info notification and does not call addItemFromUuid', async () => {
@@ -1126,6 +1246,7 @@ test('onDropItem integration — Folder with no Items shows info notification an
 
   const folders = new Map([
     ['folder-empty', {
+      id: 'folder-empty',
       name: 'Empty Folder',
       contents: [
         { documentName: 'Actor', uuid: 'Actor.someone' }

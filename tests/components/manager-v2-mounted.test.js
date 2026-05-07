@@ -107,20 +107,21 @@ function createStore(calls = [], options = {}) {
     gathering: true,
     recipeCategories: true
   };
+  const alchemyManagedItemOptions = options.emptyComponents ? [] : [
+    { id: 'c1', name: 'Iron Ore', img: 'icons/commodities/metal/ore-chunk-grey.webp', sourceItemUuid: 'Compendium.fabricate.items.iron-ore' },
+    { id: 'c2', name: 'Glass Vial', img: 'icons/containers/kitchenware/vase-clay-blue.webp' },
+    { id: 'c3', name: 'Nightshade', img: 'icons/consumables/plants/nightshade.jpg' },
+    { id: 'c4', name: 'Coal', img: 'icons/commodities/materials/bowl-powder-black.webp' }
+  ];
   const systemDetails = {
     alchemy: {
       id: 'alchemy',
       name: 'Alchemy',
       description: 'Potion and essence work',
-      resolutionMode: 'alchemy',
+      resolutionMode: options.alchemyResolutionMode || 'alchemy',
       advancedOptionsEnabled: true,
       features: selectedFeatures,
-      managedItemOptions: [
-        { id: 'c1', name: 'Iron Ore', img: 'icons/commodities/metal/ore-chunk-grey.webp', sourceItemUuid: 'Compendium.fabricate.items.iron-ore' },
-        { id: 'c2', name: 'Glass Vial', img: 'icons/containers/kitchenware/vase-clay-blue.webp' },
-        { id: 'c3', name: 'Nightshade', img: 'icons/consumables/plants/nightshade.jpg' },
-        { id: 'c4', name: 'Coal', img: 'icons/commodities/materials/bowl-powder-black.webp' }
-      ],
+      managedItemOptions: alchemyManagedItemOptions,
       essenceDefinitions: [
         { id: 'earth', name: 'Earth', description: 'Stone and root.', icon: 'fas fa-mountain', sourceComponentId: 'c1', sourceItemUuid: 'c1', associatedSystemItemId: 'c1' },
         { id: 'water', name: 'Water', description: 'Clear current.', icon: 'fas fa-water', sourceComponentId: null, sourceItemUuid: null, associatedSystemItemId: null }
@@ -162,6 +163,9 @@ function createStore(calls = [], options = {}) {
         essences: [{ id: 'earth', name: 'Earth', icon: 'fas fa-mountain', quantity: 2 }],
         sourceUuidDisplay: 'Compendium.fabricate.items.iron-ore',
         hasSourceUuid: true,
+        sourceOrigin: 'compendium',
+        sourceOriginLabel: 'Compendium',
+        sourceMissing: false,
         showTags: true,
         showEssences: true,
         difficulty: 2,
@@ -176,6 +180,9 @@ function createStore(calls = [], options = {}) {
         essences: [],
         sourceUuidDisplay: '',
         hasSourceUuid: false,
+        sourceOrigin: 'unknown',
+        sourceOriginLabel: 'Unknown',
+        sourceMissing: false,
         showTags: true,
         showEssences: true
       }
@@ -190,6 +197,9 @@ function createStore(calls = [], options = {}) {
         essences: [],
         sourceUuidDisplay: '',
         hasSourceUuid: false,
+        sourceOrigin: 'unknown',
+        sourceOriginLabel: 'Unknown',
+        sourceMissing: false,
         showTags: false,
         showEssences: false
       }
@@ -294,7 +304,7 @@ function createStore(calls = [], options = {}) {
         advancedOptionsEnabled: true,
         features: selectedFeatures,
         featureCount: 3,
-        componentCount: 4,
+        componentCount: alchemyManagedItemOptions.length,
         recipeCount: 2,
         selected: options.selected !== false
       },
@@ -356,7 +366,7 @@ function createStore(calls = [], options = {}) {
     recipeCategories: [{ name: 'elixirs', count: 1 }, { name: 'potions', count: 1 }],
     recipeSearchTerm: '',
     itemSearchTerm: '',
-    itemCards: selectedSystem ? (options.emptyComponents ? [] : componentItems[selectedSystem.id]) : [],
+    itemCards: selectedSystem ? componentCardsFor(selectedSystem.id) : [],
     essenceCards: selectedSystem ? (options.emptyEssences ? [] : essenceCardsBySystem[selectedSystem.id]) : [],
     showVisibilitySummary: true,
     canShowEnvironmentsTab: selectedFeatures.gathering === true,
@@ -378,7 +388,7 @@ function createStore(calls = [], options = {}) {
     viewState.update(state => ({
       ...state,
       selectedSystem: nextSelected,
-      itemCards: componentItems[id] || [],
+      itemCards: componentCardsFor(id),
       essenceCards: essenceCardsBySystem[id] || [],
       itemSearchTerm: '',
       canShowEnvironmentsTab: nextSelected?.features?.gathering === true,
@@ -387,6 +397,15 @@ function createStore(calls = [], options = {}) {
         selected: system.id === id
       }))
     }));
+  }
+
+  function componentCardsFor(id) {
+    if (options.emptyComponents) return [];
+    return (componentItems[id] || []).map(item => (
+      options.missingComponentSource && item.id === 'c1'
+        ? { ...item, sourceMissing: true, sourceOrigin: 'missing', sourceOriginLabel: 'Missing' }
+        : item
+    ));
   }
 
   function applySystemEnabled(id, enabled) {
@@ -889,26 +908,29 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Component directory'));
     assert.ok(target.textContent.includes('Drop items to add components'));
     assert.ok(target.textContent.includes('Iron Ore'));
-    assert.ok(target.textContent.includes('Linked source'));
-    assert.ok(target.textContent.includes('Earth 2'));
-    assert.ok(target.textContent.includes('Usage evidence'));
+    assert.ok(target.textContent.includes('Compendium'));
+    assert.ok(target.textContent.includes('Unknown'));
+    const compactEssenceChip = target.querySelector('[data-component-id="c1"] .manager-v2-essence-compact-chip');
+    assert.equal(compactEssenceChip?.textContent.trim(), '2', 'essence row should show only compact quantity text');
+    assert.equal(compactEssenceChip?.getAttribute('aria-label'), 'Earth 2', 'compact essence chip should expose the essence name and quantity accessibly');
+    assert.equal(target.textContent.includes('Usage evidence'), false);
+    assert.equal(target.textContent.includes('Evidence'), false);
+    assert.equal(target.textContent.includes('Progressive difficulty'), false);
 
     const search = target.querySelector('.manager-v2-toolbar input[type="search"]');
     search.value = 'iron';
     search.dispatchEvent(new Event('input', { bubbles: true }));
 
-    const sourceFilter = target.querySelector('[aria-label="Filter components by source state"]');
-    sourceFilter.value = 'none';
-    sourceFilter.dispatchEvent(new Event('change', { bubbles: true }));
-    sourceFilter.dispatchEvent(new Event('input', { bubbles: true }));
+    const tagFilter = target.querySelector('[aria-label="Filter components by tag"]');
+    tagFilter.value = 'container';
+    tagFilter.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
     flushSync();
     assert.equal(target.querySelectorAll('.manager-v2-component-row').length, 1);
     assert.ok(target.textContent.includes('Glass Vial'));
 
-    sourceFilter.value = 'all';
-    sourceFilter.dispatchEvent(new Event('change', { bubbles: true }));
-    sourceFilter.dispatchEvent(new Event('input', { bubbles: true }));
+    tagFilter.value = 'all';
+    tagFilter.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
     flushSync();
 
@@ -916,13 +938,15 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.ok(target.querySelector('[data-component-id="c1"]').classList.contains('is-selected'));
-    assert.ok(target.textContent.includes('Compendium.fabricate.items.iron-ore'));
+    assert.equal(target.textContent.includes('Compendium.fabricate.items.iron-ore'), false, 'raw source UUID should not render as inspector text');
 
-    const componentEditAction = target.querySelector('[data-component-action="edit"]');
-    assert.ok(componentEditAction, 'component inspector should expose an Edit action');
-    assert.ok(componentEditAction.classList.contains('is-primary'), 'Edit component should be the primary inspector action');
-    assert.ok(target.querySelector('[data-component-action="delete"]'), 'component inspector should expose a Delete action');
+    const copySourceAction = target.querySelector('[data-component-action="copy-source"]');
+    assert.ok(copySourceAction, 'component inspector should expose a copy source action');
+    assert.equal(copySourceAction.getAttribute('title'), 'Compendium.fabricate.items.iron-ore');
+    assert.equal(target.querySelector('[data-component-action="edit"]'), null, 'component inspector should not duplicate row edit action');
+    assert.equal(target.querySelector('[data-component-action="delete"]'), null, 'component inspector should not duplicate row delete action');
     assert.ok(target.querySelector('[data-component-section="source"]'), 'component inspector should expose a Source section');
+    assert.equal(target.querySelector('[data-component-source-missing]'), null, 'resolved source should not show a missing-source warning');
     const componentHeroRow = target.querySelector('.manager-v2-inspector-title-row.is-hero-large');
     assert.ok(componentHeroRow, 'component inspector should use the prominent hero title row');
     assert.ok(componentHeroRow.querySelector('.manager-v2-component-preview'), 'component inspector hero should render the component preview image');
@@ -942,6 +966,33 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.deepEqual(edited, ['c1']);
     assert.ok(calls.some(call => call[0] === 'setItemSearch' && call[1] === 'iron'));
     assert.ok(calls.some(call => call[0] === 'deleteComponent' && call[1] === 'c1'));
+  });
+
+  it('shows progressive difficulty only for progressive component systems and warns for missing sources', async () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], { alchemyResolutionMode: 'progressive', missingComponentSource: true }),
+        services: { openCurrentAdmin: () => {}, onDropItem: () => {}, onCopySourceUuid: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Components').click();
+    await tick();
+    flushSync();
+
+    assert.ok(target.textContent.includes('Progressive difficulty'));
+    assert.ok(target.textContent.includes('Missing'));
+
+    target.querySelector('[data-component-id="c1"] .manager-v2-component-identity').click();
+    await tick();
+    flushSync();
+
+    assert.ok(target.querySelector('[data-component-source-missing]'), 'missing stored source should show a warning callout');
+    assert.equal(target.textContent.includes('Compendium.fabricate.items.iron-ore'), false, 'missing source warning should not print the raw UUID');
   });
 
   it('routes to tags and categories with add feedback, usage warnings, and store delegation', async () => {
@@ -1559,6 +1610,40 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
 
     target.querySelector('.manager-v2-table-scroll .manager-v2-button.is-primary').click();
     assert.ok(calls.some(call => call[0] === 'createRecipe'));
+  });
+
+  it('points empty recipe setup to Components when the system has no components', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { emptyRecipes: true, emptyComponents: true }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Recipes').click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'recipes');
+    assert.ok(target.textContent.includes('No recipes yet'));
+    assert.ok(target.textContent.includes('Add components before creating recipes'));
+    assert.ok(target.textContent.includes('Open Components and drop world, compendium, pack, or folder items into this system.'));
+    assert.ok(target.textContent.includes('Add components'));
+    assert.equal(target.textContent.includes('Choose the recipe structure supported by the selected system.'), false);
+
+    Array.from(target.querySelectorAll('.manager-v2-setup-links .manager-v2-button'))
+      .find(button => button.textContent.includes('Add components'))
+      .click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'components');
+    assert.ok(target.textContent.includes('No components yet'));
   });
 
   it('shows setup guidance and keeps import affordance when a system has no components', async () => {
