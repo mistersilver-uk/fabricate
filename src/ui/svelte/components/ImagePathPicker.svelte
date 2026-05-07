@@ -11,7 +11,8 @@
     ariaInvalid = undefined,
     ariaDescribedBy = undefined,
     onChange = () => {},
-    onPickImagePath = null
+    onPickImagePath = null,
+    showInput = true
   } = $props();
 
   let picking = $state(false);
@@ -39,20 +40,24 @@
   }
 </script>
 
-<div class="image-path-picker">
+<div class="image-path-picker" class:is-button-only={!showInput}>
   <img class="image-path-picker-preview" src={previewPath} alt="" aria-hidden="true" />
   <div class="image-path-picker-controls">
-    <input
-      type="text"
-      value={value || ''}
-      data-environment-field={dataEnvironmentField}
-      aria-invalid={ariaInvalid}
-      aria-describedby={ariaDescribedBy}
-      oninput={(event) => onChange(event.target.value)}
-    />
+    {#if showInput}
+      <input
+        type="text"
+        value={value || ''}
+        data-environment-field={dataEnvironmentField}
+        aria-invalid={ariaInvalid}
+        aria-describedby={ariaDescribedBy}
+        oninput={(event) => onChange(event.target.value)}
+      />
+    {/if}
     <button
       type="button"
       class="image-path-picker-button"
+      data-environment-field={!showInput ? dataEnvironmentField : undefined}
+      aria-describedby={!showInput ? ariaDescribedBy : undefined}
       onclick={pickImagePath}
       disabled={!pickerAvailable || picking}
       title={buttonLabel}

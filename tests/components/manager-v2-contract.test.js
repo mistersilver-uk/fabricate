@@ -409,6 +409,37 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.AdvancedTab, undefined);
     assert.ok(!environmentEditSource.includes("id: 'advanced'"), 'environment editor should not define an advanced task tab');
     assert.ok(!environmentEditSource.includes('manager-v2-environment-details-tabs'), 'environment editor should not render environment advanced tabs');
-    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.EvidenceColumn, 'Environment evidence');
+    assert.ok(!environmentEditSource.includes('manager-v2-environment-evidence-column'), 'environment editor should no longer render the duplicated evidence column');
+    assert.ok(environmentEditSource.includes('manager-v2-environment-validation-band'), 'environment editor should render the collapsible validation band');
+  });
+
+  it('uses Foundry FilePicker for the environment image and drag-drop for scene linkage', () => {
+    assert.ok(
+      environmentEditSource.includes("import ImagePathPicker from '../../components/ImagePathPicker.svelte';"),
+      'environment editor should import the shared ImagePathPicker component'
+    );
+    assert.ok(environmentEditSource.includes('showInput={false}'), 'environment image control should render in button-only mode');
+    assert.ok(environmentEditSource.includes("onPickImagePath={onPickImagePath}"), 'environment image control should be wired to the FilePicker service');
+    assert.ok(!environmentEditSource.includes('manager-v2-raw-scene-field'), 'environment editor should no longer render a raw scene UUID input');
+    assert.ok(!environmentEditSource.includes("Environments.SceneSelect"), 'environment editor should no longer render the global scene dropdown');
+    assert.ok(environmentEditSource.includes('manager-v2-scene-drop-zone'), 'environment editor should render a drag-drop zone for scene linking');
+    assert.ok(environmentEditSource.includes('handleSceneDrop'), 'environment editor should define a scene drop handler');
+    assert.ok(environmentEditSource.includes("payload.type !== 'Scene'"), 'scene drop handler should ignore non-Scene drag payloads');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.SceneDropHint, 'Drag a scene from the Scenes sidebar to link it');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.SceneDropZoneLabel, 'Scene drop zone');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.ChooseImage, 'Choose environment image');
+  });
+
+  it('replaces the environment status checkbox with the shared status toggle', () => {
+    assert.ok(
+      environmentEditSource.includes('manager-v2-status-toggle'),
+      'environment editor should render the shared manager-v2 status-toggle button for enabled state'
+    );
+    assert.ok(
+      !/manager-v2-environment-status-card[\s\S]{0,160}type="checkbox"/.test(environmentEditSource),
+      'environment editor should not render a native checkbox inside the status card'
+    );
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.EnableEnvironment, 'Enable environment');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.DisableEnvironment, 'Disable environment');
   });
 });

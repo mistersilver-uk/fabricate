@@ -1977,7 +1977,8 @@
 }
 
 .fabricate-admin .environment-assisted-field,
-.fabricate-admin .image-path-picker-controls {
+.fabricate-admin .image-path-picker-controls,
+.fabricate-manager-v2 .image-path-picker-controls {
   display: flex;
   gap: 8px;
   min-width: 0;
@@ -1985,7 +1986,8 @@
 
 .fabricate-admin .environment-assisted-field select,
 .fabricate-admin .environment-assisted-field input,
-.fabricate-admin .image-path-picker-controls input {
+.fabricate-admin .image-path-picker-controls input,
+.fabricate-manager-v2 .image-path-picker-controls input {
   min-width: 0;
 }
 
@@ -1994,18 +1996,21 @@
 }
 
 .fabricate-admin .environment-assisted-field input,
-.fabricate-admin .image-path-picker-controls input {
+.fabricate-admin .image-path-picker-controls input,
+.fabricate-manager-v2 .image-path-picker-controls input {
   flex: 1 1 58%;
 }
 
-.fabricate-admin .image-path-picker {
+.fabricate-admin .image-path-picker,
+.fabricate-manager-v2 .image-path-picker {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
 }
 
-.fabricate-admin .image-path-picker-preview {
+.fabricate-admin .image-path-picker-preview,
+.fabricate-manager-v2 .image-path-picker-preview {
   width: 42px;
   height: 42px;
   flex: 0 0 42px;
@@ -2015,17 +2020,47 @@
   background: rgba(255, 255, 255, 0.06);
 }
 
-.fabricate-admin .image-path-picker-controls {
+.fabricate-admin .image-path-picker-controls,
+.fabricate-manager-v2 .image-path-picker-controls {
   flex: 1 1 auto;
 }
 
-.fabricate-admin .image-path-picker-button {
+.fabricate-admin .image-path-picker-button,
+.fabricate-manager-v2 .image-path-picker-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
   flex: 0 0 auto;
   white-space: nowrap;
+}
+
+.fabricate-manager-v2 .image-path-picker.is-button-only .image-path-picker-preview {
+  width: 64px;
+  height: 64px;
+  flex: 0 0 64px;
+}
+
+.fabricate-manager-v2 .image-path-picker.is-button-only .image-path-picker-button {
+  flex: 1 1 auto;
+  justify-content: flex-start;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--fab-mv2-text);
+  cursor: pointer;
+}
+
+.fabricate-manager-v2 .image-path-picker.is-button-only .image-path-picker-button:hover:not(:disabled) {
+  border-color: var(--fab-mv2-border-strong);
+  background: rgba(0, 0, 0, 0.32);
+}
+
+.fabricate-manager-v2 .image-path-picker.is-button-only .image-path-picker-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .fabricate-admin .environment-save-error {
@@ -6066,9 +6101,9 @@
 .fabricate-manager-v2 .manager-v2-environment-fields-card,
 .fabricate-manager-v2 .manager-v2-environment-scene-card,
 .fabricate-manager-v2 .manager-v2-environment-status-card,
+.fabricate-manager-v2 .manager-v2-environment-validation-band,
 .fabricate-manager-v2 .manager-v2-environment-task-rail,
-.fabricate-manager-v2 .manager-v2-environment-task-editor,
-.fabricate-manager-v2 .manager-v2-environment-evidence-column > .manager-v2-inspector-card {
+.fabricate-manager-v2 .manager-v2-environment-task-editor {
   min-width: 0;
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
@@ -6146,13 +6181,13 @@
 .fabricate-manager-v2 .manager-v2-environment-scene-card {
   display: grid;
   grid-template-columns: 154px minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 10px;
   padding: 10px;
 }
 
 .fabricate-manager-v2 .manager-v2-environment-scene-card img {
-  grid-row: 1 / 3;
+  grid-row: 1 / 4;
   width: 154px;
   height: 100%;
   min-height: 154px;
@@ -6174,50 +6209,149 @@
   overflow-wrap: anywhere;
 }
 
-.fabricate-manager-v2 .manager-v2-scene-actions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  align-self: end;
+.fabricate-manager-v2 .manager-v2-scene-drop-zone {
   grid-column: 2;
-}
-
-.fabricate-manager-v2 .manager-v2-scene-actions select,
-.fabricate-manager-v2 .manager-v2-raw-scene-field input {
-  min-width: 0;
-  height: 34px;
-  border: 1px solid var(--fab-mv2-border);
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px;
+  min-height: 96px;
+  border: 1px dashed var(--fab-mv2-border-strong);
   border-radius: 6px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-bg);
+  background: rgba(0, 0, 0, 0.12);
+  color: var(--fab-mv2-text-muted);
+  text-align: center;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+  cursor: pointer;
 }
 
-.fabricate-manager-v2 .manager-v2-raw-scene-field,
+.fabricate-manager-v2 .manager-v2-scene-drop-zone:focus-visible {
+  outline: 2px solid var(--fab-mv2-accent);
+  outline-offset: 2px;
+}
+
+.fabricate-manager-v2 .manager-v2-scene-drop-zone i {
+  font-size: 1.25rem;
+  opacity: 0.7;
+}
+
+.fabricate-manager-v2 .manager-v2-scene-drop-zone .manager-v2-scene-drop-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.3;
+}
+
+.fabricate-manager-v2 .manager-v2-scene-drop-zone.is-active {
+  border-color: var(--fab-mv2-accent);
+  background: rgba(92, 184, 92, 0.16);
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager-v2 .manager-v2-scene-drop-zone.is-linked {
+  border-style: solid;
+  border-color: rgba(92, 184, 92, 0.45);
+  background: rgba(92, 184, 92, 0.08);
+}
+
+.fabricate-manager-v2 .manager-v2-scene-drop-zone.is-warning {
+  border-color: rgba(255, 192, 120, 0.55);
+  background: rgba(255, 192, 120, 0.08);
+}
+
 .fabricate-manager-v2 .manager-v2-scene-warning {
-  grid-column: 1 / -1;
+  grid-column: 2;
 }
 
 .fabricate-manager-v2 .manager-v2-environment-status-card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
-.fabricate-manager-v2 .manager-v2-environment-status-card .manager-v2-toggle-row {
-  margin: 0;
+.fabricate-manager-v2 .manager-v2-environment-status-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-environment-status-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-environment-status-meta strong {
+  font-size: 0.95rem;
+  line-height: 1.2;
+}
+
+.fabricate-manager-v2 .manager-v2-environment-status-meta small {
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+
+.fabricate-manager-v2 .manager-v2-environment-validation-band {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-environment-validation-toggle {
+  appearance: none;
+  -webkit-appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fab-mv2-text);
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fabricate-manager-v2 .manager-v2-environment-validation-toggle:focus-visible {
+  outline: 2px solid var(--fab-mv2-accent);
+  outline-offset: 2px;
+}
+
+.fabricate-manager-v2 .manager-v2-environment-validation-toggle .manager-v2-environment-validation-chevron {
+  margin-left: auto;
+  opacity: 0.7;
+}
+
+.fabricate-manager-v2 .manager-v2-environment-validation-band.is-open .manager-v2-environment-validation-toggle {
+  border-bottom: 1px solid var(--fab-mv2-border);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-environment-validation-body {
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .fabricate-manager-v2 .manager-v2-environment-workspace {
   display: grid;
-  grid-template-columns: minmax(210px, 0.58fr) minmax(360px, 1.45fr) minmax(250px, 0.72fr);
+  grid-template-columns: minmax(220px, 0.45fr) minmax(420px, 1fr);
   gap: 12px;
   min-width: 0;
   min-height: 0;
 }
 
 .fabricate-manager-v2 .manager-v2-environment-task-rail,
-.fabricate-manager-v2 .manager-v2-environment-task-editor,
-.fabricate-manager-v2 .manager-v2-environment-evidence-column {
+.fabricate-manager-v2 .manager-v2-environment-task-editor {
   min-height: 0;
   overflow: auto;
 }
@@ -6225,13 +6359,6 @@
 .fabricate-manager-v2 .manager-v2-environment-task-rail,
 .fabricate-manager-v2 .manager-v2-environment-task-editor {
   padding: 12px;
-}
-
-.fabricate-manager-v2 .manager-v2-environment-evidence-column {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-width: 0;
 }
 
 .fabricate-manager-v2 .manager-v2-task-rail-list {
@@ -7093,8 +7220,7 @@
   }
 
   .fabricate-manager-v2 .manager-v2-environment-task-rail,
-  .fabricate-manager-v2 .manager-v2-environment-task-editor,
-  .fabricate-manager-v2 .manager-v2-environment-evidence-column {
+  .fabricate-manager-v2 .manager-v2-environment-task-editor {
     overflow: visible;
   }
 

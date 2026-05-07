@@ -1759,7 +1759,10 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.querySelector('.manager-v2-environment-editor-shell .manager-v2-environment-edit-view'));
     assert.ok(target.querySelector('.manager-v2-environment-task-rail'));
     assert.ok(target.querySelector('.manager-v2-environment-task-editor'));
-    assert.ok(target.querySelector('.manager-v2-environment-evidence-column'));
+    assert.equal(target.querySelector('.manager-v2-environment-evidence-column'), null);
+    assert.ok(target.querySelector('.manager-v2-environment-validation-band'));
+    assert.ok(target.querySelector('.manager-v2-scene-drop-zone'));
+    assert.ok(target.querySelector('.manager-v2-environment-status-card .manager-v2-status-toggle'));
     assert.equal(target.textContent.includes('Back to environments'), false);
     assert.ok(target.textContent.includes('Quiet Cavern'));
 

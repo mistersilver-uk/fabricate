@@ -403,8 +403,24 @@ test('manager-v2 environments browser and edit route define compact responsive g
     'environment details band should include a compact status/evidence card'
   );
   assert.ok(
-    workspaceBlock.includes('grid-template-columns: minmax(210px, 0.58fr) minmax(360px, 1.45fr) minmax(250px, 0.72fr);'),
-    'environment editor workspace should expose task rail, selected task editor, and evidence column at normal widths'
+    workspaceBlock.includes('grid-template-columns: minmax(220px, 0.45fr) minmax(420px, 1fr);'),
+    'environment editor workspace should expose only task rail and selected task editor at normal widths'
+  );
+  assert.ok(
+    !css.includes('manager-v2-environment-evidence-column'),
+    'environment editor CSS should no longer reference the removed evidence column'
+  );
+  assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-environment-validation-band'),
+    'environment editor should style the collapsible validation band above the workspace'
+  );
+  assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-scene-drop-zone'),
+    'environment editor should style the scene drag-drop zone'
+  );
+  assert.ok(
+    css.includes('.fabricate-manager-v2 .image-path-picker.is-button-only .image-path-picker-button'),
+    'environment editor should style the button-only ImagePathPicker variant'
   );
   assert.ok(css.includes('.fabricate-manager-v2 .manager-v2-environment-scene-card'), 'environment editor should define a linked scene card');
   assert.ok(css.includes('.fabricate-manager-v2 .manager-v2-task-tabs'), 'environment editor should define task tabs');
