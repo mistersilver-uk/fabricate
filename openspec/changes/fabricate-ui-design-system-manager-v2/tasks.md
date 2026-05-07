@@ -588,7 +588,23 @@ Re-audit follow-up after the previous source-vs-spec audit shipped as commit `a4
 - [x] Auto-clamp resets `pageIndex` to 0 when filters narrow the result count below the current page; do not clamp to the final valid page because the user's intent is unclear in that moment.
 - [x] Default `pageSize=10` matches the mock; selector offers `10 / 25 / 50`. No "All" option to keep the contract simple.
 - [x] `risk` / `economyMode` / `timeOfDay` are persisted environment fields validated by `GatheringEnvironmentStore.js`; do not remove them as the audit initially suspected. The canonical `gathering-and-harvesting/spec.md` does not currently document them, but the runtime contract is real.
-- [x] F2 (stacked-layout cramping) and F7 (environment toolbar wrap) are deferred until the regenerated post-F1 screenshots show whether the layout fixes resolve them.
+
+## Concrete Implementation Plan: Smoke-Test Fixture-Pollution Fix
+
+The screenshot regen suite was failing at Phase D0 with "Manager V2 default selection did not select the first available system" because the world's persisted settings DB carried a leftover crafting system ("Alchemical Smithing", id `TPa0fbGzI7OO7hwu`) from a prior interactive dev session. Phase B's stale-system cleanup only matched literal name `Arcane Forge`, so it skipped that leftover. The manager-v2 auto-selected the alphabetically-first row (the leftover) instead of the test-created Herbalist's Compendium.
+
+- [x] Broaden Phase B's stale-system cleanup in `scripts/foundry-test-run.mjs` to delete ALL crafting systems at startup. The smoke harness owns crafting state for the duration of the run, so a clean slate is correct. Comment cites the rationale (post-rename leftovers + dev-session orphans both miss the previous name filter).
+- [x] Extend `assertManagerV2LayoutStable` to recognise `.manager-v2-component-row`, `.manager-v2-essence-row`, `.manager-v2-vocabulary-row`, and `.manager-v2-essence-edit-view` so the new F3 captures pass the row-presence assertion when the active route is Components / Essences / Tags & Categories / Essence Edit instead of just Systems / Recipes / Environments.
+- [x] Re-run `npm run test:foundry` end-to-end — the suite now passes (`=== foundry-test: ALL PASSED ===`). Twenty-six manager-v2 screenshots regenerate, including the seven new captures from F3.
+- [x] **F2 — stacked layout** at 1000×700 reads cleanly post-F1; no further changes needed. Verified against `test-results/screenshot-09-manager-v2-selected-stacked.png`.
+- [x] **F7 — environment toolbar wrap** at 1280×820 fits all six filters on a single row; no `More filters` overflow needed. Verified against `test-results/screenshot-21-manager-v2-environments-browse-normal.png`.
+- [x] Validate with `npm test` (2310/2310 pass) and `npm run build` (clean).
+
+### Smoke-Test Fixture Fix Scope Decisions
+
+- [x] Phase B owns the world's crafting state. Cleaning ALL systems at startup is the correct contract for an integration smoke test; no other test consumer relies on persisted systems across smoke runs.
+- [x] `assertManagerV2LayoutStable` row check now covers every browser-row class in manager-v2; the editor-form check covers every `*-edit-*` view shell. Future routes must add their row class here.
+- [x] Do not introduce a runtime "default seed system on first open" behaviour. The leftover came from prior dev sessions, not from a runtime contract.
 
 ## Future Implementation Sequence
 

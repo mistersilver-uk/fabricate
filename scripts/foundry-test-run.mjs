@@ -634,10 +634,15 @@ async function assertManagerV2LayoutStable(page, label) {
       '.manager-v2-environment-row',
       '.manager-v2-environment-identity',
       '.manager-v2-environment-editor-shell',
+      '.manager-v2-component-row',
+      '.manager-v2-component-identity',
+      '.manager-v2-essence-row',
+      '.manager-v2-vocabulary-row',
       '.manager-v2-inspector-card',
       '.manager-v2-system-edit-form',
       '.manager-v2-edit-card',
       '.manager-v2-toggle-row',
+      '.manager-v2-essence-edit-view',
       '.environment-draft-editor',
       '.manager-v2-environment-edit-view',
       '.manager-v2-environment-workspace',
@@ -668,11 +673,15 @@ async function assertManagerV2LayoutStable(page, label) {
     metric.selector === '.manager-v2-system-row'
       || metric.selector === '.manager-v2-recipe-row'
       || metric.selector === '.manager-v2-environment-row'
+      || metric.selector === '.manager-v2-component-row'
+      || metric.selector === '.manager-v2-essence-row'
+      || metric.selector === '.manager-v2-vocabulary-row'
   ).length;
   const editFormCount = metrics.filter(metric =>
     metric.selector === '.manager-v2-system-edit-form'
       || metric.selector === '.manager-v2-environment-editor-shell'
       || metric.selector === '.manager-v2-environment-edit-view'
+      || metric.selector === '.manager-v2-essence-edit-view'
       || metric.selector === '.environment-draft-editor'
   ).length;
   if (rowCount === 0 && editFormCount === 0) {
@@ -1454,17 +1463,19 @@ async function main() {
     process.stdout.write('Phase B: Creating test actors and items...\n');
     try {
       const createdDocs = await page.evaluate(async () => {
-        // Clean up any stale test data from previous runs
-        // 1. Clean stale crafting systems and their recipes first
+        // Clean up any stale test data from previous runs.
+        // Clean ALL crafting systems, not just Arcane Forge: previous runs may
+        // have renamed the system before crashing (so the name check misses
+        // them), and unrelated dev sessions can leave orphaned systems in the
+        // persisted world settings. The smoke harness owns the crafting state
+        // for the duration of the run, so a clean slate is correct.
         const csm = game.fabricate.getCraftingSystemManager();
         const rm = game.fabricate.getRecipeManager();
         const environmentStore = game.fabricate.getGatheringEnvironmentStore?.();
-        const allSystems = csm.getSystems();
-        const staleSystems = allSystems.filter(s => s.name === 'Arcane Forge');
+        const staleSystems = csm.getSystems();
         for (const sys of staleSystems) {
           console.log(`Cleaning stale crafting system: ${sys.name} (${sys.id})`);
           try { await environmentStore?.cleanupByCraftingSystem?.(sys.id); } catch { /* ok */ }
-          // Delete all recipes in this system
           const recipes = rm.getRecipesForSystem?.(sys.id) ?? [];
           for (const r of recipes) {
             try { await rm.deleteRecipe(r.id); } catch { /* ok */ }
