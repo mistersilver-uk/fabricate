@@ -224,6 +224,9 @@ test('manager-v2 recipes browser defines compact responsive table geometry', () 
 test('manager-v2 components browser defines drop target and compact responsive table geometry', () => {
   const tableBlock = blockFor('.fabricate-manager-v2 .manager-v2-components-table');
   const dropBlock = blockFor('.fabricate-manager-v2 .manager-v2-component-drop-zone');
+  const tagSearchBlock = blockFor('.fabricate-manager-v2 .manager-v2-tag-search');
+  const tagSuggestionsBlock = blockFor('.fabricate-manager-v2 .manager-v2-tag-suggestions');
+  const selectedTagPillBlock = blockFor('.fabricate-manager-v2 .manager-v2-selected-tag-pill');
   const identityBlock = blockFor('.fabricate-manager-v2 .manager-v2-component-identity');
   const componentCopyBlock = blockFor('.fabricate-manager-v2 .manager-v2-component-identity .manager-v2-system-copy');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager-v2 (max-width: 1120px)'));
@@ -243,6 +246,11 @@ test('manager-v2 components browser defines drop target and compact responsive t
   assert.ok(dropBlock.includes('grid-template-columns: 42px minmax(0, 1fr);'), 'component drop zone should reserve icon and copy space');
   assert.ok(dropBlock.includes('margin: 12px;'), 'component drop zone should keep balanced vertical spacing around the toolbar');
   assert.ok(css.includes('.fabricate-manager-v2 .manager-v2-component-drop-zone.is-drop-active'), 'component drop zone should expose an active drag state');
+  assert.ok(tagSearchBlock.includes('position: relative;'), 'component tag search should anchor its suggestion list to the control');
+  assert.ok(tagSearchBlock.includes('max-width: 320px;'), 'component tag search should keep bounded toolbar geometry');
+  assert.ok(tagSuggestionsBlock.includes('position: absolute;'), 'component tag suggestions should overlay below the search field without shifting the toolbar');
+  assert.ok(tagSuggestionsBlock.includes('max-height: 148px;'), 'component tag suggestions should be scroll bounded');
+  assert.ok(selectedTagPillBlock.includes('padding-right: 4px;'), 'selected tag pills should reserve compact space for the remove button');
   assert.ok(
     identityBlock.includes('grid-template-columns: 46px minmax(0, 1fr);')
       || css.includes('.fabricate-manager-v2 .manager-v2-recipe-identity,\n.fabricate-manager-v2 .manager-v2-component-identity,\n.fabricate-manager-v2 .manager-v2-environment-identity'),

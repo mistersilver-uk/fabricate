@@ -928,18 +928,61 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     search.value = 'iron';
     search.dispatchEvent(new Event('input', { bubbles: true }));
 
-    const tagFilter = target.querySelector('[aria-label="Filter components by tag"]');
-    tagFilter.value = 'container';
-    tagFilter.dispatchEvent(new Event('change', { bubbles: true }));
+    assert.equal(target.querySelector('[aria-label="Filter components by tag"]'), null, 'component tag filtering should use searchable pills, not the legacy dropdown');
+
+    const tagSearch = target.querySelector('[aria-label="Search component tags"]');
+    assert.ok(tagSearch, 'component tag search should render when component tags are available');
+    tagSearch.value = 'con';
+    tagSearch.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    const containerSuggestion = Array.from(target.querySelectorAll('.manager-v2-tag-suggestion'))
+      .find(button => button.textContent.includes('container'));
+    assert.ok(containerSuggestion, 'tag search should show matching tags underneath');
+    containerSuggestion.click();
     await tick();
     flushSync();
     assert.equal(target.querySelectorAll('.manager-v2-component-row').length, 1);
     assert.ok(target.textContent.includes('Glass Vial'));
+    const containerPill = target.querySelector('[data-component-tag-pill="container"]');
+    assert.ok(containerPill, 'selected tag should render as a removable pill');
 
-    tagFilter.value = 'all';
-    tagFilter.dispatchEvent(new Event('change', { bubbles: true }));
+    containerPill.querySelector('button').click();
     await tick();
     flushSync();
+    assert.equal(target.querySelectorAll('.manager-v2-component-row').length, 2);
+
+    tagSearch.value = 'ore';
+    tagSearch.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    Array.from(target.querySelectorAll('.manager-v2-tag-suggestion'))
+      .find(button => button.textContent.includes('ore'))
+      .click();
+    await tick();
+    flushSync();
+    tagSearch.value = 'metal';
+    tagSearch.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    Array.from(target.querySelectorAll('.manager-v2-tag-suggestion'))
+      .find(button => button.textContent.includes('metal'))
+      .click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelectorAll('.manager-v2-component-row').length, 1, 'multiple selected tags should require all tags');
+    assert.ok(target.textContent.includes('Iron Ore'));
+
+    target.querySelector('[data-component-tag-pill="ore"]').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('[data-component-tag-pill="ore"]'), null, 'right-clicking a tag pill should remove it');
+
+    target.querySelector('[data-clear-filters="components"]').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('[data-component-tag-pill="metal"]'), null, 'clear filters should remove selected tag pills');
+    assert.equal(target.querySelectorAll('.manager-v2-component-row').length, 2);
 
     target.querySelector('[data-component-id="c1"] .manager-v2-component-identity').click();
     await tick();
@@ -1892,9 +1935,14 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    const tagFilter = target.querySelector('[aria-label="Filter components by tag"]');
-    tagFilter.value = 'ore';
-    tagFilter.dispatchEvent(new Event('change', { bubbles: true }));
+    const tagSearch = target.querySelector('[aria-label="Search component tags"]');
+    tagSearch.value = 'ore';
+    tagSearch.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    Array.from(target.querySelectorAll('.manager-v2-tag-suggestion'))
+      .find(button => button.textContent.includes('ore'))
+      .click();
     await tick();
     flushSync();
     assert.equal(target.querySelectorAll('.manager-v2-component-row').length, 1);
@@ -1904,6 +1952,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     flushSync();
 
     assert.equal(target.querySelector('[aria-label="Filter components by tag"]'), null);
+    assert.equal(target.querySelector('[aria-label="Search component tags"]'), null);
     assert.equal(target.querySelectorAll('.manager-v2-component-row').length, 1);
     assert.ok(target.textContent.includes('Coal'));
     assert.equal(target.textContent.includes('No components match these filters'), false);

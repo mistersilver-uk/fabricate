@@ -4227,6 +4227,109 @@
   background: var(--fab-mv2-bg);
 }
 
+.fabricate-manager-v2 .manager-v2-tag-search {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  flex: 1 1 210px;
+  min-width: 180px;
+  max-width: 320px;
+}
+
+.fabricate-manager-v2 .manager-v2-tag-search-label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  width: 100%;
+}
+
+.fabricate-manager-v2 .manager-v2-tag-search input {
+  min-width: 0;
+  height: 34px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-bg);
+}
+
+.fabricate-manager-v2 .manager-v2-tag-suggestions {
+  position: absolute;
+  z-index: 12;
+  top: 38px;
+  right: 0;
+  left: 0;
+  display: grid;
+  gap: 2px;
+  max-height: 148px;
+  padding: 4px;
+  border: 1px solid var(--fab-mv2-border-strong);
+  border-radius: 6px;
+  background: var(--fab-mv2-surface-1);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.32);
+  overflow-y: auto;
+}
+
+.fabricate-manager-v2 .manager-v2-tag-suggestion {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 4px;
+  color: var(--fab-mv2-text);
+  background: transparent;
+  text-align: left;
+}
+
+.fabricate-manager-v2 .manager-v2-tag-suggestion:hover,
+.fabricate-manager-v2 .manager-v2-tag-suggestion:focus-visible {
+  color: #f4fff4;
+  background: rgba(92, 184, 92, 0.18);
+}
+
+.fabricate-manager-v2 .manager-v2-tag-no-matches {
+  padding: 5px 8px;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.fabricate-manager-v2 .manager-v2-selected-tag-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-selected-tag-pill {
+  padding-right: 4px;
+  border-color: rgba(92, 184, 92, 0.42);
+  background: rgba(92, 184, 92, 0.12);
+}
+
+.fabricate-manager-v2 .manager-v2-selected-tag-pill button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  color: var(--fab-mv2-text-muted);
+  background: transparent;
+}
+
+.fabricate-manager-v2 .manager-v2-selected-tag-pill button:hover,
+.fabricate-manager-v2 .manager-v2-selected-tag-pill button:focus-visible {
+  color: #f4fff4;
+  background: rgba(255, 255, 255, 0.12);
+}
+
 .fabricate-manager-v2 .manager-v2-search i {
   position: absolute;
   top: 50%;
@@ -6740,6 +6843,11 @@
 
   .fabricate-manager-v2 .manager-v2-search {
     flex-basis: 100%;
+  }
+
+  .fabricate-manager-v2 .manager-v2-tag-search {
+    flex-basis: 100%;
+    max-width: none;
   }
 
   .fabricate-manager-v2 .manager-v2-edit-card-heading,

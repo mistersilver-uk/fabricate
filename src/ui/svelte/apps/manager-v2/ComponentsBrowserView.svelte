@@ -21,7 +21,8 @@
     onCopySourceUuid = () => {}
   } = $props();
 
-  let tagFilter = $state('all');
+  let selectedTagFilters = $state([]);
+  let tagSearchTerm = $state('');
   let essenceFilter = $state('all');
   let lastSystemId = $state('');
   let pageIndex = $state(0);
@@ -29,7 +30,8 @@
 
   $effect(() => {
     if (selectedSystemId === lastSystemId) return;
-    tagFilter = 'all';
+    selectedTagFilters = [];
+    tagSearchTerm = '';
     essenceFilter = 'all';
     lastSystemId = selectedSystemId;
   });
@@ -38,9 +40,17 @@
   const showComponentEssences = $derived((itemCards || []).some(item => item.showEssences || (Array.isArray(item.essences) && item.essences.length > 0)));
   const componentTagOptions = $derived(uniqueSorted((itemCards || []).flatMap(item => Array.isArray(item.tags) ? item.tags : [])));
   const componentEssenceOptions = $derived(uniqueSorted((itemCards || []).flatMap(item => Array.isArray(item.essences) ? item.essences.map(essence => essence.name || essence.id) : [])));
+  const normalizedTagSearchTerm = $derived((tagSearchTerm || '').trim().toLowerCase());
+  const tagSearchSuggestions = $derived(normalizedTagSearchTerm
+    ? componentTagOptions.filter(tag =>
+        !selectedTagFilters.includes(tag)
+        && tag.toLowerCase().includes(normalizedTagSearchTerm)
+      )
+    : []);
   const filteredComponents = $derived((itemCards || []).filter(item => {
-    const matchesTag = tagFilter === 'all'
-      || (Array.isArray(item.tags) && item.tags.includes(tagFilter));
+    const itemTags = Array.isArray(item.tags) ? item.tags : [];
+    const matchesTag = selectedTagFilters.length === 0
+      || selectedTagFilters.every(tag => itemTags.includes(tag));
     const matchesEssence = essenceFilter === 'all'
       || (Array.isArray(item.essences) && item.essences.some(essence => (essence.name || essence.id) === essenceFilter));
     return matchesTag && matchesEssence;
@@ -51,7 +61,8 @@
   );
   const filtersActive = $derived(
     (itemSearchTerm || '').trim().length > 0
-    || tagFilter !== 'all'
+    || selectedTagFilters.length > 0
+    || (tagSearchTerm || '').trim().length > 0
     || essenceFilter !== 'all'
   );
   const componentTableClass = $derived([
@@ -174,9 +185,34 @@
     return !!selectedComponentId && item.id === selectedComponentId;
   }
 
+  function addTagFilter(tag) {
+    const normalized = String(tag || '').trim();
+    if (!normalized || selectedTagFilters.includes(normalized)) return;
+    selectedTagFilters = [...selectedTagFilters, normalized];
+    tagSearchTerm = '';
+    pageIndex = 0;
+  }
+
+  function removeTagFilter(tag) {
+    selectedTagFilters = selectedTagFilters.filter(selected => selected !== tag);
+    pageIndex = 0;
+  }
+
+  function removeTagFilterFromContext(event, tag) {
+    event.preventDefault();
+    removeTagFilter(tag);
+  }
+
+  function setEssenceFilter(value) {
+    essenceFilter = value;
+    pageIndex = 0;
+  }
+
   function clearFilters() {
-    tagFilter = 'all';
+    selectedTagFilters = [];
+    tagSearchTerm = '';
     essenceFilter = 'all';
+    pageIndex = 0;
     onSearchChange('');
   }
 </script>
@@ -214,20 +250,48 @@
       />
     </label>
     {#if showComponentTags && componentTagOptions.length > 0}
-      <label class="manager-v2-filter">
-        <span>{text('FABRICATE.Admin.ManagerV2.Component.Tags', 'Tags')}</span>
-        <select value={tagFilter} onchange={(event) => tagFilter = event.currentTarget.value} aria-label={text('FABRICATE.Admin.ManagerV2.Component.TagFilterLabel', 'Filter components by tag')}>
-          <option value="all">{text('FABRICATE.Admin.ManagerV2.Component.TagAll', 'All tags')}</option>
-          {#each componentTagOptions as tag}
-            <option value={tag}>{tag}</option>
-          {/each}
-        </select>
-      </label>
+      <div class="manager-v2-tag-search" data-component-tag-search>
+        <label class="manager-v2-filter manager-v2-tag-search-label">
+          <span>{text('FABRICATE.Admin.ManagerV2.Component.Tags', 'Tags')}</span>
+          <input
+            type="search"
+            value={tagSearchTerm}
+            oninput={(event) => tagSearchTerm = event.currentTarget.value}
+            placeholder={text('FABRICATE.Admin.ManagerV2.Component.TagSearchPlaceholder', 'Search tags...')}
+            aria-label={text('FABRICATE.Admin.ManagerV2.Component.TagSearchLabel', 'Search component tags')}
+            aria-controls="manager-v2-component-tag-suggestions"
+          />
+        </label>
+        {#if normalizedTagSearchTerm.length > 0}
+          <div id="manager-v2-component-tag-suggestions" class="manager-v2-tag-suggestions" role="listbox" aria-label={text('FABRICATE.Admin.ManagerV2.Component.TagSuggestions', 'Matching component tags')}>
+            {#each tagSearchSuggestions as tag}
+              <button type="button" role="option" aria-selected="false" class="manager-v2-tag-suggestion" onclick={() => addTagFilter(tag)}>
+                <i class="fas fa-tag" aria-hidden="true"></i>
+                <span>{tag}</span>
+              </button>
+            {:else}
+              <span class="manager-v2-tag-no-matches">{text('FABRICATE.Admin.ManagerV2.Component.TagNoMatches', 'No matching tags')}</span>
+            {/each}
+          </div>
+        {/if}
+        {#if selectedTagFilters.length > 0}
+          <div class="manager-v2-selected-tag-row" role="list" aria-label={text('FABRICATE.Admin.ManagerV2.Component.SelectedTags', 'Selected component tags')}>
+            {#each selectedTagFilters as tag}
+              <span class="manager-v2-chip manager-v2-selected-tag-pill" role="listitem" data-component-tag-pill={tag} oncontextmenu={(event) => removeTagFilterFromContext(event, tag)}>
+                <span>{tag}</span>
+                <button type="button" aria-label={text('FABRICATE.Admin.ManagerV2.Component.RemoveTagNamed', 'Remove tag {name}').replace('{name}', tag)} title={text('FABRICATE.Admin.ManagerV2.Component.RemoveTag', 'Remove tag')} onclick={() => removeTagFilter(tag)}>
+                  <i class="fas fa-times" aria-hidden="true"></i>
+                </button>
+              </span>
+            {/each}
+          </div>
+        {/if}
+      </div>
     {/if}
     {#if showComponentEssences && componentEssenceOptions.length > 0}
       <label class="manager-v2-filter">
         <span>{text('FABRICATE.Admin.ManagerV2.Component.Essences', 'Essences')}</span>
-        <select value={essenceFilter} onchange={(event) => essenceFilter = event.currentTarget.value} aria-label={text('FABRICATE.Admin.ManagerV2.Component.EssenceFilterLabel', 'Filter components by essence')}>
+        <select value={essenceFilter} onchange={(event) => setEssenceFilter(event.currentTarget.value)} aria-label={text('FABRICATE.Admin.ManagerV2.Component.EssenceFilterLabel', 'Filter components by essence')}>
           <option value="all">{text('FABRICATE.Admin.ManagerV2.Component.EssenceAll', 'All essences')}</option>
           {#each componentEssenceOptions as essence}
             <option value={essence}>{essence}</option>
