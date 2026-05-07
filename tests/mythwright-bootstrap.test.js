@@ -1,6 +1,6 @@
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 
 globalThis.game = { ready: false };
 
@@ -191,16 +191,34 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     assert.equal(helper.sanitizeIconPath('icons/svg/item-bag.svg'), 'icons/svg/item-bag.svg');
   });
 
-  it('uses only valid Foundry core icon paths for Mythwright-authored icons', () => {
+  it('uses only valid Foundry core icon paths for Mythwright-authored icons', t => {
     const helper = globalThis.MythwrightDnd5eBootstrap;
+
+    // Cheap shape-check: runs everywhere (CI included). Catches typos and
+    // malformed entries even when the live Foundry manifest isn't present.
+    const ICON_PATH_SHAPE = /^icons\/[a-z0-9_-]+(?:\/[a-z0-9_-]+)*\.(svg|webp|png|jpg|jpeg)$/;
+    assert.ok(helper.APPROVED_MYTHWRIGHT_ICON_PATHS.length > 10);
+    for (const iconPath of helper.APPROVED_MYTHWRIGHT_ICON_PATHS) {
+      assert.match(iconPath, ICON_PATH_SHAPE, `${iconPath} is not a well-formed Foundry icon path`);
+    }
+
+    // Existence check: requires tmp/fvtt-icon-paths.md, which is generated
+    // locally from a running Foundry instance and gitignored. Skip when
+    // absent (CI, fresh clones) rather than fail — the shape check above
+    // still runs.
+    const iconManifestUrl = new URL('../tmp/fvtt-icon-paths.md', import.meta.url);
+    if (!existsSync(iconManifestUrl)) {
+      t.skip('tmp/fvtt-icon-paths.md not present — regenerate locally from a running Foundry to validate against the live icon set');
+      return;
+    }
+
     const foundryIconPaths = new Set(
-      readFileSync(new URL('../tmp/fvtt-icon-paths.md', import.meta.url), 'utf8')
+      readFileSync(iconManifestUrl, 'utf8')
         .split(/\r?\n/)
         .map(path => path.trim())
         .filter(Boolean)
     );
 
-    assert.ok(helper.APPROVED_MYTHWRIGHT_ICON_PATHS.length > 10);
     for (const iconPath of helper.APPROVED_MYTHWRIGHT_ICON_PATHS) {
       assert.ok(foundryIconPaths.has(iconPath), `${iconPath} should exist in tmp/fvtt-icon-paths.md`);
     }
