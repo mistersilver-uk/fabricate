@@ -2067,11 +2067,12 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(target.querySelectorAll('.manager-v2-validation-group').length, 2);
     const taskTabs = Array.from(target.querySelectorAll('.manager-v2-task-tabs [role="tab"]'));
     assert.equal(taskTabs.find(tab => tab.textContent.includes('Results'))?.dataset.environmentInvalid, 'true');
-
-    target.querySelector('.manager-v2-environment-details-tabs [role="tab"]:nth-child(2)').click();
+    assert.equal(taskTabs.some(tab => tab.textContent.includes('Advanced')), false);
+    assert.equal(target.querySelector('.manager-v2-environment-details-tabs'), null);
+    taskTabs.find(tab => tab.textContent.includes('Catalysts'))?.click();
     await tick();
     flushSync();
-    assert.equal(target.querySelector('[data-environment-field="environment.name"]'), null);
+    assert.ok(target.querySelector('[data-environment-field="environment.name"]'));
 
     target.querySelector('.environment-validation-link').click();
     await tick();

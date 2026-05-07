@@ -1343,28 +1343,11 @@ export function createAdminStore(services) {
       ? allSystems.find(s => s.id === resolvedSystemId) || null
       : null;
 
-    const visibleTab = _resolveVisibleTab(get(activeTab), selectedSystem);
-    if (visibleTab !== get(activeTab)) {
-      activeTab.set(visibleTab);
-    }
-
-    // Phase 1: publish the cheap systems list immediately so the v2 systems
-    // browser paints without flashing the empty state while expensive per-
-    // system data (item cards, environments) is still being computed below.
-    viewState.update(prev => ({
-      ...prev,
-      systems: systemList,
-      hasSystem: !!selectedSystem,
-      selectedSystemName: selectedSystem?.name || ''
-    }));
-    await Promise.resolve();
-
     const availableScriptMacros = services.getScriptMacros?.() || [];
     const sceneOptions = services.getSceneOptions?.() || [];
     const rollTableOptions = services.getRollTableOptions?.() || [];
 
     let selectedSystemData = null;
-    let itemCards = [];
     let essenceCards = [];
     let recipeListData = { recipes: [], recipeCategories: [], showVisibilitySummary: false };
 
@@ -1389,11 +1372,6 @@ export function createAdminStore(services) {
       });
       essenceCards = _buildEssenceCards(essenceDefinitions, managedItems, managedItemOptions);
 
-      const essenceDefinitionById = new Map(essenceDefinitions.map(def => [def.id, def]));
-      const advancedEnabled = selectedSystem.advancedOptionsEnabled !== false;
-      const showTags = true;
-      const showEssences = advancedEnabled && selectedSystem.features?.essences === true;
-
       selectedSystemData = _buildSelectedSystemViewData(
         selectedSystem,
         managedItemOptions,
@@ -1403,6 +1381,44 @@ export function createAdminStore(services) {
         rollTableOptions
       );
 
+      recipeListData = _buildRecipeList(
+        systemManager,
+        recipeManager,
+        selectedSystem,
+        get(recipeSearch)
+      );
+    }
+
+    const visibleTab = _resolveVisibleTab(get(activeTab), selectedSystem);
+    if (visibleTab !== get(activeTab)) {
+      activeTab.set(visibleTab);
+    }
+
+    // Phase 1: publish all synchronous selected-system context immediately so
+    // manager v2 can paint its selected rail, menu, and inspector before slower
+    // item/environment work finishes.
+    viewState.update(prev => ({
+      ...prev,
+      systems: systemList,
+      hasSystem: !!selectedSystem,
+      selectedSystemName: selectedSystem?.name || '',
+      selectedSystem: selectedSystemData,
+      essenceCards,
+      recipes: recipeListData.recipes,
+      recipeCategories: recipeListData.recipeCategories,
+      showVisibilitySummary: recipeListData.showVisibilitySummary,
+      recipeSearchTerm: get(recipeSearch),
+      itemSearchTerm: get(itemSearch)
+    }));
+    await Promise.resolve();
+
+    let itemCards = [];
+    if (selectedSystem) {
+      const advancedEnabled = selectedSystem.advancedOptionsEnabled !== false;
+      const showTags = true;
+      const showEssences = advancedEnabled && selectedSystem.features?.essences === true;
+      const essenceDefinitionById = new Map((selectedSystemData?.essenceDefinitions || []).map(def => [def.id, def]));
+
       itemCards = await _buildItemCards(
         systemManager,
         selectedSystem,
@@ -1410,13 +1426,6 @@ export function createAdminStore(services) {
         showTags,
         showEssences,
         essenceDefinitionById
-      );
-
-      recipeListData = _buildRecipeList(
-        systemManager,
-        recipeManager,
-        selectedSystem,
-        get(recipeSearch)
       );
     }
 

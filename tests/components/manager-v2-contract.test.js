@@ -15,6 +15,7 @@ const systemsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/Syst
 const recipesBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/RecipesBrowserView.svelte');
 const componentEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/ComponentEditView.svelte');
 const componentsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/ComponentsBrowserView.svelte');
+const environmentEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/EnvironmentEditView.svelte');
 const environmentsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/EnvironmentsBrowserView.svelte');
 const appPath = resolve(repoRoot, 'src/ui/SvelteCraftingSystemManagerV2App.svelte.js');
 const mainPath = resolve(repoRoot, 'src/main.js');
@@ -29,12 +30,13 @@ const systemsBrowserSource = readFileSync(systemsBrowserPath, 'utf8');
 const recipesBrowserSource = readFileSync(recipesBrowserPath, 'utf8');
 const componentEditSource = readFileSync(componentEditPath, 'utf8');
 const componentsBrowserSource = readFileSync(componentsBrowserPath, 'utf8');
+const environmentEditSource = readFileSync(environmentEditPath, 'utf8');
 const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
 const appSource = readFileSync(appPath, 'utf8');
 const mainSource = readFileSync(mainPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
-const managerV2Source = [rootSource, essenceBrowserSource, essenceEditSource, tagsCategoriesSource, systemEditSource, systemsBrowserSource, recipesBrowserSource, componentsBrowserSource, componentEditSource, environmentsBrowserSource].join('\n');
+const managerV2Source = [rootSource, essenceBrowserSource, essenceEditSource, tagsCategoriesSource, systemEditSource, systemsBrowserSource, recipesBrowserSource, componentsBrowserSource, componentEditSource, environmentEditSource, environmentsBrowserSource].join('\n');
 
 describe('CraftingSystemManagerV2 source contract', () => {
   it('self-registers as a parallel manager app without replacing the legacy manager', () => {
@@ -402,6 +404,11 @@ describe('CraftingSystemManagerV2 source contract', () => {
       assert.ok(rootSource.includes(snippet), `environment edit route should wire ${snippet}`);
     }
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.TaskTabDetails, 'Task Details');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.TaskTabCheck, 'Check');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.TaskTabAdvanced, undefined);
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.AdvancedTab, undefined);
+    assert.ok(!environmentEditSource.includes("id: 'advanced'"), 'environment editor should not define an advanced task tab');
+    assert.ok(!environmentEditSource.includes('manager-v2-environment-details-tabs'), 'environment editor should not render environment advanced tabs');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.EvidenceColumn, 'Environment evidence');
   });
 });

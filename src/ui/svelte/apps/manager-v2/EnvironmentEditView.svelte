@@ -70,11 +70,10 @@
     { id: 'catalysts', section: 'catalysts', icon: 'fas fa-key', labelKey: 'FABRICATE.Admin.ManagerV2.Environment.TaskTabCatalysts', fallback: 'Catalysts' },
     { id: 'visibility', section: 'visibility', icon: 'fas fa-eye', labelKey: 'FABRICATE.Admin.ManagerV2.Environment.TaskTabVisibility', fallback: 'Visibility' },
     { id: 'timing', section: 'time', icon: 'fas fa-clock', labelKey: 'FABRICATE.Admin.ManagerV2.Environment.TaskTabTiming', fallback: 'Timing' },
-    { id: 'advanced', section: 'check', icon: 'fas fa-sliders-h', labelKey: 'FABRICATE.Admin.ManagerV2.Environment.TaskTabAdvanced', fallback: 'Advanced' }
+    { id: 'check', section: 'check', icon: 'fas fa-dice-d20', labelKey: 'FABRICATE.Admin.ManagerV2.Environment.TaskTabCheck', fallback: 'Check' }
   ];
 
   let localSelectedTaskId = $state('');
-  let detailsTab = $state('details');
   let activeTaskTab = $state('details');
   let pendingVisibility = $state(null);
   let pendingVisibilityKey = $state('');
@@ -323,19 +322,13 @@
     if (sectionKey === 'catalysts') return 'catalysts';
     if (sectionKey === 'visibility') return 'visibility';
     if (sectionKey === 'time' || sectionKey === 'failure') return 'timing';
-    if (sectionKey === 'check') return 'advanced';
+    if (sectionKey === 'check') return 'check';
     return 'details';
   }
 
   function taskTabInvalid(tabId) {
     if (!activeTask?.id) return false;
     return normalizedValidationErrors.some(error => error.taskId === activeTask.id && taskTabForSection(error.sectionKey) === tabId);
-  }
-
-  function environmentDetailsTabForPath(path) {
-    if (String(path || '').startsWith('environment.sceneUuid')) return 'advanced';
-    if (String(path || '').startsWith('environment.')) return 'details';
-    return detailsTab;
   }
 
   function resultGroupIdForValidationPath(path, taskId) {
@@ -405,8 +398,6 @@
           [resultGroupExpansionId(target.taskId, target.resultGroupId)]: true
         };
       }
-    } else {
-      detailsTab = environmentDetailsTabForPath(error?.path);
     }
   }
 
@@ -788,7 +779,7 @@
     <section class="manager-v2-environment-details-band" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.DetailsBand', 'Environment workspace')}>
       <div class="manager-v2-edit-card-heading">
         <div>
-          <p class="manager-v2-kicker">{isNew ? text('FABRICATE.Admin.Environments.NewDraftTitle', 'New Gathering Environment') : text('FABRICATE.Admin.ManagerV2.Environment.EditKicker', 'Environment Edit')}</p>
+          <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Environment.EnvironmentDetailsTab', 'Environment Details')}</p>
           <h2 class="manager-v2-card-title">{environmentName()}</h2>
         </div>
         <div class="manager-v2-action-group">
@@ -802,170 +793,54 @@
         </div>
       </div>
 
-      <div class="manager-v2-environment-details-tabs" role="tablist" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.DetailTabs', 'Environment detail sections')}>
-        <button type="button" role="tab" class:active={detailsTab === 'details'} aria-selected={detailsTab === 'details'} onclick={() => { detailsTab = 'details'; }}>{text('FABRICATE.Admin.ManagerV2.Environment.EnvironmentDetailsTab', 'Environment Details')}</button>
-        <button type="button" role="tab" class:active={detailsTab === 'advanced'} aria-selected={detailsTab === 'advanced'} onclick={() => { detailsTab = 'advanced'; }}>{text('FABRICATE.Admin.ManagerV2.Environment.AdvancedTab', 'Advanced')}</button>
-      </div>
-
       <div class="manager-v2-environment-details-grid">
         <div class="manager-v2-environment-fields-card">
-          {#if detailsTab === 'details'}
-            <div class="manager-v2-form-grid">
-              <label class="manager-v2-field">
-                <span>{localize('FABRICATE.Admin.Environments.Name')}</span>
-                <input
-                  type="text"
-                  value={environmentDraft.name}
-                  data-environment-field={environmentField('name')}
-                  aria-invalid={fieldInvalid(environmentField('name'))}
-                  aria-describedby={fieldDescribedBy(environmentField('name'))}
-                  oninput={(event) => updateField('name', event.target.value)}
-                />
-                {#if fieldErrors(environmentField('name')).length > 0}
-                  <span class="environment-field-error" id={fieldErrorId(environmentField('name'))}>{fieldErrors(environmentField('name'))[0].message}</span>
-                {/if}
-              </label>
-              <label class="manager-v2-field">
-                <span>{localize('FABRICATE.Admin.Environments.SelectionMode')}</span>
-                <select
-                  value={environmentDraft.selectionMode}
-                  data-environment-field={environmentField('selectionMode')}
-                  aria-invalid={fieldInvalid(environmentField('selectionMode'))}
-                  aria-describedby={fieldDescribedBy(environmentField('selectionMode'))}
-                  onchange={(event) => updateField('selectionMode', event.target.value)}
-                >
-                  <option value="targeted">{localize('FABRICATE.Admin.Environments.SelectionTargeted')}</option>
-                  <option value="blind">{localize('FABRICATE.Admin.Environments.SelectionBlind')}</option>
-                </select>
-                {#if fieldErrors(environmentField('selectionMode')).length > 0}
-                  <span class="environment-field-error" id={fieldErrorId(environmentField('selectionMode'))}>{fieldErrors(environmentField('selectionMode'))[0].message}</span>
-                {/if}
-              </label>
-              <label class="manager-v2-field span-2">
-                <span>{localize('FABRICATE.Admin.Environments.Description')}</span>
-                <textarea rows="3" value={environmentDraft.description} oninput={(event) => updateField('description', event.target.value)}></textarea>
-              </label>
-              <label class="manager-v2-field span-2">
-                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Image', 'Environment image')}</span>
-                <input
-                  type="text"
-                  value={environmentDraft.img || ''}
-                  placeholder="icons/environment/wilderness/cave-entrance.webp"
-                  data-environment-field={environmentField('img')}
-                  oninput={(event) => updateField('img', event.target.value)}
-                />
-              </label>
-              <label class="manager-v2-field">
-                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Region', 'Region')}</span>
-                <input
-                  type="text"
-                  value={environmentDraft.region || ''}
-                  data-environment-field={environmentField('region')}
-                  oninput={(event) => updateField('region', event.target.value)}
-                />
-              </label>
-              <label class="manager-v2-field">
-                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Biome', 'Biome')}</span>
-                <input
-                  type="text"
-                  value={environmentDraft.biome || ''}
-                  data-environment-field={environmentField('biome')}
-                  oninput={(event) => updateField('biome', event.target.value)}
-                />
-              </label>
-              <label class="manager-v2-field">
-                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Risk', 'Risk')}</span>
-                <select
-                  value={environmentDraft.risk || 'safe'}
-                  data-environment-field={environmentField('risk')}
-                  onchange={(event) => updateField('risk', event.target.value)}
-                >
-                  <option value="safe">{text('FABRICATE.Admin.ManagerV2.Environment.RiskSafe', 'Safe')}</option>
-                  <option value="hazardous">{text('FABRICATE.Admin.ManagerV2.Environment.RiskHazardous', 'Hazardous')}</option>
-                  <option value="unsafe">{text('FABRICATE.Admin.ManagerV2.Environment.RiskUnsafe', 'Unsafe')}</option>
-                  <option value="extreme">{text('FABRICATE.Admin.ManagerV2.Environment.RiskExtreme', 'Extreme')}</option>
-                </select>
-              </label>
-              <label class="manager-v2-field">
-                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Economy', 'Economy')}</span>
-                <select
-                  value={environmentDraft.economyMode || 'time'}
-                  data-environment-field={environmentField('economyMode')}
-                  onchange={(event) => updateField('economyMode', event.target.value)}
-                >
-                  <option value="time">{text('FABRICATE.Admin.ManagerV2.Environment.EconomyTime', 'Time')}</option>
-                  <option value="nodes">{text('FABRICATE.Admin.ManagerV2.Environment.EconomyNodes', 'Nodes')}</option>
-                  <option value="stamina">{text('FABRICATE.Admin.ManagerV2.Environment.EconomyStamina', 'Stamina')}</option>
-                  <option value="hybrid">{text('FABRICATE.Admin.ManagerV2.Environment.EconomyHybrid', 'Hybrid')}</option>
-                </select>
-              </label>
-              <label class="manager-v2-field">
-                <span>{text('FABRICATE.Admin.ManagerV2.Environment.TimeOfDay', 'Time of day')}</span>
-                <input
-                  type="text"
-                  value={environmentDraft.conditions?.timeOfDay || ''}
-                  data-environment-field={environmentField('conditions.timeOfDay')}
-                  oninput={(event) => updateCondition('timeOfDay', event.target.value)}
-                />
-              </label>
-              <label class="manager-v2-field">
-                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Weather', 'Weather')}</span>
-                <input
-                  type="text"
-                  value={environmentDraft.conditions?.weather || ''}
-                  data-environment-field={environmentField('conditions.weather')}
-                  oninput={(event) => updateCondition('weather', event.target.value)}
-                />
-              </label>
-              <label class="manager-v2-toggle-row span-2">
-                <input type="checkbox" checked={environmentDraft.enabled} onchange={(event) => updateField('enabled', event.target.checked)} />
-                <span>
-                  <strong>{localize('FABRICATE.Admin.Environments.Enabled')}</strong>
-                  <small>{environmentDraft.enabled ? text('FABRICATE.Admin.ManagerV2.StatusActive', 'Active') : text('FABRICATE.Admin.ManagerV2.StatusDisabled', 'Disabled')}</small>
-                </span>
-              </label>
-            </div>
-          {:else}
-            <div class="manager-v2-form-grid">
-              <label class="manager-v2-field span-2">
-                <span>{localize('FABRICATE.Admin.Environments.SceneUuid')}</span>
-                <select
-                  value={environmentDraft.sceneUuid || ''}
-                  aria-label={localize('FABRICATE.Admin.Environments.SceneSelect')}
-                  aria-describedby={selectedSceneMissing ? 'manager-v2-environment-scene-reference-warning' : undefined}
-                  onchange={(event) => updateField('sceneUuid', event.target.value)}
-                >
-                  <option value="">{localize('FABRICATE.Admin.Environments.NoSceneSelected')}</option>
-                  {#if selectedSceneMissing}
-                    <option value={environmentDraft.sceneUuid}>{localize('FABRICATE.Admin.Environments.MissingReferenceOption', { uuid: environmentDraft.sceneUuid })}</option>
-                  {/if}
-                  {#each sceneOptionList as scene (scene.uuid)}
-                    <option value={scene.uuid}>{scene.name}</option>
-                  {/each}
-                </select>
-              </label>
-              <label class="manager-v2-field span-2">
-                <span>{text('FABRICATE.Admin.ManagerV2.Environment.RawSceneUuid', 'Raw Scene UUID')}</span>
-                <input
-                  type="text"
-                  value={environmentDraft.sceneUuid || ''}
-                  placeholder="Scene.xxxxxxxxxxxxxxxx"
-                  data-environment-field={environmentField('sceneUuid')}
-                  aria-invalid={fieldInvalid(environmentField('sceneUuid'))}
-                  aria-describedby={fieldDescribedBy(environmentField('sceneUuid'), selectedSceneMissing ? 'manager-v2-environment-scene-reference-warning' : '')}
-                  oninput={(event) => updateField('sceneUuid', event.target.value)}
-                />
-                {#if selectedSceneMissing}
-                  <span class="environment-stale-warning" id="manager-v2-environment-scene-reference-warning">
-                    {localize('FABRICATE.Admin.Environments.LinkedSceneReferenceWarning')}
-                  </span>
-                {/if}
-                {#if fieldErrors(environmentField('sceneUuid')).length > 0}
-                  <span class="environment-field-error" id={fieldErrorId(environmentField('sceneUuid'))}>{fieldErrors(environmentField('sceneUuid'))[0].message}</span>
-                {/if}
-              </label>
-            </div>
-          {/if}
+          <div class="manager-v2-form-grid">
+            <label class="manager-v2-field">
+              <span>{localize('FABRICATE.Admin.Environments.Name')}</span>
+              <input
+                type="text"
+                value={environmentDraft.name}
+                data-environment-field={environmentField('name')}
+                aria-invalid={fieldInvalid(environmentField('name'))}
+                aria-describedby={fieldDescribedBy(environmentField('name'))}
+                oninput={(event) => updateField('name', event.target.value)}
+              />
+              {#if fieldErrors(environmentField('name')).length > 0}
+                <span class="environment-field-error" id={fieldErrorId(environmentField('name'))}>{fieldErrors(environmentField('name'))[0].message}</span>
+              {/if}
+            </label>
+            <label class="manager-v2-field">
+              <span>{localize('FABRICATE.Admin.Environments.SelectionMode')}</span>
+              <select
+                value={environmentDraft.selectionMode}
+                data-environment-field={environmentField('selectionMode')}
+                aria-invalid={fieldInvalid(environmentField('selectionMode'))}
+                aria-describedby={fieldDescribedBy(environmentField('selectionMode'))}
+                onchange={(event) => updateField('selectionMode', event.target.value)}
+              >
+                <option value="targeted">{localize('FABRICATE.Admin.Environments.SelectionTargeted')}</option>
+                <option value="blind">{localize('FABRICATE.Admin.Environments.SelectionBlind')}</option>
+              </select>
+              {#if fieldErrors(environmentField('selectionMode')).length > 0}
+                <span class="environment-field-error" id={fieldErrorId(environmentField('selectionMode'))}>{fieldErrors(environmentField('selectionMode'))[0].message}</span>
+              {/if}
+            </label>
+            <label class="manager-v2-field span-2">
+              <span>{localize('FABRICATE.Admin.Environments.Description')}</span>
+              <textarea rows="3" value={environmentDraft.description} oninput={(event) => updateField('description', event.target.value)}></textarea>
+            </label>
+            <label class="manager-v2-field span-2">
+              <span>{text('FABRICATE.Admin.ManagerV2.Environment.Image', 'Environment image')}</span>
+              <input
+                type="text"
+                value={environmentDraft.img || ''}
+                placeholder="icons/environment/wilderness/cave-entrance.webp"
+                data-environment-field={environmentField('img')}
+                oninput={(event) => updateField('img', event.target.value)}
+              />
+            </label>
+          </div>
         </div>
 
         <section class="manager-v2-environment-scene-card" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.SceneCard', 'Linked scene')}>
@@ -982,9 +857,13 @@
               value={environmentDraft.sceneUuid || ''}
               data-environment-field={environmentField('sceneUuid')}
               aria-label={localize('FABRICATE.Admin.Environments.SceneSelect')}
+              aria-describedby={fieldDescribedBy(environmentField('sceneUuid'), selectedSceneMissing ? 'manager-v2-environment-scene-reference-warning' : '')}
               onchange={(event) => updateField('sceneUuid', event.target.value)}
             >
               <option value="">{localize('FABRICATE.Admin.Environments.NoSceneSelected')}</option>
+              {#if selectedSceneMissing}
+                <option value={environmentDraft.sceneUuid}>{localize('FABRICATE.Admin.Environments.MissingReferenceOption', { uuid: environmentDraft.sceneUuid })}</option>
+              {/if}
               {#each sceneOptionList as scene (scene.uuid)}
                 <option value={scene.uuid}>{scene.name}</option>
               {/each}
@@ -993,6 +872,42 @@
               <i class="fas fa-unlink" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.ManagerV2.Environment.UnlinkScene', 'Unlink')}</span>
             </button>
+            <label class="manager-v2-field manager-v2-raw-scene-field">
+              <span>{text('FABRICATE.Admin.ManagerV2.Environment.RawSceneUuid', 'Raw Scene UUID')}</span>
+              <input
+                type="text"
+                value={environmentDraft.sceneUuid || ''}
+                placeholder="Scene.xxxxxxxxxxxxxxxx"
+                data-environment-field={environmentField('sceneUuid')}
+                aria-invalid={fieldInvalid(environmentField('sceneUuid'))}
+                aria-describedby={fieldDescribedBy(environmentField('sceneUuid'), selectedSceneMissing ? 'manager-v2-environment-scene-reference-warning' : '')}
+                oninput={(event) => updateField('sceneUuid', event.target.value)}
+              />
+            </label>
+            {#if selectedSceneMissing}
+              <span class="environment-stale-warning manager-v2-scene-warning" id="manager-v2-environment-scene-reference-warning">
+                {localize('FABRICATE.Admin.Environments.LinkedSceneReferenceWarning')}
+              </span>
+            {/if}
+            {#if fieldErrors(environmentField('sceneUuid')).length > 0}
+              <span class="environment-field-error manager-v2-scene-warning" id={fieldErrorId(environmentField('sceneUuid'))}>{fieldErrors(environmentField('sceneUuid'))[0].message}</span>
+            {/if}
+          </div>
+        </section>
+
+        <section class="manager-v2-environment-status-card" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Summary', 'Environment summary')}>
+          <label class="manager-v2-toggle-row">
+            <input type="checkbox" checked={environmentDraft.enabled} onchange={(event) => updateField('enabled', event.target.checked)} />
+            <span>
+              <strong>{localize('FABRICATE.Admin.Environments.Enabled')}</strong>
+              <small>{environmentDraft.enabled ? text('FABRICATE.Admin.ManagerV2.StatusActive', 'Active') : text('FABRICATE.Admin.ManagerV2.StatusDisabled', 'Disabled')}</small>
+            </span>
+          </label>
+          <div class="manager-v2-fact-grid">
+            <div class="manager-v2-fact"><strong>{tasks.length}</strong><span>{localize('FABRICATE.Admin.Environments.Tasks')}</span></div>
+            <div class="manager-v2-fact"><strong>{environmentResultCount()}</strong><span>{localize('FABRICATE.Admin.Environments.Results')}</span></div>
+            <div class="manager-v2-fact"><strong>{environmentCatalystCount()}</strong><span>{localize('FABRICATE.Admin.Environments.Catalysts')}</span></div>
+            <div class="manager-v2-fact"><strong>{environmentSelectionModeLabel()}</strong><span>{localize('FABRICATE.Admin.Environments.SelectionMode')}</span></div>
           </div>
         </section>
       </div>
@@ -1279,7 +1194,7 @@
                 {fieldErrors}
                 {fieldErrorId}
               />
-            {:else}
+            {:else if activeTaskTab === 'check'}
               {#if activeTask.resolutionMode === 'progressive'}
                 <ProgressiveFields
                   {activeTaskProgressive}
@@ -1300,9 +1215,9 @@
                 />
               {:else}
                 <div class="manager-v2-empty compact">
-                  <i class="fas fa-sliders-h" aria-hidden="true"></i>
-                  <h3>{text('FABRICATE.Admin.ManagerV2.Environment.NoAdvancedTaskFields', 'No advanced fields')}</h3>
-                  <p>{text('FABRICATE.Admin.ManagerV2.Environment.NoAdvancedTaskFieldsHint', 'Progressive check controls appear here for progressive tasks.')}</p>
+                  <i class="fas fa-dice-d20" aria-hidden="true"></i>
+                  <h3>{text('FABRICATE.Admin.ManagerV2.Environment.NoCheckTaskFields', 'No check fields')}</h3>
+                  <p>{text('FABRICATE.Admin.ManagerV2.Environment.NoCheckTaskFieldsHint', 'Routed tasks use result selection from the Results tab.')}</p>
                 </div>
               {/if}
             {/if}

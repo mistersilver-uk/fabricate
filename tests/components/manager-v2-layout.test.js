@@ -333,7 +333,9 @@ test('manager-v2 essence edit route defines picker-based responsive geometry', (
   assert.ok(!inspectorSourceSummaryBlock.includes('grid-template-columns: 54px minmax(0, 1fr) auto;'), 'inspector source summary should not crowd evidence and unlink into a three-column row');
   assert.ok(inspectorSourceSummaryBlock.includes('grid-template-columns: 54px minmax(0, 1fr);'), 'inspector source summary should be only the linked item evidence card');
   assert.ok(inspectorSourceActionsBlock.includes('margin-top: 10px;'), 'inspector source action row should sit below the linked item card');
-  assert.ok(inspectorSourceActionsBlock.includes('justify-content: flex-end;'), 'inspector source action row should place unlink separately from source evidence');
+  assert.ok(inspectorSourceActionsBlock.includes('display: grid;'), 'inspector source actions should use stable row geometry');
+  assert.ok(inspectorSourceActionsBlock.includes('grid-template-columns: repeat(2, minmax(0, 1fr));'), 'inspector source actions should keep copy and unlink on the same row');
+  assert.ok(!mediumQuery.includes('.fabricate-manager-v2 .manager-v2-essence-inspector-source-actions .manager-v2-button'), 'narrow manager-v2 layout should not stack the selected essence source actions');
   assert.ok(warningActionBlock.includes('rgba(246, 176, 72'), 'unlink source should have an amber warning-action button style');
   assert.ok(sourceDropBlock.includes('width: 100%;'), 'essence source drop target should use the full source panel width');
   assert.ok(sourceDropBlock.includes('height: 84px;'), 'essence source drop target should have a stable wide drop-zone height');
@@ -355,6 +357,7 @@ test('manager-v2 environments browser and edit route define compact responsive g
   const actionGridBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-action-grid');
   const editorShellBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-editor-shell');
   const editorViewBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-edit-view');
+  const detailsGridBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-details-grid');
   const workspaceBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-workspace');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager-v2 (max-width: 1120px)'));
 
@@ -392,11 +395,20 @@ test('manager-v2 environments browser and edit route define compact responsive g
   );
   assert.ok(editorViewBlock.includes('grid-template-rows: auto minmax(0, 1fr);'), 'environment editor should reserve details band plus scrollable workspace');
   assert.ok(
+    detailsGridBlock.includes('grid-template-columns: minmax(300px, 1.02fr) minmax(360px, 1.1fr) minmax(230px, 0.58fr);'),
+    'environment details band should expose identity, scene linkage, and status/evidence at normal widths'
+  );
+  assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-environment-status-card {\n  display: flex;'),
+    'environment details band should include a compact status/evidence card'
+  );
+  assert.ok(
     workspaceBlock.includes('grid-template-columns: minmax(210px, 0.58fr) minmax(360px, 1.45fr) minmax(250px, 0.72fr);'),
     'environment editor workspace should expose task rail, selected task editor, and evidence column at normal widths'
   );
   assert.ok(css.includes('.fabricate-manager-v2 .manager-v2-environment-scene-card'), 'environment editor should define a linked scene card');
   assert.ok(css.includes('.fabricate-manager-v2 .manager-v2-task-tabs'), 'environment editor should define task tabs');
+  assert.equal(css.includes('.fabricate-manager-v2 .manager-v2-environment-details-tabs'), false, 'environment editor should not define removed environment advanced tabs');
   assert.ok(
     mediumQuery.includes('.fabricate-manager-v2 .manager-v2-environment-row') && mediumQuery.includes('grid-template-columns: minmax(0, 1fr);'),
     'medium manager-v2 layout should stack environment rows before columns become cramped'

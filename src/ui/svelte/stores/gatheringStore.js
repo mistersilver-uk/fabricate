@@ -345,6 +345,7 @@ export function createGatheringStore(services) {
       syncSelection();
       return get(listing);
     } catch (err) {
+      console.error('Fabricate | Gathering refresh failed:', err);
       const message = err?.message || localize('FABRICATE.Gathering.Notifications.RefreshFailed');
       error.set(message);
       services.notify?.error?.(message);
@@ -459,6 +460,7 @@ export function createGatheringStore(services) {
       await refresh();
       return result;
     } catch (err) {
+      console.error('Fabricate | Gathering startAttempt failed:', err);
       const message = err?.message || localize('FABRICATE.Gathering.Notifications.StartFailed');
       error.set(message);
       services.notify?.error?.(message);

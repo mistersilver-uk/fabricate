@@ -202,7 +202,15 @@ function createGatheringResultResolver(resolutionModeService) {
   return {
     async resolveRouted({ provider, resultSelection, resultGroups = [] } = {}) {
       if (provider === 'macroOutcome') {
-        return runGatheringMacro(resultSelection?.macroUuid, { kind: 'gatheringOutcome', resultGroups });
+        try {
+          return await runGatheringMacro(resultSelection?.macroUuid, { kind: 'gatheringOutcome', resultGroups });
+        } catch (err) {
+          console.error('Fabricate | Gathering routed-outcome macro failed:', err);
+          return {
+            status: 'misconfigured',
+            diagnostics: [{ code: 'MACRO_OUTCOME_THREW', message: err?.message || 'Gathering outcome macro threw' }]
+          };
+        }
       }
 
       if (provider === 'rollTableOutcome') {
@@ -265,16 +273,23 @@ function createGatheringFailureFeedback() {
   return {
     async apply({ failureOutcome, actor, viewer, system, environment, task, outcome, checkResult } = {}) {
       if (failureOutcome?.mode === 'macro') {
-        return runGatheringMacro(failureOutcome.macroUuid, {
-          kind: 'gatheringFailure',
-          actor,
-          viewer,
-          system,
-          environment,
-          task,
-          outcome,
-          checkResult
-        });
+        try {
+          return await runGatheringMacro(failureOutcome.macroUuid, {
+            kind: 'gatheringFailure',
+            actor,
+            viewer,
+            system,
+            environment,
+            task,
+            outcome,
+            checkResult
+          });
+        } catch (err) {
+          console.error('Fabricate | Gathering failure-feedback macro failed:', err);
+          const fallback = game.i18n?.localize?.('FABRICATE.Gathering.FailureDefault') || 'Gathering produced no results.';
+          ui.notifications?.warn?.(fallback);
+          return { message: fallback, error: err?.message || 'Macro threw' };
+        }
       }
       const message = failureOutcome?.text || game.i18n?.localize?.('FABRICATE.Gathering.FailureDefault') || 'Gathering produced no results.';
       ui.notifications?.warn?.(message);

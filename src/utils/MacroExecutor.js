@@ -25,6 +25,7 @@ export class MacroExecutor {
     const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
     const fn = new AsyncFunction(
       'context',
+      'args',
       'game',
       'foundry',
       'ui',
@@ -32,7 +33,7 @@ export class MacroExecutor {
       `"use strict";\n${macro.command}`
     );
 
-    return await fn(context, game, foundry, ui, fromUuid);
+    return await fn(context, context, game, foundry, ui, fromUuid);
   }
 }
 

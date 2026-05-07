@@ -771,7 +771,6 @@
           "DetailsBand": "Environment workspace",
           "DetailTabs": "Environment detail sections",
           "EnvironmentDetailsTab": "Environment Details",
-          "AdvancedTab": "Advanced",
           "RawSceneUuid": "Raw Scene UUID",
           "SceneCard": "Linked scene",
           "UnlinkScene": "Unlink",
@@ -783,7 +782,7 @@
           "TaskTabCatalysts": "Catalysts",
           "TaskTabVisibility": "Visibility",
           "TaskTabTiming": "Timing",
-          "TaskTabAdvanced": "Advanced",
+          "TaskTabCheck": "Check",
           "EvidenceColumn": "Environment evidence",
           "Summary": "Environment summary",
           "Validation": "Validation",
@@ -791,8 +790,8 @@
           "ValidationWarning": "Warning",
           "NoValidationIssues": "No validation issues are currently reported.",
           "SelectedTask": "Selected task",
-          "NoAdvancedTaskFields": "No advanced fields",
-          "NoAdvancedTaskFieldsHint": "Progressive check controls appear here for progressive tasks."
+          "NoCheckTaskFields": "No check fields",
+          "NoCheckTaskFieldsHint": "Routed tasks use result selection from the Results tab."
         },
         "Column": {
           "System": "System",
