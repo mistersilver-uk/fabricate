@@ -99,6 +99,15 @@ GatheringEnvironment = {
   enabled: boolean,
   selectionMode: "targeted" | "blind",
   sceneUuid?: string | null,
+  region?: string,
+  biomes?: string[],
+  dangerTags?: string[],
+  hazardSelectionMode?: "highestRankedDrop" | "allDrops",
+  hazardPolicy?: "successWithHazard" | "failureWithHazard",
+  enabledTaskIds?: string[],
+  disabledTaskIds?: string[],
+  enabledHazardIds?: string[],
+  disabledHazardIds?: string[],
   tasks: GatheringTask[],
 }
 ```
@@ -111,6 +120,123 @@ GatheringEnvironment = {
 4. If `selectionMode === "blind"`, the environment must define exactly one task.
 5. If `sceneUuid` is present, it references the scene where player self-service gathering is allowed.
 6. Disabled environments are never attemptable by non-GM users and are hidden from normal player gathering flows.
+7. `region` is single-select; `biomes` and `dangerTags` are multi-select tag lists.
+8. Weather and time of day are not environment fields. They are global gathering conditions used when matching reusable tasks and hazards.
+9. `enabledTaskIds`, `disabledTaskIds`, `enabledHazardIds`, and `disabledHazardIds` store environment-level composition toggles for reusable library records without rewriting the library definitions.
+
+## Global Gathering Conditions
+
+### Purpose
+
+Represent the current weather/time-of-day state used by gathering listing, matching, and attempts.
+
+### Properties
+
+```js
+GatheringConditionConfig = {
+  conditions: {
+    weather: string,
+    timeOfDay: string,
+  },
+  vocabularies: {
+    regions: string[],
+    biomes: string[],
+    danger: string[],
+    weather: string[],
+    timeOfDay: string[],
+  },
+}
+```
+
+### Requirements
+
+1. Default weather is `"clear"` and default time of day is `"day"`.
+2. Default regions are empty. Default biomes are `forest`, `grassland`, `mountain`, `cave`, `coastal`, `swamp`, `desert`, `urban`, `ruins`, and `wasteland`.
+3. Default danger tags are `safe`, `hazardous`, `dangerous`, and `deadly`.
+4. Default weather tags are `clear`, `cloudy`, `rain`, `storm`, `snow`, `fog`, and `wind`.
+5. Default time-of-day tags are `dawn`, `day`, `dusk`, and `night`.
+6. GM-customized vocabularies are preserved. Defaults are seeded only when a custom list is absent or empty.
+7. `game.fabricate.gathering.getConditions()` returns current conditions and available tag vocabularies for GM and player-facing callers.
+8. `game.fabricate.gathering.setWeather(weatherTag)`, `setTimeOfDay(timeOfDayTag)`, and `setConditions({ weather, timeOfDay })` require a GM user, validate tags against the configured vocabularies, persist the setting, dispatch `fabricate.gathering.conditionsUpdated`, and refresh gathering listings.
+9. Player-facing callers may read conditions but may not mutate them.
+
+## Reusable Gathering Task Library
+
+### Purpose
+
+Represent GM-authored gathering tasks that can be composed into multiple environments for a crafting system.
+
+### Properties
+
+```js
+GatheringTaskDefinition = {
+  id: string,
+  name: string,
+  description?: string,
+  img?: string,
+  enabled: boolean,
+  region?: string,
+  biomes?: string[],
+  weather?: string[],
+  timeOfDay?: string[],
+  dropRows: Array<{
+    id: string,
+    componentId?: string,
+    itemUuid?: string,
+    quantity: number,
+    dropRate: number,
+    enabled: boolean,
+  }>,
+  itemSelectionMode: "highestRankedDrop" | "allDrops",
+  staminaCost?: number,
+  gatheringModifier?: ModifierProvider,
+}
+```
+
+### Requirements
+
+1. Definitions are scoped to one crafting system.
+2. Disabled definitions never match for player gathering.
+3. Empty match tags mean "matches any" for that dimension.
+4. Region matches when omitted or equal to the environment region.
+5. Biomes match when omitted or at least one task biome is present on the environment.
+6. Weather and time of day match against the current global gathering conditions.
+7. Drop rows require a `dropRate` integer from 1 to 100, a positive quantity, and either a component reference or item UUID.
+8. Row order is authoritative for `highestRankedDrop`.
+
+## Reusable Gathering Hazard Library
+
+### Purpose
+
+Represent GM-authored hazard outcomes that can be composed into environments by tag matching.
+
+### Properties
+
+```js
+GatheringHazardDefinition = {
+  id: string,
+  name: string,
+  description?: string,
+  img?: string,
+  enabled: boolean,
+  dangerTags?: string[],
+  region?: string,
+  biomes?: string[],
+  weather?: string[],
+  timeOfDay?: string[],
+  dropRate: number,
+  hazardModifier?: ModifierProvider,
+}
+```
+
+### Requirements
+
+1. Definitions are scoped to one crafting system.
+2. Disabled definitions never match for player gathering.
+3. Empty match tags mean "matches any" for that dimension.
+4. Danger matches when omitted or at least one hazard danger tag is present on the environment.
+5. Region, biome, weather, and time-of-day matching use the same rules as reusable task definitions.
+6. `dropRate` must be an integer from 1 to 100.
 
 ## GatheringTask
 
@@ -128,7 +254,7 @@ GatheringTask = {
   img?: string,  // default is 'icons/svg/item-bag.svg'
   enabled: boolean,
 
-  resolutionMode: "progressive" | "routed",
+  resolutionMode: "progressive" | "routed" | "d100",
 
   catalysts: Catalyst[],
   visibility?: GatheringVisibilityGate,
@@ -162,13 +288,33 @@ GatheringTask = {
 
 ### Requirements
 
-1. `resolutionMode` must be either `"progressive"` or `"routed"`.
+1. `resolutionMode` must be `"progressive"`, `"routed"`, or gathering-native `"d100"`.
 2. Gathering tasks have no ingredients. Any configuration that depends on `IngredientSet` or `ingredientSet` routing is invalid.
 3. `failureOutcome` is optional, but task failure must still be supported at runtime by applying default failure feedback when no special outcome is configured.
 4. `failureOutcome` applies whenever routed or progressive resolution ends in failure, including when a provider returns compatibility aliases from the former miss-family or hazard-family keyword sets.
 5. Invalid `failureOutcome` configuration must abort start-attempt validation before provider resolution, terminal history, result creation, catalyst usage, or failure feedback side effects.
 6. GM-facing helper text should document `fail` as the canonical special outcome keyword. Older aliases remain accepted for compatibility but are not the preferred authored form.
 7. Disabled tasks are ignored for normal player listing and may not be attempted.
+
+## D100 Gathering Resolution
+
+### Purpose
+
+Resolve gathering-native reusable task drops and matched hazards through ordered d100 rows.
+
+### Runtime Requirements
+
+1. Before any player attempt starts, Fabricate rejects gathering if Foundry is paused.
+2. For every enabled item row in the selected reusable task, roll `d100`, add the gathering modifier, and drop the row when `effectiveRoll >= 101 - dropRate`.
+3. For every enabled matched hazard in the environment, roll `d100`, add the hazard modifier, and drop the hazard when `effectiveRoll >= 101 - dropRate`.
+4. `itemSelectionMode === "allDrops"` awards every dropped item row.
+5. `itemSelectionMode === "highestRankedDrop"` awards the first dropped item row in authored row order.
+6. Environment `hazardSelectionMode === "allDrops"` keeps every dropped hazard.
+7. Environment `hazardSelectionMode === "highestRankedDrop"` keeps the first dropped hazard in matched hazard order.
+8. Environment `hazardPolicy === "successWithHazard"` reports a successful gathering outcome with hazard evidence when hazards drop.
+9. Environment `hazardPolicy === "failureWithHazard"` reports a failed gathering outcome with hazard evidence when hazards drop.
+10. If no hazards are enabled or matched, the environment is mechanically safe even when danger tags are present.
+11. Attempt history and player-facing output must redact d100 rows, hazards, provider diagnostics, and task identity when the environment is blind and the viewer is not allowed to inspect the underlying task.
 
 ## TimeRequirement
 

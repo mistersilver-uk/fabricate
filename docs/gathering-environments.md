@@ -27,6 +27,11 @@ Each environment belongs to one crafting system and stores:
 | **Description** | Optional notes shown by the authoring UI |
 | **Enabled** | Disabled environments are ignored by normal player listing |
 | **Selection Mode** | `targeted` for multiple visible tasks, or `blind` for exactly one opaque task |
+| **Region** | Optional single region tag used to match reusable tasks and hazards |
+| **Biomes** | Optional biome tags used to match reusable tasks and hazards |
+| **Danger Tags** | Optional danger tags used to match reusable hazards |
+| **Hazard Selection Mode** | `allDrops` or `highestRankedDrop` for matched hazards |
+| **Hazard Policy** | Whether dropped hazards are success-with-hazard or failure-with-hazard |
 | **Scene UUID** | Optional scene gate for environments tied to a specific scene |
 
 Scene UUIDs are kept as authored text. If a saved scene reference no longer resolves, the Environments tab keeps the UUID visible and preserves it on save until the GM clears or replaces it. Players remain blocked by an unresolved scene gate until the reference is repaired.
@@ -34,6 +39,52 @@ Scene UUIDs are kept as authored text. If a saved scene reference no longer reso
 Deleting an environment also cleans active and historical gathering runs that reference it.
 
 The Scene UUID field has an assisted selector populated from the current world scene list plus a manual UUID input. Selecting a scene writes its UUID; typing directly remains supported for pasted or external references. If the saved UUID is no longer in the scene list, the editor shows the unresolved value as a preserved option until the GM changes it.
+
+## Global Conditions And Tags
+
+Gathering weather and time of day are global gathering conditions, not environment browse filters. GMs can set current weather and current time of day in the Manager V2 gathering library/settings panel or through the public API:
+
+```js
+game.fabricate.gathering.getConditions();
+game.fabricate.gathering.setWeather("rain");
+game.fabricate.gathering.setTimeOfDay("night");
+game.fabricate.gathering.setConditions({ weather: "fog", timeOfDay: "dawn" });
+```
+
+Mutation methods require a GM user, validate values against the configured weather and time-of-day vocabularies, persist the gathering config setting, dispatch `fabricate.gathering.conditionsUpdated`, and refresh gathering listings. Player-facing code may call `getConditions()` but cannot mutate conditions.
+
+When gathering is enabled and no custom values exist, Fabricate seeds default vocabularies for biomes, danger, weather, and time of day. Regions are intentionally empty by default because campaign geography is world-specific. Empty task or hazard match tags mean "matches any" for that dimension.
+
+## Reusable Task And Hazard Libraries
+
+Manager V2 exposes reusable task and hazard authoring for the selected crafting system. Environments compose those reusable records by matching environment region, biome, danger, and the current global weather/time state. GMs can toggle matched task and hazard records on or off per environment; row details stay behind expandable library rows so the environment workspace remains scan-friendly.
+
+Reusable task records support:
+
+| Field | Description |
+|:------|:------------|
+| **Name, description, image, enabled** | GM-authored task identity and availability |
+| **Region, biomes, weather, time of day** | Optional match tags; empty means any |
+| **Drop rows** | Ordered d100 item/component rows with quantity and `dropRate` from 1 to 100 |
+| **Item selection mode** | `highestRankedDrop` awards the first dropped row; `allDrops` awards every dropped row |
+| **Stamina and modifiers** | Optional stamina cost and gathering roll modifier provider |
+
+Reusable hazard records support:
+
+| Field | Description |
+|:------|:------------|
+| **Name, description, image, enabled** | GM-authored hazard identity and availability |
+| **Danger, region, biomes, weather, time of day** | Optional match tags; empty means any |
+| **Drop rate** | d100 hazard trigger rate from 1 to 100 |
+| **Modifier** | Optional hazard roll modifier provider |
+
+Disabled reusable tasks and hazards never match for player gathering.
+
+## D100 Resolution
+
+Reusable gathering tasks use gathering-native d100 rows. For each enabled item row, Fabricate rolls `d100 + gatheringModifier`; the row drops when the effective roll is at least `101 - dropRate`. Matched enabled hazards roll independently with `d100 + hazardModifier` and the same threshold rule.
+
+Task item selection mode chooses all dropped item rows or only the highest-ranked dropped row. Environment hazard selection mode chooses all dropped hazards or only the highest-ranked dropped hazard. The environment hazard policy decides whether a dropped hazard produces success-with-hazard or failure-with-hazard. If no hazards are enabled or matched, the environment is mechanically safe even when danger tags are present.
 
 ## Task Authoring
 

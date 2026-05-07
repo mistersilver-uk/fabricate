@@ -72,6 +72,15 @@ const TASK_PROGRESSIVE_AWARD_MODES = new Set(['equal', 'partial', 'exceed']);
 const TASK_TIME_UNITS = ['minutes', 'hours', 'days', 'months', 'years'];
 const TASK_FAILURE_OUTCOME_MODES = new Set(['text', 'macro']);
 const DEFAULT_GATHERING_TASK_IMG = 'icons/svg/item-bag.svg';
+const GATHERING_CONFIG_SETTING = 'gatheringConfig';
+const DEFAULT_GATHERING_CONDITIONS = Object.freeze({ weather: 'clear', timeOfDay: 'day' });
+const DEFAULT_GATHERING_VOCABULARIES = Object.freeze({
+  regions: [],
+  biomes: ['forest', 'grassland', 'mountain', 'cave', 'coastal', 'swamp', 'desert', 'urban', 'ruins', 'wasteland'],
+  danger: ['safe', 'hazardous', 'dangerous', 'deadly'],
+  weather: ['clear', 'cloudy', 'rain', 'storm', 'snow', 'fog', 'wind'],
+  timeOfDay: ['dawn', 'day', 'dusk', 'night']
+});
 
 // ---------------------------------------------------------------------------
 // Module-private helper functions
@@ -232,6 +241,97 @@ function _buildSalvageSummary(item, salvageEnabled) {
 function _clonePlain(value) {
   if (value === null || value === undefined) return value;
   return JSON.parse(JSON.stringify(value));
+}
+
+function _normalizeGatheringTag(value) {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function _normalizeGatheringTagList(value) {
+  const values = Array.isArray(value) ? value : (value ? String(value).split(',') : []);
+  return Array.from(new Set(values.map(_normalizeGatheringTag).filter(Boolean)));
+}
+
+function _seedGatheringVocabulary(raw, defaults) {
+  const values = _normalizeGatheringTagList(raw);
+  return values.length > 0 ? values : [...defaults];
+}
+
+function _normalizeGatheringDropRow(row = {}, randomID = () => Math.random().toString(36).slice(2, 10)) {
+  return {
+    id: row.id ? String(row.id) : randomID(),
+    name: String(row.name || ''),
+    componentId: String(row.componentId || row.systemItemId || ''),
+    itemUuid: String(row.itemUuid || ''),
+    quantity: Number.isFinite(Number(row.quantity)) && Number(row.quantity) > 0 ? Number(row.quantity) : 1,
+    dropRate: Number.isFinite(Number(row.dropRate)) ? Math.min(100, Math.max(1, Math.floor(Number(row.dropRate)))) : 1,
+    enabled: row.enabled !== false
+  };
+}
+
+function _normalizeGatheringTask(task = {}, randomID = () => Math.random().toString(36).slice(2, 10)) {
+  const id = String(task.id || randomID());
+  return {
+    id,
+    name: String(task.name || 'Gather'),
+    description: String(task.description || ''),
+    img: String(task.img || DEFAULT_GATHERING_TASK_IMG),
+    enabled: task.enabled !== false,
+    region: _normalizeGatheringTag(task.region),
+    biomes: _normalizeGatheringTagList(task.biomes),
+    weather: _normalizeGatheringTagList(task.weather),
+    timeOfDay: _normalizeGatheringTagList(task.timeOfDay),
+    itemSelectionMode: task.itemSelectionMode === 'allDrops' ? 'allDrops' : 'highestRankedDrop',
+    dropRows: (Array.isArray(task.dropRows ?? task.itemDrops) ? (task.dropRows ?? task.itemDrops) : [])
+      .map(row => _normalizeGatheringDropRow(row, randomID)),
+    staminaCost: Number.isFinite(Number(task.staminaCost)) && Number(task.staminaCost) > 0 ? Number(task.staminaCost) : 0,
+    gatheringModifier: task.gatheringModifier && typeof task.gatheringModifier === 'object' ? _clonePlain(task.gatheringModifier) : null,
+    timeRequirement: task.timeRequirement && typeof task.timeRequirement === 'object' ? _clonePlain(task.timeRequirement) : null
+  };
+}
+
+function _normalizeGatheringHazard(hazard = {}, randomID = () => Math.random().toString(36).slice(2, 10)) {
+  return {
+    id: hazard.id ? String(hazard.id) : randomID(),
+    name: String(hazard.name || 'Hazard'),
+    description: String(hazard.description || ''),
+    img: String(hazard.img || 'icons/svg/hazard.svg'),
+    enabled: hazard.enabled !== false,
+    dangerTags: _normalizeGatheringTagList(hazard.dangerTags),
+    region: _normalizeGatheringTag(hazard.region),
+    biomes: _normalizeGatheringTagList(hazard.biomes),
+    weather: _normalizeGatheringTagList(hazard.weather),
+    timeOfDay: _normalizeGatheringTagList(hazard.timeOfDay),
+    dropRate: Number.isFinite(Number(hazard.dropRate)) ? Math.min(100, Math.max(1, Math.floor(Number(hazard.dropRate)))) : 1,
+    hazardModifier: hazard.hazardModifier && typeof hazard.hazardModifier === 'object' ? _clonePlain(hazard.hazardModifier) : null
+  };
+}
+
+function _normalizeGatheringConfig(raw = {}, randomID = () => Math.random().toString(36).slice(2, 10)) {
+  const vocabularies = {
+    regions: _seedGatheringVocabulary(raw?.vocabularies?.regions, DEFAULT_GATHERING_VOCABULARIES.regions),
+    biomes: _seedGatheringVocabulary(raw?.vocabularies?.biomes, DEFAULT_GATHERING_VOCABULARIES.biomes),
+    danger: _seedGatheringVocabulary(raw?.vocabularies?.danger, DEFAULT_GATHERING_VOCABULARIES.danger),
+    weather: _seedGatheringVocabulary(raw?.vocabularies?.weather, DEFAULT_GATHERING_VOCABULARIES.weather),
+    timeOfDay: _seedGatheringVocabulary(raw?.vocabularies?.timeOfDay, DEFAULT_GATHERING_VOCABULARIES.timeOfDay)
+  };
+  const weather = _normalizeGatheringTag(raw?.conditions?.weather) || DEFAULT_GATHERING_CONDITIONS.weather;
+  const timeOfDay = _normalizeGatheringTag(raw?.conditions?.timeOfDay) || DEFAULT_GATHERING_CONDITIONS.timeOfDay;
+  const systems = {};
+  for (const [systemId, systemConfig] of Object.entries(raw?.systems || {})) {
+    systems[String(systemId)] = {
+      tasks: (Array.isArray(systemConfig?.tasks) ? systemConfig.tasks : []).map(task => _normalizeGatheringTask(task, randomID)),
+      hazards: (Array.isArray(systemConfig?.hazards) ? systemConfig.hazards : []).map(hazard => _normalizeGatheringHazard(hazard, randomID))
+    };
+  }
+  return {
+    vocabularies,
+    conditions: {
+      weather: vocabularies.weather.includes(weather) ? weather : DEFAULT_GATHERING_CONDITIONS.weather,
+      timeOfDay: vocabularies.timeOfDay.includes(timeOfDay) ? timeOfDay : DEFAULT_GATHERING_CONDITIONS.timeOfDay
+    },
+    systems
+  };
 }
 
 function _escapeHtml(value) {
@@ -1042,6 +1142,7 @@ export function createAdminStore(services) {
     itemSearchTerm: '',
     graphData: { nodes: [], edges: [], width: 0, height: 0 },
     graphSearchTerm: '',
+    gatheringConfig: _normalizeGatheringConfig(services.getSetting?.(GATHERING_CONFIG_SETTING) || {}),
     ..._emptyEnvironmentState(false)
   });
 
@@ -1105,6 +1206,27 @@ export function createAdminStore(services) {
     if (typeof globalThis.foundry?.utils?.randomID === 'function') return globalThis.foundry.utils.randomID();
     if (typeof globalThis.crypto?.randomUUID === 'function') return globalThis.crypto.randomUUID();
     return Math.random().toString(36).slice(2, 14);
+  }
+
+  function _currentGatheringConfig() {
+    return _normalizeGatheringConfig(services.getSetting?.(GATHERING_CONFIG_SETTING) || {}, _randomID);
+  }
+
+  async function _saveGatheringConfig(config) {
+    const normalized = _normalizeGatheringConfig(config, _randomID);
+    await services.setSetting?.(GATHERING_CONFIG_SETTING, normalized);
+    viewState.update(state => ({ ...state, gatheringConfig: _clonePlain(normalized) }));
+    return normalized;
+  }
+
+  function _gatheringSystemConfig(config, systemId) {
+    const id = String(systemId || get(selectedSystemId) || '');
+    if (!id) return null;
+    config.systems = config.systems || {};
+    config.systems[id] = config.systems[id] || { tasks: [], hazards: [] };
+    config.systems[id].tasks = Array.isArray(config.systems[id].tasks) ? config.systems[id].tasks : [];
+    config.systems[id].hazards = Array.isArray(config.systems[id].hazards) ? config.systems[id].hazards : [];
+    return config.systems[id];
   }
 
   function _resolveEnvironmentTaskSelection(draft, preferredTaskId = '') {
@@ -1404,6 +1526,7 @@ export function createAdminStore(services) {
       selectedSystemName: selectedSystem?.name || '',
       selectedSystem: selectedSystemData,
       essenceCards,
+      gatheringConfig: _clonePlain(_currentGatheringConfig()),
       recipes: recipeListData.recipes,
       recipeCategories: recipeListData.recipeCategories,
       showVisibilitySummary: recipeListData.showVisibilitySummary,
@@ -1449,6 +1572,7 @@ export function createAdminStore(services) {
       selectedSystem: selectedSystemData,
       itemCards,
       essenceCards,
+      gatheringConfig: _clonePlain(_currentGatheringConfig()),
       recipes: recipeListData.recipes,
       recipeCategories: recipeListData.recipeCategories,
       showVisibilitySummary: recipeListData.showVisibilitySummary,
@@ -1612,7 +1736,23 @@ export function createAdminStore(services) {
     const current = get(environmentDraft);
     if (!current || typeof updates !== 'object' || updates === null) return false;
 
-    const allowed = new Set(['name', 'description', 'enabled', 'selectionMode', 'sceneUuid', 'tasks']);
+    const allowed = new Set([
+      'name',
+      'description',
+      'enabled',
+      'selectionMode',
+      'sceneUuid',
+      'region',
+      'biomes',
+      'dangerTags',
+      'hazardSelectionMode',
+      'hazardPolicy',
+      'enabledTaskIds',
+      'disabledTaskIds',
+      'enabledHazardIds',
+      'disabledHazardIds',
+      'tasks'
+    ]);
     const next = _clonePlain(current);
     for (const [field, value] of Object.entries(updates)) {
       if (!allowed.has(field)) continue;
@@ -1624,6 +1764,12 @@ export function createAdminStore(services) {
       } else if (field === 'tasks') {
         next.tasks = Array.isArray(value) ? _clonePlain(value) : [];
         selectedEnvironmentTaskId.set(_resolveEnvironmentTaskSelection(next, get(selectedEnvironmentTaskId)));
+      } else if (['biomes', 'dangerTags'].includes(field)) {
+        next[field] = _normalizeGatheringTagList(value);
+      } else if (['enabledTaskIds', 'disabledTaskIds', 'enabledHazardIds', 'disabledHazardIds'].includes(field)) {
+        next[field] = Array.from(new Set((Array.isArray(value) ? value : [])
+          .map(entry => String(entry || '').trim())
+          .filter(Boolean)));
       } else {
         next[field] = String(value ?? '');
       }
@@ -2627,6 +2773,130 @@ export function createAdminStore(services) {
     await refresh();
   }
 
+  async function updateGatheringConditions(updates = {}) {
+    const config = _currentGatheringConfig();
+    const next = { ...config, conditions: { ...config.conditions } };
+    if (updates.weather !== undefined) {
+      const weather = _normalizeGatheringTag(updates.weather);
+      if (config.vocabularies.weather.includes(weather)) next.conditions.weather = weather;
+    }
+    if (updates.timeOfDay !== undefined) {
+      const timeOfDay = _normalizeGatheringTag(updates.timeOfDay);
+      if (config.vocabularies.timeOfDay.includes(timeOfDay)) next.conditions.timeOfDay = timeOfDay;
+    }
+    if (typeof services.setGatheringConditions === 'function') {
+      await services.setGatheringConditions(next.conditions);
+      viewState.update(state => ({
+        ...state,
+        gatheringConfig: _clonePlain(_normalizeGatheringConfig({
+          ...config,
+          conditions: next.conditions
+        }, _randomID))
+      }));
+    } else {
+      await _saveGatheringConfig(next);
+    }
+    await refresh();
+    return true;
+  }
+
+  async function updateGatheringVocabulary(kind, values) {
+    if (!Object.prototype.hasOwnProperty.call(DEFAULT_GATHERING_VOCABULARIES, kind)) return false;
+    const config = _currentGatheringConfig();
+    const nextValues = _normalizeGatheringTagList(values);
+    config.vocabularies[kind] = nextValues.length > 0 ? nextValues : [...DEFAULT_GATHERING_VOCABULARIES[kind]];
+    if (kind === 'weather' && !config.vocabularies.weather.includes(config.conditions.weather)) {
+      config.conditions.weather = config.vocabularies.weather[0] || DEFAULT_GATHERING_CONDITIONS.weather;
+    }
+    if (kind === 'timeOfDay' && !config.vocabularies.timeOfDay.includes(config.conditions.timeOfDay)) {
+      config.conditions.timeOfDay = config.vocabularies.timeOfDay[0] || DEFAULT_GATHERING_CONDITIONS.timeOfDay;
+    }
+    await _saveGatheringConfig(config);
+    await refresh();
+    return true;
+  }
+
+  async function addGatheringLibraryTask(systemId = get(selectedSystemId)) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig) return null;
+    const firstComponent = _selectedManagedItemOptions()[0];
+    const task = _normalizeGatheringTask({
+      id: _randomID(),
+      name: services.localize?.('FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask') || 'Reusable gathering task',
+      dropRows: [{
+        id: _randomID(),
+        componentId: firstComponent?.id || '',
+        quantity: 1,
+        dropRate: 100
+      }]
+    }, _randomID);
+    systemConfig.tasks = [...systemConfig.tasks, task];
+    await _saveGatheringConfig(config);
+    await refresh();
+    return task;
+  }
+
+  async function updateGatheringLibraryTask(systemId = get(selectedSystemId), taskId, updates = {}) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig || !taskId) return false;
+    systemConfig.tasks = systemConfig.tasks.map(task => task.id === taskId
+      ? _normalizeGatheringTask({ ...task, ...updates }, _randomID)
+      : task);
+    await _saveGatheringConfig(config);
+    await refresh();
+    return true;
+  }
+
+  async function deleteGatheringLibraryTask(systemId = get(selectedSystemId), taskId) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig || !taskId) return false;
+    systemConfig.tasks = systemConfig.tasks.filter(task => task.id !== taskId);
+    await _saveGatheringConfig(config);
+    await refresh();
+    return true;
+  }
+
+  async function addGatheringLibraryHazard(systemId = get(selectedSystemId)) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig) return null;
+    const hazard = _normalizeGatheringHazard({
+      id: _randomID(),
+      name: services.localize?.('FABRICATE.Admin.ManagerV2.Environment.NewLibraryHazard') || 'Reusable hazard',
+      dangerTags: ['hazardous'],
+      dropRate: 25
+    }, _randomID);
+    systemConfig.hazards = [...systemConfig.hazards, hazard];
+    await _saveGatheringConfig(config);
+    await refresh();
+    return hazard;
+  }
+
+  async function updateGatheringLibraryHazard(systemId = get(selectedSystemId), hazardId, updates = {}) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig || !hazardId) return false;
+    systemConfig.hazards = systemConfig.hazards.map(hazard => hazard.id === hazardId
+      ? _normalizeGatheringHazard({ ...hazard, ...updates }, _randomID)
+      : hazard);
+    await _saveGatheringConfig(config);
+    await refresh();
+    return true;
+  }
+
+  async function deleteGatheringLibraryHazard(systemId = get(selectedSystemId), hazardId) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig || !hazardId) return false;
+    systemConfig.hazards = systemConfig.hazards.filter(hazard => hazard.id !== hazardId);
+    await _saveGatheringConfig(config);
+    await refresh();
+    return true;
+  }
+
   // --- Config save actions ---
 
   async function saveCraftingCheckConfig(configOrMode, macroUuid, outcomesText) {
@@ -2996,6 +3266,14 @@ export function createAdminStore(services) {
     addEssence,
     updateEssence,
     removeEssence,
+    updateGatheringConditions,
+    updateGatheringVocabulary,
+    addGatheringLibraryTask,
+    updateGatheringLibraryTask,
+    deleteGatheringLibraryTask,
+    addGatheringLibraryHazard,
+    updateGatheringLibraryHazard,
+    deleteGatheringLibraryHazard,
     saveCraftingCheckConfig,
     saveCurrencyConfig,
     saveAlchemyConfig,

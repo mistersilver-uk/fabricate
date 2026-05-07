@@ -81,6 +81,7 @@ export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
       getCraftingSystemManager: () => game?.fabricate?.getCraftingSystemManager?.() ?? null,
       getRecipeManager: () => game?.fabricate?.getRecipeManager?.() ?? null,
       getGatheringEnvironmentStore: () => game?.fabricate?.getGatheringEnvironmentStore?.() ?? null,
+      setGatheringConditions: async (conditions) => game?.fabricate?.gathering?.setConditions?.(conditions),
       getScriptMacros: () =>
         Array.from(game.macros?.contents || [])
           .filter(m => (m.type || '').toLowerCase() === 'script')

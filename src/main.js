@@ -654,23 +654,54 @@ class Fabricate {
     return this.gatheringRichStateService?.updateConditions(options);
   }
 
+  /**
+   * Read current gathering conditions and configured tag vocabularies.
+   *
+   * This public API is safe for player-facing callers. It exposes global
+   * weather/time-of-day state and available gathering tags, but not GM-only
+   * library internals.
+   *
+   * @returns {{weather: string, timeOfDay: string, vocabularies: object}|undefined}
+   */
   getGatheringConditions() {
     this._requireReady();
     return this.gatheringRichStateService?.getConditions();
   }
 
+  /**
+   * Set the current global gathering weather tag.
+   *
+   * @param {string} weatherTag Configured weather tag.
+   * @returns {*} Updated gathering conditions.
+   */
   setGatheringWeather(weatherTag) {
     this._requireReady();
     this._requireGM();
     return this.gatheringRichStateService?.setWeather(weatherTag);
   }
 
+  /**
+   * Set the current global gathering time-of-day tag.
+   *
+   * @param {string} timeOfDayTag Configured time-of-day tag.
+   * @returns {*} Updated gathering conditions.
+   */
   setGatheringTimeOfDay(timeOfDayTag) {
     this._requireReady();
     this._requireGM();
     return this.gatheringRichStateService?.setTimeOfDay(timeOfDayTag);
   }
 
+  /**
+   * Atomically update global gathering conditions.
+   *
+   * Omitted fields keep their current values. Mutations require a GM user,
+   * validate tags through the rich state service, persist the setting, and
+   * dispatch the gathering condition update hook.
+   *
+   * @param {{weather?: string, timeOfDay?: string}} conditions Condition updates.
+   * @returns {*} Updated gathering conditions.
+   */
   setGatheringConditions(conditions = {}) {
     this._requireReady();
     this._requireGM();

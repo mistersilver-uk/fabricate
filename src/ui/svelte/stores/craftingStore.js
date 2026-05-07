@@ -250,6 +250,12 @@ function _buildSalvageEntries(
         if (!haystack.includes(lowerSearch)) continue;
       }
 
+      // Hide entries the actor cannot act on. 0-available is always hidden
+      // unless an active salvage run exists (resume access is preserved).
+      // The "Craftable Only" filter only governs partial-inventory entries
+      // (e.g. have 1, need 2) — those remain visible when the toggle is off
+      // but are filtered when on.
+      if (totalAvailable === 0 && !activeRun) continue;
       if (showOnlyAvailable && !allowSalvageAction && !activeRun) continue;
 
       entries.push({

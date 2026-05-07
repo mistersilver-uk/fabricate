@@ -823,6 +823,52 @@ describe('createCraftingStore', () => {
       assert.equal(vs.salvageEntries[0].canSalvage, true);
     });
 
+    it('hides 0-available salvage entries even when showOnlyAvailable is false', async () => {
+      // Actor with no inventory matches.
+      const actor = {
+        id: 'a1',
+        name: 'Alice',
+        isOwner: true,
+        items: []
+      };
+      actor.items[Symbol.iterator] = function iterator() {
+        return [][Symbol.iterator]();
+      };
+      actor.items.size = 0;
+
+      const services = createMockServices({
+        getAvailableActors: () => [actor],
+        getOwnedActors: () => [actor],
+        getGameUser: () => ({ id: 'u1', character: actor }),
+        getCraftingSystemManager: () => ({
+          getSystems: () => [{
+            id: 'sys-1',
+            name: 'Mythwright',
+            features: { salvage: true },
+            components: [
+              { id: 'c1', name: 'Ancient Fragment', salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [] } },
+              { id: 'c2', name: 'Armour Plates',    salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [] } },
+              { id: 'c3', name: 'Battleaxe',        salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [] } }
+            ]
+          }],
+          getSystem: () => null
+        })
+      });
+
+      const store = createCraftingStore(services);
+      // Default showOnlyAvailable is true; turn it off to reproduce the
+      // reported scenario where the user unchecked "Craftable Only".
+      store.toggleAvailable();
+      await store.refresh();
+
+      const vs = get(store.viewState);
+      assert.equal(
+        vs.salvageEntries.length,
+        0,
+        '0-available entries must be hidden regardless of the showOnlyAvailable toggle'
+      );
+    });
+
     it('delegates to craftingEngine.salvage with actor uuid and component identifiers', async () => {
       const actor = {
         id: 'a1',

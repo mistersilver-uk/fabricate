@@ -253,6 +253,14 @@ Current GM editor behavior:
 - The tab loads the selected system's environment list from the gathering environment store.
 - Environment list and draft records are cloned before exposure to the Svelte view.
 - The selected draft can edit environment name, description, enabled state, `selectionMode`, and optional `sceneUuid`.
+- The selected draft can edit gathering composition tags: one `region`, multiple `biomes`, and multiple `dangerTags`.
+- The selected draft can configure `hazardSelectionMode` and `hazardPolicy`.
+- The Environments editor shows current global weather and time of day as context, not as environment browse filters.
+- The Environments editor exposes reusable gathering task and hazard library rows for the selected crafting system, including per-environment enable/disable toggles.
+- Reusable task and hazard row overrides stay inside expandable rows so the default environment workspace remains scannable.
+- Reusable task authoring includes name, match tags, ordered d100 drop row reference/quantity/drop rate, and item selection mode.
+- Reusable hazard authoring includes name, danger/match tags, and d100 drop rate.
+- The settings/tag area can edit gathering vocabularies for regions, biomes, danger, weather, and time of day, and can update current global weather/time through the public gathering condition API when available.
 - The selected draft can add, select, duplicate, delete, and reorder tasks.
 - The selected task can edit `name`, `description`, `img`, `enabled`, and `resolutionMode`.
 - The selected task can add, rename, delete, and reorder result groups.
@@ -546,7 +554,8 @@ It is opened from the `Gathering` header action in the Items directory and must 
 - Show only environments whose owning crafting system has `features.gathering === true`.
 - Hide disabled environments for non-GM users.
 - If an environment is scene-gated, show whether the selected actor currently meets the scene/token requirements.
-- Display environment name, description, and selection-mode summary.
+- Display environment name, description, region, biome, danger/risk, current global weather/time evidence, and selection-mode summary.
+- Do not expose weather or time of day as player environment browse filters.
 
 ### Task Selection
 
@@ -570,12 +579,14 @@ If the environment is `blind`:
 
 Before creating a run, the UI must check:
 
-- game is not paused 
+- game is not paused
 - the actor does not already have an active gathering run for the same `taskId`
 - selected environment and task are enabled
 - scene/token access rules pass when `sceneUuid` is configured
 - task visibility gate passes for the selected actor
 - required catalysts are available
+
+When the game is paused, the app must keep environment browsing readable, show a paused-game blocker, disable start actions, and avoid implying that stamina, nodes, catalysts, rolls, chat, history, or item awards were consumed.
 
 If `task.timeRequirement` is absent:
 

@@ -1447,8 +1447,17 @@
             availableScriptMacros={$viewState.selectedSystem?.availableScriptMacros || []}
             sceneOptions={$viewState.selectedSystem?.sceneOptions || []}
             rollTableOptions={$viewState.selectedSystem?.rollTableOptions || []}
+            gatheringConfig={$viewState.gatheringConfig}
             onPickImagePath={services?.pickImagePath}
             onUpdateEnvironment={store.updateEnvironmentDraft}
+            onUpdateGatheringConditions={store.updateGatheringConditions}
+            onUpdateGatheringVocabulary={store.updateGatheringVocabulary}
+            onAddGatheringLibraryTask={store.addGatheringLibraryTask}
+            onUpdateGatheringLibraryTask={store.updateGatheringLibraryTask}
+            onDeleteGatheringLibraryTask={store.deleteGatheringLibraryTask}
+            onAddGatheringLibraryHazard={store.addGatheringLibraryHazard}
+            onUpdateGatheringLibraryHazard={store.updateGatheringLibraryHazard}
+            onDeleteGatheringLibraryHazard={store.deleteGatheringLibraryHazard}
             onCancelEnvironment={store.cancelEnvironmentDraft}
             onSaveEnvironment={store.saveEnvironmentDraft}
             onDuplicateEnvironment={store.duplicateEnvironmentDraft}

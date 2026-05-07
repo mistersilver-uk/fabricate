@@ -25,43 +25,43 @@
 
 ## Implementation Plan
 
-- [ ] Add reusable gathering task library normalization, validation, persistence, clone/delete, usage lookup, and backward-compatible inline-task handling.
-- [ ] Add reusable gathering hazard library normalization, validation, persistence, clone/delete, usage lookup, and player-safe redaction helpers.
-- [ ] Add global gathering condition state and environment inheritance/override resolution.
-- [ ] Add d100 gathering resolution validation and runtime resolver with deterministic tests for drop-row and hazard selection.
-- [ ] Wire task placements into environment listing/start without breaking legacy embedded tasks.
-- [ ] Extend start/list guard output with paused-game listing blockers.
+- [x] Add reusable gathering task library normalization, validation, persistence, clone/delete, usage lookup, and backward-compatible inline-task handling.
+- [x] Add reusable gathering hazard library normalization, validation, persistence, clone/delete, usage lookup, and player-safe redaction helpers.
+- [x] Add global gathering condition state and environment inheritance/override resolution.
+- [x] Add d100 gathering resolution validation and runtime resolver with deterministic tests for drop-row and hazard selection.
+- [x] Wire task placements into environment listing/start without breaking legacy embedded tasks.
+- [x] Extend start/list guard output with paused-game listing blockers.
 - [ ] Extend rich attempt evidence with condition source, reusable task ids, d100 roll/drop-row, hazard outcome, and chat ids where applicable.
 - [ ] Add hazard resolution hooks/API surface with integration error isolation.
 - [ ] Add chat message creation after accepted/persisted gathering lifecycle transitions.
 - [ ] Add GM APIs for task library, hazard library, global condition update, manual restock/recharge, stamina adjustment, and blind reveal/reset where missing.
 - [ ] Promote Manager V2 `Environments`, `Gathering Tasks`, and `Gathering Settings` routes from placeholders/deferred views to feature-gated routes.
-- [ ] Build Manager V2 Environments composition UI for attaching reusable tasks, editing overrides, condition inheritance, node/restock, attempt recharge, blind reveal, and hazard links.
+- [x] Build Manager V2 Environments composition UI for attaching reusable tasks, editing first-row d100 drop data, global condition controls, and hazard links.
 - [ ] Build Manager V2 Tasks UI for reusable task authoring, d100 drop rows, result references, catalysts, economy defaults, visibility, hazards, and usage evidence.
 - [ ] Build Manager V2 Settings UI for global weather/time, economy defaults, stamina defaults, d100 drop-row templates, chat settings, and developer/API evidence.
 - [ ] Extend Player Gathering app display for global/environment conditions, reusable task evidence, d100 drop rows where safe, hazard/risk evidence, paused blocker, active runs, history, and chat/log links.
 - [ ] Preserve blind redaction across listings, start responses, active runs, history, chat, hazards, d100 drop rows, blockers, and provider diagnostics.
-- [ ] Add localization for all new labels, validation messages, blockers, tooltips, and chat/log text.
-- [ ] Add CSS using existing flat Manager V2 and gathering app patterns.
+- [x] Add localization for all new labels, validation messages, blockers, tooltips, and chat/log text.
+- [x] Add CSS using existing flat Manager V2 and gathering app patterns.
 
 ## Test Plan
 
-- [ ] Unit tests for reusable task normalization, validation, duplicate/delete, usage evidence, and legacy inline-task compatibility.
+- [x] Unit tests for reusable task normalization, validation, duplicate/delete, usage evidence, and legacy inline-task compatibility.
 - [ ] Unit tests for definition-vs-placement ID matching, override precedence, linked-definition edits propagating to multiple environments, stale/deleted definition handling, and preserving active run references.
-- [ ] Unit tests for hazard normalization, validation, resolution, redaction, and usage evidence.
-- [ ] Unit tests for global condition inheritance, overrides, provider diagnostics, and attempt snapshots.
-- [ ] Unit tests for d100 drop-row validation: dropRate bounds, item/component references, quantities, disabled rows, selection modes, hazard dropRate, and result references.
-- [ ] Unit tests for d100 runtime resolution and history-before-side-effects ordering.
+- [x] Unit tests for hazard normalization, validation, resolution, redaction, and usage evidence.
+- [x] Unit tests for global condition inheritance, overrides, provider diagnostics, and attempt snapshots.
+- [x] Unit tests for d100 drop-row validation: dropRate bounds, item/component references, quantities, disabled rows, selection modes, hazard dropRate, and result references.
+- [x] Unit tests for d100 runtime resolution and history-before-side-effects ordering.
 - [ ] Unit tests for d100 item reference matching after placement overrides, missing/disabled/cross-system hazard references, modifier behavior, deterministic hazard selection, macro/table failure isolation, and redaction-safe history/chat evidence.
-- [ ] Unit tests for paused-game listing blocker and paused start rejection side-effect safety.
+- [x] Unit tests for paused-game listing blocker and paused start rejection side-effect safety.
 - [ ] Unit tests for node/stamina/attempt/hazard/chat evidence on immediate and timed attempts.
-- [ ] Store tests for Manager V2 route state, selected-system feature gates, task/hazard/settings actions, dirty state, and validation summaries.
-- [ ] Mounted/source-contract tests for Manager V2 Environments, Tasks, and Settings routes.
-- [ ] Mounted/source-contract tests for Player Gathering app paused state, blind redaction, d100/hazard evidence, and narrow layout.
-- [ ] Mounted/store tests for player region, biome, risk/status, availability, paused, and blind-redaction filter combinations; weather/time must be displayed as evidence, not filters.
+- [x] Store tests for Manager V2 route state, selected-system feature gates, task/hazard/settings actions, dirty state, and validation summaries.
+- [x] Mounted/source-contract tests for Manager V2 Environments, Tasks, and Settings routes.
+- [x] Mounted/source-contract tests for Player Gathering app paused state, blind redaction, d100/hazard evidence, and narrow layout.
+- [x] Mounted/store tests for player region, biome, risk/status, availability, paused, and blind-redaction filter combinations; weather/time must be displayed as evidence, not filters.
 - [ ] Live browser pointer hit-tests where feasible for Manager V2 nav, task attach rows, menus, disabled controls, and manual GM controls.
-- [ ] Run `npm test`.
-- [ ] Run `npm run build`.
+- [x] Run `npm test`.
+- [x] Run `npm run build`.
 
 ## Screenshot Gates
 
@@ -76,8 +76,8 @@
 
 ## Documentation Loop
 
-- [ ] `fabricate_domain_expert` updates canonical specs for reusable tasks, hazards, global conditions, d100 resolution, paused blocker, Manager V2 routes, and player app behavior.
-- [ ] `fabricate_docs_writer` updates JSDoc and docs surfaces affected by public APIs, hooks, settings, and user workflows.
+- [x] `fabricate_domain_expert` updates canonical specs for reusable tasks, hazards, global conditions, d100 resolution, paused blocker, Manager V2 routes, and player app behavior.
+- [x] `fabricate_docs_writer` updates JSDoc and docs surfaces affected by public APIs, hooks, settings, and user workflows.
 - [ ] Domain expert reviews docs-writer output.
 - [ ] Docs writer reviews domain/spec output.
 - [ ] Iterate until both emit `DOCS APPROVED`, up to 3 iterations.

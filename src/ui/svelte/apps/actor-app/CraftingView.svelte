@@ -209,6 +209,17 @@
     border: 1px solid var(--fab-border);
     border-radius: var(--fab-v2-radius-panel);
     background: var(--fab-surface-soft);
+    max-height: clamp(140px, 28vh, 280px);
+    overflow-y: auto;
+  }
+
+  .crafting-view__salvage-band h4 {
+    position: sticky;
+    top: 0;
+    margin: 0 0 var(--fab-space-1) 0;
+    padding: var(--fab-space-1) 0;
+    background: var(--fab-surface-soft);
+    z-index: 1;
   }
 
   .crafting-view__toolbar {

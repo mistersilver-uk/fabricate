@@ -4046,6 +4046,66 @@
   color: #ff9b9b;
 }
 
+.manager-v2-gathering-library {
+  display: grid;
+  gap: 12px;
+}
+
+.manager-v2-library-details {
+  border: 1px solid var(--fab-v2-border);
+  border-radius: var(--fab-v2-radius-panel);
+  background: var(--fab-v2-surface-2);
+  padding: 10px;
+}
+
+.manager-v2-library-details summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.manager-v2-library-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.manager-v2-library-list {
+  display: grid;
+  gap: 8px;
+}
+
+.manager-v2-library-row {
+  border: 1px solid var(--fab-v2-border);
+  border-radius: var(--fab-v2-radius-panel);
+  background: var(--fab-v2-surface-2);
+  padding: 8px;
+}
+
+.manager-v2-library-row summary {
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.manager-v2-inline-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-weight: 700;
+}
+
+.manager-v2-inline-toggle span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@container manager-v2 (max-width: 900px) {
+  .manager-v2-library-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
 .gathering-v2-panel-heading {
   display: flex;
   align-items: center;

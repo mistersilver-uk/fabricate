@@ -413,6 +413,43 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(environmentEditSource.includes('manager-v2-environment-validation-band'), 'environment editor should render the collapsible validation band');
   });
 
+  it('wires Manager V2 gathering libraries, global conditions, and environment composition controls', () => {
+    for (const snippet of [
+      'gatheringConfig={$viewState.gatheringConfig}',
+      'onUpdateGatheringConditions={store.updateGatheringConditions}',
+      'onUpdateGatheringVocabulary={store.updateGatheringVocabulary}',
+      'onAddGatheringLibraryTask={store.addGatheringLibraryTask}',
+      'onUpdateGatheringLibraryTask={store.updateGatheringLibraryTask}',
+      'onDeleteGatheringLibraryTask={store.deleteGatheringLibraryTask}',
+      'onAddGatheringLibraryHazard={store.addGatheringLibraryHazard}',
+      'onUpdateGatheringLibraryHazard={store.updateGatheringLibraryHazard}',
+      'onDeleteGatheringLibraryHazard={store.deleteGatheringLibraryHazard}'
+    ]) {
+      assert.ok(rootSource.includes(snippet), `root should wire ${snippet}`);
+    }
+    for (const snippet of [
+      'manager-v2-gathering-library',
+      'CurrentWeather',
+      'CurrentTimeOfDay',
+      "updateField('region'",
+      "updateField('biomes'",
+      "updateField('dangerTags'",
+      "updateField('hazardSelectionMode'",
+      "updateField('hazardPolicy'",
+      'libraryRecordEnabled(task.id',
+      'toggleLibraryRecord(task.id',
+      'libraryRecordEnabled(hazard.id',
+      'toggleLibraryRecord(hazard.id',
+      'onUpdateGatheringLibraryTask?.',
+      'onUpdateGatheringLibraryHazard?.',
+      'onUpdateGatheringVocabulary?.'
+    ]) {
+      assert.ok(environmentEditSource.includes(snippet), `environment editor should include ${snippet}`);
+    }
+    assert.ok(!environmentEditSource.includes('weatherFilter'), 'weather should not be an environment browse filter');
+    assert.ok(!environmentEditSource.includes('timeOfDayFilter'), 'time of day should not be an environment browse filter');
+  });
+
   it('uses Foundry FilePicker for the environment image and drag-drop for scene linkage', () => {
     assert.ok(
       environmentEditSource.includes("import ImagePathPicker from '../../components/ImagePathPicker.svelte';"),

@@ -26,8 +26,17 @@
     availableScriptMacros = [],
     sceneOptions = [],
     rollTableOptions = [],
+    gatheringConfig = null,
     onPickImagePath,
     onUpdateEnvironment,
+    onUpdateGatheringConditions,
+    onUpdateGatheringVocabulary,
+    onAddGatheringLibraryTask,
+    onUpdateGatheringLibraryTask,
+    onDeleteGatheringLibraryTask,
+    onAddGatheringLibraryHazard,
+    onUpdateGatheringLibraryHazard,
+    onDeleteGatheringLibraryHazard,
     onSaveEnvironment,
     onDuplicateEnvironment,
     onDeleteEnvironment,
@@ -102,6 +111,11 @@
   const scriptMacroOptions = $derived(Array.isArray(availableScriptMacros) ? availableScriptMacros : []);
   const sceneOptionList = $derived(Array.isArray(sceneOptions) ? sceneOptions : []);
   const rollTableOptionList = $derived(Array.isArray(rollTableOptions) ? rollTableOptions : []);
+  const gatheringVocabularies = $derived(gatheringConfig?.vocabularies || {});
+  const gatheringConditions = $derived(gatheringConfig?.conditions || {});
+  const gatheringSystemConfig = $derived(gatheringConfig?.systems?.[environmentDraft?.craftingSystemId] || { tasks: [], hazards: [] });
+  const libraryTasks = $derived(Array.isArray(gatheringSystemConfig.tasks) ? gatheringSystemConfig.tasks : []);
+  const libraryHazards = $derived(Array.isArray(gatheringSystemConfig.hazards) ? gatheringSystemConfig.hazards : []);
   const activeVisibilityKey = $derived(`${environmentDraft?.id || 'new'}:${environmentDraft?.craftingSystemId || ''}:${activeTaskId}`);
   const editorVisibility = $derived(pendingVisibility || activeTaskVisibility);
   const normalizedValidationErrors = $derived(validationErrors.map(error => normalizedValidationTarget(error)));
@@ -447,6 +461,59 @@
         ...(environmentDraft?.conditions || {}),
         [field]: value
       }
+    });
+  }
+
+  function tagCsv(values) {
+    return (Array.isArray(values) ? values : [])
+      .map(value => String(value || '').trim())
+      .filter(Boolean)
+      .join(', ');
+  }
+
+  function parseTags(value) {
+    return String(value || '')
+      .split(',')
+      .map(entry => entry.trim().toLowerCase())
+      .filter(Boolean);
+  }
+
+  function firstDropRow(task) {
+    return Array.isArray(task?.dropRows) && task.dropRows.length > 0
+      ? task.dropRows[0]
+      : { id: 'drop-row', componentId: '', itemUuid: '', quantity: 1, dropRate: 100, enabled: true };
+  }
+
+  function updateTaskFirstDropRow(task, updates) {
+    const existingRows = Array.isArray(task?.dropRows) && task.dropRows.length > 0 ? task.dropRows : [firstDropRow(task)];
+    const nextRows = existingRows.map((row, index) => index === 0 ? { ...row, ...updates } : row);
+    onUpdateGatheringLibraryTask?.(environmentDraft?.craftingSystemId, task.id, { dropRows: nextRows });
+  }
+
+  function environmentIdList(field) {
+    return Array.isArray(environmentDraft?.[field]) ? environmentDraft[field] : [];
+  }
+
+  function libraryRecordEnabled(recordId, enabledField, disabledField) {
+    const enabled = environmentIdList(enabledField);
+    const disabled = environmentIdList(disabledField);
+    if (disabled.includes(recordId)) return false;
+    return enabled.length === 0 || enabled.includes(recordId);
+  }
+
+  function toggleLibraryRecord(recordId, checked, enabledField, disabledField) {
+    const enabled = environmentIdList(enabledField);
+    const disabled = environmentIdList(disabledField);
+    if (checked) {
+      onUpdateEnvironment?.({
+        [enabledField]: Array.from(new Set([...enabled, recordId])),
+        [disabledField]: disabled.filter(id => id !== recordId)
+      });
+      return;
+    }
+    onUpdateEnvironment?.({
+      [enabledField]: enabled.filter(id => id !== recordId),
+      [disabledField]: Array.from(new Set([...disabled, recordId]))
     });
   }
 
@@ -1013,6 +1080,166 @@
           {/if}
         </div>
       {/if}
+    </section>
+
+    <section class="manager-v2-inspector-card manager-v2-gathering-library" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.GatheringLibrarySettings', 'Gathering library and settings')}>
+      <div class="manager-v2-edit-card-heading">
+        <div>
+          <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Environment.GlobalConditions', 'Global conditions')}</p>
+          <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Environment.GatheringLibrarySettings', 'Gathering library and settings')}</h3>
+        </div>
+      </div>
+
+      <div class="manager-v2-form-grid">
+        <label class="manager-v2-field">
+          <span>{text('FABRICATE.Admin.ManagerV2.Environment.CurrentWeather', 'Current weather')}</span>
+          <select value={gatheringConditions.weather || 'clear'} onchange={(event) => onUpdateGatheringConditions?.({ weather: event.target.value })}>
+            {#each gatheringVocabularies.weather || ['clear'] as weather (weather)}
+              <option value={weather}>{weather}</option>
+            {/each}
+          </select>
+        </label>
+        <label class="manager-v2-field">
+          <span>{text('FABRICATE.Admin.ManagerV2.Environment.CurrentTimeOfDay', 'Current time of day')}</span>
+          <select value={gatheringConditions.timeOfDay || 'day'} onchange={(event) => onUpdateGatheringConditions?.({ timeOfDay: event.target.value })}>
+            {#each gatheringVocabularies.timeOfDay || ['day'] as timeOfDay (timeOfDay)}
+              <option value={timeOfDay}>{timeOfDay}</option>
+            {/each}
+          </select>
+        </label>
+        <label class="manager-v2-field">
+          <span>{text('FABRICATE.Admin.ManagerV2.Environment.EnvironmentRegion', 'Environment region')}</span>
+          <input value={environmentDraft.region || ''} list="manager-v2-gathering-regions" oninput={(event) => updateField('region', event.target.value)} />
+          <datalist id="manager-v2-gathering-regions">
+            {#each gatheringVocabularies.regions || [] as region (region)}<option value={region}></option>{/each}
+          </datalist>
+        </label>
+        <label class="manager-v2-field">
+          <span>{text('FABRICATE.Admin.ManagerV2.Environment.EnvironmentBiomes', 'Environment biomes')}</span>
+          <input value={tagCsv(environmentDraft.biomes)} oninput={(event) => updateField('biomes', parseTags(event.target.value))} />
+        </label>
+        <label class="manager-v2-field">
+          <span>{text('FABRICATE.Admin.ManagerV2.Environment.EnvironmentDangerTags', 'Danger tags')}</span>
+          <input value={tagCsv(environmentDraft.dangerTags)} oninput={(event) => updateField('dangerTags', parseTags(event.target.value))} />
+        </label>
+        <label class="manager-v2-field">
+          <span>{text('FABRICATE.Admin.ManagerV2.Environment.HazardSelectionMode', 'Hazard selection')}</span>
+          <select value={environmentDraft.hazardSelectionMode || 'allDrops'} onchange={(event) => updateField('hazardSelectionMode', event.target.value)}>
+            <option value="allDrops">{text('FABRICATE.Admin.ManagerV2.Environment.AllDrops', 'All drops')}</option>
+            <option value="highestRankedDrop">{text('FABRICATE.Admin.ManagerV2.Environment.HighestRankedDrop', 'Highest-ranked drop')}</option>
+          </select>
+        </label>
+        <label class="manager-v2-field">
+          <span>{text('FABRICATE.Admin.ManagerV2.Environment.HazardPolicy', 'Hazard policy')}</span>
+          <select value={environmentDraft.hazardPolicy || 'successWithHazard'} onchange={(event) => updateField('hazardPolicy', event.target.value)}>
+            <option value="successWithHazard">{text('FABRICATE.Admin.ManagerV2.Environment.SuccessWithHazard', 'Success with hazard')}</option>
+            <option value="failureWithHazard">{text('FABRICATE.Admin.ManagerV2.Environment.FailureWithHazard', 'Failure with hazard')}</option>
+          </select>
+        </label>
+      </div>
+
+      <details class="manager-v2-library-details">
+        <summary>{text('FABRICATE.Admin.ManagerV2.Environment.TagVocabularies', 'Tag vocabularies')}</summary>
+        <div class="manager-v2-form-grid">
+          {#each ['regions', 'biomes', 'danger', 'weather', 'timeOfDay'] as vocabulary (vocabulary)}
+            <label class="manager-v2-field">
+              <span>{vocabulary}</span>
+              <input value={tagCsv(gatheringVocabularies[vocabulary])} oninput={(event) => onUpdateGatheringVocabulary?.(vocabulary, parseTags(event.target.value))} />
+            </label>
+          {/each}
+        </div>
+      </details>
+
+      <div class="manager-v2-library-columns">
+        <section>
+          <div class="manager-v2-edit-card-heading">
+            <div>
+              <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Environment.ReusableTasks', 'Reusable tasks')}</p>
+              <h4>{libraryTasks.length}</h4>
+            </div>
+            <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.AddReusableTask', 'Add reusable task')} title={text('FABRICATE.Admin.ManagerV2.Environment.AddReusableTask', 'Add reusable task')} onclick={() => onAddGatheringLibraryTask?.(environmentDraft?.craftingSystemId)}>
+              <i class="fas fa-plus" aria-hidden="true"></i>
+            </button>
+          </div>
+          <div class="manager-v2-library-list">
+            {#each libraryTasks as task (task.id)}
+              {@const row = firstDropRow(task)}
+              <details class="manager-v2-library-row">
+                <summary>
+                  <label class="manager-v2-inline-toggle">
+                    <input
+                      type="checkbox"
+                      checked={libraryRecordEnabled(task.id, 'enabledTaskIds', 'disabledTaskIds')}
+                      onchange={(event) => toggleLibraryRecord(task.id, event.target.checked, 'enabledTaskIds', 'disabledTaskIds')}
+                    />
+                    <span>{task.name}</span>
+                  </label>
+                </summary>
+                <div class="manager-v2-form-grid">
+                  <label class="manager-v2-field"><span>{text('FABRICATE.Admin.Environments.Name', 'Name')}</span><input value={task.name} oninput={(event) => onUpdateGatheringLibraryTask?.(environmentDraft?.craftingSystemId, task.id, { name: event.target.value })} /></label>
+                  <label class="manager-v2-field"><span>{text('FABRICATE.Admin.ManagerV2.Environment.MatchRegion', 'Match region')}</span><input value={task.region || ''} oninput={(event) => onUpdateGatheringLibraryTask?.(environmentDraft?.craftingSystemId, task.id, { region: event.target.value })} /></label>
+                  <label class="manager-v2-field"><span>{text('FABRICATE.Admin.ManagerV2.Environment.MatchBiomes', 'Match biomes')}</span><input value={tagCsv(task.biomes)} oninput={(event) => onUpdateGatheringLibraryTask?.(environmentDraft?.craftingSystemId, task.id, { biomes: parseTags(event.target.value) })} /></label>
+                  <label class="manager-v2-field"><span>{text('FABRICATE.Admin.ManagerV2.Environment.MatchWeather', 'Match weather')}</span><input value={tagCsv(task.weather)} oninput={(event) => onUpdateGatheringLibraryTask?.(environmentDraft?.craftingSystemId, task.id, { weather: parseTags(event.target.value) })} /></label>
+                  <label class="manager-v2-field"><span>{text('FABRICATE.Admin.ManagerV2.Environment.MatchTimeOfDay', 'Match time')}</span><input value={tagCsv(task.timeOfDay)} oninput={(event) => onUpdateGatheringLibraryTask?.(environmentDraft?.craftingSystemId, task.id, { timeOfDay: parseTags(event.target.value) })} /></label>
+                  <label class="manager-v2-field"><span>{text('FABRICATE.Admin.ManagerV2.Environment.DropComponent', 'Drop component')}</span><select value={row.componentId || ''} onchange={(event) => updateTaskFirstDropRow(task, { componentId: event.target.value })}><option value=""></option>{#each managedItemOptions as item (item.id)}<option value={item.id}>{item.name}</option>{/each}</select></label>
+                  <label class="manager-v2-field"><span>{text('FABRICATE.Admin.ManagerV2.Environment.DropRate', 'Drop rate')}</span><input type="number" min="1" max="100" step="1" value={row.dropRate || 1} oninput={(event) => updateTaskFirstDropRow(task, { dropRate: Number(event.target.value || 1) })} /></label>
+                  <label class="manager-v2-field"><span>{text('FABRICATE.Admin.ManagerV2.Environment.Quantity', 'Quantity')}</span><input type="number" min="1" step="1" value={row.quantity || 1} oninput={(event) => updateTaskFirstDropRow(task, { quantity: Number(event.target.value || 1) })} /></label>
+                  <label class="manager-v2-field"><span>{text('FABRICATE.Admin.ManagerV2.Environment.ItemSelectionMode', 'Item selection')}</span><select value={task.itemSelectionMode || 'highestRankedDrop'} onchange={(event) => onUpdateGatheringLibraryTask?.(environmentDraft?.craftingSystemId, task.id, { itemSelectionMode: event.target.value })}><option value="highestRankedDrop">{text('FABRICATE.Admin.ManagerV2.Environment.HighestRankedDrop', 'Highest-ranked drop')}</option><option value="allDrops">{text('FABRICATE.Admin.ManagerV2.Environment.AllDrops', 'All drops')}</option></select></label>
+                </div>
+                <button type="button" class="manager-v2-button is-danger" onclick={() => onDeleteGatheringLibraryTask?.(environmentDraft?.craftingSystemId, task.id)}>
+                  <i class="fas fa-trash" aria-hidden="true"></i>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.DeleteReusableTask', 'Delete reusable task')}</span>
+                </button>
+              </details>
+            {:else}
+              <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Environment.NoReusableTasks', 'No reusable tasks yet.')}</p>
+            {/each}
+          </div>
+        </section>
+
+        <section>
+          <div class="manager-v2-edit-card-heading">
+            <div>
+              <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Environment.ReusableHazards', 'Reusable hazards')}</p>
+              <h4>{libraryHazards.length}</h4>
+            </div>
+            <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.AddReusableHazard', 'Add reusable hazard')} title={text('FABRICATE.Admin.ManagerV2.Environment.AddReusableHazard', 'Add reusable hazard')} onclick={() => onAddGatheringLibraryHazard?.(environmentDraft?.craftingSystemId)}>
+              <i class="fas fa-plus" aria-hidden="true"></i>
+            </button>
+          </div>
+          <div class="manager-v2-library-list">
+            {#each libraryHazards as hazard (hazard.id)}
+              <details class="manager-v2-library-row">
+                <summary>
+                  <label class="manager-v2-inline-toggle">
+                    <input
+                      type="checkbox"
+                      checked={libraryRecordEnabled(hazard.id, 'enabledHazardIds', 'disabledHazardIds')}
+                      onchange={(event) => toggleLibraryRecord(hazard.id, event.target.checked, 'enabledHazardIds', 'disabledHazardIds')}
+                    />
+                    <span>{hazard.name}</span>
+                  </label>
+                </summary>
+                <div class="manager-v2-form-grid">
+                  <label class="manager-v2-field"><span>{text('FABRICATE.Admin.Environments.Name', 'Name')}</span><input value={hazard.name} oninput={(event) => onUpdateGatheringLibraryHazard?.(environmentDraft?.craftingSystemId, hazard.id, { name: event.target.value })} /></label>
+                  <label class="manager-v2-field"><span>{text('FABRICATE.Admin.ManagerV2.Environment.MatchDanger', 'Match danger')}</span><input value={tagCsv(hazard.dangerTags)} oninput={(event) => onUpdateGatheringLibraryHazard?.(environmentDraft?.craftingSystemId, hazard.id, { dangerTags: parseTags(event.target.value) })} /></label>
+                  <label class="manager-v2-field"><span>{text('FABRICATE.Admin.ManagerV2.Environment.MatchRegion', 'Match region')}</span><input value={hazard.region || ''} oninput={(event) => onUpdateGatheringLibraryHazard?.(environmentDraft?.craftingSystemId, hazard.id, { region: event.target.value })} /></label>
+                  <label class="manager-v2-field"><span>{text('FABRICATE.Admin.ManagerV2.Environment.MatchBiomes', 'Match biomes')}</span><input value={tagCsv(hazard.biomes)} oninput={(event) => onUpdateGatheringLibraryHazard?.(environmentDraft?.craftingSystemId, hazard.id, { biomes: parseTags(event.target.value) })} /></label>
+                  <label class="manager-v2-field"><span>{text('FABRICATE.Admin.ManagerV2.Environment.MatchWeather', 'Match weather')}</span><input value={tagCsv(hazard.weather)} oninput={(event) => onUpdateGatheringLibraryHazard?.(environmentDraft?.craftingSystemId, hazard.id, { weather: parseTags(event.target.value) })} /></label>
+                  <label class="manager-v2-field"><span>{text('FABRICATE.Admin.ManagerV2.Environment.MatchTimeOfDay', 'Match time')}</span><input value={tagCsv(hazard.timeOfDay)} oninput={(event) => onUpdateGatheringLibraryHazard?.(environmentDraft?.craftingSystemId, hazard.id, { timeOfDay: parseTags(event.target.value) })} /></label>
+                  <label class="manager-v2-field"><span>{text('FABRICATE.Admin.ManagerV2.Environment.DropRate', 'Drop rate')}</span><input type="number" min="1" max="100" step="1" value={hazard.dropRate || 1} oninput={(event) => onUpdateGatheringLibraryHazard?.(environmentDraft?.craftingSystemId, hazard.id, { dropRate: Number(event.target.value || 1) })} /></label>
+                </div>
+                <button type="button" class="manager-v2-button is-danger" onclick={() => onDeleteGatheringLibraryHazard?.(environmentDraft?.craftingSystemId, hazard.id)}>
+                  <i class="fas fa-trash" aria-hidden="true"></i>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.DeleteReusableHazard', 'Delete reusable hazard')}</span>
+                </button>
+              </details>
+            {:else}
+              <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Environment.NoReusableHazards', 'No reusable hazards yet.')}</p>
+            {/each}
+          </div>
+        </section>
+      </div>
     </section>
 
     <section class="manager-v2-environment-workspace" aria-label={localize('FABRICATE.Admin.Environments.Tasks')}>

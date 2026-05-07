@@ -1910,6 +1910,54 @@ describe('createAdminStore', () => {
       assert.equal(vs.selectedSystem?.features.gathering, true);
     });
 
+    it('exposes and persists gathering config libraries and global conditions', async () => {
+      const services = createMockServices({
+        randomID: (() => {
+          let id = 0;
+          return () => `gid-${++id}`;
+        })()
+      });
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      sys.components = [{ id: 'herb', name: 'Herb', img: 'herb.webp' }];
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.updateGatheringConditions({ weather: 'rain', timeOfDay: 'night' });
+      await store.updateGatheringVocabulary('regions', ['north', 'south']);
+      const task = await store.addGatheringLibraryTask('sys1');
+      await store.updateGatheringLibraryTask('sys1', task.id, {
+        name: 'Rain Herbs',
+        region: 'north',
+        biomes: ['forest'],
+        weather: ['rain'],
+        timeOfDay: ['night'],
+        dropRows: [{ id: 'drop-herb', componentId: 'herb', quantity: 2, dropRate: 80 }]
+      });
+      const hazard = await store.addGatheringLibraryHazard('sys1');
+      await store.updateGatheringLibraryHazard('sys1', hazard.id, {
+        name: 'Thorns',
+        dangerTags: ['hazardous'],
+        dropRate: 30
+      });
+
+      const config = services._store.gatheringConfig;
+      assert.deepEqual(config.conditions, { weather: 'rain', timeOfDay: 'night' });
+      assert.deepEqual(config.vocabularies.regions, ['north', 'south']);
+      assert.equal(config.systems.sys1.tasks[0].name, 'Rain Herbs');
+      assert.deepEqual(config.systems.sys1.tasks[0].dropRows[0], {
+        id: 'drop-herb',
+        name: '',
+        componentId: 'herb',
+        itemUuid: '',
+        quantity: 2,
+        dropRate: 80,
+        enabled: true
+      });
+      assert.equal(config.systems.sys1.hazards[0].name, 'Thorns');
+      assert.equal(get(store.viewState).gatheringConfig.systems.sys1.hazards[0].dropRate, 30);
+    });
+
     it('viewState.selectedSystem.craftingCheck.outcomesText is comma-separated string from outcomes array', async () => {
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
