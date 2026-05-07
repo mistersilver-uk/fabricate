@@ -24,6 +24,7 @@
 - [x] Assign explicit valid Foundry core icons to Mythwright-authored items, recipes, and macro.
 - [x] Expand curated elemental variants across additional weapon and armour types.
 - [x] Add tiered elemental quality outputs from `Flawed` through `Mythic` with guarded damage, resistance, and AC scaling.
+- [x] Update the generated Mythwright crafting system description to the player-facing copy.
 - [x] Run `node --test tests/mythwright-bootstrap.test.js`.
 - [x] Run `node --test tests/mythwright-bootstrap.test.js tests/compendium-drop.test.js`.
 - [x] Run `npm test`.

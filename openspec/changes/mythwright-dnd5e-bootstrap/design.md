@@ -24,6 +24,8 @@ The world script:
 - Creates or updates recipes and gathering environments by deterministic IDs.
 - Creates or updates a `Mythwright Crafting Check` world Macro and records its UUID on the system.
 
+The generated crafting system description is player-facing copy: "Mythwright lets you turn harvested components, rare essences, and hard-won materials into weapons, armour, tools, and relics worthy of legend. Build multi-step recipes, forge mundane gear or world-shaping artefacts, and make crafting feel like part of the story rather than a shopping list."
+
 SRD base weapon and armour items preserve their SRD source reference so Fabricate can match actor/world copies back to the canonical SRD item. Quality variants are copied from SRD item data only as a template; their matching identity strips `flags.core.sourceId`, `_stats.compendiumSource`, `sourceUuid`, `sourceItemUuid`, and `fallbackItemIds`. The original SRD source is retained only as Mythwright provenance metadata.
 
 Generated tags are reserved only for tag-placeholder ingredient matching. Mythwright's generated recipes currently use exact component ingredients and essence requirements, not tag-placeholder ingredients, so the bootstrap emits no component tags, no recipe tags, and an empty `CraftingSystem.itemTags` list. Recipe categories remain the Mythwright GM UI filtering mechanism for Weapons, Armour, and Relics.
