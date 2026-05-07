@@ -127,8 +127,10 @@ The smoke harness runs in one of two profiles selected by the `FOUNDRY_SMOKE_PRO
 
 | Profile | When | Phases | Total |
 |---------|------|--------|-------|
-| `full` (default) | Local, screenshot regen | Phase B → Phase C → Phase D0 (manager-v2 screenshots) → Phase D (legacy Recipe Manager screenshots) → Phase D2/D3 (Gathering app behaviour + screenshots) → Phase E (craft) → Phase F (cleanup) | ~10–15 min |
-| `ci` | Release-candidate CI | Phase B → Phase C → ~~Phase D0~~ ~~Phase D~~ → Phase D2/D3 → Phase E → Phase F | ~6–8 min |
+| `full` (default) | Local, screenshot regen | Phase B → Phase C → Phase D0 (manager-v2 screenshots) → Phase D (legacy Recipe Manager screenshots) → Phase D2/D3 (Gathering app behaviour + screenshots) → Phase E (craft) → Phase E2 (no-selectable-actors) → Phase F (cleanup) | ~10–15 min |
+| `ci` | Release-candidate CI | Phase B → Phase C → ~~Phase D0~~ ~~Phase D~~ → Phase D2 → ~~Phase D3~~ → Phase E → ~~Phase E2~~ → Phase F | ~6–8 min |
+
+The CI profile additionally skips Phase D3 and Phase E2 because each opens a fresh `browser.newContext()` and joins the world a second/third time as a player or observer user; cold-loading Foundry's UI repeatedly on a hosted Ubuntu runner reliably exceeds the 30s `waitForFunction(() => game.ready)` budget those phases use, while a warm dev machine clears it in 5–10s.
 
 Run the CI-equivalent profile locally with:
 
