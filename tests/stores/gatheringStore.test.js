@@ -164,6 +164,35 @@ describe('createGatheringStore', () => {
     assert.deepEqual(state.history.map(run => run.id), ['run-history']);
   });
 
+  it('normalizes system options and filters environments by selected gathering system', async () => {
+    const { services } = makeServices({
+      listing: {
+        gatheringSystems: [
+          { id: 'system-b', name: 'Alchemy' },
+          { id: 'system-a', name: 'Mythwright' }
+        ],
+        environments: [
+          { id: 'env-a', name: 'Mines', craftingSystemId: 'system-a', craftingSystemName: 'Mythwright', attemptable: true, blockedReasons: [], tasks: [] },
+          { id: 'env-b', name: 'Greenhouse', craftingSystemId: 'system-b', craftingSystemName: 'Alchemy', attemptable: true, blockedReasons: [], tasks: [] }
+        ],
+        activeRuns: [{ id: 'run-a', craftingSystemId: 'system-a', craftingSystemName: 'Mythwright' }]
+      }
+    });
+    const store = createGatheringStore(services);
+
+    await store.refresh();
+    assert.equal(get(store.viewState).hasMultipleGatheringSystems, true);
+    assert.deepEqual(get(store.viewState).gatheringSystems.map(system => system.name), ['Alchemy', 'Mythwright']);
+    assert.deepEqual(get(store.viewState).filteredEnvironments.map(environment => environment.id), ['env-a', 'env-b']);
+
+    store.selectSystem('system-b');
+    assert.equal(get(store.viewState).selectedSystemId, 'system-b');
+    assert.deepEqual(get(store.viewState).filteredEnvironments.map(environment => environment.id), ['env-b']);
+
+    store.selectSystem('missing-system');
+    assert.equal(get(store.viewState).selectedSystemId, 'all');
+  });
+
   it('starts a targeted task, refreshes listing, and notifies on success', async () => {
     const { services, calls } = makeServices();
     const store = createGatheringStore(services);

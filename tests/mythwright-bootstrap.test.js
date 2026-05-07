@@ -274,6 +274,8 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
 
     assert.equal(recipe.category, 'Relics');
     assert.equal(recipe.img, 'icons/weapons/swords/greatsword-blue.webp');
+    assert.match(recipe.description, /awakening Mythwright Mythic Longsword/);
+    assert.match(recipe.description, /artefact worthy of legend/);
     assert.deepEqual(recipe.tags, []);
     assert.ok(recipe.steps.at(-1).resultGroups.some(group => group.name === 'Mythic'));
   });
@@ -311,7 +313,58 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     assert.equal(payload.craftingCheck.macroUuid, 'Macro.mythwright-check');
     assert.equal(payload.salvageCraftingCheck.macroUuid, 'Macro.mythwright-check');
     assert.equal(payload.essenceDefinitions.find(essence => essence.id === 'ember').sourceItemUuid, 'Item.ember-essence');
+    assert.match(payload.essenceDefinitions.find(essence => essence.id === 'ember').description, /cinder-bright essence/);
     assert.deepEqual(payload.components, [{ id: 'raw-ore', name: 'Raw Ore' }]);
+  });
+
+  it('uses patterned player-facing recipe copy and plain gathering environment names', () => {
+    const helper = globalThis.MythwrightDnd5eBootstrap;
+    const club = helper.buildRecipeForSrd(
+      { name: 'Club', type: 'weapon', item: { img: 'icons/svg/item-bag.svg' } },
+      new Map([['weapon-club', { id: 'weapon-club' }]])
+    );
+    const shield = helper.buildRecipeForSrd(
+      { name: 'Shield', type: 'armor', item: { img: 'icons/svg/item-bag.svg' } },
+      new Map([['armor-shield', { id: 'armor-shield' }]])
+    );
+    const elemental = helper.buildElementalRecipe({
+      id: 'weapon-ember-shortsword',
+      name: 'Ember Shortsword',
+      baseName: 'Shortsword',
+      type: 'weapon',
+      essenceId: 'ember',
+      damageType: 'fire'
+    });
+    const environment = helper.buildEnvironment('mythwright-mines', 'Mines', 'hazardous', []);
+
+    assert.equal(
+      club.description,
+      'A simple Mythwright recipe for crafting a sturdy club, guiding the crafter from raw material selection through shaping, balancing, and finishing the weapon.'
+    );
+    assert.match(shield.description, /crafting a sturdy shield/);
+    assert.match(elemental.description, /binding ember essence into shortsword/);
+    assert.equal(environment.name, 'Mines');
+    assert.match(environment.description, /Old mineworks/);
+    assert.equal(environment.description.includes('Mythwright gathering site'), false);
+  });
+
+  it('populates Mythwright item and component descriptions from generated flavour', () => {
+    const helper = globalThis.MythwrightDnd5eBootstrap;
+    const payload = helper.itemPayload({
+      id: 'raw-ore',
+      name: 'Raw Ore',
+      folder: { id: 'folder-a' },
+      img: 'icons/commodities/stone/ore-pile-grey.webp'
+    });
+    const component = helper.componentFromItem('raw-ore', {
+      name: 'Raw Ore',
+      img: payload.img,
+      system: payload.system
+    }, { preserveSourceIdentity: false });
+
+    assert.match(payload.system.description.value, /Unrefined ore/);
+    assert.match(component.description, /Unrefined ore/);
+    assert.match(helper.mythwrightItemDescription('ember', 'Ember Essence'), /cinder-bright essence/);
   });
 
   it('builds elemental weapon payloads without SRD identity and with elemental damage metadata', () => {

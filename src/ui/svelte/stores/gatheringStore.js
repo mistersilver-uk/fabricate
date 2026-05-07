@@ -61,6 +61,27 @@ function normalizeRunRows(rows) {
   return Array.isArray(rows) ? rows.filter(Boolean) : [];
 }
 
+function normalizeSystemOptions(listing) {
+  const explicit = Array.isArray(listing?.gatheringSystems) ? listing.gatheringSystems : [];
+  const byId = new Map();
+  for (const system of explicit) {
+    const id = String(system?.id || '').trim();
+    if (!id) continue;
+    byId.set(id, { id, name: String(system?.name || id).trim() || id });
+  }
+  for (const row of [
+    ...(Array.isArray(listing?.environments) ? listing.environments : []),
+    ...(Array.isArray(listing?.activeRuns) ? listing.activeRuns : []),
+    ...(Array.isArray(listing?.history) ? listing.history : [])
+  ]) {
+    const id = String(row?.craftingSystemId || '').trim();
+    if (!id || byId.has(id)) continue;
+    const name = String(row?.craftingSystemName || id).trim() || id;
+    byId.set(id, { id, name });
+  }
+  return Array.from(byId.values()).sort((left, right) => left.name.localeCompare(right.name));
+}
+
 function normalizeListing(listing, actor, availableActors) {
   return {
     visible: listing?.visible === true,
@@ -73,7 +94,8 @@ function normalizeListing(listing, actor, availableActors) {
       : availableActors.map(actorOption),
     environments: Array.isArray(listing?.environments) ? listing.environments : [],
     activeRuns: normalizeRunRows(listing?.activeRuns),
-    history: normalizeRunRows(listing?.history)
+    history: normalizeRunRows(listing?.history),
+    gatheringSystems: normalizeSystemOptions(listing)
   };
 }
 
@@ -119,11 +141,18 @@ function buildViewState({
   selectedActor,
   availableActors,
   listing,
+  selectedSystemId = 'all',
   loading = false,
   startingTaskKey = null,
   error = null,
   lastResult = null
 }) {
+  const systemOptions = listing?.gatheringSystems ?? [];
+  const systemFilterId = systemOptions.some(system => system.id === selectedSystemId) ? selectedSystemId : 'all';
+  const environments = listing?.environments ?? [];
+  const filteredEnvironments = systemFilterId === 'all'
+    ? environments
+    : environments.filter(environment => String(environment?.craftingSystemId || '') === systemFilterId);
   return {
     loading,
     startingTaskKey,
@@ -134,7 +163,11 @@ function buildViewState({
     availableActors,
     hasSelectableActors: availableActors.length > 0,
     listing,
-    environments: listing?.environments ?? [],
+    environments,
+    filteredEnvironments,
+    gatheringSystems: systemOptions,
+    selectedSystemId: systemFilterId,
+    hasMultipleGatheringSystems: systemOptions.length > 1,
     activeRuns: listing?.activeRuns ?? [],
     history: listing?.history ?? [],
     blockedReasons: listing?.blockedReasons ?? [],
@@ -183,6 +216,7 @@ export function createGatheringStore(services) {
   const startingTaskKey = writable(null);
   const error = writable(null);
   const lastResult = writable(null);
+  const selectedSystemId = writable('all');
   const viewState = writable(buildViewState({
     selectedActor: get(selectedActor),
     availableActors: get(availableActors),
@@ -194,6 +228,7 @@ export function createGatheringStore(services) {
       selectedActor: get(selectedActor),
       availableActors: get(availableActors),
       listing: get(listing),
+      selectedSystemId: get(selectedSystemId),
       loading: get(loading),
       startingTaskKey: get(startingTaskKey),
       error: get(error),
@@ -236,7 +271,11 @@ export function createGatheringStore(services) {
       }
 
       const result = await services.listGatheringForActor({ actor });
-      listing.set(normalizeListing(result, actor, actors));
+      const normalized = normalizeListing(result, actor, actors);
+      listing.set(normalized);
+      if (get(selectedSystemId) !== 'all' && !normalized.gatheringSystems.some(system => system.id === get(selectedSystemId))) {
+        selectedSystemId.set('all');
+      }
       return get(listing);
     } catch (err) {
       const message = err?.message || localize('FABRICATE.Gathering.Notifications.RefreshFailed');
@@ -255,8 +294,17 @@ export function createGatheringStore(services) {
     selectedActor.set(actor);
     await services.setSetting?.('lastGatheringActor', actor?.id ?? '');
     listing.set(null);
+    selectedSystemId.set('all');
     syncViewState();
     return actor;
+  }
+
+  function selectSystem(systemId) {
+    const normalizedId = String(systemId || 'all');
+    const systems = get(listing)?.gatheringSystems ?? [];
+    selectedSystemId.set(normalizedId === 'all' || systems.some(system => system.id === normalizedId) ? normalizedId : 'all');
+    syncViewState();
+    return get(selectedSystemId);
   }
 
   async function startTask(environmentId, task = {}) {
@@ -315,10 +363,12 @@ export function createGatheringStore(services) {
     startingTaskKey,
     error,
     lastResult,
+    selectedSystemId,
     viewState,
     refresh,
     refreshActors,
     selectActor,
+    selectSystem,
     startTask,
     destroy
   };

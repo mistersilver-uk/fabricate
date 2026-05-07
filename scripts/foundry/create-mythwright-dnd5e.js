@@ -169,6 +169,45 @@ const MythwrightDnd5eBootstrap = (() => {
     ['relic-radiant-shield', 'Radiant Shield', 'Mythwright > Relics', MYTHWRIGHT_ICONS.relicRadiantShield],
     ['relic-shadow-dagger', 'Shadow Dagger', 'Mythwright > Relics', MYTHWRIGHT_ICONS.relicShadowDagger]
   ];
+  const BASE_ITEM_DESCRIPTIONS = Object.freeze({
+    'raw-ore': 'Unrefined ore split from stubborn stone, ready to be smelted into honest crafting metal.',
+    hardwood: 'Seasoned hardwood with a tight grain, prized for handles, hafts, bows, and reinforced frames.',
+    'cured-hide': 'Supple cured hide prepared for straps, grips, padding, and layered armour work.',
+    'iron-ingot': 'A clean iron ingot poured for Mythwright patterns, reliable enough for blades, buckles, and fittings.',
+    'weapon-core': 'A shaped weapon core that gives a blade, haft, or striking head its durable heart.',
+    'balanced-hilt': 'A fitted grip and guard assembly balanced for control once the weapon is finished.',
+    'bow-stave': 'A carefully cut stave with enough spring to become a dependable bow.',
+    'armour-plates': 'Overlapping plates hammered into shape for breastplates, mail reinforcement, and shields.',
+    'reinforced-straps': 'Riveted straps and bindings that keep armour secure through hard use.',
+    'monster-trophy': 'A trophy taken from a dangerous creature, carrying the proof and power of the hunt.',
+    'ancient-fragment': 'A rune-scarred fragment from a fallen age, still holding a memory of forgotten craft.',
+    'dragon-scale': 'A heat-scarred dragon scale, light in the hand and stubborn against steel.',
+    'artisan-catalyst': 'A reliable shop catalyst used to steady finishing work and draw out finer results.',
+    'mythic-catalyst': 'A rare catalyst bright with old enchantment, fit for awakening relic-grade work.'
+  });
+  const ESSENCE_DESCRIPTIONS = Object.freeze({
+    ember: 'A cinder-bright essence that warms the air around it and hungers for the shape of flame.',
+    frost: 'A pale essence rimed with hoarfrost, quieting heat and hardening the work beneath the hammer.',
+    storm: 'A restless essence that snaps with distant thunder and pulls metal toward sudden motion.',
+    radiance: 'A golden essence that answers oath, polish, and prayer with a clear steady light.',
+    shadow: 'A dim essence gathered where light fails, useful for subtle edges and silent protections.',
+    dragon: 'A fierce essence carrying the pride of scaled tyrants and the memory of ancient fire.'
+  });
+  const RELIC_DESCRIPTIONS = Object.freeze({
+    'relic-mythic-longsword': 'A legendary longsword pattern awaiting final awakening, built to hold ember-bright power without breaking.',
+    'relic-draconic-scale-mail': 'Scale mail wrought around draconic trophies, meant to turn aside flame and fang alike.',
+    'relic-storm-bow': 'A storm-forged bow whose limbs seem to remember thunder even before the string is drawn.',
+    'relic-radiant-shield': 'A radiant shield prepared for vows, battlefield light, and the defence of companions.',
+    'relic-shadow-dagger': 'A narrow relic dagger shaped for moonless work, silent cuts, and secrets carried in steel.'
+  });
+  const ENVIRONMENT_DESCRIPTIONS = Object.freeze({
+    'mythwright-mines': 'Old mineworks and fresh cuts where raw ore waits in cramped seams and echoing galleries.',
+    'mythwright-wilds': 'Trackless woodland where hardwood, hides, and useful wild finds reward patient hands.',
+    'mythwright-ruins': 'Broken halls and buried foundations where ancient fragments still remember lost makers.',
+    'mythwright-battlefields': 'Scarred fields where trophies, broken gear, and hard lessons lie beneath the churned earth.',
+    'mythwright-planar-sites': 'Thin places where the world shivers and volatile essences can be bound by steady craft.',
+    'mythwright-dragon-lairs': 'Ash-marked lairs and hoard-scraped stone where dragon scale can be won by the brave.'
+  });
 
   function normalizeName(value) {
     return String(value || '')
@@ -272,6 +311,60 @@ const MythwrightDnd5eBootstrap = (() => {
     delete payload.sourceItemUuid;
     delete payload.fallbackItemIds;
     return payload;
+  }
+
+  function htmlToText(value) {
+    return String(value || '')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function descriptionToSystem(text, system = {}) {
+    const value = String(text || '').trim();
+    if (!value) return system;
+    return {
+      ...system,
+      description: {
+        ...(system.description || {}),
+        value: `<p>${value}</p>`
+      }
+    };
+  }
+
+  function mythwrightItemDescription(id, name, { source = null, preserveSourceIdentity = false, quality = null, baseName = null } = {}) {
+    if (preserveSourceIdentity) {
+      const sourceDescription = htmlToText(source?.system?.description?.value || source?.toObject?.()?.system?.description?.value || '');
+      return sourceDescription;
+    }
+    if (BASE_ITEM_DESCRIPTIONS[id]) return BASE_ITEM_DESCRIPTIONS[id];
+    if (ESSENCE_DESCRIPTIONS[id]) return ESSENCE_DESCRIPTIONS[id];
+    if (RELIC_DESCRIPTIONS[id]) return RELIC_DESCRIPTIONS[id];
+    if (quality && baseName) {
+      return `${quality} Mythwright ${baseName.toLowerCase()} finished with distinctive workshop marks and ready for the table.`;
+    }
+    return `${name} created for Mythwright crafting, ready to serve as a story-rich component or finished item.`;
+  }
+
+  function srdRecipeDescription(target) {
+    const itemName = String(target?.name || 'item').toLowerCase();
+    if (target?.type === 'weapon') {
+      return `A simple Mythwright recipe for crafting a sturdy ${itemName}, guiding the crafter from raw material selection through shaping, balancing, and finishing the weapon.`;
+    }
+    if (normalizeName(target?.name) === 'shield') {
+      return 'A simple Mythwright recipe for crafting a sturdy shield, guiding the crafter from raw material selection through shaping, reinforcing, and finishing the shield.';
+    }
+    return `A simple Mythwright recipe for crafting sturdy ${itemName.toLowerCase()}, guiding the crafter from raw material selection through shaping, fitting, and finishing the armour.`;
+  }
+
+  function relicRecipeDescription(name) {
+    return `A signature Mythwright relic recipe for awakening ${name}, drawing trophies, ancient fragments, dragon scale, and rare essence into an artefact worthy of legend.`;
+  }
+
+  function elementalRecipeDescription(definition) {
+    const essence = ESSENCES.find(entry => entry.id === definition?.essenceId)?.name || `${definition?.essenceId || 'elemental'} essence`;
+    const base = definition?.baseName || definition?.name || 'the base item';
+    return `A focused Mythwright infusion recipe for binding ${essence.toLowerCase()} into ${base.toLowerCase()}, finishing each quality tier with controlled elemental power.`;
   }
 
   function appendDescription(system = {}, text) {
@@ -385,16 +478,23 @@ const MythwrightDnd5eBootstrap = (() => {
     baseSourceId = null
   }) {
     const sourceObject = source?.toObject?.() || {};
+    const qualityMatch = String(name || '').match(/^(Flawed|Fine|Masterwork|Mythic)\s+(.+)$/);
+    const description = mythwrightItemDescription(id, name || source?.name, {
+      source,
+      preserveSourceIdentity,
+      quality: qualityMatch?.[1] || null,
+      baseName: qualityMatch?.[2] || null
+    });
     const payload = {
       ...sourceObject,
       name: name || source?.name || 'Unnamed Item',
       type: source?.type || type,
       img: sanitizeIconPath(source?.img || img || DEFAULT_ITEM_ICON, { allowExternal: !!source?.img }),
       folder: folder?.id || null,
-      system: {
+      system: descriptionToSystem(description, {
         ...(sourceObject.system || {}),
         quantity: Number(sourceObject.system?.quantity || 1)
-      },
+      }),
       flags: {
         ...(sourceObject.flags || {}),
         core: {
@@ -446,7 +546,7 @@ const MythwrightDnd5eBootstrap = (() => {
       const damageResult = addElementalDamage(payload.system || {}, definition.damageType, quality.damage);
       payload.system = appendDescription(
         damageResult.system,
-        `${quality.name} Mythwright elemental variant infused with ${definition.essenceId} essence.`
+        `${quality.name} Mythwright elemental work infused with ${definition.essenceId} essence, its edge carrying controlled ${definition.damageType} power.`
       );
       payload.flags.fabricate.elemental.damageApplied = damageResult.applied;
       payload.flags.fabricate.elemental.damageFormula = quality.damage;
@@ -455,7 +555,7 @@ const MythwrightDnd5eBootstrap = (() => {
 
     if (definition.resistanceType) {
       const defensiveText = quality.resistance
-        ? `While equipped, this item grants resistance to ${definition.resistanceType} damage${quality.acBonus ? ` and a +${quality.acBonus} bonus to AC` : ''}.`
+        ? `While equipped, this Mythwright armour carries ${definition.essenceId} essence and grants resistance to ${definition.resistanceType} damage${quality.acBonus ? ` and a +${quality.acBonus} bonus to AC` : ''}.`
         : `This flawed elemental item carries unstable ${definition.essenceId} essence but grants no reliable resistance.`;
       payload.system = appendDescription(
         payload.system || {},
@@ -633,10 +733,11 @@ const MythwrightDnd5eBootstrap = (() => {
     const sourceItemUuid = extra.preserveSourceIdentity === false
       ? null
       : (item.flags?.core?.sourceId || item.uuid || null);
+    const itemDescription = htmlToText(item.system?.description?.value || item.toObject?.()?.system?.description?.value || '');
     return {
       id,
       name: item.name,
-      description: '',
+      description: itemDescription,
       img: sanitizeIconPath(item.img || DEFAULT_ITEM_ICON, { allowExternal: true }),
       sourceUuid,
       sourceItemUuid,
@@ -680,7 +781,7 @@ const MythwrightDnd5eBootstrap = (() => {
     return {
       id: recipeId,
       name: `Craft ${target.name}`,
-      description: `Mythwright multi-step recipe for ${target.name}.`,
+      description: srdRecipeDescription(target),
       img: sanitizeIconPath(target.item?.img || DEFAULT_ITEM_ICON, { allowExternal: true }),
       category: target.type === 'weapon' ? 'Weapons' : 'Armour',
       craftingSystemId: SYSTEM_ID,
@@ -729,7 +830,7 @@ const MythwrightDnd5eBootstrap = (() => {
     return {
       id: `mythwright-${relicId}`,
       name: `Craft ${name}`,
-      description: `A signature Mythwright relic recipe for ${name}.`,
+      description: relicRecipeDescription(name),
       img: RELICS.find(definition => definition[0] === relicId)?.[3] || DEFAULT_ITEM_ICON,
       category: 'Relics',
       craftingSystemId: SYSTEM_ID,
@@ -763,7 +864,7 @@ const MythwrightDnd5eBootstrap = (() => {
     return {
       id: recipeId,
       name: `Infuse ${definition.name}`,
-      description: `A focused elemental finishing recipe for ${definition.name}.`,
+      description: elementalRecipeDescription(definition),
       img: definition.img || DEFAULT_ITEM_ICON,
       category: definition.type === 'weapon' ? 'Weapons' : 'Armour',
       craftingSystemId: SYSTEM_ID,
@@ -826,6 +927,7 @@ const MythwrightDnd5eBootstrap = (() => {
       essenceDefinitions: ESSENCES.map(essence => ({
         id: essence.id,
         name: essence.name,
+        description: ESSENCE_DESCRIPTIONS[essence.id] || '',
         icon: essence.icon,
         sourceComponentId: essence.id,
         sourceItemUuid: worldItems.get(essence.id)?.uuid || null
@@ -841,7 +943,7 @@ const MythwrightDnd5eBootstrap = (() => {
       id,
       craftingSystemId: SYSTEM_ID,
       name,
-      description: `${name} Mythwright gathering site.`,
+      description: ENVIRONMENT_DESCRIPTIONS[id] || `${name} holds useful materials for careful gatherers.`,
       risk,
       economyMode: 'time',
       selectionMode: 'targeted',
@@ -1073,12 +1175,12 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
         ]
       });
       const environments = [
-        buildEnvironment('mythwright-mines', 'Mythwright Mines', 'hazardous', [standardTask('mine-ore', 'Extract Ore', 'raw-ore')]),
-        buildEnvironment('mythwright-wilds', 'Mythwright Wilds', 'safe', [standardTask('wild-hardwood', 'Harvest Hardwood', 'hardwood')]),
-        buildEnvironment('mythwright-ruins', 'Mythwright Ruins', 'unsafe', [standardTask('ruin-fragment', 'Recover Ancient Fragments', 'ancient-fragment')]),
-        buildEnvironment('mythwright-battlefields', 'Mythwright Battlefields', 'hazardous', [standardTask('battle-trophy', 'Scavenge Trophies', 'monster-trophy')]),
-        buildEnvironment('mythwright-planar-sites', 'Mythwright Planar Sites', 'extreme', [standardTask('planar-essence', 'Bind Planar Essence', 'storm')]),
-        buildEnvironment('mythwright-dragon-lairs', 'Mythwright Dragon Lairs', 'extreme', [standardTask('dragon-scale', 'Harvest Dragon Scale', 'dragon-scale')])
+        buildEnvironment('mythwright-mines', 'Mines', 'hazardous', [standardTask('mine-ore', 'Extract Ore', 'raw-ore')]),
+        buildEnvironment('mythwright-wilds', 'Wilds', 'safe', [standardTask('wild-hardwood', 'Harvest Hardwood', 'hardwood')]),
+        buildEnvironment('mythwright-ruins', 'Ruins', 'unsafe', [standardTask('ruin-fragment', 'Recover Ancient Fragments', 'ancient-fragment')]),
+        buildEnvironment('mythwright-battlefields', 'Battlefields', 'hazardous', [standardTask('battle-trophy', 'Scavenge Trophies', 'monster-trophy')]),
+        buildEnvironment('mythwright-planar-sites', 'Planar Sites', 'extreme', [standardTask('planar-essence', 'Bind Planar Essence', 'storm')]),
+        buildEnvironment('mythwright-dragon-lairs', 'Dragon Lairs', 'extreme', [standardTask('dragon-scale', 'Harvest Dragon Scale', 'dragon-scale')])
       ];
       for (const environment of environments) {
         await upsertEnvironment(environmentStore, environment, summary);
@@ -1121,9 +1223,14 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
     elementalVariantQualityName,
     elementalQualityVariantDefinitions,
     elementalVariantPayload,
+    srdRecipeDescription,
+    relicRecipeDescription,
+    elementalRecipeDescription,
+    mythwrightItemDescription,
     tagsForComponent,
     itemTagsForSystem,
     buildSystemPayload,
+    buildEnvironment,
     run
   };
 })();

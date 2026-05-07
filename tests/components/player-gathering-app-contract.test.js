@@ -90,17 +90,24 @@ describe('player gathering app source contract', () => {
       "localize('FABRICATE.Gathering.ActiveRuns.Title')",
       "localize('FABRICATE.Gathering.Feedback.Title')",
       "localize('FABRICATE.Gathering.History.Title')",
+      "localize('FABRICATE.Gathering.SystemFilter')",
+      "localize('FABRICATE.Gathering.AllSystems')",
       '$viewState.activeRuns',
       '$viewState.feedback',
       '$viewState.history',
+      '$viewState.hasMultipleGatheringSystems',
       'displayRunLabel(run)',
-      "localize('FABRICATE.Gathering.BlindTaskLabel')"
+      "localize('FABRICATE.Gathering.BlindTaskLabel')",
+      'gathering-system-chip',
+      'store.selectSystem(event.target.value)'
     ]) {
       assert.ok(rootSource.includes(snippet), `GatheringAppRoot should include ${snippet}`);
     }
 
     assert.equal(localeAt('FABRICATE.Gathering.ActiveRuns.Title'), 'Active Gathering');
     assert.equal(localeAt('FABRICATE.Gathering.History.Title'), 'Recent History');
+    assert.equal(localeAt('FABRICATE.Gathering.SystemFilter'), 'Filter by crafting system');
+    assert.equal(localeAt('FABRICATE.Gathering.AllSystems'), 'All systems');
     assert.equal(localeAt('FABRICATE.Gathering.FailureDefault'), 'Gathering produced no results.');
   });
 

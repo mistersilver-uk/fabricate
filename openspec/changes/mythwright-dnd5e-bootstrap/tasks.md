@@ -7,6 +7,13 @@
 - [x] Add focused unit tests for routed providers and bootstrap helpers.
 - [x] Run `npm test`.
 - [x] Run `npm run build`.
+- [x] Document patterned Mythwright flavour copy and gathering system-context UI behavior.
+- [x] Add Mythwright recipe/item/component/environment description helpers and tests.
+- [x] Add gathering listing system names, metadata, store filtering, app filter/chips, and tests.
+- [x] Run `node --test tests\mythwright-bootstrap.test.js`.
+- [x] Run `node --test tests\gathering-engine-listing.test.js tests\stores\gatheringStore.test.js tests\components\player-gathering-app-contract.test.js`.
+- [x] Run `npm test`.
+- [x] Run `npm run build`.
 - [x] Strip SRD source identity from Mythwright quality variant items and components while preserving base SRD links.
 - [x] Clean duplicate SRD-sourced quality variants and sanitize Mythwright icon paths on rerun.
 - [x] Add whole-system component source uniqueness validation for create/update payloads.

@@ -568,6 +568,51 @@ test('listForActor returns active timed runs and recent terminal history for tar
   assert.deepEqual(listing.history[0].checkResult, historyRun.checkResult);
 });
 
+test('listForActor annotates environments and run rows with gathering system metadata', async () => {
+  const systems = [
+    { id: 'system-a', name: 'Mythwright', enabled: true, features: { gathering: true }, components: [] },
+    { id: 'system-b', name: 'Alchemy', enabled: true, features: { gathering: true }, components: [] }
+  ];
+  const activeRun = {
+    id: 'run-active',
+    actorUuid: actor.uuid,
+    userId: viewer.id,
+    craftingSystemId: 'system-b',
+    environmentId: 'env-b',
+    taskId: 'task-b',
+    status: 'waitingTime'
+  };
+  const historyRun = {
+    id: 'run-history',
+    actorUuid: actor.uuid,
+    userId: viewer.id,
+    craftingSystemId: 'system-a',
+    environmentId: 'env-a',
+    taskId: 'task-a',
+    status: 'succeeded'
+  };
+  const engine = makeEngine({
+    systems,
+    environments: [
+      environment({ id: 'env-a', craftingSystemId: 'system-a', name: 'Mines' }),
+      environment({ id: 'env-b', craftingSystemId: 'system-b', name: 'Greenhouse', tasks: [task({ id: 'task-b', name: 'Clip Herbs' })] })
+    ],
+    activeRuns: new Map([['task-b', activeRun]]),
+    history: [historyRun]
+  });
+
+  const listing = await engine.listForActor({ viewer, actor });
+
+  assert.deepEqual(listing.gatheringSystems, [
+    { id: 'system-b', name: 'Alchemy' },
+    { id: 'system-a', name: 'Mythwright' }
+  ]);
+  assert.equal(listing.environments.find(entry => entry.id === 'env-a').craftingSystemName, 'Mythwright');
+  assert.equal(listing.environments.find(entry => entry.id === 'env-b').craftingSystemName, 'Alchemy');
+  assert.equal(listing.activeRuns[0].craftingSystemName, 'Alchemy');
+  assert.equal(listing.history[0].craftingSystemName, 'Mythwright');
+});
+
 test('non-GM blind active and history rows do not expose task identity or terminal internals', async () => {
   const secretTask = task({
     id: 'secret-mooncap-task',

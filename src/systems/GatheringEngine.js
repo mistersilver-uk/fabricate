@@ -497,6 +497,11 @@ export class GatheringEngine {
       : uniqueReasons(environmentModels.flatMap(environment => environment.blockedReasons));
     const activeRuns = this._activeRunModels({ actor: selectedActor, viewer });
     const history = this._historyModels({ actor: selectedActor, viewer });
+    const gatheringSystems = this._gatheringSystemOptions([
+      ...environmentModels,
+      ...activeRuns,
+      ...history
+    ]);
 
     return {
       visible: true,
@@ -508,7 +513,8 @@ export class GatheringEngine {
       selectableActors: selectableActors.map(actorToOption),
       environments: environmentModels,
       activeRuns,
-      history
+      history,
+      gatheringSystems
     };
   }
 
@@ -528,6 +534,7 @@ export class GatheringEngine {
   _runModel({ run, viewer, terminal }) {
     if (!run?.id) return null;
     const environment = this._findEnvironment(run.environmentId);
+    const system = this._allSystems().get(String(run.craftingSystemId));
     const task = environment
       ? normalizeList(environment.tasks).find(task => task?.id === run.taskId) ?? null
       : null;
@@ -537,6 +544,7 @@ export class GatheringEngine {
       id: stringOrNull(run.id),
       status,
       craftingSystemId: stringOrNull(run.craftingSystemId),
+      craftingSystemName: stringOrEmpty(system?.name),
       environmentId: stringOrNull(run.environmentId),
       environmentName: stringOrEmpty(environment?.name),
       selectionMode: environment?.selectionMode === 'blind' ? 'blind' : 'targeted',
@@ -722,6 +730,7 @@ export class GatheringEngine {
     return {
       id: stringOrNull(environment.id),
       craftingSystemId: stringOrNull(environment.craftingSystemId),
+      craftingSystemName: stringOrEmpty(system?.name),
       name: stringOrEmpty(environment.name),
       description: stringOrEmpty(environment.description),
       img: stringOrNull(environment.img),
@@ -1674,6 +1683,8 @@ export class GatheringEngine {
   }
 
   _emptyListing({ viewer, actor = null, selectableActors = [], reason }) {
+    const activeRuns = actor ? this._activeRunModels({ actor, viewer }) : [];
+    const history = actor ? this._historyModels({ actor, viewer }) : [];
     return {
       visible: true,
       attemptable: false,
@@ -1683,9 +1694,26 @@ export class GatheringEngine {
       selectedActorId: actor ? idOf(actor) : null,
       selectableActors: selectableActors.map(actorToOption),
       environments: [],
-      activeRuns: actor ? this._activeRunModels({ actor, viewer }) : [],
-      history: actor ? this._historyModels({ actor, viewer }) : []
+      activeRuns,
+      history,
+      gatheringSystems: this._gatheringSystemOptions([...activeRuns, ...history])
     };
+  }
+
+  _gatheringSystemOptions(models = []) {
+    const systems = this._allSystems();
+    const ids = Array.from(new Set(normalizeList(models)
+      .map(model => stringOrNull(model?.craftingSystemId))
+      .filter(Boolean)));
+    return ids
+      .map(id => {
+        const system = systems.get(id);
+        return {
+          id,
+          name: stringOrEmpty(system?.name) || stringOrEmpty(models.find(model => model?.craftingSystemId === id)?.craftingSystemName) || id
+        };
+      })
+      .sort((left, right) => left.name.localeCompare(right.name));
   }
 
   _emptyVisibilityReason(hidden) {

@@ -12,16 +12,16 @@
   let regionFilter = $state('all');
   let biomeFilter = $state('all');
 
-  const filteredEnvironments = $derived(($viewState.environments || []).filter(environment => {
+  const filteredEnvironments = $derived(($viewState.filteredEnvironments || []).filter(environment => {
     const query = searchTerm.trim().toLowerCase();
-    const matchesSearch = !query || `${environment.name || ''} ${environment.description || ''} ${environment.region || ''} ${environment.biome || ''}`.toLowerCase().includes(query);
+    const matchesSearch = !query || `${environment.name || ''} ${environment.description || ''} ${environment.craftingSystemName || ''} ${environment.region || ''} ${environment.biome || ''}`.toLowerCase().includes(query);
     const matchesRisk = riskFilter === 'all' || (environment.risk || 'safe') === riskFilter;
     const matchesRegion = regionFilter === 'all' || (environment.region || '') === regionFilter;
     const matchesBiome = biomeFilter === 'all' || (environment.biome || '') === biomeFilter;
     return matchesSearch && matchesRisk && matchesRegion && matchesBiome;
   }));
-  const regionOptions = $derived(uniqueSorted(($viewState.environments || []).map(environment => environment.region)));
-  const biomeOptions = $derived(uniqueSorted(($viewState.environments || []).map(environment => environment.biome)));
+  const regionOptions = $derived(uniqueSorted(($viewState.filteredEnvironments || []).map(environment => environment.region)));
+  const biomeOptions = $derived(uniqueSorted(($viewState.filteredEnvironments || []).map(environment => environment.biome)));
 
   onMount(() => {
     store.refresh();
@@ -181,6 +181,9 @@
               {#if run.environmentName}
                 <span>{run.environmentName}</span>
               {/if}
+              {#if $viewState.hasMultipleGatheringSystems && run.craftingSystemName}
+                <span class="gathering-chip gathering-system-chip">{run.craftingSystemName}</span>
+              {/if}
             </div>
             <div class="gathering-run-meta">
               <span>{statusLabel(run.status)}</span>
@@ -231,6 +234,14 @@
         <option value="unsafe">{localize('FABRICATE.Gathering.Risk.unsafe')}</option>
         <option value="extreme">{localize('FABRICATE.Gathering.Risk.extreme')}</option>
       </select>
+      {#if $viewState.hasMultipleGatheringSystems}
+        <select value={$viewState.selectedSystemId || 'all'} aria-label={localize('FABRICATE.Gathering.SystemFilter')} onchange={(event) => store.selectSystem(event.target.value)}>
+          <option value="all">{localize('FABRICATE.Gathering.AllSystems')}</option>
+          {#each $viewState.gatheringSystems as system (system.id)}
+            <option value={system.id}>{system.name}</option>
+          {/each}
+        </select>
+      {/if}
       <select bind:value={regionFilter} aria-label={localize('FABRICATE.Gathering.RegionFilter')}>
         <option value="all">{localize('FABRICATE.Gathering.AllRegions')}</option>
         {#each regionOptions as region (region)}
@@ -259,6 +270,7 @@
               <div class="gathering-chip-row">
                 {#if environment.region}<span class="gathering-chip">{environment.region}</span>{/if}
                 {#if environment.biome}<span class="gathering-chip">{environment.biome}</span>{/if}
+                {#if $viewState.hasMultipleGatheringSystems && environment.craftingSystemName}<span class="gathering-chip gathering-system-chip">{environment.craftingSystemName}</span>{/if}
                 <span class="gathering-chip">{localize(`FABRICATE.Gathering.Risk.${environment.risk || 'safe'}`)}</span>
                 {#if environment.conditions?.timeOfDay}<span class="gathering-chip">{environment.conditions.timeOfDay}</span>{/if}
                 {#if environment.conditions?.weather}<span class="gathering-chip">{environment.conditions.weather}</span>{/if}
@@ -340,6 +352,9 @@
               <strong>{displayRunLabel(run)}</strong>
               {#if run.environmentName}
                 <span>{run.environmentName}</span>
+              {/if}
+              {#if $viewState.hasMultipleGatheringSystems && run.craftingSystemName}
+                <span class="gathering-chip gathering-system-chip">{run.craftingSystemName}</span>
               {/if}
             </div>
             <span>{historySummary(run)}</span>

@@ -25,6 +25,9 @@ Mythwright needs a practical first-run bootstrap that creates world content, lin
 - Limit mundane SRD quality variants to `Flawed`, `Standard`, `Fine`, and `Masterwork`; reserve Mythic outcomes for elemental and bespoke relic recipes.
 - Add curated elemental weapon and armour/shield variants that require matching essences, preserve only provenance links to the SRD base item, and expand into tiered `Flawed` through `Mythic` outputs.
 - Use explicit valid Foundry core icon paths for Mythwright-authored items, recipes, and macros.
+- Replace terse generated Mythwright recipe, item, component, essence, and gathering environment copy with player-facing fantasy descriptions.
+- Rename deterministic Mythwright gathering environments to plain location names while preserving their deterministic IDs.
+- Add player Gathering app crafting-system context: a system filter appears only when multiple gathering systems are present, and system chips display on environment/run rows only in that multi-system case.
 
 ## Non-Goals
 
