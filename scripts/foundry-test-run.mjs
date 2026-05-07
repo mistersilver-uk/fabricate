@@ -2826,9 +2826,13 @@ async function main() {
 
         await selectGatheringActor(page, 'Alara the Alchemist');
         await startGatheringTaskByLabel(page, 'Gather Meadow Herbs');
-        await page.locator('.gathering-feedback-panel.success').first().waitFor({ state: 'visible', timeout: 10_000 });
+        // 30s (not 10s) for post-task-start outcomes: on hosted Ubuntu CI
+        // runners the feedback panel + history row reliably take 10–20s
+        // longer than locally to render, since task resolution piggybacks
+        // on Foundry's tick rate which lags under headless load.
+        await page.locator('.gathering-feedback-panel.success').first().waitFor({ state: 'visible', timeout: 30_000 });
         await page.locator('.gathering-history-row').filter({ hasText: 'Gather Meadow Herbs' }).first()
-          .waitFor({ state: 'visible', timeout: 10_000 });
+          .waitFor({ state: 'visible', timeout: 30_000 });
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'gathering-immediate-success');
 
@@ -2838,9 +2842,9 @@ async function main() {
           return alara?.items?.contents?.filter(item => item.name === 'Mystic Herb').length ?? 0;
         }, cleanup.alaraId);
         await startGatheringTaskByLabel(page, 'Search Withered Patch');
-        await page.locator('.gathering-feedback-panel.warning').first().waitFor({ state: 'visible', timeout: 10_000 });
+        await page.locator('.gathering-feedback-panel.warning').first().waitFor({ state: 'visible', timeout: 30_000 });
         await page.locator('.gathering-history-row').filter({ hasText: 'Search Withered Patch' }).first()
-          .waitFor({ state: 'visible', timeout: 10_000 });
+          .waitFor({ state: 'visible', timeout: 30_000 });
         const herbCountAfterFailure = await page.evaluate((alaraId) => {
           const alara = game.actors.get(alaraId);
           return alara?.items?.contents?.filter(item => item.name === 'Mystic Herb').length ?? 0;
@@ -2854,7 +2858,7 @@ async function main() {
 
         await startGatheringTaskByLabel(page, 'Tend Slow Bloom');
         await page.locator('.gathering-run-row').filter({ hasText: 'Tend Slow Bloom' }).first()
-          .waitFor({ state: 'visible', timeout: 10_000 });
+          .waitFor({ state: 'visible', timeout: 30_000 });
         await scrollGatheringAppToText(page, 'Active Gathering');
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'gathering-timed-active');
@@ -2872,7 +2876,7 @@ async function main() {
         await openGatheringAppFromDirectory(page);
         await selectGatheringActor(page, 'Alara the Alchemist');
         await page.locator('.gathering-history-row').filter({ hasText: 'Tend Slow Bloom' }).first()
-          .waitFor({ state: 'visible', timeout: 10_000 });
+          .waitFor({ state: 'visible', timeout: 30_000 });
         const firstHistoryText = await page.locator('.gathering-history-row').first().textContent();
         if (!String(firstHistoryText || '').includes('Tend Slow Bloom')) {
           throw new Error('Completed timed gathering run was not prepended to history.');
