@@ -223,6 +223,11 @@ test('manager-v2 recipes browser defines compact responsive table geometry', () 
 
 test('manager-v2 components browser defines drop target and compact responsive table geometry', () => {
   const tableBlock = blockFor('.fabricate-manager-v2 .manager-v2-components-table');
+  const toolbarBlock = Array.from(css.matchAll(/\.fabricate-manager-v2 \.manager-v2-toolbar\s*\{[\s\S]*?\}/g))
+    .map(match => match[0])
+    .join('\n');
+  const toolbarPrimaryBlock = blockFor('.fabricate-manager-v2 .manager-v2-toolbar-primary');
+  const toolbarPillsBlock = blockFor('.fabricate-manager-v2 .manager-v2-toolbar-pills');
   const dropBlock = blockFor('.fabricate-manager-v2 .manager-v2-component-drop-zone');
   const tagSearchBlock = blockFor('.fabricate-manager-v2 .manager-v2-tag-search');
   const tagSuggestionsBlock = blockFor('.fabricate-manager-v2 .manager-v2-tag-suggestions');
@@ -246,6 +251,13 @@ test('manager-v2 components browser defines drop target and compact responsive t
   assert.ok(dropBlock.includes('grid-template-columns: 42px minmax(0, 1fr);'), 'component drop zone should reserve icon and copy space');
   assert.ok(dropBlock.includes('margin: 12px;'), 'component drop zone should keep balanced vertical spacing around the toolbar');
   assert.ok(css.includes('.fabricate-manager-v2 .manager-v2-component-drop-zone.is-drop-active'), 'component drop zone should expose an active drag state');
+  assert.ok(toolbarBlock.includes('display: grid;'), 'manager-v2 toolbar should own a grid layout for primary controls and auxiliary rows');
+  assert.ok(toolbarBlock.includes('grid-template-columns: minmax(0, 1fr);'), 'manager-v2 toolbar grid should keep rows bounded to the main content width');
+  assert.ok(toolbarPrimaryBlock.includes('display: flex;'), 'manager-v2 primary toolbar row should lay out controls as a flex row');
+  assert.ok(toolbarPrimaryBlock.includes('flex-wrap: wrap;'), 'manager-v2 primary toolbar row should wrap controls without involving selected pills');
+  assert.ok(toolbarPillsBlock.includes('display: flex;'), 'manager-v2 pill row should be its own flex row');
+  assert.ok(toolbarPillsBlock.includes('flex-wrap: wrap;'), 'manager-v2 pill row should wrap selected tags independently');
+  assert.ok(toolbarPillsBlock.includes('width: 100%;'), 'manager-v2 pill row should occupy a full toolbar row');
   assert.ok(tagSearchBlock.includes('position: relative;'), 'component tag search should anchor its suggestion list to the control');
   assert.ok(tagSearchBlock.includes('max-width: 320px;'), 'component tag search should keep bounded toolbar geometry');
   assert.ok(tagSuggestionsBlock.includes('position: absolute;'), 'component tag suggestions should overlay below the search field without shifting the toolbar');

@@ -239,72 +239,74 @@
   </section>
 
   <section class="manager-v2-toolbar" aria-label={text('FABRICATE.Admin.ManagerV2.Component.Filters', 'Component filters')}>
-    <label class="manager-v2-search">
-      <i class="fas fa-search" aria-hidden="true"></i>
-      <input
-        type="search"
-        value={itemSearchTerm || ''}
-        oninput={(event) => onSearchChange(event.currentTarget.value)}
-        placeholder={text('FABRICATE.Admin.ManagerV2.Component.SearchPlaceholder', 'Search components...')}
-        aria-label={text('FABRICATE.Admin.ManagerV2.Component.SearchLabel', 'Search components')}
-      />
-    </label>
-    {#if showComponentTags && componentTagOptions.length > 0}
-      <div class="manager-v2-tag-search" data-component-tag-search>
-        <label class="manager-v2-filter manager-v2-tag-search-label">
-          <span>{text('FABRICATE.Admin.ManagerV2.Component.Tags', 'Tags')}</span>
-          <input
-            type="search"
-            value={tagSearchTerm}
-            oninput={(event) => tagSearchTerm = event.currentTarget.value}
-            placeholder={text('FABRICATE.Admin.ManagerV2.Component.TagSearchPlaceholder', 'Search tags...')}
-            aria-label={text('FABRICATE.Admin.ManagerV2.Component.TagSearchLabel', 'Search component tags')}
-            aria-controls="manager-v2-component-tag-suggestions"
-          />
-        </label>
-        {#if normalizedTagSearchTerm.length > 0}
-          <div id="manager-v2-component-tag-suggestions" class="manager-v2-tag-suggestions" role="listbox" aria-label={text('FABRICATE.Admin.ManagerV2.Component.TagSuggestions', 'Matching component tags')}>
-            {#each tagSearchSuggestions as tag}
-              <button type="button" role="option" aria-selected="false" class="manager-v2-tag-suggestion" onclick={() => addTagFilter(tag)}>
-                <i class="fas fa-tag" aria-hidden="true"></i>
-                <span>{tag}</span>
-              </button>
-            {:else}
-              <span class="manager-v2-tag-no-matches">{text('FABRICATE.Admin.ManagerV2.Component.TagNoMatches', 'No matching tags')}</span>
-            {/each}
-          </div>
-        {/if}
-        {#if selectedTagFilters.length > 0}
-          <div class="manager-v2-selected-tag-row" role="list" aria-label={text('FABRICATE.Admin.ManagerV2.Component.SelectedTags', 'Selected component tags')}>
-            {#each selectedTagFilters as tag}
-              <span class="manager-v2-chip manager-v2-selected-tag-pill" role="listitem" data-component-tag-pill={tag} oncontextmenu={(event) => removeTagFilterFromContext(event, tag)}>
-                <span>{tag}</span>
-                <button type="button" aria-label={text('FABRICATE.Admin.ManagerV2.Component.RemoveTagNamed', 'Remove tag {name}').replace('{name}', tag)} title={text('FABRICATE.Admin.ManagerV2.Component.RemoveTag', 'Remove tag')} onclick={() => removeTagFilter(tag)}>
-                  <i class="fas fa-times" aria-hidden="true"></i>
-                </button>
-              </span>
-            {/each}
-          </div>
-        {/if}
-      </div>
-    {/if}
-    {#if showComponentEssences && componentEssenceOptions.length > 0}
-      <label class="manager-v2-filter">
-        <span>{text('FABRICATE.Admin.ManagerV2.Component.Essences', 'Essences')}</span>
-        <select value={essenceFilter} onchange={(event) => setEssenceFilter(event.currentTarget.value)} aria-label={text('FABRICATE.Admin.ManagerV2.Component.EssenceFilterLabel', 'Filter components by essence')}>
-          <option value="all">{text('FABRICATE.Admin.ManagerV2.Component.EssenceAll', 'All essences')}</option>
-          {#each componentEssenceOptions as essence}
-            <option value={essence}>{essence}</option>
-          {/each}
-        </select>
+    <div class="manager-v2-toolbar-primary">
+      <label class="manager-v2-search">
+        <i class="fas fa-search" aria-hidden="true"></i>
+        <input
+          type="search"
+          value={itemSearchTerm || ''}
+          oninput={(event) => onSearchChange(event.currentTarget.value)}
+          placeholder={text('FABRICATE.Admin.ManagerV2.Component.SearchPlaceholder', 'Search components...')}
+          aria-label={text('FABRICATE.Admin.ManagerV2.Component.SearchLabel', 'Search components')}
+        />
       </label>
-    {/if}
-    <span class="manager-v2-chip">{text('FABRICATE.Admin.ManagerV2.SearchCount', '{shown} of {total}').replace('{shown}', filteredComponents.length).replace('{total}', totalComponentsCount)}</span>
-    {#if filtersActive}
-      <button type="button" class="manager-v2-button manager-v2-clear-filters" data-clear-filters="components" onclick={clearFilters}>
-        <i class="fas fa-times" aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.ManagerV2.ClearFilters', 'Clear filters')}</span>
-      </button>
+      {#if showComponentTags && componentTagOptions.length > 0}
+        <div class="manager-v2-tag-search" data-component-tag-search>
+          <label class="manager-v2-filter manager-v2-tag-search-label">
+            <span>{text('FABRICATE.Admin.ManagerV2.Component.Tags', 'Tags')}</span>
+            <input
+              type="search"
+              value={tagSearchTerm}
+              oninput={(event) => tagSearchTerm = event.currentTarget.value}
+              placeholder={text('FABRICATE.Admin.ManagerV2.Component.TagSearchPlaceholder', 'Search tags...')}
+              aria-label={text('FABRICATE.Admin.ManagerV2.Component.TagSearchLabel', 'Search component tags')}
+              aria-controls="manager-v2-component-tag-suggestions"
+            />
+          </label>
+          {#if normalizedTagSearchTerm.length > 0}
+            <div id="manager-v2-component-tag-suggestions" class="manager-v2-tag-suggestions" role="listbox" aria-label={text('FABRICATE.Admin.ManagerV2.Component.TagSuggestions', 'Matching component tags')}>
+              {#each tagSearchSuggestions as tag}
+                <button type="button" role="option" aria-selected="false" class="manager-v2-tag-suggestion" onclick={() => addTagFilter(tag)}>
+                  <i class="fas fa-tag" aria-hidden="true"></i>
+                  <span>{tag}</span>
+                </button>
+              {:else}
+                <span class="manager-v2-tag-no-matches">{text('FABRICATE.Admin.ManagerV2.Component.TagNoMatches', 'No matching tags')}</span>
+              {/each}
+            </div>
+          {/if}
+        </div>
+      {/if}
+      {#if showComponentEssences && componentEssenceOptions.length > 0}
+        <label class="manager-v2-filter">
+          <span>{text('FABRICATE.Admin.ManagerV2.Component.Essences', 'Essences')}</span>
+          <select value={essenceFilter} onchange={(event) => setEssenceFilter(event.currentTarget.value)} aria-label={text('FABRICATE.Admin.ManagerV2.Component.EssenceFilterLabel', 'Filter components by essence')}>
+            <option value="all">{text('FABRICATE.Admin.ManagerV2.Component.EssenceAll', 'All essences')}</option>
+            {#each componentEssenceOptions as essence}
+              <option value={essence}>{essence}</option>
+            {/each}
+          </select>
+        </label>
+      {/if}
+      <span class="manager-v2-chip">{text('FABRICATE.Admin.ManagerV2.SearchCount', '{shown} of {total}').replace('{shown}', filteredComponents.length).replace('{total}', totalComponentsCount)}</span>
+      {#if filtersActive}
+        <button type="button" class="manager-v2-button manager-v2-clear-filters" data-clear-filters="components" onclick={clearFilters}>
+          <i class="fas fa-times" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.ManagerV2.ClearFilters', 'Clear filters')}</span>
+        </button>
+      {/if}
+    </div>
+    {#if selectedTagFilters.length > 0}
+      <div class="manager-v2-toolbar-pills manager-v2-selected-tag-row" role="list" aria-label={text('FABRICATE.Admin.ManagerV2.Component.SelectedTags', 'Selected component tags')}>
+        {#each selectedTagFilters as tag}
+          <span class="manager-v2-chip manager-v2-selected-tag-pill" role="listitem" data-component-tag-pill={tag} oncontextmenu={(event) => removeTagFilterFromContext(event, tag)}>
+            <span>{tag}</span>
+            <button type="button" aria-label={text('FABRICATE.Admin.ManagerV2.Component.RemoveTagNamed', 'Remove tag {name}').replace('{name}', tag)} title={text('FABRICATE.Admin.ManagerV2.Component.RemoveTag', 'Remove tag')} onclick={() => removeTagFilter(tag)}>
+              <i class="fas fa-times" aria-hidden="true"></i>
+            </button>
+          </span>
+        {/each}
+      </div>
     {/if}
   </section>
 

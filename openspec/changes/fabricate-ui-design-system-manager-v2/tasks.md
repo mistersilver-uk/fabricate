@@ -624,6 +624,23 @@ Follow-up to the previous Smoke-Test Fixture Fix. The "delete ALL crafting syste
 - [x] Leave the user's existing `.foundry-e2e/data/Data/worlds/fabricate-smoke/` directory in place. It is theirs to keep or delete. The harness no longer reads from or writes to it.
 - [x] Do not delete or modify anything in `fabricate-smoke/` programmatically. If the user wants to clean it up, that is a manual choice.
 
+## Concrete Implementation Plan: Component Tag Search Layout
+
+This corrective slice stabilizes the manager-v2 component toolbar when multiple tag filters are selected. The tag input should remain a bounded primary toolbar control; selected tag pills should wrap independently below it.
+
+- [x] Keep component search, tag search input, essence filter, result count, and clear filters in a new `.manager-v2-toolbar-primary` row.
+- [x] Move selected tag pills out of `.manager-v2-tag-search` and into a sibling `.manager-v2-toolbar-pills` row.
+- [x] Keep tag suggestions anchored to `.manager-v2-tag-search` with absolute positioning.
+- [x] Preserve tag pill removal through both the remove button and right-click context menu.
+- [x] Update manager-v2 CSS so `.manager-v2-toolbar` is a grid container, primary controls flex-wrap independently, and the pill row wraps without resizing the tag input.
+- [x] Update focused mounted/layout contract tests for the separated toolbar/pill structure.
+- [x] Validate with the focused manager-v2 tests, `npm test`, and `npm run build`.
+
+### Component Tag Search Layout Scope Decisions
+
+- [x] This is layout-only; component filtering, tag suggestion matching, pagination reset, and clear-filter semantics stay unchanged.
+- [x] The toolbar may grow vertically after tag selection, but selected pills must not live inside the tag search control or change suggestion anchoring.
+
 ## Future Implementation Sequence
 
 - [ ] Add manager-v2 app wrapper and root component behind an explicit launch path or setting.

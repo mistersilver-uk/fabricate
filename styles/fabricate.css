@@ -4184,11 +4184,34 @@
 }
 
 .fabricate-manager-v2 .manager-v2-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.fabricate-manager-v2 .manager-v2-toolbar:not(:has(.manager-v2-toolbar-primary)) {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.fabricate-manager-v2 .manager-v2-toolbar-primary {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  background: rgba(255, 255, 255, 0.03);
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-toolbar-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+  width: 100%;
 }
 
 .fabricate-manager-v2 .manager-v2-search {
@@ -6834,7 +6857,8 @@
     border-bottom: 1px solid var(--fab-mv2-border);
   }
 
-  .fabricate-manager-v2 .manager-v2-toolbar,
+  .fabricate-manager-v2 .manager-v2-toolbar-primary,
+  .fabricate-manager-v2 .manager-v2-toolbar:not(:has(.manager-v2-toolbar-primary)),
   .fabricate-manager-v2 .manager-v2-header-actions,
   .fabricate-manager-v2 .manager-v2-action-group {
     justify-content: flex-start;

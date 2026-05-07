@@ -946,6 +946,13 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Glass Vial'));
     const containerPill = target.querySelector('[data-component-tag-pill="container"]');
     assert.ok(containerPill, 'selected tag should render as a removable pill');
+    const componentToolbar = target.querySelector('.manager-v2-toolbar');
+    const primaryToolbarRow = target.querySelector('.manager-v2-toolbar-primary');
+    const tagSearchControl = target.querySelector('[data-component-tag-search]');
+    const selectedTagRow = target.querySelector('.manager-v2-toolbar-pills');
+    assert.ok(primaryToolbarRow.contains(tagSearchControl), 'tag search control should stay in the primary toolbar row');
+    assert.equal(selectedTagRow?.parentElement, componentToolbar, 'selected tag pills should render in a toolbar sibling row');
+    assert.equal(tagSearchControl.contains(containerPill), false, 'selected tag pills should not live inside the tag search control');
 
     containerPill.querySelector('button').click();
     await tick();
