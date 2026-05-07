@@ -48,19 +48,20 @@ function main() {
     process.stderr.write('Warning: dist/ not found. Run npm run build first.\n');
   }
 
-  // Copy world fixture (writable — Foundry creates db files on launch)
-  const worldDest = join(DATA_DIR, 'worlds', 'fabricate-smoke');
-  const worldSrc = join(WORLDS_SRC, 'fabricate-smoke');
+  // Copy CI smoke world fixture. The runtime dir is wiped and recopied on
+  // every up so that smoke runs start pristine — no leftover settings db,
+  // actors, items, or crafting systems from a prior run can contaminate
+  // assertions. The user's other worlds at .foundry-e2e/data/Data/worlds/
+  // are not touched; only `fabricate-smoke-ci/` is automation-owned.
+  const worldDest = join(DATA_DIR, 'worlds', 'fabricate-smoke-ci');
+  const worldSrc = join(WORLDS_SRC, 'fabricate-smoke-ci');
   if (existsSync(worldSrc)) {
-    // Only copy world.json if dest doesn't exist (preserve Foundry-created db files)
-    if (!existsSync(worldDest)) {
-      cpSync(worldSrc, worldDest, { recursive: true });
-      process.stdout.write('Copied world: fabricate-smoke\n');
-    } else {
-      // Always update world.json in case it changed
-      cpSync(join(worldSrc, 'world.json'), join(worldDest, 'world.json'));
-      process.stdout.write('Updated world.json for fabricate-smoke\n');
+    if (existsSync(worldDest)) {
+      rmSync(worldDest, { recursive: true, force: true });
+      process.stdout.write('Wiped previous smoke world: fabricate-smoke-ci\n');
     }
+    cpSync(worldSrc, worldDest, { recursive: true });
+    process.stdout.write('Copied smoke world: fabricate-smoke-ci\n');
   }
 
   // Copy each downloaded game system

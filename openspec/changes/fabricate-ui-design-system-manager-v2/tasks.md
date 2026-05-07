@@ -606,6 +606,24 @@ The screenshot regen suite was failing at Phase D0 with "Manager V2 default sele
 - [x] `assertManagerV2LayoutStable` row check now covers every browser-row class in manager-v2; the editor-form check covers every `*-edit-*` view shell. Future routes must add their row class here.
 - [x] Do not introduce a runtime "default seed system on first open" behaviour. The leftover came from prior dev sessions, not from a runtime contract.
 
+## Concrete Implementation Plan: Smoke World Isolation
+
+Follow-up to the previous Smoke-Test Fixture Fix. The "delete ALL crafting systems at Phase B start" change in `d503d2a` was destructive of user dev state: the leftover system that broke the smoke run was the maintainer's own interactive dev work in the `fabricate-smoke` world. Going forward the smoke harness must never touch the user's dev world. This slice reverts the aggressive cleanup and isolates the smoke run into a dedicated, ephemeral world.
+
+- [x] Rename the smoke fixture from `.foundry-e2e/worlds/fabricate-smoke/` to `.foundry-e2e/worlds/fabricate-smoke-ci/` (via `git mv`). Update `world.json` `id` to `"fabricate-smoke-ci"` and set the title/description to clearly mark the world as auto-wiped CI-only.
+- [x] Update `scripts/foundry-setup-data.mjs` so the smoke world is wiped (`rmSync` recursive) and re-copied (`cpSync`) on every `test:foundry:up`. The user's other worlds at `.foundry-e2e/data/Data/worlds/` are not touched; only `fabricate-smoke-ci/` is automation-owned.
+- [x] Update `WORLD_ID` in `scripts/foundry-test-run.mjs` and `FOUNDRY_WORLD` in `docker-compose.foundry.yml` from `fabricate-smoke` to `fabricate-smoke-ci`. Update the harness header comment.
+- [x] Update `docs/contributing.md` to reference the new CI world id.
+- [x] Revert Phase B's "delete ALL systems" cleanup back to the original literal-name `s.name === 'Arcane Forge'` filter. The wipe-and-recreate in setup-data already guarantees an empty world; the literal-name filter is a belt-and-suspenders guard against a rare partial mid-run crash that left a renamed system around. The narrow filter cannot delete unrelated state if isolation ever regresses.
+- [x] Verify with `npm test` (2313/2313 pass) and `npm run build` (clean). End-to-end `npm run test:foundry` should pass and write to `fabricate-smoke-ci` without touching the user's `fabricate-smoke` directory.
+
+### Smoke World Isolation Scope Decisions
+
+- [x] Choose a `-ci` suffix because it reads as automation-only and is unlikely to be opened interactively by mistake. The world title also calls out "auto-wiped each run" so anyone who does open it knows it is throwaway.
+- [x] Keep the literal-name `Arcane Forge` filter in Phase B even though the wipe-and-recreate makes it almost always a no-op. It costs nothing and acts as a safety check if the wipe ever regresses.
+- [x] Leave the user's existing `.foundry-e2e/data/Data/worlds/fabricate-smoke/` directory in place. It is theirs to keep or delete. The harness no longer reads from or writes to it.
+- [x] Do not delete or modify anything in `fabricate-smoke/` programmatically. If the user wants to clean it up, that is a manual choice.
+
 ## Future Implementation Sequence
 
 - [ ] Add manager-v2 app wrapper and root component behind an explicit launch path or setting.

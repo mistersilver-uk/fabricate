@@ -39,7 +39,7 @@ services:
       FOUNDRY_ADMIN_KEY: "fabricate-test-admin"
       CONTAINER_PRESERVE_CONFIG: "true"
       CONTAINER_CACHE: "/data/container_cache"
-      FOUNDRY_WORLD: "fabricate-smoke"
+      FOUNDRY_WORLD: "fabricate-smoke-ci"
     volumes:
       # Full user data directory (assembled by foundry-setup-data.mjs)
       - ./.foundry-e2e/data:/data

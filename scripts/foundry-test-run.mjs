@@ -7,7 +7,7 @@
  *   1. Opens the Foundry setup page.
  *   2. Accepts the first-run license page if shown.
  *   3. Logs in as admin.
- *   4. Launches the fabricate-smoke world.
+ *   4. Launches the fabricate-smoke-ci world.
  *   5. Confirms the Fabricate module is active (game.modules check via console).
  *   6. Creates test actors and items with inventories.
  *   7. Creates a crafting system with components and recipes.
@@ -39,7 +39,7 @@ const RESULTS_DIR = join(ROOT, 'test-results');
 
 const FOUNDRY_URL = process.env.FOUNDRY_URL ?? 'http://localhost:30000';
 const ADMIN_KEY = process.env.FOUNDRY_ADMIN_KEY ?? 'fabricate-test-admin';
-const WORLD_ID = 'fabricate-smoke';
+const WORLD_ID = 'fabricate-smoke-ci';
 const JOIN_BUTTON_SELECTOR = 'button:has-text("Join Game Session"), button[name="join"]';
 const JOIN_USER_SELECT_SELECTOR = 'select[name="userid"]';
 const JOIN_USER_TILE_SELECTOR = '[data-user-id]';
@@ -1464,15 +1464,19 @@ async function main() {
     try {
       const createdDocs = await page.evaluate(async () => {
         // Clean up any stale test data from previous runs.
-        // Clean ALL crafting systems, not just Arcane Forge: previous runs may
-        // have renamed the system before crashing (so the name check misses
-        // them), and unrelated dev sessions can leave orphaned systems in the
-        // persisted world settings. The smoke harness owns the crafting state
-        // for the duration of the run, so a clean slate is correct.
+        // 1. Clean stale crafting systems and their recipes first.
+        //    Filter by literal "Arcane Forge" name so we never delete user
+        //    state. The CI world (`fabricate-smoke-ci`) is wiped and
+        //    recopied by setup-data on every up, so this should be a no-op
+        //    in normal runs; the filter is belt-and-suspenders defence
+        //    against a partial mid-run crash that left a renamed system
+        //    around — those are still recoverable by the literal-name
+        //    rename-back at the end of Phase D0.
         const csm = game.fabricate.getCraftingSystemManager();
         const rm = game.fabricate.getRecipeManager();
         const environmentStore = game.fabricate.getGatheringEnvironmentStore?.();
-        const staleSystems = csm.getSystems();
+        const allSystems = csm.getSystems();
+        const staleSystems = allSystems.filter(s => s.name === 'Arcane Forge');
         for (const sys of staleSystems) {
           console.log(`Cleaning stale crafting system: ${sys.name} (${sys.id})`);
           try { await environmentStore?.cleanupByCraftingSystem?.(sys.id); } catch { /* ok */ }

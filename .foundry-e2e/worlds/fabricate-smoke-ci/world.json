@@ -1,0 +1,17 @@
+{
+  "id": "fabricate-smoke-ci",
+  "title": "Fabricate CI Smoke Test World (auto-wiped each run)",
+  "description": "Ephemeral world fixture used by the Fabricate integration smoke test harness. The runtime data dir is wiped and recopied from this fixture on every test:foundry:up; do not use this world for interactive dev work.",
+  "system": "dnd5e",
+  "coreVersion": "13.351",
+  "systemVersion": "5.2.5",
+  "compatibility": {
+    "minimum": "13",
+    "verified": "13"
+  },
+  "background": "",
+  "nextSession": null,
+  "resetKeys": false,
+  "safeMode": false,
+  "joinTheme": "default"
+}

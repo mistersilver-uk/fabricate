@@ -114,7 +114,7 @@ After a run, results are written to `test-results/`:
 ### What the smoke test checks
 
 1. Navigates to the Foundry setup page and authenticates as admin.
-2. Launches the `fabricate-smoke` world.
+2. Launches the `fabricate-smoke-ci` world (auto-wiped from the fixture under `.foundry-e2e/worlds/fabricate-smoke-ci/` on every `test:foundry:up`).
 3. Waits for `game.ready` in the browser.
 4. Verifies the Fabricate module is active (`game.modules.get('fabricate')?.active === true`).
 5. Opens the Items sidebar and clicks the **Craft Item** button injected by Fabricate.
