@@ -28,7 +28,8 @@ const environmentComponentNames = [
 const sharedComponentNames = [
   'ImagePathPicker',
   'IconPicker',
-  'EssenceSourceSelector'
+  'EssenceSourceSelector',
+  'Pagination'
 ];
 
 let tempRoot;
@@ -50,7 +51,6 @@ function compileManagerV2Root() {
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EnvironmentsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EssenceBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EssenceEditView.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/Pagination.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/RecipesBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/SystemEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/SystemsBrowserView.svelte');

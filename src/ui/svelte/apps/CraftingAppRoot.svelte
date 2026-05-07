@@ -2,8 +2,8 @@
 <script>
   import { localize } from '../util/foundryBridge.js';
   import ActorCraftingHeader from './ActorCraftingHeader.svelte';
-  import CraftingTab from './CraftingTab.svelte';
-  import AlchemyTab from './AlchemyTab.svelte';
+  import CraftingView from './actor-app/CraftingView.svelte';
+  import AlchemyView from './actor-app/AlchemyView.svelte';
 
   let { store, services = null } = $props();
 
@@ -19,7 +19,7 @@
   const hasCraftingTab = store.hasCraftingTab;
 </script>
 
-<div class="fabricate-crafting-app">
+<div class="fabricate-crafting-app fabricate-actor-app">
   <ActorCraftingHeader
     availableActors={$viewState.availableActors}
     ownedActors={$viewState.ownedActors}
@@ -51,9 +51,9 @@
   {/if}
 
   {#if $hasAlchemyTab && ($activeTab === 'alchemy' || !$hasCraftingTab)}
-    <AlchemyTab {store} />
+    <AlchemyView {store} />
   {:else}
-    <CraftingTab {store} {services} />
+    <CraftingView {store} {services} />
   {/if}
 </div>
 
@@ -61,9 +61,9 @@
   .fabricate-tab-bar {
     display: flex;
     gap: 0;
-    padding: 0 12px;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.2);
-    background: rgba(0, 0, 0, 0.06);
+    padding: 0 var(--fab-space-3);
+    border-bottom: 1px solid var(--fab-border);
+    background: var(--fab-surface-soft);
   }
 
   .fabricate-tab {
@@ -73,22 +73,29 @@
     padding: 6px 12px;
     font-size: 13px;
     border-radius: 6px 6px 0 0;
-    border: 1px solid rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--fab-border);
     border-bottom: none;
     background: transparent;
-    opacity: 0.7;
+    color: var(--fab-text-muted);
+    opacity: 0.85;
     cursor: pointer;
   }
 
   .fabricate-tab:hover {
-    background: rgba(0, 0, 0, 0.08);
+    background: var(--fab-surface-raised);
+    color: var(--fab-text);
     opacity: 1;
   }
 
   .fabricate-tab.active {
-    background: var(--fabricate-primary);
-    color: #fff;
-    border-color: var(--fabricate-primary);
+    background: var(--fab-accent-soft);
+    color: var(--fab-accent);
+    border-color: var(--fab-accent);
     opacity: 1;
+  }
+
+  .fabricate-tab:focus-visible {
+    outline: 2px solid var(--fab-accent);
+    outline-offset: 2px;
   }
 </style>

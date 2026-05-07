@@ -1,85 +1,119 @@
-# Proposal: Rich Gathering Environments
+# Proposal: Rich Gathering Environments End To End
 
 ## Summary
 
-Expand Fabricate gathering from a thin environment/task wrapper into a richer fantasy-facing subsystem for places, resource nodes, environmental conditions, risk, and actor stamina. The new direction is informed by the Actor Gathering App reference at `openspec/changes/fabricate-ui-design-system-manager-v2/references/Actor Gathering App.png`.
+Complete rich gathering environments as an end-to-end feature. GMs author reusable gathering tasks and hazards, compose them into environment locations, set global gathering conditions such as weather and time, and expose a gathering-native player workflow that resolves attempts through d100 item drop rows and matched hazard drop-rate rolls while preserving existing routed/progressive gathering compatibility.
 
-This change now includes the staged production implementation slices for rich gathering runtime data, Manager V2 authoring, and the Player Gathering V2 app.
+The current codebase already contains a first rich-gathering slice: additive environment metadata, node/stamina/attempt evidence, Manager V2 environment editing, and the Player Gathering app shell. This change plans the remaining production work needed to make the feature cohesive, reusable, and shippable.
+
+No GitHub issue number was supplied for this planning pass.
 
 ## Motivation
 
-The current gathering model is intentionally narrow: an environment can be scene-gated and contains targeted or blind tasks, each task resolves through routed or progressive result logic. That is functional, but it still feels close to roll-table execution with a scene check.
+The existing gathering model supports environment-owned tasks and the current first rich slice adds place metadata and some economy evidence. It still leaves several gaps for actual GM use:
 
-The new design pushes gathering toward a more engaging game-world activity:
-
-- Environments are places players can browse and search, not merely scene links.
-- Regions and biomes make gathering feel grounded in the campaign world.
-- Resource nodes let GMs control availability, counts, depletion, and respawn.
-- Time of day and weather can modify yields and availability.
-- Risk levels and encounter tables let gathering carry tension.
-- Stamina-based gathering can replace or augment time/node respawn loops for groups that want faster expedition gameplay.
-- Blind environments can contain multiple hidden tasks and optionally reveal those tasks through play.
-- Public hooks, APIs, and chat output make gathering extensible for system and module developers.
+- Gathering tasks are embedded inside environments, so a GM cannot maintain a reusable task library and place the same forage, mine, scavenge, or harvest task in multiple environments.
+- Hazards are described only as failure or encounter-adjacent data, not reusable authored records that can be attached to environments or tasks.
+- Weather and time are environment-local fields, while the requested workflow needs global gathering conditions that can be inherited by many environments and overridden where needed.
+- Resolution still behaves like generic routed/progressive crafting resolution. The requested gathering experience needs a d100-native outcome model with ordered item drop rows, item selection modes, matched hazard rolls, hazard policies, and empty-handed outcomes.
+- Player attempts are rejected when the game is paused, but the Player Gathering app needs a clear paused-game blocker before the player reaches an attempt failure.
+- Manager V2 needs complete Environments, Tasks, and Settings surfaces for authoring and operating the feature.
+- The player app needs to display environment conditions, reusable task evidence, hazards, d100 drop evidence, blockers, active attempts, and logs without leaking hidden blind-task data.
 
 ## Goals
 
-- Define rich `GatheringEnvironment` extensions for region, biome, imagery, risk, optional scene linkage, time of day, weather, and player-facing search/filter metadata.
-- Define resource-node semantics for gathering tasks: node counts, availability, depletion, respawn policies, manual GM restock, and probabilistic world-time restock.
-- Define condition modifiers for time of day and weather that can alter task availability, yield, risk, stamina cost, or difficulty without hardcoding a game system.
-- Define encounter/risk hooks for gathering attempts without turning Fabricate into a full travel simulator.
-- Define optional stamina-based gathering as a system-level gathering economy that can be used instead of, or alongside, world-time task duration and node respawn.
-- Define natural dnd5e/pf2e expression support and macro alternatives for checks, modifiers, stamina, and recharge rules.
-- Define manual-only and automatic stamina regeneration modes plus GM controls for manually setting gathering stamina.
-- Define blind environment support for multiple hidden tasks and progressive task reveal.
-- Define task attempt limits with time windows, probabilistic recharge, manual recharge, or hybrid recharge.
-- Define rich developer hooks, programming interfaces, and chat message output for gathering attempts.
-- Define GM app surfaces for authoring and controlling environments, regions, nodes, weather/time, risk, encounters, and manual restock.
-- Define Actor Gathering app surfaces for browsing environments, selecting tasks, viewing stamina, seeing risk/conditions, starting attempts, and reviewing logs.
-- Preserve the existing gathering lifecycle until this change is implemented; current fields remain backward-compatible inputs.
+- Add a reusable GM-authored gathering task library scoped to a crafting system.
+- Add a reusable GM-authored gathering hazard library scoped to a crafting system.
+- Allow environments to compose reusable task definitions with per-environment overrides for availability, conditions, hazard weights, node counts, stamina, attempt limits, and result tuning.
+- Define global gathering conditions for weather and time, with environment override/inheritance semantics.
+- Add a gathering-native d100 resolution mode that does not require GMs to model gathering outcomes as generic routed result-group names.
+- Preserve legacy routed/progressive gathering tasks and the existing immediate/timed lifecycle.
+- Surface a player-safe paused-game blocker in listing state and the Player Gathering app.
+- Promote Manager V2 feature routes for Environments, Tasks, and Gathering Settings with feature-gated navigation, route normalization, breadcrumbs, focused components, localization, CSS, and tests.
+- Display rich environment/task/hazard/condition evidence in the Player Gathering app with blind redaction.
+- Define screenshot acceptance criteria before implementation.
+- Keep the implementation system-agnostic and Foundry V13-compatible.
 
 ## Non-Goals
 
-- Do not introduce a standalone harvesting subsystem. Harvesting remains recipe or salvage data.
-- Do not add hardcoded dnd5e, pf2e, or other system-specific stamina formulas in core.
-- Do not require environments to be linked to Foundry scenes.
-- Do not implement hex maps, travel pathfinding, random overland navigation, or campaign calendar replacement.
-- Do not expose hidden blind-task details to non-GM users.
-- Do not make encounter generation mandatory for gathering.
-- Do not make automatic stamina regeneration mandatory.
-- Do not require blind environments to reveal tasks; progressive reveal is optional.
+- Do not add standalone harvesting. Harvesting remains recipe or salvage data.
+- Do not build travel maps, hex crawls, pathfinding, or a calendar/weather simulation engine.
+- Do not hardcode dnd5e, pf2e, or other system-specific formulas in Fabricate core.
+- Do not replace existing routed/progressive gathering resolution.
+- Do not require environments to be linked to scenes.
+- Do not expose hidden blind-task names, results, hazards, or provider diagnostics to non-GM users.
+- Do not add npm dependencies unless a later implementation plan revision explains the need.
 
 ## Scope
 
-In scope:
+In scope for implementation planning:
 
-- `openspec/changes/rich-gathering-environments/`
-- Gathering domain deltas for environment metadata, nodes, respawn, conditions, risk, encounters, and stamina.
-- UI deltas for GM gathering environment management and the Actor Gathering app.
-- Implementation planning and validation criteria for a future feature slice.
+- OpenSpec change docs under `openspec/changes/rich-gathering-environments/`.
+- Canonical spec updates during the docs/domain loop after implementation.
+- Gathering domain model extensions under future `src/systems/` work.
+- Manager V2 Environments, Tasks, and Gathering Settings routes.
+- Player Gathering app display and blocker behavior.
+- Localization and style updates required by those UI changes.
+- Unit, store, mounted/component, build, and screenshot validation.
 
-Out of scope:
+Out of scope for this planning pass:
 
-- Data migrations.
-- Foundry compatibility metadata changes.
+- Production code edits.
+- Runtime documentation edits.
+- Data migrations that rewrite existing saved environments eagerly.
+- Compatibility metadata changes unless implementation introduces new Foundry API requirements.
+
+## Existing Baseline
+
+The repo currently has:
+
+- `GatheringEnvironmentStore` normalization and validation for rich environment fields, node config, attempt limits, blind selection, reveal config, encounter config, chat settings, risk, economy mode, and conditions.
+- `GatheringRichStateService` for actor stamina state, node restock, environment condition updates, blind reveal state, and rich attempt evidence.
+- `GatheringEngine` listing/start flow with pause, scene/token, visibility, catalyst, rich node/stamina/attempt blockers, immediate/timed resolution, and blind redaction.
+- Manager V2 environment browser/edit views.
+- Player Gathering app search/filter/detail/log shell with stamina and condition evidence.
+
+This plan treats those as a first slice, not as complete end-to-end delivery.
 
 ## Affected Future Surfaces
 
-Future implementation is expected to touch:
+Expected production implementation surfaces:
 
-- `openspec/specs/gathering-and-harvesting/spec.md`
-- `openspec/specs/ui-integration/spec.md`
-- `src/systems/` gathering runtime and stores
-- `src/ui/svelte/apps/manager-v2/` environment browse/edit views
-- `src/ui/svelte/apps/` Actor Gathering app components
-- `src/ui/svelte/stores/` gathering and admin store derivations
-- `lang/en.json`
+- `src/systems/GatheringEnvironmentStore.js`
+- `src/systems/GatheringEngine.js`
+- `src/systems/GatheringRichStateService.js`
+- new or focused `src/systems/` modules for task library, hazard library, condition state, and d100 resolution
+- `src/gatheringBootstrapAdapters.js`
+- `src/main.js`
+- `src/ui/SvelteCraftingSystemManagerV2App.svelte.js`
+- `src/ui/SvelteGatheringApp.svelte.js`
+- `src/ui/svelte/apps/manager-v2/`
+- `src/ui/svelte/apps/GatheringAppRoot.svelte`
+- `src/ui/svelte/stores/adminStore.js`
+- `src/ui/svelte/stores/gatheringStore.js`
 - `styles/fabricate.css`
-- unit, mounted, and Foundry screenshot tests
+- `lang/en.json`
+- focused tests under `tests/`
+
+## Resolved Agent Roster
+
+Routing table results for this change:
+
+- Planning: `fabricate_orchestrator`
+- Plan review: `fabricate_domain_expert`, `fabricate_ux_designer`, `fabricate_quality_engineer`
+- Implementation: `fabricate_implementer`
+- Post-implementation review: `fabricate_reviewer`, `fabricate_ux_designer`, `fabricate_quality_engineer`
+- Documentation loop: `fabricate_domain_expert`, `fabricate_docs_writer`
+
+The `javascript-structural-design` skill is required because implementation will introduce or reshape JavaScript module boundaries for reusable task/hazard libraries, global condition state, d100 resolution, and runtime collaborator wiring.
 
 ## Acceptance Criteria
 
-- The delta spec defines the new domain concepts without ambiguity about what is optional, what is system-owned, and what is runtime-owned.
-- The GM app requirements explain how GMs author regions, conditions, nodes, respawn, risk, encounter tables, and stamina mode.
-- The Actor Gathering app requirements explain how players browse environments and tasks while respecting visibility, risk, stamina, node availability, and hidden blind-task rules.
-- The delta includes developer-facing hooks/APIs and chat message requirements for gathering attempts.
-- The design preserves existing gathering behavior for legacy environments until migration or defaults are explicitly implemented.
+- GMs can create reusable gathering tasks and hazards, then attach them to multiple environments with per-environment overrides.
+- Global weather/time conditions affect listing and attempts according to configured inheritance/override rules.
+- d100 gathering resolution supports ordered item drop rows, `highestRankedDrop` and `allDrops` selection, matched hazard rolls, success-with-hazard and failure-with-hazard policies, empty-handed outcomes, and player-safe result summaries.
+- Player listing and start actions show a paused-game blocker without committing any start side effects.
+- Manager V2 exposes Environments, Tasks, and Gathering Settings routes as real feature-gated routes.
+- The Player Gathering app shows rich environment/task/hazard/condition evidence and logs while preserving blind redaction.
+- Existing routed/progressive gathering environments still load and resolve.
+- Unit, mounted/component, build, and screenshot gates pass before implementation review.

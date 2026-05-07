@@ -16,10 +16,12 @@
 
   const visibleEnvironments = $derived(($viewState.filteredEnvironments || []).filter(environment => {
     const query = searchTerm.trim().toLowerCase();
-    const matchesSearch = !query || `${environment.name || ''} ${environment.description || ''} ${environment.craftingSystemName || ''} ${environment.region || ''} ${environment.biome || ''}`.toLowerCase().includes(query);
-    const matchesRisk = riskFilter === 'all' || (environment.risk || 'safe') === riskFilter;
+    const biomes = environmentBiomes(environment);
+    const dangerTags = environmentDangerTags(environment);
+    const matchesSearch = !query || `${environment.name || ''} ${environment.description || ''} ${environment.craftingSystemName || ''} ${environment.region || ''} ${biomes.join(' ')}`.toLowerCase().includes(query);
+    const matchesRisk = riskFilter === 'all' || dangerTags.includes(riskFilter);
     const matchesRegion = regionFilter === 'all' || (environment.region || '') === regionFilter;
-    const matchesBiome = biomeFilter === 'all' || (environment.biome || '') === biomeFilter;
+    const matchesBiome = biomeFilter === 'all' || biomes.includes(biomeFilter);
     return matchesSearch && matchesRisk && matchesRegion && matchesBiome;
   }));
   const environmentPageCount = $derived(Math.max(1, Math.ceil(visibleEnvironments.length / environmentPageSize)));
@@ -32,7 +34,8 @@
       || null
   );
   const regionOptions = $derived(uniqueSorted(($viewState.systemFilteredEnvironments || $viewState.filteredEnvironments || []).map(environment => environment.region)));
-  const biomeOptions = $derived(uniqueSorted(($viewState.systemFilteredEnvironments || $viewState.filteredEnvironments || []).map(environment => environment.biome)));
+  const biomeOptions = $derived(uniqueSorted(($viewState.systemFilteredEnvironments || $viewState.filteredEnvironments || []).flatMap(environment => environmentBiomes(environment))));
+  const riskOptions = $derived(uniqueSorted(($viewState.systemFilteredEnvironments || $viewState.filteredEnvironments || []).flatMap(environment => environmentDangerTags(environment))));
   const potentialResults = $derived(resultPreviews(activeTask));
 
   onMount(() => {
@@ -102,7 +105,20 @@
   }
 
   function riskLabel(risk) {
-    return localize(`FABRICATE.Gathering.Risk.${risk || 'safe'}`);
+    const tag = risk || 'safe';
+    const key = `FABRICATE.Gathering.Risk.${tag}`;
+    const value = localize(key);
+    return value === key ? tag : value;
+  }
+
+  function environmentBiomes(environment) {
+    const values = Array.isArray(environment?.biomes) ? environment.biomes : (environment?.biome ? [environment.biome] : []);
+    return uniqueSorted(values);
+  }
+
+  function environmentDangerTags(environment) {
+    const values = Array.isArray(environment?.dangerTags) ? environment.dangerTags : (environment?.risk ? [environment.risk] : ['safe']);
+    return uniqueSorted(values.length ? values : ['safe']);
   }
 
   function activeRunTime(run) {
@@ -346,10 +362,7 @@
           </label>
           <select bind:value={riskFilter} aria-label={localize('FABRICATE.Gathering.RiskFilter')}>
             <option value="all">{localize('FABRICATE.Gathering.AllRisks')}</option>
-            <option value="safe">{localize('FABRICATE.Gathering.Risk.safe')}</option>
-            <option value="hazardous">{localize('FABRICATE.Gathering.Risk.hazardous')}</option>
-            <option value="unsafe">{localize('FABRICATE.Gathering.Risk.unsafe')}</option>
-            <option value="extreme">{localize('FABRICATE.Gathering.Risk.extreme')}</option>
+            {#each riskOptions as risk (risk)}<option value={risk}>{riskLabel(risk)}</option>{/each}
           </select>
           <select value={$viewState.availabilityFilter} aria-label={localize('FABRICATE.Gathering.AvailabilityFilter')} onchange={(event) => store.setAvailabilityFilter(event.target.value)}>
             <option value="all">{localize('FABRICATE.Gathering.Availability.All')}</option>
@@ -396,8 +409,8 @@
                 <strong>{environment.name}</strong>
                 <span>{environment.region || environment.craftingSystemName || localize('FABRICATE.Gathering.NoRegion')}</span>
                 <span class="gathering-chip-row">
-                  {#if environment.biome}<span class="gathering-chip">{environment.biome}</span>{/if}
-                  <span class={`gathering-chip is-risk-${environment.risk || 'safe'}`}>{riskLabel(environment.risk)}</span>
+                  {#each environmentBiomes(environment) as biome (biome)}<span class="gathering-chip">{biome}</span>{/each}
+                  {#each environmentDangerTags(environment) as risk (risk)}<span class={`gathering-chip is-risk-${risk}`}>{riskLabel(risk)}</span>{/each}
                 </span>
               </span>
               <span class="gathering-v2-row-status">{environmentAvailability(environment)}</span>
@@ -428,7 +441,7 @@
               <h3>{activeEnvironment.name}</h3>
               <span>{localize('FABRICATE.Gathering.GatheringTasks')}</span>
             </div>
-            <span class={`gathering-chip is-risk-${activeEnvironment.risk || 'safe'}`}>{riskLabel(activeEnvironment.risk)}</span>
+            {#each environmentDangerTags(activeEnvironment) as risk (risk)}<span class={`gathering-chip is-risk-${risk}`}>{riskLabel(risk)}</span>{/each}
           </div>
 
           {#if activeEnvironment.blockedReasons?.length}
@@ -496,16 +509,16 @@
             <div>
               <h3>{activeEnvironment.name}</h3>
               <span>{activeEnvironment.region || localize('FABRICATE.Gathering.NoRegion')}</span>
-              <span class={`gathering-chip is-risk-${activeEnvironment.risk || 'safe'}`}>{riskLabel(activeEnvironment.risk)}</span>
+              {#each environmentDangerTags(activeEnvironment) as risk (risk)}<span class={`gathering-chip is-risk-${risk}`}>{riskLabel(risk)}</span>{/each}
             </div>
           </section>
 
           {#if activeEnvironment.description}<p class="gathering-v2-description">{activeEnvironment.description}</p>{/if}
 
           <section class="gathering-v2-facts" aria-label={localize('FABRICATE.Gathering.EnvironmentFacts')}>
-            {#if activeEnvironment.biome}
-              <div><i class="fas fa-seedling" aria-hidden="true"></i><span>{localize('FABRICATE.Gathering.Biome')}</span><strong>{activeEnvironment.biome}</strong></div>
-            {/if}
+            {#each environmentBiomes(activeEnvironment) as biome (biome)}
+              <div><i class="fas fa-seedling" aria-hidden="true"></i><span>{localize('FABRICATE.Gathering.Biome')}</span><strong>{biome}</strong></div>
+            {/each}
             {#each conditionFacts(activeEnvironment) as fact (fact.label)}
               <div><i class={`fas ${fact.icon}`} aria-hidden="true"></i><span>{fact.label}</span><strong>{fact.value}</strong></div>
             {/each}

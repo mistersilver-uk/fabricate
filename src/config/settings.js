@@ -4,6 +4,7 @@ export const SETTING_KEYS = Object.freeze({
   RECIPES: 'recipes',
   CRAFTING_SYSTEMS: 'craftingSystems',
   GATHERING_ENVIRONMENTS: 'gatheringEnvironments',
+  GATHERING_CONFIG: 'gatheringConfig',
   ENABLED: 'enabled',
   SHOW_SIMPLE_RECIPES_ONLY: 'showSimpleRecipesOnly',
   AUTO_CRAFT: 'autoCraft',
@@ -39,6 +40,13 @@ const BASE_DEFINITIONS = Object.freeze({
     config: false,
     type: Array,
     default: []
+  },
+  [SETTING_KEYS.GATHERING_CONFIG]: {
+    name: 'Gathering Configuration',
+    scope: 'world',
+    config: false,
+    type: Object,
+    default: {}
   },
   [SETTING_KEYS.ENABLED]: {
     name: 'FABRICATE.Settings.Enabled.Name',

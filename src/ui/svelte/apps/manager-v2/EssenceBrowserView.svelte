@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
-  import Pagination from './Pagination.svelte';
+  import Pagination from '../../components/Pagination.svelte';
 
   let {
     essenceCards = [],

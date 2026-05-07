@@ -4,7 +4,7 @@ import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 
 // --- Active Runs Column Structure ---
 
-describe('RunSummary: Active Runs Column Structure', () => {
+describe('RunBands: Active Runs Column Structure', () => {
   before(() => setupDOM());
   after(() => teardownDOM());
 
@@ -100,7 +100,7 @@ describe('RunSummary: Active Runs Column Structure', () => {
 
 // --- History Runs Column Structure ---
 
-describe('RunSummary: History Runs Column Structure', () => {
+describe('RunBands: History Runs Column Structure', () => {
   before(() => setupDOM());
   after(() => teardownDOM());
 
@@ -159,7 +159,7 @@ describe('RunSummary: History Runs Column Structure', () => {
 
 // --- Empty States ---
 
-describe('RunSummary: Empty States', () => {
+describe('RunBands: Empty States', () => {
   before(() => setupDOM());
   after(() => teardownDOM());
 
@@ -184,7 +184,7 @@ describe('RunSummary: Empty States', () => {
 
 // --- Action Button Callbacks ---
 
-describe('RunSummary: Action Button Callbacks', () => {
+describe('RunBands: Action Button Callbacks', () => {
   before(() => setupDOM());
   after(() => teardownDOM());
 
@@ -246,12 +246,12 @@ describe('RunSummary: Action Button Callbacks', () => {
 
 // --- Duplicate-key guard (T-168) ---
 
-describe('RunSummary: Duplicate-key guard — composite key strategy', () => {
+describe('RunBands: Duplicate-key guard — composite key strategy', () => {
   before(() => setupDOM());
   after(() => teardownDOM());
 
   /**
-   * Simulate the keying logic that RunSummary.svelte applies when rendering
+   * Simulate the keying logic that RunBands.svelte applies when rendering
    * {#each activeRuns as run (`active-${run.id}`)}.
    * With composite keys a duplicate run.id within activeRuns would still
    * produce a unique key (same id appears twice but the prefix+id is unique

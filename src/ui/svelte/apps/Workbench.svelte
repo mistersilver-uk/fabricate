@@ -22,113 +22,249 @@
 
 <div
   class="fabricate-workbench"
-  style="border-top: 1px solid rgba(0, 0, 0, 0.15); padding: 8px; background: rgba(0, 0, 0, 0.06);"
   use:dragDrop={{ onDrop: handleDrop, activeClass: 'workbench-drop-active' }}
 >
-  <!-- Header row -->
-  <div class="workbench-header">
-    <span
-      class="workbench-title"
-      style="text-transform: uppercase; font-size: 12px; font-weight: 700; opacity: 0.7;"
-    >
-      {localize('FABRICATE.Workbench.Title')}
-    </span>
-
-    <div class="workbench-actions">
-      {#if !isEmpty}
-        <button
-          type="button"
-          class="workbench-clear-btn"
-          aria-label={localize('FABRICATE.Workbench.Clear')}
-          onclick={() => onClearWorkbench?.()}
-        >
-          <i class="fas fa-trash"></i>
-        </button>
-      {/if}
-
-      <button
-        type="button"
-        class="workbench-submit-btn"
-        disabled={isEmpty}
-        onclick={() => { if (!isEmpty) onSubmitWorkbench?.(); }}
-      >
-        {localize('FABRICATE.Workbench.Submit')}
-      </button>
-    </div>
+  <!-- Drop area -->
+  <div class="workbench-drop-area" class:workbench-drop-area--filled={!isEmpty}>
+    {#if isEmpty}
+      <div class="workbench-empty">
+        <i class="fas fa-flask" aria-hidden="true"></i>
+        <p>{localize('FABRICATE.Workbench.EmptyHint')}</p>
+      </div>
+    {:else}
+      <div class="workbench-chips">
+        {#each entries as entry (entry.componentId)}
+          <div
+            class="workbench-chip"
+            data-component-id={entry.componentId}
+            aria-label="{entry.name} x{entry.quantity}"
+            onclick={() => onAddToWorkbench?.(entry.componentId)}
+            oncontextmenu={(event) => { event.preventDefault(); onRemoveFromWorkbench?.(entry.componentId); }}
+            onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRemoveFromWorkbench?.(entry.componentId); } }}
+            role="button"
+            tabindex="0"
+          >
+            {#if entry.img}
+              <img
+                src={entry.img}
+                alt=""
+                width="20"
+                height="20"
+              />
+            {/if}
+            <span class="chip-label">{entry.name}</span>
+            <span class="chip-quantity">x{entry.quantity}</span>
+            <button
+              type="button"
+              class="chip-remove"
+              aria-label={localize('FABRICATE.Workbench.RemoveEntry').replace('{name}', entry.name)}
+              onclick={(event) => { event.stopPropagation(); onRemoveFromWorkbench?.(entry.componentId); }}
+            >
+              <i class="fas fa-times" aria-hidden="true"></i>
+            </button>
+          </div>
+        {/each}
+      </div>
+    {/if}
   </div>
 
-  <!-- Body -->
-  {#if isEmpty}
-    <p
-      class="workbench-empty"
-      style="font-style: italic; font-size: 12px; opacity: 0.5; padding: 16px 0; text-align: center;"
+  <!-- Action bar -->
+  <div class="workbench-actions">
+    <button
+      type="button"
+      class="workbench-attempt-btn"
+      disabled={isEmpty}
+      onclick={() => { if (!isEmpty) onSubmitWorkbench?.(); }}
     >
-      {localize('FABRICATE.Workbench.EmptyHint')}
-    </p>
-  {:else}
-    <div
-      class="workbench-chips"
-      style="display: flex; flex-wrap: wrap; gap: 4px;"
-    >
-      {#each entries as entry (entry.componentId)}
-        <div
-          class="workbench-chip"
-          data-component-id={entry.componentId}
-          aria-label="{entry.name} x{entry.quantity}"
-          style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 4px; background: rgba(0, 0, 0, 0.1); border: 1px solid rgba(0, 0, 0, 0.15); font-size: 12px; cursor: pointer;"
-          onclick={() => onAddToWorkbench?.(entry.componentId)}
-          oncontextmenu={(event) => { event.preventDefault(); onRemoveFromWorkbench?.(entry.componentId); }}
-          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRemoveFromWorkbench?.(entry.componentId); } }}
-          role="button"
-          tabindex="0"
-        >
-          {#if entry.img}
-            <img
-              src={entry.img}
-              alt={entry.name}
-              width="20"
-              height="20"
-            />
-          {/if}
-          <span class="chip-label">{entry.name} x{entry.quantity}</span>
-        </div>
-      {/each}
-    </div>
-  {/if}
+      <i class="fas fa-flask" aria-hidden="true"></i>
+      {localize('FABRICATE.ActorApp.Alchemy.AttemptAlchemy')}
+    </button>
+    {#if !isEmpty}
+      <button
+        type="button"
+        class="workbench-clear-btn"
+        aria-label={localize('FABRICATE.Workbench.Clear')}
+        onclick={() => onClearWorkbench?.()}
+      >
+        <i class="fas fa-trash" aria-hidden="true"></i>
+      </button>
+    {/if}
+  </div>
 </div>
 
 <style>
-  .workbench-header {
+  .fabricate-workbench {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
+    flex: 1;
+    min-height: 0;
+  }
+
+  .workbench-drop-area {
+    flex: 1;
+    min-height: 200px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    margin-bottom: 8px;
+    justify-content: center;
+    border: 2px dashed var(--fab-border);
+    border-radius: var(--fab-v2-radius-panel);
+    padding: var(--fab-space-3);
+    background: var(--fab-surface-soft);
+  }
+
+  .workbench-drop-area--filled {
+    align-items: stretch;
+    justify-content: stretch;
+    border-style: solid;
+  }
+
+  .workbench-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--fab-space-2);
+    color: var(--fab-text-subtle);
+    text-align: center;
+  }
+
+  .workbench-empty i {
+    font-size: 28px;
+    opacity: 0.5;
+  }
+
+  .workbench-empty p {
+    margin: 0;
+    font-size: 13px;
+  }
+
+  .workbench-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--fab-space-1);
+    align-content: flex-start;
+  }
+
+  .workbench-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--fab-space-1);
+    padding: 4px 4px 4px 8px;
+    border-radius: var(--fab-v2-radius-control);
+    background: var(--fab-surface-raised);
+    border: 1px solid var(--fab-border);
+    color: var(--fab-text);
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .workbench-chip:hover,
+  .workbench-chip:focus-visible {
+    background: var(--fab-accent-soft);
+    border-color: var(--fab-accent);
+  }
+
+  .workbench-chip img {
+    border-radius: 3px;
+    object-fit: contain;
+  }
+
+  .chip-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 120px;
+  }
+
+  .chip-quantity {
+    font-variant-numeric: tabular-nums;
+    color: var(--fab-text-muted);
+    font-weight: 600;
+  }
+
+  .chip-remove {
+    appearance: none;
+    -webkit-appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--fab-text-subtle);
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 3px;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .chip-remove:hover,
+  .chip-remove:focus-visible {
+    color: var(--fab-danger);
+    background: var(--fab-danger-soft);
   }
 
   .workbench-actions {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--fab-space-2);
   }
 
-  .workbench-submit-btn {
-    background: var(--fabricate-primary, #4a90e2);
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    padding: 6px 16px;
-    font-size: 13px;
+  .workbench-attempt-btn {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--fab-space-1);
+    background: var(--fab-accent);
+    color: #051e0c;
+    border: 1px solid var(--fab-accent-strong);
+    border-radius: var(--fab-v2-radius-control);
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 700;
     cursor: pointer;
   }
 
-  .workbench-submit-btn:disabled {
-    opacity: 0.4;
-    cursor: default;
+  .workbench-attempt-btn:hover:not(:disabled) {
+    background: var(--fab-accent-hover);
   }
 
-  :global(.fabricate-workbench.workbench-drop-active) {
-    background: rgba(74, 144, 226, 0.12) !important;
-    outline: 2px dashed var(--fabricate-primary, #4a90e2);
-    outline-offset: -2px;
+  .workbench-attempt-btn:focus-visible {
+    outline: 2px solid var(--fab-accent);
+    outline-offset: 2px;
+  }
+
+  .workbench-attempt-btn:disabled {
+    background: var(--fab-surface-raised);
+    color: var(--fab-text-subtle);
+    border-color: var(--fab-border);
+    cursor: not-allowed;
+  }
+
+  .workbench-clear-btn {
+    appearance: none;
+    -webkit-appearance: none;
+    border: 1px solid var(--fab-border);
+    background: transparent;
+    color: var(--fab-text-muted);
+    width: var(--fab-v2-icon-button);
+    height: var(--fab-v2-icon-button);
+    border-radius: var(--fab-v2-radius-control);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .workbench-clear-btn:hover,
+  .workbench-clear-btn:focus-visible {
+    color: var(--fab-danger);
+    border-color: var(--fab-danger);
+  }
+
+  :global(.fabricate-workbench.workbench-drop-active .workbench-drop-area) {
+    background: var(--fab-accent-soft) !important;
+    border-color: var(--fab-accent) !important;
   }
 </style>

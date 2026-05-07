@@ -505,7 +505,7 @@
     opacity: 0.72;
   }
 
-  @media (max-width: 620px) {
+  @container actor-app (max-width: 620px) {
     .actor-crafting-header {
       align-items: stretch;
       flex-direction: column;

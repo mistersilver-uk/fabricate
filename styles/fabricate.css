@@ -87,6 +87,15 @@
   padding: 0;
 }
 
+/* Fabricate Actor App V2 design-system scope.
+   Establishes the named `actor-app` container so child components can use
+   container queries (e.g. `@container actor-app (max-width: 620px)`) to
+   respond to the application size rather than the viewport. */
+.fabricate-actor-app {
+  container-type: inline-size;
+  container-name: actor-app;
+}
+
 .run-summary-section {
   padding: 10px 12px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.12);
@@ -4029,6 +4038,8 @@
   color: #f7d77b;
 }
 
+.gathering-chip.is-risk-dangerous,
+.gathering-chip.is-risk-deadly,
 .gathering-chip.is-risk-unsafe,
 .gathering-chip.is-risk-extreme {
   background: rgba(255, 82, 82, 0.2);

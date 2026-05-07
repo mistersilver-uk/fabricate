@@ -36,7 +36,7 @@ import {
   getRecipeEditorAppClass
 } from './ui/appFactory.js';
 import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from './ui/itemsDirectoryButtons.js';
-import { registerFabricateSettings, getSetting, setSetting } from './config/settings.js';
+import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS } from './config/settings.js';
 import { MigrationRunner } from './migration/MigrationRunner.js';
 import { ItemPilesIntegration } from './integrations/ItemPilesIntegration.js';
 import { cleanupStalePreferences, isGatheringActorSelectableByUser } from './config/preferencesCleanup.js';
@@ -453,6 +453,9 @@ class Fabricate {
     this.gatheringEnvironmentStore.load();
     this.gatheringRichStateService = new GatheringRichStateService({
       environmentStore: this.gatheringEnvironmentStore,
+      getSetting,
+      setSetting,
+      settingKey: SETTING_KEYS.GATHERING_CONFIG,
       nowWorldTime: () => Number(game.time?.worldTime || 0),
       getUserId: () => game.user?.id || null,
       hooks: Hooks
@@ -651,6 +654,29 @@ class Fabricate {
     return this.gatheringRichStateService?.updateConditions(options);
   }
 
+  getGatheringConditions() {
+    this._requireReady();
+    return this.gatheringRichStateService?.getConditions();
+  }
+
+  setGatheringWeather(weatherTag) {
+    this._requireReady();
+    this._requireGM();
+    return this.gatheringRichStateService?.setWeather(weatherTag);
+  }
+
+  setGatheringTimeOfDay(timeOfDayTag) {
+    this._requireReady();
+    this._requireGM();
+    return this.gatheringRichStateService?.setTimeOfDay(timeOfDayTag);
+  }
+
+  setGatheringConditions(conditions = {}) {
+    this._requireReady();
+    this._requireGM();
+    return this.gatheringRichStateService?.setConditions(conditions);
+  }
+
   setGatheringStamina(options = {}) {
     this._requireReady();
     this._requireGM();
@@ -739,6 +765,12 @@ Hooks.once('init', async () => {
 
   // Make API available globally
   game.fabricate = fabricate;
+  game.fabricate.gathering = {
+    getConditions: () => fabricate.getGatheringConditions(),
+    setWeather: (weatherTag) => fabricate.setGatheringWeather(weatherTag),
+    setTimeOfDay: (timeOfDayTag) => fabricate.setGatheringTimeOfDay(timeOfDayTag),
+    setConditions: (conditions) => fabricate.setGatheringConditions(conditions)
+  };
 
   // Expose classes for advanced users
   game.fabricate.api = {

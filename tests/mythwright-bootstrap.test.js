@@ -104,8 +104,8 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
       }
     );
 
-    assert.equal(component.sourceUuid, null);
-    assert.equal(component.sourceItemUuid, null);
+    assert.equal(component.sourceUuid, 'Item.world-fine-longsword');
+    assert.equal(component.sourceItemUuid, 'Item.world-fine-longsword');
     assert.deepEqual(component.fallbackItemIds, []);
     assert.equal(component.mythwrightBaseSourceId, 'Compendium.dnd5e.items.longsword');
   });
@@ -244,6 +244,61 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     assert.ok(result.unresolved.includes('Dagger'));
   });
 
+  it('pins Mythwright SRD equipment to the DnD5e 2024 Equipment compendium UUIDs', () => {
+    const helper = globalThis.MythwrightDnd5eBootstrap;
+    const byName = new Map(helper.DND5E_EQUIPMENT24_SRD_ITEMS.map(([, name, uuid]) => [name, uuid]));
+
+    assert.equal(byName.get('Longsword'), 'Compendium.dnd5e.equipment24.Item.phbwepLongsword0');
+    assert.equal(byName.get('Light Crossbow'), 'Compendium.dnd5e.equipment24.Item.phbwepLightCross');
+    assert.equal(byName.get('Plate Armor'), 'Compendium.dnd5e.equipment24.Item.phbarmPlateArmor');
+    assert.equal(byName.get('Shield'), 'Compendium.dnd5e.equipment24.Item.phbarmShield0000');
+  });
+
+  it('resolves SRD items by explicit compendium UUID before scanning packs by name', async () => {
+    const helper = globalThis.MythwrightDnd5eBootstrap;
+    const originalGame = globalThis.game;
+    const resolvedById = {
+      name: 'Longsword',
+      type: 'weapon',
+      uuid: 'Compendium.dnd5e.equipment24.Item.phbwepLongsword0'
+    };
+    const pack = {
+      collection: 'dnd5e.equipment24',
+      metadata: { packageName: 'dnd5e', type: 'Item' },
+      documentName: 'Item',
+      getDocument: async id => id === 'phbwepLongsword0' ? resolvedById : null,
+      getDocuments: async () => [
+        { name: 'Longsword', type: 'weapon', uuid: 'Compendium.dnd5e.items.legacy-longsword' }
+      ]
+    };
+    const packs = [pack];
+    packs.get = id => id === 'dnd5e.equipment24' ? pack : null;
+    globalThis.game = { ...originalGame, packs };
+
+    const result = await helper.discoverSrdItems(packs);
+    const longsword = result.resolved.find(entry => entry.name === 'Longsword');
+
+    assert.equal(longsword.item.uuid, 'Compendium.dnd5e.equipment24.Item.phbwepLongsword0');
+    globalThis.game = originalGame;
+  });
+
+  it('builds SRD base components that reference compendium items without world import identity', () => {
+    const helper = globalThis.MythwrightDnd5eBootstrap;
+    const component = helper.componentFromItem('weapon-longsword', {
+      name: 'Longsword',
+      type: 'weapon',
+      img: 'icons/longsword.webp',
+      uuid: 'Compendium.dnd5e.equipment24.Item.phbwepLongsword0',
+      system: { description: { value: '<p>A standard SRD longsword.</p>' } },
+      toObject: () => ({ system: { description: { value: '<p>A standard SRD longsword.</p>' } } })
+    });
+
+    assert.equal(component.sourceUuid, 'Compendium.dnd5e.equipment24.Item.phbwepLongsword0');
+    assert.equal(component.sourceItemUuid, 'Compendium.dnd5e.equipment24.Item.phbwepLongsword0');
+    assert.equal(component.name, 'Longsword');
+    assert.match(component.description, /standard SRD longsword/);
+  });
+
   it('builds deterministic multi-step SRD recipes with a macroOutcome finishing step', () => {
     const helper = globalThis.MythwrightDnd5eBootstrap;
     const target = { name: 'Longsword', type: 'weapon', item: { img: 'icons/longsword.webp' } };
@@ -265,6 +320,12 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     ));
     assert.deepEqual(recipe.steps.at(-1).resultGroups.map(group => group.name), [
       'Flawed', 'Standard', 'Fine', 'Masterwork'
+    ]);
+    assert.deepEqual(recipe.steps.at(-1).resultGroups.map(group => group.results[0].componentId), [
+      'weapon-flawed-longsword',
+      'weapon-longsword',
+      'weapon-fine-longsword',
+      'weapon-masterwork-longsword'
     ]);
   });
 

@@ -348,9 +348,11 @@ export class GatheringEngine {
       });
     }
 
-    const outcome = task.resolutionMode === 'progressive'
-      ? await this._resolveProgressiveOutcome({ viewer, actor, system, environment, task })
-      : await this._resolveRoutedOutcome({ viewer, actor, system, environment, task });
+    const outcome = task.resolutionMode === 'd100'
+      ? await this._resolveD100Outcome({ viewer, actor, system, environment, task })
+      : (task.resolutionMode === 'progressive'
+        ? await this._resolveProgressiveOutcome({ viewer, actor, system, environment, task })
+        : await this._resolveRoutedOutcome({ viewer, actor, system, environment, task }));
     if (outcome.status === 'misconfigured') {
       return this._clearMisconfiguredWaitingRun({
         viewer,
@@ -560,7 +562,9 @@ export class GatheringEngine {
     const timeGate = plainObjectOrNull(run.timeGate);
     if (timeGate) model.timeGate = timeGate;
     if (run.economyEvidence && typeof run.economyEvidence === 'object') {
-      model.economyEvidence = opaqueBlind ? redactRichEvidence(run.economyEvidence) : cloneJson(run.economyEvidence);
+      model.economyEvidence = opaqueBlind
+        ? redactRichEvidence(run.economyEvidence)
+        : stripRuntimeSnapshotFromRun({ economyEvidence: run.economyEvidence }).economyEvidence;
     }
     if (run.conditionSnapshot && typeof run.conditionSnapshot === 'object') {
       model.conditions = cloneJson(run.conditionSnapshot);
@@ -646,12 +650,22 @@ export class GatheringEngine {
       return { missingReference: 'environment', system };
     }
 
-    const task = normalizeList(environment.tasks).find(task => task?.id === run.taskId) ?? null;
+    const snapshot = plainObjectOrNull(run?.economyEvidence?.runtimeSnapshot);
+    const snapshotTask = plainObjectOrNull(snapshot?.task);
+    const snapshotEnvironment = snapshotTask
+      ? {
+          ...environment,
+          conditions: plainObjectOrNull(snapshot?.conditions) || plainObjectOrNull(run?.conditionSnapshot) || plainObjectOrNull(environment?.conditions) || {},
+          hazards: normalizeList(snapshot?.hazards)
+        }
+      : null;
+    const currentTask = normalizeList(environment.tasks).find(task => task?.id === run.taskId) ?? null;
+    const task = snapshotTask || currentTask;
     if (!task) {
       return { missingReference: 'task', system, environment };
     }
 
-    return { system, environment, task };
+    return { system, environment: snapshotEnvironment || environment, task };
   }
 
   _isSelectableActor(actor, viewer, selectableActors) {
@@ -685,7 +699,14 @@ export class GatheringEngine {
       if (!systems.has(environment?.craftingSystemId)) return false;
       if (environment.enabled === false && !viewer?.isGM) return false;
       return true;
-    });
+    }).map(environment => this._composeEnvironment(environment, systems.get(environment.craftingSystemId)));
+  }
+
+  _composeEnvironment(environment, system = null) {
+    if (typeof this.richState?.composeEnvironment === 'function') {
+      return this.richState.composeEnvironment(environment, system);
+    }
+    return environment;
   }
 
   async _buildEnvironmentListing({ environment, system, viewer, actor }) {
@@ -727,6 +748,8 @@ export class GatheringEngine {
       ? environmentBlockedReasons
       : (attemptable ? [] : uniqueReasons(taskModels.flatMap(task => task.blockedReasons)));
 
+    const biomes = normalizeStringList(environment.biomes ?? environment.biome);
+    const dangerTags = normalizeStringList(environment.dangerTags ?? environment.risk);
     return {
       id: stringOrNull(environment.id),
       craftingSystemId: stringOrNull(environment.craftingSystemId),
@@ -735,8 +758,10 @@ export class GatheringEngine {
       description: stringOrEmpty(environment.description),
       img: stringOrNull(environment.img),
       region: stringOrEmpty(environment.region),
-      biome: stringOrEmpty(environment.biome),
-      risk: stringOrNull(environment.risk) || 'safe',
+      biome: stringOrEmpty(environment.biome) || biomes[0] || '',
+      biomes,
+      dangerTags,
+      risk: stringOrNull(environment.risk) || dangerTags[0] || 'safe',
       economyMode: stringOrNull(environment.economyMode) || 'time',
       conditions: plainObjectOrNull(environment.conditions) || {},
       selectionMode: environment.selectionMode === 'blind' ? 'blind' : 'targeted',
@@ -805,6 +830,10 @@ export class GatheringEngine {
 
   async _taskBlockedReasons({ environment, system, task, actor, viewer }) {
     const blockedReasons = [];
+    if (this._gamePaused()) {
+      blockedReasons.push(this._blockedReason('GAME_PAUSED'));
+    }
+
     if (this.runManager?.findActiveRunForTask?.(actor, task.id)) {
       blockedReasons.push(this._blockedReason('DUPLICATE_ACTIVE_RUN', {
         data: this._isOpaqueBlindTask({ environment, viewer }) ? null : { taskId: task.id }
@@ -999,9 +1028,15 @@ export class GatheringEngine {
     if (!id) return null;
     if (typeof this.environmentStore?.get === 'function') {
       const environment = this.environmentStore.get(id);
-      if (environment) return environment;
+      if (environment) {
+        const system = this._allSystems().get(String(environment.craftingSystemId));
+        return this._composeEnvironment(environment, system);
+      }
     }
-    return normalizeList(this.environmentStore?.list?.()).find(environment => environment?.id === id) ?? null;
+    const environment = normalizeList(this.environmentStore?.list?.()).find(environment => environment?.id === id) ?? null;
+    if (!environment) return null;
+    const system = this._allSystems().get(String(environment.craftingSystemId));
+    return this._composeEnvironment(environment, system);
   }
 
   _findStartTask({ environment, taskId }) {
@@ -1040,8 +1075,13 @@ export class GatheringEngine {
       environmentId: stringOrNull(environment.id),
       taskId: stringOrNull(task.id)
     };
-    if (hasRichGatheringData(environment, task)) {
-      Object.assign(runData, this._richHistoryPayload({ environment, task, richAttempt }));
+    if (hasRichGatheringData(environment, task) || task.resolutionMode === 'd100') {
+      const richPayload = this._richHistoryPayload({ environment, task, richAttempt, viewer });
+      richPayload.economyEvidence = {
+        ...(richPayload.economyEvidence || {}),
+        runtimeSnapshot: this._runtimeSnapshot({ environment, task })
+      };
+      Object.assign(runData, richPayload);
     }
     const timeRequirement = normalizeTimeRequirement(task.timeRequirement);
 
@@ -1095,9 +1135,11 @@ export class GatheringEngine {
   }
 
   async _resolveImmediateAttempt({ viewer, actor, system, environment, task, richAttempt = null }) {
-    const outcome = task.resolutionMode === 'progressive'
-      ? await this._resolveProgressiveOutcome({ viewer, actor, system, environment, task })
-      : await this._resolveRoutedOutcome({ viewer, actor, system, environment, task });
+    const outcome = task.resolutionMode === 'd100'
+      ? await this._resolveD100Outcome({ viewer, actor, system, environment, task })
+      : (task.resolutionMode === 'progressive'
+        ? await this._resolveProgressiveOutcome({ viewer, actor, system, environment, task })
+        : await this._resolveRoutedOutcome({ viewer, actor, system, environment, task }));
 
     if (outcome.status === 'misconfigured') {
       return this._blockedStart({
@@ -1147,7 +1189,7 @@ export class GatheringEngine {
       checkResult,
       plan
     });
-    const richPayload = this._richHistoryPayload({ environment, task, richAttempt });
+    const richPayload = this._richHistoryPayload({ environment, task, richAttempt, viewer });
     Object.assign(runData, richPayload);
     Object.assign(payload, richPayload);
     let run;
@@ -1249,7 +1291,7 @@ export class GatheringEngine {
           createdResults: [],
           usedCatalysts: [],
           checkResult: { blind: true, status: outcome.status },
-          ...this._richHistoryPayload({ environment, task })
+          ...this._richHistoryPayload({ environment, task, viewer })
         }
       };
     }
@@ -1259,7 +1301,7 @@ export class GatheringEngine {
       usedCatalysts: plan.usedCatalysts
     };
     if (checkResult !== undefined) payload.checkResult = checkResult;
-    Object.assign(payload, this._richHistoryPayload({ environment, task }));
+    Object.assign(payload, this._richHistoryPayload({ environment, task, viewer }));
 
     return {
       runData: {
@@ -1271,12 +1313,22 @@ export class GatheringEngine {
     };
   }
 
-  _richHistoryPayload({ environment, task, richAttempt = null }) {
+  _richHistoryPayload({ environment, task, richAttempt = null, viewer = null }) {
     if (!hasRichGatheringData(environment, task)) return {};
+    const opaqueBlind = viewer ? this._isOpaqueBlindTask({ environment, viewer }) : false;
+    const evidence = plainObjectOrNull(richAttempt?.evidence) || this._richListingMetadata({ environment, task, viewer });
     return {
-      economyEvidence: plainObjectOrNull(richAttempt?.evidence) || this._richListingMetadata({ environment, task }),
+      economyEvidence: opaqueBlind ? redactRichEvidence(evidence) : evidence,
       conditionSnapshot: plainObjectOrNull(environment?.conditions) || {},
       riskLevel: stringOrNull(task?.riskOverride) || stringOrNull(environment?.risk) || 'safe'
+    };
+  }
+
+  _runtimeSnapshot({ environment, task }) {
+    return {
+      task: cloneJson(task),
+      hazards: normalizeList(environment?.hazards).map(hazard => cloneJson(hazard)),
+      conditions: plainObjectOrNull(environment?.conditions) || {}
     };
   }
 
@@ -1322,6 +1374,46 @@ export class GatheringEngine {
       task
     });
     return normalizeTerminalOutcome(raw);
+  }
+
+  async _resolveD100Outcome({ viewer, actor, system, environment, task }) {
+    if (typeof this.richState?.resolveD100Attempt !== 'function') {
+      return misconfiguredOutcome({
+        code: 'MISSING_D100_RESOLVER',
+        message: 'D100 gathering resolution requires a rich gathering resolver'
+      });
+    }
+    const gatheringModifier = Number(task?.gatheringModifier?.value ?? task?.gatheringModifier ?? 0);
+    const hazardModifier = Number(environment?.hazardModifier?.value ?? environment?.hazardModifier ?? 0);
+    const resolved = this.richState.resolveD100Attempt({
+      task,
+      environment,
+      actor,
+      viewer,
+      system,
+      gatheringModifier: Number.isFinite(gatheringModifier) ? gatheringModifier : 0,
+      hazardModifier: Number.isFinite(hazardModifier) ? hazardModifier : 0
+    });
+    const resultGroups = [{
+      id: `${task.id}-d100-results`,
+      name: task.name || 'Gathered',
+      results: normalizeList(resolved?.items).map(item => ({
+        id: item.id,
+        componentId: stringOrNull(item.componentId),
+        itemUuid: stringOrNull(item.itemUuid),
+        quantity: Number(item.quantity || 1)
+      }))
+    }];
+    return {
+      status: resolved?.status === 'failed' ? 'failed' : 'succeeded',
+      resultGroups,
+      checkResult: {
+        provider: 'd100',
+        items: normalizeList(resolved?.items),
+        hazards: normalizeList(resolved?.hazards),
+        hazardPolicy: stringOrNull(resolved?.hazardPolicy)
+      }
+    };
   }
 
   async _resolveProgressiveOutcome({ viewer, actor, system, environment, task }) {
@@ -1495,7 +1587,7 @@ export class GatheringEngine {
     const opaqueBlind = this._isOpaqueBlindTask({ environment, viewer });
     const publicRun = opaqueBlind
       ? redactBlindTerminalRun(run)
-      : enrichPublicTerminalRun(run, { createdResults, usedCatalysts, checkResult });
+      : enrichPublicTerminalRun(stripRuntimeSnapshotFromRun(run), { createdResults, usedCatalysts, checkResult });
     const response = {
       accepted: true,
       started: true,
@@ -1556,6 +1648,11 @@ export class GatheringEngine {
 
   async _cancelMissingReferenceRun({ viewer, actor, run, resolved }) {
     const opaqueBlind = resolved.environment && this._isOpaqueBlindTask({ environment: resolved.environment, viewer });
+    const cancellationPayload = {
+      economyEvidence: opaqueBlind
+        ? redactRichEvidence(run?.economyEvidence || {})
+        : stripRuntimeSnapshotFromRun({ economyEvidence: run?.economyEvidence || {} }).economyEvidence
+    };
     const cancelledRun = await this.runManager.cancelRun(actor, run.id, opaqueBlind
       ? {
           terminalRunData: {
@@ -1564,12 +1661,13 @@ export class GatheringEngine {
             taskId: 'blind'
           },
           payload: {
+            ...cancellationPayload,
             createdResults: [],
             usedCatalysts: [],
             checkResult: { blind: true, status: 'cancelled' }
           }
         }
-      : {});
+      : { payload: cancellationPayload });
     if (!cancelledRun) {
       throw Object.assign(new Error('Timed gathering cancellation history was not written'), {
         code: 'TERMINAL_HISTORY_NOT_WRITTEN'
@@ -1599,7 +1697,7 @@ export class GatheringEngine {
       taskId: opaqueBlind ? null : stringOrNull(run?.taskId),
       runId: stringOrNull(run?.id),
       runStatus: 'cancelled',
-      run: opaqueBlind ? redactBlindTerminalRun(cancelledRun) : cancelledRun,
+      run: opaqueBlind ? redactBlindTerminalRun(cancelledRun) : stripRuntimeSnapshotFromRun(cancelledRun),
       blockedReasons: [
         this._blockedReason('MISSING_REFERENCE', {
           data: { reference: reason }
@@ -1635,7 +1733,7 @@ export class GatheringEngine {
 
   _startedWaitingStart({ viewer, actor, system, environment, task, run }) {
     const opaqueBlind = this._isOpaqueBlindTask({ environment, viewer });
-    const publicRun = opaqueBlind ? redactBlindRun(run) : run;
+    const publicRun = opaqueBlind ? redactBlindRun(run) : stripRuntimeSnapshotFromRun(run);
     return {
       accepted: true,
       started: true,
@@ -2005,15 +2103,37 @@ function validateTaskConfiguration(task) {
   const resolutionMode = stringOrNull(task?.resolutionMode);
   const resultGroups = normalizeList(task?.resultGroups);
 
-  if (resolutionMode !== 'routed' && resolutionMode !== 'progressive') {
-    errors.push('Gathering task requires a routed or progressive resolution mode');
+  if (resolutionMode !== 'routed' && resolutionMode !== 'progressive' && resolutionMode !== 'd100') {
+    errors.push('Gathering task requires a routed, progressive, or d100 resolution mode');
     return errors;
   }
 
-  if (resultGroups.length === 0) {
+  if (resolutionMode !== 'd100' && resultGroups.length === 0) {
     errors.push('Gathering task requires at least one result group');
   }
-  errors.push(...validateResultGroupNames(resultGroups));
+  if (resolutionMode !== 'd100') {
+    errors.push(...validateResultGroupNames(resultGroups));
+  }
+
+  if (resolutionMode === 'd100') {
+    const rows = normalizeList(task?.dropRows ?? task?.itemDrops);
+    if (rows.length === 0) {
+      errors.push('D100 gathering task requires at least one item drop row');
+    }
+    for (const row of rows) {
+      const dropRate = Number(row?.dropRate);
+      if (!Number.isInteger(dropRate) || dropRate < 1 || dropRate > 100) {
+        errors.push('D100 gathering item drop rows require dropRate from 1 to 100');
+      }
+      if (!stringOrNull(row?.componentId) && !stringOrNull(row?.itemUuid)) {
+        errors.push('D100 gathering item drop rows require componentId or itemUuid');
+      }
+      const quantity = Number(row?.quantity);
+      if (!Number.isFinite(quantity) || quantity <= 0) {
+        errors.push('D100 gathering item drop rows require positive quantity');
+      }
+    }
+  }
 
   if (resolutionMode === 'routed') {
     const provider = stringOrNull(task?.resultSelection?.provider);
@@ -2130,6 +2250,9 @@ function redactBlindRun(run) {
   if (!run || typeof run !== 'object') return run;
   const redacted = { ...run };
   redacted.taskId = null;
+  if (redacted.economyEvidence && typeof redacted.economyEvidence === 'object') {
+    redacted.economyEvidence = redactRichEvidence(redacted.economyEvidence);
+  }
   delete redacted.diagnostic;
   delete redacted.diagnostics;
   return redacted;
@@ -2142,6 +2265,15 @@ function redactBlindTerminalRun(run) {
   delete redacted.usedCatalysts;
   delete redacted.createdResults;
   return redacted;
+}
+
+function stripRuntimeSnapshotFromRun(run) {
+  if (!run || typeof run !== 'object') return run;
+  const publicRun = cloneJson(run);
+  if (publicRun.economyEvidence && typeof publicRun.economyEvidence === 'object') {
+    delete publicRun.economyEvidence.runtimeSnapshot;
+  }
+  return publicRun;
 }
 
 function enrichPublicTerminalRun(run, { createdResults, usedCatalysts, checkResult }) {
@@ -2160,6 +2292,15 @@ function redactRichEvidence(evidence = {}) {
   if (redacted.node) {
     redacted.node = { available: Number(redacted.node.remaining ?? redacted.node.current ?? 0) > 0 };
   }
+  if (Array.isArray(redacted.hazards)) {
+    redacted.hazards = redacted.hazards.map(() => ({ matched: true }));
+  }
+  delete redacted.items;
+  delete redacted.rolls;
+  delete redacted.dropRows;
+  delete redacted.selectedItems;
+  delete redacted.selectedHazards;
+  delete redacted.runtimeSnapshot;
   delete redacted.encounterOutcome;
   delete redacted.revealEvents;
   return redacted;
@@ -2198,6 +2339,12 @@ function normalizeList(value) {
   if (typeof value.values === 'function') return Array.from(value.values());
   if (typeof value[Symbol.iterator] === 'function') return Array.from(value);
   return [];
+}
+
+function normalizeStringList(value) {
+  return Array.from(new Set(normalizeList(Array.isArray(value) ? value : (value ? [value] : []))
+    .map(entry => stringOrEmpty(entry))
+    .filter(Boolean)));
 }
 
 function actorToOption(actor) {

@@ -2,7 +2,7 @@ import { getSetting as defaultGetSetting, setSetting as defaultSetSetting, SETTI
 
 const DEFAULT_TASK_IMG = 'icons/svg/item-bag.svg';
 const VALID_SELECTION_MODES = new Set(['targeted', 'blind']);
-const VALID_RESOLUTION_MODES = new Set(['progressive', 'routed']);
+const VALID_RESOLUTION_MODES = new Set(['progressive', 'routed', 'd100']);
 const VALID_RESULT_SELECTION_PROVIDERS = new Set(['macroOutcome', 'rollTableOutcome']);
 const VALID_CHECK_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
 const VALID_PROGRESSIVE_AWARD_MODES = new Set(['partial', 'equal', 'exceed']);
@@ -283,6 +283,8 @@ export class GatheringEnvironmentStore {
       img: normalizeOptionalString(data?.img),
       region: stringOrEmpty(data?.region),
       biome: stringOrEmpty(data?.biome),
+      biomes: normalizeStringList(data?.biomes ?? data?.biome),
+      dangerTags: normalizeStringList(data?.dangerTags ?? data?.risk),
       risk: VALID_RISK_LEVELS.has(data?.risk) ? data.risk : 'safe',
       economyMode: VALID_ECONOMY_MODES.has(data?.economyMode) ? data.economyMode : 'time',
       conditions: normalizeConditions(data?.conditions),
@@ -290,6 +292,12 @@ export class GatheringEnvironmentStore {
       enabled: data?.enabled !== false,
       selectionMode,
       sceneUuid: normalizeOptionalString(data?.sceneUuid),
+      enabledTaskIds: normalizeIdList(data?.enabledTaskIds),
+      disabledTaskIds: normalizeIdList(data?.disabledTaskIds),
+      enabledHazardIds: normalizeIdList(data?.enabledHazardIds),
+      disabledHazardIds: normalizeIdList(data?.disabledHazardIds),
+      hazardSelectionMode: ['highestRankedDrop', 'allDrops'].includes(data?.hazardSelectionMode) ? data.hazardSelectionMode : 'allDrops',
+      hazardPolicy: ['successWithHazard', 'failureWithHazard'].includes(data?.hazardPolicy) ? data.hazardPolicy : 'successWithHazard',
       tasks: Array.isArray(data?.tasks) ? data.tasks.map(task => this._normalizeTask(task)) : []
     };
   }
@@ -310,6 +318,8 @@ export class GatheringEnvironmentStore {
       img: normalizeOptionalString(data?.img) || DEFAULT_TASK_IMG,
       enabled: data?.enabled !== false,
       resolutionMode,
+      itemSelectionMode: ['highestRankedDrop', 'allDrops'].includes(data?.itemSelectionMode) ? data.itemSelectionMode : 'highestRankedDrop',
+      dropRows: Array.isArray(data?.dropRows ?? data?.itemDrops) ? (data.dropRows ?? data.itemDrops).map(row => normalizeDropRow(row, this.randomID)) : [],
       catalysts: Array.isArray(data?.catalysts) ? data.catalysts.map(catalyst => normalizeCatalyst(catalyst)) : [],
       resultGroups: Array.isArray(data?.resultGroups) ? data.resultGroups.map(group => this._normalizeResultGroup(group)) : []
     };
@@ -449,7 +459,7 @@ export class GatheringEnvironmentStore {
     }
 
     if (!VALID_RESOLUTION_MODES.has(originalTask?.resolutionMode)) {
-      errors.push(`Task "${label}" resolutionMode must be progressive or routed`);
+      errors.push(`Task "${label}" resolutionMode must be progressive, routed, or d100`);
     }
 
     errors.push(...this._validateProviderConfig(task.visibility, {
@@ -462,7 +472,9 @@ export class GatheringEnvironmentStore {
     }
 
     errors.push(...validateCatalysts(task.catalysts, `Task "${label}"`, originalTask?.catalysts));
-    errors.push(...validateResultGroupNames(task.resultGroups, `Task "${label}"`));
+    if (task.resolutionMode !== 'd100') {
+      errors.push(...validateResultGroupNames(task.resultGroups, `Task "${label}"`));
+    }
 
     if (task.failureOutcome) {
       errors.push(...validateFailureOutcome(task.failureOutcome, `Task "${label}" failureOutcome`));
@@ -483,6 +495,10 @@ export class GatheringEnvironmentStore {
 
     if (task.enabled !== true) {
       return errors;
+    }
+
+    if (task.resolutionMode === 'd100') {
+      errors.push(...validateDropRows(originalTask?.dropRows ?? originalTask?.itemDrops, `Task "${label}"`));
     }
 
     if (task.resolutionMode === 'routed') {
@@ -684,6 +700,40 @@ function normalizeResult(data = {}, randomID) {
     quantity: Number.isFinite(Number(data?.quantity)) && Number(data.quantity) > 0 ? Number(data.quantity) : 1,
     propertyMacroUuid: normalizeOptionalString(data?.propertyMacroUuid)
   };
+}
+
+function normalizeDropRow(data = {}, randomID) {
+  return {
+    id: data?.id ? String(data.id) : randomID(),
+    name: stringOrEmpty(data?.name),
+    componentId: normalizeOptionalString(data?.componentId ?? data?.systemItemId),
+    itemUuid: normalizeOptionalString(data?.itemUuid),
+    quantity: Number.isFinite(Number(data?.quantity)) && Number(data.quantity) > 0 ? Number(data.quantity) : 1,
+    dropRate: data?.dropRate === undefined || data?.dropRate === null || data?.dropRate === '' ? 1 : Number(data.dropRate),
+    enabled: data?.enabled !== false
+  };
+}
+
+function validateDropRows(rows, label) {
+  const entries = Array.isArray(rows) ? rows : [];
+  const errors = [];
+  if (entries.length < 1) {
+    errors.push(`${label} d100 resolution requires at least one drop row`);
+  }
+  for (const row of entries) {
+    const dropRate = Number(row?.dropRate);
+    if (!Number.isInteger(dropRate) || dropRate < 1 || dropRate > 100) {
+      errors.push(`${label} drop row "${row?.id || 'row'}" dropRate must be an integer from 1 to 100`);
+    }
+    if (!row?.componentId && !row?.itemUuid) {
+      errors.push(`${label} drop row "${row?.id || 'row'}" requires componentId or itemUuid`);
+    }
+    const quantity = Number(row?.quantity);
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      errors.push(`${label} drop row "${row?.id || 'row'}" quantity must be positive`);
+    }
+  }
+  return errors;
 }
 
 function validateResultGroupNames(resultGroups, label) {
@@ -959,6 +1009,16 @@ function numberOrNull(value) {
   if (value === null || value === undefined || value === '') return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
+}
+
+function normalizeStringList(value) {
+  const values = Array.isArray(value) ? value : (value ? [value] : []);
+  return Array.from(new Set(values.map(entry => stringOrEmpty(entry).toLowerCase()).filter(Boolean)));
+}
+
+function normalizeIdList(value) {
+  const values = Array.isArray(value) ? value : (value ? [value] : []);
+  return Array.from(new Set(values.map(entry => stringOrEmpty(entry)).filter(Boolean)));
 }
 
 function trimmedOrDefault(value, fallback) {

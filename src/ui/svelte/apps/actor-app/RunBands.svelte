@@ -1,6 +1,15 @@
 <!-- Svelte 5 runes mode -->
+<!--
+  RunBands renders the In Progress / Recent History dual-band surface used by
+  both the Alchemy and Crafting tabs of the actor app. It replaces the legacy
+  RunSummary.svelte one-to-one in Slice 0; pagination per column and V2 chrome
+  styling are introduced in Slices 1 and 2.
+
+  Props mirror the legacy RunSummary contract; new optional pagination props
+  are no-ops until callers provide them.
+-->
 <script>
-  import { localize } from '../util/foundryBridge.js';
+  import { localize } from '../../util/foundryBridge.js';
 
   let {
     activeRuns = [],

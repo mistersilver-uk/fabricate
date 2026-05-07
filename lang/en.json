@@ -4,6 +4,71 @@
     "Common": {
       "General": "General"
     },
+    "ActorApp": {
+      "Header": {
+        "ActorLevelSummary": "Level {level} {className}"
+      },
+      "RunBands": {
+        "InProgress": "In Progress",
+        "RecentHistory": "Recent History"
+      },
+      "Alchemy": {
+        "SystemLabel": "Alchemy System",
+        "ComponentsTitle": "Components",
+        "CurrentMix": "Current Mix ({count})",
+        "SelectedRecipe": "Selected Recipe",
+        "SelectRecipeHint": "Select a discovered recipe to see its expected result and required components.",
+        "ExpectedResult": "Expected Result",
+        "RequiredComponents": "Required Components",
+        "RequiredEssences": "Required Essences",
+        "AttemptAlchemy": "Attempt Alchemy",
+        "LegendAvailable": "Available",
+        "LegendLowQuantity": "Low Quantity",
+        "LegendUnavailable": "Unavailable"
+      },
+      "Crafting": {
+        "ColumnRecipe": "Recipe",
+        "ColumnStatus": "Status",
+        "ColumnRequirements": "Requirements",
+        "ColumnResult": "Result",
+        "ColumnActions": "Actions",
+        "SelectRecipeHint": "Select a recipe to see its requirements, expected result, and craft actions.",
+        "ExpectedResult": "Expected Result",
+        "Requirements": "Required Components",
+        "Essences": "Essences",
+        "Catalysts": "Catalysts / Tools",
+        "ActiveRun": "Active Run",
+        "RemainingTime": "{time} remaining"
+      },
+      "CraftPlan": {
+        "ChipComplex": "Complex",
+        "ChipMultiStep": "Multi-step",
+        "ChipPaths": "{count} Paths",
+        "ChipChoices": "{count} Choice",
+        "SelectPath": "Path",
+        "IngredientSets": "Ingredient Sets",
+        "PathSatisfiable": "Currently satisfiable",
+        "PathMissing": "Missing materials",
+        "NoGroups": "No required components for this path.",
+        "OrChooseOne": "Choose one",
+        "OptionTypeComponent": "Component",
+        "OptionTypeTag": "Tag",
+        "OptionTypeEssence": "Essence",
+        "OptionTypeCatalyst": "Catalyst",
+        "RequiredEssences": "Optional Essences",
+        "Catalysts": "Catalysts / Tools",
+        "SourceTooltip": "Supplied by {name}",
+        "SourceMissing": "No source",
+        "OutcomeHeading": "Expected Outcome",
+        "OutcomeFixed": "Fixed Result",
+        "OutcomeRouted": "Routed Outcome",
+        "OutcomeProgressive": "Progressive / Quality-Variable",
+        "StepTimeline": "Step Timeline",
+        "StepCompleted": "Done",
+        "StepCurrent": "Now",
+        "StepPending": "Pending"
+      }
+    },
     "Settings": {
       "Enabled": {
         "Name": "Enable Crafting System",
@@ -1621,6 +1686,8 @@
       "Risk": {
         "safe": "Safe",
         "hazardous": "Hazardous",
+        "dangerous": "Dangerous",
+        "deadly": "Deadly",
         "unsafe": "Unsafe",
         "extreme": "Extreme"
       }
@@ -1629,7 +1696,8 @@
       "Title": "Workbench",
       "Clear": "Clear workbench",
       "Submit": "Craft",
-      "EmptyHint": "Drop or click components to begin"
+      "EmptyHint": "Drop components here or click items from the palette",
+      "RemoveEntry": "Remove {name}"
     },
     "Tabs": {
       "Alchemy": "Alchemy",

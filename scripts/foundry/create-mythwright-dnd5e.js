@@ -69,20 +69,66 @@ const MythwrightDnd5eBootstrap = (() => {
   const APPROVED_MYTHWRIGHT_ICON_PATHS = Object.freeze(Array.from(new Set(Object.values(MYTHWRIGHT_ICONS))));
   const APPROVED_MYTHWRIGHT_ICON_SET = new Set(APPROVED_MYTHWRIGHT_ICON_PATHS);
 
-  const SRD_WEAPONS = [
-    'Club', 'Dagger', 'Greatclub', 'Handaxe', 'Javelin', 'Light Hammer', 'Mace',
-    'Quarterstaff', 'Sickle', 'Spear', 'Crossbow, Light', 'Dart', 'Shortbow',
-    'Sling', 'Battleaxe', 'Flail', 'Glaive', 'Greataxe', 'Greatsword', 'Halberd',
-    'Lance', 'Longsword', 'Maul', 'Morningstar', 'Pike', 'Rapier', 'Scimitar',
-    'Shortsword', 'Trident', 'War Pick', 'Warhammer', 'Whip', 'Blowgun',
-    'Crossbow, Hand', 'Crossbow, Heavy', 'Longbow', 'Net'
-  ];
+  const DND5E_EQUIPMENT24_SRD_ITEMS = Object.freeze([
+    ['weapon', 'Club', 'Compendium.dnd5e.equipment24.Item.phbwepClub000000'],
+    ['weapon', 'Dagger', 'Compendium.dnd5e.equipment24.Item.phbwepDagger0000'],
+    ['weapon', 'Greatclub', 'Compendium.dnd5e.equipment24.Item.phbwepGreatclub0'],
+    ['weapon', 'Handaxe', 'Compendium.dnd5e.equipment24.Item.phbwepHandaxe000'],
+    ['weapon', 'Javelin', 'Compendium.dnd5e.equipment24.Item.phbwepJavelin000'],
+    ['weapon', 'Light Hammer', 'Compendium.dnd5e.equipment24.Item.phbwepLightHamme'],
+    ['weapon', 'Mace', 'Compendium.dnd5e.equipment24.Item.phbwepMace000000'],
+    ['weapon', 'Quarterstaff', 'Compendium.dnd5e.equipment24.Item.phbwepQuartersta'],
+    ['weapon', 'Sickle', 'Compendium.dnd5e.equipment24.Item.phbwepSickle0000'],
+    ['weapon', 'Spear', 'Compendium.dnd5e.equipment24.Item.phbwepSpear00000'],
+    ['weapon', 'Light Crossbow', 'Compendium.dnd5e.equipment24.Item.phbwepLightCross'],
+    ['weapon', 'Dart', 'Compendium.dnd5e.equipment24.Item.phbwepDart000000'],
+    ['weapon', 'Shortbow', 'Compendium.dnd5e.equipment24.Item.phbwepShortbow00'],
+    ['weapon', 'Sling', 'Compendium.dnd5e.equipment24.Item.phbwepSling00000'],
+    ['weapon', 'Battleaxe', 'Compendium.dnd5e.equipment24.Item.phbwepBattleaxe0'],
+    ['weapon', 'Flail', 'Compendium.dnd5e.equipment24.Item.phbwepFlail00000'],
+    ['weapon', 'Glaive', 'Compendium.dnd5e.equipment24.Item.phbwepGlaive0000'],
+    ['weapon', 'Greataxe', 'Compendium.dnd5e.equipment24.Item.phbwepGreataxe00'],
+    ['weapon', 'Greatsword', 'Compendium.dnd5e.equipment24.Item.phbwepGreatsword'],
+    ['weapon', 'Halberd', 'Compendium.dnd5e.equipment24.Item.phbwepHalberd000'],
+    ['weapon', 'Lance', 'Compendium.dnd5e.equipment24.Item.phbwepLance00000'],
+    ['weapon', 'Longsword', 'Compendium.dnd5e.equipment24.Item.phbwepLongsword0'],
+    ['weapon', 'Maul', 'Compendium.dnd5e.equipment24.Item.phbwepMaul000000'],
+    ['weapon', 'Morningstar', 'Compendium.dnd5e.equipment24.Item.phbwepMorningsta'],
+    ['weapon', 'Pike', 'Compendium.dnd5e.equipment24.Item.phbwepPike000000'],
+    ['weapon', 'Rapier', 'Compendium.dnd5e.equipment24.Item.phbwepRapier0000'],
+    ['weapon', 'Scimitar', 'Compendium.dnd5e.equipment24.Item.phbwepScimitar00'],
+    ['weapon', 'Shortsword', 'Compendium.dnd5e.equipment24.Item.phbwepShortsword'],
+    ['weapon', 'Trident', 'Compendium.dnd5e.equipment24.Item.phbwepTrident000'],
+    ['weapon', 'War Pick', 'Compendium.dnd5e.equipment24.Item.phbwepWarPick000'],
+    ['weapon', 'Warhammer', 'Compendium.dnd5e.equipment24.Item.phbwepWarhammer0'],
+    ['weapon', 'Whip', 'Compendium.dnd5e.equipment24.Item.phbwepWhip000000'],
+    ['weapon', 'Blowgun', 'Compendium.dnd5e.equipment24.Item.phbwepBlowgun000'],
+    ['weapon', 'Hand Crossbow', 'Compendium.dnd5e.equipment24.Item.phbwepHandCrossb'],
+    ['weapon', 'Heavy Crossbow', 'Compendium.dnd5e.equipment24.Item.phbwepHeavyCross'],
+    ['weapon', 'Longbow', 'Compendium.dnd5e.equipment24.Item.phbwepLongbow000'],
+    ['weapon', 'Net', 'Compendium.dnd5e.equipment24.Item.phbagNet00000000'],
+    ['armor', 'Padded Armor', 'Compendium.dnd5e.equipment24.Item.phbarmPaddedArmo'],
+    ['armor', 'Leather Armor', 'Compendium.dnd5e.equipment24.Item.phbarmLeatherArm'],
+    ['armor', 'Studded Leather Armor', 'Compendium.dnd5e.equipment24.Item.phbarmStuddedLea'],
+    ['armor', 'Hide Armor', 'Compendium.dnd5e.equipment24.Item.phbarmHideArmor0'],
+    ['armor', 'Chain Shirt', 'Compendium.dnd5e.equipment24.Item.phbarmChainShirt'],
+    ['armor', 'Scale Mail', 'Compendium.dnd5e.equipment24.Item.phbarmScaleMail0'],
+    ['armor', 'Breastplate', 'Compendium.dnd5e.equipment24.Item.phbarmBreastplat'],
+    ['armor', 'Half Plate Armor', 'Compendium.dnd5e.equipment24.Item.phbarmHalfPlateA'],
+    ['armor', 'Ring Mail', 'Compendium.dnd5e.equipment24.Item.phbarmRingMail00'],
+    ['armor', 'Chain Mail', 'Compendium.dnd5e.equipment24.Item.phbarmChainMail0'],
+    ['armor', 'Splint Armor', 'Compendium.dnd5e.equipment24.Item.phbarmSplintArmo'],
+    ['armor', 'Plate Armor', 'Compendium.dnd5e.equipment24.Item.phbarmPlateArmor'],
+    ['armor', 'Shield', 'Compendium.dnd5e.equipment24.Item.phbarmShield0000']
+  ]);
 
-  const SRD_ARMOUR = [
-    'Padded Armor', 'Leather Armor', 'Studded Leather Armor', 'Hide Armor',
-    'Chain Shirt', 'Scale Mail', 'Breastplate', 'Half Plate Armor', 'Ring Mail',
-    'Chain Mail', 'Splint Armor', 'Plate Armor', 'Shield'
-  ];
+  const SRD_WEAPONS = DND5E_EQUIPMENT24_SRD_ITEMS
+    .filter(([type]) => type === 'weapon')
+    .map(([, name]) => name);
+
+  const SRD_ARMOUR = DND5E_EQUIPMENT24_SRD_ITEMS
+    .filter(([type]) => type === 'armor')
+    .map(([, name]) => name);
 
   const FOLDER_PATHS = [
     'Mythwright > Gathered components',
@@ -236,6 +282,41 @@ const MythwrightDnd5eBootstrap = (() => {
     return Array.from(collection);
   }
 
+  function compendiumPackIdFromUuid(uuid) {
+    const parts = String(uuid || '').split('.');
+    if (parts[0] !== 'Compendium' || parts.length < 4) return null;
+    return `${parts[1]}.${parts[2]}`;
+  }
+
+  function compendiumDocumentIdFromUuid(uuid) {
+    const parts = String(uuid || '').split('.');
+    if (parts[0] !== 'Compendium') return null;
+    return parts.at(-1) || null;
+  }
+
+  function compendiumPackForUuid(uuid) {
+    const packId = compendiumPackIdFromUuid(uuid);
+    if (!packId) return null;
+    return globalThis.game?.packs?.get?.(packId)
+      || collectionValues(globalThis.game?.packs).find(pack => pack.collection === packId)
+      || null;
+  }
+
+  async function resolveCompendiumDocument(uuid) {
+    if (!uuid) return null;
+    if (typeof globalThis.fromUuid === 'function') {
+      const doc = await globalThis.fromUuid(uuid);
+      if (doc) return doc;
+    }
+
+    const pack = compendiumPackForUuid(uuid);
+    const id = compendiumDocumentIdFromUuid(uuid);
+    if (!pack || !id) return null;
+    if (typeof pack.getDocument === 'function') return await pack.getDocument(id);
+    const indexEntry = collectionValues(pack.index).find(entry => entry?._id === id || entry?.id === id);
+    return indexEntry || null;
+  }
+
   function folderSegments(path) {
     return String(path || '').split('>').map(part => part.trim()).filter(Boolean);
   }
@@ -284,6 +365,13 @@ const MythwrightDnd5eBootstrap = (() => {
 
   function itemSourceId(item) {
     return item?._stats?.compendiumSource || item?.flags?.core?.sourceId || null;
+  }
+
+  function sourceIdentityFromDocument(source, sourceObject = {}) {
+    return source?.uuid
+      || sourceObject?._stats?.compendiumSource
+      || sourceObject?.flags?.core?.sourceId
+      || null;
   }
 
   function itemMythwrightId(item) {
@@ -478,6 +566,7 @@ const MythwrightDnd5eBootstrap = (() => {
     baseSourceId = null
   }) {
     const sourceObject = source?.toObject?.() || {};
+    const sourceIdentity = sourceIdentityFromDocument(source, sourceObject);
     const qualityMatch = String(name || '').match(/^(Flawed|Fine|Masterwork|Mythic)\s+(.+)$/);
     const description = mythwrightItemDescription(id, name || source?.name, {
       source,
@@ -500,7 +589,7 @@ const MythwrightDnd5eBootstrap = (() => {
         core: {
           ...(sourceObject.flags?.core || {}),
           sourceId: preserveSourceIdentity
-            ? (source?.uuid || sourceObject.flags?.core?.sourceId || null)
+            ? sourceIdentity
             : null
         },
         fabricate: {
@@ -510,13 +599,19 @@ const MythwrightDnd5eBootstrap = (() => {
         }
       }
     };
+    if (preserveSourceIdentity && sourceIdentity) {
+      payload._stats = {
+        ...(sourceObject._stats || {}),
+        compendiumSource: sourceIdentity
+      };
+    }
     if (!payload.flags.core.sourceId) delete payload.flags.core.sourceId;
     if (!preserveSourceIdentity) stripSourceIdentity(payload);
     return payload;
   }
 
   function elementalVariantPayload(definition, source, folder) {
-    const baseSourceId = source?.uuid || source?.flags?.core?.sourceId || null;
+    const baseSourceId = sourceIdentityFromDocument(source, source?.toObject?.() || {});
     const quality = elementalQualityById(definition.quality?.id);
     const payload = itemPayload({
       id: definition.id,
@@ -695,9 +790,16 @@ const MythwrightDnd5eBootstrap = (() => {
 
   async function discoverSrdItems(packs = globalThis.game?.packs) {
     const targets = new Map([
-      ...SRD_WEAPONS.map(name => [normalizeName(name), { name, type: 'weapon', item: null }]),
-      ...SRD_ARMOUR.map(name => [normalizeName(name), { name, type: 'armor', item: null }])
+      ...DND5E_EQUIPMENT24_SRD_ITEMS.map(([type, name, uuid]) => [
+        normalizeName(name),
+        { name, type, uuid, item: null }
+      ])
     ]);
+
+    for (const target of targets.values()) {
+      const doc = await resolveCompendiumDocument(target.uuid);
+      if (doc) target.item = doc;
+    }
 
     for (const pack of collectionValues(packs)) {
       const metadata = pack.metadata || {};
@@ -713,6 +815,7 @@ const MythwrightDnd5eBootstrap = (() => {
         const key = normalizeName(doc?.name);
         const target = targets.get(key);
         if (!target) continue;
+        if (target.item) continue;
         const kind = classifySrdItem(doc);
         if (kind && kind !== target.type) continue;
         if (!target.item) target.item = doc;
@@ -729,10 +832,13 @@ const MythwrightDnd5eBootstrap = (() => {
   }
 
   function componentFromItem(id, item, extra = {}) {
-    const sourceUuid = extra.preserveSourceIdentity === false ? null : (item.uuid || null);
+    const itemUuid = item.uuid || null;
+    const sourceUuid = extra.preserveSourceIdentity === false
+      ? (itemUuid?.startsWith('Compendium.') ? null : itemUuid)
+      : itemUuid;
     const sourceItemUuid = extra.preserveSourceIdentity === false
-      ? null
-      : (item.flags?.core?.sourceId || item.uuid || null);
+      ? (itemUuid?.startsWith('Compendium.') ? null : itemUuid)
+      : (itemSourceId(item) || itemUuid);
     const itemDescription = htmlToText(item.system?.description?.value || item.toObject?.()?.system?.description?.value || '');
     return {
       id,
@@ -1062,15 +1168,8 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
     }
 
     for (const target of srd.resolved) {
-      const folderPathName = target.type === 'weapon' ? 'Mythwright > Weapons > Mundane' : 'Mythwright > Armour > Mundane';
       const componentId = idFromName(target.type, target.name);
-      const item = await ensureWorldItem(
-        [componentId, target.name, folderPathName, target.item?.img, itemTypeForName(target.name), target.item],
-        foldersByPath,
-        summary,
-        { preserveSourceIdentity: true }
-      );
-      worldItems.set(componentId, item);
+      worldItems.set(componentId, target.item);
 
       const keptQualityItems = [];
       for (const quality of MUNDANE_QUALITY.filter(entry => entry !== 'Standard')) {
@@ -1196,6 +1295,7 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
 
   return {
     SYSTEM_ID,
+    DND5E_EQUIPMENT24_SRD_ITEMS,
     SRD_WEAPONS,
     SRD_ARMOUR,
     ELEMENTAL_VARIANTS,
@@ -1205,6 +1305,9 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
     idFromName,
     folderPath,
     findFolderByPath,
+    compendiumPackIdFromUuid,
+    compendiumDocumentIdFromUuid,
+    resolveCompendiumDocument,
     sanitizeIconPath,
     stripSourceIdentity,
     itemPayload,

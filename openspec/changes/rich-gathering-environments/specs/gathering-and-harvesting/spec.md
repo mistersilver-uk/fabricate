@@ -10,7 +10,7 @@ Gathering environments MUST support richer place metadata while preserving optio
 2. A gathering environment MAY define a `region` label used for player search/filtering and GM organization.
 3. A gathering environment MAY define a `biome` label used for player search/filtering, GM organization, and condition/yield rules.
 4. A gathering environment MAY define a risk level. Supported initial risk levels SHOULD include `safe`, `hazardous`, `unsafe`, and `extreme`.
-5. A gathering environment MAY define current condition state, including time of day and weather.
+5. A gathering environment MUST NOT own current weather or current time of day in the reusable-library model. It MAY define condition override notes or inheritance metadata, but the active weather/time state is global gathering state.
 6. Scene linkage MUST remain optional. If `sceneUuid` is absent, the environment is not scene-gated by default and may still be player-visible when other guards pass.
 7. If `sceneUuid` is present, existing scene/token access rules still apply unless a later approved requirement adds a different access policy.
 8. Environment metadata MUST be display-safe for non-GM users. It MUST NOT leak hidden task identity, hidden result details, provider diagnostics, or GM-only notes.
@@ -27,17 +27,88 @@ Regions and biomes MUST make environments easier to ground in the game world and
 5. Player-facing environment listings SHOULD expose region and biome filters when those fields are present on one or more visible environments.
 6. GM-facing environment listings SHOULD expose region and biome filters and SHOULD show unclassified environments explicitly rather than hiding them.
 
-### Requirement: Environment conditions
+### Requirement: Global gathering conditions
 
-Gathering environments MUST support GM-controlled condition state for time of day and weather.
+Gathering MUST support GM-controlled global condition state for time of day and weather.
 
-1. Condition state MAY include `timeOfDay`, `weather`, and `visibility` or equivalent labels.
-2. Condition values MUST be authored or selected by the GM unless an approved integration provider supplies them.
-3. Condition state MAY modify task availability, result yield, check difficulty, stamina cost, risk, or encounter chance.
-4. Condition modifiers MUST be declarative or provider-driven. Fabricate core MUST NOT hardcode game-system-specific weather, time, or skill formulas.
-5. A gathering attempt SHOULD snapshot relevant condition state when the attempt starts so active runs and history can explain what conditions affected the attempt.
-6. Player-facing UI MAY show beneficial or harmful condition notes only when those notes are not hidden by blind task or visibility rules.
-7. Changing current environment conditions MUST NOT retroactively rewrite completed gathering history.
+1. Global condition state MUST include current `weather` and current `timeOfDay`.
+2. Global condition settings MUST include tag vocabularies for regions, biomes, danger, weather, and time of day.
+3. Default vocabularies MUST seed biomes, danger, weather, and time of day when no custom values exist; regions default to empty because campaign geography is world-specific.
+4. Default current weather MUST be `clear`.
+5. Default current time of day MUST be `day`.
+6. Condition values MUST be authored or selected by the GM unless an approved integration provider supplies them.
+7. Condition mutation APIs MUST validate requested values against the configured vocabularies.
+8. Authorized mutation APIs MUST persist condition changes, dispatch `fabricate.gathering.conditionsUpdated`, and refresh gathering listings.
+9. Player-facing APIs MAY read current conditions but MUST NOT mutate them.
+10. Environments MAY use weather/time as matching dimensions for reusable tasks and hazards, but player environment browse filters MUST NOT expose weather/time as environment filters.
+11. Condition state MAY include `visibility` or equivalent labels in later provider-backed slices.
+12. Condition state MAY modify task availability, result yield, check difficulty, stamina cost, risk, or encounter chance.
+13. Condition modifiers MUST be declarative or provider-driven. Fabricate core MUST NOT hardcode game-system-specific weather, time, or skill formulas.
+14. A gathering attempt SHOULD snapshot relevant condition state when the attempt starts so active runs and history can explain what conditions affected the attempt.
+15. Player-facing UI MAY show beneficial or harmful condition notes only when those notes are not hidden by blind task or visibility rules.
+16. Changing current global conditions MUST NOT retroactively rewrite completed gathering history.
+
+### Requirement: Reusable gathering task libraries
+
+Crafting systems with gathering enabled MUST support reusable GM-authored gathering task records.
+
+1. A task record MUST be scoped to one crafting system.
+2. A task record MUST include name, description, image, enabled state, and ordered item drop rows.
+3. A task record MAY include matching tags for `region`, `biomes[]`, `weather[]`, and `timeOfDay[]`.
+4. Empty matching tags for a dimension mean the task matches any value for that dimension.
+5. A task matches an environment only when every configured task dimension matches the environment tags plus current global weather/time.
+6. Disabled task records MUST NOT match for player gathering.
+7. Item drop rows MUST include an item or component reference, quantity, enabled state, and `dropRate` from 1 through 100.
+8. Task item selection mode MUST be `highestRankedDrop` or `allDrops`.
+9. A task MAY define stamina cost and a gathering roll modifier provider.
+10. Environment records MAY toggle matching task records on or off without copying their full task definition.
+11. Per-environment overrides MUST remain associated with the environment and MUST NOT rewrite the reusable task definition.
+12. Legacy embedded environment tasks MUST remain valid as inline compatibility tasks.
+
+### Requirement: Reusable gathering hazard libraries
+
+Crafting systems with gathering enabled MUST support reusable GM-authored hazard records.
+
+1. A hazard record MUST be scoped to one crafting system.
+2. A hazard record MUST include name, description, image, enabled state, and `dropRate` from 1 through 100.
+3. A hazard record MAY include matching tags for `dangerTags[]`, `region`, `biomes[]`, `weather[]`, and `timeOfDay[]`.
+4. Empty matching tags for a dimension mean the hazard matches any value for that dimension.
+5. A hazard matches an environment only when every configured hazard dimension matches the environment tags plus current global weather/time.
+6. Disabled hazard records MUST NOT match for player gathering.
+7. A hazard MAY define a hazard roll modifier provider.
+8. If no hazards are enabled and matched, the environment is mechanically safe even when it has danger tags.
+9. Environment records MAY toggle matching hazard records on or off without copying their full hazard definition.
+10. Hazard output MUST respect blind task and GM-only redaction rules.
+
+### Requirement: Environment composition by tags
+
+Gathering environments MUST compose reusable tasks and hazards from their configured tags and global conditions.
+
+1. An environment MUST support one `region` value.
+2. An environment MUST support zero or more `biomes[]` values.
+3. An environment MUST support zero or more `dangerTags[]` values.
+4. `danger` is the reusable-library matching vocabulary. Existing `risk` display values MAY map to danger tags for compatibility, but the matching contract MUST use `dangerTags[]`.
+5. Matching tasks MUST use environment region/biomes plus global weather/time.
+6. Matching hazards MUST use environment region/biomes/danger tags plus global weather/time.
+7. Weather and time of day MUST NOT be environment-owned browse filters.
+8. GM authoring screens MAY filter task and hazard libraries by weather/time tags for authoring.
+9. Player listings MUST show the current global weather/time as context.
+10. Player listings MUST show only enabled matching tasks and player-safe matched hazard/risk evidence.
+
+### Requirement: Gathering-native d100 resolution
+
+Gathering MUST support a `d100` task resolution mode for reusable task drop rows and matched hazards.
+
+1. For every enabled item drop row in the selected task, Fabricate MUST roll `d100`, add the gathering modifier, and drop the row when `effectiveRoll >= 101 - dropRate`.
+2. For every enabled matched hazard in the environment, Fabricate MUST roll `d100`, add the hazard modifier, and drop the hazard when `effectiveRoll >= 101 - dropRate`.
+3. `dropRate` MUST be an integer from 1 through 100.
+4. `highestRankedDrop` item selection MUST keep only the first dropped item row by task row order.
+5. `allDrops` item selection MUST keep every dropped item row.
+6. Environment hazard selection mode MUST support `highestRankedDrop` and `allDrops`.
+7. Environment hazard policy MUST support success-with-hazard and failure-with-hazard behavior.
+8. D100 resolution MUST write roll, modifier, threshold, selected item rows, selected hazards, condition snapshot, and hazard policy evidence where safe to reveal.
+9. D100 resolution MUST preserve history-before-side-effects ordering.
+10. Existing routed and progressive task resolution modes MUST remain valid compatibility behavior.
 
 ### Requirement: Natural gathering expressions and macros
 
@@ -180,14 +251,17 @@ Gathering start and completion MUST account for rich environment features when t
 Rich gathering MUST expose stable hooks and programming interfaces for integration developers.
 
 1. Fabricate MUST expose documented APIs for listing rich gathering environments for an actor, starting a gathering attempt, inspecting GM-only environment state, manually restocking nodes, manually recharging attempt limits, manually setting stamina, and revealing or clearing blind-task discovery where permissions allow.
-2. Public player APIs MUST enforce the same visibility, scene/access, blind redaction, stamina, node, attempt-limit, and provider-diagnostic secrecy rules as the UI.
-3. GM APIs MAY expose full diagnostic and hidden task state when called by an authorized GM context.
-4. Hook points SHOULD exist before and after major lifecycle events: environment listing, task visibility evaluation, condition modifier resolution, stamina calculation, stamina spend, attempt-limit evaluation, node availability evaluation, node depletion, attempt start, provider resolution, encounter resolution, result creation, history write, chat message creation, respawn/recharge, manual restock, manual stamina adjustment, and blind reveal.
-5. Hooks MUST be able to observe or modify only the phases explicitly documented as mutable. Read-only phases MUST not allow mutation.
-6. Hook payloads MUST include stable ids and redaction-safe display data for player-facing hooks, plus full GM data only for GM-authorized hooks.
-7. Hooks and APIs MUST have clear error handling. Integration errors MUST be isolated and reported as diagnostics without corrupting gathering state.
-8. APIs that mutate stamina, node counts, attempt limits, or reveal state MUST validate permissions and write auditable history or GM log evidence where practical.
-9. Developer-facing contracts MUST avoid direct dependency on Foundry globals from presentational Svelte components; Foundry access remains in runtime/service boundaries.
+2. Fabricate MUST expose `game.fabricate.gathering.getConditions()` for current global conditions and tag vocabularies.
+3. Fabricate MUST expose `game.fabricate.gathering.setWeather(weatherTag)`, `setTimeOfDay(timeOfDayTag)`, and `setConditions({ weather, timeOfDay })` for authorized GM/API callers.
+4. Condition mutation APIs MUST reject unauthorized player callers and invalid tags before persistence.
+5. Public player APIs MUST enforce the same visibility, scene/access, blind redaction, stamina, node, attempt-limit, and provider-diagnostic secrecy rules as the UI.
+6. GM APIs MAY expose full diagnostic and hidden task state when called by an authorized GM context.
+7. Hook points SHOULD exist before and after major lifecycle events: environment listing, task visibility evaluation, condition modifier resolution, stamina calculation, stamina spend, attempt-limit evaluation, node availability evaluation, node depletion, attempt start, provider resolution, encounter resolution, result creation, history write, chat message creation, respawn/recharge, manual restock, manual stamina adjustment, and blind reveal.
+8. Hooks MUST be able to observe or modify only the phases explicitly documented as mutable. Read-only phases MUST not allow mutation.
+9. Hook payloads MUST include stable ids and redaction-safe display data for player-facing hooks, plus full GM data only for GM-authorized hooks.
+10. Hooks and APIs MUST have clear error handling. Integration errors MUST be isolated and reported as diagnostics without corrupting gathering state.
+11. APIs that mutate stamina, node counts, attempt limits, condition state, or reveal state MUST validate permissions and write auditable history or GM log evidence where practical.
+12. Developer-facing contracts MUST avoid direct dependency on Foundry globals from presentational Svelte components; Foundry access remains in runtime/service boundaries.
 
 ### Requirement: Gathering chat messages
 

@@ -18,17 +18,17 @@ const source = readFileSync(componentPath, 'utf8');
 // Imports
 // ---------------------------------------------------------------------------
 
-test('CraftingAppRoot: imports AlchemyTab', () => {
+test('CraftingAppRoot: imports AlchemyView from actor-app', () => {
   assert.ok(
-    source.includes("import AlchemyTab from './AlchemyTab.svelte'"),
-    'must import AlchemyTab'
+    source.includes("import AlchemyView from './actor-app/AlchemyView.svelte'"),
+    'must import AlchemyView from actor-app folder'
   );
 });
 
-test('CraftingAppRoot: imports CraftingTab', () => {
+test('CraftingAppRoot: imports CraftingView from actor-app', () => {
   assert.ok(
-    source.includes("import CraftingTab from './CraftingTab.svelte'"),
-    'must import CraftingTab'
+    source.includes("import CraftingView from './actor-app/CraftingView.svelte'"),
+    'must import CraftingView from actor-app folder'
   );
 });
 
@@ -95,25 +95,25 @@ test('CraftingAppRoot: alchemy tab onclick calls store.setActiveTab', () => {
 // Tab content switching
 // ---------------------------------------------------------------------------
 
-test('CraftingAppRoot: renders AlchemyTab when alchemy is active', () => {
-  assert.ok(source.includes('<AlchemyTab'), 'must render AlchemyTab component');
+test('CraftingAppRoot: renders AlchemyView when alchemy is active', () => {
+  assert.ok(source.includes('<AlchemyView'), 'must render AlchemyView component');
 });
 
-test('CraftingAppRoot: renders CraftingTab when crafting is active', () => {
-  assert.ok(source.includes('<CraftingTab'), 'must render CraftingTab component');
+test('CraftingAppRoot: renders CraftingView when crafting is active', () => {
+  assert.ok(source.includes('<CraftingView'), 'must render CraftingView component');
 });
 
-test('CraftingAppRoot: passes store to AlchemyTab', () => {
+test('CraftingAppRoot: passes store to AlchemyView', () => {
   assert.ok(
-    source.includes('<AlchemyTab {store}'),
-    'AlchemyTab must receive {store} prop'
+    source.includes('<AlchemyView {store}'),
+    'AlchemyView must receive {store} prop'
   );
 });
 
-test('CraftingAppRoot: hasAlchemyTab controls AlchemyTab rendering', () => {
+test('CraftingAppRoot: hasAlchemyTab controls AlchemyView rendering', () => {
   assert.ok(
     source.includes('$hasAlchemyTab'),
-    'AlchemyTab rendering must check $hasAlchemyTab'
+    'AlchemyView rendering must check $hasAlchemyTab'
   );
 });
 

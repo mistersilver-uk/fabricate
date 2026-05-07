@@ -743,6 +743,175 @@ function _evaluateDiscoveredCraftability(recipe, systemComponents, palette, sour
   return false;
 }
 
+// ---------------------------------------------------------------------------
+// Slice 3 (actor-crafting-app-v2): complex recipe craft-plan helpers.
+//
+// These are pure top-level functions so they can be tested in isolation.
+// Source allocation here is read-only display data — the user cannot reassign
+// sources through the inspector, and craft() is unchanged.
+// ---------------------------------------------------------------------------
+
+function _buildComplexityClassification(recipe) {
+  if (!recipe) {
+    return { isComplex: false, isMultiStep: false, pathCount: 1, choiceCount: 0 };
+  }
+  const isComplex = !recipe.isSimpleRecipe();
+  const isMultiStep = Array.isArray(recipe.steps) && recipe.steps.length > 0;
+  const pathCount = Array.isArray(recipe.ingredientSets) ? recipe.ingredientSets.length : 0;
+  // Choice count = number of OR groups (groups with > 1 option) in the
+  // currently-displayed first ingredient set. This drives the "N Choice" chip.
+  const firstSet = recipe.ingredientSets?.[0];
+  const groups = Array.isArray(firstSet?.ingredientGroups) ? firstSet.ingredientGroups : [];
+  const choiceCount = groups.filter(g => Array.isArray(g.options) && g.options.length > 1).length;
+  return { isComplex, isMultiStep, pathCount, choiceCount };
+}
+
+/**
+ * Resolve the first source actor that has at least one item matching the
+ * given ingredient option. Returns advisory display data only; the canonical
+ * craft() path aggregates inventory across all source actors and does not use
+ * this allocation.
+ *
+ * @param {object} option - Ingredient option (has matches() method)
+ * @param {object[]} sourceActors - Component source actors
+ * @returns {{ actorId: string, actorName: string }|null}
+ */
+function _resolveFirstMatchingSource(option, sourceActors) {
+  if (!option || typeof option.matches !== 'function') return null;
+  for (const actor of sourceActors) {
+    const items = Array.isArray(actor?.items) ? actor.items : Array.from(actor?.items ?? []);
+    if (items.some(item => option.matches(item))) {
+      return { actorId: actor.id, actorName: actor.name };
+    }
+  }
+  return null;
+}
+
+function _summarizeOptionLabel(option) {
+  if (!option) return '';
+  if (option.match?.type === 'tags') {
+    const tags = Array.isArray(option.match.tags) ? option.match.tags.join(', ') : '';
+    return tags ? `Tag: ${tags}` : 'Tag';
+  }
+  return option.name || option.label || option.componentId || option.itemUuid || 'Component';
+}
+
+function _summarizeOptionType(option) {
+  if (!option) return 'component';
+  if (option.match?.type === 'tags') return 'tag';
+  return 'component';
+}
+
+function _availableQuantityFor(option, sourceActors) {
+  if (!option || typeof option.matches !== 'function') return 0;
+  let total = 0;
+  for (const actor of sourceActors) {
+    const items = Array.isArray(actor?.items) ? actor.items : Array.from(actor?.items ?? []);
+    for (const item of items) {
+      if (option.matches(item)) {
+        total += Number(item.system?.quantity ?? 1) || 0;
+      }
+    }
+  }
+  return total;
+}
+
+function _buildIngredientSetCardData(set, sourceActors) {
+  const groups = Array.isArray(set?.ingredientGroups) ? set.ingredientGroups : [];
+  const cards = groups.map(group => {
+    const options = Array.isArray(group.options) ? group.options : [];
+    return {
+      id: group.id,
+      name: group.name || '',
+      options: options.map(option => {
+        const need = Number(option.quantity ?? 1) || 1;
+        const have = _availableQuantityFor(option, sourceActors);
+        return {
+          id: option.id ?? `${group.id}-${_summarizeOptionLabel(option)}`,
+          type: _summarizeOptionType(option),
+          label: _summarizeOptionLabel(option),
+          need,
+          have,
+          satisfied: have >= need,
+          source: _resolveFirstMatchingSource(option, sourceActors)
+        };
+      })
+    };
+  });
+  const essences = Object.entries(set?.essences ?? {}).map(([type, need]) => ({
+    type,
+    need: Number(need) || 0
+  }));
+  const catalysts = Array.isArray(set?.catalysts)
+    ? set.catalysts.map(cat => ({
+      id: cat.id ?? cat.componentId ?? cat.systemItemId,
+      name: cat.name || cat.componentId || cat.systemItemId || 'Catalyst',
+      need: Number(cat.quantity ?? 1) || 1
+    }))
+    : [];
+  return { groups: cards, essences, catalysts };
+}
+
+/**
+ * Build the read-only craft plan for the complex-recipe inspector.
+ *
+ * @param {object} recipe - Raw Recipe model
+ * @param {object} preparedRecipe - Prepared display recipe (already has prepared evaluation states)
+ * @param {object[]} sourceActors - Component source actors
+ * @param {number} selectedPathIndex - Currently-selected path index
+ * @returns {object} craftPlan payload
+ */
+function _buildCraftPlan(recipe, preparedRecipe, sourceActors, selectedPathIndex) {
+  const ingredientSets = Array.isArray(recipe.ingredientSets) ? recipe.ingredientSets : [];
+  const paths = ingredientSets.map((set, index) => {
+    const { groups, essences, catalysts } = _buildIngredientSetCardData(set, sourceActors);
+    const allSatisfied = groups.length > 0 && groups.every(group =>
+      group.options.some(option => option.satisfied)
+    );
+    return {
+      id: set.id ?? `path-${index}`,
+      index,
+      name: set.name || `Path ${index + 1}`,
+      isSelected: index === selectedPathIndex,
+      isSatisfiable: allSatisfied,
+      groups,
+      essences,
+      catalysts
+    };
+  });
+
+  const steps = Array.isArray(recipe.steps) ? recipe.steps : [];
+  const stepEntries = steps.map((step, index) => ({
+    id: step.id ?? `step-${index}`,
+    index,
+    name: step.name || `Step ${index + 1}`,
+    status: 'pending'
+  }));
+  // Mark step status based on the prepared active-run data when available.
+  if (preparedRecipe?.activeRunId && Number.isInteger(preparedRecipe?.activeRunStepIndex)) {
+    const activeIdx = preparedRecipe.activeRunStepIndex;
+    stepEntries.forEach(entry => {
+      if (entry.index < activeIdx) entry.status = 'completed';
+      else if (entry.index === activeIdx) entry.status = 'current';
+    });
+  }
+
+  let outcomeType = 'fixed';
+  if (recipe.isVariable) outcomeType = 'progressive';
+  else if (recipe.outcomeRouting && typeof recipe.outcomeRouting === 'object') outcomeType = 'routed';
+
+  return {
+    paths,
+    selectedPathIndex,
+    selectedPathId: paths[selectedPathIndex]?.id ?? null,
+    steps: stepEntries,
+    outcome: {
+      type: outcomeType,
+      label: preparedRecipe?.resultDescription ?? recipe.getResultDescription?.() ?? ''
+    }
+  };
+}
+
 /**
  * Build the discovered recipes list for the alchemy panel.
  *
@@ -857,6 +1026,29 @@ export function createCraftingStore(services) {
   const discoveredRecipeSearch = writable('');
   const discoveredCraftableOnly = writable(false);
 
+  // --- Selected discovered recipe (Slice 1: actor-crafting-app-v2) ---
+  // Inspector selection. Lookups MUST go through `discoveredRecipes` (the
+  // already-filtered list) so non-GM hidden recipes never reach the inspector
+  // even if a hidden id is forced into the writable.
+  const selectedDiscoveredRecipeId = writable(null);
+  const selectedDiscoveredRecipe = writable(null);
+
+  // --- Selected crafting recipe (Slice 2: actor-crafting-app-v2) ---
+  // Inspector selection for the Crafting tab. Lookups go through the
+  // viewState.recipes list (the already-prepared/visibility-filtered
+  // recipes) so teaser/hidden state is preserved.
+  const selectedRecipeId = writable(null);
+  const selectedRecipeInspector = writable(null);
+  const craftingPageIndex = writable(0);
+  const historyPageIndex = writable(0);
+  const pageSize = writable(10);
+
+  // --- Selected path per complex recipe (Slice 3: actor-crafting-app-v2) ---
+  // Map of recipeId -> ingredient-set index. Used by the complex-recipe
+  // inspector so flipping rows preserves the user's chosen path.
+  // Stored as a writable Map; selection state is per-store-instance.
+  const selectedPathByRecipeId = writable(new Map());
+
   // --- Filtered run views (Task 16) ---
   // Runs filtered to alchemy systems only (for AlchemyTab RunSummary)
   const alchemyRuns = writable([]);
@@ -901,6 +1093,8 @@ export function createCraftingStore(services) {
     _recomputePalette();
     _clampWorkbench();
     _recomputeDiscoveredRecipes();
+    _recomputeSelectedDiscoveredRecipe();
+    _recomputeSelectedRecipeInspector();
   }
 
   // --- Internal: clamp workbench quantities to current inventory ---
@@ -968,6 +1162,143 @@ export function createCraftingStore(services) {
     discoveredRecipes.set(entries);
   }
 
+  // --- Internal: recompute selected discovered recipe inspector payload ---
+  // Lookup is intentionally scoped to the already-filtered `discoveredRecipes`
+  // list. This guarantees that non-GM viewers never see hidden-recipe data
+  // through the inspector, even if a hidden id is forced into the selection
+  // writable. If the selected id is not in the filtered list, the inspector
+  // payload is cleared.
+  function _recomputeSelectedDiscoveredRecipe() {
+    const id = get(selectedDiscoveredRecipeId);
+    if (!id) {
+      selectedDiscoveredRecipe.set(null);
+      return;
+    }
+    const filteredList = get(discoveredRecipes);
+    const entry = filteredList.find(r => r.id === id);
+    if (!entry) {
+      selectedDiscoveredRecipe.set(null);
+      return;
+    }
+
+    const recipeManager = services.getRecipeManager?.();
+    const recipe = recipeManager?.getRecipe?.(id) ?? null;
+    if (!recipe) {
+      selectedDiscoveredRecipe.set({
+        id: entry.id,
+        name: entry.name,
+        img: entry.img,
+        canCraft: entry.canCraft,
+        resultDescription: '',
+        ingredientStates: [],
+        essenceStates: [],
+        catalystStates: []
+      });
+      return;
+    }
+
+    const sources = get(componentSourceActors);
+    const evaluation = recipeManager.evaluateCraftability(sources, recipe);
+    const resultDescription = typeof recipe.getResultDescription === 'function'
+      ? recipe.getResultDescription()
+      : '';
+
+    selectedDiscoveredRecipe.set({
+      id: entry.id,
+      name: entry.name,
+      img: entry.img,
+      canCraft: entry.canCraft,
+      resultDescription,
+      ingredientStates: evaluation?.ingredientStates ?? [],
+      essenceStates: evaluation?.essenceStates ?? [],
+      catalystStates: evaluation?.catalystStates ?? []
+    });
+  }
+
+  function selectDiscoveredRecipe(id) {
+    selectedDiscoveredRecipeId.set(id || null);
+    _recomputeSelectedDiscoveredRecipe();
+  }
+
+  // --- Internal: recompute selected crafting-recipe inspector payload ---
+  // The Crafting tab inspector reads from `viewState.recipes` so the prepared
+  // shape (status, evaluation states, teaser fields, active-run summary) is
+  // already correct. Auto-select-first runs only when the prior selection is
+  // missing or no longer present.
+  //
+  // Slice 3: for complex recipes the payload also includes a `craftPlan`
+  // structure with classification chips, ingredient-set paths, AND/OR groups,
+  // and read-only source allocation badges. The complex inspector renders
+  // from this craftPlan; the source allocation is advisory display data only
+  // and does NOT change craft() behaviour.
+  function _recomputeSelectedRecipeInspector() {
+    const view = get(viewState);
+    const recipes = Array.isArray(view?.recipes) ? view.recipes : [];
+    if (recipes.length === 0) {
+      selectedRecipeInspector.set(null);
+      return;
+    }
+    let id = get(selectedRecipeId);
+    let entry = id ? recipes.find(r => r.id === id) : null;
+    if (!entry) {
+      entry = recipes[0];
+      id = entry.id;
+      selectedRecipeId.set(id);
+    }
+    const recipeManager = services.getRecipeManager?.();
+    const recipe = recipeManager?.getRecipe?.(entry.id) ?? null;
+    const sourceActors = get(componentSourceActors);
+    const isComplex = recipe ? !recipe.isSimpleRecipe() : false;
+    const classification = _buildComplexityClassification(recipe);
+    let craftPlan = null;
+    if (isComplex && recipe) {
+      const pathsMap = get(selectedPathByRecipeId);
+      const selectedPathIndex = Math.max(0, Math.min(
+        recipe.ingredientSets.length - 1,
+        Number.isInteger(pathsMap.get(entry.id)) ? pathsMap.get(entry.id) : 0
+      ));
+      craftPlan = _buildCraftPlan(recipe, entry, sourceActors, selectedPathIndex);
+    }
+    selectedRecipeInspector.set({
+      ...entry,
+      classification,
+      craftPlan
+    });
+  }
+
+  function selectRecipe(id) {
+    selectedRecipeId.set(id || null);
+    _recomputeSelectedRecipeInspector();
+  }
+
+  function selectPath(recipeId, pathIndex) {
+    if (!recipeId) return;
+    selectedPathByRecipeId.update(map => {
+      const next = new Map(map);
+      next.set(recipeId, Math.max(0, pathIndex | 0));
+      return next;
+    });
+    _recomputeSelectedRecipeInspector();
+  }
+
+  function setCraftingPageIndex(index) {
+    craftingPageIndex.set(Math.max(0, index | 0));
+  }
+
+  function setHistoryPageIndex(index) {
+    historyPageIndex.set(Math.max(0, index | 0));
+  }
+
+  function setPageSize(size) {
+    const next = Number(size);
+    if (Number.isFinite(next) && next > 0) {
+      pageSize.set(next);
+      craftingPageIndex.set(0);
+      historyPageIndex.set(0);
+      services.setSetting?.('actorAppPageSize', next);
+    }
+  }
+
   // --- refresh ---
   async function refresh() {
     const recipeManager = services.getRecipeManager();
@@ -1027,6 +1358,9 @@ export function createCraftingStore(services) {
     // --- Task 5: Discovered recipes ---
     _recomputeDiscoveredRecipes();
 
+    // --- Slice 1: Selected discovered recipe inspector ---
+    _recomputeSelectedDiscoveredRecipe();
+
     const currentShoppingList = get(shoppingList);
     let shoppingListData = null;
     if (currentShoppingList.length > 0) {
@@ -1044,6 +1378,9 @@ export function createCraftingStore(services) {
       search: get(searchTerm),
       shoppingListData
     });
+
+    // --- Slice 2: Selected crafting recipe inspector (uses fresh viewState) ---
+    _recomputeSelectedRecipeInspector();
 
     // --- Task 16: Filter runs by tab context ---
     // Build a set of recipe IDs that belong to alchemy systems
@@ -1162,10 +1499,12 @@ export function createCraftingStore(services) {
     const systems = get(alchemySystems);
     const system = systems.find(s => s.id === systemId) || null;
     selectedAlchemySystem.set(system);
-    // Clear workbench when switching systems
+    // Clear workbench and selected inspector when switching systems
     workbench.set([]);
+    selectedDiscoveredRecipeId.set(null);
     _recomputePalette();
     _recomputeDiscoveredRecipes();
+    _recomputeSelectedDiscoveredRecipe();
   }
 
   // --- Task 6: Tab action ---
@@ -1328,11 +1667,13 @@ export function createCraftingStore(services) {
   function setDiscoveredRecipeSearch(term) {
     discoveredRecipeSearch.set(term);
     _recomputeDiscoveredRecipes();
+    _recomputeSelectedDiscoveredRecipe();
   }
 
   function toggleDiscoveredCraftableOnly() {
     discoveredCraftableOnly.update(v => !v);
     _recomputeDiscoveredRecipes();
+    _recomputeSelectedDiscoveredRecipe();
   }
 
   async function autoFill(recipeId) {
@@ -1720,6 +2061,23 @@ export function createCraftingStore(services) {
     setDiscoveredRecipeSearch,
     toggleDiscoveredCraftableOnly,
     autoFill,
+    // Slice 1 (actor-crafting-app-v2): Selected discovered recipe inspector
+    selectedDiscoveredRecipeId,
+    selectedDiscoveredRecipe,
+    selectDiscoveredRecipe,
+    // Slice 2 (actor-crafting-app-v2): Selected crafting recipe inspector + pagination
+    selectedRecipeId,
+    selectedRecipeInspector,
+    selectRecipe,
+    craftingPageIndex,
+    historyPageIndex,
+    pageSize,
+    setCraftingPageIndex,
+    setHistoryPageIndex,
+    setPageSize,
+    // Slice 3 (actor-crafting-app-v2): Per-recipe path selection
+    selectedPathByRecipeId,
+    selectPath,
     // Task 16: Filtered run views
     alchemyRuns,
     alchemyRunHistory,

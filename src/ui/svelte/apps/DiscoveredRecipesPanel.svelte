@@ -6,10 +6,25 @@
     recipes = [],
     searchTerm = '',
     craftableOnly = false,
+    selectedRecipeId = null,
     onSearch,
     onToggleCraftableOnly,
-    onAutoFill
+    onAutoFill,
+    onSelectRecipe
   } = $props();
+
+  function handleRowClick(recipeId) {
+    if (typeof onSelectRecipe === 'function') {
+      onSelectRecipe(recipeId);
+    }
+  }
+
+  function handleRowKey(event, recipeId) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleRowClick(recipeId);
+    }
+  }
 </script>
 
 <div class="alchemy-discovered">
@@ -55,7 +70,16 @@
       </div>
     {:else}
       {#each recipes as recipe (recipe.id)}
-        <div class="alchemy-discovered-row" data-recipe-id={recipe.id}>
+        <div
+          class="alchemy-discovered-row"
+          class:alchemy-discovered-row--selected={selectedRecipeId === recipe.id}
+          data-recipe-id={recipe.id}
+          role={onSelectRecipe ? 'button' : undefined}
+          tabindex={onSelectRecipe ? 0 : undefined}
+          aria-pressed={onSelectRecipe ? (selectedRecipeId === recipe.id) : undefined}
+          onclick={onSelectRecipe ? () => handleRowClick(recipe.id) : undefined}
+          onkeydown={onSelectRecipe ? (e) => handleRowKey(e, recipe.id) : undefined}
+        >
           <img
             class="alchemy-discovered-img"
             src={recipe.img || 'icons/svg/item-bag.svg'}
@@ -82,7 +106,7 @@
             aria-label={localize('FABRICATE.Alchemy.AutoFill') + ' ' + recipe.name}
             aria-disabled={recipe.canCraft ? undefined : 'true'}
             disabled={!recipe.canCraft}
-            onclick={recipe.canCraft ? () => onAutoFill?.(recipe.id) : null}
+            onclick={recipe.canCraft ? (e) => { e.stopPropagation(); onAutoFill?.(recipe.id); } : null}
           >
             <i class="fas fa-fill-drip"></i>
           </button>
@@ -157,6 +181,24 @@
 
   .alchemy-discovered-row:hover {
     background: rgba(0, 0, 0, 0.06);
+  }
+
+  .alchemy-discovered-row[role="button"] {
+    cursor: pointer;
+  }
+
+  .alchemy-discovered-row--selected {
+    background: var(--fab-accent-soft);
+    box-shadow: inset 3px 0 0 var(--fab-accent);
+  }
+
+  .alchemy-discovered-row--selected:hover {
+    background: var(--fab-accent-soft);
+  }
+
+  .alchemy-discovered-row[role="button"]:focus-visible {
+    outline: 2px solid var(--fab-accent);
+    outline-offset: -2px;
   }
 
   .alchemy-discovered-img {

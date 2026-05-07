@@ -6,15 +6,16 @@
 
 The GM manager MUST expose rich gathering environment authoring when a selected crafting system has gathering enabled.
 
-1. The environment browse view SHOULD support search and filters for region, biome, risk, status, availability, and current condition where data exists.
-2. Environment rows SHOULD show image, name, region, biome, risk, enabled state, node availability summary, and current condition summary where data exists.
+1. The environment browse view SHOULD support search and filters for region, biome, risk, status, availability, and condition source/status evidence where data exists; current global weather/time MUST be shown as inherited evidence and managed in Settings, not used as environment browse filters.
+2. Environment rows SHOULD show image, name, region, biome, risk, enabled state, node availability summary, and inherited current condition summary where data exists.
 3. The selected-environment inspector SHOULD show player-facing image, description, region, biome, risk, scene-link state, current conditions, node availability summary, stamina economy summary, and validation.
 4. The environment editor MUST keep core environment identity separate from task/node authoring.
 5. The editor MUST allow environments to exist without a linked scene. Scene link controls are optional access/evidence controls, not the identity of the environment.
 6. The editor SHOULD include sections or tabs for Overview, Location, Conditions, Tasks / Nodes, Results, Risk / Encounters, Economy, Visibility, and Advanced, or an equivalent grouping.
 7. Overview/Location authoring MUST include name, description, image, enabled state, region, biome, and optional scene link where supported.
-8. Conditions authoring MUST let GMs set current time of day and weather when those features are enabled.
-9. Conditions authoring MUST show which task availability, yield, risk, stamina, or difficulty modifiers are active.
+8. Environment condition authoring MUST show the inherited global time of day and weather snapshot, but MUST NOT be the primary place to set global weather/time.
+9. Settings MUST be the only primary GM UI surface for current global weather and current global time of day. Environment authoring MAY expose explicit inherit/override controls for future provider slices.
+10. Conditions authoring MUST show which task availability, yield, risk, stamina, or difficulty modifiers are active.
 10. Tasks / Nodes authoring MUST expose task identity, enabled state, current node count, max node count, depletion timing, respawn policy, next respawn evidence, and manual restock controls when node economy is enabled.
 11. Manual restock controls MUST be GM-only and MUST show whether they affect current count, max count, or both.
 12. Economy authoring MUST show the selected gathering economy mode and expose only relevant controls as primary: time requirement for `time`, node controls for `nodes`, stamina cost/regeneration for `stamina`, and combined controls for `hybrid`.
@@ -31,7 +32,20 @@ The GM manager MUST expose rich gathering environment authoring when a selected 
 23. Attempt limit authoring MUST expose limit scope, max attempts, time window, recharge policy, probabilistic recharge settings, manual recharge controls, and current counter/recharge evidence.
 24. Developer/API configuration SHOULD expose hook enablement notes, chat message settings, and integration-safe identifiers for environments, tasks, nodes, stamina, attempt limits, encounters, and reveal states.
 25. Chat message controls SHOULD allow GMs to choose which gathering lifecycle events produce chat messages and whether GM diagnostics are whispered/restricted.
-26. GM screenshots MUST prove environment without scene link, region/biome filters, condition controls, node count/restock, respawn policy, attempt limits/recharge, blind multi-task reveal controls, risk/encounter controls, stamina regeneration/manual-set controls, expression/macro provider controls, chat settings, validation, and narrow-width stacking.
+27. Attached reusable task and hazard rows MUST show a compact collapsed summary with default-vs-override chips, enabled state, matching evidence, dirty/validation markers, and an explicit expand/collapse control.
+28. Expanded override panels MUST contain per-environment override fields only; reusable definition fields remain edited in their library surface.
+29. Expanded override rows MUST be keyboard reachable, preserve focus on save/error where practical, and stack without horizontal clipping in narrow Manager V2 widths.
+30. GM screenshots MUST prove environment without scene link, region/biome filters, inherited condition evidence, node count/restock, respawn policy, attempt limits/recharge, blind multi-task reveal controls, risk/encounter controls, stamina regeneration/manual-set controls, expression/macro provider controls, chat settings, validation, and narrow-width stacking.
+
+### Requirement: GM reusable gathering hazard management
+
+The GM manager MUST expose reusable hazard library authoring when a selected crafting system has gathering enabled.
+
+1. Hazard CRUD MAY live as a dedicated `Gathering Hazards` route or as a nested reusable library surface inside `Gathering Tasks` or `Gathering Settings`.
+2. The chosen hazard authoring surface MUST support create, edit, duplicate, delete, enable/disable, search/filter, usage evidence, and deletion confirmation when hazards are used by environments or tasks.
+3. Hazard rows MUST show name, image, description summary, enabled state, danger tags, region/biome/weather/time matching tags, drop rate, and modifier provider evidence.
+4. Hazard edit controls MUST validate drop rate, tag vocabulary values, provider configuration, and unsafe deletion.
+5. Environment and task composition surfaces MUST be able to attach/toggle matched reusable hazards without editing the reusable hazard definition inline.
 
 ### Requirement: Actor Gathering App rich environment browsing
 
@@ -41,9 +55,10 @@ The Actor Gathering app MUST present rich environments as player-facing places w
 2. The top header MUST show selected actor and, when enabled, gathering stamina current/max values and regeneration/adjustment affordance where permitted.
 3. The app SHOULD provide primary tabs or segmented navigation for `Environments` and `Gathering Log`.
 4. The environment browser MUST support search plus region, biome, risk/status, and availability filters where data exists.
+4a. The player environment browser MUST NOT expose current weather or current time of day as environment filters; those values are displayed as context/evidence only.
 5. Environment rows SHOULD be image-led and include environment name, region, biome, risk/status chip, and availability summary where safe to reveal.
 6. Selecting an environment MUST populate a task list and environment detail/evidence panel.
-7. Environment detail SHOULD show image, name, region, biome, description, risk, current time of day, weather, visibility/condition summary, and scene/access state where relevant.
+7. Environment detail SHOULD show image, name, region, biome, description, risk, current global time of day, current global weather, visibility/condition summary, and scene/access state where relevant.
 8. Task rows SHOULD show task image, name, description, required tools/catalysts summary, stamina cost or time cost, node availability state, risk modifier, and start/select action where safe to reveal.
 9. If stamina is enabled, task rows MUST show stamina cost and start blockers when the actor lacks stamina.
 10. If nodes are enabled, task rows MUST show availability or generic depleted state according to visibility/redaction rules.

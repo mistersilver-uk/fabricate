@@ -16,7 +16,7 @@ export class SvelteCraftingApp extends SvelteApplicationMixin(
 
   static DEFAULT_OPTIONS = {
     id: 'fabricate-crafting',
-    classes: ['fabricate', 'crafting-app'],
+    classes: ['fabricate', 'crafting-app', 'fabricate-actor-app'],
     tag: 'div',
     window: {
       title: 'Crafting',
@@ -24,8 +24,8 @@ export class SvelteCraftingApp extends SvelteApplicationMixin(
       resizable: true
     },
     position: {
-      width: 700,
-      height: 800
+      width: 1280,
+      height: 820
     }
   };
 

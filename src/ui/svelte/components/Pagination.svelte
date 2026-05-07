@@ -1,6 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
-  import { localize } from '../../util/foundryBridge.js';
+  import { localize } from '../util/foundryBridge.js';
 
   let {
     totalCount = 0,

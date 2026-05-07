@@ -2,73 +2,103 @@
 
 ## Planning
 
-- [x] Review the Actor Gathering App reference image.
-- [x] Read canonical gathering, player gathering UI, and actor flag specs.
-- [x] Create a separate OpenSpec change for rich gathering rather than modifying the manager-v2 visual-only change.
-- [x] Record keep/change/discard review notes for the Actor Gathering App reference.
-- [x] Define domain deltas for regions, biomes, conditions, nodes, respawn, risk, encounters, and stamina.
-- [x] Define UI deltas for GM environment management and the Actor Gathering app.
-- [x] Add natural dnd5e/pf2e expressions and custom macro alternatives for rich gathering formulas.
-- [x] Add manual-only and automatic stamina regeneration controls plus GM manual stamina setting.
-- [x] Add multi-task blind environments with optional progressive reveal.
-- [x] Add task attempt limits with time windows, probabilistic recharge, manual recharge, and hybrid recharge.
-- [x] Add developer hooks/API and gathering chat message requirements.
+- [x] Read `AGENTS.md`.
+- [x] Read existing `openspec/changes/rich-gathering-environments/` docs and deltas.
+- [x] Read canonical gathering and UI integration specs.
+- [x] Inspect current gathering runtime, environment store, rich state service, Manager V2, player app, styles, localization, and tests at a planning level.
+- [x] Load `javascript-structural-design` for module-boundary planning.
+- [x] Resolve auto-spawn agent roster from `AGENTS.md`.
+- [x] Update `proposal.md`, `design.md`, and `tasks.md` for the user-supplied end-to-end brief.
+- [ ] Run plan review loop with `fabricate_domain_expert`, `fabricate_ux_designer`, and `fabricate_quality_engineer`.
+- [ ] Revise plan docs for plan-review findings, up to 3 iterations.
 
 ## Implementation Entry Criteria
 
-- [x] Decide whether this ships as one large feature or staged slices: staged phases, with core API/runtime first, Manager V2 GM UI second, and Actor Gathering app third.
-- [x] Decide whether region/biome values are free-text, system-owned vocabularies, or world-owned vocabularies for the first implementation: environment-local strings first.
-- [x] Decide whether stamina uses Fabricate actor flags by default, game-system provider resources by default, or a selectable provider model: selectable provider model, defaulting to Fabricate actor flags when stamina is enabled and no external provider is configured.
-- [x] Decide rollback semantics for stamina spend and node depletion when an accepted attempt fails during history/result/catalyst commit: no irreversible stamina/node/result/catalyst side effect may occur before terminal history persists; failed post-history commits must leave auditable evidence and avoid result/catalyst side effects.
-- [x] Decide whether condition state is environment-local, globally inherited, or integration-driven: environment-local first, with provider/integration hooks reserved.
-- [x] Decide stable public hook names and API method names before implementation: use `fabricate.gathering.*` hook names and add narrow `game.fabricate` rich gathering methods for GM state, node restock, attempt recharge, stamina adjustment, condition update, and blind reveal.
-- [x] Decide default blind task-selection strategies and reveal scopes for first implementation: default unrevealed selection is first available task; reveal scope defaults to actor when progressive reveal is enabled.
-- [x] Decide chat message event defaults and whether they are system-level, environment-level, or task-level settings: disabled unless explicitly enabled at environment/task event settings.
-- [x] Add migration/defaulting plan before editing production data models: additive normalization only; legacy environments are not rewritten until saved and load with neutral defaults.
+- [ ] Plan review emits `APPROVED` from all resolved plan-review agents.
+- [x] Decide reusable task storage location: dedicated world setting keyed by crafting system for this slice, with system-record promotion deferred.
+- [x] Decide hazard storage location and first-slice hazard capabilities: same dedicated setting keyed by crafting system, nested hazard authoring allowed under Gathering Tasks.
+- [x] Decide whether d100 is a new `resolutionMode` or a gathering-only routed subtype: `resolutionMode: "d100"` for reusable gathering-native tasks, while routed/progressive remain compatibility modes.
+- [x] Decide global condition persistence location and provider contract: dedicated gathering config world setting, manual mode first, provider integration deferred.
+- [x] Decide minimum chat output scope for first end-to-end implementation: no mandatory chat output in this slice; persist chat ids/evidence only when later chat creation is enabled.
+- [x] Confirm no new npm dependency is required.
+- [ ] Confirm screenshot harness: Vite/happy-dom where sufficient, Foundry Playwright where runtime or pointer behavior requires it.
 
-## Current Implementation Progress
+## Implementation Plan
 
-- [x] Implemented the first core API/runtime slice: additive rich environment/task normalization, player-safe listing metadata, blocker evaluation for node availability/stamina/attempt limits, rich run evidence persistence, GM state APIs, and `fabricate.gathering.*` hook dispatch points.
-- [x] Implemented the first Manager V2 GM UI slice: rich environment metadata fields, condition fields, task economy controls, and environment risk/region/biome filters.
-- [x] Implemented the first Player Gathering app slice: environment search/filtering, environment imagery/region/biome/risk/condition display, stamina summary display, and task economy evidence.
-- [x] Added focused unit/component coverage for additive rich metadata normalization, blind multi-task validation, rich blocker ordering, existing listing/start/finish compatibility, bootstrap API exposure, and affected app contracts.
+- [ ] Add reusable gathering task library normalization, validation, persistence, clone/delete, usage lookup, and backward-compatible inline-task handling.
+- [ ] Add reusable gathering hazard library normalization, validation, persistence, clone/delete, usage lookup, and player-safe redaction helpers.
+- [ ] Add global gathering condition state and environment inheritance/override resolution.
+- [ ] Add d100 gathering resolution validation and runtime resolver with deterministic tests for drop-row and hazard selection.
+- [ ] Wire task placements into environment listing/start without breaking legacy embedded tasks.
+- [ ] Extend start/list guard output with paused-game listing blockers.
+- [ ] Extend rich attempt evidence with condition source, reusable task ids, d100 roll/drop-row, hazard outcome, and chat ids where applicable.
+- [ ] Add hazard resolution hooks/API surface with integration error isolation.
+- [ ] Add chat message creation after accepted/persisted gathering lifecycle transitions.
+- [ ] Add GM APIs for task library, hazard library, global condition update, manual restock/recharge, stamina adjustment, and blind reveal/reset where missing.
+- [ ] Promote Manager V2 `Environments`, `Gathering Tasks`, and `Gathering Settings` routes from placeholders/deferred views to feature-gated routes.
+- [ ] Build Manager V2 Environments composition UI for attaching reusable tasks, editing overrides, condition inheritance, node/restock, attempt recharge, blind reveal, and hazard links.
+- [ ] Build Manager V2 Tasks UI for reusable task authoring, d100 drop rows, result references, catalysts, economy defaults, visibility, hazards, and usage evidence.
+- [ ] Build Manager V2 Settings UI for global weather/time, economy defaults, stamina defaults, d100 drop-row templates, chat settings, and developer/API evidence.
+- [ ] Extend Player Gathering app display for global/environment conditions, reusable task evidence, d100 drop rows where safe, hazard/risk evidence, paused blocker, active runs, history, and chat/log links.
+- [ ] Preserve blind redaction across listings, start responses, active runs, history, chat, hazards, d100 drop rows, blockers, and provider diagnostics.
+- [ ] Add localization for all new labels, validation messages, blockers, tooltips, and chat/log text.
+- [ ] Add CSS using existing flat Manager V2 and gathering app patterns.
 
-## Future Implementation Plan
+## Test Plan
 
-- [x] Extend gathering environment normalization and validation with additive fields for region, biome, image, conditions, risk, economy, node availability, respawn, encounter hooks, and stamina cost.
-- [ ] Complete runtime services for elapsed/probabilistic node respawn evaluation and persisted respawn rolls.
-- [ ] Complete runtime services for time-window attempt counters, probabilistic recharge, manual recharge UX/API, and persisted recharge rolls.
-- [ ] Complete runtime services for stamina regeneration modes, external provider/system formula evaluation, and regeneration history.
-- [x] Add runtime services for blind multi-task selection, progressive reveal, reveal scopes, manual reveal, and reset/revoke reveal.
-- [x] Add first-slice public APIs and hook dispatch for rich gathering listing, guards, stamina, nodes, attempt limits, conditions, and blind reveal.
-- [ ] Complete public APIs and hook dispatch for condition modifiers, encounters, chat output, provider formula evaluation, and advanced recharge/respawn events.
-- [x] Extend `listGatheringForActor` to return player-safe environment metadata, region/biome filters, condition summaries, risk summaries, node availability, attempt-limit blockers, stamina blockers, revealed blind tasks, generic blind actions, and hidden-task redaction.
-- [x] Extend `startGatheringAttempt` guard order to include attempt limits, stamina, node availability, rich evidence capture, and commit-after-history ordering.
-- [ ] Complete `startGatheringAttempt` integrations for encounter hooks, condition modifiers, and chat output.
-- [x] Extend active/history gathering run records with economy evidence: stamina spent, node consumed/restored, attempt counter/recharge state, condition snapshot, risk level, encounter outcome, chat message ids where relevant, reveal events, and redaction-safe display data.
-- [x] Build first-slice GM manager-v2 rich environment browse/edit surfaces with region/biome/risk/condition filters, task node controls, respawn policy controls, attempt-limit controls, and stamina economy settings.
-- [ ] Complete GM manager-v2 rich controls for blind reveal operations, expression/macro providers, manual restock/recharge flows, encounter table configuration, chat settings, and developer/API evidence.
-- [x] Build first-slice Actor Gathering app redesign with environment browser, task list, stamina summary, rich evidence chips, and narrow responsive layout.
-- [x] Repair Player Gathering V2 layout to match the reference direction: wider app shell, full-width header, paginated environment browser, center selected-environment task list, and right-side environment/detail plus active task panels.
-- [x] Remove invalid environment fallback image requests from the Player Gathering V2 app.
-- [ ] Complete Actor Gathering detail/evidence panel polish and active/log tab rich evidence display.
-- [x] Add localization for all new labels, states, validation messages, tooltips, and hidden/redacted copy.
-- [x] Add first-slice unit tests for rich normalization, node/stamina/attempt blockers, bootstrap APIs, listing compatibility, and hidden-task redaction compatibility.
-- [ ] Add remaining unit tests for elapsed/probabilistic node respawn, manual restock UX/API, probabilistic persistence, attempt recharge, stamina regeneration/provider formulas, condition modifiers, encounter hooks, chat output, API permission edge cases, and hook isolation.
-- [ ] Add mounted tests for GM rich environment editor and Actor Gathering app.
-- [ ] Add Foundry Playwright smoke tests and screenshots for GM rich environment editing and Actor Gathering normal/narrow states.
+- [ ] Unit tests for reusable task normalization, validation, duplicate/delete, usage evidence, and legacy inline-task compatibility.
+- [ ] Unit tests for definition-vs-placement ID matching, override precedence, linked-definition edits propagating to multiple environments, stale/deleted definition handling, and preserving active run references.
+- [ ] Unit tests for hazard normalization, validation, resolution, redaction, and usage evidence.
+- [ ] Unit tests for global condition inheritance, overrides, provider diagnostics, and attempt snapshots.
+- [ ] Unit tests for d100 drop-row validation: dropRate bounds, item/component references, quantities, disabled rows, selection modes, hazard dropRate, and result references.
+- [ ] Unit tests for d100 runtime resolution and history-before-side-effects ordering.
+- [ ] Unit tests for d100 item reference matching after placement overrides, missing/disabled/cross-system hazard references, modifier behavior, deterministic hazard selection, macro/table failure isolation, and redaction-safe history/chat evidence.
+- [ ] Unit tests for paused-game listing blocker and paused start rejection side-effect safety.
+- [ ] Unit tests for node/stamina/attempt/hazard/chat evidence on immediate and timed attempts.
+- [ ] Store tests for Manager V2 route state, selected-system feature gates, task/hazard/settings actions, dirty state, and validation summaries.
+- [ ] Mounted/source-contract tests for Manager V2 Environments, Tasks, and Settings routes.
+- [ ] Mounted/source-contract tests for Player Gathering app paused state, blind redaction, d100/hazard evidence, and narrow layout.
+- [ ] Mounted/store tests for player region, biome, risk/status, availability, paused, and blind-redaction filter combinations; weather/time must be displayed as evidence, not filters.
+- [ ] Live browser pointer hit-tests where feasible for Manager V2 nav, task attach rows, menus, disabled controls, and manual GM controls.
+- [ ] Run `npm test`.
+- [ ] Run `npm run build`.
 
-## Scope Decisions
+## Screenshot Gates
 
-- [ ] Do not introduce standalone harvesting; keep harvesting as recipe or salvage.
-- [ ] Do not require scene links for environments.
-- [ ] Do not hardcode weather, time, or stamina formulas for specific game systems in core.
-- [ ] Do not expose blind task identity or hidden result metadata to non-GM users.
-- [ ] Do not make encounter automation mandatory.
-- [ ] Do not make automatic stamina regeneration mandatory.
-- [ ] Do not require blind environments to progressively reveal tasks.
+- [ ] Capture Manager V2 Environments desktop screenshot proving environment composition, attached reusable tasks, global-condition inheritance, node/restock controls, and validation.
+- [ ] Capture Manager V2 Tasks desktop screenshot proving reusable task list, d100 drop-row editor, hazard drop-rate controls, and result evidence.
+- [ ] Capture Manager V2 Settings desktop screenshot proving global weather/time, stamina defaults, d100 drop-row defaults, chat settings, and developer/API section.
+- [ ] Capture Player Gathering desktop screenshot proving first visible state, environment browser, selected environment, conditions, hazard/risk chips, task list, and start controls.
+- [ ] Capture Player Gathering paused-state screenshot proving blocker visibility and disabled start actions.
+- [ ] Capture Player Gathering blind-state screenshot proving generic action and redacted task/hazard/result evidence.
+- [ ] Capture narrow Manager V2 screenshot around 720px wide proving stacked layout without clipping.
+- [ ] Capture narrow Player Gathering screenshot around 560px wide proving scroll containment and reachable controls.
 
-## Verification For This Planning Change
+## Documentation Loop
 
-- [x] `git diff --check -- openspec/changes/rich-gathering-environments`
-- [x] Manual review of this change against `openspec/specs/gathering-and-harvesting/spec.md` and `openspec/specs/ui-integration/spec.md`.
+- [ ] `fabricate_domain_expert` updates canonical specs for reusable tasks, hazards, global conditions, d100 resolution, paused blocker, Manager V2 routes, and player app behavior.
+- [ ] `fabricate_docs_writer` updates JSDoc and docs surfaces affected by public APIs, hooks, settings, and user workflows.
+- [ ] Domain expert reviews docs-writer output.
+- [ ] Docs writer reviews domain/spec output.
+- [ ] Iterate until both emit `DOCS APPROVED`, up to 3 iterations.
+
+## Review Gates
+
+- [ ] Implementation review loop with `fabricate_reviewer`, `fabricate_ux_designer`, and `fabricate_quality_engineer`.
+- [ ] Resolve `NEEDS_CHANGES` findings up to 3 implementation revisions.
+- [ ] Stop and escalate on any `BLOCKED` verdict.
+
+## Plan Risks
+
+- Reusable task placements may collide with existing environment-embedded task IDs and active run references unless placement IDs and definition IDs are kept distinct.
+- Global condition state can create confusing precedence unless inheritance/override UI is explicit.
+- d100 drop-row resolution may overlap with routed/progressive result authoring; the implementation needs a clear validation and display boundary.
+- Hazard output can leak hidden blind-task information if redaction is not centralized.
+- Chat messages must be created only after state transitions are persisted enough to avoid announcing failed commits.
+- Manager V2 route promotion touches nav, routing, store state, CSS, localization, and tests, so UI review and pointer hit-tests are required.
+
+## Loop Accounting
+
+- Plan loop iterations completed: 0 review iterations so far; docs drafted by orchestrator and ready for plan review.
+- Implementation loop iterations completed: 0; implementation has not started for this end-to-end plan.
+- Documentation loop iterations completed: 0; docs loop is deferred until implementation diff exists.
