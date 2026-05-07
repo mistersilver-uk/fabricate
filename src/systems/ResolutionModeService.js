@@ -20,6 +20,14 @@ export class ResolutionModeService {
     return recipe?.resultSelection?.provider || null;
   }
 
+  getResultSelection(recipe, step = null) {
+    return step?.resultSelection || recipe?.resultSelection || null;
+  }
+
+  getProviderForStep(recipe, step = null) {
+    return this.getResultSelection(recipe, step)?.provider || null;
+  }
+
   getExecutionSteps(recipe) {
     return typeof recipe?.getExecutionSteps === 'function'
       ? recipe.getExecutionSteps()
@@ -49,7 +57,8 @@ export class ResolutionModeService {
   // ---------------------------------------------------------------------------
 
   async resolveByRollTable(recipe, step, allGroups) {
-    const tableUuid = recipe?.resultSelection?.rollTableUuid;
+    const selection = this.getResultSelection(recipe, step);
+    const tableUuid = selection?.rollTableUuid;
     if (!tableUuid) {
       return { groups: [], meta: { error: 'No roll table UUID configured' } };
     }
@@ -138,18 +147,34 @@ export class ResolutionModeService {
         }
       }
 
-      if (mode === 'tiered') {
-        if (!checkEnabled) errors.push('Legacy tiered compatibility mode requires crafting checks enabled');
-        if (outcomes.length === 0) errors.push('Legacy tiered compatibility mode requires at least one declared outcome');
-        if (sets.length < 1) errors.push(`Step "${step.name || step.id}" must have at least 1 ingredient set in legacy tiered compatibility mode`);
-        if (groups.length < 1) errors.push(`Step "${step.name || step.id}" must have at least 1 result group in legacy tiered compatibility mode`);
+      if (mode === 'tiered' || mode === 'routed') {
+        if (sets.length < 1) errors.push(`Step "${step.name || step.id}" must have at least 1 ingredient set in ${mode === 'routed' ? 'routed' : 'legacy tiered compatibility'} mode`);
+        if (groups.length < 1) errors.push(`Step "${step.name || step.id}" must have at least 1 result group in ${mode === 'routed' ? 'routed' : 'legacy tiered compatibility'} mode`);
 
-        const groupIds = new Set(groups.map(g => g.id));
-        const routing = step?.outcomeRouting || recipe?.outcomeRouting || {};
-        for (const outcome of outcomes) {
-          const target = routing?.[outcome];
-          if (!target || !groupIds.has(target)) {
-            errors.push(`Outcome "${outcome}" must map to a valid result group in step "${step.name || step.id}"`);
+        if (mode === 'tiered') {
+          if (!checkEnabled) errors.push('Legacy tiered compatibility mode requires crafting checks enabled');
+          if (outcomes.length === 0) errors.push('Legacy tiered compatibility mode requires at least one declared outcome');
+          const groupIds = new Set(groups.map(g => g.id));
+          const routing = step?.outcomeRouting || recipe?.outcomeRouting || {};
+          for (const outcome of outcomes) {
+            const target = routing?.[outcome];
+            if (!target || !groupIds.has(target)) {
+              errors.push(`Outcome "${outcome}" must map to a valid result group in step "${step.name || step.id}"`);
+            }
+          }
+        } else {
+          const provider = this.getProviderForStep(recipe, step);
+          if (!provider) {
+            errors.push(`Step "${step.name || step.id}" in routed mode requires resultSelection.provider`);
+          } else if (!['ingredientSet', 'macroOutcome', 'rollTableOutcome'].includes(provider)) {
+            errors.push('Invalid result selection provider: ' + provider);
+          }
+          const selection = this.getResultSelection(recipe, step);
+          if (provider === 'rollTableOutcome' && !selection?.rollTableUuid) {
+            errors.push('rollTableOutcome provider requires a roll table UUID');
+          }
+          if (provider === 'macroOutcome' && !checkEnabled) {
+            errors.push('macroOutcome provider requires crafting checks enabled');
           }
         }
       }
@@ -320,14 +345,34 @@ export class ResolutionModeService {
       };
     }
 
-    if (mode === 'tiered') {
+    if (mode === 'tiered' || mode === 'routed') {
       const outcome = checkResult?.outcome != null ? String(checkResult.outcome) : null;
-      const routing = step?.outcomeRouting || recipe?.outcomeRouting || {};
-      const routedId = outcome ? routing[outcome] : null;
-      return {
-        groups: routedId ? allGroups.filter(group => group.id === routedId) : [],
-        meta: { outcome, routedId }
-      };
+      if (mode === 'tiered') {
+        const routing = step?.outcomeRouting || recipe?.outcomeRouting || {};
+        const routedId = outcome ? routing[outcome] : null;
+        return {
+          groups: routedId ? allGroups.filter(group => group.id === routedId) : [],
+          meta: { outcome, routedId }
+        };
+      }
+
+      const provider = this.getProviderForStep(recipe, step);
+      if (provider === 'ingredientSet') {
+        const mappedId = ingredientSet?.resultGroupId || selectedResultGroupId || null;
+        if (mappedId) return { groups: allGroups.filter(group => group.id === mappedId), meta: {} };
+        return { groups: allGroups.slice(0, 1), meta: {} };
+      }
+      if (provider === 'macroOutcome') {
+        const normalized = this._normalizeName(outcome);
+        if (this._isFailKeyword(normalized)) return { groups: [], meta: { outcome, disposition: 'fail' } };
+        if (this._isMissKeyword(normalized)) return { groups: [], meta: { outcome, disposition: 'miss' } };
+        const matched = allGroups.filter(group => this._normalizeName(group.name) === normalized);
+        if (matched.length === 0) {
+          return { groups: [], meta: { outcome, disposition: 'misconfiguration', error: `No result group matches outcome "${outcome}"` } };
+        }
+        return { groups: matched.slice(0, 1), meta: { outcome, disposition: 'success' } };
+      }
+      return { groups: allGroups.slice(0, 1), meta: {} };
     }
 
     if (mode === 'progressive') {
@@ -427,6 +472,10 @@ export class ResolutionModeService {
     const mode = this.getMode(recipe);
     if (mode === 'tiered') {
       return !!(checkResult?.outcome != null && String(checkResult.outcome).trim().length > 0);
+    }
+    if (mode === 'routed') {
+      return this.getProvider(recipe) !== 'macroOutcome'
+        || !!(checkResult?.outcome != null && String(checkResult.outcome).trim().length > 0);
     }
     if (mode === 'progressive') {
       return Number.isFinite(Number(checkResult?.value));

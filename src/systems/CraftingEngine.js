@@ -401,7 +401,7 @@ export class CraftingEngine {
       options?.resultGroupId || null
     );
 
-    if (resolutionMeta?.disposition === 'error') {
+    if (resolutionMeta?.disposition === 'error' || resolutionMeta?.disposition === 'misconfiguration') {
       const message = resolutionMeta.error || 'Crafting resolution failed';
       if (runManager && run) {
         await runManager.completeStepFailure(craftingActor, run, stepIndex, message, {
@@ -803,11 +803,19 @@ export class CraftingEngine {
       rollTableResult = await resolutionService.resolveByRollTable(recipe, step, allGroups);
       if (rollTableResult.meta?.error && !rollTableResult.meta?.disposition) {
         console.error(`Fabricate | rollTableOutcome error: ${rollTableResult.meta.error}`);
-        return { items: [], rollTableMeta: { error: rollTableResult.meta.error, disposition: 'error' } };
+        return {
+          items: [],
+          rollTableMeta: { error: rollTableResult.meta.error, disposition: 'error' },
+          resolutionMeta: { error: rollTableResult.meta.error, disposition: 'error' }
+        };
       }
       if (rollTableResult.meta?.disposition === 'misconfiguration') {
         console.error(`Fabricate | rollTableOutcome misconfiguration: ${rollTableResult.meta.error}`);
-        return { items: [], rollTableMeta: { error: rollTableResult.meta.error, disposition: 'misconfiguration' } };
+        return {
+          items: [],
+          rollTableMeta: { error: rollTableResult.meta.error, disposition: 'misconfiguration' },
+          resolutionMeta: { error: rollTableResult.meta.error, disposition: 'misconfiguration' }
+        };
       }
     }
 
@@ -1359,7 +1367,8 @@ export class CraftingEngine {
     }
 
     const mode = resolutionService?.getMode(recipe) || system?.resolutionMode || 'simple';
-    const checkRequired = mode === 'tiered' || mode === 'progressive';
+    const selection = resolutionService?.getResultSelection?.(recipe, step) || recipe?.resultSelection || null;
+    const checkRequired = mode === 'tiered' || mode === 'progressive' || (mode === 'routed' && selection?.provider === 'macroOutcome');
     const advancedEnabled = system.advancedOptionsEnabled !== false;
     const features = system.features || {};
     const checksEnabled = advancedEnabled && (features.craftingChecks === true || system?.craftingCheck?.enabled === true);
@@ -1466,7 +1475,9 @@ export class CraftingEngine {
     const outcome = result.outcome != null ? String(result.outcome) : null;
     const value = Number.isFinite(Number(result.value)) ? Number(result.value) : null;
     const allowed = Array.isArray(config.outcomes) ? config.outcomes : [];
-    if (outcome && allowed.length > 0 && !allowed.includes(outcome)) {
+    const normalizedOutcome = outcome?.trim().toLowerCase();
+    const normalizedAllowed = allowed.map(entry => String(entry || '').trim().toLowerCase()).filter(Boolean);
+    if (outcome && normalizedAllowed.length > 0 && !normalizedAllowed.includes(normalizedOutcome)) {
       return {
         success: false,
         outcome,
@@ -1705,6 +1716,7 @@ export class CraftingEngine {
       ingredientSets: step?.ingredientSets || recipe.ingredientSets || [],
       resultGroups: step?.resultGroups || recipe.resultGroups || [],
       outcomeRouting: step?.outcomeRouting || recipe.outcomeRouting || null,
+      resultSelection: step?.resultSelection || recipe.resultSelection || null,
       catalysts: [
         ...(Array.isArray(recipe?.catalysts) ? recipe.catalysts : []),
         ...(Array.isArray(step?.catalysts) ? step.catalysts : [])

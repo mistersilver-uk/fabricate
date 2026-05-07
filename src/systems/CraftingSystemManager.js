@@ -68,7 +68,7 @@ export class CraftingSystemManager {
       enabled: system.enabled !== false,
       resolutionMode: (function _normalizeResolutionMode(raw) {
         if (raw === 'cauldron') return 'alchemy'; // T-189: legacy alias
-        return ['simple', 'mapped', 'tiered', 'progressive', 'alchemy'].includes(raw) ? raw : 'simple';
+        return ['simple', 'mapped', 'tiered', 'routed', 'progressive', 'alchemy'].includes(raw) ? raw : 'simple';
       })(system.resolutionMode),
       // New spec-first shape
       features,

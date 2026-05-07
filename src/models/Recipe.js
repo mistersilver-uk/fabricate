@@ -374,7 +374,8 @@ export class Recipe {
       currencyCost: this._normalizeCurrencyCost(step.currencyCost),
       outcomeRouting: step.outcomeRouting && typeof step.outcomeRouting === 'object'
         ? { ...step.outcomeRouting }
-        : null
+        : null,
+      resultSelection: this._normalizeResultSelection(step.resultSelection)
     };
   }
 
@@ -452,7 +453,8 @@ export class Recipe {
       catalysts: this.catalysts || [],
       timeRequirement: null,
       currencyRequirement: null,
-      outcomeRouting: this.outcomeRouting || null
+      outcomeRouting: this.outcomeRouting || null,
+      resultSelection: this.resultSelection || null
     }];
   }
 }
