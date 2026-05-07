@@ -396,6 +396,8 @@
             "RecipeDocs": "Recipe docs",
             "Quickstart": "Quickstart"
           },
+          "EnableNamed": "Enable {name}",
+          "DisableNamed": "Disable {name}",
           "ToggleNamed": "Toggle {name}",
           "Edit": "Edit recipe",
           "Duplicate": "Duplicate recipe",

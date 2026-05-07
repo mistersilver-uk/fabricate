@@ -224,6 +224,8 @@ Capabilities:
 
 List recipes for the selected crafting system.
 
+In Manager V2, recipe browse status uses the same compact interactive on/off toggle pattern as systems and environment browse rows. The Status column remains a Status column, and each row exposes a keyboard-reachable toggle with On/Off copy and enabled/disabled color treatment.
+
 Columns:
 
 - Name

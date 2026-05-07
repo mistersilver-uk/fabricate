@@ -186,7 +186,7 @@ test('manager-v2 empty states use refined heading and setup-panel styling', () =
 test('manager-v2 recipes browser defines compact responsive table geometry', () => {
   const tableBlock = blockFor('.fabricate-manager-v2 .manager-v2-recipes-table');
   const identityBlock = blockFor('.fabricate-manager-v2 .manager-v2-recipe-identity');
-  const toggleBlock = blockFor('.fabricate-manager-v2 .manager-v2-toggle input');
+  const statusCellBlock = blockFor('.fabricate-manager-v2 .manager-v2-system-row .manager-v2-status-cell,\n.fabricate-manager-v2 .manager-v2-recipe-row .manager-v2-status-cell,\n.fabricate-manager-v2 .manager-v2-environment-row .manager-v2-status-cell');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager-v2 (max-width: 1120px)'));
 
   assert.ok(
@@ -206,7 +206,11 @@ test('manager-v2 recipes browser defines compact responsive table geometry', () 
       || css.includes('.fabricate-manager-v2 .manager-v2-recipe-identity,\n.fabricate-manager-v2 .manager-v2-component-identity'),
     'recipe identity should reserve thumbnail space'
   );
-  assert.ok(toggleBlock.includes('width: 18px;'), 'recipe enabled toggle should keep a stable hit target');
+  assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-recipe-row .manager-v2-status-cell'),
+    'recipe status cells should use the shared compact status-toggle alignment'
+  );
+  assert.ok(statusCellBlock.includes('justify-self: start;'), 'shared status toggle cells should align compact toggles to the start');
   assert.ok(
     mediumQuery.includes('.fabricate-manager-v2 .manager-v2-recipe-row') && mediumQuery.includes('grid-template-columns: minmax(0, 1fr);'),
     'medium manager-v2 layout should stack recipe rows before columns become cramped'

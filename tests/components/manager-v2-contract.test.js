@@ -141,6 +141,8 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.equal(lang.FABRICATE.Admin.ManagerV2.SystemEdit.EditBadge, undefined);
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Recipe.Title, 'Recipes');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Recipe.Requirements, 'Requirements');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Recipe.EnableNamed, 'Enable {name}');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Recipe.DisableNamed, 'Disable {name}');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Component.Title, 'Components');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Component.DropZoneTitle, 'Drop items to add components');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Component.Origin, 'Origin');
@@ -200,6 +202,8 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(!rootSource.includes('manager-v2-scope-clear'), 'selected-system rail should not render the old x clear icon');
     assert.ok(managerV2Source.includes('toggleSystemEnabled'), 'systems browser should expose interactive row status toggles');
     assert.ok(systemsBrowserSource.includes('manager-v2-status-toggle'), 'systems browser should render status as a toggle control');
+    assert.ok(recipesBrowserSource.includes('manager-v2-status-toggle'), 'recipes browser should render status as a toggle control');
+    assert.ok(!recipesBrowserSource.includes('type="checkbox"\n                  checked={recipe.enabled !== false}'), 'recipes browser should not render recipe status as a checkbox');
     assert.ok(!rootSource.includes("setView('systems')"), 'systems should not be exposed as a left-rail tab');
     assert.ok(!rootSource.includes('manager-v2-count-cluster'), 'system rows should not duplicate inspector counts inline');
     assert.ok(!rootSource.includes('FABRICATE.Admin.ManagerV2.QuickActions'), 'inspector should not duplicate row actions');

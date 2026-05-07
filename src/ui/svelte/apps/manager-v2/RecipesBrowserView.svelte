@@ -244,16 +244,24 @@
             <span role="cell" class="manager-v2-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.ManagerV2.Recipe.Requirements', 'Requirements')}>
               <span class="manager-v2-muted">{requirementsSummary(recipe)}</span>
             </span>
-            <span role="cell" class="manager-v2-recipe-status manager-v2-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.ManagerV2.Recipe.Status', 'Status')}>
-              <label class="manager-v2-toggle">
-                <input
-                  type="checkbox"
-                  checked={recipe.enabled !== false}
-                  aria-label={text('FABRICATE.Admin.ManagerV2.Recipe.ToggleNamed', 'Toggle {name}').replace('{name}', recipe.name)}
-                  onchange={(event) => onToggleEnabled(recipe.id, event.currentTarget.checked)}
-                />
-                <span>{recipe.enabled === false ? text('FABRICATE.Admin.ManagerV2.StatusDisabled', 'Disabled') : text('FABRICATE.Admin.ManagerV2.StatusActive', 'Active')}</span>
-              </label>
+            <span role="cell" class="manager-v2-recipe-status manager-v2-labeled-cell manager-v2-status-cell" data-label={stackedLabel('FABRICATE.Admin.ManagerV2.Recipe.Status', 'Status')}>
+              <button
+                type="button"
+                class={`manager-v2-status-toggle ${recipe.enabled === false ? 'is-off' : 'is-on'}`}
+                aria-pressed={recipe.enabled !== false}
+                aria-label={recipe.enabled === false
+                  ? text('FABRICATE.Admin.ManagerV2.Recipe.EnableNamed', 'Enable {name}').replace('{name}', recipe.name)
+                  : text('FABRICATE.Admin.ManagerV2.Recipe.DisableNamed', 'Disable {name}').replace('{name}', recipe.name)}
+                onclick={(event) => { event.stopPropagation(); onToggleEnabled(recipe.id, recipe.enabled === false); }}
+                onkeydown={(event) => event.stopPropagation()}
+              >
+                <span class="manager-v2-status-toggle-track" aria-hidden="true">
+                  <span class="manager-v2-status-toggle-knob"></span>
+                </span>
+                <span class="manager-v2-status-toggle-label">
+                  {recipe.enabled === false ? text('FABRICATE.Admin.ManagerV2.StatusOff', 'Off') : text('FABRICATE.Admin.ManagerV2.StatusOn', 'On')}
+                </span>
+              </button>
             </span>
             <span role="cell" class="manager-v2-action-group manager-v2-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.ManagerV2.Column.Actions', 'Actions')}>
               <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Recipe.EditNamed', 'Edit {name}').replace('{name}', recipe.name)} title={text('FABRICATE.Admin.ManagerV2.Recipe.Edit', 'Edit recipe')} onclick={() => onEditRecipe(recipe.id)}>

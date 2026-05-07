@@ -816,6 +816,15 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Restores a small amount of health.'));
     assert.ok(target.textContent.includes('Requirements'));
     assert.ok(target.textContent.includes('Player visibility'));
+    const enabledRecipeToggle = target.querySelector('[data-recipe-id="r1"] .manager-v2-status-toggle');
+    const disabledRecipeToggle = target.querySelector('[data-recipe-id="r2"] .manager-v2-status-toggle');
+    assert.ok(enabledRecipeToggle, 'enabled recipe row should render the shared status toggle');
+    assert.ok(disabledRecipeToggle, 'disabled recipe row should render the shared status toggle');
+    assert.equal(enabledRecipeToggle.getAttribute('aria-pressed'), 'true');
+    assert.equal(disabledRecipeToggle.getAttribute('aria-pressed'), 'false');
+    assert.equal(enabledRecipeToggle.querySelector('.manager-v2-status-toggle-label').textContent.trim(), 'On');
+    assert.equal(disabledRecipeToggle.querySelector('.manager-v2-status-toggle-label').textContent.trim(), 'Off');
+    assert.equal(target.querySelector('[data-recipe-id="r2"] .manager-v2-toggle input[type="checkbox"]'), null);
 
     target.querySelector('[data-recipe-id="r2"] .manager-v2-recipe-identity').click();
     await tick();
@@ -855,9 +864,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     search.value = 'elixir';
     search.dispatchEvent(new Event('input', { bubbles: true }));
 
-    const toggle = target.querySelector('[data-recipe-id="r2"] input[type="checkbox"]');
-    toggle.checked = true;
-    toggle.dispatchEvent(new Event('change', { bubbles: true }));
+    target.querySelector('[data-recipe-id="r2"] .manager-v2-status-toggle').click();
 
     target.querySelector('[data-recipe-id="r2"] .manager-v2-icon-button').click();
     target.querySelector('[data-recipe-id="r2"] .manager-v2-icon-button:nth-of-type(2)').click();
