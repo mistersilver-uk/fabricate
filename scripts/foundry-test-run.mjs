@@ -597,31 +597,61 @@ async function setRecipeManagerWindowSize(page, { width, height }) {
 }
 
 /**
+ * Race a promise against a deadline. Used to surface page.evaluate hangs as
+ * thrown errors (with context) rather than silent waits that consume the
+ * job timeout. Discovered cause for an earlier 13-minute Phase D0 hang
+ * in CI: a page.evaluate after a viewport resize was waiting indefinitely
+ * for the page's JS thread, with no timeout of its own. The script-level
+ * deadline guarantees we get a useful error and a `screenshot-failure.png`
+ * instead of a cancelled job.
+ * @template T
+ * @param {Promise<T>} promise
+ * @param {number} ms
+ * @param {string} label
+ * @returns {Promise<T>}
+ */
+function withDeadline(promise, ms, label) {
+  let timer;
+  const deadline = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Operation '${label}' exceeded ${ms}ms deadline`)), ms);
+  });
+  return Promise.race([promise, deadline]).finally(() => clearTimeout(timer));
+}
+
+/**
  * Resize the rendered Crafting System Manager V2 application frame for
  * responsive screenshots and hit testing.
  * @param {import('playwright').Page} page
  * @param {{ width: number, height: number }} size
  */
 async function setManagerV2WindowSize(page, { width, height }) {
-  await page.setViewportSize({
-    width: Math.max(1366, width + 80),
-    height: Math.max(768, height + 80)
-  });
-  await page.evaluate(({ width, height }) => {
-    const manager = document.querySelector('.fabricate-manager-v2');
-    const app = manager?.closest('.application, .app') || document.querySelector('#fabricate-crafting-system-manager-v2');
-    if (!app) return null;
-    Object.assign(app.style, {
-      width: `${width}px`,
-      height: `${height}px`,
-      left: '20px',
-      top: '20px'
-    });
-    return {
-      width: app.getBoundingClientRect().width,
-      height: app.getBoundingClientRect().height
-    };
-  }, { width, height });
+  await withDeadline(
+    page.setViewportSize({
+      width: Math.max(1366, width + 80),
+      height: Math.max(768, height + 80)
+    }),
+    15_000,
+    `setViewportSize ${width}x${height}`
+  );
+  await withDeadline(
+    page.evaluate(({ width, height }) => {
+      const manager = document.querySelector('.fabricate-manager-v2');
+      const app = manager?.closest('.application, .app') || document.querySelector('#fabricate-crafting-system-manager-v2');
+      if (!app) return null;
+      Object.assign(app.style, {
+        width: `${width}px`,
+        height: `${height}px`,
+        left: '20px',
+        top: '20px'
+      });
+      return {
+        width: app.getBoundingClientRect().width,
+        height: app.getBoundingClientRect().height
+      };
+    }, { width, height }),
+    15_000,
+    `setManagerV2WindowSize evaluate ${width}x${height}`
+  );
   await page.waitForTimeout(500);
 }
 
@@ -631,7 +661,7 @@ async function setManagerV2WindowSize(page, { width, height }) {
  * @param {string} label
  */
 async function assertManagerV2LayoutStable(page, label) {
-  const metrics = await page.evaluate(() => {
+  const metrics = await withDeadline(page.evaluate(() => {
     const selectors = [
       '.fabricate-manager-v2',
       '.manager-v2-main',
@@ -673,7 +703,7 @@ async function assertManagerV2LayoutStable(page, label) {
         text: element.textContent?.replace(/\s+/g, ' ').trim().slice(0, 80) || ''
       };
     }));
-  });
+  }), 30_000, `assertManagerV2LayoutStable ${label}`);
 
   const overflowing = metrics.filter(metric => metric.scrollWidth > metric.clientWidth + 2);
   if (overflowing.length > 0) {
@@ -2356,11 +2386,19 @@ async function main() {
         await assertManagerV2LayoutStable(page, 'components normal');
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-v2-components-normal');
+        process.stdout.write('  D0: components normal screenshotted\n');
 
+        // Components → stacked. Earlier CI runs hung silently between this
+        // resize and the next screenshot for ~13 minutes. The withDeadline
+        // wrappers above now surface a hang here as a thrown error rather
+        // than an opaque job timeout.
         await setManagerV2WindowSize(page, { width: 1000, height: 700 });
+        process.stdout.write('  D0: components stacked resize complete\n');
         await assertManagerV2LayoutStable(page, 'components stacked');
+        process.stdout.write('  D0: components stacked layout asserted\n');
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-v2-components-stacked');
+        process.stdout.write('  D0: components stacked screenshotted\n');
 
         await setManagerV2WindowSize(page, { width: 1280, height: 820 });
         await page.locator('.fabricate-manager-v2 .manager-v2-nav-button:has-text("Tags")').first().click();
