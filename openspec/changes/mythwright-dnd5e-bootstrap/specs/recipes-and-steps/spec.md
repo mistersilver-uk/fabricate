@@ -44,15 +44,16 @@ The Mythwright DnD5e bootstrap SHALL separate mundane SRD quality crafting, elem
 - **WHEN** Mythwright builds a bespoke relic recipe
 - **THEN** the recipe MAY include a `Mythic` result group.
 
-#### Scenario: Elemental recipes require matching essence
+#### Scenario: Elemental recipes require matching essence and route quality tiers
 
 - **WHEN** Mythwright builds a curated elemental finishing recipe
 - **THEN** the recipe SHALL require the matching essence and an artisan or mythic catalyst.
-- **AND** the recipe SHALL produce the matching curated elemental variant.
+- **AND** the recipe SHALL include `Flawed`, `Standard`, `Fine`, `Masterwork`, and `Mythic` result groups.
+- **AND** the recipe SHALL use macro outcome routing to produce the matching tiered elemental variant.
 
 #### Scenario: Elemental item payloads expose DnD5e function and visible fallback text
 
 - **WHEN** Mythwright builds an elemental weapon variant from an SRD item with `system.damage.parts`
-- **THEN** the payload SHALL add an elemental damage part.
+- **THEN** the payload SHALL add a quality-scaled elemental damage part.
 - **WHEN** Mythwright builds an elemental armour or shield variant
-- **THEN** the payload SHALL add resistance metadata using an item ActiveEffect and visible description text.
+- **THEN** the payload SHALL add quality-scaled defensive metadata using item ActiveEffects where applicable and visible description text.

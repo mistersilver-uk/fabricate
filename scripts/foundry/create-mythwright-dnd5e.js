@@ -12,9 +12,60 @@ const MythwrightDnd5eBootstrap = (() => {
   const MACRO_NAME = 'Mythwright Crafting Check';
   const ROOT_FOLDER = 'Mythwright';
   const DEFAULT_ITEM_ICON = 'icons/svg/item-bag.svg';
-  const APPROVED_MYTHWRIGHT_ICON_PATHS = Object.freeze([
-    DEFAULT_ITEM_ICON
-  ]);
+  const MYTHWRIGHT_ICONS = Object.freeze({
+    defaultItem: DEFAULT_ITEM_ICON,
+    macro: 'icons/tools/smithing/anvil.webp',
+    rawOre: 'icons/commodities/stone/ore-pile-grey.webp',
+    hardwood: 'icons/commodities/wood/lumber-stack-brown.webp',
+    curedHide: 'icons/commodities/leather/leather-bolt-tan.webp',
+    ironIngot: 'icons/commodities/metal/ingot-iron.webp',
+    weaponCore: 'icons/commodities/metal/ingot-steel.webp',
+    balancedHilt: 'icons/weapons/swords/sword-hilt-steel-green.webp',
+    bowStave: 'icons/weapons/bows/shortbow-recurve.webp',
+    armourPlates: 'icons/equipment/chest/breastplate-layered-steel.webp',
+    reinforcedStraps: 'icons/sundries/survival/leather-strap-brown.webp',
+    monsterTrophy: 'icons/commodities/bones/horn-simple-grey.webp',
+    ancientFragment: 'icons/commodities/treasure/token-runed-spiral-grey.webp',
+    dragonScale: 'icons/commodities/leather/scales-brown.webp',
+    artisanCatalyst: 'icons/tools/smithing/anvil.webp',
+    mythicCatalyst: 'icons/commodities/treasure/token-runed-fehu-gold.webp',
+    emberEssence: 'icons/svg/fire.svg',
+    frostEssence: 'icons/magic/air/weather-clouds-snow.webp',
+    stormEssence: 'icons/svg/lightning.svg',
+    radianceEssence: 'icons/svg/sun.svg',
+    shadowEssence: 'icons/commodities/currency/coin-engraved-moon-silver.webp',
+    dragonEssence: 'icons/commodities/bones/bones-dragon-grey.webp',
+    relicMythicLongsword: 'icons/weapons/swords/greatsword-blue.webp',
+    relicDraconicScaleMail: 'icons/equipment/chest/breastplate-scale-grey.webp',
+    relicStormBow: 'icons/weapons/bows/longbow-recurve.webp',
+    relicRadiantShield: 'icons/equipment/shield/heater-steel-gold.webp',
+    relicShadowDagger: 'icons/weapons/daggers/dagger-curved-black.webp',
+    emberShortsword: 'icons/weapons/swords/shortsword-guard-gold-red.webp',
+    frostLongsword: 'icons/weapons/swords/sword-guard-blue.webp',
+    stormShortbow: 'icons/weapons/bows/shortbow-recurve-blue.webp',
+    stormWarhammer: 'icons/weapons/hammers/hammer-double-glowing-yellow.webp',
+    radiantMace: 'icons/weapons/maces/mace-flanged-steel.webp',
+    radiantLongbow: 'icons/weapons/bows/longbow-gold-pink.webp',
+    shadowDagger: 'icons/weapons/daggers/dagger-curved-black.webp',
+    shadowRapier: 'icons/weapons/swords/sword-guard-purple.webp',
+    dragonGreatsword: 'icons/weapons/swords/greatsword-blue.webp',
+    dragonGreataxe: 'icons/weapons/axes/axe-double-engraved-runes.webp',
+    emberBattleaxe: 'icons/weapons/axes/axe-battle-elemental-lava.webp',
+    frostSpear: 'icons/weapons/polearms/spear-ice-crystal-blue.webp',
+    emberScaleMail: 'icons/equipment/chest/breastplate-scale-grey.webp',
+    emberShield: 'icons/equipment/shield/heater-steel-crystal-red.webp',
+    frostChainMail: 'icons/equipment/chest/breastplate-layered-steel-blue-gold.webp',
+    frostHalfPlate: 'icons/equipment/chest/breastplate-cuirass-steel-blue.webp',
+    stormShield: 'icons/equipment/shield/kite-wooden-sigil-purple.webp',
+    stormStuddedLeatherArmor: 'icons/equipment/chest/breastplate-layered-leather-studded.webp',
+    radiantShield: 'icons/equipment/shield/heater-steel-gold.webp',
+    radiantPlateArmor: 'icons/equipment/chest/breastplate-layered-gold.webp',
+    shadowLeatherArmor: 'icons/equipment/chest/breastplate-layered-leather-black.webp',
+    shadowBreastplate: 'icons/equipment/chest/breastplate-gorget-steel-purple.webp',
+    dragonScaleMail: 'icons/equipment/chest/breastplate-scale-grey.webp',
+    dragonPlateArmor: 'icons/equipment/chest/breastplate-sculpted-green.webp'
+  });
+  const APPROVED_MYTHWRIGHT_ICON_PATHS = Object.freeze(Array.from(new Set(Object.values(MYTHWRIGHT_ICONS))));
   const APPROVED_MYTHWRIGHT_ICON_SET = new Set(APPROVED_MYTHWRIGHT_ICON_PATHS);
 
   const SRD_WEAPONS = [
@@ -49,54 +100,73 @@ const MythwrightDnd5eBootstrap = (() => {
   ];
 
   const MUNDANE_QUALITY = ['Flawed', 'Standard', 'Fine', 'Masterwork'];
+  const ELEMENTAL_QUALITY = Object.freeze([
+    { id: 'flawed', name: 'Flawed', damage: '1', resistance: false, acBonus: 0 },
+    { id: 'standard', name: 'Standard', damage: '1d4', resistance: true, acBonus: 0 },
+    { id: 'fine', name: 'Fine', damage: '1d6', resistance: true, acBonus: 1 },
+    { id: 'masterwork', name: 'Masterwork', damage: '1d8', resistance: true, acBonus: 2 },
+    { id: 'mythic', name: 'Mythic', damage: '1d10', resistance: true, acBonus: 3 }
+  ]);
   const RELIC_QUALITY = ['Flawed', 'Standard', 'Fine', 'Masterwork', 'Mythic'];
   const ESSENCES = [
-    { id: 'ember', name: 'Ember Essence', icon: 'fas fa-fire' },
-    { id: 'frost', name: 'Frost Essence', icon: 'fas fa-snowflake' },
-    { id: 'storm', name: 'Storm Essence', icon: 'fas fa-bolt' },
-    { id: 'radiance', name: 'Radiance Essence', icon: 'fas fa-sun' },
-    { id: 'shadow', name: 'Shadow Essence', icon: 'fas fa-moon' },
-    { id: 'dragon', name: 'Dragon Essence', icon: 'fas fa-dragon' }
+    { id: 'ember', name: 'Ember Essence', icon: 'fas fa-fire', img: MYTHWRIGHT_ICONS.emberEssence },
+    { id: 'frost', name: 'Frost Essence', icon: 'fas fa-snowflake', img: MYTHWRIGHT_ICONS.frostEssence },
+    { id: 'storm', name: 'Storm Essence', icon: 'fas fa-bolt', img: MYTHWRIGHT_ICONS.stormEssence },
+    { id: 'radiance', name: 'Radiance Essence', icon: 'fas fa-sun', img: MYTHWRIGHT_ICONS.radianceEssence },
+    { id: 'shadow', name: 'Shadow Essence', icon: 'fas fa-moon', img: MYTHWRIGHT_ICONS.shadowEssence },
+    { id: 'dragon', name: 'Dragon Essence', icon: 'fas fa-dragon', img: MYTHWRIGHT_ICONS.dragonEssence }
   ];
 
   const ELEMENTAL_VARIANTS = [
-    { id: 'weapon-ember-shortsword', name: 'Ember Shortsword', baseName: 'Shortsword', type: 'weapon', essenceId: 'ember', damageType: 'fire' },
-    { id: 'weapon-frost-longsword', name: 'Frost Longsword', baseName: 'Longsword', type: 'weapon', essenceId: 'frost', damageType: 'cold' },
-    { id: 'weapon-storm-shortbow', name: 'Storm Shortbow', baseName: 'Shortbow', type: 'weapon', essenceId: 'storm', damageType: 'lightning' },
-    { id: 'weapon-radiant-mace', name: 'Radiant Mace', baseName: 'Mace', type: 'weapon', essenceId: 'radiance', damageType: 'radiant' },
-    { id: 'weapon-shadow-dagger', name: 'Shadow Dagger', baseName: 'Dagger', type: 'weapon', essenceId: 'shadow', damageType: 'necrotic' },
-    { id: 'weapon-dragon-greatsword', name: 'Dragon Greatsword', baseName: 'Greatsword', type: 'weapon', essenceId: 'dragon', damageType: 'fire' },
-    { id: 'armor-ember-scale-mail', name: 'Ember Scale Mail', baseName: 'Scale Mail', type: 'armor', essenceId: 'ember', resistanceType: 'fire' },
-    { id: 'armor-frost-chain-mail', name: 'Frost Chain Mail', baseName: 'Chain Mail', type: 'armor', essenceId: 'frost', resistanceType: 'cold' },
-    { id: 'armor-storm-shield', name: 'Storm Shield', baseName: 'Shield', type: 'armor', essenceId: 'storm', resistanceType: 'lightning' },
-    { id: 'armor-radiant-shield', name: 'Radiant Shield', baseName: 'Shield', type: 'armor', essenceId: 'radiance', resistanceType: 'radiant' },
-    { id: 'armor-shadow-leather-armor', name: 'Shadow Leather Armor', baseName: 'Leather Armor', type: 'armor', essenceId: 'shadow', resistanceType: 'necrotic' },
-    { id: 'armor-dragon-scale-mail', name: 'Dragon Scale Mail', baseName: 'Scale Mail', type: 'armor', essenceId: 'dragon', resistanceType: 'fire' }
+    { id: 'weapon-ember-shortsword', name: 'Ember Shortsword', baseName: 'Shortsword', type: 'weapon', essenceId: 'ember', damageType: 'fire', img: MYTHWRIGHT_ICONS.emberShortsword },
+    { id: 'weapon-ember-battleaxe', name: 'Ember Battleaxe', baseName: 'Battleaxe', type: 'weapon', essenceId: 'ember', damageType: 'fire', img: MYTHWRIGHT_ICONS.emberBattleaxe },
+    { id: 'weapon-frost-longsword', name: 'Frost Longsword', baseName: 'Longsword', type: 'weapon', essenceId: 'frost', damageType: 'cold', img: MYTHWRIGHT_ICONS.frostLongsword },
+    { id: 'weapon-frost-spear', name: 'Frost Spear', baseName: 'Spear', type: 'weapon', essenceId: 'frost', damageType: 'cold', img: MYTHWRIGHT_ICONS.frostSpear },
+    { id: 'weapon-storm-shortbow', name: 'Storm Shortbow', baseName: 'Shortbow', type: 'weapon', essenceId: 'storm', damageType: 'lightning', img: MYTHWRIGHT_ICONS.stormShortbow },
+    { id: 'weapon-storm-warhammer', name: 'Storm Warhammer', baseName: 'Warhammer', type: 'weapon', essenceId: 'storm', damageType: 'lightning', img: MYTHWRIGHT_ICONS.stormWarhammer },
+    { id: 'weapon-radiant-mace', name: 'Radiant Mace', baseName: 'Mace', type: 'weapon', essenceId: 'radiance', damageType: 'radiant', img: MYTHWRIGHT_ICONS.radiantMace },
+    { id: 'weapon-radiant-longbow', name: 'Radiant Longbow', baseName: 'Longbow', type: 'weapon', essenceId: 'radiance', damageType: 'radiant', img: MYTHWRIGHT_ICONS.radiantLongbow },
+    { id: 'weapon-shadow-dagger', name: 'Shadow Dagger', baseName: 'Dagger', type: 'weapon', essenceId: 'shadow', damageType: 'necrotic', img: MYTHWRIGHT_ICONS.shadowDagger },
+    { id: 'weapon-shadow-rapier', name: 'Shadow Rapier', baseName: 'Rapier', type: 'weapon', essenceId: 'shadow', damageType: 'necrotic', img: MYTHWRIGHT_ICONS.shadowRapier },
+    { id: 'weapon-dragon-greatsword', name: 'Dragon Greatsword', baseName: 'Greatsword', type: 'weapon', essenceId: 'dragon', damageType: 'fire', img: MYTHWRIGHT_ICONS.dragonGreatsword },
+    { id: 'weapon-dragon-greataxe', name: 'Dragon Greataxe', baseName: 'Greataxe', type: 'weapon', essenceId: 'dragon', damageType: 'fire', img: MYTHWRIGHT_ICONS.dragonGreataxe },
+    { id: 'armor-ember-scale-mail', name: 'Ember Scale Mail', baseName: 'Scale Mail', type: 'armor', essenceId: 'ember', resistanceType: 'fire', img: MYTHWRIGHT_ICONS.emberScaleMail },
+    { id: 'armor-ember-shield', name: 'Ember Shield', baseName: 'Shield', type: 'armor', essenceId: 'ember', resistanceType: 'fire', img: MYTHWRIGHT_ICONS.emberShield },
+    { id: 'armor-frost-chain-mail', name: 'Frost Chain Mail', baseName: 'Chain Mail', type: 'armor', essenceId: 'frost', resistanceType: 'cold', img: MYTHWRIGHT_ICONS.frostChainMail },
+    { id: 'armor-frost-half-plate', name: 'Frost Half Plate', baseName: 'Half Plate Armor', type: 'armor', essenceId: 'frost', resistanceType: 'cold', img: MYTHWRIGHT_ICONS.frostHalfPlate },
+    { id: 'armor-storm-shield', name: 'Storm Shield', baseName: 'Shield', type: 'armor', essenceId: 'storm', resistanceType: 'lightning', img: MYTHWRIGHT_ICONS.stormShield },
+    { id: 'armor-storm-studded-leather-armor', name: 'Storm Studded Leather Armor', baseName: 'Studded Leather Armor', type: 'armor', essenceId: 'storm', resistanceType: 'lightning', img: MYTHWRIGHT_ICONS.stormStuddedLeatherArmor },
+    { id: 'armor-radiant-shield', name: 'Radiant Shield', baseName: 'Shield', type: 'armor', essenceId: 'radiance', resistanceType: 'radiant', img: MYTHWRIGHT_ICONS.radiantShield },
+    { id: 'armor-radiant-plate-armor', name: 'Radiant Plate Armor', baseName: 'Plate Armor', type: 'armor', essenceId: 'radiance', resistanceType: 'radiant', img: MYTHWRIGHT_ICONS.radiantPlateArmor },
+    { id: 'armor-shadow-leather-armor', name: 'Shadow Leather Armor', baseName: 'Leather Armor', type: 'armor', essenceId: 'shadow', resistanceType: 'necrotic', img: MYTHWRIGHT_ICONS.shadowLeatherArmor },
+    { id: 'armor-shadow-breastplate', name: 'Shadow Breastplate', baseName: 'Breastplate', type: 'armor', essenceId: 'shadow', resistanceType: 'necrotic', img: MYTHWRIGHT_ICONS.shadowBreastplate },
+    { id: 'armor-dragon-scale-mail', name: 'Dragon Scale Mail', baseName: 'Scale Mail', type: 'armor', essenceId: 'dragon', resistanceType: 'fire', img: MYTHWRIGHT_ICONS.dragonScaleMail },
+    { id: 'armor-dragon-plate-armor', name: 'Dragon Plate Armor', baseName: 'Plate Armor', type: 'armor', essenceId: 'dragon', resistanceType: 'fire', img: MYTHWRIGHT_ICONS.dragonPlateArmor }
   ];
 
   const BASE_ITEMS = [
-    ['raw-ore', 'Raw Ore', 'Mythwright > Ingredients > Mundane', DEFAULT_ITEM_ICON],
-    ['hardwood', 'Hardwood', 'Mythwright > Ingredients > Mundane', DEFAULT_ITEM_ICON],
-    ['cured-hide', 'Cured Hide', 'Mythwright > Ingredients > Mundane', DEFAULT_ITEM_ICON],
-    ['iron-ingot', 'Iron Ingot', 'Mythwright > Ingredients > Mundane', DEFAULT_ITEM_ICON],
-    ['weapon-core', 'Weapon Core', 'Mythwright > Components > Weapon Parts', DEFAULT_ITEM_ICON],
-    ['balanced-hilt', 'Balanced Hilt', 'Mythwright > Components > Weapon Parts', DEFAULT_ITEM_ICON],
-    ['bow-stave', 'Bow Stave', 'Mythwright > Components > Weapon Parts', DEFAULT_ITEM_ICON],
-    ['armour-plates', 'Armour Plates', 'Mythwright > Components > Armour Parts', DEFAULT_ITEM_ICON],
-    ['reinforced-straps', 'Reinforced Straps', 'Mythwright > Components > Armour Parts', DEFAULT_ITEM_ICON],
-    ['monster-trophy', 'Monster Trophy', 'Mythwright > Gathered components', DEFAULT_ITEM_ICON],
-    ['ancient-fragment', 'Ancient Fragment', 'Mythwright > Gathered components', DEFAULT_ITEM_ICON],
-    ['dragon-scale', 'Dragon Scale', 'Mythwright > Gathered components', DEFAULT_ITEM_ICON],
-    ['artisan-catalyst', 'Artisan Catalyst', 'Mythwright > Tools & Catalysts', DEFAULT_ITEM_ICON],
-    ['mythic-catalyst', 'Mythic Catalyst', 'Mythwright > Tools & Catalysts', DEFAULT_ITEM_ICON]
+    ['raw-ore', 'Raw Ore', 'Mythwright > Ingredients > Mundane', MYTHWRIGHT_ICONS.rawOre],
+    ['hardwood', 'Hardwood', 'Mythwright > Ingredients > Mundane', MYTHWRIGHT_ICONS.hardwood],
+    ['cured-hide', 'Cured Hide', 'Mythwright > Ingredients > Mundane', MYTHWRIGHT_ICONS.curedHide],
+    ['iron-ingot', 'Iron Ingot', 'Mythwright > Ingredients > Mundane', MYTHWRIGHT_ICONS.ironIngot],
+    ['weapon-core', 'Weapon Core', 'Mythwright > Components > Weapon Parts', MYTHWRIGHT_ICONS.weaponCore],
+    ['balanced-hilt', 'Balanced Hilt', 'Mythwright > Components > Weapon Parts', MYTHWRIGHT_ICONS.balancedHilt],
+    ['bow-stave', 'Bow Stave', 'Mythwright > Components > Weapon Parts', MYTHWRIGHT_ICONS.bowStave],
+    ['armour-plates', 'Armour Plates', 'Mythwright > Components > Armour Parts', MYTHWRIGHT_ICONS.armourPlates],
+    ['reinforced-straps', 'Reinforced Straps', 'Mythwright > Components > Armour Parts', MYTHWRIGHT_ICONS.reinforcedStraps],
+    ['monster-trophy', 'Monster Trophy', 'Mythwright > Gathered components', MYTHWRIGHT_ICONS.monsterTrophy],
+    ['ancient-fragment', 'Ancient Fragment', 'Mythwright > Gathered components', MYTHWRIGHT_ICONS.ancientFragment],
+    ['dragon-scale', 'Dragon Scale', 'Mythwright > Gathered components', MYTHWRIGHT_ICONS.dragonScale],
+    ['artisan-catalyst', 'Artisan Catalyst', 'Mythwright > Tools & Catalysts', MYTHWRIGHT_ICONS.artisanCatalyst],
+    ['mythic-catalyst', 'Mythic Catalyst', 'Mythwright > Tools & Catalysts', MYTHWRIGHT_ICONS.mythicCatalyst]
   ];
 
   const RELICS = [
-    ['relic-mythic-longsword', 'Mythwright Mythic Longsword', 'Mythwright > Relics', DEFAULT_ITEM_ICON],
-    ['relic-draconic-scale-mail', 'Draconic Scale Mail', 'Mythwright > Relics', DEFAULT_ITEM_ICON],
-    ['relic-storm-bow', 'Storm-Forged Bow', 'Mythwright > Relics', DEFAULT_ITEM_ICON],
-    ['relic-radiant-shield', 'Radiant Shield', 'Mythwright > Relics', DEFAULT_ITEM_ICON],
-    ['relic-shadow-dagger', 'Shadow Dagger', 'Mythwright > Relics', DEFAULT_ITEM_ICON]
+    ['relic-mythic-longsword', 'Mythwright Mythic Longsword', 'Mythwright > Relics', MYTHWRIGHT_ICONS.relicMythicLongsword],
+    ['relic-draconic-scale-mail', 'Draconic Scale Mail', 'Mythwright > Relics', MYTHWRIGHT_ICONS.relicDraconicScaleMail],
+    ['relic-storm-bow', 'Storm-Forged Bow', 'Mythwright > Relics', MYTHWRIGHT_ICONS.relicStormBow],
+    ['relic-radiant-shield', 'Radiant Shield', 'Mythwright > Relics', MYTHWRIGHT_ICONS.relicRadiantShield],
+    ['relic-shadow-dagger', 'Shadow Dagger', 'Mythwright > Relics', MYTHWRIGHT_ICONS.relicShadowDagger]
   ];
 
   function normalizeName(value) {
@@ -215,18 +285,18 @@ const MythwrightDnd5eBootstrap = (() => {
     };
   }
 
-  function addElementalDamage(system = {}, damageType) {
+  function addElementalDamage(system = {}, damageType, formula = '1d4') {
     const damage = system.damage && typeof system.damage === 'object'
       ? { ...system.damage }
       : null;
     if (!damage || !Array.isArray(damage.parts)) {
       return {
-        system: appendDescription(system, `This weapon deals an extra 1d4 ${damageType} damage on a hit.`),
+        system: appendDescription(system, `This weapon deals an extra ${formula} ${damageType} damage on a hit.`),
         applied: false
       };
     }
 
-    damage.parts = [...damage.parts, ['1d4', damageType]];
+    damage.parts = [...damage.parts, [formula, damageType]];
     return {
       system: {
         ...system,
@@ -254,6 +324,53 @@ const MythwrightDnd5eBootstrap = (() => {
         }
       }
     };
+  }
+
+  function acBonusEffect(name, img, acBonus) {
+    return {
+      name: `${name} Armour Bonus`,
+      img,
+      transfer: true,
+      disabled: false,
+      changes: [{
+        key: 'system.attributes.ac.bonus',
+        mode: 2,
+        value: String(acBonus),
+        priority: 20
+      }],
+      flags: {
+        fabricate: {
+          mythwrightAcBonus: acBonus
+        }
+      }
+    };
+  }
+
+  function elementalQualityById(id = 'standard') {
+    return ELEMENTAL_QUALITY.find(quality => quality.id === id) || ELEMENTAL_QUALITY.find(quality => quality.id === 'standard');
+  }
+
+  function elementalVariantQualityId(definition, quality = elementalQualityById()) {
+    if (quality.id === 'standard') return definition.id;
+    const prefix = definition.type === 'weapon' ? 'weapon' : 'armor';
+    const essencePrefix = `${prefix}-${definition.essenceId}-`;
+    const baseSlug = definition.id.startsWith(essencePrefix)
+      ? definition.id.slice(essencePrefix.length)
+      : normalizeName(definition.baseName).replace(/\s+/g, '-');
+    return `${prefix}-${definition.essenceId}-${quality.id}-${baseSlug}`;
+  }
+
+  function elementalVariantQualityName(definition, quality = elementalQualityById()) {
+    return quality.id === 'standard' ? definition.name : `${quality.name} ${definition.name}`;
+  }
+
+  function elementalQualityVariantDefinitions(definition) {
+    return ELEMENTAL_QUALITY.map(quality => ({
+      ...definition,
+      id: elementalVariantQualityId(definition, quality),
+      name: elementalVariantQualityName(definition, quality),
+      quality
+    }));
   }
 
   function itemPayload({
@@ -299,46 +416,54 @@ const MythwrightDnd5eBootstrap = (() => {
 
   function elementalVariantPayload(definition, source, folder) {
     const baseSourceId = source?.uuid || source?.flags?.core?.sourceId || null;
+    const quality = elementalQualityById(definition.quality?.id);
     const payload = itemPayload({
       id: definition.id,
       name: definition.name,
       folder,
-      img: source?.img || DEFAULT_ITEM_ICON,
+      img: definition.img || source?.img || DEFAULT_ITEM_ICON,
       type: itemTypeForName(definition.baseName, definition.type === 'weapon' ? 'weapon' : 'equipment'),
       source,
       preserveSourceIdentity: false,
       baseSourceId
     });
+    if (definition.img) payload.img = sanitizeIconPath(definition.img);
 
     payload.flags.fabricate = {
       ...(payload.flags.fabricate || {}),
       elemental: {
         essenceId: definition.essenceId,
         baseItemName: definition.baseName,
+        quality: quality.id,
         ...(definition.damageType ? { damageType: definition.damageType } : {}),
-        ...(definition.resistanceType ? { resistanceType: definition.resistanceType } : {})
+        ...(definition.resistanceType ? { resistanceType: definition.resistanceType } : {}),
+        ...(quality.acBonus ? { acBonus: quality.acBonus } : {})
       }
     };
 
     if (definition.damageType) {
-      const damageResult = addElementalDamage(payload.system || {}, definition.damageType);
+      const damageResult = addElementalDamage(payload.system || {}, definition.damageType, quality.damage);
       payload.system = appendDescription(
         damageResult.system,
-        `Mythwright elemental variant infused with ${definition.essenceId} essence.`
+        `${quality.name} Mythwright elemental variant infused with ${definition.essenceId} essence.`
       );
       payload.flags.fabricate.elemental.damageApplied = damageResult.applied;
+      payload.flags.fabricate.elemental.damageFormula = quality.damage;
       return payload;
     }
 
     if (definition.resistanceType) {
+      const defensiveText = quality.resistance
+        ? `While equipped, this item grants resistance to ${definition.resistanceType} damage${quality.acBonus ? ` and a +${quality.acBonus} bonus to AC` : ''}.`
+        : `This flawed elemental item carries unstable ${definition.essenceId} essence but grants no reliable resistance.`;
       payload.system = appendDescription(
         payload.system || {},
-        `While equipped, this item grants resistance to ${definition.resistanceType} damage.`
+        defensiveText
       );
-      payload.effects = [
-        ...(Array.isArray(payload.effects) ? payload.effects : []),
-        resistanceEffect(definition.name, payload.img, definition.resistanceType)
-      ];
+      const effects = Array.isArray(payload.effects) ? [...payload.effects] : [];
+      if (quality.resistance) effects.push(resistanceEffect(definition.name, payload.img, definition.resistanceType));
+      if (quality.acBonus) effects.push(acBonusEffect(definition.name, payload.img, quality.acBonus));
+      payload.effects = effects;
     }
 
     return payload;
@@ -604,7 +729,7 @@ const MythwrightDnd5eBootstrap = (() => {
       id: `mythwright-${relicId}`,
       name: `Craft ${name}`,
       description: `A signature Mythwright relic recipe for ${name}.`,
-      img: DEFAULT_ITEM_ICON,
+      img: RELICS.find(definition => definition[0] === relicId)?.[3] || DEFAULT_ITEM_ICON,
       category: 'Relics',
       craftingSystemId: SYSTEM_ID,
       system: 'dnd5e',
@@ -633,26 +758,27 @@ const MythwrightDnd5eBootstrap = (() => {
   function buildElementalRecipe(definition) {
     const recipeId = `mythwright-infuse-${definition.id}`;
     const baseComponentId = idFromName(definition.type === 'weapon' ? 'weapon' : 'armor', definition.baseName);
+    const qualityDefinitions = elementalQualityVariantDefinitions(definition);
     return {
       id: recipeId,
       name: `Infuse ${definition.name}`,
       description: `A focused elemental finishing recipe for ${definition.name}.`,
-      img: DEFAULT_ITEM_ICON,
+      img: definition.img || DEFAULT_ITEM_ICON,
       category: definition.type === 'weapon' ? 'Weapons' : 'Armour',
       craftingSystemId: SYSTEM_ID,
       system: 'dnd5e',
       tags: [],
       enabled: true,
       transferEffects: true,
-      resultSelection: { provider: 'ingredientSet' },
+      resultSelection: { provider: 'macroOutcome' },
       steps: [{
         id: `${recipeId}-finish`,
         name: 'Elemental Finish',
         ingredientSets: [
-          ingredientSet(`${recipeId}-finish-set`, [baseComponentId, 'artisan-catalyst'], 'standard', { [definition.essenceId]: 1 })
+          ingredientSet(`${recipeId}-finish-set`, [baseComponentId, 'artisan-catalyst'], null, { [definition.essenceId]: 1 })
         ],
-        resultSelection: { provider: 'ingredientSet' },
-        resultGroups: [resultGroup('standard', 'Standard', definition.id)]
+        resultSelection: { provider: 'macroOutcome' },
+        resultGroups: qualityDefinitions.map(variant => resultGroup(variant.quality.id, variant.quality.name, variant.id))
       }]
     };
   }
@@ -709,7 +835,7 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
 
   async function ensureMacro(summary) {
     const existing = collectionValues(globalThis.game?.macros).find(macro => macro.name === MACRO_NAME);
-    const payload = { name: MACRO_NAME, type: 'script', command: macroCommand(), img: DEFAULT_ITEM_ICON };
+    const payload = { name: MACRO_NAME, type: 'script', command: macroCommand(), img: MYTHWRIGHT_ICONS.macro };
     if (existing) {
       await existing.update(payload);
       summary.macro = existing.uuid;
@@ -777,7 +903,7 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
     }
     for (const essence of ESSENCES) {
       const item = await ensureWorldItem(
-        [essence.id, essence.name, 'Mythwright > Essences', DEFAULT_ITEM_ICON],
+        [essence.id, essence.name, 'Mythwright > Essences', essence.img || DEFAULT_ITEM_ICON],
         foldersByPath,
         summary
       );
@@ -817,8 +943,10 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
     }
 
     for (const definition of ELEMENTAL_VARIANTS) {
-      const item = await ensureElementalVariant(definition, srdByName, foldersByPath, summary);
-      if (item) worldItems.set(definition.id, item);
+      for (const variant of elementalQualityVariantDefinitions(definition)) {
+        const item = await ensureElementalVariant(variant, srdByName, foldersByPath, summary);
+        if (item) worldItems.set(variant.id, item);
+      }
     }
 
     const macro = await ensureMacro(summary);
@@ -839,17 +967,18 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
           target.item?.uuid || null
         ])
     ));
-    const elementalBaseSourceById = new Map(ELEMENTAL_VARIANTS.map(definition => [
+    const elementalTierDefinitions = ELEMENTAL_VARIANTS.flatMap(definition => elementalQualityVariantDefinitions(definition));
+    const elementalBaseSourceById = new Map(elementalTierDefinitions.map(definition => [
       definition.id,
       srdByName.get(normalizeName(definition.baseName))?.item?.uuid || null
     ]));
-    const elementalDefinitions = new Map(ELEMENTAL_VARIANTS.map(definition => [definition.id, definition]));
+    const elementalDefinitions = new Map(elementalTierDefinitions.map(definition => [definition.id, definition]));
 
     const components = Array.from(worldItems.entries()).map(([id, item]) => componentFromItem(id, item, {
-      preserveSourceIdentity: !srdQualityComponentIds.has(id),
+      preserveSourceIdentity: !srdQualityComponentIds.has(id) && !elementalDefinitions.has(id),
       mythwrightBaseSourceId: qualityBaseSourceById.get(id) || elementalBaseSourceById.get(id) || null,
       tags: tagsForComponent(),
-      difficulty: MUNDANE_QUALITY.some(quality => item.name?.startsWith(`${quality} `)) ? 5 : (elementalDefinitions.has(id) ? 7 : 1),
+      difficulty: MUNDANE_QUALITY.some(quality => item.name?.startsWith(`${quality} `)) ? 5 : (elementalDefinitions.has(id) ? 7 + (elementalDefinitions.get(id)?.quality?.acBonus || 0) : 1),
       salvage: {
         enabled: true,
         ingredientQuantity: 1,
@@ -913,7 +1042,7 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
       await upsertRecipe(recipeManager, buildRecipeForSrd(target, componentMap), summary);
     }
     for (const definition of ELEMENTAL_VARIANTS) {
-      if (componentMap.has(definition.id)) {
+      if (elementalQualityVariantDefinitions(definition).every(variant => componentMap.has(variant.id))) {
         await upsertRecipe(recipeManager, buildElementalRecipe(definition), summary);
       }
     }
@@ -958,6 +1087,8 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
     SYSTEM_ID,
     SRD_WEAPONS,
     SRD_ARMOUR,
+    ELEMENTAL_VARIANTS,
+    ELEMENTAL_QUALITY,
     APPROVED_MYTHWRIGHT_ICON_PATHS,
     normalizeName,
     idFromName,
@@ -976,6 +1107,10 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
     buildRecipeForSrd,
     buildRelicRecipe,
     buildElementalRecipe,
+    elementalQualityById,
+    elementalVariantQualityId,
+    elementalVariantQualityName,
+    elementalQualityVariantDefinitions,
     elementalVariantPayload,
     tagsForComponent,
     itemTagsForSystem,

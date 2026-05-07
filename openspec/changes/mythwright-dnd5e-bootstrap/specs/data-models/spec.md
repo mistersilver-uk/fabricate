@@ -16,17 +16,20 @@ Recipe steps SHALL persist an optional `resultSelection` object using the same p
 
 ### Requirement: Mythwright generated tag policy
 
-The Mythwright DnD5e bootstrap SHALL use component and recipe tags only for matchable traits, filtering roles, or essence identity.
+The Mythwright DnD5e bootstrap SHALL emit tags only when generated recipes use those tags for tag-placeholder ingredient matching.
 
-#### Scenario: Generated content omits system-association tags
+#### Scenario: Generated content omits unused tags
 
 - **WHEN** Mythwright builds generated components, recipes, and `CraftingSystem.itemTags`
-- **THEN** those generated tags SHALL NOT include a `mythwright` tag whose only purpose is identifying the source bootstrap.
+- **AND** no generated recipe uses a tag-placeholder ingredient that matches those tags
+- **THEN** generated components SHALL have empty `tags`.
+- **AND** generated recipes SHALL have empty `tags`.
+- **AND** `CraftingSystem.itemTags` SHALL be empty.
 
-#### Scenario: Generated tags describe matching traits
+#### Scenario: Recipe categories remain the UI grouping mechanism
 
-- **WHEN** Mythwright tags generated SRD, quality, elemental, essence, relic, component, or catalyst content
-- **THEN** the tags SHALL describe matching/filtering traits such as `weapon`, `armor`, `srd`, `quality`, `elemental`, essence IDs, `relic`, `component`, `essence`, or `catalyst`.
+- **WHEN** Mythwright builds generated recipes
+- **THEN** recipe `category` values and `CraftingSystem.categories` SHALL provide GM UI grouping/filtering metadata instead of generated tags.
 
 ### Requirement: Mythwright authored variant identity
 
@@ -37,3 +40,19 @@ The Mythwright DnD5e bootstrap SHALL keep SRD base items source-linked while tre
 - **WHEN** Mythwright creates a generated quality or elemental variant from an SRD item
 - **THEN** the variant SHALL strip SRD matching fields such as `flags.core.sourceId`, `_stats.compendiumSource`, `sourceUuid`, `sourceItemUuid`, and `fallbackItemIds`.
 - **AND** the variant MAY preserve the base SRD UUID as Mythwright provenance metadata.
+
+#### Scenario: Elemental tiers preserve standard identity
+
+- **WHEN** Mythwright creates tiered elemental variants for a curated elemental definition
+- **THEN** the `Standard` variant SHALL keep the existing deterministic elemental ID.
+- **AND** non-standard quality variants SHALL use deterministic quality-qualified IDs.
+
+### Requirement: Mythwright authored icon validity
+
+The Mythwright DnD5e bootstrap SHALL use valid Foundry core icon paths for Mythwright-authored images.
+
+#### Scenario: Generated authored content uses valid icons
+
+- **WHEN** Mythwright creates generated items, recipes, or its crafting check macro
+- **THEN** hardcoded Mythwright icon paths SHALL exist in the Foundry core icon inventory.
+- **AND** SRD-derived base items MAY preserve their source item image from DnD5e compendium data.

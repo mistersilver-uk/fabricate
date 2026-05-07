@@ -20,9 +20,11 @@ Mythwright needs a practical first-run bootstrap that creates world content, lin
 - Keep SRD base components source-linked while making quality variants Mythwright-authored world items with independent component identity.
 - Sanitize Mythwright-authored icon paths during bootstrap reruns.
 - Validate duplicate component source references across full `createSystem()` and `updateSystem()` payloads.
-- Treat item and recipe tags as matching/filtering metadata only; generated content must not use `mythwright` as a system-association tag.
-- Limit mundane SRD quality variants to `Flawed`, `Standard`, `Fine`, and `Masterwork`; reserve Mythic outcomes for bespoke relic recipes.
-- Add curated elemental weapon and armour/shield variants that require matching essences and preserve only provenance links to the SRD base item.
+- Emit Mythwright tags only when generated recipes use them for tag-placeholder ingredient matching; current generated content has no tags because recipes use exact component ingredients.
+- Use custom recipe categories, not tags, for Mythwright GM UI filtering.
+- Limit mundane SRD quality variants to `Flawed`, `Standard`, `Fine`, and `Masterwork`; reserve Mythic outcomes for elemental and bespoke relic recipes.
+- Add curated elemental weapon and armour/shield variants that require matching essences, preserve only provenance links to the SRD base item, and expand into tiered `Flawed` through `Mythic` outputs.
+- Use explicit valid Foundry core icon paths for Mythwright-authored items, recipes, and macros.
 
 ## Non-Goals
 

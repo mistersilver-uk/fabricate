@@ -22,3 +22,4 @@ PLAN.md
 # Content pack specifications (premium, not for public repo)
 content-packs/
 /.claude/settings.local.json
+tmp

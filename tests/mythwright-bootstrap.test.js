@@ -1,5 +1,6 @@
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 globalThis.game = { ready: false };
 
@@ -190,6 +191,21 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     assert.equal(helper.sanitizeIconPath('icons/svg/item-bag.svg'), 'icons/svg/item-bag.svg');
   });
 
+  it('uses only valid Foundry core icon paths for Mythwright-authored icons', () => {
+    const helper = globalThis.MythwrightDnd5eBootstrap;
+    const foundryIconPaths = new Set(
+      readFileSync(new URL('../tmp/fvtt-icon-paths.md', import.meta.url), 'utf8')
+        .split(/\r?\n/)
+        .map(path => path.trim())
+        .filter(Boolean)
+    );
+
+    assert.ok(helper.APPROVED_MYTHWRIGHT_ICON_PATHS.length > 10);
+    for (const iconPath of helper.APPROVED_MYTHWRIGHT_ICON_PATHS) {
+      assert.ok(foundryIconPaths.has(iconPath), `${iconPath} should exist in tmp/fvtt-icon-paths.md`);
+    }
+  });
+
   it('discovers SRD items by normalized name from DnD5e item packs', async () => {
     const helper = globalThis.MythwrightDnd5eBootstrap;
     const packs = [{
@@ -218,8 +234,17 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     ]));
 
     assert.equal(recipe.id, 'mythwright-craft-longsword');
+    assert.equal(recipe.category, 'Weapons');
+    assert.deepEqual(recipe.tags, []);
     assert.equal(recipe.steps.length, 4);
     assert.equal(recipe.steps.at(-1).resultSelection.provider, 'macroOutcome');
+    assert.ok(recipe.steps.every(step =>
+      step.ingredientSets.every(set =>
+        set.ingredientGroups.every(group =>
+          group.options.every(option => option.match.type === 'component')
+        )
+      )
+    ));
     assert.deepEqual(recipe.steps.at(-1).resultGroups.map(group => group.name), [
       'Flawed', 'Standard', 'Fine', 'Masterwork'
     ]);
@@ -229,13 +254,13 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     const helper = globalThis.MythwrightDnd5eBootstrap;
     const recipe = helper.buildRelicRecipe('relic-mythic-longsword', 'Mythwright Mythic Longsword', 'ember');
 
-    assert.ok(recipe.tags.includes('relic'));
-    assert.ok(recipe.tags.includes('mythic'));
-    assert.ok(!recipe.tags.includes('mythwright'));
+    assert.equal(recipe.category, 'Relics');
+    assert.equal(recipe.img, 'icons/weapons/swords/greatsword-blue.webp');
+    assert.deepEqual(recipe.tags, []);
     assert.ok(recipe.steps.at(-1).resultGroups.some(group => group.name === 'Mythic'));
   });
 
-  it('uses matchable component tags without the Mythwright system association tag', () => {
+  it('does not emit generated tags when no Mythwright recipe uses tag ingredients', () => {
     const helper = globalThis.MythwrightDnd5eBootstrap;
 
     const tags = helper.tagsForComponent(
@@ -247,14 +272,14 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
       }
     );
 
-    assert.deepEqual(tags.sort(), ['quality', 'srd', 'weapon']);
-    assert.ok(!helper.itemTagsForSystem().includes('mythwright'));
+    assert.deepEqual(tags, []);
+    assert.deepEqual(helper.itemTagsForSystem(), []);
   });
 
   it('builds elemental weapon payloads without SRD identity and with elemental damage metadata', () => {
     const helper = globalThis.MythwrightDnd5eBootstrap;
     const payload = helper.elementalVariantPayload(
-      { id: 'weapon-ember-shortsword', name: 'Ember Shortsword', baseName: 'Shortsword', type: 'weapon', essenceId: 'ember', damageType: 'fire' },
+      { id: 'weapon-ember-shortsword', name: 'Ember Shortsword', baseName: 'Shortsword', type: 'weapon', essenceId: 'ember', damageType: 'fire', img: 'icons/weapons/swords/shortsword-guard-gold-red.webp' },
       {
         name: 'Shortsword',
         type: 'weapon',
@@ -270,6 +295,7 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     );
 
     assert.equal(payload.name, 'Ember Shortsword');
+    assert.equal(payload.img, 'icons/weapons/swords/shortsword-guard-gold-red.webp');
     assert.equal(payload.flags.core, undefined);
     assert.equal(payload._stats, undefined);
     assert.equal(payload.flags.fabricate.mythwrightBaseSourceId, 'Compendium.dnd5e.items.shortsword');
@@ -277,6 +303,37 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     assert.equal(payload.flags.fabricate.elemental.damageType, 'fire');
     assert.equal(payload.flags.fabricate.elemental.damageApplied, true);
     assert.deepEqual(payload.system.damage.parts.at(-1), ['1d4', 'fire']);
+  });
+
+  it('builds tiered elemental weapon payloads with stable standard identity and scaled damage', () => {
+    const helper = globalThis.MythwrightDnd5eBootstrap;
+    const definition = { id: 'weapon-ember-shortsword', name: 'Ember Shortsword', baseName: 'Shortsword', type: 'weapon', essenceId: 'ember', damageType: 'fire', img: 'icons/weapons/swords/shortsword-guard-gold-red.webp' };
+    const variants = helper.elementalQualityVariantDefinitions(definition);
+    const mythic = variants.find(variant => variant.quality.id === 'mythic');
+
+    assert.equal(variants.find(variant => variant.quality.id === 'standard').id, 'weapon-ember-shortsword');
+    assert.equal(mythic.id, 'weapon-ember-mythic-shortsword');
+    assert.equal(mythic.name, 'Mythic Ember Shortsword');
+
+    const payload = helper.elementalVariantPayload(
+      mythic,
+      {
+        name: 'Shortsword',
+        type: 'weapon',
+        img: 'icons/shortsword.webp',
+        uuid: 'Compendium.dnd5e.items.shortsword',
+        toObject: () => ({
+          system: { quantity: 1, damage: { parts: [['1d6', 'piercing']] } },
+          flags: { core: { sourceId: 'Compendium.dnd5e.items.shortsword' } }
+        })
+      },
+      { id: 'elemental-folder' }
+    );
+
+    assert.equal(payload.flags.fabricate.mythwrightId, 'weapon-ember-mythic-shortsword');
+    assert.equal(payload.flags.fabricate.elemental.quality, 'mythic');
+    assert.equal(payload.flags.fabricate.elemental.damageFormula, '1d10');
+    assert.deepEqual(payload.system.damage.parts.at(-1), ['1d10', 'fire']);
   });
 
   it('builds elemental armour payloads without SRD identity and with resistance metadata', () => {
@@ -309,6 +366,54 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     assert.equal(payload.effects.at(-1).changes[0].value, 'fire');
   });
 
+  it('builds tiered elemental armour payloads with resistance and AC scaling', () => {
+    const helper = globalThis.MythwrightDnd5eBootstrap;
+    const definition = { id: 'armor-dragon-scale-mail', name: 'Dragon Scale Mail', baseName: 'Scale Mail', type: 'armor', essenceId: 'dragon', resistanceType: 'fire', img: 'icons/equipment/chest/breastplate-scale-grey.webp' };
+    const [flawed] = helper.elementalQualityVariantDefinitions(definition);
+    const mythic = helper.elementalQualityVariantDefinitions(definition).find(variant => variant.quality.id === 'mythic');
+
+    const source = {
+      name: 'Scale Mail',
+      type: 'equipment',
+      img: 'icons/scale-mail.webp',
+      uuid: 'Compendium.dnd5e.items.scale-mail',
+      toObject: () => ({
+        system: { quantity: 1, description: { value: '<p>Base armour.</p>' } },
+        flags: { core: { sourceId: 'Compendium.dnd5e.items.scale-mail' } }
+      })
+    };
+    const flawedPayload = helper.elementalVariantPayload(flawed, source, { id: 'elemental-folder' });
+    const mythicPayload = helper.elementalVariantPayload(mythic, source, { id: 'elemental-folder' });
+
+    assert.equal(flawedPayload.flags.fabricate.elemental.quality, 'flawed');
+    assert.match(flawedPayload.system.description.value, /grants no reliable resistance/);
+    assert.deepEqual(flawedPayload.effects, []);
+    assert.equal(mythicPayload.flags.fabricate.elemental.quality, 'mythic');
+    assert.equal(mythicPayload.flags.fabricate.elemental.acBonus, 3);
+    assert.match(mythicPayload.system.description.value, /resistance to fire damage and a \+3 bonus to AC/);
+    assert.equal(mythicPayload.effects[0].changes[0].key, 'system.traits.dr.value');
+    assert.equal(mythicPayload.effects[1].changes[0].key, 'system.attributes.ac.bonus');
+    assert.equal(mythicPayload.effects[1].changes[0].value, '3');
+  });
+
+  it('expands curated elemental variants across additional weapon and armour types', () => {
+    const helper = globalThis.MythwrightDnd5eBootstrap;
+    const ids = new Set(helper.ELEMENTAL_VARIANTS.map(variant => variant.id));
+
+    assert.ok(ids.has('weapon-ember-battleaxe'));
+    assert.ok(ids.has('weapon-frost-spear'));
+    assert.ok(ids.has('weapon-storm-warhammer'));
+    assert.ok(ids.has('weapon-radiant-longbow'));
+    assert.ok(ids.has('weapon-shadow-rapier'));
+    assert.ok(ids.has('weapon-dragon-greataxe'));
+    assert.ok(ids.has('armor-ember-shield'));
+    assert.ok(ids.has('armor-frost-half-plate'));
+    assert.ok(ids.has('armor-storm-studded-leather-armor'));
+    assert.ok(ids.has('armor-radiant-plate-armor'));
+    assert.ok(ids.has('armor-shadow-breastplate'));
+    assert.ok(ids.has('armor-dragon-plate-armor'));
+  });
+
   it('builds elemental recipes requiring matching essence and producing the intended variant', () => {
     const helper = globalThis.MythwrightDnd5eBootstrap;
     const recipe = helper.buildElementalRecipe({
@@ -317,13 +422,30 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
       baseName: 'Shortsword',
       type: 'weapon',
       essenceId: 'ember',
-      damageType: 'fire'
+      damageType: 'fire',
+      img: 'icons/weapons/swords/shortsword-guard-gold-red.webp'
     });
     const set = recipe.steps[0].ingredientSets[0];
 
     assert.equal(recipe.transferEffects, true);
-    assert.deepEqual(recipe.tags, ['weapon', 'elemental', 'ember']);
+    assert.equal(recipe.category, 'Weapons');
+    assert.equal(recipe.img, 'icons/weapons/swords/shortsword-guard-gold-red.webp');
+    assert.deepEqual(recipe.tags, []);
+    assert.equal(recipe.resultSelection.provider, 'macroOutcome');
+    assert.equal(recipe.steps[0].resultSelection.provider, 'macroOutcome');
+    assert.ok(set.ingredientGroups.every(group =>
+      group.options.every(option => option.match.type === 'component')
+    ));
     assert.equal(set.essences.ember, 1);
-    assert.equal(recipe.steps[0].resultGroups[0].results[0].componentId, 'weapon-ember-shortsword');
+    assert.deepEqual(recipe.steps[0].resultGroups.map(group => group.name), [
+      'Flawed', 'Standard', 'Fine', 'Masterwork', 'Mythic'
+    ]);
+    assert.deepEqual(recipe.steps[0].resultGroups.map(group => group.results[0].componentId), [
+      'weapon-ember-flawed-shortsword',
+      'weapon-ember-shortsword',
+      'weapon-ember-fine-shortsword',
+      'weapon-ember-masterwork-shortsword',
+      'weapon-ember-mythic-shortsword'
+    ]);
   });
 });

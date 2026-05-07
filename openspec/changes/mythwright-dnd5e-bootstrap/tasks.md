@@ -15,11 +15,15 @@
 - [x] Run `npm test`.
 - [x] Run `npm run build`.
 - [x] Document the Mythwright tag policy, no-Mythic-mundane rule, and curated elemental variant behavior.
-- [x] Remove the generated `mythwright` tag from components, recipes, and system `itemTags`.
+- [x] Remove generated Mythwright tags from components, recipes, and system `itemTags` unless used by tag-placeholder ingredients.
+- [x] Preserve custom recipe categories as the Mythwright GM UI filtering mechanism.
 - [x] Remove Mythic from mundane SRD quality variants and finishing result groups while preserving relic Mythic outputs.
 - [x] Clean obsolete deterministic Mythic SRD quality variants from earlier bootstrap runs.
 - [x] Add curated elemental weapon and armour/shield variants with guarded DnD5e damage or resistance metadata.
 - [x] Add elemental finishing recipes requiring matching essences and artisan catalysts.
+- [x] Assign explicit valid Foundry core icons to Mythwright-authored items, recipes, and macro.
+- [x] Expand curated elemental variants across additional weapon and armour types.
+- [x] Add tiered elemental quality outputs from `Flawed` through `Mythic` with guarded damage, resistance, and AC scaling.
 - [x] Run `node --test tests/mythwright-bootstrap.test.js`.
 - [x] Run `node --test tests/mythwright-bootstrap.test.js tests/compendium-drop.test.js`.
 - [x] Run `npm test`.
