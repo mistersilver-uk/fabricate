@@ -121,6 +121,26 @@ After a run, results are written to `test-results/`:
 6. Asserts the Crafting App window is visible.
 7. Fails if any browser console errors were captured during the session.
 
+### Smoke profiles (`full` vs `ci`)
+
+The smoke harness runs in one of two profiles selected by the `FOUNDRY_SMOKE_PROFILE` env var (or the `--profile=<value>` CLI flag on `node scripts/foundry-test.mjs`):
+
+| Profile | When | Phases | Total |
+|---------|------|--------|-------|
+| `full` (default) | Local, screenshot regen | Phase B → Phase C → Phase D0 (manager-v2 screenshots) → Phase D (legacy Recipe Manager screenshots) → Phase D2/D3 (Gathering app behaviour + screenshots) → Phase E (craft) → Phase F (cleanup) | ~10–15 min |
+| `ci` | Release-candidate CI | Phase B → Phase C → ~~Phase D0~~ ~~Phase D~~ → Phase D2/D3 → Phase E → Phase F | ~6–8 min |
+
+Run the CI-equivalent profile locally with:
+
+```sh
+npm run test:foundry:ci
+# or
+FOUNDRY_SMOKE_PROFILE=ci npm run test:foundry      # POSIX
+$env:FOUNDRY_SMOKE_PROFILE='ci'; npm run test:foundry  # PowerShell
+```
+
+The `ci` profile skips manager-v2 / Recipe Manager screenshot regeneration only — it still creates a system, recipes, and crafts a Healing Potion end-to-end. Use `full` whenever you need fresh visual references for design review.
+
 ## CI workflows
 
 ### Conventional Commits workflow

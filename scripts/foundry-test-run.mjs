@@ -40,6 +40,17 @@ const RESULTS_DIR = join(ROOT, 'test-results');
 const FOUNDRY_URL = process.env.FOUNDRY_URL ?? 'http://localhost:30000';
 const ADMIN_KEY = process.env.FOUNDRY_ADMIN_KEY ?? 'fabricate-test-admin';
 const WORLD_ID = 'fabricate-smoke-ci';
+
+// Smoke profile selector. Default `full` runs every phase including
+// the manager-v2 screenshot suite (Phase D0) and the legacy Recipe
+// Manager screenshots (Phase D), which together regenerate ~26
+// reference artifacts for visual verification. Set
+// FOUNDRY_SMOKE_PROFILE=ci to skip those phases — CI exercises module
+// load + system creation + crafting end-to-end (Phases B, C, E, F)
+// and finishes much faster, leaving the screenshot suite for local
+// developer use.
+const SMOKE_PROFILE = String(process.env.FOUNDRY_SMOKE_PROFILE ?? 'full').toLowerCase();
+const RUN_SCREENSHOT_PHASES = SMOKE_PROFILE !== 'ci';
 const JOIN_BUTTON_SELECTOR = 'button:has-text("Join Game Session"), button[name="join"]';
 const JOIN_USER_SELECT_SELECTOR = 'select[name="userid"]';
 const JOIN_USER_TILE_SELECTOR = '[data-user-id]';
@@ -2130,6 +2141,13 @@ async function main() {
       }
 
       // ── Phase D0: Screenshot Crafting System Manager V2 ─────────────────────
+      // Gated behind RUN_SCREENSHOT_PHASES so the CI smoke profile skips the
+      // ~25 manager-v2 captures and pointer hit-tests; local `full` runs
+      // continue to regenerate them for visual verification.
+      if (!RUN_SCREENSHOT_PHASES) {
+        process.stdout.write('Phase D0: skipped (FOUNDRY_SMOKE_PROFILE=ci).\n');
+        results.steps.push({ step: 'screenshot-manager-v2', passed: true, skipped: true });
+      } else {
       process.stdout.write('Phase D0: Opening Crafting System Manager V2...\n');
       try {
         await page.evaluate(async (sysId) => {
@@ -2498,8 +2516,15 @@ async function main() {
         results.steps.push({ step: 'screenshot-manager-v2', passed: false, error: err.message });
         throw err;
       }
+      }
 
       // ── Phase D: Screenshot Recipe Manager ──────────────────────────────────
+      // Gated behind RUN_SCREENSHOT_PHASES so the CI smoke profile skips the
+      // legacy Recipe Manager screenshot tour; local `full` runs keep it.
+      if (!RUN_SCREENSHOT_PHASES) {
+        process.stdout.write('Phase D: skipped (FOUNDRY_SMOKE_PROFILE=ci).\n');
+        results.steps.push({ step: 'screenshot-recipe-manager', passed: true, skipped: true });
+      } else {
       process.stdout.write('Phase D: Opening Recipe Manager...\n');
       try {
         // Pre-select the system via settings so the adminStore picks it up on init
@@ -2701,6 +2726,7 @@ async function main() {
       } catch (err) {
         results.steps.push({ step: 'screenshot-recipe-manager', passed: false, error: err.message });
         process.stderr.write(`Phase D failed: ${err.message}\n`);
+      }
       }
 
       // ── Phase D2: Screenshot Gathering app live states ─────────────────────

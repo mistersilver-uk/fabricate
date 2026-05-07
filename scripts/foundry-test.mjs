@@ -36,6 +36,14 @@ function runScript(scriptPath, args = []) {
 }
 
 async function main() {
+  // Optional --profile=<full|ci> CLI arg flows through to the child run script
+  // via FOUNDRY_SMOKE_PROFILE. Useful for cross-platform local CI emulation;
+  // POSIX users could also set the env var directly.
+  for (const arg of process.argv.slice(2)) {
+    const match = /^--profile=(.+)$/.exec(arg);
+    if (match) process.env.FOUNDRY_SMOKE_PROFILE = match[1];
+  }
+
   const up = join(__dirname, 'foundry-test-up.mjs');
   const run = join(__dirname, 'foundry-test-run.mjs');
   const down = join(__dirname, 'foundry-test-down.mjs');

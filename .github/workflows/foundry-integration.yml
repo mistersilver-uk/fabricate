@@ -23,6 +23,11 @@ jobs:
       FOUNDRY_TELEMETRY: "false"
       FOUNDRY_ADMIN_KEY: fabricate-test-admin
       FOUNDRY_URL: http://localhost:30000
+      # Skip the manager-v2 + legacy Recipe Manager screenshot phases.
+      # CI verifies module load + system creation + crafting end-to-end;
+      # screenshot fidelity is for local visual verification (run
+      # `npm run test:foundry` without this env var to regenerate them).
+      FOUNDRY_SMOKE_PROFILE: ci
 
     steps:
       - uses: actions/checkout@v4
