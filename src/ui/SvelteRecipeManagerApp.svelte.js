@@ -432,6 +432,31 @@ export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
             ui.notifications.error(localize('FABRICATE.Admin.Items.SourceUuidCopyFailed'));
           }
         },
+        onUnlinkSource: async (itemId) => {
+          const systemManager = game.fabricate.getCraftingSystemManager();
+          const systemId = get(this._adminStore.selectedSystemId) || '';
+          if (!systemId || !itemId) return;
+          try {
+            await systemManager.updateItem(systemId, itemId, { sourceItemUuid: null });
+            ui.notifications.info(localize('FABRICATE.Admin.Items.SourceUnlinked'));
+            await this._adminStore.refresh();
+          } catch (err) {
+            ui.notifications.warn(err?.message || localize('FABRICATE.Admin.Items.UnlinkFailed'));
+          }
+        },
+        onOpenSource: async (uuid) => {
+          if (!uuid) return;
+          try {
+            const document = await fromUuid(uuid);
+            if (!document) {
+              ui.notifications.warn(localize('FABRICATE.Admin.Items.SourceNotFound'));
+              return;
+            }
+            await document.sheet?.render?.(true);
+          } catch (err) {
+            ui.notifications.warn(err?.message || localize('FABRICATE.Admin.Items.SourceNotFound'));
+          }
+        },
         onEditRecipe: (recipeId) => {
           const recipe = game.fabricate.getRecipeManager().getRecipe(recipeId);
           if (!recipe) return;

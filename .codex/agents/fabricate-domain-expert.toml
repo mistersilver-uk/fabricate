@@ -16,9 +16,19 @@ Scope:
 - File or draft backlog tasks for actionable gaps.
 - Do not implement production features from this role.
 
+Plan-review duty:
+- When the orchestrator routes a plan for domain review (touches src/models/, src/systems/, src/integrations/, openspec/specs/, lang/, or domain language), audit the OpenSpec change docs against current DOMAIN.md and canonical specs.
+- Emit a plan verdict on the first line: APPROVED, NEEDS_CHANGES, or BLOCKED, followed by findings tied to the change docs.
+- Do not edit src/, tests/, or runtime docs from the plan-review duty; restrict edits to openspec/specs/, openspec/changes/<change>/, and DOMAIN.md.
+
+Documentation iteration loop:
+- Run paired with fabricate_docs_writer as defined in AGENTS.md whenever the change touches behaviour or any documented API surface.
+- Update DOMAIN.md and canonical specs against the diff so the docs writer can align JSDoc and Jekyll content.
+- Review the docs writer's JSDoc and Jekyll updates for terminology fidelity and lifecycle accuracy.
+- Emit one of two verdicts on the paired output and the diff: DOCS APPROVED or DOCS NEEDS_CHANGES with concrete findings.
+- Iterate with the docs writer until both emit DOCS APPROVED, capped at 3 revisions before escalating.
+
 Output:
-- Main alignment findings.
-- DOMAIN.md sections updated when applicable.
-- Naming proposals as current -> proposed -> reason.
-- Open questions and backlog issues created or drafted.
+- First line is the verdict for the active duty: APPROVED, NEEDS_CHANGES, or BLOCKED for plan review; DOCS APPROVED or DOCS NEEDS_CHANGES for the docs loop. Use a plain audit summary when neither duty applies.
+- Then list main alignment findings, DOMAIN.md sections updated when applicable, naming proposals as current -> proposed -> reason, and open questions or backlog issues created or drafted.
 """

@@ -193,6 +193,76 @@ describe('createGatheringStore', () => {
     assert.equal(get(store.viewState).selectedSystemId, 'all');
   });
 
+  it('tracks V2 tab, selected environment, selected task, and availability filter state', async () => {
+    const { services } = makeServices({
+      listing: {
+        environments: [
+          {
+            id: 'env-a',
+            name: 'Mines',
+            attemptable: true,
+            blockedReasons: [],
+            tasks: [{ id: 'task-a', label: 'Gather Iron', attemptable: true, blockedReasons: [] }]
+          },
+          {
+            id: 'env-b',
+            name: 'Ruins',
+            attemptable: false,
+            blockedReasons: [{ code: 'SCENE_TOKEN_BLOCKED', message: 'Move to scene.' }],
+            tasks: [{ action: 'blindGather', label: 'Gather', blind: true, attemptable: false, blockedReasons: [] }]
+          }
+        ]
+      }
+    });
+    const store = createGatheringStore(services);
+
+    await store.refresh();
+    assert.equal(get(store.viewState).selectedEnvironmentId, null);
+    assert.equal(get(store.viewState).selectedTaskKey, null);
+
+    store.selectEnvironment('env-b');
+    assert.equal(get(store.viewState).selectedEnvironmentId, 'env-b');
+    assert.equal(get(store.viewState).selectedTaskKey, 'env-b:blindGather');
+
+    store.selectTab('log');
+    assert.equal(get(store.viewState).activeTab, 'log');
+
+    store.setAvailabilityFilter('available');
+    assert.deepEqual(get(store.viewState).filteredEnvironments.map(environment => environment.id), ['env-a']);
+    assert.equal(get(store.viewState).selectedEnvironmentId, null);
+    assert.equal(get(store.viewState).selectedTaskKey, null);
+  });
+
+  it('derives a stamina summary from rich task metadata', async () => {
+    const { services } = makeServices({
+      listing: {
+        environments: [{
+          id: 'env-a',
+          name: 'Meadow',
+          attemptable: true,
+          blockedReasons: [],
+          tasks: [{
+            id: 'task-a',
+            label: 'Harvest',
+            attemptable: true,
+            blockedReasons: [],
+            rich: { stamina: { state: { current: 96, max: 120, provider: 'fabricate' } } }
+          }]
+        }]
+      }
+    });
+    const store = createGatheringStore(services);
+
+    await store.refresh();
+
+    assert.deepEqual(get(store.viewState).staminaSummary, {
+      current: 96,
+      max: 120,
+      provider: 'fabricate',
+      regenerationMode: null
+    });
+  });
+
   it('starts a targeted task, refreshes listing, and notifies on success', async () => {
     const { services, calls } = makeServices();
     const store = createGatheringStore(services);

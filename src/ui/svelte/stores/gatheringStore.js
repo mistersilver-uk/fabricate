@@ -61,6 +61,44 @@ function normalizeRunRows(rows) {
   return Array.isArray(rows) ? rows.filter(Boolean) : [];
 }
 
+function taskKey(environmentId, task = {}, index = 0) {
+  return `${environmentId || 'environment'}:${task?.id || task?.action || index}`;
+}
+
+function environmentAvailability(environment) {
+  if (environment?.attemptable === true) return 'available';
+  if (environment?.attemptable === false) return 'blocked';
+  const tasks = Array.isArray(environment?.tasks) ? environment.tasks : [];
+  if (tasks.length === 0) return 'empty';
+  return tasks.some(task => task?.attemptable === true) ? 'available' : 'blocked';
+}
+
+function environmentMatchesAvailability(environment, filter) {
+  if (!filter || filter === 'all') return true;
+  return environmentAvailability(environment) === filter;
+}
+
+function firstAttemptableTask(environment) {
+  const tasks = Array.isArray(environment?.tasks) ? environment.tasks : [];
+  return tasks.find(task => task?.attemptable === true) ?? tasks[0] ?? null;
+}
+
+function normalizeStaminaSummary(environments = []) {
+  for (const environment of environments) {
+    for (const task of Array.isArray(environment?.tasks) ? environment.tasks : []) {
+      const state = task?.rich?.stamina?.state;
+      if (!state || state.current === null || state.current === undefined) continue;
+      return {
+        current: state.current,
+        max: state.max ?? null,
+        provider: state.provider || null,
+        regenerationMode: state.regenerationMode || null
+      };
+    }
+  }
+  return null;
+}
+
 function normalizeSystemOptions(listing) {
   const explicit = Array.isArray(listing?.gatheringSystems) ? listing.gatheringSystems : [];
   const byId = new Map();
@@ -142,6 +180,10 @@ function buildViewState({
   availableActors,
   listing,
   selectedSystemId = 'all',
+  selectedEnvironmentId = null,
+  selectedTaskKey = null,
+  activeTab = 'environments',
+  availabilityFilter = 'all',
   loading = false,
   startingTaskKey = null,
   error = null,
@@ -150,21 +192,37 @@ function buildViewState({
   const systemOptions = listing?.gatheringSystems ?? [];
   const systemFilterId = systemOptions.some(system => system.id === selectedSystemId) ? selectedSystemId : 'all';
   const environments = listing?.environments ?? [];
-  const filteredEnvironments = systemFilterId === 'all'
+  const systemFilteredEnvironments = systemFilterId === 'all'
     ? environments
     : environments.filter(environment => String(environment?.craftingSystemId || '') === systemFilterId);
+  const filteredEnvironments = systemFilteredEnvironments
+    .filter(environment => environmentMatchesAvailability(environment, availabilityFilter));
+  const selectedEnvironment = filteredEnvironments.find(environment => environment?.id === selectedEnvironmentId)
+    ?? null;
+  const tasks = Array.isArray(selectedEnvironment?.tasks) ? selectedEnvironment.tasks : [];
+  const selectedTask = tasks.find((task, index) => taskKey(selectedEnvironment?.id, task, index) === selectedTaskKey)
+    ?? firstAttemptableTask(selectedEnvironment);
   return {
     loading,
     startingTaskKey,
     error,
     lastResult,
+    activeTab: activeTab === 'log' ? 'log' : 'environments',
+    availabilityFilter: ['all', 'available', 'blocked', 'empty'].includes(availabilityFilter) ? availabilityFilter : 'all',
     selectedActor,
     selectedActorId: selectedActor?.id ?? null,
     availableActors,
     hasSelectableActors: availableActors.length > 0,
     listing,
     environments,
+    systemFilteredEnvironments,
     filteredEnvironments,
+    selectedEnvironment,
+    selectedEnvironmentId: selectedEnvironment?.id ?? null,
+    selectedTask,
+    selectedTaskKey: selectedTask ? taskKey(selectedEnvironment?.id, selectedTask, tasks.indexOf(selectedTask)) : null,
+    selectedEnvironmentAvailability: selectedEnvironment ? environmentAvailability(selectedEnvironment) : null,
+    staminaSummary: normalizeStaminaSummary(systemFilteredEnvironments),
     gatheringSystems: systemOptions,
     selectedSystemId: systemFilterId,
     hasMultipleGatheringSystems: systemOptions.length > 1,
@@ -217,6 +275,10 @@ export function createGatheringStore(services) {
   const error = writable(null);
   const lastResult = writable(null);
   const selectedSystemId = writable('all');
+  const selectedEnvironmentId = writable(null);
+  const selectedTaskKey = writable(null);
+  const activeTab = writable('environments');
+  const availabilityFilter = writable('all');
   const viewState = writable(buildViewState({
     selectedActor: get(selectedActor),
     availableActors: get(availableActors),
@@ -229,6 +291,10 @@ export function createGatheringStore(services) {
       availableActors: get(availableActors),
       listing: get(listing),
       selectedSystemId: get(selectedSystemId),
+      selectedEnvironmentId: get(selectedEnvironmentId),
+      selectedTaskKey: get(selectedTaskKey),
+      activeTab: get(activeTab),
+      availabilityFilter: get(availabilityFilter),
       loading: get(loading),
       startingTaskKey: get(startingTaskKey),
       error: get(error),
@@ -276,6 +342,7 @@ export function createGatheringStore(services) {
       if (get(selectedSystemId) !== 'all' && !normalized.gatheringSystems.some(system => system.id === get(selectedSystemId))) {
         selectedSystemId.set('all');
       }
+      syncSelection();
       return get(listing);
     } catch (err) {
       const message = err?.message || localize('FABRICATE.Gathering.Notifications.RefreshFailed');
@@ -295,16 +362,69 @@ export function createGatheringStore(services) {
     await services.setSetting?.('lastGatheringActor', actor?.id ?? '');
     listing.set(null);
     selectedSystemId.set('all');
+    selectedEnvironmentId.set(null);
+    selectedTaskKey.set(null);
     syncViewState();
     return actor;
+  }
+
+  function syncSelection() {
+    const state = buildViewState({
+      selectedActor: get(selectedActor),
+      availableActors: get(availableActors),
+      listing: get(listing),
+      selectedSystemId: get(selectedSystemId),
+      selectedEnvironmentId: get(selectedEnvironmentId),
+      selectedTaskKey: get(selectedTaskKey),
+      activeTab: get(activeTab),
+      availabilityFilter: get(availabilityFilter),
+      loading: get(loading),
+      startingTaskKey: get(startingTaskKey),
+      error: get(error),
+      lastResult: get(lastResult)
+    });
+    if (state.selectedEnvironmentId !== get(selectedEnvironmentId)) {
+      selectedEnvironmentId.set(state.selectedEnvironmentId);
+    }
+    if (state.selectedTaskKey !== get(selectedTaskKey)) {
+      selectedTaskKey.set(state.selectedTaskKey);
+    }
+    viewState.set(state);
+    return state;
   }
 
   function selectSystem(systemId) {
     const normalizedId = String(systemId || 'all');
     const systems = get(listing)?.gatheringSystems ?? [];
     selectedSystemId.set(normalizedId === 'all' || systems.some(system => system.id === normalizedId) ? normalizedId : 'all');
-    syncViewState();
+    syncSelection();
     return get(selectedSystemId);
+  }
+
+  function selectEnvironment(environmentId) {
+    selectedEnvironmentId.set(environmentId || null);
+    selectedTaskKey.set(null);
+    syncSelection();
+    return get(selectedEnvironmentId);
+  }
+
+  function selectTask(environmentId, task = {}, index = 0) {
+    selectedEnvironmentId.set(environmentId || null);
+    selectedTaskKey.set(taskKey(environmentId, task, index));
+    syncSelection();
+    return get(selectedTaskKey);
+  }
+
+  function selectTab(tab) {
+    activeTab.set(tab === 'log' ? 'log' : 'environments');
+    syncViewState();
+    return get(activeTab);
+  }
+
+  function setAvailabilityFilter(filter) {
+    availabilityFilter.set(['all', 'available', 'blocked', 'empty'].includes(filter) ? filter : 'all');
+    syncSelection();
+    return get(availabilityFilter);
   }
 
   async function startTask(environmentId, task = {}) {
@@ -364,11 +484,19 @@ export function createGatheringStore(services) {
     error,
     lastResult,
     selectedSystemId,
+    selectedEnvironmentId,
+    selectedTaskKey,
+    activeTab,
+    availabilityFilter,
     viewState,
     refresh,
     refreshActors,
     selectActor,
     selectSystem,
+    selectEnvironment,
+    selectTask,
+    selectTab,
+    setAvailabilityFilter,
     startTask,
     destroy
   };

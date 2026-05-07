@@ -21,14 +21,20 @@ test('localize(key) calls game.i18n.localize and returns result', () => {
 });
 
 test('localize(key, data) calls game.i18n.format and returns result', () => {
+  const data = { name: 'foo' };
+  const calls = [];
   globalThis.game = {
     i18n: {
       localize: () => 'bad',
-      format: (k, d) => `formatted:${k}:${d.name}`
+      format: (k, d) => {
+        calls.push({ key: k, data: d });
+        return `formatted:${k}:${d.name}`;
+      }
     }
   };
-  const result = localize('MY.Key', { name: 'foo' });
+  const result = localize('MY.Key', data);
   assert.equal(result, 'formatted:MY.Key:foo');
+  assert.deepEqual(calls, [{ key: 'MY.Key', data }]);
   delete globalThis.game;
 });
 

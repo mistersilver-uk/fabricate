@@ -168,6 +168,8 @@ The Actor Gathering app should feel like choosing where and how to gather in the
 - attempt-limit blockers show remaining attempts or redaction-safe recharge state
 - chat/log evidence shows what happened without leaking hidden task details
 
+The V2 player app implementation uses the Actor Gathering App reference as its concrete layout direction: a wider window, a full-width header, a paginated left environment browser, a center task list that remains empty until the player selects an environment, and a right column containing environment details above the active task attempt panel. Missing environment imagery renders an in-app placeholder instead of requesting a fallback asset path.
+
 The Actor app must present strong fantasy while staying honest about hidden information. Potential result previews are allowed only when the task is targeted and visible, or when GM visibility permits them.
 
 ## Compatibility

@@ -484,7 +484,48 @@
           "Edit": "Edit component",
           "Delete": "Delete component",
           "EditNamed": "Edit {name}",
-          "DeleteNamed": "Delete {name}"
+          "DeleteNamed": "Delete {name}",
+          "EditTitle": "Edit component",
+          "EditSubtitle": "Update tags, essences, and source linkage for this component.",
+          "EditBreadcrumb": "Edit component",
+          "EditTabs": "Edit component tabs",
+          "EditMissingHint": "Pick a component from the browser to edit its tags, essences, and source linkage.",
+          "Cancel": "Cancel",
+          "SaveComponent": "Save Component",
+          "Saving": "Saving...",
+          "Dirty": "Unsaved",
+          "DiscardDirtyContent": "The current component has unsaved changes. Discard them and continue?",
+          "SaveFailed": "Save failed. Try again or refresh the manager.",
+          "NoEditableFields": "There are no editable tag or essence fields for this component in the selected system.",
+          "Tabs": {
+            "Details": "Details",
+            "TagsEssences": "Tags & Essences"
+          },
+          "Identity": {
+            "Title": "Identity",
+            "NameLabel": "Name",
+            "DescriptionLabel": "Description",
+            "ImageLabel": "Image",
+            "SourceBackedHint": "This component is backed by a Foundry item. Changes to its source item's name, image, or description will be reflected here."
+          },
+          "SourceOriginLinked": "Linked",
+          "SourceCard": {
+            "Title": "Linked Source Item",
+            "Open": "Open Source Item",
+            "Replace": "Replace Source",
+            "ReplaceHint": "Drop a Foundry item here to replace the linked source.",
+            "Unlink": "Unlink Source Item",
+            "NoneLabel": "No source",
+            "NoSourceHint": "Drop or replace a Foundry item to link this component to a source."
+          },
+          "TagsEdit": {
+            "Title": "Tags",
+            "NoTags": "No tags are defined for this system yet."
+          },
+          "EssencesEdit": {
+            "Title": "Essences",
+            "NoEssences": "No essences are defined for this system yet."
+          }
         },
         "TagsCategories": {
           "Kicker": "System vocabulary",
@@ -593,7 +634,9 @@
           "DescriptionPlaceholder": "Description",
           "Source": "Source",
           "SourceNone": "No source",
+          "SourceNoneShort": "None",
           "SourceLinked": "Linked source",
+          "SourceLinkedFilter": "Linked",
           "SourceMissing": "Source item missing",
           "SourceStale": "Source unresolved",
           "SourceNeedsAttention": "Needs attention",
@@ -603,6 +646,8 @@
           "SourceNoUuid": "This component has no source item UUID.",
           "SourceEvidenceHint": "Stored source evidence remains readable until you clear or repair it.",
           "SourceEditHint": "Pick or drop a managed component to provide the effect-transfer source.",
+          "CopySource": "Copy source UUID",
+          "UnlinkSource": "Unlink Source",
           "Filters": "Essence filters",
           "SearchPlaceholder": "Search essences...",
           "SearchLabel": "Search essences",
@@ -925,6 +970,9 @@
         "SourceUuidCopyFailed": "Could not copy source item UUID.",
         "SourceReplaced": "Replaced source for {name}.",
         "ReplaceFailed": "Failed to replace component source.",
+        "SourceUnlinked": "Unlinked component source.",
+        "UnlinkFailed": "Failed to unlink component source.",
+        "SourceNotFound": "The linked source item could not be opened.",
         "NoManagedItems": "No Components",
         "NoManagedItemsHint": "Drag in world or compendium items to build this system's item library.",
         "NoSystemHint": "Create or select a crafting system to manage components.",
@@ -1434,10 +1482,33 @@
       "SystemFilter": "Filter by crafting system",
       "RegionFilter": "Filter by region",
       "BiomeFilter": "Filter by biome",
+      "AvailabilityFilter": "Filter by availability",
       "AllRisks": "All risks",
       "AllSystems": "All systems",
       "AllRegions": "All regions",
       "AllBiomes": "All biomes",
+      "Navigation": "Gathering navigation",
+      "Workspace": "Gathering workspace",
+      "EnvironmentBrowser": "Environment browser",
+      "EnvironmentList": "Gathering environments",
+        "EnvironmentDetail": "Environment detail",
+        "EnvironmentFacts": "Environment facts",
+        "EnvironmentImagePlaceholder": "Environment image placeholder",
+        "TaskList": "Gathering tasks",
+      "GatheringTasks": "Gathering Tasks",
+      "ActiveTask": "Active Task",
+      "StartGathering": "Start Gathering",
+      "Requirements": "Requirements",
+      "PotentialResults": "Potential Results",
+      "TaskNotes": "Task Notes",
+      "NoToolsRequired": "No tools required",
+      "NoRegion": "Uncharted region",
+      "Biome": "Biome",
+      "Scene": "Scene",
+      "SelectTask": "Select {name}",
+      "StaminaSpent": "{spent} stamina spent",
+      "AttemptsUsed": "{count}/{max} attempts used",
+      "ChatMessages": "{count} chat messages",
       "Stamina": "Gathering stamina",
       "StaminaSummary": "Stamina {current}/{max}",
       "StaminaCost": "{cost} stamina",
@@ -1471,10 +1542,37 @@
         "cancelled": "Cancelled",
         "unknown": "Unknown"
       },
+        "Tabs": {
+          "Environments": "Environments",
+          "Log": "Gathering Log"
+        },
+        "Pagination": {
+          "Environments": "Environment pages",
+          "ShowingEnvironments": "Showing {start}-{end} of {total} environments",
+          "PreviousPage": "Previous environment page",
+          "NextPage": "Next environment page"
+        },
+        "Availability": {
+        "All": "All availability",
+        "Available": "Available",
+        "Blocked": "Blocked",
+        "Empty": "No tasks"
+      },
+      "Condition": {
+        "Time": "Time",
+        "Weather": "Weather",
+        "Visibility": "Visibility"
+      },
       "Empty": {
         "NoSelectableActorsTitle": "No Selectable Actors",
         "NoSelectableActorsHint": "Ask the GM to grant ownership of an actor before gathering.",
-        "NoEnvironments": "No gathering environments are available."
+          "NoEnvironments": "No gathering environments are available.",
+          "NoFilteredEnvironments": "No environments match these filters.",
+          "SelectEnvironmentForTasks": "Select an environment to view its gathering tasks.",
+          "SelectEnvironmentForDetails": "Select an environment to view its details.",
+          "NoTasks": "No gathering tasks are available.",
+        "NoActiveRuns": "No active gathering runs.",
+        "NoHistory": "No gathering history yet."
       },
       "Notifications": {
         "Started": "Gathering started.",

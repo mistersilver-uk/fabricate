@@ -15,6 +15,38 @@ Primary stack: JavaScript ES modules, Svelte 5, Vite, `node:test`, happy-dom, Pl
 - Treat `openspec/specs/*/spec.md` as the canonical specification source of truth. The legacy `spec/` directory is compatibility-only.
 - Route quick-start documentation changes to `docs/quickstart.md` only.
 
+## Default Agentic Workflow
+
+Non-trivial work runs as a `plan → plan-review → implement → review → docs` state machine, with iteration until each gate accepts. Stages auto-spawn role-specific subagents based on the change signals below — agents do not need to be requested by name. Subagents not matched by the routing table only run when explicitly requested.
+
+### Auto-spawn routing
+
+Match the change against every signal that applies. All matching agents run in parallel within their stage; this is multi-select, not single-pick.
+
+| Signal | Agent(s) | Stage |
+| --- | --- | --- |
+| Any non-trivial task | `fabricate_orchestrator` (plan), `fabricate_implementer` (build), `fabricate_reviewer` (verdict) | always |
+| Touches `src/ui/`, `src/ui/svelte/`, or `styles/` | `fabricate_ux_designer` | plan-review + post-implementation review |
+| Touches `src/models/`, `src/systems/`, `src/integrations/`, `openspec/specs/`, `lang/`, or domain language | `fabricate_domain_expert` | plan-review + docs loop |
+| Adds, removes, or restructures tests, or changes test infrastructure under `tests/` | `fabricate_quality_engineer` | plan-review + post-implementation review |
+| Changes behaviour, public API surfaces, hooks, slash commands, settings, JSDoc-documented exports, or anything covered by `docs/` | `fabricate_docs_writer` + `fabricate_domain_expert` (paired loop) | post-implementation docs loop |
+| Competitor, market, or precedent question | `fabricate_competitive_analyst` | plan |
+| GitHub PR investigation | `fabricate_pr_explorer` | as needed |
+
+### Iteration cycles
+
+Three loops run until acceptance, each capped at 3 revisions before escalating to the user:
+
+1. **Plan review loop.** Orchestrator drafts the OpenSpec change docs, then runs the plan-review agents matched by the routing table. Each emits `APPROVED / NEEDS_CHANGES / BLOCKED` against the plan. Orchestrator revises the change docs until every plan reviewer approves.
+2. **Implementation review loop.** Implementer ships changes; `fabricate_reviewer` plus any post-implementation reviewers from the routing table emit verdicts. Implementer addresses `NEEDS_CHANGES` until every reviewer emits `APPROVED`.
+3. **Documentation iteration loop.** Triggered whenever the change touches behaviour or any documented API surface. `fabricate_domain_expert` updates `DOMAIN.md` and canonical specs against the diff; `fabricate_docs_writer` updates JSDoc and the Jekyll site. Each then reviews the other's output and emits `DOCS APPROVED / DOCS NEEDS_CHANGES`. Loop until both approve.
+
+### Stop conditions
+
+- Any reviewer returning `BLOCKED` halts the loop and surfaces to the user.
+- Hitting the 3-revision cap on any loop halts and surfaces to the user with the outstanding findings.
+- User intervention takes precedence; treat user guidance as the new entry condition for the next iteration.
+
 ## Build & Test
 
 ### Prereqs
@@ -67,7 +99,7 @@ Primary stack: JavaScript ES modules, Svelte 5, Vite, `node:test`, happy-dom, Pl
 
 ## Local Codex Agents And Skills
 
-Prefer the local Codex custom agents in `.codex/agents/` for role-specific work, and the shared skills in `skills/` for workflow instructions. Subagents only run when explicitly requested, so prompts and automation should tell Codex which agents to spawn and which files each implementation worker owns.
+Prefer the local Codex custom agents in `.codex/agents/` for role-specific work, and the shared skills in `skills/` for workflow instructions. The default workflow above auto-spawns these agents based on change signals; explicit requests are only required for agents and skills that the routing table does not cover.
 
 Custom agents:
 

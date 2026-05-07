@@ -1429,6 +1429,54 @@ describe('createAdminStore', () => {
       await store.deleteComponent('comp-1');
       assert.deepEqual(deletedArgs, { sysId: 'sys1', itemId: 'comp-1' });
     });
+
+    it('updateComponent forwards updates to systemManager.updateItem and refreshes', async () => {
+      let updateArgs = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) sys.items = [makeItem({ id: 'item1', name: 'Herb' })];
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateItem: async (sysId, itemId, updates) => { updateArgs = { sysId, itemId, updates }; }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.updateComponent('item1', { tags: ['herb'], essences: { earth: 2 } });
+      assert.equal(result, true);
+      assert.deepEqual(updateArgs, { sysId: 'sys1', itemId: 'item1', updates: { tags: ['herb'], essences: { earth: 2 } } });
+    });
+
+    it('updateComponent returns false when systemManager.updateItem rejects', async () => {
+      const errors = [];
+      const services = createMockServices({
+        notify: { info: () => {}, warn: () => {}, error: (msg) => errors.push(msg) }
+      });
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateItem: async () => { throw new Error('boom'); }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.updateComponent('item1', { tags: ['herb'] });
+      assert.equal(result, false);
+      assert.deepEqual(errors, ['boom']);
+    });
+
+    it('updateComponent is a no-op when itemId or system is missing', async () => {
+      let updateCalled = false;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateItem: async () => { updateCalled = true; }
+      });
+      const store = createAdminStore(services);
+      const result = await store.updateComponent('', { tags: [] });
+      assert.equal(result, false);
+      assert.equal(updateCalled, false);
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -1757,7 +1805,7 @@ describe('createAdminStore', () => {
         'createRecipe', 'deleteRecipe', 'duplicateRecipe', 'toggleRecipeEnabled',
         'importRecipes', 'exportRecipes',
         'exportSystem', 'importSystem',
-        'deleteComponent',
+        'deleteComponent', 'updateComponent',
         'setRecipeSearch', 'setItemSearch',
         'refresh', 'destroy'
       ];

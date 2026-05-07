@@ -8,7 +8,6 @@
     showSourceUi = false,
     selectedEssenceId = '',
     onSelectEssence = () => {},
-    onCreateEssence = () => {},
     onEditEssence = () => {},
     onRemoveEssence = () => {}
   } = $props();
@@ -49,21 +48,6 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  function sourceStateLabel(essence) {
-    const state = essence?.sourceState || 'none';
-    if (state === 'linked') return text('FABRICATE.Admin.ManagerV2.Essence.SourceLinked', 'Linked source');
-    if (state === 'missing') return text('FABRICATE.Admin.ManagerV2.Essence.SourceMissing', 'Source item missing');
-    if (state === 'stale') return text('FABRICATE.Admin.ManagerV2.Essence.SourceStale', 'Source unresolved');
-    return text('FABRICATE.Admin.ManagerV2.Essence.SourceNone', 'No source');
-  }
-
-  function sourceStateClass(essence) {
-    const state = essence?.sourceState || 'none';
-    if (state === 'linked') return 'is-active';
-    if (state === 'missing' || state === 'stale') return 'is-warning';
-    return 'is-disabled';
-  }
-
   function editEssence(essence, event) {
     event?.stopPropagation();
     onEditEssence(essence.id);
@@ -85,6 +69,13 @@
     searchTerm = '';
     sourceFilter = 'all';
   }
+
+  function sourceImageLabel(essence) {
+    return essence?.associatedItem?.name
+      || essence?.associatedItemName
+      || essence?.sourceName
+      || text('FABRICATE.Admin.ManagerV2.Essence.Source', 'Source');
+  }
 </script>
 
 <main class="manager-v2-main" aria-label={text('FABRICATE.Admin.ManagerV2.Essence.Title', 'Essences')}>
@@ -94,17 +85,6 @@
       <h2 class="manager-v2-title">{text('FABRICATE.Admin.ManagerV2.Essence.Library', 'Essence browser')}</h2>
       <p class="manager-v2-subtitle">{text('FABRICATE.Admin.ManagerV2.Essence.LibraryHint', 'Browse, create, and maintain essence definitions for the selected crafting system.')}</p>
     </div>
-  </section>
-
-  <section class="manager-v2-essence-action-band" aria-label={text('FABRICATE.Admin.ManagerV2.Essence.Create', 'Create essence')}>
-    <span>
-      <strong>{text('FABRICATE.Admin.ManagerV2.Essence.CreateBandTitle', 'Add an essence definition')}</strong>
-      <small>{text('FABRICATE.Admin.ManagerV2.Essence.CreateBandHint', 'Create and edit essences in the dedicated editor so browse rows stay selection-only.')}</small>
-    </span>
-    <button type="button" class="manager-v2-button is-primary" onclick={onCreateEssence}>
-      <i class="fas fa-plus" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.ManagerV2.Essence.Create', 'Create essence')}</span>
-    </button>
   </section>
 
   <section class="manager-v2-toolbar" aria-label={text('FABRICATE.Admin.ManagerV2.Essence.Filters', 'Essence filters')}>
@@ -123,7 +103,7 @@
         <span>{text('FABRICATE.Admin.ManagerV2.Essence.SourceFilter', 'Source')}</span>
         <select value={sourceFilter} onchange={(event) => sourceFilter = event.currentTarget.value} aria-label={text('FABRICATE.Admin.ManagerV2.Essence.SourceFilterLabel', 'Filter essences by source state')}>
           <option value="all">{text('FABRICATE.Admin.ManagerV2.Essence.SourceAll', 'All sources')}</option>
-          <option value="linked">{text('FABRICATE.Admin.ManagerV2.Essence.SourceLinked', 'Linked source')}</option>
+          <option value="linked">{text('FABRICATE.Admin.ManagerV2.Essence.SourceLinkedFilter', 'Linked')}</option>
           <option value="needs-attention">{text('FABRICATE.Admin.ManagerV2.Essence.SourceNeedsAttention', 'Needs attention')}</option>
           <option value="none">{text('FABRICATE.Admin.ManagerV2.Essence.SourceNone', 'No source')}</option>
         </select>
@@ -184,10 +164,17 @@
               </span>
             </span>
             {#if showSourceUi}
-              <span role="cell" class="manager-v2-labeled-cell" data-label={text('FABRICATE.Admin.ManagerV2.Essence.Source', 'Source')}>
-                <span class={`manager-v2-chip ${sourceStateClass(essence)}`}>{sourceStateLabel(essence)}</span>
-                {#if essence.sourceName}
-                  <span class="manager-v2-muted">{essence.sourceName}</span>
+              <span role="cell" class="manager-v2-labeled-cell manager-v2-essence-source-cell" data-label={text('FABRICATE.Admin.ManagerV2.Essence.Source', 'Source')}>
+                {#if essence.associatedItem}
+                  <img
+                    class="manager-v2-essence-source-cell-image"
+                    src={essence.associatedItem.img || 'icons/svg/item-bag.svg'}
+                    alt={sourceImageLabel(essence)}
+                    title={sourceImageLabel(essence)}
+                    aria-label={sourceImageLabel(essence)}
+                  />
+                {:else}
+                  <span class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Essence.SourceNoneShort', 'None')}</span>
                 {/if}
               </span>
             {/if}

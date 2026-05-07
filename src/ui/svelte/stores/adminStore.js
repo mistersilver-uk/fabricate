@@ -2880,6 +2880,24 @@ export function createAdminStore(services) {
     await refresh();
   }
 
+  async function updateComponent(itemId, updates = {}) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!itemId || !sysId) return false;
+    if (!updates || typeof updates !== 'object') return false;
+    if (Object.keys(updates).length === 0) return true;
+
+    try {
+      await systemManager.updateItem(sysId, itemId, updates);
+      await refresh();
+      return true;
+    } catch (err) {
+      console.error('Fabricate | Failed to update component:', err);
+      services.notify?.error?.(err?.message || 'Failed to update component');
+      return false;
+    }
+  }
+
   // --- Search ---
 
   async function setRecipeSearch(term) {
@@ -2983,6 +3001,7 @@ export function createAdminStore(services) {
     exportSystem,
     importSystem,
     deleteComponent,
+    updateComponent,
     setRecipeSearch,
     setItemSearch,
     setGraphSearch,

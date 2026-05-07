@@ -611,6 +611,20 @@ Required corrections:
 - The right inspector should be a readable system summary with icon, name, resolution, enabled state, description, counts, and enabled features. It should not include a separate quick-actions card while row actions and header actions already cover the implemented commands.
 - At medium and narrow widths, the layout should stack before table columns become unreadable, and primary actions, row actions, search, filter, selected-row state, and inspector content should remain reachable.
 
+## Essence Browser Source UI Correction
+
+The essences browser should follow the same ownership pattern as the environment and component slices: route-level creation lives in the top-right header, row actions own edit/delete, and the inspector owns selected-object evidence and source maintenance.
+
+Required corrections:
+
+- Remove the in-page `Add an essence definition` band. The browser begins with the page header, then filters, then the table.
+- Browser source rows use compact evidence, not state badges. A resolved `associatedItem` renders as an image-only Source cell with the source name available to title/accessible labels. Unresolved or absent source evidence renders localized `None`.
+- Source filtering still uses existing source state data, but the browser no longer displays `Linked source` badges.
+- The selected essence inspector no longer shows a source-state chip under the essence name.
+- When effect transfer is enabled, the selected essence inspector shows source controls: resolved sources show image/name in the linked-item card, then `Copy source UUID` and amber `Unlink Source` actions underneath; unresolved sources show the existing essence source picker/drop target.
+- Source unlink, picker selection, and drop import persist only through `store.updateEssence(essenceId, { sourceComponentId })`; drops continue to import through `services.importSingleManagedItemFromDrop(data)`.
+- The browse-mode inspector does not render an `Essence actions` card. Edit/delete stay in table rows to avoid duplicating controls.
+
 ## Localization
 
 All visible text belongs in `lang/`.

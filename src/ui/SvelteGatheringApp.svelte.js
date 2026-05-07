@@ -41,8 +41,8 @@ export class SvelteGatheringApp extends SvelteApplicationMixin(
       resizable: true
     },
     position: {
-      width: 760,
-      height: 760
+      width: 1520,
+      height: 880
     }
   };
 

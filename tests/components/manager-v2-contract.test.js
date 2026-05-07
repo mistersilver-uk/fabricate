@@ -13,6 +13,7 @@ const tagsCategoriesPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/Tags
 const systemEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/SystemEditView.svelte');
 const systemsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/SystemsBrowserView.svelte');
 const recipesBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/RecipesBrowserView.svelte');
+const componentEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/ComponentEditView.svelte');
 const componentsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/ComponentsBrowserView.svelte');
 const environmentsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/EnvironmentsBrowserView.svelte');
 const appPath = resolve(repoRoot, 'src/ui/SvelteCraftingSystemManagerV2App.svelte.js');
@@ -26,13 +27,14 @@ const tagsCategoriesSource = readFileSync(tagsCategoriesPath, 'utf8');
 const systemEditSource = readFileSync(systemEditPath, 'utf8');
 const systemsBrowserSource = readFileSync(systemsBrowserPath, 'utf8');
 const recipesBrowserSource = readFileSync(recipesBrowserPath, 'utf8');
+const componentEditSource = readFileSync(componentEditPath, 'utf8');
 const componentsBrowserSource = readFileSync(componentsBrowserPath, 'utf8');
 const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
 const appSource = readFileSync(appPath, 'utf8');
 const mainSource = readFileSync(mainPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
-const managerV2Source = [rootSource, essenceBrowserSource, essenceEditSource, tagsCategoriesSource, systemEditSource, systemsBrowserSource, recipesBrowserSource, componentsBrowserSource, environmentsBrowserSource].join('\n');
+const managerV2Source = [rootSource, essenceBrowserSource, essenceEditSource, tagsCategoriesSource, systemEditSource, systemsBrowserSource, recipesBrowserSource, componentsBrowserSource, componentEditSource, environmentsBrowserSource].join('\n');
 
 describe('CraftingSystemManagerV2 source contract', () => {
   it('self-registers as a parallel manager app without replacing the legacy manager', () => {
@@ -155,7 +157,8 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Essence.EditTitle, 'Edit essence');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Essence.EditBreadcrumb, 'Edit essence');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Essence.CreateBreadcrumb, 'Create essence');
-    assert.equal(lang.FABRICATE.Admin.ManagerV2.Essence.SourceLinked, 'Linked source');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Essence.SourceLinkedFilter, 'Linked');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Essence.SourceNoneShort, 'None');
   });
 
   it('routes system Edit to the in-place v2 edit view and existing store callbacks', () => {
@@ -273,6 +276,10 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(!essenceBrowserSource.includes('onUpdateEssence'), 'browser should not own essence update persistence');
     assert.ok(!essenceBrowserSource.includes('manager-v2-essence-edit-row'), 'browser should not render inline edit rows');
     assert.ok(!essenceBrowserSource.includes('manager-v2-essence-create-name'), 'browser should not render inline create fields');
+    assert.ok(!essenceBrowserSource.includes('manager-v2-essence-action-band'), 'browser should not duplicate the route-header create action');
+    assert.ok(!essenceBrowserSource.includes("text('FABRICATE.Admin.ManagerV2.Essence.SourceLinked'"), 'browser should not render linked-source badges');
+    assert.ok(essenceBrowserSource.includes('manager-v2-essence-source-cell-image'), 'browser source column should render resolved source images');
+    assert.ok(essenceBrowserSource.includes('FABRICATE.Admin.ManagerV2.Essence.SourceNoneShort'), 'browser source column should render compact None copy when unresolved');
   });
 
   it('uses shared manager-v2 essence picker controls on the dedicated edit route', () => {
@@ -285,7 +292,12 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(!essenceEditSource.includes('EditKicker'), 'edit route should not render a duplicate inner route header');
     assert.ok(!essenceEditSource.includes('IconClassHint'), 'edit route should not expose raw icon class copy');
     assert.ok(rootSource.includes('form="manager-v2-essence-edit-form"'), 'root header should own the primary save action for the edit form');
-    assert.ok(rootSource.includes("currentView !== 'essence-edit'"), 'inspector should hide edit actions while already editing');
+    assert.ok(!rootSource.includes('data-essence-action="edit"'), 'inspector should not duplicate browse row edit actions');
+    assert.ok(!rootSource.includes('data-essence-action="delete"'), 'inspector should not duplicate browse row delete actions');
+    assert.ok(rootSource.includes('data-essence-action="copy-source"'), 'inspector should expose source UUID copy through the source action row');
+    assert.ok(rootSource.includes('data-essence-action="unlink-source"'), 'inspector should expose source unlink through the source action row');
+    assert.ok(rootSource.includes('store.updateEssence?.(selectedEssenceForInspector.id, { sourceComponentId })'), 'inspector source changes should use updateEssence');
+    assert.ok(rootSource.includes('importSingleManagedItemFromDrop'), 'inspector source drops should reuse the managed-item import seam');
     assert.ok(!essenceEditSource.includes('game.'), 'edit route should not reference Foundry runtime globals');
   });
 
@@ -325,16 +337,42 @@ describe('CraftingSystemManagerV2 source contract', () => {
     for (const snippet of [
       'store.setItemSearch?.',
       'services?.onDropItem?.(data)',
-      'services?.onEditComponent?.(itemId)',
       'store.deleteComponent?.(itemId)',
       'services?.onCopySourceUuid?.(uuid)'
     ]) {
       assert.ok(rootSource.includes(snippet), `root should wire ${snippet}`);
     }
     assert.ok(rootSource.includes("activeView = view"), 'components should use the selected-system route state');
-    assert.ok(!rootSource.includes('saveComponent'), 'components browser should not introduce inline save behavior');
     assert.ok(!rootSource.includes('usageCount ='), 'components browser should not invent usage counts');
     assert.ok(!rootSource.includes('stale source'), 'components browser should not invent source freshness labels');
+  });
+
+  it('routes the components row Edit action through the in-manager component-edit view', () => {
+    assert.ok(
+      rootSource.includes("activeView = 'component-edit'"),
+      'editComponent should set the activeView to the in-manager component-edit route'
+    );
+    assert.ok(
+      rootSource.includes("import ComponentEditView"),
+      'root should import the ComponentEditView'
+    );
+    assert.ok(
+      rootSource.includes("store.updateComponent?."),
+      'root should persist component-edit saves through the admin-store updateComponent action'
+    );
+    assert.ok(
+      !rootSource.includes('services?.onEditComponent?.'),
+      'manager-v2 row Edit should no longer launch the legacy component editor'
+    );
+    const componentEditScript = componentEditSource.split('</script>')[0] || componentEditSource;
+    assert.ok(
+      !/\b(?:game|ui|Hooks|CONFIG)\.[a-zA-Z]/.test(componentEditScript),
+      'ComponentEditView script should not reference Foundry globals directly'
+    );
+    assert.ok(
+      !componentEditSource.includes('foundry.applications'),
+      'ComponentEditView should not import Foundry application classes'
+    );
   });
 
   it('uses a purpose-built manager-v2 environment editor instead of mounting the legacy tab', () => {

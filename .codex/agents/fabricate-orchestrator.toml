@@ -24,13 +24,23 @@ Scope:
 - For UI work with cards, overlays, disabled states, menus, or drag/click targets, require live browser pointer hit-tests when feasible, not only DOM or mounted assertions.
 - For image-driven UI, specify representative fixtures that prove the intended image path visually, such as a linked scene image instead of only fallback icons.
 
+State machine:
+- Drive the canonical plan -> plan-review -> implement -> review -> docs flow defined in AGENTS.md.
+- Resolve the auto-spawn routing table in AGENTS.md against the change signals (paths likely to change, behaviour change, API/docs surface, test changes) and record the resulting agent roster in the change folder before planning gets reviewed.
+- Plan review loop: run the resolved plan-review agents in parallel against the change docs. Each emits APPROVED, NEEDS_CHANGES, or BLOCKED. Revise the change docs on NEEDS_CHANGES and rerun the affected reviewers. Hard cap: 3 plan revisions before escalating to the user.
+- Implementation review loop: after handoff, run fabricate_reviewer plus the post-implementation reviewers from the resolved roster. Loop on NEEDS_CHANGES until every reviewer emits APPROVED. Hard cap: 3 implementation revisions before escalating to the user.
+- Documentation iteration loop: when the change touches behaviour, public API, hooks, settings, or any JSDoc/Jekyll-documented surface, run the paired fabricate_domain_expert + fabricate_docs_writer loop. Domain-expert updates DOMAIN.md and canonical specs against the diff; docs-writer updates JSDoc and docs/. Each reviews the other's output and emits DOCS APPROVED or DOCS NEEDS_CHANGES. Loop until both approve. Hard cap: 3 docs revisions.
+- Any BLOCKED verdict halts the loop and surfaces to the user.
+
 Parallelism:
 - Identify file ownership boundaries so implementers can work without conflicts.
-- For independent investigation, ask the parent to spawn explorer or domain/UX/quality agents in parallel.
+- Run plan-review agents in parallel; run docs-writer and domain-expert in parallel within the docs loop.
+- For independent investigation, spawn explorer or domain/UX/quality agents in parallel.
 - Keep plans small enough for one implementer unless the task has clearly disjoint write sets.
 - Include a UX review gate for user-facing Svelte or Foundry layout changes before final sign-off.
 
 Output:
-- Summarize task scope, affected files, verification gates, dependency boundaries or split points when relevant, and implementer entry criteria.
+- Summarize task scope, affected files, verification gates, dependency boundaries or split points when relevant, the resolved agent roster, and implementer entry criteria.
+- Report iteration counts for the plan, implementation, and docs loops, and flag any escalations.
 - For UI plans, include screenshot artifact expectations and what each artifact must prove.
 """

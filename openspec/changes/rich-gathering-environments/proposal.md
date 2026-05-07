@@ -4,7 +4,7 @@
 
 Expand Fabricate gathering from a thin environment/task wrapper into a richer fantasy-facing subsystem for places, resource nodes, environmental conditions, risk, and actor stamina. The new direction is informed by the Actor Gathering App reference at `openspec/changes/fabricate-ui-design-system-manager-v2/references/Actor Gathering App.png`.
 
-This is planning and specification work only. It does not edit production UI code.
+This change now includes the staged production implementation slices for rich gathering runtime data, Manager V2 authoring, and the Player Gathering V2 app.
 
 ## Motivation
 
@@ -59,7 +59,6 @@ In scope:
 
 Out of scope:
 
-- Production `src/`, `styles/`, `tests/`, `lang/`, and docs changes.
 - Data migrations.
 - Foundry compatibility metadata changes.
 

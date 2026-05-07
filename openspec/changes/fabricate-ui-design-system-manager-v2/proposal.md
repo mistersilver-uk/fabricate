@@ -134,6 +134,7 @@ Future implementation is expected to touch:
 - The recipe browser and recipe editor requirements reflect the later recipe direction images while preserving Fabricate's recipe semantics.
 - The component browser/editor requirements reflect the component direction image while preserving Fabricate component, source, tag, essence, usage, and salvage semantics.
 - The essences requirements reflect the later essence direction image while preserving EssenceDefinition, source item, and component-usage semantics.
+- The essences browser corrective slice keeps create/edit/delete ownership in the header/table rows, uses compact source image or `None` row evidence, and moves source link/unlink/drop maintenance into the selected essence inspector without new persistence APIs.
 - The tags/categories requirements reflect the later system-level direction image while preserving Fabricate item-tag, flat recipe-category, reserved `General`, and single-category recipe semantics.
 - The recipe resolution and visibility tab requirements reflect their later direction images while preserving system-owned mode context and recipe/domain-specific behavior.
 - The first-slice systems view keeps actions in one clear header location, avoids duplicate quick-action panels, hides future feature/admin tabs until a system is selected, and preserves readable row and inspector text at normal Foundry window sizes.

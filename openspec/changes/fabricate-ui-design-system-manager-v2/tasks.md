@@ -52,6 +52,8 @@ This first implementation slice creates the basic structure for `CraftingSystemM
 - [x] Keep legacy `mapped`/`tiered` mode handling display-only if encountered; v2 does not add new legacy editing behavior.
 - [x] Do not add recipe dnd5e/pf2e crafting-check UI in this slice; those providers are gathering-check behavior unless a later recipe-check spec adds them.
 - [x] Do not add essence source-item editing in this slice because current runtime and the delta still need source-link semantic alignment.
+- [x] Keep selected essence source evidence readable in the inspector by separating source thumbnail/copy from the unlink action row.
+- [x] Move selected essence source actions below the linked item card, add copy source UUID, and style unlink as amber destructive.
 
 ## Corrective Implementation Plan: First-Slice Screenshot Review
 
@@ -700,6 +702,14 @@ This corrective slice stabilizes the manager-v2 component toolbar when multiple 
 - [ ] When effect transfer is enabled, source selection must use picker and drag/drop flows, preserve stale source evidence, and surface whether the linked source resolves and can provide effects.
 - [ ] Preserve the right evidence rail from the reference: identity preview, details/usage/source evidence where applicable, validation, duplicate/delete actions, and no unsupported decorative metrics.
 - [ ] Update localization, mounted tests, layout tests, and Foundry/Playwright smoke coverage for browse-only essences, edit-route navigation, pop-over icon picker, conditional source panel, dirty save/cancel, and responsive screenshots.
+
+## Corrective Implementation Plan: Essence Browser Source UI
+
+- [x] Remove the duplicate essence create band from the browser; creation stays in the route header.
+- [x] Replace visible linked-source badges in browser rows with compact source image evidence or localized `None`.
+- [x] Move browse-mode source mutation to the selected essence inspector using the existing source selector/drop import flow and `store.updateEssence`.
+- [x] Remove the duplicate browse-mode inspector Essence actions card so edit/delete remain row actions.
+- [x] Update focused manager-v2 contract, mounted, and layout tests for the revised source UI.
 
 ## Verification For This Planning Change
 

@@ -49,6 +49,8 @@
 - [x] Build first-slice GM manager-v2 rich environment browse/edit surfaces with region/biome/risk/condition filters, task node controls, respawn policy controls, attempt-limit controls, and stamina economy settings.
 - [ ] Complete GM manager-v2 rich controls for blind reveal operations, expression/macro providers, manual restock/recharge flows, encounter table configuration, chat settings, and developer/API evidence.
 - [x] Build first-slice Actor Gathering app redesign with environment browser, task list, stamina summary, rich evidence chips, and narrow responsive layout.
+- [x] Repair Player Gathering V2 layout to match the reference direction: wider app shell, full-width header, paginated environment browser, center selected-environment task list, and right-side environment/detail plus active task panels.
+- [x] Remove invalid environment fallback image requests from the Player Gathering V2 app.
 - [ ] Complete Actor Gathering detail/evidence panel polish and active/log tab rich evidence display.
 - [x] Add localization for all new labels, states, validation messages, tooltips, and hidden/redacted copy.
 - [x] Add first-slice unit tests for rich normalization, node/stamina/attempt blockers, bootstrap APIs, listing compatibility, and hidden-task redaction compatibility.

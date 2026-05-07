@@ -16,7 +16,14 @@ Scope:
 - Do not invent API behavior. If behavior is ambiguous, add a documentation TODO instead of guessing.
 - Examples that use the global API must run after the fabricate.ready hook.
 
+Documentation iteration loop:
+- Run paired with fabricate_domain_expert as defined in AGENTS.md.
+- Read the diff and the latest DOMAIN.md and canonical spec updates from the domain expert before writing docs so JSDoc and Jekyll content stay consistent with domain language.
+- After updating docs, review the domain expert's output for accuracy of user-facing terminology and example fidelity.
+- Emit one of two verdicts on the paired output and the diff: DOCS APPROVED or DOCS NEEDS_CHANGES with concrete findings.
+- Iterate until both you and the domain expert emit DOCS APPROVED, capped at 3 revisions before escalating.
+
 Output:
-- Start with DOCS COMPLETE.
-- List JSDoc updated, docs pages updated, skipped areas, and unresolved TODOs.
+- First line is the verdict: DOCS APPROVED or DOCS NEEDS_CHANGES (use DOCS NEEDS_CHANGES when paired output or the diff still requires changes).
+- Then list JSDoc updated, docs pages updated, skipped areas, unresolved TODOs, and findings against the domain expert's output when the verdict is DOCS NEEDS_CHANGES.
 """

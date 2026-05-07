@@ -11,8 +11,10 @@
   let riskFilter = $state('all');
   let regionFilter = $state('all');
   let biomeFilter = $state('all');
+  let environmentPage = $state(1);
+  const environmentPageSize = 6;
 
-  const filteredEnvironments = $derived(($viewState.filteredEnvironments || []).filter(environment => {
+  const visibleEnvironments = $derived(($viewState.filteredEnvironments || []).filter(environment => {
     const query = searchTerm.trim().toLowerCase();
     const matchesSearch = !query || `${environment.name || ''} ${environment.description || ''} ${environment.craftingSystemName || ''} ${environment.region || ''} ${environment.biome || ''}`.toLowerCase().includes(query);
     const matchesRisk = riskFilter === 'all' || (environment.risk || 'safe') === riskFilter;
@@ -20,22 +22,55 @@
     const matchesBiome = biomeFilter === 'all' || (environment.biome || '') === biomeFilter;
     return matchesSearch && matchesRisk && matchesRegion && matchesBiome;
   }));
-  const regionOptions = $derived(uniqueSorted(($viewState.filteredEnvironments || []).map(environment => environment.region)));
-  const biomeOptions = $derived(uniqueSorted(($viewState.filteredEnvironments || []).map(environment => environment.biome)));
+  const environmentPageCount = $derived(Math.max(1, Math.ceil(visibleEnvironments.length / environmentPageSize)));
+  const currentEnvironmentPage = $derived(Math.min(environmentPage, environmentPageCount));
+  const pagedEnvironments = $derived(visibleEnvironments.slice((currentEnvironmentPage - 1) * environmentPageSize, currentEnvironmentPage * environmentPageSize));
+  const activeEnvironment = $derived(visibleEnvironments.find(environment => environment.id === $viewState.selectedEnvironmentId) || null);
+  const activeTasks = $derived(Array.isArray(activeEnvironment?.tasks) ? activeEnvironment.tasks : []);
+  const activeTask = $derived(
+    activeTasks.find((task, index) => taskKey(activeEnvironment, task, index) === $viewState.selectedTaskKey)
+      || null
+  );
+  const regionOptions = $derived(uniqueSorted(($viewState.systemFilteredEnvironments || $viewState.filteredEnvironments || []).map(environment => environment.region)));
+  const biomeOptions = $derived(uniqueSorted(($viewState.systemFilteredEnvironments || $viewState.filteredEnvironments || []).map(environment => environment.biome)));
+  const potentialResults = $derived(resultPreviews(activeTask));
 
   onMount(() => {
     store.refresh();
+  });
+
+  $effect(() => {
+    searchTerm;
+    riskFilter;
+    regionFilter;
+    biomeFilter;
+    $viewState.availabilityFilter;
+    $viewState.selectedSystemId;
+    environmentPage = 1;
+  });
+
+  $effect(() => {
+    if (environmentPage > environmentPageCount) environmentPage = environmentPageCount;
+    if (environmentPage < 1) environmentPage = 1;
   });
 
   function actorImage(actor) {
     return actor?.img || 'icons/svg/mystery-man.svg';
   }
 
+  function environmentImage(environment) {
+    return environment?.img || environment?.image || null;
+  }
+
+  function taskImage(task) {
+    return task?.img || task?.image || null;
+  }
+
   function displayTaskLabel(task) {
-    if (task?.blind === true || task.action === 'blindGather') {
+    if (task?.blind === true || task?.action === 'blindGather') {
       return task.label || localize('FABRICATE.Gathering.BlindTaskLabel');
     }
-    return task.label || task.name || localize('FABRICATE.Gathering.BlindTaskLabel');
+    return task?.label || task?.name || localize('FABRICATE.Gathering.BlindTaskLabel');
   }
 
   function blockedMessage(reason) {
@@ -56,9 +91,7 @@
   }
 
   function displayRunLabel(run) {
-    if (run?.blind === true) {
-      return run.label || localize('FABRICATE.Gathering.BlindTaskLabel');
-    }
+    if (run?.blind === true) return run.label || localize('FABRICATE.Gathering.BlindTaskLabel');
     return run?.label || localize('FABRICATE.Gathering.BlindTaskLabel');
   }
 
@@ -68,11 +101,13 @@
     return value === key ? status || localize('FABRICATE.Gathering.Status.unknown') : value;
   }
 
+  function riskLabel(risk) {
+    return localize(`FABRICATE.Gathering.Risk.${risk || 'safe'}`);
+  }
+
   function activeRunTime(run) {
     if (!run?.timeGate?.availableAt) return '';
-    return localize('FABRICATE.Gathering.ActiveRuns.AvailableAt', {
-      time: run.timeGate.availableAt
-    });
+    return localize('FABRICATE.Gathering.ActiveRuns.AvailableAt', { time: run.timeGate.availableAt });
   }
 
   function historySummary(run) {
@@ -86,77 +121,147 @@
     return statusLabel(run.status);
   }
 
-  function startButtonLabel(task) {
-    if (task?.attemptable !== true) {
-      return localize('FABRICATE.Gathering.BlockedAction');
-    }
-    return displayTaskLabel(task);
-  }
-
   function uniqueSorted(values) {
     return Array.from(new Set(values.map(value => String(value || '').trim()).filter(Boolean)))
       .sort((a, b) => a.localeCompare(b));
   }
 
-  function taskEconomySummary(task) {
+  function economyParts(source) {
+    const rich = source?.rich || source?.economyEvidence || source || {};
     const parts = [];
-    if (task?.rich?.stamina?.cost) parts.push(localize('FABRICATE.Gathering.StaminaCost', { cost: task.rich.stamina.cost }));
-    if (task?.rich?.nodes) {
-      const nodes = task.rich.nodes.current === null
-        ? localize(task.rich.nodes.available ? 'FABRICATE.Gathering.NodesAvailable' : 'FABRICATE.Gathering.NodesDepleted')
-        : localize('FABRICATE.Gathering.NodeCount', { current: task.rich.nodes.current, max: task.rich.nodes.max });
-      parts.push(nodes);
+    const stamina = rich?.stamina;
+    const nodes = rich?.nodes;
+    const attemptLimit = rich?.attemptLimit;
+    if (stamina?.cost) parts.push(localize('FABRICATE.Gathering.StaminaCost', { cost: stamina.cost }));
+    if (stamina?.spent) parts.push(localize('FABRICATE.Gathering.StaminaSpent', { spent: stamina.spent }));
+    if (nodes) {
+      parts.push(nodes.current === null || nodes.current === undefined
+        ? localize(nodes.available ? 'FABRICATE.Gathering.NodesAvailable' : 'FABRICATE.Gathering.NodesDepleted')
+        : localize('FABRICATE.Gathering.NodeCount', { current: nodes.current, max: nodes.max }));
     }
-    if (task?.rich?.attemptLimit?.remaining !== null && task?.rich?.attemptLimit?.remaining !== undefined) {
-      parts.push(localize('FABRICATE.Gathering.AttemptsRemaining', { remaining: task.rich.attemptLimit.remaining, max: task.rich.attemptLimit.max }));
+    if (attemptLimit?.remaining !== null && attemptLimit?.remaining !== undefined) {
+      parts.push(localize('FABRICATE.Gathering.AttemptsRemaining', { remaining: attemptLimit.remaining, max: attemptLimit.max }));
+    } else if (attemptLimit?.count !== undefined && attemptLimit?.max !== undefined) {
+      parts.push(localize('FABRICATE.Gathering.AttemptsUsed', { count: attemptLimit.count, max: attemptLimit.max }));
     }
-    return parts.join(' · ');
+    return parts;
   }
 
-  function staminaSummary() {
-    const task = ($viewState.environments || []).flatMap(environment => environment.tasks || []).find(task => task?.rich?.stamina?.state);
-    const state = task?.rich?.stamina?.state;
-    if (!state || state.current === null) return '';
-    return localize('FABRICATE.Gathering.StaminaSummary', { current: state.current, max: state.max ?? '?' });
+  function taskEconomySummary(task) {
+    return economyParts(task).join(' · ');
+  }
+
+  function environmentAvailability(environment) {
+    if (environment?.attemptable === true) return localize('FABRICATE.Gathering.Availability.Available');
+    if (environment?.attemptable === false) return localize('FABRICATE.Gathering.Availability.Blocked');
+    if (!environment?.tasks?.length) return localize('FABRICATE.Gathering.Availability.Empty');
+    return localize('FABRICATE.Gathering.Availability.Available');
+  }
+
+  function conditionFacts(environment) {
+    const conditions = environment?.conditions || {};
+    return [
+      { icon: 'fa-sun', label: localize('FABRICATE.Gathering.Condition.Time'), value: conditions.timeOfDay },
+      { icon: 'fa-cloud-sun', label: localize('FABRICATE.Gathering.Condition.Weather'), value: conditions.weather },
+      { icon: 'fa-eye', label: localize('FABRICATE.Gathering.Condition.Visibility'), value: conditions.visibility }
+    ].filter(fact => String(fact.value || '').trim());
+  }
+
+  function startButtonLabel(task) {
+    if (!task) return localize('FABRICATE.Gathering.StartGathering');
+    if (task?.attemptable !== true) return localize('FABRICATE.Gathering.BlockedAction');
+    return localize('FABRICATE.Gathering.StartGathering');
+  }
+
+  function resultPreviews(task) {
+    if (!task || task.blind === true) return [];
+    const previews = task.potentialResults || task.resultPreviews || task.resultsPreview || task.visibleResults || [];
+    return Array.isArray(previews) ? previews.filter(Boolean) : [];
+  }
+
+  function resultImage(result) {
+    return result?.img || result?.image || result?.icon || 'icons/svg/item-bag.svg';
+  }
+
+  function runEvidence(run) {
+    const parts = [];
+    if (run?.environmentName) parts.push(run.environmentName);
+    if ($viewState.hasMultipleGatheringSystems && run?.craftingSystemName) parts.push(run.craftingSystemName);
+    parts.push(...economyParts(run));
+    if (run?.conditions) {
+      parts.push(...Object.values(run.conditions).map(value => String(value || '').trim()).filter(Boolean));
+    }
+    if (Array.isArray(run?.chatMessageIds) && run.chatMessageIds.length > 0) {
+      parts.push(localize('FABRICATE.Gathering.ChatMessages', { count: run.chatMessageIds.length }));
+    }
+    return parts;
+  }
+
+  function environmentPaginationSummary() {
+    if (visibleEnvironments.length === 0) {
+      return localize('FABRICATE.Gathering.Pagination.ShowingEnvironments', { start: 0, end: 0, total: 0 });
+    }
+    const start = ((currentEnvironmentPage - 1) * environmentPageSize) + 1;
+    const end = Math.min(currentEnvironmentPage * environmentPageSize, visibleEnvironments.length);
+    return localize('FABRICATE.Gathering.Pagination.ShowingEnvironments', { start, end, total: visibleEnvironments.length });
+  }
+
+  function selectEnvironment(environment) {
+    store.selectEnvironment(environment?.id);
+  }
+
+  function selectTask(task, index) {
+    store.selectTask(activeEnvironment?.id, task, index);
   }
 </script>
 
 <div class="fabricate-gathering-app">
-  <header class="gathering-header">
-    <div>
-      <h2>{localize('FABRICATE.Gathering.Title')}</h2>
-      <p>{localize('FABRICATE.Gathering.Subtitle')}</p>
-    </div>
-
-    <label class="gathering-actor-select">
-      <span>{localize('FABRICATE.Gathering.Actor')}</span>
-      <select
-        disabled={$viewState.availableActors.length === 0}
-        value={$viewState.selectedActorId || ''}
-        onchange={(event) => store.selectActor(event.target.value).then(() => store.refresh())}
-      >
-        {#each $viewState.availableActors as actor (actor.id)}
-          <option value={actor.id}>{actor.name}</option>
-        {/each}
-      </select>
-    </label>
-    {#if staminaSummary()}
-      <div class="gathering-stamina-summary" aria-label={localize('FABRICATE.Gathering.Stamina')}>
-        <i class="fas fa-bolt" aria-hidden="true"></i>
-        <span>{staminaSummary()}</span>
-      </div>
-    {/if}
-  </header>
-
-  {#if $viewState.selectedActor}
-    <section class="gathering-selected-actor" aria-label={localize('FABRICATE.Gathering.SelectedActor')}>
-      <img src={actorImage($viewState.selectedActor)} alt="" />
+  <header class="gathering-v2-header">
+    <section class="gathering-v2-title">
+      <i class="fas fa-leaf" aria-hidden="true"></i>
       <div>
-        <strong>{$viewState.selectedActor.name}</strong>
-        <span>{localize('FABRICATE.Gathering.InventoryTarget')}</span>
+        <h2>{localize('FABRICATE.Gathering.Title')}</h2>
+        <p>{localize('FABRICATE.Gathering.Subtitle')}</p>
       </div>
     </section>
-  {/if}
+
+    <section class="gathering-v2-actor-card" aria-label={localize('FABRICATE.Gathering.SelectedActor')}>
+      {#if $viewState.selectedActor}
+        <img src={actorImage($viewState.selectedActor)} alt="" />
+      {/if}
+      <label>
+        <span>{localize('FABRICATE.Gathering.Actor')}</span>
+        <select
+          disabled={$viewState.availableActors.length === 0}
+          value={$viewState.selectedActorId || ''}
+          onchange={(event) => store.selectActor(event.target.value).then(() => store.refresh())}
+        >
+          {#each $viewState.availableActors as actor (actor.id)}
+            <option value={actor.id}>{actor.name}</option>
+          {/each}
+        </select>
+      </label>
+    </section>
+
+    {#if $viewState.staminaSummary}
+      <section class="gathering-v2-stamina" aria-label={localize('FABRICATE.Gathering.Stamina')}>
+        <span>{localize('FABRICATE.Gathering.Stamina')}</span>
+        <strong>{localize('FABRICATE.Gathering.StaminaSummary', { current: $viewState.staminaSummary.current, max: $viewState.staminaSummary.max ?? '?' })}</strong>
+        <meter min="0" max={$viewState.staminaSummary.max || $viewState.staminaSummary.current || 1} value={$viewState.staminaSummary.current || 0}></meter>
+      </section>
+    {/if}
+
+    <nav class="gathering-v2-tabs" aria-label={localize('FABRICATE.Gathering.Navigation')}>
+      <button type="button" class:is-active={$viewState.activeTab === 'environments'} aria-pressed={$viewState.activeTab === 'environments'} onclick={() => store.selectTab('environments')}>
+        <i class="fas fa-leaf" aria-hidden="true"></i>
+        <span>{localize('FABRICATE.Gathering.Tabs.Environments')}</span>
+      </button>
+      <button type="button" class:is-active={$viewState.activeTab === 'log'} aria-pressed={$viewState.activeTab === 'log'} onclick={() => store.selectTab('log')}>
+        <i class="fas fa-rectangle-list" aria-hidden="true"></i>
+        <span>{localize('FABRICATE.Gathering.Tabs.Log')}</span>
+      </button>
+    </nav>
+  </header>
 
   {#if $viewState.feedback}
     <section class="gathering-feedback-panel" class:success={$viewState.feedback.tone === 'success'} class:warning={$viewState.feedback.tone === 'warning'} aria-label={localize('FABRICATE.Gathering.Feedback.Title')}>
@@ -165,35 +270,6 @@
         <strong>{$viewState.feedback.label}</strong>
       </div>
       <span>{$viewState.feedback.message}</span>
-    </section>
-  {/if}
-
-  {#if $viewState.activeRuns?.length}
-    <section class="gathering-run-section" aria-label={localize('FABRICATE.Gathering.ActiveRuns.Title')}>
-      <div class="gathering-section-heading">
-        <h3>{localize('FABRICATE.Gathering.ActiveRuns.Title')}</h3>
-      </div>
-      <div class="gathering-runs-grid">
-        {#each $viewState.activeRuns as run, index (runKey(run, index, 'active'))}
-          <article class="gathering-run-row">
-            <div>
-              <strong>{displayRunLabel(run)}</strong>
-              {#if run.environmentName}
-                <span>{run.environmentName}</span>
-              {/if}
-              {#if $viewState.hasMultipleGatheringSystems && run.craftingSystemName}
-                <span class="gathering-chip gathering-system-chip">{run.craftingSystemName}</span>
-              {/if}
-            </div>
-            <div class="gathering-run-meta">
-              <span>{statusLabel(run.status)}</span>
-              {#if activeRunTime(run)}
-                <span>{activeRunTime(run)}</span>
-              {/if}
-            </div>
-          </article>
-        {/each}
-      </div>
     </section>
   {/if}
 
@@ -213,6 +289,45 @@
       <span>{localize('FABRICATE.Gathering.Blocked.NoSelectableActors')}</span>
       <span>{localize('FABRICATE.Gathering.Empty.NoSelectableActorsHint')}</span>
     </div>
+  {:else if $viewState.activeTab === 'log'}
+    <main class="gathering-v2-log" aria-label={localize('FABRICATE.Gathering.Tabs.Log')}>
+      <section class="gathering-run-section">
+        <div class="gathering-section-heading"><h3>{localize('FABRICATE.Gathering.ActiveRuns.Title')}</h3></div>
+        <div class="gathering-runs-grid">
+          {#each $viewState.activeRuns as run, index (runKey(run, index, 'active'))}
+            <article class="gathering-run-row">
+              <div>
+                <strong>{displayRunLabel(run)}</strong>
+                {#each runEvidence(run) as part (part)}<span>{part}</span>{/each}
+              </div>
+              <div class="gathering-run-meta">
+                <span>{statusLabel(run.status)}</span>
+                {#if activeRunTime(run)}<span>{activeRunTime(run)}</span>{/if}
+              </div>
+            </article>
+          {:else}
+            <div class="gathering-empty-state is-compact">{localize('FABRICATE.Gathering.Empty.NoActiveRuns')}</div>
+          {/each}
+        </div>
+      </section>
+
+      <section class="gathering-run-section">
+        <div class="gathering-section-heading"><h3>{localize('FABRICATE.Gathering.History.Title')}</h3></div>
+        <div class="gathering-history-list">
+          {#each $viewState.history as run, index (runKey(run, index, 'history'))}
+            <article class="gathering-history-row">
+              <div>
+                <strong>{displayRunLabel(run)}</strong>
+                {#each runEvidence(run) as part (part)}<span>{part}</span>{/each}
+              </div>
+              <span>{historySummary(run)}</span>
+            </article>
+          {:else}
+            <div class="gathering-empty-state is-compact">{localize('FABRICATE.Gathering.Empty.NoHistory')}</div>
+          {/each}
+        </div>
+      </section>
+    </main>
   {:else if $viewState.environments.length === 0}
     <div class="gathering-empty-state">
       {#each $viewState.blockedReasons as reason, index (reasonKey(reason, index, 'listing'))}
@@ -222,95 +337,126 @@
       {/each}
     </div>
   {:else}
-    <section class="gathering-filter-bar" aria-label={localize('FABRICATE.Gathering.Filters')}>
-      <label>
-        <i class="fas fa-search" aria-hidden="true"></i>
-        <input type="search" bind:value={searchTerm} placeholder={localize('FABRICATE.Gathering.SearchPlaceholder')} />
-      </label>
-      <select bind:value={riskFilter} aria-label={localize('FABRICATE.Gathering.RiskFilter')}>
-        <option value="all">{localize('FABRICATE.Gathering.AllRisks')}</option>
-        <option value="safe">{localize('FABRICATE.Gathering.Risk.safe')}</option>
-        <option value="hazardous">{localize('FABRICATE.Gathering.Risk.hazardous')}</option>
-        <option value="unsafe">{localize('FABRICATE.Gathering.Risk.unsafe')}</option>
-        <option value="extreme">{localize('FABRICATE.Gathering.Risk.extreme')}</option>
-      </select>
-      {#if $viewState.hasMultipleGatheringSystems}
-        <select value={$viewState.selectedSystemId || 'all'} aria-label={localize('FABRICATE.Gathering.SystemFilter')} onchange={(event) => store.selectSystem(event.target.value)}>
-          <option value="all">{localize('FABRICATE.Gathering.AllSystems')}</option>
-          {#each $viewState.gatheringSystems as system (system.id)}
-            <option value={system.id}>{system.name}</option>
-          {/each}
-        </select>
-      {/if}
-      <select bind:value={regionFilter} aria-label={localize('FABRICATE.Gathering.RegionFilter')}>
-        <option value="all">{localize('FABRICATE.Gathering.AllRegions')}</option>
-        {#each regionOptions as region (region)}
-          <option value={region}>{region}</option>
-        {/each}
-      </select>
-      <select bind:value={biomeFilter} aria-label={localize('FABRICATE.Gathering.BiomeFilter')}>
-        <option value="all">{localize('FABRICATE.Gathering.AllBiomes')}</option>
-        {#each biomeOptions as biome (biome)}
-          <option value={biome}>{biome}</option>
-        {/each}
-      </select>
-    </section>
-    <main class="gathering-environment-list">
-      {#each filteredEnvironments as environment (environment.id)}
-        <section class="gathering-environment-card" class:is-blocked={environment.attemptable !== true}>
-          <div class="gathering-environment-card-header">
-            {#if environment.img}
-              <img class="gathering-environment-image" src={environment.img} alt="" />
-            {/if}
-            <div>
-              <h3>{environment.name}</h3>
-              {#if environment.description}
-                <p>{environment.description}</p>
+    <main class="gathering-v2-workspace" aria-label={localize('FABRICATE.Gathering.Workspace')}>
+      <aside class="gathering-v2-environment-browser" aria-label={localize('FABRICATE.Gathering.EnvironmentBrowser')}>
+        <section class="gathering-filter-bar" aria-label={localize('FABRICATE.Gathering.Filters')}>
+          <label class="gathering-search">
+            <i class="fas fa-search" aria-hidden="true"></i>
+            <input type="search" bind:value={searchTerm} placeholder={localize('FABRICATE.Gathering.SearchPlaceholder')} />
+          </label>
+          <select bind:value={riskFilter} aria-label={localize('FABRICATE.Gathering.RiskFilter')}>
+            <option value="all">{localize('FABRICATE.Gathering.AllRisks')}</option>
+            <option value="safe">{localize('FABRICATE.Gathering.Risk.safe')}</option>
+            <option value="hazardous">{localize('FABRICATE.Gathering.Risk.hazardous')}</option>
+            <option value="unsafe">{localize('FABRICATE.Gathering.Risk.unsafe')}</option>
+            <option value="extreme">{localize('FABRICATE.Gathering.Risk.extreme')}</option>
+          </select>
+          <select value={$viewState.availabilityFilter} aria-label={localize('FABRICATE.Gathering.AvailabilityFilter')} onchange={(event) => store.setAvailabilityFilter(event.target.value)}>
+            <option value="all">{localize('FABRICATE.Gathering.Availability.All')}</option>
+            <option value="available">{localize('FABRICATE.Gathering.Availability.Available')}</option>
+            <option value="blocked">{localize('FABRICATE.Gathering.Availability.Blocked')}</option>
+            <option value="empty">{localize('FABRICATE.Gathering.Availability.Empty')}</option>
+          </select>
+          {#if $viewState.hasMultipleGatheringSystems}
+            <select value={$viewState.selectedSystemId || 'all'} aria-label={localize('FABRICATE.Gathering.SystemFilter')} onchange={(event) => store.selectSystem(event.target.value)}>
+              <option value="all">{localize('FABRICATE.Gathering.AllSystems')}</option>
+              {#each $viewState.gatheringSystems as system (system.id)}
+                <option value={system.id}>{system.name}</option>
+              {/each}
+            </select>
+          {/if}
+          <select bind:value={regionFilter} aria-label={localize('FABRICATE.Gathering.RegionFilter')}>
+            <option value="all">{localize('FABRICATE.Gathering.AllRegions')}</option>
+            {#each regionOptions as region (region)}<option value={region}>{region}</option>{/each}
+          </select>
+          <select bind:value={biomeFilter} aria-label={localize('FABRICATE.Gathering.BiomeFilter')}>
+            <option value="all">{localize('FABRICATE.Gathering.AllBiomes')}</option>
+            {#each biomeOptions as biome (biome)}<option value={biome}>{biome}</option>{/each}
+          </select>
+        </section>
+
+        <section class="gathering-v2-environment-list" aria-label={localize('FABRICATE.Gathering.EnvironmentList')}>
+          {#each pagedEnvironments as environment (environment.id)}
+            <button
+              type="button"
+              class="gathering-v2-environment-row"
+              class:is-selected={activeEnvironment?.id === environment.id}
+              class:is-blocked={environment.attemptable === false}
+              aria-pressed={activeEnvironment?.id === environment.id}
+              onclick={() => selectEnvironment(environment)}
+            >
+              {#if environmentImage(environment)}
+                <img src={environmentImage(environment)} alt="" />
+              {:else}
+                <span class="gathering-environment-placeholder" aria-label={localize('FABRICATE.Gathering.EnvironmentImagePlaceholder')}>
+                  <i class="fas fa-leaf" aria-hidden="true"></i>
+                </span>
               {/if}
-              <div class="gathering-chip-row">
-                {#if environment.region}<span class="gathering-chip">{environment.region}</span>{/if}
-                {#if environment.biome}<span class="gathering-chip">{environment.biome}</span>{/if}
-                {#if $viewState.hasMultipleGatheringSystems && environment.craftingSystemName}<span class="gathering-chip gathering-system-chip">{environment.craftingSystemName}</span>{/if}
-                <span class="gathering-chip">{localize(`FABRICATE.Gathering.Risk.${environment.risk || 'safe'}`)}</span>
-                {#if environment.conditions?.timeOfDay}<span class="gathering-chip">{environment.conditions.timeOfDay}</span>{/if}
-                {#if environment.conditions?.weather}<span class="gathering-chip">{environment.conditions.weather}</span>{/if}
-              </div>
+              <span class="gathering-v2-row-copy">
+                <strong>{environment.name}</strong>
+                <span>{environment.region || environment.craftingSystemName || localize('FABRICATE.Gathering.NoRegion')}</span>
+                <span class="gathering-chip-row">
+                  {#if environment.biome}<span class="gathering-chip">{environment.biome}</span>{/if}
+                  <span class={`gathering-chip is-risk-${environment.risk || 'safe'}`}>{riskLabel(environment.risk)}</span>
+                </span>
+              </span>
+              <span class="gathering-v2-row-status">{environmentAvailability(environment)}</span>
+            </button>
+          {:else}
+            <div class="gathering-empty-state is-compact">{localize('FABRICATE.Gathering.Empty.NoFilteredEnvironments')}</div>
+          {/each}
+        </section>
+
+        <footer class="gathering-v2-pagination" aria-label={localize('FABRICATE.Gathering.Pagination.Environments')}>
+          <span>{environmentPaginationSummary()}</span>
+          <div>
+            <button type="button" class="gathering-icon-action" disabled={currentEnvironmentPage <= 1} title={localize('FABRICATE.Gathering.Pagination.PreviousPage')} aria-label={localize('FABRICATE.Gathering.Pagination.PreviousPage')} onclick={() => environmentPage -= 1}>
+              <i class="fas fa-chevron-left" aria-hidden="true"></i>
+            </button>
+            <span>{currentEnvironmentPage} / {environmentPageCount}</span>
+            <button type="button" class="gathering-icon-action" disabled={currentEnvironmentPage >= environmentPageCount} title={localize('FABRICATE.Gathering.Pagination.NextPage')} aria-label={localize('FABRICATE.Gathering.Pagination.NextPage')} onclick={() => environmentPage += 1}>
+              <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            </button>
+          </div>
+        </footer>
+      </aside>
+
+      <section class="gathering-v2-task-panel" aria-label={localize('FABRICATE.Gathering.TaskList')}>
+        {#if activeEnvironment}
+          <div class="gathering-v2-panel-heading">
+            <div class="gathering-v2-hero-copy">
+              <h3>{activeEnvironment.name}</h3>
+              <span>{localize('FABRICATE.Gathering.GatheringTasks')}</span>
             </div>
-            {#if environment.sceneUuid}
-              <span class="gathering-chip">{localize('FABRICATE.Gathering.SceneLinked')}</span>
-            {/if}
+            <span class={`gathering-chip is-risk-${activeEnvironment.risk || 'safe'}`}>{riskLabel(activeEnvironment.risk)}</span>
           </div>
 
-          {#if environment.blockedReasons?.length}
+          {#if activeEnvironment.blockedReasons?.length}
             <ul class="gathering-blocked-reasons">
-              {#each environment.blockedReasons || [] as reason, index (reasonKey(reason, index, `environment:${environment.id}`))}
+              {#each activeEnvironment.blockedReasons || [] as reason, index (reasonKey(reason, index, `environment:${activeEnvironment.id}`))}
                 <li>{blockedMessage(reason)}</li>
               {/each}
             </ul>
           {/if}
 
           <div class="gathering-task-list">
-            {#each environment.tasks || [] as task, index (taskKey(environment, task, index))}
-              <article class="gathering-task-row" class:is-blocked={task.attemptable !== true}>
-                {#if task.img && !task.blind}
-                  <img src={task.img} alt="" />
-                {:else}
-                  <div class="gathering-task-icon" aria-hidden="true">
-                    <i class="fas fa-leaf"></i>
-                  </div>
-                {/if}
+            {#each activeTasks as task, index (taskKey(activeEnvironment, task, index))}
+              <article class="gathering-task-row" class:is-selected={activeTask && taskKey(activeEnvironment, task, index) === taskKey(activeEnvironment, activeTask, activeTasks.indexOf(activeTask))} class:is-blocked={task.attemptable !== true}>
+                <button type="button" class="gathering-task-select" onclick={() => selectTask(task, index)} aria-label={localize('FABRICATE.Gathering.SelectTask', { name: displayTaskLabel(task) })}>
+                  {#if taskImage(task) && !task.blind}
+                    <img src={taskImage(task)} alt="" />
+                  {:else}
+                    <span class="gathering-task-icon" aria-hidden="true"><i class="fas fa-leaf"></i></span>
+                  {/if}
+                </button>
 
                 <div class="gathering-task-body">
                   <strong>{displayTaskLabel(task)}</strong>
-                  {#if task.description}
-                    <span>{task.description}</span>
-                  {/if}
-                  {#if taskEconomySummary(task)}
-                    <span class="gathering-task-economy">{taskEconomySummary(task)}</span>
-                  {/if}
+                  {#if task.description && !task.blind}<span>{task.description}</span>{/if}
+                  {#if taskEconomySummary(task)}<span class="gathering-task-economy">{taskEconomySummary(task)}</span>{/if}
                   {#if task.blockedReasons?.length}
                     <ul class="gathering-blocked-reasons">
-                      {#each task.blockedReasons || [] as reason, reasonIndex (reasonKey(reason, reasonIndex, taskKey(environment, task, index)))}
+                      {#each task.blockedReasons || [] as reason, reasonIndex (reasonKey(reason, reasonIndex, taskKey(activeEnvironment, task, index)))}
                         <li>{blockedMessage(reason)}</li>
                       {/each}
                     </ul>
@@ -319,48 +465,110 @@
 
                 <button
                   type="button"
-                  class="gathering-start-button"
-                  disabled={task.attemptable !== true || $viewState.startingTaskKey === taskKey(environment, task, index)}
-                  onclick={() => store.startTask(environment.id, task)}
+                  class="gathering-icon-action"
+                  disabled={task.attemptable !== true || $viewState.startingTaskKey === taskKey(activeEnvironment, task, index)}
+                  title={startButtonLabel(task)}
+                  aria-label={startButtonLabel(task)}
+                  onclick={() => store.startTask(activeEnvironment.id, task)}
                 >
-                  <i class="fas fa-leaf"></i>
-                  <span>
-                    {#if $viewState.startingTaskKey === taskKey(environment, task, index)}
-                      {localize('FABRICATE.Gathering.Starting')}
-                    {:else}
-                      {startButtonLabel(task)}
-                    {/if}
-                  </span>
+                  <i class="fas fa-chevron-right" aria-hidden="true"></i>
                 </button>
               </article>
+            {:else}
+              <div class="gathering-empty-state is-compact">{localize('FABRICATE.Gathering.Empty.NoTasks')}</div>
             {/each}
           </div>
-        </section>
-      {/each}
-    </main>
-  {/if}
+        {:else}
+          <div class="gathering-empty-state is-compact">{localize('FABRICATE.Gathering.Empty.SelectEnvironmentForTasks')}</div>
+        {/if}
+      </section>
 
-  {#if $viewState.history?.length}
-    <section class="gathering-run-section" aria-label={localize('FABRICATE.Gathering.History.Title')}>
-      <div class="gathering-section-heading">
-        <h3>{localize('FABRICATE.Gathering.History.Title')}</h3>
-      </div>
-      <div class="gathering-history-list">
-        {#each $viewState.history as run, index (runKey(run, index, 'history'))}
-          <article class="gathering-history-row">
+      <aside class="gathering-v2-detail-panel" aria-label={localize('FABRICATE.Gathering.EnvironmentDetail')}>
+        {#if activeEnvironment}
+          <section class="gathering-v2-hero">
+            {#if environmentImage(activeEnvironment)}
+              <img src={environmentImage(activeEnvironment)} alt="" />
+            {:else}
+              <div class="gathering-v2-hero-placeholder" aria-label={localize('FABRICATE.Gathering.EnvironmentImagePlaceholder')}>
+                <i class="fas fa-leaf" aria-hidden="true"></i>
+              </div>
+            {/if}
             <div>
-              <strong>{displayRunLabel(run)}</strong>
-              {#if run.environmentName}
-                <span>{run.environmentName}</span>
-              {/if}
-              {#if $viewState.hasMultipleGatheringSystems && run.craftingSystemName}
-                <span class="gathering-chip gathering-system-chip">{run.craftingSystemName}</span>
-              {/if}
+              <h3>{activeEnvironment.name}</h3>
+              <span>{activeEnvironment.region || localize('FABRICATE.Gathering.NoRegion')}</span>
+              <span class={`gathering-chip is-risk-${activeEnvironment.risk || 'safe'}`}>{riskLabel(activeEnvironment.risk)}</span>
             </div>
-            <span>{historySummary(run)}</span>
-          </article>
-        {/each}
-      </div>
-    </section>
+          </section>
+
+          {#if activeEnvironment.description}<p class="gathering-v2-description">{activeEnvironment.description}</p>{/if}
+
+          <section class="gathering-v2-facts" aria-label={localize('FABRICATE.Gathering.EnvironmentFacts')}>
+            {#if activeEnvironment.biome}
+              <div><i class="fas fa-seedling" aria-hidden="true"></i><span>{localize('FABRICATE.Gathering.Biome')}</span><strong>{activeEnvironment.biome}</strong></div>
+            {/if}
+            {#each conditionFacts(activeEnvironment) as fact (fact.label)}
+              <div><i class={`fas ${fact.icon}`} aria-hidden="true"></i><span>{fact.label}</span><strong>{fact.value}</strong></div>
+            {/each}
+            {#if activeEnvironment.sceneUuid}
+              <div><i class="fas fa-map-location-dot" aria-hidden="true"></i><span>{localize('FABRICATE.Gathering.Scene')}</span><strong>{localize('FABRICATE.Gathering.SceneLinked')}</strong></div>
+            {/if}
+          </section>
+
+          <section class="gathering-v2-active-task" aria-label={localize('FABRICATE.Gathering.ActiveTask')}>
+            <div class="gathering-section-heading"><h3>{localize('FABRICATE.Gathering.ActiveTask')}</h3></div>
+            {#if activeTask}
+              <article class="gathering-v2-active-task-card">
+                {#if taskImage(activeTask) && !activeTask.blind}
+                  <img src={taskImage(activeTask)} alt="" />
+                {:else}
+                  <span class="gathering-task-icon" aria-hidden="true"><i class="fas fa-leaf"></i></span>
+                {/if}
+                <div>
+                  <strong>{displayTaskLabel(activeTask)}</strong>
+                  {#if activeTask.description && !activeTask.blind}<span>{activeTask.description}</span>{/if}
+                </div>
+                {#if taskEconomySummary(activeTask)}<span>{taskEconomySummary(activeTask)}</span>{/if}
+              </article>
+
+              <div class="gathering-v2-detail-section">
+                <h4>{localize('FABRICATE.Gathering.Requirements')}</h4>
+                <p>{activeTask.requirementsSummary || activeTask.toolsSummary || localize('FABRICATE.Gathering.NoToolsRequired')}</p>
+              </div>
+
+              {#if potentialResults.length}
+                <div class="gathering-v2-detail-section">
+                  <h4>{localize('FABRICATE.Gathering.PotentialResults')}</h4>
+                  <div class="gathering-v2-result-grid">
+                    {#each potentialResults.slice(0, 5) as result, index (`result:${result.id || result.name || index}`)}
+                      <article>
+                        <img src={resultImage(result)} alt="" />
+                        <strong>{result.name || result.label || localize('FABRICATE.Labels.UnknownItem')}</strong>
+                        {#if result.rarity}<span>{result.rarity}</span>{/if}
+                      </article>
+                    {/each}
+                  </div>
+                </div>
+              {/if}
+
+              {#if activeTask.notes}
+                <div class="gathering-v2-detail-section">
+                  <h4>{localize('FABRICATE.Gathering.TaskNotes')}</h4>
+                  <p>{activeTask.notes}</p>
+                </div>
+              {/if}
+
+              <button type="button" class="gathering-start-button" disabled={activeTask.attemptable !== true} onclick={() => store.startTask(activeEnvironment.id, activeTask)}>
+                <i class="fas fa-play" aria-hidden="true"></i>
+                <span>{startButtonLabel(activeTask)}</span>
+              </button>
+            {:else}
+              <div class="gathering-empty-state is-compact">{localize('FABRICATE.Gathering.Empty.NoTasks')}</div>
+            {/if}
+          </section>
+        {:else}
+          <div class="gathering-empty-state is-compact">{localize('FABRICATE.Gathering.Empty.SelectEnvironmentForDetails')}</div>
+        {/if}
+      </aside>
+    </main>
   {/if}
 </div>

@@ -44,6 +44,7 @@ function rewriteClientImports(code) {
 
 function compileManagerV2Root() {
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/CraftingSystemManagerV2Root.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/ComponentEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/ComponentsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EnvironmentEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EnvironmentsBrowserView.svelte');
@@ -62,7 +63,7 @@ function compileManagerV2Root() {
     writeCompiledSvelte(`src/ui/svelte/components/${componentName}.svelte`);
   }
 
-  for (const utilPath of ['foundryBridge.js', 'essenceIcons.js', 'fontAwesomeFreeClassicIcons.js', 'iconPickerPopover.js']) {
+  for (const utilPath of ['foundryBridge.js', 'essenceIcons.js', 'fontAwesomeFreeClassicIcons.js', 'iconPickerPopover.js', 'componentEditor.js']) {
     const utilDestination = join(tempRoot, `src/ui/svelte/util/${utilPath}`);
     mkdirSync(dirname(utilDestination), { recursive: true });
     writeFileSync(
@@ -460,6 +461,11 @@ function createStore(calls = [], options = {}) {
     deleteRecipe: (id) => calls.push(['deleteRecipe', id]),
     setItemSearch: (term) => calls.push(['setItemSearch', term]),
     deleteComponent: (id) => calls.push(['deleteComponent', id]),
+    updateComponent: (id, updates) => {
+      calls.push(['updateComponent', id, updates]);
+      if (options.updateComponentReject) return Promise.reject(new Error('update failed'));
+      return options.updateComponentResult ?? true;
+    },
     addEssence: (name, description, icon, sourceComponentId) => {
       calls.push(['addEssence', name, description, icon, sourceComponentId]);
       if (options.addEssenceReject) return Promise.reject(new Error('add failed'));
@@ -1000,6 +1006,8 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     const copySourceAction = target.querySelector('[data-component-action="copy-source"]');
     assert.ok(copySourceAction, 'component inspector should expose a copy source action');
     assert.equal(copySourceAction.getAttribute('title'), 'Compendium.fabricate.items.iron-ore');
+    copySourceAction.click();
+    flushSync();
     assert.equal(target.querySelector('[data-component-action="edit"]'), null, 'component inspector should not duplicate row edit action');
     assert.equal(target.querySelector('[data-component-action="delete"]'), null, 'component inspector should not duplicate row delete action');
     assert.ok(target.querySelector('[data-component-section="source"]'), 'component inspector should expose a Source section');
@@ -1014,13 +1022,21 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     });
     target.querySelector('.manager-v2-component-drop-zone').dispatchEvent(dropEvent);
 
-    target.querySelector('[data-component-id="c1"] .manager-v2-icon-button').click();
-    target.querySelector('[data-component-id="c1"] .manager-v2-icon-button:nth-of-type(2)').click();
-    target.querySelector('[data-component-id="c1"] .manager-v2-icon-button:nth-of-type(3)').click();
+    target.querySelector('[data-component-id="c1"] [aria-label="Edit Iron Ore"]').click();
+    flushSync();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'component-edit', 'row Edit action should route into the manager-v2 component-edit view');
+    Array.from(target.querySelectorAll('.manager-v2-breadcrumbs button')).find(button => button.textContent.trim() === 'Components').click();
+    flushSync();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'components', 'breadcrumb Components button should return to the components browser');
+    target.querySelector('[data-component-id="c1"] [aria-label="Delete Iron Ore"]').click();
 
     assert.deepEqual(dropped, [{ type: 'Item', uuid: 'Item.dropped' }]);
     assert.deepEqual(copied, ['Compendium.fabricate.items.iron-ore']);
-    assert.deepEqual(edited, ['c1']);
+    assert.deepEqual(edited, [], 'manager-v2 row Edit should no longer call the legacy services.onEditComponent');
     assert.ok(calls.some(call => call[0] === 'setItemSearch' && call[1] === 'iron'));
     assert.ok(calls.some(call => call[0] === 'deleteComponent' && call[1] === 'c1'));
   });
@@ -1050,6 +1066,99 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
 
     assert.ok(target.querySelector('[data-component-source-missing]'), 'missing stored source should show a warning callout');
     assert.equal(target.textContent.includes('Compendium.fabricate.items.iron-ore'), false, 'missing source warning should not print the raw UUID');
+  });
+
+  it('opens the in-manager component-edit view, persists tag changes, and exposes source actions', async () => {
+    const calls = [];
+    const replaced = [];
+    const unlinked = [];
+    const opened = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls),
+        services: {
+          openCurrentAdmin: () => {},
+          onDropItem: () => {},
+          onCopySourceUuid: () => {},
+          onReplaceSource: (itemId, data) => replaced.push({ itemId, data }),
+          onUnlinkSource: (itemId) => unlinked.push(itemId),
+          onOpenSource: (uuid) => opened.push(uuid)
+        }
+      }
+    });
+    flushSync();
+
+    navButton('Components').click();
+    await tick();
+    flushSync();
+
+    target.querySelector('[data-component-id="c1"] [aria-label="Edit Iron Ore"]').click();
+    flushSync();
+    await tick();
+    flushSync();
+
+    const root = target.querySelector('.fabricate-manager-v2');
+    assert.equal(root.dataset.managerV2View, 'component-edit', 'row Edit should land on the component-edit route');
+    assert.ok(target.textContent.includes('Edit component'), 'header should show the Edit component title');
+    assert.ok(target.querySelector('[data-component-edit-tab="details"].is-active'), 'Details tab should be active by default');
+    assert.ok(target.querySelector('[data-component-edit-section="identity"]'), 'Identity card should render on the Details tab');
+    assert.ok(target.querySelector('[data-component-edit-section="source"]'), 'Linked Source Item card should render on the Details tab');
+
+    target.querySelector('[data-component-edit-action="open-source"]').click();
+    flushSync();
+    assert.deepEqual(opened, ['Compendium.fabricate.items.iron-ore'], 'Open Source Item should call onOpenSource with the stored UUID');
+
+    target.querySelector('[data-component-edit-action="unlink-source"]').click();
+    flushSync();
+    assert.deepEqual(unlinked, ['c1'], 'Unlink Source Item should call onUnlinkSource with the component id');
+
+    const dropEvent = new Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(dropEvent, 'dataTransfer', {
+      value: { getData: () => JSON.stringify({ type: 'Item', uuid: 'Item.replacement' }) }
+    });
+    target.querySelector('[data-component-edit-action="replace-source"]').dispatchEvent(dropEvent);
+    flushSync();
+    assert.deepEqual(replaced, [{ itemId: 'c1', data: { type: 'Item', uuid: 'Item.replacement' } }], 'drop should route through onReplaceSource for the active component');
+
+    target.querySelector('[data-component-edit-tab="tags-essences"]').click();
+    flushSync();
+    await tick();
+    flushSync();
+
+    assert.ok(target.querySelector('[data-component-edit-tab="tags-essences"].is-active'), 'Tags & Essences tab should activate on click');
+    assert.ok(target.querySelector('[data-component-edit-section="tags"]'), 'Tags section should render');
+    assert.ok(target.querySelector('[data-component-edit-section="essences"]'), 'Essences section should render');
+
+    const mineralCheckbox = Array.from(target.querySelectorAll('.manager-v2-component-tag-option'))
+      .find(label => label.textContent.includes('mineral'));
+    assert.ok(mineralCheckbox, 'tag checkboxes should render for the system itemTags');
+    const mineralInput = mineralCheckbox.querySelector('input[type="checkbox"]');
+    mineralInput.checked = true;
+    mineralInput.dispatchEvent(new Event('change', { bubbles: true }));
+    flushSync();
+    await tick();
+    flushSync();
+
+    assert.ok(target.textContent.includes('Unsaved'), 'dirty indicator should appear after a tag change');
+
+    const saveButton = target.querySelector('button[form="manager-v2-component-edit-form"]');
+    assert.ok(saveButton, 'header save submit should target the edit form');
+    assert.equal(saveButton.disabled, false, 'save should be enabled when the draft is dirty');
+    saveButton.click();
+    flushSync();
+    await tick();
+    flushSync();
+    await tick();
+    flushSync();
+
+    const updateCall = calls.find(call => call[0] === 'updateComponent');
+    assert.ok(updateCall, 'save should call store.updateComponent');
+    assert.equal(updateCall[1], 'c1');
+    assert.equal(Array.isArray(updateCall[2].tags) && updateCall[2].tags.includes('mineral'), true, 'tags update should include the newly checked tag');
+    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'components', 'successful save should return to the components browser');
   });
 
   it('routes to tags and categories with add feedback, usage warnings, and store delegation', async () => {
@@ -1198,13 +1307,19 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
   it('routes to the essence browser and dedicated edit route without inline editing', async () => {
     const calls = [];
     const editedComponents = [];
+    const copiedSources = [];
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(Component, {
       target,
       props: {
         store: createStore(calls),
-        services: { openCurrentAdmin: () => {}, onEditComponent: (id) => editedComponents.push(id) }
+        services: {
+          openCurrentAdmin: () => {},
+          onEditComponent: (id) => editedComponents.push(id),
+          onCopySourceUuid: (uuid) => copiedSources.push(uuid),
+          importSingleManagedItemFromDrop: async () => ({ id: 'c2', name: 'Glass Vial', img: 'icons/consumables/potions/vial-corked-blue.webp' })
+        }
       }
     });
     flushSync();
@@ -1220,13 +1335,27 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Essence browser'));
     assert.equal(target.querySelectorAll('.manager-v2-essence-row').length, 2);
     assert.ok(target.textContent.includes('Earth'));
-    assert.ok(target.textContent.includes('Linked source'));
-    assert.ok(target.textContent.includes('Iron Ore'));
+    assert.equal(target.querySelector('.manager-v2-essence-action-band'), null);
+    assert.equal(target.textContent.includes('Linked source'), false);
+    const linkedSourceImage = target.querySelector('[data-essence-id="earth"] .manager-v2-essence-source-cell-image');
+    assert.ok(linkedSourceImage, 'linked essence Source column should render image evidence');
+    assert.equal(linkedSourceImage.title, 'Iron Ore');
+    assert.equal(linkedSourceImage.getAttribute('aria-label'), 'Iron Ore');
+    assert.ok(target.querySelector('[data-essence-id="water"] .manager-v2-essence-source-cell').textContent.includes('None'));
     assert.ok(target.textContent.includes('Deletion blocked'));
     assert.equal(target.querySelectorAll('.manager-v2-essence-usage-item').length, 1);
     assert.equal(target.querySelector('.manager-v2-essence-usage-item').title, 'Iron Ore');
     target.querySelector('.manager-v2-essence-usage-item').click();
-    assert.deepEqual(editedComponents, ['c1']);
+    flushSync();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'component-edit', 'essence usage thumbnail should route to the manager-v2 component-edit view');
+    assert.deepEqual(editedComponents, [], 'essence usage thumbnail should no longer launch the legacy services.onEditComponent');
+    navButton('Essences').click();
+    flushSync();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'essences');
     assert.equal(target.querySelectorAll('.manager-v2-essence-edit-row').length, 0);
     assert.equal(target.querySelectorAll('#manager-v2-essence-create-name').length, 0);
 
@@ -1236,14 +1365,47 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.querySelector('[data-essence-id="water"]').classList.contains('is-selected'));
     assert.ok(target.textContent.includes('Clear current.'));
 
-    const essenceEditAction = target.querySelector('[data-essence-action="edit"]');
-    assert.ok(essenceEditAction, 'essence inspector should expose an Edit action');
-    assert.ok(essenceEditAction.classList.contains('is-primary'), 'Edit essence should be the primary inspector action');
-    assert.ok(target.querySelector('[data-essence-action="delete"]'), 'essence inspector should expose a Delete action');
+    assert.equal(target.querySelector('[data-essence-action="edit"]'), null, 'essence inspector should not duplicate row Edit actions');
+    assert.equal(target.querySelector('[data-essence-action="delete"]'), null, 'essence inspector should not duplicate row Delete actions');
     assert.ok(target.querySelector('[data-essence-section="usage"]'), 'essence inspector should expose a Usage section');
+    assert.ok(target.querySelector('[data-essence-section="source"] .manager-v2-essence-source-drop-zone .essence-source-trigger'), 'unlinked selected essence should expose a source drop zone');
     const essenceHeroRow = target.querySelector('.manager-v2-inspector-title-row.is-hero-large');
     assert.ok(essenceHeroRow, 'essence inspector should use the prominent hero title row');
     assert.ok(essenceHeroRow.querySelector('.manager-v2-inspector-icon.is-hero-large'), 'essence inspector hero should render the icon at hero-large size');
+
+    const inspectorDropEvent = new Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(inspectorDropEvent, 'dataTransfer', {
+      value: { getData: () => JSON.stringify({ type: 'Item', uuid: 'Item.glass-vial' }) }
+    });
+    target.querySelector('[data-essence-section="source"] .essence-source-trigger').dispatchEvent(inspectorDropEvent);
+    await tick();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateEssence' && call[1] === 'water' && call[2].sourceComponentId === 'c2'));
+
+    target.querySelector('[data-essence-id="earth"]').click();
+    await tick();
+    flushSync();
+    const inspectorSourceSummary = target.querySelector('[data-essence-section="source"] .manager-v2-essence-inspector-source-summary');
+    assert.ok(inspectorSourceSummary, 'linked selected essence should render a source summary card');
+    assert.equal(inspectorSourceSummary.querySelectorAll('.manager-v2-essence-source-thumb').length, 1, 'linked selected essence should show one source thumbnail');
+    assert.ok(inspectorSourceSummary.querySelector('.manager-v2-essence-source-copy').textContent.includes('Iron Ore'), 'linked selected essence should keep the source name readable');
+    assert.equal(inspectorSourceSummary.querySelector('.manager-v2-essence-source-copy').textContent.includes('c1'), false, 'linked selected essence should not print UUID evidence under the item name');
+    const inspectorSourceActions = target.querySelector('[data-essence-section="source"] .manager-v2-essence-inspector-source-actions');
+    assert.ok(inspectorSourceActions, 'linked selected essence should expose source actions below the item card');
+    assert.equal(inspectorSourceSummary.contains(inspectorSourceActions), false, 'source actions should sit outside the linked item card');
+    const copySourceAction = inspectorSourceActions.querySelector('[data-essence-action="copy-source"]');
+    assert.ok(copySourceAction, 'linked selected essence should expose source copy');
+    assert.equal(copySourceAction.disabled, false);
+    copySourceAction.click();
+    flushSync();
+    assert.deepEqual(copiedSources, ['c1']);
+    const unlinkSourceAction = inspectorSourceActions.querySelector('[data-essence-action="unlink-source"]');
+    assert.ok(unlinkSourceAction.classList.contains('is-warning-action'), 'unlink source should use the amber warning action style');
+    unlinkSourceAction.click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateEssence' && call[1] === 'earth' && call[2].sourceComponentId === null));
 
     const sourceFilter = target.querySelector('[aria-label="Filter essences by source state"]');
     sourceFilter.value = 'none';
@@ -1290,7 +1452,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     document.querySelector('.essence-source-picker-option[title="Glass Vial"]').click();
     await tick();
     flushSync();
-    assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Glass Vial'));
+    assert.ok(target.querySelector('.manager-v2-essence-source-summary').textContent.includes('Glass Vial'));
     target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').click();
     await tick();
     flushSync();
@@ -1303,7 +1465,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     flushSync();
     assert.equal(target.querySelector('[data-essence-id="earth"] [aria-label="Delete Earth"]').disabled, true);
 
-    target.querySelector('.manager-v2-essence-action-band .manager-v2-button').click();
+    target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').click();
     await tick();
     flushSync();
     assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'essence-edit');
@@ -1496,7 +1658,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     navButton('Essences').click();
     await tick();
     flushSync();
-    target.querySelector('.manager-v2-essence-action-band .manager-v2-button').click();
+    target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').click();
     await tick();
     flushSync();
     const createName = target.querySelector('#manager-v2-essence-edit-name');
@@ -1753,7 +1915,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Essence docs'));
     assert.equal(target.textContent.includes('Select an essence'), false);
 
-    target.querySelector('.manager-v2-essence-action-band .manager-v2-button.is-primary').click();
+    target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').click();
     await tick();
     flushSync();
 
