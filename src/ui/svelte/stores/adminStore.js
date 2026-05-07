@@ -1348,6 +1348,17 @@ export function createAdminStore(services) {
       activeTab.set(visibleTab);
     }
 
+    // Phase 1: publish the cheap systems list immediately so the v2 systems
+    // browser paints without flashing the empty state while expensive per-
+    // system data (item cards, environments) is still being computed below.
+    viewState.update(prev => ({
+      ...prev,
+      systems: systemList,
+      hasSystem: !!selectedSystem,
+      selectedSystemName: selectedSystem?.name || ''
+    }));
+    await Promise.resolve();
+
     const availableScriptMacros = services.getScriptMacros?.() || [];
     const sceneOptions = services.getSceneOptions?.() || [];
     const rollTableOptions = services.getRollTableOptions?.() || [];
@@ -1421,7 +1432,8 @@ export function createAdminStore(services) {
       graphData = filterGraph(layoutResult, { searchTerm: get(graphSearch) });
     }
 
-    viewState.set({
+    viewState.update(prev => ({
+      ...prev,
       systems: systemList,
       hasSystem: !!selectedSystem,
       selectedSystemName: selectedSystem?.name || '',
@@ -1436,7 +1448,7 @@ export function createAdminStore(services) {
       graphData,
       graphSearchTerm: get(graphSearch),
       ...environmentState
-    });
+    }));
   }
 
   // ---------------------------------------------------------------------------

@@ -229,6 +229,23 @@ describe('createAdminStore', () => {
       assert.equal(get(store.viewState).systems[0].selected, true);
     });
 
+    it('publishes systems list synchronously before phase-2 await chain', async () => {
+      // Regression: previously refresh() built systemList early but only wrote
+      // viewState after awaiting expensive per-system work (item cards, environments),
+      // so the v2 systems browser flashed "No crafting systems yet" on open.
+      // After the two-phase fix, the systems list must be visible before refresh()
+      // yields to the microtask queue.
+      const services = createMockServices();
+      const store = createAdminStore(services);
+      // createAdminStore kicks off refresh() without awaiting it; the synchronous
+      // portion of refresh() runs before this line, including the phase-1 write.
+      const vs = get(store.viewState);
+      assert.equal(vs.systems.length, 1, 'phase-1 must publish systems before yielding');
+      assert.equal(vs.systems[0].id, 'sys1');
+      // Let phase-2 settle so the rest of the suite starts from a clean state.
+      await store.refresh();
+    });
+
     it('leaves selection empty when no systems exist', async () => {
       const services = createMockServices({
         getSetting: () => ''
