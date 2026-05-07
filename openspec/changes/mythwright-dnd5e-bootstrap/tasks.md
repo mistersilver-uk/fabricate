@@ -7,3 +7,20 @@
 - [x] Add focused unit tests for routed providers and bootstrap helpers.
 - [x] Run `npm test`.
 - [x] Run `npm run build`.
+- [x] Strip SRD source identity from Mythwright quality variant items and components while preserving base SRD links.
+- [x] Clean duplicate SRD-sourced quality variants and sanitize Mythwright icon paths on rerun.
+- [x] Add whole-system component source uniqueness validation for create/update payloads.
+- [x] Add focused bootstrap and manager tests for variant identity, cleanup, icons, and bulk source validation.
+- [x] Run `node --test tests/mythwright-bootstrap.test.js tests/compendium-drop.test.js`.
+- [x] Run `npm test`.
+- [x] Run `npm run build`.
+- [x] Document the Mythwright tag policy, no-Mythic-mundane rule, and curated elemental variant behavior.
+- [x] Remove the generated `mythwright` tag from components, recipes, and system `itemTags`.
+- [x] Remove Mythic from mundane SRD quality variants and finishing result groups while preserving relic Mythic outputs.
+- [x] Clean obsolete deterministic Mythic SRD quality variants from earlier bootstrap runs.
+- [x] Add curated elemental weapon and armour/shield variants with guarded DnD5e damage or resistance metadata.
+- [x] Add elemental finishing recipes requiring matching essences and artisan catalysts.
+- [x] Run `node --test tests/mythwright-bootstrap.test.js`.
+- [x] Run `node --test tests/mythwright-bootstrap.test.js tests/compendium-drop.test.js`.
+- [x] Run `npm test`.
+- [x] Run `npm run build`.

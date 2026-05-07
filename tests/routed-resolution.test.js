@@ -96,6 +96,19 @@ describe('routed recipe resolution', () => {
     assert.equal(recipe.toJSON().steps[0].resultSelection.macroUuid, 'Macro.step');
   });
 
+  it('Recipe.validate accepts explicit-step recipes with no top-level result groups', () => {
+    const recipe = new Recipe({
+      id: 'step-only-recipe',
+      name: 'Step Only Recipe',
+      craftingSystemId: 'sys-routed',
+      steps: [step({ resultSelection: { provider: 'ingredientSet' } })]
+    });
+
+    const result = recipe.validate();
+
+    assert.equal(result.valid, true, result.errors.join(', '));
+  });
+
   it('step.resultSelection overrides recipe-level resultSelection for macroOutcome routing', () => {
     const activeStep = step({ resultSelection: { provider: 'macroOutcome' } });
     const recipe = recipeWithStep(activeStep);

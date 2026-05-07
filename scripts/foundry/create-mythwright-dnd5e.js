@@ -11,6 +11,11 @@ const MythwrightDnd5eBootstrap = (() => {
   const SYSTEM_NAME = 'Mythwright';
   const MACRO_NAME = 'Mythwright Crafting Check';
   const ROOT_FOLDER = 'Mythwright';
+  const DEFAULT_ITEM_ICON = 'icons/svg/item-bag.svg';
+  const APPROVED_MYTHWRIGHT_ICON_PATHS = Object.freeze([
+    DEFAULT_ITEM_ICON
+  ]);
+  const APPROVED_MYTHWRIGHT_ICON_SET = new Set(APPROVED_MYTHWRIGHT_ICON_PATHS);
 
   const SRD_WEAPONS = [
     'Club', 'Dagger', 'Greatclub', 'Handaxe', 'Javelin', 'Light Hammer', 'Mace',
@@ -35,13 +40,16 @@ const MythwrightDnd5eBootstrap = (() => {
     'Mythwright > Components > Armour Parts',
     'Mythwright > Weapons > Mundane',
     'Mythwright > Weapons > Quality',
+    'Mythwright > Weapons > Elemental',
     'Mythwright > Armour > Mundane',
     'Mythwright > Armour > Quality',
+    'Mythwright > Armour > Elemental',
     'Mythwright > Relics',
     'Mythwright > Tools & Catalysts'
   ];
 
-  const QUALITY = ['Flawed', 'Standard', 'Fine', 'Masterwork', 'Mythic'];
+  const MUNDANE_QUALITY = ['Flawed', 'Standard', 'Fine', 'Masterwork'];
+  const RELIC_QUALITY = ['Flawed', 'Standard', 'Fine', 'Masterwork', 'Mythic'];
   const ESSENCES = [
     { id: 'ember', name: 'Ember Essence', icon: 'fas fa-fire' },
     { id: 'frost', name: 'Frost Essence', icon: 'fas fa-snowflake' },
@@ -51,29 +59,44 @@ const MythwrightDnd5eBootstrap = (() => {
     { id: 'dragon', name: 'Dragon Essence', icon: 'fas fa-dragon' }
   ];
 
+  const ELEMENTAL_VARIANTS = [
+    { id: 'weapon-ember-shortsword', name: 'Ember Shortsword', baseName: 'Shortsword', type: 'weapon', essenceId: 'ember', damageType: 'fire' },
+    { id: 'weapon-frost-longsword', name: 'Frost Longsword', baseName: 'Longsword', type: 'weapon', essenceId: 'frost', damageType: 'cold' },
+    { id: 'weapon-storm-shortbow', name: 'Storm Shortbow', baseName: 'Shortbow', type: 'weapon', essenceId: 'storm', damageType: 'lightning' },
+    { id: 'weapon-radiant-mace', name: 'Radiant Mace', baseName: 'Mace', type: 'weapon', essenceId: 'radiance', damageType: 'radiant' },
+    { id: 'weapon-shadow-dagger', name: 'Shadow Dagger', baseName: 'Dagger', type: 'weapon', essenceId: 'shadow', damageType: 'necrotic' },
+    { id: 'weapon-dragon-greatsword', name: 'Dragon Greatsword', baseName: 'Greatsword', type: 'weapon', essenceId: 'dragon', damageType: 'fire' },
+    { id: 'armor-ember-scale-mail', name: 'Ember Scale Mail', baseName: 'Scale Mail', type: 'armor', essenceId: 'ember', resistanceType: 'fire' },
+    { id: 'armor-frost-chain-mail', name: 'Frost Chain Mail', baseName: 'Chain Mail', type: 'armor', essenceId: 'frost', resistanceType: 'cold' },
+    { id: 'armor-storm-shield', name: 'Storm Shield', baseName: 'Shield', type: 'armor', essenceId: 'storm', resistanceType: 'lightning' },
+    { id: 'armor-radiant-shield', name: 'Radiant Shield', baseName: 'Shield', type: 'armor', essenceId: 'radiance', resistanceType: 'radiant' },
+    { id: 'armor-shadow-leather-armor', name: 'Shadow Leather Armor', baseName: 'Leather Armor', type: 'armor', essenceId: 'shadow', resistanceType: 'necrotic' },
+    { id: 'armor-dragon-scale-mail', name: 'Dragon Scale Mail', baseName: 'Scale Mail', type: 'armor', essenceId: 'dragon', resistanceType: 'fire' }
+  ];
+
   const BASE_ITEMS = [
-    ['raw-ore', 'Raw Ore', 'Mythwright > Ingredients > Mundane', 'icons/commodities/stone/ore-pile-grey.webp'],
-    ['hardwood', 'Hardwood', 'Mythwright > Ingredients > Mundane', 'icons/commodities/wood/wood-pile.webp'],
-    ['cured-hide', 'Cured Hide', 'Mythwright > Ingredients > Mundane', 'icons/commodities/leather/leather-bolt-tan.webp'],
-    ['iron-ingot', 'Iron Ingot', 'Mythwright > Ingredients > Mundane', 'icons/commodities/metal/ingot-stamped-silver.webp'],
-    ['weapon-core', 'Weapon Core', 'Mythwright > Components > Weapon Parts', 'icons/commodities/metal/ingot-steel.webp'],
-    ['balanced-hilt', 'Balanced Hilt', 'Mythwright > Components > Weapon Parts', 'icons/weapons/swords/sword-hilt-steel.webp'],
-    ['bow-stave', 'Bow Stave', 'Mythwright > Components > Weapon Parts', 'icons/weapons/bows/shortbow-recurve.webp'],
-    ['armour-plates', 'Armour Plates', 'Mythwright > Components > Armour Parts', 'icons/equipment/chest/breastplate-layered-steel.webp'],
-    ['reinforced-straps', 'Reinforced Straps', 'Mythwright > Components > Armour Parts', 'icons/equipment/waist/belt-buckle-square.webp'],
-    ['monster-trophy', 'Monster Trophy', 'Mythwright > Gathered components', 'icons/commodities/bones/horn-simple-grey.webp'],
-    ['ancient-fragment', 'Ancient Fragment', 'Mythwright > Gathered components', 'icons/commodities/stone/stone-pieces-grey.webp'],
-    ['dragon-scale', 'Dragon Scale', 'Mythwright > Gathered components', 'icons/commodities/materials/scales-red.webp'],
-    ['artisan-catalyst', 'Artisan Catalyst', 'Mythwright > Tools & Catalysts', 'icons/tools/smithing/anvil.webp'],
-    ['mythic-catalyst', 'Mythic Catalyst', 'Mythwright > Tools & Catalysts', 'icons/magic/symbols/rune-sigil-gold.webp']
+    ['raw-ore', 'Raw Ore', 'Mythwright > Ingredients > Mundane', DEFAULT_ITEM_ICON],
+    ['hardwood', 'Hardwood', 'Mythwright > Ingredients > Mundane', DEFAULT_ITEM_ICON],
+    ['cured-hide', 'Cured Hide', 'Mythwright > Ingredients > Mundane', DEFAULT_ITEM_ICON],
+    ['iron-ingot', 'Iron Ingot', 'Mythwright > Ingredients > Mundane', DEFAULT_ITEM_ICON],
+    ['weapon-core', 'Weapon Core', 'Mythwright > Components > Weapon Parts', DEFAULT_ITEM_ICON],
+    ['balanced-hilt', 'Balanced Hilt', 'Mythwright > Components > Weapon Parts', DEFAULT_ITEM_ICON],
+    ['bow-stave', 'Bow Stave', 'Mythwright > Components > Weapon Parts', DEFAULT_ITEM_ICON],
+    ['armour-plates', 'Armour Plates', 'Mythwright > Components > Armour Parts', DEFAULT_ITEM_ICON],
+    ['reinforced-straps', 'Reinforced Straps', 'Mythwright > Components > Armour Parts', DEFAULT_ITEM_ICON],
+    ['monster-trophy', 'Monster Trophy', 'Mythwright > Gathered components', DEFAULT_ITEM_ICON],
+    ['ancient-fragment', 'Ancient Fragment', 'Mythwright > Gathered components', DEFAULT_ITEM_ICON],
+    ['dragon-scale', 'Dragon Scale', 'Mythwright > Gathered components', DEFAULT_ITEM_ICON],
+    ['artisan-catalyst', 'Artisan Catalyst', 'Mythwright > Tools & Catalysts', DEFAULT_ITEM_ICON],
+    ['mythic-catalyst', 'Mythic Catalyst', 'Mythwright > Tools & Catalysts', DEFAULT_ITEM_ICON]
   ];
 
   const RELICS = [
-    ['relic-mythic-longsword', 'Mythwright Mythic Longsword', 'Mythwright > Relics', 'icons/weapons/swords/greatsword-blue.webp'],
-    ['relic-draconic-scale-mail', 'Draconic Scale Mail', 'Mythwright > Relics', 'icons/equipment/chest/breastplate-scale-red.webp'],
-    ['relic-storm-bow', 'Storm-Forged Bow', 'Mythwright > Relics', 'icons/weapons/bows/longbow-recurve-blue.webp'],
-    ['relic-radiant-shield', 'Radiant Shield', 'Mythwright > Relics', 'icons/equipment/shield/heater-steel-gold.webp'],
-    ['relic-shadow-dagger', 'Shadow Dagger', 'Mythwright > Relics', 'icons/weapons/daggers/dagger-guard-black.webp']
+    ['relic-mythic-longsword', 'Mythwright Mythic Longsword', 'Mythwright > Relics', DEFAULT_ITEM_ICON],
+    ['relic-draconic-scale-mail', 'Draconic Scale Mail', 'Mythwright > Relics', DEFAULT_ITEM_ICON],
+    ['relic-storm-bow', 'Storm-Forged Bow', 'Mythwright > Relics', DEFAULT_ITEM_ICON],
+    ['relic-radiant-shield', 'Radiant Shield', 'Mythwright > Relics', DEFAULT_ITEM_ICON],
+    ['relic-shadow-dagger', 'Shadow Dagger', 'Mythwright > Relics', DEFAULT_ITEM_ICON]
   ];
 
   function normalizeName(value) {
@@ -149,13 +172,106 @@ const MythwrightDnd5eBootstrap = (() => {
     ) || null;
   }
 
-  function itemPayload({ id, name, folder, img, type = 'loot', source = null }) {
+  function itemSourceId(item) {
+    return item?._stats?.compendiumSource || item?.flags?.core?.sourceId || null;
+  }
+
+  function itemMythwrightId(item) {
+    return item?.flags?.fabricate?.mythwrightId || null;
+  }
+
+  function sanitizeIconPath(path, { allowExternal = false } = {}) {
+    const value = String(path || '').trim();
+    if (!value) return DEFAULT_ITEM_ICON;
+    if (allowExternal && /^(icons\/|systems\/|modules\/|worlds\/|https?:\/\/)/.test(value)) return value;
+    return APPROVED_MYTHWRIGHT_ICON_SET.has(value) ? value : DEFAULT_ITEM_ICON;
+  }
+
+  function stripSourceIdentity(payload) {
+    if (!payload || typeof payload !== 'object') return payload;
+    if (payload.flags?.core) {
+      delete payload.flags.core.sourceId;
+      if (Object.keys(payload.flags.core).length === 0) delete payload.flags.core;
+    }
+    if (payload._stats) {
+      delete payload._stats.compendiumSource;
+      if (Object.keys(payload._stats).length === 0) delete payload._stats;
+    }
+    delete payload.sourceUuid;
+    delete payload.sourceItemUuid;
+    delete payload.fallbackItemIds;
+    return payload;
+  }
+
+  function appendDescription(system = {}, text) {
+    const existing = String(system.description?.value || '').trim();
+    const addition = `<p>${text}</p>`;
+    return {
+      ...system,
+      description: {
+        ...(system.description || {}),
+        value: existing ? `${existing}\n${addition}` : addition
+      }
+    };
+  }
+
+  function addElementalDamage(system = {}, damageType) {
+    const damage = system.damage && typeof system.damage === 'object'
+      ? { ...system.damage }
+      : null;
+    if (!damage || !Array.isArray(damage.parts)) {
+      return {
+        system: appendDescription(system, `This weapon deals an extra 1d4 ${damageType} damage on a hit.`),
+        applied: false
+      };
+    }
+
+    damage.parts = [...damage.parts, ['1d4', damageType]];
+    return {
+      system: {
+        ...system,
+        damage
+      },
+      applied: true
+    };
+  }
+
+  function resistanceEffect(name, img, resistanceType) {
+    return {
+      name: `${name} Resistance`,
+      img,
+      transfer: true,
+      disabled: false,
+      changes: [{
+        key: 'system.traits.dr.value',
+        mode: 2,
+        value: resistanceType,
+        priority: 20
+      }],
+      flags: {
+        fabricate: {
+          mythwrightResistance: resistanceType
+        }
+      }
+    };
+  }
+
+  function itemPayload({
+    id,
+    name,
+    folder,
+    img,
+    type = 'loot',
+    source = null,
+    preserveSourceIdentity = false,
+    baseSourceId = null
+  }) {
     const sourceObject = source?.toObject?.() || {};
     const payload = {
       ...sourceObject,
-      name: source?.name || name,
+      name: name || source?.name || 'Unnamed Item',
       type: source?.type || type,
-      img: source?.img || img || 'icons/svg/item-bag.svg',
+      img: sanitizeIconPath(source?.img || img || DEFAULT_ITEM_ICON, { allowExternal: !!source?.img }),
       folder: folder?.id || null,
       system: {
         ...(sourceObject.system || {}),
@@ -165,23 +281,74 @@ const MythwrightDnd5eBootstrap = (() => {
         ...(sourceObject.flags || {}),
         core: {
           ...(sourceObject.flags?.core || {}),
-          sourceId: source?.uuid || sourceObject.flags?.core?.sourceId || null
+          sourceId: preserveSourceIdentity
+            ? (source?.uuid || sourceObject.flags?.core?.sourceId || null)
+            : null
         },
         fabricate: {
           ...(sourceObject.flags?.fabricate || {}),
-          mythwrightId: id
+          mythwrightId: id,
+          ...(baseSourceId && !preserveSourceIdentity ? { mythwrightBaseSourceId: baseSourceId } : {})
         }
       }
     };
     if (!payload.flags.core.sourceId) delete payload.flags.core.sourceId;
+    if (!preserveSourceIdentity) stripSourceIdentity(payload);
     return payload;
   }
 
-  async function ensureWorldItem(definition, foldersByPath, summary) {
+  function elementalVariantPayload(definition, source, folder) {
+    const baseSourceId = source?.uuid || source?.flags?.core?.sourceId || null;
+    const payload = itemPayload({
+      id: definition.id,
+      name: definition.name,
+      folder,
+      img: source?.img || DEFAULT_ITEM_ICON,
+      type: itemTypeForName(definition.baseName, definition.type === 'weapon' ? 'weapon' : 'equipment'),
+      source,
+      preserveSourceIdentity: false,
+      baseSourceId
+    });
+
+    payload.flags.fabricate = {
+      ...(payload.flags.fabricate || {}),
+      elemental: {
+        essenceId: definition.essenceId,
+        baseItemName: definition.baseName,
+        ...(definition.damageType ? { damageType: definition.damageType } : {}),
+        ...(definition.resistanceType ? { resistanceType: definition.resistanceType } : {})
+      }
+    };
+
+    if (definition.damageType) {
+      const damageResult = addElementalDamage(payload.system || {}, definition.damageType);
+      payload.system = appendDescription(
+        damageResult.system,
+        `Mythwright elemental variant infused with ${definition.essenceId} essence.`
+      );
+      payload.flags.fabricate.elemental.damageApplied = damageResult.applied;
+      return payload;
+    }
+
+    if (definition.resistanceType) {
+      payload.system = appendDescription(
+        payload.system || {},
+        `While equipped, this item grants resistance to ${definition.resistanceType} damage.`
+      );
+      payload.effects = [
+        ...(Array.isArray(payload.effects) ? payload.effects : []),
+        resistanceEffect(definition.name, payload.img, definition.resistanceType)
+      ];
+    }
+
+    return payload;
+  }
+
+  async function ensureWorldItem(definition, foldersByPath, summary, options = {}) {
     const [id, name, path, img, type = 'loot', source = null] = definition;
     const folder = foldersByPath.get(path) || await ensureFolderPath(path, { summary });
     foldersByPath.set(path, folder);
-    const payload = itemPayload({ id, name, folder, img, type, source });
+    const payload = itemPayload({ id, name, folder, img, type, source, ...options });
     const existing = findWorldItem(payload.name, folder);
     if (existing) {
       await existing.update(payload);
@@ -191,6 +358,104 @@ const MythwrightDnd5eBootstrap = (() => {
     const created = await Item.create(payload);
     summary.items.created++;
     return created;
+  }
+
+  async function ensureElementalVariant(definition, srdByName, foldersByPath, summary) {
+    const target = srdByName.get(normalizeName(definition.baseName));
+    if (!target?.item) return null;
+
+    const folderPathName = definition.type === 'weapon'
+      ? 'Mythwright > Weapons > Elemental'
+      : 'Mythwright > Armour > Elemental';
+    const folder = foldersByPath.get(folderPathName) || await ensureFolderPath(folderPathName, { summary });
+    foldersByPath.set(folderPathName, folder);
+    const payload = elementalVariantPayload(definition, target.item, folder);
+    const existing = findWorldItem(payload.name, folder);
+    if (existing) {
+      await existing.update(payload);
+      summary.items.updated++;
+      return existing;
+    }
+    const created = await Item.create(payload);
+    summary.items.created++;
+    return created;
+  }
+
+  function qualityVariantIdsForTarget(target) {
+    return MUNDANE_QUALITY
+      .filter(entry => entry !== 'Standard')
+      .map(quality => idFromName(`${target.type}-${quality.toLowerCase()}`, target.name));
+  }
+
+  function obsoleteQualityVariantIdsForTarget(target) {
+    return [idFromName(`${target.type}-mythic`, target.name)];
+  }
+
+  async function cleanupQualityVariantDuplicates(target, foldersByPath, keptItems = [], summary = null) {
+    const baseSourceId = target?.item?.uuid || null;
+    if (!baseSourceId) return [];
+
+    const qualityFolderPath = target.type === 'weapon'
+      ? 'Mythwright > Weapons > Quality'
+      : 'Mythwright > Armour > Quality';
+    const qualityFolder = foldersByPath?.get?.(qualityFolderPath) || findFolderByPath(qualityFolderPath);
+    const qualityFolderId = qualityFolder?.id || null;
+    const kept = new Set(keptItems.map(item => item?.id || item?.uuid).filter(Boolean));
+    const qualityIds = new Set(qualityVariantIdsForTarget(target));
+    const deleted = [];
+
+    for (const item of collectionValues(globalThis.game?.items)) {
+      const itemId = item?.id || item?.uuid;
+      const folderId = item?.folder?.id || item?.folder || null;
+      if (!itemId || kept.has(itemId)) continue;
+      if (qualityFolderId && folderId !== qualityFolderId) continue;
+      if (!qualityIds.has(itemMythwrightId(item))) continue;
+      if (itemSourceId(item) !== baseSourceId) continue;
+
+      if (typeof item.delete === 'function') {
+        await item.delete();
+        deleted.push(item);
+        if (summary?.items) summary.items.deleted = (summary.items.deleted || 0) + 1;
+      } else if (typeof item.update === 'function') {
+        const payload = stripSourceIdentity({
+          flags: {
+            ...(item.flags || {}),
+            core: { ...(item.flags?.core || {}) },
+            fabricate: { ...(item.flags?.fabricate || {}), mythwrightBaseSourceId: baseSourceId }
+          },
+          _stats: { ...(item._stats || {}) },
+          img: sanitizeIconPath(item.img || DEFAULT_ITEM_ICON, { allowExternal: true })
+        });
+        await item.update(payload);
+        if (summary?.items) summary.items.updated++;
+      }
+    }
+
+    return deleted;
+  }
+
+  async function cleanupObsoleteQualityVariants(target, foldersByPath, summary = null) {
+    const qualityFolderPath = target.type === 'weapon'
+      ? 'Mythwright > Weapons > Quality'
+      : 'Mythwright > Armour > Quality';
+    const qualityFolder = foldersByPath?.get?.(qualityFolderPath) || findFolderByPath(qualityFolderPath);
+    const qualityFolderId = qualityFolder?.id || null;
+    const obsoleteIds = new Set(obsoleteQualityVariantIdsForTarget(target));
+    const deleted = [];
+
+    for (const item of collectionValues(globalThis.game?.items)) {
+      const folderId = item?.folder?.id || item?.folder || null;
+      if (qualityFolderId && folderId !== qualityFolderId) continue;
+      if (!obsoleteIds.has(itemMythwrightId(item))) continue;
+
+      if (typeof item.delete === 'function') {
+        await item.delete();
+        deleted.push(item);
+        if (summary?.items) summary.items.deleted = (summary.items.deleted || 0) + 1;
+      }
+    }
+
+    return deleted;
   }
 
   function classifySrdItem(item) {
@@ -238,17 +503,22 @@ const MythwrightDnd5eBootstrap = (() => {
   }
 
   function componentFromItem(id, item, extra = {}) {
+    const sourceUuid = extra.preserveSourceIdentity === false ? null : (item.uuid || null);
+    const sourceItemUuid = extra.preserveSourceIdentity === false
+      ? null
+      : (item.flags?.core?.sourceId || item.uuid || null);
     return {
       id,
       name: item.name,
       description: '',
-      img: item.img || 'icons/svg/item-bag.svg',
-      sourceUuid: item.uuid || null,
-      sourceItemUuid: item.flags?.core?.sourceId || item.uuid || null,
+      img: sanitizeIconPath(item.img || DEFAULT_ITEM_ICON, { allowExternal: true }),
+      sourceUuid,
+      sourceItemUuid,
       fallbackItemIds: [],
       tags: extra.tags || [],
       difficulty: extra.difficulty || 1,
-      salvage: extra.salvage || { enabled: false }
+      salvage: extra.salvage || { enabled: false },
+      ...(extra.mythwrightBaseSourceId ? { mythwrightBaseSourceId: extra.mythwrightBaseSourceId } : {})
     };
   }
 
@@ -285,11 +555,11 @@ const MythwrightDnd5eBootstrap = (() => {
       id: recipeId,
       name: `Craft ${target.name}`,
       description: `Mythwright multi-step recipe for ${target.name}.`,
-      img: target.item?.img || 'icons/svg/item-bag.svg',
+      img: sanitizeIconPath(target.item?.img || DEFAULT_ITEM_ICON, { allowExternal: true }),
       category: target.type === 'weapon' ? 'Weapons' : 'Armour',
       craftingSystemId: SYSTEM_ID,
       system: 'dnd5e',
-      tags: ['mythwright', target.type, 'srd'],
+      tags: [],
       enabled: true,
       resultSelection: { provider: 'macroOutcome' },
       steps: [
@@ -319,7 +589,7 @@ const MythwrightDnd5eBootstrap = (() => {
           name: 'Finish Quality',
           ingredientSets: [ingredientSet(`${recipeId}-finish-set`, [baseId, 'artisan-catalyst'])],
           resultSelection: { provider: 'macroOutcome' },
-          resultGroups: QUALITY.map(quality => resultGroup(
+          resultGroups: MUNDANE_QUALITY.map(quality => resultGroup(
             quality.toLowerCase(),
             quality,
             quality === 'Standard' ? baseId : idFromName(`${target.type}-${quality.toLowerCase()}`, target.name)
@@ -334,11 +604,11 @@ const MythwrightDnd5eBootstrap = (() => {
       id: `mythwright-${relicId}`,
       name: `Craft ${name}`,
       description: `A signature Mythwright relic recipe for ${name}.`,
-      img: 'icons/svg/mystery-man.svg',
+      img: DEFAULT_ITEM_ICON,
       category: 'Relics',
       craftingSystemId: SYSTEM_ID,
       system: 'dnd5e',
-      tags: ['mythwright', 'relic'],
+      tags: [],
       enabled: true,
       resultSelection: { provider: 'macroOutcome' },
       steps: [
@@ -354,16 +624,45 @@ const MythwrightDnd5eBootstrap = (() => {
           name: 'Awaken Relic',
           ingredientSets: [ingredientSet(`${relicId}-finish-set`, ['mythic-catalyst', 'dragon-scale'], null, { [essenceId]: 2 })],
           resultSelection: { provider: 'macroOutcome' },
-          resultGroups: [
-            resultGroup('flawed', 'Flawed', relicId),
-            resultGroup('standard', 'Standard', relicId),
-            resultGroup('fine', 'Fine', relicId),
-            resultGroup('masterwork', 'Masterwork', relicId),
-            resultGroup('mythic', 'Mythic', relicId)
-          ]
+          resultGroups: RELIC_QUALITY.map(quality => resultGroup(quality.toLowerCase(), quality, relicId))
         }
       ]
     };
+  }
+
+  function buildElementalRecipe(definition) {
+    const recipeId = `mythwright-infuse-${definition.id}`;
+    const baseComponentId = idFromName(definition.type === 'weapon' ? 'weapon' : 'armor', definition.baseName);
+    return {
+      id: recipeId,
+      name: `Infuse ${definition.name}`,
+      description: `A focused elemental finishing recipe for ${definition.name}.`,
+      img: DEFAULT_ITEM_ICON,
+      category: definition.type === 'weapon' ? 'Weapons' : 'Armour',
+      craftingSystemId: SYSTEM_ID,
+      system: 'dnd5e',
+      tags: [],
+      enabled: true,
+      transferEffects: true,
+      resultSelection: { provider: 'ingredientSet' },
+      steps: [{
+        id: `${recipeId}-finish`,
+        name: 'Elemental Finish',
+        ingredientSets: [
+          ingredientSet(`${recipeId}-finish-set`, [baseComponentId, 'artisan-catalyst'], 'standard', { [definition.essenceId]: 1 })
+        ],
+        resultSelection: { provider: 'ingredientSet' },
+        resultGroups: [resultGroup('standard', 'Standard', definition.id)]
+      }]
+    };
+  }
+
+  function tagsForComponent() {
+    return [];
+  }
+
+  function itemTagsForSystem() {
+    return [];
   }
 
   function buildEnvironment(id, name, risk, tasks) {
@@ -390,6 +689,7 @@ const MythwrightDnd5eBootstrap = (() => {
   function macroCommand() {
     return `const groups = args?.[0]?.step?.resultGroups || [];
 const finalStep = /finish|awaken/i.test(args?.[0]?.step?.name || '');
+const hasMythic = groups.some(group => String(group?.name || group?.id || '').toLowerCase() === 'mythic');
 let total = 10;
 try {
   const roll = await new Roll('1d20').evaluate();
@@ -404,12 +704,12 @@ if (total < 8) return { success: true, outcome: 'flawed', value: total, data: {}
 if (total < 14) return { success: true, outcome: 'standard', value: total, data: {} };
 if (total < 18) return { success: true, outcome: 'fine', value: total, data: {} };
 if (total < 20) return { success: true, outcome: 'masterwork', value: total, data: {} };
-return { success: true, outcome: 'mythic', value: total, data: {} };`;
+return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: total, data: {} };`;
   }
 
   async function ensureMacro(summary) {
     const existing = collectionValues(globalThis.game?.macros).find(macro => macro.name === MACRO_NAME);
-    const payload = { name: MACRO_NAME, type: 'script', command: macroCommand(), img: 'icons/tools/smithing/anvil.webp' };
+    const payload = { name: MACRO_NAME, type: 'script', command: macroCommand(), img: DEFAULT_ITEM_ICON };
     if (existing) {
       await existing.update(payload);
       summary.macro = existing.uuid;
@@ -452,7 +752,7 @@ return { success: true, outcome: 'mythic', value: total, data: {} };`;
 
     const summary = {
       folders: { created: 0, updated: 0 },
-      items: { created: 0, updated: 0 },
+      items: { created: 0, updated: 0, deleted: 0 },
       srd: { resolved: 0, unresolved: [] },
       system: 'skipped',
       recipes: { created: 0, updated: 0 },
@@ -468,6 +768,7 @@ return { success: true, outcome: 'mythic', value: total, data: {} };`;
     const srd = await discoverSrdItems();
     summary.srd.resolved = srd.resolved.length;
     summary.srd.unresolved = srd.unresolved;
+    const srdByName = new Map(srd.resolved.map(target => [normalizeName(target.name), target]));
 
     const worldItems = new Map();
     for (const def of BASE_ITEMS) {
@@ -476,7 +777,7 @@ return { success: true, outcome: 'mythic', value: total, data: {} };`;
     }
     for (const essence of ESSENCES) {
       const item = await ensureWorldItem(
-        [essence.id, essence.name, 'Mythwright > Essences', 'icons/magic/symbols/rune-sigil-blue.webp'],
+        [essence.id, essence.name, 'Mythwright > Essences', DEFAULT_ITEM_ICON],
         foldersByPath,
         summary
       );
@@ -493,20 +794,31 @@ return { success: true, outcome: 'mythic', value: total, data: {} };`;
       const item = await ensureWorldItem(
         [componentId, target.name, folderPathName, target.item?.img, itemTypeForName(target.name), target.item],
         foldersByPath,
-        summary
+        summary,
+        { preserveSourceIdentity: true }
       );
       worldItems.set(componentId, item);
 
-      for (const quality of QUALITY.filter(entry => entry !== 'Standard')) {
+      const keptQualityItems = [];
+      for (const quality of MUNDANE_QUALITY.filter(entry => entry !== 'Standard')) {
         const qualityId = idFromName(`${target.type}-${quality.toLowerCase()}`, target.name);
         const qualityFolder = target.type === 'weapon' ? 'Mythwright > Weapons > Quality' : 'Mythwright > Armour > Quality';
         const qualityItem = await ensureWorldItem(
           [qualityId, `${quality} ${target.name}`, qualityFolder, target.item?.img, itemTypeForName(target.name), target.item],
           foldersByPath,
-          summary
+          summary,
+          { preserveSourceIdentity: false, baseSourceId: target.item?.uuid || null }
         );
         worldItems.set(qualityId, qualityItem);
+        keptQualityItems.push(qualityItem);
       }
+      await cleanupQualityVariantDuplicates(target, foldersByPath, keptQualityItems, summary);
+      await cleanupObsoleteQualityVariants(target, foldersByPath, summary);
+    }
+
+    for (const definition of ELEMENTAL_VARIANTS) {
+      const item = await ensureElementalVariant(definition, srdByName, foldersByPath, summary);
+      if (item) worldItems.set(definition.id, item);
     }
 
     const macro = await ensureMacro(summary);
@@ -514,9 +826,30 @@ return { success: true, outcome: 'mythic', value: total, data: {} };`;
     const recipeManager = globalThis.game.fabricate.getRecipeManager();
     const environmentStore = globalThis.game.fabricate.getGatheringEnvironmentStore?.();
 
+    const srdQualityComponentIds = new Set(srd.resolved.flatMap(target =>
+      MUNDANE_QUALITY
+        .filter(entry => entry !== 'Standard')
+        .map(quality => idFromName(`${target.type}-${quality.toLowerCase()}`, target.name))
+    ));
+    const qualityBaseSourceById = new Map(srd.resolved.flatMap(target =>
+      MUNDANE_QUALITY
+        .filter(entry => entry !== 'Standard')
+        .map(quality => [
+          idFromName(`${target.type}-${quality.toLowerCase()}`, target.name),
+          target.item?.uuid || null
+        ])
+    ));
+    const elementalBaseSourceById = new Map(ELEMENTAL_VARIANTS.map(definition => [
+      definition.id,
+      srdByName.get(normalizeName(definition.baseName))?.item?.uuid || null
+    ]));
+    const elementalDefinitions = new Map(ELEMENTAL_VARIANTS.map(definition => [definition.id, definition]));
+
     const components = Array.from(worldItems.entries()).map(([id, item]) => componentFromItem(id, item, {
-      tags: ['mythwright'],
-      difficulty: QUALITY.some(quality => item.name?.startsWith(`${quality} `)) ? 5 : 1,
+      preserveSourceIdentity: !srdQualityComponentIds.has(id),
+      mythwrightBaseSourceId: qualityBaseSourceById.get(id) || elementalBaseSourceById.get(id) || null,
+      tags: tagsForComponent(),
+      difficulty: MUNDANE_QUALITY.some(quality => item.name?.startsWith(`${quality} `)) ? 5 : (elementalDefinitions.has(id) ? 7 : 1),
       salvage: {
         enabled: true,
         ingredientQuantity: 1,
@@ -562,7 +895,7 @@ return { success: true, outcome: 'mythic', value: total, data: {} };`;
         sourceComponentId: essence.id,
         sourceItemUuid: worldItems.get(essence.id)?.uuid || null
       })),
-      itemTags: ['mythwright', 'weapon', 'armor', 'relic', 'component', 'essence', 'srd'],
+      itemTags: itemTagsForSystem(),
       categories: ['Weapons', 'Armour', 'Relics'],
       components
     };
@@ -578,6 +911,11 @@ return { success: true, outcome: 'mythic', value: total, data: {} };`;
     const componentMap = new Map(components.map(component => [component.id, component]));
     for (const target of srd.resolved) {
       await upsertRecipe(recipeManager, buildRecipeForSrd(target, componentMap), summary);
+    }
+    for (const definition of ELEMENTAL_VARIANTS) {
+      if (componentMap.has(definition.id)) {
+        await upsertRecipe(recipeManager, buildElementalRecipe(definition), summary);
+      }
     }
     await upsertRecipe(recipeManager, buildRelicRecipe('relic-mythic-longsword', 'Mythwright Mythic Longsword', 'ember'), summary);
     await upsertRecipe(recipeManager, buildRelicRecipe('relic-draconic-scale-mail', 'Draconic Scale Mail', 'dragon'), summary);
@@ -620,15 +958,27 @@ return { success: true, outcome: 'mythic', value: total, data: {} };`;
     SYSTEM_ID,
     SRD_WEAPONS,
     SRD_ARMOUR,
+    APPROVED_MYTHWRIGHT_ICON_PATHS,
     normalizeName,
     idFromName,
     folderPath,
     findFolderByPath,
+    sanitizeIconPath,
+    stripSourceIdentity,
     itemPayload,
+    componentFromItem,
+    qualityVariantIdsForTarget,
+    cleanupQualityVariantDuplicates,
+    obsoleteQualityVariantIdsForTarget,
+    cleanupObsoleteQualityVariants,
     classifySrdItem,
     discoverSrdItems,
     buildRecipeForSrd,
     buildRelicRecipe,
+    buildElementalRecipe,
+    elementalVariantPayload,
+    tagsForComponent,
+    itemTagsForSystem,
     run
   };
 })();

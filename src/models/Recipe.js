@@ -157,35 +157,34 @@ export class Recipe {
       }
     }
 
-    // Result validation
-    if (this.resultGroups.length === 0) {
+    // Result validation. Explicit multi-step recipes own their outputs on each step;
+    // implicit recipes still use the top-level result groups.
+    if (!hasSteps && this.resultGroups.length === 0) {
       errors.push('Recipe must have at least one result group');
     }
 
-    const resultGroupIds = new Set();
-    const resultIds = new Set();
-    for (const group of this.resultGroups) {
-      if (resultGroupIds.has(group.id)) {
-        errors.push(`Duplicate result group ID: ${group.id}`);
-      }
-      resultGroupIds.add(group.id);
-      if (!Array.isArray(group.results) || group.results.length === 0) {
-        errors.push(`Result group "${group.id}" must contain at least one result`);
-        continue;
-      }
+    const resultContainers = hasSteps
+      ? this.steps.map(step => ({
+        label: `Step "${step.name || step.id}"`,
+        resultGroups: Array.isArray(step.resultGroups) ? step.resultGroups : [],
+        resultSelection: step.resultSelection || this.resultSelection
+      }))
+      : [{
+        label: 'Recipe',
+        resultGroups: this.resultGroups,
+        resultSelection: this.resultSelection
+      }];
 
-      for (const result of group.results) {
-        if (resultIds.has(result.id)) {
-          errors.push(`Duplicate result ID: ${result.id}`);
-        }
-        resultIds.add(result.id);
-
-        const resultValidation = result.validate();
-        if (!resultValidation.valid) {
-          errors.push(`Result "${result.id}": ${resultValidation.errors.join(', ')}`);
-        }
-      }
+    for (const container of resultContainers) {
+      this._validateResultGroups(container.resultGroups, container.label, errors);
+      this._validateRollTableResultSelection(container.resultSelection, container.resultGroups, errors);
     }
+
+    const resultGroupIds = new Set(this.resultGroups.map(group => group.id));
+    const resultIds = new Set(this.resultGroups.flatMap(group => (group.results || []).map(result => result.id)));
+    const routableResultGroupIds = hasSteps
+      ? new Set(this.steps.flatMap(step => (step.resultGroups || []).map(group => group.id)))
+      : resultGroupIds;
 
     // Variable recipe validation
     if (this.isVariable) {
@@ -201,15 +200,48 @@ export class Recipe {
 
     if (this.outcomeRouting && typeof this.outcomeRouting === 'object') {
       for (const [outcome, resultGroupId] of Object.entries(this.outcomeRouting)) {
-        if (resultGroupId && !resultGroupIds.has(resultGroupId)) {
+        if (resultGroupId && !routableResultGroupIds.has(resultGroupId)) {
           errors.push(`Outcome routing "${outcome}" references invalid result group ID: ${resultGroupId}`);
         }
       }
     }
 
-    // rollTableOutcome provider validation
-    if (this.resultSelection?.provider === 'rollTableOutcome') {
-      if (!this.resultSelection.rollTableUuid) {
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  }
+
+  _validateResultGroups(resultGroups, label, errors) {
+    const resultGroupIds = new Set();
+    const resultIds = new Set();
+    for (const group of resultGroups) {
+      if (resultGroupIds.has(group.id)) {
+        errors.push(`${label} has duplicate result group ID: ${group.id}`);
+      }
+      resultGroupIds.add(group.id);
+      if (!Array.isArray(group.results) || group.results.length === 0) {
+        errors.push(`${label} result group "${group.id}" must contain at least one result`);
+        continue;
+      }
+
+      for (const result of group.results) {
+        if (resultIds.has(result.id)) {
+          errors.push(`${label} has duplicate result ID: ${result.id}`);
+        }
+        resultIds.add(result.id);
+
+        const resultValidation = result.validate();
+        if (!resultValidation.valid) {
+          errors.push(`${label} result "${result.id}": ${resultValidation.errors.join(', ')}`);
+        }
+      }
+    }
+  }
+
+  _validateRollTableResultSelection(resultSelection, resultGroups, errors) {
+    if (resultSelection?.provider === 'rollTableOutcome') {
+      if (!resultSelection.rollTableUuid) {
         errors.push('rollTableOutcome provider requires a roll table UUID');
       }
 
@@ -217,7 +249,7 @@ export class Recipe {
       const FAIL_KEYWORDS = new Set(['fail', 'failed', 'failure', 'f']);
       const MISS_KEYWORDS = new Set(['miss', 'missed', 'm', 'nothing', 'none', 'whiff', 'whiffed']);
       const seenNames = new Map();
-      for (const group of this.resultGroups) {
+      for (const group of resultGroups) {
         const normalized = String(group.name || '').trim().toLowerCase();
         if (seenNames.has(normalized)) {
           errors.push(`Duplicate result group name "${group.name}" (case-insensitive) — rollTableOutcome requires unique names`);
@@ -228,11 +260,6 @@ export class Recipe {
         }
       }
     }
-
-    return {
-      valid: errors.length === 0,
-      errors
-    };
   }
 
   toJSON() {

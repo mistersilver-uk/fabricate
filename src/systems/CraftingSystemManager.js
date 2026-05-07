@@ -812,6 +812,7 @@ export class CraftingSystemManager {
   async createSystem(data = {}) {
     this._assertGM('create crafting system');
     const system = this._normalizeSystem(data);
+    this._assertUniqueComponentSourcesForSystem(system);
     this.systems.set(system.id, system);
     await this.save();
     this._notifySystemsChanged();
@@ -943,6 +944,7 @@ export class CraftingSystemManager {
     };
 
     const merged = this._normalizeSystem(mergedInput);
+    this._assertUniqueComponentSourcesForSystem(merged);
     const resolutionModeChanged = current.resolutionMode !== merged.resolutionMode;
 
     if (resolutionModeChanged) {
@@ -1077,6 +1079,21 @@ export class CraftingSystemManager {
     throw new Error(
       `Component source reference already belongs to "${conflict.name || conflict.id}" (${conflict.id})`
     );
+  }
+
+  _assertUniqueComponentSourcesForSystem(system) {
+    const claims = new Map();
+    for (const component of system.components || []) {
+      for (const ref of getComponentSourceReferences(component)) {
+        const existing = claims.get(ref);
+        if (existing && existing.id !== component.id) {
+          throw new Error(
+            `Component source reference "${ref}" is claimed by both "${existing.name || existing.id}" (${existing.id}) and "${component.name || component.id}" (${component.id})`
+          );
+        }
+        claims.set(ref, component);
+      }
+    }
   }
 
   _sameSourceReferenceSet(left, right) {

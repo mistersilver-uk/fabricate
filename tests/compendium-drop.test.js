@@ -691,6 +691,84 @@ test('createItem — rejects a duplicate source reference already used by anothe
   );
 });
 
+test('createSystem — rejects duplicate component source references in one payload', async () => {
+  const mgr = buildManager([]);
+
+  await assert.rejects(
+    () => mgr.createSystem({
+      id: 'sys-dupes',
+      name: 'Duplicate Sources',
+      components: [
+        {
+          id: 'comp-a',
+          name: 'Iron Ore',
+          sourceUuid: 'Compendium.world.pack.item-a'
+        },
+        {
+          id: 'comp-b',
+          name: 'Iron Ore Copy',
+          fallbackItemIds: ['Compendium.world.pack.item-a']
+        }
+      ]
+    }),
+    /claimed by both/
+  );
+});
+
+test('updateSystem — rejects duplicate component source references in one payload', async () => {
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [
+      {
+        id: 'comp-a',
+        name: 'Iron Ore',
+        sourceUuid: 'Compendium.world.pack.item-a'
+      },
+      {
+        id: 'comp-b',
+        name: 'Coal',
+        sourceUuid: 'Compendium.world.pack.item-b'
+      }
+    ]
+  }]);
+
+  await assert.rejects(
+    () => mgr.updateSystem('sys1', {
+      components: [
+        {
+          id: 'comp-a',
+          name: 'Iron Ore',
+          sourceUuid: 'Compendium.world.pack.item-a'
+        },
+        {
+          id: 'comp-b',
+          name: 'Iron Ore Copy',
+          sourceItemUuid: 'Compendium.world.pack.item-a'
+        }
+      ]
+    }),
+    /claimed by both/
+  );
+});
+
+test('createSystem — allows multiple components without source references', async () => {
+  const mgr = buildManager([]);
+
+  const system = await mgr.createSystem({
+    id: 'sys-no-sources',
+    name: 'No Source Components',
+    components: [
+      { id: 'comp-a', name: 'Hand-authored A' },
+      { id: 'comp-b', name: 'Hand-authored B' }
+    ]
+  });
+
+  assert.equal(system.components.length, 2);
+  assert.equal(system.components[0].sourceUuid, null);
+  assert.equal(system.components[1].sourceItemUuid, null);
+});
+
 test('updateItem — rejects changing a component to a source reference already used by another component', async () => {
   const mgr = buildManager([{
     id: 'sys1',

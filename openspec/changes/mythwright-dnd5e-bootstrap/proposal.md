@@ -17,9 +17,16 @@ Mythwright needs a practical first-run bootstrap that creates world content, lin
 - Treat `resolutionMode: "routed"` as a recipe resolution mode.
 - Support routed recipe providers `ingredientSet`, `macroOutcome`, and `rollTableOutcome`.
 - Seed Mythwright folders, world Items, system config, recipes, gathering environments, and a crafting check Macro idempotently.
+- Keep SRD base components source-linked while making quality variants Mythwright-authored world items with independent component identity.
+- Sanitize Mythwright-authored icon paths during bootstrap reruns.
+- Validate duplicate component source references across full `createSystem()` and `updateSystem()` payloads.
+- Treat item and recipe tags as matching/filtering metadata only; generated content must not use `mythwright` as a system-association tag.
+- Limit mundane SRD quality variants to `Flawed`, `Standard`, `Fine`, and `Masterwork`; reserve Mythic outcomes for bespoke relic recipes.
+- Add curated elemental weapon and armour/shield variants that require matching essences and preserve only provenance links to the SRD base item.
 
 ## Non-Goals
 
 - Package Mythwright as a compendium.
 - Add npm dependencies.
 - Support non-DnD5e systems in the Mythwright bootstrap.
+- Generate every SRD item crossed with every essence.
