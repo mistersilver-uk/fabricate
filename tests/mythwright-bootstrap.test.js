@@ -276,6 +276,26 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     assert.deepEqual(helper.itemTagsForSystem(), []);
   });
 
+  it('builds the Mythwright system payload with player-facing description copy', () => {
+    const helper = globalThis.MythwrightDnd5eBootstrap;
+    const payload = helper.buildSystemPayload({
+      macroUuid: 'Macro.mythwright-check',
+      worldItems: new Map([
+        ['ember', { uuid: 'Item.ember-essence' }]
+      ]),
+      components: [{ id: 'raw-ore', name: 'Raw Ore' }]
+    });
+
+    assert.equal(
+      payload.description,
+      'Mythwright lets you turn harvested components, rare essences, and hard-won materials into weapons, armour, tools, and relics worthy of legend. Build multi-step recipes, forge mundane gear or world-shaping artefacts, and make crafting feel like part of the story rather than a shopping list.'
+    );
+    assert.equal(payload.craftingCheck.macroUuid, 'Macro.mythwright-check');
+    assert.equal(payload.salvageCraftingCheck.macroUuid, 'Macro.mythwright-check');
+    assert.equal(payload.essenceDefinitions.find(essence => essence.id === 'ember').sourceItemUuid, 'Item.ember-essence');
+    assert.deepEqual(payload.components, [{ id: 'raw-ore', name: 'Raw Ore' }]);
+  });
+
   it('builds elemental weapon payloads without SRD identity and with elemental damage metadata', () => {
     const helper = globalThis.MythwrightDnd5eBootstrap;
     const payload = helper.elementalVariantPayload(

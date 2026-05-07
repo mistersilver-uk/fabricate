@@ -9,6 +9,7 @@
 const MythwrightDnd5eBootstrap = (() => {
   const SYSTEM_ID = 'mythwright-dnd5e';
   const SYSTEM_NAME = 'Mythwright';
+  const SYSTEM_DESCRIPTION = 'Mythwright lets you turn harvested components, rare essences, and hard-won materials into weapons, armour, tools, and relics worthy of legend. Build multi-step recipes, forge mundane gear or world-shaping artefacts, and make crafting feel like part of the story rather than a shopping list.';
   const MACRO_NAME = 'Mythwright Crafting Check';
   const ROOT_FOLDER = 'Mythwright';
   const DEFAULT_ITEM_ICON = 'icons/svg/item-bag.svg';
@@ -791,6 +792,50 @@ const MythwrightDnd5eBootstrap = (() => {
     return [];
   }
 
+  function buildSystemPayload({ macroUuid, worldItems = new Map(), components = [] } = {}) {
+    return {
+      id: SYSTEM_ID,
+      name: SYSTEM_NAME,
+      description: SYSTEM_DESCRIPTION,
+      enabled: true,
+      resolutionMode: 'routed',
+      features: {
+        multiStepRecipes: true,
+        essences: true,
+        gathering: true,
+        salvage: true,
+        craftingChecks: true,
+        chatOutput: true,
+        effectTransfer: true,
+        outcomeRouting: true
+      },
+      craftingCheck: {
+        enabled: true,
+        macroUuid: macroUuid || '',
+        mode: 'namedOutcomes',
+        outcomes: ['flawed', 'standard', 'fine', 'masterwork', 'mythic'],
+        consumption: { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false }
+      },
+      salvageResolutionMode: 'routed',
+      salvageCraftingCheck: {
+        enabled: true,
+        macroUuid: macroUuid || '',
+        outcomes: ['pass', 'fail'],
+        consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false }
+      },
+      essenceDefinitions: ESSENCES.map(essence => ({
+        id: essence.id,
+        name: essence.name,
+        icon: essence.icon,
+        sourceComponentId: essence.id,
+        sourceItemUuid: worldItems.get(essence.id)?.uuid || null
+      })),
+      itemTags: itemTagsForSystem(),
+      categories: ['Weapons', 'Armour', 'Relics'],
+      components
+    };
+  }
+
   function buildEnvironment(id, name, risk, tasks) {
     return {
       id,
@@ -987,47 +1032,11 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
       }
     }));
 
-    const systemPayload = {
-      id: SYSTEM_ID,
-      name: SYSTEM_NAME,
-      description: 'DnD5e-first Mythwright crafting seeded from SRD weapons and armour.',
-      enabled: true,
-      resolutionMode: 'routed',
-      features: {
-        multiStepRecipes: true,
-        essences: true,
-        gathering: true,
-        salvage: true,
-        craftingChecks: true,
-        chatOutput: true,
-        effectTransfer: true,
-        outcomeRouting: true
-      },
-      craftingCheck: {
-        enabled: true,
-        macroUuid: macro.uuid,
-        mode: 'namedOutcomes',
-        outcomes: ['flawed', 'standard', 'fine', 'masterwork', 'mythic'],
-        consumption: { consumeIngredientsOnFail: true, consumeCatalystsOnFail: false }
-      },
-      salvageResolutionMode: 'routed',
-      salvageCraftingCheck: {
-        enabled: true,
-        macroUuid: macro.uuid,
-        outcomes: ['pass', 'fail'],
-        consumption: { consumeComponentOnFail: true, consumeCatalystsOnFail: false }
-      },
-      essenceDefinitions: ESSENCES.map(essence => ({
-        id: essence.id,
-        name: essence.name,
-        icon: essence.icon,
-        sourceComponentId: essence.id,
-        sourceItemUuid: worldItems.get(essence.id)?.uuid || null
-      })),
-      itemTags: itemTagsForSystem(),
-      categories: ['Weapons', 'Armour', 'Relics'],
+    const systemPayload = buildSystemPayload({
+      macroUuid: macro.uuid,
+      worldItems,
       components
-    };
+    });
 
     if (systemManager.getSystem(SYSTEM_ID)) {
       await systemManager.updateSystem(SYSTEM_ID, systemPayload);
@@ -1114,6 +1123,7 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
     elementalVariantPayload,
     tagsForComponent,
     itemTagsForSystem,
+    buildSystemPayload,
     run
   };
 })();
