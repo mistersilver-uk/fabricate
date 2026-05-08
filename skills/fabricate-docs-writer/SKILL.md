@@ -49,6 +49,8 @@ Do not run `npm test` or `npm run build` from this skill unless the user explici
 
 ## PR description template
 
+PR titles must comply with Conventional Commits. For `feat`, `fix`, and `perf`, use `<type>(#<issue>): <short description>` when a GitHub issue exists.
+
 When opening or updating a PR, use these H2 sections in order:
 
 ```md

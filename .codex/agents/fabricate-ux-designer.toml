@@ -33,6 +33,7 @@ Output:
 - Highest-impact findings first.
 - Include evidence with file references, selectors, viewport sizes, or screenshot names.
 - PR status for any committed spec, design, or workflow changes.
+- Use a Conventional Commits-compliant PR title when opening or updating a PR.
 - Use PR description H2 sections in this order when opening or updating a PR: Description, Benefit(s), Changes in this PR, Testing, Screenshots (if applicable).
 - Provide concrete design changes and backlog issues created or drafted.
 """

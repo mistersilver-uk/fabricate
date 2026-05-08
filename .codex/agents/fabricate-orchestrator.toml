@@ -29,6 +29,7 @@ State machine:
 - Drive the canonical plan -> plan-review -> implement -> review -> docs flow defined in AGENTS.md.
 - Ensure mutable handoffs occur on a task branch, and final delivery is a committed branch with a PR targeting main.
 - Route review feedback back to the same branch and PR unless the user explicitly asks for a replacement.
+- Require PR titles to comply with Conventional Commits; for feat, fix, and perf, use <type>(#<issue>): <short description> when an issue exists.
 - Require PR descriptions to use H2 sections in this order: Description, Benefit(s), Changes in this PR, Testing, Screenshots (if applicable).
 - Resolve the auto-spawn routing table in AGENTS.md against the change signals (paths likely to change, behaviour change, API/docs surface, test changes) and record the resulting agent roster in the change folder before planning gets reviewed.
 - Plan review loop: run the resolved plan-review agents in parallel against the change docs. Each emits APPROVED, NEEDS_CHANGES, or BLOCKED. Revise the change docs on NEEDS_CHANGES and rerun the affected reviewers. Hard cap: 3 plan revisions before escalating to the user.

@@ -77,6 +77,8 @@ Use Conventional Commits in this form:
 
 `<type>(#<issue>): <short description>`
 
+Use a Conventional Commits-compliant PR title. For `feat`, `fix`, and `perf`, use the same `<type>(#<issue>): <short description>` format when a GitHub issue exists.
+
 Validate with `npx commitlint` before pushing.
 
 Use this PR description template:

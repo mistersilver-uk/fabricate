@@ -47,6 +47,7 @@ Validation:
 Output:
 - Commit the completed work to the task branch, push it, and open or update a PR targeting main.
 - Apply review feedback by updating the same branch and PR unless the user explicitly asks for a replacement.
+- Use a Conventional Commits-compliant PR title; for feat, fix, and perf, use <type>(#<issue>): <short description> when an issue exists.
 - Use PR description H2 sections in this order: Description, Benefit(s), Changes in this PR, Testing, Screenshots (if applicable).
 - Changed files, validation results, screenshot status for UI changes, PR link/status, and known follow-ups.
 """

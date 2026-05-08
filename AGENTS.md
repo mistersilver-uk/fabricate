@@ -97,6 +97,7 @@ Three loops run until acceptance, each capped at 3 revisions before escalating t
 - When the work is complete, commit to that branch, push it, and open a PR targeting `main`.
 - Respond to review feedback by updating the same branch and PR; do not open replacement PRs unless the user asks.
 - Review-only agents inspect the active branch and PR, and must not merge to `main`.
+- PR titles must comply with Conventional Commits, using the same `<type>(#<issue>): <short description>` format for `feat`, `fix`, and `perf`.
 - PR descriptions must use H2 sections in this order: `Description`, `Benefit(s)`, `Changes in this PR`, `Testing`, and `Screenshots (if applicable)`.
 - Never commit directly to `main`.
 - Use Conventional Commits.

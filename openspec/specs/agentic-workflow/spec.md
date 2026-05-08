@@ -41,6 +41,7 @@ All mutating agent work MUST happen on a non-`main` branch and be delivered thro
 - **THEN** it commits the change to the task branch
 - **AND** pushes the branch
 - **AND** opens or updates a PR targeting `main`
+- **AND** the PR title complies with Conventional Commits, including the GitHub issue number for `feat`, `fix`, and `perf`
 - **AND** the PR description uses H2 sections for `Description`, `Benefit(s)`, `Changes in this PR`, `Testing`, and `Screenshots (if applicable)`
 
 #### Scenario: responding to review feedback

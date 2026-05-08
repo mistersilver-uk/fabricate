@@ -7,3 +7,4 @@
 - [x] Update all Fabricate role skills.
 - [x] Validate the docs-only diff.
 - [x] Add the required PR description H2 template to agent and skill guidance.
+- [x] Require Conventional Commits-compliant PR titles in agent and skill guidance.

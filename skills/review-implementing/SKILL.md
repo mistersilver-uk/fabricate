@@ -21,6 +21,8 @@ Systematically process and implement changes based on code review feedback.
 
 Before changing files, verify the current branch is not `main`; create or switch to the PR branch that received feedback. Commit fixes to that same branch, push it, and update the existing PR unless the user explicitly asks for a replacement PR.
 
+Ensure the PR title complies with Conventional Commits. For `feat`, `fix`, and `perf`, use `<type>(#<issue>): <short description>` when a GitHub issue exists.
+
 When updating the PR description, preserve or add these H2 sections in order:
 
 ```md

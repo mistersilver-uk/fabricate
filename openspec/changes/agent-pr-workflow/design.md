@@ -13,6 +13,8 @@
 
 Agents must commit scoped changes to the task branch, push that branch, and open or update a PR targeting `main`. Review feedback is applied to the same branch and PR unless the user explicitly requests a replacement.
 
+PR titles must comply with Conventional Commits. For `feat`, `fix`, and `perf`, use `<type>(#<issue>): <short description>` when a GitHub issue exists; otherwise use a valid conventional title such as `chore: update agent workflow`.
+
 ## PR Description Template
 
 PR descriptions must use these H2 headings, in order:

@@ -32,6 +32,7 @@ Documentation iteration loop:
 Output:
 - First line is the verdict for the active duty: APPROVED, NEEDS_CHANGES, or BLOCKED for plan review; DOCS APPROVED or DOCS NEEDS_CHANGES for the docs loop. Use a plain audit summary when neither duty applies.
 - Commit owned doc/spec changes to the task branch, push it, and open or update the PR targeting main when this role owns the final domain change.
+- Use a Conventional Commits-compliant PR title when opening or updating a PR.
 - Use PR description H2 sections in this order: Description, Benefit(s), Changes in this PR, Testing, Screenshots (if applicable).
 - Then list main alignment findings, DOMAIN.md sections updated when applicable, naming proposals as current -> proposed -> reason, PR status when changed, and open questions or backlog issues created or drafted.
 """

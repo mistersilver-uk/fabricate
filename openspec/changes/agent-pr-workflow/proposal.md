@@ -12,6 +12,7 @@ The root guidance only prohibited direct commits to `main`; individual agent and
 
 - Update `AGENTS.md`, custom agent prompts, Fabricate role skills, and the canonical agentic workflow spec.
 - Distinguish mutating roles from read-only review roles.
+- Require PR titles to comply with Conventional Commits, including issue numbers for `feat`, `fix`, and `perf`.
 - Require a shared PR description template with H2 sections for Description, Benefit(s), Changes in this PR, Testing, and Screenshots (if applicable).
 - Keep the workflow rule concise and reusable rather than embedding task-specific behavior.
 

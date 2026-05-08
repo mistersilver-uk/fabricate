@@ -68,6 +68,8 @@ The orchestrator drives a `plan → plan-review → implement → review → doc
 
 ## PR description template
 
+PR titles must comply with Conventional Commits. For `feat`, `fix`, and `perf`, use `<type>(#<issue>): <short description>` when a GitHub issue exists.
+
 When opening or updating a PR, use these H2 sections in order:
 
 ```md
