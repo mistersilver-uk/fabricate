@@ -48,6 +48,10 @@
   function chevronIcon() {
     return expanded ? 'fas fa-chevron-down' : 'fas fa-chevron-right';
   }
+
+  function runKey(run, index, scope) {
+    return run?.uiKey || `${scope}-${run?.runType || 'crafting'}-${run?.id ?? index}`;
+  }
 </script>
 
 {#if hasCraftingActor}
@@ -79,7 +83,7 @@
         <h4 class="run-bands__column-title">{localize('FABRICATE.RunSummary.InProgress')}</h4>
         {#if activeRuns.length > 0}
           <ul class="run-list">
-            {#each activeRunsPage as run (`active-${run.id}`)}
+            {#each activeRunsPage as run, index (runKey(run, index, 'active'))}
               <li class="run-row">
                 <strong>{run.recipeName}</strong>
                 <span class="badge">{run.statusLabel}</span>
@@ -148,7 +152,7 @@
         <h4 class="run-bands__column-title">{localize('FABRICATE.RunSummary.RecentHistory')}</h4>
         {#if runHistory.length > 0}
           <ul class="run-list">
-            {#each runHistoryPage as run (`history-${run.id}`)}
+            {#each runHistoryPage as run, index (runKey(run, index, 'history'))}
               <li class="run-row">
                 <strong>{run.recipeName}</strong>
                 <span class="badge">{run.statusLabel}</span>

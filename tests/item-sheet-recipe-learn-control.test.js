@@ -19,6 +19,8 @@ const {
   registerItemSheetRecipeLearnControl
 } = await import('../src/ui/ItemSheetRecipeLearnControl.js');
 
+const ALARA_IMAGE = 'assets/img/Alara the Alchemist.webp';
+
 function getPathValue(object, path) {
   return String(path).split('.').reduce((value, part) => {
     if (value == null || typeof value !== 'object') return undefined;
@@ -76,10 +78,11 @@ class FakeItem extends FakeDocument {
 }
 
 class FakeActor extends FakeDocument {
-  constructor({ id = 'actor-1', name = 'Alara', items = [], flagsArg = {}, canUpdate = true } = {}) {
+  constructor({ id = 'actor-1', name = 'Alara', img = ALARA_IMAGE, items = [], flagsArg = {}, canUpdate = true } = {}) {
     super(flagsArg);
     this.id = id;
     this.name = name;
+    this.img = img;
     this.items = items;
     this.canUserModify = () => canUpdate;
 

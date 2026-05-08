@@ -11,6 +11,9 @@ import { get } from 'svelte/store';
 
 const { createCraftingStore } = await import('../../src/ui/svelte/stores/craftingStore.js');
 
+const ALARA_IMAGE = 'assets/img/Alara the Alchemist.webp';
+const BROMM_IMAGE = 'assets/img/Bromm the Blacksmith.webp';
+
 function makeIngredientOption(id, componentId, quantity = 1) {
   return {
     id,
@@ -58,10 +61,11 @@ function makeComplexRecipe(id, name, ingredientSets, opts = {}) {
   };
 }
 
-function makeActor(id, name, componentItems = []) {
+function makeActor(id, name, componentItems = [], img = null) {
   return {
     id,
     name,
+    img,
     isOwner: true,
     items: componentItems.map(componentId => ({
       id: `it-${id}-${componentId}`,
@@ -146,9 +150,9 @@ describe('Slice 3 store: complex recipe craftPlan derivation', () => {
       results: [{ id: 'res1' }]
     });
     const sys = { id: 'sys-1', name: 'Smithing', enabled: true, resolutionMode: 'simple', components: [], features: { essences: false } };
-    const brom = makeActor('brom', 'Brom', ['iron', 'iron']);
+    const bromm = makeActor('bromm', 'Bromm', ['iron', 'iron'], BROMM_IMAGE);
     const stash = makeActor('stash', 'Party Stash', ['silver']);
-    const services = makeServices({ recipes: [recipe], systems: [sys], actors: [brom, stash] });
+    const services = makeServices({ recipes: [recipe], systems: [sys], actors: [bromm, stash] });
     const store = createCraftingStore(services);
     await store.refresh();
 
@@ -161,11 +165,12 @@ describe('Slice 3 store: complex recipe craftPlan derivation', () => {
     assert.equal(inspector.craftPlan.selectedPathIndex, 0, 'first path is selected by default');
     assert.equal(inspector.craftPlan.paths[0].name, 'Standard Path');
 
-    // Source allocation: option o1 (iron x2) needs 2 of 'iron' — Brom has 2 (advisory).
+    // Source allocation: option o1 (iron x2) needs 2 of 'iron' — Bromm has 2 (advisory).
     const selectedPath = inspector.craftPlan.paths[0];
     const firstOption = selectedPath.groups[0].options[0];
-    assert.equal(firstOption.satisfied, true, 'iron x2 should be satisfied by Brom');
-    assert.equal(firstOption.source?.actorName, 'Brom');
+    assert.equal(firstOption.satisfied, true, 'iron x2 should be satisfied by Bromm');
+    assert.equal(firstOption.source?.actorName, 'Bromm');
+    assert.equal(get(store.viewState).ownedActors[0].img, BROMM_IMAGE);
 
     // Outcome should be classified as 'fixed' for this simple variable=false case.
     assert.equal(inspector.craftPlan.outcome.type, 'fixed');
@@ -180,7 +185,7 @@ describe('Slice 3 store: complex recipe craftPlan derivation', () => {
       makeIngredientSet('p2', 'Silver', [makeIngredientGroup('g2', [opt2])])
     ]);
     const sys = { id: 'sys-1', name: 'Smithing', enabled: true, resolutionMode: 'simple', components: [], features: { essences: false } };
-    const services = makeServices({ recipes: [recipe], systems: [sys], actors: [makeActor('a', 'Alice', ['iron', 'silver'])] });
+    const services = makeServices({ recipes: [recipe], systems: [sys], actors: [makeActor('alara', 'Alara', ['iron', 'silver'], ALARA_IMAGE)] });
     const store = createCraftingStore(services);
     await store.refresh();
 

@@ -87,3 +87,42 @@ test('CraftingView: wires RunBands collapse + per-band pagination to the store',
   assert.match(source, /\bonHistoryPageChange\s*=\s*\{store\.setHistoryPageIndex\}/, 'must wire history page changes');
   assert.match(source, /\bexpanded\s*=\s*\{\$runBandsExpanded\}/, 'must subscribe to runBandsExpanded');
 });
+
+test('CraftingView: inspector visibility is gated on $inspectorVisible store state', () => {
+  assert.match(source, /\{#if \$inspectorVisible\}/, 'inspector must be conditional on $inspectorVisible');
+  assert.match(source, /store\.setInspectorVisible\(false\)/, 'close button must dispatch setInspectorVisible(false)');
+  assert.match(source, /store\.setInspectorVisible\(true\)/, 'reopen pill must dispatch setInspectorVisible(true)');
+});
+
+test('CraftingView: inspector close button has accessible name + V2 chrome', () => {
+  assert.match(
+    source,
+    /class="crafting-view__inspector-close"\s+aria-label=\{localize\('FABRICATE\.ActorApp\.Crafting\.HideInspector'\)\}/,
+    'close button must declare an accessible name'
+  );
+  assert.match(
+    source,
+    /data-testid="crafting-view-hide-inspector"/,
+    'close button exposes a stable test selector'
+  );
+});
+
+test('CraftingView: reopen pill renders only when the inspector is hidden', () => {
+  // The pill should appear inside the {#if !$inspectorVisible} branch only,
+  // not unconditionally in the toolbar.
+  assert.match(
+    source,
+    /\{#if !\$inspectorVisible\}[\s\S]*?crafting-view__inspector-show/,
+    'reopen pill must be gated on hidden inspector state'
+  );
+});
+
+test('CraftingView: body grid collapses to single column when only main column is present', () => {
+  const styleMatch = source.match(/<style>([\s\S]*?)<\/style>/);
+  const scoped = styleMatch[1];
+  assert.match(
+    scoped,
+    /\.crafting-view__body:has\(>\s*\.crafting-view__main:only-child\)\s*\{[^}]*grid-template-columns:\s*1fr/,
+    'body must collapse to 1fr when the inspector is hidden'
+  );
+});

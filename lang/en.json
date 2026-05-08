@@ -38,7 +38,9 @@
         "Essences": "Essences",
         "Catalysts": "Catalysts / Tools",
         "ActiveRun": "Active Run",
-        "RemainingTime": "{time} remaining"
+        "RemainingTime": "{time} remaining",
+        "ShowInspector": "Show recipe details",
+        "HideInspector": "Hide recipe details"
       },
       "CraftPlan": {
         "ChipComplex": "Complex",

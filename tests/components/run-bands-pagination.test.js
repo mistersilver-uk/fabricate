@@ -53,6 +53,13 @@ test('RunBands: page slicing uses an internal $derived against the page index', 
   assert.match(source, /runHistoryPage\s*=\s*\$derived/, 'runHistoryPage is derived from runHistory + historyPageIndex');
 });
 
+test('RunBands: keyed rows use run UI keys with fallback identity', () => {
+  assert.match(source, /function runKey\(/, 'must centralize row key creation');
+  assert.match(source, /run\?\.uiKey/, 'must prefer the store-provided UI key');
+  assert.match(source, /\{#each activeRunsPage as run, index \(runKey\(run, index, 'active'\)\)\}/, 'active rows must use runKey');
+  assert.match(source, /\{#each runHistoryPage as run, index \(runKey\(run, index, 'history'\)\)\}/, 'history rows must use runKey');
+});
+
 test('RunBands: scoped CSS uses --fab-* tokens, no legacy --fabricate-*', () => {
   const styleMatch = source.match(/<style>([\s\S]*?)<\/style>/);
   assert.ok(styleMatch, 'RunBands must have a scoped <style> block');

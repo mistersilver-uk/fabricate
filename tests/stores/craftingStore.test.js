@@ -1622,6 +1622,75 @@ describe('run deduplication — each_key_duplicate guard', () => {
     assert.equal(vs.activeRuns.length, 1);
     assert.equal(vs.runHistory.length, 1);
   });
+
+  it('keeps crafting and salvage history rows with the same persisted ID by using distinct UI keys', async () => {
+    const craftingRun = makeRun('shared-id', 'r1', 'succeeded');
+    craftingRun.finishedAt = 3000;
+    const salvageRun = {
+      id: 'shared-id',
+      componentId: 'comp-1',
+      craftingSystemId: 'sys-1',
+      componentName: 'Broken Sword',
+      status: 'succeeded',
+      startedAt: 2000,
+      finishedAt: 4000
+    };
+    const services = createMockServices({
+      getCraftingRunManager: () => ({
+        getActiveRuns: () => [],
+        getRunHistory: () => [craftingRun],
+        getActiveRun: () => null,
+        cancelRun: async () => true
+      }),
+      getSalvageRunManager: () => ({
+        getActiveRuns: () => [],
+        getRunHistory: () => [salvageRun],
+        getActiveRun: () => null,
+        cancelRun: async () => true
+      }),
+      getCraftingSystemManager: () => ({
+        getSystem: () => ({
+          id: 'sys-1',
+          name: 'Smithing',
+          components: [{ id: 'comp-1', name: 'Broken Sword' }]
+        }),
+        getSystems: () => []
+      })
+    });
+    const store = createCraftingStore(services);
+    await store.refresh();
+    const vs = get(store.viewState);
+    const uiKeys = vs.runHistory.map(r => r.uiKey);
+    assert.equal(vs.runHistory.length, 2);
+    assert.deepEqual([...new Set(uiKeys)], uiKeys, 'merged history rows must have unique UI keys');
+    assert.ok(uiKeys.includes('crafting-shared-id'));
+    assert.ok(uiKeys.includes('salvage-shared-id'));
+  });
+
+  it('deduplicates duplicate salvage history rows before render', async () => {
+    const salvageRun = {
+      id: 'salvage-dup',
+      componentId: 'comp-1',
+      craftingSystemId: 'sys-1',
+      componentName: 'Broken Sword',
+      status: 'succeeded',
+      startedAt: 2000,
+      finishedAt: 4000
+    };
+    const services = createMockServices({
+      getSalvageRunManager: () => ({
+        getActiveRuns: () => [],
+        getRunHistory: () => [salvageRun, salvageRun],
+        getActiveRun: () => null,
+        cancelRun: async () => true
+      })
+    });
+    const store = createCraftingStore(services);
+    await store.refresh();
+    const vs = get(store.viewState);
+    assert.equal(vs.runHistory.filter(r => r.uiKey === 'salvage-salvage-dup').length, 1);
+  });
+
   // ---------------------------------------------------------------------------
   // T-091: Completed runs must not appear in activeRuns
   // ---------------------------------------------------------------------------

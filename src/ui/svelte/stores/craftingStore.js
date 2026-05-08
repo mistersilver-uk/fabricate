@@ -142,6 +142,7 @@ function _buildRunDisplay(run, recipeManager, worldTime, scope = 'active') {
 
   return {
     id: run.id,
+    uiKey: `crafting-${run.id}`,
     recipeId: run.recipeId,
     recipeName,
     status: run.status,
@@ -195,6 +196,7 @@ function _buildSalvageRunDisplay(run, systemManager, worldTime, scope = 'active'
 
   return {
     id: run.id,
+    uiKey: `salvage-${run.id}`,
     runType: 'salvage',
     recipeId: null,
     recipeName: componentName,
@@ -213,6 +215,18 @@ function _buildSalvageRunDisplay(run, systemManager, worldTime, scope = 'active'
     componentId: run.componentId,
     craftingSystemId: run.craftingSystemId
   };
+}
+
+function _dedupeRunDisplays(runs = []) {
+  const seen = new Set();
+  const deduped = [];
+  for (const run of runs) {
+    const key = run?.uiKey || `${run?.runType || 'crafting'}-${run?.id}`;
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(run);
+  }
+  return deduped;
 }
 
 function _buildSalvageEntries(
@@ -373,14 +387,9 @@ function _buildPreparedRecipes(
     .filter(run => ['inProgress', 'waitingTime'].includes(run.status))
     .map(run => _buildRunDisplay(run, recipeManager, worldTime, 'active'))
     .sort((a, b) => Number(b.startedAt || 0) - Number(a.startedAt || 0));
-  // Guard against duplicate run IDs (e.g. data corruption, race conditions) to prevent
-  // Svelte each_key_duplicate errors in RunSummary.svelte.
-  const seenActiveIds = new Set();
-  const craftingActiveRuns = craftingActiveRunsAllSorted.filter(run => {
-    if (seenActiveIds.has(run.id)) return false;
-    seenActiveIds.add(run.id);
-    return true;
-  });
+  // Guard against duplicate run records (e.g. data corruption, race conditions) to prevent
+  // Svelte each_key_duplicate errors in RunBands.svelte.
+  const craftingActiveRuns = _dedupeRunDisplays(craftingActiveRunsAllSorted);
   const activeRunsByRecipeId = new Map();
   for (const run of craftingActiveRuns) {
     const list = activeRunsByRecipeId.get(run.recipeId) || [];
@@ -391,10 +400,10 @@ function _buildPreparedRecipes(
   const salvageActiveRunsRaw = (salvageRunManager && craftingActor)
     ? salvageRunManager.getActiveRuns(craftingActor)
     : [];
-  const salvageActiveRuns = salvageActiveRunsRaw
+  const salvageActiveRuns = _dedupeRunDisplays(salvageActiveRunsRaw
     .filter(run => ['inProgress', 'waitingTime'].includes(run.status))
     .map(run => _buildSalvageRunDisplay(run, craftingSystemManager, worldTime, 'active'))
-    .sort((a, b) => Number(b.startedAt || 0) - Number(a.startedAt || 0));
+    .sort((a, b) => Number(b.startedAt || 0) - Number(a.startedAt || 0)));
   const salvageRunsByKey = new Map(
     salvageActiveRuns.map(run => [`${run.craftingSystemId}::${run.componentId}`, run])
   );
@@ -405,25 +414,20 @@ function _buildPreparedRecipes(
     : [];
   const craftingRunHistoryMapped = historyRaw
     .map(run => _buildRunDisplay(run, recipeManager, worldTime, 'history'));
-  // Guard against duplicate run IDs in history (e.g. completeRun called twice) to prevent
-  // Svelte each_key_duplicate errors in RunSummary.svelte.
-  const seenHistoryIds = new Set();
-  const craftingRunHistory = craftingRunHistoryMapped.filter(run => {
-    if (seenHistoryIds.has(run.id)) return false;
-    seenHistoryIds.add(run.id);
-    return true;
-  });
+  // Guard against duplicate history records (e.g. completeRun called twice) to prevent
+  // Svelte each_key_duplicate errors in RunBands.svelte.
+  const craftingRunHistory = _dedupeRunDisplays(craftingRunHistoryMapped);
 
   const salvageHistoryRaw = (salvageRunManager && craftingActor)
     ? salvageRunManager.getRunHistory(craftingActor, 10)
     : [];
-  const salvageRunHistory = salvageHistoryRaw
+  const salvageRunHistory = _dedupeRunDisplays(salvageHistoryRaw
     .map(run => _buildSalvageRunDisplay(run, craftingSystemManager, worldTime, 'history'))
-    .sort((a, b) => Number(b.finishedAt || b.startedAt || 0) - Number(a.finishedAt || a.startedAt || 0));
+    .sort((a, b) => Number(b.finishedAt || b.startedAt || 0) - Number(a.finishedAt || a.startedAt || 0)));
 
-  const activeRuns = [...craftingActiveRuns, ...salvageActiveRuns]
+  const activeRuns = _dedupeRunDisplays([...craftingActiveRuns, ...salvageActiveRuns])
     .sort((a, b) => Number(b.startedAt || 0) - Number(a.startedAt || 0));
-  const runHistory = [...craftingRunHistory, ...salvageRunHistory]
+  const runHistory = _dedupeRunDisplays([...craftingRunHistory, ...salvageRunHistory])
     .sort((a, b) => Number(b.finishedAt || b.startedAt || 0) - Number(a.finishedAt || a.startedAt || 0));
 
   // --- Recipes ---
@@ -1127,6 +1131,7 @@ export function createCraftingStore(services) {
   const historyPageIndex = writable(0);
   const activeRunPageIndex = writable(0);
   const runBandsExpanded = writable(true);
+  const inspectorVisible = writable(true);
   const pageSize = writable(10);
 
   // --- Selected path per complex recipe (Slice 3: actor-crafting-app-v2) ---
@@ -1383,6 +1388,14 @@ export function createCraftingStore(services) {
 
   function toggleRunBandsExpanded() {
     runBandsExpanded.update(v => !v);
+  }
+
+  function toggleInspectorVisible() {
+    inspectorVisible.update(v => !v);
+  }
+
+  function setInspectorVisible(visible) {
+    inspectorVisible.set(Boolean(visible));
   }
 
   function setPageSize(size) {
@@ -2169,11 +2182,14 @@ export function createCraftingStore(services) {
     historyPageIndex,
     activeRunPageIndex,
     runBandsExpanded,
+    inspectorVisible,
     pageSize,
     setCraftingPageIndex,
     setHistoryPageIndex,
     setActiveRunPageIndex,
     toggleRunBandsExpanded,
+    toggleInspectorVisible,
+    setInspectorVisible,
     setPageSize,
     // Slice 3 (actor-crafting-app-v2): Per-recipe path selection
     selectedPathByRecipeId,

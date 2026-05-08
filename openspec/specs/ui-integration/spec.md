@@ -253,14 +253,36 @@ Current GM editor behavior:
 - The tab loads the selected system's environment list from the gathering environment store.
 - Environment list and draft records are cloned before exposure to the Svelte view.
 - The selected draft can edit environment name, description, enabled state, `selectionMode`, and optional `sceneUuid`.
+- The selected draft can edit a player-facing environment image independent of any linked scene.
 - The selected draft can edit gathering composition tags: one `region`, multiple `biomes`, and multiple `dangerTags`.
+- The selected draft can edit risk display/evidence and risk-to-danger matching evidence where supported.
 - The selected draft can configure `hazardSelectionMode` and `hazardPolicy`.
 - The Environments editor shows current global weather and time of day as context, not as environment browse filters.
+- Settings is the only primary GM UI surface for current global weather and current global time of day. Environment authoring may expose inherited condition evidence and future provider override evidence, but must not be the primary condition mutation surface.
 - The Environments editor exposes reusable gathering task and hazard library rows for the selected crafting system, including per-environment enable/disable toggles.
-- Reusable task and hazard row overrides stay inside expandable rows so the default environment workspace remains scannable.
+- Reusable task and hazard row overrides stay inside expandable rows so the default environment workspace remains scannable. Collapsed rows show default-vs-override chips, enabled state, matching evidence, dirty/validation markers, and an explicit expand/collapse control.
+- Expanded override panels contain per-environment override fields only; reusable definition fields remain edited in their library surface.
+- Expanded override rows are keyboard reachable, preserve focus on save/error where practical, and stack without horizontal clipping in narrow Manager V2 widths.
 - Reusable task authoring includes name, match tags, ordered d100 drop row reference/quantity/drop rate, and item selection mode.
-- Reusable hazard authoring includes name, danger/match tags, and d100 drop rate.
+- Reusable task authoring may also include node count, depletion timing, respawn policy, stamina cost, attempt limits, risk overrides, encounter hooks, natural expression providers, and macro providers where the selected economy/features use them.
+- Reusable hazard authoring includes name, image, description, enabled state, danger/match tags, d100 drop rate, and modifier provider evidence.
 - The settings/tag area can edit gathering vocabularies for regions, biomes, danger, weather, and time of day, and can update current global weather/time through the public gathering condition API when available.
+- The editor keeps core environment identity separate from task/node authoring.
+- The editor allows environments to exist without a linked scene. Scene link controls are optional access/evidence controls, not the identity of the environment.
+- The editor should group rich gathering authoring into Overview, Location, Conditions, Tasks / Nodes, Results, Risk / Encounters, Economy, Visibility, and Advanced sections or equivalent groupings.
+- Conditions authoring shows which task availability, yield, risk, stamina, or difficulty modifiers are active.
+- Tasks / Nodes authoring exposes task identity, enabled state, current node count, max node count, depletion timing, respawn policy, next respawn evidence, and manual restock controls when node economy is enabled.
+- Manual restock controls are GM-only and show whether they affect current count, max count, or both.
+- Economy authoring shows the selected gathering economy mode and exposes only relevant controls as primary: time requirement for `time`, node controls for `nodes`, stamina cost/regeneration for `stamina`, and combined controls for `hybrid`.
+- Stamina authoring exposes system-level stamina configuration, including max/current provider strategy, regeneration mode, regeneration rule, manual adjustment permissions, and task stamina costs.
+- GM controls allow authorized GMs to manually set an actor's current gathering stamina and, when Fabricate owns the maximum, maximum gathering stamina.
+- Risk / Encounters authoring exposes environment risk, task risk overrides, encounter table links, trigger hooks, and player-facing risk copy.
+- Encounter controls are optional and must not require every gathering task to have an encounter table.
+- Attempt limit authoring exposes limit scope, max attempts, time window, recharge policy, probabilistic recharge settings, manual recharge controls, and current counter/recharge evidence.
+- Blind environment authoring allows multiple tasks, hide-by-default behavior, blind task-selection strategy, progressive reveal toggle, reveal scope, reveal triggers, manual reveal, and reset/revoke reveal controls.
+- Developer/API configuration should expose hook enablement notes, chat message settings, provider diagnostics, and integration-safe identifiers for environments, tasks, nodes, stamina, attempt limits, encounters, and reveal states.
+- Chat message controls should allow GMs to choose which gathering lifecycle events produce chat messages and whether GM diagnostics are whispered/restricted.
+- The editor evidence column should preview the player-facing environment card, task availability, modified yields/costs, risk, encounter hooks, stamina cost, and validation.
 - The selected draft can add, select, duplicate, delete, and reorder tasks.
 - The selected task can edit `name`, `description`, `img`, `enabled`, and `resolutionMode`.
 - The selected task can add, rename, delete, and reorder result groups.
@@ -288,16 +310,29 @@ Current GM editor behavior:
 - The selected-task time-requirement editor supports clearing `timeRequirement` for immediate resolution and editing minutes, hours, days, months, and years for timed tasks.
 - The selected-task failure-outcome editor supports clearing to default failure feedback plus text and macro custom outcomes, with provider switching clearing stale provider fields.
 - Save-blocking validation exposes a localized summary, inline field-addressable errors, `aria-invalid`, `aria-describedby`, keyboard focus to the first invalid field after failed save, and persistent stale-reference warnings.
+- Validation identifies invalid node counts, invalid respawn policies, invalid stamina formulas/providers, invalid condition modifiers, invalid encounter table links, invalid attempt-limit settings, and risk values outside supported vocabulary.
 - Narrow-window layout behavior is implemented with app/container-width rules so list/editor panes and advanced controls remain reachable in resized Foundry windows.
 
 Validation rules from `009-gathering-and-harvesting.md` must be enforced before save.
 
 The environments editor must block save when:
 
-- `selectionMode === "blind"` and the environment has anything other than exactly one task
+- `selectionMode === "blind"` and multiple tasks can be selected without valid blind-selection/redaction configuration
 - `selectionMode === "targeted"` and the environment has zero tasks
 - a task is missing required routed or progressive fields
 - a task's result groups violate reserved failure keyword rules
+
+### Gathering Hazard Library
+
+When `features.gathering === true`, Manager V2 must expose reusable hazard library authoring as a dedicated route or as a nested reusable library surface inside gathering tasks or gathering settings.
+
+Hazard library authoring must support:
+
+- create, edit, duplicate, delete, enable/disable, search/filter, and usage evidence
+- deletion confirmation when hazards are used by environments or tasks
+- rows showing name, image, description summary, enabled state, danger tags, region/biome/weather/time matching tags, drop rate, and modifier provider evidence
+- validation for drop rate, tag vocabulary values, provider configuration, and unsafe deletion
+- composition surfaces that attach or toggle matched reusable hazards without editing reusable hazard definitions inline
 
 ## Recipe Editor
 
@@ -545,17 +580,22 @@ It is opened from the `Gathering` header action in the Items directory and must 
 ### Actor Selection
 
 - Select the gathering actor.
+- The top header shows the selected actor and, when enabled, gathering stamina current/max values plus regeneration or adjustment affordances where permitted.
 - Persist the last selected actor in `fabricate.lastGatheringActor`.
 - Only actors the user owns are selectable for non-GM users.
 - Actor selection is permission-based, not actor-type-based; actor types such as `npc`, `group`, or `character` are valid when the user has the required ownership/permission.
+- The app should provide primary tabs or segmented navigation for `Environments` and `Gathering Log`.
 
 ### Environment List
 
 - Show only environments whose owning crafting system has `features.gathering === true`.
 - Hide disabled environments for non-GM users.
+- Support search plus region, biome, risk/status, and availability filters where data exists.
 - If an environment is scene-gated, show whether the selected actor currently meets the scene/token requirements.
-- Display environment name, description, region, biome, danger/risk, current global weather/time evidence, and selection-mode summary.
+- Display environment image, name, description, region, biome, danger/risk, current global weather/time evidence, selection-mode summary, visibility/condition summary, scene/access state, and availability summary where safe to reveal.
 - Do not expose weather or time of day as player environment browse filters.
+- Environment rows should be image-led and include environment name, region, biome, risk/status chip, and availability summary where safe to reveal.
+- Selecting an environment populates a task list and environment detail/evidence panel.
 
 ### Task Selection
 
@@ -565,15 +605,23 @@ If the environment is `targeted`:
 - each task shows:
   - image
   - name
+  - description
   - time requirement summary if present
   - catalyst summary
+  - stamina cost if stamina is enabled
+  - node availability state if nodes are enabled
+  - risk modifier where safe to reveal
   - availability state
+  - start/select action
+- potential result previews may be shown for targeted visible tasks and GM-visible tasks, but must not reveal hidden blind-task results to non-GM users
 
 If the environment is `blind`:
 
-- show one generic gather action for the single task
-- do not expose alternate per-task choices to the player
-- still show task-derived time requirement and requirement summaries where useful
+- show one generic gather action or equivalent environment-level action for unrevealed hidden tasks
+- do not expose alternate unrevealed per-task choices to the player
+- if progressive reveal is enabled, revealed blind tasks may appear as named task rows for the relevant actor/user/party/global scope while unrevealed tasks remain hidden
+- still show task-derived time requirement, stamina cost, node availability, and requirement summaries where useful and safe to reveal
+- GM users may inspect full task, node, condition, risk, encounter, and diagnostic detail
 
 ### Start Gathering Flow
 
@@ -585,8 +633,13 @@ Before creating a run, the UI must check:
 - scene/token access rules pass when `sceneUuid` is configured
 - task visibility gate passes for the selected actor
 - required catalysts are available
+- required stamina is available when stamina is enabled
+- node availability passes when nodes are enabled
+- attempt limits have remaining attempts or recharge state allows the attempt
 
 When the game is paused, the app must keep environment browsing readable, show a paused-game blocker, disable start actions, and avoid implying that stamina, nodes, catalysts, rolls, chat, history, or item awards were consumed.
+
+Start actions must surface blocking reasons for missing stamina, depleted nodes, scene/token access, duplicate active runs, hidden tasks, missing catalysts/tools, attempt limits, provider diagnostics, and paused game.
 
 If `task.timeRequirement` is absent:
 
@@ -615,6 +668,8 @@ Each active run entry shows:
 - status (`inProgress` or `waitingTime`)
 - started time
 - remaining or completion time when `timeGate` exists
+- stamina/node evidence where safe
+- cancel/details actions where supported
 
 The app must not allow starting a second active run for the same actor and `taskId`.
 Instead it should show the existing run and an actionable blocking reason.
@@ -644,9 +699,41 @@ Each history row shows:
 - task for `targeted` environments, or a localized generic label for `blind` environments
 - terminal status
 - completion time
-- summary of results or failure outcome
+- summary of results, failure outcome, encounter outcome, stamina spend/regeneration, and node depletion/restock evidence where visible
 
 In `blind` environments, real task names remain GM-only in player-facing active runs, history rows, duplicate-run blockers, notifications, and terminal feedback.
+
+### Gathering Stamina Presentation
+
+When stamina economy is enabled:
+
+- Stamina summary shows current and maximum stamina when known.
+- Stamina summary should show regeneration hint or next regeneration time when known.
+- Task start buttons communicate stamina cost before the attempt starts.
+- If a task is blocked by stamina, the UI shows the missing amount and any known recovery path.
+- Manual GM stamina adjustment controls are visible only to users with permission.
+- Stamina UI is hidden or demoted when the selected gathering system does not use stamina.
+- If stamina is manual-only, the UI must not imply automatic regeneration or next regeneration time.
+- If stamina regenerates over time, the UI should show the configured interval, next regeneration time, or regeneration rate when known.
+- GM manual stamina adjustment UI provides set-current and add/subtract flows where permissions allow.
+
+### Rich Gathering Disclosure
+
+- Non-GM users must not see hidden task names, hidden result groups, provider diagnostics, encounter table internals, or GM-only notes.
+- Blind environments use generic task labels and redaction-safe active/history text for non-GM users.
+- Depleted-node and respawn hints may be generic for blind or hidden tasks.
+- Risk and condition summaries may be shown at the environment level when they are not task-revealing.
+- Encounter feedback is visible when an encounter hook produces player-facing output, but hidden diagnostics and GM-only encounter metadata remain redacted.
+- Chat messages generated by gathering attempts should be reflected in the log or linked attempt detail where practical.
+- Narrow layouts keep actor/stamina header, environment filters, selected environment, task list, and start action reachable without horizontal overflow.
+
+### Rich Gathering Developer and Chat UI
+
+- GM configuration should include an advanced Developer / Automation section for hook/API notes, stable ids, macro entry points, and provider diagnostics.
+- Developer-facing UI distinguishes read-only hook evidence from mutable provider controls.
+- Chat message settings should be grouped with automation or feedback settings and should expose event-level toggles.
+- Chat preview should show player-safe output and GM-only diagnostic output separately when possible.
+- Provider diagnostics from expressions, macros, hooks, APIs, and chat generation must be visible to GMs in validation/evidence panels.
 
 ## Data Storage (UI-relevant)
 
@@ -657,6 +744,7 @@ World settings:
 - `fabricate.craftingSystems`
 - `fabricate.recipes`
 - `fabricate.gatheringEnvironments`
+- `fabricate.gatheringConditions`
 
 Client settings:
 

@@ -12,6 +12,8 @@ import { get } from 'svelte/store';
 
 const { createCraftingStore } = await import('../../src/ui/svelte/stores/craftingStore.js');
 
+const ALARA_IMAGE = 'assets/img/Alara the Alchemist.webp';
+
 function makeRecipe(id, name, opts = {}) {
   return {
     id,
@@ -44,7 +46,8 @@ function makeSystem(id, recipeIds, mode = 'simple') {
 function makeServices({ recipes = [], systems = [] } = {}) {
   const actorA = {
     id: 'a1',
-    name: 'Alice',
+    name: 'Alara',
+    img: ALARA_IMAGE,
     isOwner: true,
     items: [],
     flags: { fabricate: { learnedRecipes: {} } }
@@ -179,5 +182,26 @@ describe('Slice 2 store: selected recipe inspector', () => {
     assert.equal(get(store.craftingPageIndex), 0);
     store.setHistoryPageIndex(-1);
     assert.equal(get(store.historyPageIndex), 0);
+  });
+
+  it('inspectorVisible defaults to true and toggleInspectorVisible flips it', () => {
+    const services = makeServices();
+    const store = createCraftingStore(services);
+    assert.equal(get(store.inspectorVisible), true, 'inspector starts visible');
+    store.toggleInspectorVisible();
+    assert.equal(get(store.inspectorVisible), false, 'toggle hides the inspector');
+    store.toggleInspectorVisible();
+    assert.equal(get(store.inspectorVisible), true, 'toggle restores the inspector');
+  });
+
+  it('setInspectorVisible coerces to boolean and is per-store-instance isolated', () => {
+    const services = makeServices();
+    const a = createCraftingStore(services);
+    const b = createCraftingStore(services);
+    a.setInspectorVisible(0);
+    assert.equal(get(a.inspectorVisible), false, 'falsy input must hide inspector');
+    a.setInspectorVisible('on');
+    assert.equal(get(a.inspectorVisible), true, 'truthy input must show inspector');
+    assert.equal(get(b.inspectorVisible), true, 'instance B must not be affected by A');
   });
 });

@@ -252,47 +252,46 @@ describe('RunBands: Duplicate-key guard — composite key strategy', () => {
 
   /**
    * Simulate the keying logic that RunBands.svelte applies when rendering
-   * {#each activeRuns as run (`active-${run.id}`)}.
-   * With composite keys a duplicate run.id within activeRuns would still
-   * produce a unique key (same id appears twice but the prefix+id is unique
-   * only if the dedup layer in craftingStore removed the duplicate).
+   * {#each activeRunsPage as run, index (runKey(run, index, 'active'))}.
+   * The store-provided uiKey keeps crafting and salvage run domains distinct
+   * while preserving the raw manager run id for actions.
    *
-   * These tests verify that when given a pre-deduplicated list (as the store
-   * now guarantees) the composite key approach produces unique keys, and that
-   * a list with raw duplicates would have produced collisions under the old
-   * plain-id keying strategy.
+   * These tests verify that pre-deduplicated lists produce unique keys and
+   * that the render key can differ from the persisted run id.
    */
 
-  it('composite key "active-<id>" is unique for deduplicated activeRuns list', () => {
+  function displayKey(run, index, scope) {
+    return run?.uiKey || `${scope}-${run?.runType || 'crafting'}-${run?.id ?? index}`;
+  }
+
+  it('uiKey is unique for deduplicated activeRuns list', () => {
     const runs = [
-      { id: 'run-1', recipeName: 'Potion A', statusLabel: 'In Progress' },
-      { id: 'run-2', recipeName: 'Potion B', statusLabel: 'In Progress' }
+      { id: 'run-1', uiKey: 'crafting-run-1', recipeName: 'Potion A', statusLabel: 'In Progress' },
+      { id: 'run-2', uiKey: 'crafting-run-2', recipeName: 'Potion B', statusLabel: 'In Progress' }
     ];
 
-    const keys = runs.map(r => `active-${r.id}`);
+    const keys = runs.map((r, index) => displayKey(r, index, 'active'));
     const uniqueKeys = new Set(keys);
-    assert.equal(keys.length, uniqueKeys.size, 'All composite keys must be unique for a deduplicated list');
+    assert.equal(keys.length, uniqueKeys.size, 'All UI keys must be unique for a deduplicated list');
   });
 
-  it('composite key "history-<id>" is unique for deduplicated runHistory list', () => {
+  it('uiKey is unique for deduplicated runHistory list', () => {
     const runs = [
-      { id: 'hist-1', recipeName: 'Sword', statusLabel: 'Succeeded' },
-      { id: 'hist-2', recipeName: 'Shield', statusLabel: 'Failed' }
+      { id: 'hist-1', uiKey: 'crafting-hist-1', recipeName: 'Sword', statusLabel: 'Succeeded' },
+      { id: 'hist-2', uiKey: 'crafting-hist-2', recipeName: 'Shield', statusLabel: 'Failed' }
     ];
 
-    const keys = runs.map(r => `history-${r.id}`);
+    const keys = runs.map((r, index) => displayKey(r, index, 'history'));
     const uniqueKeys = new Set(keys);
-    assert.equal(keys.length, uniqueKeys.size, 'All composite keys must be unique for a deduplicated history list');
+    assert.equal(keys.length, uniqueKeys.size, 'All UI keys must be unique for a deduplicated history list');
   });
 
-  it('active and history composite keys never collide even when run.id is shared across lists', () => {
-    // A run that just finished may transiently appear in both collections.
-    // The prefix ensures the keys are distinct across the two separate each blocks.
+  it('crafting and salvage UI keys do not collide when run.id is shared in one history list', () => {
     const sharedRunId = 'shared-run-42';
-    const activeKey = `active-${sharedRunId}`;
-    const historyKey = `history-${sharedRunId}`;
+    const craftingKey = displayKey({ id: sharedRunId, uiKey: `crafting-${sharedRunId}` }, 0, 'history');
+    const salvageKey = displayKey({ id: sharedRunId, uiKey: `salvage-${sharedRunId}`, runType: 'salvage' }, 1, 'history');
 
-    assert.notEqual(activeKey, historyKey, 'active and history keys with same run ID must differ');
+    assert.notEqual(craftingKey, salvageKey, 'crafting and salvage keys with same run ID must differ');
   });
 
   it('rendering a list row for each deduplicated run produces the correct count of li elements', () => {
@@ -307,7 +306,7 @@ describe('RunBands: Duplicate-key guard — composite key strategy', () => {
     for (const run of deduplicatedRuns) {
       const li = document.createElement('li');
       li.className = 'run-row';
-      li.dataset.key = `active-${run.id}`;
+      li.dataset.key = displayKey(run, 0, 'active');
 
       const strong = document.createElement('strong');
       strong.textContent = run.recipeName;
@@ -320,24 +319,24 @@ describe('RunBands: Duplicate-key guard — composite key strategy', () => {
   });
 
   it('deduplicating activeRuns before render eliminates duplicate-key-prone rows', () => {
-    // Simulate what craftingStore now does: deduplicate before the list reaches RunSummary
+    // Simulate what craftingStore now does: deduplicate before the list reaches RunBands
     const rawRuns = [
-      { id: 'dup-id', recipeName: 'Potion', statusLabel: 'In Progress' },
-      { id: 'dup-id', recipeName: 'Potion', statusLabel: 'In Progress' }  // duplicate
+      { id: 'dup-id', uiKey: 'crafting-dup-id', recipeName: 'Potion', statusLabel: 'In Progress' },
+      { id: 'dup-id', uiKey: 'crafting-dup-id', recipeName: 'Potion', statusLabel: 'In Progress' }  // duplicate
     ];
 
     // Apply the same dedup logic as craftingStore
     const seen = new Set();
     const deduped = rawRuns.filter(r => {
-      if (seen.has(r.id)) return false;
-      seen.add(r.id);
+      if (seen.has(r.uiKey)) return false;
+      seen.add(r.uiKey);
       return true;
     });
 
     assert.equal(deduped.length, 1, 'Deduplication must reduce two identical-ID runs to one');
 
-    const keys = deduped.map(r => `active-${r.id}`);
+    const keys = deduped.map((r, index) => displayKey(r, index, 'active'));
     const uniqueKeys = new Set(keys);
-    assert.equal(keys.length, uniqueKeys.size, 'All composite keys must be unique after deduplication');
+    assert.equal(keys.length, uniqueKeys.size, 'All UI keys must be unique after deduplication');
   });
 });

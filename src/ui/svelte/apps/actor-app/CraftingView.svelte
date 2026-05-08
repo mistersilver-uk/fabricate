@@ -55,6 +55,8 @@
   const activeRunPageIndex = store.activeRunPageIndex;
   // svelte-ignore state_referenced_locally
   const historyPageIndex = store.historyPageIndex;
+  // svelte-ignore state_referenced_locally
+  const inspectorVisible = store.inspectorVisible;
 
   function handleShowRunDetails(runId, scope) {
     renderDialog({
@@ -171,6 +173,17 @@
             selectedCategory={$selectedCategory}
             onCategoryChange={store.setCategory}
           />
+          {#if !$inspectorVisible}
+            <button
+              type="button"
+              class="crafting-view__inspector-show"
+              data-testid="crafting-view-show-inspector"
+              onclick={() => store.setInspectorVisible(true)}
+            >
+              <i class="fas fa-circle-info" aria-hidden="true"></i>
+              {localize('FABRICATE.ActorApp.Crafting.ShowInspector')}
+            </button>
+          {/if}
         </header>
 
         <RecipeTable
@@ -189,18 +202,34 @@
           onPageSizeChange={(size) => store.setPageSize(size)}
         />
       </div>
-      <div class="crafting-view__inspector">
-        <SelectedRecipeInspector
-          recipe={$selectedRecipeInspector}
-          onCraft={store.craft}
-          onAddToShoppingList={store.addToShoppingList}
-          onToggleFavourite={store.toggleFavourite}
-          onShowDetails={handleShowDetails}
-          onLearnRecipe={store.learnRecipe}
-          onRestartRun={store.restartRun}
-          onSelectPath={store.selectPath}
-        />
-      </div>
+      {#if $inspectorVisible}
+        <div class="crafting-view__inspector">
+          <header class="crafting-view__inspector-header">
+            <span class="crafting-view__inspector-title">
+              {$selectedRecipeInspector?.name ?? localize('FABRICATE.ActorApp.Crafting.SelectRecipeHint')}
+            </span>
+            <button
+              type="button"
+              class="crafting-view__inspector-close"
+              aria-label={localize('FABRICATE.ActorApp.Crafting.HideInspector')}
+              data-testid="crafting-view-hide-inspector"
+              onclick={() => store.setInspectorVisible(false)}
+            >
+              <i class="fas fa-times" aria-hidden="true"></i>
+            </button>
+          </header>
+          <SelectedRecipeInspector
+            recipe={$selectedRecipeInspector}
+            onCraft={store.craft}
+            onAddToShoppingList={store.addToShoppingList}
+            onToggleFavourite={store.toggleFavourite}
+            onShowDetails={handleShowDetails}
+            onLearnRecipe={store.learnRecipe}
+            onRestartRun={store.restartRun}
+            onSelectPath={store.selectPath}
+          />
+        </div>
+      {/if}
     </div>
   {/if}
 </div>
@@ -259,6 +288,10 @@
     min-height: 0;
   }
 
+  .crafting-view__body:has(> .crafting-view__main:only-child) {
+    grid-template-columns: 1fr;
+  }
+
   .crafting-view__main {
     display: flex;
     flex-direction: column;
@@ -274,6 +307,78 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
+  }
+
+  .crafting-view__inspector-header {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-1) var(--fab-space-2);
+    border-bottom: 1px solid var(--fab-border);
+    background: var(--fab-surface-soft);
+    border-top-left-radius: var(--fab-v2-radius-panel);
+    border-top-right-radius: var(--fab-v2-radius-panel);
+  }
+
+  .crafting-view__inspector-title {
+    flex: 1;
+    min-width: 0;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--fab-text-subtle);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .crafting-view__inspector-close {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid transparent;
+    border-radius: var(--fab-v2-radius-control);
+    background: transparent;
+    color: var(--fab-text-muted);
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .crafting-view__inspector-close:hover,
+  .crafting-view__inspector-close:focus-visible {
+    color: var(--fab-danger);
+    border-color: var(--fab-danger);
+    background: var(--fab-danger-soft);
+  }
+
+  .crafting-view__inspector-show {
+    appearance: none;
+    -webkit-appearance: none;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--fab-space-1);
+    height: var(--fab-v2-control-height);
+    padding: 0 var(--fab-space-3);
+    border: 1px solid var(--fab-border);
+    border-radius: 16px;
+    background: transparent;
+    color: var(--fab-text-muted);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    margin-left: auto;
+  }
+
+  .crafting-view__inspector-show:hover,
+  .crafting-view__inspector-show:focus-visible {
+    color: var(--fab-text);
+    border-color: var(--fab-border-strong);
+    background: var(--fab-surface-raised);
   }
 
   .crafting-view__inspector > :global(.simple-inspector),
