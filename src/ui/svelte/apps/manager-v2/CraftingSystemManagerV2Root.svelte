@@ -1225,11 +1225,11 @@
         {/if}
         {#if currentView === 'environments'}
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.ManagerV2.Nav.Environments', 'Environments')}</span>
+          <span>{text('FABRICATE.Admin.ManagerV2.Nav.Environments', 'Gathering')}</span>
         {/if}
         {#if currentView === 'environment-edit'}
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <button type="button" onclick={backToEnvironmentsBrowse}>{text('FABRICATE.Admin.ManagerV2.Nav.Environments', 'Environments')}</button>
+          <button type="button" onclick={backToEnvironmentsBrowse}>{text('FABRICATE.Admin.ManagerV2.Nav.Environments', 'Gathering')}</button>
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.ManagerV2.Environment.EditBreadcrumb', 'Edit environment')}</span>
         {/if}
@@ -1325,10 +1325,6 @@
           <i class="fas fa-file-import" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.ManagerV2.Import', 'Import')}</span>
         </button>
-        <button type="button" class="manager-v2-button" onclick={openCurrentAdmin}>
-          <i class="fas fa-book" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.ManagerV2.OpenCurrentAdmin', 'Open current admin')}</span>
-        </button>
         <button type="button" class="manager-v2-button" onclick={() => exportSystem()} disabled={!selectedSystemId}>
           <i class="fas fa-file-export" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.ManagerV2.Export', 'Export')}</span>
@@ -1395,7 +1391,7 @@
           {#if canShowEnvironments}
             <button type="button" class={`manager-v2-nav-button ${currentView === 'environments' || currentView === 'environment-edit' ? 'is-active' : ''}`} aria-current={currentView === 'environments' || currentView === 'environment-edit' ? 'page' : undefined} onclick={() => setView('environments')}>
               <i class="fas fa-seedling" aria-hidden="true"></i>
-              <span class="manager-v2-nav-label">{text('FABRICATE.Admin.ManagerV2.Nav.Environments', 'Environments')}</span>
+              <span class="manager-v2-nav-label">{text('FABRICATE.Admin.ManagerV2.Nav.Environments', 'Gathering')}</span>
               <span class="manager-v2-nav-count">{selectedCounts.environments ?? 0}</span>
             </button>
           {/if}

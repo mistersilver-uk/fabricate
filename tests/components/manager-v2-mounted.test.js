@@ -629,7 +629,13 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(target.textContent.includes('Quick actions'), false);
     assert.deepEqual(
       Array.from(target.querySelectorAll('.manager-v2-nav-label')).map(label => label.textContent.trim()),
-      ['System settings', 'Recipes', 'Components', 'Tags & Categories', 'Essences', 'Environments', 'Rules', 'Graph']
+      ['System settings', 'Recipes', 'Components', 'Tags & Categories', 'Essences', 'Gathering', 'Rules', 'Graph']
+    );
+    assert.equal(
+      Array.from(target.querySelectorAll('.manager-v2-header-actions .manager-v2-button'))
+        .some(button => button.textContent.includes('Open current admin')),
+      false,
+      'system library header should not expose the legacy admin launch button'
     );
     const systemSettingsNav = Array.from(target.querySelectorAll('.manager-v2-nav-button'))
       .find(button => button.querySelector('.manager-v2-nav-label')?.textContent.trim() === 'System settings');
@@ -789,7 +795,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(target.querySelector('[data-system-id="alchemy"]').getAttribute('aria-selected'), 'true');
     assert.deepEqual(
       Array.from(target.querySelectorAll('.manager-v2-nav-label')).map(label => label.textContent.trim()),
-      ['System settings', 'Recipes', 'Components', 'Tags & Categories', 'Essences', 'Environments', 'Rules', 'Graph']
+      ['System settings', 'Recipes', 'Components', 'Tags & Categories', 'Essences', 'Gathering', 'Rules', 'Graph']
     );
     assert.ok(target.textContent.includes('System library'));
   });
@@ -1689,7 +1695,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Environments').click();
+    navButton('Gathering').click();
     await tick();
     flushSync();
 
@@ -1698,6 +1704,39 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Gathering environments'));
     assert.ok(target.textContent.includes('Moonlit Forest'));
     assert.ok(target.textContent.includes('Quiet Cavern'));
+    const gatheringTabs = Array.from(target.querySelectorAll('.manager-v2-gathering-tab'));
+    assert.deepEqual(
+      gatheringTabs.map(tab => tab.textContent.trim()),
+      ['Environments', 'Tasks', 'Encounters', 'Settings']
+    );
+    assert.equal(
+      gatheringTabs.find(tab => tab.textContent.includes('Environments')).getAttribute('aria-selected'),
+      'true'
+    );
+
+    for (const [label, placeholder] of [
+      ['Tasks', 'Reusable gathering task management is planned for a later slice.'],
+      ['Encounters', 'Encounter and hazard authoring is planned for a later slice.'],
+      ['Settings', 'Gathering-wide configuration is planned for a later slice.']
+    ]) {
+      gatheringTabs.find(tab => tab.textContent.includes(label)).click();
+      await tick();
+      flushSync();
+
+      assert.equal(
+        target.querySelector(`.manager-v2-gathering-tab[aria-selected="true"]`).textContent.trim(),
+        label
+      );
+      assert.ok(target.textContent.includes(placeholder));
+      assert.equal(target.querySelector('.manager-v2-toolbar'), null);
+      assert.equal(target.querySelector('.manager-v2-environments-table'), null);
+    }
+
+    target.querySelector('#manager-v2-gathering-tab-environments').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('#manager-v2-gathering-tab-environments').getAttribute('aria-selected'), 'true');
+    assert.equal(target.querySelectorAll('.manager-v2-environment-row').length, 2);
 
     const environmentTable = target.querySelector('.manager-v2-environments-table');
     assert.deepEqual(
@@ -1786,7 +1825,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Environments').click();
+    navButton('Gathering').click();
     await tick();
     flushSync();
 
@@ -1938,7 +1977,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Environments').click();
+    navButton('Gathering').click();
     await tick();
     flushSync();
     target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').click();
@@ -1964,7 +2003,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Environments').click();
+    navButton('Gathering').click();
     await tick();
     flushSync();
     target.querySelector('[aria-label="Edit Moonlit Forest"]').click();
@@ -2004,7 +2043,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Environments').click();
+    navButton('Gathering').click();
     await tick();
     flushSync();
     target.querySelector('[aria-label="Edit Moonlit Forest"]').click();
@@ -2058,7 +2097,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     });
     flushSync();
 
-    navButton('Environments').click();
+    navButton('Gathering').click();
     await tick();
     flushSync();
     target.querySelector('[aria-label="Edit Moonlit Forest"]').click();
