@@ -90,8 +90,8 @@
   .alchemy-palette {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
-    gap: 6px;
-    padding: 4px;
+    gap: var(--fab-space-1);
+    padding: var(--fab-space-1);
   }
 
   .alchemy-palette-empty {
@@ -100,9 +100,9 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    padding: 24px;
-    color: rgba(0, 0, 0, 0.4);
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-6);
+    color: var(--fab-text-subtle);
     font-size: 13px;
   }
 
@@ -120,23 +120,31 @@
     flex-direction: column;
     align-items: center;
     padding: 6px 4px;
-    border-radius: 6px;
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    background: rgba(0, 0, 0, 0.04);
+    border-radius: var(--fab-v2-radius-panel);
+    border: 1px solid var(--fab-border);
+    background: var(--fab-surface-soft);
+    color: var(--fab-text);
     cursor: grab;
     position: relative;
     min-height: 104px;
     user-select: none;
   }
 
-  .alchemy-palette-cell:hover {
-    background: rgba(0, 0, 0, 0.1);
-    border-color: rgba(0, 0, 0, 0.2);
+  .alchemy-palette-cell:hover,
+  .alchemy-palette-cell:focus-visible {
+    background: var(--fab-accent-soft);
+    border-color: var(--fab-accent);
+  }
+
+  .alchemy-palette-cell:focus-visible {
+    outline: 2px solid var(--fab-accent);
+    outline-offset: 2px;
   }
 
   .alchemy-palette-cell--empty {
-    opacity: 0.35;
+    opacity: 0.5;
     pointer-events: none;
+    background: var(--fab-surface-raised);
   }
 
   .alchemy-palette-img-wrapper {
@@ -157,6 +165,7 @@
     font-size: 12px;
     line-height: 1.2;
     text-align: center;
+    color: var(--fab-text);
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
@@ -170,16 +179,18 @@
     display: inline-block;
     padding: 2px 6px;
     border-radius: 10px;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
     min-width: 20px;
     text-align: center;
-    background: var(--fabricate-primary, #4a90d9);
-    color: #fff;
+    background: var(--fab-accent);
+    color: #051e0c;
+    border: 1px solid var(--fab-accent-strong);
   }
 
   .alchemy-palette-badge--zero {
-    background: rgba(0, 0, 0, 0.2);
-    color: rgba(255, 255, 255, 0.5);
+    background: var(--fab-surface-raised);
+    color: var(--fab-text-subtle);
+    border-color: var(--fab-border);
   }
 </style>

@@ -16,7 +16,7 @@ export class SvelteCraftingApp extends SvelteApplicationMixin(
 
   static DEFAULT_OPTIONS = {
     id: 'fabricate-crafting',
-    classes: ['fabricate', 'crafting-app', 'fabricate-actor-app'],
+    classes: ['fabricate', 'crafting-app'],
     tag: 'div',
     window: {
       title: 'Crafting',

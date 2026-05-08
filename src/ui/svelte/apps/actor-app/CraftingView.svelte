@@ -1,17 +1,14 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  CraftingView is the V2 player-facing crafting tab. Replaces CraftingTab.svelte.
+  CraftingView is the V2 player-facing crafting tab. Two full-height columns:
+    LEFT (crafting-view__main): RunBands (collapsible, paginated), Salvage band
+      (when entries exist), ShoppingList (collapsible), search/filter toolbar,
+      RecipeTable, recipe-table Pagination.
+    RIGHT (crafting-view__inspector): SelectedRecipeInspector — dominates the
+      vertical space and dispatches between simple/complex variants.
 
-  Layout:
-    RunBands (crafting-filtered)
-    Salvage band (when entries exist)
-    ShoppingList band (existing component)
-    Toolbar (search + filters)
-    Recipe table + Selected recipe inspector (side-by-side at normal widths)
-    Pagination footer
-
-  The selected-recipe inspector dispatches between simple and complex variants
-  based on classification (currently always simple — Slice 3 adds complex).
+  At narrow container widths the two-column grid collapses to a single column
+  via @container actor-app queries.
 
   Teaser/secrecy: prepared recipes already mask hidden fields. The table and
   inspector render only what was provided, never raw recipe internals.
@@ -52,6 +49,12 @@
   const craftingPageIndex = store.craftingPageIndex;
   // svelte-ignore state_referenced_locally
   const pageSize = store.pageSize;
+  // svelte-ignore state_referenced_locally
+  const runBandsExpanded = store.runBandsExpanded;
+  // svelte-ignore state_referenced_locally
+  const activeRunPageIndex = store.activeRunPageIndex;
+  // svelte-ignore state_referenced_locally
+  const historyPageIndex = store.historyPageIndex;
 
   function handleShowRunDetails(runId, scope) {
     renderDialog({
@@ -88,74 +91,6 @@
 </script>
 
 <div class="crafting-view fabricate-actor-app--crafting" data-testid="crafting-view">
-  <RunBands
-    activeRuns={$craftingRuns ?? $viewState.activeRuns}
-    runHistory={$craftingRunHistory ?? $viewState.runHistory}
-    hasCraftingActor={$viewState.hasCraftingActor}
-    onCraft={store.craft}
-    onShowRunDetails={handleShowRunDetails}
-    onRestartRun={store.restartRun}
-    onCancelRun={store.cancelRun}
-    onCancelSalvageRun={store.cancelSalvageRun}
-  />
-
-  {#if $viewState.salvageEntries?.length > 0}
-    <section class="crafting-view__salvage-band">
-      <h4>{localize('FABRICATE.Salvage.Title')}</h4>
-      <ul class="run-list">
-        {#each $viewState.salvageEntries as entry (`salvage-${entry.systemId}-${entry.id}`)}
-          <li class="run-row">
-            <strong>{entry.name}</strong>
-            <span class="badge">{entry.statusLabel}</span>
-            <span class="hint">
-              {entry.systemName} • {localize('FABRICATE.Salvage.AvailableCount')
-                .replace('{have}', String(entry.quantityAvailable))
-                .replace('{need}', String(entry.quantityRequired))}
-            </span>
-            <span class="run-row-actions">
-              <button
-                type="button"
-                class="details-btn"
-                disabled={!entry.allowSalvageAction}
-                onclick={() => store.salvage(entry.systemId, entry.id)}
-                title={localize('FABRICATE.Salvage.Start')}
-              >
-                {entry.buttonLabel}
-              </button>
-            </span>
-          </li>
-        {/each}
-      </ul>
-    </section>
-  {/if}
-
-  <ShoppingListPanel
-    shoppingListData={$viewState.shoppingListData}
-    shoppingListEntries={enrichedShoppingEntries}
-    expanded={$shoppingListExpanded}
-    onToggleExpanded={store.toggleShoppingListExpanded}
-    onRemoveRecipe={store.removeFromShoppingList}
-    onSetQuantity={store.setShoppingListQuantity}
-    onClearAll={store.clearShoppingList}
-  />
-
-  <header class="crafting-view__toolbar">
-    <SearchBar
-      value={$searchTerm}
-      onSearch={store.setSearch}
-      placeholder={localize('FABRICATE.Search.Placeholder')}
-    />
-    <FilterBar
-      showCraftableOnly={$showOnlyAvailable}
-      onToggleCraftable={store.toggleAvailable}
-      showFavouritesOnly={$showFavouritesOnly}
-      onToggleFavourites={store.toggleFavouritesOnly}
-      categories={$viewState.categories}
-      selectedCategory={$selectedCategory}
-      onCategoryChange={store.setCategory}
-    />
-  </header>
-
   {#if !$viewState.hasComponentSources}
     <div class="crafting-view__empty">
       <i class="fas fa-info-circle" aria-hidden="true"></i>
@@ -164,6 +99,80 @@
   {:else}
     <div class="crafting-view__body">
       <div class="crafting-view__main">
+        <RunBands
+          activeRuns={$craftingRuns ?? $viewState.activeRuns}
+          runHistory={$craftingRunHistory ?? $viewState.runHistory}
+          hasCraftingActor={$viewState.hasCraftingActor}
+          expanded={$runBandsExpanded}
+          activeRunPageIndex={$activeRunPageIndex}
+          historyPageIndex={$historyPageIndex}
+          onToggleExpanded={store.toggleRunBandsExpanded}
+          onActiveRunPageChange={store.setActiveRunPageIndex}
+          onHistoryPageChange={store.setHistoryPageIndex}
+          onCraft={store.craft}
+          onShowRunDetails={handleShowRunDetails}
+          onRestartRun={store.restartRun}
+          onCancelRun={store.cancelRun}
+          onCancelSalvageRun={store.cancelSalvageRun}
+        />
+
+        {#if $viewState.salvageEntries?.length > 0}
+          <section class="crafting-view__salvage-band">
+            <h4>{localize('FABRICATE.Salvage.Title')}</h4>
+            <ul class="run-list">
+              {#each $viewState.salvageEntries as entry (`salvage-${entry.systemId}-${entry.id}`)}
+                <li class="run-row">
+                  <strong>{entry.name}</strong>
+                  <span class="badge">{entry.statusLabel}</span>
+                  <span class="hint">
+                    {entry.systemName} • {localize('FABRICATE.Salvage.AvailableCount')
+                      .replace('{have}', String(entry.quantityAvailable))
+                      .replace('{need}', String(entry.quantityRequired))}
+                  </span>
+                  <span class="run-row-actions">
+                    <button
+                      type="button"
+                      class="details-btn"
+                      disabled={!entry.allowSalvageAction}
+                      onclick={() => store.salvage(entry.systemId, entry.id)}
+                      title={localize('FABRICATE.Salvage.Start')}
+                    >
+                      {entry.buttonLabel}
+                    </button>
+                  </span>
+                </li>
+              {/each}
+            </ul>
+          </section>
+        {/if}
+
+        <ShoppingListPanel
+          shoppingListData={$viewState.shoppingListData}
+          shoppingListEntries={enrichedShoppingEntries}
+          expanded={$shoppingListExpanded}
+          onToggleExpanded={store.toggleShoppingListExpanded}
+          onRemoveRecipe={store.removeFromShoppingList}
+          onSetQuantity={store.setShoppingListQuantity}
+          onClearAll={store.clearShoppingList}
+        />
+
+        <header class="crafting-view__toolbar">
+          <SearchBar
+            value={$searchTerm}
+            onSearch={store.setSearch}
+            placeholder={localize('FABRICATE.Search.Placeholder')}
+          />
+          <FilterBar
+            showCraftableOnly={$showOnlyAvailable}
+            onToggleCraftable={store.toggleAvailable}
+            showFavouritesOnly={$showFavouritesOnly}
+            onToggleFavourites={store.toggleFavouritesOnly}
+            categories={$viewState.categories}
+            selectedCategory={$selectedCategory}
+            onCategoryChange={store.setCategory}
+          />
+        </header>
+
         <RecipeTable
           recipes={pagedRecipes}
           selectedRecipeId={$selectedRecipeInspector?.id ?? null}
@@ -180,16 +189,18 @@
           onPageSizeChange={(size) => store.setPageSize(size)}
         />
       </div>
-      <SelectedRecipeInspector
-        recipe={$selectedRecipeInspector}
-        onCraft={store.craft}
-        onAddToShoppingList={store.addToShoppingList}
-        onToggleFavourite={store.toggleFavourite}
-        onShowDetails={handleShowDetails}
-        onLearnRecipe={store.learnRecipe}
-        onRestartRun={store.restartRun}
-        onSelectPath={store.selectPath}
-      />
+      <div class="crafting-view__inspector">
+        <SelectedRecipeInspector
+          recipe={$selectedRecipeInspector}
+          onCraft={store.craft}
+          onAddToShoppingList={store.addToShoppingList}
+          onToggleFavourite={store.toggleFavourite}
+          onShowDetails={handleShowDetails}
+          onLearnRecipe={store.learnRecipe}
+          onRestartRun={store.restartRun}
+          onSelectPath={store.selectPath}
+        />
+      </div>
     </div>
   {/if}
 </div>
@@ -254,11 +265,30 @@
     gap: var(--fab-space-2);
     min-width: 0;
     overflow-y: auto;
+    padding-right: var(--fab-space-1);
+  }
+
+  .crafting-view__inspector {
+    align-self: stretch;
+    overflow-y: auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .crafting-view__inspector > :global(.simple-inspector),
+  .crafting-view__inspector > :global(.complex-inspector) {
+    flex: 1;
+    min-height: 0;
   }
 
   @container actor-app (max-width: 1180px) {
     .crafting-view__body {
       grid-template-columns: 1fr;
+    }
+
+    .crafting-view__inspector {
+      align-self: auto;
     }
   }
 </style>

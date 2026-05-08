@@ -1047,6 +1047,8 @@ export function createCraftingStore(services) {
   const selectedRecipeInspector = writable(null);
   const craftingPageIndex = writable(0);
   const historyPageIndex = writable(0);
+  const activeRunPageIndex = writable(0);
+  const runBandsExpanded = writable(true);
   const pageSize = writable(10);
 
   // --- Selected path per complex recipe (Slice 3: actor-crafting-app-v2) ---
@@ -1293,6 +1295,14 @@ export function createCraftingStore(services) {
 
   function setHistoryPageIndex(index) {
     historyPageIndex.set(Math.max(0, index | 0));
+  }
+
+  function setActiveRunPageIndex(index) {
+    activeRunPageIndex.set(Math.max(0, index | 0));
+  }
+
+  function toggleRunBandsExpanded() {
+    runBandsExpanded.update(v => !v);
   }
 
   function setPageSize(size) {
@@ -2077,9 +2087,13 @@ export function createCraftingStore(services) {
     selectRecipe,
     craftingPageIndex,
     historyPageIndex,
+    activeRunPageIndex,
+    runBandsExpanded,
     pageSize,
     setCraftingPageIndex,
     setHistoryPageIndex,
+    setActiveRunPageIndex,
+    toggleRunBandsExpanded,
     setPageSize,
     // Slice 3 (actor-crafting-app-v2): Per-recipe path selection
     selectedPathByRecipeId,

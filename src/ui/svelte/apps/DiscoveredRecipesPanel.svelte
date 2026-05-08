@@ -136,10 +136,10 @@
 
   .alchemy-discovered-title {
     margin: 0 0 2px 0;
-    font-size: 13px;
+    font-size: 11px;
     font-weight: 700;
     text-transform: uppercase;
-    opacity: 0.7;
+    color: var(--fab-text-subtle);
     letter-spacing: 0.04em;
   }
 
@@ -156,14 +156,26 @@
   }
 
   .alchemy-discovered-search {
-    height: 28px;
+    height: var(--fab-v2-control-height);
     font-size: 13px;
-    border-radius: 4px;
-    padding: 0 6px;
+    border-radius: var(--fab-v2-radius-control);
+    padding: 0 var(--fab-space-2);
     width: 100%;
     box-sizing: border-box;
-    border: 1px solid rgba(0, 0, 0, 0.3);
-    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--fab-border);
+    background: var(--fab-surface-raised);
+    color: var(--fab-text);
+  }
+
+  .alchemy-discovered-search::placeholder {
+    color: var(--fab-text-subtle);
+  }
+
+  .alchemy-discovered-search:focus,
+  .alchemy-discovered-search:focus-visible {
+    outline: 2px solid var(--fab-accent);
+    outline-offset: 2px;
+    border-color: var(--fab-accent);
   }
 
   .alchemy-discovered-list {
@@ -174,13 +186,14 @@
   .alchemy-discovered-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 8px;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    gap: var(--fab-space-2);
+    padding: 6px var(--fab-space-2);
+    border-bottom: 1px solid var(--fab-border);
+    color: var(--fab-text);
   }
 
   .alchemy-discovered-row:hover {
-    background: rgba(0, 0, 0, 0.06);
+    background: var(--fab-surface-raised);
   }
 
   .alchemy-discovered-row[role="button"] {
@@ -218,41 +231,52 @@
   }
 
   .alchemy-discovered-badge {
-    font-size: 12px;
-    padding: 1px 5px;
-    border-radius: 3px;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--fab-border);
     flex-shrink: 0;
     font-weight: 600;
   }
 
   .alchemy-discovered-badge.available {
-    background: rgba(40, 160, 80, 0.15);
-    color: #1e7a3c;
+    background: var(--fab-accent-soft);
+    color: var(--fab-accent);
+    border-color: var(--fab-accent);
   }
 
   .alchemy-discovered-badge.missing {
-    background: rgba(0, 0, 0, 0.06);
-    color: rgba(0, 0, 0, 0.45);
+    background: var(--fab-warning-soft);
+    color: var(--fab-warning);
+    border-color: var(--fab-warning);
   }
 
   .alchemy-autofill-btn {
-    width: 32px;
-    height: 32px;
+    width: var(--fab-v2-icon-button);
+    height: var(--fab-v2-icon-button);
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 4px;
-    border: 1px solid rgba(0, 0, 0, 0.15);
-    background: rgba(0, 0, 0, 0.04);
+    border-radius: var(--fab-v2-radius-control);
+    border: 1px solid var(--fab-border);
+    background: transparent;
+    color: var(--fab-text-muted);
     cursor: pointer;
     flex-shrink: 0;
     font-size: 13px;
     padding: 0;
   }
 
+  .alchemy-autofill-btn:hover:not(:disabled),
+  .alchemy-autofill-btn:focus-visible {
+    border-color: var(--fab-border-strong);
+    color: var(--fab-text);
+    background: var(--fab-surface-raised);
+  }
+
   .alchemy-autofill-btn:disabled {
-    opacity: 0.3;
-    cursor: default;
+    opacity: 0.45;
+    cursor: not-allowed;
   }
 
   .alchemy-discovered-empty {
@@ -260,9 +284,10 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    padding: 24px 12px;
+    gap: var(--fab-space-1);
+    padding: var(--fab-space-6) var(--fab-space-3);
     text-align: center;
+    color: var(--fab-text-subtle);
   }
 
   .alchemy-discovered-empty i {
@@ -273,7 +298,7 @@
   .alchemy-discovered-empty-msg,
   .alchemy-discovered-empty-hint {
     font-size: 12px;
-    opacity: 0.5;
+    color: var(--fab-text-subtle);
     margin: 0;
     text-align: center;
   }

@@ -57,6 +57,13 @@
     if (environmentPage < 1) environmentPage = 1;
   });
 
+  $effect(() => {
+    const firstEnvironment = visibleEnvironments[0] || null;
+    if (!activeEnvironment && firstEnvironment?.id) {
+      store.selectEnvironment(firstEnvironment.id);
+    }
+  });
+
   function actorImage(actor) {
     return actor?.img || 'icons/svg/mystery-man.svg';
   }

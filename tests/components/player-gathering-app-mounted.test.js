@@ -236,10 +236,10 @@ describe('player Gathering V2 app mounted behavior', () => {
     await store.refresh();
 
     await waitForText('Sunbloom Meadows');
-    assert.ok(target.textContent.includes('Select an environment to view its gathering tasks.'));
-    assert.ok(target.textContent.includes('Select an environment to view its details.'));
+    await waitForText('Harvest Wild Herbs');
+    assert.equal(target.textContent.includes('Select an environment to view its gathering tasks.'), false);
+    assert.equal(target.textContent.includes('Select an environment to view its details.'), false);
     assert.ok(target.textContent.includes('Showing 1-2 of 2 environments'));
-    assert.equal(target.textContent.includes('Harvest Wild Herbs'), false);
 
     const sunbloomInitial = Array.from(target.querySelectorAll('.gathering-v2-environment-row'))
       .find(button => button.textContent.includes('Sunbloom Meadows'));

@@ -49,6 +49,12 @@
   const alchemyRuns = store.alchemyRuns;
   // svelte-ignore state_referenced_locally
   const alchemyRunHistory = store.alchemyRunHistory;
+  // svelte-ignore state_referenced_locally
+  const runBandsExpanded = store.runBandsExpanded;
+  // svelte-ignore state_referenced_locally
+  const activeRunPageIndex = store.activeRunPageIndex;
+  // svelte-ignore state_referenced_locally
+  const historyPageIndex = store.historyPageIndex;
 
   let filteredPalette = $derived.by(() => {
     let entries = $palette;
@@ -72,6 +78,12 @@
     activeRuns={$alchemyRuns ?? $viewState.activeRuns}
     runHistory={$alchemyRunHistory ?? $viewState.runHistory}
     hasCraftingActor={$viewState.hasCraftingActor}
+    expanded={$runBandsExpanded}
+    activeRunPageIndex={$activeRunPageIndex}
+    historyPageIndex={$historyPageIndex}
+    onToggleExpanded={store.toggleRunBandsExpanded}
+    onActiveRunPageChange={store.setActiveRunPageIndex}
+    onHistoryPageChange={store.setHistoryPageIndex}
     onCraft={store.craft}
     onShowRunDetails={null}
     onRestartRun={store.restartRun}
