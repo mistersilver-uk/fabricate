@@ -21,5 +21,6 @@ Output:
 - Sections updated.
 - Major additions or changed conclusions.
 - PR status for any committed report changes.
+- Use PR description H2 sections in this order when opening or updating a PR: Description, Benefit(s), Changes in this PR, Testing, Screenshots (if applicable).
 - Stale items that still need verification.
 """

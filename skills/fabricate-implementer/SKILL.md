@@ -79,6 +79,20 @@ Use Conventional Commits in this form:
 
 Validate with `npx commitlint` before pushing.
 
+Use this PR description template:
+
+```md
+## Description
+
+## Benefit(s)
+
+## Changes in this PR
+
+## Testing
+
+## Screenshots (if applicable)
+```
+
 ## Expected output
 
 Provide:

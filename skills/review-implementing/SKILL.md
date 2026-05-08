@@ -21,6 +21,20 @@ Systematically process and implement changes based on code review feedback.
 
 Before changing files, verify the current branch is not `main`; create or switch to the PR branch that received feedback. Commit fixes to that same branch, push it, and update the existing PR unless the user explicitly asks for a replacement PR.
 
+When updating the PR description, preserve or add these H2 sections in order:
+
+```md
+## Description
+
+## Benefit(s)
+
+## Changes in this PR
+
+## Testing
+
+## Screenshots (if applicable)
+```
+
 ### 1. Parse Reviewer Notes
 
 Identify individual feedback items:

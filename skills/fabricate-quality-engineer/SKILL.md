@@ -47,6 +47,22 @@ Keep this skill aligned with the `fabricate_quality_engineer` custom Codex agent
 - `medium`: significant incorrect behavior or confusing state
 - `low`: non-blocking reliability issue or maintainability risk
 
+## PR description template
+
+When opening or updating a PR, use these H2 sections in order:
+
+```md
+## Description
+
+## Benefit(s)
+
+## Changes in this PR
+
+## Testing
+
+## Screenshots (if applicable)
+```
+
 ## Expected output
 
 Provide:

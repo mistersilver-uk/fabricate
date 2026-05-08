@@ -66,6 +66,22 @@ The orchestrator drives a `plan → plan-review → implement → review → doc
 - If `gh` is unavailable or unauthenticated, record the block in the active change folder instead of guessing issue state.
 - In Default collaboration mode, do not stop for extra user input unless the task is genuinely blocked.
 
+## PR description template
+
+When opening or updating a PR, use these H2 sections in order:
+
+```md
+## Description
+
+## Benefit(s)
+
+## Changes in this PR
+
+## Testing
+
+## Screenshots (if applicable)
+```
+
 ## Expected output
 
 Provide:

@@ -53,6 +53,22 @@ Check:
 - Name the screenshot file, viewport/window size, and concrete pass/fail criteria when giving screenshot feedback.
 - Do not implement production UI changes unless the user explicitly switches to implementation work.
 
+## PR description template
+
+When opening or updating a PR, use these H2 sections in order:
+
+```md
+## Description
+
+## Benefit(s)
+
+## Changes in this PR
+
+## Testing
+
+## Screenshots (if applicable)
+```
+
 ## Expected output
 
 Lead with the highest-impact findings or recommendations, then provide:

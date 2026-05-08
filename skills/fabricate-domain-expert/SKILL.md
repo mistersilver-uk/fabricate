@@ -61,6 +61,22 @@ Check for:
 - Do not implement production features from this skill.
 - If `gh` is unavailable, produce issue-ready backlog notes instead of skipping them.
 
+## PR description template
+
+When opening or updating a PR, use these H2 sections in order:
+
+```md
+## Description
+
+## Benefit(s)
+
+## Changes in this PR
+
+## Testing
+
+## Screenshots (if applicable)
+```
+
 ## Expected output
 
 First line is the verdict for the active duty:

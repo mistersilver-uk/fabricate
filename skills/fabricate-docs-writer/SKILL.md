@@ -47,6 +47,22 @@ You may update:
 
 Do not run `npm test` or `npm run build` from this skill unless the user explicitly asks. Those gates belong to implementation.
 
+## PR description template
+
+When opening or updating a PR, use these H2 sections in order:
+
+```md
+## Description
+
+## Benefit(s)
+
+## Changes in this PR
+
+## Testing
+
+## Screenshots (if applicable)
+```
+
 ## Expected output
 
 First line is the verdict: `DOCS APPROVED` or `DOCS NEEDS_CHANGES` (use `DOCS NEEDS_CHANGES` when the paired domain-expert output or the diff still requires changes).

@@ -43,6 +43,22 @@ Maintain these sections:
 - monetization landscape and model evaluation
 - content pack opportunities and recommended strategy
 
+## PR description template
+
+When opening or updating a PR, use these H2 sections in order:
+
+```md
+## Description
+
+## Benefit(s)
+
+## Changes in this PR
+
+## Testing
+
+## Screenshots (if applicable)
+```
+
 ## Expected output
 
 Provide:

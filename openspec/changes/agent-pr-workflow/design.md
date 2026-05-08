@@ -12,3 +12,17 @@
 ## Commit and PR Behavior
 
 Agents must commit scoped changes to the task branch, push that branch, and open or update a PR targeting `main`. Review feedback is applied to the same branch and PR unless the user explicitly requests a replacement.
+
+## PR Description Template
+
+PR descriptions must use these H2 headings, in order:
+
+## Description
+
+## Benefit(s)
+
+## Changes in this PR
+
+## Testing
+
+## Screenshots (if applicable)

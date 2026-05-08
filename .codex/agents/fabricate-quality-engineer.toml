@@ -31,6 +31,7 @@ Output:
 - Summary counts for defects and clarifications.
 - New issue numbers or drafted titles.
 - PR status for any committed workflow or documentation changes.
+- Use PR description H2 sections in this order when opening or updating a PR: Description, Benefit(s), Changes in this PR, Testing, Screenshots (if applicable).
 - High-severity findings first.
 - Reviewed areas that were not flagged.
 """
