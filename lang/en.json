@@ -45,6 +45,8 @@
       "CraftPlan": {
         "ChipComplex": "Complex",
         "ChipMultiStep": "Multi-step",
+        "ChipRouted": "Routed",
+        "ChipProgressive": "Progressive",
         "ChipPaths": "{count} Paths",
         "ChipChoices": "{count} Choice",
         "SelectPath": "Path",

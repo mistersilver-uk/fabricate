@@ -215,6 +215,40 @@ describe('Slice 3 store: complex recipe craftPlan derivation', () => {
     assert.equal(c.isMultiStep, true);
     assert.equal(c.pathCount, 1);
     assert.equal(c.choiceCount, 1, 'one OR group with 2 options should count as 1 choice');
+    assert.equal(c.isRouted, false, 'no outcomeRouting set → isRouted false');
+    assert.equal(c.isProgressive, false, 'isVariable not set → isProgressive false');
+  });
+
+  it('flags isRouted when recipe declares outcomeRouting', async () => {
+    const opt = makeIngredientOption('o1', 'iron', 1);
+    const path = makeIngredientSet('p1', 'Path', [makeIngredientGroup('g1', [opt])]);
+    const recipe = makeComplexRecipe('rrouted', 'Routed', [path], {
+      outcomeRouting: { provider: 'ingredientSet' }
+    });
+    const sys = { id: 'sys-1', name: 's', enabled: true, resolutionMode: 'simple', components: [], features: { essences: false } };
+    const services = makeServices({ recipes: [recipe], systems: [sys], actors: [makeActor('a', 'A', ['iron'])] });
+    const store = createCraftingStore(services);
+    await store.refresh();
+
+    const c = get(store.selectedRecipeInspector).classification;
+    assert.equal(c.isRouted, true, 'classification.isRouted must reflect outcomeRouting presence');
+    assert.equal(c.isProgressive, false);
+  });
+
+  it('flags isProgressive when recipe.isVariable is true', async () => {
+    const opt = makeIngredientOption('o1', 'iron', 1);
+    const path = makeIngredientSet('p1', 'Path', [makeIngredientGroup('g1', [opt])]);
+    const recipe = makeComplexRecipe('rprog', 'Progressive', [path], {
+      isVariable: true
+    });
+    const sys = { id: 'sys-1', name: 's', enabled: true, resolutionMode: 'simple', components: [], features: { essences: false } };
+    const services = makeServices({ recipes: [recipe], systems: [sys], actors: [makeActor('a', 'A', ['iron'])] });
+    const store = createCraftingStore(services);
+    await store.refresh();
+
+    const c = get(store.selectedRecipeInspector).classification;
+    assert.equal(c.isProgressive, true);
+    assert.equal(c.isRouted, false);
   });
 
   it('marks unsatisfiable paths and missing source allocation when no items match', async () => {

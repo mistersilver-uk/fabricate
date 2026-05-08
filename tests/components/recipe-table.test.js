@@ -85,3 +85,10 @@ test('RecipeTable: chip wrapper uses tone-aware modifier classes', () => {
   assert.ok(source.includes('recipe-table__chip--complex'), 'Complex chip must use the purple-tone modifier');
   assert.ok(source.includes('recipe-table__chip--info'), 'Multi-step / Paths / Choices chips must use the info-tone modifier');
 });
+
+test('RecipeTable: row renders Routed and Progressive chips based on classification', () => {
+  assert.ok(source.includes('recipe.classification?.isRouted'), 'must check classification.isRouted');
+  assert.ok(source.includes('recipe.classification?.isProgressive'), 'must check classification.isProgressive');
+  assert.ok(source.includes('FABRICATE.ActorApp.CraftPlan.ChipRouted'));
+  assert.ok(source.includes('FABRICATE.ActorApp.CraftPlan.ChipProgressive'));
+});

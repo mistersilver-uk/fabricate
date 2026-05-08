@@ -764,7 +764,7 @@ function _evaluateDiscoveredCraftability(recipe, systemComponents, palette, sour
 
 function _buildComplexityClassification(recipe) {
   if (!recipe) {
-    return { isComplex: false, isMultiStep: false, pathCount: 1, choiceCount: 0 };
+    return { isComplex: false, isMultiStep: false, isRouted: false, isProgressive: false, pathCount: 1, choiceCount: 0 };
   }
   const isComplex = !recipe.isSimpleRecipe();
   const isMultiStep = Array.isArray(recipe.steps) && recipe.steps.length > 0;
@@ -774,7 +774,11 @@ function _buildComplexityClassification(recipe) {
   const firstSet = recipe.ingredientSets?.[0];
   const groups = Array.isArray(firstSet?.ingredientGroups) ? firstSet.ingredientGroups : [];
   const choiceCount = groups.filter(g => Array.isArray(g.options) && g.options.length > 1).length;
-  return { isComplex, isMultiStep, pathCount, choiceCount };
+  // Routed = recipe declares an outcomeRouting contract (mapping / macro / roll-table provider).
+  // Progressive = recipe declares variable / quality-variable output.
+  const isRouted = recipe.outcomeRouting !== null && typeof recipe.outcomeRouting === 'object';
+  const isProgressive = recipe.isVariable === true;
+  return { isComplex, isMultiStep, isRouted, isProgressive, pathCount, choiceCount };
 }
 
 /**

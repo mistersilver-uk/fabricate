@@ -1,8 +1,9 @@
 <!-- Svelte 5 runes mode -->
 <!--
   ComplexityChips renders the chip strip describing why a recipe is complex:
-  Complex / Multi-step / N Paths / N Choice. Driven by the prepared
-  classification payload from craftingStore._buildComplexityClassification.
+  Complex / Multi-step / Routed / Progressive / N Paths / N Choice. Driven by
+  the prepared classification payload from
+  craftingStore._buildComplexityClassification.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
@@ -14,6 +15,12 @@
     const items = [{ id: 'complex', label: localize('FABRICATE.ActorApp.CraftPlan.ChipComplex'), tone: 'purple' }];
     if (classification.isMultiStep) {
       items.push({ id: 'multi-step', label: localize('FABRICATE.ActorApp.CraftPlan.ChipMultiStep'), tone: 'info' });
+    }
+    if (classification.isRouted) {
+      items.push({ id: 'routed', label: localize('FABRICATE.ActorApp.CraftPlan.ChipRouted'), tone: 'info' });
+    }
+    if (classification.isProgressive) {
+      items.push({ id: 'progressive', label: localize('FABRICATE.ActorApp.CraftPlan.ChipProgressive'), tone: 'purple' });
     }
     if ((classification.pathCount ?? 0) > 1) {
       items.push({

@@ -102,7 +102,7 @@
           <span class="recipe-table__status {statusToneClass(recipe)}">
             {recipe.statusLabel}
           </span>
-          {#if recipe.classification?.isComplex || recipe.classification?.isMultiStep || (recipe.classification?.pathCount ?? 0) > 1 || (recipe.classification?.choiceCount ?? 0) > 0}
+          {#if recipe.classification?.isComplex || recipe.classification?.isMultiStep || recipe.classification?.isRouted || recipe.classification?.isProgressive || (recipe.classification?.pathCount ?? 0) > 1 || (recipe.classification?.choiceCount ?? 0) > 0}
             <span class="recipe-table__chips">
               {#if recipe.classification?.isComplex}
                 <span class="recipe-table__chip recipe-table__chip--complex">
@@ -112,6 +112,16 @@
               {#if recipe.classification?.isMultiStep}
                 <span class="recipe-table__chip recipe-table__chip--info">
                   {localize('FABRICATE.ActorApp.CraftPlan.ChipMultiStep')}
+                </span>
+              {/if}
+              {#if recipe.classification?.isRouted}
+                <span class="recipe-table__chip recipe-table__chip--info">
+                  {localize('FABRICATE.ActorApp.CraftPlan.ChipRouted')}
+                </span>
+              {/if}
+              {#if recipe.classification?.isProgressive}
+                <span class="recipe-table__chip recipe-table__chip--complex">
+                  {localize('FABRICATE.ActorApp.CraftPlan.ChipProgressive')}
                 </span>
               {/if}
               {#if (recipe.classification?.pathCount ?? 0) > 1}

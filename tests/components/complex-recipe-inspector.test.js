@@ -70,6 +70,13 @@ test('ComplexityChips: returns empty when classification is not complex', () => 
   assert.ok(chipsSrc.includes('classification?.isComplex'));
 });
 
+test('ComplexityChips: renders Routed and Progressive chips driven by classification flags', () => {
+  assert.ok(chipsSrc.includes('classification.isRouted'), 'must check classification.isRouted');
+  assert.ok(chipsSrc.includes('classification.isProgressive'), 'must check classification.isProgressive');
+  assert.ok(chipsSrc.includes('FABRICATE.ActorApp.CraftPlan.ChipRouted'));
+  assert.ok(chipsSrc.includes('FABRICATE.ActorApp.CraftPlan.ChipProgressive'));
+});
+
 test('IngredientSetCard: renders AND-grouped options with read-only source allocation', () => {
   assert.ok(ingSrc.includes('FABRICATE.ActorApp.CraftPlan.OrChooseOne'));
   assert.ok(ingSrc.includes('option.satisfied'));
