@@ -7387,6 +7387,63 @@
   margin: 0;
 }
 
+.fabricate-manager-v2 .manager-v2-gathering-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: -2px 0 12px;
+  padding: 4px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.fabricate-manager-v2 .manager-v2-gathering-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--fab-mv2-text-muted);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.fabricate-manager-v2 .manager-v2-gathering-tab:not(.is-active):hover {
+  color: var(--fab-mv2-text);
+  border-color: var(--fab-mv2-border);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.fabricate-manager-v2 .manager-v2-gathering-tab.is-active {
+  color: var(--fab-mv2-text);
+  border-color: rgba(92, 184, 92, 0.48);
+  background: rgba(92, 184, 92, 0.16);
+}
+
+.fabricate-manager-v2 .manager-v2-gathering-tab:focus-visible {
+  outline: 2px solid rgba(92, 184, 92, 0.62);
+  outline-offset: 2px;
+}
+
+.fabricate-manager-v2 .manager-v2-gathering-panel {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-gathering-placeholder {
+  min-height: 280px;
+}
+
 .fabricate-manager-v2 .manager-v2-empty {
   display: grid;
   place-items: center;
@@ -7517,6 +7574,14 @@
     display: flex;
     flex-direction: column;
     overflow: visible;
+  }
+
+  .fabricate-manager-v2 .manager-v2-gathering-tabs {
+    align-items: stretch;
+  }
+
+  .fabricate-manager-v2 .manager-v2-gathering-tab {
+    flex: 1 1 140px;
   }
 
   .fabricate-manager-v2 .manager-v2-system-edit-main {

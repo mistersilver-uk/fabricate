@@ -132,6 +132,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(lang.FABRICATE.Admin.ManagerV2, 'English localization should define manager-v2 copy');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Title, 'Crafting systems');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Nav.Components, 'Components');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Nav.Environments, 'Gathering');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.OpenCurrentAdmin, 'Open current admin');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Breadcrumbs, 'Breadcrumbs');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.EditSystem, 'Edit system');
@@ -212,6 +213,10 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(!rootSource.includes("setView('systems')"), 'systems should not be exposed as a left-rail tab');
     assert.ok(!rootSource.includes('manager-v2-count-cluster'), 'system rows should not duplicate inspector counts inline');
     assert.ok(!rootSource.includes('FABRICATE.Admin.ManagerV2.QuickActions'), 'inspector should not duplicate row actions');
+    assert.ok(
+      !rootSource.replace(/\r\n/g, '\n').includes("{:else}\n        <button type=\"button\" class=\"manager-v2-button\" onclick={importSystem}>\n          <i class=\"fas fa-file-import\" aria-hidden=\"true\"></i>\n          <span>{text('FABRICATE.Admin.ManagerV2.Import', 'Import')}</span>\n        </button>\n        <button type=\"button\" class=\"manager-v2-button\" onclick={openCurrentAdmin}>"),
+      'system library header should not render the legacy admin launch button'
+    );
     assert.equal(lang.FABRICATE.Admin.ManagerV2.SystemLibraryHint, 'Select a row to view counts and enabled features.');
     assert.equal(
       lang.FABRICATE.Admin.ManagerV2.InspectorHint,
@@ -227,6 +232,17 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(rootSource.includes('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Title'), 'empty environments inspector should use localized setup copy');
     assert.ok(rootSource.includes('https://misterpotts.github.io/fabricate/gathering-environments/'), 'empty environments inspector should link to published gathering docs');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.EmptyTitle, 'No gathering environments yet');
+    assert.ok(environmentsBrowserSource.includes('manager-v2-gathering-tabs'), 'gathering page should render local section tabs');
+    assert.ok(environmentsBrowserSource.includes("activeGatheringTab = 'environments'"), 'gathering page should default and reset to environments');
+    assert.ok(environmentsBrowserSource.includes('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksPlaceholderHint'), 'gathering placeholder copy should be localized');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Label, 'Gathering sections');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Environments, 'Environments');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Tasks, 'Tasks');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Encounters, 'Encounters');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Settings, 'Settings');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksPlaceholderHint, 'Reusable gathering task management is planned for a later slice.');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.EncountersPlaceholderHint, 'Encounter and hazard authoring is planned for a later slice.');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderHint, 'Gathering-wide configuration is planned for a later slice.');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Title, 'Set up environments');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.EmptySetup.GatheringDocs, 'Gathering docs');
     assert.ok(rootSource.includes('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.Title'), 'empty recipes inspector should use localized setup copy');
