@@ -23,14 +23,16 @@ You may update:
 ## Workflow
 
 1. Read the diff first.
-2. Read the changed source files before writing docs.
-3. Read the corresponding docs pages.
-4. Read the latest `DOMAIN.md` and canonical-spec updates from `fabricate_domain_expert` so JSDoc and Jekyll content stay consistent with domain language.
-5. Update only documentation that matches real behavior.
-6. Keep quick-start content canonical in `docs/quickstart.md`.
-7. Review the domain expert's output for terminology accuracy and example fidelity, then emit `DOCS APPROVED` or `DOCS NEEDS_CHANGES` with concrete findings.
-8. Iterate with the domain expert until both emit `DOCS APPROVED`, capped at 3 revisions before escalating to the orchestrator.
-9. Report exactly what changed and what could not be documented confidently.
+2. Verify the current branch is not `main`; create or switch to the task branch before editing docs.
+3. Read the changed source files before writing docs.
+4. Read the corresponding docs pages.
+5. Read the latest `DOMAIN.md` and canonical-spec updates from `fabricate_domain_expert` so JSDoc and Jekyll content stay consistent with domain language.
+6. Update only documentation that matches real behavior.
+7. Keep quick-start content canonical in `docs/quickstart.md`.
+8. Review the domain expert's output for terminology accuracy and example fidelity, then emit `DOCS APPROVED` or `DOCS NEEDS_CHANGES` with concrete findings.
+9. Iterate with the domain expert until both emit `DOCS APPROVED`, capped at 3 revisions before escalating to the orchestrator.
+10. Commit owned docs changes to the task branch, push it, and open or update the PR targeting `main` when this role owns the final docs change.
+11. Report exactly what changed, PR status when changed, and what could not be documented confidently.
 
 ## Documentation rules
 
@@ -44,6 +46,24 @@ You may update:
 ## Validation rule
 
 Do not run `npm test` or `npm run build` from this skill unless the user explicitly asks. Those gates belong to implementation.
+
+## PR description template
+
+PR titles must comply with Conventional Commits. For `feat`, `fix`, and `perf`, use `<type>(#<issue>): <short description>` when a GitHub issue exists.
+
+When opening or updating a PR, use these H2 sections in order:
+
+```md
+## Description
+
+## Benefit(s)
+
+## Changes in this PR
+
+## Testing
+
+## Screenshots (if applicable)
+```
 
 ## Expected output
 

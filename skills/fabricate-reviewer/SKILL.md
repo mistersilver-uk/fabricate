@@ -18,14 +18,17 @@ Keep this skill aligned with the `fabricate_reviewer` custom Codex agent.
 ## Review workflow
 
 1. Review the diff with a findings-first mindset.
-2. Check correctness, regression risk, and missing edge cases.
-3. Check whether the structure keeps dependencies explicit, constructors boring, and responsibilities cohesive when JavaScript boundaries changed.
-4. Check test quality and whether coverage matches the risk.
-5. Verify Foundry compatibility assumptions for touched APIs.
-6. For UI changes, verify screenshots are evaluated against acceptance criteria, not just generated.
-7. Check durable product behavior is documented in canonical specs or active design docs, not only in tests, agent prompts, or conversation history.
-8. Run `npm test` and `npm run build` if validation is missing, stale, or suspicious.
-9. Return one gate status on the first line:
+2. Review the active branch and PR against `main`; do not commit, push, or merge from this skill.
+3. Check the PR title complies with Conventional Commits, including the GitHub issue number for `feat`, `fix`, and `perf` when an issue exists.
+4. Check the PR description uses H2 sections in this order: `Description`, `Benefit(s)`, `Changes in this PR`, `Testing`, and `Screenshots (if applicable)`.
+5. Check correctness, regression risk, and missing edge cases.
+6. Check whether the structure keeps dependencies explicit, constructors boring, and responsibilities cohesive when JavaScript boundaries changed.
+7. Check test quality and whether coverage matches the risk.
+8. Verify Foundry compatibility assumptions for touched APIs.
+9. For UI changes, verify screenshots are evaluated against acceptance criteria, not just generated.
+10. Check durable product behavior is documented in canonical specs or active design docs, not only in tests, agent prompts, or conversation history.
+11. Run `npm test` and `npm run build` if validation is missing, stale, or suspicious.
+12. Return one gate status on the first line:
    - `APPROVED`
    - `NEEDS_CHANGES`
    - `BLOCKED`

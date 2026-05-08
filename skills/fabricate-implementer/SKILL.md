@@ -19,18 +19,20 @@ Keep this skill aligned with the `fabricate_implementer` custom Codex agent.
 ## Workflow
 
 1. Read the active change folder before touching code.
-2. Confirm the task scope and keep changes limited to that task.
-3. Add or adjust tests first when practical.
-4. Load `javascript-structural-design` when the change reshapes dependencies, constructors, module boundaries, or test seams.
-5. Load `javascript-mastery` when the change depends on non-trivial JavaScript behavior or language edge cases.
-6. Implement the minimum change that satisfies the plan.
-7. For UI changes, inspect the rendered outcome against the planned criteria before handoff; do not treat screenshot creation alone as validation.
-8. If implementation reveals a durable product rule, update the relevant canonical spec or active change design doc.
-9. Run validation gates after each logical change set:
+2. Verify the current branch is not `main`; create or switch to the task branch before editing.
+3. Confirm the task scope and keep changes limited to that task.
+4. Add or adjust tests first when practical.
+5. Load `javascript-structural-design` when the change reshapes dependencies, constructors, module boundaries, or test seams.
+6. Load `javascript-mastery` when the change depends on non-trivial JavaScript behavior or language edge cases.
+7. Implement the minimum change that satisfies the plan.
+8. For UI changes, inspect the rendered outcome against the planned criteria before handoff; do not treat screenshot creation alone as validation.
+9. If implementation reveals a durable product rule, update the relevant canonical spec or active change design doc.
+10. Run validation gates after each logical change set:
    - `npm test`
    - `npm run build`
-10. If either gate fails, fix the problem and rerun both gates.
-11. Summarize the changed files, validation results, screenshot artifacts, and any follow-up work.
+11. If either gate fails, fix the problem and rerun both gates.
+12. Commit to the task branch, push it, and open or update the PR targeting `main`.
+13. Summarize the changed files, validation results, screenshot artifacts, PR status, and any follow-up work.
 
 ## Implementation rules
 
@@ -67,13 +69,31 @@ When the task touches Foundry APIs, verify these cases:
 - Preserve `flags.core.sourceId` when embedded items must map back to source items.
 - Use `CraftingSystemManager.getSystems()` and `getItems(systemId)`.
 
-## Commit rule
+## Branch, commit, and PR rule
 
-If the user asks for a commit, use Conventional Commits in this form:
+Implementation work must be committed to a non-`main` task branch and delivered through a PR targeting `main`. Apply review feedback by updating the same branch and PR unless the user explicitly asks for a replacement.
+
+Use Conventional Commits in this form:
 
 `<type>(#<issue>): <short description>`
 
+Use a Conventional Commits-compliant PR title. For `feat`, `fix`, and `perf`, use the same `<type>(#<issue>): <short description>` format when a GitHub issue exists.
+
 Validate with `npx commitlint` before pushing.
+
+Use this PR description template:
+
+```md
+## Description
+
+## Benefit(s)
+
+## Changes in this PR
+
+## Testing
+
+## Screenshots (if applicable)
+```
 
 ## Expected output
 
@@ -81,4 +101,5 @@ Provide:
 
 - changed file list
 - test and build status
+- PR link or status
 - known limitations or deferred follow-ups
