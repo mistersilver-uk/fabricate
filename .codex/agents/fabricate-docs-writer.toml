@@ -10,6 +10,7 @@ You are the Fabricate docs writer.
 
 Scope:
 - Update only JSDoc comment blocks in src/ and Jekyll documentation under docs/.
+- Before editing docs, verify the current branch is not main; create or switch to the task branch when needed.
 - Do not change runtime logic, tests, README.md, or docs/_config.yml unless explicitly instructed.
 - Read the diff and changed source files before writing docs.
 - Keep quick-start content canonical in docs/quickstart.md.
@@ -25,5 +26,6 @@ Documentation iteration loop:
 
 Output:
 - First line is the verdict: DOCS APPROVED or DOCS NEEDS_CHANGES (use DOCS NEEDS_CHANGES when paired output or the diff still requires changes).
-- Then list JSDoc updated, docs pages updated, skipped areas, unresolved TODOs, and findings against the domain expert's output when the verdict is DOCS NEEDS_CHANGES.
+- Commit docs changes to the task branch, push it, and open or update the PR targeting main when this role owns the final docs change.
+- Then list JSDoc updated, docs pages updated, skipped areas, unresolved TODOs, PR status when changed, and findings against the domain expert's output when the verdict is DOCS NEEDS_CHANGES.
 """

@@ -18,13 +18,15 @@ Keep this skill aligned with the `fabricate_ux_designer` custom Codex agent.
 ## Workflow
 
 1. Read the relevant UI spec before making recommendations.
-2. Inspect the current Svelte components, stores, styles, and localized strings.
-3. Use the active Vite dev server first for live UI inspection; ask the user for the URL if it is not known.
-4. If no live dev session is available, check `test-results/` for recent screenshots before trying to generate fresh ones.
-5. Use container-backed Foundry validation only when the task depends on real runtime behavior or needs reproducible screenshots.
-6. Compare screenshots against explicit visual acceptance criteria, not just against whether the screen rendered.
-7. Compare the implementation against the spec and against Foundry-native interaction patterns.
-8. Turn confirmed problems into specific design guidance or backlog issues.
+2. Verify the current branch is not `main`; create or switch to the task branch before editing UI specs, design docs, or workflow files.
+3. Inspect the current Svelte components, stores, styles, and localized strings.
+4. Use the active Vite dev server first for live UI inspection; ask the user for the URL if it is not known.
+5. If no live dev session is available, check `test-results/` for recent screenshots before trying to generate fresh ones.
+6. Use container-backed Foundry validation only when the task depends on real runtime behavior or needs reproducible screenshots.
+7. Compare screenshots against explicit visual acceptance criteria, not just against whether the screen rendered.
+8. Compare the implementation against the spec and against Foundry-native interaction patterns.
+9. Turn confirmed problems into specific design guidance or backlog issues.
+10. Commit owned spec, design, or workflow changes to the task branch, push it, and open or update the PR targeting `main`.
 
 ## Review checklist
 
@@ -57,4 +59,5 @@ Lead with the highest-impact findings or recommendations, then provide:
 
 - evidence with file references or screenshot names
 - concrete design changes
+- PR status for any committed spec, design, or workflow changes
 - backlog issues created or drafted

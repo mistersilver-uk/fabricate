@@ -25,6 +25,35 @@ Non-trivial changes MUST be planned in a dedicated change folder under `openspec
 - **WHEN** work is non-trivial or spans multiple files, validations, or decisions
 - **THEN** the implementer creates or updates `proposal.md`, `design.md`, and `tasks.md` in `openspec/changes/<change>/`
 
+### Requirement: Branch and PR workflow
+
+All mutating agent work MUST happen on a non-`main` branch and be delivered through a PR targeting `main`.
+
+#### Scenario: starting mutable work
+
+- **WHEN** an agent will edit implementation, documentation, specs, prompts, skills, or workflow files
+- **THEN** it verifies the current branch first
+- **AND** if the branch is `main`, it creates or switches to a task branch before editing
+
+#### Scenario: finishing mutable work
+
+- **WHEN** an agent completes a scoped change
+- **THEN** it commits the change to the task branch
+- **AND** pushes the branch
+- **AND** opens or updates a PR targeting `main`
+
+#### Scenario: responding to review feedback
+
+- **WHEN** a reviewer requests changes on a PR
+- **THEN** the implementing agent updates the same branch and PR
+- **AND** it does not open a replacement PR unless the user explicitly asks
+
+#### Scenario: read-only review work
+
+- **WHEN** a review-only agent evaluates work
+- **THEN** it reviews the active branch and PR against `main`
+- **AND** it must not commit, push, or merge
+
 ### Requirement: Shared skill source
 
 Shared reusable skills MUST live under the repository `skills/` directory.

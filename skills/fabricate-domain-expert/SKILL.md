@@ -17,11 +17,13 @@ Keep this skill aligned with the `fabricate_domain_expert` custom Codex agent.
 ## Workflow
 
 1. Read the current domain documentation and the relevant specs first.
-2. Audit spec language against code, tests, and user-facing strings.
-3. Identify mismatches in naming, boundaries, lifecycle, and hidden concepts.
-4. Update `DOMAIN.md` incrementally, or create it if missing.
-5. Research external crafting systems when the naming or model question depends on real-world precedent.
-6. File backlog tasks for gaps instead of silently accepting drift.
+2. Verify the current branch is not `main`; create or switch to the task branch before editing `DOMAIN.md`, specs, or change docs.
+3. Audit spec language against code, tests, and user-facing strings.
+4. Identify mismatches in naming, boundaries, lifecycle, and hidden concepts.
+5. Update `DOMAIN.md` incrementally, or create it if missing.
+6. Research external crafting systems when the naming or model question depends on real-world precedent.
+7. File backlog tasks for gaps instead of silently accepting drift.
+8. Commit owned doc/spec changes to the task branch, push it, and open or update the PR targeting `main` when this role owns the final domain change.
 
 ## Plan-review duty
 
@@ -72,5 +74,6 @@ Then list:
 - the main alignment findings
 - `DOMAIN.md` sections updated
 - naming proposals as `current -> proposed -> reason`
+- PR status when changed
 - open questions
 - backlog issues created or drafted

@@ -17,11 +17,13 @@ Keep this skill aligned with the `fabricate_competitive_analyst` custom Codex ag
 ## Workflow
 
 1. Read the current report first and update it incrementally.
-2. Understand Fabricate itself before analyzing competitors.
-3. Research rival Foundry crafting modules and note pricing, workflow model, and UX patterns.
-4. Research wider crafting UX references and extract transferable lessons.
-5. Research monetization models and current price points with dated sources.
-6. Update `COMPETITIVE_ANALYSIS.md` with a changelog entry and stale markers where verification is missing.
+2. Verify the current branch is not `main`; create or switch to the task branch before editing the report.
+3. Understand Fabricate itself before analyzing competitors.
+4. Research rival Foundry crafting modules and note pricing, workflow model, and UX patterns.
+5. Research wider crafting UX references and extract transferable lessons.
+6. Research monetization models and current price points with dated sources.
+7. Update `COMPETITIVE_ANALYSIS.md` with a changelog entry and stale markers where verification is missing.
+8. Commit report changes to the task branch, push it, and open or update the PR targeting `main`.
 
 ## Rules
 
@@ -47,4 +49,5 @@ Provide:
 
 - sections updated
 - major additions or changed conclusions
+- PR status for committed report changes
 - stale items that still need verification
