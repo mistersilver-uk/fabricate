@@ -123,7 +123,7 @@ describe('Recipe editor theme layout contract', () => {
 });
 
 describe('Recipe editor shared control CSS', () => {
-  it('defines shared input, button, and accent styling for the recipe editor', () => {
+  it('defines shared input, button, and accent styling for the recipe editor on --fab-* tokens', () => {
     assert.match(
       css,
       /\.fabricate-recipe-editor :is\(input:not\(\[type="checkbox"\]\):not\(\[type="radio"\]\), select, textarea\) \{/s
@@ -133,10 +133,18 @@ describe('Recipe editor shared control CSS', () => {
       css,
       /\.fabricate-recipe-editor button:not\(\.validation-error-link\):not\(\.icon-button\) \{/s
     );
-    assert.ok(css.includes('accent-color: var(--fabricate-editor-accent, #4a90e2);'));
+    assert.ok(
+      css.includes('accent-color: var(--fab-accent);'),
+      'recipe editor checkbox/radio accent must use --fab-accent'
+    );
     assert.match(
       css,
-      /box-shadow:\s+0 0 0 1px var\(--fabricate-editor-accent, #4a90e2\),/s
+      /box-shadow:\s+0 0 0 1px var\(--fab-accent\),/s,
+      'recipe editor focus ring must use --fab-accent'
+    );
+    assert.ok(
+      !css.includes('--fabricate-editor-'),
+      'legacy --fabricate-editor-* token namespace must be fully migrated'
     );
   });
 
@@ -151,11 +159,13 @@ describe('Recipe editor shared control CSS', () => {
     );
     assert.match(
       css,
-      /\.fabricate-recipe-editor select option,[\s\S]*?background: var\(--fabricate-editor-menu-bg, #171b26\);/
+      /\.fabricate-recipe-editor select option,[\s\S]*?background: var\(--fab-bg-3\);/,
+      'recipe editor select option chrome must use --fab-bg-3 surface'
     );
     assert.match(
       css,
-      /\.fabricate-recipe-editor select option:checked,[\s\S]*?background: var\(--fabricate-editor-menu-selected, #5a88bb\);/
+      /\.fabricate-recipe-editor select option:checked,[\s\S]*?background: var\(--fab-accent\);/,
+      'selected option must highlight on --fab-accent'
     );
   });
 });

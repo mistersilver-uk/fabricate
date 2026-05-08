@@ -1141,9 +1141,9 @@
 }
 
 .fabricate-admin .essence-source-selector-shell.drop-active .essence-source-trigger {
-  border-color: var(--fabricate-primary);
-  background: rgba(74, 144, 226, 0.12);
-  box-shadow: 0 0 0 1px rgba(74, 144, 226, 0.25);
+  border-color: var(--fab-accent);
+  background: var(--fab-accent-soft);
+  box-shadow: 0 0 0 1px var(--fab-accent);
 }
 
 .fabricate-admin .essence-source-trigger-image {
@@ -1230,27 +1230,36 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 8px;
+  gap: var(--fab-space-1);
+  padding: var(--fab-space-2);
   min-width: 0;
   min-height: 88px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--fab-border);
+  border-radius: var(--fab-v2-radius-panel);
+  background: var(--fab-surface-soft);
+  color: var(--fab-text);
   text-align: center;
+  cursor: pointer;
+}
+
+.fabricate-admin .essence-source-picker-option:hover,
+.fabricate-admin .essence-source-picker-option:focus-visible {
+  border-color: var(--fab-border-strong);
+  background: var(--fab-surface-raised);
 }
 
 .fabricate-admin .essence-source-picker-option.selected {
-  border-color: var(--fabricate-primary);
-  background: rgba(74, 144, 226, 0.18);
+  border-color: var(--fab-accent);
+  background: var(--fab-accent-soft);
+  color: var(--fab-accent);
 }
 
 .fabricate-admin .essence-source-picker-option img {
   width: 48px;
   height: 48px;
   object-fit: contain;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.08);
+  border-radius: var(--fab-v2-radius-panel);
+  background: var(--fab-surface-raised);
 }
 
 .fabricate-admin .essence-source-picker-option span {
@@ -1776,20 +1785,22 @@
   flex: 0 0 auto;
   min-width: 0;
   min-height: 226px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.12);
-  padding: 8px;
+  border: 1px solid var(--fab-border);
+  border-radius: var(--fab-v2-radius-panel);
+  background: var(--fab-surface-soft);
+  color: var(--fab-text);
+  padding: var(--fab-space-2);
 }
 
 .fabricate-admin .environment-card.active {
-  border-color: rgba(120, 160, 255, 0.7);
-  box-shadow: 0 0 0 1px rgba(120, 160, 255, 0.2);
+  border-color: var(--fab-accent);
+  box-shadow: 0 0 0 1px var(--fab-accent-soft);
 }
 
 .fabricate-admin .environment-card.is-disabled {
-  border-color: rgba(255, 255, 255, 0.09);
-  background: rgba(0, 0, 0, 0.18);
+  border-color: var(--fab-border);
+  background: var(--fab-surface-raised);
+  opacity: 0.65;
 }
 
 .fabricate-admin .environment-card-image-action,
@@ -1816,8 +1827,8 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.06);
+  border-radius: var(--fab-v2-radius-panel);
+  background: var(--fab-surface-raised);
 }
 
 .fabricate-admin .environment-card-image-action {
@@ -1868,18 +1879,18 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: rgba(120, 160, 255, 0.18);
+  background: var(--fab-accent-soft);
 }
 
 .fabricate-admin .environment-card-name-action:focus-visible .environment-name {
-  color: #d7e2ff;
+  color: var(--fab-accent);
   text-decoration: underline;
   text-decoration-thickness: 2px;
   text-underline-offset: 3px;
 }
 
 .fabricate-admin .environment-card-name-action:focus-visible .environment-summary {
-  color: rgba(215, 226, 255, 0.82);
+  color: var(--fab-accent);
 }
 
 .fabricate-admin .environment-select {
@@ -1913,7 +1924,7 @@
   display: block;
   max-width: 100%;
   overflow: hidden;
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--fab-text-muted);
   font-size: 0.8rem;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -2454,12 +2465,12 @@
 .fabricate-admin .environment-visibility-authoring,
 .fabricate-admin .environment-catalyst-authoring,
 .fabricate-admin .environment-result-authoring {
-  margin-top: 10px;
+  margin-top: var(--fab-space-2);
   min-width: 0;
-  padding: 8px 10px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.035);
+  padding: var(--fab-space-2) var(--fab-space-3) var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: var(--fab-v2-radius-panel);
+  background: var(--fab-surface-soft);
 }
 
 .fabricate-admin .environment-base-authoring > details,
@@ -2505,11 +2516,11 @@
 .fabricate-admin .environment-result-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--fab-space-2);
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--fab-border);
+  border-radius: var(--fab-v2-radius-panel);
+  background: var(--fab-surface);
   overflow: visible;
 }
 
@@ -2991,29 +3002,29 @@
   box-sizing: border-box;
   font: inherit;
   padding: 4px 10px;
-  border: 1px solid var(--fabricate-editor-border, rgba(255, 255, 255, 0.14));
-  border-radius: 7px;
-  background: var(--fabricate-editor-input-bg, rgba(255, 255, 255, 0.04));
-  color: var(--fabricate-editor-text, rgba(255, 243, 232, 0.92));
+  border: 1px solid var(--fab-border);
+  border-radius: var(--fab-v2-radius-control);
+  background: var(--fab-surface-raised);
+  color: var(--fab-text);
   transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
 }
 
 .fabricate-recipe-editor :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea):hover {
-  border-color: var(--fabricate-editor-border-strong, rgba(255, 255, 255, 0.24));
-  background: var(--fabricate-editor-input-bg-hover, rgba(255, 255, 255, 0.07));
+  border-color: var(--fab-border-strong);
+  background: var(--fab-surface-raised);
 }
 
 .fabricate-recipe-editor :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea):focus-visible {
   outline: none;
-  border-color: var(--fabricate-editor-accent, #4a90e2);
-  background: var(--fabricate-editor-input-bg-active, rgba(255, 255, 255, 0.1));
+  border-color: var(--fab-accent);
+  background: var(--fab-surface);
   box-shadow:
-          0 0 0 1px var(--fabricate-editor-accent, #4a90e2),
-          0 0 0 4px var(--fabricate-editor-accent-soft, rgba(74, 144, 226, 0.22));
+          0 0 0 1px var(--fab-accent),
+          0 0 0 4px var(--fab-accent-soft);
 }
 
 .fabricate-recipe-editor :is(input:not([type="checkbox"]):not([type="radio"]), textarea)::placeholder {
-  color: var(--fabricate-editor-placeholder, rgba(255, 231, 212, 0.42));
+  color: var(--fab-text-subtle);
 }
 
 .fabricate-recipe-editor select {
@@ -3022,8 +3033,8 @@
 
 .fabricate-recipe-editor select option,
 .fabricate-recipe-editor select optgroup {
-  background: var(--fabricate-editor-menu-bg, #171b26);
-  color: var(--fabricate-editor-text, rgba(255, 243, 232, 0.92));
+  background: var(--fab-bg-3);
+  color: var(--fab-text);
   line-height: 1.25;
 }
 
@@ -3035,43 +3046,41 @@
 .fabricate-recipe-editor select option:checked,
 .fabricate-recipe-editor select option:hover,
 .fabricate-recipe-editor select option:focus {
-  background: var(--fabricate-editor-menu-selected, #5a88bb);
-  color: #fff;
+  background: var(--fab-accent);
+  color: #051e0c;
 }
 
 .fabricate-recipe-editor :is(input[type="checkbox"], input[type="radio"]) {
-  accent-color: var(--fabricate-editor-accent, #4a90e2);
+  accent-color: var(--fab-accent);
 }
 
 .fabricate-recipe-editor button:not(.validation-error-link):not(.icon-button) {
-  color: inherit;
-  border: 1px solid var(--fabricate-editor-border, rgba(255, 255, 255, 0.14));
-  border-radius: 7px;
-  background: var(--fabricate-editor-surface-strong, rgba(0, 0, 0, 0.24));
-  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+  color: var(--fab-text);
+  border: 1px solid var(--fab-border);
+  border-radius: var(--fab-v2-radius-control);
+  background: var(--fab-surface-raised);
+  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 }
 
 .fabricate-recipe-editor button:not(.validation-error-link):not(.icon-button):hover:not(:disabled),
 .fabricate-recipe-editor button:not(.validation-error-link):not(.icon-button):focus-visible:not(:disabled) {
-  border-color: var(--fabricate-editor-border-strong, rgba(255, 255, 255, 0.24));
-  background: var(--fabricate-editor-input-bg-hover, rgba(255, 255, 255, 0.07));
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
-  transform: translateY(-1px);
+  border-color: var(--fab-border-strong);
+  background: var(--fab-surface);
 }
 
 .fabricate-recipe-editor button:not(.validation-error-link):not(.icon-button):focus-visible {
-  outline: none;
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
 }
 
 .fabricate-recipe-editor button:not(.validation-error-link):not(.icon-button):disabled {
   opacity: 0.5;
   cursor: not-allowed;
   box-shadow: none;
-  transform: none;
 }
 
 .btn-danger:hover {
-  color: var(--fabricate-danger);
+  color: var(--fab-danger);
 }
 
 
@@ -3209,11 +3218,11 @@
 
 .graph-edge.cycle-edge {
   stroke-dasharray: 6 3;
-  stroke: var(--fabricate-warning, #f0ad4e);
+  stroke: var(--fab-warning);
 }
 
 .graph-edge.cycle-edge + defs marker polygon {
-  fill: var(--fabricate-warning, #f0ad4e);
+  fill: var(--fab-warning);
 }
 
 .graph-node {
@@ -3222,12 +3231,13 @@
   height: 80px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  background: var(--color-bg-sheet, #fff);
-  border: 1px solid rgba(0, 0, 0, 0.2);
-  border-radius: 5px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2);
+  background: var(--fab-surface);
+  color: var(--fab-text);
+  border: 1px solid var(--fab-border);
+  border-radius: var(--fab-v2-radius-control);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
   cursor: pointer;
   text-align: left;
   font-size: 12px;
@@ -3236,8 +3246,8 @@
 }
 
 .graph-node:hover {
-  border-color: var(--fabricate-primary, #4a90e2);
-  box-shadow: 0 3px 8px rgba(74, 144, 226, 0.25);
+  border-color: var(--fab-accent);
+  box-shadow: 0 3px 8px var(--fab-accent-soft);
   transform: scale(1.03);
   z-index: 10;
 }
@@ -3248,7 +3258,7 @@
   min-width: 32px;
   object-fit: cover;
   border-radius: 3px;
-  border: 1px solid rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--fab-border);
 }
 
 .node-info {
@@ -3305,12 +3315,12 @@
   display: inline-block;
   width: 24px;
   height: 2px;
-  background: var(--color-border-dark, #888);
+  background: var(--fab-border-strong);
 }
 
 .legend-line.dashed {
   background: none;
-  border-top: 2px dashed var(--fabricate-warning, #f0ad4e);
+  border-top: 2px dashed var(--fab-warning);
 }
 
 .legend-stats {
@@ -3803,19 +3813,20 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: #999;
+  color: var(--fab-text-muted);
   padding: 2px 4px;
   font-size: 0.8rem;
 }
 
-.alchemy-remove-btn:hover {
-  color: var(--fabricate-danger, #dc3545);
+.alchemy-remove-btn:hover,
+.alchemy-remove-btn:focus-visible {
+  color: var(--fab-danger);
 }
 
 .alchemy-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--fab-space-1);
 }
 
 .alchemy-submit-btn {
@@ -3823,17 +3834,19 @@
 }
 
 .alchemy-clear-btn {
-  background: none;
-  border: 1px solid rgba(0, 0, 0, 0.15);
-  border-radius: 3px;
+  background: transparent;
+  border: 1px solid var(--fab-border);
+  border-radius: var(--fab-v2-radius-control);
   cursor: pointer;
   padding: 4px 8px;
-  color: #999;
+  color: var(--fab-text-muted);
 }
 
-.alchemy-clear-btn:hover {
-  color: var(--fabricate-danger, #dc3545);
-  border-color: var(--fabricate-danger, #dc3545);
+.alchemy-clear-btn:hover,
+.alchemy-clear-btn:focus-visible {
+  color: var(--fab-danger);
+  border-color: var(--fab-danger);
+  background: var(--fab-danger-soft);
 }
 
 /* ==========================================
@@ -4610,18 +4623,18 @@
 }
 
 .fabricate-manager-v2 {
-  --fab-mv2-bg: #101719;
-  --fab-mv2-surface-1: #162022;
-  --fab-mv2-surface-2: #1d292b;
-  --fab-mv2-surface-3: #243133;
-  --fab-mv2-border: rgba(255, 255, 255, 0.12);
-  --fab-mv2-border-strong: rgba(120, 190, 150, 0.38);
-  --fab-mv2-text: rgba(245, 248, 246, 0.92);
-  --fab-mv2-text-muted: rgba(245, 248, 246, 0.64);
-  --fab-mv2-accent: var(--fabricate-success);
-  --fab-mv2-info: var(--fabricate-primary);
-  --fab-mv2-warning: var(--fabricate-warning);
-  --fab-mv2-danger: var(--fabricate-danger);
+  --fab-mv2-bg: var(--fab-bg-1);
+  --fab-mv2-surface-1: var(--fab-bg-2);
+  --fab-mv2-surface-2: var(--fab-bg-3);
+  --fab-mv2-surface-3: var(--fab-surface-raised);
+  --fab-mv2-border: var(--fab-border);
+  --fab-mv2-border-strong: var(--fab-border-strong);
+  --fab-mv2-text: var(--fab-text);
+  --fab-mv2-text-muted: var(--fab-text-muted);
+  --fab-mv2-accent: var(--fab-accent);
+  --fab-mv2-info: var(--fab-info);
+  --fab-mv2-warning: var(--fab-warning);
+  --fab-mv2-danger: var(--fab-danger);
   position: relative;
   isolation: isolate;
   container-type: inline-size;

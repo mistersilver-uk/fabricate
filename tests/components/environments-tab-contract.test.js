@@ -710,8 +710,8 @@ describe('GM environments tab source contract', () => {
     );
     assert.match(
       styleSource,
-      /\.fabricate-admin \.environment-card-image-action:focus-visible::after\s*\{[^}]*background:\s*rgba\(120,\s*160,\s*255,\s*0\.18\);/s,
-      'keyboard focus on the image edit target should use a non-border tint overlay'
+      /\.fabricate-admin \.environment-card-image-action:focus-visible::after\s*\{[^}]*background:\s*var\(--fab-accent-soft\);/s,
+      'keyboard focus on the image edit target should use the V2 accent-soft tint overlay'
     );
     assert.match(
       styleSource,
