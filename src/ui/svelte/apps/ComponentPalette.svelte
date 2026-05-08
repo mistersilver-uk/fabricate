@@ -55,13 +55,12 @@
   {:else}
     {#each palette as component (component.componentId)}
       {@const isEmpty = component.availableQuantity === 0}
-      <div
+      <button
+        type="button"
         class="alchemy-palette-cell"
         class:alchemy-palette-cell--empty={isEmpty}
-        role="button"
         aria-label="{component.name} ({component.availableQuantity} {localize('FABRICATE.Alchemy.Palette.Available')})"
-        aria-disabled={isEmpty ? 'true' : undefined}
-        tabindex={isEmpty ? -1 : 0}
+        disabled={isEmpty}
         draggable={!isEmpty}
         onclick={() => onAddToWorkbench?.(component.componentId)}
         oncontextmenu={(e) => handleContextMenu(e, component)}
@@ -81,7 +80,7 @@
           >{component.availableQuantity}</span>
         </div>
         <span class="alchemy-palette-cell-name">{component.name}</span>
-      </div>
+      </button>
     {/each}
   {/if}
 </div>
@@ -128,6 +127,7 @@
     position: relative;
     min-height: 104px;
     user-select: none;
+    font: inherit;
   }
 
   .alchemy-palette-cell:hover,

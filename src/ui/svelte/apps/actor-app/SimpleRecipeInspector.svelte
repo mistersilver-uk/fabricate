@@ -148,6 +148,28 @@
       </section>
     {/if}
 
+    {#if recipe.timeAndCost}
+      <section class="simple-inspector__time-cost" data-testid="time-cost-card">
+        <h4 class="simple-inspector__heading">
+          {localize('FABRICATE.ActorApp.CraftPlan.TimeAndCost')}
+        </h4>
+        <dl class="simple-inspector__time-cost-list">
+          {#if recipe.timeAndCost.timeLabel}
+            <div class="simple-inspector__time-cost-row">
+              <dt><i class="fas fa-clock" aria-hidden="true"></i> {localize('FABRICATE.ActorApp.CraftPlan.TimeLabel')}</dt>
+              <dd>{recipe.timeAndCost.timeLabel}</dd>
+            </div>
+          {/if}
+          {#if recipe.timeAndCost.currencyLabel}
+            <div class="simple-inspector__time-cost-row">
+              <dt><i class="fas fa-coins" aria-hidden="true"></i> {localize('FABRICATE.ActorApp.CraftPlan.CoinCostLabel')}</dt>
+              <dd>{recipe.timeAndCost.currencyLabel}</dd>
+            </div>
+          {/if}
+        </dl>
+      </section>
+    {/if}
+
     <footer class="simple-inspector__actions">
       {#if recipe.canLearn}
         <button
@@ -368,6 +390,46 @@
     font-variant-numeric: tabular-nums;
     color: var(--fab-text-muted);
     font-size: 11px;
+  }
+
+  .simple-inspector__time-cost {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-1);
+    padding: var(--fab-space-2);
+    border-radius: var(--fab-v2-radius-control);
+    border: 1px solid var(--fab-border);
+    background: var(--fab-surface-soft);
+  }
+
+  .simple-inspector__time-cost-list {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-1);
+  }
+
+  .simple-inspector__time-cost-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--fab-space-2);
+    font-size: 13px;
+  }
+
+  .simple-inspector__time-cost-row dt {
+    margin: 0;
+    color: var(--fab-text-muted);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--fab-space-1);
+  }
+
+  .simple-inspector__time-cost-row dd {
+    margin: 0;
+    color: var(--fab-text);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
   }
 
   .simple-inspector__actions {

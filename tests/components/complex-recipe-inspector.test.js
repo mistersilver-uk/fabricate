@@ -112,3 +112,11 @@ test('SelectedRecipeInspector: dispatches based on classification.isComplex', ()
 test('SelectedRecipeInspector: forwards onSelectPath to ComplexRecipeInspector', () => {
   assert.ok(dispatcherSrc.includes('onSelectPath'));
 });
+
+test('ComplexRecipeInspector: renders Time & Cost card when recipe.timeAndCost is set', () => {
+  assert.ok(inspectorSrc.includes('FABRICATE.ActorApp.CraftPlan.TimeAndCost'));
+  assert.ok(inspectorSrc.includes('FABRICATE.ActorApp.CraftPlan.TimeLabel'));
+  assert.ok(inspectorSrc.includes('FABRICATE.ActorApp.CraftPlan.CoinCostLabel'));
+  assert.ok(inspectorSrc.includes('recipe.timeAndCost'), 'must gate the card on recipe.timeAndCost');
+  assert.ok(inspectorSrc.includes('data-testid="time-cost-card"'));
+});

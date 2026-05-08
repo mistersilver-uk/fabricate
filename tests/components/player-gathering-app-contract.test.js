@@ -74,6 +74,14 @@ describe('player gathering app source contract', () => {
     assert.ok(!storeSource.includes('globalThis.'));
   });
 
+  it('refreshes open gathering apps when global gathering conditions change', () => {
+    const appSource = source(appPath);
+
+    assert.ok(appSource.includes("Hooks.on('fabricate.gathering.conditionsUpdated'"));
+    assert.ok(appSource.includes("Hooks?.off?.('fabricate.gathering.conditionsUpdated'"));
+    assert.ok(appSource.includes('this._gatheringStore?.refresh?.()'));
+  });
+
   it('renders targeted task names but blind tasks through localized generic labels', () => {
     const rootSource = source(rootPath);
 

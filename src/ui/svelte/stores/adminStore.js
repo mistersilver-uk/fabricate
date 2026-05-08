@@ -1229,6 +1229,78 @@ export function createAdminStore(services) {
     return config.systems[id];
   }
 
+  function _environmentList() {
+    const store = _getEnvironmentStore();
+    const values = typeof store?.list === 'function' ? store.list() : [];
+    return Array.isArray(values) ? values.filter(Boolean) : [];
+  }
+
+  function _gatheringLibraryRecordMatchesEnvironment(record, environment, conditions, includeDanger = false) {
+    const environmentRegion = _normalizeGatheringTag(environment?.region);
+    const environmentBiomes = _normalizeGatheringTagList(environment?.biomes ?? environment?.biome);
+    const environmentDanger = _normalizeGatheringTagList(environment?.dangerTags ?? environment?.risk);
+    const recordBiomes = _normalizeGatheringTagList(record?.biomes);
+    const recordWeather = _normalizeGatheringTagList(record?.weather);
+    const recordTimeOfDay = _normalizeGatheringTagList(record?.timeOfDay);
+    const recordDanger = _normalizeGatheringTagList(record?.dangerTags);
+    if (record?.region && _normalizeGatheringTag(record.region) !== environmentRegion) return false;
+    if (recordBiomes.length > 0 && !recordBiomes.some(tag => environmentBiomes.includes(tag))) return false;
+    if (recordWeather.length > 0 && !recordWeather.includes(_normalizeGatheringTag(conditions?.weather))) return false;
+    if (recordTimeOfDay.length > 0 && !recordTimeOfDay.includes(_normalizeGatheringTag(conditions?.timeOfDay))) return false;
+    if (includeDanger && recordDanger.length > 0 && !recordDanger.some(tag => environmentDanger.includes(tag))) return false;
+    return true;
+  }
+
+  function _environmentAllowsGatheringLibraryRecord(environment, recordId, kind) {
+    const enabledKey = kind === 'hazard' ? 'enabledHazardIds' : 'enabledTaskIds';
+    const disabledKey = kind === 'hazard' ? 'disabledHazardIds' : 'disabledTaskIds';
+    const enabled = Array.isArray(environment?.[enabledKey]) ? environment[enabledKey].map(String) : [];
+    const disabled = Array.isArray(environment?.[disabledKey]) ? environment[disabledKey].map(String) : [];
+    if (disabled.includes(String(recordId))) return false;
+    return enabled.length === 0 || enabled.includes(String(recordId));
+  }
+
+  function _gatheringLibraryRecordUsages(config, systemId, record, kind) {
+    if (!record?.id) return [];
+    const enabledKey = kind === 'hazard' ? 'enabledHazardIds' : 'enabledTaskIds';
+    const disabledKey = kind === 'hazard' ? 'disabledHazardIds' : 'disabledTaskIds';
+    const includeDanger = kind === 'hazard';
+    const usages = [];
+    for (const environment of _environmentList()) {
+      if (String(environment?.craftingSystemId || '') !== String(systemId || '')) continue;
+      const enabled = Array.isArray(environment?.[enabledKey]) ? environment[enabledKey].map(String) : [];
+      const disabled = Array.isArray(environment?.[disabledKey]) ? environment[disabledKey].map(String) : [];
+      const explicitlyReferenced = enabled.includes(String(record.id)) || disabled.includes(String(record.id));
+      const matched = _gatheringLibraryRecordMatchesEnvironment(record, environment, config.conditions, includeDanger)
+        && _environmentAllowsGatheringLibraryRecord(environment, record.id, kind);
+      if (!explicitlyReferenced && !matched) continue;
+      usages.push({
+        id: String(environment.id || ''),
+        name: String(environment.name || environment.id || 'Unnamed environment'),
+        explicitlyReferenced,
+        matched
+      });
+    }
+    return usages;
+  }
+
+  async function _confirmGatheringLibraryRecordDelete({ config, systemId, record, kind }) {
+    const usages = _gatheringLibraryRecordUsages(config, systemId, record, kind);
+    if (usages.length === 0) return true;
+    const label = kind === 'hazard' ? 'hazard' : 'task';
+    const usageList = usages
+      .slice(0, 6)
+      .map(usage => `<li>${_escapeHtml(usage.name)}</li>`)
+      .join('');
+    const overflow = usages.length > 6 ? `<li>${_escapeHtml(`and ${usages.length - 6} more`)}</li>` : '';
+    return await services.confirmDialog?.({
+      title: `Delete reusable gathering ${label}?`,
+      content: `<p>Delete reusable gathering ${label} <strong>${_escapeHtml(record?.name || record?.id || label)}</strong>?</p><p>This ${label} is currently used by ${usages.length} environment(s):</p><ul>${usageList}${overflow}</ul>`,
+      yes: () => true,
+      no: () => false
+    }) === true;
+  }
+
   function _resolveEnvironmentTaskSelection(draft, preferredTaskId = '') {
     const tasks = Array.isArray(draft?.tasks) ? draft.tasks : [];
     if (preferredTaskId && tasks.some(task => task.id === preferredTaskId)) {
@@ -2853,6 +2925,8 @@ export function createAdminStore(services) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !taskId) return false;
+    const task = systemConfig.tasks.find(task => task.id === taskId);
+    if (task && !await _confirmGatheringLibraryRecordDelete({ config, systemId, record: task, kind: 'task' })) return false;
     systemConfig.tasks = systemConfig.tasks.filter(task => task.id !== taskId);
     await _saveGatheringConfig(config);
     await refresh();
@@ -2891,6 +2965,8 @@ export function createAdminStore(services) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !hazardId) return false;
+    const hazard = systemConfig.hazards.find(hazard => hazard.id === hazardId);
+    if (hazard && !await _confirmGatheringLibraryRecordDelete({ config, systemId, record: hazard, kind: 'hazard' })) return false;
     systemConfig.hazards = systemConfig.hazards.filter(hazard => hazard.id !== hazardId);
     await _saveGatheringConfig(config);
     await refresh();

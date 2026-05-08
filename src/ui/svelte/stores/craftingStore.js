@@ -555,6 +555,7 @@ function _buildPreparedRecipes(
         : 'Craft',
       canLearn,
       hasMultipleSets: recipe.ingredientSets.length > 1,
+      classification: _buildComplexityClassification(recipe),
       resultDescription: isTeaser && teaserHiddenFields.includes('results') ? 'FABRICATE.Teaser.HiddenResults' : recipe.getResultDescription(),
       ingredients: isTeaser && teaserHiddenFields.includes('ingredients') ? [] : (evaluation?.ingredientStates ?? []),
       essences: isTeaser && teaserHiddenFields.includes('essences') ? [] : (evaluation?.essenceStates ?? []),
@@ -770,6 +771,83 @@ function _buildComplexityClassification(recipe) {
   const groups = Array.isArray(firstSet?.ingredientGroups) ? firstSet.ingredientGroups : [];
   const choiceCount = groups.filter(g => Array.isArray(g.options) && g.options.length > 1).length;
   return { isComplex, isMultiStep, pathCount, choiceCount };
+}
+
+/**
+ * Aggregate time + currency cost for the recipe.
+ *
+ * For multi-step recipes the totals are summed across step.timeRequirement
+ * and step.currencyCost. The recipe-level currencyCost (used by simple
+ * recipes) is added on top.
+ *
+ * Returns null when the recipe declares neither a time nor a currency cost,
+ * so the inspector can skip the Time & Cost section entirely.
+ *
+ * @param {object} recipe
+ * @returns {{
+ *   timeLabel: string|null,
+ *   currencyLabel: string|null,
+ *   currencies: Array<{ abbreviation: string, amount: number }>|null
+ * } | null}
+ */
+function _buildTimeAndCostSummary(recipe) {
+  if (!recipe) return null;
+
+  const total = { minutes: 0, hours: 0, days: 0, months: 0, years: 0 };
+  let hasTime = false;
+  const currencyMap = new Map();
+
+  const steps = Array.isArray(recipe.steps) ? recipe.steps : [];
+  for (const step of steps) {
+    const tr = step?.timeRequirement;
+    if (tr && typeof tr === 'object') {
+      for (const unit of ['minutes', 'hours', 'days', 'months', 'years']) {
+        const value = Number(tr[unit] || 0) || 0;
+        if (value > 0) hasTime = true;
+        total[unit] += value;
+      }
+    }
+    const stepCurrencies = step?.currencyCost?.currencies;
+    if (Array.isArray(stepCurrencies)) {
+      for (const c of stepCurrencies) {
+        if (!c?.abbreviation || !(c.amount > 0)) continue;
+        currencyMap.set(c.abbreviation, (currencyMap.get(c.abbreviation) || 0) + c.amount);
+      }
+    }
+  }
+
+  const recipeCurrencies = recipe?.currencyCost?.currencies;
+  if (Array.isArray(recipeCurrencies)) {
+    for (const c of recipeCurrencies) {
+      if (!c?.abbreviation || !(c.amount > 0)) continue;
+      currencyMap.set(c.abbreviation, (currencyMap.get(c.abbreviation) || 0) + c.amount);
+    }
+  }
+
+  const hasCurrency = currencyMap.size > 0;
+  if (!hasTime && !hasCurrency) return null;
+
+  return {
+    timeLabel: hasTime ? _formatTimeLabel(total) : null,
+    currencies: hasCurrency
+      ? Array.from(currencyMap, ([abbreviation, amount]) => ({ abbreviation, amount }))
+      : null,
+    currencyLabel: hasCurrency ? _formatCurrencyLabel(currencyMap) : null
+  };
+}
+
+function _formatTimeLabel(time) {
+  const parts = [];
+  if (time.years > 0) parts.push(`${time.years}y`);
+  if (time.months > 0) parts.push(`${time.months}mo`);
+  if (time.days > 0) parts.push(`${time.days}d`);
+  if (time.hours > 0) parts.push(`${time.hours}h`);
+  if (time.minutes > 0) parts.push(`${time.minutes}m`);
+  return parts.join(' ');
+}
+
+function _formatCurrencyLabel(currencyMap) {
+  return Array.from(currencyMap, ([abbreviation, amount]) => `${amount} ${abbreviation}`).join(' · ');
 }
 
 /**
@@ -1258,6 +1336,7 @@ export function createCraftingStore(services) {
     const sourceActors = get(componentSourceActors);
     const isComplex = recipe ? !recipe.isSimpleRecipe() : false;
     const classification = _buildComplexityClassification(recipe);
+    const timeAndCost = _buildTimeAndCostSummary(recipe);
     let craftPlan = null;
     if (isComplex && recipe) {
       const pathsMap = get(selectedPathByRecipeId);
@@ -1270,7 +1349,8 @@ export function createCraftingStore(services) {
     selectedRecipeInspector.set({
       ...entry,
       classification,
-      craftPlan
+      craftPlan,
+      timeAndCost
     });
   }
 

@@ -52,3 +52,9 @@ test('SimpleRecipeInspector: scoped CSS uses --fab-* tokens', () => {
   assert.ok(scoped.includes('var(--fab-accent)'), 'must use --fab-accent for primary action');
   assert.ok(!scoped.includes('--fabricate-primary'), 'must not reference the legacy --fabricate-primary token');
 });
+
+test('SimpleRecipeInspector: renders Time & Cost card when recipe.timeAndCost is set', () => {
+  assert.ok(source.includes('recipe.timeAndCost'));
+  assert.ok(source.includes('FABRICATE.ActorApp.CraftPlan.TimeAndCost'));
+  assert.ok(source.includes('data-testid="time-cost-card"'));
+});

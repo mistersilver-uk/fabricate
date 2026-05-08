@@ -240,6 +240,64 @@ describe('Slice 3 store: complex recipe craftPlan derivation', () => {
     assert.equal(bMap.get('r1'), undefined, 'instance B must not share path selection');
   });
 
+  it('attaches a timeAndCost summary when the recipe declares time or currency cost', async () => {
+    const opt = makeIngredientOption('o1', 'iron', 1);
+    const path = makeIngredientSet('p1', 'Path A', [makeIngredientGroup('g1', [opt])]);
+    const recipe = makeComplexRecipe('rcost', 'Forged Blade', [path], {
+      steps: [
+        { id: 's1', name: 'Heat', timeRequirement: { minutes: 30, hours: 1, days: 0, months: 0, years: 0 }, currencyCost: { currencies: [{ abbreviation: 'gp', amount: 5 }] } },
+        { id: 's2', name: 'Forge', timeRequirement: { minutes: 0, hours: 1, days: 0, months: 0, years: 0 }, currencyCost: { currencies: [{ abbreviation: 'gp', amount: 7 }] } }
+      ]
+    });
+    recipe.currencyCost = null;
+    const sys = { id: 'sys-1', name: 's', enabled: true, resolutionMode: 'simple', components: [], features: { essences: false } };
+    const services = makeServices({ recipes: [recipe], systems: [sys], actors: [makeActor('a', 'A', ['iron'])] });
+    const store = createCraftingStore(services);
+    await store.refresh();
+
+    const inspector = get(store.selectedRecipeInspector);
+    assert.ok(inspector?.timeAndCost, 'timeAndCost should be attached');
+    assert.equal(inspector.timeAndCost.timeLabel, '2h 30m', 'time label should sum step time requirements');
+    assert.equal(inspector.timeAndCost.currencyLabel, '12 gp', 'currency label should sum step currency costs');
+    assert.deepEqual(inspector.timeAndCost.currencies, [{ abbreviation: 'gp', amount: 12 }]);
+  });
+
+  it('aggregates currencies across steps and recipe-level currencyCost', async () => {
+    const opt = makeIngredientOption('o1', 'iron', 1);
+    const path = makeIngredientSet('p1', 'Path A', [makeIngredientGroup('g1', [opt])]);
+    const recipe = makeComplexRecipe('rmulti', 'Multi', [path], {
+      steps: [
+        { id: 's1', name: 'Step', timeRequirement: null, currencyCost: { currencies: [{ abbreviation: 'gp', amount: 3 }, { abbreviation: 'sp', amount: 2 }] } }
+      ]
+    });
+    recipe.currencyCost = { currencies: [{ abbreviation: 'gp', amount: 4 }] };
+    const sys = { id: 'sys-1', name: 's', enabled: true, resolutionMode: 'simple', components: [], features: { essences: false } };
+    const services = makeServices({ recipes: [recipe], systems: [sys], actors: [makeActor('a', 'A', ['iron'])] });
+    const store = createCraftingStore(services);
+    await store.refresh();
+
+    const inspector = get(store.selectedRecipeInspector);
+    assert.ok(inspector?.timeAndCost?.currencies);
+    const gp = inspector.timeAndCost.currencies.find(c => c.abbreviation === 'gp');
+    const sp = inspector.timeAndCost.currencies.find(c => c.abbreviation === 'sp');
+    assert.equal(gp?.amount, 7, 'gp should aggregate step (3) + recipe (4)');
+    assert.equal(sp?.amount, 2, 'sp should come from the step alone');
+  });
+
+  it('returns null timeAndCost when neither time nor currency is declared', async () => {
+    const opt = makeIngredientOption('o1', 'iron', 1);
+    const path = makeIngredientSet('p1', 'Path A', [makeIngredientGroup('g1', [opt])]);
+    const recipe = makeComplexRecipe('rnone', 'Free Recipe', [path]);
+    recipe.currencyCost = null;
+    const sys = { id: 'sys-1', name: 's', enabled: true, resolutionMode: 'simple', components: [], features: { essences: false } };
+    const services = makeServices({ recipes: [recipe], systems: [sys], actors: [makeActor('a', 'A', ['iron'])] });
+    const store = createCraftingStore(services);
+    await store.refresh();
+
+    const inspector = get(store.selectedRecipeInspector);
+    assert.equal(inspector.timeAndCost, null, 'should be null when neither time nor cost is defined');
+  });
+
   it('simple recipes do not get a craftPlan payload', async () => {
     // A simple recipe (single set, single option per group, no catalysts, etc.)
     const opt = makeIngredientOption('o1', 'iron', 1);

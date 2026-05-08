@@ -19,12 +19,6 @@
     }
   }
 
-  function handleRowKey(event, recipeId) {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      handleRowClick(recipeId);
-    }
-  }
 </script>
 
 <div class="alchemy-discovered">
@@ -70,35 +64,38 @@
       </div>
     {:else}
       {#each recipes as recipe (recipe.id)}
-        <div
+        <article
           class="alchemy-discovered-row"
           class:alchemy-discovered-row--selected={selectedRecipeId === recipe.id}
           data-recipe-id={recipe.id}
-          role={onSelectRecipe ? 'button' : undefined}
-          tabindex={onSelectRecipe ? 0 : undefined}
-          aria-pressed={onSelectRecipe ? (selectedRecipeId === recipe.id) : undefined}
-          onclick={onSelectRecipe ? () => handleRowClick(recipe.id) : undefined}
-          onkeydown={onSelectRecipe ? (e) => handleRowKey(e, recipe.id) : undefined}
         >
-          <img
-            class="alchemy-discovered-img"
-            src={recipe.img || 'icons/svg/item-bag.svg'}
-            alt={recipe.name}
-            width="32"
-            height="32"
-          />
-
-          <span class="alchemy-discovered-name">{recipe.name}</span>
-
-          <span
-            class="alchemy-discovered-badge"
-            class:available={recipe.canCraft}
-            class:missing={!recipe.canCraft}
+          <button
+            type="button"
+            class="alchemy-discovered-select"
+            disabled={!onSelectRecipe}
+            aria-pressed={onSelectRecipe ? (selectedRecipeId === recipe.id) : undefined}
+            onclick={() => handleRowClick(recipe.id)}
           >
-            {recipe.canCraft
-              ? localize('FABRICATE.Alchemy.StatusAvailable')
-              : localize('FABRICATE.Alchemy.StatusMissing')}
-          </span>
+            <img
+              class="alchemy-discovered-img"
+              src={recipe.img || 'icons/svg/item-bag.svg'}
+              alt={recipe.name}
+              width="32"
+              height="32"
+            />
+
+            <span class="alchemy-discovered-name">{recipe.name}</span>
+
+            <span
+              class="alchemy-discovered-badge"
+              class:available={recipe.canCraft}
+              class:missing={!recipe.canCraft}
+            >
+              {recipe.canCraft
+                ? localize('FABRICATE.Alchemy.StatusAvailable')
+                : localize('FABRICATE.Alchemy.StatusMissing')}
+            </span>
+          </button>
 
           <button
             type="button"
@@ -110,7 +107,7 @@
           >
             <i class="fas fa-fill-drip"></i>
           </button>
-        </div>
+        </article>
       {/each}
     {/if}
   </div>
@@ -196,8 +193,23 @@
     background: var(--fab-surface-raised);
   }
 
-  .alchemy-discovered-row[role="button"] {
+  .alchemy-discovered-select {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-2);
+    border: 0;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    font: inherit;
+    padding: 0;
     cursor: pointer;
+  }
+
+  .alchemy-discovered-select:disabled {
+    cursor: default;
   }
 
   .alchemy-discovered-row--selected {
@@ -209,9 +221,9 @@
     background: var(--fab-accent-soft);
   }
 
-  .alchemy-discovered-row[role="button"]:focus-visible {
+  .alchemy-discovered-select:focus-visible {
     outline: 2px solid var(--fab-accent);
-    outline-offset: -2px;
+    outline-offset: 2px;
   }
 
   .alchemy-discovered-img {

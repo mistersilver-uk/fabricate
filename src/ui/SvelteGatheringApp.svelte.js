@@ -30,6 +30,7 @@ export class SvelteGatheringApp extends SvelteApplicationMixin(
 
   _gatheringStore = null;
   _services = null;
+  _conditionHook = null;
 
   static DEFAULT_OPTIONS = {
     id: 'fabricate-gathering',
@@ -83,6 +84,7 @@ export class SvelteGatheringApp extends SvelteApplicationMixin(
       const services = this._buildServices();
       this._gatheringStore = createGatheringStore(services);
       this._services = services;
+      this._registerConditionRefreshHook();
     }
 
     return {
@@ -92,12 +94,27 @@ export class SvelteGatheringApp extends SvelteApplicationMixin(
   }
 
   async close(options) {
+    this._unregisterConditionRefreshHook();
     if (this._gatheringStore) {
       this._gatheringStore.destroy();
       this._gatheringStore = null;
       this._services = null;
     }
     return super.close(options);
+  }
+
+  _registerConditionRefreshHook() {
+    if (this._conditionHook || !globalThis.Hooks?.on) return;
+    this._conditionHook = () => {
+      void this._gatheringStore?.refresh?.();
+    };
+    Hooks.on('fabricate.gathering.conditionsUpdated', this._conditionHook);
+  }
+
+  _unregisterConditionRefreshHook() {
+    if (!this._conditionHook) return;
+    globalThis.Hooks?.off?.('fabricate.gathering.conditionsUpdated', this._conditionHook);
+    this._conditionHook = null;
   }
 
   /**

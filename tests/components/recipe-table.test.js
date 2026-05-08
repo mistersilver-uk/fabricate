@@ -69,3 +69,19 @@ test('RecipeTable: primary craft button uses recipe.allowCraftAction gate', () =
   assert.ok(source.includes('disabled={!recipe.allowCraftAction}'));
   assert.ok(source.includes('recipe.craftButtonLabel'));
 });
+
+test('RecipeTable: row renders complexity chips when classification flags are set', () => {
+  assert.ok(source.includes('recipe.classification?.isComplex'), 'must check classification.isComplex');
+  assert.ok(source.includes('recipe.classification?.isMultiStep'), 'must check classification.isMultiStep');
+  assert.ok(source.includes('recipe.classification.pathCount'), 'must check classification.pathCount');
+  assert.ok(source.includes('recipe.classification.choiceCount'), 'must check classification.choiceCount');
+  assert.ok(source.includes('FABRICATE.ActorApp.CraftPlan.ChipComplex'));
+  assert.ok(source.includes('FABRICATE.ActorApp.CraftPlan.ChipMultiStep'));
+  assert.ok(source.includes('FABRICATE.ActorApp.CraftPlan.ChipPaths'));
+  assert.ok(source.includes('FABRICATE.ActorApp.CraftPlan.ChipChoices'));
+});
+
+test('RecipeTable: chip wrapper uses tone-aware modifier classes', () => {
+  assert.ok(source.includes('recipe-table__chip--complex'), 'Complex chip must use the purple-tone modifier');
+  assert.ok(source.includes('recipe-table__chip--info'), 'Multi-step / Paths / Choices chips must use the info-tone modifier');
+});

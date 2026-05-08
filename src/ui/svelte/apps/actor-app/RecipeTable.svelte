@@ -102,9 +102,28 @@
           <span class="recipe-table__status {statusToneClass(recipe)}">
             {recipe.statusLabel}
           </span>
-          {#if recipe.hasMultipleSets}
-            <span class="recipe-table__chip">
-              {localize('FABRICATE.RecipeCard.MultipleOptions')}
+          {#if recipe.classification?.isComplex || recipe.classification?.isMultiStep || (recipe.classification?.pathCount ?? 0) > 1 || (recipe.classification?.choiceCount ?? 0) > 0}
+            <span class="recipe-table__chips">
+              {#if recipe.classification?.isComplex}
+                <span class="recipe-table__chip recipe-table__chip--complex">
+                  {localize('FABRICATE.ActorApp.CraftPlan.ChipComplex')}
+                </span>
+              {/if}
+              {#if recipe.classification?.isMultiStep}
+                <span class="recipe-table__chip recipe-table__chip--info">
+                  {localize('FABRICATE.ActorApp.CraftPlan.ChipMultiStep')}
+                </span>
+              {/if}
+              {#if (recipe.classification?.pathCount ?? 0) > 1}
+                <span class="recipe-table__chip recipe-table__chip--info">
+                  {localize('FABRICATE.ActorApp.CraftPlan.ChipPaths').replace('{count}', String(recipe.classification.pathCount))}
+                </span>
+              {/if}
+              {#if (recipe.classification?.choiceCount ?? 0) > 0}
+                <span class="recipe-table__chip recipe-table__chip--info">
+                  {localize('FABRICATE.ActorApp.CraftPlan.ChipChoices').replace('{count}', String(recipe.classification.choiceCount))}
+                </span>
+              {/if}
             </span>
           {/if}
         </div>
@@ -304,12 +323,34 @@
     color: var(--fab-purple);
   }
 
+  .recipe-table__chips {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
   .recipe-table__chip {
-    font-size: 11px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
     color: var(--fab-text-subtle);
     background: var(--fab-surface-raised);
+    border: 1px solid var(--fab-border);
     padding: 1px 6px;
-    border-radius: 3px;
+    border-radius: 4px;
+  }
+
+  .recipe-table__chip--complex {
+    background: var(--fab-purple-soft);
+    color: var(--fab-purple);
+    border-color: var(--fab-purple);
+  }
+
+  .recipe-table__chip--info {
+    background: var(--fab-info-soft);
+    color: var(--fab-info);
+    border-color: var(--fab-info);
   }
 
   .recipe-table__cell--requirements {

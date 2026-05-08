@@ -1958,6 +1958,100 @@ describe('createAdminStore', () => {
       assert.equal(get(store.viewState).gatheringConfig.systems.sys1.hazards[0].dropRate, 30);
     });
 
+    it('requires confirmation before deleting reusable gathering records used by environments', async () => {
+      const confirmations = [];
+      const services = createMockServices({
+        confirmDialog: async (options) => {
+          confirmations.push(options);
+          return false;
+        },
+        getGatheringEnvironmentStore: () => ({
+          list: () => [{
+            id: 'env-used',
+            name: 'Used Grove',
+            craftingSystemId: 'sys1',
+            region: 'north',
+            biomes: ['forest'],
+            dangerTags: ['hazardous'],
+            enabledTaskIds: ['task-used'],
+            enabledHazardIds: ['hazard-used']
+          }]
+        })
+      });
+      services._store.gatheringConfig = {
+        conditions: { weather: 'clear', timeOfDay: 'day' },
+        vocabularies: {
+          regions: ['north'],
+          biomes: ['forest'],
+          danger: ['safe', 'hazardous'],
+          weather: ['clear'],
+          timeOfDay: ['day']
+        },
+        systems: {
+          sys1: {
+            tasks: [{ id: 'task-used', name: 'Used Task', region: 'north', biomes: ['forest'], dropRows: [] }],
+            hazards: [{ id: 'hazard-used', name: 'Used Hazard', dangerTags: ['hazardous'], region: 'north', biomes: ['forest'], dropRate: 25 }]
+          }
+        }
+      };
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      assert.equal(await store.deleteGatheringLibraryTask('sys1', 'task-used'), false);
+      assert.equal(await store.deleteGatheringLibraryHazard('sys1', 'hazard-used'), false);
+      assert.equal(confirmations.length, 2);
+      assert.ok(confirmations[0].content.includes('Used Grove'));
+      assert.ok(confirmations[1].content.includes('Used Grove'));
+      assert.equal(services._store.gatheringConfig.systems.sys1.tasks.length, 1);
+      assert.equal(services._store.gatheringConfig.systems.sys1.hazards.length, 1);
+    });
+
+    it('deletes reusable gathering records after used-record confirmation is accepted', async () => {
+      let confirmationCount = 0;
+      const services = createMockServices({
+        confirmDialog: async () => {
+          confirmationCount += 1;
+          return true;
+        },
+        getGatheringEnvironmentStore: () => ({
+          list: () => [{
+            id: 'env-used',
+            name: 'Used Grove',
+            craftingSystemId: 'sys1',
+            region: 'north',
+            biomes: ['forest'],
+            dangerTags: ['hazardous']
+          }]
+        })
+      });
+      services._store.gatheringConfig = {
+        conditions: { weather: 'clear', timeOfDay: 'day' },
+        vocabularies: {
+          regions: ['north'],
+          biomes: ['forest'],
+          danger: ['safe', 'hazardous'],
+          weather: ['clear'],
+          timeOfDay: ['day']
+        },
+        systems: {
+          sys1: {
+            tasks: [{ id: 'task-used', name: 'Used Task', region: 'north', biomes: ['forest'], dropRows: [] }],
+            hazards: [{ id: 'hazard-used', name: 'Used Hazard', dangerTags: ['hazardous'], region: 'north', biomes: ['forest'], dropRate: 25 }]
+          }
+        }
+      };
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      assert.equal(await store.deleteGatheringLibraryTask('sys1', 'task-used'), true);
+      assert.equal(await store.deleteGatheringLibraryHazard('sys1', 'hazard-used'), true);
+      assert.equal(confirmationCount, 2);
+      assert.equal(services._store.gatheringConfig.systems.sys1.tasks.length, 0);
+      assert.equal(services._store.gatheringConfig.systems.sys1.hazards.length, 0);
+    });
+
     it('viewState.selectedSystem.craftingCheck.outcomesText is comma-separated string from outcomes array', async () => {
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
