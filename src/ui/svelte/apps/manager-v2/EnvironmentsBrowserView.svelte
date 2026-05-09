@@ -332,12 +332,22 @@
           <div class="manager-v2-empty">
             <div>
               <i class="fas fa-seedling" aria-hidden="true"></i>
-              <h3>{text('FABRICATE.Admin.ManagerV2.Environment.EmptyTitle', 'No gathering environments yet')}</h3>
-              <p>{text('FABRICATE.Admin.ManagerV2.Environment.EmptyHint', 'Environments define where gathering happens, which scene or location they represent, what tasks players can attempt, and which results those tasks can produce.')}</p>
-              <button type="button" class="manager-v2-button is-primary" onclick={onCreateEnvironment}>
-                <i class="fas fa-plus" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Create', 'Create environment')}</span>
-              </button>
+              <h3>{text('FABRICATE.Admin.ManagerV2.Environment.EmptyTitle', 'Prepare gathering building blocks first')}</h3>
+              <p>{text('FABRICATE.Admin.ManagerV2.Environment.EmptyHint', 'Define reusable tasks and hazards before creating environments, then attach those building blocks to each location players can gather from.')}</p>
+              <div class="manager-v2-action-group">
+                <button type="button" class="manager-v2-button is-primary" onclick={onCreateEnvironment}>
+                  <i class="fas fa-plus" aria-hidden="true"></i>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Create', 'Create environment')}</span>
+                </button>
+                <button type="button" class="manager-v2-button" onclick={() => selectGatheringTab('tasks')}>
+                  <i class="fas fa-list-check" aria-hidden="true"></i>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.OpenTasks', 'Review tasks')}</span>
+                </button>
+                <button type="button" class="manager-v2-button" onclick={() => selectGatheringTab('encounters')}>
+                  <i class="fas fa-compass" aria-hidden="true"></i>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.OpenHazards', 'Review hazards')}</span>
+                </button>
+              </div>
             </div>
           </div>
         {:else if filteredEnvironments.length === 0}

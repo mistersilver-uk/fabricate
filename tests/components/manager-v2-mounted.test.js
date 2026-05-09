@@ -1830,12 +1830,48 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     flushSync();
 
     assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'environments');
-    assert.ok(target.textContent.includes('No gathering environments yet'));
-    assert.ok(target.textContent.includes('Environments define where gathering happens'));
-    assert.ok(target.textContent.includes('Set up environments'));
-    assert.ok(target.textContent.includes('Create an environment for a biome, room, region, or scene.'));
+    const gatheringTabs = Array.from(target.querySelectorAll('.manager-v2-gathering-tab'));
+    assert.deepEqual(
+      gatheringTabs.map(tab => tab.textContent.trim()),
+      ['Environments', 'Tasks', 'Encounters', 'Settings']
+    );
+    assert.equal(target.querySelector('#manager-v2-gathering-tab-environments').getAttribute('aria-selected'), 'true');
+    assert.ok(target.textContent.includes('Prepare gathering building blocks first'));
+    assert.ok(target.textContent.includes('Define reusable tasks and hazards before creating environments'));
+    assert.ok(target.textContent.includes('Review tasks'));
+    assert.ok(target.textContent.includes('Review hazards'));
+    assert.ok(target.textContent.includes('Plan gathering content'));
+    assert.ok(target.textContent.includes('Define reusable gathering tasks with their checks'));
+    assert.ok(target.textContent.includes('Prepare encounter and hazard options'));
+    assert.ok(target.textContent.includes('Create environments after the reusable task and hazard libraries are ready to attach.'));
     assert.ok(target.textContent.includes('Gathering docs'));
     assert.equal(target.textContent.includes('Select an environment'), false);
+
+    Array.from(target.querySelectorAll('.manager-v2-table-scroll .manager-v2-button'))
+      .find(button => button.textContent.includes('Review tasks'))
+      .click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('#manager-v2-gathering-tab-tasks').getAttribute('aria-selected'), 'true');
+    assert.ok(target.textContent.includes('Reusable gathering task management is planned for a later slice.'));
+
+    target.querySelector('#manager-v2-gathering-tab-environments').click();
+    await tick();
+    flushSync();
+
+    Array.from(target.querySelectorAll('.manager-v2-table-scroll .manager-v2-button'))
+      .find(button => button.textContent.includes('Review hazards'))
+      .click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('#manager-v2-gathering-tab-encounters').getAttribute('aria-selected'), 'true');
+    assert.ok(target.textContent.includes('Encounter and hazard authoring is planned for a later slice.'));
+
+    target.querySelector('#manager-v2-gathering-tab-environments').click();
+    await tick();
+    flushSync();
 
     target.querySelector('.manager-v2-table-scroll .manager-v2-button.is-primary').click();
     await tick();

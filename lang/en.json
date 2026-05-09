@@ -800,7 +800,9 @@
             "EncountersPlaceholderTitle": "Gathering encounters",
             "EncountersPlaceholderHint": "Encounter and hazard authoring is planned for a later slice.",
             "SettingsPlaceholderTitle": "Gathering settings",
-            "SettingsPlaceholderHint": "Gathering-wide configuration is planned for a later slice."
+            "SettingsPlaceholderHint": "Gathering-wide configuration is planned for a later slice.",
+            "OpenTasks": "Review tasks",
+            "OpenHazards": "Review hazards"
           },
           "Filters": "Environment filters",
           "SearchPlaceholder": "Search environments...",
@@ -813,8 +815,8 @@
           "SelectionAll": "All modes",
           "Table": "Environments table",
           "TableShort": "Environments",
-          "EmptyTitle": "No gathering environments yet",
-          "EmptyHint": "Environments define where gathering happens, which scene or location they represent, what tasks players can attempt, and which results those tasks can produce.",
+          "EmptyTitle": "Prepare gathering building blocks first",
+          "EmptyHint": "Define reusable tasks and hazards before creating environments, then attach those building blocks to each location players can gather from.",
           "EmptySearchTitle": "No environments match these filters",
           "EmptySearchHint": "Clear search and filters to show all environments in this system.",
           "Column": {
@@ -836,11 +838,12 @@
           "InspectorHint": "The inspector shows scene imagery, task evidence, draft state, and existing actions for the selected row.",
           "EmptySetup": {
             "Kicker": "Gathering setup",
-            "Title": "Set up environments",
-            "Hint": "Create the first environment for this gathering-enabled system, then describe the location and add the tasks players can attempt there.",
-            "StepCreate": "Create an environment for a biome, room, region, or scene.",
+            "Title": "Plan gathering content",
+            "Hint": "Reusable tasks and hazards give environments consistent activities, risks, and rewards across gathering locations.",
+            "StepCreate": "Create environments after the reusable task and hazard libraries are ready to attach.",
             "StepLocation": "Link a Foundry scene or write enough location detail for GMs and players.",
-            "StepTasks": "Add gathering tasks, result groups, catalysts, checks, timing, and failure outcomes.",
+            "StepTasks": "Define reusable gathering tasks with their checks, timing, result groups, and failure outcomes.",
+            "StepHazards": "Prepare encounter and hazard options that can be reused across risky locations.",
             "Resources": "Environment resources",
             "GatheringDocs": "Gathering docs",
             "Quickstart": "Quickstart"
