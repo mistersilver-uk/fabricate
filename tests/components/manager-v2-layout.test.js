@@ -140,6 +140,17 @@ test('manager-v2 nav buttons clear host mouse focus and keep green keyboard focu
   assert.equal(navFocusVisibleBlock.includes('orange'), false, 'nav keyboard focus should not use orange');
 });
 
+test('manager-v2 gathering tab buttons clear host mouse focus and keep green keyboard focus', () => {
+  const gatheringTabFocusBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-tab:focus');
+  const gatheringTabFocusVisibleBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-tab:focus-visible');
+
+  assert.ok(gatheringTabFocusBlock.includes('outline: none;'), 'mouse focus on gathering tabs should not inherit the host outline');
+  assert.ok(gatheringTabFocusBlock.includes('box-shadow: none;'), 'mouse focus on gathering tabs should not inherit the host orange focus shadow');
+  assert.ok(gatheringTabFocusVisibleBlock.includes('outline: 2px solid rgba(92, 184, 92, 0.62);'), 'keyboard focus on gathering tabs should use the manager-v2 accent');
+  assert.equal(gatheringTabFocusBlock.includes('orange'), false, 'gathering tab focus should not use orange');
+  assert.equal(gatheringTabFocusVisibleBlock.includes('orange'), false, 'gathering tab keyboard focus should not use orange');
+});
+
 test('manager-v2 inspector count labels wrap without truncation', () => {
   const factBlock = blockFor('.fabricate-manager-v2 .manager-v2-fact');
   const factLineBlock = blockFor('.fabricate-manager-v2 .manager-v2-fact-line');
