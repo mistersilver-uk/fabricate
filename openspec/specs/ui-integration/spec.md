@@ -22,9 +22,12 @@ Fabricate's Foundry-facing product UI must use a clean flat visual style.
 - Visual hierarchy should come from spacing, typography, borders, and restrained shadows rather than decorative gradients or blur-based glass effects.
 - Shared tokens in `styles/fabricate.css` and app-local editor tokens should be the source of truth for reusable surface treatments.
 - Fabricate exposes a global module setting, `fabricate.theme`, for choosing the active product UI colour theme.
-- `Fabricate` is the default theme; `Mythwright` preserves the previous dark green product palette.
+- `Fabricate` is the default theme.
+- `Mythwright` preserves the previous dark green product palette.
+- The supported preset catalog also includes `Ironblood Forge`, `Hearth & Herb`, `Starglass Arcana`, and `Foundry Native`.
+- `Foundry Native` is a fixed Fabricate-owned palette inspired by Foundry's default visual language; it does not dynamically track Foundry runtime CSS, the active Foundry theme, or third-party Foundry skins.
 - Product UI colours outside the theme token declaration layer must reference theme variables or reusable semantic variables/classes rather than raw colour literals.
-- Changing the theme setting applies a stable document-level theme attribute so open Fabricate UI surfaces that consume `--fab-*` tokens update without requiring a reload.
+- Changing the theme setting applies a stable theme attribute to `document.documentElement` and open Fabricate app roots so already-open Fabricate UI surfaces that consume `--fab-*` tokens update without requiring a reload or reopen cycle.
 - Generated documentation output and third-party/vendor theme assets are out of scope for this rule unless they are explicitly restyled as Fabricate product UI.
 
 ## Responsive Product UI

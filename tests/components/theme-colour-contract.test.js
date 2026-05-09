@@ -13,31 +13,22 @@ const productRoots = [
 ];
 const allowedExtensions = new Set(['.js', '.svelte', '.css']);
 const colourLiteralPattern = /(#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)|hsla?\([^)]*\)|(?<![-\w])(?:white|black)(?![-\w]))/g;
-const requiredThemeTokens = [
-  '--fab-bg-0',
-  '--fab-bg-1',
-  '--fab-bg-2',
-  '--fab-bg-3',
-  '--fab-surface',
-  '--fab-border',
-  '--fab-border-strong',
-  '--fab-border-soft',
-  '--fab-text',
-  '--fab-text-secondary',
-  '--fab-text-muted',
-  '--fab-text-subtle',
-  '--fab-accent',
-  '--fab-accent-hover',
-  '--fab-accent-strong',
-  '--fab-accent-soft',
-  '--fab-on-info',
-  '--fab-on-success',
-  '--fab-success',
-  '--fab-info',
-  '--fab-warning',
-  '--fab-danger',
-  '--fab-purple'
-];
+const themeSelectors = Object.freeze({
+  fabricate: ':root,\n:root[data-fabricate-theme="fabricate"],\n.fabricate[data-fabricate-theme="fabricate"]',
+  mythwright: ':root[data-fabricate-theme="mythwright"],\n.fabricate[data-fabricate-theme="mythwright"]',
+  'ironblood-forge': ':root[data-fabricate-theme="ironblood-forge"],\n.fabricate[data-fabricate-theme="ironblood-forge"]',
+  'hearth-herb': ':root[data-fabricate-theme="hearth-herb"],\n.fabricate[data-fabricate-theme="hearth-herb"]',
+  'starglass-arcana': ':root[data-fabricate-theme="starglass-arcana"],\n.fabricate[data-fabricate-theme="starglass-arcana"]',
+  'foundry-native': ':root[data-fabricate-theme="foundry-native"],\n.fabricate[data-fabricate-theme="foundry-native"]'
+});
+const themePaletteAnchors = Object.freeze({
+  fabricate: ['#111A23', '#15212B', '#1B2833', '#2C3B49', '#F1D1B5', '#D9B89C', '#E8C6A7', '#9AB89C', '#B97C78'],
+  mythwright: ['#071116', '#0B1720', '#101D27', '#152633', '#F2F7F5', '#63D47B', '#58B7E8', '#F4C04F', '#FF5252'],
+  'ironblood-forge': ['#141214', '#1F1A1D', '#2C2428', '#5A4A50', '#F0E2D4', '#C58B5A', '#8E9A8F', '#92A78B', '#A86D66'],
+  'hearth-herb': ['#161C19', '#1F2924', '#2B3831', '#53695E', '#F1E9D8', '#C8A36E', '#9BB79E', '#AFC7A4', '#B98378'],
+  'starglass-arcana': ['#121824', '#1A2232', '#243147', '#40506B', '#F2ECFF', '#9FC5E8', '#C7A6E6', '#9DC9BD', '#C78A96'],
+  'foundry-native': ['#0C0A14', '#111018', '#30282F', '#2E2833', '#F3F3F5', '#BC8963', '#706B70', '#617054', '#A16C60']
+});
 
 function collectProductFiles(rootPath) {
   const files = [];
@@ -88,6 +79,18 @@ function blockFor(source, selector) {
   assert.fail(`unterminated block for ${selector}`);
 }
 
+function tokenNames(source) {
+  return [...new Set([...source.matchAll(/--fab-[A-Za-z0-9-]+(?=\s*:)/g)].map(match => match[0]))].sort();
+}
+
+function tokenReferences(source) {
+  return [...new Set([...source.matchAll(/var\((--fab-[A-Za-z0-9-]+)/g)].map(match => match[1]))].sort();
+}
+
+function fallbackBackedTokens(source) {
+  return new Set([...source.matchAll(/var\((--fab-[A-Za-z0-9-]+)\s*,/g)].map(match => match[1]));
+}
+
 function findColourLiteralOffenders() {
   const offenders = [];
 
@@ -111,41 +114,43 @@ function findColourLiteralOffenders() {
 }
 
 describe('Theme colour contract', () => {
-  it('defines Fabricate and Mythwright theme scopes with required palette tokens', () => {
+  it('defines the full supported theme catalog with complete Fabricate token coverage', () => {
     const css = readFileSync(cssPath, 'utf8');
+    const rootBlock = blockFor(css, ':root');
+    const themeBlocks = Object.fromEntries(
+      Object.entries(themeSelectors).map(([themeId, selector]) => [themeId, blockFor(css, selector)])
+    );
+    const referenceThemeTokens = tokenNames(themeBlocks.fabricate);
+    const rootTokens = new Set(tokenNames(rootBlock));
+    const allDefinedTokens = new Set(tokenNames(css));
+    const allReferencedFabTokens = tokenReferences(css);
+    const tokensWithFallbacks = fallbackBackedTokens(css);
 
-    assert.match(css, /:root,\s*:root\[data-fabricate-theme="fabricate"\]/);
-    assert.match(css, /:root\[data-fabricate-theme="mythwright"\]/);
-    const fabricateBlock = blockFor(css, ':root,\n:root[data-fabricate-theme="fabricate"]');
-    const mythwrightBlock = blockFor(css, ':root[data-fabricate-theme="mythwright"]');
+    assert.ok(referenceThemeTokens.length > 100, 'theme blocks should define the full Fabricate theme token surface');
 
-    for (const value of [
-      '#111A23',
-      '#15212B',
-      '#1B2833',
-      '#2C3B49',
-      '#F1D1B5',
-      '#D9B89C',
-      '#E8C6A7',
-      '#9AB89C',
-      '#A9C7AA',
-      '#B97C78',
-      '#BFD5C3',
-      '#B9D3DD',
-      '#CEC1E6',
-      '#E4C0CD',
-      '#EBC8B3',
-      '#E7DBB1',
-      '#B9DDD7',
-      '#D8BED4'
-    ]) {
-      assert.ok(fabricateBlock.includes(value), `Fabricate palette should define ${value}`);
+    for (const [themeId, block] of Object.entries(themeBlocks)) {
+      assert.deepEqual(
+        tokenNames(block),
+        referenceThemeTokens,
+        `${themeId} should define the same theme-token surface as fabricate`
+      );
+
+      for (const value of themePaletteAnchors[themeId]) {
+        assert.ok(block.includes(value), `${themeId} palette should define ${value}`);
+      }
     }
 
-    for (const token of requiredThemeTokens) {
-      assert.match(fabricateBlock, new RegExp(`${token}:`), `Fabricate theme should define ${token}`);
-      assert.match(mythwrightBlock, new RegExp(`${token}:`), `Mythwright theme should define ${token}`);
-    }
+    const unresolvedReferencedTokens = allReferencedFabTokens.filter(token =>
+      !referenceThemeTokens.includes(token)
+      && !rootTokens.has(token)
+      && !allDefinedTokens.has(token)
+      && !tokensWithFallbacks.has(token)
+    );
+    assert.deepEqual(
+      unresolvedReferencedTokens,
+      [],
+      `all shared Fabricate token references should resolve from either the root token layer or every theme block:\n${unresolvedReferencedTokens.join('\n')}`
+    );
   });
 
   it('keeps product UI colour literals inside theme token declarations', () => {

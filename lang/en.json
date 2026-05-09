@@ -94,7 +94,11 @@
         "Hint": "Choose the colour theme for Fabricate's module UI.",
         "Choices": {
           "Fabricate": "Fabricate",
-          "Mythwright": "Mythwright"
+          "Mythwright": "Mythwright",
+          "IronbloodForge": "Ironblood Forge",
+          "HearthHerb": "Hearth & Herb",
+          "StarglassArcana": "Starglass Arcana",
+          "FoundryNative": "Foundry Native"
         }
       }
     },
