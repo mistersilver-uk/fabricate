@@ -4840,6 +4840,12 @@
   flex-wrap: wrap;
 }
 
+.fabricate-manager-v2 .manager-v2-environments-toolbar {
+  max-height: 100px;
+  align-content: flex-start;
+  overflow-y: auto;
+}
+
 .fabricate-manager-v2 .manager-v2-toolbar-primary {
   display: flex;
   align-items: center;

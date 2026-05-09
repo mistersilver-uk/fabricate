@@ -247,7 +247,7 @@
       role="tabpanel"
       aria-labelledby="manager-v2-gathering-tab-environments"
     >
-      <section class="manager-v2-toolbar" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Filters', 'Environment filters')}>
+      <section class="manager-v2-toolbar manager-v2-environments-toolbar" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Filters', 'Environment filters')}>
         <label class="manager-v2-search">
           <i class="fas fa-search" aria-hidden="true"></i>
           <input

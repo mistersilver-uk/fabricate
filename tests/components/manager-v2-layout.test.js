@@ -351,6 +351,7 @@ test('manager-v2 essence edit route defines picker-based responsive geometry', (
 });
 
 test('manager-v2 environments browser and edit route define compact responsive geometry', () => {
+  const toolbarBlock = blockFor('.fabricate-manager-v2 .manager-v2-environments-toolbar');
   const tableBlock = blockFor('.fabricate-manager-v2 .manager-v2-environments-table');
   const taskCountBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-task-count');
   const actionsBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-actions');
@@ -361,6 +362,14 @@ test('manager-v2 environments browser and edit route define compact responsive g
   const workspaceBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-workspace');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager-v2 (max-width: 1120px)'));
 
+  assert.ok(
+    toolbarBlock.includes('max-height: 100px;') && toolbarBlock.includes('overflow-y: auto;'),
+    'environments toolbar should keep wrapped filters height-bounded instead of pushing the empty state down'
+  );
+  assert.ok(
+    toolbarBlock.includes('align-content: flex-start;'),
+    'environments toolbar should keep wrapped filter rows pinned to the top of its bounded scroll area'
+  );
   assert.ok(
     tableBlock.includes('--fab-mv2-environment-grid: minmax(0, 1.72fr) minmax(86px, 0.42fr) 46px 72px 116px;'),
     'environments table should define five compact columns without a linked-scene column'
