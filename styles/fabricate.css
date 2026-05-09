@@ -7400,7 +7400,7 @@
   align-items: center;
   margin: -2px 0 12px;
   padding: 4px;
-  border: 1px solid var(--fab-mv2-border);
+  border-bottom: 1px solid var(--fab-mv2-border);
   background: rgba(255, 255, 255, 0.035);
 }
 
