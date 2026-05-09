@@ -260,6 +260,7 @@ Current GM editor behavior:
 - The Environments editor shows current global weather and time of day as context, not as environment browse filters.
 - Settings is the only primary GM UI surface for current global weather and current global time of day. Environment authoring may expose inherited condition evidence and future provider override evidence, but must not be the primary condition mutation surface.
 - The Environments editor exposes reusable gathering task and hazard library rows for the selected crafting system, including per-environment enable/disable toggles.
+- When the Manager V2 Gathering `Environments` browser has no environments, its empty state keeps `Environments` selected, keeps `Create environment` available, and guides GMs to prepare reusable gathering tasks plus encounter/hazard options before composing environments.
 - Reusable task and hazard row overrides stay inside expandable rows so the default environment workspace remains scannable. Collapsed rows show default-vs-override chips, enabled state, matching evidence, dirty/validation markers, and an explicit expand/collapse control.
 - Expanded override panels contain per-environment override fields only; reusable definition fields remain edited in their library surface.
 - Expanded override rows are keyboard reachable, preserve focus on save/error where practical, and stack without horizontal clipping in narrow Manager V2 widths.

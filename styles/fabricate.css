@@ -4840,6 +4840,12 @@
   flex-wrap: wrap;
 }
 
+.fabricate-manager-v2 .manager-v2-environments-toolbar {
+  max-height: 100px;
+  align-content: flex-start;
+  overflow-y: auto;
+}
+
 .fabricate-manager-v2 .manager-v2-toolbar-primary {
   display: flex;
   align-items: center;
@@ -7394,8 +7400,7 @@
   align-items: center;
   margin: -2px 0 12px;
   padding: 4px;
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
+  border-bottom: 1px solid var(--fab-mv2-border);
   background: rgba(255, 255, 255, 0.035);
 }
 
@@ -7429,6 +7434,11 @@
   background: rgba(92, 184, 92, 0.16);
 }
 
+.fabricate-manager-v2 .manager-v2-gathering-tab:focus {
+  outline: none;
+  box-shadow: none;
+}
+
 .fabricate-manager-v2 .manager-v2-gathering-tab:focus-visible {
   outline: 2px solid rgba(92, 184, 92, 0.62);
   outline-offset: 2px;
@@ -7450,7 +7460,6 @@
   min-height: 220px;
   padding: 18px;
   border: 1px dashed var(--fab-mv2-border);
-  border-radius: 8px;
   color: var(--fab-mv2-text-muted);
   text-align: center;
   background: rgba(255, 255, 255, 0.03);

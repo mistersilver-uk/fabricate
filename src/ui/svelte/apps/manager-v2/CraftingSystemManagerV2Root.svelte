@@ -1763,19 +1763,19 @@
             </div>
           </section>
         {:else if environmentList.length === 0}
-          <section class="manager-v2-setup-card" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Title', 'Set up environments')}>
+          <section class="manager-v2-setup-card" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Title', 'Plan gathering content')}>
             <div class="manager-v2-setup-card-header">
               <i class="fas fa-seedling" aria-hidden="true"></i>
               <div>
                 <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Kicker', 'Gathering setup')}</p>
-                <h3>{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Title', 'Set up environments')}</h3>
+                <h3>{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Title', 'Plan gathering content')}</h3>
               </div>
             </div>
-            <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Hint', 'Create the first environment for this gathering-enabled system, then describe the location and add the tasks players can attempt there.')}</p>
+            <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Hint', 'Reusable tasks and hazards give environments consistent activities, risks, and rewards across gathering locations.')}</p>
             <ol class="manager-v2-setup-list">
-              <li>{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.StepCreate', 'Create an environment for a biome, room, region, or scene.')}</li>
-              <li>{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.StepLocation', 'Link a Foundry scene or write enough location detail for GMs and players.')}</li>
-              <li>{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.StepTasks', 'Add gathering tasks, result groups, catalysts, checks, timing, and failure outcomes.')}</li>
+              <li>{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.StepTasks', 'Define reusable gathering tasks with their checks, timing, result groups, and failure outcomes.')}</li>
+              <li>{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.StepHazards', 'Prepare encounter and hazard options that can be reused across risky locations.')}</li>
+              <li>{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.StepCreate', 'Create environments after the reusable task and hazard libraries are ready to attach.')}</li>
             </ol>
             <div class="manager-v2-setup-links" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Resources', 'Environment resources')}>
               <a class="manager-v2-button" href="https://misterpotts.github.io/fabricate/gathering-environments/" target="_blank" rel="noreferrer">

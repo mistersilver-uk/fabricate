@@ -231,19 +231,31 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(managerV2Source.includes('FABRICATE.Admin.ManagerV2.Environment.EmptyTitle'), 'empty environments browser should use Manager V2 localized copy');
     assert.ok(rootSource.includes('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Title'), 'empty environments inspector should use localized setup copy');
     assert.ok(rootSource.includes('https://misterpotts.github.io/fabricate/gathering-environments/'), 'empty environments inspector should link to published gathering docs');
-    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.EmptyTitle, 'No gathering environments yet');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.EmptyTitle, 'Prepare gathering building blocks first');
+    assert.equal(
+      lang.FABRICATE.Admin.ManagerV2.Environment.EmptyHint,
+      'Define reusable tasks and hazards before creating environments, then attach those building blocks to each location players can gather from.'
+    );
     assert.ok(environmentsBrowserSource.includes('manager-v2-gathering-tabs'), 'gathering page should render local section tabs');
     assert.ok(environmentsBrowserSource.includes("activeGatheringTab = 'environments'"), 'gathering page should default and reset to environments');
     assert.ok(environmentsBrowserSource.includes('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksPlaceholderHint'), 'gathering placeholder copy should be localized');
+    assert.ok(environmentsBrowserSource.includes("selectGatheringTab('tasks')"), 'empty environments guidance should route to the Tasks tab');
+    assert.ok(environmentsBrowserSource.includes("selectGatheringTab('encounters')"), 'empty environments guidance should route hazards to the Encounters tab');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Label, 'Gathering sections');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Environments, 'Environments');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Tasks, 'Tasks');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Encounters, 'Encounters');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Settings, 'Settings');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.OpenTasks, 'Review tasks');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.OpenHazards, 'Review hazards');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksPlaceholderHint, 'Reusable gathering task management is planned for a later slice.');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.EncountersPlaceholderHint, 'Encounter and hazard authoring is planned for a later slice.');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderHint, 'Gathering-wide configuration is planned for a later slice.');
-    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Title, 'Set up environments');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Title, 'Plan gathering content');
+    assert.equal(
+      lang.FABRICATE.Admin.ManagerV2.Environment.EmptySetup.StepHazards,
+      'Prepare encounter and hazard options that can be reused across risky locations.'
+    );
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.EmptySetup.GatheringDocs, 'Gathering docs');
     assert.ok(rootSource.includes('FABRICATE.Admin.ManagerV2.Recipe.EmptySetup.Title'), 'empty recipes inspector should use localized setup copy');
     assert.ok(rootSource.includes('https://misterpotts.github.io/fabricate/recipes/'), 'empty recipes inspector should link to published recipe docs');

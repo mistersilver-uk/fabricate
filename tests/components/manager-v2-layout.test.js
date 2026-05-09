@@ -140,6 +140,17 @@ test('manager-v2 nav buttons clear host mouse focus and keep green keyboard focu
   assert.equal(navFocusVisibleBlock.includes('orange'), false, 'nav keyboard focus should not use orange');
 });
 
+test('manager-v2 gathering tab buttons clear host mouse focus and keep green keyboard focus', () => {
+  const gatheringTabFocusBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-tab:focus');
+  const gatheringTabFocusVisibleBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-tab:focus-visible');
+
+  assert.ok(gatheringTabFocusBlock.includes('outline: none;'), 'mouse focus on gathering tabs should not inherit the host outline');
+  assert.ok(gatheringTabFocusBlock.includes('box-shadow: none;'), 'mouse focus on gathering tabs should not inherit the host orange focus shadow');
+  assert.ok(gatheringTabFocusVisibleBlock.includes('outline: 2px solid rgba(92, 184, 92, 0.62);'), 'keyboard focus on gathering tabs should use the manager-v2 accent');
+  assert.equal(gatheringTabFocusBlock.includes('orange'), false, 'gathering tab focus should not use orange');
+  assert.equal(gatheringTabFocusVisibleBlock.includes('orange'), false, 'gathering tab keyboard focus should not use orange');
+});
+
 test('manager-v2 inspector count labels wrap without truncation', () => {
   const factBlock = blockFor('.fabricate-manager-v2 .manager-v2-fact');
   const factLineBlock = blockFor('.fabricate-manager-v2 .manager-v2-fact-line');
@@ -351,6 +362,7 @@ test('manager-v2 essence edit route defines picker-based responsive geometry', (
 });
 
 test('manager-v2 environments browser and edit route define compact responsive geometry', () => {
+  const toolbarBlock = blockFor('.fabricate-manager-v2 .manager-v2-environments-toolbar');
   const tableBlock = blockFor('.fabricate-manager-v2 .manager-v2-environments-table');
   const taskCountBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-task-count');
   const actionsBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-actions');
@@ -361,6 +373,14 @@ test('manager-v2 environments browser and edit route define compact responsive g
   const workspaceBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-workspace');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager-v2 (max-width: 1120px)'));
 
+  assert.ok(
+    toolbarBlock.includes('max-height: 100px;') && toolbarBlock.includes('overflow-y: auto;'),
+    'environments toolbar should keep wrapped filters height-bounded instead of pushing the empty state down'
+  );
+  assert.ok(
+    toolbarBlock.includes('align-content: flex-start;'),
+    'environments toolbar should keep wrapped filter rows pinned to the top of its bounded scroll area'
+  );
   assert.ok(
     tableBlock.includes('--fab-mv2-environment-grid: minmax(0, 1.72fr) minmax(86px, 0.42fr) 46px 72px 116px;'),
     'environments table should define five compact columns without a linked-scene column'
