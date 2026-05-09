@@ -7450,7 +7450,6 @@
   min-height: 220px;
   padding: 18px;
   border: 1px dashed var(--fab-mv2-border);
-  border-radius: 8px;
   color: var(--fab-mv2-text-muted);
   text-align: center;
   background: rgba(255, 255, 255, 0.03);
