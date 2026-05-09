@@ -237,23 +237,23 @@
     height: 58px;
     box-sizing: border-box;
     padding: 4px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: var(--fab-overlay-light-06);
+    border: 1px solid var(--fab-overlay-light-16);
     border-radius: 8px;
     cursor: pointer;
     transition: background 0.15s, border-color 0.15s;
   }
 
   .recipe-image-picker-trigger:hover {
-    background: rgba(255, 255, 255, 0.12);
-    border-color: rgba(255, 255, 255, 0.28);
+    background: var(--fab-overlay-light-12);
+    border-color: var(--fab-overlay-light-28);
   }
 
   .recipe-image-picker-trigger:disabled {
     cursor: not-allowed;
     opacity: 0.72;
-    background: rgba(255, 255, 255, 0.04);
-    border-color: rgba(255, 255, 255, 0.12);
+    background: var(--fab-overlay-light-04);
+    border-color: var(--fab-overlay-light-12);
   }
 
   .recipe-image-thumbnail {
@@ -267,10 +267,10 @@
   .recipe-image-picker-popover {
     position: absolute;
     z-index: 4000;
-    background: #171b26;
-    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: var(--fab-editor-menu-bg);
+    border: 1px solid var(--fab-overlay-light-18);
     border-radius: 10px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.48);
+    box-shadow: 0 8px 32px var(--fab-overlay-dark-48);
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -278,17 +278,17 @@
 
   .recipe-image-picker-search {
     padding: 8px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid var(--fab-overlay-light-10);
     flex-shrink: 0;
   }
 
   .recipe-image-picker-search input {
     width: 100%;
     box-sizing: border-box;
-    background: rgba(255, 255, 255, 0.07);
-    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: var(--fab-overlay-light-07);
+    border: 1px solid var(--fab-overlay-light-16);
     border-radius: 6px;
-    color: rgba(255, 243, 232, 0.92);
+    color: var(--fab-editor-text);
     padding: 6px 10px;
     font-size: 0.85rem;
   }
@@ -320,13 +320,13 @@
   }
 
   .recipe-image-picker-option:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.2);
+    background: var(--fab-overlay-light-10);
+    border-color: var(--fab-overlay-light-20);
   }
 
   .recipe-image-picker-option.selected {
-    background: rgba(74, 144, 226, 0.24);
-    border-color: rgba(74, 144, 226, 0.6);
+    background: var(--fab-editor-accent-soft);
+    border-color: var(--fab-info-border);
   }
 
   .recipe-image-picker-option img {
@@ -343,7 +343,7 @@
   .recipe-image-picker-empty {
     grid-column: 1 / -1;
     text-align: center;
-    color: rgba(255, 229, 210, 0.5);
+    color: var(--fab-text-disabled);
     font-size: 0.85rem;
     padding: 16px;
     margin: 0;

@@ -172,16 +172,16 @@
 
 <style>
   .ingredient-group-card {
-    border: 1px solid var(--fabricate-editor-border, rgba(255, 255, 255, 0.14));
+    border: 1px solid var(--fab-editor-border, var(--fab-overlay-light-14));
     border-radius: 8px;
     padding: 10px;
     margin-bottom: 8px;
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--fab-overlay-light-03);
   }
 
   .group-error {
-    border-color: var(--fabricate-editor-border-danger, rgba(255, 124, 102, 0.48));
-    box-shadow: 0 0 0 1px var(--fabricate-editor-border-danger, rgba(255, 124, 102, 0.48));
+    border-color: var(--fab-editor-border-danger, var(--fab-editor-border-danger));
+    box-shadow: 0 0 0 1px var(--fab-editor-border-danger, var(--fab-editor-border-danger));
   }
 
   .group-header {
@@ -206,8 +206,8 @@
     text-align: left;
     font-size: 0.8rem;
     padding: 2px 4px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
+    border-bottom: 1px solid var(--fab-overlay-light-08);
+    color: var(--fab-editor-muted, var(--fab-editor-muted));
   }
 
   .ingredient-options-table td {
@@ -219,7 +219,7 @@
     text-align: center;
     font-weight: bold;
     font-size: 0.8rem;
-    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
+    color: var(--fab-editor-muted, var(--fab-editor-muted));
     padding: 2px;
   }
 
@@ -229,9 +229,9 @@
     gap: 4px;
     min-height: 34px;
     padding: 4px 6px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--fab-overlay-light-05);
     border-radius: 6px;
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--fab-overlay-light-03);
   }
 
   .item-thumb {
@@ -241,7 +241,7 @@
   }
 
   .no-item {
-    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
+    color: var(--fab-editor-muted, var(--fab-editor-muted));
     font-style: italic;
   }
 
@@ -264,11 +264,11 @@
     cursor: pointer;
     padding: 2px 4px;
     border-radius: 5px;
-    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
+    color: var(--fab-editor-muted, var(--fab-editor-muted));
   }
 
   .icon-button.danger {
-    color: var(--fabricate-editor-danger, rgba(255, 216, 208, 0.95));
+    color: var(--fab-editor-danger, var(--fab-editor-danger));
   }
 
   .add-option-btn {
@@ -295,7 +295,7 @@
 
     .option-row {
       padding: 6px 0;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      border-bottom: 1px solid var(--fab-overlay-light-06);
     }
   }
 </style>

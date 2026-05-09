@@ -115,7 +115,7 @@
               markerHeight="6"
               orient="auto-start-reverse"
             >
-              <polygon points="0 0, 10 3.5, 0 7" fill="var(--color-border-dark, #888)" />
+              <polygon points="0 0, 10 3.5, 0 7" fill="var(--color-border-dark, var(--fab-text-subtle))" />
             </marker>
           </defs>
           {#each filteredGraph.edges as edge (edge.id)}
@@ -123,7 +123,7 @@
               d={edge.path}
               class="graph-edge"
               class:cycle-edge={edge.isCycleEdge}
-              stroke="var(--color-border-dark, #888)"
+              stroke="var(--color-border-dark, var(--fab-text-subtle))"
               fill="none"
               marker-end="url(#arrowhead)"
             />

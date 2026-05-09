@@ -1,3 +1,9 @@
+import {
+  DEFAULT_FABRICATE_THEME,
+  FABRICATE_THEME_CHOICES,
+  applyFabricateTheme
+} from '../ui/theme.js';
+
 export const FABRICATE_SETTINGS_NAMESPACE = 'fabricate';
 
 export const SETTING_KEYS = Object.freeze({
@@ -16,7 +22,8 @@ export const SETTING_KEYS = Object.freeze({
   MIGRATION_VERSION: 'migrationVersion',
   FAVOURITE_RECIPES: 'favouriteRecipes',
   RECENTLY_CRAFTED: 'recentlyCrafted',
-  LAST_ALCHEMY_SYSTEM: 'lastAlchemySystem'
+  LAST_ALCHEMY_SYSTEM: 'lastAlchemySystem',
+  THEME: 'theme'
 });
 
 const BASE_DEFINITIONS = Object.freeze({
@@ -71,6 +78,16 @@ const BASE_DEFINITIONS = Object.freeze({
     config: true,
     type: Boolean,
     default: false
+  },
+  [SETTING_KEYS.THEME]: {
+    name: 'FABRICATE.Settings.Theme.Name',
+    hint: 'FABRICATE.Settings.Theme.Hint',
+    scope: 'world',
+    config: true,
+    type: String,
+    choices: FABRICATE_THEME_CHOICES,
+    default: DEFAULT_FABRICATE_THEME,
+    onChange: applyFabricateTheme
   },
   [SETTING_KEYS.LAST_CRAFTING_ACTOR]: {
     name: 'Last Crafting Actor',

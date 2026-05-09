@@ -508,39 +508,39 @@
 
   <style>
   .fabricate-recipe-editor {
-    --fabricate-editor-surface: rgba(0, 0, 0, 0.16);
-    --fabricate-editor-surface-strong: rgba(0, 0, 0, 0.24);
-    --fabricate-editor-surface-soft: rgba(255, 255, 255, 0.05);
-    --fabricate-editor-border: rgba(255, 255, 255, 0.14);
-    --fabricate-editor-border-strong: rgba(255, 255, 255, 0.24);
-    --fabricate-editor-border-danger: rgba(255, 124, 102, 0.48);
-    --fabricate-editor-text: rgba(255, 243, 232, 0.92);
-    --fabricate-editor-muted: rgba(255, 229, 210, 0.68);
-    --fabricate-editor-muted-strong: rgba(255, 236, 220, 0.82);
-    --fabricate-editor-placeholder: rgba(255, 231, 212, 0.42);
-    --fabricate-editor-input-bg: rgba(255, 255, 255, 0.04);
-    --fabricate-editor-input-bg-hover: rgba(255, 255, 255, 0.07);
-    --fabricate-editor-input-bg-active: rgba(255, 255, 255, 0.1);
-    --fabricate-editor-menu-bg: #171b26;
-    --fabricate-editor-menu-selected: #5a88bb;
-    --fabricate-editor-accent: var(--fabricate-primary, #4a90e2);
-    --fabricate-editor-accent-soft: rgba(74, 144, 226, 0.22);
-    --fabricate-editor-danger: rgba(255, 216, 208, 0.95);
-    --fabricate-editor-danger-soft: rgba(220, 53, 69, 0.18);
-    --fabricate-editor-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+    --fab-editor-surface: var(--fab-overlay-dark-16);
+    --fab-editor-surface-strong: var(--fab-overlay-dark-24);
+    --fab-editor-surface-soft: var(--fab-overlay-light-05);
+    --fab-editor-border: var(--fab-overlay-light-14);
+    --fab-editor-border-strong: var(--fab-overlay-light-24);
+    --fab-editor-border-danger: var(--fab-danger-border);
+    --fab-editor-text: var(--fab-text);
+    --fab-editor-muted: var(--fab-text-muted);
+    --fab-editor-muted-strong: var(--fab-text-secondary);
+    --fab-editor-placeholder: var(--fab-text-disabled);
+    --fab-editor-input-bg: var(--fab-overlay-light-04);
+    --fab-editor-input-bg-hover: var(--fab-overlay-light-07);
+    --fab-editor-input-bg-active: var(--fab-overlay-light-10);
+    --fab-editor-menu-bg: var(--fab-bg-3);
+    --fab-editor-menu-selected: var(--fab-info-strong);
+    --fab-editor-accent: var(--fab-info);
+    --fab-editor-accent-soft: var(--fab-info-soft);
+    --fab-editor-danger: var(--fab-danger-text);
+    --fab-editor-danger-soft: var(--fab-danger-soft);
+    --fab-editor-shadow: 0 10px 24px var(--fab-overlay-dark-18);
     display: flex;
     flex-direction: column;
     height: 100%;
     overflow: hidden;
-    color: var(--fabricate-editor-text);
-    background: rgba(6, 9, 17, 0.21);
+    color: var(--fab-editor-text);
+    background: var(--fab-overlay-dark-20);
   }
 
   .editor-header {
     padding: 12px 18px;
-    border-bottom: 1px solid var(--fabricate-editor-border);
+    border-bottom: 1px solid var(--fab-editor-border);
     flex-shrink: 0;
-    background: rgba(0, 0, 0, 0.14);
+    background: var(--fab-overlay-dark-14);
   }
 
   .editor-header h2 {
@@ -590,7 +590,7 @@
     margin: 0;
     font-size: 0.78rem;
     line-height: 1.35;
-    color: var(--fabricate-editor-muted);
+    color: var(--fab-editor-muted);
   }
 
   .basic-info-layout .info-grid {
@@ -617,7 +617,7 @@
   .field-row label {
     font-weight: bold;
     font-size: 0.9rem;
-    color: var(--fabricate-editor-muted-strong);
+    color: var(--fab-editor-muted-strong);
   }
 
   .field-row input,
@@ -628,11 +628,11 @@
   }
 
   .editor-panel-surface {
-    background: var(--fabricate-editor-surface);
-    border: 1px solid var(--fabricate-editor-border);
+    background: var(--fab-editor-surface);
+    border: 1px solid var(--fab-editor-border);
     border-radius: 12px;
     padding: 14px;
-    box-shadow: var(--fabricate-editor-shadow);
+    box-shadow: var(--fab-editor-shadow);
   }
 
   .flags-section {
@@ -653,7 +653,7 @@
     align-items: center;
     gap: 6px;
     cursor: pointer;
-    color: var(--fabricate-editor-muted-strong);
+    color: var(--fab-editor-muted-strong);
   }
 
   .section-header {
@@ -663,7 +663,7 @@
     gap: 12px;
     margin-bottom: 14px;
     padding-bottom: 10px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid var(--fab-overlay-light-08);
   }
 
   .section-header h3 {
@@ -681,33 +681,33 @@
     justify-content: flex-end;
     gap: 8px;
     padding: 12px 18px;
-    border-top: 1px solid var(--fabricate-editor-border);
+    border-top: 1px solid var(--fab-editor-border);
     flex-shrink: 0;
-    background: rgba(0, 0, 0, 0.18);
+    background: var(--fab-overlay-dark-18);
   }
 
   .save-btn {
     font-weight: bold;
-    background: rgba(62, 108, 175, 0.93);
-    border-color: rgba(148, 190, 255, 0.34);
-    color: #fff;
+    background: var(--fab-info-strong);
+    border-color: var(--fab-blue-border);
+    color: var(--fab-text);
   }
 
   .save-btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
-    background: var(--fabricate-editor-surface-strong);
-    border-color: var(--fabricate-editor-border);
-    color: var(--fabricate-editor-muted);
+    background: var(--fab-editor-surface-strong);
+    border-color: var(--fab-editor-border);
+    color: var(--fab-editor-muted);
   }
 
   .field-error {
-    border-color: var(--fabricate-editor-border-danger) !important;
-    box-shadow: 0 0 0 1px var(--fabricate-editor-border-danger), 0 0 0 4px rgba(220, 53, 69, 0.12);
+    border-color: var(--fab-editor-border-danger) !important;
+    box-shadow: 0 0 0 1px var(--fab-editor-border-danger), 0 0 0 4px var(--fab-danger-soft);
   }
 
   .inline-error {
-    color: var(--fabricate-editor-danger);
+    color: var(--fab-editor-danger);
     font-size: 0.8rem;
     margin-top: 2px;
   }

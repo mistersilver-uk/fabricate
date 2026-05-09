@@ -105,6 +105,7 @@ Fabricate stores data in Foundry's settings and flags:
 | World setting | `fabricate.craftingSystems` | All crafting system configurations |
 | World setting | `fabricate.recipes` | All recipes |
 | World setting | `fabricate.gatheringEnvironments` | Gathering environment and task configurations |
+| World setting | `fabricate.theme` | Active product UI theme (`Fabricate` by default; `Mythwright` preserves the previous dark green palette) |
 | Client setting | `fabricate.lastCraftingActor` | Last selected crafting actor UUID |
 | Client setting | `fabricate.lastGatheringActor` | Last selected gathering actor ID |
 | Client setting | `fabricate.lastComponentSources` | Last selected source actor UUIDs |

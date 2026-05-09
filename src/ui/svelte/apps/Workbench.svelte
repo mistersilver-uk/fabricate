@@ -217,7 +217,7 @@
     justify-content: center;
     gap: var(--fab-space-1);
     background: var(--fab-accent);
-    color: #051e0c;
+    color: var(--fab-on-accent);
     border: 1px solid var(--fab-accent-strong);
     border-radius: var(--fab-v2-radius-control);
     padding: 8px 16px;

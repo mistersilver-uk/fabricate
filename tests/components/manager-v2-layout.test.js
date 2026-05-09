@@ -91,8 +91,8 @@ test('manager-v2 systems status cells use stable interactive on-off toggles', ()
   assert.ok(toggleBlock.includes('border-radius: 999px;'), 'system status toggles should read as toggle buttons');
   assert.ok(focusBlock.includes('outline: none;') && focusBlock.includes('box-shadow: none;'), 'mouse focus should not inherit the host orange focus ring');
   assert.ok(focusVisibleBlock.includes('outline: 2px solid var(--fab-mv2-accent);'), 'keyboard focus should keep a manager-v2 focus-visible ring');
-  assert.ok(onBlock.includes('rgba(92, 184, 92'), 'enabled status should use the manager-v2 green accent family');
-  assert.ok(offBlock.includes('rgba(255, 192, 120'), 'disabled status should use a distinct muted warning/off color');
+  assert.ok(onBlock.includes('var(--fab-success'), 'enabled status should use the manager-v2 success accent family');
+  assert.ok(offBlock.includes('var(--fab-warning'), 'disabled status should use a distinct muted warning/off color');
   assert.ok(trackBlock.includes('width: 24px;'), 'toggle track should reserve only enough space for the compact state control');
   assert.ok(knobBlock.includes('transition: transform'), 'toggle knob should expose a clear state change');
   assert.ok(onKnobBlock.includes('transform: translateX(10px);'), 'enabled status should move the toggle knob on');
@@ -146,7 +146,7 @@ test('manager-v2 gathering tab buttons clear host mouse focus and keep green key
 
   assert.ok(gatheringTabFocusBlock.includes('outline: none;'), 'mouse focus on gathering tabs should not inherit the host outline');
   assert.ok(gatheringTabFocusBlock.includes('box-shadow: none;'), 'mouse focus on gathering tabs should not inherit the host orange focus shadow');
-  assert.ok(gatheringTabFocusVisibleBlock.includes('outline: 2px solid rgba(92, 184, 92, 0.62);'), 'keyboard focus on gathering tabs should use the manager-v2 accent');
+  assert.ok(gatheringTabFocusVisibleBlock.includes('outline: 2px solid var(--fab-success-border);'), 'keyboard focus on gathering tabs should use the manager-v2 accent');
   assert.equal(gatheringTabFocusBlock.includes('orange'), false, 'gathering tab focus should not use orange');
   assert.equal(gatheringTabFocusVisibleBlock.includes('orange'), false, 'gathering tab keyboard focus should not use orange');
 });
@@ -347,7 +347,7 @@ test('manager-v2 essence edit route defines picker-based responsive geometry', (
   assert.ok(inspectorSourceActionsBlock.includes('display: grid;'), 'inspector source actions should use stable row geometry');
   assert.ok(inspectorSourceActionsBlock.includes('grid-template-columns: repeat(2, minmax(0, 1fr));'), 'inspector source actions should keep copy and unlink on the same row');
   assert.ok(!mediumQuery.includes('.fabricate-manager-v2 .manager-v2-essence-inspector-source-actions .manager-v2-button'), 'narrow manager-v2 layout should not stack the selected essence source actions');
-  assert.ok(warningActionBlock.includes('rgba(246, 176, 72'), 'unlink source should have an amber warning-action button style');
+  assert.ok(warningActionBlock.includes('var(--fab-warning'), 'unlink source should have an amber warning-action button style');
   assert.ok(sourceDropBlock.includes('width: 100%;'), 'essence source drop target should use the full source panel width');
   assert.ok(sourceDropBlock.includes('height: 84px;'), 'essence source drop target should have a stable wide drop-zone height');
   assert.ok(iconTriggerBlock.includes('grid-template-columns: 28px minmax(0, 1fr) 16px;'), 'icon picker trigger should be a real picker control, not a raw text field');
@@ -502,9 +502,12 @@ test('manager-v2 pagination footer uses scoped chrome with stable summary, nav, 
   );
 });
 
-test('design-system tokens are declared at :root as the agreed source of truth', () => {
-  const rootMatches = Array.from(css.matchAll(/:root\s*\{[\s\S]*?\}/g));
-  const rootBlock = rootMatches.map(match => match[0]).join('\n');
+test('design-system colour tokens are declared in the theme layer as the agreed source of truth', () => {
+  const rootBlock = blockFor(':root');
+  const themeBlock = [
+    blockFor(':root,\n:root[data-fabricate-theme="fabricate"]'),
+    blockFor(':root[data-fabricate-theme="mythwright"]')
+  ].join('\n');
 
   for (const token of [
     '--fab-bg-0:',
@@ -530,7 +533,12 @@ test('design-system tokens are declared at :root as the agreed source of truth',
     '--fab-danger:',
     '--fab-danger-soft:',
     '--fab-purple:',
-    '--fab-purple-soft:',
+    '--fab-purple-soft:'
+  ]) {
+    assert.ok(themeBlock.includes(token), `theme layer should declare design-system colour token ${token.replace(':', '')}`);
+  }
+
+  for (const token of [
     '--fab-space-1:',
     '--fab-space-2:',
     '--fab-space-3:',
@@ -538,7 +546,7 @@ test('design-system tokens are declared at :root as the agreed source of truth',
     '--fab-space-5:',
     '--fab-space-6:'
   ]) {
-    assert.ok(rootBlock.includes(token), `:root should declare design-system token ${token.replace(':', '')}`);
+    assert.ok(rootBlock.includes(token), `root layer should declare design-system layout token ${token.replace(':', '')}`);
   }
 });
 

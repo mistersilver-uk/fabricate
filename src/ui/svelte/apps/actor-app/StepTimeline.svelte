@@ -106,7 +106,7 @@
 
   .step-timeline__step--completed .step-timeline__index {
     background: var(--fab-accent);
-    color: #051e0c;
+    color: var(--fab-on-accent);
   }
 
   .step-timeline__step--completed .step-timeline__status {
@@ -120,7 +120,7 @@
 
   .step-timeline__step--current .step-timeline__index {
     background: var(--fab-info);
-    color: #04141d;
+    color: var(--fab-bg-0);
   }
 
   .step-timeline__step--current .step-timeline__status {

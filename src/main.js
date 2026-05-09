@@ -35,6 +35,7 @@ import {
   getRecipeManagerAppClass,
   getRecipeEditorAppClass
 } from './ui/appFactory.js';
+import { applyCurrentFabricateTheme } from './ui/theme.js';
 import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from './ui/itemsDirectoryButtons.js';
 import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS } from './config/settings.js';
 import { MigrationRunner } from './migration/MigrationRunner.js';
@@ -414,6 +415,7 @@ class Fabricate {
 
     // Register settings
     this.registerSettings();
+    applyCurrentFabricateTheme(getSetting, SETTING_KEYS.THEME);
     // Run data migrations before managers load persisted data
     await this._runMigrations();
     // Create managers

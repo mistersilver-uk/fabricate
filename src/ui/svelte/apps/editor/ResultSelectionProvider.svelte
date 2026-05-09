@@ -119,10 +119,10 @@
   .result-selection-section {
     margin: 0;
     padding: 14px;
-    border: 1px solid var(--fabricate-editor-border, rgba(255, 255, 255, 0.14));
+    border: 1px solid var(--fab-editor-border, var(--fab-overlay-light-14));
     border-radius: 12px;
-    background: var(--fabricate-editor-surface, rgba(0, 0, 0, 0.16));
-    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.2);
+    background: var(--fab-editor-surface, var(--fab-overlay-dark-16));
+    box-shadow: 0 14px 32px var(--fab-overlay-dark-20);
   }
 
   .result-selection-section h4 {
@@ -150,7 +150,7 @@
   }
 
   .hint {
-    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
+    color: var(--fab-editor-muted, var(--fab-editor-muted));
     font-style: italic;
     font-size: 0.9rem;
     margin: 4px 0 8px;
@@ -164,7 +164,7 @@
 
   .outcome-routing-section h5 {
     margin: 0 0 4px;
-    color: var(--fabricate-editor-muted-strong, rgba(255, 236, 220, 0.82));
+    color: var(--fab-editor-muted-strong, var(--fab-editor-muted-strong));
   }
 
   .roll-table-section label {
@@ -184,9 +184,9 @@
     gap: 8px;
     margin-bottom: 6px;
     padding: 8px 10px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--fab-overlay-light-06);
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--fab-overlay-light-03);
   }
 
   .mapping-label {

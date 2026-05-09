@@ -59,8 +59,8 @@
     flex-direction: column;
     height: 100%;
     overflow: hidden;
-    border-left: 1px solid var(--fabricate-editor-border, rgba(255, 255, 255, 0.14));
-    background: var(--fabricate-editor-surface, rgba(0, 0, 0, 0.16));
+    border-left: 1px solid var(--fab-editor-border, var(--fab-overlay-light-14));
+    background: var(--fab-editor-surface, var(--fab-overlay-dark-16));
     padding: 0;
     min-width: 200px;
     max-width: 280px;
@@ -68,15 +68,15 @@
 
   .picker-header {
     flex: 0 0 auto;
-    background: var(--fabricate-editor-menu-bg, #171b26);
+    background: var(--fab-editor-menu-bg, var(--fab-editor-menu-bg));
     padding: 10px;
-    border-bottom: 1px solid var(--fabricate-editor-border, rgba(255, 255, 255, 0.14));
+    border-bottom: 1px solid var(--fab-editor-border, var(--fab-overlay-light-14));
   }
 
   .picker-heading {
     margin: 0 0 6px;
     font-size: 1rem;
-    color: var(--fabricate-editor-muted-strong, rgba(255, 236, 220, 0.82));
+    color: var(--fab-editor-muted-strong, var(--fab-editor-muted-strong));
   }
 
   .picker-search {
@@ -105,10 +105,10 @@
     gap: 10px;
     width: 100%;
     padding: 8px 10px;
-    border: 1px solid var(--fabricate-editor-border, rgba(255, 255, 255, 0.14));
+    border: 1px solid var(--fab-editor-border, var(--fab-overlay-light-14));
     border-radius: 8px;
-    background: var(--fabricate-editor-input-bg, rgba(255, 255, 255, 0.04));
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    background: var(--fab-editor-input-bg, var(--fab-overlay-light-04));
+    box-shadow: inset 0 1px 0 var(--fab-overlay-light-03);
     cursor: grab;
     overflow: hidden;
     text-align: center;
@@ -120,9 +120,9 @@
   }
 
   .picker-card:hover {
-    background: var(--fabricate-editor-accent-soft, rgba(74, 144, 226, 0.22));
-    border-color: rgba(148, 190, 255, 0.3);
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.18);
+    background: var(--fab-editor-accent-soft, var(--fab-editor-accent-soft));
+    border-color: var(--fab-blue-border);
+    box-shadow: 0 10px 20px var(--fab-overlay-dark-18);
     transform: translateY(-1px);
   }
 
@@ -138,7 +138,7 @@
     flex: 1 1 auto;
     font-size: 0.75rem;
     line-height: 1.2;
-    color: var(--fabricate-editor-text, rgba(255, 243, 232, 0.92));
+    color: var(--fab-editor-text, var(--fab-editor-text));
     max-width: 100%;
     min-width: 0;
     text-align: left;
@@ -148,7 +148,7 @@
   }
 
   .picker-empty {
-    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
+    color: var(--fab-editor-muted, var(--fab-editor-muted));
     font-style: italic;
     text-align: center;
     padding: 18px 12px;
@@ -160,7 +160,7 @@
       max-width: none;
       max-height: 260px;
       border-left: 0;
-      border-top: 1px solid var(--fabricate-editor-border, rgba(255, 255, 255, 0.14));
+      border-top: 1px solid var(--fab-editor-border, var(--fab-overlay-light-14));
     }
   }
 </style>

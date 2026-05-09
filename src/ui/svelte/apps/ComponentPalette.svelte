@@ -184,7 +184,7 @@
     min-width: 20px;
     text-align: center;
     background: var(--fab-accent);
-    color: #051e0c;
+    color: var(--fab-on-accent);
     border: 1px solid var(--fab-accent-strong);
   }
 
