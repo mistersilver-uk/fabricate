@@ -20,7 +20,11 @@ This guide walks you through installing Fabricate, creating your first crafting 
 
 ### Theme
 
-Fabricate defaults to the **Fabricate** colour theme. To use the previous dark green palette, open Foundry's module settings for Fabricate and set **Fabricate Theme** to **Mythwright**.
+Fabricate defaults to the **Fabricate** colour theme. The theme setting also includes **Mythwright**, **Ironblood Forge**, **Hearth & Herb**, **Starglass Arcana**, and **Foundry Native**.
+
+Open Foundry's module settings for Fabricate and set **Fabricate Theme** to switch palettes. Changing the theme updates open Fabricate app windows immediately; you do not need to close and reopen them.
+
+**Foundry Native** is a fixed Foundry-inspired Fabricate palette. It is designed to sit closer to Foundry's default visual language, but it does not dynamically follow your active Foundry skin or third-party Foundry theme.
 
 ## Step 1: Open the Crafting UI
 

@@ -505,8 +505,8 @@ test('manager-v2 pagination footer uses scoped chrome with stable summary, nav, 
 test('design-system colour tokens are declared in the theme layer as the agreed source of truth', () => {
   const rootBlock = blockFor(':root');
   const themeBlock = [
-    blockFor(':root,\n:root[data-fabricate-theme="fabricate"]'),
-    blockFor(':root[data-fabricate-theme="mythwright"]')
+    blockFor(':root,\n:root[data-fabricate-theme="fabricate"],\n.fabricate[data-fabricate-theme="fabricate"]'),
+    blockFor(':root[data-fabricate-theme="mythwright"],\n.fabricate[data-fabricate-theme="mythwright"]')
   ].join('\n');
 
   for (const token of [

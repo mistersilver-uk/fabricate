@@ -44,33 +44,77 @@ describe('Fabricate theme management', () => {
     assert.equal(theme.definition.config, true);
     assert.equal(theme.definition.type, String);
     assert.equal(theme.definition.default, DEFAULT_FABRICATE_THEME);
+    assert.deepEqual(FABRICATE_THEME_IDS, {
+      FABRICATE: 'fabricate',
+      MYTHWRIGHT: 'mythwright',
+      IRONBLOOD_FORGE: 'ironblood-forge',
+      HEARTH_HERB: 'hearth-herb',
+      STARGLASS_ARCANA: 'starglass-arcana',
+      FOUNDRY_NATIVE: 'foundry-native'
+    });
+    assert.deepEqual(FABRICATE_THEME_CHOICES, {
+      fabricate: 'Fabricate',
+      mythwright: 'Mythwright',
+      'ironblood-forge': 'Ironblood Forge',
+      'hearth-herb': 'Hearth & Herb',
+      'starglass-arcana': 'Starglass Arcana',
+      'foundry-native': 'Foundry Native'
+    });
     assert.deepEqual(theme.definition.choices, FABRICATE_THEME_CHOICES);
   });
 
-  it('applies theme changes through the registered setting onChange callback', () => {
+  it('applies theme changes through the registered setting onChange callback and stamps open Fabricate app roots', () => {
     let themeDefinition;
     globalThis.game.settings.register = (_namespace, key, definition) => {
       if (key === SETTING_KEYS.THEME) themeDefinition = definition;
     };
+    document.body.innerHTML = `
+      <section class="fabricate" data-appid="crafting"></section>
+      <section class="fabricate" data-appid="manager">
+        <div class="fabricate-manager-v2"></div>
+      </section>
+      <section class="fabricate-manager-v2" data-appid="surface-only"></section>
+    `;
 
     registerFabricateSettings();
-    themeDefinition.onChange(FABRICATE_THEME_IDS.MYTHWRIGHT);
+    themeDefinition.onChange(FABRICATE_THEME_IDS.STARGLASS_ARCANA);
 
-    assert.equal(document.documentElement.getAttribute(FABRICATE_THEME_ATTRIBUTE), FABRICATE_THEME_IDS.MYTHWRIGHT);
+    assert.equal(document.documentElement.getAttribute(FABRICATE_THEME_ATTRIBUTE), FABRICATE_THEME_IDS.STARGLASS_ARCANA);
+    for (const appRoot of document.querySelectorAll('.fabricate')) {
+      assert.equal(
+        appRoot.getAttribute(FABRICATE_THEME_ATTRIBUTE),
+        FABRICATE_THEME_IDS.STARGLASS_ARCANA
+      );
+    }
+    assert.equal(
+      document.querySelector('[data-appid="surface-only"]').getAttribute(FABRICATE_THEME_ATTRIBUTE),
+      null
+    );
   });
 
   it('applies the current stored theme after settings registration', () => {
+    document.body.innerHTML = '<section class="fabricate" data-appid="gathering"></section>';
     const applied = applyCurrentFabricateTheme(
-      key => key === SETTING_KEYS.THEME ? FABRICATE_THEME_IDS.MYTHWRIGHT : undefined,
+      key => key === SETTING_KEYS.THEME ? FABRICATE_THEME_IDS.IRONBLOOD_FORGE : undefined,
       SETTING_KEYS.THEME
     );
 
-    assert.equal(applied, FABRICATE_THEME_IDS.MYTHWRIGHT);
-    assert.equal(document.documentElement.getAttribute(FABRICATE_THEME_ATTRIBUTE), FABRICATE_THEME_IDS.MYTHWRIGHT);
+    assert.equal(applied, FABRICATE_THEME_IDS.IRONBLOOD_FORGE);
+    assert.equal(document.documentElement.getAttribute(FABRICATE_THEME_ATTRIBUTE), FABRICATE_THEME_IDS.IRONBLOOD_FORGE);
+    assert.equal(
+      document.querySelector('[data-appid="gathering"]').getAttribute(FABRICATE_THEME_ATTRIBUTE),
+      FABRICATE_THEME_IDS.IRONBLOOD_FORGE
+    );
   });
 
-  it('normalizes invalid theme ids to the Fabricate default', () => {
-    assert.equal(normalizeFabricateTheme('unknown'), FABRICATE_THEME_IDS.FABRICATE);
+  it('normalizes supported theme ids and safely falls back for unknown values', () => {
+    for (const themeId of Object.values(FABRICATE_THEME_IDS)) {
+      assert.equal(normalizeFabricateTheme(themeId), themeId);
+    }
+
+    for (const invalidThemeId of [undefined, null, '', 'unknown', {}, []]) {
+      assert.equal(normalizeFabricateTheme(invalidThemeId), FABRICATE_THEME_IDS.FABRICATE);
+    }
 
     const applied = applyFabricateTheme('unknown');
     assert.equal(applied, FABRICATE_THEME_IDS.FABRICATE);
