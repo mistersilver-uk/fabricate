@@ -88,6 +88,14 @@
       "AutoCraft": {
         "Name": "Auto-Craft",
         "Hint": "Automatically craft items without showing a confirmation dialog when you have all required materials."
+      },
+      "Theme": {
+        "Name": "Fabricate Theme",
+        "Hint": "Choose the colour theme for Fabricate's module UI.",
+        "Choices": {
+          "Fabricate": "Fabricate",
+          "Mythwright": "Mythwright"
+        }
       }
     },
     "Search": {

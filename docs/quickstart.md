@@ -18,6 +18,10 @@ This guide walks you through installing Fabricate, creating your first crafting 
 4. Click **Install**
 5. Enable the module in your world
 
+### Theme
+
+Fabricate defaults to the **Fabricate** colour theme. To use the previous dark green palette, open Foundry's module settings for Fabricate and set **Fabricate Theme** to **Mythwright**.
+
 ## Step 1: Open the Crafting UI
 
 Open the **Items** sidebar on the left side of Foundry. You'll see two new header buttons:

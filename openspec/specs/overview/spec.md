@@ -105,9 +105,9 @@ World:
 - `fabricate.craftingSystems`
 - `fabricate.recipes`
 - `fabricate.gatheringEnvironments`
+- `fabricate.theme`
 
 Client:
-
 
 - `fabricate.lastCraftingActor`
 - `fabricate.lastGatheringActor`

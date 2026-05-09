@@ -21,7 +21,7 @@ describe('Recipe editor theme layout contract', () => {
     assert.match(rootSource, /class="flags-section editor-panel-surface"/);
     assert.match(rootSource, /class="ingredient-sets-section editor-panel-surface"/);
     assert.match(rootSource, /class="result-groups-section editor-panel-surface"/);
-    assert.match(rootSource, /--fabricate-editor-surface:/);
+    assert.match(rootSource, /--fab-editor-surface:/);
     assert.match(rootSource, /\.editor-panel-surface \{/);
   });
 
@@ -54,7 +54,7 @@ describe('Recipe editor theme layout contract', () => {
       'validation banner should not use the previous pale error background'
     );
     assert.ok(
-      bannerSource.includes('var(--fabricate-editor-border-danger'),
+      bannerSource.includes('var(--fab-editor-border-danger'),
       'validation banner should rely on the editor danger token set'
     );
     assert.ok(
@@ -90,7 +90,7 @@ describe('Recipe editor theme layout contract', () => {
       'picker search section should use a solid surface without gradient treatments'
     );
     assert.ok(
-      pickerSource.includes('background: var(--fabricate-editor-menu-bg, #171b26);'),
+      pickerSource.includes('background: var(--fab-editor-menu-bg'),
       'picker search section should use the editor solid surface token'
     );
     assert.ok(
@@ -98,7 +98,7 @@ describe('Recipe editor theme layout contract', () => {
       'picker should dedicate a scroll region to the grid beneath the search section'
     );
     assert.ok(
-      pickerSource.includes('var(--fabricate-editor-input-bg'),
+      pickerSource.includes('var(--fab-editor-input-bg'),
       'picker cards should use the shared editor input/surface token'
     );
   });

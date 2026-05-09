@@ -200,17 +200,17 @@
 
 <style>
   .accordion-panel {
-    border: 1px solid var(--fabricate-editor-border, rgba(255, 255, 255, 0.14));
+    border: 1px solid var(--fab-editor-border, var(--fab-overlay-light-14));
     border-radius: 10px;
     margin-bottom: 8px;
     overflow: hidden;
-    background: var(--fabricate-editor-surface-soft, rgba(255, 255, 255, 0.05));
-    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
+    background: var(--fab-editor-surface-soft, var(--fab-overlay-light-05));
+    box-shadow: 0 10px 22px var(--fab-overlay-dark-18);
   }
 
   .group-error {
-    border-color: var(--fabricate-editor-border-danger, rgba(255, 124, 102, 0.48));
-    box-shadow: 0 0 0 1px var(--fabricate-editor-border-danger, rgba(255, 124, 102, 0.48));
+    border-color: var(--fab-editor-border-danger, var(--fab-editor-border-danger));
+    box-shadow: 0 0 0 1px var(--fab-editor-border-danger, var(--fab-editor-border-danger));
   }
 
   .accordion-header {
@@ -219,13 +219,13 @@
     gap: 6px;
     padding: 8px 12px;
     cursor: pointer;
-    background: rgba(0, 0, 0, 0.18);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: var(--fab-overlay-dark-18);
+    border-bottom: 1px solid var(--fab-overlay-light-06);
     user-select: none;
   }
 
   .accordion-header:focus-visible {
-    outline: 2px solid var(--color-border-highlight, #4488cc);
+    outline: 2px solid var(--color-border-highlight, var(--fab-info));
   }
 
   .chevron {
@@ -235,18 +235,18 @@
 
   .drag-handle {
     cursor: grab;
-    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
+    color: var(--fab-editor-muted, var(--fab-editor-muted));
   }
 
   .panel-title {
     font-weight: bold;
     flex: 1;
-    color: var(--fabricate-editor-text, rgba(255, 243, 232, 0.92));
+    color: var(--fab-editor-text, var(--fab-editor-text));
   }
 
   .panel-summary {
     font-size: 0.85rem;
-    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
+    color: var(--fab-editor-muted, var(--fab-editor-muted));
   }
 
   .panel-actions {
@@ -260,7 +260,7 @@
     cursor: pointer;
     padding: 2px 4px;
     border-radius: 5px;
-    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
+    color: var(--fab-editor-muted, var(--fab-editor-muted));
   }
 
   .panel-actions button:disabled {
@@ -270,13 +270,13 @@
 
   .panel-actions button:hover:not(:disabled),
   .panel-actions button:focus-visible:not(:disabled) {
-    background: var(--fabricate-editor-input-bg-hover, rgba(255, 255, 255, 0.07));
-    color: var(--fabricate-editor-text, rgba(255, 243, 232, 0.92));
+    background: var(--fab-editor-input-bg-hover, var(--fab-overlay-light-07));
+    color: var(--fab-editor-text, var(--fab-editor-text));
   }
 
   .accordion-body {
     padding: 12px;
-    background: rgba(0, 0, 0, 0.12);
+    background: var(--fab-overlay-dark-12);
   }
 
   .group-name-row {
@@ -289,7 +289,7 @@
   .group-name-row label {
     font-weight: bold;
     white-space: nowrap;
-    color: var(--fabricate-editor-muted-strong, rgba(255, 236, 220, 0.82));
+    color: var(--fab-editor-muted-strong, var(--fab-editor-muted-strong));
   }
 
   .group-name-row input {
@@ -306,8 +306,8 @@
     text-align: left;
     font-size: 0.8rem;
     padding: 2px 4px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
+    border-bottom: 1px solid var(--fab-overlay-light-08);
+    color: var(--fab-editor-muted, var(--fab-editor-muted));
   }
 
   .result-table td {
@@ -321,9 +321,9 @@
     gap: 4px;
     min-height: 34px;
     padding: 4px 6px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--fab-overlay-light-05);
     border-radius: 6px;
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--fab-overlay-light-03);
   }
 
   .item-thumb {
@@ -333,7 +333,7 @@
   }
 
   .no-item {
-    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
+    color: var(--fab-editor-muted, var(--fab-editor-muted));
     font-style: italic;
   }
 
@@ -351,11 +351,11 @@
     cursor: pointer;
     padding: 2px 4px;
     border-radius: 5px;
-    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
+    color: var(--fab-editor-muted, var(--fab-editor-muted));
   }
 
   .icon-button.danger {
-    color: var(--fabricate-editor-danger, rgba(255, 216, 208, 0.95));
+    color: var(--fab-editor-danger, var(--fab-editor-danger));
   }
 
   .result-actions {
@@ -363,22 +363,22 @@
   }
 
   .results-empty {
-    border: 2px dashed rgba(148, 190, 255, 0.3);
+    border: 2px dashed var(--fab-blue-border);
     border-radius: 8px;
     padding: 12px;
     text-align: center;
-    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
+    color: var(--fab-editor-muted, var(--fab-editor-muted));
     font-style: italic;
-    background: rgba(74, 144, 226, 0.08);
+    background: var(--fab-blue-soft);
   }
 
   .drop-zone-area {
-    border: 2px dashed rgba(148, 190, 255, 0.3);
+    border: 2px dashed var(--fab-blue-border);
     border-radius: 8px;
     padding: 12px;
     text-align: center;
-    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
+    color: var(--fab-editor-muted, var(--fab-editor-muted));
     margin-top: 8px;
-    background: rgba(74, 144, 226, 0.08);
+    background: var(--fab-blue-soft);
   }
 </style>

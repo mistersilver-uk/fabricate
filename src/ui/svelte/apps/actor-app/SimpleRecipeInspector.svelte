@@ -456,7 +456,7 @@
 
   .simple-inspector__btn--primary {
     background: var(--fab-accent);
-    color: #051e0c;
+    color: var(--fab-on-accent);
     border-color: var(--fab-accent-strong);
     flex: 1;
     justify-content: center;

@@ -179,7 +179,7 @@
 
   .component-editor-header {
     padding: 14px 16px 10px;
-    border-bottom: 1px solid var(--color-border-light, #ccc);
+    border-bottom: 1px solid var(--fab-border);
     flex-shrink: 0;
   }
 
@@ -224,8 +224,8 @@
     gap: 8px;
     padding: 8px 10px;
     border-radius: 8px;
-    border: 1px solid var(--color-border-light, #ccc);
-    background: rgba(0, 0, 0, 0.05);
+    border: 1px solid var(--fab-border);
+    background: var(--fab-overlay-dark-05);
   }
 
   .tag-chip input {
@@ -245,8 +245,8 @@
     gap: 8px;
     padding: 8px 10px;
     border-radius: 9px;
-    border: 1px solid var(--color-border-light, #ccc);
-    background: rgba(0, 0, 0, 0.05);
+    border: 1px solid var(--fab-border);
+    background: var(--fab-overlay-dark-05);
   }
 
   .essence-icon {
@@ -255,7 +255,7 @@
     display: grid;
     place-items: center;
     border-radius: 8px;
-    background: rgba(0, 0, 0, 0.08);
+    background: var(--fab-overlay-dark-08);
     flex: 0 0 auto;
   }
 
@@ -288,8 +288,8 @@
     width: 24px;
     height: 24px;
     border-radius: 7px;
-    border: 1px solid var(--color-border-light, #bbb);
-    background: rgba(0, 0, 0, 0.04);
+    border: 1px solid var(--fab-border-strong);
+    background: var(--fab-overlay-dark-04, var(--fab-overlay-dark-05));
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -304,8 +304,8 @@
 
   .essence-step:hover,
   .essence-step:focus-visible {
-    border-color: var(--color-text-accent, #666);
-    background: rgba(0, 0, 0, 0.08);
+    border-color: var(--color-text-accent, var(--fab-text-subtle));
+    background: var(--fab-overlay-dark-08);
   }
 
   .component-editor-footer {
@@ -313,7 +313,7 @@
     justify-content: flex-end;
     gap: 8px;
     padding: 12px 16px;
-    border-top: 1px solid var(--color-border-light, #ccc);
+    border-top: 1px solid var(--fab-border);
     flex-shrink: 0;
   }
 

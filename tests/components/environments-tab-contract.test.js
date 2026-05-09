@@ -527,12 +527,12 @@ describe('GM environments tab source contract', () => {
   it('separates amber stale-reference warnings from red validation errors', () => {
     assert.match(
       styleSource,
-      /\.fabricate-admin \.environment-field-error\s*\{[^}]*color:\s*#f3b5b5;/s,
+      /\.fabricate-admin \.environment-field-error\s*\{[^}]*color:\s*var\(--fab-danger-text\);/s,
       'validation errors should keep red error treatment'
     );
     assert.match(
       styleSource,
-      /\.fabricate-admin \.environment-stale-warning\s*\{[^}]*border:\s*1px solid rgba\(240,\s*173,\s*78,\s*0\.42\);[^}]*background:\s*rgba\(240,\s*173,\s*78,\s*0\.12\);[^}]*color:\s*#f3d08b;/s,
+      /\.fabricate-admin \.environment-stale-warning\s*\{[^}]*border:\s*1px solid var\(--fab-warning-border\);[^}]*background:\s*var\(--fab-warning-soft\);[^}]*color:\s*var\(--fab-warning-text\);/s,
       'stale references should render as amber warnings, not red validation errors'
     );
     assert.doesNotMatch(
@@ -592,7 +592,7 @@ describe('GM environments tab source contract', () => {
     );
     assert.match(
       styleSource,
-      /\.fabricate-admin \.environment-save-actions\s*\{[^}]*padding:\s*8px 0 calc\(8px \+ env\(safe-area-inset-bottom,\s*0px\)\);[^}]*background:\s*rgba\(20,\s*24,\s*31,\s*0\.96\);/s,
+      /\.fabricate-admin \.environment-save-actions\s*\{[^}]*padding:\s*8px 0 calc\(8px \+ env\(safe-area-inset-bottom,\s*0px\)\);[^}]*background:\s*var\(--fab-bg-2\);/s,
       'save actions should use restrained dark admin styling and safe-area padding without overlapping fields'
     );
     assert.match(
@@ -720,13 +720,13 @@ describe('GM environments tab source contract', () => {
     );
     assert.match(
       styleSource,
-      /\.fabricate-admin \.environment-card-actions \.environment-action-menu-trigger:hover,\s*\.fabricate-admin \.environment-card-actions \.environment-action-menu-trigger:focus-visible,\s*\.fabricate-admin \.environment-card-actions \.btn-icon:hover,\s*\.fabricate-admin \.environment-card-actions \.btn-icon:focus-visible\s*\{[^}]*background:\s*rgba\(18,\s*22,\s*32,\s*0\.96\);[^}]*border-color:\s*rgba\(120,\s*160,\s*255,\s*0\.65\);[^}]*box-shadow:/s,
-      'environment card action hover/focus should keep an opaque readable chip instead of a clear wash'
+      /\.fabricate-admin \.environment-card-actions \.environment-action-menu-trigger:hover,\s*\.fabricate-admin \.environment-card-actions \.environment-action-menu-trigger:focus-visible,\s*\.fabricate-admin \.environment-card-actions \.btn-icon:hover,\s*\.fabricate-admin \.environment-card-actions \.btn-icon:focus-visible\s*\{[^}]*background:\s*var\(--fab-bg-2\);[^}]*border-color:\s*var\(--fab-info-border\);[^}]*box-shadow:/s,
+      'environment card action hover/focus should keep an opaque themed readable chip instead of a clear wash'
     );
     assert.match(
       styleSource,
-      /\.fabricate-admin \.environment-card-actions \.environment-card-delete:hover,\s*\.fabricate-admin \.environment-card-actions \.environment-card-delete:focus-visible\s*\{[^}]*background:\s*rgba\(92,\s*24,\s*28,\s*0\.96\);[^}]*border-color:\s*rgba\(220,\s*80,\s*80,\s*0\.72\);/s,
-      'environment card delete hover/focus should keep an opaque danger chip'
+      /\.fabricate-admin \.environment-card-actions \.environment-card-delete:hover,\s*\.fabricate-admin \.environment-card-actions \.environment-card-delete:focus-visible\s*\{[^}]*background:\s*var\(--fab-danger-surface-strong\);[^}]*border-color:\s*var\(--fab-danger-focus\);/s,
+      'environment card delete hover/focus should keep an opaque themed danger chip'
     );
   });
 

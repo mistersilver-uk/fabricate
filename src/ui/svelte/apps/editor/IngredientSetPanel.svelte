@@ -252,12 +252,12 @@
 
 <style>
   .accordion-panel {
-    border: 1px solid var(--fabricate-editor-border, rgba(255, 255, 255, 0.14));
+    border: 1px solid var(--fab-editor-border, var(--fab-overlay-light-14));
     border-radius: 10px;
     margin-bottom: 8px;
     overflow: hidden;
-    background: var(--fabricate-editor-surface-soft, rgba(255, 255, 255, 0.05));
-    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
+    background: var(--fab-editor-surface-soft, var(--fab-overlay-light-05));
+    box-shadow: 0 10px 22px var(--fab-overlay-dark-18);
   }
 
   .accordion-header {
@@ -266,13 +266,13 @@
     gap: 6px;
     padding: 8px 12px;
     cursor: pointer;
-    background: rgba(0, 0, 0, 0.18);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: var(--fab-overlay-dark-18);
+    border-bottom: 1px solid var(--fab-overlay-light-06);
     user-select: none;
   }
 
   .accordion-header:focus-visible {
-    outline: 2px solid var(--color-border-highlight, #4488cc);
+    outline: 2px solid var(--fab-info-border);
   }
 
   .chevron {
@@ -282,18 +282,18 @@
 
   .drag-handle {
     cursor: grab;
-    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
+    color: var(--fab-editor-muted, var(--fab-editor-muted));
   }
 
   .panel-title {
     font-weight: bold;
     flex: 1;
-    color: var(--fabricate-editor-text, rgba(255, 243, 232, 0.92));
+    color: var(--fab-editor-text, var(--fab-editor-text));
   }
 
   .panel-summary {
     font-size: 0.85rem;
-    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
+    color: var(--fab-editor-muted, var(--fab-editor-muted));
   }
 
   .panel-actions {
@@ -307,7 +307,7 @@
     cursor: pointer;
     padding: 2px 4px;
     border-radius: 5px;
-    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
+    color: var(--fab-editor-muted, var(--fab-editor-muted));
   }
 
   .panel-actions button:disabled {
@@ -317,13 +317,13 @@
 
   .panel-actions button:hover:not(:disabled),
   .panel-actions button:focus-visible:not(:disabled) {
-    background: var(--fabricate-editor-input-bg-hover, rgba(255, 255, 255, 0.07));
-    color: var(--fabricate-editor-text, rgba(255, 243, 232, 0.92));
+    background: var(--fab-editor-input-bg-hover, var(--fab-overlay-light-07));
+    color: var(--fab-editor-text, var(--fab-editor-text));
   }
 
   .accordion-body {
     padding: 12px;
-    background: rgba(0, 0, 0, 0.12);
+    background: var(--fab-overlay-dark-12);
   }
 
   .set-name-row {
@@ -336,7 +336,7 @@
   .set-name-row label {
     font-weight: bold;
     white-space: nowrap;
-    color: var(--fabricate-editor-muted-strong, rgba(255, 236, 220, 0.82));
+    color: var(--fab-editor-muted-strong, var(--fab-editor-muted-strong));
   }
 
   .set-name-row input {
@@ -348,25 +348,25 @@
   }
 
   .drop-zone-area {
-    border: 2px dashed rgba(148, 190, 255, 0.3);
+    border: 2px dashed var(--fab-blue-border);
     border-radius: 8px;
     padding: 12px;
     text-align: center;
-    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
+    color: var(--fab-editor-muted, var(--fab-editor-muted));
     margin: 8px 0;
-    background: rgba(74, 144, 226, 0.08);
+    background: var(--fab-blue-soft);
   }
 
   .essence-requirements {
     margin-top: 10px;
     padding-top: 10px;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid var(--fab-overlay-light-08);
   }
 
   .essence-requirements h4 {
     margin: 0 0 8px 0;
     font-size: 0.9rem;
-    color: var(--fabricate-editor-muted-strong, rgba(255, 236, 220, 0.82));
+    color: var(--fab-editor-muted-strong, var(--fab-editor-muted-strong));
   }
 
   .essence-grid {
@@ -382,8 +382,8 @@
     gap: 6px;
     padding: 8px 9px;
     border-radius: 9px;
-    border: 1px solid var(--fabricate-editor-border, rgba(255, 255, 255, 0.14));
-    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--fab-editor-border, var(--fab-overlay-light-14));
+    background: var(--fab-overlay-light-04);
     min-width: 0;
   }
 
@@ -391,8 +391,8 @@
     width: 24px;
     height: 24px;
     border-radius: 7px;
-    border: 1px solid var(--fabricate-editor-border, rgba(255, 255, 255, 0.14));
-    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--fab-editor-border, var(--fab-overlay-light-14));
+    background: var(--fab-overlay-light-04);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -408,13 +408,13 @@
 
   .essence-step:hover:not(:disabled),
   .essence-step:focus-visible {
-    border-color: var(--color-border-highlight, #4488cc);
-    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--fab-info-border);
+    background: var(--fab-overlay-light-08);
   }
 
   .essence-requirements .hint {
     margin: 0;
-    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
+    color: var(--fab-editor-muted, var(--fab-editor-muted));
   }
 
   .essence-requirements .essence-card .essence-quantity-input {
@@ -444,7 +444,7 @@
     display: grid;
     place-items: center;
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--fab-overlay-light-06);
     flex: 0 0 auto;
   }
 

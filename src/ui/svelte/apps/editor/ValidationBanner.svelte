@@ -33,12 +33,12 @@
     position: sticky;
     top: 0;
     z-index: 10;
-    background: rgba(82, 22, 31, 0.94);
-    border: 1px solid var(--fabricate-editor-border-danger, rgba(255, 124, 102, 0.48));
+    background: var(--fab-danger-surface);
+    border: 1px solid var(--fab-editor-border-danger, var(--fab-editor-border-danger));
     border-radius: 10px;
     padding: 12px 14px;
     margin-bottom: 10px;
-    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
+    box-shadow: 0 10px 22px var(--fab-overlay-dark-18);
   }
 
   .validation-banner strong {
@@ -46,7 +46,7 @@
     align-items: center;
     gap: 6px;
     margin-bottom: 6px;
-    color: var(--fabricate-editor-danger, rgba(255, 216, 208, 0.95));
+    color: var(--fab-editor-danger, var(--fab-editor-danger));
   }
 
   .validation-error-list {
@@ -64,16 +64,16 @@
     background: none;
     border: none;
     padding: 0;
-    color: var(--fabricate-editor-danger, rgba(255, 216, 208, 0.95));
+    color: var(--fab-editor-danger, var(--fab-editor-danger));
     text-decoration: underline;
-    text-decoration-color: rgba(255, 216, 208, 0.56);
+    text-decoration-color: var(--fab-danger-text);
     cursor: pointer;
     font-size: inherit;
     text-align: left;
   }
 
   .validation-error-link:hover {
-    color: #fff;
-    text-decoration-color: #fff;
+    color: var(--fab-text);
+    text-decoration-color: var(--fab-text);
   }
 </style>

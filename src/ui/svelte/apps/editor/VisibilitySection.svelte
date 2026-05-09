@@ -291,14 +291,14 @@
   .visibility-section {
     margin-bottom: 0;
     padding: 14px;
-    border: 1px solid var(--fabricate-editor-border, rgba(255, 255, 255, 0.14));
+    border: 1px solid var(--fab-editor-border, var(--fab-overlay-light-14));
     border-radius: 12px;
-    background: var(--fabricate-editor-surface, rgba(0, 0, 0, 0.16));
-    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.2);
+    background: var(--fab-editor-surface, var(--fab-overlay-dark-16));
+    box-shadow: 0 14px 32px var(--fab-overlay-dark-20);
   }
 
   .hint {
-    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
+    color: var(--fab-editor-muted, var(--fab-editor-muted));
     font-style: italic;
     margin: 4px 0;
   }
@@ -308,13 +308,13 @@
     align-items: center;
     gap: 6px;
     cursor: pointer;
-    color: var(--fabricate-editor-muted-strong, rgba(255, 236, 220, 0.82));
+    color: var(--fab-editor-muted-strong, var(--fab-editor-muted-strong));
   }
 
   .user-checkboxes {
     margin-top: 8px;
     padding: 10px 0 0 12px;
-    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    border-left: 1px solid var(--fab-overlay-light-08);
   }
 
   .user-checkboxes h4 {
@@ -357,16 +357,16 @@
     height: 100%;
     padding: 10px 8px;
     box-sizing: border-box;
-    border: 1px dashed rgba(255, 255, 255, 0.22);
+    border: 1px dashed var(--fab-overlay-light-22);
     border-radius: 10px;
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--fab-overlay-light-03);
     overflow: hidden;
     transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
   }
 
   .recipe-item-target:global(.recipe-item-drop-active) {
-    border-color: rgba(148, 190, 255, 0.46);
-    background: rgba(74, 144, 226, 0.16);
+    border-color: var(--fab-info-border);
+    background: var(--fab-blue-soft);
     transform: translateY(-1px);
   }
 
@@ -405,9 +405,9 @@
     position: relative;
     box-sizing: border-box;
     padding: 0;
-    border: 1px solid var(--fabricate-editor-border, rgba(255, 255, 255, 0.14));
+    border: 1px solid var(--fab-editor-border, var(--fab-overlay-light-14));
     border-radius: 10px;
-    background: var(--fabricate-editor-input-bg, rgba(255, 255, 255, 0.04));
+    background: var(--fab-editor-input-bg, var(--fab-overlay-light-04));
     overflow: hidden;
     cursor: pointer;
   }
@@ -417,7 +417,7 @@
     align-items: center;
     gap: 10px;
     min-height: 74px;
-    color: var(--fabricate-editor-muted-strong, rgba(255, 236, 220, 0.82));
+    color: var(--fab-editor-muted-strong, var(--fab-editor-muted-strong));
   }
 
   .recipe-item-empty i {
@@ -436,7 +436,7 @@
     border-radius: 8px;
     object-fit: cover;
     flex: 0 0 auto;
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--fab-overlay-light-05);
   }
 
   .recipe-item-img {
@@ -476,7 +476,7 @@
     gap: 3px;
     padding: 8px 9px 9px;
     box-sizing: border-box;
-    background: rgba(0, 0, 0, 0.7);
+    background: var(--fab-overlay-dark-70);
   }
 
   .recipe-item-row-text {
@@ -508,7 +508,7 @@
     display: -webkit-box;
     font-size: 0.78rem;
     line-height: 1.3;
-    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
+    color: var(--fab-editor-muted, var(--fab-editor-muted));
     overflow: hidden;
     white-space: normal;
     -webkit-box-orient: vertical;
@@ -516,7 +516,7 @@
 
   .recipe-item-warning,
   .recipe-item-row-state {
-    color: var(--fabricate-editor-danger, rgba(255, 216, 208, 0.95));
+    color: var(--fab-editor-danger, var(--fab-editor-danger));
   }
 
   .recipe-item-summary-hint,
@@ -552,23 +552,23 @@
     width: 30px;
     height: 30px;
     padding: 0;
-    border: 1px solid var(--fabricate-editor-border, rgba(255, 255, 255, 0.14));
+    border: 1px solid var(--fab-editor-border, var(--fab-overlay-light-14));
     border-radius: 8px;
-    background: var(--fabricate-editor-input-bg, rgba(255, 255, 255, 0.04));
-    color: var(--fabricate-editor-text, rgba(255, 243, 232, 0.92));
+    background: var(--fab-editor-input-bg, var(--fab-overlay-light-04));
+    color: var(--fab-editor-text, var(--fab-editor-text));
     cursor: pointer;
     transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
   }
 
   .recipe-item-icon-button:hover {
-    background: rgba(255, 255, 255, 0.12);
-    border-color: rgba(255, 255, 255, 0.24);
+    background: var(--fab-overlay-light-12);
+    border-color: var(--fab-overlay-light-24);
     transform: translateY(-1px);
   }
 
   .recipe-item-icon-button.danger:hover {
-    border-color: rgba(255, 124, 102, 0.4);
-    color: var(--fabricate-editor-danger, rgba(255, 216, 208, 0.95));
+    border-color: var(--fab-danger-border);
+    color: var(--fab-editor-danger, var(--fab-editor-danger));
   }
 
   .recipe-item-picker-header {
@@ -581,7 +581,7 @@
     font-size: 0.96rem;
     font-weight: 700;
     letter-spacing: 0.01em;
-    color: var(--fabricate-editor-muted-strong, rgba(255, 236, 220, 0.82));
+    color: var(--fab-editor-muted-strong, var(--fab-editor-muted-strong));
   }
 
   .recipe-item-search {
@@ -605,16 +605,16 @@
     min-height: 54px;
     padding: 8px 12px;
     box-sizing: border-box;
-    border: 1px solid var(--fabricate-editor-border, rgba(255, 255, 255, 0.14));
+    border: 1px solid var(--fab-editor-border, var(--fab-overlay-light-14));
     border-radius: 10px;
-    background: var(--fabricate-editor-input-bg, rgba(255, 255, 255, 0.04));
+    background: var(--fab-editor-input-bg, var(--fab-overlay-light-04));
     min-width: 0;
     overflow: hidden;
   }
 
   .recipe-item-row.selected {
-    border-color: rgba(148, 190, 255, 0.46);
-    background: rgba(74, 144, 226, 0.18);
+    border-color: var(--fab-info-border);
+    background: var(--fab-blue-soft);
   }
 
   .recipe-item-row-main {
@@ -630,9 +630,9 @@
     overflow: hidden;
     box-sizing: border-box;
     padding: 8px 12px 8px 10px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--fab-overlay-light-08);
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.02);
+    background: var(--fab-overlay-light-02);
     cursor: pointer;
   }
 
@@ -640,13 +640,13 @@
     display: flex;
     align-items: flex-start;
     gap: 8px;
-    color: var(--fabricate-editor-danger, rgba(255, 216, 208, 0.95));
+    color: var(--fab-editor-danger, var(--fab-editor-danger));
     margin: 0;
     font-size: 0.9rem;
     padding: 10px 12px;
-    border: 1px solid var(--fabricate-editor-border-danger, rgba(255, 124, 102, 0.48));
+    border: 1px solid var(--fab-editor-border-danger, var(--fab-editor-border-danger));
     border-radius: 8px;
-    background: var(--fabricate-editor-danger-soft, rgba(220, 53, 69, 0.18));
+    background: var(--fab-editor-danger-soft, var(--fab-editor-danger-soft));
   }
 
   @media (max-width: 900px) {

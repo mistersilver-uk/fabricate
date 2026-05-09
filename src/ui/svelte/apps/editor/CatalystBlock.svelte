@@ -123,7 +123,7 @@
 <style>
   .catalyst-block {
     margin-top: 12px;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid var(--fab-overlay-light-08);
     padding-top: 8px;
   }
 
@@ -137,7 +137,7 @@
   .catalyst-header h4 {
     margin: 0;
     font-size: 0.9rem;
-    color: var(--fabricate-editor-muted-strong, rgba(255, 236, 220, 0.82));
+    color: var(--fab-editor-muted-strong, var(--fab-editor-muted-strong));
   }
 
   .catalyst-table {
@@ -149,8 +149,8 @@
     text-align: left;
     font-size: 0.8rem;
     padding: 2px 4px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
+    border-bottom: 1px solid var(--fab-overlay-light-08);
+    color: var(--fab-editor-muted, var(--fab-editor-muted));
   }
 
   .catalyst-table td {
@@ -164,9 +164,9 @@
     gap: 4px;
     min-height: 34px;
     padding: 4px 6px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--fab-overlay-light-05);
     border-radius: 6px;
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--fab-overlay-light-03);
   }
 
   .item-thumb {
@@ -176,7 +176,7 @@
   }
 
   .no-item {
-    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
+    color: var(--fab-editor-muted, var(--fab-editor-muted));
     font-style: italic;
   }
 
@@ -190,20 +190,20 @@
     cursor: pointer;
     padding: 2px 4px;
     border-radius: 5px;
-    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
+    color: var(--fab-editor-muted, var(--fab-editor-muted));
   }
 
   .icon-button.danger {
-    color: var(--fabricate-editor-danger, rgba(255, 216, 208, 0.95));
+    color: var(--fab-editor-danger, var(--fab-editor-danger));
   }
 
   .catalyst-empty {
-    border: 2px dashed rgba(148, 190, 255, 0.3);
+    border: 2px dashed var(--fab-blue-border);
     border-radius: 8px;
     padding: 12px;
     text-align: center;
-    color: var(--fabricate-editor-muted, rgba(255, 229, 210, 0.68));
+    color: var(--fab-editor-muted, var(--fab-editor-muted));
     font-style: italic;
-    background: rgba(74, 144, 226, 0.08);
+    background: var(--fab-blue-soft);
   }
 </style>
