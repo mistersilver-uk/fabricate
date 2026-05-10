@@ -267,13 +267,13 @@ Current GM editor behavior:
 - The selected system's Gathering Settings tab configures per-system `Times of day` and `Weather conditions` matching settings with enable toggles, current value selectors, add controls, label/icon-editable value pills, and selected-system cleanup on deletion.
 - The Environments editor shows current global weather and time of day as context, not as environment browse filters.
 - Settings is the only primary GM UI surface for current global weather and current global time of day. Environment authoring may expose inherited condition evidence and future provider override evidence, but must not be the primary condition mutation surface.
-- The Environments editor exposes reusable gathering task and hazard library rows for the selected crafting system, including per-environment enable/disable toggles.
-- When the Manager V2 Gathering `Environments` browser has no environments, its empty state keeps `Environments` selected, keeps `Create environment` available, and guides GMs to prepare reusable gathering tasks plus encounter/hazard options before composing environments.
-- Reusable task and hazard row overrides stay inside expandable rows so the default environment workspace remains scannable. Collapsed rows show default-vs-override chips, enabled state, matching evidence, dirty/validation markers, and an explicit expand/collapse control.
-- Expanded override panels contain per-environment override fields only; reusable definition fields remain edited in their library surface.
+- The Environments editor exposes Gathering Task and hazard library rows for the selected crafting system, including per-environment enable/disable toggles.
+- When the Manager V2 Gathering `Environments` browser has no environments, its empty state keeps `Environments` selected, keeps `Create environment` available, and guides GMs to prepare Gathering Tasks plus encounter/hazard options before composing environments.
+- Gathering Task and hazard row overrides stay inside expandable rows so the default environment workspace remains scannable. Collapsed rows show default-vs-override chips, enabled state, matching evidence, dirty/validation markers, and an explicit expand/collapse control.
+- Expanded override panels contain per-environment override fields only; Gathering Task fields remain edited in their library surface.
 - Expanded override rows are keyboard reachable, preserve focus on save/error where practical, and stack without horizontal clipping in narrow Manager V2 widths.
-- Reusable task authoring includes name, match tags, and ordered d100 drop row reference/quantity/drop rate. D100 row selection is controlled by selected-system Gathering Rules, not reusable task authoring.
-- Reusable task authoring may also include node count, depletion timing, respawn policy, stamina cost, attempt limits, risk overrides, encounter hooks, natural expression providers, and macro providers where the selected economy/features use them.
+- Gathering Task authoring includes name, match tags, and ordered d100 drop row reference/quantity/drop rate. D100 row selection is controlled by selected-system Gathering Rules, not Gathering Task authoring.
+- Gathering Task authoring may also include node count, depletion timing, respawn policy, stamina cost, attempt limits, risk overrides, encounter hooks, natural expression providers, and macro providers where the selected economy/features use them.
 - Reusable hazard authoring includes name, image, description, enabled state, danger/match tags, d100 drop rate, and modifier provider evidence.
 - The settings/tag area can edit gathering vocabularies for regions, biomes, and danger. Weather and time-of-day vocabulary editing lives in the Gathering Settings tab condition panels.
 - The editor keeps core environment identity separate from task/node authoring.

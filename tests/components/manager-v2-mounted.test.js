@@ -681,7 +681,7 @@ function createStore(calls = [], options = {}) {
     deleteGatheringVocabularyValue: (...args) => calls.push(['deleteGatheringVocabularyValue', ...args]),
     addGatheringLibraryTask: (systemId) => {
       calls.push(['addGatheringLibraryTask', systemId]);
-      return { id: 'task-new', name: 'Reusable gathering task', dropRows: [] };
+      return { id: 'task-new', name: 'New Gathering Task', dropRows: [] };
     },
     updateGatheringLibraryTask: (...args) => calls.push(['updateGatheringLibraryTask', ...args]),
     duplicateGatheringLibraryTask: (...args) => {
@@ -1972,7 +1972,32 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Gather Moon Herbs'));
     assert.ok(target.textContent.includes('Prospect Crystal Veins'));
     assert.ok(target.textContent.includes('High Day, Clear Sky'));
-    assert.ok(target.querySelector('[data-gathering-task-inspector]').textContent.includes('Selected reusable task'));
+    assert.ok(target.querySelector('[data-gathering-task-inspector]').textContent.includes('Selected gathering task'));
+    assert.equal(
+      target.querySelector('.manager-v2-inspector').textContent.includes('Gathering task actions'),
+      false,
+      'selected gathering task inspector should not duplicate row actions'
+    );
+    assert.equal(
+      target.querySelector('.manager-v2-inspector [aria-label="Edit Gather Moon Herbs"]'),
+      null,
+      'selected gathering task inspector should not render edit action buttons'
+    );
+    assert.equal(
+      target.querySelector('.manager-v2-inspector [aria-label="Duplicate Gather Moon Herbs"]'),
+      null,
+      'selected gathering task inspector should not render duplicate action buttons'
+    );
+    assert.equal(
+      target.querySelector('.manager-v2-inspector [aria-label="Delete Gather Moon Herbs"]'),
+      null,
+      'selected gathering task inspector should not render delete action buttons'
+    );
+    assert.equal(
+      target.querySelector('[data-gathering-task-inspector] .manager-v2-action-group'),
+      null,
+      'selected gathering task identity card should not contain an action group'
+    );
     assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Nightshade x2 (80%)'));
     assert.equal(target.querySelector('[data-gathering-task-fact="environments"] strong').textContent.trim(), '1');
 
@@ -2033,7 +2058,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     flushSync();
     assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'gathering-task-edit');
     assert.ok(target.querySelector('[data-gathering-task-editor-placeholder]'));
-    assert.ok(target.textContent.includes('Detailed authoring fields for reusable gathering task definitions are coming later.'));
+    assert.ok(target.textContent.includes('Detailed authoring fields for gathering tasks are coming later.'));
     target.querySelector('[data-gathering-task-editor-placeholder] .manager-v2-button').click();
     await tick();
     flushSync();
@@ -2089,8 +2114,8 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Weather conditions'));
     assert.ok(target.textContent.includes('Regions'));
     assert.ok(target.textContent.includes('Biomes'));
-    assert.ok(target.textContent.includes('These values control current time matching for reusable tasks and hazards.'));
-    assert.ok(target.textContent.includes('These values control current weather matching for reusable tasks and hazards.'));
+    assert.ok(target.textContent.includes('These values control current time matching for gathering tasks and hazards.'));
+    assert.ok(target.textContent.includes('These values control current weather matching for gathering tasks and hazards.'));
     assert.ok(target.textContent.includes('Environments use one region. Labels can be renamed without changing ids.'));
     assert.ok(target.textContent.includes('Environments can use multiple biomes. Left-click the coloured icon to edit icon; right-click to edit colour.'));
     assert.equal(target.querySelectorAll('.manager-v2-condition-add input').length, 4);
@@ -2370,13 +2395,13 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     );
     assert.equal(target.querySelector('#manager-v2-gathering-tab-environments').getAttribute('aria-selected'), 'true');
     assert.ok(target.textContent.includes('Prepare gathering building blocks first'));
-    assert.ok(target.textContent.includes('Define reusable tasks and hazards before creating environments'));
+    assert.ok(target.textContent.includes('Define gathering tasks and hazards before creating environments'));
     assert.ok(target.textContent.includes('Review tasks'));
     assert.ok(target.textContent.includes('Review hazards'));
     assert.ok(target.textContent.includes('Plan gathering content'));
-    assert.ok(target.textContent.includes('Define reusable gathering tasks with their checks'));
+    assert.ok(target.textContent.includes('Define gathering tasks with their checks'));
     assert.ok(target.textContent.includes('Prepare encounter and hazard options'));
-    assert.ok(target.textContent.includes('Create environments after the reusable task and hazard libraries are ready to attach.'));
+    assert.ok(target.textContent.includes('Create environments after the gathering task and hazard libraries are ready to attach.'));
     assert.ok(target.textContent.includes('Gathering docs'));
     assert.equal(target.textContent.includes('Select an environment'), false);
 
@@ -2417,7 +2442,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(calls.some(call => call[0] === 'createEnvironmentDraft'));
   });
 
-  it('shows create guidance when the reusable gathering task library is empty', async () => {
+  it('shows create guidance when the gathering task library is empty', async () => {
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -2437,8 +2462,8 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    assert.ok(target.textContent.includes('No reusable tasks yet'));
-    assert.ok(target.textContent.includes('Create reusable gathering task definitions before attaching them to environments.'));
+    assert.ok(target.textContent.includes('No gathering tasks yet'));
+    assert.ok(target.textContent.includes('Create gathering tasks before attaching them to environments.'));
     target.querySelector('[data-gathering-tasks-browser] .manager-v2-button.is-primary').click();
     await tick();
     flushSync();

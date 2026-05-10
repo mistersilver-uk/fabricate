@@ -115,7 +115,7 @@ GatheringEnvironment = {
   disabledTaskIds?: string[],
   enabledHazardIds?: string[],
   disabledHazardIds?: string[],
-  tasks: GatheringTask[],
+  tasks: GatheringTask[], // Environment Task records in the persisted schema
 }
 ```
 
@@ -123,15 +123,15 @@ GatheringEnvironment = {
 
 1. `craftingSystemId` must reference an existing `CraftingSystem`.
 2. `selectionMode` must be either `"targeted"` or `"blind"`.
-3. If `selectionMode === "targeted"`, the environment must define at least one task.
-4. If `selectionMode === "blind"`, the environment may define one or more hidden tasks. Non-GM listings expose a generic gather action unless a configured reveal state makes one or more tasks visible.
+3. If `selectionMode === "targeted"`, the environment must define at least one Environment Task.
+4. If `selectionMode === "blind"`, the environment may define one or more hidden Environment Tasks. Non-GM listings expose a generic gather action unless a configured reveal state makes one or more tasks visible.
 5. `img` is an optional player-facing environment image independent of any linked scene.
 6. If `sceneUuid` is present, it references the scene where player self-service gathering is allowed.
 7. Scene linkage is optional. If `sceneUuid` is absent, the environment is not scene-gated by default and may still be player-visible when other guards pass.
 8. Disabled environments are never attemptable by non-GM users and are hidden from normal player gathering flows.
 9. `region` is single-select; `biomes` and `dangerTags` are multi-select tag lists.
 10. `risk` is optional player-facing risk evidence. Existing risk display values may map to `dangerTags`, but reusable hazard matching uses `dangerTags`.
-11. Weather and time of day are not environment fields. They are global gathering conditions used when matching reusable tasks and hazards.
+11. Weather and time of day are not environment fields. They are global gathering conditions used when matching Gathering Tasks and hazards.
 12. `enabledTaskIds`, `disabledTaskIds`, `enabledHazardIds`, and `disabledHazardIds` store environment-level composition toggles for reusable library records without rewriting the library definitions.
 13. Environment metadata exposed to non-GM users must not leak hidden task identity, hidden result details, provider diagnostics, or GM-only notes.
 14. Legacy environments without rich metadata remain valid and load with neutral defaults.
@@ -216,25 +216,25 @@ ConditionOption = {
 9. Missing per-system weather settings default to enabled, current `clear`, and values `clear`, `cloudy`, `rain`, `storm`, `snow`, `fog`, and `wind` as option records.
 10. Missing per-system time-of-day settings default to enabled, current `day`, and values `dawn`, `day`, `dusk`, and `night` as option records.
 11. Legacy top-level `conditions`, per-system string condition values, and `vocabularies.weather` / `vocabularies.timeOfDay` remain backward-compatible inputs for normalizing missing per-system settings.
-12. Deleting a per-system condition value removes it from reusable tasks and hazards in that system only.
+12. Deleting a per-system condition value removes it from Gathering Tasks and hazards in that system only.
 13. Deleting the last value of an enabled per-system condition dimension must be rejected; GMs may disable that dimension instead.
 14. `game.fabricate.gathering.getConditions()` returns current conditions and available tag vocabularies for GM and player-facing callers.
 15. `game.fabricate.gathering.setWeather(weatherTag)`, `setTimeOfDay(timeOfDayTag)`, and `setConditions({ weather, timeOfDay })` require a GM user, validate tags against the configured vocabularies, persist the setting, dispatch `fabricate.gathering.conditionsUpdated`, and refresh gathering listings.
 16. Player-facing callers may read conditions but may not mutate them.
 17. Condition values are authored or selected by the GM unless an approved integration provider supplies them.
-18. Environments may use weather/time as matching dimensions for reusable tasks and hazards, but player environment browse filters must not expose weather/time as environment filters.
-19. Disabled per-system weather or time-of-day dimensions are ignored during reusable task and hazard matching.
+18. Environments may use weather/time as matching dimensions for Gathering Tasks and hazards, but player environment browse filters must not expose weather/time as environment filters.
+19. Disabled per-system weather or time-of-day dimensions are ignored during Gathering Task and hazard matching.
 20. Condition state may modify task availability, result yield, check difficulty, stamina cost, risk, or encounter chance through declarative or provider-driven configuration.
 21. Fabricate core must not hardcode game-system-specific weather, time, skill, or stamina formulas.
 22. A gathering attempt should snapshot relevant condition state when the attempt starts so active runs and history can explain what conditions affected the attempt.
 23. Player-facing UI may show beneficial or harmful condition notes only when those notes are not hidden by blind task or visibility rules.
 24. Changing current global conditions must not retroactively rewrite completed gathering history.
 
-## Reusable Gathering Task Library
+## Gathering Task Library
 
 ### Purpose
 
-Represent GM-authored gathering tasks that can be composed into multiple environments for a crafting system.
+Represent GM-authored Gathering Tasks that can be composed into multiple environments for a crafting system. The persisted schema currently uses `GatheringTaskDefinition`.
 
 ### Properties
 
@@ -265,8 +265,8 @@ GatheringTaskDefinition = {
 
 ### Requirements
 
-1. Definitions are scoped to one crafting system.
-2. Disabled definitions never match for player gathering.
+1. Gathering Tasks are scoped to one crafting system.
+2. Disabled Gathering Tasks never match for player gathering.
 3. Empty match tags mean "matches any" for that dimension.
 4. Region matches when omitted or equal to the environment region.
 5. Biomes match when omitted or at least one task biome is present on the environment.
@@ -274,9 +274,9 @@ GatheringTaskDefinition = {
 7. Drop rows require a `dropRate` integer from 1 to 100, a positive quantity, and either a component reference or item UUID.
 8. `itemSelectionMode` is a legacy compatibility field. New Manager V2 authoring and d100 runtime behavior use system Gathering Rules once they are authored.
 9. Row order is authoritative for `highestRankedDrop` and `limitedDrops`.
-10. A definition may declare stamina cost, node availability, attempt limits, risk overrides, encounter hooks, and condition or roll modifier providers where the selected gathering economy uses them.
-11. Per-environment overrides remain associated with the environment and must not rewrite the reusable task definition.
-12. Legacy embedded environment tasks remain valid as inline compatibility tasks.
+10. A Gathering Task may declare stamina cost, node availability, attempt limits, risk overrides, encounter hooks, and condition or roll modifier providers where the selected gathering economy uses them.
+11. Per-environment overrides remain associated with the environment and must not rewrite the Gathering Task.
+12. Legacy Environment Tasks remain valid as inline compatibility tasks.
 
 ## Reusable Gathering Hazard Library
 
@@ -309,15 +309,15 @@ GatheringHazardDefinition = {
 2. Disabled definitions never match for player gathering.
 3. Empty match tags mean "matches any" for that dimension.
 4. Danger matches when omitted or at least one hazard danger tag is present on the environment.
-5. Region, biome, weather, and time-of-day matching use the same rules as reusable task definitions.
+5. Region, biome, weather, and time-of-day matching use the same rules as Gathering Tasks.
 6. `dropRate` must be an integer from 1 to 100.
 7. Hazard output must respect blind task and GM-only redaction rules.
 
-## GatheringTask
+## EnvironmentTask
 
 ### Purpose
 
-Represent one attemptable gathering activity within an environment.
+Represent one legacy inline attemptable gathering activity within an environment. The persisted schema currently uses `GatheringTask`.
 
 ### Properties
 
@@ -381,12 +381,12 @@ GatheringTask = {
 
 ### Purpose
 
-Resolve gathering-native reusable task drops and matched hazards through ordered d100 rows.
+Resolve gathering-native Gathering Task drops and matched hazards through ordered d100 rows.
 
 ### Runtime Requirements
 
 1. Before any player attempt starts, Fabricate rejects gathering if Foundry is paused.
-2. For every enabled item row in the selected reusable task, roll `d100`, add the gathering modifier, and drop the row when `effectiveRoll >= 101 - dropRate`.
+2. For every enabled item row in the selected Gathering Task, roll `d100`, add the gathering modifier, and drop the row when `effectiveRoll >= 101 - dropRate`.
 3. For every enabled matched hazard in the environment, roll `d100`, add the hazard modifier, and drop the hazard when `effectiveRoll >= 101 - dropRate`.
 4. System Gathering Rules select rewards after item rows roll once rules are authored.
 5. Reward `highestRankedDrop` awards the first dropped item row in authored row order.

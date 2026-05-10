@@ -1915,7 +1915,8 @@ describe('createAdminStore', () => {
         randomID: (() => {
           let id = 0;
           return () => `gid-${++id}`;
-        })()
+        })(),
+        localize: (key) => key === 'FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask' ? 'New Gathering Task' : key
       });
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
@@ -1926,6 +1927,7 @@ describe('createAdminStore', () => {
       await store.updateGatheringConditions({ weather: 'rain', timeOfDay: 'night' });
       await store.updateGatheringVocabulary('regions', ['north', 'south']);
       const task = await store.addGatheringLibraryTask('sys1');
+      assert.equal(task.name, 'New Gathering Task');
       await store.updateGatheringLibraryTask('sys1', task.id, {
         name: 'Rain Herbs',
         region: 'north',
@@ -1981,7 +1983,7 @@ describe('createAdminStore', () => {
       assert.equal(get(store.viewState).gatheringConfig.systems.sys1.hazards[0].dropRate, 30);
     });
 
-    it('duplicates reusable gathering task definitions with fresh task and drop ids', async () => {
+    it('duplicates gathering tasks with fresh task and drop ids', async () => {
       const services = createMockServices({
         randomID: (() => {
           let id = 0;
@@ -2043,7 +2045,7 @@ describe('createAdminStore', () => {
       assert.equal(get(store.viewState).gatheringConfig.systems.sys1.tasks.length, 2);
     });
 
-    it('returns null when duplicating a missing reusable gathering task definition', async () => {
+    it('returns null when duplicating a missing gathering task', async () => {
       const services = createMockServices();
       services._store.gatheringConfig = {
         systems: {
@@ -2332,7 +2334,7 @@ describe('createAdminStore', () => {
       assert.deepEqual(get(store.viewState).gatheringConfig.systems.sys1.rules, services._store.gatheringConfig.systems.sys1.rules);
     });
 
-    it('requires confirmation before deleting reusable gathering records used by environments', async () => {
+    it('requires confirmation before deleting gathering library records used by environments', async () => {
       const confirmations = [];
       const services = createMockServices({
         confirmDialog: async (options) => {
@@ -2381,7 +2383,7 @@ describe('createAdminStore', () => {
       assert.equal(services._store.gatheringConfig.systems.sys1.hazards.length, 1);
     });
 
-    it('deletes reusable gathering records after used-record confirmation is accepted', async () => {
+    it('deletes gathering library records after used-record confirmation is accepted', async () => {
       let confirmationCount = 0;
       const services = createMockServices({
         confirmDialog: async () => {

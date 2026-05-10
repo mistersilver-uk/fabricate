@@ -1,7 +1,7 @@
 # Tasks
 
 - [x] Add task browser OpenSpec docs.
-- [x] Add reusable task duplicate support to `adminStore`.
+- [x] Add Gathering Task duplicate support to `adminStore`.
 - [x] Add Gathering `Tasks` tab browser UI with search, filters, pagination, row actions, and empty states.
 - [x] Add root selected-task state, task inspector, and placeholder editor route.
 - [x] Add localized strings for task browser, placeholder editor, availability, and inspector copy.

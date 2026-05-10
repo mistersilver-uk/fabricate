@@ -1538,15 +1538,15 @@ export function createAdminStore(services) {
   async function _confirmGatheringLibraryRecordDelete({ config, systemId, record, kind }) {
     const usages = _gatheringLibraryRecordUsages(config, systemId, record, kind);
     if (usages.length === 0) return true;
-    const label = kind === 'hazard' ? 'hazard' : 'task';
+    const label = kind === 'hazard' ? 'reusable gathering hazard' : 'gathering task';
     const usageList = usages
       .slice(0, 6)
       .map(usage => `<li>${_escapeHtml(usage.name)}</li>`)
       .join('');
     const overflow = usages.length > 6 ? `<li>${_escapeHtml(`and ${usages.length - 6} more`)}</li>` : '';
     return await services.confirmDialog?.({
-      title: `Delete reusable gathering ${label}?`,
-      content: `<p>Delete reusable gathering ${label} <strong>${_escapeHtml(record?.name || record?.id || label)}</strong>?</p><p>This ${label} is currently used by ${usages.length} environment(s):</p><ul>${usageList}${overflow}</ul>`,
+      title: `Delete ${label}?`,
+      content: `<p>Delete ${label} <strong>${_escapeHtml(record?.name || record?.id || label)}</strong>?</p><p>This ${label} is currently used by ${usages.length} environment(s):</p><ul>${usageList}${overflow}</ul>`,
       yes: () => true,
       no: () => false
     }) === true;
@@ -3336,7 +3336,7 @@ export function createAdminStore(services) {
     const firstComponent = _selectedManagedItemOptions()[0];
     const task = _normalizeGatheringTask({
       id: _randomID(),
-      name: services.localize?.('FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask') || 'Reusable gathering task',
+      name: services.localize?.('FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask') || 'New Gathering Task',
       dropRows: [{
         id: _randomID(),
         componentId: firstComponent?.id || '',

@@ -27,8 +27,8 @@ Each environment belongs to one crafting system and stores:
 | **Description** | Optional notes shown by the authoring UI |
 | **Enabled** | Disabled environments are ignored by normal player listing |
 | **Selection Mode** | `targeted` for multiple visible tasks, or `blind` for exactly one opaque task |
-| **Region** | Optional single region tag used to match reusable tasks and hazards |
-| **Biomes** | Optional biome tags used to match reusable tasks and hazards |
+| **Region** | Optional single region tag used to match Gathering Tasks and hazards |
+| **Biomes** | Optional biome tags used to match Gathering Tasks and hazards |
 | **Danger Tags** | Optional danger tags used to match reusable hazards |
 | **Scene UUID** | Optional scene gate for environments tied to a specific scene |
 
@@ -67,13 +67,13 @@ Manager V2 stores d100 gathering rules per selected crafting system under `gathe
 
 Legacy per-task item selection, per-environment hazard selection, and per-environment hazard policy fields may still be read when an existing system has no `rules` object. Manager V2 no longer exposes those fields as authoring controls.
 
-## Reusable Task And Hazard Libraries
+## Gathering Task And Hazard Libraries
 
-Manager V2 exposes the selected crafting system's reusable task definitions from the Gathering **Tasks** tab. The task browser supports search, status/region/biome/availability filters, pagination, row selection, enabled toggles, duplicate/delete actions, and a right-side inspector with availability, matching-environment count, and drop summaries. The row **Edit** action opens a placeholder editor for now; detailed reusable task authoring fields are deferred to a later Manager V2 slice.
+Manager V2 exposes the selected crafting system's Gathering Tasks from the Gathering **Tasks** tab. The task browser supports search, status/region/biome/availability filters, pagination, row selection, enabled toggles, duplicate/delete actions, and a right-side inspector with availability, matching-environment count, and drop summaries. The row **Edit** action opens a placeholder editor for now; detailed Gathering Task authoring fields are deferred to a later Manager V2 slice.
 
-Environment authoring still composes reusable tasks and hazards by matching environment region, biome, danger, and the current global weather and time-of-day state. GMs can toggle matched task and hazard records on or off per environment. The reusable hazard browser and full reusable task/hazard authoring form are not part of this slice.
+Environment authoring still composes Gathering Tasks and reusable hazards by matching environment region, biome, danger, and the current global weather and time-of-day state. GMs can toggle matched task and hazard records on or off per environment. The reusable hazard browser and full Gathering Task/hazard authoring form are not part of this slice.
 
-Reusable task records support:
+Gathering Task records support:
 
 | Field | Description |
 |:------|:------------|
@@ -91,17 +91,17 @@ Reusable hazard records support:
 | **Drop rate** | d100 hazard trigger rate from 1 to 100 |
 | **Modifier** | Optional hazard roll modifier provider |
 
-Disabled reusable tasks and hazards never match for player gathering.
+Disabled Gathering Tasks and hazards never match for player gathering.
 
 ## D100 Resolution
 
-Reusable gathering tasks use gathering-native d100 rows. For each enabled item row, Fabricate rolls `d100 + gatheringModifier`; the row drops when the effective roll is at least `101 - dropRate`. Matched enabled hazards roll independently with `d100 + hazardModifier` and the same threshold rule.
+Gathering Tasks use gathering-native d100 rows. For each enabled item row, Fabricate rolls `d100 + gatheringModifier`; the row drops when the effective roll is at least `101 - dropRate`. Matched enabled hazards roll independently with `d100 + hazardModifier` and the same threshold rule.
 
 The selected crafting system's Gathering Rules choose reward and hazard rows after rolling. `highestRankedDrop` selects the first successful row by authored order, `allDrops` selects every successful row, and `limitedDrops` selects the first `N` successful rows by authored order. `successWithHazard` records selected hazards while the gathering still succeeds. `failureWithHazard` records selected hazards and makes the attempt fail, so no selected rewards are awarded. If no hazards are enabled or matched, the environment is mechanically safe even when danger tags are present.
 
 ## Task Authoring
 
-An environment contains one or more gathering tasks. The current GM editor supports selected-task authoring for:
+An environment contains one or more Environment Tasks. The current GM editor supports selected Environment Task authoring for:
 
 | Area | Supported fields |
 |:-----|:-----------------|

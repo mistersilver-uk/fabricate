@@ -144,9 +144,9 @@
       id: 'tasks',
       icon: 'fas fa-list-check',
       titleKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksTitle',
-      titleFallback: 'Reusable gathering tasks',
+      titleFallback: 'Gathering Tasks',
       hintKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksHint',
-      hintFallback: 'Browse reusable gathering task definitions before attaching them to environments.'
+      hintFallback: 'Browse gathering tasks before attaching them to environments.'
     },
     {
       id: 'encounters',
@@ -424,9 +424,10 @@
     if (currentView === 'essence-edit') return isCreatingEssenceDraft
       ? text('FABRICATE.Admin.ManagerV2.Essence.CreateTitle', 'Create essence')
       : text('FABRICATE.Admin.ManagerV2.Essence.EditTitle', 'Edit essence');
+    if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksTitle', 'Gathering Tasks');
     if (currentView === 'environments') return text('FABRICATE.Admin.ManagerV2.Environment.Title', 'Environments');
     if (currentView === 'environment-edit') return text('FABRICATE.Admin.ManagerV2.Environment.EditTitle', 'Edit environment');
-    if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EditTitle', 'Edit reusable task');
+    if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EditTitle', 'Edit gathering task');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.ManagerV2.SystemEdit.Title', 'System settings');
     return text('FABRICATE.Admin.ManagerV2.Title', 'Crafting systems');
   }
@@ -441,9 +442,10 @@
     if (currentView === 'essence-edit' && isCreatingEssenceDraft) return text('FABRICATE.Admin.ManagerV2.Essence.CreateNoSourceSubtitle', 'Define identity and icon for a new essence.');
     if (currentView === 'essence-edit' && showEssenceSourceUi) return text('FABRICATE.Admin.ManagerV2.Essence.EditSubtitle', 'Update identity, icon, and source linkage for this essence.');
     if (currentView === 'essence-edit') return text('FABRICATE.Admin.ManagerV2.Essence.EditNoSourceSubtitle', 'Update identity and icon for this essence.');
+    if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksHint', 'Browse gathering tasks before attaching them to environments.');
     if (currentView === 'environments') return text('FABRICATE.Admin.ManagerV2.Environment.Subtitle', 'Manage gathering environments for the selected crafting system.');
     if (currentView === 'environment-edit') return text('FABRICATE.Admin.ManagerV2.Environment.EditSubtitle', 'Edit scene linkage, environment details, tasks, results, catalysts, visibility, timing, and validation in the v2 workspace.');
-    if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EditSubtitle', 'Detailed reusable task authoring fields are coming in a later Manager V2 slice.');
+    if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EditSubtitle', 'Detailed gathering task authoring fields are coming in a later Manager V2 slice.');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.ManagerV2.SystemEdit.Subtitle', 'Edit base settings for the selected crafting system without leaving manager v2.');
     return text('FABRICATE.Admin.ManagerV2.Subtitle', 'Manage the system definitions that organize Fabricate components, recipes, gathering, and feature rules.');
   }
@@ -470,6 +472,28 @@
     }
     if (result !== false) callback();
     return result;
+  }
+
+  function headerActionsLabel() {
+    if (currentView === 'recipes') return text('FABRICATE.Admin.ManagerV2.Recipe.Actions', 'Recipe actions');
+    if (currentView === 'components' || currentView === 'component-edit') return text('FABRICATE.Admin.ManagerV2.Component.Actions', 'Component actions');
+    if (currentView === 'tags') return text('FABRICATE.Admin.ManagerV2.TagsCategories.Actions', 'Tags and categories actions');
+    if (currentView === 'essences' || currentView === 'essence-edit') return text('FABRICATE.Admin.ManagerV2.Essence.Actions', 'Essence actions');
+    if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Actions', 'Gathering task actions');
+    if (currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit') return text('FABRICATE.Admin.ManagerV2.Environment.Actions', 'Environment actions');
+    if (currentView === 'system-edit') return text('FABRICATE.Admin.ManagerV2.SystemEdit.Actions', 'System edit actions');
+    return text('FABRICATE.Admin.ManagerV2.SystemActions', 'System actions');
+  }
+
+  function inspectorLabel() {
+    if (currentView === 'recipes') return text('FABRICATE.Admin.ManagerV2.Recipe.Inspector', 'Selected recipe inspector');
+    if (currentView === 'components') return text('FABRICATE.Admin.ManagerV2.Component.Inspector', 'Selected component inspector');
+    if (currentView === 'tags') return text('FABRICATE.Admin.ManagerV2.TagsCategories.Inspector', 'Tags and categories inspector');
+    if (currentView === 'essences' || currentView === 'essence-edit') return text('FABRICATE.Admin.ManagerV2.Essence.Inspector', 'Selected essence inspector');
+    if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Inspector', 'Selected gathering task inspector');
+    if (currentView === 'environments') return text('FABRICATE.Admin.ManagerV2.Environment.Inspector', 'Selected environment inspector');
+    if (currentView === 'system-edit') return text('FABRICATE.Admin.ManagerV2.SystemEdit.Inspector', 'System edit evidence');
+    return text('FABRICATE.Admin.ManagerV2.SelectedSystemInspector', 'Selected system inspector');
   }
 
   function finishEnvironmentRouteExit(confirmed) {
@@ -1184,7 +1208,7 @@
   }
 
   function gatheringTaskName(task) {
-    return String(task?.name || text('FABRICATE.Admin.ManagerV2.Environment.Tasks.UnnamedTask', 'Unnamed reusable task')).trim();
+    return String(task?.name || text('FABRICATE.Admin.ManagerV2.Environment.Tasks.UnnamedTask', 'Unnamed gathering task')).trim();
   }
 
   function gatheringTaskImage(task) {
@@ -1523,7 +1547,7 @@
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <button type="button" onclick={backToGatheringTaskLibrary}>{text('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Tasks', 'Tasks')}</button>
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EditBreadcrumb', 'Edit reusable task')}</span>
+          <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EditBreadcrumb', 'Edit gathering task')}</span>
         {/if}
         {#if currentView === 'system-edit'}
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
@@ -1533,7 +1557,7 @@
       <h1 class="manager-v2-title">{viewTitle()}</h1>
       <p class="manager-v2-subtitle">{viewSubtitle()}</p>
     </div>
-    <div class="manager-v2-header-actions" aria-label={currentView === 'recipes' ? text('FABRICATE.Admin.ManagerV2.Recipe.Actions', 'Recipe actions') : currentView === 'components' || currentView === 'component-edit' ? text('FABRICATE.Admin.ManagerV2.Component.Actions', 'Component actions') : currentView === 'tags' ? text('FABRICATE.Admin.ManagerV2.TagsCategories.Actions', 'Tags and categories actions') : currentView === 'essences' || currentView === 'essence-edit' ? text('FABRICATE.Admin.ManagerV2.Essence.Actions', 'Essence actions') : currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' ? text('FABRICATE.Admin.ManagerV2.Environment.Actions', 'Environment actions') : currentView === 'system-edit' ? text('FABRICATE.Admin.ManagerV2.SystemEdit.Actions', 'System edit actions') : text('FABRICATE.Admin.ManagerV2.SystemActions', 'System actions')}>
+    <div class="manager-v2-header-actions" aria-label={headerActionsLabel()}>
       {#if currentView === 'recipes'}
         <button type="button" class="manager-v2-button" onclick={importRecipes} disabled={!selectedSystemId}>
           <i class="fas fa-file-import" aria-hidden="true"></i>
@@ -1585,6 +1609,11 @@
         <button type="submit" form="manager-v2-essence-edit-form" class="manager-v2-button is-primary" disabled={!canSaveEssenceEdit}>
           <i class={essenceEditSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
           <span>{essenceEditSaveLabel()}</span>
+        </button>
+      {:else if currentView === 'environments' && activeGatheringTab === 'tasks'}
+        <button type="button" class="manager-v2-button is-primary" onclick={() => createGatheringTask(selectedSystemId)} disabled={!canShowEnvironments}>
+          <i class="fas fa-plus" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Create', 'Create gathering task')}</span>
         </button>
       {:else if currentView === 'environments'}
         <button type="button" class="manager-v2-button is-primary" onclick={createEnvironment} disabled={!canShowEnvironments}>
@@ -1803,17 +1832,17 @@
         </section>
       </main>
     {:else if currentView === 'gathering-task-edit' && selectedSystem}
-      <main class="manager-v2-main manager-v2-gathering-task-edit-main" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EditTitle', 'Edit reusable task')}>
+      <main class="manager-v2-main manager-v2-gathering-task-edit-main" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EditTitle', 'Edit gathering task')}>
         <section class="manager-v2-task-editor-placeholder" data-gathering-task-editor-placeholder>
           <div class="manager-v2-setup-card-header">
             <i class="fas fa-list-check" aria-hidden="true"></i>
             <div>
-              <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.PlaceholderKicker', 'Reusable task definition')}</p>
-              <h2>{selectedGatheringTask ? gatheringTaskName(selectedGatheringTask) : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SelectTask', 'Select a reusable task')}</h2>
+              <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.PlaceholderKicker', 'Gathering task')}</p>
+              <h2>{selectedGatheringTask ? gatheringTaskName(selectedGatheringTask) : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SelectTask', 'Select a gathering task')}</h2>
             </div>
           </div>
           <p class="manager-v2-muted">
-            {text('FABRICATE.Admin.ManagerV2.Environment.Tasks.PlaceholderHint', 'Detailed authoring fields for reusable gathering task definitions are coming later. Use the library browser for selection, duplication, deletion, and status for now.')}
+            {text('FABRICATE.Admin.ManagerV2.Environment.Tasks.PlaceholderHint', 'Detailed authoring fields for gathering tasks are coming later. Use the task browser for selection, duplication, deletion, and status for now.')}
           </p>
           <div class="manager-v2-action-group">
             <button type="button" class="manager-v2-button" onclick={backToGatheringTaskLibrary}>
@@ -1938,7 +1967,7 @@
     {/if}
 
     {#if currentView !== 'environment-edit' && currentView !== 'component-edit'}
-    <aside class="manager-v2-inspector" aria-label={currentView === 'recipes' ? text('FABRICATE.Admin.ManagerV2.Recipe.Inspector', 'Selected recipe inspector') : currentView === 'components' ? text('FABRICATE.Admin.ManagerV2.Component.Inspector', 'Selected component inspector') : currentView === 'tags' ? text('FABRICATE.Admin.ManagerV2.TagsCategories.Inspector', 'Tags and categories inspector') : currentView === 'essences' || currentView === 'essence-edit' ? text('FABRICATE.Admin.ManagerV2.Essence.Inspector', 'Selected essence inspector') : currentView === 'environments' ? text('FABRICATE.Admin.ManagerV2.Environment.Inspector', 'Selected environment inspector') : currentView === 'system-edit' ? text('FABRICATE.Admin.ManagerV2.SystemEdit.Inspector', 'System edit evidence') : text('FABRICATE.Admin.ManagerV2.SelectedSystemInspector', 'Selected system inspector')}>
+    <aside class="manager-v2-inspector" aria-label={inspectorLabel()}>
       {#if currentView === 'tags' && selectedSystem}
         <section class="manager-v2-inspector-card">
           <div class="manager-v2-inspector-title-row">
@@ -2024,7 +2053,7 @@
               <div class="manager-v2-inspector-title-row is-hero-large">
                 <img class="manager-v2-recipe-preview" src={gatheringTaskImage(selectedGatheringTask)} alt="" />
                 <div class="manager-v2-inspector-copy">
-                  <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Selected', 'Selected reusable task')}</p>
+                  <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Selected', 'Selected gathering task')}</p>
                   <h2 class="manager-v2-inspector-name" title={gatheringTaskName(selectedGatheringTask)}>{gatheringTaskName(selectedGatheringTask)}</h2>
                   <div class="manager-v2-chip-row">
                     <span class={`manager-v2-chip ${selectedGatheringTask.enabled === false ? 'is-disabled' : 'is-active'}`}>
@@ -2041,7 +2070,7 @@
             </section>
 
             <section class="manager-v2-inspector-card">
-              <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Details', 'Reusable task details')}</h3>
+              <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Details', 'Gathering task details')}</h3>
               <div class="manager-v2-fact-grid">
                 <div class="manager-v2-fact" data-gathering-task-fact="region">
                   <strong>{gatheringOptionLabel('region', selectedGatheringTask.region) || text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyRegion', 'Any region')}</strong>
@@ -2078,29 +2107,12 @@
               {/if}
             </section>
 
-            <section class="manager-v2-inspector-card">
-              <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Actions', 'Reusable task actions')}</h3>
-              <div class="manager-v2-inspector-actions">
-                <button type="button" class="manager-v2-button is-primary" onclick={() => editGatheringTask(selectedGatheringTask.id)}>
-                  <i class="fas fa-edit" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Edit', 'Edit reusable task')}</span>
-                </button>
-                <button type="button" class="manager-v2-button" onclick={() => duplicateGatheringTask(selectedSystemId, selectedGatheringTask.id)}>
-                  <i class="fas fa-copy" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Duplicate', 'Duplicate reusable task')}</span>
-                </button>
-                <button type="button" class="manager-v2-button is-danger" onclick={() => deleteGatheringTask(selectedSystemId, selectedGatheringTask.id)}>
-                  <i class="fas fa-trash" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Delete', 'Delete reusable task')}</span>
-                </button>
-              </div>
-            </section>
           {:else}
             <div class="manager-v2-empty">
               <div>
                 <i class="fas fa-list-check" aria-hidden="true"></i>
-                <h3>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SelectTask', 'Select a reusable task')}</h3>
-                <p>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.InspectorHint', 'The inspector shows reusable task availability, active environment matches, and drop summaries for the selected row.')}</p>
+                <h3>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SelectTask', 'Select a gathering task')}</h3>
+                <p>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.InspectorHint', 'The inspector shows gathering task availability, active environment matches, and drop summaries for the selected row.')}</p>
               </div>
             </div>
           {/if}
@@ -2255,11 +2267,11 @@
                 <h3>{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Title', 'Plan gathering content')}</h3>
               </div>
             </div>
-            <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Hint', 'Reusable tasks and hazards give environments consistent activities, risks, and rewards across gathering locations.')}</p>
+            <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Hint', 'Gathering tasks and hazards give environments consistent activities, risks, and rewards across gathering locations.')}</p>
             <ol class="manager-v2-setup-list">
-              <li>{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.StepTasks', 'Define reusable gathering tasks with their checks, timing, result groups, and failure outcomes.')}</li>
+              <li>{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.StepTasks', 'Define gathering tasks with their checks, timing, result groups, and failure outcomes.')}</li>
               <li>{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.StepHazards', 'Prepare encounter and hazard options that can be reused across risky locations.')}</li>
-              <li>{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.StepCreate', 'Create environments after the reusable task and hazard libraries are ready to attach.')}</li>
+              <li>{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.StepCreate', 'Create environments after the gathering task and hazard libraries are ready to attach.')}</li>
             </ol>
             <div class="manager-v2-setup-links" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Resources', 'Environment resources')}>
               <a class="manager-v2-button" href="https://misterpotts.github.io/fabricate/gathering-environments/" target="_blank" rel="noreferrer">

@@ -236,7 +236,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.EmptyTitle, 'Prepare gathering building blocks first');
     assert.equal(
       lang.FABRICATE.Admin.ManagerV2.Environment.EmptyHint,
-      'Define reusable tasks and hazards before creating environments, then attach those building blocks to each location players can gather from.'
+      'Define gathering tasks and hazards before creating environments, then attach those building blocks to each location players can gather from.'
     );
     assert.ok(environmentsBrowserSource.includes('manager-v2-gathering-tabs'), 'gathering page should render local section tabs');
     assert.ok(rootSource.includes("let activeGatheringTab = $state('environments')"), 'root should own gathering tab state for inspector coordination');
@@ -266,7 +266,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Settings, 'Settings');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.OpenTasks, 'Review tasks');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.OpenHazards, 'Review hazards');
-    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksHint, 'Browse reusable gathering task definitions before attaching them to environments.');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksHint, 'Browse gathering tasks before attaching them to environments.');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.EncountersPlaceholderHint, 'Reusable hazard authoring is planned for a later slice.');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderHint, 'Set system-level d100 reward and hazard rules for gathering.');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Conditions.TimeOfDayTitle, 'Times of day');
@@ -591,7 +591,18 @@ describe('CraftingSystemManagerV2 source contract', () => {
     ]) {
       assert.ok(gatheringTasksBrowserSource.includes(snippet), `task browser should include ${snippet}`);
     }
-    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.EmptyTitle, 'No reusable tasks yet');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.EmptyTitle, 'No gathering tasks yet');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask, 'New Gathering Task');
+    assert.equal(
+      rootSource.match(/FABRICATE\.Admin\.ManagerV2\.Environment\.Tasks\.Actions/g)?.length ?? 0,
+      1,
+      'gathering task actions localization should remain only for the header aria label, not a redundant inspector card'
+    );
+    assert.ok(
+      !rootSource.includes("<h3 class=\"manager-v2-card-title\">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Actions', 'Gathering task actions')}</h3>"),
+      'gathering task inspector should not keep an action card heading'
+    );
+    assert.ok(!rootSource.includes('duplicateGatheringTask(selectedSystemId, selectedGatheringTask.id)'), 'gathering task inspector should not duplicate row-level duplicate actions');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.BackToLibrary, 'Back to task library');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.CopySuffix, 'Copy');
   });

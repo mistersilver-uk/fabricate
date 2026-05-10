@@ -118,7 +118,7 @@
   }
 
   function taskName(task) {
-    return String(task?.name || text('FABRICATE.Admin.ManagerV2.Environment.Tasks.UnnamedTask', 'Unnamed reusable task')).trim();
+    return String(task?.name || text('FABRICATE.Admin.ManagerV2.Environment.Tasks.UnnamedTask', 'Unnamed gathering task')).trim();
   }
 
   function taskImage(task) {
@@ -216,20 +216,20 @@
   aria-labelledby={labelledBy}
   data-gathering-tasks-browser
 >
-  <section class="manager-v2-toolbar manager-v2-task-toolbar" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Filters', 'Reusable task filters')}>
+  <section class="manager-v2-toolbar manager-v2-task-toolbar" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Filters', 'Gathering task filters')}>
     <label class="manager-v2-search">
       <i class="fas fa-search" aria-hidden="true"></i>
       <input
         type="search"
         bind:value={searchTerm}
-        placeholder={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SearchPlaceholder', 'Search reusable tasks...')}
-        aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SearchLabel', 'Search reusable tasks')}
+        placeholder={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SearchPlaceholder', 'Search gathering tasks...')}
+        aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SearchLabel', 'Search gathering tasks')}
       />
     </label>
     <label class="manager-v2-filter">
       <span>{text('FABRICATE.Admin.ManagerV2.StatusFilter', 'Status')}</span>
       <select value={statusFilter} onchange={(event) => statusFilter = event.currentTarget.value}>
-        <option value="all">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.StatusAll', 'All reusable tasks')}</option>
+        <option value="all">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.StatusAll', 'All gathering tasks')}</option>
         <option value="active">{text('FABRICATE.Admin.ManagerV2.StatusActive', 'Active')}</option>
         <option value="disabled">{text('FABRICATE.Admin.ManagerV2.StatusDisabled', 'Disabled')}</option>
       </select>
@@ -270,16 +270,16 @@
     {/if}
   </section>
 
-  <section class="manager-v2-table-scroll" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Table', 'Reusable gathering tasks table')}>
+  <section class="manager-v2-table-scroll" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Table', 'Gathering tasks table')}>
     {#if taskList.length === 0}
       <div class="manager-v2-empty">
         <div>
           <i class="fas fa-list-check" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EmptyTitle', 'No reusable tasks yet')}</h3>
-          <p>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EmptyHint', 'Create reusable gathering task definitions before attaching them to environments.')}</p>
+          <h3>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EmptyTitle', 'No gathering tasks yet')}</h3>
+          <p>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EmptyHint', 'Create gathering tasks before attaching them to environments.')}</p>
           <button type="button" class="manager-v2-button is-primary" onclick={() => onCreateTask(selectedSystemId)}>
             <i class="fas fa-plus" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Create', 'Create reusable task')}</span>
+            <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Create', 'Create gathering task')}</span>
           </button>
         </div>
       </div>
@@ -287,15 +287,15 @@
       <div class="manager-v2-empty">
         <div>
           <i class="fas fa-search" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EmptySearchTitle', 'No reusable tasks match these filters')}</h3>
-          <p>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EmptySearchHint', 'Clear search and filters to show all reusable tasks in this system.')}</p>
+          <h3>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EmptySearchTitle', 'No gathering tasks match these filters')}</h3>
+          <p>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EmptySearchHint', 'Clear search and filters to show all gathering tasks in this system.')}</p>
           <button type="button" class="manager-v2-button" onclick={clearFilters}>{text('FABRICATE.Admin.ManagerV2.ClearFilters', 'Clear filters')}</button>
         </div>
       </div>
     {:else}
-      <div class="manager-v2-gathering-tasks-table" role="table" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.TableShort', 'Reusable gathering tasks')}>
+      <div class="manager-v2-gathering-tasks-table" role="table" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.TableShort', 'Gathering tasks')}>
         <div class="manager-v2-table-head manager-v2-gathering-task-table-head" role="row">
-          <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Column.Task', 'Reusable task')}</span>
+          <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Column.Task', 'Gathering task')}</span>
           <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Environment.Region', 'Region')}</span>
           <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Environment.Biome', 'Biome')}</span>
           <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Drops', 'Drops')}</span>
@@ -350,13 +350,13 @@
               </button>
             </span>
             <span role="cell" class="manager-v2-action-group manager-v2-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.ManagerV2.Column.Actions', 'Actions')}>
-              <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EditNamed', 'Edit {name}').replace('{name}', taskName(task))} title={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Edit', 'Edit reusable task')} onclick={() => onEditTask(task.id)}>
+              <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EditNamed', 'Edit {name}').replace('{name}', taskName(task))} title={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Edit', 'Edit gathering task')} onclick={() => onEditTask(task.id)}>
                 <i class="fas fa-edit" aria-hidden="true"></i>
               </button>
-              <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DuplicateNamed', 'Duplicate {name}').replace('{name}', taskName(task))} title={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Duplicate', 'Duplicate reusable task')} onclick={() => onDuplicateTask(selectedSystemId, task.id)}>
+              <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DuplicateNamed', 'Duplicate {name}').replace('{name}', taskName(task))} title={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Duplicate', 'Duplicate gathering task')} onclick={() => onDuplicateTask(selectedSystemId, task.id)}>
                 <i class="fas fa-copy" aria-hidden="true"></i>
               </button>
-              <button type="button" class="manager-v2-icon-button is-danger" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DeleteNamed', 'Delete {name}').replace('{name}', taskName(task))} title={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Delete', 'Delete reusable task')} onclick={() => onDeleteTask(selectedSystemId, task.id)}>
+              <button type="button" class="manager-v2-icon-button is-danger" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DeleteNamed', 'Delete {name}').replace('{name}', taskName(task))} title={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Delete', 'Delete gathering task')} onclick={() => onDeleteTask(selectedSystemId, task.id)}>
                 <i class="fas fa-trash" aria-hidden="true"></i>
               </button>
             </span>

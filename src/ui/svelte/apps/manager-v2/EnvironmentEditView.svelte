@@ -1167,10 +1167,10 @@
         <section>
           <div class="manager-v2-edit-card-heading">
             <div>
-              <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Environment.ReusableTasks', 'Reusable tasks')}</p>
+              <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Environment.ReusableTasks', 'Gathering Tasks')}</p>
               <h4>{libraryTasks.length}</h4>
             </div>
-            <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.AddReusableTask', 'Add reusable task')} title={text('FABRICATE.Admin.ManagerV2.Environment.AddReusableTask', 'Add reusable task')} onclick={() => onAddGatheringLibraryTask?.(environmentDraft?.craftingSystemId)}>
+            <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.AddReusableTask', 'Add gathering task')} title={text('FABRICATE.Admin.ManagerV2.Environment.AddReusableTask', 'Add gathering task')} onclick={() => onAddGatheringLibraryTask?.(environmentDraft?.craftingSystemId)}>
               <i class="fas fa-plus" aria-hidden="true"></i>
             </button>
           </div>
@@ -1200,11 +1200,11 @@
                 </div>
                 <button type="button" class="manager-v2-button is-danger" onclick={() => onDeleteGatheringLibraryTask?.(environmentDraft?.craftingSystemId, task.id)}>
                   <i class="fas fa-trash" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.DeleteReusableTask', 'Delete reusable task')}</span>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.DeleteReusableTask', 'Delete gathering task')}</span>
                 </button>
               </details>
             {:else}
-              <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Environment.NoReusableTasks', 'No reusable tasks yet.')}</p>
+              <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Environment.NoReusableTasks', 'No gathering tasks yet.')}</p>
             {/each}
           </div>
         </section>

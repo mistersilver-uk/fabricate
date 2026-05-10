@@ -2,9 +2,9 @@
 
 ## UI
 
-`EnvironmentsBrowserView` continues to own the local Gathering tab strip. The `Tasks` panel renders a browser over reusable `GatheringTaskDefinition` records using the same Manager V2 toolbar, table, empty state, and pagination patterns used by the recipe and environment browsers.
+`EnvironmentsBrowserView` continues to own the local Gathering tab strip. The `Tasks` panel renders a browser over Gathering Task records backed by `GatheringTaskDefinition` data using the same Manager V2 toolbar, table, empty state, and pagination patterns used by the recipe and environment browsers.
 
-Rows are selectable independent of Edit. Selecting a row updates root-owned task-definition state for the inspector. Edit selects the definition and switches the center panel to a non-saving placeholder editor route. The placeholder explicitly states that detailed authoring fields are coming later and returns to the task library without mutating the definition.
+Rows are selectable independent of Edit. Selecting a row updates root-owned Gathering Task selection state for the inspector. Edit selects the task and switches the center panel to a non-saving placeholder editor route. The placeholder explicitly states that detailed authoring fields are coming later and returns to the task library without mutating the task.
 
 ## Availability
 
@@ -24,4 +24,4 @@ Targeted checks cover mounted task-browser behavior, source/contract wiring, loc
 
 ## Out Of Scope
 
-The full reusable task-definition authoring form, validation UX for individual task fields, hazard browser work, and any migration of legacy embedded environment tasks are deferred.
+The full Gathering Task authoring form, validation UX for individual task fields, hazard browser work, and any migration of legacy Environment Tasks are deferred.
