@@ -2041,8 +2041,18 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Choose which successful d100 reward rows are granted.'));
     assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Choose which matching hazards are applied after a gathering roll.'));
     assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Decide whether selected hazards still allow the gathering attempt to succeed.'));
-    assert.ok(target.textContent.includes('Highest ranked successful drop'));
-    assert.ok(target.textContent.includes('All successful drops'));
+    const rewardsSelect = target.querySelector('#manager-v2-gathering-rule-rewards');
+    const hazardsSelect = target.querySelector('#manager-v2-gathering-rule-hazards');
+    assert.deepEqual(
+      Array.from(rewardsSelect.options).map(option => option.textContent.trim()),
+      ['Highest ranked successful drop', 'All successful drops', 'Limit successful drops']
+    );
+    assert.deepEqual(
+      Array.from(hazardsSelect.options).map(option => option.textContent.trim()),
+      ['Highest ranked triggered hazard', 'All triggered hazards', 'Limit triggered hazards']
+    );
+    assert.equal(hazardsSelect.textContent.includes('Highest ranked successful drop'), false);
+    assert.equal(hazardsSelect.textContent.includes('All successful drops'), false);
     assert.ok(target.textContent.includes('Gathering succeeds'));
     assert.ok(target.querySelector('.manager-v2-inspector [data-gathering-inspector-rules]'));
     assert.equal(target.querySelector('.manager-v2-inspector [data-gathering-inspector-rules] h2').textContent.trim(), 'Rules');

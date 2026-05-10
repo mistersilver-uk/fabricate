@@ -33,6 +33,7 @@ Controls:
 - Hazard Outcome description with its select underneath.
 
 All labels and aria text are localized in `lang/en.json`.
+Reward selection modes and hazard selection modes share the same stored enum values, but their select labels are localized separately so rewards describe successful drops and hazards describe triggered hazards.
 
 ## Tests
-Focused tests cover store normalization/persistence, runtime rule precedence/limited selection, root wiring, real Settings tab rendering, conditional steppers, and absence of duplicate v2 environment-editor rule controls.
+Focused tests cover store normalization/persistence, runtime rule precedence/limited selection, root wiring, real Settings tab rendering, distinct reward/hazard selection labels, conditional steppers, and absence of duplicate v2 environment-editor rule controls.

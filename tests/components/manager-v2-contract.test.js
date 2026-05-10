@@ -519,6 +519,13 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(rootSource.includes('manager-v2-rule-copy'), 'root should render rule descriptions beside inspector icons');
     assert.ok(rootSource.includes('data-gathering-rule-stepper="rewardLimit"'), 'root should render the reward limit stepper');
     assert.ok(rootSource.includes('data-gathering-rule-stepper="hazardLimit"'), 'root should render the hazard limit stepper');
+    assert.ok(rootSource.includes('FABRICATE.Admin.ManagerV2.Environment.Rules.HazardHighestRankedDrop'), 'hazard rule select should use hazard-specific drop labels');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Rules.HighestRankedDrop, 'Highest ranked successful drop');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Rules.AllDrops, 'All successful drops');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Rules.LimitedDrops, 'Limit successful drops');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Rules.HazardHighestRankedDrop, 'Highest ranked triggered hazard');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Rules.HazardAllDrops, 'All triggered hazards');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Rules.HazardLimitedDrops, 'Limit triggered hazards');
     assert.ok(rootSource.includes('selectedGatheringConditionShortcuts'), 'root should derive selected-system condition shortcuts');
     assert.ok(rootSource.includes('buildSelectedGatheringConditionShortcuts'), 'root should keep shortcut visibility gated by selected-system gathering conditions');
     assert.ok(rootSource.includes('data-systems-gathering-conditions'), 'systems inspector should render a global condition shortcut card');

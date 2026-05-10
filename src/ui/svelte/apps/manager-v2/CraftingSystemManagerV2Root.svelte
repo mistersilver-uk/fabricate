@@ -1864,9 +1864,9 @@
                 </label>
                 <span class="manager-v2-rule-field">
                   <select id="manager-v2-gathering-rule-hazards" value={selectedGatheringRules.hazardSelectionMode} onchange={(event) => updateSelectedGatheringRules({ hazardSelectionMode: event.target.value })}>
-                    <option value="highestRankedDrop">{text('FABRICATE.Admin.ManagerV2.Environment.Rules.HighestRankedDrop', 'Highest ranked successful drop')}</option>
-                    <option value="allDrops">{text('FABRICATE.Admin.ManagerV2.Environment.Rules.AllDrops', 'All successful drops')}</option>
-                    <option value="limitedDrops">{text('FABRICATE.Admin.ManagerV2.Environment.Rules.LimitedDrops', 'Limit successful drops')}</option>
+                    <option value="highestRankedDrop">{text('FABRICATE.Admin.ManagerV2.Environment.Rules.HazardHighestRankedDrop', 'Highest ranked triggered hazard')}</option>
+                    <option value="allDrops">{text('FABRICATE.Admin.ManagerV2.Environment.Rules.HazardAllDrops', 'All triggered hazards')}</option>
+                    <option value="limitedDrops">{text('FABRICATE.Admin.ManagerV2.Environment.Rules.HazardLimitedDrops', 'Limit triggered hazards')}</option>
                   </select>
                 </span>
               </div>

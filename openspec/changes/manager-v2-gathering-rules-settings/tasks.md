@@ -7,6 +7,7 @@
 - [x] Remove duplicated center-panel rule summary and move rule descriptions beside the inspector icons.
 - [x] Remove duplicate Manager V2 environment-editor d100 rule controls.
 - [x] Add localized strings.
+- [x] Use hazard-specific localized selection labels while preserving stored rule values.
 - [x] Add and run focused tests.
 - [x] Run `npm test`.
 - [x] Run `npm run build`.
