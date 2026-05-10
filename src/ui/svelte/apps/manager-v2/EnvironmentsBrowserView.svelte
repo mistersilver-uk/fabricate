@@ -16,7 +16,6 @@
     sceneOptions = [],
     shouldUseEnvironmentDraftForDisplay = false,
     activeGatheringTab = 'environments',
-    gatheringRules = {},
     onSelectGatheringTab = () => {},
     onSelectEnvironment = () => {},
     onEditEnvironment = () => {},
@@ -57,12 +56,12 @@
     {
       id: 'encounters',
       labelKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Encounters',
-      labelFallback: 'Encounters',
-      icon: 'fas fa-compass',
+      labelFallback: 'Hazards',
+      icon: 'fas fa-exclamation-triangle',
       titleKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.EncountersPlaceholderTitle',
-      titleFallback: 'Gathering encounters',
+      titleFallback: 'Gathering hazards',
       hintKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.EncountersPlaceholderHint',
-      hintFallback: 'Encounter and hazard authoring is planned for a later slice.'
+      hintFallback: 'Reusable hazard authoring is planned for a later slice.'
     },
     {
       id: 'settings',
@@ -72,7 +71,7 @@
       titleKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderTitle',
       titleFallback: 'Gathering settings',
       hintKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderHint',
-      hintFallback: 'Gathering-wide configuration is planned for a later slice.'
+      hintFallback: 'Set system-level d100 reward and hazard rules for gathering.'
     }
   ];
 
@@ -88,6 +87,7 @@
   });
 
   const environmentList = $derived(environments || []);
+  const activeGatheringTabConfig = $derived(gatheringTabs.find(tab => tab.id === activeGatheringTab) || gatheringTabs[0]);
   const regionOptions = $derived(uniqueSorted(environmentList.map(environment => environment.region)));
   const biomeOptions = $derived(uniqueSorted(environmentList.map(environment => environment.biome)));
   const normalizedSearchTerm = $derived(searchTerm.trim().toLowerCase());
@@ -214,19 +214,16 @@
     onSelectGatheringTab(tabId);
   }
 
-  function ruleModeLabel(mode) {
-    const labels = {
-      highestRankedDrop: text('FABRICATE.Admin.ManagerV2.Environment.Rules.HighestRankedDrop', 'Highest ranked successful drop'),
-      allDrops: text('FABRICATE.Admin.ManagerV2.Environment.Rules.AllDrops', 'All successful drops'),
-      limitedDrops: text('FABRICATE.Admin.ManagerV2.Environment.Rules.LimitedDrops', 'Limit successful drops')
-    };
-    return labels[mode] || labels.highestRankedDrop;
+  function gatheringHeaderTitle() {
+    const titleKey = activeGatheringTabConfig?.titleKey;
+    if (titleKey) return text(titleKey, activeGatheringTabConfig.titleFallback);
+    return text('FABRICATE.Admin.ManagerV2.Environment.Library', 'Gathering environments');
   }
 
-  function hazardOutcomeLabel(policy) {
-    return policy === 'failureWithHazard'
-      ? text('FABRICATE.Admin.ManagerV2.Environment.Rules.GatheringFails', 'Gathering fails')
-      : text('FABRICATE.Admin.ManagerV2.Environment.Rules.GatheringSucceeds', 'Gathering succeeds');
+  function gatheringHeaderHint() {
+    const hintKey = activeGatheringTabConfig?.hintKey;
+    if (hintKey) return text(hintKey, activeGatheringTabConfig.hintFallback);
+    return text('FABRICATE.Admin.ManagerV2.Environment.LibraryHint', 'Browse scene-linked gathering environments and open the existing editor for task authoring.');
   }
 </script>
 
@@ -234,8 +231,8 @@
   <section class="manager-v2-section-header">
     <div class="manager-v2-heading">
       <p class="manager-v2-kicker">{selectedSystemName || text('FABRICATE.Admin.ManagerV2.SelectSystem', 'Select a system')}</p>
-      <h2 class="manager-v2-title">{text('FABRICATE.Admin.ManagerV2.Environment.Library', 'Gathering environments')}</h2>
-      <p class="manager-v2-subtitle">{text('FABRICATE.Admin.ManagerV2.Environment.LibraryHint', 'Browse scene-linked gathering environments and open the existing editor for task authoring.')}</p>
+      <h2 class="manager-v2-title">{gatheringHeaderTitle()}</h2>
+      <p class="manager-v2-subtitle">{gatheringHeaderHint()}</p>
     </div>
   </section>
 
@@ -360,7 +357,7 @@
                   <span>{text('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.OpenTasks', 'Review tasks')}</span>
                 </button>
                 <button type="button" class="manager-v2-button" onclick={() => selectGatheringTab('encounters')}>
-                  <i class="fas fa-compass" aria-hidden="true"></i>
+                  <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
                   <span>{text('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.OpenHazards', 'Review hazards')}</span>
                 </button>
               </div>
@@ -470,31 +467,7 @@
       id="manager-v2-gathering-panel-settings"
       role="tabpanel"
       aria-labelledby="manager-v2-gathering-tab-settings"
-    >
-      <section class="manager-v2-gathering-settings-summary" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Rules.SummaryLabel', 'Gathering rules summary')}>
-        <div class="manager-v2-section-header">
-          <div class="manager-v2-heading">
-            <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Environment.Rules.Kicker', 'Gathering rules')}</p>
-            <h3 class="manager-v2-title">{text('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderTitle', 'Gathering settings')}</h3>
-            <p class="manager-v2-subtitle">{text('FABRICATE.Admin.ManagerV2.Environment.Rules.SettingsHint', 'System-level d100 rules apply to every gathering environment in this crafting system.')}</p>
-          </div>
-        </div>
-        <div class="manager-v2-fact-grid">
-          <div class="manager-v2-fact" data-gathering-rule-fact="rewards">
-            <strong>{ruleModeLabel(gatheringRules.rewardSelectionMode)}</strong>
-            <span>{text('FABRICATE.Admin.ManagerV2.Environment.Rules.Rewards', 'Rewards')}</span>
-          </div>
-          <div class="manager-v2-fact" data-gathering-rule-fact="hazards">
-            <strong>{ruleModeLabel(gatheringRules.hazardSelectionMode)}</strong>
-            <span>{text('FABRICATE.Admin.ManagerV2.Environment.Rules.Hazards', 'Hazards')}</span>
-          </div>
-          <div class="manager-v2-fact" data-gathering-rule-fact="outcome">
-            <strong>{hazardOutcomeLabel(gatheringRules.hazardPolicy)}</strong>
-            <span>{text('FABRICATE.Admin.ManagerV2.Environment.Rules.HazardOutcome', 'Hazard outcome')}</span>
-          </div>
-        </div>
-      </section>
-    </div>
+    ></div>
   {:else}
     {@const activeTab = gatheringTabs.find(tab => tab.id === activeGatheringTab)}
     <div

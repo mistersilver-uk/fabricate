@@ -25,12 +25,12 @@ Selection order is authored rank: `dropRows` order for rewards and matched reusa
 If no reward rows and no hazards are selected, the existing d100 attempt result remains `succeeded` with zero rewards.
 
 ## UI
-The Gathering Settings tab replaces placeholder-only content with a summary of the selected system rules. The right inspector renders a visually distinct Rules card using Manager V2 inspector-card, icon-row, select, and 34px icon-button patterns.
+The Gathering Settings tab uses the shared gathering browser header for context and keeps the center panel free of duplicated rule summaries. The right inspector renders a visually distinct Rules card using Manager V2 inspector-card, icon-row, select, and 34px icon-button patterns.
 
 Controls:
-- Rewards select with conditional reward-limit stepper.
-- Hazards select with conditional hazard-limit stepper.
-- Hazard Outcome select.
+- Rewards description with its select underneath and a conditional reward-limit stepper.
+- Hazards description with its select underneath and a conditional hazard-limit stepper.
+- Hazard Outcome description with its select underneath.
 
 All labels and aria text are localized in `lang/en.json`.
 

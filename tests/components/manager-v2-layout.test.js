@@ -210,6 +210,22 @@ test('manager-v2 empty states use refined heading and setup-panel styling', () =
   assert.ok(setupLinksBlock.includes('flex-wrap: wrap;'), 'setup links should wrap in narrow inspectors');
 });
 
+test('manager-v2 gathering rules inspector stacks descriptions above normal-weight selects', () => {
+  const ruleRowBlock = blockFor('.fabricate-manager-v2 .manager-v2-rule-row');
+  const ruleCopyBlock = blockFor('.fabricate-manager-v2 .manager-v2-rule-copy');
+  const ruleCopyDescriptionBlock = blockFor('.fabricate-manager-v2 .manager-v2-rule-copy span');
+  const ruleFieldBlock = blockFor('.fabricate-manager-v2 .manager-v2-rule-field');
+  const ruleInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-rule-field select,\n.fabricate-manager-v2 .manager-v2-rule-stepper input');
+
+  assert.ok(ruleRowBlock.includes('grid-template-columns: 34px minmax(0, 1fr);'), 'rule rows should place icon and description on the same row');
+  assert.ok(ruleCopyBlock.includes('display: flex;') && ruleCopyBlock.includes('flex-direction: column;'), 'rule copy should stack label and description beside the icon');
+  assert.ok(ruleCopyDescriptionBlock.includes('color: var(--fab-mv2-text-muted);'), 'rule descriptions should read as supporting copy');
+  assert.ok(ruleFieldBlock.includes('grid-column: 2;'), 'rule selects should sit underneath the description column');
+  assert.ok(ruleFieldBlock.includes('font-weight: 400;'), 'rule field text should not force bold select text');
+  assert.ok(ruleInputBlock.includes('font-weight: 400;'), 'rule select and input text should not inherit bold labels');
+  assert.equal(css.includes('.fabricate-manager-v2 .manager-v2-gathering-settings-summary'), false, 'settings center panel should not keep the duplicated rules summary');
+});
+
 test('manager-v2 recipes browser defines compact responsive table geometry', () => {
   const tableBlock = blockFor('.fabricate-manager-v2 .manager-v2-recipes-table');
   const identityBlock = blockFor('.fabricate-manager-v2 .manager-v2-recipe-identity');

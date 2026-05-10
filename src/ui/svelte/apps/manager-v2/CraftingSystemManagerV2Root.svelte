@@ -145,11 +145,11 @@
     },
     {
       id: 'encounters',
-      icon: 'fas fa-compass',
+      icon: 'fas fa-exclamation-triangle',
       titleKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.EncountersPlaceholderTitle',
-      titleFallback: 'Gathering encounters',
+      titleFallback: 'Gathering hazards',
       hintKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.EncountersPlaceholderHint',
-      hintFallback: 'Encounter and hazard authoring is planned for a later slice.'
+      hintFallback: 'Reusable hazard authoring is planned for a later slice.'
     },
     {
       id: 'settings',
@@ -157,7 +157,7 @@
       titleKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderTitle',
       titleFallback: 'Gathering settings',
       hintKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderHint',
-      hintFallback: 'Gathering-wide configuration is planned for a later slice.'
+      hintFallback: 'Set system-level d100 reward and hazard rules for gathering.'
     }
   ];
   const activeGatheringInspectorTab = $derived(
@@ -1499,7 +1499,6 @@
         sceneOptions={selectedSystem?.sceneOptions || []}
         {shouldUseEnvironmentDraftForDisplay}
         {activeGatheringTab}
-        gatheringRules={selectedGatheringRules}
         onSelectGatheringTab={selectGatheringTab}
         onSelectEnvironment={(id) => selectEnvironment(id)}
         onEditEnvironment={(id) => editEnvironment(id)}
@@ -1776,17 +1775,20 @@
             </div>
 
             <div class="manager-v2-rules-stack">
-              <label class="manager-v2-rule-row">
+              <div class="manager-v2-rule-row">
                 <span class="manager-v2-rule-icon" aria-hidden="true"><i class="fas fa-gift"></i></span>
+                <label class="manager-v2-rule-copy" for="manager-v2-gathering-rule-rewards">
+                  <strong>{text('FABRICATE.Admin.ManagerV2.Environment.Rules.Rewards', 'Rewards')}</strong>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Rules.RewardsDescription', 'Choose which successful d100 reward rows are granted.')}</span>
+                </label>
                 <span class="manager-v2-rule-field">
-                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Rules.Rewards', 'Rewards')}</span>
-                  <select value={selectedGatheringRules.rewardSelectionMode} onchange={(event) => updateSelectedGatheringRules({ rewardSelectionMode: event.target.value })}>
+                  <select id="manager-v2-gathering-rule-rewards" value={selectedGatheringRules.rewardSelectionMode} onchange={(event) => updateSelectedGatheringRules({ rewardSelectionMode: event.target.value })}>
                     <option value="highestRankedDrop">{text('FABRICATE.Admin.ManagerV2.Environment.Rules.HighestRankedDrop', 'Highest ranked successful drop')}</option>
                     <option value="allDrops">{text('FABRICATE.Admin.ManagerV2.Environment.Rules.AllDrops', 'All successful drops')}</option>
                     <option value="limitedDrops">{text('FABRICATE.Admin.ManagerV2.Environment.Rules.LimitedDrops', 'Limit successful drops')}</option>
                   </select>
                 </span>
-              </label>
+              </div>
               {#if selectedGatheringRules.rewardSelectionMode === 'limitedDrops'}
                 <div class="manager-v2-rule-stepper" data-gathering-rule-stepper="rewardLimit">
                   <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Rules.DecreaseRewardLimit', 'Decrease reward limit')} onclick={() => adjustGatheringRuleLimit('rewardLimit', -1)}><i class="fas fa-minus" aria-hidden="true"></i></button>
@@ -1795,17 +1797,20 @@
                 </div>
               {/if}
 
-              <label class="manager-v2-rule-row">
+              <div class="manager-v2-rule-row">
                 <span class="manager-v2-rule-icon" aria-hidden="true"><i class="fas fa-triangle-exclamation"></i></span>
+                <label class="manager-v2-rule-copy" for="manager-v2-gathering-rule-hazards">
+                  <strong>{text('FABRICATE.Admin.ManagerV2.Environment.Rules.Hazards', 'Hazards')}</strong>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Rules.HazardsDescription', 'Choose which matching hazards are applied after a gathering roll.')}</span>
+                </label>
                 <span class="manager-v2-rule-field">
-                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Rules.Hazards', 'Hazards')}</span>
-                  <select value={selectedGatheringRules.hazardSelectionMode} onchange={(event) => updateSelectedGatheringRules({ hazardSelectionMode: event.target.value })}>
+                  <select id="manager-v2-gathering-rule-hazards" value={selectedGatheringRules.hazardSelectionMode} onchange={(event) => updateSelectedGatheringRules({ hazardSelectionMode: event.target.value })}>
                     <option value="highestRankedDrop">{text('FABRICATE.Admin.ManagerV2.Environment.Rules.HighestRankedDrop', 'Highest ranked successful drop')}</option>
                     <option value="allDrops">{text('FABRICATE.Admin.ManagerV2.Environment.Rules.AllDrops', 'All successful drops')}</option>
                     <option value="limitedDrops">{text('FABRICATE.Admin.ManagerV2.Environment.Rules.LimitedDrops', 'Limit successful drops')}</option>
                   </select>
                 </span>
-              </label>
+              </div>
               {#if selectedGatheringRules.hazardSelectionMode === 'limitedDrops'}
                 <div class="manager-v2-rule-stepper" data-gathering-rule-stepper="hazardLimit">
                   <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Rules.DecreaseHazardLimit', 'Decrease hazard limit')} onclick={() => adjustGatheringRuleLimit('hazardLimit', -1)}><i class="fas fa-minus" aria-hidden="true"></i></button>
@@ -1814,16 +1819,19 @@
                 </div>
               {/if}
 
-              <label class="manager-v2-rule-row">
+              <div class="manager-v2-rule-row">
                 <span class="manager-v2-rule-icon" aria-hidden="true"><i class="fas fa-scale-balanced"></i></span>
+                <label class="manager-v2-rule-copy" for="manager-v2-gathering-rule-outcome">
+                  <strong>{text('FABRICATE.Admin.ManagerV2.Environment.Rules.HazardOutcome', 'Hazard outcome')}</strong>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Rules.HazardOutcomeDescription', 'Decide whether selected hazards still allow the gathering attempt to succeed.')}</span>
+                </label>
                 <span class="manager-v2-rule-field">
-                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Rules.HazardOutcome', 'Hazard outcome')}</span>
-                  <select value={selectedGatheringRules.hazardPolicy} onchange={(event) => updateSelectedGatheringRules({ hazardPolicy: event.target.value })}>
+                  <select id="manager-v2-gathering-rule-outcome" value={selectedGatheringRules.hazardPolicy} onchange={(event) => updateSelectedGatheringRules({ hazardPolicy: event.target.value })}>
                     <option value="successWithHazard">{text('FABRICATE.Admin.ManagerV2.Environment.Rules.GatheringSucceeds', 'Gathering succeeds')}</option>
                     <option value="failureWithHazard">{text('FABRICATE.Admin.ManagerV2.Environment.Rules.GatheringFails', 'Gathering fails')}</option>
                   </select>
                 </span>
-              </label>
+              </div>
             </div>
           </section>
         {:else if currentView === 'environments' && activeGatheringInspectorTab}
