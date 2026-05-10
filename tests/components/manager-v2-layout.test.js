@@ -363,6 +363,9 @@ test('manager-v2 essence edit route defines picker-based responsive geometry', (
 
 test('manager-v2 environments browser and edit route define compact responsive geometry', () => {
   const toolbarBlock = blockFor('.fabricate-manager-v2 .manager-v2-environments-toolbar');
+  const gatheringPanelBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-panel');
+  const gatheringEnvironmentsPanelBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-panel-environments');
+  const tableScrollBlock = blockFor('.fabricate-manager-v2 .manager-v2-table-scroll');
   const tableBlock = blockFor('.fabricate-manager-v2 .manager-v2-environments-table');
   const taskCountBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-task-count');
   const actionsBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-actions');
@@ -380,6 +383,18 @@ test('manager-v2 environments browser and edit route define compact responsive g
   assert.ok(
     toolbarBlock.includes('align-content: flex-start;'),
     'environments toolbar should keep wrapped filter rows pinned to the top of its bounded scroll area'
+  );
+  assert.ok(
+    gatheringPanelBlock.includes('min-height: 0;') && gatheringPanelBlock.includes('overflow: hidden;'),
+    'gathering panels should participate in the manager-v2 bounded grid instead of expanding to content height'
+  );
+  assert.ok(
+    gatheringEnvironmentsPanelBlock.includes('grid-template-rows: auto minmax(0, 1fr) auto;'),
+    'environments gathering panel should reserve a bounded scroll row between toolbar and pagination'
+  );
+  assert.ok(
+    tableScrollBlock.includes('overflow: auto;') && tableScrollBlock.includes('min-height: 0;'),
+    'environment table scroll region should own internal overflow once bounded by the gathering panel'
   );
   assert.ok(
     tableBlock.includes('--fab-mv2-environment-grid: minmax(0, 1.72fr) minmax(86px, 0.42fr) 46px 72px 116px;'),

@@ -8121,7 +8121,13 @@
 .fabricate-manager-v2 .manager-v2-gathering-panel {
   display: grid;
   gap: 12px;
+  min-height: 0;
   min-width: 0;
+  overflow: hidden;
+}
+
+.fabricate-manager-v2 .manager-v2-gathering-panel-environments {
+  grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
 .fabricate-manager-v2 .manager-v2-gathering-placeholder {

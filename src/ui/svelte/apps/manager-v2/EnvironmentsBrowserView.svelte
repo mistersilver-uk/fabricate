@@ -242,7 +242,7 @@
 
   {#if activeGatheringTab === 'environments'}
     <div
-      class="manager-v2-gathering-panel"
+      class="manager-v2-gathering-panel manager-v2-gathering-panel-environments"
       id="manager-v2-gathering-panel-environments"
       role="tabpanel"
       aria-labelledby="manager-v2-gathering-tab-environments"

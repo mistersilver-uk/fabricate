@@ -22,6 +22,10 @@ This change makes the active gathering tab a controlled prop:
 
 When the selected system changes, the gathering tab resets to `environments`, matching the existing browser reset behavior.
 
+## Scroll Containment
+
+The Environments tab's gathering panel must define bounded grid rows for its toolbar, environment list, and pagination footer. The environment list row uses `minmax(0, 1fr)` so `.manager-v2-table-scroll` receives a constrained height and can scroll internally instead of expanding to fit every environment row.
+
 ## Compatibility
 
 The change is presentation-only. It does not affect environment selection, draft editing, persistence, validation, runtime gathering flows, or player-facing gathering behavior.
