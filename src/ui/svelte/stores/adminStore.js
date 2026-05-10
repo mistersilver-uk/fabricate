@@ -3374,6 +3374,26 @@ export function createAdminStore(services) {
     return true;
   }
 
+  async function duplicateGatheringLibraryTask(systemId = get(selectedSystemId), taskId) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig || !taskId) return null;
+    const task = systemConfig.tasks.find(task => task.id === taskId);
+    if (!task) return null;
+    const copySuffix = services.localize?.('FABRICATE.Admin.ManagerV2.Environment.Tasks.CopySuffix') || 'Copy';
+    const duplicate = _normalizeGatheringTask({
+      ..._clonePlain(task),
+      id: _randomID(),
+      name: `${task.name || 'Gather'} (${copySuffix})`,
+      dropRows: (Array.isArray(task.dropRows) ? task.dropRows : [])
+        .map(row => ({ ..._clonePlain(row), id: _randomID() }))
+    }, _randomID);
+    systemConfig.tasks = [...systemConfig.tasks, duplicate];
+    await _saveGatheringConfig(config);
+    await refresh();
+    return duplicate;
+  }
+
   async function addGatheringLibraryHazard(systemId = get(selectedSystemId)) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
@@ -3796,6 +3816,7 @@ export function createAdminStore(services) {
     addGatheringLibraryTask,
     updateGatheringLibraryTask,
     deleteGatheringLibraryTask,
+    duplicateGatheringLibraryTask,
     addGatheringLibraryHazard,
     updateGatheringLibraryHazard,
     deleteGatheringLibraryHazard,

@@ -5561,6 +5561,12 @@
   overflow-y: auto;
 }
 
+.fabricate-manager-v2 .manager-v2-task-toolbar {
+  max-height: 112px;
+  align-content: flex-start;
+  overflow-y: auto;
+}
+
 .fabricate-manager-v2 .manager-v2-toolbar-primary {
   display: flex;
   align-items: center;
@@ -5852,6 +5858,14 @@
   min-width: 0;
 }
 
+.fabricate-manager-v2 .manager-v2-gathering-tasks-table {
+  --fab-mv2-gathering-task-grid: minmax(0, 1.58fr) minmax(78px, 0.42fr) minmax(0, 0.5fr) 58px minmax(0, 0.72fr) 74px 72px 92px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
 .fabricate-manager-v2 .manager-v2-essences-table {
   --fab-mv2-essence-grid: minmax(0, 1.55fr) minmax(64px, 0.32fr) minmax(92px, 0.42fr) 92px;
   display: flex;
@@ -5911,6 +5925,16 @@
   min-width: 0;
 }
 
+.fabricate-manager-v2 .manager-v2-gathering-task-table-head,
+.fabricate-manager-v2 .manager-v2-gathering-task-row {
+  display: grid;
+  grid-template-columns: var(--fab-mv2-gathering-task-grid);
+  gap: 8px;
+  align-items: center;
+  align-content: center;
+  min-width: 0;
+}
+
 .fabricate-manager-v2 .manager-v2-essence-table-head,
 .fabricate-manager-v2 .manager-v2-essence-row {
   display: grid;
@@ -5927,6 +5951,8 @@
 .fabricate-manager-v2 .manager-v2-component-row > *,
 .fabricate-manager-v2 .manager-v2-environment-table-head > *,
 .fabricate-manager-v2 .manager-v2-environment-row > *,
+.fabricate-manager-v2 .manager-v2-gathering-task-table-head > *,
+.fabricate-manager-v2 .manager-v2-gathering-task-row > *,
 .fabricate-manager-v2 .manager-v2-essence-table-head > *,
 .fabricate-manager-v2 .manager-v2-essence-row > * {
   min-width: 0;
@@ -5949,7 +5975,8 @@
 
 .fabricate-manager-v2 .manager-v2-system-row .manager-v2-status-cell,
 .fabricate-manager-v2 .manager-v2-recipe-row .manager-v2-status-cell,
-.fabricate-manager-v2 .manager-v2-environment-row .manager-v2-status-cell {
+.fabricate-manager-v2 .manager-v2-environment-row .manager-v2-status-cell,
+.fabricate-manager-v2 .manager-v2-gathering-task-row .manager-v2-status-cell {
   justify-self: start;
 }
 
@@ -6065,6 +6092,7 @@
 .fabricate-manager-v2 .manager-v2-recipe-row,
 .fabricate-manager-v2 .manager-v2-component-row,
 .fabricate-manager-v2 .manager-v2-environment-row,
+.fabricate-manager-v2 .manager-v2-gathering-task-row,
 .fabricate-manager-v2 .manager-v2-essence-row {
   width: 100%;
   min-height: 76px;
@@ -6083,6 +6111,7 @@
 .fabricate-manager-v2 .manager-v2-recipe-row:hover,
 .fabricate-manager-v2 .manager-v2-component-row:hover,
 .fabricate-manager-v2 .manager-v2-environment-row:hover,
+.fabricate-manager-v2 .manager-v2-gathering-task-row:hover,
 .fabricate-manager-v2 .manager-v2-essence-row:hover {
   border-color: var(--fab-mv2-border-strong);
   background: var(--fab-mv2-surface-3);
@@ -6091,6 +6120,7 @@
 .fabricate-manager-v2 .manager-v2-recipe-row.is-selected,
 .fabricate-manager-v2 .manager-v2-component-row.is-selected,
 .fabricate-manager-v2 .manager-v2-environment-row.is-selected,
+.fabricate-manager-v2 .manager-v2-gathering-task-row.is-selected,
 .fabricate-manager-v2 .manager-v2-essence-row.is-selected {
   border-color: var(--fab-mv2-border-strong);
   background: var(--fab-success-soft);
@@ -6127,7 +6157,8 @@
 .fabricate-manager-v2 .manager-v2-system-identity:focus,
 .fabricate-manager-v2 .manager-v2-recipe-identity:focus,
 .fabricate-manager-v2 .manager-v2-component-identity:focus,
-.fabricate-manager-v2 .manager-v2-environment-identity:focus {
+.fabricate-manager-v2 .manager-v2-environment-identity:focus,
+.fabricate-manager-v2 .manager-v2-gathering-task-identity:focus {
   outline: none;
   box-shadow: none;
 }
@@ -6135,7 +6166,8 @@
 .fabricate-manager-v2 .manager-v2-system-identity:focus-visible,
 .fabricate-manager-v2 .manager-v2-recipe-identity:focus-visible,
 .fabricate-manager-v2 .manager-v2-component-identity:focus-visible,
-.fabricate-manager-v2 .manager-v2-environment-identity:focus-visible {
+.fabricate-manager-v2 .manager-v2-environment-identity:focus-visible,
+.fabricate-manager-v2 .manager-v2-gathering-task-identity:focus-visible {
   outline: 2px solid var(--fab-success-border);
   outline-offset: 3px;
   border-radius: 6px;
@@ -6199,7 +6231,8 @@
 
 .fabricate-manager-v2 .manager-v2-recipe-identity,
 .fabricate-manager-v2 .manager-v2-component-identity,
-.fabricate-manager-v2 .manager-v2-environment-identity {
+.fabricate-manager-v2 .manager-v2-environment-identity,
+.fabricate-manager-v2 .manager-v2-gathering-task-identity {
   appearance: none;
   -webkit-appearance: none;
   display: grid;
@@ -6247,6 +6280,7 @@
 .fabricate-manager-v2 .manager-v2-recipe-preview,
 .fabricate-manager-v2 .manager-v2-component-thumb,
 .fabricate-manager-v2 .manager-v2-component-preview,
+.fabricate-manager-v2 .manager-v2-gathering-task-thumb,
 .fabricate-manager-v2 .manager-v2-environment-thumb,
 .fabricate-manager-v2 .manager-v2-environment-preview {
   width: 46px;
@@ -8263,6 +8297,27 @@
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
+.fabricate-manager-v2 .manager-v2-gathering-panel-tasks {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"] .manager-v2-main {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.fabricate-manager-v2 .manager-v2-task-editor-placeholder {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-height: 0;
+  margin: 12px;
+  padding: 16px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-mv2-surface-2);
+  overflow: auto;
+}
+
 .fabricate-manager-v2 .manager-v2-gathering-placeholder {
   min-height: 280px;
 }
@@ -8865,6 +8920,7 @@
   .fabricate-manager-v2 .manager-v2-recipe-row,
   .fabricate-manager-v2 .manager-v2-component-row,
   .fabricate-manager-v2 .manager-v2-environment-row,
+  .fabricate-manager-v2 .manager-v2-gathering-task-row,
   .fabricate-manager-v2 .manager-v2-essence-row {
     grid-template-columns: minmax(0, 1fr);
     min-width: 0;
@@ -8875,6 +8931,7 @@
   .fabricate-manager-v2 .manager-v2-recipe-row > *,
   .fabricate-manager-v2 .manager-v2-component-row > *,
   .fabricate-manager-v2 .manager-v2-environment-row > *,
+  .fabricate-manager-v2 .manager-v2-gathering-task-row > *,
   .fabricate-manager-v2 .manager-v2-essence-row > * {
     min-width: 0;
   }

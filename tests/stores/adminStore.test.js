@@ -1981,6 +1981,85 @@ describe('createAdminStore', () => {
       assert.equal(get(store.viewState).gatheringConfig.systems.sys1.hazards[0].dropRate, 30);
     });
 
+    it('duplicates reusable gathering task definitions with fresh task and drop ids', async () => {
+      const services = createMockServices({
+        randomID: (() => {
+          let id = 0;
+          return () => `copy-id-${++id}`;
+        })(),
+        localize: (key) => key === 'FABRICATE.Admin.ManagerV2.Environment.Tasks.CopySuffix' ? 'Copy' : key
+      });
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      services._store.gatheringConfig = {
+        systems: {
+          sys1: {
+            tasks: [{
+              id: 'task-herbs',
+              name: 'Moon Herbs',
+              description: 'Gather under old trees.',
+              enabled: true,
+              region: 'north',
+              biomes: ['forest'],
+              weather: ['clear'],
+              timeOfDay: ['night'],
+              dropRows: [
+                { id: 'drop-a', componentId: 'herb', quantity: 2, dropRate: 80, enabled: true },
+                { id: 'drop-b', itemUuid: 'Item.random', quantity: 1, dropRate: 20, enabled: false }
+              ],
+              staminaCost: 1,
+              gatheringModifier: { provider: 'macro', macroUuid: 'Macro.mod' },
+              timeRequirement: { hours: 1 }
+            }]
+          },
+          sys2: {
+            tasks: [{ id: 'task-other', name: 'Other System', dropRows: [{ id: 'drop-other' }] }]
+          }
+        }
+      };
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const duplicate = await store.duplicateGatheringLibraryTask('sys1', 'task-herbs');
+
+      const sys1Tasks = services._store.gatheringConfig.systems.sys1.tasks;
+      assert.equal(duplicate.id, 'copy-id-1');
+      assert.equal(duplicate.name, 'Moon Herbs (Copy)');
+      assert.deepEqual(duplicate.dropRows.map(row => row.id), ['copy-id-2', 'copy-id-3']);
+      assert.deepEqual(duplicate.region, 'north');
+      assert.deepEqual(duplicate.biomes, ['forest']);
+      assert.deepEqual(duplicate.weather, ['clear']);
+      assert.deepEqual(duplicate.timeOfDay, ['night']);
+      assert.deepEqual(duplicate.gatheringModifier, { provider: 'macro', macroUuid: 'Macro.mod' });
+      assert.deepEqual(duplicate.timeRequirement, { hours: 1 });
+      assert.equal(sys1Tasks.length, 2);
+      assert.deepEqual(sys1Tasks[0].dropRows.map(row => row.id), ['drop-a', 'drop-b']);
+      assert.equal(services._store.gatheringConfig.systems.sys2.tasks.length, 1);
+      assert.equal(services._store.gatheringConfig.systems.sys2.tasks[0].id, 'task-other');
+      assert.equal(services._store.gatheringConfig.systems.sys2.tasks[0].name, 'Other System');
+      assert.deepEqual(services._store.gatheringConfig.systems.sys2.tasks[0].dropRows.map(row => row.id), ['drop-other']);
+      duplicate.dropRows[0].quantity = 99;
+      assert.equal(sys1Tasks[0].dropRows[0].quantity, 2);
+      assert.equal(get(store.viewState).gatheringConfig.systems.sys1.tasks.length, 2);
+    });
+
+    it('returns null when duplicating a missing reusable gathering task definition', async () => {
+      const services = createMockServices();
+      services._store.gatheringConfig = {
+        systems: {
+          sys1: {
+            tasks: [{ id: 'task-herbs', name: 'Moon Herbs', dropRows: [] }]
+          }
+        }
+      };
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      assert.equal(await store.duplicateGatheringLibraryTask('sys1', 'missing'), null);
+      assert.equal(await store.duplicateGatheringLibraryTask('missing-system', 'task-herbs'), null);
+      assert.equal(services._store.gatheringConfig.systems.sys1.tasks.length, 1);
+    });
+
     it('manages selected-system gathering weather and time vocabulary without affecting other systems', async () => {
       const services = createMockServices();
       const sys = services.getCraftingSystemManager().getSystem('sys1');

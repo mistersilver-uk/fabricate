@@ -33,6 +33,7 @@
   let componentEditSaving = $state(false);
   let componentEditDraft = $state(null);
   let activeGatheringTab = $state('environments');
+  let selectedGatheringTaskId = $state('');
   const placeholderViews = [
     { id: 'rules', icon: 'fas fa-sliders-h', labelKey: 'FABRICATE.Admin.ManagerV2.Nav.Rules', fallback: 'Rules' },
     { id: 'graph', icon: 'fas fa-project-diagram', labelKey: 'FABRICATE.Admin.ManagerV2.Nav.Graph', fallback: 'Graph' }
@@ -142,10 +143,10 @@
     {
       id: 'tasks',
       icon: 'fas fa-list-check',
-      titleKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksPlaceholderTitle',
-      titleFallback: 'Gathering tasks',
-      hintKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksPlaceholderHint',
-      hintFallback: 'Reusable gathering task management is planned for a later slice.'
+      titleKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksTitle',
+      titleFallback: 'Reusable gathering tasks',
+      hintKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksHint',
+      hintFallback: 'Browse reusable gathering task definitions before attaching them to environments.'
     },
     {
       id: 'encounters',
@@ -174,6 +175,13 @@
     hazardLimit: 1,
     hazardPolicy: 'successWithHazard'
   });
+  const selectedGatheringSystemConfig = $derived($viewState.gatheringConfig?.systems?.[selectedSystemId] || {});
+  const gatheringTaskDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.tasks) ? selectedGatheringSystemConfig.tasks : []);
+  const selectedGatheringTask = $derived(
+    gatheringTaskDefinitions.find(task => task.id === selectedGatheringTaskId)
+      || gatheringTaskDefinitions[0]
+      || null
+  );
 
   $effect(() => {
     if (selectedSystemId === lastComponentSystemId) return;
@@ -196,13 +204,24 @@
   $effect(() => {
     if (selectedSystemId === lastGatheringSystemId) return;
     activeGatheringTab = 'environments';
+    selectedGatheringTaskId = '';
     lastGatheringSystemId = selectedSystemId;
   });
 
   $effect(() => {
     if (activeGatheringTab === 'environments') return;
     if (currentView === 'environments' && canShowEnvironments) return;
+    if (currentView === 'gathering-task-edit' && canShowEnvironments) return;
     activeGatheringTab = 'environments';
+  });
+
+  $effect(() => {
+    if (!canShowEnvironments) {
+      selectedGatheringTaskId = '';
+      return;
+    }
+    if (selectedGatheringTaskId && gatheringTaskDefinitions.some(task => task.id === selectedGatheringTaskId)) return;
+    selectedGatheringTaskId = gatheringTaskDefinitions[0]?.id || '';
   });
 
   $effect(() => {
@@ -371,7 +390,7 @@
 
   function normalizedActiveView(view, system, environmentsAvailable, essencesAvailable) {
     if (!system) return 'systems';
-    if ((view === 'environments' || view === 'environment-edit') && !environmentsAvailable) return 'systems';
+    if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit') && !environmentsAvailable) return 'systems';
     if ((view === 'essences' || view === 'essence-edit') && !essencesAvailable) return 'systems';
     return view;
   }
@@ -407,6 +426,7 @@
       : text('FABRICATE.Admin.ManagerV2.Essence.EditTitle', 'Edit essence');
     if (currentView === 'environments') return text('FABRICATE.Admin.ManagerV2.Environment.Title', 'Environments');
     if (currentView === 'environment-edit') return text('FABRICATE.Admin.ManagerV2.Environment.EditTitle', 'Edit environment');
+    if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EditTitle', 'Edit reusable task');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.ManagerV2.SystemEdit.Title', 'System settings');
     return text('FABRICATE.Admin.ManagerV2.Title', 'Crafting systems');
   }
@@ -423,6 +443,7 @@
     if (currentView === 'essence-edit') return text('FABRICATE.Admin.ManagerV2.Essence.EditNoSourceSubtitle', 'Update identity and icon for this essence.');
     if (currentView === 'environments') return text('FABRICATE.Admin.ManagerV2.Environment.Subtitle', 'Manage gathering environments for the selected crafting system.');
     if (currentView === 'environment-edit') return text('FABRICATE.Admin.ManagerV2.Environment.EditSubtitle', 'Edit scene linkage, environment details, tasks, results, catalysts, visibility, timing, and validation in the v2 workspace.');
+    if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EditSubtitle', 'Detailed reusable task authoring fields are coming in a later Manager V2 slice.');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.ManagerV2.SystemEdit.Subtitle', 'Edit base settings for the selected crafting system without leaving manager v2.');
     return text('FABRICATE.Admin.ManagerV2.Subtitle', 'Manage the system definitions that organize Fabricate components, recipes, gathering, and feature rules.');
   }
@@ -528,7 +549,7 @@
 
   function setView(view) {
     if ((view === 'recipes' || view === 'components' || view === 'component-edit' || view === 'tags' || view === 'system-edit') && !selectedSystem) return;
-    if ((view === 'environments' || view === 'environment-edit') && !canShowEnvironments) return;
+    if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit') && !canShowEnvironments) return;
     if ((view === 'essences' || view === 'essence-edit') && !canShowEssences) return;
     afterTruthyResult(confirmRouteExit(view), () => { activeView = view; });
   }
@@ -887,6 +908,63 @@
     store.deleteEnvironmentDraft?.(environmentId);
   }
 
+  function selectGatheringTask(taskId = selectedGatheringTask?.id) {
+    selectedGatheringTaskId = taskId || '';
+  }
+
+  function createGatheringTask(systemId = selectedSystemId) {
+    if (!systemId) return;
+    const created = store.addGatheringLibraryTask?.(systemId);
+    if (isPromise(created)) {
+      created.then(task => {
+        if (task?.id) selectedGatheringTaskId = task.id;
+      });
+      return;
+    }
+    if (created?.id) selectedGatheringTaskId = created.id;
+  }
+
+  function editGatheringTask(taskId = selectedGatheringTask?.id) {
+    if (!taskId || !canShowEnvironments) return;
+    selectedGatheringTaskId = taskId;
+    activeGatheringTab = 'tasks';
+    activeView = 'gathering-task-edit';
+  }
+
+  function backToGatheringTaskLibrary() {
+    activeGatheringTab = 'tasks';
+    activeView = 'environments';
+  }
+
+  function duplicateGatheringTask(systemId = selectedSystemId, taskId = selectedGatheringTask?.id) {
+    if (!systemId || !taskId) return;
+    const duplicated = store.duplicateGatheringLibraryTask?.(systemId, taskId);
+    if (isPromise(duplicated)) {
+      duplicated.then(task => {
+        if (task?.id) selectedGatheringTaskId = task.id;
+      });
+      return;
+    }
+    if (duplicated?.id) selectedGatheringTaskId = duplicated.id;
+  }
+
+  function deleteGatheringTask(systemId = selectedSystemId, taskId = selectedGatheringTask?.id) {
+    if (!systemId || !taskId) return;
+    const deleted = store.deleteGatheringLibraryTask?.(systemId, taskId);
+    if (isPromise(deleted)) {
+      deleted.then(value => {
+        if (value !== false && selectedGatheringTaskId === taskId) selectedGatheringTaskId = '';
+      });
+      return;
+    }
+    if (deleted !== false && selectedGatheringTaskId === taskId) selectedGatheringTaskId = '';
+  }
+
+  function toggleGatheringTaskEnabled(systemId = selectedSystemId, taskId = selectedGatheringTask?.id, enabled = true) {
+    if (!systemId || !taskId) return;
+    store.updateGatheringLibraryTask?.(systemId, taskId, { enabled });
+  }
+
   function moveEnvironment(environmentId = selectedEnvironment?.id, direction) {
     if (!environmentId || !direction) return;
     store.moveEnvironmentDraft?.(environmentId, direction);
@@ -1103,6 +1181,85 @@
   function environmentCatalystCount(environment) {
     return (Array.isArray(environment?.tasks) ? environment.tasks : [])
       .reduce((total, task) => total + (Array.isArray(task?.catalysts) ? task.catalysts.length : 0), 0);
+  }
+
+  function gatheringTaskName(task) {
+    return String(task?.name || text('FABRICATE.Admin.ManagerV2.Environment.Tasks.UnnamedTask', 'Unnamed reusable task')).trim();
+  }
+
+  function gatheringTaskImage(task) {
+    return task?.img || 'icons/svg/item-bag.svg';
+  }
+
+  function gatheringTaskDropRows(task) {
+    return Array.isArray(task?.dropRows) ? task.dropRows : [];
+  }
+
+  function gatheringManagedItemLabel(componentId) {
+    const item = (selectedSystem?.managedItemOptions || []).find(option => String(option.id || '') === String(componentId || ''));
+    return item?.name || componentId || '';
+  }
+
+  function gatheringTaskDropLabel(row) {
+    const name = row?.name || gatheringManagedItemLabel(row?.componentId) || row?.itemUuid || text('FABRICATE.Admin.ManagerV2.Environment.Tasks.UnresolvedDrop', 'Unresolved drop');
+    return `${name} x${row?.quantity || 1} (${row?.dropRate || 1}%)`;
+  }
+
+  function gatheringOptionLabel(kind, id) {
+    const options = kind === 'biome'
+      ? selectedGatheringSystemConfig.vocabularies?.biomes?.values
+      : selectedGatheringSystemConfig.vocabularies?.regions?.values;
+    const option = (Array.isArray(options) ? options : []).find(value => String(value?.id || value) === String(id || ''));
+    return String(option?.label || option?.id || id || '').trim();
+  }
+
+  function gatheringConditionLabel(kind, id) {
+    const setting = selectedGatheringSystemConfig.conditions?.[kind] || {};
+    const option = (Array.isArray(setting.values) ? setting.values : [])
+      .find(value => String(value?.id || value) === String(id || ''));
+    return String(option?.label || option?.id || id || '').trim();
+  }
+
+  function gatheringTaskAvailability(task) {
+    const timeValues = Array.isArray(task?.timeOfDay) ? task.timeOfDay : [];
+    const weatherValues = Array.isArray(task?.weather) ? task.weather : [];
+    const times = timeValues.length > 0
+      ? timeValues.map(id => gatheringConditionLabel('timeOfDay', id)).filter(Boolean).join(', ')
+      : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyTime', 'Any time');
+    const weather = weatherValues.length > 0
+      ? weatherValues.map(id => gatheringConditionLabel('weather', id)).filter(Boolean).join(', ')
+      : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyWeather', 'Any weather');
+    return `${times}, ${weather}`;
+  }
+
+  function gatheringTaskAllowedInEnvironment(task, environment) {
+    const enabledIds = Array.isArray(environment?.enabledTaskIds) ? environment.enabledTaskIds.map(String) : [];
+    const disabledIds = Array.isArray(environment?.disabledTaskIds) ? environment.disabledTaskIds.map(String) : [];
+    if (disabledIds.includes(String(task?.id))) return false;
+    if (enabledIds.length > 0 && !enabledIds.includes(String(task?.id))) return false;
+    return true;
+  }
+
+  function activeGatheringTaskEnvironmentCount(task) {
+    if (!task || task.enabled === false) return 0;
+    const weatherSetting = selectedGatheringSystemConfig.conditions?.weather || {};
+    const timeSetting = selectedGatheringSystemConfig.conditions?.timeOfDay || {};
+    const taskBiomes = Array.isArray(task.biomes) ? task.biomes : [];
+    const taskWeather = Array.isArray(task.weather) ? task.weather : [];
+    const taskTime = Array.isArray(task.timeOfDay) ? task.timeOfDay : [];
+    return environmentList.filter(environment => {
+      if (environment?.enabled === false) return false;
+      if (String(environment?.craftingSystemId || selectedSystemId) !== String(selectedSystemId || '')) return false;
+      if (!gatheringTaskAllowedInEnvironment(task, environment)) return false;
+      if (task.region && task.region !== String(environment?.region || '')) return false;
+      const environmentBiomes = Array.isArray(environment?.biomes)
+        ? environment.biomes
+        : (environment?.biome ? [environment.biome] : []);
+      if (taskBiomes.length > 0 && !taskBiomes.some(biome => environmentBiomes.includes(biome))) return false;
+      if (weatherSetting.enabled !== false && taskWeather.length > 0 && !taskWeather.includes(weatherSetting.current)) return false;
+      if (timeSetting.enabled !== false && taskTime.length > 0 && !taskTime.includes(timeSetting.current)) return false;
+      return true;
+    }).length;
   }
 
   function environmentFacts(environment) {
@@ -1362,6 +1519,12 @@
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.ManagerV2.Environment.EditBreadcrumb', 'Edit environment')}</span>
         {/if}
+        {#if currentView === 'gathering-task-edit'}
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <button type="button" onclick={backToGatheringTaskLibrary}>{text('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Tasks', 'Tasks')}</button>
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EditBreadcrumb', 'Edit reusable task')}</span>
+        {/if}
         {#if currentView === 'system-edit'}
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.ManagerV2.SystemEdit.Breadcrumb', 'System settings')}</span>
@@ -1370,7 +1533,7 @@
       <h1 class="manager-v2-title">{viewTitle()}</h1>
       <p class="manager-v2-subtitle">{viewSubtitle()}</p>
     </div>
-    <div class="manager-v2-header-actions" aria-label={currentView === 'recipes' ? text('FABRICATE.Admin.ManagerV2.Recipe.Actions', 'Recipe actions') : currentView === 'components' || currentView === 'component-edit' ? text('FABRICATE.Admin.ManagerV2.Component.Actions', 'Component actions') : currentView === 'tags' ? text('FABRICATE.Admin.ManagerV2.TagsCategories.Actions', 'Tags and categories actions') : currentView === 'essences' || currentView === 'essence-edit' ? text('FABRICATE.Admin.ManagerV2.Essence.Actions', 'Essence actions') : currentView === 'environments' || currentView === 'environment-edit' ? text('FABRICATE.Admin.ManagerV2.Environment.Actions', 'Environment actions') : currentView === 'system-edit' ? text('FABRICATE.Admin.ManagerV2.SystemEdit.Actions', 'System edit actions') : text('FABRICATE.Admin.ManagerV2.SystemActions', 'System actions')}>
+    <div class="manager-v2-header-actions" aria-label={currentView === 'recipes' ? text('FABRICATE.Admin.ManagerV2.Recipe.Actions', 'Recipe actions') : currentView === 'components' || currentView === 'component-edit' ? text('FABRICATE.Admin.ManagerV2.Component.Actions', 'Component actions') : currentView === 'tags' ? text('FABRICATE.Admin.ManagerV2.TagsCategories.Actions', 'Tags and categories actions') : currentView === 'essences' || currentView === 'essence-edit' ? text('FABRICATE.Admin.ManagerV2.Essence.Actions', 'Essence actions') : currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' ? text('FABRICATE.Admin.ManagerV2.Environment.Actions', 'Environment actions') : currentView === 'system-edit' ? text('FABRICATE.Admin.ManagerV2.SystemEdit.Actions', 'System edit actions') : text('FABRICATE.Admin.ManagerV2.SystemActions', 'System actions')}>
       {#if currentView === 'recipes'}
         <button type="button" class="manager-v2-button" onclick={importRecipes} disabled={!selectedSystemId}>
           <i class="fas fa-file-import" aria-hidden="true"></i>
@@ -1439,6 +1602,11 @@
         <button type="button" class="manager-v2-button is-primary" onclick={saveEnvironmentEdit} disabled={!$viewState.environmentDraftDirty || $viewState.environmentSaving}>
           <i class={$viewState.environmentSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Environments.Save', 'Save Environment')}</span>
+        </button>
+      {:else if currentView === 'gathering-task-edit'}
+        <button type="button" class="manager-v2-button" onclick={backToGatheringTaskLibrary}>
+          <i class="fas fa-arrow-left" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.BackToLibrary', 'Back to task library')}</span>
         </button>
       {:else if currentView === 'system-edit'}
         <button type="button" class="manager-v2-button" onclick={backToSystemsBrowser}>
@@ -1518,7 +1686,7 @@
             </button>
           {/if}
           {#if canShowEnvironments}
-            <button type="button" class={`manager-v2-nav-button ${currentView === 'environments' || currentView === 'environment-edit' ? 'is-active' : ''}`} aria-current={currentView === 'environments' || currentView === 'environment-edit' ? 'page' : undefined} onclick={() => setView('environments')}>
+            <button type="button" class={`manager-v2-nav-button ${currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' ? 'is-active' : ''}`} aria-current={currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' ? 'page' : undefined} onclick={() => setView('environments')}>
               <i class="fas fa-seedling" aria-hidden="true"></i>
               <span class="manager-v2-nav-label">{text('FABRICATE.Admin.ManagerV2.Nav.Environments', 'Gathering')}</span>
               <span class="manager-v2-nav-count">{selectedCounts.environments ?? 0}</span>
@@ -1550,7 +1718,15 @@
         sceneOptions={selectedSystem?.sceneOptions || []}
         {shouldUseEnvironmentDraftForDisplay}
         {activeGatheringTab}
+        selectedTaskId={selectedGatheringTask?.id || selectedGatheringTaskId}
+        managedItemOptions={selectedSystem?.managedItemOptions || []}
         onSelectGatheringTab={selectGatheringTab}
+        onSelectGatheringTask={selectGatheringTask}
+        onCreateGatheringTask={createGatheringTask}
+        onEditGatheringTask={editGatheringTask}
+        onDuplicateGatheringTask={duplicateGatheringTask}
+        onDeleteGatheringTask={deleteGatheringTask}
+        onToggleGatheringTaskEnabled={toggleGatheringTaskEnabled}
         onSelectEnvironment={(id) => selectEnvironment(id)}
         onEditEnvironment={(id) => editEnvironment(id)}
         onCreateEnvironment={createEnvironment}
@@ -1624,6 +1800,27 @@
             onUpdateTimeRequirement={store.updateEnvironmentTaskTimeRequirement}
             onUpdateFailureOutcome={store.updateEnvironmentTaskFailureOutcome}
           />
+        </section>
+      </main>
+    {:else if currentView === 'gathering-task-edit' && selectedSystem}
+      <main class="manager-v2-main manager-v2-gathering-task-edit-main" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EditTitle', 'Edit reusable task')}>
+        <section class="manager-v2-task-editor-placeholder" data-gathering-task-editor-placeholder>
+          <div class="manager-v2-setup-card-header">
+            <i class="fas fa-list-check" aria-hidden="true"></i>
+            <div>
+              <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.PlaceholderKicker', 'Reusable task definition')}</p>
+              <h2>{selectedGatheringTask ? gatheringTaskName(selectedGatheringTask) : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SelectTask', 'Select a reusable task')}</h2>
+            </div>
+          </div>
+          <p class="manager-v2-muted">
+            {text('FABRICATE.Admin.ManagerV2.Environment.Tasks.PlaceholderHint', 'Detailed authoring fields for reusable gathering task definitions are coming later. Use the library browser for selection, duplication, deletion, and status for now.')}
+          </p>
+          <div class="manager-v2-action-group">
+            <button type="button" class="manager-v2-button" onclick={backToGatheringTaskLibrary}>
+              <i class="fas fa-arrow-left" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.BackToLibrary', 'Back to task library')}</span>
+            </button>
+          </div>
         </section>
       </main>
     {:else if currentView === 'essences' && selectedSystem}
@@ -1820,8 +2017,94 @@
           <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.TagsCategories.GeneralTitle', 'General category')}</h3>
           <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.TagsCategories.GeneralInspectorHint', 'General is the built-in category for recipes without a custom category and cannot be removed.')}</p>
         </section>
-      {:else if currentView === 'environments' || currentView === 'environment-edit'}
-        {#if currentView === 'environments' && activeGatheringTab === 'settings'}
+      {:else if currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit'}
+        {#if (currentView === 'environments' && activeGatheringTab === 'tasks') || currentView === 'gathering-task-edit'}
+          {#if selectedGatheringTask}
+            <section class="manager-v2-inspector-card" data-gathering-task-inspector>
+              <div class="manager-v2-inspector-title-row is-hero-large">
+                <img class="manager-v2-recipe-preview" src={gatheringTaskImage(selectedGatheringTask)} alt="" />
+                <div class="manager-v2-inspector-copy">
+                  <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Selected', 'Selected reusable task')}</p>
+                  <h2 class="manager-v2-inspector-name" title={gatheringTaskName(selectedGatheringTask)}>{gatheringTaskName(selectedGatheringTask)}</h2>
+                  <div class="manager-v2-chip-row">
+                    <span class={`manager-v2-chip ${selectedGatheringTask.enabled === false ? 'is-disabled' : 'is-active'}`}>
+                      {selectedGatheringTask.enabled === false ? text('FABRICATE.Admin.ManagerV2.StatusDisabled', 'Disabled') : text('FABRICATE.Admin.ManagerV2.StatusActive', 'Active')}
+                    </span>
+                    <span class="manager-v2-chip">{gatheringTaskAvailability(selectedGatheringTask)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <p class="manager-v2-muted">
+                {selectedGatheringTask.description || text('FABRICATE.Admin.ManagerV2.NoDescriptionAdded', 'No description has been added.')}
+              </p>
+            </section>
+
+            <section class="manager-v2-inspector-card">
+              <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Details', 'Reusable task details')}</h3>
+              <div class="manager-v2-fact-grid">
+                <div class="manager-v2-fact" data-gathering-task-fact="region">
+                  <strong>{gatheringOptionLabel('region', selectedGatheringTask.region) || text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyRegion', 'Any region')}</strong>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Region', 'Region')}</span>
+                </div>
+                <div class="manager-v2-fact" data-gathering-task-fact="biomes">
+                  <strong>{Array.isArray(selectedGatheringTask.biomes) && selectedGatheringTask.biomes.length > 0 ? selectedGatheringTask.biomes.length : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyBiome', 'Any biome')}</strong>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Biome', 'Biome')}</span>
+                </div>
+                <div class="manager-v2-fact" data-gathering-task-fact="drops">
+                  <strong>{gatheringTaskDropRows(selectedGatheringTask).length}</strong>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Drops', 'Drops')}</span>
+                </div>
+                <div class="manager-v2-fact" data-gathering-task-fact="environments">
+                  <strong>{activeGatheringTaskEnvironmentCount(selectedGatheringTask)}</strong>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ActiveEnvironments', 'Active environments')}</span>
+                </div>
+              </div>
+            </section>
+
+            <section class="manager-v2-inspector-card">
+              <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropSummary', 'Drop summary')}</h3>
+              {#if gatheringTaskDropRows(selectedGatheringTask).length > 0}
+                <div class="manager-v2-requirements-list">
+                  {#each gatheringTaskDropRows(selectedGatheringTask) as row (row.id)}
+                    <div class="manager-v2-requirement-row">
+                      <span>{gatheringTaskDropLabel(row)}</span>
+                      <strong>{row.enabled === false ? text('FABRICATE.Admin.ManagerV2.StatusDisabled', 'Disabled') : text('FABRICATE.Admin.ManagerV2.StatusActive', 'Active')}</strong>
+                    </div>
+                  {/each}
+                </div>
+              {:else}
+                <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.NoDrops', 'No drops have been added.')}</p>
+              {/if}
+            </section>
+
+            <section class="manager-v2-inspector-card">
+              <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Actions', 'Reusable task actions')}</h3>
+              <div class="manager-v2-inspector-actions">
+                <button type="button" class="manager-v2-button is-primary" onclick={() => editGatheringTask(selectedGatheringTask.id)}>
+                  <i class="fas fa-edit" aria-hidden="true"></i>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Edit', 'Edit reusable task')}</span>
+                </button>
+                <button type="button" class="manager-v2-button" onclick={() => duplicateGatheringTask(selectedSystemId, selectedGatheringTask.id)}>
+                  <i class="fas fa-copy" aria-hidden="true"></i>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Duplicate', 'Duplicate reusable task')}</span>
+                </button>
+                <button type="button" class="manager-v2-button is-danger" onclick={() => deleteGatheringTask(selectedSystemId, selectedGatheringTask.id)}>
+                  <i class="fas fa-trash" aria-hidden="true"></i>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Delete', 'Delete reusable task')}</span>
+                </button>
+              </div>
+            </section>
+          {:else}
+            <div class="manager-v2-empty">
+              <div>
+                <i class="fas fa-list-check" aria-hidden="true"></i>
+                <h3>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SelectTask', 'Select a reusable task')}</h3>
+                <p>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.InspectorHint', 'The inspector shows reusable task availability, active environment matches, and drop summaries for the selected row.')}</p>
+              </div>
+            </div>
+          {/if}
+        {:else if currentView === 'environments' && activeGatheringTab === 'settings'}
           <section class="manager-v2-inspector-card manager-v2-gathering-rules-card" data-gathering-inspector-rules>
             <div class="manager-v2-inspector-title-row">
               <span class="manager-v2-inspector-icon" aria-hidden="true">

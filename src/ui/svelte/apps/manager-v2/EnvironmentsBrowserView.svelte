@@ -6,6 +6,7 @@
   import IconPicker from '../../components/IconPicker.svelte';
   import ManagerV2ColorPicker from '../../components/ManagerV2ColorPicker.svelte';
   import ManagerV2ColorPopover from '../../components/ManagerV2ColorPopover.svelte';
+  import GatheringTasksBrowserView from './GatheringTasksBrowserView.svelte';
 
   let {
     environments = [],
@@ -21,7 +22,15 @@
     sceneOptions = [],
     shouldUseEnvironmentDraftForDisplay = false,
     activeGatheringTab = 'environments',
+    selectedTaskId = '',
+    managedItemOptions = [],
     onSelectGatheringTab = () => {},
+    onSelectGatheringTask = () => {},
+    onCreateGatheringTask = () => {},
+    onEditGatheringTask = () => {},
+    onDuplicateGatheringTask = () => {},
+    onDeleteGatheringTask = () => {},
+    onToggleGatheringTaskEnabled = () => {},
     onSelectEnvironment = () => {},
     onEditEnvironment = () => {},
     onCreateEnvironment = () => {},
@@ -74,10 +83,10 @@
       labelKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Tasks',
       labelFallback: 'Tasks',
       icon: 'fas fa-list-check',
-      titleKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksPlaceholderTitle',
-      titleFallback: 'Gathering tasks',
-      hintKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksPlaceholderHint',
-      hintFallback: 'Reusable gathering task management is planned for a later slice.'
+      titleKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksTitle',
+      titleFallback: 'Reusable gathering tasks',
+      hintKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksHint',
+      hintFallback: 'Browse reusable gathering task definitions before attaching them to environments.'
     },
     {
       id: 'encounters',
@@ -788,6 +797,21 @@
         onPageSizeChange={(next) => { pageSize = next; pageIndex = 0; }}
       />
     </div>
+  {:else if activeGatheringTab === 'tasks'}
+    <GatheringTasksBrowserView
+      tasks={selectedGatheringSystemConfig.tasks || []}
+      environments={environmentList}
+      {selectedTaskId}
+      {selectedSystemId}
+      {gatheringConfig}
+      {managedItemOptions}
+      onSelectTask={onSelectGatheringTask}
+      onCreateTask={onCreateGatheringTask}
+      onEditTask={onEditGatheringTask}
+      onDuplicateTask={onDuplicateGatheringTask}
+      onDeleteTask={onDeleteGatheringTask}
+      onToggleTaskEnabled={onToggleGatheringTaskEnabled}
+    />
   {:else if activeGatheringTab === 'settings'}
     <div
       class="manager-v2-gathering-panel manager-v2-gathering-settings"

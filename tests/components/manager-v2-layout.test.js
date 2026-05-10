@@ -297,7 +297,7 @@ test('manager-v2 gathering settings condition panels use a two-column responsive
 test('manager-v2 recipes browser defines compact responsive table geometry', () => {
   const tableBlock = blockFor('.fabricate-manager-v2 .manager-v2-recipes-table');
   const identityBlock = blockFor('.fabricate-manager-v2 .manager-v2-recipe-identity');
-  const statusCellBlock = blockFor('.fabricate-manager-v2 .manager-v2-system-row .manager-v2-status-cell,\n.fabricate-manager-v2 .manager-v2-recipe-row .manager-v2-status-cell,\n.fabricate-manager-v2 .manager-v2-environment-row .manager-v2-status-cell');
+  const statusCellBlock = blockFor('.fabricate-manager-v2 .manager-v2-system-row .manager-v2-status-cell,\n.fabricate-manager-v2 .manager-v2-recipe-row .manager-v2-status-cell,\n.fabricate-manager-v2 .manager-v2-environment-row .manager-v2-status-cell,\n.fabricate-manager-v2 .manager-v2-gathering-task-row .manager-v2-status-cell');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager-v2 (max-width: 1120px)'));
 
   assert.ok(
@@ -309,8 +309,8 @@ test('manager-v2 recipes browser defines compact responsive table geometry', () 
     'recipes table should have a no-category grid variant'
   );
   assert.ok(
-    css.includes('.fabricate-manager-v2 .manager-v2-recipe-row,\n.fabricate-manager-v2 .manager-v2-component-row,\n.fabricate-manager-v2 .manager-v2-environment-row,\n.fabricate-manager-v2 .manager-v2-essence-row {\n  width: 100%;\n  min-height: 76px;'),
-    'recipe, component, environment, and essence rows should have stable row height'
+    css.includes('.fabricate-manager-v2 .manager-v2-recipe-row,\n.fabricate-manager-v2 .manager-v2-component-row,\n.fabricate-manager-v2 .manager-v2-environment-row,\n.fabricate-manager-v2 .manager-v2-gathering-task-row,\n.fabricate-manager-v2 .manager-v2-essence-row {\n  width: 100%;\n  min-height: 76px;'),
+    'recipe, component, environment, gathering task, and essence rows should have stable row height'
   );
   assert.ok(
     identityBlock.includes('grid-template-columns: 46px minmax(0, 1fr);')
@@ -330,6 +330,31 @@ test('manager-v2 recipes browser defines compact responsive table geometry', () 
     mediumQuery.includes('.fabricate-manager-v2 .manager-v2-labeled-cell::before') && mediumQuery.includes('content: attr(data-label);'),
     'stacked recipe cells should expose visible labels after table headers are hidden'
   );
+});
+
+test('manager-v2 gathering task browser defines bounded toolbar and compact table geometry without reorder controls', () => {
+  const toolbarBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-toolbar');
+  const panelBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-panel-tasks');
+  const tableBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-tasks-table');
+  const rowBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-table-head,\n.fabricate-manager-v2 .manager-v2-gathering-task-row');
+  const identityBlock = blockFor('.fabricate-manager-v2 .manager-v2-recipe-identity,\n.fabricate-manager-v2 .manager-v2-component-identity,\n.fabricate-manager-v2 .manager-v2-environment-identity,\n.fabricate-manager-v2 .manager-v2-gathering-task-identity');
+  const mainBlock = blockFor('.fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"] .manager-v2-main');
+  const placeholderBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-editor-placeholder');
+  const mediumQuery = css.slice(css.indexOf('@container fabricate-manager-v2 (max-width: 1120px)'));
+
+  assert.ok(toolbarBlock.includes('max-height: 112px;') && toolbarBlock.includes('overflow-y: auto;'), 'task toolbar should stay bounded when filters wrap or labels are long');
+  assert.ok(panelBlock.includes('grid-template-rows: auto minmax(0, 1fr) auto;'), 'task panel should reserve toolbar, table scroll, and pagination rows');
+  assert.ok(tableBlock.includes('--fab-mv2-gathering-task-grid:'), 'task browser should define a compact desktop grid');
+  assert.ok(!tableBlock.includes('reorder'), 'task browser should not reserve a reorder column');
+  assert.ok(rowBlock.includes('grid-template-columns: var(--fab-mv2-gathering-task-grid);'), 'task rows should use the shared task grid');
+  assert.ok(identityBlock.includes('grid-template-columns: 46px minmax(0, 1fr);'), 'task identity should reserve thumbnail space');
+  assert.ok(mainBlock.includes('grid-template-rows: minmax(0, 1fr);'), 'task placeholder edit route should keep a bounded main content area');
+  assert.ok(placeholderBlock.includes('overflow: auto;'), 'task placeholder editor should scroll internally for narrow windows or long localized copy');
+  assert.ok(
+    mediumQuery.includes('.fabricate-manager-v2 .manager-v2-gathering-task-row') && mediumQuery.includes('grid-template-columns: minmax(0, 1fr);'),
+    'medium manager-v2 layout should stack task rows before columns become cramped'
+  );
+  assert.equal(css.includes('.fabricate-manager-v2 .manager-v2-gathering-task-row .manager-v2-environment-reorder-stack'), false, 'task rows should not render environment reorder controls');
 });
 
 test('manager-v2 components browser defines drop target and compact responsive table geometry', () => {

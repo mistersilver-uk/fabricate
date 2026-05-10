@@ -69,7 +69,9 @@ Legacy per-task item selection, per-environment hazard selection, and per-enviro
 
 ## Reusable Task And Hazard Libraries
 
-Manager V2 exposes reusable task and hazard authoring for the selected crafting system. Environments compose those reusable records by matching environment region, biome, danger, and the current global weather/time state. GMs can toggle matched task and hazard records on or off per environment; row details stay behind expandable library rows so the environment workspace remains scan-friendly.
+Manager V2 exposes the selected crafting system's reusable task definitions from the Gathering **Tasks** tab. The task browser supports search, status/region/biome/availability filters, pagination, row selection, enabled toggles, duplicate/delete actions, and a right-side inspector with availability, matching-environment count, and drop summaries. The row **Edit** action opens a placeholder editor for now; detailed reusable task authoring fields are deferred to a later Manager V2 slice.
+
+Environment authoring still composes reusable tasks and hazards by matching environment region, biome, danger, and the current global weather and time-of-day state. GMs can toggle matched task and hazard records on or off per environment. The reusable hazard browser and full reusable task/hazard authoring form are not part of this slice.
 
 Reusable task records support:
 
