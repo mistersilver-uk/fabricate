@@ -438,6 +438,11 @@ test('manager-v2 environments browser and edit route define compact responsive g
     'environment reorder buttons should reveal only their own thin row-width overlay band on hover or keyboard focus'
   );
   assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:disabled {\n  opacity: 0;\n  pointer-events: auto;')
+      && css.includes('.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:disabled:hover,\n.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:disabled:focus-visible {\n  opacity: 1;'),
+    'disabled environment reorder bands should stay hidden until their own hover or keyboard focus'
+  );
+  assert.ok(
     css.includes('.fabricate-manager-v2 .manager-v2-environment-row .manager-v2-status-cell'),
     'environment status cells should align the shared compact status toggle'
   );

@@ -7029,7 +7029,13 @@
 }
 
 .fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:disabled {
-  pointer-events: none;
+  opacity: 0;
+  pointer-events: auto;
+}
+
+.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:disabled:hover,
+.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:disabled:focus-visible {
+  opacity: 1;
 }
 
 .fabricate-manager-v2 .manager-v2-toggle {
