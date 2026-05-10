@@ -24,6 +24,22 @@ test('manager-v2 root defines a scoped responsive app container', () => {
   assert.ok(block.includes('overflow: hidden;'), 'manager-v2 shell should own overflow');
 });
 
+test('Fabricate app shells suppress host click focus outlines while preserving keyboard focus', () => {
+  const managerFocusBlock = blockFor('.fabricate-manager-v2 button:focus,\n.fabricate-manager-v2 input:focus,\n.fabricate-manager-v2 select:focus,\n.fabricate-manager-v2 textarea:focus,\n.fabricate-manager-v2 [tabindex]:focus');
+  const managerFocusVisibleBlock = blockFor('.fabricate-manager-v2 button:focus-visible,\n.fabricate-manager-v2 input:focus-visible,\n.fabricate-manager-v2 select:focus-visible,\n.fabricate-manager-v2 [tabindex]:focus-visible');
+  const adminFocusBlock = blockFor('.fabricate-admin button:focus,\n.fabricate-admin input:focus,\n.fabricate-admin select:focus,\n.fabricate-admin textarea:focus,\n.fabricate-admin [tabindex]:focus');
+  const actorFocusBlock = blockFor('.fabricate-actor-app button:focus,\n.fabricate-actor-app input:focus,\n.fabricate-actor-app select:focus,\n.fabricate-actor-app textarea:focus,\n.fabricate-actor-app [tabindex]:focus');
+
+  assert.ok(managerFocusBlock.includes('outline: none;') && managerFocusBlock.includes('box-shadow: none;'), 'manager-v2 controls should clear host click focus outlines');
+  assert.ok(adminFocusBlock.includes('outline: none;') && adminFocusBlock.includes('box-shadow: none;'), 'legacy admin controls should clear host click focus outlines');
+  assert.ok(actorFocusBlock.includes('outline: none;') && actorFocusBlock.includes('box-shadow: none;'), 'actor app controls should clear host click focus outlines');
+  assert.ok(
+    css.includes('.fabricate.crafting-app button:focus:not(:focus-visible),\n.fabricate.crafting-app input:focus:not(:focus-visible),\n.fabricate.crafting-app select:focus:not(:focus-visible),\n.fabricate.crafting-app textarea:focus:not(:focus-visible),\n.fabricate.crafting-app [tabindex]:focus:not(:focus-visible) {\n  outline: none;\n  box-shadow: none;'),
+    'classic crafting app controls should clear host click focus outlines'
+  );
+  assert.ok(managerFocusVisibleBlock.includes('outline: 2px solid var(--fab-mv2-accent);'), 'manager-v2 keyboard focus should remain visible');
+});
+
 test('manager-v2 body starts as a three-region grid and stacks at narrow width', () => {
   const bodyBlock = blockFor('.fabricate-manager-v2 .manager-v2-body');
 

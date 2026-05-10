@@ -751,6 +751,15 @@
   background: var(--fab-bg-1);
 }
 
+.fabricate.crafting-app button:focus:not(:focus-visible),
+.fabricate.crafting-app input:focus:not(:focus-visible),
+.fabricate.crafting-app select:focus:not(:focus-visible),
+.fabricate.crafting-app textarea:focus:not(:focus-visible),
+.fabricate.crafting-app [tabindex]:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
+
 .fabricate-crafting-app {
   display: flex;
   flex-direction: column;
@@ -780,6 +789,15 @@
 
 .fabricate-actor-app * {
   box-sizing: border-box;
+}
+
+.fabricate-actor-app button:focus,
+.fabricate-actor-app input:focus,
+.fabricate-actor-app select:focus,
+.fabricate-actor-app textarea:focus,
+.fabricate-actor-app [tabindex]:focus {
+  outline: none;
+  box-shadow: none;
 }
 
 .fabricate-actor-app button:focus-visible,
@@ -1339,6 +1357,15 @@
 
 .fabricate-admin * {
   box-sizing: border-box;
+}
+
+.fabricate-admin button:focus,
+.fabricate-admin input:focus,
+.fabricate-admin select:focus,
+.fabricate-admin textarea:focus,
+.fabricate-admin [tabindex]:focus {
+  outline: none;
+  box-shadow: none;
 }
 
 .fabricate-admin button:focus-visible,
@@ -5330,6 +5357,15 @@
 .fabricate-manager-v2 select,
 .fabricate-manager-v2 textarea {
   font: inherit;
+}
+
+.fabricate-manager-v2 button:focus,
+.fabricate-manager-v2 input:focus,
+.fabricate-manager-v2 select:focus,
+.fabricate-manager-v2 textarea:focus,
+.fabricate-manager-v2 [tabindex]:focus {
+  outline: none;
+  box-shadow: none;
 }
 
 .fabricate-manager-v2 button:focus-visible,
