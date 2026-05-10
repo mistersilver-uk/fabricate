@@ -15,6 +15,8 @@
     selectedSystemId = '',
     sceneOptions = [],
     shouldUseEnvironmentDraftForDisplay = false,
+    activeGatheringTab = 'environments',
+    onSelectGatheringTab = () => {},
     onSelectEnvironment = () => {},
     onEditEnvironment = () => {},
     onCreateEnvironment = () => {},
@@ -33,7 +35,6 @@
   let lastSystemId = $state('');
   let pageIndex = $state(0);
   let pageSize = $state(10);
-  let activeGatheringTab = $state('environments');
 
   const gatheringTabs = [
     {
@@ -55,12 +56,12 @@
     {
       id: 'encounters',
       labelKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Encounters',
-      labelFallback: 'Encounters',
-      icon: 'fas fa-compass',
+      labelFallback: 'Hazards',
+      icon: 'fas fa-exclamation-triangle',
       titleKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.EncountersPlaceholderTitle',
-      titleFallback: 'Gathering encounters',
+      titleFallback: 'Gathering hazards',
       hintKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.EncountersPlaceholderHint',
-      hintFallback: 'Encounter and hazard authoring is planned for a later slice.'
+      hintFallback: 'Reusable hazard authoring is planned for a later slice.'
     },
     {
       id: 'settings',
@@ -70,7 +71,7 @@
       titleKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderTitle',
       titleFallback: 'Gathering settings',
       hintKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderHint',
-      hintFallback: 'Gathering-wide configuration is planned for a later slice.'
+      hintFallback: 'Set system-level d100 reward and hazard rules for gathering.'
     }
   ];
 
@@ -82,11 +83,11 @@
     riskFilter = 'all';
     regionFilter = 'all';
     biomeFilter = 'all';
-    activeGatheringTab = 'environments';
     lastSystemId = selectedSystemId;
   });
 
   const environmentList = $derived(environments || []);
+  const activeGatheringTabConfig = $derived(gatheringTabs.find(tab => tab.id === activeGatheringTab) || gatheringTabs[0]);
   const regionOptions = $derived(uniqueSorted(environmentList.map(environment => environment.region)));
   const biomeOptions = $derived(uniqueSorted(environmentList.map(environment => environment.biome)));
   const normalizedSearchTerm = $derived(searchTerm.trim().toLowerCase());
@@ -210,7 +211,19 @@
   }
 
   function selectGatheringTab(tabId) {
-    activeGatheringTab = tabId;
+    onSelectGatheringTab(tabId);
+  }
+
+  function gatheringHeaderTitle() {
+    const titleKey = activeGatheringTabConfig?.titleKey;
+    if (titleKey) return text(titleKey, activeGatheringTabConfig.titleFallback);
+    return text('FABRICATE.Admin.ManagerV2.Environment.Library', 'Gathering environments');
+  }
+
+  function gatheringHeaderHint() {
+    const hintKey = activeGatheringTabConfig?.hintKey;
+    if (hintKey) return text(hintKey, activeGatheringTabConfig.hintFallback);
+    return text('FABRICATE.Admin.ManagerV2.Environment.LibraryHint', 'Browse scene-linked gathering environments and open the existing editor for task authoring.');
   }
 </script>
 
@@ -218,8 +231,8 @@
   <section class="manager-v2-section-header">
     <div class="manager-v2-heading">
       <p class="manager-v2-kicker">{selectedSystemName || text('FABRICATE.Admin.ManagerV2.SelectSystem', 'Select a system')}</p>
-      <h2 class="manager-v2-title">{text('FABRICATE.Admin.ManagerV2.Environment.Library', 'Gathering environments')}</h2>
-      <p class="manager-v2-subtitle">{text('FABRICATE.Admin.ManagerV2.Environment.LibraryHint', 'Browse scene-linked gathering environments and open the existing editor for task authoring.')}</p>
+      <h2 class="manager-v2-title">{gatheringHeaderTitle()}</h2>
+      <p class="manager-v2-subtitle">{gatheringHeaderHint()}</p>
     </div>
   </section>
 
@@ -242,7 +255,7 @@
 
   {#if activeGatheringTab === 'environments'}
     <div
-      class="manager-v2-gathering-panel"
+      class="manager-v2-gathering-panel manager-v2-gathering-panel-environments"
       id="manager-v2-gathering-panel-environments"
       role="tabpanel"
       aria-labelledby="manager-v2-gathering-tab-environments"
@@ -344,7 +357,7 @@
                   <span>{text('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.OpenTasks', 'Review tasks')}</span>
                 </button>
                 <button type="button" class="manager-v2-button" onclick={() => selectGatheringTab('encounters')}>
-                  <i class="fas fa-compass" aria-hidden="true"></i>
+                  <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
                   <span>{text('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.OpenHazards', 'Review hazards')}</span>
                 </button>
               </div>
@@ -448,6 +461,13 @@
         onPageSizeChange={(next) => { pageSize = next; pageIndex = 0; }}
       />
     </div>
+  {:else if activeGatheringTab === 'settings'}
+    <div
+      class="manager-v2-gathering-panel manager-v2-gathering-settings"
+      id="manager-v2-gathering-panel-settings"
+      role="tabpanel"
+      aria-labelledby="manager-v2-gathering-tab-settings"
+    ></div>
   {:else}
     {@const activeTab = gatheringTabs.find(tab => tab.id === activeGatheringTab)}
     <div
