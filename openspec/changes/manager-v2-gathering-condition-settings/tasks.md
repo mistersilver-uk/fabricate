@@ -14,3 +14,5 @@
 - [x] Update Settings UI pills/selectors for labels, icons, and icon picker editing.
 - [x] Add focused regression coverage for option records, matching ids, and settings layout polish.
 - [x] Re-run focused suites, `npm test`, and `npm run build`.
+- [x] Refine condition pill geometry to two-per-row rectangular cards with centered icons.
+- [x] Add icon picker support to new condition value creation.

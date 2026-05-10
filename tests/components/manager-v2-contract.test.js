@@ -489,6 +489,8 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(environmentsBrowserSource.includes('onDeleteGatheringConditionValue?.'), 'settings condition panels should wire value deletion');
     assert.ok(environmentsBrowserSource.includes('IconPicker'), 'settings condition panels should reuse the shared icon picker');
     assert.ok(environmentsBrowserSource.includes('manager-v2-condition-label-input'), 'settings condition panels should expose editable display labels');
+    assert.ok(environmentsBrowserSource.includes("onAddGatheringConditionValue?.(kind, { label: value, icon: conditionAddIcon(kind) }"), 'settings condition add should include the selected icon');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Conditions.NewIcon, 'New value icon');
     assert.ok(environmentEditSource.includes("{#each ['regions', 'biomes', 'danger'] as vocabulary"), 'environment editor should keep only non-weather generic vocabulary CSV controls');
     assert.ok(!environmentEditSource.includes("{#each ['regions', 'biomes', 'danger', 'weather', 'timeOfDay'] as vocabulary"), 'environment editor should not expose weather/time generic vocabulary CSV controls');
     assert.ok(rootSource.includes('updateSelectedGatheringRules'), 'root should wire rule updates');

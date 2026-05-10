@@ -851,6 +851,7 @@
             "EnableMatching": "Enable matching",
             "DisableMatching": "Disable matching",
             "Values": "Condition values",
+            "NewIcon": "New value icon",
             "EditIcon": "Edit icon",
             "EditLabel": "Edit label",
             "RemoveValue": "Remove {value}"

@@ -238,8 +238,12 @@ test('manager-v2 gathering settings condition panels use a two-column responsive
   assert.ok(settingsBlock.includes('padding: 12px;'), 'settings panel should use padded workspace spacing');
   assert.ok(panelBlock.includes('align-content: start;'), 'condition panel content should pack to its natural height');
   assert.ok(panelBlock.includes('height: 100%;'), 'condition panel backgrounds should fill the stretched grid row');
-  assert.ok(addBlock.includes('grid-template-columns: minmax(0, 1fr) 34px;'), 'condition add controls should reserve a stable icon button column');
-  assert.ok(pillBlock.includes('grid-template-columns: 28px minmax(72px, 1fr) 22px;'), 'condition pills should reserve icon, label, and remove columns');
+  assert.ok(addBlock.includes('grid-template-columns: 36px minmax(0, 1fr) 34px;'), 'condition add controls should reserve icon picker, label input, and add button columns');
+  assert.ok(css.includes('.fabricate-manager-v2 .manager-v2-condition-pill-list {\n  display: grid;'), 'condition pills should use grid rows instead of wrapping as single full-width flex pills');
+  assert.ok(css.includes('grid-template-columns: repeat(2, minmax(0, 1fr));'), 'condition pills should fit two per line');
+  assert.ok(pillBlock.includes('grid-template-columns: 30px minmax(0, 1fr) 24px;'), 'condition pills should reserve icon, label, and remove columns');
+  assert.ok(pillBlock.includes('border-radius: 6px;'), 'condition pills should be rounded rectangles rather than ovals');
+  assert.ok(css.includes('.fabricate-manager-v2 .manager-v2-condition-pill .essence-icon-picker-trigger.icon-only') && css.includes('justify-content: center;'), 'condition pill icon picker buttons should center icons');
   assert.ok(
     mediumQuery.includes('.fabricate-manager-v2 .manager-v2-gathering-settings')
       && mediumQuery.includes('grid-template-columns: minmax(0, 1fr);'),

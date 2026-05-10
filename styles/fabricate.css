@@ -8279,7 +8279,7 @@
 
 .fabricate-manager-v2 .manager-v2-condition-add {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 34px;
+  grid-template-columns: 36px minmax(0, 1fr) 34px;
   gap: 8px;
   align-items: end;
   min-width: 0;
@@ -8291,34 +8291,60 @@
 }
 
 .fabricate-manager-v2 .manager-v2-condition-pill-list {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
   min-width: 0;
 }
 
 .fabricate-manager-v2 .manager-v2-condition-pill {
-  display: inline-grid;
-  grid-template-columns: 28px minmax(72px, 1fr) 22px;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 24px;
   gap: 4px;
   align-items: center;
-  max-width: 100%;
-  min-height: 32px;
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
   padding: 2px;
   border: 1px solid var(--fab-mv2-border);
-  border-radius: 999px;
+  border-radius: 6px;
   color: var(--fab-mv2-text);
   background: var(--fab-mv2-bg);
   overflow: hidden;
 }
 
+.fabricate-manager-v2 .manager-v2-condition-add .essence-icon-picker-trigger.icon-only,
 .fabricate-manager-v2 .manager-v2-condition-pill .essence-icon-picker-trigger.icon-only {
-  width: 28px;
-  height: 28px;
-  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  grid-template-columns: 1fr;
+  width: 100%;
+  height: 100%;
+  min-height: 30px;
+  padding: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: 4px;
   background: transparent;
+}
+
+.fabricate-manager-v2 .manager-v2-condition-add .essence-icon-picker-trigger.icon-only {
+  height: 36px;
+  border: 1px solid var(--fab-mv2-border);
+  background: var(--fab-overlay-light-06);
+}
+
+.fabricate-manager-v2 .manager-v2-condition-add .essence-icon-picker-trigger.icon-only .essence-icon-picker-preview,
+.fabricate-manager-v2 .manager-v2-condition-pill .essence-icon-picker-trigger.icon-only .essence-icon-picker-preview {
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
+  background: transparent;
+}
+
+.fabricate-manager-v2 .manager-v2-condition-add .essence-icon-picker-trigger.icon-only .essence-icon-picker-trigger-caret,
+.fabricate-manager-v2 .manager-v2-condition-pill .essence-icon-picker-trigger.icon-only .essence-icon-picker-trigger-caret {
+  display: none;
 }
 
 .fabricate-manager-v2 .manager-v2-condition-label-input {

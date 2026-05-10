@@ -595,6 +595,7 @@ function createStore(calls = [], options = {}) {
     updateGatheringConditions: (...args) => calls.push(['updateGatheringConditions', ...args]),
     toggleGatheringConditionEnabled: (...args) => calls.push(['toggleGatheringConditionEnabled', ...args]),
     addGatheringConditionValue: (...args) => calls.push(['addGatheringConditionValue', ...args]),
+    updateGatheringConditionValue: (...args) => calls.push(['updateGatheringConditionValue', ...args]),
     deleteGatheringConditionValue: (...args) => calls.push(['deleteGatheringConditionValue', ...args])
   };
 }
@@ -1787,7 +1788,9 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Times of day'));
     assert.ok(target.textContent.includes('Weather conditions'));
     assert.equal(target.querySelectorAll('.manager-v2-condition-add input').length, 2);
+    assert.equal(target.querySelectorAll('.manager-v2-condition-add .essence-icon-picker-trigger.icon-only').length, 2);
     assert.equal(target.querySelectorAll('.manager-v2-condition-pill').length, 5);
+    assert.equal(target.querySelectorAll('.manager-v2-condition-pill .essence-icon-picker-trigger.icon-only').length, 5);
     assert.equal(target.querySelector('.manager-v2-gathering-settings-summary'), null);
     assert.equal(target.querySelector('[data-gathering-rule-fact]'), null);
     assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Choose which successful d100 reward rows are granted.'));

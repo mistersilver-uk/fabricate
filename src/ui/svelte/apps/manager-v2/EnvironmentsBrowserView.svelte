@@ -44,6 +44,8 @@
   let pageSize = $state(10);
   let weatherInput = $state('');
   let timeOfDayInput = $state('');
+  let weatherIconInput = $state('fas fa-cloud-sun');
+  let timeOfDayIconInput = $state('fas fa-clock');
 
   const gatheringTabs = [
     {
@@ -92,6 +94,10 @@
     riskFilter = 'all';
     regionFilter = 'all';
     biomeFilter = 'all';
+    weatherInput = '';
+    timeOfDayInput = '';
+    weatherIconInput = defaultConditionIcon('weather');
+    timeOfDayIconInput = defaultConditionIcon('timeOfDay');
     lastSystemId = selectedSystemId;
   });
 
@@ -267,11 +273,20 @@
     else weatherInput = value;
   }
 
+  function conditionAddIcon(kind) {
+    return kind === 'timeOfDay' ? timeOfDayIconInput : weatherIconInput;
+  }
+
+  function setConditionAddIcon(kind, value) {
+    if (kind === 'timeOfDay') timeOfDayIconInput = value;
+    else weatherIconInput = value;
+  }
+
   function submitConditionValue(event, kind) {
     event.preventDefault();
     const value = conditionInputValue(kind).trim();
     if (!value) return;
-    onAddGatheringConditionValue?.(kind, value, selectedSystemId);
+    onAddGatheringConditionValue?.(kind, { label: value, icon: conditionAddIcon(kind) }, selectedSystemId);
     setConditionInput(kind, '');
   }
 
@@ -291,6 +306,10 @@
 
   function conditionIcon(option, kind) {
     if (option && typeof option === 'object' && option.icon) return option.icon;
+    return defaultConditionIcon(kind);
+  }
+
+  function defaultConditionIcon(kind) {
     return kind === 'timeOfDay' ? 'fas fa-clock' : 'fas fa-cloud-sun';
   }
 
@@ -590,6 +609,12 @@
           </label>
 
           <form class="manager-v2-condition-add" onsubmit={(event) => submitConditionValue(event, condition.kind)}>
+            <IconPicker
+              value={conditionAddIcon(condition.kind)}
+              iconOnly={true}
+              buttonTitle={text('FABRICATE.Admin.ManagerV2.Environment.Conditions.NewIcon', 'New value icon')}
+              onChange={(icon) => setConditionAddIcon(condition.kind, icon)}
+            />
             <label class="manager-v2-field">
               <span>{conditionAddLabel(condition.kind)}</span>
               <input

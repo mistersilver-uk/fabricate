@@ -30,7 +30,7 @@ Top-level `conditions` and `vocabularies` remain valid legacy inputs. Normalizat
 Runtime composition resolves the selected system's condition settings before matching reusable tasks and hazards. Enabled dimensions filter against the current option id; disabled dimensions ignore record tags for that dimension.
 
 ## UI
-The Gathering Settings center panel renders two equal-height panels in a two-column grid that stacks at medium widths. Each panel aligns its content to the top and has a compact enable toggle, current-value selector, add control, and value pills with icon picker, label input, and remove affordance.
+The Gathering Settings center panel renders two equal-height panels in a two-column grid that stacks at medium widths. Each panel aligns its content to the top and has a compact enable toggle, current-value selector, add control with an icon picker for the new value, and value pills with icon picker, label input, and remove affordance. Value pills render as two-per-row rectangular controls with modest rounded corners.
 
 The environment editor keeps region, biome, and danger generic vocabulary CSV controls. Weather and time-of-day are managed through Settings.
 
