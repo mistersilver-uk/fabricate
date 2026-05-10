@@ -2013,9 +2013,48 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(calls.filter(call => call[0] === 'updateGatheringVocabularyValue').at(-1)[1], 'biomes');
-    biomeIconTrigger.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    const biomeColorTrigger = target.querySelector('[data-gathering-vocabulary-panel="biomes"] [data-gathering-vocabulary-value="forest"] .manager-v2-biome-combined-trigger');
+    const managerShell = target.querySelector('.fabricate-manager-v2');
+    const managerMain = target.querySelector('.manager-v2-main');
+    const originalShellRect = managerShell.getBoundingClientRect;
+    const originalMainRect = managerMain.getBoundingClientRect;
+    const originalBiomeTriggerRect = biomeColorTrigger.getBoundingClientRect;
+    managerShell.getBoundingClientRect = () => ({
+      left: 100,
+      top: 50,
+      right: 800,
+      bottom: 370,
+      width: 700,
+      height: 320
+    });
+    managerMain.getBoundingClientRect = () => ({
+      left: 120,
+      top: 60,
+      right: 760,
+      bottom: 360,
+      width: 640,
+      height: 300
+    });
+    biomeColorTrigger.getBoundingClientRect = () => ({
+      left: 140,
+      top: 330,
+      right: 170,
+      bottom: 360,
+      width: 30,
+      height: 30
+    });
+    biomeColorTrigger.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
     await tick();
     flushSync();
+    await tick();
+    flushSync();
+    const colorPopover = target.querySelector('[data-manager-v2-color-picker-popover]');
+    assert.ok(colorPopover);
+    assert.equal(colorPopover.closest('.fabricate-manager-v2'), managerShell, 'biome color popover should stay inside the Manager V2 shell overlay layer');
+    assert.equal(colorPopover.closest('[data-gathering-vocabulary-panel="biomes"]'), null, 'biome color popover should be portaled out of the settings panel');
+    assert.match(colorPopover.getAttribute('style'), /bottom:\s*\d+px;/, 'lower biome color popovers should flip above the trigger when space below is constrained');
+    assert.match(colorPopover.getAttribute('style'), /left:\s*40px;/, 'biome color popover should left-align with the trigger while within the main panel bounds');
+    assert.match(colorPopover.getAttribute('style'), /width:\s*220px;/, 'biome color popover should keep its fixed compact width');
     target.querySelector('[data-manager-v2-color-token="mist"]').click();
     await tick();
     flushSync();
@@ -2028,14 +2067,27 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(target.querySelector('[data-manager-v2-color-picker-popover]'), null);
-    biomeIconTrigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true, cancelable: true }));
+    biomeColorTrigger.getBoundingClientRect = () => ({
+      left: 760,
+      top: 330,
+      right: 790,
+      bottom: 360,
+      width: 30,
+      height: 30
+    });
+    biomeColorTrigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true, cancelable: true }));
     await tick();
     flushSync();
-    assert.ok(target.querySelector('[data-manager-v2-color-picker-popover]'));
+    const constrainedColorPopover = target.querySelector('[data-manager-v2-color-picker-popover]');
+    assert.ok(constrainedColorPopover);
+    assert.match(constrainedColorPopover.getAttribute('style'), /left:\s*424px;/, 'biome color popover should clamp to the Manager V2 main panel right edge');
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await tick();
     flushSync();
     assert.equal(target.querySelector('[data-manager-v2-color-picker-popover]'), null);
+    managerShell.getBoundingClientRect = originalShellRect;
+    managerMain.getBoundingClientRect = originalMainRect;
+    biomeColorTrigger.getBoundingClientRect = originalBiomeTriggerRect;
     assert.equal(target.querySelector('.manager-v2-gathering-settings-summary'), null);
     assert.equal(target.querySelector('[data-gathering-rule-fact]'), null);
     assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Choose which successful d100 reward rows are granted.'));

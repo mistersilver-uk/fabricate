@@ -8479,9 +8479,7 @@
 .fabricate-manager-v2 .manager-v2-color-picker-popover {
   position: absolute;
   box-sizing: border-box;
-  z-index: 20;
-  top: calc(100% + 6px);
-  left: 0;
+  z-index: 120;
   display: grid;
   gap: 8px;
   width: 220px;

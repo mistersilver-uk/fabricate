@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
+  import { portal } from '../actions/portal.js';
 
   let {
     colorToken = 'sage',
@@ -8,8 +9,14 @@
     presetGridLabel = 'Colour presets',
     customHexLabel = 'Custom hex',
     onChange = () => {},
-    onDismiss = () => {}
+    onDismiss = () => {},
+    manageDismiss = true,
+    popoverStyle = '',
+    portalTarget = null,
+    registerPopoverNode = () => {}
   } = $props();
+
+  let popoverRoot = $state(null);
 
   const presets = [
     { token: 'sage', label: 'Sage' },
@@ -44,12 +51,21 @@
   function updateCustomColor(value) {
     onChange({ colorToken: normalizedToken(colorToken), customColor: value });
   }
+
+  $effect(() => {
+    registerPopoverNode(popoverRoot);
+
+    return () => registerPopoverNode(null);
+  });
 </script>
 
 <span
+  bind:this={popoverRoot}
   class="manager-v2-color-picker-popover"
   data-manager-v2-color-picker-popover
-  use:dismissOnOutsideClick={{ onDismiss }}
+  style={popoverStyle}
+  use:dismissOnOutsideClick={{ enabled: manageDismiss, onDismiss }}
+  use:portal={portalTarget}
 >
   <span class="manager-v2-color-preset-grid" aria-label={presetGridLabel}>
     {#each presets as preset (preset.token)}

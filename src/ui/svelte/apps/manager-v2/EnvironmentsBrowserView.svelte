@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { computeIconPickerPopoverLayout } from '../../util/iconPickerPopover.js';
   import Pagination from '../../components/Pagination.svelte';
   import IconPicker from '../../components/IconPicker.svelte';
   import ManagerV2ColorPicker from '../../components/ManagerV2ColorPicker.svelte';
@@ -57,6 +58,9 @@
   let biomeColorTokenInput = $state('sage');
   let biomeCustomColorInput = $state('');
   let openBiomeColorPickerId = $state('');
+  let biomeColorTriggerButton = $state(null);
+  let biomeColorPopoverRoot = $state(null);
+  let biomeColorPopoverStyle = $state('');
 
   const gatheringTabs = [
     {
@@ -401,13 +405,114 @@
   function openBiomeColorPicker(event, id) {
     event?.preventDefault?.();
     event?.stopPropagation?.();
-    openBiomeColorPickerId = openBiomeColorPickerId === id ? '' : id;
+    const shouldOpen = openBiomeColorPickerId !== id;
+    openBiomeColorPickerId = shouldOpen ? id : '';
+    biomeColorTriggerButton = shouldOpen ? event?.currentTarget ?? null : null;
+    if (shouldOpen) {
+      updateBiomeColorPopoverPosition();
+    }
   }
 
   function handleBiomeIconKeydown(event, id) {
     if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return;
     openBiomeColorPicker(event, id);
   }
+
+  function closeBiomeColorPicker() {
+    openBiomeColorPickerId = '';
+    biomeColorTriggerButton = null;
+  }
+
+  function getBiomeColorPopoverHost() {
+    if (!biomeColorTriggerButton || typeof document === 'undefined') return null;
+
+    return biomeColorTriggerButton.closest('.fabricate-manager-v2');
+  }
+
+  function getBiomeColorPopoverHorizontalBounds(hostRect) {
+    if (!biomeColorTriggerButton) return {};
+
+    const mainPanel = biomeColorTriggerButton.closest('.manager-v2-main');
+    const mainPanelRect = mainPanel?.getBoundingClientRect?.();
+    if (!mainPanelRect) return {};
+
+    return {
+      minLeft: mainPanelRect.left - hostRect.left + 16,
+      maxRight: mainPanelRect.right - hostRect.left - 16
+    };
+  }
+
+  function updateBiomeColorPopoverPosition() {
+    if (!openBiomeColorPickerId || !biomeColorTriggerButton || typeof window === 'undefined') return;
+
+    const popoverHost = getBiomeColorPopoverHost();
+    const hostRect = popoverHost?.getBoundingClientRect?.() ?? {
+      left: 0,
+      top: 0,
+      width: window.innerWidth,
+      height: window.innerHeight
+    };
+    const triggerRect = biomeColorTriggerButton.getBoundingClientRect();
+    const horizontalBounds = getBiomeColorPopoverHorizontalBounds(hostRect);
+    const layout = computeIconPickerPopoverLayout(
+      {
+        left: triggerRect.left - hostRect.left,
+        right: triggerRect.right - hostRect.left,
+        top: triggerRect.top - hostRect.top,
+        bottom: triggerRect.bottom - hostRect.top,
+        width: triggerRect.width,
+        height: triggerRect.height
+      },
+      { width: hostRect.width || window.innerWidth, height: hostRect.height || window.innerHeight },
+      {
+        horizontalAlign: 'left',
+        minLeft: horizontalBounds.minLeft,
+        maxRight: horizontalBounds.maxRight,
+        minWidth: 220,
+        maxWidth: 220
+      }
+    );
+
+    if (!layout) {
+      biomeColorPopoverStyle = '';
+      return;
+    }
+
+    const verticalPosition = layout.placement === 'top'
+      ? `top: auto; bottom: ${layout.bottom}px;`
+      : `top: ${layout.top}px; bottom: auto;`;
+
+    biomeColorPopoverStyle = [
+      `left: ${layout.left}px;`,
+      'right: auto;',
+      `width: ${layout.width}px;`,
+      `max-height: ${layout.maxHeight}px;`,
+      verticalPosition
+    ].join(' ');
+  }
+
+  function registerBiomeColorPopoverNode(node) {
+    biomeColorPopoverRoot = node;
+  }
+
+  $effect(() => {
+    if (!openBiomeColorPickerId || typeof window === 'undefined' || typeof document === 'undefined') {
+      biomeColorPopoverStyle = '';
+      biomeColorPopoverRoot = null;
+      return;
+    }
+
+    updateBiomeColorPopoverPosition();
+
+    const handleViewportChange = () => updateBiomeColorPopoverPosition();
+    window.addEventListener('resize', handleViewportChange);
+    document.addEventListener('scroll', handleViewportChange, true);
+
+    return () => {
+      window.removeEventListener('resize', handleViewportChange);
+      document.removeEventListener('scroll', handleViewportChange, true);
+    };
+  });
 
   function updateCurrentCondition(kind, value) {
     onUpdateGatheringConditions?.({ [kind]: value, systemId: selectedSystemId });
@@ -854,7 +959,10 @@
                         presetGridLabel={text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.ColorPresets', 'Colour presets')}
                         customHexLabel={text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.CustomHex', 'Custom hex')}
                         onChange={(updates) => onUpdateGatheringVocabularyValue?.(vocabulary.kind, valueId, updates, selectedSystemId)}
-                        onDismiss={() => openBiomeColorPickerId = ''}
+                        onDismiss={closeBiomeColorPicker}
+                        popoverStyle={biomeColorPopoverStyle}
+                        portalTarget={() => getBiomeColorPopoverHost()}
+                        registerPopoverNode={registerBiomeColorPopoverNode}
                       />
                     {/if}
                   </span>
