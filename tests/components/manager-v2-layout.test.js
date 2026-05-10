@@ -514,8 +514,11 @@ test('manager-v2 environments browser and edit route define compact responsive g
   assert.ok(actionGridBlock.includes('grid-template-columns: repeat(2, 34px);'), 'environment edit duplicate delete buttons should sit in a compact grid');
   assert.ok(
     mediumQuery.includes('.fabricate-manager-v2 .manager-v2-action-group.manager-v2-environment-actions.manager-v2-labeled-cell')
-      && mediumQuery.includes('justify-content: space-between;')
+      && mediumQuery.includes('display: grid;')
+      && mediumQuery.includes('grid-template-columns: minmax(88px, 0.35fr) 72px;')
+      && mediumQuery.includes('justify-content: stretch;')
       && mediumQuery.includes('.fabricate-manager-v2 .manager-v2-environment-actions .manager-v2-environment-action-grid')
+      && mediumQuery.includes('justify-self: end;')
       && mediumQuery.includes('margin-left: auto;'),
     'responsive environment row actions should stay right-aligned instead of inheriting the generic left-aligned action group layout'
   );

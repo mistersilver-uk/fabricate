@@ -8904,10 +8904,17 @@
   }
 
   .fabricate-manager-v2 .manager-v2-action-group.manager-v2-environment-actions.manager-v2-labeled-cell {
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: minmax(88px, 0.35fr) 72px;
+    justify-content: stretch;
+  }
+
+  .fabricate-manager-v2 .manager-v2-action-group.manager-v2-environment-actions.manager-v2-labeled-cell::before {
+    min-width: 0;
   }
 
   .fabricate-manager-v2 .manager-v2-environment-actions .manager-v2-environment-action-grid {
+    justify-self: end;
     margin-left: auto;
   }
 
