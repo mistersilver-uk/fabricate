@@ -1730,6 +1730,15 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
       assert.ok(target.textContent.includes(placeholder));
       assert.equal(target.querySelector('.manager-v2-toolbar'), null);
       assert.equal(target.querySelector('.manager-v2-environments-table'), null);
+      assert.equal(
+        target.querySelector('.manager-v2-inspector [data-gathering-inspector-placeholder] h2').textContent.trim(),
+        label === 'Tasks' ? 'Gathering tasks' : label === 'Encounters' ? 'Gathering encounters' : 'Gathering settings'
+      );
+      assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes(placeholder));
+      assert.equal(
+        target.querySelector('.manager-v2-inspector').textContent.includes('Selected environment'),
+        false
+      );
     }
 
     target.querySelector('#manager-v2-gathering-tab-environments').click();
@@ -1855,6 +1864,11 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
 
     assert.equal(target.querySelector('#manager-v2-gathering-tab-tasks').getAttribute('aria-selected'), 'true');
     assert.ok(target.textContent.includes('Reusable gathering task management is planned for a later slice.'));
+    assert.equal(
+      target.querySelector('.manager-v2-inspector [data-gathering-inspector-placeholder]').getAttribute('data-gathering-inspector-placeholder'),
+      'tasks'
+    );
+    assert.equal(target.querySelector('.manager-v2-inspector').textContent.includes('Plan gathering content'), false);
 
     target.querySelector('#manager-v2-gathering-tab-environments').click();
     await tick();

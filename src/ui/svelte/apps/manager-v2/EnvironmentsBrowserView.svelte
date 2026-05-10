@@ -15,6 +15,8 @@
     selectedSystemId = '',
     sceneOptions = [],
     shouldUseEnvironmentDraftForDisplay = false,
+    activeGatheringTab = 'environments',
+    onSelectGatheringTab = () => {},
     onSelectEnvironment = () => {},
     onEditEnvironment = () => {},
     onCreateEnvironment = () => {},
@@ -33,7 +35,6 @@
   let lastSystemId = $state('');
   let pageIndex = $state(0);
   let pageSize = $state(10);
-  let activeGatheringTab = $state('environments');
 
   const gatheringTabs = [
     {
@@ -82,7 +83,6 @@
     riskFilter = 'all';
     regionFilter = 'all';
     biomeFilter = 'all';
-    activeGatheringTab = 'environments';
     lastSystemId = selectedSystemId;
   });
 
@@ -210,7 +210,7 @@
   }
 
   function selectGatheringTab(tabId) {
-    activeGatheringTab = tabId;
+    onSelectGatheringTab(tabId);
   }
 </script>
 

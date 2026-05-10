@@ -25,12 +25,14 @@
   let selectedEssenceId = $state('');
   let lastComponentSystemId = $state('');
   let lastEssenceSystemId = $state('');
+  let lastGatheringSystemId = $state('');
   let essenceEditDirty = $state(false);
   let essenceEditSaving = $state(false);
   let essenceEditDraft = $state(null);
   let componentEditDirty = $state(false);
   let componentEditSaving = $state(false);
   let componentEditDraft = $state(null);
+  let activeGatheringTab = $state('environments');
   const placeholderViews = [
     { id: 'rules', icon: 'fas fa-sliders-h', labelKey: 'FABRICATE.Admin.ManagerV2.Nav.Rules', fallback: 'Rules' },
     { id: 'graph', icon: 'fas fa-project-diagram', labelKey: 'FABRICATE.Admin.ManagerV2.Nav.Graph', fallback: 'Graph' }
@@ -132,6 +134,35 @@
   );
   const selectedEnvironmentFacts = $derived(environmentFacts(selectedEnvironment));
   const selectedEnvironmentSceneState = $derived(environmentSceneState(selectedEnvironment));
+  const gatheringInspectorTabs = [
+    {
+      id: 'tasks',
+      icon: 'fas fa-list-check',
+      titleKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksPlaceholderTitle',
+      titleFallback: 'Gathering tasks',
+      hintKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksPlaceholderHint',
+      hintFallback: 'Reusable gathering task management is planned for a later slice.'
+    },
+    {
+      id: 'encounters',
+      icon: 'fas fa-compass',
+      titleKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.EncountersPlaceholderTitle',
+      titleFallback: 'Gathering encounters',
+      hintKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.EncountersPlaceholderHint',
+      hintFallback: 'Encounter and hazard authoring is planned for a later slice.'
+    },
+    {
+      id: 'settings',
+      icon: 'fas fa-sliders',
+      titleKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderTitle',
+      titleFallback: 'Gathering settings',
+      hintKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderHint',
+      hintFallback: 'Gathering-wide configuration is planned for a later slice.'
+    }
+  ];
+  const activeGatheringInspectorTab = $derived(
+    gatheringInspectorTabs.find(tab => tab.id === activeGatheringTab) || null
+  );
 
   $effect(() => {
     if (selectedSystemId === lastComponentSystemId) return;
@@ -149,6 +180,18 @@
     essenceEditSaving = false;
     essenceEditDraft = null;
     lastEssenceSystemId = selectedSystemId;
+  });
+
+  $effect(() => {
+    if (selectedSystemId === lastGatheringSystemId) return;
+    activeGatheringTab = 'environments';
+    lastGatheringSystemId = selectedSystemId;
+  });
+
+  $effect(() => {
+    if (activeGatheringTab === 'environments') return;
+    if (currentView === 'environments' && canShowEnvironments) return;
+    activeGatheringTab = 'environments';
   });
 
   $effect(() => {
@@ -765,6 +808,10 @@
   function moveEnvironment(environmentId = selectedEnvironment?.id, direction) {
     if (!environmentId || !direction) return;
     store.moveEnvironmentDraft?.(environmentId, direction);
+  }
+
+  function selectGatheringTab(tabId) {
+    activeGatheringTab = gatheringInspectorTabs.some(tab => tab.id === tabId) ? tabId : 'environments';
   }
 
   function environmentListIndex(environmentId) {
@@ -1419,6 +1466,8 @@
         {selectedSystemId}
         sceneOptions={selectedSystem?.sceneOptions || []}
         {shouldUseEnvironmentDraftForDisplay}
+        {activeGatheringTab}
+        onSelectGatheringTab={selectGatheringTab}
         onSelectEnvironment={(id) => selectEnvironment(id)}
         onEditEnvironment={(id) => editEnvironment(id)}
         onCreateEnvironment={createEnvironment}
@@ -1680,7 +1729,24 @@
           <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.TagsCategories.GeneralInspectorHint', 'General is the built-in category for recipes without a custom category and cannot be removed.')}</p>
         </section>
       {:else if currentView === 'environments' || currentView === 'environment-edit'}
-        {#if selectedEnvironment}
+        {#if currentView === 'environments' && activeGatheringInspectorTab}
+          <section class="manager-v2-inspector-card" data-gathering-inspector-placeholder={activeGatheringInspectorTab.id}>
+            <div class="manager-v2-inspector-title-row is-hero-large">
+              <span class="manager-v2-inspector-icon is-hero-large" aria-hidden="true">
+                <i class={activeGatheringInspectorTab.icon}></i>
+              </span>
+              <div class="manager-v2-inspector-copy">
+                <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Label', 'Gathering sections')}</p>
+                <h2 class="manager-v2-inspector-name">
+                  {text(activeGatheringInspectorTab.titleKey, activeGatheringInspectorTab.titleFallback)}
+                </h2>
+              </div>
+            </div>
+            <p class="manager-v2-muted">
+              {text(activeGatheringInspectorTab.hintKey, activeGatheringInspectorTab.hintFallback)}
+            </p>
+          </section>
+        {:else if selectedEnvironment}
           <section class="manager-v2-inspector-card">
             <img class={`manager-v2-environment-preview ${hasEnvironmentSceneImage(selectedEnvironment) ? '' : 'is-fallback'}`} src={environmentImage(selectedEnvironment)} alt="" />
             <div class="manager-v2-inspector-copy">

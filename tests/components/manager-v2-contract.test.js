@@ -237,7 +237,10 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'Define reusable tasks and hazards before creating environments, then attach those building blocks to each location players can gather from.'
     );
     assert.ok(environmentsBrowserSource.includes('manager-v2-gathering-tabs'), 'gathering page should render local section tabs');
-    assert.ok(environmentsBrowserSource.includes("activeGatheringTab = 'environments'"), 'gathering page should default and reset to environments');
+    assert.ok(rootSource.includes("let activeGatheringTab = $state('environments')"), 'root should own gathering tab state for inspector coordination');
+    assert.ok(environmentsBrowserSource.includes("activeGatheringTab = 'environments'"), 'gathering page should accept environments as the default active tab');
+    assert.ok(environmentsBrowserSource.includes('onSelectGatheringTab(tabId)'), 'gathering page should report tab changes to the root');
+    assert.ok(rootSource.includes('data-gathering-inspector-placeholder'), 'right inspector should render placeholders for non-environment gathering tabs');
     assert.ok(environmentsBrowserSource.includes('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksPlaceholderHint'), 'gathering placeholder copy should be localized');
     assert.ok(environmentsBrowserSource.includes("selectGatheringTab('tasks')"), 'empty environments guidance should route to the Tasks tab');
     assert.ok(environmentsBrowserSource.includes("selectGatheringTab('encounters')"), 'empty environments guidance should route hazards to the Encounters tab');
