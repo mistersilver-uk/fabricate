@@ -410,8 +410,8 @@ test('manager-v2 environments browser and edit route define compact responsive g
     'environment identity should reserve the larger scene thumbnail column'
   );
   assert.ok(
-    css.includes('.fabricate-manager-v2 .manager-v2-environment-thumb {\n  width: 120px;\n  height: 68px;'),
-    'environment thumbnails should reserve a larger scene-like image area'
+    css.includes('.fabricate-manager-v2 .manager-v2-environment-thumb {\n  display: block;\n  align-self: center;\n  width: 120px;\n  height: 68px;'),
+    'environment thumbnails should reserve a larger centered scene-like image area'
   );
   assert.ok(taskCountBlock.includes('font-weight: 800;'), 'environment task count should render as plain emphasized text');
   assert.ok(actionsBlock.includes('grid-template-columns: 72px;'), 'environment row actions should only reserve edit duplicate delete controls');
@@ -419,15 +419,21 @@ test('manager-v2 environments browser and edit route define compact responsive g
   assert.ok(actionGridBlock.includes('grid-template-columns: repeat(2, 34px);'), 'environment edit duplicate delete buttons should sit in a compact grid');
   assert.ok(
     reorderStackBlock.includes('position: absolute;')
-      && reorderStackBlock.includes('right: 7px;')
-      && reorderStackBlock.includes('grid-template-rows: 34px 34px;')
+      && reorderStackBlock.includes('inset: 0;')
+      && reorderStackBlock.includes('grid-template-rows: 18px 18px;')
+      && reorderStackBlock.includes('align-content: space-between;')
       && reorderStackBlock.includes('opacity: 0;')
       && reorderStackBlock.includes('pointer-events: none;'),
-    'environment move up/down buttons should be hidden absolute row overlays'
+    'environment move up/down buttons should be hidden full-row top and bottom overlays'
   );
   assert.ok(
-    css.includes('.fabricate-manager-v2 .manager-v2-environment-row:hover .manager-v2-environment-reorder-stack,\n.fabricate-manager-v2 .manager-v2-environment-row:focus-within .manager-v2-environment-reorder-stack {\n  opacity: 1;\n  pointer-events: auto;'),
+    css.includes('.fabricate-manager-v2 .manager-v2-environment-row:hover .manager-v2-environment-reorder-stack,\n.fabricate-manager-v2 .manager-v2-environment-row:focus-within .manager-v2-environment-reorder-stack {\n  opacity: 1;'),
     'environment reorder overlay should become usable on row hover or keyboard focus'
+  );
+  assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button {\n  width: 100%;\n  height: 18px;')
+      && css.includes('background: var(--fab-overlay-dark-32);'),
+    'environment reorder buttons should render as thin row-width overlay bands with centered icons'
   );
   assert.ok(
     css.includes('.fabricate-manager-v2 .manager-v2-environment-row .manager-v2-status-cell'),

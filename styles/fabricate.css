@@ -6230,6 +6230,8 @@
 }
 
 .fabricate-manager-v2 .manager-v2-environment-thumb {
+  display: block;
+  align-self: center;
   width: 120px;
   height: 68px;
 }
@@ -6986,12 +6988,10 @@
 
 .fabricate-manager-v2 .manager-v2-environment-reorder-stack {
   position: absolute;
-  top: 7px;
-  right: 7px;
-  bottom: 7px;
+  inset: 0;
+  z-index: 2;
   display: grid;
-  grid-template-rows: 34px 34px;
-  gap: 4px;
+  grid-template-rows: 18px 18px;
   align-content: space-between;
   opacity: 0;
   pointer-events: none;
@@ -7001,7 +7001,33 @@
 .fabricate-manager-v2 .manager-v2-environment-row:hover .manager-v2-environment-reorder-stack,
 .fabricate-manager-v2 .manager-v2-environment-row:focus-within .manager-v2-environment-reorder-stack {
   opacity: 1;
+}
+
+.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button {
+  width: 100%;
+  height: 18px;
+  min-height: 18px;
+  border-right: 0;
+  border-left: 0;
+  border-radius: 0;
+  color: var(--fab-mv2-text);
+  background: var(--fab-overlay-dark-32);
+  flex: 0 0 auto;
   pointer-events: auto;
+}
+
+.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:first-child {
+  border-top: 0;
+  border-radius: 8px 8px 0 0;
+}
+
+.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:last-child {
+  border-bottom: 0;
+  border-radius: 0 0 8px 8px;
+}
+
+.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:disabled {
+  pointer-events: none;
 }
 
 .fabricate-manager-v2 .manager-v2-toggle {
