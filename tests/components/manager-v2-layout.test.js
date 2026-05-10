@@ -370,6 +370,7 @@ test('manager-v2 environments browser and edit route define compact responsive g
   const taskCountBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-task-count');
   const actionsBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-actions');
   const actionGridBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-action-grid');
+  const reorderStackBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-reorder-stack');
   const editorShellBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-editor-shell');
   const editorViewBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-edit-view');
   const detailsGridBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-details-grid');
@@ -397,23 +398,36 @@ test('manager-v2 environments browser and edit route define compact responsive g
     'environment table scroll region should own internal overflow once bounded by the gathering panel'
   );
   assert.ok(
-    tableBlock.includes('--fab-mv2-environment-grid: minmax(0, 1.72fr) minmax(86px, 0.42fr) 46px 72px 116px;'),
-    'environments table should define five compact columns without a linked-scene column'
+    tableBlock.includes('--fab-mv2-environment-grid: minmax(0, 1.72fr) minmax(86px, 0.42fr) 46px 72px 72px;'),
+    'environments table should define five compact columns without reserving a reorder column'
   );
   assert.ok(
-    css.includes('.fabricate-manager-v2 .manager-v2-environment-identity {\n  grid-template-columns: 72px minmax(0, 1fr);'),
-    'environment identity should reserve a wider scene thumbnail'
+    css.includes('.fabricate-manager-v2 .manager-v2-environment-row {\n  position: relative;\n  min-height: 88px;\n}'),
+    'environment rows should anchor hover overlays while keeping height stable around larger thumbnails'
   );
   assert.ok(
-    css.includes('.fabricate-manager-v2 .manager-v2-environment-thumb {\n  width: 72px;\n  height: 48px;'),
-    'environment thumbnails should use scene-like proportions'
+    css.includes('.fabricate-manager-v2 .manager-v2-environment-identity {\n  grid-template-columns: 120px minmax(0, 1fr);'),
+    'environment identity should reserve the larger scene thumbnail column'
+  );
+  assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-environment-thumb {\n  width: 120px;\n  height: 68px;'),
+    'environment thumbnails should reserve a larger scene-like image area'
   );
   assert.ok(taskCountBlock.includes('font-weight: 800;'), 'environment task count should render as plain emphasized text');
-  assert.ok(actionsBlock.includes('grid-template-columns: 72px 34px;'), 'environment row actions should reserve edit/delete grid plus reorder stack');
+  assert.ok(actionsBlock.includes('grid-template-columns: 72px;'), 'environment row actions should only reserve edit duplicate delete controls');
+  assert.ok(!actionsBlock.includes('grid-template-columns: 72px 34px;'), 'environment row actions should not reserve a reorder stack column');
   assert.ok(actionGridBlock.includes('grid-template-columns: repeat(2, 34px);'), 'environment edit duplicate delete buttons should sit in a compact grid');
   assert.ok(
-    css.includes('.fabricate-manager-v2 .manager-v2-environment-reorder-stack {\n  grid-template-rows: repeat(2, 34px);'),
-    'environment move up/down buttons should stack at the right edge'
+    reorderStackBlock.includes('position: absolute;')
+      && reorderStackBlock.includes('right: 7px;')
+      && reorderStackBlock.includes('grid-template-rows: 34px 34px;')
+      && reorderStackBlock.includes('opacity: 0;')
+      && reorderStackBlock.includes('pointer-events: none;'),
+    'environment move up/down buttons should be hidden absolute row overlays'
+  );
+  assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-environment-row:hover .manager-v2-environment-reorder-stack,\n.fabricate-manager-v2 .manager-v2-environment-row:focus-within .manager-v2-environment-reorder-stack {\n  opacity: 1;\n  pointer-events: auto;'),
+    'environment reorder overlay should become usable on row hover or keyboard focus'
   );
   assert.ok(
     css.includes('.fabricate-manager-v2 .manager-v2-environment-row .manager-v2-status-cell'),

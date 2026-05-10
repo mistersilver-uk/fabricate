@@ -26,6 +26,12 @@ When the selected system changes, the gathering tab resets to `environments`, ma
 
 The Environments tab's gathering panel must define bounded grid rows for its toolbar, environment list, and pagination footer. The environment list row uses `minmax(0, 1fr)` so `.manager-v2-table-scroll` receives a constrained height and can scroll internally instead of expanding to fit every environment row.
 
+## Environment Browser Row Layout
+
+Environment browser rows use a larger scene thumbnail at `120px x 68px`, with the identity grid reserving the same `120px` image column. The row is positioned relatively and maintains a stable minimum height around the larger thumbnail.
+
+The actions column reserves only the visible edit, duplicate, and delete controls. Move up/down controls remain in the DOM but render as an absolute top/bottom overlay on the row's right edge. The overlay is hidden by default and becomes available when the row is hovered or contains keyboard focus, preserving keyboard access without dedicating a permanent table column to reordering.
+
 ## Compatibility
 
 The change is presentation-only. It does not affect environment selection, draft editing, persistence, validation, runtime gathering flows, or player-facing gathering behavior.

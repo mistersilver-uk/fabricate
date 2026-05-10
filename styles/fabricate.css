@@ -5803,7 +5803,7 @@
 }
 
 .fabricate-manager-v2 .manager-v2-environments-table {
-  --fab-mv2-environment-grid: minmax(0, 1.72fr) minmax(86px, 0.42fr) 46px 72px 116px;
+  --fab-mv2-environment-grid: minmax(0, 1.72fr) minmax(86px, 0.42fr) 46px 72px 72px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -6033,6 +6033,11 @@
   background: var(--fab-mv2-surface-2);
 }
 
+.fabricate-manager-v2 .manager-v2-environment-row {
+  position: relative;
+  min-height: 88px;
+}
+
 .fabricate-manager-v2 .manager-v2-recipe-row:hover,
 .fabricate-manager-v2 .manager-v2-component-row:hover,
 .fabricate-manager-v2 .manager-v2-environment-row:hover,
@@ -6171,7 +6176,7 @@
 }
 
 .fabricate-manager-v2 .manager-v2-environment-identity {
-  grid-template-columns: 72px minmax(0, 1fr);
+  grid-template-columns: 120px minmax(0, 1fr);
 }
 
 .fabricate-manager-v2 .manager-v2-system-icon,
@@ -6225,8 +6230,8 @@
 }
 
 .fabricate-manager-v2 .manager-v2-environment-thumb {
-  width: 72px;
-  height: 48px;
+  width: 120px;
+  height: 68px;
 }
 
 .fabricate-manager-v2 .manager-v2-environment-preview {
@@ -6965,26 +6970,38 @@
 
 .fabricate-manager-v2 .manager-v2-environment-actions {
   display: grid;
-  grid-template-columns: 72px 34px;
+  grid-template-columns: 72px;
   gap: 6px;
   align-items: stretch;
   justify-content: end;
   width: 100%;
 }
 
-.fabricate-manager-v2 .manager-v2-environment-action-grid,
-.fabricate-manager-v2 .manager-v2-environment-reorder-stack {
+.fabricate-manager-v2 .manager-v2-environment-action-grid {
   display: grid;
+  grid-template-columns: repeat(2, 34px);
+  grid-auto-rows: 34px;
   gap: 4px;
 }
 
-.fabricate-manager-v2 .manager-v2-environment-action-grid {
-  grid-template-columns: repeat(2, 34px);
-  grid-auto-rows: 34px;
+.fabricate-manager-v2 .manager-v2-environment-reorder-stack {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  bottom: 7px;
+  display: grid;
+  grid-template-rows: 34px 34px;
+  gap: 4px;
+  align-content: space-between;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
 }
 
-.fabricate-manager-v2 .manager-v2-environment-reorder-stack {
-  grid-template-rows: repeat(2, 34px);
+.fabricate-manager-v2 .manager-v2-environment-row:hover .manager-v2-environment-reorder-stack,
+.fabricate-manager-v2 .manager-v2-environment-row:focus-within .manager-v2-environment-reorder-stack {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .fabricate-manager-v2 .manager-v2-toggle {
