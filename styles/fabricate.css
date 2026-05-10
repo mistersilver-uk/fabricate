@@ -7018,6 +7018,12 @@
   opacity: 1;
 }
 
+.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:focus,
+.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
 .fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:first-child {
   border-top: 0;
   border-radius: 8px 8px 0 0;
