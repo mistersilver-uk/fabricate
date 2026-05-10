@@ -2079,26 +2079,49 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     flushSync();
     assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'gathering-task-edit');
     assert.ok(target.querySelector('[data-gathering-task-editor]'));
+    assert.ok(target.querySelector('[data-gathering-task-core-editor]'));
     assert.ok(target.textContent.includes('Edit availability, identity, and drop rules for the selected gathering task.'));
     assert.ok(target.querySelector('[data-gathering-task-drops-table]'));
     assert.ok(target.querySelector('[data-gathering-task-drop-inspector]'));
-    assert.ok(target.querySelector('[data-gathering-task-summary]'));
-    assert.ok(target.querySelector('[data-gathering-task-matching-logic]'));
-    assert.ok(target.textContent.includes('Task Summary'));
-    assert.ok(target.textContent.includes('Base Rate'));
+    assert.equal(target.querySelector('.manager-v2-task-editor-tabs'), null);
+    assert.equal(target.querySelector('[data-gathering-task-summary]'), null);
+    assert.equal(target.querySelector('[data-gathering-task-matching-logic]'), null);
+    assert.ok(target.textContent.includes('Drop chance'));
+    assert.ok(target.textContent.includes('Final chance'));
     const taskNameInput = target.querySelector('[data-gathering-task-field="name"]');
     taskNameInput.value = 'Gather Sun Herbs';
     taskNameInput.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
     assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].name === 'Gather Sun Herbs'));
-    const timeCheckbox = Array.from(target.querySelectorAll('[data-gathering-task-field="timeOfDay"] input[type="checkbox"]'))
-      .find(input => input.checked);
-    timeCheckbox.checked = false;
-    timeCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+    const timeSelect = target.querySelector('[data-gathering-task-field="timeOfDay"] select');
+    const weatherSelect = target.querySelector('[data-gathering-task-field="weather"] select');
+    assert.deepEqual(
+      Array.from(timeSelect.options).map(option => option.textContent.trim()).slice(0, 2),
+      ['Any Time', 'First Light']
+    );
+    assert.deepEqual(
+      Array.from(weatherSelect.options).map(option => option.textContent.trim()).slice(0, 2),
+      ['Any Weather', 'Clear Sky']
+    );
+    assert.equal(timeSelect.value, 'day');
+    assert.equal(weatherSelect.value, 'clear');
+    timeSelect.value = 'night';
+    timeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && Array.isArray(call[3].timeOfDay) && call[3].timeOfDay[0] === 'night'));
+    timeSelect.value = '';
+    timeSelect.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
     flushSync();
     assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && Array.isArray(call[3].timeOfDay) && call[3].timeOfDay.length === 0));
+    const inspectorSlider = target.querySelector('[data-gathering-task-drop-inspector] input[type="range"]');
+    inspectorSlider.value = '35';
+    inspectorSlider.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.id === 'drop-nightshade' && row.dropRate === 35)));
     const chanceSlider = target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] input[type="range"]');
     chanceSlider.value = '25';
     chanceSlider.dispatchEvent(new Event('input', { bubbles: true }));

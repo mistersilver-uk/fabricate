@@ -348,8 +348,8 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(!tableBlock.includes('reorder'), 'task browser should not reserve a reorder column');
   assert.ok(rowBlock.includes('grid-template-columns: var(--fab-mv2-gathering-task-grid);'), 'task rows should use the shared task grid');
   assert.ok(identityBlock.includes('grid-template-columns: 46px minmax(0, 1fr);'), 'task identity should reserve thumbnail space');
-  assert.ok(editorBlock.includes('grid-template-rows: auto auto auto auto minmax(0, 1fr) auto auto;'), 'task edit route should reserve the header, tab strip, summary, drops, editor, and formula rows');
-  assert.ok(editorBlock.includes('overflow: auto;'), 'task editor should scroll as a full task workspace');
+  assert.ok(editorBlock.includes('grid-template-rows: auto auto minmax(0, 1fr);'), 'task edit route should keep core details, notices, and drops on one central page');
+  assert.ok(editorBlock.includes('overflow: hidden;'), 'task editor should keep the drops table bounded inside the central workspace');
   assert.ok(dropTableBlock.includes('--fab-mv2-task-drop-grid:'), 'task editor drop rows should define compact desktop geometry');
   assert.ok(
     mediumQuery.includes('.fabricate-manager-v2 .manager-v2-gathering-task-drop-row') && mediumQuery.includes('grid-template-columns: minmax(0, 1fr);'),

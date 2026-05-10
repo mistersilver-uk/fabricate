@@ -7,9 +7,9 @@ Manager V2 SHALL provide reusable Gathering Task authoring for the selected craf
 #### Scenario: Editing a reusable Gathering Task
 
 - **WHEN** a GM opens a gathering task from the task browser
-- **THEN** Manager V2 SHALL show editable task identity, enabled state, match tags, and drop rules
+- **THEN** Manager V2 SHALL show editable task identity, image, description, enabled state, time/weather availability dropdowns, and drop rules on one central page
 - **AND** the right inspector SHALL edit the selected drop rule
-- **AND** user-facing copy SHALL use drop chance, drop rules, or drop resolution language rather than new d100 wording.
+- **AND** user-facing copy SHALL use drop chance, drop rules, or drop resolution language.
 
 #### Scenario: Assigning a dropped component
 

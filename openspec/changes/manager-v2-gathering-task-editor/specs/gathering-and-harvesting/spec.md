@@ -24,9 +24,9 @@ Reusable gathering task drop rows SHALL support a base drop chance, positive qua
 - **WHEN** drop resolution runs
 - **THEN** those non-matching modifiers SHALL NOT change the row chance.
 
-### Requirement: D100 Gathering Resolution
+### Requirement: Gathering Drop Resolution
 
-D100 Gathering Resolution SHALL preserve row order for selected rewards after condition-adjusted drop chance checks.
+Gathering Drop Resolution SHALL preserve row order for selected rewards after condition-adjusted drop chance checks.
 
 #### Scenario: Zero chance rows are valid but do not drop without modifiers
 

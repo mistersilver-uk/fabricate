@@ -15,4 +15,4 @@ Gathering tasks can be browsed in Manager V2, but editing their reusable drop ru
 ## Scope Notes
 
 - The existing gathering hazards placeholder keeps its current route/tab id (`encounters`) and display intent. This change does not rename that route state.
-- User-facing copy uses drop chance, drop rules, and drop resolution language. Internal `d100` runtime names remain where renaming would create unrelated churn.
+- User-facing copy uses drop chance, drop rules, and drop resolution language. Internal runtime names remain where renaming would create unrelated churn.

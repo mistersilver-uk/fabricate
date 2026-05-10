@@ -571,7 +571,10 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'store.duplicateGatheringLibraryTask',
       'data-gathering-task-inspector',
       'GatheringTaskEditView',
-      'data-gathering-task-drop-inspector'
+      'data-gathering-task-drop-inspector',
+      'addGatheringDropModifier',
+      'updateGatheringDropModifier',
+      'gatheringDropFinalChance'
     ]) {
       assert.ok(rootSource.includes(snippet), `root should include ${snippet}`);
     }
@@ -596,6 +599,8 @@ describe('CraftingSystemManagerV2 source contract', () => {
     }
     for (const snippet of [
       'data-gathering-task-editor',
+      'data-gathering-task-core-editor',
+      'data-gathering-task-availability',
       'data-gathering-task-drops-table',
       'use:dragDrop',
       'onImportDrop(rowId, data)',
@@ -605,6 +610,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
     ]) {
       assert.ok(gatheringTaskEditSource.includes(snippet), `task editor should include ${snippet}`);
     }
+    assert.ok(!gatheringTaskEditSource.includes('manager-v2-task-editor-tabs'), 'task editor should be a one-page editor without tab navigation');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.EmptyTitle, 'No gathering tasks yet');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChance, 'Drop chance');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask, 'New Gathering Task');
