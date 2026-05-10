@@ -8068,6 +8068,35 @@
   min-width: 0;
 }
 
+.fabricate-manager-v2 .manager-v2-condition-shortcut-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.fabricate-manager-v2 .manager-v2-condition-shortcut {
+  gap: 6px;
+}
+
+.fabricate-manager-v2 .manager-v2-condition-shortcut-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--fab-mv2-text);
+  line-height: 1.25;
+}
+
+.fabricate-manager-v2 .manager-v2-condition-shortcut-label i {
+  width: 16px;
+  color: var(--fab-mv2-text-muted);
+  text-align: center;
+}
+
+.fabricate-manager-v2 .manager-v2-condition-shortcut select {
+  font-weight: 400;
+}
+
 .fabricate-manager-v2 .manager-v2-button,
 .fabricate-manager-v2 .manager-v2-icon-button {
   appearance: none;
@@ -8234,7 +8263,7 @@
   align-items: stretch;
   overflow: auto;
   min-height: 0;
-  padding: 12px;
+  padding: 0 12px 12px;
 }
 
 .fabricate-manager-v2 .manager-v2-condition-panel {
@@ -8285,6 +8314,14 @@
   min-width: 0;
 }
 
+.fabricate-manager-v2 .manager-v2-region-add {
+  grid-template-columns: minmax(0, 1fr) 34px;
+}
+
+.fabricate-manager-v2 .manager-v2-biome-add {
+  grid-template-columns: 36px 36px minmax(0, 1fr) 34px;
+}
+
 .fabricate-manager-v2 .manager-v2-condition-current select,
 .fabricate-manager-v2 .manager-v2-condition-add input {
   height: 36px;
@@ -8313,6 +8350,34 @@
   overflow: hidden;
 }
 
+.fabricate-manager-v2 .manager-v2-vocabulary-pill.is-region {
+  grid-template-columns: minmax(0, 1fr) 24px;
+}
+
+.fabricate-manager-v2 .manager-v2-vocabulary-pill.is-biome {
+  grid-template-columns: 28px 30px minmax(0, 1fr) 30px 24px;
+}
+
+.fabricate-manager-v2 .manager-v2-biome-swatch,
+.fabricate-manager-v2 .manager-v2-color-swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
+  color: var(--fab-bg-0);
+  background: var(--manager-v2-color-swatch, var(--fab-tag-sage));
+}
+
+.fabricate-manager-v2 .manager-v2-biome-swatch {
+  min-height: 28px;
+}
+
+.fabricate-manager-v2 .manager-v2-biome-swatch i {
+  font-size: 0.8rem;
+}
+
 .fabricate-manager-v2 .manager-v2-condition-add .essence-icon-picker-trigger.icon-only,
 .fabricate-manager-v2 .manager-v2-condition-pill .essence-icon-picker-trigger.icon-only {
   display: inline-flex;
@@ -8326,6 +8391,87 @@
   border: 0;
   border-radius: 4px;
   background: transparent;
+}
+
+.fabricate-manager-v2 .manager-v2-color-picker {
+  position: relative;
+  display: inline-block;
+  min-width: 0;
+  height: 100%;
+}
+
+.fabricate-manager-v2 .manager-v2-color-picker-trigger,
+.fabricate-manager-v2 .manager-v2-color-preset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 30px;
+  height: 100%;
+  min-height: 30px;
+  padding: 3px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+}
+
+.fabricate-manager-v2 .manager-v2-condition-add .manager-v2-color-picker-trigger {
+  height: 36px;
+  border: 1px solid var(--fab-mv2-border);
+  background: var(--fab-overlay-light-06);
+}
+
+.fabricate-manager-v2 .manager-v2-color-picker-trigger:hover,
+.fabricate-manager-v2 .manager-v2-color-picker-trigger:focus-visible,
+.fabricate-manager-v2 .manager-v2-color-preset:hover,
+.fabricate-manager-v2 .manager-v2-color-preset:focus-visible {
+  outline: 2px solid var(--fab-mv2-accent);
+  outline-offset: 1px;
+}
+
+.fabricate-manager-v2 .manager-v2-color-picker-popover {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  display: grid;
+  gap: 8px;
+  width: 180px;
+  padding: 8px;
+  border: 1px solid var(--fab-mv2-border-strong);
+  border-radius: 6px;
+  background: var(--fab-mv2-surface-2);
+  box-shadow: var(--fab-v2-shadow);
+}
+
+.fabricate-manager-v2 .manager-v2-color-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.fabricate-manager-v2 .manager-v2-color-preset {
+  aspect-ratio: 1;
+  border: 1px solid var(--fab-mv2-border);
+}
+
+.fabricate-manager-v2 .manager-v2-color-preset.is-selected {
+  border-color: var(--fab-mv2-accent);
+}
+
+.fabricate-manager-v2 .manager-v2-color-custom {
+  display: grid;
+  gap: 4px;
+  color: var(--fab-mv2-text);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.fabricate-manager-v2 .manager-v2-color-custom input {
+  min-height: 28px;
+  height: 28px;
+  padding: 0 6px;
+  font-size: 0.76rem;
 }
 
 .fabricate-manager-v2 .manager-v2-condition-add .essence-icon-picker-trigger.icon-only {

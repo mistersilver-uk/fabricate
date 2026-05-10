@@ -3,6 +3,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import IconPicker from '../../components/IconPicker.svelte';
+  import ManagerV2ColorPicker from '../../components/ManagerV2ColorPicker.svelte';
 
   let {
     environments = [],
@@ -30,7 +31,10 @@
     onToggleGatheringConditionEnabled = () => {},
     onAddGatheringConditionValue = () => {},
     onUpdateGatheringConditionValue = () => {},
-    onDeleteGatheringConditionValue = () => {}
+    onDeleteGatheringConditionValue = () => {},
+    onAddGatheringVocabularyValue = () => {},
+    onUpdateGatheringVocabularyValue = () => {},
+    onDeleteGatheringVocabularyValue = () => {}
   } = $props();
 
   let searchTerm = $state('');
@@ -44,8 +48,13 @@
   let pageSize = $state(10);
   let weatherInput = $state('');
   let timeOfDayInput = $state('');
+  let regionInput = $state('');
+  let biomeInput = $state('');
   let weatherIconInput = $state('fas fa-cloud-sun');
   let timeOfDayIconInput = $state('fas fa-clock');
+  let biomeIconInput = $state('fas fa-tree');
+  let biomeColorTokenInput = $state('sage');
+  let biomeCustomColorInput = $state('');
 
   const gatheringTabs = [
     {
@@ -96,8 +105,13 @@
     biomeFilter = 'all';
     weatherInput = '';
     timeOfDayInput = '';
+    regionInput = '';
+    biomeInput = '';
     weatherIconInput = defaultConditionIcon('weather');
     timeOfDayIconInput = defaultConditionIcon('timeOfDay');
+    biomeIconInput = 'fas fa-tree';
+    biomeColorTokenInput = 'sage';
+    biomeCustomColorInput = '';
     lastSystemId = selectedSystemId;
   });
 
@@ -112,6 +126,12 @@
     enabled: true,
     current: gatheringConfig?.conditions?.timeOfDay || 'day',
     values: gatheringConfig?.vocabularies?.timeOfDay || ['dawn', 'day', 'dusk', 'night']
+  });
+  const regionVocabulary = $derived(selectedGatheringSystemConfig.vocabularies?.regions || {
+    values: gatheringConfig?.vocabularies?.regions || []
+  });
+  const biomeVocabulary = $derived(selectedGatheringSystemConfig.vocabularies?.biomes || {
+    values: gatheringConfig?.vocabularies?.biomes || ['forest', 'grassland', 'mountain', 'cave', 'coastal', 'swamp', 'desert', 'urban', 'ruins', 'wasteland']
   });
   const activeGatheringTabConfig = $derived(gatheringTabs.find(tab => tab.id === activeGatheringTab) || gatheringTabs[0]);
   const regionOptions = $derived(uniqueSorted(environmentList.map(environment => environment.region)));
@@ -288,6 +308,79 @@
     if (!value) return;
     onAddGatheringConditionValue?.(kind, { label: value, icon: conditionAddIcon(kind) }, selectedSystemId);
     setConditionInput(kind, '');
+  }
+
+  function vocabularyTitle(kind) {
+    return kind === 'regions'
+      ? text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.RegionsTitle', 'Regions')
+      : text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.BiomesTitle', 'Biomes');
+  }
+
+  function vocabularyAddLabel(kind) {
+    return kind === 'regions'
+      ? text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.AddRegion', 'Add region')
+      : text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.AddBiome', 'Add biome');
+  }
+
+  function vocabularyPlaceholder(kind) {
+    return kind === 'regions'
+      ? text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.RegionPlaceholder', 'e.g. northlands')
+      : text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.BiomePlaceholder', 'e.g. mushroom forest');
+  }
+
+  function vocabularyInputValue(kind) {
+    return kind === 'regions' ? regionInput : biomeInput;
+  }
+
+  function setVocabularyInput(kind, value) {
+    if (kind === 'regions') regionInput = value;
+    else biomeInput = value;
+  }
+
+  function submitVocabularyValue(event, kind) {
+    event.preventDefault();
+    const value = vocabularyInputValue(kind).trim();
+    if (!value) return;
+    const payload = kind === 'biomes'
+      ? { label: value, icon: biomeIconInput, colorToken: biomeColorTokenInput, customColor: biomeCustomColorInput }
+      : { label: value };
+    onAddGatheringVocabularyValue?.(kind, payload, selectedSystemId);
+    setVocabularyInput(kind, '');
+  }
+
+  function vocabularyId(option) {
+    if (option && typeof option === 'object') return String(option.id || '').trim();
+    return String(option || '').trim();
+  }
+
+  function vocabularyLabel(option) {
+    if (option && typeof option === 'object') return String(option.label || option.id || '').trim();
+    return String(option || '').trim();
+  }
+
+  function vocabularyValues(vocabulary) {
+    return Array.isArray(vocabulary?.values) ? vocabulary.values : [];
+  }
+
+  function biomeIcon(option) {
+    if (option && typeof option === 'object' && option.icon) return option.icon;
+    return 'fas fa-tree';
+  }
+
+  function biomeColorToken(option) {
+    if (option && typeof option === 'object' && option.colorToken) return option.colorToken;
+    return 'sage';
+  }
+
+  function biomeCustomColor(option) {
+    if (option && typeof option === 'object' && option.customColor) return option.customColor;
+    return '';
+  }
+
+  function biomeSwatchStyle(option) {
+    const hex = /^#[0-9a-fA-F]{6}$/.test(biomeCustomColor(option)) ? biomeCustomColor(option) : '';
+    const token = String(biomeColorToken(option) || 'sage').replace(/^--fab-tag-/, '');
+    return `--manager-v2-color-swatch: ${hex || `var(--fab-tag-${token})`}`;
   }
 
   function updateCurrentCondition(kind, value) {
@@ -657,6 +750,104 @@
                   title={text('FABRICATE.Admin.ManagerV2.Environment.Conditions.RemoveValue', 'Remove {value}').replace('{value}', conditionLabel(option))}
                   disabled={condition.setting.enabled !== false && conditionValues(condition.setting).length <= 1}
                   onclick={() => onDeleteGatheringConditionValue?.(condition.kind, valueId, selectedSystemId)}
+                >
+                  <i class="fas fa-times" aria-hidden="true"></i>
+                </button>
+              </span>
+            {/each}
+          </div>
+        </section>
+      {/each}
+      {#each [
+        { kind: 'regions', icon: 'fas fa-map-location-dot', vocabulary: regionVocabulary },
+        { kind: 'biomes', icon: 'fas fa-tree', vocabulary: biomeVocabulary }
+      ] as vocabulary (vocabulary.kind)}
+        <section class={`manager-v2-condition-panel manager-v2-vocabulary-settings-panel ${vocabulary.kind === 'biomes' ? 'is-biomes' : 'is-regions'}`} data-gathering-vocabulary-panel={vocabulary.kind} aria-label={vocabularyTitle(vocabulary.kind)}>
+          <header class="manager-v2-condition-panel-header">
+            <span class="manager-v2-condition-panel-title">
+              <i class={vocabulary.icon} aria-hidden="true"></i>
+              <span>{vocabularyTitle(vocabulary.kind)}</span>
+            </span>
+          </header>
+
+          <form class={`manager-v2-condition-add ${vocabulary.kind === 'biomes' ? 'manager-v2-biome-add' : 'manager-v2-region-add'}`} onsubmit={(event) => submitVocabularyValue(event, vocabulary.kind)}>
+            {#if vocabulary.kind === 'biomes'}
+              <IconPicker
+                value={biomeIconInput}
+                iconOnly={true}
+                buttonTitle={text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.NewBiomeIcon', 'New biome icon')}
+                onChange={(icon) => biomeIconInput = icon}
+              />
+              <ManagerV2ColorPicker
+                colorToken={biomeColorTokenInput}
+                customColor={biomeCustomColorInput}
+                buttonTitle={text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.NewBiomeColor', 'New biome colour')}
+                presetGridLabel={text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.ColorPresets', 'Colour presets')}
+                customHexLabel={text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.CustomHex', 'Custom hex')}
+                onChange={(updates) => {
+                  biomeColorTokenInput = updates.colorToken;
+                  biomeCustomColorInput = updates.customColor;
+                }}
+              />
+            {/if}
+            <label class="manager-v2-field">
+              <span>{vocabularyAddLabel(vocabulary.kind)}</span>
+              <input
+                value={vocabularyInputValue(vocabulary.kind)}
+                placeholder={vocabularyPlaceholder(vocabulary.kind)}
+                oninput={(event) => setVocabularyInput(vocabulary.kind, event.currentTarget.value)}
+              />
+            </label>
+            <button type="submit" class="manager-v2-icon-button" aria-label={vocabularyAddLabel(vocabulary.kind)} title={vocabularyAddLabel(vocabulary.kind)}>
+              <i class="fas fa-plus" aria-hidden="true"></i>
+            </button>
+          </form>
+
+          <div class="manager-v2-condition-pill-list" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.Values', 'Vocabulary values')}>
+            {#each vocabularyValues(vocabulary.vocabulary) as option (vocabularyId(option))}
+              {@const valueId = vocabularyId(option)}
+              <span class={`manager-v2-condition-pill manager-v2-vocabulary-pill ${vocabulary.kind === 'biomes' ? 'is-biome' : 'is-region'}`} data-gathering-vocabulary-value={valueId}>
+                {#if vocabulary.kind === 'biomes'}
+                  <span class="manager-v2-biome-swatch" style={biomeSwatchStyle(option)} aria-hidden="true">
+                    <i class={biomeIcon(option)}></i>
+                  </span>
+                {/if}
+                {#if vocabulary.kind === 'biomes'}
+                  <IconPicker
+                    value={biomeIcon(option)}
+                    iconOnly={true}
+                    buttonTitle={text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.EditBiomeIcon', 'Edit biome icon')}
+                    onChange={(icon) => onUpdateGatheringVocabularyValue?.(vocabulary.kind, valueId, { icon }, selectedSystemId)}
+                  />
+                {/if}
+                <input
+                  class="manager-v2-condition-label-input"
+                  value={vocabularyLabel(option)}
+                  aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.EditLabel', 'Edit label')}
+                  onblur={(event) => onUpdateGatheringVocabularyValue?.(vocabulary.kind, valueId, { label: event.currentTarget.value }, selectedSystemId)}
+                  onkeydown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      event.currentTarget.blur();
+                    }
+                  }}
+                />
+                {#if vocabulary.kind === 'biomes'}
+                  <ManagerV2ColorPicker
+                    colorToken={biomeColorToken(option)}
+                    customColor={biomeCustomColor(option)}
+                    buttonTitle={text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.EditBiomeColor', 'Edit biome colour')}
+                    presetGridLabel={text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.ColorPresets', 'Colour presets')}
+                    customHexLabel={text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.CustomHex', 'Custom hex')}
+                    onChange={(updates) => onUpdateGatheringVocabularyValue?.(vocabulary.kind, valueId, updates, selectedSystemId)}
+                  />
+                {/if}
+                <button
+                  type="button"
+                  class="manager-v2-condition-remove"
+                  aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.RemoveValue', 'Remove {value}').replace('{value}', vocabularyLabel(option))}
+                  title={text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.RemoveValue', 'Remove {value}').replace('{value}', vocabularyLabel(option))}
+                  onclick={() => onDeleteGatheringVocabularyValue?.(vocabulary.kind, valueId, selectedSystemId)}
                 >
                   <i class="fas fa-times" aria-hidden="true"></i>
                 </button>

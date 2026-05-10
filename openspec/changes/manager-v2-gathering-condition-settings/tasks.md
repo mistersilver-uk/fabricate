@@ -16,3 +16,12 @@
 - [x] Re-run focused suites, `npm test`, and `npm run build`.
 - [x] Refine condition pill geometry to two-per-row rectangular cards with centered icons.
 - [x] Add icon picker support to new condition value creation.
+- [x] Add Systems Library right-inspector shortcuts for enabled current weather/time-of-day conditions.
+- [x] Add focused contract, mounted, and layout coverage for the inspector shortcut.
+- [x] Re-run focused suites, `npm test`, and `npm run build`.
+- [x] Normalize per-system region and biome vocabulary records with legacy top-level fallback.
+- [x] Add admin-store actions for region/biome add, update, and delete.
+- [x] Prune deleted region/biome ids from selected-system environments, reusable tasks, and hazards.
+- [x] Render Gathering Settings Regions and Biomes panels with biome icon and colour controls.
+- [x] Remove Regions/Biomes from the environment editor generic vocabulary CSV controls.
+- [x] Add focused store, contract, mounted, and layout coverage for region/biome vocabulary editing.

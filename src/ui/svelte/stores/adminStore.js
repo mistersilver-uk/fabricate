@@ -82,6 +82,9 @@ const DEFAULT_GATHERING_VOCABULARIES = Object.freeze({
   timeOfDay: ['dawn', 'day', 'dusk', 'night']
 });
 const GATHERING_CONDITION_DIMENSIONS = new Set(['weather', 'timeOfDay']);
+const GATHERING_VOCABULARY_DIMENSIONS = new Set(['regions', 'biomes']);
+const GATHERING_BIOME_COLOR_TOKENS = new Set(['sage', 'mist', 'lavender', 'rose', 'peach', 'butter', 'aqua', 'mauve']);
+const DEFAULT_GATHERING_BIOME_COLOR_TOKEN = 'sage';
 const DEFAULT_GATHERING_CONDITION_ICONS = Object.freeze({
   weather: Object.freeze({
     clear: 'fas fa-sun',
@@ -278,6 +281,13 @@ function _normalizeGatheringTag(value) {
   return String(value ?? '').trim().toLowerCase();
 }
 
+function _normalizeGatheringVocabularyId(value) {
+  if (value && typeof value === 'object') {
+    return _normalizeGatheringVocabularyId(value.id ?? value.value ?? value.label);
+  }
+  return _normalizeGatheringTag(value);
+}
+
 function _normalizeGatheringConditionId(value) {
   if (value && typeof value === 'object') {
     return _normalizeGatheringConditionId(value.id ?? value.value ?? value.label);
@@ -302,6 +312,68 @@ function _normalizeGatheringConditionIdList(value) {
 function _seedGatheringVocabulary(raw, defaults) {
   const values = _normalizeGatheringTagList(raw);
   return values.length > 0 ? values : [...defaults];
+}
+
+function _gatheringVocabularyLabelFromId(id) {
+  return String(id || '')
+    .split(/[\s-]+/)
+    .filter(Boolean)
+    .map(token => token.length <= 2 ? token.toUpperCase() : `${token.charAt(0).toUpperCase()}${token.slice(1)}`)
+    .join(' ');
+}
+
+function _normalizeBiomeColorToken(value) {
+  const token = String(value || '').trim().replace(/^--fab-tag-/, '');
+  return GATHERING_BIOME_COLOR_TOKENS.has(token) ? token : DEFAULT_GATHERING_BIOME_COLOR_TOKEN;
+}
+
+function _normalizeCustomHex(value) {
+  const hex = String(value || '').trim();
+  return /^#[0-9a-fA-F]{6}$/.test(hex) ? hex.toUpperCase() : '';
+}
+
+function _normalizeGatheringVocabularyOption(kind, value) {
+  const isRecord = value && typeof value === 'object';
+  const id = _normalizeGatheringVocabularyId(isRecord ? (value.id ?? value.value ?? value.label) : value);
+  if (!id) return null;
+  const rawLabel = isRecord ? String(value.label ?? '').trim() : String(value ?? '').trim();
+  const label = rawLabel || _gatheringVocabularyLabelFromId(id);
+  if (kind === 'biomes') {
+    return {
+      id,
+      label,
+      icon: normalizeEssenceIcon(isRecord ? value.icon : 'fas fa-tree'),
+      colorToken: _normalizeBiomeColorToken(isRecord ? value.colorToken : DEFAULT_GATHERING_BIOME_COLOR_TOKEN),
+      customColor: _normalizeCustomHex(isRecord ? value.customColor : '')
+    };
+  }
+  return { id, label };
+}
+
+function _normalizeGatheringVocabularyOptions(kind, value) {
+  const values = Array.isArray(value) ? value : (value ? String(value).split(',') : []);
+  const options = [];
+  const seen = new Set();
+  for (const raw of values) {
+    const option = _normalizeGatheringVocabularyOption(kind, raw);
+    if (!option || seen.has(option.id)) continue;
+    seen.add(option.id);
+    options.push(option);
+  }
+  return options;
+}
+
+function _normalizeGatheringSystemVocabularies(raw = {}, fallbackVocabularies = {}) {
+  const normalized = {};
+  for (const kind of GATHERING_VOCABULARY_DIMENSIONS) {
+    const rawValues = Array.isArray(raw?.[kind]?.values)
+      ? raw[kind].values
+      : (Array.isArray(raw?.[kind]) ? raw[kind] : fallbackVocabularies?.[kind]);
+    normalized[kind] = {
+      values: _normalizeGatheringVocabularyOptions(kind, rawValues)
+    };
+  }
+  return normalized;
 }
 
 function _conditionLabelFromId(id) {
@@ -437,6 +509,7 @@ function _normalizeGatheringConfig(raw = {}, randomID = () => Math.random().toSt
     systems[String(systemId)] = {
       rules: _normalizeGatheringRules(systemConfig?.rules),
       conditions: _normalizeGatheringSystemConditions(systemConfig?.conditions, { vocabularies, conditions: { weather, timeOfDay } }),
+      vocabularies: _normalizeGatheringSystemVocabularies(systemConfig?.vocabularies, vocabularies),
       tasks: (Array.isArray(systemConfig?.tasks) ? systemConfig.tasks : []).map(task => _normalizeGatheringTask(task, randomID)),
       hazards: (Array.isArray(systemConfig?.hazards) ? systemConfig.hazards : []).map(hazard => _normalizeGatheringHazard(hazard, randomID))
     };
@@ -1370,11 +1443,13 @@ export function createAdminStore(services) {
     config.systems[id] = config.systems[id] || {
       rules: _normalizeGatheringRules(),
       conditions: _normalizeGatheringSystemConditions(null, config),
+      vocabularies: _normalizeGatheringSystemVocabularies(null, config.vocabularies),
       tasks: [],
       hazards: []
     };
     config.systems[id].rules = _normalizeGatheringRules(config.systems[id].rules);
     config.systems[id].conditions = _normalizeGatheringSystemConditions(config.systems[id].conditions, config);
+    config.systems[id].vocabularies = _normalizeGatheringSystemVocabularies(config.systems[id].vocabularies, config.vocabularies);
     config.systems[id].tasks = Array.isArray(config.systems[id].tasks) ? config.systems[id].tasks : [];
     config.systems[id].hazards = Array.isArray(config.systems[id].hazards) ? config.systems[id].hazards : [];
     return config.systems[id];
@@ -3121,6 +3196,111 @@ export function createAdminStore(services) {
     return true;
   }
 
+  async function addGatheringVocabularyValue(kind, value, systemId = get(selectedSystemId)) {
+    if (!GATHERING_VOCABULARY_DIMENSIONS.has(kind)) return false;
+    const option = _normalizeGatheringVocabularyOption(kind, value);
+    if (!option) return false;
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig) return false;
+    const vocabulary = systemConfig.vocabularies[kind] || { values: [] };
+    if (!vocabulary.values.some(existing => existing.id === option.id)) {
+      vocabulary.values = [...vocabulary.values, option];
+    }
+    systemConfig.vocabularies[kind] = vocabulary;
+    await _saveGatheringConfig(config);
+    await refresh();
+    return true;
+  }
+
+  async function updateGatheringVocabularyValue(kind, valueId, updates = {}, systemId = get(selectedSystemId)) {
+    if (!GATHERING_VOCABULARY_DIMENSIONS.has(kind)) return false;
+    const id = _normalizeGatheringVocabularyId(valueId);
+    if (!id || !updates || typeof updates !== 'object') return false;
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig) return false;
+    const vocabulary = systemConfig.vocabularies[kind] || { values: [] };
+    let changed = false;
+    vocabulary.values = vocabulary.values.map(option => {
+      if (option.id !== id) return option;
+      changed = true;
+      const next = {
+        ...option,
+        label: updates.label !== undefined ? (String(updates.label || '').trim() || option.label) : option.label
+      };
+      if (kind === 'biomes') {
+        next.icon = updates.icon !== undefined ? normalizeEssenceIcon(updates.icon) : option.icon;
+        next.colorToken = updates.colorToken !== undefined ? _normalizeBiomeColorToken(updates.colorToken) : option.colorToken;
+        next.customColor = updates.customColor !== undefined ? _normalizeCustomHex(updates.customColor) : option.customColor;
+      }
+      return next;
+    });
+    if (!changed) return false;
+    systemConfig.vocabularies[kind] = vocabulary;
+    await _saveGatheringConfig(config);
+    await refresh();
+    return true;
+  }
+
+  async function _pruneGatheringVocabularyFromEnvironments(systemId, kind, id) {
+    const environmentStore = _getEnvironmentStore();
+    if (!environmentStore?.update) return;
+    const environments = _environmentList();
+    for (const environment of environments) {
+      if (String(environment?.craftingSystemId || '') !== String(systemId || '')) continue;
+      let payload = null;
+      if (kind === 'regions' && _normalizeGatheringVocabularyId(environment.region) === id) {
+        payload = { ..._clonePlain(environment), region: '' };
+      }
+      if (kind === 'biomes') {
+        const nextBiomes = _normalizeGatheringTagList(environment.biomes ?? environment.biome)
+          .filter(existing => _normalizeGatheringVocabularyId(existing) !== id);
+        if (nextBiomes.length !== _normalizeGatheringTagList(environment.biomes ?? environment.biome).length) {
+          payload = { ..._clonePlain(environment), biomes: nextBiomes, biome: nextBiomes[0] || '' };
+        }
+      }
+      if (payload) await environmentStore.update(environment.id, payload);
+    }
+  }
+
+  async function deleteGatheringVocabularyValue(kind, valueId, systemId = get(selectedSystemId)) {
+    if (!GATHERING_VOCABULARY_DIMENSIONS.has(kind)) return false;
+    const id = _normalizeGatheringVocabularyId(valueId);
+    if (!id) return false;
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig) return false;
+    const vocabulary = systemConfig.vocabularies[kind] || { values: [] };
+    const nextValues = vocabulary.values.filter(option => option.id !== id);
+    if (nextValues.length === vocabulary.values.length) return true;
+    systemConfig.vocabularies[kind] = { values: nextValues };
+    if (kind === 'regions') {
+      systemConfig.tasks = systemConfig.tasks.map(task => ({
+        ...task,
+        region: _normalizeGatheringVocabularyId(task.region) === id ? '' : task.region
+      }));
+      systemConfig.hazards = systemConfig.hazards.map(hazard => ({
+        ...hazard,
+        region: _normalizeGatheringVocabularyId(hazard.region) === id ? '' : hazard.region
+      }));
+    }
+    if (kind === 'biomes') {
+      systemConfig.tasks = systemConfig.tasks.map(task => ({
+        ...task,
+        biomes: _normalizeGatheringTagList(task.biomes).filter(existing => _normalizeGatheringVocabularyId(existing) !== id)
+      }));
+      systemConfig.hazards = systemConfig.hazards.map(hazard => ({
+        ...hazard,
+        biomes: _normalizeGatheringTagList(hazard.biomes).filter(existing => _normalizeGatheringVocabularyId(existing) !== id)
+      }));
+    }
+    await _pruneGatheringVocabularyFromEnvironments(systemId, kind, id);
+    await _saveGatheringConfig(config);
+    await refresh();
+    return true;
+  }
+
   async function updateGatheringRules(systemId = get(selectedSystemId), updates = {}) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
@@ -3594,6 +3774,9 @@ export function createAdminStore(services) {
     addGatheringConditionValue,
     updateGatheringConditionValue,
     deleteGatheringConditionValue,
+    addGatheringVocabularyValue,
+    updateGatheringVocabularyValue,
+    deleteGatheringVocabularyValue,
     updateGatheringRules,
     addGatheringLibraryTask,
     updateGatheringLibraryTask,

@@ -2094,6 +2094,115 @@ describe('createAdminStore', () => {
       assert.deepEqual(services._store.gatheringConfig.systems.sys2.hazards[0].weather, ['heavy-rain']);
     });
 
+    it('normalizes and edits selected-system region and biome vocabularies', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      services._store.gatheringConfig = {
+        vocabularies: {
+          regions: ['north'],
+          biomes: ['forest'],
+          danger: ['safe'],
+          weather: ['clear'],
+          timeOfDay: ['day']
+        },
+        systems: {
+          sys1: {
+            tasks: [{ id: 'task-forest', name: 'Forest', region: 'north', biomes: ['forest'], dropRows: [] }],
+            hazards: [{ id: 'hazard-forest', name: 'Forest Hazard', region: 'north', biomes: ['forest'], dropRate: 50 }]
+          }
+        }
+      };
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      assert.deepEqual(get(store.viewState).gatheringConfig.systems.sys1.vocabularies.regions.values, [
+        { id: 'north', label: 'north' }
+      ]);
+      assert.deepEqual(get(store.viewState).gatheringConfig.systems.sys1.vocabularies.biomes.values, [
+        { id: 'forest', label: 'forest', icon: 'fas fa-tree', colorToken: 'sage', customColor: '' }
+      ]);
+
+      await store.addGatheringVocabularyValue('regions', 'South Coast', 'sys1');
+      await store.addGatheringVocabularyValue('biomes', { label: 'Crystal Cavern', icon: 'fas fa-gem', colorToken: 'mist', customColor: '#88aaff' }, 'sys1');
+      await store.updateGatheringVocabularyValue('regions', 'south coast', { label: 'Southern Coast' }, 'sys1');
+      await store.updateGatheringVocabularyValue('biomes', 'crystal cavern', { label: 'Crystal Caves', icon: 'fas fa-mountain', colorToken: '--fab-tag-lavender', customColor: 'bad' }, 'sys1');
+
+      const vocabularies = services._store.gatheringConfig.systems.sys1.vocabularies;
+      assert.deepEqual(vocabularies.regions.values.at(-1), { id: 'south coast', label: 'Southern Coast' });
+      assert.deepEqual(vocabularies.biomes.values.at(-1), {
+        id: 'crystal cavern',
+        label: 'Crystal Caves',
+        icon: 'fas fa-mountain',
+        colorToken: 'lavender',
+        customColor: ''
+      });
+      assert.deepEqual(services._store.gatheringConfig.systems.sys1.tasks[0].biomes, ['forest']);
+      assert.deepEqual(services._store.gatheringConfig.systems.sys1.hazards[0].biomes, ['forest']);
+    });
+
+    it('deletes selected-system region and biome vocabulary values and prunes matching references only in that system', async () => {
+      const environmentUpdates = [];
+      const environments = [
+        { id: 'env-sys1', craftingSystemId: 'sys1', region: 'north', biomes: ['forest', 'swamp'] },
+        { id: 'env-sys2', craftingSystemId: 'sys2', region: 'north', biomes: ['forest'] }
+      ];
+      const services = createMockServices({
+        getGatheringEnvironmentStore: () => ({
+          list: () => environments,
+          update: async (id, updates) => {
+            environmentUpdates.push([id, updates]);
+            const index = environments.findIndex(environment => environment.id === id);
+            if (index >= 0) environments[index] = { ...environments[index], ...updates };
+            return environments[index];
+          }
+        })
+      });
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      services._store.gatheringConfig = {
+        systems: {
+          sys1: {
+            vocabularies: {
+              regions: { values: [{ id: 'north', label: 'North' }] },
+              biomes: { values: [{ id: 'forest', label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage' }] }
+            },
+            tasks: [{ id: 'task-forest', name: 'Forest', region: 'north', biomes: ['forest'], dropRows: [] }],
+            hazards: [{ id: 'hazard-forest', name: 'Forest Hazard', region: 'north', biomes: ['forest'], dropRate: 50 }]
+          },
+          sys2: {
+            vocabularies: {
+              regions: { values: [{ id: 'north', label: 'North' }] },
+              biomes: { values: [{ id: 'forest', label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage' }] }
+            },
+            tasks: [{ id: 'task-other', name: 'Other', region: 'north', biomes: ['forest'], dropRows: [] }],
+            hazards: [{ id: 'hazard-other', name: 'Other Hazard', region: 'north', biomes: ['forest'], dropRate: 50 }]
+          }
+        }
+      };
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      assert.equal(await store.deleteGatheringVocabularyValue('regions', 'north', 'sys1'), true);
+      assert.equal(await store.deleteGatheringVocabularyValue('biomes', 'forest', 'sys1'), true);
+
+      const sys1 = services._store.gatheringConfig.systems.sys1;
+      const sys2 = services._store.gatheringConfig.systems.sys2;
+      assert.deepEqual(sys1.vocabularies.regions.values, []);
+      assert.deepEqual(sys1.vocabularies.biomes.values, []);
+      assert.equal(sys1.tasks[0].region, '');
+      assert.deepEqual(sys1.tasks[0].biomes, []);
+      assert.equal(sys1.hazards[0].region, '');
+      assert.deepEqual(sys1.hazards[0].biomes, []);
+      assert.equal(sys2.tasks[0].region, 'north');
+      assert.deepEqual(sys2.tasks[0].biomes, ['forest']);
+      assert.deepEqual(environmentUpdates.map(update => update[0]), ['env-sys1', 'env-sys1']);
+      assert.equal(environments[0].region, '');
+      assert.deepEqual(environments[0].biomes, ['swamp']);
+      assert.equal(environments[1].region, 'north');
+      assert.deepEqual(environments[1].biomes, ['forest']);
+    });
+
     it('normalizes and persists selected-system gathering rules', async () => {
       const services = createMockServices();
       const sys = services.getCraftingSystemManager().getSystem('sys1');

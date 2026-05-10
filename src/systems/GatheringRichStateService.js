@@ -9,6 +9,9 @@ const DEFAULT_VOCABULARIES = Object.freeze({
   timeOfDay: ['dawn', 'day', 'dusk', 'night']
 });
 const CONDITION_DIMENSIONS = ['weather', 'timeOfDay'];
+const VOCABULARY_DIMENSIONS = ['regions', 'biomes'];
+const BIOME_COLOR_TOKENS = new Set(['sage', 'mist', 'lavender', 'rose', 'peach', 'butter', 'aqua', 'mauve']);
+const DEFAULT_BIOME_COLOR_TOKEN = 'sage';
 const DEFAULT_CONDITION_ICONS = Object.freeze({
   weather: Object.freeze({
     clear: 'fas fa-sun',
@@ -522,6 +525,7 @@ function normalizeGatheringConfig(raw = {}) {
     systems[String(systemId)] = {
       rules: normalizeGatheringRules(config?.rules),
       conditions: normalizeSystemConditions(config?.conditions, { vocabularies, conditions: { weather, timeOfDay } }),
+      vocabularies: normalizeSystemVocabularies(config?.vocabularies, vocabularies),
       tasks: normalizeList(config?.tasks).map(normalizeLibraryTask),
       hazards: normalizeList(config?.hazards).map(normalizeHazard)
     };
@@ -559,6 +563,19 @@ function normalizeSystemConditions(raw = {}, fallback = {}) {
 function resolveSystemConditionSettings(config, systemId) {
   return config?.systems?.[systemId]?.conditions
     || normalizeSystemConditions(null, { vocabularies: config?.vocabularies, conditions: config?.conditions });
+}
+
+function normalizeSystemVocabularies(raw = {}, fallbackVocabularies = {}) {
+  const normalized = {};
+  for (const kind of VOCABULARY_DIMENSIONS) {
+    const rawValues = Array.isArray(raw?.[kind]?.values)
+      ? raw[kind].values
+      : (Array.isArray(raw?.[kind]) ? raw[kind] : fallbackVocabularies?.[kind]);
+    normalized[kind] = {
+      values: normalizeVocabularyOptions(kind, rawValues)
+    };
+  }
+  return normalized;
 }
 
 function conditionSettingsToCurrent(settings) {
@@ -702,6 +719,55 @@ function selectDrops(drops, mode, limit = 1) {
 function seedVocabulary(raw, defaults) {
   const values = normalizeTagList(raw);
   return values.length > 0 ? values : [...defaults];
+}
+
+function vocabularyLabelFromId(id) {
+  return String(id || '')
+    .split(/[\s-]+/)
+    .filter(Boolean)
+    .map(token => token.length <= 2 ? token.toUpperCase() : `${token.charAt(0).toUpperCase()}${token.slice(1)}`)
+    .join(' ');
+}
+
+function normalizeBiomeColorToken(value) {
+  const token = String(value || '').trim().replace(/^--fab-tag-/, '');
+  return BIOME_COLOR_TOKENS.has(token) ? token : DEFAULT_BIOME_COLOR_TOKEN;
+}
+
+function normalizeCustomHex(value) {
+  const hex = String(value || '').trim();
+  return /^#[0-9a-fA-F]{6}$/.test(hex) ? hex.toUpperCase() : '';
+}
+
+function normalizeVocabularyOption(kind, value) {
+  const isRecord = value && typeof value === 'object';
+  const id = normalizeTag(isRecord ? (value.id ?? value.value ?? value.label) : value);
+  if (!id) return null;
+  const rawLabel = isRecord ? String(value.label ?? '').trim() : String(value ?? '').trim();
+  const label = rawLabel || vocabularyLabelFromId(id);
+  if (kind === 'biomes') {
+    return {
+      id,
+      label,
+      icon: normalizeConditionIcon(isRecord ? value.icon : 'fas fa-tree', 'fas fa-tree'),
+      colorToken: normalizeBiomeColorToken(isRecord ? value.colorToken : DEFAULT_BIOME_COLOR_TOKEN),
+      customColor: normalizeCustomHex(isRecord ? value.customColor : '')
+    };
+  }
+  return { id, label };
+}
+
+function normalizeVocabularyOptions(kind, value) {
+  const values = Array.isArray(value) ? value : (value ? [value] : []);
+  const options = [];
+  const seen = new Set();
+  for (const raw of values) {
+    const option = normalizeVocabularyOption(kind, raw);
+    if (!option || seen.has(option.id)) continue;
+    seen.add(option.id);
+    options.push(option);
+  }
+  return options;
 }
 
 function normalizeTagList(value) {

@@ -454,6 +454,9 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'onToggleGatheringConditionEnabled={store.toggleGatheringConditionEnabled}',
       'onAddGatheringConditionValue={store.addGatheringConditionValue}',
       'onDeleteGatheringConditionValue={store.deleteGatheringConditionValue}',
+      'onAddGatheringVocabularyValue={store.addGatheringVocabularyValue}',
+      'onUpdateGatheringVocabularyValue={store.updateGatheringVocabularyValue}',
+      'onDeleteGatheringVocabularyValue={store.deleteGatheringVocabularyValue}',
       'onUpdateGatheringRules={store.updateGatheringRules}',
       'onAddGatheringLibraryTask={store.addGatheringLibraryTask}',
       'onUpdateGatheringLibraryTask={store.updateGatheringLibraryTask}',
@@ -487,16 +490,27 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(environmentsBrowserSource.includes('onAddGatheringConditionValue?.'), 'settings condition panels should wire value additions');
     assert.ok(environmentsBrowserSource.includes('onUpdateGatheringConditionValue?.'), 'settings condition panels should wire label and icon updates');
     assert.ok(environmentsBrowserSource.includes('onDeleteGatheringConditionValue?.'), 'settings condition panels should wire value deletion');
+    assert.ok(environmentsBrowserSource.includes('data-gathering-vocabulary-panel={vocabulary.kind}'), 'settings tab should render region and biome vocabulary panels');
+    assert.ok(environmentsBrowserSource.includes('onAddGatheringVocabularyValue?.'), 'settings vocabulary panels should wire value additions');
+    assert.ok(environmentsBrowserSource.includes('onUpdateGatheringVocabularyValue?.'), 'settings vocabulary panels should wire label, icon, and colour updates');
+    assert.ok(environmentsBrowserSource.includes('onDeleteGatheringVocabularyValue?.'), 'settings vocabulary panels should wire value deletion');
+    assert.ok(environmentsBrowserSource.includes('ManagerV2ColorPicker'), 'settings biome panels should use the manager-v2 color picker');
     assert.ok(environmentsBrowserSource.includes('IconPicker'), 'settings condition panels should reuse the shared icon picker');
     assert.ok(environmentsBrowserSource.includes('manager-v2-condition-label-input'), 'settings condition panels should expose editable display labels');
     assert.ok(environmentsBrowserSource.includes("onAddGatheringConditionValue?.(kind, { label: value, icon: conditionAddIcon(kind) }"), 'settings condition add should include the selected icon');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Conditions.NewIcon, 'New value icon');
-    assert.ok(environmentEditSource.includes("{#each ['regions', 'biomes', 'danger'] as vocabulary"), 'environment editor should keep only non-weather generic vocabulary CSV controls');
+    assert.ok(environmentEditSource.includes("{#each ['danger'] as vocabulary"), 'environment editor should keep only danger in generic vocabulary CSV controls');
+    assert.ok(!environmentEditSource.includes("{#each ['regions', 'biomes', 'danger'] as vocabulary"), 'environment editor should not expose regions/biomes in generic vocabulary CSV controls');
     assert.ok(!environmentEditSource.includes("{#each ['regions', 'biomes', 'danger', 'weather', 'timeOfDay'] as vocabulary"), 'environment editor should not expose weather/time generic vocabulary CSV controls');
     assert.ok(rootSource.includes('updateSelectedGatheringRules'), 'root should wire rule updates');
     assert.ok(rootSource.includes('manager-v2-rule-copy'), 'root should render rule descriptions beside inspector icons');
     assert.ok(rootSource.includes('data-gathering-rule-stepper="rewardLimit"'), 'root should render the reward limit stepper');
     assert.ok(rootSource.includes('data-gathering-rule-stepper="hazardLimit"'), 'root should render the hazard limit stepper');
+    assert.ok(rootSource.includes('selectedGatheringConditionShortcuts'), 'root should derive selected-system condition shortcuts');
+    assert.ok(rootSource.includes('buildSelectedGatheringConditionShortcuts'), 'root should keep shortcut visibility gated by selected-system gathering conditions');
+    assert.ok(rootSource.includes('data-systems-gathering-conditions'), 'systems inspector should render a global condition shortcut card');
+    assert.ok(rootSource.includes('data-systems-gathering-condition={condition.kind}'), 'systems inspector should render one shortcut per enabled condition dimension');
+    assert.ok(rootSource.includes("store.updateGatheringConditions?.({ [kind]: value, systemId: selectedSystemId })"), 'systems inspector shortcuts should reuse current condition persistence with selected system id');
     assert.ok(!environmentEditSource.includes("updateField('hazardSelectionMode'"), 'environment editor should not expose per-environment hazard selection rules');
     assert.ok(!environmentEditSource.includes("updateField('hazardPolicy'"), 'environment editor should not expose per-environment hazard policy');
     assert.ok(!environmentEditSource.includes('ItemSelectionMode'), 'environment editor should not expose per-task item selection rules');

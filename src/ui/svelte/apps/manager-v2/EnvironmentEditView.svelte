@@ -114,6 +114,10 @@
   const gatheringVocabularies = $derived(gatheringConfig?.vocabularies || {});
   const gatheringConditions = $derived(gatheringConfig?.conditions || {});
   const gatheringSystemConfig = $derived(gatheringConfig?.systems?.[environmentDraft?.craftingSystemId] || { tasks: [], hazards: [] });
+  const gatheringSystemVocabularies = $derived(gatheringSystemConfig?.vocabularies || {});
+  const regionVocabularyValues = $derived(Array.isArray(gatheringSystemVocabularies?.regions?.values)
+    ? gatheringSystemVocabularies.regions.values
+    : (gatheringVocabularies.regions || []));
   const gatheringSystemConditions = $derived(gatheringSystemConfig?.conditions || {});
   const weatherSetting = $derived(gatheringSystemConditions.weather || { current: gatheringConditions.weather || 'clear', values: gatheringVocabularies.weather || ['clear'] });
   const timeOfDaySetting = $derived(gatheringSystemConditions.timeOfDay || { current: gatheringConditions.timeOfDay || 'day', values: gatheringVocabularies.timeOfDay || ['day'] });
@@ -487,6 +491,16 @@
   }
 
   function conditionLabel(option) {
+    if (option && typeof option === 'object') return String(option.label || option.id || '').trim();
+    return String(option || '').trim();
+  }
+
+  function vocabularyId(option) {
+    if (option && typeof option === 'object') return String(option.id || '').trim();
+    return String(option || '').trim();
+  }
+
+  function vocabularyLabel(option) {
     if (option && typeof option === 'object') return String(option.label || option.id || '').trim();
     return String(option || '').trim();
   }
@@ -1124,7 +1138,7 @@
           <span>{text('FABRICATE.Admin.ManagerV2.Environment.EnvironmentRegion', 'Environment region')}</span>
           <input value={environmentDraft.region || ''} list="manager-v2-gathering-regions" oninput={(event) => updateField('region', event.target.value)} />
           <datalist id="manager-v2-gathering-regions">
-            {#each gatheringVocabularies.regions || [] as region (region)}<option value={region}></option>{/each}
+            {#each regionVocabularyValues as region (vocabularyId(region))}<option value={vocabularyId(region)} label={vocabularyLabel(region)}></option>{/each}
           </datalist>
         </label>
         <label class="manager-v2-field">
@@ -1140,7 +1154,7 @@
       <details class="manager-v2-library-details">
         <summary>{text('FABRICATE.Admin.ManagerV2.Environment.TagVocabularies', 'Tag vocabularies')}</summary>
         <div class="manager-v2-form-grid">
-          {#each ['regions', 'biomes', 'danger'] as vocabulary (vocabulary)}
+          {#each ['danger'] as vocabulary (vocabulary)}
             <label class="manager-v2-field">
               <span>{vocabulary}</span>
               <input value={tagCsv(gatheringVocabularies[vocabulary])} oninput={(event) => onUpdateGatheringVocabulary?.(vocabulary, parseTags(event.target.value))} />

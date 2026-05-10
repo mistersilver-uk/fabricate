@@ -24,15 +24,36 @@ conditions: {
 }
 ```
 
-Top-level `conditions` and `vocabularies` remain valid legacy inputs. Normalization uses those values when a per-system condition block is absent, converting string vocabularies into option records. Existing per-system string values are also normalized into option records. Matching fields on tasks and hazards remain normalized condition ids, not display labels.
+It also stores per-system gathering vocabulary records:
+
+```js
+vocabularies: {
+  regions: {
+    values: [
+      { id: 'north', label: 'North' }
+    ]
+  },
+  biomes: {
+    values: [
+      { id: 'forest', label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage', customColor: '' }
+    ]
+  }
+}
+```
+
+Top-level `conditions` and `vocabularies` remain valid legacy inputs. Normalization uses those values when a per-system condition or vocabulary block is absent, converting string vocabularies into option records. Existing per-system string values are also normalized into option records. Matching fields on environments, tasks, and hazards remain normalized ids, not display labels.
 
 ## Matching
 Runtime composition resolves the selected system's condition settings before matching reusable tasks and hazards. Enabled dimensions filter against the current option id; disabled dimensions ignore record tags for that dimension.
 
 ## UI
-The Gathering Settings center panel renders two equal-height panels in a two-column grid that stacks at medium widths. Each panel aligns its content to the top and has a compact enable toggle, current-value selector, add control with an icon picker for the new value, and value pills with icon picker, label input, and remove affordance. Value pills render as two-per-row rectangular controls with modest rounded corners.
+The Gathering Settings center panel renders four panels in a scrollable two-column grid that stacks at medium widths. The weather and time-of-day panels align content to the top and have a compact enable toggle, current-value selector, add control with an icon picker for the new value, and value pills with icon picker, label input, and remove affordance. Value pills render as two-per-row rectangular controls with modest rounded corners.
 
-The environment editor keeps region, biome, and danger generic vocabulary CSV controls. Weather and time-of-day are managed through Settings.
+Regions and Biomes render below the condition panels. Regions are text-only labels with add, edit, and delete controls. Biomes use the same pill geometry but add icon and colour affordances. Biome colours store theme token keys such as `sage`, `mist`, and `lavender`; a valid custom hex overrides the displayed token colour, while invalid or blank custom hex falls back to the token.
+
+The Systems Library right inspector renders a compact `Global conditions` shortcut card only when the selected system enables gathering and at least one condition dimension is enabled. Time of day and weather selectors share the same card, and each selector appears only for its enabled dimension. Changing either selector reuses `updateGatheringConditions` with the selected `systemId`; vocabulary editing remains in Gathering Settings.
+
+The environment editor keeps only the Danger generic vocabulary CSV control. Weather, time-of-day, Regions, and Biomes are managed through Settings.
 
 ## Safety
-Deleting the last value while a dimension is enabled returns `false`. When deletion succeeds, only selected-system reusable tasks and hazards have that tag removed.
+Deleting the last time/weather value while a dimension is enabled returns `false`. Region and biome panels allow deleting the final value. When deletion succeeds, only selected-system environments, reusable tasks, and hazards have that id removed.

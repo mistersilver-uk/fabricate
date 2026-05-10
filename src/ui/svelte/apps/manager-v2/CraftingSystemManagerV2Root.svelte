@@ -75,6 +75,10 @@
   );
   const selectedCountFacts = $derived(buildSelectedCountFacts(selectedCounts));
   const enabledFeatureLabels = $derived(featureLabels(selectedSystem));
+  const selectedGatheringConditionShortcuts = $derived(buildSelectedGatheringConditionShortcuts(
+    selectedSystem,
+    $viewState.gatheringConfig
+  ));
   const visiblePlaceholderViews = $derived(selectedSystem
     ? placeholderViews.filter(view => isViewAvailableForSystem(view, selectedSystem))
     : []
@@ -231,6 +235,11 @@
     store.updateGatheringRules?.(selectedSystemId, updates);
   }
 
+  function updateSelectedGatheringCondition(kind, value) {
+    if (!selectedSystemId || !kind) return;
+    store.updateGatheringConditions?.({ [kind]: value, systemId: selectedSystemId });
+  }
+
   function adjustGatheringRuleLimit(field, delta) {
     const current = Number(selectedGatheringRules?.[field] || 1);
     updateSelectedGatheringRules({ [field]: Math.max(1, Math.floor(current + delta)) });
@@ -317,6 +326,47 @@
         value: counts.recipeCategories
       }
     ];
+  }
+
+  function buildSelectedGatheringConditionShortcuts(system, gatheringConfig) {
+    if (system?.features?.gathering !== true) return [];
+    const systemConditions = gatheringConfig?.systems?.[system.id]?.conditions || {};
+    return [
+      {
+        kind: 'timeOfDay',
+        icon: 'fas fa-clock',
+        label: text('FABRICATE.Admin.ManagerV2.CurrentTimeOfDay', 'Current time of day'),
+        setting: systemConditions.timeOfDay || {
+          enabled: true,
+          current: gatheringConfig?.conditions?.timeOfDay || 'day',
+          values: gatheringConfig?.vocabularies?.timeOfDay || []
+        }
+      },
+      {
+        kind: 'weather',
+        icon: 'fas fa-cloud-sun',
+        label: text('FABRICATE.Admin.ManagerV2.CurrentWeather', 'Current weather'),
+        setting: systemConditions.weather || {
+          enabled: true,
+          current: gatheringConfig?.conditions?.weather || 'clear',
+          values: gatheringConfig?.vocabularies?.weather || []
+        }
+      }
+    ].filter(condition => condition.setting?.enabled !== false && conditionValues(condition.setting).length > 0);
+  }
+
+  function conditionId(option) {
+    if (option && typeof option === 'object') return String(option.id || '').trim();
+    return String(option || '').trim();
+  }
+
+  function conditionLabel(option) {
+    if (option && typeof option === 'object') return String(option.label || option.id || '').trim();
+    return String(option || '').trim();
+  }
+
+  function conditionValues(setting) {
+    return Array.isArray(setting?.values) ? setting.values : [];
   }
 
   function normalizedActiveView(view, system, environmentsAvailable, essencesAvailable) {
@@ -1513,6 +1563,9 @@
         onAddGatheringConditionValue={store.addGatheringConditionValue}
         onUpdateGatheringConditionValue={store.updateGatheringConditionValue}
         onDeleteGatheringConditionValue={store.deleteGatheringConditionValue}
+        onAddGatheringVocabularyValue={store.addGatheringVocabularyValue}
+        onUpdateGatheringVocabularyValue={store.updateGatheringVocabularyValue}
+        onDeleteGatheringVocabularyValue={store.deleteGatheringVocabularyValue}
       />
     {:else if currentView === 'environment-edit' && selectedSystem}
       <main class="manager-v2-main manager-v2-environment-edit-main" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.EditTitle', 'Edit environment')}>
@@ -2449,6 +2502,27 @@
             <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.NoOptionalFeatures', 'No optional features enabled.')}</p>
           {/if}
         </section>
+
+        {#if selectedGatheringConditionShortcuts.length > 0}
+          <section class="manager-v2-inspector-card manager-v2-condition-shortcut-card" data-systems-gathering-conditions aria-label={text('FABRICATE.Admin.ManagerV2.GlobalConditions', 'Global conditions')}>
+            <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.GlobalConditions', 'Global conditions')}</h3>
+            <div class="manager-v2-condition-shortcut-list">
+              {#each selectedGatheringConditionShortcuts as condition (condition.kind)}
+                <label class="manager-v2-field manager-v2-condition-shortcut" data-systems-gathering-condition={condition.kind}>
+                  <span class="manager-v2-condition-shortcut-label">
+                    <i class={condition.icon} aria-hidden="true"></i>
+                    <span>{condition.label}</span>
+                  </span>
+                  <select value={condition.setting.current} onchange={(event) => updateSelectedGatheringCondition(condition.kind, event.currentTarget.value)}>
+                    {#each conditionValues(condition.setting) as option (conditionId(option))}
+                      <option value={conditionId(option)}>{conditionLabel(option)}</option>
+                    {/each}
+                  </select>
+                </label>
+              {/each}
+            </div>
+          </section>
+        {/if}
       {:else if ($viewState.systems || []).length === 0}
         <section class="manager-v2-setup-card" aria-label={text('FABRICATE.Admin.ManagerV2.EmptySetup.Title', 'Set up your first system')}>
           <div class="manager-v2-setup-card-header">

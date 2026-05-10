@@ -172,6 +172,9 @@ test('manager-v2 inspector count labels wrap without truncation', () => {
   const factLineBlock = blockFor('.fabricate-manager-v2 .manager-v2-fact-line');
   const factLeadingBlock = blockFor('.fabricate-manager-v2 .manager-v2-fact-leading');
   const featureListBlock = blockFor('.fabricate-manager-v2 .manager-v2-feature-list');
+  const conditionShortcutListBlock = blockFor('.fabricate-manager-v2 .manager-v2-condition-shortcut-list');
+  const conditionShortcutLabelBlock = blockFor('.fabricate-manager-v2 .manager-v2-condition-shortcut-label');
+  const conditionShortcutSelectBlock = blockFor('.fabricate-manager-v2 .manager-v2-condition-shortcut select');
 
   assert.ok(css.includes('grid-template-columns: repeat(2, minmax(0, 1fr));'), 'count facts should use a two-column inspector grid');
   assert.ok(factBlock.includes('display: block;'), 'count facts should render one phrase instead of wrapping separate flex children');
@@ -188,6 +191,10 @@ test('manager-v2 inspector count labels wrap without truncation', () => {
   assert.ok(css.includes('.fabricate-manager-v2 .manager-v2-fact strong.is-disabled'), 'disabled count values should preserve emphasis');
   assert.ok(featureListBlock.includes('align-items: flex-start;'), 'feature pills should align to the top of the card');
   assert.ok(featureListBlock.includes('justify-content: flex-start;'), 'feature pills should align to the left of the card');
+  assert.ok(conditionShortcutListBlock.includes('grid-template-columns: minmax(0, 1fr);'), 'condition shortcut card should keep compact one-column inspector controls');
+  assert.ok(conditionShortcutListBlock.includes('gap: 10px;'), 'condition shortcut controls should have stable spacing');
+  assert.ok(conditionShortcutLabelBlock.includes('display: inline-flex;'), 'condition shortcut labels should align icons and text');
+  assert.ok(conditionShortcutSelectBlock.includes('font-weight: 400;'), 'condition shortcut select text should not inherit bold label weight');
 });
 
 test('manager-v2 empty states use refined heading and setup-panel styling', () => {
@@ -230,19 +237,29 @@ test('manager-v2 gathering settings condition panels use a two-column responsive
   const settingsBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-settings');
   const panelBlock = blockFor('.fabricate-manager-v2 .manager-v2-condition-panel');
   const addBlock = blockFor('.fabricate-manager-v2 .manager-v2-condition-add');
+  const regionAddBlock = blockFor('.fabricate-manager-v2 .manager-v2-region-add');
+  const biomeAddBlock = blockFor('.fabricate-manager-v2 .manager-v2-biome-add');
   const pillBlock = blockFor('.fabricate-manager-v2 .manager-v2-condition-pill');
+  const regionPillBlock = blockFor('.fabricate-manager-v2 .manager-v2-vocabulary-pill.is-region');
+  const biomePillBlock = blockFor('.fabricate-manager-v2 .manager-v2-vocabulary-pill.is-biome');
+  const colorPresetGridBlock = blockFor('.fabricate-manager-v2 .manager-v2-color-preset-grid');
   const labelInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-condition-label-input');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager-v2 (max-width: 1120px)'));
 
   assert.ok(settingsBlock.includes('grid-template-columns: repeat(2, minmax(0, 1fr));'), 'settings conditions should sit side by side at normal widths');
   assert.ok(settingsBlock.includes('align-items: stretch;'), 'condition panels should stretch to equal height in the two-column layout');
-  assert.ok(settingsBlock.includes('padding: 12px;'), 'settings panel should use padded workspace spacing');
+  assert.ok(settingsBlock.includes('padding: 0 12px 12px;'), 'settings panel should remove extra top padding while keeping side and bottom workspace spacing');
   assert.ok(panelBlock.includes('align-content: start;'), 'condition panel content should pack to its natural height');
   assert.ok(panelBlock.includes('height: 100%;'), 'condition panel backgrounds should fill the stretched grid row');
   assert.ok(addBlock.includes('grid-template-columns: 36px minmax(0, 1fr) 34px;'), 'condition add controls should reserve icon picker, label input, and add button columns');
+  assert.ok(regionAddBlock.includes('grid-template-columns: minmax(0, 1fr) 34px;'), 'region add controls should be text-only');
+  assert.ok(biomeAddBlock.includes('grid-template-columns: 36px 36px minmax(0, 1fr) 34px;'), 'biome add controls should reserve icon and color picker columns');
   assert.ok(css.includes('.fabricate-manager-v2 .manager-v2-condition-pill-list {\n  display: grid;'), 'condition pills should use grid rows instead of wrapping as single full-width flex pills');
   assert.ok(css.includes('grid-template-columns: repeat(2, minmax(0, 1fr));'), 'condition pills should fit two per line');
   assert.ok(pillBlock.includes('grid-template-columns: 30px minmax(0, 1fr) 24px;'), 'condition pills should reserve icon, label, and remove columns');
+  assert.ok(regionPillBlock.includes('grid-template-columns: minmax(0, 1fr) 24px;'), 'region pills should expose editable labels and remove controls without icon columns');
+  assert.ok(biomePillBlock.includes('grid-template-columns: 28px 30px minmax(0, 1fr) 30px 24px;'), 'biome pills should reserve swatch, icon, label, color, and remove columns');
+  assert.ok(colorPresetGridBlock.includes('grid-template-columns: repeat(4, 1fr);'), 'biome color picker presets should render as a compact grid');
   assert.ok(pillBlock.includes('border-radius: 6px;'), 'condition pills should be rounded rectangles rather than ovals');
   assert.ok(labelInputBlock.includes('align-self: center;'), 'condition label edit inputs should center inside the pill');
   assert.ok(labelInputBlock.includes('min-height: 0;'), 'condition label edit inputs should override inherited input minimum height');

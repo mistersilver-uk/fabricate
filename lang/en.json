@@ -856,6 +856,23 @@
             "EditLabel": "Edit label",
             "RemoveValue": "Remove {value}"
           },
+          "Vocabularies": {
+            "RegionsTitle": "Regions",
+            "BiomesTitle": "Biomes",
+            "AddRegion": "Add region",
+            "AddBiome": "Add biome",
+            "RegionPlaceholder": "e.g. Northlands",
+            "BiomePlaceholder": "e.g. Mushroom forest",
+            "Values": "Vocabulary values",
+            "NewBiomeIcon": "New biome icon",
+            "NewBiomeColor": "New biome colour",
+            "EditBiomeIcon": "Edit biome icon",
+            "EditBiomeColor": "Edit biome colour",
+            "ColorPresets": "Colour presets",
+            "CustomHex": "Custom hex",
+            "EditLabel": "Edit label",
+            "RemoveValue": "Remove {value}"
+          },
           "Filters": "Environment filters",
           "SearchPlaceholder": "Search environments...",
           "SearchLabel": "Search environments",
