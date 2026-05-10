@@ -109,8 +109,8 @@ GatheringEnvironment = {
   biomes?: string[],
   dangerTags?: string[],
   risk?: string,
-  hazardSelectionMode?: "highestRankedDrop" | "allDrops",
-  hazardPolicy?: "successWithHazard" | "failureWithHazard",
+  hazardSelectionMode?: "highestRankedDrop" | "allDrops", // legacy compatibility-read only
+  hazardPolicy?: "successWithHazard" | "failureWithHazard", // legacy compatibility-read only
   enabledTaskIds?: string[],
   disabledTaskIds?: string[],
   enabledHazardIds?: string[],
@@ -135,6 +135,35 @@ GatheringEnvironment = {
 12. `enabledTaskIds`, `disabledTaskIds`, `enabledHazardIds`, and `disabledHazardIds` store environment-level composition toggles for reusable library records without rewriting the library definitions.
 13. Environment metadata exposed to non-GM users must not leak hidden task identity, hidden result details, provider diagnostics, or GM-only notes.
 14. Legacy environments without rich metadata remain valid and load with neutral defaults.
+15. `hazardSelectionMode` and `hazardPolicy` are legacy compatibility fields. New Manager V2 authoring and d100 runtime behavior use system Gathering Rules once they are authored.
+
+## System Gathering Rules
+
+### Purpose
+
+Represent selected-system d100 reward and hazard behavior for all gathering environments in that crafting system.
+
+### Properties
+
+```js
+GatheringRules = {
+  rewardSelectionMode: "highestRankedDrop" | "allDrops" | "limitedDrops",
+  rewardLimit: number,
+  hazardSelectionMode: "highestRankedDrop" | "allDrops" | "limitedDrops",
+  hazardLimit: number,
+  hazardPolicy: "successWithHazard" | "failureWithHazard",
+}
+```
+
+### Requirements
+
+1. Rules are stored under `gatheringConfig.systems[systemId].rules`.
+2. Missing rules normalize to reward mode `highestRankedDrop`, reward limit `1`, hazard mode `allDrops`, hazard limit `1`, and hazard policy `successWithHazard`.
+3. Unknown selection modes normalize to their defaults.
+4. Unknown hazard policies normalize to `successWithHazard`.
+5. Limits normalize to positive integers.
+6. These rules are authoritative for d100 reward selection, hazard selection, and hazard outcome once authored.
+7. Existing worlds without a system `rules` object may read legacy task/environment selection fields for backwards-compatible d100 behavior.
 
 ## Global Gathering Conditions
 
@@ -206,7 +235,7 @@ GatheringTaskDefinition = {
     dropRate: number,
     enabled: boolean,
   }>,
-  itemSelectionMode: "highestRankedDrop" | "allDrops",
+  itemSelectionMode: "highestRankedDrop" | "allDrops", // legacy compatibility-read only
   staminaCost?: number,
   gatheringModifier?: ModifierProvider,
 }
@@ -221,10 +250,11 @@ GatheringTaskDefinition = {
 5. Biomes match when omitted or at least one task biome is present on the environment.
 6. Weather and time of day match against the current global gathering conditions.
 7. Drop rows require a `dropRate` integer from 1 to 100, a positive quantity, and either a component reference or item UUID.
-8. Row order is authoritative for `highestRankedDrop`.
-9. A definition may declare stamina cost, node availability, attempt limits, risk overrides, encounter hooks, and condition or roll modifier providers where the selected gathering economy uses them.
-10. Per-environment overrides remain associated with the environment and must not rewrite the reusable task definition.
-11. Legacy embedded environment tasks remain valid as inline compatibility tasks.
+8. `itemSelectionMode` is a legacy compatibility field. New Manager V2 authoring and d100 runtime behavior use system Gathering Rules once they are authored.
+9. Row order is authoritative for `highestRankedDrop` and `limitedDrops`.
+10. A definition may declare stamina cost, node availability, attempt limits, risk overrides, encounter hooks, and condition or roll modifier providers where the selected gathering economy uses them.
+11. Per-environment overrides remain associated with the environment and must not rewrite the reusable task definition.
+12. Legacy embedded environment tasks remain valid as inline compatibility tasks.
 
 ## Reusable Gathering Hazard Library
 
@@ -336,17 +366,23 @@ Resolve gathering-native reusable task drops and matched hazards through ordered
 1. Before any player attempt starts, Fabricate rejects gathering if Foundry is paused.
 2. For every enabled item row in the selected reusable task, roll `d100`, add the gathering modifier, and drop the row when `effectiveRoll >= 101 - dropRate`.
 3. For every enabled matched hazard in the environment, roll `d100`, add the hazard modifier, and drop the hazard when `effectiveRoll >= 101 - dropRate`.
-4. `itemSelectionMode === "allDrops"` awards every dropped item row.
-5. `itemSelectionMode === "highestRankedDrop"` awards the first dropped item row in authored row order.
-6. Environment `hazardSelectionMode === "allDrops"` keeps every dropped hazard.
-7. Environment `hazardSelectionMode === "highestRankedDrop"` keeps the first dropped hazard in matched hazard order.
-8. Environment `hazardPolicy === "successWithHazard"` reports a successful gathering outcome with hazard evidence when hazards drop.
-9. Environment `hazardPolicy === "failureWithHazard"` reports a failed gathering outcome with hazard evidence when hazards drop.
-10. If no hazards are enabled or matched, the environment is mechanically safe even when danger tags are present.
-11. Attempt history and player-facing output must redact d100 rows, hazards, provider diagnostics, and task identity when the environment is blind and the viewer is not allowed to inspect the underlying task.
-12. D100 resolution must write roll, modifier, threshold, selected item rows, selected hazards, condition snapshot, and hazard policy evidence where safe to reveal.
-13. D100 resolution must preserve history-before-side-effects ordering.
-14. Existing routed and progressive task resolution modes remain valid compatibility behavior.
+4. System Gathering Rules select rewards after item rows roll once rules are authored.
+5. Reward `highestRankedDrop` awards the first dropped item row in authored row order.
+6. Reward `allDrops` awards every dropped item row.
+7. Reward `limitedDrops` awards the first `rewardLimit` dropped item rows in authored row order.
+8. System Gathering Rules select hazards after hazards roll once rules are authored.
+9. Hazard `highestRankedDrop` keeps the first dropped hazard in matched hazard order.
+10. Hazard `allDrops` keeps every dropped hazard.
+11. Hazard `limitedDrops` keeps the first `hazardLimit` dropped hazards in matched hazard order.
+12. Hazard policy `successWithHazard` reports a successful gathering outcome with hazard evidence when hazards drop.
+13. Hazard policy `failureWithHazard` reports a failed gathering outcome with hazard evidence when hazards drop and must not award selected reward rows.
+14. Legacy `task.itemSelectionMode`, `environment.hazardSelectionMode`, and `environment.hazardPolicy` fields may be read only when a system has no authored `rules` object; authored system rules override them.
+15. If no hazards are enabled or matched, the environment is mechanically safe even when danger tags are present.
+16. Attempt history and player-facing output must redact d100 rows, hazards, provider diagnostics, and task identity when the environment is blind and the viewer is not allowed to inspect the underlying task.
+17. D100 resolution must write roll, modifier, threshold, selected item rows, selected hazards, condition snapshot, and hazard policy evidence where safe to reveal.
+18. Timed d100 runs must snapshot the start-time task, hazards, conditions, and rules so later configuration changes do not alter completion.
+19. D100 resolution must preserve history-before-side-effects ordering.
+20. Existing routed and progressive task resolution modes remain valid compatibility behavior.
 
 ## Natural Gathering Expressions and Macros
 

@@ -81,6 +81,15 @@ const DEFAULT_GATHERING_VOCABULARIES = Object.freeze({
   weather: ['clear', 'cloudy', 'rain', 'storm', 'snow', 'fog', 'wind'],
   timeOfDay: ['dawn', 'day', 'dusk', 'night']
 });
+const GATHERING_DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops', 'limitedDrops']);
+const GATHERING_HAZARD_POLICIES = new Set(['successWithHazard', 'failureWithHazard']);
+const DEFAULT_GATHERING_RULES = Object.freeze({
+  rewardSelectionMode: 'highestRankedDrop',
+  rewardLimit: 1,
+  hazardSelectionMode: 'allDrops',
+  hazardLimit: 1,
+  hazardPolicy: 'successWithHazard'
+});
 
 // ---------------------------------------------------------------------------
 // Module-private helper functions
@@ -307,6 +316,31 @@ function _normalizeGatheringHazard(hazard = {}, randomID = () => Math.random().t
   };
 }
 
+function _normalizePositiveInteger(value, fallback = 1) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 1) return fallback;
+  return Math.max(1, Math.floor(number));
+}
+
+function _normalizeGatheringRules(rules = {}) {
+  const rewardSelectionMode = GATHERING_DROP_SELECTION_MODES.has(rules?.rewardSelectionMode)
+    ? rules.rewardSelectionMode
+    : DEFAULT_GATHERING_RULES.rewardSelectionMode;
+  const hazardSelectionMode = GATHERING_DROP_SELECTION_MODES.has(rules?.hazardSelectionMode)
+    ? rules.hazardSelectionMode
+    : DEFAULT_GATHERING_RULES.hazardSelectionMode;
+  const hazardPolicy = GATHERING_HAZARD_POLICIES.has(rules?.hazardPolicy)
+    ? rules.hazardPolicy
+    : DEFAULT_GATHERING_RULES.hazardPolicy;
+  return {
+    rewardSelectionMode,
+    rewardLimit: _normalizePositiveInteger(rules?.rewardLimit, DEFAULT_GATHERING_RULES.rewardLimit),
+    hazardSelectionMode,
+    hazardLimit: _normalizePositiveInteger(rules?.hazardLimit, DEFAULT_GATHERING_RULES.hazardLimit),
+    hazardPolicy
+  };
+}
+
 function _normalizeGatheringConfig(raw = {}, randomID = () => Math.random().toString(36).slice(2, 10)) {
   const vocabularies = {
     regions: _seedGatheringVocabulary(raw?.vocabularies?.regions, DEFAULT_GATHERING_VOCABULARIES.regions),
@@ -320,6 +354,7 @@ function _normalizeGatheringConfig(raw = {}, randomID = () => Math.random().toSt
   const systems = {};
   for (const [systemId, systemConfig] of Object.entries(raw?.systems || {})) {
     systems[String(systemId)] = {
+      rules: _normalizeGatheringRules(systemConfig?.rules),
       tasks: (Array.isArray(systemConfig?.tasks) ? systemConfig.tasks : []).map(task => _normalizeGatheringTask(task, randomID)),
       hazards: (Array.isArray(systemConfig?.hazards) ? systemConfig.hazards : []).map(hazard => _normalizeGatheringHazard(hazard, randomID))
     };
@@ -1223,7 +1258,8 @@ export function createAdminStore(services) {
     const id = String(systemId || get(selectedSystemId) || '');
     if (!id) return null;
     config.systems = config.systems || {};
-    config.systems[id] = config.systems[id] || { tasks: [], hazards: [] };
+    config.systems[id] = config.systems[id] || { rules: _normalizeGatheringRules(), tasks: [], hazards: [] };
+    config.systems[id].rules = _normalizeGatheringRules(config.systems[id].rules);
     config.systems[id].tasks = Array.isArray(config.systems[id].tasks) ? config.systems[id].tasks : [];
     config.systems[id].hazards = Array.isArray(config.systems[id].hazards) ? config.systems[id].hazards : [];
     return config.systems[id];
@@ -2888,6 +2924,19 @@ export function createAdminStore(services) {
     return true;
   }
 
+  async function updateGatheringRules(systemId = get(selectedSystemId), updates = {}) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig || !updates || typeof updates !== 'object') return false;
+    systemConfig.rules = _normalizeGatheringRules({
+      ...systemConfig.rules,
+      ...updates
+    });
+    await _saveGatheringConfig(config);
+    await refresh();
+    return true;
+  }
+
   async function addGatheringLibraryTask(systemId = get(selectedSystemId)) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
@@ -3344,6 +3393,7 @@ export function createAdminStore(services) {
     removeEssence,
     updateGatheringConditions,
     updateGatheringVocabulary,
+    updateGatheringRules,
     addGatheringLibraryTask,
     updateGatheringLibraryTask,
     deleteGatheringLibraryTask,

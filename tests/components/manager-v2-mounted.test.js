@@ -1707,7 +1707,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     const gatheringTabs = Array.from(target.querySelectorAll('.manager-v2-gathering-tab'));
     assert.deepEqual(
       gatheringTabs.map(tab => tab.textContent.trim()),
-      ['Environments', 'Tasks', 'Encounters', 'Settings']
+      ['Environments', 'Tasks', 'Hazards', 'Settings']
     );
     assert.equal(
       gatheringTabs.find(tab => tab.textContent.includes('Environments')).getAttribute('aria-selected'),
@@ -1716,8 +1716,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
 
     for (const [label, placeholder] of [
       ['Tasks', 'Reusable gathering task management is planned for a later slice.'],
-      ['Encounters', 'Encounter and hazard authoring is planned for a later slice.'],
-      ['Settings', 'Gathering-wide configuration is planned for a later slice.']
+      ['Hazards', 'Reusable hazard authoring is planned for a later slice.']
     ]) {
       gatheringTabs.find(tab => tab.textContent.includes(label)).click();
       await tick();
@@ -1730,7 +1729,43 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
       assert.ok(target.textContent.includes(placeholder));
       assert.equal(target.querySelector('.manager-v2-toolbar'), null);
       assert.equal(target.querySelector('.manager-v2-environments-table'), null);
+      assert.equal(
+        target.querySelector('.manager-v2-inspector [data-gathering-inspector-placeholder] h2').textContent.trim(),
+        label === 'Tasks' ? 'Gathering tasks' : label === 'Hazards' ? 'Gathering hazards' : 'Gathering settings'
+      );
+      assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes(placeholder));
+      assert.equal(
+        target.querySelector('.manager-v2-inspector').textContent.includes('Selected environment'),
+        false
+      );
     }
+
+    gatheringTabs.find(tab => tab.textContent.includes('Settings')).click();
+    await tick();
+    flushSync();
+    assert.equal(
+      target.querySelector(`.manager-v2-gathering-tab[aria-selected="true"]`).textContent.trim(),
+      'Settings'
+    );
+    assert.equal(target.querySelector('.manager-v2-toolbar'), null);
+    assert.equal(target.querySelector('.manager-v2-environments-table'), null);
+    assert.ok(target.textContent.includes('Set system-level d100 reward and hazard rules for gathering.'));
+    assert.equal(target.querySelector('.manager-v2-gathering-settings-summary'), null);
+    assert.equal(target.querySelector('[data-gathering-rule-fact]'), null);
+    assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Choose which successful d100 reward rows are granted.'));
+    assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Choose which matching hazards are applied after a gathering roll.'));
+    assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Decide whether selected hazards still allow the gathering attempt to succeed.'));
+    assert.ok(target.textContent.includes('Highest ranked successful drop'));
+    assert.ok(target.textContent.includes('All successful drops'));
+    assert.ok(target.textContent.includes('Gathering succeeds'));
+    assert.ok(target.querySelector('.manager-v2-inspector [data-gathering-inspector-rules]'));
+    assert.equal(target.querySelector('.manager-v2-inspector [data-gathering-inspector-rules] h2').textContent.trim(), 'Rules');
+    assert.equal(target.querySelectorAll('.manager-v2-inspector [data-gathering-inspector-rules] select').length, 3);
+    assert.equal(target.querySelector('.manager-v2-inspector [data-gathering-rule-stepper]'), null);
+    assert.equal(
+      target.querySelector('.manager-v2-inspector').textContent.includes('Selected environment'),
+      false
+    );
 
     target.querySelector('#manager-v2-gathering-tab-environments').click();
     await tick();
@@ -1833,7 +1868,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     const gatheringTabs = Array.from(target.querySelectorAll('.manager-v2-gathering-tab'));
     assert.deepEqual(
       gatheringTabs.map(tab => tab.textContent.trim()),
-      ['Environments', 'Tasks', 'Encounters', 'Settings']
+      ['Environments', 'Tasks', 'Hazards', 'Settings']
     );
     assert.equal(target.querySelector('#manager-v2-gathering-tab-environments').getAttribute('aria-selected'), 'true');
     assert.ok(target.textContent.includes('Prepare gathering building blocks first'));
@@ -1855,6 +1890,11 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
 
     assert.equal(target.querySelector('#manager-v2-gathering-tab-tasks').getAttribute('aria-selected'), 'true');
     assert.ok(target.textContent.includes('Reusable gathering task management is planned for a later slice.'));
+    assert.equal(
+      target.querySelector('.manager-v2-inspector [data-gathering-inspector-placeholder]').getAttribute('data-gathering-inspector-placeholder'),
+      'tasks'
+    );
+    assert.equal(target.querySelector('.manager-v2-inspector').textContent.includes('Plan gathering content'), false);
 
     target.querySelector('#manager-v2-gathering-tab-environments').click();
     await tick();
@@ -1867,7 +1907,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     flushSync();
 
     assert.equal(target.querySelector('#manager-v2-gathering-tab-encounters').getAttribute('aria-selected'), 'true');
-    assert.ok(target.textContent.includes('Encounter and hazard authoring is planned for a later slice.'));
+    assert.ok(target.textContent.includes('Reusable hazard authoring is planned for a later slice.'));
 
     target.querySelector('#manager-v2-gathering-tab-environments').click();
     await tick();

@@ -1958,6 +1958,56 @@ describe('createAdminStore', () => {
       assert.equal(get(store.viewState).gatheringConfig.systems.sys1.hazards[0].dropRate, 30);
     });
 
+    it('normalizes and persists selected-system gathering rules', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+
+      services._store.gatheringConfig = {
+        systems: {
+          sys1: {
+            rules: {
+              rewardSelectionMode: 'invalid',
+              rewardLimit: 0,
+              hazardSelectionMode: 'limitedDrops',
+              hazardLimit: '3.8',
+              hazardPolicy: 'bad-policy'
+            },
+            tasks: [],
+            hazards: []
+          }
+        }
+      };
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      assert.deepEqual(get(store.viewState).gatheringConfig.systems.sys1.rules, {
+        rewardSelectionMode: 'highestRankedDrop',
+        rewardLimit: 1,
+        hazardSelectionMode: 'limitedDrops',
+        hazardLimit: 3,
+        hazardPolicy: 'successWithHazard'
+      });
+
+      await store.updateGatheringRules('sys1', {
+        rewardSelectionMode: 'limitedDrops',
+        rewardLimit: 2,
+        hazardSelectionMode: 'highestRankedDrop',
+        hazardLimit: -4,
+        hazardPolicy: 'failureWithHazard'
+      });
+
+      assert.deepEqual(services._store.gatheringConfig.systems.sys1.rules, {
+        rewardSelectionMode: 'limitedDrops',
+        rewardLimit: 2,
+        hazardSelectionMode: 'highestRankedDrop',
+        hazardLimit: 1,
+        hazardPolicy: 'failureWithHazard'
+      });
+      assert.deepEqual(get(store.viewState).gatheringConfig.systems.sys1.rules, services._store.gatheringConfig.systems.sys1.rules);
+    });
+
     it('requires confirmation before deleting reusable gathering records used by environments', async () => {
       const confirmations = [];
       const services = createMockServices({

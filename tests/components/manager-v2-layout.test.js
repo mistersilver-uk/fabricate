@@ -24,6 +24,22 @@ test('manager-v2 root defines a scoped responsive app container', () => {
   assert.ok(block.includes('overflow: hidden;'), 'manager-v2 shell should own overflow');
 });
 
+test('Fabricate app shells suppress host click focus outlines while preserving keyboard focus', () => {
+  const managerFocusBlock = blockFor('.fabricate-manager-v2 button:focus,\n.fabricate-manager-v2 input:focus,\n.fabricate-manager-v2 select:focus,\n.fabricate-manager-v2 textarea:focus,\n.fabricate-manager-v2 [tabindex]:focus');
+  const managerFocusVisibleBlock = blockFor('.fabricate-manager-v2 button:focus-visible,\n.fabricate-manager-v2 input:focus-visible,\n.fabricate-manager-v2 select:focus-visible,\n.fabricate-manager-v2 [tabindex]:focus-visible');
+  const adminFocusBlock = blockFor('.fabricate-admin button:focus,\n.fabricate-admin input:focus,\n.fabricate-admin select:focus,\n.fabricate-admin textarea:focus,\n.fabricate-admin [tabindex]:focus');
+  const actorFocusBlock = blockFor('.fabricate-actor-app button:focus,\n.fabricate-actor-app input:focus,\n.fabricate-actor-app select:focus,\n.fabricate-actor-app textarea:focus,\n.fabricate-actor-app [tabindex]:focus');
+
+  assert.ok(managerFocusBlock.includes('outline: none;') && managerFocusBlock.includes('box-shadow: none;'), 'manager-v2 controls should clear host click focus outlines');
+  assert.ok(adminFocusBlock.includes('outline: none;') && adminFocusBlock.includes('box-shadow: none;'), 'legacy admin controls should clear host click focus outlines');
+  assert.ok(actorFocusBlock.includes('outline: none;') && actorFocusBlock.includes('box-shadow: none;'), 'actor app controls should clear host click focus outlines');
+  assert.ok(
+    css.includes('.fabricate.crafting-app button:focus:not(:focus-visible),\n.fabricate.crafting-app input:focus:not(:focus-visible),\n.fabricate.crafting-app select:focus:not(:focus-visible),\n.fabricate.crafting-app textarea:focus:not(:focus-visible),\n.fabricate.crafting-app [tabindex]:focus:not(:focus-visible) {\n  outline: none;\n  box-shadow: none;'),
+    'classic crafting app controls should clear host click focus outlines'
+  );
+  assert.ok(managerFocusVisibleBlock.includes('outline: 2px solid var(--fab-mv2-accent);'), 'manager-v2 keyboard focus should remain visible');
+});
+
 test('manager-v2 body starts as a three-region grid and stacks at narrow width', () => {
   const bodyBlock = blockFor('.fabricate-manager-v2 .manager-v2-body');
 
@@ -192,6 +208,22 @@ test('manager-v2 empty states use refined heading and setup-panel styling', () =
   assert.ok(setupHeaderBlock.includes('grid-template-columns: 38px minmax(0, 1fr);'), 'setup panel should reserve icon space');
   assert.ok(setupListBlock.includes('line-height: 1.35;'), 'setup tips should stay dense and readable');
   assert.ok(setupLinksBlock.includes('flex-wrap: wrap;'), 'setup links should wrap in narrow inspectors');
+});
+
+test('manager-v2 gathering rules inspector stacks descriptions above normal-weight selects', () => {
+  const ruleRowBlock = blockFor('.fabricate-manager-v2 .manager-v2-rule-row');
+  const ruleCopyBlock = blockFor('.fabricate-manager-v2 .manager-v2-rule-copy');
+  const ruleCopyDescriptionBlock = blockFor('.fabricate-manager-v2 .manager-v2-rule-copy span');
+  const ruleFieldBlock = blockFor('.fabricate-manager-v2 .manager-v2-rule-field');
+  const ruleInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-rule-field select,\n.fabricate-manager-v2 .manager-v2-rule-stepper input');
+
+  assert.ok(ruleRowBlock.includes('grid-template-columns: 34px minmax(0, 1fr);'), 'rule rows should place icon and description on the same row');
+  assert.ok(ruleCopyBlock.includes('display: flex;') && ruleCopyBlock.includes('flex-direction: column;'), 'rule copy should stack label and description beside the icon');
+  assert.ok(ruleCopyDescriptionBlock.includes('color: var(--fab-mv2-text-muted);'), 'rule descriptions should read as supporting copy');
+  assert.ok(ruleFieldBlock.includes('grid-column: 2;'), 'rule selects should sit underneath the description column');
+  assert.ok(ruleFieldBlock.includes('font-weight: 400;'), 'rule field text should not force bold select text');
+  assert.ok(ruleInputBlock.includes('font-weight: 400;'), 'rule select and input text should not inherit bold labels');
+  assert.equal(css.includes('.fabricate-manager-v2 .manager-v2-gathering-settings-summary'), false, 'settings center panel should not keep the duplicated rules summary');
 });
 
 test('manager-v2 recipes browser defines compact responsive table geometry', () => {
@@ -363,10 +395,14 @@ test('manager-v2 essence edit route defines picker-based responsive geometry', (
 
 test('manager-v2 environments browser and edit route define compact responsive geometry', () => {
   const toolbarBlock = blockFor('.fabricate-manager-v2 .manager-v2-environments-toolbar');
+  const gatheringPanelBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-panel');
+  const gatheringEnvironmentsPanelBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-panel-environments');
+  const tableScrollBlock = blockFor('.fabricate-manager-v2 .manager-v2-table-scroll');
   const tableBlock = blockFor('.fabricate-manager-v2 .manager-v2-environments-table');
   const taskCountBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-task-count');
   const actionsBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-actions');
   const actionGridBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-action-grid');
+  const reorderStackBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-reorder-stack');
   const editorShellBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-editor-shell');
   const editorViewBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-edit-view');
   const detailsGridBlock = blockFor('.fabricate-manager-v2 .manager-v2-environment-details-grid');
@@ -382,23 +418,65 @@ test('manager-v2 environments browser and edit route define compact responsive g
     'environments toolbar should keep wrapped filter rows pinned to the top of its bounded scroll area'
   );
   assert.ok(
-    tableBlock.includes('--fab-mv2-environment-grid: minmax(0, 1.72fr) minmax(86px, 0.42fr) 46px 72px 116px;'),
-    'environments table should define five compact columns without a linked-scene column'
+    gatheringPanelBlock.includes('min-height: 0;') && gatheringPanelBlock.includes('overflow: hidden;'),
+    'gathering panels should participate in the manager-v2 bounded grid instead of expanding to content height'
   );
   assert.ok(
-    css.includes('.fabricate-manager-v2 .manager-v2-environment-identity {\n  grid-template-columns: 72px minmax(0, 1fr);'),
-    'environment identity should reserve a wider scene thumbnail'
+    gatheringEnvironmentsPanelBlock.includes('grid-template-rows: auto minmax(0, 1fr) auto;'),
+    'environments gathering panel should reserve a bounded scroll row between toolbar and pagination'
   );
   assert.ok(
-    css.includes('.fabricate-manager-v2 .manager-v2-environment-thumb {\n  width: 72px;\n  height: 48px;'),
-    'environment thumbnails should use scene-like proportions'
+    tableScrollBlock.includes('overflow: auto;') && tableScrollBlock.includes('min-height: 0;'),
+    'environment table scroll region should own internal overflow once bounded by the gathering panel'
+  );
+  assert.ok(
+    tableBlock.includes('--fab-mv2-environment-grid: minmax(0, 1.72fr) minmax(86px, 0.42fr) 46px 72px 72px;'),
+    'environments table should define five compact columns without reserving a reorder column'
+  );
+  assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-environment-row {\n  position: relative;\n  min-height: 88px;\n}'),
+    'environment rows should anchor hover overlays while keeping height stable around larger thumbnails'
+  );
+  assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-environment-identity {\n  grid-template-columns: 120px minmax(0, 1fr);\n  align-self: center;\n  min-height: 68px;'),
+    'environment identity should reserve and vertically center the larger scene thumbnail column'
+  );
+  assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-environment-thumb {\n  display: block;\n  align-self: center;\n  width: 120px;\n  height: 68px;'),
+    'environment thumbnails should reserve a larger centered scene-like image area'
   );
   assert.ok(taskCountBlock.includes('font-weight: 800;'), 'environment task count should render as plain emphasized text');
-  assert.ok(actionsBlock.includes('grid-template-columns: 72px 34px;'), 'environment row actions should reserve edit/delete grid plus reorder stack');
+  assert.ok(actionsBlock.includes('grid-template-columns: 72px;'), 'environment row actions should only reserve edit duplicate delete controls');
+  assert.ok(!actionsBlock.includes('grid-template-columns: 72px 34px;'), 'environment row actions should not reserve a reorder stack column');
   assert.ok(actionGridBlock.includes('grid-template-columns: repeat(2, 34px);'), 'environment edit duplicate delete buttons should sit in a compact grid');
   assert.ok(
-    css.includes('.fabricate-manager-v2 .manager-v2-environment-reorder-stack {\n  grid-template-rows: repeat(2, 34px);'),
-    'environment move up/down buttons should stack at the right edge'
+    reorderStackBlock.includes('position: absolute;')
+      && reorderStackBlock.includes('inset: 0;')
+      && reorderStackBlock.includes('grid-template-rows: 18px 18px;')
+      && reorderStackBlock.includes('align-content: space-between;')
+      && reorderStackBlock.includes('pointer-events: none;'),
+    'environment move up/down hit areas should span hidden full-row top and bottom overlay bands'
+  );
+  assert.ok(
+    !css.includes('.manager-v2-environment-row:hover .manager-v2-environment-reorder-stack')
+      && !css.includes('.manager-v2-environment-row:focus-within .manager-v2-environment-reorder-stack'),
+    'environment reorder overlay should not become visible from whole-row hover or focus'
+  );
+  assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button {\n  width: 100%;\n  height: 18px;')
+      && css.includes('background: var(--fab-overlay-dark-32);')
+      && css.includes('opacity: 0;')
+      && css.includes('.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:hover,\n.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:focus-visible {\n  opacity: 1;'),
+    'environment reorder buttons should reveal only their own thin row-width overlay band on hover or keyboard focus'
+  );
+  assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:disabled {\n  opacity: 0;\n  pointer-events: auto;')
+      && css.includes('.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:disabled:hover,\n.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:disabled:focus-visible {\n  opacity: 1;'),
+    'disabled environment reorder bands should stay hidden until their own hover or keyboard focus'
+  );
+  assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:focus,\n.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:focus-visible {\n  outline: none;\n  box-shadow: none;'),
+    'environment reorder buttons should not inherit host focus outlines after click'
   );
   assert.ok(
     css.includes('.fabricate-manager-v2 .manager-v2-environment-row .manager-v2-status-cell'),

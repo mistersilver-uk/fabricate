@@ -1122,20 +1122,6 @@
           <span>{text('FABRICATE.Admin.ManagerV2.Environment.EnvironmentDangerTags', 'Danger tags')}</span>
           <input value={tagCsv(environmentDraft.dangerTags)} oninput={(event) => updateField('dangerTags', parseTags(event.target.value))} />
         </label>
-        <label class="manager-v2-field">
-          <span>{text('FABRICATE.Admin.ManagerV2.Environment.HazardSelectionMode', 'Hazard selection')}</span>
-          <select value={environmentDraft.hazardSelectionMode || 'allDrops'} onchange={(event) => updateField('hazardSelectionMode', event.target.value)}>
-            <option value="allDrops">{text('FABRICATE.Admin.ManagerV2.Environment.AllDrops', 'All drops')}</option>
-            <option value="highestRankedDrop">{text('FABRICATE.Admin.ManagerV2.Environment.HighestRankedDrop', 'Highest-ranked drop')}</option>
-          </select>
-        </label>
-        <label class="manager-v2-field">
-          <span>{text('FABRICATE.Admin.ManagerV2.Environment.HazardPolicy', 'Hazard policy')}</span>
-          <select value={environmentDraft.hazardPolicy || 'successWithHazard'} onchange={(event) => updateField('hazardPolicy', event.target.value)}>
-            <option value="successWithHazard">{text('FABRICATE.Admin.ManagerV2.Environment.SuccessWithHazard', 'Success with hazard')}</option>
-            <option value="failureWithHazard">{text('FABRICATE.Admin.ManagerV2.Environment.FailureWithHazard', 'Failure with hazard')}</option>
-          </select>
-        </label>
       </div>
 
       <details class="manager-v2-library-details">
@@ -1184,7 +1170,6 @@
                   <label class="manager-v2-field"><span>{text('FABRICATE.Admin.ManagerV2.Environment.DropComponent', 'Drop component')}</span><select value={row.componentId || ''} onchange={(event) => updateTaskFirstDropRow(task, { componentId: event.target.value })}><option value=""></option>{#each managedItemOptions as item (item.id)}<option value={item.id}>{item.name}</option>{/each}</select></label>
                   <label class="manager-v2-field"><span>{text('FABRICATE.Admin.ManagerV2.Environment.DropRate', 'Drop rate')}</span><input type="number" min="1" max="100" step="1" value={row.dropRate || 1} oninput={(event) => updateTaskFirstDropRow(task, { dropRate: Number(event.target.value || 1) })} /></label>
                   <label class="manager-v2-field"><span>{text('FABRICATE.Admin.ManagerV2.Environment.Quantity', 'Quantity')}</span><input type="number" min="1" step="1" value={row.quantity || 1} oninput={(event) => updateTaskFirstDropRow(task, { quantity: Number(event.target.value || 1) })} /></label>
-                  <label class="manager-v2-field"><span>{text('FABRICATE.Admin.ManagerV2.Environment.ItemSelectionMode', 'Item selection')}</span><select value={task.itemSelectionMode || 'highestRankedDrop'} onchange={(event) => onUpdateGatheringLibraryTask?.(environmentDraft?.craftingSystemId, task.id, { itemSelectionMode: event.target.value })}><option value="highestRankedDrop">{text('FABRICATE.Admin.ManagerV2.Environment.HighestRankedDrop', 'Highest-ranked drop')}</option><option value="allDrops">{text('FABRICATE.Admin.ManagerV2.Environment.AllDrops', 'All drops')}</option></select></label>
                 </div>
                 <button type="button" class="manager-v2-button is-danger" onclick={() => onDeleteGatheringLibraryTask?.(environmentDraft?.craftingSystemId, task.id)}>
                   <i class="fas fa-trash" aria-hidden="true"></i>

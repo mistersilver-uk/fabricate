@@ -417,10 +417,14 @@ test('d100 resolution supports all-drops items and failure-with-hazard policy', 
     config: {
       systems: {
         'system-a': {
+          rules: {
+            rewardSelectionMode: 'allDrops',
+            hazardSelectionMode: 'allDrops',
+            hazardPolicy: 'failureWithHazard'
+          },
           tasks: [{
             id: 'task-d100',
             name: 'Forage',
-            itemSelectionMode: 'allDrops',
             dropRows: [
               { id: 'drop-common', componentId: 'herb', quantity: 2, dropRate: 10 },
               { id: 'drop-rare', itemUuid: 'Item.rare', quantity: 1, dropRate: 80 }
@@ -434,7 +438,7 @@ test('d100 resolution supports all-drops items and failure-with-hazard policy', 
   const calls = {};
   const engine = makeEngine({
     richState: service,
-    env: environment({ hazardPolicy: 'failureWithHazard' }),
+    env: environment(),
     calls
   });
 
@@ -448,6 +452,88 @@ test('d100 resolution supports all-drops items and failure-with-hazard policy', 
   assert.deepEqual(calls.terminal[0].payload.checkResult.items.map(row => row.id), ['drop-common', 'drop-rare']);
 });
 
+test('d100 resolution applies system gathering rules over legacy task and environment fields', async () => {
+  const { service } = makeRichState({
+    rolls: [100, 100, 100, 100, 100],
+    config: {
+      systems: {
+        'system-a': {
+          rules: {
+            rewardSelectionMode: 'limitedDrops',
+            rewardLimit: 2,
+            hazardSelectionMode: 'limitedDrops',
+            hazardLimit: 1,
+            hazardPolicy: 'successWithHazard'
+          },
+          tasks: [{
+            id: 'task-limited',
+            name: 'Limited Forage',
+            itemSelectionMode: 'allDrops',
+            dropRows: [
+              { id: 'drop-first', componentId: 'herb', quantity: 1, dropRate: 100 },
+              { id: 'drop-second', componentId: 'herb', quantity: 1, dropRate: 100 },
+              { id: 'drop-third', componentId: 'herb', quantity: 1, dropRate: 100 }
+            ]
+          }],
+          hazards: [
+            { id: 'hazard-first', name: 'First', dangerTags: ['hazardous'], dropRate: 100 },
+            { id: 'hazard-second', name: 'Second', dangerTags: ['hazardous'], dropRate: 100 }
+          ]
+        }
+      }
+    }
+  });
+  const calls = {};
+  const engine = makeEngine({
+    richState: service,
+    env: environment({ hazardSelectionMode: 'allDrops', hazardPolicy: 'failureWithHazard' }),
+    calls
+  });
+
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-limited' });
+
+  assert.equal(result.accepted, true);
+  assert.equal(result.state, 'succeeded');
+  assert.deepEqual(calls.terminal[0].payload.checkResult.items.map(row => row.id), ['drop-first', 'drop-second']);
+  assert.deepEqual(calls.terminal[0].payload.checkResult.hazards.map(row => row.id), ['hazard-first']);
+});
+
+test('d100 resolution preserves legacy selection fields when system rules are missing', async () => {
+  const { service } = makeRichState({
+    rolls: [100, 100, 100],
+    config: {
+      systems: {
+        'system-a': {
+          tasks: [{
+            id: 'task-legacy-selection',
+            name: 'Legacy Forage',
+            itemSelectionMode: 'allDrops',
+            dropRows: [
+              { id: 'drop-first', componentId: 'herb', quantity: 1, dropRate: 100 },
+              { id: 'drop-second', componentId: 'herb', quantity: 1, dropRate: 100 }
+            ]
+          }],
+          hazards: [{ id: 'hazard-first', name: 'First', dangerTags: ['hazardous'], dropRate: 100 }]
+        }
+      }
+    }
+  });
+  const calls = {};
+  const engine = makeEngine({
+    richState: service,
+    env: environment({ hazardSelectionMode: 'allDrops', hazardPolicy: 'failureWithHazard' }),
+    calls
+  });
+
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-legacy-selection' });
+
+  assert.equal(result.accepted, true);
+  assert.equal(result.state, 'failed');
+  assert.deepEqual(calls.terminal[0].payload.checkResult.items.map(row => row.id), ['drop-first', 'drop-second']);
+  assert.deepEqual(calls.terminal[0].payload.checkResult.hazards.map(row => row.id), ['hazard-first']);
+  assert.equal(calls.created.length, 0);
+});
+
 test('d100 resolution applies numeric task and hazard modifier providers', () => {
   const { service } = makeRichState({ rolls: [90, 90] });
   const result = service.resolveD100Attempt({
@@ -458,7 +544,7 @@ test('d100 resolution applies numeric task and hazard modifier providers', () =>
       dropRows: [{ id: 'drop-modified', componentId: 'herb', quantity: 1, dropRate: 10 }]
     },
     environment: {
-      hazardSelectionMode: 'allDrops',
+      rules: { rewardSelectionMode: 'allDrops', hazardSelectionMode: 'allDrops' },
       hazards: [{ id: 'hazard-modified', name: 'Thorns', dropRate: 10, hazardModifier: { provider: 'static', value: 1 } }]
     }
   });
@@ -468,29 +554,49 @@ test('d100 resolution applies numeric task and hazard modifier providers', () =>
   assert.deepEqual(result.hazards.map(row => [row.id, row.effectiveRoll, row.modifier]), [['hazard-modified', 91, 1]]);
 });
 
-test('timed d100 runs complete from their start-time library snapshot after conditions change', async () => {
-  const { service } = makeRichState({
-    rolls: [100, 100],
+test('timed d100 runs complete from their start-time library snapshot after conditions and rules change', async () => {
+  const { service, settings } = makeRichState({
+    rolls: [100, 100, 100, 100],
     config: {
       conditions: { weather: 'rain', timeOfDay: 'night' },
       systems: {
         'system-a': {
+          rules: {
+            rewardSelectionMode: 'limitedDrops',
+            rewardLimit: 1,
+            hazardSelectionMode: 'limitedDrops',
+            hazardLimit: 1,
+            hazardPolicy: 'successWithHazard'
+          },
           tasks: [{
             id: 'task-timed-rain',
             name: 'Timed Rain Forage',
             weather: ['rain'],
             timeOfDay: ['night'],
             timeRequirement: { minutes: 1 },
-            dropRows: [{ id: 'drop-rain-herb', componentId: 'herb', quantity: 1, dropRate: 100 }]
+            dropRows: [
+              { id: 'drop-rain-herb', componentId: 'herb', quantity: 1, dropRate: 100 },
+              { id: 'drop-rain-flower', componentId: 'herb', quantity: 1, dropRate: 100 }
+            ]
           }],
-          hazards: [{
-            id: 'hazard-rain-thorns',
-            name: 'Rain Thorns',
-            dangerTags: ['hazardous'],
-            weather: ['rain'],
-            timeOfDay: ['night'],
-            dropRate: 100
-          }]
+          hazards: [
+            {
+              id: 'hazard-rain-thorns',
+              name: 'Rain Thorns',
+              dangerTags: ['hazardous'],
+              weather: ['rain'],
+              timeOfDay: ['night'],
+              dropRate: 100
+            },
+            {
+              id: 'hazard-rain-mud',
+              name: 'Rain Mud',
+              dangerTags: ['hazardous'],
+              weather: ['rain'],
+              timeOfDay: ['night'],
+              dropRate: 100
+            }
+          ]
         }
       }
     }
@@ -532,7 +638,20 @@ test('timed d100 runs complete from their start-time library snapshot after cond
 
   const start = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-timed-rain' });
   const activeListing = await engine.listForActor({ viewer, actor });
-  await service.setConditions({ weather: 'clear', timeOfDay: 'day' });
+  settings.set(SETTING_KEYS.GATHERING_CONFIG, {
+    conditions: { weather: 'clear', timeOfDay: 'day' },
+    systems: {
+      'system-a': {
+        rules: {
+          rewardSelectionMode: 'allDrops',
+          hazardSelectionMode: 'allDrops',
+          hazardPolicy: 'failureWithHazard'
+        },
+        tasks: [],
+        hazards: []
+      }
+    }
+  });
   const processed = await engine.processWorldTime(10);
 
   assert.equal(start.accepted, true);
@@ -543,6 +662,89 @@ test('timed d100 runs complete from their start-time library snapshot after cond
   assert.deepEqual(calls.created[0].resultGroups[0].results.map(row => row.id), ['drop-rain-herb']);
   assert.deepEqual(calls.completed.checkResult.hazards.map(row => row.id), ['hazard-rain-thorns']);
   assert.equal(JSON.stringify(start.run.economyEvidence).includes('runtimeSnapshot'), false);
+});
+
+test('timed d100 legacy runs snapshot legacy hazard behavior before rules are authored', async () => {
+  const { service, settings } = makeRichState({
+    rolls: [100, 100, 100],
+    config: {
+      systems: {
+        'system-a': {
+          tasks: [{
+            id: 'task-timed-legacy',
+            name: 'Timed Legacy Forage',
+            itemSelectionMode: 'allDrops',
+            timeRequirement: { minutes: 1 },
+            dropRows: [{ id: 'drop-legacy-herb', componentId: 'herb', quantity: 1, dropRate: 100 }]
+          }],
+          hazards: [
+            { id: 'hazard-legacy-thorns', name: 'Thorns', dangerTags: ['hazardous'], dropRate: 100 },
+            { id: 'hazard-legacy-mud', name: 'Mud', dangerTags: ['hazardous'], dropRate: 100 }
+          ]
+        }
+      }
+    }
+  });
+  const calls = {};
+  let activeRun = null;
+  const runManager = {
+    getActiveRuns: () => activeRun ? [activeRun] : [],
+    getRunHistory: () => [],
+    findActiveRunForTask: () => null,
+    createWaitingRun: async (selectedActor, runData, timeRequirement) => {
+      activeRun = {
+        id: 'run-waiting-legacy',
+        status: 'waitingTime',
+        actorUuid: selectedActor.uuid,
+        userId: viewer.id,
+        startedAtWorldTime: 1,
+        updatedAtWorldTime: 1,
+        timeGate: timeRequirement,
+        ...runData
+      };
+      return activeRun;
+    },
+    getMaturedWaitingRuns: () => activeRun ? [{ actor, run: activeRun }] : [],
+    completeRun: async (_selectedActor, run, status, payload, options) => {
+      const completed = {
+        ...run,
+        status,
+        ...options.terminalRunData,
+        ...payload,
+        completedAtWorldTime: 10
+      };
+      activeRun = null;
+      calls.completed = completed;
+      return completed;
+    }
+  };
+  const engine = makeEngine({
+    richState: service,
+    env: environment({ hazardSelectionMode: 'allDrops', hazardPolicy: 'successWithHazard' }),
+    calls,
+    runManager
+  });
+
+  const start = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-timed-legacy' });
+  settings.set(SETTING_KEYS.GATHERING_CONFIG, {
+    systems: {
+      'system-a': {
+        rules: {
+          rewardSelectionMode: 'highestRankedDrop',
+          hazardSelectionMode: 'highestRankedDrop',
+          hazardPolicy: 'failureWithHazard'
+        },
+        tasks: [],
+        hazards: []
+      }
+    }
+  });
+  const processed = await engine.processWorldTime(10);
+
+  assert.equal(start.accepted, true);
+  assert.equal(processed.completed.length, 1);
+  assert.equal(calls.completed.status, 'succeeded');
+  assert.deepEqual(calls.completed.checkResult.hazards.map(row => row.id), ['hazard-legacy-thorns', 'hazard-legacy-mud']);
 });
 
 test('timed d100 missing-reference cancellation does not expose or persist runtime snapshots', async () => {

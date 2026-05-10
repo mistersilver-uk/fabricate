@@ -751,6 +751,15 @@
   background: var(--fab-bg-1);
 }
 
+.fabricate.crafting-app button:focus:not(:focus-visible),
+.fabricate.crafting-app input:focus:not(:focus-visible),
+.fabricate.crafting-app select:focus:not(:focus-visible),
+.fabricate.crafting-app textarea:focus:not(:focus-visible),
+.fabricate.crafting-app [tabindex]:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
+
 .fabricate-crafting-app {
   display: flex;
   flex-direction: column;
@@ -780,6 +789,15 @@
 
 .fabricate-actor-app * {
   box-sizing: border-box;
+}
+
+.fabricate-actor-app button:focus,
+.fabricate-actor-app input:focus,
+.fabricate-actor-app select:focus,
+.fabricate-actor-app textarea:focus,
+.fabricate-actor-app [tabindex]:focus {
+  outline: none;
+  box-shadow: none;
 }
 
 .fabricate-actor-app button:focus-visible,
@@ -1339,6 +1357,15 @@
 
 .fabricate-admin * {
   box-sizing: border-box;
+}
+
+.fabricate-admin button:focus,
+.fabricate-admin input:focus,
+.fabricate-admin select:focus,
+.fabricate-admin textarea:focus,
+.fabricate-admin [tabindex]:focus {
+  outline: none;
+  box-shadow: none;
 }
 
 .fabricate-admin button:focus-visible,
@@ -5332,6 +5359,15 @@
   font: inherit;
 }
 
+.fabricate-manager-v2 button:focus,
+.fabricate-manager-v2 input:focus,
+.fabricate-manager-v2 select:focus,
+.fabricate-manager-v2 textarea:focus,
+.fabricate-manager-v2 [tabindex]:focus {
+  outline: none;
+  box-shadow: none;
+}
+
 .fabricate-manager-v2 button:focus-visible,
 .fabricate-manager-v2 input:focus-visible,
 .fabricate-manager-v2 select:focus-visible,
@@ -5803,7 +5839,7 @@
 }
 
 .fabricate-manager-v2 .manager-v2-environments-table {
-  --fab-mv2-environment-grid: minmax(0, 1.72fr) minmax(86px, 0.42fr) 46px 72px 116px;
+  --fab-mv2-environment-grid: minmax(0, 1.72fr) minmax(86px, 0.42fr) 46px 72px 72px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -6033,6 +6069,11 @@
   background: var(--fab-mv2-surface-2);
 }
 
+.fabricate-manager-v2 .manager-v2-environment-row {
+  position: relative;
+  min-height: 88px;
+}
+
 .fabricate-manager-v2 .manager-v2-recipe-row:hover,
 .fabricate-manager-v2 .manager-v2-component-row:hover,
 .fabricate-manager-v2 .manager-v2-environment-row:hover,
@@ -6171,7 +6212,9 @@
 }
 
 .fabricate-manager-v2 .manager-v2-environment-identity {
-  grid-template-columns: 72px minmax(0, 1fr);
+  grid-template-columns: 120px minmax(0, 1fr);
+  align-self: center;
+  min-height: 68px;
 }
 
 .fabricate-manager-v2 .manager-v2-system-icon,
@@ -6225,8 +6268,10 @@
 }
 
 .fabricate-manager-v2 .manager-v2-environment-thumb {
-  width: 72px;
-  height: 48px;
+  display: block;
+  align-self: center;
+  width: 120px;
+  height: 68px;
 }
 
 .fabricate-manager-v2 .manager-v2-environment-preview {
@@ -6965,26 +7010,74 @@
 
 .fabricate-manager-v2 .manager-v2-environment-actions {
   display: grid;
-  grid-template-columns: 72px 34px;
+  grid-template-columns: 72px;
   gap: 6px;
   align-items: stretch;
   justify-content: end;
   width: 100%;
 }
 
-.fabricate-manager-v2 .manager-v2-environment-action-grid,
-.fabricate-manager-v2 .manager-v2-environment-reorder-stack {
+.fabricate-manager-v2 .manager-v2-environment-action-grid {
   display: grid;
+  grid-template-columns: repeat(2, 34px);
+  grid-auto-rows: 34px;
   gap: 4px;
 }
 
-.fabricate-manager-v2 .manager-v2-environment-action-grid {
-  grid-template-columns: repeat(2, 34px);
-  grid-auto-rows: 34px;
+.fabricate-manager-v2 .manager-v2-environment-reorder-stack {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-rows: 18px 18px;
+  align-content: space-between;
+  pointer-events: none;
 }
 
-.fabricate-manager-v2 .manager-v2-environment-reorder-stack {
-  grid-template-rows: repeat(2, 34px);
+.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button {
+  width: 100%;
+  height: 18px;
+  min-height: 18px;
+  border-right: 0;
+  border-left: 0;
+  border-radius: 0;
+  color: var(--fab-mv2-text);
+  background: var(--fab-overlay-dark-32);
+  flex: 0 0 auto;
+  opacity: 0;
+  pointer-events: auto;
+  transition: opacity 120ms ease;
+}
+
+.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:hover,
+.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:focus-visible {
+  opacity: 1;
+}
+
+.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:focus,
+.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:first-child {
+  border-top: 0;
+  border-radius: 8px 8px 0 0;
+}
+
+.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:last-child {
+  border-bottom: 0;
+  border-radius: 0 0 8px 8px;
+}
+
+.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:disabled {
+  opacity: 0;
+  pointer-events: auto;
+}
+
+.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:disabled:hover,
+.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:disabled:focus-visible {
+  opacity: 1;
 }
 
 .fabricate-manager-v2 .manager-v2-toggle {
@@ -8121,11 +8214,116 @@
 .fabricate-manager-v2 .manager-v2-gathering-panel {
   display: grid;
   gap: 12px;
+  min-height: 0;
   min-width: 0;
+  overflow: hidden;
+}
+
+.fabricate-manager-v2 .manager-v2-gathering-panel-environments {
+  grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
 .fabricate-manager-v2 .manager-v2-gathering-placeholder {
   min-height: 280px;
+}
+
+.fabricate-manager-v2 .manager-v2-gathering-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fabricate-manager-v2 .manager-v2-gathering-rules-card {
+  border-color: var(--fab-warning-border);
+  background: var(--fab-overlay-light-08);
+}
+
+.fabricate-manager-v2 .manager-v2-rules-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-rule-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-rule-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  color: var(--fab-warning-text);
+  background: var(--fab-overlay-dark-20);
+}
+
+.fabricate-manager-v2 .manager-v2-rule-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  color: var(--fab-mv2-text);
+  font-size: 0.82rem;
+  line-height: 1.3;
+}
+
+.fabricate-manager-v2 .manager-v2-rule-copy strong {
+  font-size: 0.84rem;
+  line-height: 1.2;
+}
+
+.fabricate-manager-v2 .manager-v2-rule-copy span {
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.75rem;
+}
+
+.fabricate-manager-v2 .manager-v2-rule-field {
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  color: var(--fab-mv2-text);
+  font-size: 0.82rem;
+  font-weight: 400;
+}
+
+.fabricate-manager-v2 .manager-v2-rule-field select,
+.fabricate-manager-v2 .manager-v2-rule-stepper input {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-bg);
+  font-weight: 400;
+}
+
+.fabricate-manager-v2 .manager-v2-rule-field select {
+  padding: 0 10px;
+}
+
+.fabricate-manager-v2 .manager-v2-rule-stepper {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 34px;
+  gap: 6px;
+  padding-left: 42px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-rule-stepper input {
+  padding: 0 8px;
+  text-align: center;
 }
 
 .fabricate-manager-v2 .manager-v2-empty {

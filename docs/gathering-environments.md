@@ -30,8 +30,6 @@ Each environment belongs to one crafting system and stores:
 | **Region** | Optional single region tag used to match reusable tasks and hazards |
 | **Biomes** | Optional biome tags used to match reusable tasks and hazards |
 | **Danger Tags** | Optional danger tags used to match reusable hazards |
-| **Hazard Selection Mode** | `allDrops` or `highestRankedDrop` for matched hazards |
-| **Hazard Policy** | Whether dropped hazards are success-with-hazard or failure-with-hazard |
 | **Scene UUID** | Optional scene gate for environments tied to a specific scene |
 
 Scene UUIDs are kept as authored text. If a saved scene reference no longer resolves, the Environments tab keeps the UUID visible and preserves it on save until the GM clears or replaces it. Players remain blocked by an unresolved scene gate until the reference is repaired.
@@ -55,6 +53,20 @@ Mutation methods require a GM user, validate values against the configured weath
 
 When gathering is enabled and no custom values exist, Fabricate seeds default vocabularies for biomes, danger, weather, and time of day. Regions are intentionally empty by default because campaign geography is world-specific. Empty task or hazard match tags mean "matches any" for that dimension.
 
+## Gathering Rules
+
+Manager V2 stores d100 gathering rules per selected crafting system under `gatheringConfig.systems[systemId].rules`. These settings are edited from the Gathering Settings tab and are authoritative for every d100 gathering environment in that system once authored.
+
+| Rule | Values |
+|:-----|:-------|
+| **Rewards** | `highestRankedDrop`, `allDrops`, or `limitedDrops` |
+| **Reward limit** | Positive integer used when Rewards is `limitedDrops` |
+| **Hazards** | `highestRankedDrop`, `allDrops`, or `limitedDrops` |
+| **Hazard limit** | Positive integer used when Hazards is `limitedDrops` |
+| **Hazard outcome** | `successWithHazard` or `failureWithHazard` |
+
+Legacy per-task item selection, per-environment hazard selection, and per-environment hazard policy fields may still be read when an existing system has no `rules` object. Manager V2 no longer exposes those fields as authoring controls.
+
 ## Reusable Task And Hazard Libraries
 
 Manager V2 exposes reusable task and hazard authoring for the selected crafting system. Environments compose those reusable records by matching environment region, biome, danger, and the current global weather/time state. GMs can toggle matched task and hazard records on or off per environment; row details stay behind expandable library rows so the environment workspace remains scan-friendly.
@@ -65,8 +77,7 @@ Reusable task records support:
 |:------|:------------|
 | **Name, description, image, enabled** | GM-authored task identity and availability |
 | **Region, biomes, weather, time of day** | Optional match tags; empty means any |
-| **Drop rows** | Ordered d100 item/component rows with quantity and `dropRate` from 1 to 100 |
-| **Item selection mode** | `highestRankedDrop` awards the first dropped row; `allDrops` awards every dropped row |
+| **Drop rows** | Ordered d100 item/component rows with quantity and `dropRate` from 1 to 100. Authored order is the rank used by system Gathering Rules. |
 | **Stamina and modifiers** | Optional stamina cost and gathering roll modifier provider |
 
 Reusable hazard records support:
@@ -84,7 +95,7 @@ Disabled reusable tasks and hazards never match for player gathering.
 
 Reusable gathering tasks use gathering-native d100 rows. For each enabled item row, Fabricate rolls `d100 + gatheringModifier`; the row drops when the effective roll is at least `101 - dropRate`. Matched enabled hazards roll independently with `d100 + hazardModifier` and the same threshold rule.
 
-Task item selection mode chooses all dropped item rows or only the highest-ranked dropped row. Environment hazard selection mode chooses all dropped hazards or only the highest-ranked dropped hazard. The environment hazard policy decides whether a dropped hazard produces success-with-hazard or failure-with-hazard. If no hazards are enabled or matched, the environment is mechanically safe even when danger tags are present.
+The selected crafting system's Gathering Rules choose reward and hazard rows after rolling. `highestRankedDrop` selects the first successful row by authored order, `allDrops` selects every successful row, and `limitedDrops` selects the first `N` successful rows by authored order. `successWithHazard` records selected hazards while the gathering still succeeds. `failureWithHazard` records selected hazards and makes the attempt fail, so no selected rewards are awarded. If no hazards are enabled or matched, the environment is mechanically safe even when danger tags are present.
 
 ## Task Authoring
 

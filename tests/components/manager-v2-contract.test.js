@@ -237,20 +237,23 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'Define reusable tasks and hazards before creating environments, then attach those building blocks to each location players can gather from.'
     );
     assert.ok(environmentsBrowserSource.includes('manager-v2-gathering-tabs'), 'gathering page should render local section tabs');
-    assert.ok(environmentsBrowserSource.includes("activeGatheringTab = 'environments'"), 'gathering page should default and reset to environments');
+    assert.ok(rootSource.includes("let activeGatheringTab = $state('environments')"), 'root should own gathering tab state for inspector coordination');
+    assert.ok(environmentsBrowserSource.includes("activeGatheringTab = 'environments'"), 'gathering page should accept environments as the default active tab');
+    assert.ok(environmentsBrowserSource.includes('onSelectGatheringTab(tabId)'), 'gathering page should report tab changes to the root');
+    assert.ok(rootSource.includes('data-gathering-inspector-placeholder'), 'right inspector should render placeholders for non-environment gathering tabs');
     assert.ok(environmentsBrowserSource.includes('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksPlaceholderHint'), 'gathering placeholder copy should be localized');
     assert.ok(environmentsBrowserSource.includes("selectGatheringTab('tasks')"), 'empty environments guidance should route to the Tasks tab');
-    assert.ok(environmentsBrowserSource.includes("selectGatheringTab('encounters')"), 'empty environments guidance should route hazards to the Encounters tab');
+    assert.ok(environmentsBrowserSource.includes("selectGatheringTab('encounters')"), 'empty environments guidance should route hazards to the Hazards tab');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Label, 'Gathering sections');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Environments, 'Environments');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Tasks, 'Tasks');
-    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Encounters, 'Encounters');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Encounters, 'Hazards');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Settings, 'Settings');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.OpenTasks, 'Review tasks');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.OpenHazards, 'Review hazards');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksPlaceholderHint, 'Reusable gathering task management is planned for a later slice.');
-    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.EncountersPlaceholderHint, 'Encounter and hazard authoring is planned for a later slice.');
-    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderHint, 'Gathering-wide configuration is planned for a later slice.');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.EncountersPlaceholderHint, 'Reusable hazard authoring is planned for a later slice.');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderHint, 'Set system-level d100 reward and hazard rules for gathering.');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Title, 'Plan gathering content');
     assert.equal(
       lang.FABRICATE.Admin.ManagerV2.Environment.EmptySetup.StepHazards,
@@ -446,6 +449,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'gatheringConfig={$viewState.gatheringConfig}',
       'onUpdateGatheringConditions={store.updateGatheringConditions}',
       'onUpdateGatheringVocabulary={store.updateGatheringVocabulary}',
+      'onUpdateGatheringRules={store.updateGatheringRules}',
       'onAddGatheringLibraryTask={store.addGatheringLibraryTask}',
       'onUpdateGatheringLibraryTask={store.updateGatheringLibraryTask}',
       'onDeleteGatheringLibraryTask={store.deleteGatheringLibraryTask}',
@@ -462,8 +466,6 @@ describe('CraftingSystemManagerV2 source contract', () => {
       "updateField('region'",
       "updateField('biomes'",
       "updateField('dangerTags'",
-      "updateField('hazardSelectionMode'",
-      "updateField('hazardPolicy'",
       'libraryRecordEnabled(task.id',
       'toggleLibraryRecord(task.id',
       'libraryRecordEnabled(hazard.id',
@@ -474,6 +476,14 @@ describe('CraftingSystemManagerV2 source contract', () => {
     ]) {
       assert.ok(environmentEditSource.includes(snippet), `environment editor should include ${snippet}`);
     }
+    assert.ok(rootSource.includes('data-gathering-inspector-rules'), 'root should render the settings rules inspector');
+    assert.ok(rootSource.includes('updateSelectedGatheringRules'), 'root should wire rule updates');
+    assert.ok(rootSource.includes('manager-v2-rule-copy'), 'root should render rule descriptions beside inspector icons');
+    assert.ok(rootSource.includes('data-gathering-rule-stepper="rewardLimit"'), 'root should render the reward limit stepper');
+    assert.ok(rootSource.includes('data-gathering-rule-stepper="hazardLimit"'), 'root should render the hazard limit stepper');
+    assert.ok(!environmentEditSource.includes("updateField('hazardSelectionMode'"), 'environment editor should not expose per-environment hazard selection rules');
+    assert.ok(!environmentEditSource.includes("updateField('hazardPolicy'"), 'environment editor should not expose per-environment hazard policy');
+    assert.ok(!environmentEditSource.includes('ItemSelectionMode'), 'environment editor should not expose per-task item selection rules');
     assert.ok(!environmentEditSource.includes('weatherFilter'), 'weather should not be an environment browse filter');
     assert.ok(!environmentEditSource.includes('timeOfDayFilter'), 'time of day should not be an environment browse filter');
   });
