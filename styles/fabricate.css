@@ -7031,6 +7031,10 @@
   gap: 4px;
 }
 
+.fabricate-manager-v2 .manager-v2-environment-action-grid .manager-v2-icon-button.is-danger {
+  grid-column: 2;
+}
+
 .fabricate-manager-v2 .manager-v2-environment-reorder-stack {
   position: absolute;
   inset: 0;

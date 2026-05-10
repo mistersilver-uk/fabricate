@@ -513,6 +513,10 @@ test('manager-v2 environments browser and edit route define compact responsive g
   assert.ok(!actionsBlock.includes('grid-template-columns: 72px 34px;'), 'environment row actions should not reserve a reorder stack column');
   assert.ok(actionGridBlock.includes('grid-template-columns: repeat(2, 34px);'), 'environment edit duplicate delete buttons should sit in a compact grid');
   assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-environment-action-grid .manager-v2-icon-button.is-danger {\n  grid-column: 2;\n}'),
+    'environment delete quick action should sit in the right column below the duplicate action'
+  );
+  assert.ok(
     mediumQuery.includes('.fabricate-manager-v2 .manager-v2-action-group.manager-v2-environment-actions.manager-v2-labeled-cell')
       && mediumQuery.includes('display: grid;')
       && mediumQuery.includes('grid-template-columns: minmax(88px, 0.35fr) 72px;')
