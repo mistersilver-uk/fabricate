@@ -81,6 +81,7 @@ const DEFAULT_GATHERING_VOCABULARIES = Object.freeze({
   weather: ['clear', 'cloudy', 'rain', 'storm', 'snow', 'fog', 'wind'],
   timeOfDay: ['dawn', 'day', 'dusk', 'night']
 });
+const GATHERING_CONDITION_DIMENSIONS = new Set(['weather', 'timeOfDay']);
 const GATHERING_DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops', 'limitedDrops']);
 const GATHERING_HAZARD_POLICIES = new Set(['successWithHazard', 'failureWithHazard']);
 const DEFAULT_GATHERING_RULES = Object.freeze({
@@ -355,6 +356,7 @@ function _normalizeGatheringConfig(raw = {}, randomID = () => Math.random().toSt
   for (const [systemId, systemConfig] of Object.entries(raw?.systems || {})) {
     systems[String(systemId)] = {
       rules: _normalizeGatheringRules(systemConfig?.rules),
+      conditions: _normalizeGatheringSystemConditions(systemConfig?.conditions, { vocabularies, conditions: { weather, timeOfDay } }),
       tasks: (Array.isArray(systemConfig?.tasks) ? systemConfig.tasks : []).map(task => _normalizeGatheringTask(task, randomID)),
       hazards: (Array.isArray(systemConfig?.hazards) ? systemConfig.hazards : []).map(hazard => _normalizeGatheringHazard(hazard, randomID))
     };
@@ -366,6 +368,28 @@ function _normalizeGatheringConfig(raw = {}, randomID = () => Math.random().toSt
       timeOfDay: vocabularies.timeOfDay.includes(timeOfDay) ? timeOfDay : DEFAULT_GATHERING_CONDITIONS.timeOfDay
     },
     systems
+  };
+}
+
+function _normalizeGatheringConditionSetting(kind, raw = {}, fallback = {}) {
+  const fallbackValues = fallback?.vocabularies?.[kind] || DEFAULT_GATHERING_VOCABULARIES[kind] || [];
+  const enabled = raw?.enabled !== false;
+  const explicitValues = Array.isArray(raw?.values);
+  const normalizedValues = explicitValues ? _normalizeGatheringTagList(raw.values) : _seedGatheringVocabulary(raw?.values, fallbackValues);
+  const values = normalizedValues.length > 0 || !enabled ? normalizedValues : [...fallbackValues];
+  const fallbackCurrent = _normalizeGatheringTag(fallback?.conditions?.[kind]) || DEFAULT_GATHERING_CONDITIONS[kind];
+  const requestedCurrent = _normalizeGatheringTag(raw?.current) || fallbackCurrent;
+  return {
+    enabled,
+    current: values.includes(requestedCurrent) ? requestedCurrent : values[0] || DEFAULT_GATHERING_CONDITIONS[kind],
+    values
+  };
+}
+
+function _normalizeGatheringSystemConditions(raw = {}, fallback = {}) {
+  return {
+    weather: _normalizeGatheringConditionSetting('weather', raw?.weather, fallback),
+    timeOfDay: _normalizeGatheringConditionSetting('timeOfDay', raw?.timeOfDay, fallback)
   };
 }
 
@@ -1258,8 +1282,14 @@ export function createAdminStore(services) {
     const id = String(systemId || get(selectedSystemId) || '');
     if (!id) return null;
     config.systems = config.systems || {};
-    config.systems[id] = config.systems[id] || { rules: _normalizeGatheringRules(), tasks: [], hazards: [] };
+    config.systems[id] = config.systems[id] || {
+      rules: _normalizeGatheringRules(),
+      conditions: _normalizeGatheringSystemConditions(null, config),
+      tasks: [],
+      hazards: []
+    };
     config.systems[id].rules = _normalizeGatheringRules(config.systems[id].rules);
+    config.systems[id].conditions = _normalizeGatheringSystemConditions(config.systems[id].conditions, config);
     config.systems[id].tasks = Array.isArray(config.systems[id].tasks) ? config.systems[id].tasks : [];
     config.systems[id].hazards = Array.isArray(config.systems[id].hazards) ? config.systems[id].hazards : [];
     return config.systems[id];
@@ -1271,7 +1301,7 @@ export function createAdminStore(services) {
     return Array.isArray(values) ? values.filter(Boolean) : [];
   }
 
-  function _gatheringLibraryRecordMatchesEnvironment(record, environment, conditions, includeDanger = false) {
+  function _gatheringLibraryRecordMatchesEnvironment(record, environment, conditions, includeDanger = false, conditionSettings = null) {
     const environmentRegion = _normalizeGatheringTag(environment?.region);
     const environmentBiomes = _normalizeGatheringTagList(environment?.biomes ?? environment?.biome);
     const environmentDanger = _normalizeGatheringTagList(environment?.dangerTags ?? environment?.risk);
@@ -1281,8 +1311,8 @@ export function createAdminStore(services) {
     const recordDanger = _normalizeGatheringTagList(record?.dangerTags);
     if (record?.region && _normalizeGatheringTag(record.region) !== environmentRegion) return false;
     if (recordBiomes.length > 0 && !recordBiomes.some(tag => environmentBiomes.includes(tag))) return false;
-    if (recordWeather.length > 0 && !recordWeather.includes(_normalizeGatheringTag(conditions?.weather))) return false;
-    if (recordTimeOfDay.length > 0 && !recordTimeOfDay.includes(_normalizeGatheringTag(conditions?.timeOfDay))) return false;
+    if (conditionSettings?.weather?.enabled !== false && recordWeather.length > 0 && !recordWeather.includes(_normalizeGatheringTag(conditions?.weather))) return false;
+    if (conditionSettings?.timeOfDay?.enabled !== false && recordTimeOfDay.length > 0 && !recordTimeOfDay.includes(_normalizeGatheringTag(conditions?.timeOfDay))) return false;
     if (includeDanger && recordDanger.length > 0 && !recordDanger.some(tag => environmentDanger.includes(tag))) return false;
     return true;
   }
@@ -1307,7 +1337,10 @@ export function createAdminStore(services) {
       const enabled = Array.isArray(environment?.[enabledKey]) ? environment[enabledKey].map(String) : [];
       const disabled = Array.isArray(environment?.[disabledKey]) ? environment[disabledKey].map(String) : [];
       const explicitlyReferenced = enabled.includes(String(record.id)) || disabled.includes(String(record.id));
-      const matched = _gatheringLibraryRecordMatchesEnvironment(record, environment, config.conditions, includeDanger)
+      const systemConditions = config.systems?.[String(systemId || '')]?.conditions
+        || _normalizeGatheringSystemConditions(null, config);
+      const currentConditions = _gatheringCurrentConditions(systemConditions);
+      const matched = _gatheringLibraryRecordMatchesEnvironment(record, environment, currentConditions, includeDanger, systemConditions)
         && _environmentAllowsGatheringLibraryRecord(environment, record.id, kind);
       if (!explicitlyReferenced && !matched) continue;
       usages.push({
@@ -1318,6 +1351,13 @@ export function createAdminStore(services) {
       });
     }
     return usages;
+  }
+
+  function _gatheringCurrentConditions(conditionSettings) {
+    return {
+      weather: conditionSettings?.weather?.current || DEFAULT_GATHERING_CONDITIONS.weather,
+      timeOfDay: conditionSettings?.timeOfDay?.current || DEFAULT_GATHERING_CONDITIONS.timeOfDay
+    };
   }
 
   async function _confirmGatheringLibraryRecordDelete({ config, systemId, record, kind }) {
@@ -2883,27 +2923,19 @@ export function createAdminStore(services) {
 
   async function updateGatheringConditions(updates = {}) {
     const config = _currentGatheringConfig();
-    const next = { ...config, conditions: { ...config.conditions } };
+    const systemConfig = _gatheringSystemConfig(config, updates.systemId || get(selectedSystemId));
+    if (!systemConfig) return false;
+    const nextConditions = systemConfig.conditions;
     if (updates.weather !== undefined) {
       const weather = _normalizeGatheringTag(updates.weather);
-      if (config.vocabularies.weather.includes(weather)) next.conditions.weather = weather;
+      if (nextConditions.weather.values.includes(weather)) nextConditions.weather.current = weather;
     }
     if (updates.timeOfDay !== undefined) {
       const timeOfDay = _normalizeGatheringTag(updates.timeOfDay);
-      if (config.vocabularies.timeOfDay.includes(timeOfDay)) next.conditions.timeOfDay = timeOfDay;
+      if (nextConditions.timeOfDay.values.includes(timeOfDay)) nextConditions.timeOfDay.current = timeOfDay;
     }
-    if (typeof services.setGatheringConditions === 'function') {
-      await services.setGatheringConditions(next.conditions);
-      viewState.update(state => ({
-        ...state,
-        gatheringConfig: _clonePlain(_normalizeGatheringConfig({
-          ...config,
-          conditions: next.conditions
-        }, _randomID))
-      }));
-    } else {
-      await _saveGatheringConfig(next);
-    }
+    config.conditions = _gatheringCurrentConditions(nextConditions);
+    await _saveGatheringConfig(config);
     await refresh();
     return true;
   }
@@ -2919,6 +2951,62 @@ export function createAdminStore(services) {
     if (kind === 'timeOfDay' && !config.vocabularies.timeOfDay.includes(config.conditions.timeOfDay)) {
       config.conditions.timeOfDay = config.vocabularies.timeOfDay[0] || DEFAULT_GATHERING_CONDITIONS.timeOfDay;
     }
+    await _saveGatheringConfig(config);
+    await refresh();
+    return true;
+  }
+
+  async function toggleGatheringConditionEnabled(kind, enabled, systemId = get(selectedSystemId)) {
+    if (!GATHERING_CONDITION_DIMENSIONS.has(kind)) return false;
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig) return false;
+    systemConfig.conditions[kind].enabled = enabled === true;
+    await _saveGatheringConfig(config);
+    await refresh();
+    return true;
+  }
+
+  async function addGatheringConditionValue(kind, value, systemId = get(selectedSystemId)) {
+    if (!GATHERING_CONDITION_DIMENSIONS.has(kind)) return false;
+    const tag = _normalizeGatheringTag(value);
+    if (!tag) return false;
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig) return false;
+    const setting = systemConfig.conditions[kind];
+    if (!setting.values.includes(tag)) setting.values = [...setting.values, tag];
+    if (!setting.current) setting.current = tag;
+    config.conditions = _gatheringCurrentConditions(systemConfig.conditions);
+    await _saveGatheringConfig(config);
+    await refresh();
+    return true;
+  }
+
+  async function deleteGatheringConditionValue(kind, value, systemId = get(selectedSystemId)) {
+    if (!GATHERING_CONDITION_DIMENSIONS.has(kind)) return false;
+    const tag = _normalizeGatheringTag(value);
+    if (!tag) return false;
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig) return false;
+    const setting = systemConfig.conditions[kind];
+    if (setting.enabled !== false && setting.values.length <= 1 && setting.values.includes(tag)) return false;
+    const nextValues = setting.values.filter(existing => existing !== tag);
+    if (nextValues.length === setting.values.length) return true;
+    setting.values = nextValues;
+    if (!setting.values.includes(setting.current)) {
+      setting.current = setting.values[0] || DEFAULT_GATHERING_CONDITIONS[kind];
+    }
+    systemConfig.tasks = systemConfig.tasks.map(task => ({
+      ...task,
+      [kind]: _normalizeGatheringTagList(task?.[kind]).filter(existing => existing !== tag)
+    }));
+    systemConfig.hazards = systemConfig.hazards.map(hazard => ({
+      ...hazard,
+      [kind]: _normalizeGatheringTagList(hazard?.[kind]).filter(existing => existing !== tag)
+    }));
+    config.conditions = _gatheringCurrentConditions(systemConfig.conditions);
     await _saveGatheringConfig(config);
     await refresh();
     return true;
@@ -3393,6 +3481,9 @@ export function createAdminStore(services) {
     removeEssence,
     updateGatheringConditions,
     updateGatheringVocabulary,
+    toggleGatheringConditionEnabled,
+    addGatheringConditionValue,
+    deleteGatheringConditionValue,
     updateGatheringRules,
     addGatheringLibraryTask,
     updateGatheringLibraryTask,

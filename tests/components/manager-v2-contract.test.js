@@ -254,6 +254,8 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksPlaceholderHint, 'Reusable gathering task management is planned for a later slice.');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.EncountersPlaceholderHint, 'Reusable hazard authoring is planned for a later slice.');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderHint, 'Set system-level d100 reward and hazard rules for gathering.');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Conditions.TimeOfDayTitle, 'Times of day');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Conditions.WeatherTitle, 'Weather conditions');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Title, 'Plan gathering content');
     assert.equal(
       lang.FABRICATE.Admin.ManagerV2.Environment.EmptySetup.StepHazards,
@@ -449,6 +451,9 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'gatheringConfig={$viewState.gatheringConfig}',
       'onUpdateGatheringConditions={store.updateGatheringConditions}',
       'onUpdateGatheringVocabulary={store.updateGatheringVocabulary}',
+      'onToggleGatheringConditionEnabled={store.toggleGatheringConditionEnabled}',
+      'onAddGatheringConditionValue={store.addGatheringConditionValue}',
+      'onDeleteGatheringConditionValue={store.deleteGatheringConditionValue}',
       'onUpdateGatheringRules={store.updateGatheringRules}',
       'onAddGatheringLibraryTask={store.addGatheringLibraryTask}',
       'onUpdateGatheringLibraryTask={store.updateGatheringLibraryTask}',
@@ -477,6 +482,12 @@ describe('CraftingSystemManagerV2 source contract', () => {
       assert.ok(environmentEditSource.includes(snippet), `environment editor should include ${snippet}`);
     }
     assert.ok(rootSource.includes('data-gathering-inspector-rules'), 'root should render the settings rules inspector');
+    assert.ok(environmentsBrowserSource.includes('data-gathering-condition-panel={condition.kind}'), 'settings tab should render condition vocabulary panels');
+    assert.ok(environmentsBrowserSource.includes('onToggleGatheringConditionEnabled?.'), 'settings condition panels should wire matching toggles');
+    assert.ok(environmentsBrowserSource.includes('onAddGatheringConditionValue?.'), 'settings condition panels should wire value additions');
+    assert.ok(environmentsBrowserSource.includes('onDeleteGatheringConditionValue?.'), 'settings condition panels should wire value deletion');
+    assert.ok(environmentEditSource.includes("{#each ['regions', 'biomes', 'danger'] as vocabulary"), 'environment editor should keep only non-weather generic vocabulary CSV controls');
+    assert.ok(!environmentEditSource.includes("{#each ['regions', 'biomes', 'danger', 'weather', 'timeOfDay'] as vocabulary"), 'environment editor should not expose weather/time generic vocabulary CSV controls');
     assert.ok(rootSource.includes('updateSelectedGatheringRules'), 'root should wire rule updates');
     assert.ok(rootSource.includes('manager-v2-rule-copy'), 'root should render rule descriptions beside inspector icons');
     assert.ok(rootSource.includes('data-gathering-rule-stepper="rewardLimit"'), 'root should render the reward limit stepper');

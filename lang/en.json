@@ -839,6 +839,20 @@
             "DecreaseHazardLimit": "Decrease hazard limit",
             "IncreaseHazardLimit": "Increase hazard limit"
           },
+          "Conditions": {
+            "TimeOfDayTitle": "Times of day",
+            "WeatherTitle": "Weather conditions",
+            "CurrentTimeOfDay": "Current time",
+            "CurrentWeather": "Current weather",
+            "AddTimeOfDay": "Add time of day",
+            "AddWeather": "Add weather",
+            "TimeOfDayPlaceholder": "e.g. midnight",
+            "WeatherPlaceholder": "e.g. ashfall",
+            "EnableMatching": "Enable matching",
+            "DisableMatching": "Disable matching",
+            "Values": "Condition values",
+            "RemoveValue": "Remove {value}"
+          },
           "Filters": "Environment filters",
           "SearchPlaceholder": "Search environments...",
           "SearchLabel": "Search environments",

@@ -1496,6 +1496,7 @@
         {selectedEnvironmentId}
         selectedSystemName={selectedSystem?.name || ''}
         {selectedSystemId}
+        gatheringConfig={$viewState.gatheringConfig}
         sceneOptions={selectedSystem?.sceneOptions || []}
         {shouldUseEnvironmentDraftForDisplay}
         {activeGatheringTab}
@@ -1507,6 +1508,10 @@
         onDeleteEnvironment={(id) => deleteEnvironment(id)}
         onMoveEnvironment={(id, direction) => moveEnvironment(id, direction)}
         onToggleEnvironmentEnabled={(id, enabled) => toggleEnvironmentEnabled(id, enabled)}
+        onUpdateGatheringConditions={store.updateGatheringConditions}
+        onToggleGatheringConditionEnabled={store.toggleGatheringConditionEnabled}
+        onAddGatheringConditionValue={store.addGatheringConditionValue}
+        onDeleteGatheringConditionValue={store.deleteGatheringConditionValue}
       />
     {:else if currentView === 'environment-edit' && selectedSystem}
       <main class="manager-v2-main manager-v2-environment-edit-main" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.EditTitle', 'Edit environment')}>

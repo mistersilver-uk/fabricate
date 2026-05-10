@@ -186,6 +186,14 @@ GatheringConditionConfig = {
     weather: string[],
     timeOfDay: string[],
   },
+  systems: {
+    [systemId: string]: {
+      conditions: {
+        weather: { enabled: boolean, current: string, values: string[] },
+        timeOfDay: { enabled: boolean, current: string, values: string[] },
+      },
+    },
+  },
 }
 ```
 
@@ -197,16 +205,23 @@ GatheringConditionConfig = {
 4. Default weather tags are `clear`, `cloudy`, `rain`, `storm`, `snow`, `fog`, and `wind`.
 5. Default time-of-day tags are `dawn`, `day`, `dusk`, and `night`.
 6. GM-customized vocabularies are preserved. Defaults are seeded only when a custom list is absent or empty.
-7. `game.fabricate.gathering.getConditions()` returns current conditions and available tag vocabularies for GM and player-facing callers.
-8. `game.fabricate.gathering.setWeather(weatherTag)`, `setTimeOfDay(timeOfDayTag)`, and `setConditions({ weather, timeOfDay })` require a GM user, validate tags against the configured vocabularies, persist the setting, dispatch `fabricate.gathering.conditionsUpdated`, and refresh gathering listings.
-9. Player-facing callers may read conditions but may not mutate them.
-10. Condition values are authored or selected by the GM unless an approved integration provider supplies them.
-11. Environments may use weather/time as matching dimensions for reusable tasks and hazards, but player environment browse filters must not expose weather/time as environment filters.
-12. Condition state may modify task availability, result yield, check difficulty, stamina cost, risk, or encounter chance through declarative or provider-driven configuration.
-13. Fabricate core must not hardcode game-system-specific weather, time, skill, or stamina formulas.
-14. A gathering attempt should snapshot relevant condition state when the attempt starts so active runs and history can explain what conditions affected the attempt.
-15. Player-facing UI may show beneficial or harmful condition notes only when those notes are not hidden by blind task or visibility rules.
-16. Changing current global conditions must not retroactively rewrite completed gathering history.
+7. Each `gatheringConfig.systems[systemId].conditions` entry owns selected-system weather and time-of-day matching settings with `enabled`, `current`, and `values` fields.
+8. Missing per-system weather settings default to enabled, current `clear`, and values `clear`, `cloudy`, `rain`, `storm`, `snow`, `fog`, and `wind`.
+9. Missing per-system time-of-day settings default to enabled, current `day`, and values `dawn`, `day`, `dusk`, and `night`.
+10. Legacy top-level `conditions` and `vocabularies.weather` / `vocabularies.timeOfDay` remain backward-compatible inputs for normalizing missing per-system settings.
+11. Deleting a per-system condition value removes it from reusable tasks and hazards in that system only.
+12. Deleting the last value of an enabled per-system condition dimension must be rejected; GMs may disable that dimension instead.
+13. `game.fabricate.gathering.getConditions()` returns current conditions and available tag vocabularies for GM and player-facing callers.
+14. `game.fabricate.gathering.setWeather(weatherTag)`, `setTimeOfDay(timeOfDayTag)`, and `setConditions({ weather, timeOfDay })` require a GM user, validate tags against the configured vocabularies, persist the setting, dispatch `fabricate.gathering.conditionsUpdated`, and refresh gathering listings.
+15. Player-facing callers may read conditions but may not mutate them.
+16. Condition values are authored or selected by the GM unless an approved integration provider supplies them.
+17. Environments may use weather/time as matching dimensions for reusable tasks and hazards, but player environment browse filters must not expose weather/time as environment filters.
+18. Disabled per-system weather or time-of-day dimensions are ignored during reusable task and hazard matching.
+19. Condition state may modify task availability, result yield, check difficulty, stamina cost, risk, or encounter chance through declarative or provider-driven configuration.
+20. Fabricate core must not hardcode game-system-specific weather, time, skill, or stamina formulas.
+21. A gathering attempt should snapshot relevant condition state when the attempt starts so active runs and history can explain what conditions affected the attempt.
+22. Player-facing UI may show beneficial or harmful condition notes only when those notes are not hidden by blind task or visibility rules.
+23. Changing current global conditions must not retroactively rewrite completed gathering history.
 
 ## Reusable Gathering Task Library
 

@@ -8,6 +8,7 @@ const DEFAULT_VOCABULARIES = Object.freeze({
   weather: ['clear', 'cloudy', 'rain', 'storm', 'snow', 'fog', 'wind'],
   timeOfDay: ['dawn', 'day', 'dusk', 'night']
 });
+const CONDITION_DIMENSIONS = ['weather', 'timeOfDay'];
 const DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops', 'limitedDrops']);
 const LEGACY_DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops']);
 const HAZARD_POLICIES = new Set(['successWithHazard', 'failureWithHazard']);
@@ -103,6 +104,8 @@ export class GatheringRichStateService {
     const config = this._config();
     const systemId = String(system?.id || environment.craftingSystemId);
     const libraries = config.systems?.[systemId] || {};
+    const systemConditions = resolveSystemConditionSettings(config, systemId);
+    const currentConditions = conditionSettingsToCurrent(systemConditions);
     const rawSystemConfig = rawConfig?.systems?.[systemId] || {};
     const hasSystemRules = rawSystemConfig?.rules && typeof rawSystemConfig.rules === 'object' && !Array.isArray(rawSystemConfig.rules);
     const rules = hasSystemRules
@@ -116,19 +119,19 @@ export class GatheringRichStateService {
       ...normalizeList(environment.tasks),
       ...normalizeList(libraries.tasks)
         .filter(task => task?.enabled !== false)
-        .filter(task => this._recordMatchesEnvironment(task, environment, config.conditions, { includeDanger: false }))
+        .filter(task => this._recordMatchesEnvironment(task, environment, currentConditions, { includeDanger: false, conditionSettings: systemConditions }))
         .filter(task => this._environmentAllowsLibraryRecord(environment, task.id, 'task'))
         .map(task => this._libraryTaskToRuntimeTask(task))
     ];
     const hazards = normalizeList(libraries.hazards)
       .filter(hazard => hazard?.enabled !== false)
-      .filter(hazard => this._recordMatchesEnvironment(hazard, environment, config.conditions, { includeDanger: true }))
+      .filter(hazard => this._recordMatchesEnvironment(hazard, environment, currentConditions, { includeDanger: true, conditionSettings: systemConditions }))
       .filter(hazard => this._environmentAllowsLibraryRecord(environment, hazard.id, 'hazard'))
       .map(hazard => normalizeHazard(hazard));
 
     return {
       ...cloneJson(environment),
-      conditions: cloneJson(config.conditions),
+      conditions: cloneJson(currentConditions),
       biomes: normalizeTagList(environment.biomes ?? environment.biome),
       dangerTags: normalizeTagList(environment.dangerTags ?? environment.risk),
       tasks,
@@ -379,14 +382,14 @@ export class GatheringRichStateService {
     return evidence;
   }
 
-  _recordMatchesEnvironment(record, environment, conditions, { includeDanger }) {
+  _recordMatchesEnvironment(record, environment, conditions, { includeDanger, conditionSettings = null }) {
     const envRegion = normalizeTag(environment?.region);
     const envBiomes = normalizeTagList(environment?.biomes ?? environment?.biome);
     const envDanger = normalizeTagList(environment?.dangerTags ?? environment?.risk);
     if (record.region && normalizeTag(record.region) !== envRegion) return false;
     if (normalizeTagList(record.biomes).length > 0 && !hasAny(normalizeTagList(record.biomes), envBiomes)) return false;
-    if (normalizeTagList(record.weather).length > 0 && !normalizeTagList(record.weather).includes(normalizeTag(conditions.weather))) return false;
-    if (normalizeTagList(record.timeOfDay).length > 0 && !normalizeTagList(record.timeOfDay).includes(normalizeTag(conditions.timeOfDay))) return false;
+    if (conditionSettings?.weather?.enabled !== false && normalizeTagList(record.weather).length > 0 && !normalizeTagList(record.weather).includes(normalizeTag(conditions.weather))) return false;
+    if (conditionSettings?.timeOfDay?.enabled !== false && normalizeTagList(record.timeOfDay).length > 0 && !normalizeTagList(record.timeOfDay).includes(normalizeTag(conditions.timeOfDay))) return false;
     if (includeDanger && normalizeTagList(record.dangerTags).length > 0 && !hasAny(normalizeTagList(record.dangerTags), envDanger)) return false;
     return true;
   }
@@ -497,6 +500,7 @@ function normalizeGatheringConfig(raw = {}) {
   for (const [systemId, config] of Object.entries(raw?.systems || {})) {
     systems[String(systemId)] = {
       rules: normalizeGatheringRules(config?.rules),
+      conditions: normalizeSystemConditions(config?.conditions, { vocabularies, conditions: { weather, timeOfDay } }),
       tasks: normalizeList(config?.tasks).map(normalizeLibraryTask),
       hazards: normalizeList(config?.hazards).map(normalizeHazard)
     };
@@ -508,6 +512,37 @@ function normalizeGatheringConfig(raw = {}) {
       timeOfDay: vocabularies.timeOfDay.includes(timeOfDay) ? timeOfDay : DEFAULT_CONDITIONS.timeOfDay
     },
     systems
+  };
+}
+
+function normalizeSystemConditions(raw = {}, fallback = {}) {
+  const normalized = {};
+  for (const kind of CONDITION_DIMENSIONS) {
+    const fallbackValues = fallback?.vocabularies?.[kind] || DEFAULT_VOCABULARIES[kind];
+    const enabled = raw?.[kind]?.enabled !== false;
+    const explicitValues = Array.isArray(raw?.[kind]?.values);
+    const normalizedValues = explicitValues ? normalizeTagList(raw?.[kind]?.values) : seedVocabulary(raw?.[kind]?.values, fallbackValues);
+    const values = normalizedValues.length > 0 || !enabled ? normalizedValues : [...fallbackValues];
+    const fallbackCurrent = normalizeTag(fallback?.conditions?.[kind]) || DEFAULT_CONDITIONS[kind];
+    const requestedCurrent = normalizeTag(raw?.[kind]?.current) || fallbackCurrent;
+    normalized[kind] = {
+      enabled,
+      current: values.includes(requestedCurrent) ? requestedCurrent : values[0] || DEFAULT_CONDITIONS[kind],
+      values
+    };
+  }
+  return normalized;
+}
+
+function resolveSystemConditionSettings(config, systemId) {
+  return config?.systems?.[systemId]?.conditions
+    || normalizeSystemConditions(null, { vocabularies: config?.vocabularies, conditions: config?.conditions });
+}
+
+function conditionSettingsToCurrent(settings) {
+  return {
+    weather: settings?.weather?.current || DEFAULT_CONDITIONS.weather,
+    timeOfDay: settings?.timeOfDay?.current || DEFAULT_CONDITIONS.timeOfDay
   };
 }
 

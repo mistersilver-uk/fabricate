@@ -205,6 +205,43 @@ test('task and hazard libraries match environments by tags and global conditions
   assert.deepEqual(composed.hazards.map(hazard => hazard.id), ['hazard-thorns']);
 });
 
+test('disabled per-system weather and time matching ignores task and hazard condition tags', async () => {
+  const { service } = makeRichState({
+    config: {
+      conditions: { weather: 'clear', timeOfDay: 'day' },
+      systems: {
+        'system-a': {
+          conditions: {
+            weather: { enabled: false, current: 'clear', values: ['clear', 'rain'] },
+            timeOfDay: { enabled: false, current: 'day', values: ['day', 'night'] }
+          },
+          tasks: [{
+            id: 'task-rain-night',
+            name: 'Rain Night Forage',
+            weather: ['rain'],
+            timeOfDay: ['night'],
+            dropRows: [{ id: 'drop-herb', componentId: 'herb', quantity: 1, dropRate: 60 }]
+          }],
+          hazards: [{
+            id: 'hazard-rain-night',
+            name: 'Rain Night Hazard',
+            dangerTags: ['hazardous'],
+            weather: ['rain'],
+            timeOfDay: ['night'],
+            dropRate: 25
+          }]
+        }
+      }
+    }
+  });
+
+  const composed = service.composeEnvironment(environment(), system);
+
+  assert.deepEqual(composed.conditions, { weather: 'clear', timeOfDay: 'day' });
+  assert.deepEqual(composed.tasks.map(task => task.id), ['task-rain-night']);
+  assert.deepEqual(composed.hazards.map(hazard => hazard.id), ['hazard-rain-night']);
+});
+
 test('environment task and hazard toggles preserve mixed-case library IDs', async () => {
   const store = makeEnvironmentStore();
   const saved = await store.create(environment({

@@ -226,6 +226,25 @@ test('manager-v2 gathering rules inspector stacks descriptions above normal-weig
   assert.equal(css.includes('.fabricate-manager-v2 .manager-v2-gathering-settings-summary'), false, 'settings center panel should not keep the duplicated rules summary');
 });
 
+test('manager-v2 gathering settings condition panels use a two-column responsive grid', () => {
+  const settingsBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-settings');
+  const panelBlock = blockFor('.fabricate-manager-v2 .manager-v2-condition-panel');
+  const addBlock = blockFor('.fabricate-manager-v2 .manager-v2-condition-add');
+  const pillBlock = blockFor('.fabricate-manager-v2 .manager-v2-condition-pill');
+  const mediumQuery = css.slice(css.indexOf('@container fabricate-manager-v2 (max-width: 1120px)'));
+
+  assert.ok(settingsBlock.includes('grid-template-columns: repeat(2, minmax(0, 1fr));'), 'settings conditions should sit side by side at normal widths');
+  assert.ok(settingsBlock.includes('align-items: start;'), 'condition panels should stay content-height instead of stretching');
+  assert.ok(panelBlock.includes('align-content: start;'), 'condition panel content should pack to its natural height');
+  assert.ok(addBlock.includes('grid-template-columns: minmax(0, 1fr) 34px;'), 'condition add controls should reserve a stable icon button column');
+  assert.ok(pillBlock.includes('grid-template-columns: minmax(0, 1fr) 22px;'), 'condition pills should reserve a compact remove button');
+  assert.ok(
+    mediumQuery.includes('.fabricate-manager-v2 .manager-v2-gathering-settings')
+      && mediumQuery.includes('grid-template-columns: minmax(0, 1fr);'),
+    'condition panels should stack at medium widths'
+  );
+});
+
 test('manager-v2 recipes browser defines compact responsive table geometry', () => {
   const tableBlock = blockFor('.fabricate-manager-v2 .manager-v2-recipes-table');
   const identityBlock = blockFor('.fabricate-manager-v2 .manager-v2-recipe-identity');

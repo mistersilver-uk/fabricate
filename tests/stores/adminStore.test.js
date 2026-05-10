@@ -1943,6 +1943,16 @@ describe('createAdminStore', () => {
 
       const config = services._store.gatheringConfig;
       assert.deepEqual(config.conditions, { weather: 'rain', timeOfDay: 'night' });
+      assert.deepEqual(config.systems.sys1.conditions.weather, {
+        enabled: true,
+        current: 'rain',
+        values: ['clear', 'cloudy', 'rain', 'storm', 'snow', 'fog', 'wind']
+      });
+      assert.deepEqual(config.systems.sys1.conditions.timeOfDay, {
+        enabled: true,
+        current: 'night',
+        values: ['dawn', 'day', 'dusk', 'night']
+      });
       assert.deepEqual(config.vocabularies.regions, ['north', 'south']);
       assert.equal(config.systems.sys1.tasks[0].name, 'Rain Herbs');
       assert.deepEqual(config.systems.sys1.tasks[0].dropRows[0], {
@@ -1956,6 +1966,48 @@ describe('createAdminStore', () => {
       });
       assert.equal(config.systems.sys1.hazards[0].name, 'Thorns');
       assert.equal(get(store.viewState).gatheringConfig.systems.sys1.hazards[0].dropRate, 30);
+    });
+
+    it('manages selected-system gathering weather and time vocabulary without affecting other systems', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      services._store.gatheringConfig = {
+        systems: {
+          sys1: {
+            conditions: {
+              weather: { enabled: true, current: 'rain', values: ['rain'] },
+              timeOfDay: { enabled: true, current: 'night', values: ['night', 'day'] }
+            },
+            tasks: [{ id: 'task-rain', name: 'Rain', weather: ['rain'], timeOfDay: ['night'], dropRows: [] }],
+            hazards: [{ id: 'hazard-rain', name: 'Rain Hazard', weather: ['rain'], timeOfDay: ['night'], dropRate: 50 }]
+          },
+          sys2: {
+            conditions: {
+              weather: { enabled: true, current: 'rain', values: ['rain'] },
+              timeOfDay: { enabled: true, current: 'night', values: ['night'] }
+            },
+            tasks: [{ id: 'task-other', name: 'Other', weather: ['rain'], timeOfDay: ['night'], dropRows: [] }],
+            hazards: [{ id: 'hazard-other', name: 'Other Hazard', weather: ['rain'], timeOfDay: ['night'], dropRate: 50 }]
+          }
+        }
+      };
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      assert.equal(await store.deleteGatheringConditionValue('weather', 'rain', 'sys1'), false);
+      await store.toggleGatheringConditionEnabled('weather', false, 'sys1');
+      assert.equal(await store.deleteGatheringConditionValue('weather', 'rain', 'sys1'), true);
+      await store.addGatheringConditionValue('weather', 'Ash Fall', 'sys1');
+      await store.updateGatheringConditions({ weather: 'ash fall', systemId: 'sys1' });
+
+      const sys1 = services._store.gatheringConfig.systems.sys1;
+      const sys2 = services._store.gatheringConfig.systems.sys2;
+      assert.deepEqual(sys1.conditions.weather, { enabled: false, current: 'ash fall', values: ['ash fall'] });
+      assert.deepEqual(sys1.tasks[0].weather, []);
+      assert.deepEqual(sys1.hazards[0].weather, []);
+      assert.deepEqual(sys2.tasks[0].weather, ['rain']);
+      assert.deepEqual(sys2.hazards[0].weather, ['rain']);
     });
 
     it('normalizes and persists selected-system gathering rules', async () => {

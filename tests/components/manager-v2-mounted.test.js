@@ -381,7 +381,34 @@ function createStore(calls = [], options = {}) {
     environmentSaving: false,
     environmentSaveError: null,
     environmentValidationState: options.environmentValidationState || null,
-    selectedEnvironmentTaskId: 'task-forage'
+    selectedEnvironmentTaskId: 'task-forage',
+    gatheringConfig: {
+      conditions: { weather: 'clear', timeOfDay: 'day' },
+      vocabularies: {
+        regions: [],
+        biomes: ['forest'],
+        danger: ['safe', 'hazardous'],
+        weather: ['clear', 'rain'],
+        timeOfDay: ['dawn', 'day', 'night']
+      },
+      systems: {
+        alchemy: {
+          conditions: {
+            weather: { enabled: true, current: 'clear', values: ['clear', 'rain'] },
+            timeOfDay: { enabled: true, current: 'day', values: ['dawn', 'day', 'night'] }
+          },
+          rules: {
+            rewardSelectionMode: 'highestRankedDrop',
+            rewardLimit: 1,
+            hazardSelectionMode: 'allDrops',
+            hazardLimit: 1,
+            hazardPolicy: 'successWithHazard'
+          },
+          tasks: [],
+          hazards: []
+        }
+      }
+    }
   });
 
   function applySelectedSystem(id) {
@@ -564,7 +591,11 @@ function createStore(calls = [], options = {}) {
     updateEnvironmentTaskProgressive: (...args) => calls.push(['updateEnvironmentTaskProgressive', ...args]),
     updateEnvironmentTaskCheck: (...args) => calls.push(['updateEnvironmentTaskCheck', ...args]),
     updateEnvironmentTaskTimeRequirement: (...args) => calls.push(['updateEnvironmentTaskTimeRequirement', ...args]),
-    updateEnvironmentTaskFailureOutcome: (...args) => calls.push(['updateEnvironmentTaskFailureOutcome', ...args])
+    updateEnvironmentTaskFailureOutcome: (...args) => calls.push(['updateEnvironmentTaskFailureOutcome', ...args]),
+    updateGatheringConditions: (...args) => calls.push(['updateGatheringConditions', ...args]),
+    toggleGatheringConditionEnabled: (...args) => calls.push(['toggleGatheringConditionEnabled', ...args]),
+    addGatheringConditionValue: (...args) => calls.push(['addGatheringConditionValue', ...args]),
+    deleteGatheringConditionValue: (...args) => calls.push(['deleteGatheringConditionValue', ...args])
   };
 }
 
@@ -1750,6 +1781,13 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(target.querySelector('.manager-v2-toolbar'), null);
     assert.equal(target.querySelector('.manager-v2-environments-table'), null);
     assert.ok(target.textContent.includes('Set system-level d100 reward and hazard rules for gathering.'));
+    assert.equal(target.querySelectorAll('.manager-v2-condition-panel').length, 2);
+    assert.ok(target.querySelector('[data-gathering-condition-panel="timeOfDay"]'));
+    assert.ok(target.querySelector('[data-gathering-condition-panel="weather"]'));
+    assert.ok(target.textContent.includes('Times of day'));
+    assert.ok(target.textContent.includes('Weather conditions'));
+    assert.equal(target.querySelectorAll('.manager-v2-condition-add input').length, 2);
+    assert.equal(target.querySelectorAll('.manager-v2-condition-pill').length, 5);
     assert.equal(target.querySelector('.manager-v2-gathering-settings-summary'), null);
     assert.equal(target.querySelector('[data-gathering-rule-fact]'), null);
     assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Choose which successful d100 reward rows are granted.'));

@@ -13,6 +13,7 @@
     selectedEnvironmentId = '',
     selectedSystemName = '',
     selectedSystemId = '',
+    gatheringConfig = null,
     sceneOptions = [],
     shouldUseEnvironmentDraftForDisplay = false,
     activeGatheringTab = 'environments',
@@ -23,7 +24,11 @@
     onDuplicateEnvironment = () => {},
     onDeleteEnvironment = () => {},
     onMoveEnvironment = () => {},
-    onToggleEnvironmentEnabled = () => {}
+    onToggleEnvironmentEnabled = () => {},
+    onUpdateGatheringConditions = () => {},
+    onToggleGatheringConditionEnabled = () => {},
+    onAddGatheringConditionValue = () => {},
+    onDeleteGatheringConditionValue = () => {}
   } = $props();
 
   let searchTerm = $state('');
@@ -35,6 +40,8 @@
   let lastSystemId = $state('');
   let pageIndex = $state(0);
   let pageSize = $state(10);
+  let weatherInput = $state('');
+  let timeOfDayInput = $state('');
 
   const gatheringTabs = [
     {
@@ -87,6 +94,17 @@
   });
 
   const environmentList = $derived(environments || []);
+  const selectedGatheringSystemConfig = $derived(gatheringConfig?.systems?.[selectedSystemId] || {});
+  const weatherCondition = $derived(selectedGatheringSystemConfig.conditions?.weather || {
+    enabled: true,
+    current: gatheringConfig?.conditions?.weather || 'clear',
+    values: gatheringConfig?.vocabularies?.weather || ['clear', 'cloudy', 'rain', 'storm', 'snow', 'fog', 'wind']
+  });
+  const timeOfDayCondition = $derived(selectedGatheringSystemConfig.conditions?.timeOfDay || {
+    enabled: true,
+    current: gatheringConfig?.conditions?.timeOfDay || 'day',
+    values: gatheringConfig?.vocabularies?.timeOfDay || ['dawn', 'day', 'dusk', 'night']
+  });
   const activeGatheringTabConfig = $derived(gatheringTabs.find(tab => tab.id === activeGatheringTab) || gatheringTabs[0]);
   const regionOptions = $derived(uniqueSorted(environmentList.map(environment => environment.region)));
   const biomeOptions = $derived(uniqueSorted(environmentList.map(environment => environment.biome)));
@@ -212,6 +230,51 @@
 
   function selectGatheringTab(tabId) {
     onSelectGatheringTab(tabId);
+  }
+
+  function conditionTitle(kind) {
+    return kind === 'timeOfDay'
+      ? text('FABRICATE.Admin.ManagerV2.Environment.Conditions.TimeOfDayTitle', 'Times of day')
+      : text('FABRICATE.Admin.ManagerV2.Environment.Conditions.WeatherTitle', 'Weather conditions');
+  }
+
+  function conditionCurrentLabel(kind) {
+    return kind === 'timeOfDay'
+      ? text('FABRICATE.Admin.ManagerV2.Environment.Conditions.CurrentTimeOfDay', 'Current time')
+      : text('FABRICATE.Admin.ManagerV2.Environment.Conditions.CurrentWeather', 'Current weather');
+  }
+
+  function conditionAddLabel(kind) {
+    return kind === 'timeOfDay'
+      ? text('FABRICATE.Admin.ManagerV2.Environment.Conditions.AddTimeOfDay', 'Add time of day')
+      : text('FABRICATE.Admin.ManagerV2.Environment.Conditions.AddWeather', 'Add weather');
+  }
+
+  function conditionInputPlaceholder(kind) {
+    return kind === 'timeOfDay'
+      ? text('FABRICATE.Admin.ManagerV2.Environment.Conditions.TimeOfDayPlaceholder', 'e.g. midnight')
+      : text('FABRICATE.Admin.ManagerV2.Environment.Conditions.WeatherPlaceholder', 'e.g. ashfall');
+  }
+
+  function conditionInputValue(kind) {
+    return kind === 'timeOfDay' ? timeOfDayInput : weatherInput;
+  }
+
+  function setConditionInput(kind, value) {
+    if (kind === 'timeOfDay') timeOfDayInput = value;
+    else weatherInput = value;
+  }
+
+  function submitConditionValue(event, kind) {
+    event.preventDefault();
+    const value = conditionInputValue(kind).trim();
+    if (!value) return;
+    onAddGatheringConditionValue?.(kind, value, selectedSystemId);
+    setConditionInput(kind, '');
+  }
+
+  function updateCurrentCondition(kind, value) {
+    onUpdateGatheringConditions?.({ [kind]: value, systemId: selectedSystemId });
   }
 
   function gatheringHeaderTitle() {
@@ -467,7 +530,78 @@
       id="manager-v2-gathering-panel-settings"
       role="tabpanel"
       aria-labelledby="manager-v2-gathering-tab-settings"
-    ></div>
+    >
+      {#each [
+        { kind: 'timeOfDay', icon: 'fas fa-clock', setting: timeOfDayCondition },
+        { kind: 'weather', icon: 'fas fa-cloud-sun', setting: weatherCondition }
+      ] as condition (condition.kind)}
+        <section class={`manager-v2-condition-panel ${condition.setting.enabled === false ? 'is-disabled' : ''}`} data-gathering-condition-panel={condition.kind} aria-label={conditionTitle(condition.kind)}>
+          <header class="manager-v2-condition-panel-header">
+            <span class="manager-v2-condition-panel-title">
+              <i class={condition.icon} aria-hidden="true"></i>
+              <span>{conditionTitle(condition.kind)}</span>
+            </span>
+            <button
+              type="button"
+              class={`manager-v2-status-toggle ${condition.setting.enabled === false ? 'is-off' : 'is-on'}`}
+              aria-pressed={condition.setting.enabled !== false}
+              aria-label={condition.setting.enabled === false
+                ? text('FABRICATE.Admin.ManagerV2.Environment.Conditions.EnableMatching', 'Enable matching')
+                : text('FABRICATE.Admin.ManagerV2.Environment.Conditions.DisableMatching', 'Disable matching')}
+              onclick={() => onToggleGatheringConditionEnabled?.(condition.kind, condition.setting.enabled === false, selectedSystemId)}
+            >
+              <span class="manager-v2-status-toggle-track" aria-hidden="true">
+                <span class="manager-v2-status-toggle-knob"></span>
+              </span>
+              <span class="manager-v2-status-toggle-label">
+                {condition.setting.enabled === false ? text('FABRICATE.Admin.ManagerV2.StatusOff', 'Off') : text('FABRICATE.Admin.ManagerV2.StatusOn', 'On')}
+              </span>
+            </button>
+          </header>
+
+          <label class="manager-v2-field manager-v2-condition-current">
+            <span>{conditionCurrentLabel(condition.kind)}</span>
+            <select value={condition.setting.current} onchange={(event) => updateCurrentCondition(condition.kind, event.currentTarget.value)}>
+              {#each condition.setting.values || [] as value (value)}
+                <option value={value}>{value}</option>
+              {/each}
+            </select>
+          </label>
+
+          <form class="manager-v2-condition-add" onsubmit={(event) => submitConditionValue(event, condition.kind)}>
+            <label class="manager-v2-field">
+              <span>{conditionAddLabel(condition.kind)}</span>
+              <input
+                value={conditionInputValue(condition.kind)}
+                placeholder={conditionInputPlaceholder(condition.kind)}
+                oninput={(event) => setConditionInput(condition.kind, event.currentTarget.value)}
+              />
+            </label>
+            <button type="submit" class="manager-v2-icon-button" aria-label={conditionAddLabel(condition.kind)} title={conditionAddLabel(condition.kind)}>
+              <i class="fas fa-plus" aria-hidden="true"></i>
+            </button>
+          </form>
+
+          <div class="manager-v2-condition-pill-list" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Conditions.Values', 'Condition values')}>
+            {#each condition.setting.values || [] as value (value)}
+              <span class="manager-v2-condition-pill" data-gathering-condition-value={value}>
+                <span>{value}</span>
+                <button
+                  type="button"
+                  class="manager-v2-condition-remove"
+                  aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Conditions.RemoveValue', 'Remove {value}').replace('{value}', value)}
+                  title={text('FABRICATE.Admin.ManagerV2.Environment.Conditions.RemoveValue', 'Remove {value}').replace('{value}', value)}
+                  disabled={condition.setting.enabled !== false && (condition.setting.values || []).length <= 1}
+                  onclick={() => onDeleteGatheringConditionValue?.(condition.kind, value, selectedSystemId)}
+                >
+                  <i class="fas fa-times" aria-hidden="true"></i>
+                </button>
+              </span>
+            {/each}
+          </div>
+        </section>
+      {/each}
+    </div>
   {:else}
     {@const activeTab = gatheringTabs.find(tab => tab.id === activeGatheringTab)}
     <div
