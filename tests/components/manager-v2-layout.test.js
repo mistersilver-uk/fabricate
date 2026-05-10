@@ -231,6 +231,7 @@ test('manager-v2 gathering settings condition panels use a two-column responsive
   const panelBlock = blockFor('.fabricate-manager-v2 .manager-v2-condition-panel');
   const addBlock = blockFor('.fabricate-manager-v2 .manager-v2-condition-add');
   const pillBlock = blockFor('.fabricate-manager-v2 .manager-v2-condition-pill');
+  const labelInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-condition-label-input');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager-v2 (max-width: 1120px)'));
 
   assert.ok(settingsBlock.includes('grid-template-columns: repeat(2, minmax(0, 1fr));'), 'settings conditions should sit side by side at normal widths');
@@ -243,6 +244,8 @@ test('manager-v2 gathering settings condition panels use a two-column responsive
   assert.ok(css.includes('grid-template-columns: repeat(2, minmax(0, 1fr));'), 'condition pills should fit two per line');
   assert.ok(pillBlock.includes('grid-template-columns: 30px minmax(0, 1fr) 24px;'), 'condition pills should reserve icon, label, and remove columns');
   assert.ok(pillBlock.includes('border-radius: 6px;'), 'condition pills should be rounded rectangles rather than ovals');
+  assert.ok(labelInputBlock.includes('height: 22px;'), 'condition label edit inputs should stay visually shorter than the pill');
+  assert.equal(labelInputBlock.includes('font-size'), false, 'condition label edit input should not reduce text size to shrink the control');
   assert.ok(css.includes('.fabricate-manager-v2 .manager-v2-condition-pill .essence-icon-picker-trigger.icon-only') && css.includes('justify-content: center;'), 'condition pill icon picker buttons should center icons');
   assert.ok(
     mediumQuery.includes('.fabricate-manager-v2 .manager-v2-gathering-settings')
