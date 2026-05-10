@@ -7014,6 +7014,7 @@
   gap: 6px;
   align-items: stretch;
   justify-content: end;
+  justify-self: end;
   width: 100%;
 }
 
@@ -8890,6 +8891,14 @@
   .fabricate-manager-v2 .manager-v2-action-group.manager-v2-labeled-cell::before {
     flex: 0 0 88px;
     min-width: 88px;
+  }
+
+  .fabricate-manager-v2 .manager-v2-action-group.manager-v2-environment-actions.manager-v2-labeled-cell {
+    justify-content: space-between;
+  }
+
+  .fabricate-manager-v2 .manager-v2-environment-actions .manager-v2-environment-action-grid {
+    margin-left: auto;
   }
 
   .fabricate-manager-v2 .manager-v2-toggle-list {

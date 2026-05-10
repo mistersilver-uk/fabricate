@@ -2073,7 +2073,16 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(forestRow.querySelector('.manager-v2-environment-task-count.manager-v2-chip'), null);
     assert.ok(forestRow.querySelector('.manager-v2-status-toggle'));
     assert.ok(forestRow.querySelector('.manager-v2-environment-action-grid'));
+    assert.ok(forestRow.querySelector('[aria-label="Edit Moonlit Forest"]'));
+    assert.ok(forestRow.querySelector('[aria-label="Duplicate Moonlit Forest"]'));
+    assert.ok(forestRow.querySelector('[aria-label="Delete Moonlit Forest"]'));
     assert.ok(forestRow.querySelector('.manager-v2-environment-reorder-stack'));
+    assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Selected environment'));
+    assert.equal(
+      target.querySelector('.manager-v2-inspector').textContent.includes('Environment actions'),
+      false,
+      'selected environment inspector should not duplicate row quick actions'
+    );
 
     const search = target.querySelector('.manager-v2-toolbar input[type="search"]');
     search.value = 'cavern';

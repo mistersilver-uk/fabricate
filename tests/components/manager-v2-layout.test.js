@@ -496,8 +496,17 @@ test('manager-v2 environments browser and edit route define compact responsive g
   );
   assert.ok(taskCountBlock.includes('font-weight: 800;'), 'environment task count should render as plain emphasized text');
   assert.ok(actionsBlock.includes('grid-template-columns: 72px;'), 'environment row actions should only reserve edit duplicate delete controls');
+  assert.ok(actionsBlock.includes('justify-content: end;'), 'environment row actions should stay compact on the right at desktop widths');
+  assert.ok(actionsBlock.includes('justify-self: end;'), 'environment row actions should align to the right edge of their cell');
   assert.ok(!actionsBlock.includes('grid-template-columns: 72px 34px;'), 'environment row actions should not reserve a reorder stack column');
   assert.ok(actionGridBlock.includes('grid-template-columns: repeat(2, 34px);'), 'environment edit duplicate delete buttons should sit in a compact grid');
+  assert.ok(
+    mediumQuery.includes('.fabricate-manager-v2 .manager-v2-action-group.manager-v2-environment-actions.manager-v2-labeled-cell')
+      && mediumQuery.includes('justify-content: space-between;')
+      && mediumQuery.includes('.fabricate-manager-v2 .manager-v2-environment-actions .manager-v2-environment-action-grid')
+      && mediumQuery.includes('margin-left: auto;'),
+    'responsive environment row actions should stay right-aligned instead of inheriting the generic left-aligned action group layout'
+  );
   assert.ok(
     reorderStackBlock.includes('position: absolute;')
       && reorderStackBlock.includes('inset: 0;')

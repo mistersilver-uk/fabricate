@@ -241,9 +241,22 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(environmentsBrowserSource.includes("activeGatheringTab = 'environments'"), 'gathering page should accept environments as the default active tab');
     assert.ok(environmentsBrowserSource.includes('onSelectGatheringTab(tabId)'), 'gathering page should report tab changes to the root');
     assert.ok(rootSource.includes('data-gathering-inspector-placeholder'), 'right inspector should render placeholders for non-environment gathering tabs');
+    assert.equal(
+      rootSource.match(/FABRICATE\.Admin\.ManagerV2\.Environment\.Actions/g)?.length ?? 0,
+      1,
+      'environment actions localization should remain only for the header aria label, not a redundant inspector card'
+    );
+    assert.ok(
+      !rootSource.includes("<h3 class=\"manager-v2-card-title\">{text('FABRICATE.Admin.ManagerV2.Environment.Actions', 'Environment actions')}</h3>"),
+      'selected environment inspector should not render a redundant Environment actions card'
+    );
     assert.ok(environmentsBrowserSource.includes('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksPlaceholderHint'), 'gathering placeholder copy should be localized');
     assert.ok(environmentsBrowserSource.includes("selectGatheringTab('tasks')"), 'empty environments guidance should route to the Tasks tab');
     assert.ok(environmentsBrowserSource.includes("selectGatheringTab('encounters')"), 'empty environments guidance should route hazards to the Hazards tab');
+    assert.ok(environmentsBrowserSource.includes('manager-v2-environment-action-grid'), 'environment rows should keep quick action wiring');
+    assert.ok(environmentsBrowserSource.includes('onEditEnvironment(environment.id)'), 'environment rows should wire edit quick actions');
+    assert.ok(environmentsBrowserSource.includes('onDuplicateEnvironment(environment.id)'), 'environment rows should wire duplicate quick actions');
+    assert.ok(environmentsBrowserSource.includes('onDeleteEnvironment(environment.id)'), 'environment rows should wire delete quick actions');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Label, 'Gathering sections');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Environments, 'Environments');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Tasks, 'Tasks');

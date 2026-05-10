@@ -1963,35 +1963,6 @@
             </section>
           {/if}
 
-          <section class="manager-v2-inspector-card">
-            <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Environment.Actions', 'Environment actions')}</h3>
-            <div class="manager-v2-inspector-actions">
-              <button type="button" class="manager-v2-button" onclick={() => editEnvironment()}>
-                <i class="fas fa-edit" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Edit', 'Edit environment')}</span>
-              </button>
-              <button type="button" class="manager-v2-button" onclick={() => duplicateEnvironment()}>
-                <i class="fas fa-copy" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Duplicate', 'Duplicate environment')}</span>
-              </button>
-              <button type="button" class="manager-v2-button" onclick={() => toggleEnvironmentEnabled(selectedEnvironment.id, selectedEnvironment.enabled === false)}>
-                <i class={selectedEnvironment.enabled === false ? 'fas fa-toggle-off' : 'fas fa-toggle-on'} aria-hidden="true"></i>
-                <span>{selectedEnvironment.enabled === false ? text('FABRICATE.Admin.ManagerV2.Environment.Enable', 'Enable environment') : text('FABRICATE.Admin.ManagerV2.Environment.Disable', 'Disable environment')}</span>
-              </button>
-              <div class="manager-v2-action-group">
-                <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.Environments.MoveUp', 'Move up')} title={text('FABRICATE.Admin.Environments.MoveUp', 'Move up')} onclick={() => moveEnvironment(selectedEnvironment.id, 'up')}>
-                  <i class="fas fa-arrow-up" aria-hidden="true"></i>
-                </button>
-                <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.Environments.MoveDown', 'Move down')} title={text('FABRICATE.Admin.Environments.MoveDown', 'Move down')} onclick={() => moveEnvironment(selectedEnvironment.id, 'down')}>
-                  <i class="fas fa-arrow-down" aria-hidden="true"></i>
-                </button>
-              </div>
-              <button type="button" class="manager-v2-button is-danger" onclick={() => deleteEnvironment()}>
-                <i class="fas fa-trash" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Delete', 'Delete environment')}</span>
-              </button>
-            </div>
-          </section>
         {:else if environmentList.length === 0}
           <section class="manager-v2-setup-card" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Title', 'Plan gathering content')}>
             <div class="manager-v2-setup-card-header">

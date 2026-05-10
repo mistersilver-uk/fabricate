@@ -19,6 +19,8 @@ Weather and time-of-day matching currently depend on global gathering condition 
 - Normalize legacy top-level string regions/biomes into selected-system option records when per-system values are absent.
 - Render Settings-tab Regions and Biomes panels below time/weather. Region records are text-only; biome records include icon, `colorToken`, and optional `customColor`.
 - Refine the Settings vocabulary panels with concise instructional copy, compact add rows, text `Add` submit buttons, and a combined biome pill icon/colour affordance.
+- Remove the selected-environment `Environment actions` right-inspector card because the environment rows already expose edit, duplicate, enable/disable, move, and delete quick actions.
+- Keep environment row quick actions grouped on the right in responsive row layouts.
 - Remove Regions and Biomes from the environment editor's generic vocabulary CSV controls; keep Danger there.
 - Remove weather and time-of-day from the environment editor's generic CSV vocabulary controls.
 - Prune deleted time/weather values from reusable tasks and hazards in the selected system only.

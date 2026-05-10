@@ -57,6 +57,8 @@ Default biome string records normalize to title-case labels with stable ids and 
 
 The Systems Library right inspector renders a compact `Global conditions` shortcut card only when the selected system enables gathering and at least one condition dimension is enabled. Time of day and weather selectors share the same card, and each selector appears only for its enabled dimension. Changing either selector reuses `updateGatheringConditions` with the selected `systemId`; vocabulary editing remains in Gathering Settings.
 
+The Gathering Environments right inspector shows selected-environment identity, details, and draft state only. Row-level quick actions remain the control surface for edit, duplicate, enable/disable, move, and delete. In stacked responsive layouts, the environment row action cell keeps its quick-action button grid aligned to the right instead of inheriting the generic left-aligned action group layout. The hidden full-row move overlay remains anchored to the environment row.
+
 The environment editor keeps only the Danger generic vocabulary CSV control. Weather, time-of-day, Regions, and Biomes are managed through Settings.
 
 ## Safety
