@@ -49,7 +49,11 @@ Runtime composition resolves the selected system's condition settings before mat
 ## UI
 The Gathering Settings center panel renders four panels in a scrollable two-column grid that stacks at medium widths. The weather and time-of-day panels align content to the top and have a compact enable toggle, current-value selector, add control with an icon picker for the new value, and value pills with icon picker, label input, and remove affordance. Value pills render as two-per-row rectangular controls with modest rounded corners.
 
-Regions and Biomes render below the condition panels. Regions are text-only labels with add, edit, and delete controls. Biomes use the same pill geometry but add icon and colour affordances. Biome colours store theme token keys such as `sage`, `mist`, and `lavender`; a valid custom hex overrides the displayed token colour, while invalid or blank custom hex falls back to the token.
+Regions and Biomes render below the condition panels. Each settings card includes a short hint that explains how the values are consumed by reusable tasks, hazards, or environment composition. Add rows keep placeholder text in the input and use a compact text `Add` button instead of a plus-only icon.
+
+Regions are text-only labels with add, edit, and delete controls. Biomes use the same pill geometry but combine icon and colour editing into one coloured icon affordance at the left of each pill. Left click, Enter, and Space open the icon picker. Right click, ContextMenu, and Shift+F10 open the colour picker. Biome colours store theme token keys such as `sage`, `mist`, and `lavender`; a valid custom hex overrides the displayed token colour, while invalid or blank custom hex falls back to the token.
+
+Default biome string records normalize to title-case labels with stable ids and curated icon/colour metadata. Explicit biome records preserve their stored labels, icons, colours, and custom hex values.
 
 The Systems Library right inspector renders a compact `Global conditions` shortcut card only when the selected system enables gathering and at least one condition dimension is enabled. Time of day and weather selectors share the same card, and each selector appears only for its enabled dimension. Changing either selector reuses `updateGatheringConditions` with the selected `systemId`; vocabulary editing remains in Gathering Settings.
 

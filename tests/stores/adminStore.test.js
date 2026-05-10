@@ -2120,7 +2120,7 @@ describe('createAdminStore', () => {
         { id: 'north', label: 'north' }
       ]);
       assert.deepEqual(get(store.viewState).gatheringConfig.systems.sys1.vocabularies.biomes.values, [
-        { id: 'forest', label: 'forest', icon: 'fas fa-tree', colorToken: 'sage', customColor: '' }
+        { id: 'forest', label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage', customColor: '' }
       ]);
 
       await store.addGatheringVocabularyValue('regions', 'South Coast', 'sys1');

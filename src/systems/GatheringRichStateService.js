@@ -12,6 +12,18 @@ const CONDITION_DIMENSIONS = ['weather', 'timeOfDay'];
 const VOCABULARY_DIMENSIONS = ['regions', 'biomes'];
 const BIOME_COLOR_TOKENS = new Set(['sage', 'mist', 'lavender', 'rose', 'peach', 'butter', 'aqua', 'mauve']);
 const DEFAULT_BIOME_COLOR_TOKEN = 'sage';
+const DEFAULT_BIOME_METADATA = Object.freeze({
+  forest: Object.freeze({ label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage' }),
+  grassland: Object.freeze({ label: 'Grassland', icon: 'fas fa-wheat-awn', colorToken: 'butter' }),
+  mountain: Object.freeze({ label: 'Mountain', icon: 'fas fa-mountain', colorToken: 'mist' }),
+  cave: Object.freeze({ label: 'Cave', icon: 'fas fa-dungeon', colorToken: 'lavender' }),
+  coastal: Object.freeze({ label: 'Coastal', icon: 'fas fa-water', colorToken: 'aqua' }),
+  swamp: Object.freeze({ label: 'Swamp', icon: 'fas fa-frog', colorToken: 'mauve' }),
+  desert: Object.freeze({ label: 'Desert', icon: 'fas fa-sun', colorToken: 'peach' }),
+  urban: Object.freeze({ label: 'Urban', icon: 'fas fa-city', colorToken: 'mist' }),
+  ruins: Object.freeze({ label: 'Ruins', icon: 'fas fa-archway', colorToken: 'rose' }),
+  wasteland: Object.freeze({ label: 'Wasteland', icon: 'fas fa-skull', colorToken: 'mauve' })
+});
 const DEFAULT_CONDITION_ICONS = Object.freeze({
   weather: Object.freeze({
     clear: 'fas fa-sun',
@@ -744,13 +756,16 @@ function normalizeVocabularyOption(kind, value) {
   const id = normalizeTag(isRecord ? (value.id ?? value.value ?? value.label) : value);
   if (!id) return null;
   const rawLabel = isRecord ? String(value.label ?? '').trim() : String(value ?? '').trim();
-  const label = rawLabel || vocabularyLabelFromId(id);
+  const defaultBiome = kind === 'biomes' ? DEFAULT_BIOME_METADATA[id] : null;
+  const label = isRecord
+    ? (rawLabel || defaultBiome?.label || vocabularyLabelFromId(id))
+    : (kind === 'biomes' ? (defaultBiome?.label || vocabularyLabelFromId(id)) : (rawLabel || vocabularyLabelFromId(id)));
   if (kind === 'biomes') {
     return {
       id,
       label,
-      icon: normalizeConditionIcon(isRecord ? value.icon : 'fas fa-tree', 'fas fa-tree'),
-      colorToken: normalizeBiomeColorToken(isRecord ? value.colorToken : DEFAULT_BIOME_COLOR_TOKEN),
+      icon: normalizeConditionIcon(isRecord ? (value.icon || defaultBiome?.icon || 'fas fa-tree') : (defaultBiome?.icon || 'fas fa-tree'), 'fas fa-tree'),
+      colorToken: normalizeBiomeColorToken(isRecord ? (value.colorToken || defaultBiome?.colorToken || DEFAULT_BIOME_COLOR_TOKEN) : (defaultBiome?.colorToken || DEFAULT_BIOME_COLOR_TOKEN)),
       customColor: normalizeCustomHex(isRecord ? value.customColor : '')
     };
   }

@@ -25,3 +25,7 @@
 - [x] Render Gathering Settings Regions and Biomes panels with biome icon and colour controls.
 - [x] Remove Regions/Biomes from the environment editor generic vocabulary CSV controls.
 - [x] Add focused store, contract, mounted, and layout coverage for region/biome vocabulary editing.
+- [x] Add compact Settings card copy, add-row labels, and combined biome icon/colour affordance.
+- [x] Normalize default biome strings to title-case labels with curated icons/colours in admin and runtime config paths.
+- [x] Add focused store, mounted, and layout coverage for the biome settings UX polish.
+- [x] Re-run focused suites, `npm test`, and `npm run build`.

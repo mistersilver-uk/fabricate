@@ -29,6 +29,7 @@ const sharedComponentNames = [
   'ImagePathPicker',
   'IconPicker',
   'ManagerV2ColorPicker',
+  'ManagerV2ColorPopover',
   'EssenceSourceSelector',
   'Pagination'
 ];
@@ -1947,11 +1948,22 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Weather conditions'));
     assert.ok(target.textContent.includes('Regions'));
     assert.ok(target.textContent.includes('Biomes'));
+    assert.ok(target.textContent.includes('These values control current time matching for reusable tasks and hazards.'));
+    assert.ok(target.textContent.includes('These values control current weather matching for reusable tasks and hazards.'));
+    assert.ok(target.textContent.includes('Environments use one region. Labels can be renamed without changing ids.'));
+    assert.ok(target.textContent.includes('Environments can use multiple biomes. Left-click the coloured icon to edit icon; right-click to edit colour.'));
     assert.equal(target.querySelectorAll('.manager-v2-condition-add input').length, 4);
     assert.equal(target.querySelectorAll('.manager-v2-condition-add .essence-icon-picker-trigger.icon-only').length, 3);
-    assert.equal(target.querySelectorAll('.manager-v2-color-picker-trigger').length, 3);
+    assert.equal(target.querySelectorAll('.manager-v2-color-picker-trigger').length, 1);
+    assert.equal(target.querySelectorAll('.manager-v2-condition-add .manager-v2-add-button').length, 4);
+    assert.equal(Array.from(target.querySelectorAll('.manager-v2-condition-add .manager-v2-add-button')).every(button => button.textContent.trim() === 'Add'), true);
+    assert.equal(target.textContent.includes('Add time of day'), false);
+    assert.equal(target.textContent.includes('Add weather'), false);
+    assert.equal(target.textContent.includes('Add region'), false);
+    assert.equal(target.textContent.includes('Add biome'), false);
     assert.equal(target.querySelectorAll('[data-gathering-condition-value]').length, 5);
     assert.equal(target.querySelectorAll('.manager-v2-vocabulary-pill').length, 4);
+    assert.equal(target.querySelectorAll('[data-gathering-vocabulary-panel="biomes"] .manager-v2-biome-combined-trigger').length, 2);
     assert.equal(target.querySelectorAll('.manager-v2-condition-label-input').length, 9);
     assert.equal(target.querySelectorAll('.manager-v2-vocabulary-pill .manager-v2-condition-label-input').length, 4);
     assert.deepEqual(
@@ -1992,8 +2004,16 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
       calls.find(call => call[0] === 'updateGatheringVocabularyValue'),
       ['updateGatheringVocabularyValue', 'regions', 'north', { label: 'Northern Reach' }, 'alchemy']
     );
-    const biomeColorTrigger = target.querySelector('[data-gathering-vocabulary-panel="biomes"] [data-gathering-vocabulary-value="forest"] .manager-v2-color-picker-trigger');
-    biomeColorTrigger.click();
+    const biomeIconTrigger = target.querySelector('[data-gathering-vocabulary-panel="biomes"] [data-gathering-vocabulary-value="forest"] .manager-v2-biome-combined-trigger');
+    biomeIconTrigger.click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('.essence-icon-picker-popover'));
+    target.querySelector('.essence-icon-picker-popover .essence-icon-picker-option').click();
+    await tick();
+    flushSync();
+    assert.equal(calls.filter(call => call[0] === 'updateGatheringVocabularyValue').at(-1)[1], 'biomes');
+    biomeIconTrigger.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
     await tick();
     flushSync();
     target.querySelector('[data-manager-v2-color-token="mist"]').click();
@@ -2003,6 +2023,19 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
       calls.filter(call => call[0] === 'updateGatheringVocabularyValue').at(-1),
       ['updateGatheringVocabularyValue', 'biomes', 'forest', { colorToken: 'mist', customColor: '' }, 'alchemy']
     );
+    assert.ok(target.querySelector('[data-manager-v2-color-picker-popover]'));
+    document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('[data-manager-v2-color-picker-popover]'), null);
+    biomeIconTrigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true, cancelable: true }));
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-manager-v2-color-picker-popover]'));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('[data-manager-v2-color-picker-popover]'), null);
     assert.equal(target.querySelector('.manager-v2-gathering-settings-summary'), null);
     assert.equal(target.querySelector('[data-gathering-rule-fact]'), null);
     assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Choose which successful d100 reward rows are granted.'));

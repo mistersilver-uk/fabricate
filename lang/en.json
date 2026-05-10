@@ -842,6 +842,8 @@
           "Conditions": {
             "TimeOfDayTitle": "Times of day",
             "WeatherTitle": "Weather conditions",
+            "TimeOfDayHint": "These values control current time matching for reusable tasks and hazards.",
+            "WeatherHint": "These values control current weather matching for reusable tasks and hazards.",
             "CurrentTimeOfDay": "Current time",
             "CurrentWeather": "Current weather",
             "AddTimeOfDay": "Add time of day",
@@ -859,6 +861,8 @@
           "Vocabularies": {
             "RegionsTitle": "Regions",
             "BiomesTitle": "Biomes",
+            "RegionsHint": "Environments use one region. Labels can be renamed without changing ids.",
+            "BiomesHint": "Environments can use multiple biomes. Left-click the coloured icon to edit icon; right-click to edit colour.",
             "AddRegion": "Add region",
             "AddBiome": "Add biome",
             "RegionPlaceholder": "e.g. Northlands",
@@ -873,6 +877,7 @@
             "EditLabel": "Edit label",
             "RemoveValue": "Remove {value}"
           },
+          "SettingsAdd": "Add",
           "Filters": "Environment filters",
           "SearchPlaceholder": "Search environments...",
           "SearchLabel": "Search environments",

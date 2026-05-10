@@ -17,6 +17,10 @@
     disabled = false,
     buttonTitle = '',
     iconOnly = false,
+    triggerClass = '',
+    triggerStyle = '',
+    onTriggerContextMenu = null,
+    onTriggerKeydown = null,
     onChange = () => {}
   } = $props();
 
@@ -46,6 +50,18 @@
     }
 
     pickerOpen = true;
+  }
+
+  function handleTriggerContextMenu(event) {
+    if (typeof onTriggerContextMenu === 'function') {
+      onTriggerContextMenu(event);
+    }
+  }
+
+  function handleTriggerKeydown(event) {
+    if (typeof onTriggerKeydown === 'function') {
+      onTriggerKeydown(event);
+    }
   }
 
   function selectIcon(iconClass) {
@@ -156,9 +172,12 @@
   <button
     type="button"
     bind:this={triggerButton}
-    class="essence-icon-picker-trigger"
+    class={`essence-icon-picker-trigger ${triggerClass}`}
     class:icon-only={iconOnly}
+    style={triggerStyle}
     onclick={togglePicker}
+    oncontextmenu={handleTriggerContextMenu}
+    onkeydown={handleTriggerKeydown}
     disabled={disabled}
     aria-expanded={pickerOpen}
     aria-haspopup="dialog"

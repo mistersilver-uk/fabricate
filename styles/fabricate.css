@@ -8306,20 +8306,47 @@
   color: var(--fab-mv2-accent);
 }
 
+.fabricate-manager-v2 .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-condition-panel-hint {
+  margin: -2px 0 0;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
 .fabricate-manager-v2 .manager-v2-condition-add {
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr) 34px;
+  grid-template-columns: 36px minmax(0, 1fr) 48px;
   gap: 8px;
-  align-items: end;
+  align-items: center;
   min-width: 0;
 }
 
 .fabricate-manager-v2 .manager-v2-region-add {
-  grid-template-columns: minmax(0, 1fr) 34px;
+  grid-template-columns: minmax(0, 1fr) 48px;
 }
 
 .fabricate-manager-v2 .manager-v2-biome-add {
-  grid-template-columns: 36px 36px minmax(0, 1fr) 34px;
+  grid-template-columns: 36px 36px minmax(0, 1fr) 48px;
+}
+
+.fabricate-manager-v2 .manager-v2-add-button {
+  width: 48px;
+  height: 36px;
+  padding: 0 10px;
+  justify-content: center;
+  font-size: 0.78rem;
 }
 
 .fabricate-manager-v2 .manager-v2-condition-current select,
@@ -8355,10 +8382,10 @@
 }
 
 .fabricate-manager-v2 .manager-v2-vocabulary-pill.is-biome {
-  grid-template-columns: 28px 30px minmax(0, 1fr) 30px 24px;
+  grid-template-columns: 30px minmax(0, 1fr) 24px;
+  overflow: visible;
 }
 
-.fabricate-manager-v2 .manager-v2-biome-swatch,
 .fabricate-manager-v2 .manager-v2-color-swatch {
   display: inline-flex;
   align-items: center;
@@ -8368,14 +8395,6 @@
   border-radius: 4px;
   color: var(--fab-bg-0);
   background: var(--manager-v2-color-swatch, var(--fab-tag-sage));
-}
-
-.fabricate-manager-v2 .manager-v2-biome-swatch {
-  min-height: 28px;
-}
-
-.fabricate-manager-v2 .manager-v2-biome-swatch i {
-  font-size: 0.8rem;
 }
 
 .fabricate-manager-v2 .manager-v2-condition-add .essence-icon-picker-trigger.icon-only,
@@ -8398,6 +8417,22 @@
   display: inline-block;
   min-width: 0;
   height: 100%;
+}
+
+.fabricate-manager-v2 .manager-v2-biome-combined-picker {
+  position: relative;
+  display: inline-block;
+  min-width: 0;
+  height: 100%;
+}
+
+.fabricate-manager-v2 .manager-v2-condition-pill .essence-icon-picker-trigger.icon-only.manager-v2-biome-combined-trigger {
+  color: var(--fab-bg-0);
+  background: var(--manager-v2-color-swatch, var(--fab-tag-sage));
+}
+
+.fabricate-manager-v2 .manager-v2-condition-pill .essence-icon-picker-trigger.icon-only.manager-v2-biome-combined-trigger i {
+  font-size: 0.8rem;
 }
 
 .fabricate-manager-v2 .manager-v2-color-picker-trigger,
