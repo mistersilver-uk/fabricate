@@ -6177,6 +6177,8 @@
 
 .fabricate-manager-v2 .manager-v2-environment-identity {
   grid-template-columns: 120px minmax(0, 1fr);
+  align-self: center;
+  min-height: 68px;
 }
 
 .fabricate-manager-v2 .manager-v2-system-icon,
@@ -6993,14 +6995,7 @@
   display: grid;
   grid-template-rows: 18px 18px;
   align-content: space-between;
-  opacity: 0;
   pointer-events: none;
-  transition: opacity 120ms ease;
-}
-
-.fabricate-manager-v2 .manager-v2-environment-row:hover .manager-v2-environment-reorder-stack,
-.fabricate-manager-v2 .manager-v2-environment-row:focus-within .manager-v2-environment-reorder-stack {
-  opacity: 1;
 }
 
 .fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button {
@@ -7013,7 +7008,14 @@
   color: var(--fab-mv2-text);
   background: var(--fab-overlay-dark-32);
   flex: 0 0 auto;
+  opacity: 0;
   pointer-events: auto;
+  transition: opacity 120ms ease;
+}
+
+.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:hover,
+.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:focus-visible {
+  opacity: 1;
 }
 
 .fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:first-child {
@@ -8175,6 +8177,89 @@
 
 .fabricate-manager-v2 .manager-v2-gathering-placeholder {
   min-height: 280px;
+}
+
+.fabricate-manager-v2 .manager-v2-gathering-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fabricate-manager-v2 .manager-v2-gathering-settings-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-gathering-rules-card {
+  border-color: var(--fab-warning-border);
+  background: var(--fab-overlay-light-08);
+}
+
+.fabricate-manager-v2 .manager-v2-rules-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-rule-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-rule-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  color: var(--fab-warning-text);
+  background: var(--fab-overlay-dark-20);
+}
+
+.fabricate-manager-v2 .manager-v2-rule-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  color: var(--fab-mv2-text);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.fabricate-manager-v2 .manager-v2-rule-field select,
+.fabricate-manager-v2 .manager-v2-rule-stepper input {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-bg);
+}
+
+.fabricate-manager-v2 .manager-v2-rule-field select {
+  padding: 0 10px;
+}
+
+.fabricate-manager-v2 .manager-v2-rule-stepper {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 34px;
+  gap: 6px;
+  padding-left: 42px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-rule-stepper input {
+  padding: 0 8px;
+  text-align: center;
 }
 
 .fabricate-manager-v2 .manager-v2-empty {

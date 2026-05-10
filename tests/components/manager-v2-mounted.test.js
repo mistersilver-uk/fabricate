@@ -1716,8 +1716,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
 
     for (const [label, placeholder] of [
       ['Tasks', 'Reusable gathering task management is planned for a later slice.'],
-      ['Encounters', 'Encounter and hazard authoring is planned for a later slice.'],
-      ['Settings', 'Gathering-wide configuration is planned for a later slice.']
+      ['Encounters', 'Encounter and hazard authoring is planned for a later slice.']
     ]) {
       gatheringTabs.find(tab => tab.textContent.includes(label)).click();
       await tick();
@@ -1740,6 +1739,28 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
         false
       );
     }
+
+    gatheringTabs.find(tab => tab.textContent.includes('Settings')).click();
+    await tick();
+    flushSync();
+    assert.equal(
+      target.querySelector(`.manager-v2-gathering-tab[aria-selected="true"]`).textContent.trim(),
+      'Settings'
+    );
+    assert.equal(target.querySelector('.manager-v2-toolbar'), null);
+    assert.equal(target.querySelector('.manager-v2-environments-table'), null);
+    assert.ok(target.textContent.includes('System-level d100 rules apply to every gathering environment in this crafting system.'));
+    assert.ok(target.textContent.includes('Highest ranked successful drop'));
+    assert.ok(target.textContent.includes('All successful drops'));
+    assert.ok(target.textContent.includes('Gathering succeeds'));
+    assert.ok(target.querySelector('.manager-v2-inspector [data-gathering-inspector-rules]'));
+    assert.equal(target.querySelector('.manager-v2-inspector [data-gathering-inspector-rules] h2').textContent.trim(), 'Rules');
+    assert.equal(target.querySelectorAll('.manager-v2-inspector [data-gathering-inspector-rules] select').length, 3);
+    assert.equal(target.querySelector('.manager-v2-inspector [data-gathering-rule-stepper]'), null);
+    assert.equal(
+      target.querySelector('.manager-v2-inspector').textContent.includes('Selected environment'),
+      false
+    );
 
     target.querySelector('#manager-v2-gathering-tab-environments').click();
     await tick();

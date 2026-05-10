@@ -28,9 +28,9 @@ The Environments tab's gathering panel must define bounded grid rows for its too
 
 ## Environment Browser Row Layout
 
-Environment browser rows use a larger scene thumbnail at `120px x 68px`, with the identity grid reserving the same `120px` image column. The thumbnail is centered within the identity row, and the row is positioned relatively with a stable minimum height around the larger image.
+Environment browser rows use a larger scene thumbnail at `120px x 68px`, with the identity grid reserving the same `120px` image column. The identity cell and thumbnail are centered within the row, and the row is positioned relatively with a stable minimum height around the larger image.
 
-The actions column reserves only the visible edit, duplicate, and delete controls. Move up/down controls remain in the DOM but render as thin absolute overlay bands across the top and bottom of each row, with the arrow icon centered in each band. The overlay is hidden by default and becomes available when the row is hovered or contains keyboard focus, preserving keyboard access without dedicating a permanent table column to reordering.
+The actions column reserves only the visible edit, duplicate, and delete controls. Move up/down controls remain in the DOM as thin absolute overlay bands across the top and bottom of each row, with the arrow icon centered in each band. Each band is invisible by default and reveals only itself when that narrow band is hovered or keyboard-focused, preserving keyboard access without dedicating a permanent table column to reordering.
 
 ## Compatibility
 

@@ -449,6 +449,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'gatheringConfig={$viewState.gatheringConfig}',
       'onUpdateGatheringConditions={store.updateGatheringConditions}',
       'onUpdateGatheringVocabulary={store.updateGatheringVocabulary}',
+      'onUpdateGatheringRules={store.updateGatheringRules}',
       'onAddGatheringLibraryTask={store.addGatheringLibraryTask}',
       'onUpdateGatheringLibraryTask={store.updateGatheringLibraryTask}',
       'onDeleteGatheringLibraryTask={store.deleteGatheringLibraryTask}',
@@ -465,8 +466,6 @@ describe('CraftingSystemManagerV2 source contract', () => {
       "updateField('region'",
       "updateField('biomes'",
       "updateField('dangerTags'",
-      "updateField('hazardSelectionMode'",
-      "updateField('hazardPolicy'",
       'libraryRecordEnabled(task.id',
       'toggleLibraryRecord(task.id',
       'libraryRecordEnabled(hazard.id',
@@ -477,6 +476,13 @@ describe('CraftingSystemManagerV2 source contract', () => {
     ]) {
       assert.ok(environmentEditSource.includes(snippet), `environment editor should include ${snippet}`);
     }
+    assert.ok(rootSource.includes('data-gathering-inspector-rules'), 'root should render the settings rules inspector');
+    assert.ok(rootSource.includes('updateSelectedGatheringRules'), 'root should wire rule updates');
+    assert.ok(rootSource.includes('data-gathering-rule-stepper="rewardLimit"'), 'root should render the reward limit stepper');
+    assert.ok(rootSource.includes('data-gathering-rule-stepper="hazardLimit"'), 'root should render the hazard limit stepper');
+    assert.ok(!environmentEditSource.includes("updateField('hazardSelectionMode'"), 'environment editor should not expose per-environment hazard selection rules');
+    assert.ok(!environmentEditSource.includes("updateField('hazardPolicy'"), 'environment editor should not expose per-environment hazard policy');
+    assert.ok(!environmentEditSource.includes('ItemSelectionMode'), 'environment editor should not expose per-task item selection rules');
     assert.ok(!environmentEditSource.includes('weatherFilter'), 'weather should not be an environment browse filter');
     assert.ok(!environmentEditSource.includes('timeOfDayFilter'), 'time of day should not be an environment browse filter');
   });

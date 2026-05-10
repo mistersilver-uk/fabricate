@@ -417,10 +417,14 @@ test('d100 resolution supports all-drops items and failure-with-hazard policy', 
     config: {
       systems: {
         'system-a': {
+          rules: {
+            rewardSelectionMode: 'allDrops',
+            hazardSelectionMode: 'allDrops',
+            hazardPolicy: 'failureWithHazard'
+          },
           tasks: [{
             id: 'task-d100',
             name: 'Forage',
-            itemSelectionMode: 'allDrops',
             dropRows: [
               { id: 'drop-common', componentId: 'herb', quantity: 2, dropRate: 10 },
               { id: 'drop-rare', itemUuid: 'Item.rare', quantity: 1, dropRate: 80 }
@@ -434,7 +438,7 @@ test('d100 resolution supports all-drops items and failure-with-hazard policy', 
   const calls = {};
   const engine = makeEngine({
     richState: service,
-    env: environment({ hazardPolicy: 'failureWithHazard' }),
+    env: environment(),
     calls
   });
 
@@ -448,6 +452,52 @@ test('d100 resolution supports all-drops items and failure-with-hazard policy', 
   assert.deepEqual(calls.terminal[0].payload.checkResult.items.map(row => row.id), ['drop-common', 'drop-rare']);
 });
 
+test('d100 resolution applies system gathering rules over legacy task and environment fields', async () => {
+  const { service } = makeRichState({
+    rolls: [100, 100, 100, 100, 100],
+    config: {
+      systems: {
+        'system-a': {
+          rules: {
+            rewardSelectionMode: 'limitedDrops',
+            rewardLimit: 2,
+            hazardSelectionMode: 'limitedDrops',
+            hazardLimit: 1,
+            hazardPolicy: 'successWithHazard'
+          },
+          tasks: [{
+            id: 'task-limited',
+            name: 'Limited Forage',
+            itemSelectionMode: 'allDrops',
+            dropRows: [
+              { id: 'drop-first', componentId: 'herb', quantity: 1, dropRate: 100 },
+              { id: 'drop-second', componentId: 'herb', quantity: 1, dropRate: 100 },
+              { id: 'drop-third', componentId: 'herb', quantity: 1, dropRate: 100 }
+            ]
+          }],
+          hazards: [
+            { id: 'hazard-first', name: 'First', dangerTags: ['hazardous'], dropRate: 100 },
+            { id: 'hazard-second', name: 'Second', dangerTags: ['hazardous'], dropRate: 100 }
+          ]
+        }
+      }
+    }
+  });
+  const calls = {};
+  const engine = makeEngine({
+    richState: service,
+    env: environment({ hazardSelectionMode: 'allDrops', hazardPolicy: 'failureWithHazard' }),
+    calls
+  });
+
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-limited' });
+
+  assert.equal(result.accepted, true);
+  assert.equal(result.state, 'succeeded');
+  assert.deepEqual(calls.terminal[0].payload.checkResult.items.map(row => row.id), ['drop-first', 'drop-second']);
+  assert.deepEqual(calls.terminal[0].payload.checkResult.hazards.map(row => row.id), ['hazard-first']);
+});
+
 test('d100 resolution applies numeric task and hazard modifier providers', () => {
   const { service } = makeRichState({ rolls: [90, 90] });
   const result = service.resolveD100Attempt({
@@ -458,7 +508,7 @@ test('d100 resolution applies numeric task and hazard modifier providers', () =>
       dropRows: [{ id: 'drop-modified', componentId: 'herb', quantity: 1, dropRate: 10 }]
     },
     environment: {
-      hazardSelectionMode: 'allDrops',
+      rules: { rewardSelectionMode: 'allDrops', hazardSelectionMode: 'allDrops' },
       hazards: [{ id: 'hazard-modified', name: 'Thorns', dropRate: 10, hazardModifier: { provider: 'static', value: 1 } }]
     }
   });

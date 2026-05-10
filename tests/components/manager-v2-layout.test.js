@@ -406,8 +406,8 @@ test('manager-v2 environments browser and edit route define compact responsive g
     'environment rows should anchor hover overlays while keeping height stable around larger thumbnails'
   );
   assert.ok(
-    css.includes('.fabricate-manager-v2 .manager-v2-environment-identity {\n  grid-template-columns: 120px minmax(0, 1fr);'),
-    'environment identity should reserve the larger scene thumbnail column'
+    css.includes('.fabricate-manager-v2 .manager-v2-environment-identity {\n  grid-template-columns: 120px minmax(0, 1fr);\n  align-self: center;\n  min-height: 68px;'),
+    'environment identity should reserve and vertically center the larger scene thumbnail column'
   );
   assert.ok(
     css.includes('.fabricate-manager-v2 .manager-v2-environment-thumb {\n  display: block;\n  align-self: center;\n  width: 120px;\n  height: 68px;'),
@@ -422,18 +422,20 @@ test('manager-v2 environments browser and edit route define compact responsive g
       && reorderStackBlock.includes('inset: 0;')
       && reorderStackBlock.includes('grid-template-rows: 18px 18px;')
       && reorderStackBlock.includes('align-content: space-between;')
-      && reorderStackBlock.includes('opacity: 0;')
       && reorderStackBlock.includes('pointer-events: none;'),
-    'environment move up/down buttons should be hidden full-row top and bottom overlays'
+    'environment move up/down hit areas should span hidden full-row top and bottom overlay bands'
   );
   assert.ok(
-    css.includes('.fabricate-manager-v2 .manager-v2-environment-row:hover .manager-v2-environment-reorder-stack,\n.fabricate-manager-v2 .manager-v2-environment-row:focus-within .manager-v2-environment-reorder-stack {\n  opacity: 1;'),
-    'environment reorder overlay should become usable on row hover or keyboard focus'
+    !css.includes('.manager-v2-environment-row:hover .manager-v2-environment-reorder-stack')
+      && !css.includes('.manager-v2-environment-row:focus-within .manager-v2-environment-reorder-stack'),
+    'environment reorder overlay should not become visible from whole-row hover or focus'
   );
   assert.ok(
     css.includes('.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button {\n  width: 100%;\n  height: 18px;')
-      && css.includes('background: var(--fab-overlay-dark-32);'),
-    'environment reorder buttons should render as thin row-width overlay bands with centered icons'
+      && css.includes('background: var(--fab-overlay-dark-32);')
+      && css.includes('opacity: 0;')
+      && css.includes('.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:hover,\n.fabricate-manager-v2 .manager-v2-environment-reorder-stack .manager-v2-icon-button:focus-visible {\n  opacity: 1;'),
+    'environment reorder buttons should reveal only their own thin row-width overlay band on hover or keyboard focus'
   );
   assert.ok(
     css.includes('.fabricate-manager-v2 .manager-v2-environment-row .manager-v2-status-cell'),

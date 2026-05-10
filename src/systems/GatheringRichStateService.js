@@ -8,9 +8,15 @@ const DEFAULT_VOCABULARIES = Object.freeze({
   weather: ['clear', 'cloudy', 'rain', 'storm', 'snow', 'fog', 'wind'],
   timeOfDay: ['dawn', 'day', 'dusk', 'night']
 });
-const TASK_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops']);
-const HAZARD_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops']);
+const DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops', 'limitedDrops']);
 const HAZARD_POLICIES = new Set(['successWithHazard', 'failureWithHazard']);
+const DEFAULT_GATHERING_RULES = Object.freeze({
+  rewardSelectionMode: 'highestRankedDrop',
+  rewardLimit: 1,
+  hazardSelectionMode: 'allDrops',
+  hazardLimit: 1,
+  hazardPolicy: 'successWithHazard'
+});
 
 const BLOCKED_REASON_KEYS = Object.freeze({
   NODE_DEPLETED: 'FABRICATE.Gathering.Blocked.NodeDepleted',
@@ -94,6 +100,7 @@ export class GatheringRichStateService {
     if (!environment || typeof environment !== 'object') return environment;
     const config = this._config();
     const libraries = config.systems?.[String(system?.id || environment.craftingSystemId)] || {};
+    const rules = normalizeGatheringRules(libraries.rules);
     const tasks = [
       ...normalizeList(environment.tasks),
       ...normalizeList(libraries.tasks)
@@ -115,8 +122,10 @@ export class GatheringRichStateService {
       dangerTags: normalizeTagList(environment.dangerTags ?? environment.risk),
       tasks,
       hazards,
-      hazardSelectionMode: HAZARD_SELECTION_MODES.has(environment.hazardSelectionMode) ? environment.hazardSelectionMode : 'allDrops',
-      hazardPolicy: HAZARD_POLICIES.has(environment.hazardPolicy) ? environment.hazardPolicy : 'successWithHazard'
+      rules,
+      hazardSelectionMode: rules.hazardSelectionMode,
+      hazardLimit: rules.hazardLimit,
+      hazardPolicy: rules.hazardPolicy
     };
   }
 
@@ -132,8 +141,8 @@ export class GatheringRichStateService {
         modifier: taskModifier
       }))
       .filter(result => result.dropped);
-    const itemSelectionMode = TASK_SELECTION_MODES.has(task?.itemSelectionMode) ? task.itemSelectionMode : 'highestRankedDrop';
-    const selectedItems = selectDrops(droppedItems, itemSelectionMode);
+    const rules = normalizeGatheringRules(environment?.rules);
+    const selectedItems = selectDrops(droppedItems, rules.rewardSelectionMode, rules.rewardLimit);
 
     const droppedHazards = normalizeList(environment?.hazards)
       .filter(hazard => hazard?.enabled !== false)
@@ -144,9 +153,8 @@ export class GatheringRichStateService {
         modifier: numericModifier(hazard?.hazardModifier, hazardModifier)
       }))
       .filter(result => result.dropped);
-    const hazardSelectionMode = HAZARD_SELECTION_MODES.has(environment?.hazardSelectionMode) ? environment.hazardSelectionMode : 'allDrops';
-    const selectedHazards = selectDrops(droppedHazards, hazardSelectionMode);
-    const hazardPolicy = HAZARD_POLICIES.has(environment?.hazardPolicy) ? environment.hazardPolicy : 'successWithHazard';
+    const selectedHazards = selectDrops(droppedHazards, rules.hazardSelectionMode, rules.hazardLimit);
+    const hazardPolicy = rules.hazardPolicy;
 
     return {
       status: selectedHazards.length > 0 && hazardPolicy === 'failureWithHazard' ? 'failed' : 'succeeded',
@@ -476,6 +484,7 @@ function normalizeGatheringConfig(raw = {}) {
   const systems = {};
   for (const [systemId, config] of Object.entries(raw?.systems || {})) {
     systems[String(systemId)] = {
+      rules: normalizeGatheringRules(config?.rules),
       tasks: normalizeList(config?.tasks).map(normalizeLibraryTask),
       hazards: normalizeList(config?.hazards).map(normalizeHazard)
     };
@@ -501,7 +510,7 @@ function normalizeLibraryTask(task = {}) {
     biomes: normalizeTagList(task.biomes),
     weather: normalizeTagList(task.weather),
     timeOfDay: normalizeTagList(task.timeOfDay),
-    itemSelectionMode: TASK_SELECTION_MODES.has(task.itemSelectionMode) ? task.itemSelectionMode : 'highestRankedDrop',
+    itemSelectionMode: DROP_SELECTION_MODES.has(task.itemSelectionMode) ? task.itemSelectionMode : 'highestRankedDrop',
     dropRows: normalizeList(task.dropRows ?? task.itemDrops).map(normalizeItemDrop),
     staminaCost: nonNegativeNumber(task.staminaCost, 0),
     gatheringModifier: normalizeModifierProvider(task.gatheringModifier ?? task.modifier),
@@ -575,11 +584,29 @@ function rollDropRow({ row, index, roll, modifier }) {
   };
 }
 
-function selectDrops(drops, mode) {
+function normalizeGatheringRules(rules = {}) {
+  return {
+    rewardSelectionMode: DROP_SELECTION_MODES.has(rules?.rewardSelectionMode)
+      ? rules.rewardSelectionMode
+      : DEFAULT_GATHERING_RULES.rewardSelectionMode,
+    rewardLimit: positiveInteger(rules?.rewardLimit, DEFAULT_GATHERING_RULES.rewardLimit),
+    hazardSelectionMode: DROP_SELECTION_MODES.has(rules?.hazardSelectionMode)
+      ? rules.hazardSelectionMode
+      : DEFAULT_GATHERING_RULES.hazardSelectionMode,
+    hazardLimit: positiveInteger(rules?.hazardLimit, DEFAULT_GATHERING_RULES.hazardLimit),
+    hazardPolicy: HAZARD_POLICIES.has(rules?.hazardPolicy)
+      ? rules.hazardPolicy
+      : DEFAULT_GATHERING_RULES.hazardPolicy
+  };
+}
+
+function selectDrops(drops, mode, limit = 1) {
   if (mode === 'allDrops') return drops.map(drop => cloneJson(drop));
-  const highest = drops
+  const ranked = drops
     .slice()
-    .sort((left, right) => Number(left.rank) - Number(right.rank))[0];
+    .sort((left, right) => Number(left.rank) - Number(right.rank));
+  if (mode === 'limitedDrops') return ranked.slice(0, positiveInteger(limit, 1)).map(drop => cloneJson(drop));
+  const highest = ranked[0];
   return highest ? [cloneJson(highest)] : [];
 }
 
@@ -663,6 +690,11 @@ function nonNegativeNumber(value, fallback = 0) {
 function nonNegativeInteger(value, fallback = 0) {
   const number = Number(value);
   return Number.isInteger(number) && number >= 0 ? number : Number(fallback || 0);
+}
+
+function positiveInteger(value, fallback = 1) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 1 ? Math.floor(number) : Number(fallback || 1);
 }
 
 function cloneJson(value) {
