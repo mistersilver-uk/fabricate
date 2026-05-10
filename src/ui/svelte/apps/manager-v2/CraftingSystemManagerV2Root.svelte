@@ -1353,8 +1353,21 @@
     return item?.name || componentId || '';
   }
 
+  function gatheringManagedItemImage(componentId) {
+    const item = (selectedSystem?.managedItemOptions || []).find(option => String(option.id || '') === String(componentId || ''));
+    return item?.img || 'icons/svg/item-bag.svg';
+  }
+
+  function gatheringDropName(row) {
+    return row?.name || gatheringManagedItemLabel(row?.componentId) || row?.itemUuid || text('FABRICATE.Admin.ManagerV2.Environment.Tasks.UnresolvedDrop', 'Unresolved drop');
+  }
+
+  function gatheringDropImage(row) {
+    return row?.img || gatheringManagedItemImage(row?.componentId);
+  }
+
   function gatheringTaskDropLabel(row) {
-    const name = row?.name || gatheringManagedItemLabel(row?.componentId) || row?.itemUuid || text('FABRICATE.Admin.ManagerV2.Environment.Tasks.UnresolvedDrop', 'Unresolved drop');
+    const name = gatheringDropName(row);
     return `${name} x${row?.quantity || 1} (${row?.dropRate ?? 1}%)`;
   }
 
@@ -1375,6 +1388,33 @@
 
   function gatheringConditionCurrent(kind) {
     return selectedGatheringSystemConfig.conditions?.[kind]?.current || '';
+  }
+
+  function gatheringCurrentConditionLabel(kind) {
+    return gatheringConditionLabel(kind, gatheringConditionCurrent(kind))
+      || (kind === 'weather'
+        ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyWeather', 'Any weather')
+        : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyTime', 'Any time'));
+  }
+
+  function gatheringSignedPercent(value) {
+    const number = Number(value || 0);
+    return `${number >= 0 ? '+' : ''}${number}%`;
+  }
+
+  function gatheringAppliedDropModifiers(row) {
+    if (!row) return [];
+    return ['timeOfDay', 'weather'].flatMap(kind => {
+      const current = gatheringConditionCurrent(kind);
+      if (!current) return [];
+      return gatheringConditionModifierRows(row, kind)
+        .filter(modifier => modifier.conditionId === current)
+        .map(modifier => ({
+          ...modifier,
+          kind,
+          label: gatheringConditionLabel(kind, modifier.conditionId) || modifier.conditionId
+        }));
+    });
   }
 
   function gatheringDropConditionModifierTotal(row) {
@@ -2000,6 +2040,9 @@
         onDuplicateDrop={duplicateGatheringTaskDrop}
         onDeleteDrop={deleteGatheringTaskDrop}
         onImportDrop={importGatheringTaskDrop}
+        onAddModifier={addGatheringDropModifier}
+        onUpdateModifier={updateGatheringDropModifier}
+        onDeleteModifier={deleteGatheringDropModifier}
       />
     {:else if currentView === 'essences' && selectedSystem}
       <EssenceBrowserView
@@ -2198,6 +2241,7 @@
       {:else if currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit'}
         {#if (currentView === 'environments' && activeGatheringTab === 'tasks') || currentView === 'gathering-task-edit'}
           {#if selectedGatheringTask}
+            {#if currentView !== 'gathering-task-edit'}
             <section class="manager-v2-inspector-card" data-gathering-task-inspector>
               <div class="manager-v2-inspector-title-row is-hero-large">
                 <img class="manager-v2-recipe-preview" src={gatheringTaskImage(selectedGatheringTask)} alt="" />
@@ -2239,61 +2283,77 @@
                 </div>
               </div>
             </section>
+            {/if}
 
-            {#if currentView === 'gathering-task-edit' && selectedGatheringDrop}
-            <section class="manager-v2-inspector-card" data-gathering-task-drop-inspector>
-              <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SelectedDrop', 'Selected drop rule')}</h3>
-              <label class="manager-v2-field">
-                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropComponent', 'Drop component')}</span>
-                <select value={selectedGatheringDrop.componentId || ''} onchange={(event) => { if (event.currentTarget.value) updateGatheringTaskDrop(selectedGatheringDrop.id, { componentId: event.currentTarget.value, itemUuid: '' }); }}>
-                  <option value="" disabled>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.UnresolvedDrop', 'Unresolved drop')}</option>
-                  {#each selectedSystem.managedItemOptions || [] as item (item.id)}
-                    <option value={item.id}>{item.name || item.id}</option>
-                  {/each}
-                </select>
-              </label>
-              <label class="manager-v2-field">
-                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChance', 'Drop chance')}</span>
-                <input type="range" min="0" max="100" step="1" value={selectedGatheringDrop.dropRate ?? 1} oninput={(event) => updateGatheringTaskDrop(selectedGatheringDrop.id, { dropRate: Number(event.currentTarget.value) })} />
-              </label>
-              <div class="manager-v2-fact-grid">
-                <div class="manager-v2-fact" data-gathering-task-drop-fact="base-chance">
-                  <strong>{selectedGatheringDrop.dropRate ?? 1}%</strong>
-                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.BaseChance', 'Base chance')}</span>
-                </div>
-                <div class="manager-v2-fact" data-gathering-task-drop-fact="final-chance">
-                  <strong>{gatheringDropFinalChance(selectedGatheringDrop)}%</strong>
-                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.FinalChance', 'Final chance')}</span>
-                </div>
-              </div>
-              <label class="manager-v2-field">
-                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Quantity', 'Quantity')}</span>
-                <input type="number" min="1" step="1" value={selectedGatheringDrop.quantity || 1} oninput={(event) => updateGatheringTaskDrop(selectedGatheringDrop.id, { quantity: Number(event.currentTarget.value || 1) })} />
-              </label>
-
+            {#if currentView === 'gathering-task-edit'}
+            <section class="manager-v2-inspector-card manager-v2-task-summary-card" data-gathering-task-summary>
+              <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.TaskSummary', 'Task Summary')}</h3>
               <div class="manager-v2-requirements-list">
-                {#each ['timeOfDay', 'weather'] as kind}
-                  <div class="manager-v2-requirement-row manager-v2-modifier-editor" data-gathering-drop-modifier-kind={kind}>
-                    <span>{kind === 'weather' ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.WeatherModifiers', 'Weather modifiers') : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.TimeModifiers', 'Time modifiers')}</span>
-                    <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AddModifier', 'Add modifier')} onclick={() => addGatheringDropModifier(selectedGatheringDrop.id, kind)}>
-                      <i class="fas fa-plus" aria-hidden="true"></i>
-                    </button>
-                  </div>
-                  {#each gatheringConditionModifierRows(selectedGatheringDrop, kind) as modifier (modifier.id)}
-                    <div class="manager-v2-requirement-row manager-v2-modifier-row" data-gathering-drop-modifier-id={modifier.id}>
-                      <select value={modifier.conditionId} onchange={(event) => updateGatheringDropModifier(selectedGatheringDrop.id, kind, modifier.id, { conditionId: event.currentTarget.value })}>
-                        {#each gatheringConditionOptions(kind) as option (option.id)}
-                          <option value={option.id}>{option.label || option.id}</option>
-                        {/each}
-                      </select>
-                      <input class={`manager-v2-modifier-value ${gatheringDropModifierClass(modifier.value)}`} type="number" step="1" value={modifier.value || 0} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ModifierValue', 'Modifier value')} oninput={(event) => updateGatheringDropModifier(selectedGatheringDrop.id, kind, modifier.id, { value: Number(event.currentTarget.value || 0) })} />
-                      <button type="button" class="manager-v2-icon-button is-danger" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DeleteModifier', 'Delete modifier')} onclick={() => deleteGatheringDropModifier(selectedGatheringDrop.id, kind, modifier.id)}>
-                        <i class="fas fa-trash" aria-hidden="true"></i>
-                      </button>
-                    </div>
-                  {/each}
-                {/each}
+                <div class="manager-v2-requirement-row">
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Status', 'Status')}</span>
+                  <strong class={selectedGatheringTask.enabled === false ? 'is-danger' : 'is-active'}>{selectedGatheringTask.enabled === false ? text('FABRICATE.Admin.ManagerV2.StatusDisabled', 'Disabled') : text('FABRICATE.Admin.ManagerV2.StatusEnabled', 'Enabled')}</strong>
+                </div>
+                <div class="manager-v2-requirement-row">
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Drops', 'Drops')}</span>
+                  <strong>{gatheringTaskDropRows(selectedGatheringTask).length}</strong>
+                </div>
+                <div class="manager-v2-requirement-row">
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ActiveEnvironments', 'Environments Using This Task')}</span>
+                  <strong>{activeGatheringTaskEnvironmentCount(selectedGatheringTask)}</strong>
+                </div>
               </div>
+              <h4>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.TaskAvailabilityGates', 'Task Availability (Gates)')}</h4>
+              <div class="manager-v2-requirements-list">
+                <div class="manager-v2-requirement-row">
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.TimeOfDay', 'Time of Day')}</span>
+                  <strong>{Array.isArray(selectedGatheringTask.timeOfDay) && selectedGatheringTask.timeOfDay.length > 0 ? selectedGatheringTask.timeOfDay.map(id => gatheringConditionLabel('timeOfDay', id)).filter(Boolean).join(', ') : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyTimeAvailable', 'Available at any time')}</strong>
+                </div>
+                <div class="manager-v2-requirement-row">
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Weather', 'Weather')}</span>
+                  <strong>{Array.isArray(selectedGatheringTask.weather) && selectedGatheringTask.weather.length > 0 ? selectedGatheringTask.weather.map(id => gatheringConditionLabel('weather', id)).filter(Boolean).join(', ') : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyWeatherAvailable', 'Available in any weather')}</strong>
+                </div>
+              </div>
+            </section>
+
+            {#if selectedGatheringDrop}
+            <section class="manager-v2-inspector-card manager-v2-drop-preview-card" data-gathering-task-drop-inspector>
+              <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SelectedDropPreview', 'Selected Drop Preview')}</h3>
+              <div class="manager-v2-inspector-title-row">
+                <img class="manager-v2-recipe-preview" src={gatheringDropImage(selectedGatheringDrop)} alt="" />
+                <div class="manager-v2-inspector-copy">
+                  <h2 class="manager-v2-inspector-name">{gatheringDropName(selectedGatheringDrop)}</h2>
+                  <span class="manager-v2-chip">{selectedGatheringDrop.rarity || selectedGatheringDrop.rank || text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Unranked', 'Unranked')}</span>
+                </div>
+              </div>
+              <h4>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.CurrentConditions', 'Current Conditions')}</h4>
+              <div class="manager-v2-current-conditions">
+                <span><i class="far fa-clock" aria-hidden="true"></i>{gatheringCurrentConditionLabel('timeOfDay')}</span>
+                <span><i class="fas fa-cloud-rain" aria-hidden="true"></i>{gatheringCurrentConditionLabel('weather')}</span>
+              </div>
+              <h4>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AppliedModifiers', 'Applied Modifiers (for this drop)')}</h4>
+              <div class="manager-v2-chip-row">
+                {#each gatheringAppliedDropModifiers(selectedGatheringDrop) as modifier (modifier.id)}
+                  <span class={`manager-v2-chip ${gatheringDropModifierClass(modifier.value)}`}>{modifier.label} {gatheringSignedPercent(modifier.value)}</span>
+                {:else}
+                  <span class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.NoModifiers', 'No modifiers')}</span>
+                {/each}
+                <strong class={gatheringDropConditionModifierTotal(selectedGatheringDrop) < 0 ? 'is-danger' : 'is-active'}>{gatheringSignedPercent(gatheringDropConditionModifierTotal(selectedGatheringDrop))}</strong>
+              </div>
+              <div class="manager-v2-final-chance">
+                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.FinalChanceThisDrop', 'Final Chance (This Drop)')}</span>
+                <strong>{gatheringDropFinalChance(selectedGatheringDrop)}%</strong>
+                <small>({selectedGatheringDrop.dropRate ?? 1}% {text('FABRICATE.Admin.ManagerV2.Environment.Tasks.BaseChanceShort', 'base')})</small>
+              </div>
+            </section>
+            {/if}
+
+            <section class="manager-v2-inspector-card manager-v2-matching-logic-card" data-gathering-task-matching-logic>
+              <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.MatchingLogic', 'Matching Logic')}</h3>
+              <ol>
+                <li>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.MatchingLogicGate', 'Task availability gates are checked first. If the task is unavailable, no drops roll.')}</li>
+                <li>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.MatchingLogicDrops', 'For each drop in the task, base rate is adjusted by that drop rule and weather modifiers, then environment overrides are applied.')}</li>
+              </ol>
+              <p class="is-active">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.UniqueDropModifiers', 'Each drop can have unique modifiers.')}</p>
             </section>
             {:else}
             <section class="manager-v2-inspector-card">

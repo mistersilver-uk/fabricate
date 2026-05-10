@@ -8301,40 +8301,87 @@
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
-.fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"] .manager-v2-main {
-  grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
-}
-
 .fabricate-manager-v2 .manager-v2-gathering-task-edit-view {
   display: grid;
-  gap: 12px;
+  grid-template-rows: auto auto auto auto minmax(0, 1fr) auto auto;
+  gap: 10px;
   min-height: 0;
   min-width: 0;
-  padding: 12px;
-  overflow: hidden;
+  padding: 14px 18px;
+  overflow: auto;
 }
 
-.fabricate-manager-v2 .manager-v2-editor-hero {
-  display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) minmax(180px, 0.45fr);
-  gap: 12px;
-  align-items: start;
-  min-width: 0;
-  padding: 12px;
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
-  background: var(--fab-mv2-surface-2);
-}
-
-.fabricate-manager-v2 .manager-v2-editor-hero .manager-v2-recipe-preview {
-  width: 72px;
-  height: 72px;
-}
-
-.fabricate-manager-v2 .manager-v2-editor-fields,
-.fabricate-manager-v2 .manager-v2-editor-side-fields {
+.fabricate-manager-v2 .manager-v2-task-workspace-header {
   display: grid;
   gap: 10px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-link-button {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 7px;
+  min-height: 30px;
+  padding: 0;
+  border: 0;
+  color: var(--fab-mv2-text-muted);
+  background: transparent;
+  font-size: 0.86rem;
+}
+
+.fabricate-manager-v2 .manager-v2-link-button:hover {
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager-v2 .manager-v2-task-title-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) minmax(180px, 0.24fr);
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-gathering-task-large-icon {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+
+.fabricate-manager-v2 .manager-v2-task-title-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-task-title-input,
+.fabricate-manager-v2 .manager-v2-task-description-input {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  color: var(--fab-mv2-text);
+  background: transparent;
+  box-shadow: none;
+}
+
+.fabricate-manager-v2 .manager-v2-task-title-input {
+  font-size: 1.55rem;
+  line-height: 1.12;
+  font-weight: 800;
+  color: var(--fab-warning-text);
+}
+
+.fabricate-manager-v2 .manager-v2-task-description-input {
+  min-height: 34px;
+  resize: none;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.9rem;
+}
+
+.fabricate-manager-v2 .manager-v2-task-header-actions {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -8348,11 +8395,86 @@
   font-weight: 700;
 }
 
-.fabricate-manager-v2 .manager-v2-task-editor-availability {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+.fabricate-manager-v2 .manager-v2-task-editor-tabs {
+  display: flex;
+  align-items: center;
+  gap: 18px;
   min-width: 0;
+  border-bottom: 1px solid var(--fab-mv2-border);
+}
+
+.fabricate-manager-v2 .manager-v2-task-editor-tabs button {
+  min-height: 36px;
+  padding: 0 2px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--fab-mv2-text-muted);
+  background: transparent;
+  font-weight: 700;
+}
+
+.fabricate-manager-v2 .manager-v2-task-editor-tabs button.is-active {
+  color: var(--fab-warning-text);
+  border-bottom-color: var(--fab-warning-text);
+}
+
+.fabricate-manager-v2 .manager-v2-task-overview-card,
+.fabricate-manager-v2 .manager-v2-task-drops-card,
+.fabricate-manager-v2 .manager-v2-selected-drop-editor {
+  min-width: 0;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-mv2-surface-2);
+  box-shadow: inset 0 1px 0 var(--fab-overlay-light-06);
+}
+
+.fabricate-manager-v2 .manager-v2-task-overview-card {
+  display: grid;
+  grid-template-columns: minmax(230px, 0.88fr) minmax(280px, 1.18fr) minmax(180px, 0.64fr);
+  gap: 18px;
+  padding: 13px 18px;
+}
+
+.fabricate-manager-v2 .manager-v2-task-basic-info,
+.fabricate-manager-v2 .manager-v2-task-availability-summary,
+.fabricate-manager-v2 .manager-v2-task-status-summary {
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-task-availability-summary,
+.fabricate-manager-v2 .manager-v2-task-status-summary {
+  border-left: 1px solid var(--fab-mv2-border);
+  padding-left: 18px;
+}
+
+.fabricate-manager-v2 .manager-v2-task-overview-card h3,
+.fabricate-manager-v2 .manager-v2-task-card-header h3,
+.fabricate-manager-v2 .manager-v2-selected-drop-editor h3,
+.fabricate-manager-v2 .manager-v2-drop-modifier-panel h4 {
+  margin: 0;
+  color: var(--fab-warning-text);
+  font-size: 1rem;
+}
+
+.fabricate-manager-v2 .manager-v2-task-overview-card h3 span {
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.78rem;
+}
+
+.fabricate-manager-v2 .manager-v2-task-condition-line {
+  display: grid;
+  grid-template-columns: 24px minmax(90px, 0.5fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-task-condition-line span {
+  color: var(--fab-success-text);
+  text-align: right;
 }
 
 .fabricate-manager-v2 .manager-v2-chip-field {
@@ -8389,6 +8511,29 @@
   font-weight: 700;
 }
 
+.fabricate-manager-v2 .manager-v2-task-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--fab-mv2-border);
+}
+
+.fabricate-manager-v2 .manager-v2-task-card-header h3,
+.fabricate-manager-v2 .manager-v2-task-card-header h4 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-search.is-compact {
+  width: min(260px, 34%);
+  min-height: 32px;
+}
+
 .fabricate-manager-v2 .manager-v2-warning-band {
   display: flex;
   align-items: center;
@@ -8401,11 +8546,16 @@
   background: var(--fab-warning-soft);
 }
 
+.fabricate-manager-v2 .manager-v2-warning-band.is-formula {
+  justify-content: flex-start;
+  background: var(--fab-overlay-light-035);
+}
+
 .fabricate-manager-v2 .manager-v2-gathering-task-drops-table {
-  --fab-mv2-task-drop-grid: minmax(0, 1.45fr) minmax(120px, 0.62fr) 86px minmax(120px, 0.82fr) 112px;
+  --fab-mv2-task-drop-grid: minmax(0, 1.22fr) minmax(112px, 0.5fr) 104px 94px minmax(180px, 1.04fr) 104px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
   min-width: 0;
 }
 
@@ -8421,23 +8571,23 @@
 
 .fabricate-manager-v2 .manager-v2-gathering-task-drop-row {
   width: 100%;
-  min-height: 76px;
-  padding: 9px 10px;
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
+  min-height: 40px;
+  padding: 6px 10px;
+  border: 0;
+  border-top: 1px solid var(--fab-mv2-border);
+  border-radius: 0;
   color: var(--fab-mv2-text);
-  background: var(--fab-mv2-surface-2);
+  background: transparent;
 }
 
 .fabricate-manager-v2 .manager-v2-gathering-task-drop-row:hover {
-  border-color: var(--fab-mv2-border-strong);
   background: var(--fab-mv2-surface-3);
 }
 
 .fabricate-manager-v2 .manager-v2-gathering-task-drop-row.is-selected {
-  border-color: var(--fab-mv2-border-strong);
-  background: var(--fab-success-soft);
-  box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
+  border-color: var(--fab-info-border);
+  background: var(--fab-info-soft);
+  box-shadow: inset 3px 0 0 var(--fab-warning-text), inset 0 0 0 1px var(--fab-info-border);
 }
 
 .fabricate-manager-v2 .manager-v2-gathering-task-drop-table-head > *,
@@ -8466,17 +8616,111 @@
   background: var(--fab-success-soft);
 }
 
+.fabricate-manager-v2 .manager-v2-rank-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: max-content;
+  max-width: 100%;
+  min-height: 24px;
+  padding: 2px 9px;
+  border: 1px solid var(--fab-info-border);
+  border-radius: 6px;
+  color: var(--fab-info-text);
+  background: var(--fab-info-soft);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.fabricate-manager-v2 .manager-v2-selected-drop-editor {
+  display: grid;
+  min-height: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-selected-drop-fields {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.5fr) minmax(180px, 0.7fr) minmax(120px, 0.5fr);
+  gap: 12px;
+  padding: 12px 14px;
+}
+
+.fabricate-manager-v2 .manager-v2-drop-modifier-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+  padding: 0 14px 14px;
+}
+
+.fabricate-manager-v2 .manager-v2-drop-modifier-panel {
+  min-width: 0;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-overlay-light-035);
+}
+
 .fabricate-manager-v2 .manager-v2-modifier-row {
-  grid-template-columns: minmax(0, 1fr) 72px 32px;
+  grid-template-columns: minmax(0, 1fr) 24px 72px 32px;
   gap: 8px;
 }
 
+.fabricate-manager-v2 .manager-v2-modifier-arrow {
+  display: inline-flex;
+  justify-content: center;
+  font-weight: 900;
+}
+
+.fabricate-manager-v2 .manager-v2-modifier-arrow.is-active,
 .fabricate-manager-v2 .manager-v2-modifier-value.is-active {
+  color: var(--fab-success-text);
   border-color: var(--fab-success-border);
 }
 
+.fabricate-manager-v2 .manager-v2-modifier-arrow.is-danger,
 .fabricate-manager-v2 .manager-v2-modifier-value.is-danger {
+  color: var(--fab-danger-text);
   border-color: var(--fab-danger-border);
+}
+
+.fabricate-manager-v2 .manager-v2-task-summary-card h4,
+.fabricate-manager-v2 .manager-v2-drop-preview-card h4 {
+  margin: 10px 0 0;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.fabricate-manager-v2 .manager-v2-current-conditions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.fabricate-manager-v2 .manager-v2-current-conditions span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-final-chance {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  margin-top: 12px;
+}
+
+.fabricate-manager-v2 .manager-v2-final-chance strong {
+  color: var(--fab-success-text);
+  font-size: 1.42rem;
+}
+
+.fabricate-manager-v2 .manager-v2-matching-logic-card ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--fab-mv2-text-muted);
 }
 
 .fabricate-manager-v2 .manager-v2-gathering-placeholder {

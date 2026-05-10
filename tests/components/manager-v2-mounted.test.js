@@ -2082,7 +2082,10 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Edit availability, identity, and drop rules for the selected gathering task.'));
     assert.ok(target.querySelector('[data-gathering-task-drops-table]'));
     assert.ok(target.querySelector('[data-gathering-task-drop-inspector]'));
-    assert.ok(target.textContent.includes('Drop chance'));
+    assert.ok(target.querySelector('[data-gathering-task-summary]'));
+    assert.ok(target.querySelector('[data-gathering-task-matching-logic]'));
+    assert.ok(target.textContent.includes('Task Summary'));
+    assert.ok(target.textContent.includes('Base Rate'));
     const taskNameInput = target.querySelector('[data-gathering-task-field="name"]');
     taskNameInput.value = 'Gather Sun Herbs';
     taskNameInput.dispatchEvent(new Event('input', { bubbles: true }));
