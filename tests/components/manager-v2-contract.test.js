@@ -485,7 +485,10 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(environmentsBrowserSource.includes('data-gathering-condition-panel={condition.kind}'), 'settings tab should render condition vocabulary panels');
     assert.ok(environmentsBrowserSource.includes('onToggleGatheringConditionEnabled?.'), 'settings condition panels should wire matching toggles');
     assert.ok(environmentsBrowserSource.includes('onAddGatheringConditionValue?.'), 'settings condition panels should wire value additions');
+    assert.ok(environmentsBrowserSource.includes('onUpdateGatheringConditionValue?.'), 'settings condition panels should wire label and icon updates');
     assert.ok(environmentsBrowserSource.includes('onDeleteGatheringConditionValue?.'), 'settings condition panels should wire value deletion');
+    assert.ok(environmentsBrowserSource.includes('IconPicker'), 'settings condition panels should reuse the shared icon picker');
+    assert.ok(environmentsBrowserSource.includes('manager-v2-condition-label-input'), 'settings condition panels should expose editable display labels');
     assert.ok(environmentEditSource.includes("{#each ['regions', 'biomes', 'danger'] as vocabulary"), 'environment editor should keep only non-weather generic vocabulary CSV controls');
     assert.ok(!environmentEditSource.includes("{#each ['regions', 'biomes', 'danger', 'weather', 'timeOfDay'] as vocabulary"), 'environment editor should not expose weather/time generic vocabulary CSV controls');
     assert.ok(rootSource.includes('updateSelectedGatheringRules'), 'root should wire rule updates');

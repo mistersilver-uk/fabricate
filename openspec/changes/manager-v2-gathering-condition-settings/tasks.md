@@ -10,3 +10,7 @@
 - [x] Run focused validation suites.
 - [x] Run `npm test`.
 - [x] Run `npm run build`.
+- [x] Normalize condition values to option records with editable labels/icons.
+- [x] Update Settings UI pills/selectors for labels, icons, and icon picker editing.
+- [x] Add focused regression coverage for option records, matching ids, and settings layout polish.
+- [x] Re-run focused suites, `npm test`, and `npm run build`.

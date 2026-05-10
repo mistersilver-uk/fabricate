@@ -2,6 +2,7 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
+  import IconPicker from '../../components/IconPicker.svelte';
 
   let {
     environments = [],
@@ -28,6 +29,7 @@
     onUpdateGatheringConditions = () => {},
     onToggleGatheringConditionEnabled = () => {},
     onAddGatheringConditionValue = () => {},
+    onUpdateGatheringConditionValue = () => {},
     onDeleteGatheringConditionValue = () => {}
   } = $props();
 
@@ -275,6 +277,25 @@
 
   function updateCurrentCondition(kind, value) {
     onUpdateGatheringConditions?.({ [kind]: value, systemId: selectedSystemId });
+  }
+
+  function conditionId(option) {
+    if (option && typeof option === 'object') return String(option.id || '').trim();
+    return String(option || '').trim();
+  }
+
+  function conditionLabel(option) {
+    if (option && typeof option === 'object') return String(option.label || option.id || '').trim();
+    return String(option || '').trim();
+  }
+
+  function conditionIcon(option, kind) {
+    if (option && typeof option === 'object' && option.icon) return option.icon;
+    return kind === 'timeOfDay' ? 'fas fa-clock' : 'fas fa-cloud-sun';
+  }
+
+  function conditionValues(setting) {
+    return Array.isArray(setting?.values) ? setting.values : [];
   }
 
   function gatheringHeaderTitle() {
@@ -562,8 +583,8 @@
           <label class="manager-v2-field manager-v2-condition-current">
             <span>{conditionCurrentLabel(condition.kind)}</span>
             <select value={condition.setting.current} onchange={(event) => updateCurrentCondition(condition.kind, event.currentTarget.value)}>
-              {#each condition.setting.values || [] as value (value)}
-                <option value={value}>{value}</option>
+              {#each conditionValues(condition.setting) as option (conditionId(option))}
+                <option value={conditionId(option)}>{conditionLabel(option)}</option>
               {/each}
             </select>
           </label>
@@ -583,16 +604,34 @@
           </form>
 
           <div class="manager-v2-condition-pill-list" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Conditions.Values', 'Condition values')}>
-            {#each condition.setting.values || [] as value (value)}
-              <span class="manager-v2-condition-pill" data-gathering-condition-value={value}>
-                <span>{value}</span>
+            {#each conditionValues(condition.setting) as option (conditionId(option))}
+              {@const valueId = conditionId(option)}
+              <span class="manager-v2-condition-pill" data-gathering-condition-value={valueId}>
+                <IconPicker
+                  value={conditionIcon(option, condition.kind)}
+                  iconOnly={true}
+                  buttonTitle={text('FABRICATE.Admin.ManagerV2.Environment.Conditions.EditIcon', 'Edit icon')}
+                  onChange={(icon) => onUpdateGatheringConditionValue?.(condition.kind, valueId, { icon }, selectedSystemId)}
+                />
+                <input
+                  class="manager-v2-condition-label-input"
+                  value={conditionLabel(option)}
+                  aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Conditions.EditLabel', 'Edit label')}
+                  onblur={(event) => onUpdateGatheringConditionValue?.(condition.kind, valueId, { label: event.currentTarget.value }, selectedSystemId)}
+                  onkeydown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      event.currentTarget.blur();
+                    }
+                  }}
+                />
                 <button
                   type="button"
                   class="manager-v2-condition-remove"
-                  aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Conditions.RemoveValue', 'Remove {value}').replace('{value}', value)}
-                  title={text('FABRICATE.Admin.ManagerV2.Environment.Conditions.RemoveValue', 'Remove {value}').replace('{value}', value)}
-                  disabled={condition.setting.enabled !== false && (condition.setting.values || []).length <= 1}
-                  onclick={() => onDeleteGatheringConditionValue?.(condition.kind, value, selectedSystemId)}
+                  aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Conditions.RemoveValue', 'Remove {value}').replace('{value}', conditionLabel(option))}
+                  title={text('FABRICATE.Admin.ManagerV2.Environment.Conditions.RemoveValue', 'Remove {value}').replace('{value}', conditionLabel(option))}
+                  disabled={condition.setting.enabled !== false && conditionValues(condition.setting).length <= 1}
+                  onclick={() => onDeleteGatheringConditionValue?.(condition.kind, valueId, selectedSystemId)}
                 >
                   <i class="fas fa-times" aria-hidden="true"></i>
                 </button>

@@ -264,7 +264,7 @@ Current GM editor behavior:
 - The selected draft can edit gathering composition tags: one `region`, multiple `biomes`, and multiple `dangerTags`.
 - The selected draft can edit risk display/evidence and risk-to-danger matching evidence where supported.
 - The selected system's Gathering Settings tab configures d100 reward selection, hazard selection, limits, and hazard outcome through `gatheringConfig.systems[systemId].rules`.
-- The selected system's Gathering Settings tab configures per-system `Times of day` and `Weather conditions` matching settings with enable toggles, current value selectors, add controls, removable value pills, and selected-system cleanup on deletion.
+- The selected system's Gathering Settings tab configures per-system `Times of day` and `Weather conditions` matching settings with enable toggles, current value selectors, add controls, label/icon-editable value pills, and selected-system cleanup on deletion.
 - The Environments editor shows current global weather and time of day as context, not as environment browse filters.
 - Settings is the only primary GM UI surface for current global weather and current global time of day. Environment authoring may expose inherited condition evidence and future provider override evidence, but must not be the primary condition mutation surface.
 - The Environments editor exposes reusable gathering task and hazard library rows for the selected crafting system, including per-environment enable/disable toggles.

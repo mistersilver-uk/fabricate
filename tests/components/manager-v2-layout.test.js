@@ -234,10 +234,12 @@ test('manager-v2 gathering settings condition panels use a two-column responsive
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager-v2 (max-width: 1120px)'));
 
   assert.ok(settingsBlock.includes('grid-template-columns: repeat(2, minmax(0, 1fr));'), 'settings conditions should sit side by side at normal widths');
-  assert.ok(settingsBlock.includes('align-items: start;'), 'condition panels should stay content-height instead of stretching');
+  assert.ok(settingsBlock.includes('align-items: stretch;'), 'condition panels should stretch to equal height in the two-column layout');
+  assert.ok(settingsBlock.includes('padding: 12px;'), 'settings panel should use padded workspace spacing');
   assert.ok(panelBlock.includes('align-content: start;'), 'condition panel content should pack to its natural height');
+  assert.ok(panelBlock.includes('height: 100%;'), 'condition panel backgrounds should fill the stretched grid row');
   assert.ok(addBlock.includes('grid-template-columns: minmax(0, 1fr) 34px;'), 'condition add controls should reserve a stable icon button column');
-  assert.ok(pillBlock.includes('grid-template-columns: minmax(0, 1fr) 22px;'), 'condition pills should reserve a compact remove button');
+  assert.ok(pillBlock.includes('grid-template-columns: 28px minmax(72px, 1fr) 22px;'), 'condition pills should reserve icon, label, and remove columns');
   assert.ok(
     mediumQuery.includes('.fabricate-manager-v2 .manager-v2-gathering-settings')
       && mediumQuery.includes('grid-template-columns: minmax(0, 1fr);'),

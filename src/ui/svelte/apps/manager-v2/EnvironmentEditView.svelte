@@ -481,6 +481,16 @@
       .filter(Boolean);
   }
 
+  function conditionId(option) {
+    if (option && typeof option === 'object') return String(option.id || '').trim();
+    return String(option || '').trim();
+  }
+
+  function conditionLabel(option) {
+    if (option && typeof option === 'object') return String(option.label || option.id || '').trim();
+    return String(option || '').trim();
+  }
+
   function firstDropRow(task) {
     return Array.isArray(task?.dropRows) && task.dropRows.length > 0
       ? task.dropRows[0]
@@ -1097,16 +1107,16 @@
         <label class="manager-v2-field">
           <span>{text('FABRICATE.Admin.ManagerV2.Environment.CurrentWeather', 'Current weather')}</span>
           <select value={weatherSetting.current || 'clear'} onchange={(event) => onUpdateGatheringConditions?.({ weather: event.target.value })}>
-            {#each weatherSetting.values || ['clear'] as weather (weather)}
-              <option value={weather}>{weather}</option>
+            {#each weatherSetting.values || ['clear'] as weather (conditionId(weather))}
+              <option value={conditionId(weather)}>{conditionLabel(weather)}</option>
             {/each}
           </select>
         </label>
         <label class="manager-v2-field">
           <span>{text('FABRICATE.Admin.ManagerV2.Environment.CurrentTimeOfDay', 'Current time of day')}</span>
           <select value={timeOfDaySetting.current || 'day'} onchange={(event) => onUpdateGatheringConditions?.({ timeOfDay: event.target.value })}>
-            {#each timeOfDaySetting.values || ['day'] as timeOfDay (timeOfDay)}
-              <option value={timeOfDay}>{timeOfDay}</option>
+            {#each timeOfDaySetting.values || ['day'] as timeOfDay (conditionId(timeOfDay))}
+              <option value={conditionId(timeOfDay)}>{conditionLabel(timeOfDay)}</option>
             {/each}
           </select>
         </label>

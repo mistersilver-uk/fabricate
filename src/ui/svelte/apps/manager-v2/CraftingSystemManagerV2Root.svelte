@@ -157,7 +157,7 @@
       titleKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderTitle',
       titleFallback: 'Gathering settings',
       hintKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderHint',
-      hintFallback: 'Set system-level d100 reward and hazard rules for gathering.'
+      hintFallback: 'Set system-level rules for gathering.'
     }
   ];
   const activeGatheringInspectorTab = $derived(
@@ -1511,6 +1511,7 @@
         onUpdateGatheringConditions={store.updateGatheringConditions}
         onToggleGatheringConditionEnabled={store.toggleGatheringConditionEnabled}
         onAddGatheringConditionValue={store.addGatheringConditionValue}
+        onUpdateGatheringConditionValue={store.updateGatheringConditionValue}
         onDeleteGatheringConditionValue={store.deleteGatheringConditionValue}
       />
     {:else if currentView === 'environment-edit' && selectedSystem}

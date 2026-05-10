@@ -1946,12 +1946,25 @@ describe('createAdminStore', () => {
       assert.deepEqual(config.systems.sys1.conditions.weather, {
         enabled: true,
         current: 'rain',
-        values: ['clear', 'cloudy', 'rain', 'storm', 'snow', 'fog', 'wind']
+        values: [
+          { id: 'clear', label: 'Clear', icon: 'fas fa-sun' },
+          { id: 'cloudy', label: 'Cloudy', icon: 'fas fa-cloud' },
+          { id: 'rain', label: 'Rain', icon: 'fas fa-cloud-rain' },
+          { id: 'storm', label: 'Storm', icon: 'fas fa-bolt' },
+          { id: 'snow', label: 'Snow', icon: 'fas fa-snowflake' },
+          { id: 'fog', label: 'Fog', icon: 'fas fa-smog' },
+          { id: 'wind', label: 'Wind', icon: 'fas fa-wind' }
+        ]
       });
       assert.deepEqual(config.systems.sys1.conditions.timeOfDay, {
         enabled: true,
         current: 'night',
-        values: ['dawn', 'day', 'dusk', 'night']
+        values: [
+          { id: 'dawn', label: 'Dawn', icon: 'fas fa-cloud-sun' },
+          { id: 'day', label: 'Day', icon: 'fas fa-sun' },
+          { id: 'dusk', label: 'Dusk', icon: 'fas fa-cloud-moon' },
+          { id: 'night', label: 'Night', icon: 'fas fa-moon' }
+        ]
       });
       assert.deepEqual(config.vocabularies.regions, ['north', 'south']);
       assert.equal(config.systems.sys1.tasks[0].name, 'Rain Herbs');
@@ -1999,11 +2012,17 @@ describe('createAdminStore', () => {
       await store.toggleGatheringConditionEnabled('weather', false, 'sys1');
       assert.equal(await store.deleteGatheringConditionValue('weather', 'rain', 'sys1'), true);
       await store.addGatheringConditionValue('weather', 'Ash Fall', 'sys1');
-      await store.updateGatheringConditions({ weather: 'ash fall', systemId: 'sys1' });
+      await store.addGatheringConditionValue('weather', 'ash fall', 'sys1');
+      await store.updateGatheringConditionValue('weather', 'ash-fall', { label: 'Ashfall', icon: 'fas fa-volcano' }, 'sys1');
+      await store.updateGatheringConditions({ weather: 'ash-fall', systemId: 'sys1' });
 
       const sys1 = services._store.gatheringConfig.systems.sys1;
       const sys2 = services._store.gatheringConfig.systems.sys2;
-      assert.deepEqual(sys1.conditions.weather, { enabled: false, current: 'ash fall', values: ['ash fall'] });
+      assert.deepEqual(sys1.conditions.weather, {
+        enabled: false,
+        current: 'ash-fall',
+        values: [{ id: 'ash-fall', label: 'Ashfall', icon: 'fas fa-volcano' }]
+      });
       assert.deepEqual(sys1.tasks[0].weather, []);
       assert.deepEqual(sys1.hazards[0].weather, []);
       assert.deepEqual(sys2.tasks[0].weather, ['rain']);
