@@ -1,7 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { dragDrop } from '../../actions/dragDrop.js';
-  import ImagePathPicker from '../../components/ImagePathPicker.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
@@ -148,6 +147,12 @@
   function handleDropZoneDrop(rowId, data) {
     onImportDrop(rowId, data);
   }
+
+  async function chooseTaskImage() {
+    if (typeof onPickImagePath !== 'function') return;
+    const value = await onPickImagePath(task?.img || '');
+    if (value) onUpdateTask({ img: value });
+  }
 </script>
 
 <main
@@ -162,21 +167,17 @@
         <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.BackToLibrary', 'Back to tasks')}</span>
       </button>
       <div class="manager-v2-task-title-row">
-        <img class="manager-v2-gathering-task-large-icon" src={taskImage()} alt="" />
         <div class="manager-v2-task-title-copy">
-          <input class="manager-v2-task-title-input" data-gathering-task-field="name" value={task.name || ''} oninput={(event) => onUpdateTask({ name: event.currentTarget.value })} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Name', 'Name')} />
+          <div class="manager-v2-task-title-line">
+            <input class="manager-v2-task-title-input" data-gathering-task-field="name" value={task.name || ''} oninput={(event) => onUpdateTask({ name: event.currentTarget.value })} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Name', 'Name')} />
+            <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ChooseImage', 'Choose task image')} onclick={chooseTaskImage} disabled={typeof onPickImagePath !== 'function'}>
+              <i class="fas fa-pen" aria-hidden="true"></i>
+            </button>
+          </div>
           <textarea class="manager-v2-task-description-input" data-gathering-task-field="description" value={task.description || ''} oninput={(event) => onUpdateTask({ description: event.currentTarget.value })} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Description', 'Description')}></textarea>
         </div>
         <div class="manager-v2-task-header-actions">
           <span class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.TaskId', 'ID')}: {task.id}</span>
-          <ImagePathPicker
-            value={task.img || ''}
-            defaultImage="icons/svg/item-bag.svg"
-            chooseLabel={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ChooseImage', 'Choose task image')}
-            unavailableLabel={text('FABRICATE.Admin.Environments.ImagePickerUnavailable', 'Image picker unavailable')}
-            onChange={(value) => onUpdateTask({ img: value })}
-            {onPickImagePath}
-          />
         </div>
       </div>
     </header>

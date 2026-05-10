@@ -599,7 +599,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'data-gathering-task-drops-table',
       'use:dragDrop',
       'onImportDrop(rowId, data)',
-      'ImagePathPicker',
+      'onPickImagePath',
       'DropChance',
       'RewardRuleNotice'
     ]) {

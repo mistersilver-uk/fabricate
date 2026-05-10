@@ -8311,6 +8311,42 @@
   overflow: auto;
 }
 
+.fabricate-manager-v2 .manager-v2-gathering-task-edit-view :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-surface-1);
+  box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
+  font: inherit;
+}
+
+.fabricate-manager-v2 .manager-v2-gathering-task-edit-view :is(input:not([type="checkbox"]):not([type="radio"]), select) {
+  min-height: 32px;
+  padding: 5px 9px;
+}
+
+.fabricate-manager-v2 .manager-v2-gathering-task-edit-view textarea {
+  min-height: 54px;
+  padding: 7px 9px;
+  resize: vertical;
+}
+
+.fabricate-manager-v2 .manager-v2-gathering-task-edit-view input[type="range"] {
+  height: 22px;
+  min-height: 22px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  accent-color: var(--fab-mv2-accent);
+}
+
+.fabricate-manager-v2 .manager-v2-gathering-task-edit-view input[type="checkbox"] {
+  accent-color: var(--fab-mv2-accent);
+}
+
 .fabricate-manager-v2 .manager-v2-task-workspace-header {
   display: grid;
   gap: 10px;
@@ -8336,7 +8372,7 @@
 
 .fabricate-manager-v2 .manager-v2-task-title-row {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) minmax(180px, 0.24fr);
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.24fr);
   gap: 12px;
   align-items: center;
   min-width: 0;
@@ -8354,6 +8390,13 @@
   min-width: 0;
 }
 
+.fabricate-manager-v2 .manager-v2-task-title-line {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
 .fabricate-manager-v2 .manager-v2-task-title-input,
 .fabricate-manager-v2 .manager-v2-task-description-input {
   width: 100%;
@@ -8362,6 +8405,14 @@
   color: var(--fab-mv2-text);
   background: transparent;
   box-shadow: none;
+}
+
+.fabricate-manager-v2.fabricate-manager-v2 .manager-v2-gathering-task-edit-view .manager-v2-task-title-input,
+.fabricate-manager-v2.fabricate-manager-v2 .manager-v2-gathering-task-edit-view .manager-v2-task-description-input {
+  min-height: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 .fabricate-manager-v2 .manager-v2-task-title-input {
@@ -8379,8 +8430,9 @@
 }
 
 .fabricate-manager-v2 .manager-v2-task-header-actions {
-  display: grid;
-  justify-items: end;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   gap: 8px;
   min-width: 0;
 }
@@ -8450,6 +8502,10 @@
   padding-left: 18px;
 }
 
+.fabricate-manager-v2 .manager-v2-task-availability-summary .manager-v2-chip-field {
+  display: none;
+}
+
 .fabricate-manager-v2 .manager-v2-task-overview-card h3,
 .fabricate-manager-v2 .manager-v2-task-card-header h3,
 .fabricate-manager-v2 .manager-v2-selected-drop-editor h3,
@@ -8457,6 +8513,18 @@
   margin: 0;
   color: var(--fab-warning-text);
   font-size: 1rem;
+}
+
+.fabricate-manager-v2 .manager-v2-task-overview-card label,
+.fabricate-manager-v2 .manager-v2-selected-drop-fields label {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.fabricate-manager-v2 .manager-v2-selected-drop-fields label {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .fabricate-manager-v2 .manager-v2-task-overview-card h3 span {
@@ -8578,6 +8646,14 @@
   border-radius: 0;
   color: var(--fab-mv2-text);
   background: transparent;
+}
+
+.fabricate-manager-v2 .manager-v2-gathering-task-drop-row .manager-v2-labeled-cell {
+  gap: 6px;
+}
+
+.fabricate-manager-v2 .manager-v2-gathering-task-drop-row input[type="number"] {
+  max-width: 78px;
 }
 
 .fabricate-manager-v2 .manager-v2-gathering-task-drop-row:hover {
