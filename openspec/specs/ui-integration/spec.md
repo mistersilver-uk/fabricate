@@ -263,7 +263,7 @@ Current GM editor behavior:
 - The selected draft can edit a player-facing environment image independent of any linked scene.
 - The selected draft can edit gathering composition tags: one `region`, multiple `biomes`, and multiple `dangerTags`.
 - The selected draft can edit risk display/evidence and risk-to-danger matching evidence where supported.
-- The selected draft can configure `hazardSelectionMode` and `hazardPolicy`.
+- The selected system's Gathering Settings tab configures d100 reward selection, hazard selection, limits, and hazard outcome through `gatheringConfig.systems[systemId].rules`.
 - The Environments editor shows current global weather and time of day as context, not as environment browse filters.
 - Settings is the only primary GM UI surface for current global weather and current global time of day. Environment authoring may expose inherited condition evidence and future provider override evidence, but must not be the primary condition mutation surface.
 - The Environments editor exposes reusable gathering task and hazard library rows for the selected crafting system, including per-environment enable/disable toggles.
@@ -271,7 +271,7 @@ Current GM editor behavior:
 - Reusable task and hazard row overrides stay inside expandable rows so the default environment workspace remains scannable. Collapsed rows show default-vs-override chips, enabled state, matching evidence, dirty/validation markers, and an explicit expand/collapse control.
 - Expanded override panels contain per-environment override fields only; reusable definition fields remain edited in their library surface.
 - Expanded override rows are keyboard reachable, preserve focus on save/error where practical, and stack without horizontal clipping in narrow Manager V2 widths.
-- Reusable task authoring includes name, match tags, ordered d100 drop row reference/quantity/drop rate, and item selection mode.
+- Reusable task authoring includes name, match tags, and ordered d100 drop row reference/quantity/drop rate. D100 row selection is controlled by selected-system Gathering Rules, not reusable task authoring.
 - Reusable task authoring may also include node count, depletion timing, respawn policy, stamina cost, attempt limits, risk overrides, encounter hooks, natural expression providers, and macro providers where the selected economy/features use them.
 - Reusable hazard authoring includes name, image, description, enabled state, danger/match tags, d100 drop rate, and modifier provider evidence.
 - The settings/tag area can edit gathering vocabularies for regions, biomes, danger, weather, and time of day, and can update current global weather/time through the public gathering condition API when available.

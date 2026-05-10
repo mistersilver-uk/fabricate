@@ -656,7 +656,12 @@ export class GatheringEngine {
       ? {
           ...environment,
           conditions: plainObjectOrNull(snapshot?.conditions) || plainObjectOrNull(run?.conditionSnapshot) || plainObjectOrNull(environment?.conditions) || {},
-          hazards: normalizeList(snapshot?.hazards)
+          hazards: normalizeList(snapshot?.hazards),
+          rules: plainObjectOrNull(snapshot?.rules) || plainObjectOrNull(environment?.rules) || {},
+          useLegacyTaskItemSelectionMode: snapshot?.useLegacyTaskItemSelectionMode === true,
+          hazardSelectionMode: stringOrNull(snapshot?.hazardSelectionMode) || stringOrNull(environment?.hazardSelectionMode),
+          hazardLimit: snapshot?.hazardLimit,
+          hazardPolicy: stringOrNull(snapshot?.hazardPolicy) || stringOrNull(environment?.hazardPolicy)
         }
       : null;
     const currentTask = normalizeList(environment.tasks).find(task => task?.id === run.taskId) ?? null;
@@ -1328,6 +1333,11 @@ export class GatheringEngine {
     return {
       task: cloneJson(task),
       hazards: normalizeList(environment?.hazards).map(hazard => cloneJson(hazard)),
+      rules: plainObjectOrNull(environment?.rules) || {},
+      useLegacyTaskItemSelectionMode: environment?.useLegacyTaskItemSelectionMode === true,
+      hazardSelectionMode: stringOrNull(environment?.hazardSelectionMode),
+      hazardLimit: environment?.hazardLimit,
+      hazardPolicy: stringOrNull(environment?.hazardPolicy),
       conditions: plainObjectOrNull(environment?.conditions) || {}
     };
   }

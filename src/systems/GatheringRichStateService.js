@@ -9,6 +9,7 @@ const DEFAULT_VOCABULARIES = Object.freeze({
   timeOfDay: ['dawn', 'day', 'dusk', 'night']
 });
 const DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops', 'limitedDrops']);
+const LEGACY_DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops']);
 const HAZARD_POLICIES = new Set(['successWithHazard', 'failureWithHazard']);
 const DEFAULT_GATHERING_RULES = Object.freeze({
   rewardSelectionMode: 'highestRankedDrop',
@@ -25,8 +26,8 @@ const BLOCKED_REASON_KEYS = Object.freeze({
 });
 
 /**
- * Owns additive rich-gathering state that is not part of result resolution:
- * node counts stored on environment tasks, actor-scoped stamina, attempt
+ * Owns rich-gathering runtime support: global conditions, reusable library
+ * composition, system d100 rules, node counts, actor-scoped stamina, attempt
  * counters, and blind task reveal evidence. The service is intentionally small
  * and side-effect explicit so GatheringEngine can keep history-before-effects
  * ordering.
@@ -98,9 +99,19 @@ export class GatheringRichStateService {
 
   composeEnvironment(environment, system) {
     if (!environment || typeof environment !== 'object') return environment;
+    const rawConfig = typeof this.getSetting === 'function' ? this.getSetting(this.settingKey) : {};
     const config = this._config();
-    const libraries = config.systems?.[String(system?.id || environment.craftingSystemId)] || {};
-    const rules = normalizeGatheringRules(libraries.rules);
+    const systemId = String(system?.id || environment.craftingSystemId);
+    const libraries = config.systems?.[systemId] || {};
+    const rawSystemConfig = rawConfig?.systems?.[systemId] || {};
+    const hasSystemRules = rawSystemConfig?.rules && typeof rawSystemConfig.rules === 'object' && !Array.isArray(rawSystemConfig.rules);
+    const rules = hasSystemRules
+      ? normalizeGatheringRules(libraries.rules)
+      : normalizeGatheringRules({
+          hazardSelectionMode: environment.hazardSelectionMode,
+          hazardLimit: environment.hazardLimit,
+          hazardPolicy: environment.hazardPolicy
+        });
     const tasks = [
       ...normalizeList(environment.tasks),
       ...normalizeList(libraries.tasks)
@@ -123,6 +134,7 @@ export class GatheringRichStateService {
       tasks,
       hazards,
       rules,
+      useLegacyTaskItemSelectionMode: !hasSystemRules,
       hazardSelectionMode: rules.hazardSelectionMode,
       hazardLimit: rules.hazardLimit,
       hazardPolicy: rules.hazardPolicy
@@ -141,7 +153,7 @@ export class GatheringRichStateService {
         modifier: taskModifier
       }))
       .filter(result => result.dropped);
-    const rules = normalizeGatheringRules(environment?.rules);
+    const rules = resolveRulesForAttempt(task, environment);
     const selectedItems = selectDrops(droppedItems, rules.rewardSelectionMode, rules.rewardLimit);
 
     const droppedHazards = normalizeList(environment?.hazards)
@@ -510,7 +522,7 @@ function normalizeLibraryTask(task = {}) {
     biomes: normalizeTagList(task.biomes),
     weather: normalizeTagList(task.weather),
     timeOfDay: normalizeTagList(task.timeOfDay),
-    itemSelectionMode: DROP_SELECTION_MODES.has(task.itemSelectionMode) ? task.itemSelectionMode : 'highestRankedDrop',
+    itemSelectionMode: LEGACY_DROP_SELECTION_MODES.has(task.itemSelectionMode) ? task.itemSelectionMode : 'highestRankedDrop',
     dropRows: normalizeList(task.dropRows ?? task.itemDrops).map(normalizeItemDrop),
     staminaCost: nonNegativeNumber(task.staminaCost, 0),
     gatheringModifier: normalizeModifierProvider(task.gatheringModifier ?? task.modifier),
@@ -597,6 +609,26 @@ function normalizeGatheringRules(rules = {}) {
     hazardPolicy: HAZARD_POLICIES.has(rules?.hazardPolicy)
       ? rules.hazardPolicy
       : DEFAULT_GATHERING_RULES.hazardPolicy
+  };
+}
+
+function resolveRulesForAttempt(task = {}, environment = {}) {
+  const normalized = normalizeGatheringRules(environment?.rules);
+  if (environment?.useLegacyTaskItemSelectionMode !== true && environment?.rules) {
+    return normalized;
+  }
+  return {
+    ...normalized,
+    rewardSelectionMode: LEGACY_DROP_SELECTION_MODES.has(task?.itemSelectionMode)
+      ? task.itemSelectionMode
+      : normalized.rewardSelectionMode,
+    hazardSelectionMode: LEGACY_DROP_SELECTION_MODES.has(environment?.hazardSelectionMode)
+      ? environment.hazardSelectionMode
+      : normalized.hazardSelectionMode,
+    hazardLimit: positiveInteger(environment?.hazardLimit, normalized.hazardLimit),
+    hazardPolicy: HAZARD_POLICIES.has(environment?.hazardPolicy)
+      ? environment.hazardPolicy
+      : normalized.hazardPolicy
   };
 }
 
