@@ -28,6 +28,8 @@ const environmentComponentNames = [
 const sharedComponentNames = [
   'ImagePathPicker',
   'IconPicker',
+  'ManagerV2ColorPicker',
+  'ManagerV2ColorPopover',
   'EssenceSourceSelector',
   'Pagination'
 ];
@@ -381,7 +383,63 @@ function createStore(calls = [], options = {}) {
     environmentSaving: false,
     environmentSaveError: null,
     environmentValidationState: options.environmentValidationState || null,
-    selectedEnvironmentTaskId: 'task-forage'
+    selectedEnvironmentTaskId: 'task-forage',
+    gatheringConfig: options.gatheringConfig || {
+      conditions: { weather: 'clear', timeOfDay: 'day' },
+      vocabularies: {
+        regions: [],
+        biomes: ['forest'],
+        danger: ['safe', 'hazardous'],
+        weather: ['clear', 'rain'],
+        timeOfDay: ['dawn', 'day', 'night']
+      },
+      systems: {
+        alchemy: {
+          conditions: {
+            weather: {
+              enabled: true,
+              current: 'clear',
+              values: [
+                { id: 'clear', label: 'Clear Sky', icon: 'fas fa-sun' },
+                { id: 'heavy-rain', label: 'Storm Rain', icon: 'fas fa-cloud-showers-heavy' }
+              ]
+            },
+            timeOfDay: {
+              enabled: true,
+              current: 'day',
+              values: [
+                { id: 'dawn', label: 'First Light', icon: 'fas fa-cloud-sun' },
+                { id: 'day', label: 'High Day', icon: 'fas fa-sun' },
+                { id: 'night', label: 'Deep Night', icon: 'fas fa-moon' }
+              ]
+            }
+          },
+          vocabularies: {
+            regions: {
+              values: [
+                { id: 'north', label: 'Northlands' },
+                { id: 'south', label: 'South Coast' }
+              ]
+            },
+            biomes: {
+              values: [
+                { id: 'forest', label: 'Moon Forest', icon: 'fas fa-tree', colorToken: 'sage', customColor: '' },
+                { id: 'cavern', label: 'Crystal Cavern', icon: 'fas fa-gem', colorToken: 'mist', customColor: '#88AAFF' }
+              ]
+            }
+          },
+          rules: {
+            rewardSelectionMode: 'highestRankedDrop',
+            rewardLimit: 1,
+            hazardSelectionMode: 'allDrops',
+            hazardLimit: 1,
+            hazardPolicy: 'successWithHazard'
+          },
+          tasks: [],
+          hazards: []
+        }
+      }
+    }
   });
 
   function applySelectedSystem(id) {
@@ -564,7 +622,15 @@ function createStore(calls = [], options = {}) {
     updateEnvironmentTaskProgressive: (...args) => calls.push(['updateEnvironmentTaskProgressive', ...args]),
     updateEnvironmentTaskCheck: (...args) => calls.push(['updateEnvironmentTaskCheck', ...args]),
     updateEnvironmentTaskTimeRequirement: (...args) => calls.push(['updateEnvironmentTaskTimeRequirement', ...args]),
-    updateEnvironmentTaskFailureOutcome: (...args) => calls.push(['updateEnvironmentTaskFailureOutcome', ...args])
+    updateEnvironmentTaskFailureOutcome: (...args) => calls.push(['updateEnvironmentTaskFailureOutcome', ...args]),
+    updateGatheringConditions: (...args) => calls.push(['updateGatheringConditions', ...args]),
+    toggleGatheringConditionEnabled: (...args) => calls.push(['toggleGatheringConditionEnabled', ...args]),
+    addGatheringConditionValue: (...args) => calls.push(['addGatheringConditionValue', ...args]),
+    updateGatheringConditionValue: (...args) => calls.push(['updateGatheringConditionValue', ...args]),
+    deleteGatheringConditionValue: (...args) => calls.push(['deleteGatheringConditionValue', ...args]),
+    addGatheringVocabularyValue: (...args) => calls.push(['addGatheringVocabularyValue', ...args]),
+    updateGatheringVocabularyValue: (...args) => calls.push(['updateGatheringVocabularyValue', ...args]),
+    deleteGatheringVocabularyValue: (...args) => calls.push(['deleteGatheringVocabularyValue', ...args])
   };
 }
 
@@ -654,6 +720,128 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     const systemHeroRow = target.querySelector('.manager-v2-inspector .manager-v2-inspector-title-row.is-hero-large');
     assert.ok(systemHeroRow, 'systems inspector should use the prominent hero title row');
     assert.ok(systemHeroRow.querySelector('.manager-v2-inspector-icon.is-hero-large'), 'systems inspector hero should render the icon at hero-large size');
+  });
+
+  it('renders Systems Library current gathering condition shortcuts for enabled dimensions', () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    const card = target.querySelector('[data-systems-gathering-conditions]');
+    assert.ok(card, 'selected gathering system should show condition shortcut card');
+    assert.equal(card.querySelectorAll('[data-systems-gathering-condition]').length, 2);
+    assert.ok(card.querySelector('[data-systems-gathering-condition="timeOfDay"]'));
+    assert.ok(card.querySelector('[data-systems-gathering-condition="weather"]'));
+    assert.ok(card.textContent.includes('Global conditions'));
+    assert.ok(card.textContent.includes('Current time of day'));
+    assert.ok(card.textContent.includes('Current weather'));
+    assert.deepEqual(
+      Array.from(card.querySelectorAll('[data-systems-gathering-condition="weather"] option')).map(option => option.textContent),
+      ['Clear Sky', 'Storm Rain']
+    );
+
+    const weatherSelect = card.querySelector('[data-systems-gathering-condition="weather"] select');
+    weatherSelect.value = 'heavy-rain';
+    weatherSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    flushSync();
+
+    assert.deepEqual(
+      calls.find(call => call[0] === 'updateGatheringConditions'),
+      ['updateGatheringConditions', { weather: 'heavy-rain', systemId: 'alchemy' }]
+    );
+  });
+
+  it('hides Systems Library condition shortcuts when gathering or both condition dimensions are disabled', () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], {
+          selectedFeatures: {
+            essences: true,
+            effectTransfer: true,
+            itemTags: true,
+            gathering: false,
+            recipeCategories: true
+          }
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+    assert.equal(target.querySelector('[data-systems-gathering-conditions]'), null);
+
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], {
+          gatheringConfig: {
+            systems: {
+              alchemy: {
+                conditions: {
+                  weather: { enabled: false, current: 'clear', values: [{ id: 'clear', label: 'Clear Sky', icon: 'fas fa-sun' }] },
+                  timeOfDay: { enabled: false, current: 'day', values: [{ id: 'day', label: 'High Day', icon: 'fas fa-sun' }] }
+                }
+              }
+            }
+          }
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+    assert.equal(target.querySelector('[data-systems-gathering-conditions]'), null);
+  });
+
+  it('shows only the enabled Systems Library condition shortcut dimension', () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], {
+          gatheringConfig: {
+            systems: {
+              alchemy: {
+                conditions: {
+                  weather: {
+                    enabled: true,
+                    current: 'heavy-rain',
+                    values: [
+                      { id: 'clear', label: 'Clear Sky', icon: 'fas fa-sun' },
+                      { id: 'heavy-rain', label: 'Storm Rain', icon: 'fas fa-cloud-showers-heavy' }
+                    ]
+                  },
+                  timeOfDay: { enabled: false, current: 'day', values: [{ id: 'day', label: 'High Day', icon: 'fas fa-sun' }] }
+                }
+              }
+            }
+          }
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    const card = target.querySelector('[data-systems-gathering-conditions]');
+    assert.ok(card);
+    assert.equal(card.querySelectorAll('[data-systems-gathering-condition]').length, 1);
+    assert.ok(card.querySelector('[data-systems-gathering-condition="weather"]'));
+    assert.equal(card.querySelector('[data-systems-gathering-condition="timeOfDay"]'), null);
   });
 
   it('shows the unselected systems library only when no crafting systems exist', () => {
@@ -1750,13 +1938,173 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(target.querySelector('.manager-v2-toolbar'), null);
     assert.equal(target.querySelector('.manager-v2-environments-table'), null);
     assert.ok(target.textContent.includes('Set system-level d100 reward and hazard rules for gathering.'));
+    assert.equal(target.querySelectorAll('[data-gathering-condition-panel]').length, 2);
+    assert.equal(target.querySelectorAll('[data-gathering-vocabulary-panel]').length, 2);
+    assert.ok(target.querySelector('[data-gathering-condition-panel="timeOfDay"]'));
+    assert.ok(target.querySelector('[data-gathering-condition-panel="weather"]'));
+    assert.ok(target.querySelector('[data-gathering-vocabulary-panel="regions"]'));
+    assert.ok(target.querySelector('[data-gathering-vocabulary-panel="biomes"]'));
+    assert.ok(target.textContent.includes('Times of day'));
+    assert.ok(target.textContent.includes('Weather conditions'));
+    assert.ok(target.textContent.includes('Regions'));
+    assert.ok(target.textContent.includes('Biomes'));
+    assert.ok(target.textContent.includes('These values control current time matching for reusable tasks and hazards.'));
+    assert.ok(target.textContent.includes('These values control current weather matching for reusable tasks and hazards.'));
+    assert.ok(target.textContent.includes('Environments use one region. Labels can be renamed without changing ids.'));
+    assert.ok(target.textContent.includes('Environments can use multiple biomes. Left-click the coloured icon to edit icon; right-click to edit colour.'));
+    assert.equal(target.querySelectorAll('.manager-v2-condition-add input').length, 4);
+    assert.equal(target.querySelectorAll('.manager-v2-condition-add .essence-icon-picker-trigger.icon-only').length, 3);
+    assert.equal(target.querySelectorAll('.manager-v2-color-picker-trigger').length, 1);
+    assert.equal(target.querySelectorAll('.manager-v2-condition-add .manager-v2-add-button').length, 4);
+    assert.equal(Array.from(target.querySelectorAll('.manager-v2-condition-add .manager-v2-add-button')).every(button => button.textContent.trim() === 'Add'), true);
+    assert.equal(target.textContent.includes('Add time of day'), false);
+    assert.equal(target.textContent.includes('Add weather'), false);
+    assert.equal(target.textContent.includes('Add region'), false);
+    assert.equal(target.textContent.includes('Add biome'), false);
+    assert.equal(target.querySelectorAll('[data-gathering-condition-value]').length, 5);
+    assert.equal(target.querySelectorAll('.manager-v2-vocabulary-pill').length, 4);
+    assert.equal(target.querySelectorAll('[data-gathering-vocabulary-panel="biomes"] .manager-v2-biome-combined-trigger').length, 2);
+    assert.equal(target.querySelectorAll('.manager-v2-condition-label-input').length, 9);
+    assert.equal(target.querySelectorAll('.manager-v2-vocabulary-pill .manager-v2-condition-label-input').length, 4);
+    assert.deepEqual(
+      Array.from(target.querySelectorAll('[data-gathering-condition-panel="weather"] .manager-v2-condition-label-input')).map(input => input.value),
+      ['Clear Sky', 'Storm Rain']
+    );
+    assert.deepEqual(
+      Array.from(target.querySelectorAll('[data-gathering-condition-panel="timeOfDay"] .manager-v2-condition-label-input')).map(input => input.value),
+      ['First Light', 'High Day', 'Deep Night']
+    );
+    const weatherLabelInput = target.querySelector('[data-gathering-condition-value="heavy-rain"] .manager-v2-condition-label-input');
+    weatherLabelInput.value = 'Heavy Rainfall';
+    weatherLabelInput.dispatchEvent(new Event('blur'));
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      calls.find(call => call[0] === 'updateGatheringConditionValue'),
+      ['updateGatheringConditionValue', 'weather', 'heavy-rain', { label: 'Heavy Rainfall' }, 'alchemy']
+    );
+
+    const timeLabelInput = target.querySelector('[data-gathering-condition-value="dawn"] .manager-v2-condition-label-input');
+    timeLabelInput.focus();
+    timeLabelInput.value = 'Grey Dawn';
+    timeLabelInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      calls.filter(call => call[0] === 'updateGatheringConditionValue').at(-1),
+      ['updateGatheringConditionValue', 'timeOfDay', 'dawn', { label: 'Grey Dawn' }, 'alchemy']
+    );
+    assert.equal(target.querySelectorAll('[data-gathering-condition-value] .essence-icon-picker-trigger.icon-only').length, 5);
+    const regionLabelInput = target.querySelector('[data-gathering-vocabulary-panel="regions"] [data-gathering-vocabulary-value="north"] .manager-v2-condition-label-input');
+    regionLabelInput.value = 'Northern Reach';
+    regionLabelInput.dispatchEvent(new Event('blur'));
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      calls.find(call => call[0] === 'updateGatheringVocabularyValue'),
+      ['updateGatheringVocabularyValue', 'regions', 'north', { label: 'Northern Reach' }, 'alchemy']
+    );
+    const biomeIconTrigger = target.querySelector('[data-gathering-vocabulary-panel="biomes"] [data-gathering-vocabulary-value="forest"] .manager-v2-biome-combined-trigger');
+    biomeIconTrigger.click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('.essence-icon-picker-popover'));
+    target.querySelector('.essence-icon-picker-popover .essence-icon-picker-option').click();
+    await tick();
+    flushSync();
+    assert.equal(calls.filter(call => call[0] === 'updateGatheringVocabularyValue').at(-1)[1], 'biomes');
+    const biomeColorTrigger = target.querySelector('[data-gathering-vocabulary-panel="biomes"] [data-gathering-vocabulary-value="forest"] .manager-v2-biome-combined-trigger');
+    const managerShell = target.querySelector('.fabricate-manager-v2');
+    const managerMain = target.querySelector('.manager-v2-main');
+    const originalShellRect = managerShell.getBoundingClientRect;
+    const originalMainRect = managerMain.getBoundingClientRect;
+    const originalBiomeTriggerRect = biomeColorTrigger.getBoundingClientRect;
+    managerShell.getBoundingClientRect = () => ({
+      left: 100,
+      top: 50,
+      right: 800,
+      bottom: 370,
+      width: 700,
+      height: 320
+    });
+    managerMain.getBoundingClientRect = () => ({
+      left: 120,
+      top: 60,
+      right: 760,
+      bottom: 360,
+      width: 640,
+      height: 300
+    });
+    biomeColorTrigger.getBoundingClientRect = () => ({
+      left: 140,
+      top: 330,
+      right: 170,
+      bottom: 360,
+      width: 30,
+      height: 30
+    });
+    biomeColorTrigger.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    await tick();
+    flushSync();
+    await tick();
+    flushSync();
+    const colorPopover = target.querySelector('[data-manager-v2-color-picker-popover]');
+    assert.ok(colorPopover);
+    assert.equal(colorPopover.closest('.fabricate-manager-v2'), managerShell, 'biome color popover should stay inside the Manager V2 shell overlay layer');
+    assert.equal(colorPopover.closest('[data-gathering-vocabulary-panel="biomes"]'), null, 'biome color popover should be portaled out of the settings panel');
+    assert.match(colorPopover.getAttribute('style'), /bottom:\s*\d+px;/, 'lower biome color popovers should flip above the trigger when space below is constrained');
+    assert.match(colorPopover.getAttribute('style'), /left:\s*40px;/, 'biome color popover should left-align with the trigger while within the main panel bounds');
+    assert.match(colorPopover.getAttribute('style'), /width:\s*220px;/, 'biome color popover should keep its fixed compact width');
+    target.querySelector('[data-manager-v2-color-token="mist"]').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      calls.filter(call => call[0] === 'updateGatheringVocabularyValue').at(-1),
+      ['updateGatheringVocabularyValue', 'biomes', 'forest', { colorToken: 'mist', customColor: '' }, 'alchemy']
+    );
+    assert.ok(target.querySelector('[data-manager-v2-color-picker-popover]'));
+    document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('[data-manager-v2-color-picker-popover]'), null);
+    biomeColorTrigger.getBoundingClientRect = () => ({
+      left: 760,
+      top: 330,
+      right: 790,
+      bottom: 360,
+      width: 30,
+      height: 30
+    });
+    biomeColorTrigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true, cancelable: true }));
+    await tick();
+    flushSync();
+    const constrainedColorPopover = target.querySelector('[data-manager-v2-color-picker-popover]');
+    assert.ok(constrainedColorPopover);
+    assert.match(constrainedColorPopover.getAttribute('style'), /left:\s*424px;/, 'biome color popover should clamp to the Manager V2 main panel right edge');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('[data-manager-v2-color-picker-popover]'), null);
+    managerShell.getBoundingClientRect = originalShellRect;
+    managerMain.getBoundingClientRect = originalMainRect;
+    biomeColorTrigger.getBoundingClientRect = originalBiomeTriggerRect;
     assert.equal(target.querySelector('.manager-v2-gathering-settings-summary'), null);
     assert.equal(target.querySelector('[data-gathering-rule-fact]'), null);
     assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Choose which successful d100 reward rows are granted.'));
     assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Choose which matching hazards are applied after a gathering roll.'));
     assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Decide whether selected hazards still allow the gathering attempt to succeed.'));
-    assert.ok(target.textContent.includes('Highest ranked successful drop'));
-    assert.ok(target.textContent.includes('All successful drops'));
+    const rewardsSelect = target.querySelector('#manager-v2-gathering-rule-rewards');
+    const hazardsSelect = target.querySelector('#manager-v2-gathering-rule-hazards');
+    assert.deepEqual(
+      Array.from(rewardsSelect.options).map(option => option.textContent.trim()),
+      ['Highest ranked successful drop', 'All successful drops', 'Limit successful drops']
+    );
+    assert.deepEqual(
+      Array.from(hazardsSelect.options).map(option => option.textContent.trim()),
+      ['Highest ranked triggered hazard', 'All triggered hazards', 'Limit triggered hazards']
+    );
+    assert.equal(hazardsSelect.textContent.includes('Highest ranked successful drop'), false);
+    assert.equal(hazardsSelect.textContent.includes('All successful drops'), false);
     assert.ok(target.textContent.includes('Gathering succeeds'));
     assert.ok(target.querySelector('.manager-v2-inspector [data-gathering-inspector-rules]'));
     assert.equal(target.querySelector('.manager-v2-inspector [data-gathering-inspector-rules] h2').textContent.trim(), 'Rules');
@@ -1787,7 +2135,16 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(forestRow.querySelector('.manager-v2-environment-task-count.manager-v2-chip'), null);
     assert.ok(forestRow.querySelector('.manager-v2-status-toggle'));
     assert.ok(forestRow.querySelector('.manager-v2-environment-action-grid'));
+    assert.ok(forestRow.querySelector('[aria-label="Edit Moonlit Forest"]'));
+    assert.ok(forestRow.querySelector('[aria-label="Duplicate Moonlit Forest"]'));
+    assert.ok(forestRow.querySelector('[aria-label="Delete Moonlit Forest"]'));
     assert.ok(forestRow.querySelector('.manager-v2-environment-reorder-stack'));
+    assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Selected environment'));
+    assert.equal(
+      target.querySelector('.manager-v2-inspector').textContent.includes('Environment actions'),
+      false,
+      'selected environment inspector should not duplicate row quick actions'
+    );
 
     const search = target.querySelector('.manager-v2-toolbar input[type="search"]');
     search.value = 'cavern';

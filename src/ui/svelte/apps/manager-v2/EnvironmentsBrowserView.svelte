@@ -1,7 +1,11 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { computeIconPickerPopoverLayout } from '../../util/iconPickerPopover.js';
   import Pagination from '../../components/Pagination.svelte';
+  import IconPicker from '../../components/IconPicker.svelte';
+  import ManagerV2ColorPicker from '../../components/ManagerV2ColorPicker.svelte';
+  import ManagerV2ColorPopover from '../../components/ManagerV2ColorPopover.svelte';
 
   let {
     environments = [],
@@ -13,6 +17,7 @@
     selectedEnvironmentId = '',
     selectedSystemName = '',
     selectedSystemId = '',
+    gatheringConfig = null,
     sceneOptions = [],
     shouldUseEnvironmentDraftForDisplay = false,
     activeGatheringTab = 'environments',
@@ -23,7 +28,15 @@
     onDuplicateEnvironment = () => {},
     onDeleteEnvironment = () => {},
     onMoveEnvironment = () => {},
-    onToggleEnvironmentEnabled = () => {}
+    onToggleEnvironmentEnabled = () => {},
+    onUpdateGatheringConditions = () => {},
+    onToggleGatheringConditionEnabled = () => {},
+    onAddGatheringConditionValue = () => {},
+    onUpdateGatheringConditionValue = () => {},
+    onDeleteGatheringConditionValue = () => {},
+    onAddGatheringVocabularyValue = () => {},
+    onUpdateGatheringVocabularyValue = () => {},
+    onDeleteGatheringVocabularyValue = () => {}
   } = $props();
 
   let searchTerm = $state('');
@@ -35,6 +48,19 @@
   let lastSystemId = $state('');
   let pageIndex = $state(0);
   let pageSize = $state(10);
+  let weatherInput = $state('');
+  let timeOfDayInput = $state('');
+  let regionInput = $state('');
+  let biomeInput = $state('');
+  let weatherIconInput = $state('fas fa-cloud-sun');
+  let timeOfDayIconInput = $state('fas fa-clock');
+  let biomeIconInput = $state('fas fa-tree');
+  let biomeColorTokenInput = $state('sage');
+  let biomeCustomColorInput = $state('');
+  let openBiomeColorPickerId = $state('');
+  let biomeColorTriggerButton = $state(null);
+  let biomeColorPopoverRoot = $state(null);
+  let biomeColorPopoverStyle = $state('');
 
   const gatheringTabs = [
     {
@@ -83,10 +109,37 @@
     riskFilter = 'all';
     regionFilter = 'all';
     biomeFilter = 'all';
+    weatherInput = '';
+    timeOfDayInput = '';
+    regionInput = '';
+    biomeInput = '';
+    weatherIconInput = defaultConditionIcon('weather');
+    timeOfDayIconInput = defaultConditionIcon('timeOfDay');
+    biomeIconInput = 'fas fa-tree';
+    biomeColorTokenInput = 'sage';
+    biomeCustomColorInput = '';
+    openBiomeColorPickerId = '';
     lastSystemId = selectedSystemId;
   });
 
   const environmentList = $derived(environments || []);
+  const selectedGatheringSystemConfig = $derived(gatheringConfig?.systems?.[selectedSystemId] || {});
+  const weatherCondition = $derived(selectedGatheringSystemConfig.conditions?.weather || {
+    enabled: true,
+    current: gatheringConfig?.conditions?.weather || 'clear',
+    values: gatheringConfig?.vocabularies?.weather || ['clear', 'cloudy', 'rain', 'storm', 'snow', 'fog', 'wind']
+  });
+  const timeOfDayCondition = $derived(selectedGatheringSystemConfig.conditions?.timeOfDay || {
+    enabled: true,
+    current: gatheringConfig?.conditions?.timeOfDay || 'day',
+    values: gatheringConfig?.vocabularies?.timeOfDay || ['dawn', 'day', 'dusk', 'night']
+  });
+  const regionVocabulary = $derived(selectedGatheringSystemConfig.vocabularies?.regions || {
+    values: gatheringConfig?.vocabularies?.regions || []
+  });
+  const biomeVocabulary = $derived(selectedGatheringSystemConfig.vocabularies?.biomes || {
+    values: gatheringConfig?.vocabularies?.biomes || ['forest', 'grassland', 'mountain', 'cave', 'coastal', 'swamp', 'desert', 'urban', 'ruins', 'wasteland']
+  });
   const activeGatheringTabConfig = $derived(gatheringTabs.find(tab => tab.id === activeGatheringTab) || gatheringTabs[0]);
   const regionOptions = $derived(uniqueSorted(environmentList.map(environment => environment.region)));
   const biomeOptions = $derived(uniqueSorted(environmentList.map(environment => environment.biome)));
@@ -212,6 +265,280 @@
 
   function selectGatheringTab(tabId) {
     onSelectGatheringTab(tabId);
+  }
+
+  function conditionTitle(kind) {
+    return kind === 'timeOfDay'
+      ? text('FABRICATE.Admin.ManagerV2.Environment.Conditions.TimeOfDayTitle', 'Times of day')
+      : text('FABRICATE.Admin.ManagerV2.Environment.Conditions.WeatherTitle', 'Weather conditions');
+  }
+
+  function conditionCurrentLabel(kind) {
+    return kind === 'timeOfDay'
+      ? text('FABRICATE.Admin.ManagerV2.Environment.Conditions.CurrentTimeOfDay', 'Current time')
+      : text('FABRICATE.Admin.ManagerV2.Environment.Conditions.CurrentWeather', 'Current weather');
+  }
+
+  function conditionAddLabel(kind) {
+    return kind === 'timeOfDay'
+      ? text('FABRICATE.Admin.ManagerV2.Environment.Conditions.AddTimeOfDay', 'Add time of day')
+      : text('FABRICATE.Admin.ManagerV2.Environment.Conditions.AddWeather', 'Add weather');
+  }
+
+  function conditionHint(kind) {
+    return kind === 'timeOfDay'
+      ? text('FABRICATE.Admin.ManagerV2.Environment.Conditions.TimeOfDayHint', 'These values control current time matching for reusable tasks and hazards.')
+      : text('FABRICATE.Admin.ManagerV2.Environment.Conditions.WeatherHint', 'These values control current weather matching for reusable tasks and hazards.');
+  }
+
+  function conditionInputPlaceholder(kind) {
+    return kind === 'timeOfDay'
+      ? text('FABRICATE.Admin.ManagerV2.Environment.Conditions.TimeOfDayPlaceholder', 'e.g. midnight')
+      : text('FABRICATE.Admin.ManagerV2.Environment.Conditions.WeatherPlaceholder', 'e.g. ashfall');
+  }
+
+  function conditionInputValue(kind) {
+    return kind === 'timeOfDay' ? timeOfDayInput : weatherInput;
+  }
+
+  function setConditionInput(kind, value) {
+    if (kind === 'timeOfDay') timeOfDayInput = value;
+    else weatherInput = value;
+  }
+
+  function conditionAddIcon(kind) {
+    return kind === 'timeOfDay' ? timeOfDayIconInput : weatherIconInput;
+  }
+
+  function setConditionAddIcon(kind, value) {
+    if (kind === 'timeOfDay') timeOfDayIconInput = value;
+    else weatherIconInput = value;
+  }
+
+  function submitConditionValue(event, kind) {
+    event.preventDefault();
+    const value = conditionInputValue(kind).trim();
+    if (!value) return;
+    onAddGatheringConditionValue?.(kind, { label: value, icon: conditionAddIcon(kind) }, selectedSystemId);
+    setConditionInput(kind, '');
+  }
+
+  function vocabularyTitle(kind) {
+    return kind === 'regions'
+      ? text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.RegionsTitle', 'Regions')
+      : text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.BiomesTitle', 'Biomes');
+  }
+
+  function vocabularyAddLabel(kind) {
+    return kind === 'regions'
+      ? text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.AddRegion', 'Add region')
+      : text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.AddBiome', 'Add biome');
+  }
+
+  function vocabularyHint(kind) {
+    return kind === 'regions'
+      ? text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.RegionsHint', 'Environments use one region. Labels can be renamed without changing ids.')
+      : text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.BiomesHint', 'Environments can use multiple biomes. Left-click the coloured icon to edit icon; right-click to edit colour.');
+  }
+
+  function vocabularyPlaceholder(kind) {
+    return kind === 'regions'
+      ? text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.RegionPlaceholder', 'e.g. northlands')
+      : text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.BiomePlaceholder', 'e.g. mushroom forest');
+  }
+
+  function vocabularyInputValue(kind) {
+    return kind === 'regions' ? regionInput : biomeInput;
+  }
+
+  function setVocabularyInput(kind, value) {
+    if (kind === 'regions') regionInput = value;
+    else biomeInput = value;
+  }
+
+  function submitVocabularyValue(event, kind) {
+    event.preventDefault();
+    const value = vocabularyInputValue(kind).trim();
+    if (!value) return;
+    const payload = kind === 'biomes'
+      ? { label: value, icon: biomeIconInput, colorToken: biomeColorTokenInput, customColor: biomeCustomColorInput }
+      : { label: value };
+    onAddGatheringVocabularyValue?.(kind, payload, selectedSystemId);
+    setVocabularyInput(kind, '');
+  }
+
+  function vocabularyId(option) {
+    if (option && typeof option === 'object') return String(option.id || '').trim();
+    return String(option || '').trim();
+  }
+
+  function vocabularyLabel(option) {
+    if (option && typeof option === 'object') return String(option.label || option.id || '').trim();
+    return String(option || '').trim();
+  }
+
+  function vocabularyValues(vocabulary) {
+    return Array.isArray(vocabulary?.values) ? vocabulary.values : [];
+  }
+
+  function biomeIcon(option) {
+    if (option && typeof option === 'object' && option.icon) return option.icon;
+    return 'fas fa-tree';
+  }
+
+  function biomeColorToken(option) {
+    if (option && typeof option === 'object' && option.colorToken) return option.colorToken;
+    return 'sage';
+  }
+
+  function biomeCustomColor(option) {
+    if (option && typeof option === 'object' && option.customColor) return option.customColor;
+    return '';
+  }
+
+  function biomeSwatchStyle(option) {
+    const hex = /^#[0-9a-fA-F]{6}$/.test(biomeCustomColor(option)) ? biomeCustomColor(option) : '';
+    const token = String(biomeColorToken(option) || 'sage').replace(/^--fab-tag-/, '');
+    return `--manager-v2-color-swatch: ${hex || `var(--fab-tag-${token})`}`;
+  }
+
+  function openBiomeColorPicker(event, id) {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    const shouldOpen = openBiomeColorPickerId !== id;
+    openBiomeColorPickerId = shouldOpen ? id : '';
+    biomeColorTriggerButton = shouldOpen ? event?.currentTarget ?? null : null;
+    if (shouldOpen) {
+      updateBiomeColorPopoverPosition();
+    }
+  }
+
+  function handleBiomeIconKeydown(event, id) {
+    if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return;
+    openBiomeColorPicker(event, id);
+  }
+
+  function closeBiomeColorPicker() {
+    openBiomeColorPickerId = '';
+    biomeColorTriggerButton = null;
+  }
+
+  function getBiomeColorPopoverHost() {
+    if (!biomeColorTriggerButton || typeof document === 'undefined') return null;
+
+    return biomeColorTriggerButton.closest('.fabricate-manager-v2');
+  }
+
+  function getBiomeColorPopoverHorizontalBounds(hostRect) {
+    if (!biomeColorTriggerButton) return {};
+
+    const mainPanel = biomeColorTriggerButton.closest('.manager-v2-main');
+    const mainPanelRect = mainPanel?.getBoundingClientRect?.();
+    if (!mainPanelRect) return {};
+
+    return {
+      minLeft: mainPanelRect.left - hostRect.left + 16,
+      maxRight: mainPanelRect.right - hostRect.left - 16
+    };
+  }
+
+  function updateBiomeColorPopoverPosition() {
+    if (!openBiomeColorPickerId || !biomeColorTriggerButton || typeof window === 'undefined') return;
+
+    const popoverHost = getBiomeColorPopoverHost();
+    const hostRect = popoverHost?.getBoundingClientRect?.() ?? {
+      left: 0,
+      top: 0,
+      width: window.innerWidth,
+      height: window.innerHeight
+    };
+    const triggerRect = biomeColorTriggerButton.getBoundingClientRect();
+    const horizontalBounds = getBiomeColorPopoverHorizontalBounds(hostRect);
+    const layout = computeIconPickerPopoverLayout(
+      {
+        left: triggerRect.left - hostRect.left,
+        right: triggerRect.right - hostRect.left,
+        top: triggerRect.top - hostRect.top,
+        bottom: triggerRect.bottom - hostRect.top,
+        width: triggerRect.width,
+        height: triggerRect.height
+      },
+      { width: hostRect.width || window.innerWidth, height: hostRect.height || window.innerHeight },
+      {
+        horizontalAlign: 'left',
+        minLeft: horizontalBounds.minLeft,
+        maxRight: horizontalBounds.maxRight,
+        minWidth: 220,
+        maxWidth: 220
+      }
+    );
+
+    if (!layout) {
+      biomeColorPopoverStyle = '';
+      return;
+    }
+
+    const verticalPosition = layout.placement === 'top'
+      ? `top: auto; bottom: ${layout.bottom}px;`
+      : `top: ${layout.top}px; bottom: auto;`;
+
+    biomeColorPopoverStyle = [
+      `left: ${layout.left}px;`,
+      'right: auto;',
+      `width: ${layout.width}px;`,
+      `max-height: ${layout.maxHeight}px;`,
+      verticalPosition
+    ].join(' ');
+  }
+
+  function registerBiomeColorPopoverNode(node) {
+    biomeColorPopoverRoot = node;
+  }
+
+  $effect(() => {
+    if (!openBiomeColorPickerId || typeof window === 'undefined' || typeof document === 'undefined') {
+      biomeColorPopoverStyle = '';
+      biomeColorPopoverRoot = null;
+      return;
+    }
+
+    updateBiomeColorPopoverPosition();
+
+    const handleViewportChange = () => updateBiomeColorPopoverPosition();
+    window.addEventListener('resize', handleViewportChange);
+    document.addEventListener('scroll', handleViewportChange, true);
+
+    return () => {
+      window.removeEventListener('resize', handleViewportChange);
+      document.removeEventListener('scroll', handleViewportChange, true);
+    };
+  });
+
+  function updateCurrentCondition(kind, value) {
+    onUpdateGatheringConditions?.({ [kind]: value, systemId: selectedSystemId });
+  }
+
+  function conditionId(option) {
+    if (option && typeof option === 'object') return String(option.id || '').trim();
+    return String(option || '').trim();
+  }
+
+  function conditionLabel(option) {
+    if (option && typeof option === 'object') return String(option.label || option.id || '').trim();
+    return String(option || '').trim();
+  }
+
+  function conditionIcon(option, kind) {
+    if (option && typeof option === 'object' && option.icon) return option.icon;
+    return defaultConditionIcon(kind);
+  }
+
+  function defaultConditionIcon(kind) {
+    return kind === 'timeOfDay' ? 'fas fa-clock' : 'fas fa-cloud-sun';
+  }
+
+  function conditionValues(setting) {
+    return Array.isArray(setting?.values) ? setting.values : [];
   }
 
   function gatheringHeaderTitle() {
@@ -467,7 +794,206 @@
       id="manager-v2-gathering-panel-settings"
       role="tabpanel"
       aria-labelledby="manager-v2-gathering-tab-settings"
-    ></div>
+    >
+      {#each [
+        { kind: 'timeOfDay', icon: 'fas fa-clock', setting: timeOfDayCondition },
+        { kind: 'weather', icon: 'fas fa-cloud-sun', setting: weatherCondition }
+      ] as condition (condition.kind)}
+        <section class={`manager-v2-condition-panel ${condition.setting.enabled === false ? 'is-disabled' : ''}`} data-gathering-condition-panel={condition.kind} aria-label={conditionTitle(condition.kind)}>
+          <header class="manager-v2-condition-panel-header">
+            <span class="manager-v2-condition-panel-title">
+              <i class={condition.icon} aria-hidden="true"></i>
+              <span>{conditionTitle(condition.kind)}</span>
+            </span>
+            <button
+              type="button"
+              class={`manager-v2-status-toggle ${condition.setting.enabled === false ? 'is-off' : 'is-on'}`}
+              aria-pressed={condition.setting.enabled !== false}
+              aria-label={condition.setting.enabled === false
+                ? text('FABRICATE.Admin.ManagerV2.Environment.Conditions.EnableMatching', 'Enable matching')
+                : text('FABRICATE.Admin.ManagerV2.Environment.Conditions.DisableMatching', 'Disable matching')}
+              onclick={() => onToggleGatheringConditionEnabled?.(condition.kind, condition.setting.enabled === false, selectedSystemId)}
+            >
+              <span class="manager-v2-status-toggle-track" aria-hidden="true">
+                <span class="manager-v2-status-toggle-knob"></span>
+              </span>
+              <span class="manager-v2-status-toggle-label">
+                {condition.setting.enabled === false ? text('FABRICATE.Admin.ManagerV2.StatusOff', 'Off') : text('FABRICATE.Admin.ManagerV2.StatusOn', 'On')}
+              </span>
+            </button>
+          </header>
+          <p class="manager-v2-condition-panel-hint">{conditionHint(condition.kind)}</p>
+
+          <label class="manager-v2-field manager-v2-condition-current">
+            <span>{conditionCurrentLabel(condition.kind)}</span>
+            <select value={condition.setting.current} onchange={(event) => updateCurrentCondition(condition.kind, event.currentTarget.value)}>
+              {#each conditionValues(condition.setting) as option (conditionId(option))}
+                <option value={conditionId(option)}>{conditionLabel(option)}</option>
+              {/each}
+            </select>
+          </label>
+
+          <form class="manager-v2-condition-add" onsubmit={(event) => submitConditionValue(event, condition.kind)}>
+            <IconPicker
+              value={conditionAddIcon(condition.kind)}
+              iconOnly={true}
+              buttonTitle={text('FABRICATE.Admin.ManagerV2.Environment.Conditions.NewIcon', 'New value icon')}
+              onChange={(icon) => setConditionAddIcon(condition.kind, icon)}
+            />
+            <label class="manager-v2-field">
+              <input
+                value={conditionInputValue(condition.kind)}
+                aria-label={conditionAddLabel(condition.kind)}
+                placeholder={conditionInputPlaceholder(condition.kind)}
+                oninput={(event) => setConditionInput(condition.kind, event.currentTarget.value)}
+              />
+            </label>
+            <button type="submit" class="manager-v2-button manager-v2-add-button" aria-label={conditionAddLabel(condition.kind)} title={conditionAddLabel(condition.kind)}>
+              <span>{text('FABRICATE.Admin.ManagerV2.Environment.SettingsAdd', 'Add')}</span>
+            </button>
+          </form>
+
+          <div class="manager-v2-condition-pill-list" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Conditions.Values', 'Condition values')}>
+            {#each conditionValues(condition.setting) as option (conditionId(option))}
+              {@const valueId = conditionId(option)}
+              <span class="manager-v2-condition-pill" data-gathering-condition-value={valueId}>
+                <IconPicker
+                  value={conditionIcon(option, condition.kind)}
+                  iconOnly={true}
+                  buttonTitle={text('FABRICATE.Admin.ManagerV2.Environment.Conditions.EditIcon', 'Edit icon')}
+                  onChange={(icon) => onUpdateGatheringConditionValue?.(condition.kind, valueId, { icon }, selectedSystemId)}
+                />
+                <input
+                  class="manager-v2-condition-label-input"
+                  value={conditionLabel(option)}
+                  aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Conditions.EditLabel', 'Edit label')}
+                  onblur={(event) => onUpdateGatheringConditionValue?.(condition.kind, valueId, { label: event.currentTarget.value }, selectedSystemId)}
+                  onkeydown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      event.currentTarget.blur();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  class="manager-v2-condition-remove"
+                  aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Conditions.RemoveValue', 'Remove {value}').replace('{value}', conditionLabel(option))}
+                  title={text('FABRICATE.Admin.ManagerV2.Environment.Conditions.RemoveValue', 'Remove {value}').replace('{value}', conditionLabel(option))}
+                  disabled={condition.setting.enabled !== false && conditionValues(condition.setting).length <= 1}
+                  onclick={() => onDeleteGatheringConditionValue?.(condition.kind, valueId, selectedSystemId)}
+                >
+                  <i class="fas fa-times" aria-hidden="true"></i>
+                </button>
+              </span>
+            {/each}
+          </div>
+        </section>
+      {/each}
+      {#each [
+        { kind: 'regions', icon: 'fas fa-map-location-dot', vocabulary: regionVocabulary },
+        { kind: 'biomes', icon: 'fas fa-tree', vocabulary: biomeVocabulary }
+      ] as vocabulary (vocabulary.kind)}
+        <section class={`manager-v2-condition-panel manager-v2-vocabulary-settings-panel ${vocabulary.kind === 'biomes' ? 'is-biomes' : 'is-regions'}`} data-gathering-vocabulary-panel={vocabulary.kind} aria-label={vocabularyTitle(vocabulary.kind)}>
+          <header class="manager-v2-condition-panel-header">
+            <span class="manager-v2-condition-panel-title">
+              <i class={vocabulary.icon} aria-hidden="true"></i>
+              <span>{vocabularyTitle(vocabulary.kind)}</span>
+            </span>
+          </header>
+          <p class="manager-v2-condition-panel-hint">{vocabularyHint(vocabulary.kind)}</p>
+
+          <form class={`manager-v2-condition-add ${vocabulary.kind === 'biomes' ? 'manager-v2-biome-add' : 'manager-v2-region-add'}`} onsubmit={(event) => submitVocabularyValue(event, vocabulary.kind)}>
+            {#if vocabulary.kind === 'biomes'}
+              <IconPicker
+                value={biomeIconInput}
+                iconOnly={true}
+                buttonTitle={text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.NewBiomeIcon', 'New biome icon')}
+                onChange={(icon) => biomeIconInput = icon}
+              />
+              <ManagerV2ColorPicker
+                colorToken={biomeColorTokenInput}
+                customColor={biomeCustomColorInput}
+                buttonTitle={text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.NewBiomeColor', 'New biome colour')}
+                presetGridLabel={text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.ColorPresets', 'Colour presets')}
+                customHexLabel={text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.CustomHex', 'Custom hex')}
+                onChange={(updates) => {
+                  biomeColorTokenInput = updates.colorToken;
+                  biomeCustomColorInput = updates.customColor;
+                }}
+              />
+            {/if}
+            <label class="manager-v2-field">
+              <input
+                value={vocabularyInputValue(vocabulary.kind)}
+                aria-label={vocabularyAddLabel(vocabulary.kind)}
+                placeholder={vocabularyPlaceholder(vocabulary.kind)}
+                oninput={(event) => setVocabularyInput(vocabulary.kind, event.currentTarget.value)}
+              />
+            </label>
+            <button type="submit" class="manager-v2-button manager-v2-add-button" aria-label={vocabularyAddLabel(vocabulary.kind)} title={vocabularyAddLabel(vocabulary.kind)}>
+              <span>{text('FABRICATE.Admin.ManagerV2.Environment.SettingsAdd', 'Add')}</span>
+            </button>
+          </form>
+
+          <div class="manager-v2-condition-pill-list" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.Values', 'Vocabulary values')}>
+            {#each vocabularyValues(vocabulary.vocabulary) as option (vocabularyId(option))}
+              {@const valueId = vocabularyId(option)}
+              <span class={`manager-v2-condition-pill manager-v2-vocabulary-pill ${vocabulary.kind === 'biomes' ? 'is-biome' : 'is-region'}`} data-gathering-vocabulary-value={valueId}>
+                {#if vocabulary.kind === 'biomes'}
+                  <span class="manager-v2-biome-combined-picker">
+                    <IconPicker
+                      value={biomeIcon(option)}
+                      iconOnly={true}
+                      triggerClass="manager-v2-biome-combined-trigger"
+                      triggerStyle={biomeSwatchStyle(option)}
+                      buttonTitle={text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.EditBiomeIcon', 'Edit biome icon')}
+                      onTriggerContextMenu={(event) => openBiomeColorPicker(event, valueId)}
+                      onTriggerKeydown={(event) => handleBiomeIconKeydown(event, valueId)}
+                      onChange={(icon) => onUpdateGatheringVocabularyValue?.(vocabulary.kind, valueId, { icon }, selectedSystemId)}
+                    />
+                    {#if openBiomeColorPickerId === valueId}
+                      <ManagerV2ColorPopover
+                        colorToken={biomeColorToken(option)}
+                        customColor={biomeCustomColor(option)}
+                        presetGridLabel={text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.ColorPresets', 'Colour presets')}
+                        customHexLabel={text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.CustomHex', 'Custom hex')}
+                        onChange={(updates) => onUpdateGatheringVocabularyValue?.(vocabulary.kind, valueId, updates, selectedSystemId)}
+                        onDismiss={closeBiomeColorPicker}
+                        popoverStyle={biomeColorPopoverStyle}
+                        portalTarget={() => getBiomeColorPopoverHost()}
+                        registerPopoverNode={registerBiomeColorPopoverNode}
+                      />
+                    {/if}
+                  </span>
+                {/if}
+                <input
+                  class="manager-v2-condition-label-input"
+                  value={vocabularyLabel(option)}
+                  aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.EditLabel', 'Edit label')}
+                  onblur={(event) => onUpdateGatheringVocabularyValue?.(vocabulary.kind, valueId, { label: event.currentTarget.value }, selectedSystemId)}
+                  onkeydown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      event.currentTarget.blur();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  class="manager-v2-condition-remove"
+                  aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.RemoveValue', 'Remove {value}').replace('{value}', vocabularyLabel(option))}
+                  title={text('FABRICATE.Admin.ManagerV2.Environment.Vocabularies.RemoveValue', 'Remove {value}').replace('{value}', vocabularyLabel(option))}
+                  onclick={() => onDeleteGatheringVocabularyValue?.(vocabulary.kind, valueId, selectedSystemId)}
+                >
+                  <i class="fas fa-times" aria-hidden="true"></i>
+                </button>
+              </span>
+            {/each}
+          </div>
+        </section>
+      {/each}
+    </div>
   {:else}
     {@const activeTab = gatheringTabs.find(tab => tab.id === activeGatheringTab)}
     <div

@@ -75,6 +75,10 @@
   );
   const selectedCountFacts = $derived(buildSelectedCountFacts(selectedCounts));
   const enabledFeatureLabels = $derived(featureLabels(selectedSystem));
+  const selectedGatheringConditionShortcuts = $derived(buildSelectedGatheringConditionShortcuts(
+    selectedSystem,
+    $viewState.gatheringConfig
+  ));
   const visiblePlaceholderViews = $derived(selectedSystem
     ? placeholderViews.filter(view => isViewAvailableForSystem(view, selectedSystem))
     : []
@@ -157,7 +161,7 @@
       titleKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderTitle',
       titleFallback: 'Gathering settings',
       hintKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderHint',
-      hintFallback: 'Set system-level d100 reward and hazard rules for gathering.'
+      hintFallback: 'Set system-level rules for gathering.'
     }
   ];
   const activeGatheringInspectorTab = $derived(
@@ -229,6 +233,11 @@
   function updateSelectedGatheringRules(updates) {
     if (!selectedSystemId) return;
     store.updateGatheringRules?.(selectedSystemId, updates);
+  }
+
+  function updateSelectedGatheringCondition(kind, value) {
+    if (!selectedSystemId || !kind) return;
+    store.updateGatheringConditions?.({ [kind]: value, systemId: selectedSystemId });
   }
 
   function adjustGatheringRuleLimit(field, delta) {
@@ -317,6 +326,47 @@
         value: counts.recipeCategories
       }
     ];
+  }
+
+  function buildSelectedGatheringConditionShortcuts(system, gatheringConfig) {
+    if (system?.features?.gathering !== true) return [];
+    const systemConditions = gatheringConfig?.systems?.[system.id]?.conditions || {};
+    return [
+      {
+        kind: 'timeOfDay',
+        icon: 'fas fa-clock',
+        label: text('FABRICATE.Admin.ManagerV2.CurrentTimeOfDay', 'Current time of day'),
+        setting: systemConditions.timeOfDay || {
+          enabled: true,
+          current: gatheringConfig?.conditions?.timeOfDay || 'day',
+          values: gatheringConfig?.vocabularies?.timeOfDay || []
+        }
+      },
+      {
+        kind: 'weather',
+        icon: 'fas fa-cloud-sun',
+        label: text('FABRICATE.Admin.ManagerV2.CurrentWeather', 'Current weather'),
+        setting: systemConditions.weather || {
+          enabled: true,
+          current: gatheringConfig?.conditions?.weather || 'clear',
+          values: gatheringConfig?.vocabularies?.weather || []
+        }
+      }
+    ].filter(condition => condition.setting?.enabled !== false && conditionValues(condition.setting).length > 0);
+  }
+
+  function conditionId(option) {
+    if (option && typeof option === 'object') return String(option.id || '').trim();
+    return String(option || '').trim();
+  }
+
+  function conditionLabel(option) {
+    if (option && typeof option === 'object') return String(option.label || option.id || '').trim();
+    return String(option || '').trim();
+  }
+
+  function conditionValues(setting) {
+    return Array.isArray(setting?.values) ? setting.values : [];
   }
 
   function normalizedActiveView(view, system, environmentsAvailable, essencesAvailable) {
@@ -1496,6 +1546,7 @@
         {selectedEnvironmentId}
         selectedSystemName={selectedSystem?.name || ''}
         {selectedSystemId}
+        gatheringConfig={$viewState.gatheringConfig}
         sceneOptions={selectedSystem?.sceneOptions || []}
         {shouldUseEnvironmentDraftForDisplay}
         {activeGatheringTab}
@@ -1507,6 +1558,14 @@
         onDeleteEnvironment={(id) => deleteEnvironment(id)}
         onMoveEnvironment={(id, direction) => moveEnvironment(id, direction)}
         onToggleEnvironmentEnabled={(id, enabled) => toggleEnvironmentEnabled(id, enabled)}
+        onUpdateGatheringConditions={store.updateGatheringConditions}
+        onToggleGatheringConditionEnabled={store.toggleGatheringConditionEnabled}
+        onAddGatheringConditionValue={store.addGatheringConditionValue}
+        onUpdateGatheringConditionValue={store.updateGatheringConditionValue}
+        onDeleteGatheringConditionValue={store.deleteGatheringConditionValue}
+        onAddGatheringVocabularyValue={store.addGatheringVocabularyValue}
+        onUpdateGatheringVocabularyValue={store.updateGatheringVocabularyValue}
+        onDeleteGatheringVocabularyValue={store.deleteGatheringVocabularyValue}
       />
     {:else if currentView === 'environment-edit' && selectedSystem}
       <main class="manager-v2-main manager-v2-environment-edit-main" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.EditTitle', 'Edit environment')}>
@@ -1805,9 +1864,9 @@
                 </label>
                 <span class="manager-v2-rule-field">
                   <select id="manager-v2-gathering-rule-hazards" value={selectedGatheringRules.hazardSelectionMode} onchange={(event) => updateSelectedGatheringRules({ hazardSelectionMode: event.target.value })}>
-                    <option value="highestRankedDrop">{text('FABRICATE.Admin.ManagerV2.Environment.Rules.HighestRankedDrop', 'Highest ranked successful drop')}</option>
-                    <option value="allDrops">{text('FABRICATE.Admin.ManagerV2.Environment.Rules.AllDrops', 'All successful drops')}</option>
-                    <option value="limitedDrops">{text('FABRICATE.Admin.ManagerV2.Environment.Rules.LimitedDrops', 'Limit successful drops')}</option>
+                    <option value="highestRankedDrop">{text('FABRICATE.Admin.ManagerV2.Environment.Rules.HazardHighestRankedDrop', 'Highest ranked triggered hazard')}</option>
+                    <option value="allDrops">{text('FABRICATE.Admin.ManagerV2.Environment.Rules.HazardAllDrops', 'All triggered hazards')}</option>
+                    <option value="limitedDrops">{text('FABRICATE.Admin.ManagerV2.Environment.Rules.HazardLimitedDrops', 'Limit triggered hazards')}</option>
                   </select>
                 </span>
               </div>
@@ -1904,35 +1963,6 @@
             </section>
           {/if}
 
-          <section class="manager-v2-inspector-card">
-            <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Environment.Actions', 'Environment actions')}</h3>
-            <div class="manager-v2-inspector-actions">
-              <button type="button" class="manager-v2-button" onclick={() => editEnvironment()}>
-                <i class="fas fa-edit" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Edit', 'Edit environment')}</span>
-              </button>
-              <button type="button" class="manager-v2-button" onclick={() => duplicateEnvironment()}>
-                <i class="fas fa-copy" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Duplicate', 'Duplicate environment')}</span>
-              </button>
-              <button type="button" class="manager-v2-button" onclick={() => toggleEnvironmentEnabled(selectedEnvironment.id, selectedEnvironment.enabled === false)}>
-                <i class={selectedEnvironment.enabled === false ? 'fas fa-toggle-off' : 'fas fa-toggle-on'} aria-hidden="true"></i>
-                <span>{selectedEnvironment.enabled === false ? text('FABRICATE.Admin.ManagerV2.Environment.Enable', 'Enable environment') : text('FABRICATE.Admin.ManagerV2.Environment.Disable', 'Disable environment')}</span>
-              </button>
-              <div class="manager-v2-action-group">
-                <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.Environments.MoveUp', 'Move up')} title={text('FABRICATE.Admin.Environments.MoveUp', 'Move up')} onclick={() => moveEnvironment(selectedEnvironment.id, 'up')}>
-                  <i class="fas fa-arrow-up" aria-hidden="true"></i>
-                </button>
-                <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.Environments.MoveDown', 'Move down')} title={text('FABRICATE.Admin.Environments.MoveDown', 'Move down')} onclick={() => moveEnvironment(selectedEnvironment.id, 'down')}>
-                  <i class="fas fa-arrow-down" aria-hidden="true"></i>
-                </button>
-              </div>
-              <button type="button" class="manager-v2-button is-danger" onclick={() => deleteEnvironment()}>
-                <i class="fas fa-trash" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Delete', 'Delete environment')}</span>
-              </button>
-            </div>
-          </section>
         {:else if environmentList.length === 0}
           <section class="manager-v2-setup-card" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Title', 'Plan gathering content')}>
             <div class="manager-v2-setup-card-header">
@@ -2443,6 +2473,27 @@
             <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.NoOptionalFeatures', 'No optional features enabled.')}</p>
           {/if}
         </section>
+
+        {#if selectedGatheringConditionShortcuts.length > 0}
+          <section class="manager-v2-inspector-card manager-v2-condition-shortcut-card" data-systems-gathering-conditions aria-label={text('FABRICATE.Admin.ManagerV2.GlobalConditions', 'Global conditions')}>
+            <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.GlobalConditions', 'Global conditions')}</h3>
+            <div class="manager-v2-condition-shortcut-list">
+              {#each selectedGatheringConditionShortcuts as condition (condition.kind)}
+                <label class="manager-v2-field manager-v2-condition-shortcut" data-systems-gathering-condition={condition.kind}>
+                  <span class="manager-v2-condition-shortcut-label">
+                    <i class={condition.icon} aria-hidden="true"></i>
+                    <span>{condition.label}</span>
+                  </span>
+                  <select value={condition.setting.current} onchange={(event) => updateSelectedGatheringCondition(condition.kind, event.currentTarget.value)}>
+                    {#each conditionValues(condition.setting) as option (conditionId(option))}
+                      <option value={conditionId(option)}>{conditionLabel(option)}</option>
+                    {/each}
+                  </select>
+                </label>
+              {/each}
+            </div>
+          </section>
+        {/if}
       {:else if ($viewState.systems || []).length === 0}
         <section class="manager-v2-setup-card" aria-label={text('FABRICATE.Admin.ManagerV2.EmptySetup.Title', 'Set up your first system')}>
           <div class="manager-v2-setup-card-header">

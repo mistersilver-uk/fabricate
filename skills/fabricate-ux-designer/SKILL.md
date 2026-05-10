@@ -14,6 +14,7 @@ Keep this skill aligned with the `fabricate_ux_designer` custom Codex agent.
 - the active Vite dev URL when available, or a prompt to ask the user for it before using container-backed flows
 - existing screenshots in `test-results/` when no live dev session is available
 - `.codex/agents/fabricate-ux-designer.toml` when you need the full audit intent
+- `C:/Users/mjkpo/.codex/memories/manager-v2-gathering-ui-patterns.md` when work touches Manager V2 Gathering tabs, settings, rules, or focus behavior
 
 ## Workflow
 

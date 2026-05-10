@@ -6,7 +6,9 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const cssPath = resolve(__dirname, '../../styles/fabricate.css');
+const colorPickerPath = resolve(__dirname, '../../src/ui/svelte/components/ManagerV2ColorPicker.svelte');
 const css = readFileSync(cssPath, 'utf8');
+const colorPickerSource = readFileSync(colorPickerPath, 'utf8');
 
 function blockFor(selector) {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -172,6 +174,9 @@ test('manager-v2 inspector count labels wrap without truncation', () => {
   const factLineBlock = blockFor('.fabricate-manager-v2 .manager-v2-fact-line');
   const factLeadingBlock = blockFor('.fabricate-manager-v2 .manager-v2-fact-leading');
   const featureListBlock = blockFor('.fabricate-manager-v2 .manager-v2-feature-list');
+  const conditionShortcutListBlock = blockFor('.fabricate-manager-v2 .manager-v2-condition-shortcut-list');
+  const conditionShortcutLabelBlock = blockFor('.fabricate-manager-v2 .manager-v2-condition-shortcut-label');
+  const conditionShortcutSelectBlock = blockFor('.fabricate-manager-v2 .manager-v2-condition-shortcut select');
 
   assert.ok(css.includes('grid-template-columns: repeat(2, minmax(0, 1fr));'), 'count facts should use a two-column inspector grid');
   assert.ok(factBlock.includes('display: block;'), 'count facts should render one phrase instead of wrapping separate flex children');
@@ -188,6 +193,10 @@ test('manager-v2 inspector count labels wrap without truncation', () => {
   assert.ok(css.includes('.fabricate-manager-v2 .manager-v2-fact strong.is-disabled'), 'disabled count values should preserve emphasis');
   assert.ok(featureListBlock.includes('align-items: flex-start;'), 'feature pills should align to the top of the card');
   assert.ok(featureListBlock.includes('justify-content: flex-start;'), 'feature pills should align to the left of the card');
+  assert.ok(conditionShortcutListBlock.includes('grid-template-columns: minmax(0, 1fr);'), 'condition shortcut card should keep compact one-column inspector controls');
+  assert.ok(conditionShortcutListBlock.includes('gap: 10px;'), 'condition shortcut controls should have stable spacing');
+  assert.ok(conditionShortcutLabelBlock.includes('display: inline-flex;'), 'condition shortcut labels should align icons and text');
+  assert.ok(conditionShortcutSelectBlock.includes('font-weight: 400;'), 'condition shortcut select text should not inherit bold label weight');
 });
 
 test('manager-v2 empty states use refined heading and setup-panel styling', () => {
@@ -224,6 +233,65 @@ test('manager-v2 gathering rules inspector stacks descriptions above normal-weig
   assert.ok(ruleFieldBlock.includes('font-weight: 400;'), 'rule field text should not force bold select text');
   assert.ok(ruleInputBlock.includes('font-weight: 400;'), 'rule select and input text should not inherit bold labels');
   assert.equal(css.includes('.fabricate-manager-v2 .manager-v2-gathering-settings-summary'), false, 'settings center panel should not keep the duplicated rules summary');
+});
+
+test('manager-v2 gathering settings condition panels use a two-column responsive grid', () => {
+  const settingsBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-settings');
+  const panelBlock = blockFor('.fabricate-manager-v2 .manager-v2-condition-panel');
+  const addBlock = blockFor('.fabricate-manager-v2 .manager-v2-condition-add');
+  const regionAddBlock = blockFor('.fabricate-manager-v2 .manager-v2-region-add');
+  const biomeAddBlock = blockFor('.fabricate-manager-v2 .manager-v2-biome-add');
+  const pillBlock = blockFor('.fabricate-manager-v2 .manager-v2-condition-pill');
+  const regionPillBlock = blockFor('.fabricate-manager-v2 .manager-v2-vocabulary-pill.is-region');
+  const biomePillBlock = blockFor('.fabricate-manager-v2 .manager-v2-vocabulary-pill.is-biome');
+  const biomeCombinedTriggerBlock = blockFor('.fabricate-manager-v2 .manager-v2-condition-pill .essence-icon-picker-trigger.icon-only.manager-v2-biome-combined-trigger');
+  const biomeCombinedTriggerIconBlock = blockFor('.fabricate-manager-v2 .manager-v2-condition-pill .essence-icon-picker-trigger.icon-only.manager-v2-biome-combined-trigger i');
+  const colorPickerPopoverBlock = blockFor('.fabricate-manager-v2 .manager-v2-color-picker-popover');
+  const colorPresetGridBlock = blockFor('.fabricate-manager-v2 .manager-v2-color-preset-grid');
+  const colorCustomInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-color-custom input');
+  const labelInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-condition-label-input');
+  const mediumQuery = css.slice(css.indexOf('@container fabricate-manager-v2 (max-width: 1120px)'));
+
+  assert.ok(settingsBlock.includes('grid-template-columns: repeat(2, minmax(0, 1fr));'), 'settings conditions should sit side by side at normal widths');
+  assert.ok(settingsBlock.includes('align-items: stretch;'), 'condition panels should stretch to equal height in the two-column layout');
+  assert.ok(settingsBlock.includes('padding: 0 12px 12px;'), 'settings panel should remove extra top padding while keeping side and bottom workspace spacing');
+  assert.ok(panelBlock.includes('align-content: start;'), 'condition panel content should pack to its natural height');
+  assert.ok(panelBlock.includes('height: 100%;'), 'condition panel backgrounds should fill the stretched grid row');
+  assert.ok(addBlock.includes('grid-template-columns: 36px minmax(0, 1fr) 48px;'), 'condition add controls should reserve icon picker, label input, and Add button columns');
+  assert.ok(regionAddBlock.includes('grid-template-columns: minmax(0, 1fr) 48px;'), 'region add controls should be text input plus Add button');
+  assert.ok(biomeAddBlock.includes('grid-template-columns: 36px 36px minmax(0, 1fr) 48px;'), 'biome add controls should align icon, colour, input, and Add columns');
+  assert.ok(css.includes('.fabricate-manager-v2 .manager-v2-condition-pill-list {\n  display: grid;'), 'condition pills should use grid rows instead of wrapping as single full-width flex pills');
+  assert.ok(css.includes('grid-template-columns: repeat(2, minmax(0, 1fr));'), 'condition pills should fit two per line');
+  assert.ok(pillBlock.includes('grid-template-columns: 30px minmax(0, 1fr) 24px;'), 'condition pills should reserve icon, label, and remove columns');
+  assert.ok(regionPillBlock.includes('grid-template-columns: minmax(0, 1fr) 24px;'), 'region pills should expose editable labels and remove controls without icon columns');
+  assert.ok(biomePillBlock.includes('grid-template-columns: 30px minmax(0, 1fr) 24px;'), 'biome pills should reserve combined icon/color, label, and remove columns');
+  assert.ok(!biomePillBlock.includes('28px 30px minmax(0, 1fr) 30px 24px;'), 'biome pills should not reserve separate swatch and colour columns');
+  assert.ok(biomeCombinedTriggerBlock.includes('color: var(--fab-biome-icon-foreground);'), 'biome combined icon trigger should use fixed charcoal foreground across themes');
+  assert.ok(biomeCombinedTriggerBlock.includes('background: var(--manager-v2-color-swatch, var(--fab-tag-sage));'), 'biome combined icon trigger should keep token/custom swatch backgrounds');
+  assert.ok(biomeCombinedTriggerIconBlock.includes('color: var(--fab-biome-icon-foreground);'), 'biome combined nested icons should not inherit theme button colours');
+  assert.ok(css.includes('--fab-biome-icon-foreground: #202124;'), 'biome icon foreground token should stay fixed charcoal in theme declarations');
+  assert.ok(colorPickerPopoverBlock.includes('box-sizing: border-box;'), 'biome color picker popover should contain its padding and border in its width');
+  assert.ok(colorPickerPopoverBlock.includes('z-index: 120;'), 'biome color picker popover should layer with Manager V2 portaled pickers');
+  assert.equal(colorPickerPopoverBlock.includes('top: calc(100% + 6px);'), false, 'biome color picker popover position should come from computed inline placement');
+  assert.ok(colorPickerPopoverBlock.includes('width: 220px;'), 'biome color picker popover should be wide enough for presets and custom hex input');
+  assert.ok(colorPickerSource.includes('computeIconPickerPopoverLayout'), 'biome color picker should use shared popover positioning');
+  assert.ok(colorPickerSource.includes('minWidth: 220') && colorPickerSource.includes('maxWidth: 220'), 'biome color picker layout should keep a fixed compact width');
+  assert.ok(colorPickerSource.includes("horizontalAlign: 'left'"), 'biome color picker layout should left-align with the trigger');
+  assert.ok(colorPresetGridBlock.includes('grid-template-columns: repeat(4, 1fr);'), 'biome color picker presets should render as a compact grid');
+  assert.ok(colorCustomInputBlock.includes('width: 100%;'), 'biome custom hex input should fill the popover without overflowing');
+  assert.ok(colorCustomInputBlock.includes('min-width: 0;'), 'biome custom hex input should be allowed to shrink inside the popover grid');
+  assert.ok(pillBlock.includes('border-radius: 6px;'), 'condition pills should be rounded rectangles rather than ovals');
+  assert.ok(labelInputBlock.includes('align-self: center;'), 'condition label edit inputs should center inside the pill');
+  assert.ok(labelInputBlock.includes('min-height: 0;'), 'condition label edit inputs should override inherited input minimum height');
+  assert.ok(labelInputBlock.includes('height: 20px;'), 'condition label edit inputs should stay visually shorter than the pill');
+  assert.ok(labelInputBlock.includes('max-height: 20px;'), 'condition label edit inputs should not expand to fill the pill on focus');
+  assert.equal(labelInputBlock.includes('font-size'), false, 'condition label edit input should not reduce text size to shrink the control');
+  assert.ok(css.includes('.fabricate-manager-v2 .manager-v2-condition-pill .essence-icon-picker-trigger.icon-only') && css.includes('justify-content: center;'), 'condition pill icon picker buttons should center icons');
+  assert.ok(
+    mediumQuery.includes('.fabricate-manager-v2 .manager-v2-gathering-settings')
+      && mediumQuery.includes('grid-template-columns: minmax(0, 1fr);'),
+    'condition panels should stack at medium widths'
+  );
 });
 
 test('manager-v2 recipes browser defines compact responsive table geometry', () => {
@@ -447,8 +515,24 @@ test('manager-v2 environments browser and edit route define compact responsive g
   );
   assert.ok(taskCountBlock.includes('font-weight: 800;'), 'environment task count should render as plain emphasized text');
   assert.ok(actionsBlock.includes('grid-template-columns: 72px;'), 'environment row actions should only reserve edit duplicate delete controls');
+  assert.ok(actionsBlock.includes('justify-content: end;'), 'environment row actions should stay compact on the right at desktop widths');
+  assert.ok(actionsBlock.includes('justify-self: end;'), 'environment row actions should align to the right edge of their cell');
   assert.ok(!actionsBlock.includes('grid-template-columns: 72px 34px;'), 'environment row actions should not reserve a reorder stack column');
   assert.ok(actionGridBlock.includes('grid-template-columns: repeat(2, 34px);'), 'environment edit duplicate delete buttons should sit in a compact grid');
+  assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-environment-action-grid .manager-v2-icon-button.is-danger {\n  grid-column: 2;\n}'),
+    'environment delete quick action should sit in the right column below the duplicate action'
+  );
+  assert.ok(
+    mediumQuery.includes('.fabricate-manager-v2 .manager-v2-action-group.manager-v2-environment-actions.manager-v2-labeled-cell')
+      && mediumQuery.includes('display: grid;')
+      && mediumQuery.includes('grid-template-columns: minmax(88px, 0.35fr) 72px;')
+      && mediumQuery.includes('justify-content: stretch;')
+      && mediumQuery.includes('.fabricate-manager-v2 .manager-v2-environment-actions .manager-v2-environment-action-grid')
+      && mediumQuery.includes('justify-self: end;')
+      && mediumQuery.includes('margin-left: auto;'),
+    'responsive environment row actions should stay right-aligned instead of inheriting the generic left-aligned action group layout'
+  );
   assert.ok(
     reorderStackBlock.includes('position: absolute;')
       && reorderStackBlock.includes('inset: 0;')

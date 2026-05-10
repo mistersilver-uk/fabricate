@@ -1,0 +1,34 @@
+# Tasks
+
+- [x] Add OpenSpec proposal, design, and task docs.
+- [x] Normalize per-system weather and time-of-day condition settings.
+- [x] Update runtime reusable task/hazard matching to honor per-system enabled dimensions.
+- [x] Add admin-store actions for condition toggles, value additions, value deletion, and current value updates.
+- [x] Render Manager V2 Gathering Settings condition panels.
+- [x] Remove weather/time from environment editor generic vocabulary CSV controls.
+- [x] Add focused store, runtime, component, and layout coverage.
+- [x] Run focused validation suites.
+- [x] Run `npm test`.
+- [x] Run `npm run build`.
+- [x] Normalize condition values to option records with editable labels/icons.
+- [x] Update Settings UI pills/selectors for labels, icons, and icon picker editing.
+- [x] Add focused regression coverage for option records, matching ids, and settings layout polish.
+- [x] Re-run focused suites, `npm test`, and `npm run build`.
+- [x] Refine condition pill geometry to two-per-row rectangular cards with centered icons.
+- [x] Add icon picker support to new condition value creation.
+- [x] Add Systems Library right-inspector shortcuts for enabled current weather/time-of-day conditions.
+- [x] Add focused contract, mounted, and layout coverage for the inspector shortcut.
+- [x] Re-run focused suites, `npm test`, and `npm run build`.
+- [x] Normalize per-system region and biome vocabulary records with legacy top-level fallback.
+- [x] Add admin-store actions for region/biome add, update, and delete.
+- [x] Prune deleted region/biome ids from selected-system environments, reusable tasks, and hazards.
+- [x] Render Gathering Settings Regions and Biomes panels with biome icon and colour controls.
+- [x] Remove Regions/Biomes from the environment editor generic vocabulary CSV controls.
+- [x] Add focused store, contract, mounted, and layout coverage for region/biome vocabulary editing.
+- [x] Add compact Settings card copy, add-row labels, and combined biome icon/colour affordance.
+- [x] Normalize default biome strings to title-case labels with curated icons/colours in admin and runtime config paths.
+- [x] Add focused store, mounted, and layout coverage for the biome settings UX polish.
+- [x] Re-run focused suites, `npm test`, and `npm run build`.
+- [x] Remove the redundant Gathering Environments inspector actions card and keep row quick actions right-aligned in responsive layouts.
+- [x] Add focused contract, mounted, and layout coverage for the removed inspector card and row quick-action alignment.
+- [x] Fix biome colour icon contrast and constrain the colour picker popover.

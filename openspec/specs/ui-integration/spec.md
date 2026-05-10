@@ -264,6 +264,7 @@ Current GM editor behavior:
 - The selected draft can edit gathering composition tags: one `region`, multiple `biomes`, and multiple `dangerTags`.
 - The selected draft can edit risk display/evidence and risk-to-danger matching evidence where supported.
 - The selected system's Gathering Settings tab configures d100 reward selection, hazard selection, limits, and hazard outcome through `gatheringConfig.systems[systemId].rules`.
+- The selected system's Gathering Settings tab configures per-system `Times of day` and `Weather conditions` matching settings with enable toggles, current value selectors, add controls, label/icon-editable value pills, and selected-system cleanup on deletion.
 - The Environments editor shows current global weather and time of day as context, not as environment browse filters.
 - Settings is the only primary GM UI surface for current global weather and current global time of day. Environment authoring may expose inherited condition evidence and future provider override evidence, but must not be the primary condition mutation surface.
 - The Environments editor exposes reusable gathering task and hazard library rows for the selected crafting system, including per-environment enable/disable toggles.
@@ -274,7 +275,7 @@ Current GM editor behavior:
 - Reusable task authoring includes name, match tags, and ordered d100 drop row reference/quantity/drop rate. D100 row selection is controlled by selected-system Gathering Rules, not reusable task authoring.
 - Reusable task authoring may also include node count, depletion timing, respawn policy, stamina cost, attempt limits, risk overrides, encounter hooks, natural expression providers, and macro providers where the selected economy/features use them.
 - Reusable hazard authoring includes name, image, description, enabled state, danger/match tags, d100 drop rate, and modifier provider evidence.
-- The settings/tag area can edit gathering vocabularies for regions, biomes, danger, weather, and time of day, and can update current global weather/time through the public gathering condition API when available.
+- The settings/tag area can edit gathering vocabularies for regions, biomes, and danger. Weather and time-of-day vocabulary editing lives in the Gathering Settings tab condition panels.
 - The editor keeps core environment identity separate from task/node authoring.
 - The editor allows environments to exist without a linked scene. Scene link controls are optional access/evidence controls, not the identity of the environment.
 - The editor should group rich gathering authoring into Overview, Location, Conditions, Tasks / Nodes, Results, Risk / Encounters, Economy, Visibility, and Advanced sections or equivalent groupings.

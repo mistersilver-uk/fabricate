@@ -241,9 +241,22 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(environmentsBrowserSource.includes("activeGatheringTab = 'environments'"), 'gathering page should accept environments as the default active tab');
     assert.ok(environmentsBrowserSource.includes('onSelectGatheringTab(tabId)'), 'gathering page should report tab changes to the root');
     assert.ok(rootSource.includes('data-gathering-inspector-placeholder'), 'right inspector should render placeholders for non-environment gathering tabs');
+    assert.equal(
+      rootSource.match(/FABRICATE\.Admin\.ManagerV2\.Environment\.Actions/g)?.length ?? 0,
+      1,
+      'environment actions localization should remain only for the header aria label, not a redundant inspector card'
+    );
+    assert.ok(
+      !rootSource.includes("<h3 class=\"manager-v2-card-title\">{text('FABRICATE.Admin.ManagerV2.Environment.Actions', 'Environment actions')}</h3>"),
+      'selected environment inspector should not render a redundant Environment actions card'
+    );
     assert.ok(environmentsBrowserSource.includes('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksPlaceholderHint'), 'gathering placeholder copy should be localized');
     assert.ok(environmentsBrowserSource.includes("selectGatheringTab('tasks')"), 'empty environments guidance should route to the Tasks tab');
     assert.ok(environmentsBrowserSource.includes("selectGatheringTab('encounters')"), 'empty environments guidance should route hazards to the Hazards tab');
+    assert.ok(environmentsBrowserSource.includes('manager-v2-environment-action-grid'), 'environment rows should keep quick action wiring');
+    assert.ok(environmentsBrowserSource.includes('onEditEnvironment(environment.id)'), 'environment rows should wire edit quick actions');
+    assert.ok(environmentsBrowserSource.includes('onDuplicateEnvironment(environment.id)'), 'environment rows should wire duplicate quick actions');
+    assert.ok(environmentsBrowserSource.includes('onDeleteEnvironment(environment.id)'), 'environment rows should wire delete quick actions');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Label, 'Gathering sections');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Environments, 'Environments');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Tasks, 'Tasks');
@@ -254,6 +267,8 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksPlaceholderHint, 'Reusable gathering task management is planned for a later slice.');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.EncountersPlaceholderHint, 'Reusable hazard authoring is planned for a later slice.');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderHint, 'Set system-level d100 reward and hazard rules for gathering.');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Conditions.TimeOfDayTitle, 'Times of day');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Conditions.WeatherTitle, 'Weather conditions');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Title, 'Plan gathering content');
     assert.equal(
       lang.FABRICATE.Admin.ManagerV2.Environment.EmptySetup.StepHazards,
@@ -449,6 +464,12 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'gatheringConfig={$viewState.gatheringConfig}',
       'onUpdateGatheringConditions={store.updateGatheringConditions}',
       'onUpdateGatheringVocabulary={store.updateGatheringVocabulary}',
+      'onToggleGatheringConditionEnabled={store.toggleGatheringConditionEnabled}',
+      'onAddGatheringConditionValue={store.addGatheringConditionValue}',
+      'onDeleteGatheringConditionValue={store.deleteGatheringConditionValue}',
+      'onAddGatheringVocabularyValue={store.addGatheringVocabularyValue}',
+      'onUpdateGatheringVocabularyValue={store.updateGatheringVocabularyValue}',
+      'onDeleteGatheringVocabularyValue={store.deleteGatheringVocabularyValue}',
       'onUpdateGatheringRules={store.updateGatheringRules}',
       'onAddGatheringLibraryTask={store.addGatheringLibraryTask}',
       'onUpdateGatheringLibraryTask={store.updateGatheringLibraryTask}',
@@ -477,10 +498,39 @@ describe('CraftingSystemManagerV2 source contract', () => {
       assert.ok(environmentEditSource.includes(snippet), `environment editor should include ${snippet}`);
     }
     assert.ok(rootSource.includes('data-gathering-inspector-rules'), 'root should render the settings rules inspector');
+    assert.ok(environmentsBrowserSource.includes('data-gathering-condition-panel={condition.kind}'), 'settings tab should render condition vocabulary panels');
+    assert.ok(environmentsBrowserSource.includes('onToggleGatheringConditionEnabled?.'), 'settings condition panels should wire matching toggles');
+    assert.ok(environmentsBrowserSource.includes('onAddGatheringConditionValue?.'), 'settings condition panels should wire value additions');
+    assert.ok(environmentsBrowserSource.includes('onUpdateGatheringConditionValue?.'), 'settings condition panels should wire label and icon updates');
+    assert.ok(environmentsBrowserSource.includes('onDeleteGatheringConditionValue?.'), 'settings condition panels should wire value deletion');
+    assert.ok(environmentsBrowserSource.includes('data-gathering-vocabulary-panel={vocabulary.kind}'), 'settings tab should render region and biome vocabulary panels');
+    assert.ok(environmentsBrowserSource.includes('onAddGatheringVocabularyValue?.'), 'settings vocabulary panels should wire value additions');
+    assert.ok(environmentsBrowserSource.includes('onUpdateGatheringVocabularyValue?.'), 'settings vocabulary panels should wire label, icon, and colour updates');
+    assert.ok(environmentsBrowserSource.includes('onDeleteGatheringVocabularyValue?.'), 'settings vocabulary panels should wire value deletion');
+    assert.ok(environmentsBrowserSource.includes('ManagerV2ColorPicker'), 'settings biome panels should use the manager-v2 color picker');
+    assert.ok(environmentsBrowserSource.includes('IconPicker'), 'settings condition panels should reuse the shared icon picker');
+    assert.ok(environmentsBrowserSource.includes('manager-v2-condition-label-input'), 'settings condition panels should expose editable display labels');
+    assert.ok(environmentsBrowserSource.includes("onAddGatheringConditionValue?.(kind, { label: value, icon: conditionAddIcon(kind) }"), 'settings condition add should include the selected icon');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Conditions.NewIcon, 'New value icon');
+    assert.ok(environmentEditSource.includes("{#each ['danger'] as vocabulary"), 'environment editor should keep only danger in generic vocabulary CSV controls');
+    assert.ok(!environmentEditSource.includes("{#each ['regions', 'biomes', 'danger'] as vocabulary"), 'environment editor should not expose regions/biomes in generic vocabulary CSV controls');
+    assert.ok(!environmentEditSource.includes("{#each ['regions', 'biomes', 'danger', 'weather', 'timeOfDay'] as vocabulary"), 'environment editor should not expose weather/time generic vocabulary CSV controls');
     assert.ok(rootSource.includes('updateSelectedGatheringRules'), 'root should wire rule updates');
     assert.ok(rootSource.includes('manager-v2-rule-copy'), 'root should render rule descriptions beside inspector icons');
     assert.ok(rootSource.includes('data-gathering-rule-stepper="rewardLimit"'), 'root should render the reward limit stepper');
     assert.ok(rootSource.includes('data-gathering-rule-stepper="hazardLimit"'), 'root should render the hazard limit stepper');
+    assert.ok(rootSource.includes('FABRICATE.Admin.ManagerV2.Environment.Rules.HazardHighestRankedDrop'), 'hazard rule select should use hazard-specific drop labels');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Rules.HighestRankedDrop, 'Highest ranked successful drop');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Rules.AllDrops, 'All successful drops');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Rules.LimitedDrops, 'Limit successful drops');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Rules.HazardHighestRankedDrop, 'Highest ranked triggered hazard');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Rules.HazardAllDrops, 'All triggered hazards');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Rules.HazardLimitedDrops, 'Limit triggered hazards');
+    assert.ok(rootSource.includes('selectedGatheringConditionShortcuts'), 'root should derive selected-system condition shortcuts');
+    assert.ok(rootSource.includes('buildSelectedGatheringConditionShortcuts'), 'root should keep shortcut visibility gated by selected-system gathering conditions');
+    assert.ok(rootSource.includes('data-systems-gathering-conditions'), 'systems inspector should render a global condition shortcut card');
+    assert.ok(rootSource.includes('data-systems-gathering-condition={condition.kind}'), 'systems inspector should render one shortcut per enabled condition dimension');
+    assert.ok(rootSource.includes("store.updateGatheringConditions?.({ [kind]: value, systemId: selectedSystemId })"), 'systems inspector shortcuts should reuse current condition persistence with selected system id');
     assert.ok(!environmentEditSource.includes("updateField('hazardSelectionMode'"), 'environment editor should not expose per-environment hazard selection rules');
     assert.ok(!environmentEditSource.includes("updateField('hazardPolicy'"), 'environment editor should not expose per-environment hazard policy');
     assert.ok(!environmentEditSource.includes('ItemSelectionMode'), 'environment editor should not expose per-task item selection rules');

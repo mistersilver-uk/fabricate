@@ -1943,6 +1943,29 @@ describe('createAdminStore', () => {
 
       const config = services._store.gatheringConfig;
       assert.deepEqual(config.conditions, { weather: 'rain', timeOfDay: 'night' });
+      assert.deepEqual(config.systems.sys1.conditions.weather, {
+        enabled: true,
+        current: 'rain',
+        values: [
+          { id: 'clear', label: 'Clear', icon: 'fas fa-sun' },
+          { id: 'cloudy', label: 'Cloudy', icon: 'fas fa-cloud' },
+          { id: 'rain', label: 'Rain', icon: 'fas fa-cloud-rain' },
+          { id: 'storm', label: 'Storm', icon: 'fas fa-bolt' },
+          { id: 'snow', label: 'Snow', icon: 'fas fa-snowflake' },
+          { id: 'fog', label: 'Fog', icon: 'fas fa-smog' },
+          { id: 'wind', label: 'Wind', icon: 'fas fa-wind' }
+        ]
+      });
+      assert.deepEqual(config.systems.sys1.conditions.timeOfDay, {
+        enabled: true,
+        current: 'night',
+        values: [
+          { id: 'dawn', label: 'Dawn', icon: 'fas fa-cloud-sun' },
+          { id: 'day', label: 'Day', icon: 'fas fa-sun' },
+          { id: 'dusk', label: 'Dusk', icon: 'fas fa-cloud-moon' },
+          { id: 'night', label: 'Night', icon: 'fas fa-moon' }
+        ]
+      });
       assert.deepEqual(config.vocabularies.regions, ['north', 'south']);
       assert.equal(config.systems.sys1.tasks[0].name, 'Rain Herbs');
       assert.deepEqual(config.systems.sys1.tasks[0].dropRows[0], {
@@ -1956,6 +1979,228 @@ describe('createAdminStore', () => {
       });
       assert.equal(config.systems.sys1.hazards[0].name, 'Thorns');
       assert.equal(get(store.viewState).gatheringConfig.systems.sys1.hazards[0].dropRate, 30);
+    });
+
+    it('manages selected-system gathering weather and time vocabulary without affecting other systems', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      services._store.gatheringConfig = {
+        systems: {
+          sys1: {
+            conditions: {
+              weather: { enabled: true, current: 'rain', values: ['rain'] },
+              timeOfDay: { enabled: true, current: 'night', values: ['night', 'day'] }
+            },
+            tasks: [{ id: 'task-rain', name: 'Rain', weather: ['rain'], timeOfDay: ['night'], dropRows: [] }],
+            hazards: [{ id: 'hazard-rain', name: 'Rain Hazard', weather: ['rain'], timeOfDay: ['night'], dropRate: 50 }]
+          },
+          sys2: {
+            conditions: {
+              weather: { enabled: true, current: 'rain', values: ['rain'] },
+              timeOfDay: { enabled: true, current: 'night', values: ['night'] }
+            },
+            tasks: [{ id: 'task-other', name: 'Other', weather: ['rain'], timeOfDay: ['night'], dropRows: [] }],
+            hazards: [{ id: 'hazard-other', name: 'Other Hazard', weather: ['rain'], timeOfDay: ['night'], dropRate: 50 }]
+          }
+        }
+      };
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      assert.equal(await store.deleteGatheringConditionValue('weather', 'rain', 'sys1'), false);
+      await store.toggleGatheringConditionEnabled('weather', false, 'sys1');
+      assert.equal(await store.deleteGatheringConditionValue('weather', 'rain', 'sys1'), true);
+      await store.addGatheringConditionValue('weather', 'Ash Fall', 'sys1');
+      await store.addGatheringConditionValue('weather', 'ash fall', 'sys1');
+      await store.updateGatheringConditionValue('weather', 'ash-fall', { label: 'Ashfall', icon: 'fas fa-volcano' }, 'sys1');
+      await store.updateGatheringConditions({ weather: 'ash-fall', systemId: 'sys1' });
+
+      const sys1 = services._store.gatheringConfig.systems.sys1;
+      const sys2 = services._store.gatheringConfig.systems.sys2;
+      assert.deepEqual(sys1.conditions.weather, {
+        enabled: false,
+        current: 'ash-fall',
+        values: [{ id: 'ash-fall', label: 'Ashfall', icon: 'fas fa-volcano' }]
+      });
+      assert.deepEqual(sys1.tasks[0].weather, []);
+      assert.deepEqual(sys1.hazards[0].weather, []);
+      assert.deepEqual(sys2.tasks[0].weather, ['rain']);
+      assert.deepEqual(sys2.hazards[0].weather, ['rain']);
+    });
+
+    it('edits condition labels without changing ids, icons, selections, or library references', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      services._store.gatheringConfig = {
+        systems: {
+          sys1: {
+            conditions: {
+              weather: {
+                enabled: true,
+                current: 'heavy-rain',
+                values: [{ id: 'heavy-rain', label: 'Heavy Rain', icon: 'fas fa-cloud-showers-heavy' }]
+              },
+              timeOfDay: {
+                enabled: true,
+                current: 'night',
+                values: [{ id: 'night', label: 'Night', icon: 'fas fa-moon' }]
+              }
+            },
+            tasks: [{ id: 'task-rain', name: 'Rain', weather: ['heavy-rain'], timeOfDay: ['night'], dropRows: [] }],
+            hazards: [{ id: 'hazard-rain', name: 'Rain Hazard', weather: ['heavy-rain'], timeOfDay: ['night'], dropRate: 50 }]
+          },
+          sys2: {
+            conditions: {
+              weather: {
+                enabled: true,
+                current: 'heavy-rain',
+                values: [{ id: 'heavy-rain', label: 'Heavy Rain', icon: 'fas fa-cloud-showers-heavy' }]
+              },
+              timeOfDay: {
+                enabled: true,
+                current: 'night',
+                values: [{ id: 'night', label: 'Night', icon: 'fas fa-moon' }]
+              }
+            },
+            tasks: [{ id: 'task-other', name: 'Other', weather: ['heavy-rain'], timeOfDay: ['night'], dropRows: [] }],
+            hazards: [{ id: 'hazard-other', name: 'Other Hazard', weather: ['heavy-rain'], timeOfDay: ['night'], dropRate: 50 }]
+          }
+        }
+      };
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      assert.equal(await store.updateGatheringConditionValue('weather', 'heavy-rain', { label: 'Storm Rain' }, 'sys1'), true);
+      assert.equal(await store.updateGatheringConditionValue('weather', 'heavy-rain', { label: '   ' }, 'sys1'), true);
+
+      const sys1 = services._store.gatheringConfig.systems.sys1;
+      assert.deepEqual(sys1.conditions.weather, {
+        enabled: true,
+        current: 'heavy-rain',
+        values: [{ id: 'heavy-rain', label: 'Storm Rain', icon: 'fas fa-cloud-showers-heavy' }]
+      });
+      assert.deepEqual(sys1.tasks[0].weather, ['heavy-rain']);
+      assert.deepEqual(sys1.hazards[0].weather, ['heavy-rain']);
+
+      assert.equal(await store.deleteGatheringConditionValue('weather', 'heavy-rain', 'sys1'), false);
+      await store.toggleGatheringConditionEnabled('weather', false, 'sys1');
+      assert.equal(await store.deleteGatheringConditionValue('weather', 'heavy-rain', 'sys1'), true);
+
+      assert.deepEqual(services._store.gatheringConfig.systems.sys1.tasks[0].weather, []);
+      assert.deepEqual(services._store.gatheringConfig.systems.sys1.hazards[0].weather, []);
+      assert.deepEqual(services._store.gatheringConfig.systems.sys2.tasks[0].weather, ['heavy-rain']);
+      assert.deepEqual(services._store.gatheringConfig.systems.sys2.hazards[0].weather, ['heavy-rain']);
+    });
+
+    it('normalizes and edits selected-system region and biome vocabularies', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      services._store.gatheringConfig = {
+        vocabularies: {
+          regions: ['north'],
+          biomes: ['forest'],
+          danger: ['safe'],
+          weather: ['clear'],
+          timeOfDay: ['day']
+        },
+        systems: {
+          sys1: {
+            tasks: [{ id: 'task-forest', name: 'Forest', region: 'north', biomes: ['forest'], dropRows: [] }],
+            hazards: [{ id: 'hazard-forest', name: 'Forest Hazard', region: 'north', biomes: ['forest'], dropRate: 50 }]
+          }
+        }
+      };
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      assert.deepEqual(get(store.viewState).gatheringConfig.systems.sys1.vocabularies.regions.values, [
+        { id: 'north', label: 'north' }
+      ]);
+      assert.deepEqual(get(store.viewState).gatheringConfig.systems.sys1.vocabularies.biomes.values, [
+        { id: 'forest', label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage', customColor: '' }
+      ]);
+
+      await store.addGatheringVocabularyValue('regions', 'South Coast', 'sys1');
+      await store.addGatheringVocabularyValue('biomes', { label: 'Crystal Cavern', icon: 'fas fa-gem', colorToken: 'mist', customColor: '#88aaff' }, 'sys1');
+      await store.updateGatheringVocabularyValue('regions', 'south coast', { label: 'Southern Coast' }, 'sys1');
+      await store.updateGatheringVocabularyValue('biomes', 'crystal cavern', { label: 'Crystal Caves', icon: 'fas fa-mountain', colorToken: '--fab-tag-lavender', customColor: 'bad' }, 'sys1');
+
+      const vocabularies = services._store.gatheringConfig.systems.sys1.vocabularies;
+      assert.deepEqual(vocabularies.regions.values.at(-1), { id: 'south coast', label: 'Southern Coast' });
+      assert.deepEqual(vocabularies.biomes.values.at(-1), {
+        id: 'crystal cavern',
+        label: 'Crystal Caves',
+        icon: 'fas fa-mountain',
+        colorToken: 'lavender',
+        customColor: ''
+      });
+      assert.deepEqual(services._store.gatheringConfig.systems.sys1.tasks[0].biomes, ['forest']);
+      assert.deepEqual(services._store.gatheringConfig.systems.sys1.hazards[0].biomes, ['forest']);
+    });
+
+    it('deletes selected-system region and biome vocabulary values and prunes matching references only in that system', async () => {
+      const environmentUpdates = [];
+      const environments = [
+        { id: 'env-sys1', craftingSystemId: 'sys1', region: 'north', biomes: ['forest', 'swamp'] },
+        { id: 'env-sys2', craftingSystemId: 'sys2', region: 'north', biomes: ['forest'] }
+      ];
+      const services = createMockServices({
+        getGatheringEnvironmentStore: () => ({
+          list: () => environments,
+          update: async (id, updates) => {
+            environmentUpdates.push([id, updates]);
+            const index = environments.findIndex(environment => environment.id === id);
+            if (index >= 0) environments[index] = { ...environments[index], ...updates };
+            return environments[index];
+          }
+        })
+      });
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      services._store.gatheringConfig = {
+        systems: {
+          sys1: {
+            vocabularies: {
+              regions: { values: [{ id: 'north', label: 'North' }] },
+              biomes: { values: [{ id: 'forest', label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage' }] }
+            },
+            tasks: [{ id: 'task-forest', name: 'Forest', region: 'north', biomes: ['forest'], dropRows: [] }],
+            hazards: [{ id: 'hazard-forest', name: 'Forest Hazard', region: 'north', biomes: ['forest'], dropRate: 50 }]
+          },
+          sys2: {
+            vocabularies: {
+              regions: { values: [{ id: 'north', label: 'North' }] },
+              biomes: { values: [{ id: 'forest', label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage' }] }
+            },
+            tasks: [{ id: 'task-other', name: 'Other', region: 'north', biomes: ['forest'], dropRows: [] }],
+            hazards: [{ id: 'hazard-other', name: 'Other Hazard', region: 'north', biomes: ['forest'], dropRate: 50 }]
+          }
+        }
+      };
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      assert.equal(await store.deleteGatheringVocabularyValue('regions', 'north', 'sys1'), true);
+      assert.equal(await store.deleteGatheringVocabularyValue('biomes', 'forest', 'sys1'), true);
+
+      const sys1 = services._store.gatheringConfig.systems.sys1;
+      const sys2 = services._store.gatheringConfig.systems.sys2;
+      assert.deepEqual(sys1.vocabularies.regions.values, []);
+      assert.deepEqual(sys1.vocabularies.biomes.values, []);
+      assert.equal(sys1.tasks[0].region, '');
+      assert.deepEqual(sys1.tasks[0].biomes, []);
+      assert.equal(sys1.hazards[0].region, '');
+      assert.deepEqual(sys1.hazards[0].biomes, []);
+      assert.equal(sys2.tasks[0].region, 'north');
+      assert.deepEqual(sys2.tasks[0].biomes, ['forest']);
+      assert.deepEqual(environmentUpdates.map(update => update[0]), ['env-sys1', 'env-sys1']);
+      assert.equal(environments[0].region, '');
+      assert.deepEqual(environments[0].biomes, ['swamp']);
+      assert.equal(environments[1].region, 'north');
+      assert.deepEqual(environments[1].biomes, ['forest']);
     });
 
     it('normalizes and persists selected-system gathering rules', async () => {

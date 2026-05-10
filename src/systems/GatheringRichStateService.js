@@ -8,6 +8,43 @@ const DEFAULT_VOCABULARIES = Object.freeze({
   weather: ['clear', 'cloudy', 'rain', 'storm', 'snow', 'fog', 'wind'],
   timeOfDay: ['dawn', 'day', 'dusk', 'night']
 });
+const CONDITION_DIMENSIONS = ['weather', 'timeOfDay'];
+const VOCABULARY_DIMENSIONS = ['regions', 'biomes'];
+const BIOME_COLOR_TOKENS = new Set(['sage', 'mist', 'lavender', 'rose', 'peach', 'butter', 'aqua', 'mauve']);
+const DEFAULT_BIOME_COLOR_TOKEN = 'sage';
+const DEFAULT_BIOME_METADATA = Object.freeze({
+  forest: Object.freeze({ label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage' }),
+  grassland: Object.freeze({ label: 'Grassland', icon: 'fas fa-wheat-awn', colorToken: 'butter' }),
+  mountain: Object.freeze({ label: 'Mountain', icon: 'fas fa-mountain', colorToken: 'mist' }),
+  cave: Object.freeze({ label: 'Cave', icon: 'fas fa-dungeon', colorToken: 'lavender' }),
+  coastal: Object.freeze({ label: 'Coastal', icon: 'fas fa-water', colorToken: 'aqua' }),
+  swamp: Object.freeze({ label: 'Swamp', icon: 'fas fa-frog', colorToken: 'mauve' }),
+  desert: Object.freeze({ label: 'Desert', icon: 'fas fa-sun', colorToken: 'peach' }),
+  urban: Object.freeze({ label: 'Urban', icon: 'fas fa-city', colorToken: 'mist' }),
+  ruins: Object.freeze({ label: 'Ruins', icon: 'fas fa-archway', colorToken: 'rose' }),
+  wasteland: Object.freeze({ label: 'Wasteland', icon: 'fas fa-skull', colorToken: 'mauve' })
+});
+const DEFAULT_CONDITION_ICONS = Object.freeze({
+  weather: Object.freeze({
+    clear: 'fas fa-sun',
+    cloudy: 'fas fa-cloud',
+    rain: 'fas fa-cloud-rain',
+    storm: 'fas fa-bolt',
+    snow: 'fas fa-snowflake',
+    fog: 'fas fa-smog',
+    wind: 'fas fa-wind'
+  }),
+  timeOfDay: Object.freeze({
+    dawn: 'fas fa-cloud-sun',
+    day: 'fas fa-sun',
+    dusk: 'fas fa-cloud-moon',
+    night: 'fas fa-moon'
+  })
+});
+const FALLBACK_CONDITION_ICONS = Object.freeze({
+  weather: 'fas fa-cloud-sun',
+  timeOfDay: 'fas fa-clock'
+});
 const DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops', 'limitedDrops']);
 const LEGACY_DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops']);
 const HAZARD_POLICIES = new Set(['successWithHazard', 'failureWithHazard']);
@@ -74,15 +111,15 @@ export class GatheringRichStateService {
     const config = this._config();
     const nextConditions = { ...config.conditions };
     if (weather !== undefined) {
-      const tag = normalizeTag(weather);
-      if (!config.vocabularies.weather.includes(tag)) {
+      const tag = normalizeConditionId(weather);
+      if (!normalizeConditionIdList(config.vocabularies.weather).includes(tag)) {
         throw new Error(`Unknown gathering weather tag: ${weather}`);
       }
       nextConditions.weather = tag;
     }
     if (timeOfDay !== undefined) {
-      const tag = normalizeTag(timeOfDay);
-      if (!config.vocabularies.timeOfDay.includes(tag)) {
+      const tag = normalizeConditionId(timeOfDay);
+      if (!normalizeConditionIdList(config.vocabularies.timeOfDay).includes(tag)) {
         throw new Error(`Unknown gathering time-of-day tag: ${timeOfDay}`);
       }
       nextConditions.timeOfDay = tag;
@@ -103,6 +140,8 @@ export class GatheringRichStateService {
     const config = this._config();
     const systemId = String(system?.id || environment.craftingSystemId);
     const libraries = config.systems?.[systemId] || {};
+    const systemConditions = resolveSystemConditionSettings(config, systemId);
+    const currentConditions = conditionSettingsToCurrent(systemConditions);
     const rawSystemConfig = rawConfig?.systems?.[systemId] || {};
     const hasSystemRules = rawSystemConfig?.rules && typeof rawSystemConfig.rules === 'object' && !Array.isArray(rawSystemConfig.rules);
     const rules = hasSystemRules
@@ -116,19 +155,19 @@ export class GatheringRichStateService {
       ...normalizeList(environment.tasks),
       ...normalizeList(libraries.tasks)
         .filter(task => task?.enabled !== false)
-        .filter(task => this._recordMatchesEnvironment(task, environment, config.conditions, { includeDanger: false }))
+        .filter(task => this._recordMatchesEnvironment(task, environment, currentConditions, { includeDanger: false, conditionSettings: systemConditions }))
         .filter(task => this._environmentAllowsLibraryRecord(environment, task.id, 'task'))
         .map(task => this._libraryTaskToRuntimeTask(task))
     ];
     const hazards = normalizeList(libraries.hazards)
       .filter(hazard => hazard?.enabled !== false)
-      .filter(hazard => this._recordMatchesEnvironment(hazard, environment, config.conditions, { includeDanger: true }))
+      .filter(hazard => this._recordMatchesEnvironment(hazard, environment, currentConditions, { includeDanger: true, conditionSettings: systemConditions }))
       .filter(hazard => this._environmentAllowsLibraryRecord(environment, hazard.id, 'hazard'))
       .map(hazard => normalizeHazard(hazard));
 
     return {
       ...cloneJson(environment),
-      conditions: cloneJson(config.conditions),
+      conditions: cloneJson(currentConditions),
       biomes: normalizeTagList(environment.biomes ?? environment.biome),
       dangerTags: normalizeTagList(environment.dangerTags ?? environment.risk),
       tasks,
@@ -379,14 +418,14 @@ export class GatheringRichStateService {
     return evidence;
   }
 
-  _recordMatchesEnvironment(record, environment, conditions, { includeDanger }) {
+  _recordMatchesEnvironment(record, environment, conditions, { includeDanger, conditionSettings = null }) {
     const envRegion = normalizeTag(environment?.region);
     const envBiomes = normalizeTagList(environment?.biomes ?? environment?.biome);
     const envDanger = normalizeTagList(environment?.dangerTags ?? environment?.risk);
     if (record.region && normalizeTag(record.region) !== envRegion) return false;
     if (normalizeTagList(record.biomes).length > 0 && !hasAny(normalizeTagList(record.biomes), envBiomes)) return false;
-    if (normalizeTagList(record.weather).length > 0 && !normalizeTagList(record.weather).includes(normalizeTag(conditions.weather))) return false;
-    if (normalizeTagList(record.timeOfDay).length > 0 && !normalizeTagList(record.timeOfDay).includes(normalizeTag(conditions.timeOfDay))) return false;
+    if (conditionSettings?.weather?.enabled !== false && normalizeConditionIdList(record.weather).length > 0 && !normalizeConditionIdList(record.weather).includes(normalizeConditionId(conditions.weather))) return false;
+    if (conditionSettings?.timeOfDay?.enabled !== false && normalizeConditionIdList(record.timeOfDay).length > 0 && !normalizeConditionIdList(record.timeOfDay).includes(normalizeConditionId(conditions.timeOfDay))) return false;
     if (includeDanger && normalizeTagList(record.dangerTags).length > 0 && !hasAny(normalizeTagList(record.dangerTags), envDanger)) return false;
     return true;
   }
@@ -491,12 +530,14 @@ function normalizeGatheringConfig(raw = {}) {
     weather: seedVocabulary(raw?.vocabularies?.weather, DEFAULT_VOCABULARIES.weather),
     timeOfDay: seedVocabulary(raw?.vocabularies?.timeOfDay, DEFAULT_VOCABULARIES.timeOfDay)
   };
-  const weather = normalizeTag(raw?.conditions?.weather) || DEFAULT_CONDITIONS.weather;
-  const timeOfDay = normalizeTag(raw?.conditions?.timeOfDay) || DEFAULT_CONDITIONS.timeOfDay;
+  const weather = normalizeConditionId(raw?.conditions?.weather) || DEFAULT_CONDITIONS.weather;
+  const timeOfDay = normalizeConditionId(raw?.conditions?.timeOfDay) || DEFAULT_CONDITIONS.timeOfDay;
   const systems = {};
   for (const [systemId, config] of Object.entries(raw?.systems || {})) {
     systems[String(systemId)] = {
       rules: normalizeGatheringRules(config?.rules),
+      conditions: normalizeSystemConditions(config?.conditions, { vocabularies, conditions: { weather, timeOfDay } }),
+      vocabularies: normalizeSystemVocabularies(config?.vocabularies, vocabularies),
       tasks: normalizeList(config?.tasks).map(normalizeLibraryTask),
       hazards: normalizeList(config?.hazards).map(normalizeHazard)
     };
@@ -504,10 +545,55 @@ function normalizeGatheringConfig(raw = {}) {
   return {
     vocabularies,
     conditions: {
-      weather: vocabularies.weather.includes(weather) ? weather : DEFAULT_CONDITIONS.weather,
-      timeOfDay: vocabularies.timeOfDay.includes(timeOfDay) ? timeOfDay : DEFAULT_CONDITIONS.timeOfDay
+      weather: weather || DEFAULT_CONDITIONS.weather,
+      timeOfDay: timeOfDay || DEFAULT_CONDITIONS.timeOfDay
     },
     systems
+  };
+}
+
+function normalizeSystemConditions(raw = {}, fallback = {}) {
+  const normalized = {};
+  for (const kind of CONDITION_DIMENSIONS) {
+    const fallbackValues = fallback?.vocabularies?.[kind] || DEFAULT_VOCABULARIES[kind];
+    const enabled = raw?.[kind]?.enabled !== false;
+    const explicitValues = Array.isArray(raw?.[kind]?.values);
+    const normalizedValues = explicitValues ? normalizeConditionOptions(kind, raw?.[kind]?.values) : seedConditionOptions(kind, raw?.[kind]?.values, fallbackValues);
+    const values = normalizedValues.length > 0 || !enabled ? normalizedValues : normalizeConditionOptions(kind, fallbackValues);
+    const fallbackCurrent = normalizeConditionId(fallback?.conditions?.[kind]) || DEFAULT_CONDITIONS[kind];
+    const requestedCurrent = normalizeConditionId(raw?.[kind]?.current) || fallbackCurrent;
+    const valueIds = values.map(option => option.id);
+    normalized[kind] = {
+      enabled,
+      current: valueIds.includes(requestedCurrent) ? requestedCurrent : values[0]?.id || DEFAULT_CONDITIONS[kind],
+      values
+    };
+  }
+  return normalized;
+}
+
+function resolveSystemConditionSettings(config, systemId) {
+  return config?.systems?.[systemId]?.conditions
+    || normalizeSystemConditions(null, { vocabularies: config?.vocabularies, conditions: config?.conditions });
+}
+
+function normalizeSystemVocabularies(raw = {}, fallbackVocabularies = {}) {
+  const normalized = {};
+  for (const kind of VOCABULARY_DIMENSIONS) {
+    const rawValues = Array.isArray(raw?.[kind]?.values)
+      ? raw[kind].values
+      : (Array.isArray(raw?.[kind]) ? raw[kind] : fallbackVocabularies?.[kind]);
+    normalized[kind] = {
+      values: normalizeVocabularyOptions(kind, rawValues)
+    };
+  }
+  return normalized;
+}
+
+function conditionSettingsToCurrent(settings) {
+  return {
+    weather: settings?.weather?.current || DEFAULT_CONDITIONS.weather,
+    timeOfDay: settings?.timeOfDay?.current || DEFAULT_CONDITIONS.timeOfDay
   };
 }
 
@@ -520,8 +606,8 @@ function normalizeLibraryTask(task = {}) {
     enabled: task.enabled !== false,
     region: normalizeTag(task.region),
     biomes: normalizeTagList(task.biomes),
-    weather: normalizeTagList(task.weather),
-    timeOfDay: normalizeTagList(task.timeOfDay),
+    weather: normalizeConditionIdList(task.weather),
+    timeOfDay: normalizeConditionIdList(task.timeOfDay),
     itemSelectionMode: LEGACY_DROP_SELECTION_MODES.has(task.itemSelectionMode) ? task.itemSelectionMode : 'highestRankedDrop',
     dropRows: normalizeList(task.dropRows ?? task.itemDrops).map(normalizeItemDrop),
     staminaCost: nonNegativeNumber(task.staminaCost, 0),
@@ -552,8 +638,8 @@ function normalizeHazard(hazard = {}) {
     dangerTags: normalizeTagList(hazard.dangerTags),
     region: normalizeTag(hazard.region),
     biomes: normalizeTagList(hazard.biomes),
-    weather: normalizeTagList(hazard.weather),
-    timeOfDay: normalizeTagList(hazard.timeOfDay),
+    weather: normalizeConditionIdList(hazard.weather),
+    timeOfDay: normalizeConditionIdList(hazard.timeOfDay),
     dropRate: clampDropRate(hazard.dropRate),
     hazardModifier: normalizeModifierProvider(hazard.hazardModifier ?? hazard.modifier)
   };
@@ -647,6 +733,58 @@ function seedVocabulary(raw, defaults) {
   return values.length > 0 ? values : [...defaults];
 }
 
+function vocabularyLabelFromId(id) {
+  return String(id || '')
+    .split(/[\s-]+/)
+    .filter(Boolean)
+    .map(token => token.length <= 2 ? token.toUpperCase() : `${token.charAt(0).toUpperCase()}${token.slice(1)}`)
+    .join(' ');
+}
+
+function normalizeBiomeColorToken(value) {
+  const token = String(value || '').trim().replace(/^--fab-tag-/, '');
+  return BIOME_COLOR_TOKENS.has(token) ? token : DEFAULT_BIOME_COLOR_TOKEN;
+}
+
+function normalizeCustomHex(value) {
+  const hex = String(value || '').trim();
+  return /^#[0-9a-fA-F]{6}$/.test(hex) ? hex.toUpperCase() : '';
+}
+
+function normalizeVocabularyOption(kind, value) {
+  const isRecord = value && typeof value === 'object';
+  const id = normalizeTag(isRecord ? (value.id ?? value.value ?? value.label) : value);
+  if (!id) return null;
+  const rawLabel = isRecord ? String(value.label ?? '').trim() : String(value ?? '').trim();
+  const defaultBiome = kind === 'biomes' ? DEFAULT_BIOME_METADATA[id] : null;
+  const label = isRecord
+    ? (rawLabel || defaultBiome?.label || vocabularyLabelFromId(id))
+    : (kind === 'biomes' ? (defaultBiome?.label || vocabularyLabelFromId(id)) : (rawLabel || vocabularyLabelFromId(id)));
+  if (kind === 'biomes') {
+    return {
+      id,
+      label,
+      icon: normalizeConditionIcon(isRecord ? (value.icon || defaultBiome?.icon || 'fas fa-tree') : (defaultBiome?.icon || 'fas fa-tree'), 'fas fa-tree'),
+      colorToken: normalizeBiomeColorToken(isRecord ? (value.colorToken || defaultBiome?.colorToken || DEFAULT_BIOME_COLOR_TOKEN) : (defaultBiome?.colorToken || DEFAULT_BIOME_COLOR_TOKEN)),
+      customColor: normalizeCustomHex(isRecord ? value.customColor : '')
+    };
+  }
+  return { id, label };
+}
+
+function normalizeVocabularyOptions(kind, value) {
+  const values = Array.isArray(value) ? value : (value ? [value] : []);
+  const options = [];
+  const seen = new Set();
+  for (const raw of values) {
+    const option = normalizeVocabularyOption(kind, raw);
+    if (!option || seen.has(option.id)) continue;
+    seen.add(option.id);
+    options.push(option);
+  }
+  return options;
+}
+
 function normalizeTagList(value) {
   const values = Array.isArray(value) ? value : (value ? [value] : []);
   return Array.from(new Set(values.map(normalizeTag).filter(Boolean)));
@@ -654,6 +792,72 @@ function normalizeTagList(value) {
 
 function normalizeTag(value) {
   return String(value ?? '').trim().toLowerCase();
+}
+
+function normalizeConditionIdList(value) {
+  const values = Array.isArray(value) ? value : (value ? [value] : []);
+  return Array.from(new Set(values.map(normalizeConditionId).filter(Boolean)));
+}
+
+function normalizeConditionId(value) {
+  if (value && typeof value === 'object') {
+    return normalizeConditionId(value.id ?? value.value ?? value.label);
+  }
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function normalizeConditionIcon(icon, fallback) {
+  const tokens = String(icon || '').trim().split(/\s+/).filter(Boolean);
+  const prefix = tokens.find(token => /^(?:fa[bsrltd]?|fa-solid|fa-regular|fa-light|fa-thin|fa-duotone|fa-brands)$/.test(token)) || 'fas';
+  const iconToken = tokens.findLast(token => token.startsWith('fa-') && !['fa', 'fa-solid', 'fa-regular', 'fa-light', 'fa-thin', 'fa-duotone', 'fa-brands'].includes(token));
+  return iconToken ? `${prefix} ${iconToken}` : fallback;
+}
+
+function conditionLabelFromId(id) {
+  return String(id || '')
+    .split('-')
+    .filter(Boolean)
+    .map(token => token.length <= 2 ? token.toUpperCase() : `${token.charAt(0).toUpperCase()}${token.slice(1)}`)
+    .join(' ');
+}
+
+function defaultConditionIcon(kind, id) {
+  return DEFAULT_CONDITION_ICONS[kind]?.[id] || FALLBACK_CONDITION_ICONS[kind] || 'fas fa-tag';
+}
+
+function normalizeConditionOption(kind, value) {
+  const isRecord = value && typeof value === 'object';
+  const id = normalizeConditionId(isRecord ? (value.id ?? value.value ?? value.label) : value);
+  if (!id) return null;
+  const rawLabel = isRecord ? String(value.label ?? '').trim() : String(value ?? '').trim();
+  const fallbackIcon = defaultConditionIcon(kind, id);
+  return {
+    id,
+    label: isRecord ? (rawLabel || conditionLabelFromId(id)) : (/[A-Z]/.test(rawLabel) ? rawLabel : conditionLabelFromId(id)),
+    icon: normalizeConditionIcon(isRecord ? value.icon : fallbackIcon, fallbackIcon)
+  };
+}
+
+function normalizeConditionOptions(kind, value) {
+  const values = Array.isArray(value) ? value : (value ? [value] : []);
+  const options = [];
+  const seen = new Set();
+  for (const raw of values) {
+    const option = normalizeConditionOption(kind, raw);
+    if (!option || seen.has(option.id)) continue;
+    seen.add(option.id);
+    options.push(option);
+  }
+  return options;
+}
+
+function seedConditionOptions(kind, raw, defaults) {
+  const values = normalizeConditionOptions(kind, raw);
+  return values.length > 0 ? values : normalizeConditionOptions(kind, defaults);
 }
 
 function hasAny(left, right) {

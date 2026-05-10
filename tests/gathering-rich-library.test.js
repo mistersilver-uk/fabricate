@@ -165,6 +165,51 @@ test('global gathering conditions seed defaults and preserve customized vocabula
   await assert.rejects(() => service.setWeather('hail'), /Unknown gathering weather tag/);
 });
 
+test('rich gathering service normalizes default biome strings with readable labels and metadata', () => {
+  const { service } = makeRichState({
+    config: {
+      systems: {
+        'system-a': {}
+      }
+    }
+  });
+
+  assert.deepEqual(service._config().systems['system-a'].vocabularies.biomes.values, [
+    { id: 'forest', label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage', customColor: '' },
+    { id: 'grassland', label: 'Grassland', icon: 'fas fa-wheat-awn', colorToken: 'butter', customColor: '' },
+    { id: 'mountain', label: 'Mountain', icon: 'fas fa-mountain', colorToken: 'mist', customColor: '' },
+    { id: 'cave', label: 'Cave', icon: 'fas fa-dungeon', colorToken: 'lavender', customColor: '' },
+    { id: 'coastal', label: 'Coastal', icon: 'fas fa-water', colorToken: 'aqua', customColor: '' },
+    { id: 'swamp', label: 'Swamp', icon: 'fas fa-frog', colorToken: 'mauve', customColor: '' },
+    { id: 'desert', label: 'Desert', icon: 'fas fa-sun', colorToken: 'peach', customColor: '' },
+    { id: 'urban', label: 'Urban', icon: 'fas fa-city', colorToken: 'mist', customColor: '' },
+    { id: 'ruins', label: 'Ruins', icon: 'fas fa-archway', colorToken: 'rose', customColor: '' },
+    { id: 'wasteland', label: 'Wasteland', icon: 'fas fa-skull', colorToken: 'mauve', customColor: '' }
+  ]);
+});
+
+test('rich gathering service preserves explicit biome record labels icons and colours', () => {
+  const { service } = makeRichState({
+    config: {
+      systems: {
+        'system-a': {
+          vocabularies: {
+            biomes: {
+              values: [
+                { id: 'forest', label: 'Old Wood', icon: 'fas fa-leaf', colorToken: 'rose', customColor: '#aabbcc' }
+              ]
+            }
+          }
+        }
+      }
+    }
+  });
+
+  assert.deepEqual(service._config().systems['system-a'].vocabularies.biomes.values, [
+    { id: 'forest', label: 'Old Wood', icon: 'fas fa-leaf', colorToken: 'rose', customColor: '#AABBCC' }
+  ]);
+});
+
 test('task and hazard libraries match environments by tags and global conditions', async () => {
   const { service } = makeRichState({
     config: {
@@ -203,6 +248,43 @@ test('task and hazard libraries match environments by tags and global conditions
   assert.deepEqual(composed.tasks.map(task => task.id), ['task-forest-rain']);
   assert.equal(composed.tasks[0].resolutionMode, 'd100');
   assert.deepEqual(composed.hazards.map(hazard => hazard.id), ['hazard-thorns']);
+});
+
+test('disabled per-system weather and time matching ignores task and hazard condition tags', async () => {
+  const { service } = makeRichState({
+    config: {
+      conditions: { weather: 'clear', timeOfDay: 'day' },
+      systems: {
+        'system-a': {
+          conditions: {
+            weather: { enabled: false, current: 'clear', values: ['clear', 'rain'] },
+            timeOfDay: { enabled: false, current: 'day', values: ['day', 'night'] }
+          },
+          tasks: [{
+            id: 'task-rain-night',
+            name: 'Rain Night Forage',
+            weather: ['rain'],
+            timeOfDay: ['night'],
+            dropRows: [{ id: 'drop-herb', componentId: 'herb', quantity: 1, dropRate: 60 }]
+          }],
+          hazards: [{
+            id: 'hazard-rain-night',
+            name: 'Rain Night Hazard',
+            dangerTags: ['hazardous'],
+            weather: ['rain'],
+            timeOfDay: ['night'],
+            dropRate: 25
+          }]
+        }
+      }
+    }
+  });
+
+  const composed = service.composeEnvironment(environment(), system);
+
+  assert.deepEqual(composed.conditions, { weather: 'clear', timeOfDay: 'day' });
+  assert.deepEqual(composed.tasks.map(task => task.id), ['task-rain-night']);
+  assert.deepEqual(composed.hazards.map(hazard => hazard.id), ['hazard-rain-night']);
 });
 
 test('environment task and hazard toggles preserve mixed-case library IDs', async () => {
