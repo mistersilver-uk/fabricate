@@ -107,6 +107,7 @@
   --fab-on-accent: #111A23;
   --fab-on-info: #111A23;
   --fab-on-success: #111A23;
+  --fab-biome-icon-foreground: #202124;
   --fab-success: #9AB89C;
   --fab-success-strong: #A9C7AA;
   --fab-success-text: #D7E6D8;
@@ -217,6 +218,7 @@
   --fab-on-accent: #051E0C;
   --fab-on-info: #061821;
   --fab-on-success: #051E0C;
+  --fab-biome-icon-foreground: #202124;
   --fab-success: #5CB85C;
   --fab-success-strong: #63D47B;
   --fab-success-text: #DFF6DF;
@@ -327,6 +329,7 @@
   --fab-on-accent: #141214;
   --fab-on-info: #141214;
   --fab-on-success: #141214;
+  --fab-biome-icon-foreground: #202124;
   --fab-success: #92A78B;
   --fab-success-strong: #A3B298;
   --fab-success-text: #D2CFBD;
@@ -437,6 +440,7 @@
   --fab-on-accent: #161C19;
   --fab-on-info: #161C19;
   --fab-on-success: #161C19;
+  --fab-biome-icon-foreground: #202124;
   --fab-success: #AFC7A4;
   --fab-success-strong: #BBCDAD;
   --fab-success-text: #DCDEC7;
@@ -547,6 +551,7 @@
   --fab-on-accent: #121824;
   --fab-on-info: #121824;
   --fab-on-success: #121824;
+  --fab-biome-icon-foreground: #202124;
   --fab-success: #9DC9BD;
   --fab-success-strong: #ACCFC9;
   --fab-success-text: #D7E1EA;
@@ -657,6 +662,7 @@
   --fab-on-accent: #191813;
   --fab-on-info: #F3F3F5;
   --fab-on-success: #F3F3F5;
+  --fab-biome-icon-foreground: #202124;
   --fab-success: #617054;
   --fab-success-strong: #7C8B71;
   --fab-success-text: #F3F3F5;
@@ -8428,11 +8434,12 @@
 }
 
 .fabricate-manager-v2 .manager-v2-condition-pill .essence-icon-picker-trigger.icon-only.manager-v2-biome-combined-trigger {
-  color: var(--fab-bg-0);
+  color: var(--fab-biome-icon-foreground);
   background: var(--manager-v2-color-swatch, var(--fab-tag-sage));
 }
 
 .fabricate-manager-v2 .manager-v2-condition-pill .essence-icon-picker-trigger.icon-only.manager-v2-biome-combined-trigger i {
+  color: var(--fab-biome-icon-foreground);
   font-size: 0.8rem;
 }
 
@@ -8467,12 +8474,13 @@
 
 .fabricate-manager-v2 .manager-v2-color-picker-popover {
   position: absolute;
+  box-sizing: border-box;
   z-index: 20;
   top: calc(100% + 6px);
   left: 0;
   display: grid;
   gap: 8px;
-  width: 180px;
+  width: 220px;
   padding: 8px;
   border: 1px solid var(--fab-mv2-border-strong);
   border-radius: 6px;
@@ -8504,6 +8512,8 @@
 }
 
 .fabricate-manager-v2 .manager-v2-color-custom input {
+  width: 100%;
+  min-width: 0;
   min-height: 28px;
   height: 28px;
   padding: 0 6px;

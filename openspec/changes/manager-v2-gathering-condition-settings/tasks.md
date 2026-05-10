@@ -31,3 +31,4 @@
 - [x] Re-run focused suites, `npm test`, and `npm run build`.
 - [x] Remove the redundant Gathering Environments inspector actions card and keep row quick actions right-aligned in responsive layouts.
 - [x] Add focused contract, mounted, and layout coverage for the removed inspector card and row quick-action alignment.
+- [x] Fix biome colour icon contrast and constrain the colour picker popover.

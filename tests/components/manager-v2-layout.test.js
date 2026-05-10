@@ -242,7 +242,11 @@ test('manager-v2 gathering settings condition panels use a two-column responsive
   const pillBlock = blockFor('.fabricate-manager-v2 .manager-v2-condition-pill');
   const regionPillBlock = blockFor('.fabricate-manager-v2 .manager-v2-vocabulary-pill.is-region');
   const biomePillBlock = blockFor('.fabricate-manager-v2 .manager-v2-vocabulary-pill.is-biome');
+  const biomeCombinedTriggerBlock = blockFor('.fabricate-manager-v2 .manager-v2-condition-pill .essence-icon-picker-trigger.icon-only.manager-v2-biome-combined-trigger');
+  const biomeCombinedTriggerIconBlock = blockFor('.fabricate-manager-v2 .manager-v2-condition-pill .essence-icon-picker-trigger.icon-only.manager-v2-biome-combined-trigger i');
+  const colorPickerPopoverBlock = blockFor('.fabricate-manager-v2 .manager-v2-color-picker-popover');
   const colorPresetGridBlock = blockFor('.fabricate-manager-v2 .manager-v2-color-preset-grid');
+  const colorCustomInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-color-custom input');
   const labelInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-condition-label-input');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager-v2 (max-width: 1120px)'));
 
@@ -260,7 +264,15 @@ test('manager-v2 gathering settings condition panels use a two-column responsive
   assert.ok(regionPillBlock.includes('grid-template-columns: minmax(0, 1fr) 24px;'), 'region pills should expose editable labels and remove controls without icon columns');
   assert.ok(biomePillBlock.includes('grid-template-columns: 30px minmax(0, 1fr) 24px;'), 'biome pills should reserve combined icon/color, label, and remove columns');
   assert.ok(!biomePillBlock.includes('28px 30px minmax(0, 1fr) 30px 24px;'), 'biome pills should not reserve separate swatch and colour columns');
+  assert.ok(biomeCombinedTriggerBlock.includes('color: var(--fab-biome-icon-foreground);'), 'biome combined icon trigger should use fixed charcoal foreground across themes');
+  assert.ok(biomeCombinedTriggerBlock.includes('background: var(--manager-v2-color-swatch, var(--fab-tag-sage));'), 'biome combined icon trigger should keep token/custom swatch backgrounds');
+  assert.ok(biomeCombinedTriggerIconBlock.includes('color: var(--fab-biome-icon-foreground);'), 'biome combined nested icons should not inherit theme button colours');
+  assert.ok(css.includes('--fab-biome-icon-foreground: #202124;'), 'biome icon foreground token should stay fixed charcoal in theme declarations');
+  assert.ok(colorPickerPopoverBlock.includes('box-sizing: border-box;'), 'biome color picker popover should contain its padding and border in its width');
+  assert.ok(colorPickerPopoverBlock.includes('width: 220px;'), 'biome color picker popover should be wide enough for presets and custom hex input');
   assert.ok(colorPresetGridBlock.includes('grid-template-columns: repeat(4, 1fr);'), 'biome color picker presets should render as a compact grid');
+  assert.ok(colorCustomInputBlock.includes('width: 100%;'), 'biome custom hex input should fill the popover without overflowing');
+  assert.ok(colorCustomInputBlock.includes('min-width: 0;'), 'biome custom hex input should be allowed to shrink inside the popover grid');
   assert.ok(pillBlock.includes('border-radius: 6px;'), 'condition pills should be rounded rectangles rather than ovals');
   assert.ok(labelInputBlock.includes('align-self: center;'), 'condition label edit inputs should center inside the pill');
   assert.ok(labelInputBlock.includes('min-height: 0;'), 'condition label edit inputs should override inherited input minimum height');
