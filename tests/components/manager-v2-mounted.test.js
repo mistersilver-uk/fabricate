@@ -53,6 +53,7 @@ function compileManagerV2Root() {
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EnvironmentsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EssenceBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EssenceEditView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/GatheringTaskEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/GatheringTasksBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/RecipesBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/SystemEditView.svelte');
@@ -683,7 +684,27 @@ function createStore(calls = [], options = {}) {
       calls.push(['addGatheringLibraryTask', systemId]);
       return { id: 'task-new', name: 'New Gathering Task', dropRows: [] };
     },
-    updateGatheringLibraryTask: (...args) => calls.push(['updateGatheringLibraryTask', ...args]),
+    updateGatheringLibraryTask: (systemId, taskId, updates = {}) => {
+      calls.push(['updateGatheringLibraryTask', systemId, taskId, updates]);
+      viewState.update(state => {
+        const systemConfig = state.gatheringConfig?.systems?.[systemId];
+        if (!systemConfig) return state;
+        return {
+          ...state,
+          gatheringConfig: {
+            ...state.gatheringConfig,
+            systems: {
+              ...state.gatheringConfig.systems,
+              [systemId]: {
+                ...systemConfig,
+                tasks: systemConfig.tasks.map(task => task.id === taskId ? { ...task, ...updates } : task)
+              }
+            }
+          }
+        };
+      });
+      return true;
+    },
     duplicateGatheringLibraryTask: (...args) => {
       calls.push(['duplicateGatheringLibraryTask', ...args]);
       return { id: 'task-copy', name: 'Gather Moon Herbs (Copy)', dropRows: [] };
@@ -2057,9 +2078,35 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'gathering-task-edit');
-    assert.ok(target.querySelector('[data-gathering-task-editor-placeholder]'));
-    assert.ok(target.textContent.includes('Detailed authoring fields for gathering tasks are coming later.'));
-    target.querySelector('[data-gathering-task-editor-placeholder] .manager-v2-button').click();
+    assert.ok(target.querySelector('[data-gathering-task-editor]'));
+    assert.ok(target.textContent.includes('Edit availability, identity, and drop rules for the selected gathering task.'));
+    assert.ok(target.querySelector('[data-gathering-task-drops-table]'));
+    assert.ok(target.querySelector('[data-gathering-task-drop-inspector]'));
+    assert.ok(target.textContent.includes('Drop chance'));
+    const taskNameInput = target.querySelector('[data-gathering-task-field="name"]');
+    taskNameInput.value = 'Gather Sun Herbs';
+    taskNameInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].name === 'Gather Sun Herbs'));
+    const timeCheckbox = Array.from(target.querySelectorAll('[data-gathering-task-field="timeOfDay"] input[type="checkbox"]'))
+      .find(input => input.checked);
+    timeCheckbox.checked = false;
+    timeCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && Array.isArray(call[3].timeOfDay) && call[3].timeOfDay.length === 0));
+    const chanceSlider = target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] input[type="range"]');
+    chanceSlider.value = '25';
+    chanceSlider.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.id === 'drop-nightshade' && row.dropRate === 25)));
+    target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] [aria-label="Duplicate drop rule"]').click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-gathering-task-reward-rule-notice]'));
+    target.querySelector('.manager-v2-header-actions .manager-v2-button').click();
     await tick();
     flushSync();
     assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'environments');
@@ -2103,7 +2150,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     );
     assert.equal(target.querySelector('.manager-v2-toolbar'), null);
     assert.equal(target.querySelector('.manager-v2-environments-table'), null);
-    assert.ok(target.textContent.includes('Set system-level d100 reward and hazard rules for gathering.'));
+    assert.ok(target.textContent.includes('Set system-level drop resolution and hazard rules for gathering.'));
     assert.equal(target.querySelectorAll('[data-gathering-condition-panel]').length, 2);
     assert.equal(target.querySelectorAll('[data-gathering-vocabulary-panel]').length, 2);
     assert.ok(target.querySelector('[data-gathering-condition-panel="timeOfDay"]'));
@@ -2256,7 +2303,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     biomeColorTrigger.getBoundingClientRect = originalBiomeTriggerRect;
     assert.equal(target.querySelector('.manager-v2-gathering-settings-summary'), null);
     assert.equal(target.querySelector('[data-gathering-rule-fact]'), null);
-    assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Choose which successful d100 reward rows are granted.'));
+    assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Choose which successful drop rows are granted.'));
     assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Choose which matching hazards are applied after a gathering roll.'));
     assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Decide whether selected hazards still allow the gathering attempt to succeed.'));
     const rewardsSelect = target.querySelector('#manager-v2-gathering-rule-rewards');

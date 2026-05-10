@@ -17,6 +17,7 @@ const componentEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/Compo
 const componentsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/ComponentsBrowserView.svelte');
 const environmentEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/EnvironmentEditView.svelte');
 const environmentsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/EnvironmentsBrowserView.svelte');
+const gatheringTaskEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/GatheringTaskEditView.svelte');
 const gatheringTasksBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/GatheringTasksBrowserView.svelte');
 const appPath = resolve(repoRoot, 'src/ui/SvelteCraftingSystemManagerV2App.svelte.js');
 const mainPath = resolve(repoRoot, 'src/main.js');
@@ -33,12 +34,13 @@ const componentEditSource = readFileSync(componentEditPath, 'utf8');
 const componentsBrowserSource = readFileSync(componentsBrowserPath, 'utf8');
 const environmentEditSource = readFileSync(environmentEditPath, 'utf8');
 const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
+const gatheringTaskEditSource = readFileSync(gatheringTaskEditPath, 'utf8');
 const gatheringTasksBrowserSource = readFileSync(gatheringTasksBrowserPath, 'utf8');
 const appSource = readFileSync(appPath, 'utf8');
 const mainSource = readFileSync(mainPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
-const managerV2Source = [rootSource, essenceBrowserSource, essenceEditSource, tagsCategoriesSource, systemEditSource, systemsBrowserSource, recipesBrowserSource, componentsBrowserSource, componentEditSource, environmentEditSource, environmentsBrowserSource, gatheringTasksBrowserSource].join('\n');
+const managerV2Source = [rootSource, essenceBrowserSource, essenceEditSource, tagsCategoriesSource, systemEditSource, systemsBrowserSource, recipesBrowserSource, componentsBrowserSource, componentEditSource, environmentEditSource, environmentsBrowserSource, gatheringTaskEditSource, gatheringTasksBrowserSource].join('\n');
 
 describe('CraftingSystemManagerV2 source contract', () => {
   it('self-registers as a parallel manager app without replacing the legacy manager', () => {
@@ -268,7 +270,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.OpenHazards, 'Review hazards');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksHint, 'Browse gathering tasks before attaching them to environments.');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.EncountersPlaceholderHint, 'Reusable hazard authoring is planned for a later slice.');
-    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderHint, 'Set system-level d100 reward and hazard rules for gathering.');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderHint, 'Set system-level drop resolution and hazard rules for gathering.');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Conditions.TimeOfDayTitle, 'Times of day');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Conditions.WeatherTitle, 'Weather conditions');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Title, 'Plan gathering content');
@@ -568,7 +570,8 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'onToggleGatheringTaskEnabled={toggleGatheringTaskEnabled}',
       'store.duplicateGatheringLibraryTask',
       'data-gathering-task-inspector',
-      'data-gathering-task-editor-placeholder'
+      'GatheringTaskEditView',
+      'data-gathering-task-drop-inspector'
     ]) {
       assert.ok(rootSource.includes(snippet), `root should include ${snippet}`);
     }
@@ -591,7 +594,19 @@ describe('CraftingSystemManagerV2 source contract', () => {
     ]) {
       assert.ok(gatheringTasksBrowserSource.includes(snippet), `task browser should include ${snippet}`);
     }
+    for (const snippet of [
+      'data-gathering-task-editor',
+      'data-gathering-task-drops-table',
+      'use:dragDrop',
+      'onImportDrop(rowId, data)',
+      'ImagePathPicker',
+      'DropChance',
+      'RewardRuleNotice'
+    ]) {
+      assert.ok(gatheringTaskEditSource.includes(snippet), `task editor should include ${snippet}`);
+    }
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.EmptyTitle, 'No gathering tasks yet');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChance, 'Drop chance');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask, 'New Gathering Task');
     assert.equal(
       rootSource.match(/FABRICATE\.Admin\.ManagerV2\.Environment\.Tasks\.Actions/g)?.length ?? 0,

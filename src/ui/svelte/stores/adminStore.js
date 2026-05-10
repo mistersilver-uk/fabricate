@@ -441,9 +441,32 @@ function _normalizeGatheringDropRow(row = {}, randomID = () => Math.random().toS
     componentId: String(row.componentId || row.systemItemId || ''),
     itemUuid: String(row.itemUuid || ''),
     quantity: Number.isFinite(Number(row.quantity)) && Number(row.quantity) > 0 ? Number(row.quantity) : 1,
-    dropRate: Number.isFinite(Number(row.dropRate)) ? Math.min(100, Math.max(1, Math.floor(Number(row.dropRate)))) : 1,
+    dropRate: Number.isFinite(Number(row.dropRate)) ? Math.min(100, Math.max(0, Math.floor(Number(row.dropRate)))) : 1,
+    conditionModifiers: _normalizeGatheringDropConditionModifiers(row.conditionModifiers),
     enabled: row.enabled !== false
   };
+}
+
+function _normalizeGatheringDropConditionModifiers(modifiers = {}) {
+  return {
+    timeOfDay: _normalizeGatheringDropConditionModifierList(modifiers?.timeOfDay),
+    weather: _normalizeGatheringDropConditionModifierList(modifiers?.weather)
+  };
+}
+
+function _normalizeGatheringDropConditionModifierList(values = []) {
+  return (Array.isArray(values) ? values : [])
+    .map((modifier, index) => {
+      const conditionId = _normalizeGatheringConditionId(modifier?.conditionId ?? modifier?.id);
+      const value = Number(modifier?.value);
+      if (!conditionId || !Number.isFinite(value)) return null;
+      return {
+        id: String(modifier?.id || `${conditionId}-${index + 1}`),
+        conditionId,
+        value: Math.trunc(value)
+      };
+    })
+    .filter(Boolean);
 }
 
 function _normalizeGatheringTask(task = {}, randomID = () => Math.random().toString(36).slice(2, 10)) {

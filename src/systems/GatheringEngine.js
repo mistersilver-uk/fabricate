@@ -2132,8 +2132,8 @@ function validateTaskConfiguration(task) {
     }
     for (const row of rows) {
       const dropRate = Number(row?.dropRate);
-      if (!Number.isInteger(dropRate) || dropRate < 1 || dropRate > 100) {
-        errors.push('D100 gathering item drop rows require dropRate from 1 to 100');
+      if (!Number.isInteger(dropRate) || dropRate < 0 || dropRate > 100) {
+        errors.push('D100 gathering item drop rows require dropRate from 0 to 100');
       }
       if (!stringOrNull(row?.componentId) && !stringOrNull(row?.itemUuid)) {
         errors.push('D100 gathering item drop rows require componentId or itemUuid');

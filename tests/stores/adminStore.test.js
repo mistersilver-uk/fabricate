@@ -1977,6 +1977,7 @@ describe('createAdminStore', () => {
         itemUuid: '',
         quantity: 2,
         dropRate: 80,
+        conditionModifiers: { timeOfDay: [], weather: [] },
         enabled: true
       });
       assert.equal(config.systems.sys1.hazards[0].name, 'Thorns');
@@ -2006,7 +2007,7 @@ describe('createAdminStore', () => {
               weather: ['clear'],
               timeOfDay: ['night'],
               dropRows: [
-                { id: 'drop-a', componentId: 'herb', quantity: 2, dropRate: 80, enabled: true },
+                { id: 'drop-a', componentId: 'herb', quantity: 2, dropRate: 80, conditionModifiers: { weather: [{ id: 'rain-bonus', conditionId: 'rain', value: 10 }] }, enabled: true },
                 { id: 'drop-b', itemUuid: 'Item.random', quantity: 1, dropRate: 20, enabled: false }
               ],
               staminaCost: 1,
@@ -2041,8 +2042,44 @@ describe('createAdminStore', () => {
       assert.equal(services._store.gatheringConfig.systems.sys2.tasks[0].name, 'Other System');
       assert.deepEqual(services._store.gatheringConfig.systems.sys2.tasks[0].dropRows.map(row => row.id), ['drop-other']);
       duplicate.dropRows[0].quantity = 99;
+      duplicate.dropRows[0].conditionModifiers.weather[0].value = 50;
       assert.equal(sys1Tasks[0].dropRows[0].quantity, 2);
+      assert.equal(sys1Tasks[0].dropRows[0].conditionModifiers.weather[0].value, 10);
       assert.equal(get(store.viewState).gatheringConfig.systems.sys1.tasks.length, 2);
+    });
+
+    it('normalizes gathering task drop chance zero, condition modifiers, and single-value availability', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      services._store.gatheringConfig = { systems: { sys1: { tasks: [] } } };
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const task = await store.addGatheringLibraryTask('sys1');
+      await store.updateGatheringLibraryTask('sys1', task.id, {
+        weather: ['rain'],
+        timeOfDay: [],
+        dropRows: [{
+          id: 'drop-zero',
+          componentId: 'herb',
+          quantity: 3,
+          dropRate: 0,
+          conditionModifiers: {
+            weather: [{ id: 'rain-bonus', conditionId: 'Rain', value: 15 }],
+            timeOfDay: [{ id: 'night-penalty', conditionId: 'night', value: -5 }]
+          }
+        }]
+      });
+
+      const saved = services._store.gatheringConfig.systems.sys1.tasks[0];
+      assert.deepEqual(saved.weather, ['rain']);
+      assert.deepEqual(saved.timeOfDay, []);
+      assert.equal(saved.dropRows[0].dropRate, 0);
+      assert.deepEqual(saved.dropRows[0].conditionModifiers, {
+        timeOfDay: [{ id: 'night-penalty', conditionId: 'night', value: -5 }],
+        weather: [{ id: 'rain-bonus', conditionId: 'rain', value: 15 }]
+      });
     });
 
     it('returns null when duplicating a missing gathering task', async () => {

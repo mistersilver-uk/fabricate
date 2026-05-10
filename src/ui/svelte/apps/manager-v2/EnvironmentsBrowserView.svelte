@@ -106,7 +106,7 @@
       titleKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderTitle',
       titleFallback: 'Gathering settings',
       hintKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderHint',
-      hintFallback: 'Set system-level d100 reward and hazard rules for gathering.'
+      hintFallback: 'Set system-level drop resolution and hazard rules for gathering.'
     }
   ];
 

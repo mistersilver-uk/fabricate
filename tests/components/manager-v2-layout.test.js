@@ -339,7 +339,8 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const rowBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-table-head,\n.fabricate-manager-v2 .manager-v2-gathering-task-row');
   const identityBlock = blockFor('.fabricate-manager-v2 .manager-v2-recipe-identity,\n.fabricate-manager-v2 .manager-v2-component-identity,\n.fabricate-manager-v2 .manager-v2-environment-identity,\n.fabricate-manager-v2 .manager-v2-gathering-task-identity');
   const mainBlock = blockFor('.fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"] .manager-v2-main');
-  const placeholderBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-editor-placeholder');
+  const editorBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-edit-view');
+  const dropTableBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-drops-table');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager-v2 (max-width: 1120px)'));
 
   assert.ok(toolbarBlock.includes('max-height: 112px;') && toolbarBlock.includes('overflow-y: auto;'), 'task toolbar should stay bounded when filters wrap or labels are long');
@@ -348,11 +349,12 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(!tableBlock.includes('reorder'), 'task browser should not reserve a reorder column');
   assert.ok(rowBlock.includes('grid-template-columns: var(--fab-mv2-gathering-task-grid);'), 'task rows should use the shared task grid');
   assert.ok(identityBlock.includes('grid-template-columns: 46px minmax(0, 1fr);'), 'task identity should reserve thumbnail space');
-  assert.ok(mainBlock.includes('grid-template-rows: minmax(0, 1fr);'), 'task placeholder edit route should keep a bounded main content area');
-  assert.ok(placeholderBlock.includes('overflow: auto;'), 'task placeholder editor should scroll internally for narrow windows or long localized copy');
+  assert.ok(mainBlock.includes('grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;'), 'task edit route should keep fixed controls around a bounded table area');
+  assert.ok(editorBlock.includes('overflow: hidden;'), 'task editor should keep internal table scrolling bounded');
+  assert.ok(dropTableBlock.includes('--fab-mv2-task-drop-grid:'), 'task editor drop rows should define compact desktop geometry');
   assert.ok(
-    mediumQuery.includes('.fabricate-manager-v2 .manager-v2-gathering-task-row') && mediumQuery.includes('grid-template-columns: minmax(0, 1fr);'),
-    'medium manager-v2 layout should stack task rows before columns become cramped'
+    mediumQuery.includes('.fabricate-manager-v2 .manager-v2-gathering-task-drop-row') && mediumQuery.includes('grid-template-columns: minmax(0, 1fr);'),
+    'medium manager-v2 layout should stack task and drop rows before columns become cramped'
   );
   assert.equal(css.includes('.fabricate-manager-v2 .manager-v2-gathering-task-row .manager-v2-environment-reorder-stack'), false, 'task rows should not render environment reorder controls');
 });
