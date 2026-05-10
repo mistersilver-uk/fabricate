@@ -394,8 +394,23 @@ function createStore(calls = [], options = {}) {
       systems: {
         alchemy: {
           conditions: {
-            weather: { enabled: true, current: 'clear', values: ['clear', 'rain'] },
-            timeOfDay: { enabled: true, current: 'day', values: ['dawn', 'day', 'night'] }
+            weather: {
+              enabled: true,
+              current: 'clear',
+              values: [
+                { id: 'clear', label: 'Clear Sky', icon: 'fas fa-sun' },
+                { id: 'heavy-rain', label: 'Storm Rain', icon: 'fas fa-cloud-showers-heavy' }
+              ]
+            },
+            timeOfDay: {
+              enabled: true,
+              current: 'day',
+              values: [
+                { id: 'dawn', label: 'First Light', icon: 'fas fa-cloud-sun' },
+                { id: 'day', label: 'High Day', icon: 'fas fa-sun' },
+                { id: 'night', label: 'Deep Night', icon: 'fas fa-moon' }
+              ]
+            }
           },
           rules: {
             rewardSelectionMode: 'highestRankedDrop',
@@ -1790,6 +1805,35 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(target.querySelectorAll('.manager-v2-condition-add input').length, 2);
     assert.equal(target.querySelectorAll('.manager-v2-condition-add .essence-icon-picker-trigger.icon-only').length, 2);
     assert.equal(target.querySelectorAll('.manager-v2-condition-pill').length, 5);
+    assert.equal(target.querySelectorAll('.manager-v2-condition-label-input').length, 5);
+    assert.deepEqual(
+      Array.from(target.querySelectorAll('[data-gathering-condition-panel="weather"] .manager-v2-condition-label-input')).map(input => input.value),
+      ['Clear Sky', 'Storm Rain']
+    );
+    assert.deepEqual(
+      Array.from(target.querySelectorAll('[data-gathering-condition-panel="timeOfDay"] .manager-v2-condition-label-input')).map(input => input.value),
+      ['First Light', 'High Day', 'Deep Night']
+    );
+    const weatherLabelInput = target.querySelector('[data-gathering-condition-value="heavy-rain"] .manager-v2-condition-label-input');
+    weatherLabelInput.value = 'Heavy Rainfall';
+    weatherLabelInput.dispatchEvent(new Event('blur'));
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      calls.find(call => call[0] === 'updateGatheringConditionValue'),
+      ['updateGatheringConditionValue', 'weather', 'heavy-rain', { label: 'Heavy Rainfall' }, 'alchemy']
+    );
+
+    const timeLabelInput = target.querySelector('[data-gathering-condition-value="dawn"] .manager-v2-condition-label-input');
+    timeLabelInput.focus();
+    timeLabelInput.value = 'Grey Dawn';
+    timeLabelInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      calls.filter(call => call[0] === 'updateGatheringConditionValue').at(-1),
+      ['updateGatheringConditionValue', 'timeOfDay', 'dawn', { label: 'Grey Dawn' }, 'alchemy']
+    );
     assert.equal(target.querySelectorAll('.manager-v2-condition-pill .essence-icon-picker-trigger.icon-only').length, 5);
     assert.equal(target.querySelector('.manager-v2-gathering-settings-summary'), null);
     assert.equal(target.querySelector('[data-gathering-rule-fact]'), null);
