@@ -359,6 +359,8 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const dropRateValueBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-value');
   const dropRatePercentBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-percent');
   const dropRatePercentInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-percent input[type="text"]');
+  const dropRatePercentInputOverrideBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-edit-view .manager-v2-drop-rate-percent input[type="text"]');
+  const dropRatePercentSuffixBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-percent > span[aria-hidden="true"]');
   const dropRateControlBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control');
   const guaranteedDropRateControlBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control.is-guaranteed');
   const commonDropRateControlBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control.is-common');
@@ -366,6 +368,7 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const rareDropRateControlBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control.is-rare');
   const veryRareDropRateControlBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control.is-very-rare');
   const legendaryDropRateControlBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control.is-legendary');
+  const noneDropRateControlBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control.is-none');
   const dropRateTrackBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-track');
   const dropRateFillBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-fill');
   const dropRateRangeBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]');
@@ -416,8 +419,11 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.equal(selectedDropRowBlock.includes('var(--fab-warning'), false, 'selected drop rows should not use the warning family');
   assert.ok(dropRateBlock.includes('display: block;'), 'drop chance cell should expose one wrapped value');
   assert.ok(dropRateValueBlock.includes('grid-template-columns: 52px minmax(0, 1fr);') && dropRateValueBlock.includes('gap: 4px;'), 'drop chance value should keep the editable percent close to a wider slider');
-  assert.ok(dropRatePercentBlock.includes('grid-template-columns: minmax(0, 1fr) auto;'), 'drop chance percent should reserve inline space for the suffix');
-  assert.ok(dropRatePercentInputBlock.includes('height: 28px;') && dropRatePercentInputBlock.includes('text-align: right;'), 'drop chance percent should be a compact editable numeric field');
+  assert.ok(dropRatePercentBlock.includes('position: relative;') && dropRatePercentBlock.includes('display: block;'), 'drop chance percent should overlay the suffix without taking slider width');
+  assert.ok(css.includes('--fab-drop-rate-none: #E26F6B;'), 'drop chance slider should define a distinct exact-zero colour token');
+  assert.ok(dropRatePercentInputBlock.includes('height: 28px;') && dropRatePercentInputBlock.includes('box-sizing: border-box;') && dropRatePercentInputBlock.includes('padding: 4px 16px 4px 2px;') && dropRatePercentInputBlock.includes('text-align: center;'), 'drop chance percent should be a compact centered editable numeric field');
+  assert.ok(dropRatePercentInputOverrideBlock.includes('min-height: 28px;') && dropRatePercentInputOverrideBlock.includes('padding: 4px 16px 4px 2px;') && dropRatePercentInputOverrideBlock.includes('box-shadow: none;'), 'drop chance percent should override generic gathering task input chrome without affecting other fields');
+  assert.ok(dropRatePercentSuffixBlock.includes('position: absolute;') && dropRatePercentSuffixBlock.includes('right: 4px;') && dropRatePercentSuffixBlock.includes('pointer-events: none;'), 'drop chance percent suffix should sit inside the compact editor without stealing layout width');
   assert.ok(dropRateControlBlock.includes('--fab-drop-rate-value: 1%;') && dropRateControlBlock.includes('--fab-drop-rate-color: var(--fab-drop-rate-very-rare);'), 'drop chance slider should expose value and tier colour variables');
   assert.ok(dropRateTrackBlock.includes('background: var(--fab-overlay-dark-18);') && dropRateTrackBlock.includes('overflow: hidden;'), 'drop chance slider should render a neutral clipped track under the native range input');
   assert.ok(dropRateFillBlock.includes('width: var(--fab-drop-rate-value);') && dropRateFillBlock.includes('background: var(--fab-drop-rate-color);'), 'drop chance slider should fill the active track segment with the current tier colour');
@@ -432,7 +438,8 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
       && uncommonDropRateControlBlock.includes('var(--fab-drop-rate-uncommon)')
       && rareDropRateControlBlock.includes('var(--fab-drop-rate-rare)')
       && veryRareDropRateControlBlock.includes('var(--fab-drop-rate-very-rare)')
-      && legendaryDropRateControlBlock.includes('var(--fab-drop-rate-legendary)'),
+      && legendaryDropRateControlBlock.includes('var(--fab-drop-rate-legendary)')
+      && noneDropRateControlBlock.includes('var(--fab-drop-rate-none)'),
     'drop chance control classes should map the selected rarity palette to the current value'
   );
   assert.ok(dropQuantityInputBlock.includes('max-width: 52px;') && dropQuantityInputBlock.includes('font-variant-numeric: tabular-nums;'), 'quantity should remain a compact numeric text input');

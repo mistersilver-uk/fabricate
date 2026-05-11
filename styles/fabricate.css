@@ -142,6 +142,7 @@
   --fab-drop-rate-rare: #A78BFA;
   --fab-drop-rate-very-rare: #D86CCB;
   --fab-drop-rate-legendary: #E5C558;
+  --fab-drop-rate-none: #E26F6B;
   --fab-overlay-dark-05: rgba(17, 26, 35, 0.05);
   --fab-overlay-dark-08: rgba(17, 26, 35, 0.08);
   --fab-overlay-dark-10: rgba(17, 26, 35, 0.1);
@@ -259,6 +260,7 @@
   --fab-drop-rate-rare: #A78BFA;
   --fab-drop-rate-very-rare: #D86CCB;
   --fab-drop-rate-legendary: #E5C558;
+  --fab-drop-rate-none: #E26F6B;
   --fab-overlay-dark-05: rgba(0, 0, 0, 0.05);
   --fab-overlay-dark-08: rgba(0, 0, 0, 0.08);
   --fab-overlay-dark-10: rgba(0, 0, 0, 0.1);
@@ -376,6 +378,7 @@
   --fab-drop-rate-rare: #A78BFA;
   --fab-drop-rate-very-rare: #D86CCB;
   --fab-drop-rate-legendary: #E5C558;
+  --fab-drop-rate-none: #E26F6B;
   --fab-overlay-dark-05: rgba(20, 18, 20, 0.05);
   --fab-overlay-dark-08: rgba(20, 18, 20, 0.08);
   --fab-overlay-dark-10: rgba(20, 18, 20, 0.1);
@@ -493,6 +496,7 @@
   --fab-drop-rate-rare: #A78BFA;
   --fab-drop-rate-very-rare: #D86CCB;
   --fab-drop-rate-legendary: #E5C558;
+  --fab-drop-rate-none: #E26F6B;
   --fab-overlay-dark-05: rgba(22, 28, 25, 0.05);
   --fab-overlay-dark-08: rgba(22, 28, 25, 0.08);
   --fab-overlay-dark-10: rgba(22, 28, 25, 0.1);
@@ -610,6 +614,7 @@
   --fab-drop-rate-rare: #A78BFA;
   --fab-drop-rate-very-rare: #D86CCB;
   --fab-drop-rate-legendary: #E5C558;
+  --fab-drop-rate-none: #E26F6B;
   --fab-overlay-dark-05: rgba(18, 24, 36, 0.05);
   --fab-overlay-dark-08: rgba(18, 24, 36, 0.08);
   --fab-overlay-dark-10: rgba(18, 24, 36, 0.1);
@@ -727,6 +732,7 @@
   --fab-drop-rate-rare: #A78BFA;
   --fab-drop-rate-very-rare: #D86CCB;
   --fab-drop-rate-legendary: #E5C558;
+  --fab-drop-rate-none: #E26F6B;
   --fab-overlay-dark-05: rgba(12, 10, 20, 0.05);
   --fab-overlay-dark-08: rgba(12, 10, 20, 0.08);
   --fab-overlay-dark-10: rgba(12, 10, 20, 0.1);
@@ -9125,10 +9131,8 @@
 }
 
 .fabricate-manager-v2 .manager-v2-drop-rate-percent {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 2px;
+  position: relative;
+  display: block;
   color: var(--fab-mv2-text);
   font-variant-numeric: tabular-nums;
 }
@@ -9137,14 +9141,30 @@
   width: 100%;
   min-width: 0;
   height: 28px;
-  padding: 4px 3px;
+  box-sizing: border-box;
+  padding: 4px 16px 4px 2px;
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   color: var(--fab-mv2-text);
   background: var(--fab-overlay-dark-18);
   font: inherit;
   font-variant-numeric: tabular-nums;
-  text-align: right;
+  text-align: center;
+}
+
+.fabricate-manager-v2 .manager-v2-gathering-task-edit-view .manager-v2-drop-rate-percent input[type="text"] {
+  min-height: 28px;
+  padding: 4px 16px 4px 2px;
+  background: var(--fab-overlay-dark-18);
+  box-shadow: none;
+}
+
+.fabricate-manager-v2 .manager-v2-drop-rate-percent > span[aria-hidden="true"] {
+  position: absolute;
+  right: 7px;
+  top: 50%;
+  pointer-events: none;
+  transform: translateY(-50%);
 }
 
 .fabricate-manager-v2 .manager-v2-drop-rate-control {
@@ -9178,6 +9198,10 @@
 
 .fabricate-manager-v2 .manager-v2-drop-rate-control.is-legendary {
   --fab-drop-rate-color: var(--fab-drop-rate-legendary);
+}
+
+.fabricate-manager-v2 .manager-v2-drop-rate-control.is-none {
+  --fab-drop-rate-color: var(--fab-drop-rate-none);
 }
 
 .fabricate-manager-v2 .manager-v2-drop-rate-track {

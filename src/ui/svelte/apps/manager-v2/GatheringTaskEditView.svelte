@@ -244,6 +244,7 @@
 
   function dropRateTierClass(value) {
     const rate = normalizeDropRate(value);
+    if (rate === 0) return 'is-none';
     if (rate >= 100) return 'is-guaranteed';
     if (rate >= 70) return 'is-common';
     if (rate >= 35) return 'is-uncommon';
@@ -254,6 +255,7 @@
 
   function dropRateTierColor(value) {
     const rate = normalizeDropRate(value);
+    if (rate === 0) return 'var(--fab-drop-rate-none)';
     if (rate >= 100) return 'var(--fab-drop-rate-guaranteed)';
     if (rate >= 70) return 'var(--fab-drop-rate-common)';
     if (rate >= 35) return 'var(--fab-drop-rate-uncommon)';

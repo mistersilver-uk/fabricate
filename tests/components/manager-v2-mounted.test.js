@@ -2755,7 +2755,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
       ['drop-rare', 15, 'is-rare', 'var(--fab-drop-rate-rare)'],
       ['drop-very-rare', 5, 'is-very-rare', 'var(--fab-drop-rate-very-rare)'],
       ['drop-legendary', 4, 'is-legendary', 'var(--fab-drop-rate-legendary)'],
-      ['drop-zero', 0, 'is-legendary', 'var(--fab-drop-rate-legendary)']
+      ['drop-zero', 0, 'is-none', 'var(--fab-drop-rate-none)']
     ].map(([id, dropRate]) => ({
       id,
       componentId: 'c1',
@@ -2791,7 +2791,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
       ['drop-rare', 15, 'is-rare', 'var(--fab-drop-rate-rare)'],
       ['drop-very-rare', 5, 'is-very-rare', 'var(--fab-drop-rate-very-rare)'],
       ['drop-legendary', 4, 'is-legendary', 'var(--fab-drop-rate-legendary)'],
-      ['drop-zero', 0, 'is-legendary', 'var(--fab-drop-rate-legendary)']
+      ['drop-zero', 0, 'is-none', 'var(--fab-drop-rate-none)']
     ]) {
       const control = target.querySelector(`[data-gathering-task-drop-id="${id}"] .manager-v2-drop-rate-control`);
       assert.ok(control.classList.contains(tierClass), `${id} should use ${tierClass}`);
