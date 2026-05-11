@@ -9304,7 +9304,7 @@
 
 .fabricate-manager-v2 .manager-v2-drop-rate-value {
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr);
+  grid-template-columns: 52px minmax(0, 1fr);
   align-items: center;
   gap: 4px;
 }
@@ -9321,7 +9321,7 @@
   min-width: 0;
   height: 28px;
   box-sizing: border-box;
-  padding: 4px 18px 4px 6px;
+  padding: 4px 16px 4px 2px;
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   color: var(--fab-mv2-text);
@@ -9333,14 +9333,14 @@
 
 .fabricate-manager-v2 .manager-v2-gathering-task-edit-view .manager-v2-drop-rate-percent input[type="text"] {
   min-height: 28px;
-  padding: 4px 18px 4px 6px;
+  padding: 4px 16px 4px 2px;
   background: var(--fab-overlay-dark-18);
   box-shadow: none;
 }
 
 .fabricate-manager-v2 .manager-v2-drop-rate-percent > span[aria-hidden="true"] {
   position: absolute;
-  right: 6px;
+  right: 7px;
   top: 50%;
   pointer-events: none;
   transform: translateY(-50%);
@@ -9421,7 +9421,7 @@
 
 .fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-webkit-slider-runnable-track {
   height: 6px;
-  border: 0;
+  border: 1px solid var(--fab-overlay-light-10);
   border-radius: 999px;
   background: transparent;
 }
@@ -9439,9 +9439,9 @@
 
 .fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-moz-range-track {
   height: 6px;
-  border: 0;
+  border: 1px solid var(--fab-overlay-light-10);
   border-radius: 999px;
-  background: transparent;
+  background: var(--fab-overlay-dark-18);
 }
 
 .fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-moz-range-progress {
@@ -9717,10 +9717,33 @@
 .fabricate-manager-v2 .manager-v2-drop-editor-card .manager-v2-drop-rate-percent input[type="text"] {
   height: 28px;
   min-height: 28px;
-  padding: 4px 18px 4px 6px;
+  padding: 4px 24px 4px 6px;
   background: var(--fab-overlay-dark-18);
   box-shadow: none;
   text-align: center;
+}
+
+.fabricate-manager-v2 .manager-v2-drop-editor-card [data-gathering-drop-inspector-rate] .manager-v2-drop-rate-value {
+  grid-template-columns: 64px minmax(0, 1fr);
+}
+
+.fabricate-manager-v2 .manager-v2-drop-editor-card [data-gathering-drop-inspector-rate] .manager-v2-drop-rate-percent > span[aria-hidden="true"] {
+  right: 8px;
+}
+
+.fabricate-manager-v2 .manager-v2-drop-editor-card [data-gathering-drop-inspector-rate] .manager-v2-drop-rate-track {
+  left: 7px;
+  right: 7px;
+}
+
+.fabricate-manager-v2 .manager-v2-drop-editor-card [data-gathering-drop-inspector-rate] .manager-v2-drop-rate-control input[type="range"]::-webkit-slider-runnable-track {
+  border: 0;
+  background: transparent;
+}
+
+.fabricate-manager-v2 .manager-v2-drop-editor-card [data-gathering-drop-inspector-rate] .manager-v2-drop-rate-control input[type="range"]::-moz-range-track {
+  border: 0;
+  background: transparent;
 }
 
 .fabricate-manager-v2 .manager-v2-drop-editor-values {
