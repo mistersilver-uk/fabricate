@@ -325,11 +325,39 @@ test('environment task and hazard toggles preserve mixed-case library IDs', asyn
   assert.deepEqual(composed.hazards.map(hazard => hazard.id), ['hazard-other']);
 });
 
-test('d100 drop-row save validation rejects missing dropRate and non-positive quantity', () => {
+test('d100 drop-row save validation accepts zero chance and rejects invalid dropRate values', () => {
   const store = makeEnvironmentStore();
+
+  const zeroRate = store.validate(environment({
+    tasks: [{
+      id: 'd100-zero',
+      name: 'Valid Zero D100',
+      enabled: true,
+      resolutionMode: 'd100',
+      dropRows: [{ id: 'zero-rate', componentId: 'herb', quantity: 1, dropRate: 0 }]
+    }]
+  }));
+  assert.equal(zeroRate.valid, true);
+
+  const unresolvedDisabled = store.validate(environment({
+    tasks: [{
+      id: 'd100-unresolved-authoring-row',
+      name: 'Valid With Unresolved Authoring Row',
+      enabled: true,
+      resolutionMode: 'd100',
+      dropRows: [
+        { id: 'ready-row', componentId: 'herb', quantity: 1, dropRate: 50 },
+        { id: 'unresolved-row', componentId: '', itemUuid: '', quantity: 1, dropRate: 25, enabled: false }
+      ]
+    }]
+  }));
+  assert.equal(unresolvedDisabled.valid, true);
 
   for (const row of [
     { id: 'missing-rate', componentId: 'herb', quantity: 1 },
+    { id: 'negative-rate', componentId: 'herb', quantity: 1, dropRate: -1 },
+    { id: 'overflow-rate', componentId: 'herb', quantity: 1, dropRate: 101 },
+    { id: 'fractional-rate', componentId: 'herb', quantity: 1, dropRate: 20.5 },
     { id: 'zero-quantity', componentId: 'herb', quantity: 0, dropRate: 50 }
   ]) {
     const result = store.validate(environment({

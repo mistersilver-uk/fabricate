@@ -2605,6 +2605,28 @@ async function main() {
         await screenshot(page, 'manager-v2-environments-browse-stacked');
 
         await setManagerV2WindowSize(page, { width: 1280, height: 820 });
+        await page.locator('.fabricate-manager-v2 #manager-v2-gathering-tab-tasks').first().click();
+        await page.locator('.fabricate-manager-v2 .manager-v2-gathering-task-row:has-text("Smoke Reusable Forage")').first().waitFor({ state: 'visible', timeout: 10_000 });
+        await page.locator('.fabricate-manager-v2 .manager-v2-gathering-task-row:has-text("Smoke Reusable Forage") [aria-label^="Edit"]').first().click();
+        await page.locator('.fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        for (const expected of ['Task Identity', 'Task Availability', 'Drop Rules', 'Selected Drop Rule', 'Final chance']) {
+          if (await page.locator('.fabricate-manager-v2').filter({ hasText: expected }).count() === 0) {
+            throw new Error(`Manager V2 gathering task editor is missing "${expected}".`);
+          }
+        }
+        await assertManagerV2LayoutStable(page, 'gathering task editor normal');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-v2-gathering-task-editor-normal');
+
+        await setManagerV2WindowSize(page, { width: 1000, height: 720 });
+        await page.waitForTimeout(250);
+        await assertManagerV2LayoutStable(page, 'gathering task editor stacked');
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'manager-v2-gathering-task-editor-stacked');
+
+        await setManagerV2WindowSize(page, { width: 1280, height: 820 });
+        await page.locator('.fabricate-manager-v2 [data-gathering-task-core-editor] .manager-v2-link-button').first().click();
+        await page.locator('.fabricate-manager-v2 #manager-v2-gathering-tab-environments').first().click();
         await page.locator('.fabricate-manager-v2 .manager-v2-environment-row:has-text("Azure Grove") .manager-v2-icon-button').nth(0).click();
         await page.locator('.fabricate-manager-v2[data-manager-v2-view="environment-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await page.locator('.fabricate-manager-v2 .manager-v2-environment-edit-view').first().waitFor({ state: 'visible', timeout: 10_000 });

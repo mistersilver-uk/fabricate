@@ -1018,17 +1018,15 @@
 
   function addGatheringTaskDrop() {
     if (!selectedGatheringTask) return;
-    const firstComponent = (selectedSystem?.managedItemOptions || [])[0];
-    if (!firstComponent?.id) return;
     const row = {
       id: gatheringDropRowId(),
       name: '',
-      componentId: firstComponent.id,
+      componentId: '',
       itemUuid: '',
       quantity: 1,
-      dropRate: 100,
+      dropRate: 25,
       conditionModifiers: { timeOfDay: [], weather: [] },
-      enabled: true
+      enabled: false
     };
     selectedGatheringDropId = row.id;
     updateSelectedGatheringTask({ dropRows: [...gatheringTaskDropRows(selectedGatheringTask), row] });
@@ -1063,7 +1061,7 @@
     if (!rowId) return false;
     const item = await services?.importSingleManagedItemFromDrop?.(data);
     if (!item?.id) return false;
-    updateGatheringTaskDrop(rowId, { componentId: item.id, itemUuid: '', name: '' });
+    updateGatheringTaskDrop(rowId, { componentId: item.id, itemUuid: '', name: '', enabled: true });
     selectedGatheringDropId = rowId;
     return true;
   }
@@ -1363,7 +1361,7 @@
   }
 
   function gatheringDropImage(row) {
-    return row?.img || gatheringManagedItemImage(row?.componentId);
+    return row?.img || gatheringManagedItemImage(row?.componentId) || 'icons/svg/item-bag.svg';
   }
 
   function gatheringTaskDropLabel(row) {
@@ -1433,7 +1431,15 @@
   }
 
   function gatheringDropModifierClass(value) {
-    return Number(value || 0) < 0 ? 'is-danger' : 'is-active';
+    const number = Number(value || 0);
+    if (number < 0) return 'is-danger';
+    if (number > 0) return 'is-active';
+    return 'is-neutral';
+  }
+
+  function showGatheringComponentsForDrop(rowId = selectedGatheringDrop?.id) {
+    if (rowId) selectedGatheringDropId = rowId;
+    setView('components');
   }
 
   function gatheringTaskAvailability(task) {
@@ -2040,6 +2046,7 @@
         onDuplicateDrop={duplicateGatheringTaskDrop}
         onDeleteDrop={deleteGatheringTaskDrop}
         onImportDrop={importGatheringTaskDrop}
+        onShowComponents={showGatheringComponentsForDrop}
         onAddModifier={addGatheringDropModifier}
         onUpdateModifier={updateGatheringDropModifier}
         onDeleteModifier={deleteGatheringDropModifier}
@@ -2288,7 +2295,7 @@
             {#if currentView === 'gathering-task-edit'}
             {#if selectedGatheringDrop}
             <section class="manager-v2-inspector-card manager-v2-drop-editor-card" data-gathering-task-drop-inspector>
-              <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SelectedDrop', 'Selected drop rule')}</h3>
+              <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SelectedDrop', 'Selected Drop Rule')}</h3>
               <div class="manager-v2-inspector-title-row">
                 <img class="manager-v2-recipe-preview" src={gatheringDropImage(selectedGatheringDrop)} alt="" />
                 <div class="manager-v2-inspector-copy">
@@ -2299,8 +2306,8 @@
 
               <label class="manager-v2-field">
                 <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropComponent', 'Drop component')}</span>
-                <select value={selectedGatheringDrop.componentId || ''} onchange={(event) => { if (event.currentTarget.value) updateGatheringTaskDrop(selectedGatheringDrop.id, { componentId: event.currentTarget.value, itemUuid: '' }); }}>
-                  <option value="" disabled>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.UnresolvedDrop', 'Unresolved drop')}</option>
+                <select value={selectedGatheringDrop.componentId || ''} onchange={(event) => { if (event.currentTarget.value) updateGatheringTaskDrop(selectedGatheringDrop.id, { componentId: event.currentTarget.value, itemUuid: '', enabled: true }); }}>
+                  <option value="">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SelectComponent', 'Select a component')}</option>
                   {#each selectedSystem.managedItemOptions || [] as item (item.id)}
                     <option value={item.id}>{item.name || item.id}</option>
                   {/each}
@@ -2353,9 +2360,20 @@
               </div>
 
               <div class="manager-v2-final-chance" data-gathering-task-drop-fact="final-chance">
-                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.FinalChanceThisDrop', 'Final chance')}</span>
-                <strong>{gatheringDropFinalChance(selectedGatheringDrop)}%</strong>
-                <small>{selectedGatheringDrop.dropRate ?? 1}% {text('FABRICATE.Admin.ManagerV2.Environment.Tasks.BaseChanceShort', 'base')} {gatheringSignedPercent(gatheringDropConditionModifierTotal(selectedGatheringDrop))}</small>
+                <div class="manager-v2-final-chance-heading">
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.FinalChanceThisDrop', 'Final chance')}</span>
+                  <strong>{gatheringDropFinalChance(selectedGatheringDrop)}%</strong>
+                </div>
+                <div class="manager-v2-final-chance-lines">
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.CurrentTimeOfDay', 'Current time')}: <strong>{gatheringCurrentConditionLabel('timeOfDay')}</strong></span>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.CurrentWeather', 'Current weather')}: <strong>{gatheringCurrentConditionLabel('weather')}</strong></span>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.BaseChance', 'Base chance')}: <strong>{selectedGatheringDrop.dropRate ?? 1}%</strong></span>
+                  {#each gatheringAppliedDropModifiers(selectedGatheringDrop) as modifier (modifier.id)}
+                    <span class={gatheringDropModifierClass(modifier.value)}>{modifier.label}: <strong>{gatheringSignedPercent(modifier.value)}</strong></span>
+                  {:else}
+                    <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.NoMatchingModifiers', 'No matching modifiers')}: <strong>0%</strong></span>
+                  {/each}
+                </div>
               </div>
             </section>
             {:else}

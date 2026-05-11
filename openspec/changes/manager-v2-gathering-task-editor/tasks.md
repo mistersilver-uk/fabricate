@@ -22,3 +22,15 @@
 - [x] Run targeted tests.
 - [x] Run `npm test`.
 - [x] Run `npm run build`.
+
+## 5. Refinement Pass
+
+- [x] Refactor the central editor into task identity, task availability, drop rules, and calculation help areas that fit the Manager V2 shell.
+- [x] Preserve the immediate-save library editing convention and keep inline chance/quantity edits as fast table controls.
+- [x] Let Add Drop Rule create an unresolved selected row, and make unresolved rows support drop/import plus component selection in the inspector.
+- [x] Improve drop table scanability, modifier chips, row actions, search, pagination count, and duplicate component support.
+- [x] Refine the selected-drop inspector with component summary, component selection, signed time/weather modifier rows, and a clamped final chance breakdown.
+- [x] Remove the task identity heading and internal id display from the gathering task editor while keeping editable identity fields.
+- [x] Add or update focused mounted/layout/contract tests.
+- [ ] Capture normal and narrow rendered evidence for the task editor when live Foundry/Vite validation is available.
+- [x] Run targeted tests, `npm test`, and `npm run build`.

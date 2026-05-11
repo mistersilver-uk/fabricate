@@ -611,8 +611,13 @@ describe('CraftingSystemManagerV2 source contract', () => {
       assert.ok(gatheringTaskEditSource.includes(snippet), `task editor should include ${snippet}`);
     }
     assert.ok(!gatheringTaskEditSource.includes('manager-v2-task-editor-tabs'), 'task editor should be a one-page editor without tab navigation');
+    assert.ok(!gatheringTaskEditSource.includes('TaskIdentity'), 'task editor should not render a visible task identity heading');
+    assert.ok(!gatheringTaskEditSource.includes('Tasks.TaskId'), 'task editor should not render the raw internal task id localization');
+    assert.ok(!gatheringTaskEditSource.includes('Internal ID'), 'task editor should not render the raw internal task id label');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.EmptyTitle, 'No gathering tasks yet');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChance, 'Drop chance');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.TaskIdentity, undefined);
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.TaskId, undefined);
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask, 'New Gathering Task');
     assert.equal(
       rootSource.match(/FABRICATE\.Admin\.ManagerV2\.Environment\.Tasks\.Actions/g)?.length ?? 0,

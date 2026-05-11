@@ -255,6 +255,10 @@ GatheringTaskDefinition = {
     itemUuid?: string,
     quantity: number,
     dropRate: number,
+    conditionModifiers?: {
+      timeOfDay?: Array<{ id: string, conditionId: string, value: number }>,
+      weather?: Array<{ id: string, conditionId: string, value: number }>,
+    },
     enabled: boolean,
   }>,
   itemSelectionMode: "highestRankedDrop" | "allDrops", // legacy compatibility-read only
@@ -271,12 +275,13 @@ GatheringTaskDefinition = {
 4. Region matches when omitted or equal to the environment region.
 5. Biomes match when omitted or at least one task biome is present on the environment.
 6. Weather and time of day match against the current global gathering conditions.
-7. Drop rows require a `dropRate` integer from 1 to 100, a positive quantity, and either a component reference or item UUID.
-8. `itemSelectionMode` is a legacy compatibility field. New Manager V2 authoring and d100 runtime behavior use system Gathering Rules once they are authored.
-9. Row order is authoritative for `highestRankedDrop` and `limitedDrops`.
-10. A Gathering Task may declare stamina cost, node availability, attempt limits, risk overrides, encounter hooks, and condition or roll modifier providers where the selected gathering economy uses them.
-11. Per-environment overrides remain associated with the environment and must not rewrite the Gathering Task.
-12. Legacy Environment Tasks remain valid as inline compatibility tasks.
+7. Enabled drop rows require a `dropRate` integer from 0 to 100, a positive quantity, and either a component reference or item UUID. Unresolved editor rows may omit component references while a GM is still authoring the row, but they remain disabled until assigned a component or item reference.
+8. Drop row condition modifier values are signed integer percentage-point adjustments. Matching time-of-day and weather modifiers are summed into final drop chance; gathering modifiers affect the d100 roll instead.
+9. `itemSelectionMode` is a legacy compatibility field. New Manager V2 authoring and d100 runtime behavior use system Gathering Rules once they are authored.
+10. Row order is authoritative for `highestRankedDrop` and `limitedDrops`.
+11. A Gathering Task may declare stamina cost, node availability, attempt limits, risk overrides, encounter hooks, and condition or roll modifier providers where the selected gathering economy uses them.
+12. Per-environment overrides remain associated with the environment and must not rewrite the Gathering Task.
+13. Legacy Environment Tasks remain valid as inline compatibility tasks.
 
 ## Reusable Gathering Hazard Library
 
@@ -386,7 +391,7 @@ Resolve gathering-native Gathering Task drops and matched hazards through ordere
 ### Runtime Requirements
 
 1. Before any player attempt starts, Fabricate rejects gathering if Foundry is paused.
-2. For every enabled item row in the selected Gathering Task, roll `d100`, add the gathering modifier, and drop the row when `effectiveRoll >= 101 - dropRate`.
+2. For every enabled item row in the selected Gathering Task, calculate `finalDropRate = clamp(dropRate + matchingConditionModifiers, 0, 100)`, roll `d100`, add the gathering modifier, and drop the row when `effectiveRoll >= 101 - finalDropRate`.
 3. For every enabled matched hazard in the environment, roll `d100`, add the hazard modifier, and drop the hazard when `effectiveRoll >= 101 - dropRate`.
 4. System Gathering Rules select rewards after item rows roll once rules are authored.
 5. Reward `highestRankedDrop` awards the first dropped item row in authored row order.

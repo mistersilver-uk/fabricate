@@ -348,12 +348,16 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(!tableBlock.includes('reorder'), 'task browser should not reserve a reorder column');
   assert.ok(rowBlock.includes('grid-template-columns: var(--fab-mv2-gathering-task-grid);'), 'task rows should use the shared task grid');
   assert.ok(identityBlock.includes('grid-template-columns: 46px minmax(0, 1fr);'), 'task identity should reserve thumbnail space');
-  assert.ok(editorBlock.includes('grid-template-rows: auto auto minmax(0, 1fr);'), 'task edit route should keep core details, notices, and drops on one central page');
-  assert.ok(editorBlock.includes('overflow: hidden;'), 'task editor should keep the drops table bounded inside the central workspace');
+  assert.ok(editorBlock.includes('grid-template-rows: auto auto minmax(0, 1fr) auto;'), 'task edit route should keep core details, availability, drops, and help on one central page');
+  assert.ok(editorBlock.includes('overflow: auto;'), 'task editor should allow vertical scrolling without horizontal overflow');
   assert.ok(dropTableBlock.includes('--fab-mv2-task-drop-grid:'), 'task editor drop rows should define compact desktop geometry');
   assert.ok(
     mediumQuery.includes('.fabricate-manager-v2 .manager-v2-gathering-task-drop-row') && mediumQuery.includes('grid-template-columns: minmax(0, 1fr);'),
     'medium manager-v2 layout should stack task and drop rows before columns become cramped'
+  );
+  assert.ok(
+    css.includes('@container fabricate-manager-v2 (max-width: 1320px)') && css.includes('.fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"] .manager-v2-gathering-task-drop-row'),
+    'task editor should stack drop rows before the shell-wide breakpoint compresses the center pane'
   );
   assert.equal(css.includes('.fabricate-manager-v2 .manager-v2-gathering-task-row .manager-v2-environment-reorder-stack'), false, 'task rows should not render environment reorder controls');
 });

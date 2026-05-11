@@ -2126,7 +2126,7 @@ function validateTaskConfiguration(task) {
   }
 
   if (resolutionMode === 'd100') {
-    const rows = normalizeList(task?.dropRows ?? task?.itemDrops);
+    const rows = normalizeList(task?.dropRows ?? task?.itemDrops).filter(row => row?.enabled !== false);
     if (rows.length === 0) {
       errors.push('D100 gathering task requires at least one item drop row');
     }

@@ -454,8 +454,18 @@ function createStore(calls = [], options = {}) {
               biomes: ['forest'],
               weather: ['clear'],
               timeOfDay: ['day'],
-              dropRows: [
-                { id: 'drop-nightshade', componentId: 'c3', quantity: 2, dropRate: 80, enabled: true }
+              dropRows: options.taskDropRows || [
+                {
+                  id: 'drop-nightshade',
+                  componentId: 'c3',
+                  quantity: 2,
+                  dropRate: 80,
+                  enabled: true,
+                  conditionModifiers: {
+                    timeOfDay: [{ id: 'night-bonus', conditionId: 'night', value: 20 }],
+                    weather: [{ id: 'clear-penalty', conditionId: 'clear', value: -15 }]
+                  }
+                }
               ]
             },
             {
@@ -2080,6 +2090,8 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'gathering-task-edit');
     assert.ok(target.querySelector('[data-gathering-task-editor]'));
     assert.ok(target.querySelector('[data-gathering-task-core-editor]'));
+    assert.equal(target.textContent.includes('Task Identity'), false);
+    assert.equal(target.textContent.includes('Internal ID'), false);
     assert.ok(target.textContent.includes('Edit availability, identity, and drop rules for the selected gathering task.'));
     assert.ok(target.querySelector('[data-gathering-task-drops-table]'));
     assert.ok(target.querySelector('[data-gathering-task-drop-inspector]'));
@@ -2441,6 +2453,124 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
 
     assert.ok(calls.some(call => call[0] === 'addEnvironmentTask'));
     assert.ok(calls.some(call => call[0] === 'saveEnvironmentDraft'));
+  });
+
+  it('edits gathering task drop rules from unresolved row through inspector modifiers', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls),
+        services: {
+          openCurrentAdmin: () => {},
+          importSingleManagedItemFromDrop: async () => ({ id: 'c2', name: 'Glass Vial' })
+        }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    target.querySelector('#manager-v2-gathering-tab-tasks').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]').click();
+    await tick();
+    flushSync();
+
+    Array.from(target.querySelectorAll('.manager-v2-task-card-header .manager-v2-button'))
+      .find(button => button.textContent.includes('Add drop rule'))
+      .click();
+    await tick();
+    flushSync();
+
+    const addCall = calls.findLast(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.componentId === '' && row.dropRate === 25 && row.enabled === false));
+    assert.ok(addCall, 'add drop should persist an unresolved selected drop row');
+    const addedRow = addCall[3].dropRows.find(row => row.componentId === '');
+    assert.ok(target.querySelector(`[data-gathering-task-drop-id="${addedRow.id}"] [data-gathering-task-drop-zone]`));
+    assert.ok(target.textContent.includes('or create/select component'));
+
+    const componentSelect = target.querySelector('[data-gathering-task-drop-inspector] select');
+    componentSelect.value = 'c2';
+    componentSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.id === addedRow.id && row.componentId === 'c2' && row.enabled === true)));
+
+    const inspectorSlider = target.querySelector('[data-gathering-task-drop-inspector] input[type="range"]');
+    inspectorSlider.value = '100';
+    inspectorSlider.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+
+    const addModifierButtons = target.querySelectorAll('[data-gathering-task-drop-inspector] .manager-v2-drop-editor-modifier-group .manager-v2-icon-button');
+    addModifierButtons[1].click();
+    await tick();
+    flushSync();
+    const weatherModifierInput = target.querySelector('[data-gathering-drop-modifier-kind="weather"] [aria-label="Modifier value"]');
+    weatherModifierInput.value = '20';
+    weatherModifierInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-gathering-task-drop-fact="final-chance"]').textContent.includes('100%'));
+
+    weatherModifierInput.value = '-150';
+    weatherModifierInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-gathering-task-drop-fact="final-chance"]').textContent.includes('0%'));
+
+    target.querySelector(`[data-gathering-task-drop-id="${addedRow.id}"] [aria-label="Duplicate drop rule"]`).click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.filter(row => row.componentId === 'c2').length >= 2));
+    target.querySelector(`[data-gathering-task-drop-id="${addedRow.id}"] [aria-label="Delete drop rule"]`).click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.every(row => row.id !== addedRow.id)));
+  });
+
+  it('paginates gathering task editor drop rules without snapping back to the selected row', async () => {
+    const dropRows = Array.from({ length: 12 }, (_, index) => ({
+      id: `drop-page-${index + 1}`,
+      componentId: index % 2 === 0 ? 'c1' : 'c3',
+      quantity: 1,
+      dropRate: 10 + index,
+      enabled: true
+    }));
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], { taskDropRows: dropRows }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    target.querySelector('#manager-v2-gathering-tab-tasks').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]').click();
+    await tick();
+    flushSync();
+
+    assert.ok(target.querySelector('[data-gathering-task-drop-id="drop-page-1"]'));
+    assert.equal(target.querySelector('[data-pagination-page]').textContent.trim(), 'Page 1 of 2');
+    target.querySelector('[data-pagination-next]').click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('[data-pagination-page]').textContent.trim(), 'Page 2 of 2');
+    assert.equal(target.querySelector('[data-gathering-task-drop-id="drop-page-1"]'), null);
+    assert.ok(target.querySelector('[data-gathering-task-drop-id="drop-page-11"]'));
   });
 
   it('shows setup guidance and keeps create routing when a gathering system has no environments', async () => {
