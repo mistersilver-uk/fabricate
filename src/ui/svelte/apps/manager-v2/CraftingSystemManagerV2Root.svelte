@@ -1438,11 +1438,6 @@
     return 'is-neutral';
   }
 
-  function showGatheringComponentsForDrop(rowId = selectedGatheringDrop?.id) {
-    if (rowId) selectedGatheringDropId = rowId;
-    setView('components');
-  }
-
   function gatheringTaskAvailability(task) {
     const timeValues = Array.isArray(task?.timeOfDay) ? task.timeOfDay : [];
     const weatherValues = Array.isArray(task?.weather) ? task.weather : [];
@@ -2046,7 +2041,6 @@
         onDuplicateDrop={duplicateGatheringTaskDrop}
         onDeleteDrop={deleteGatheringTaskDrop}
         onImportDrop={importGatheringTaskDrop}
-        onShowComponents={showGatheringComponentsForDrop}
         onAddModifier={addGatheringDropModifier}
         onUpdateModifier={updateGatheringDropModifier}
         onDeleteModifier={deleteGatheringDropModifier}

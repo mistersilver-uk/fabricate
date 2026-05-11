@@ -905,6 +905,8 @@
             "QuantityShortHint": "award",
             "Modifiers": "Modifiers",
             "NoModifiers": "Not specified",
+            "NoComponent": "No Component",
+            "CreateOrAssign": "Create or assign",
             "DropComponentHere": "Drop component here",
             "OrCreateComponent": "or create/select component",
             "SelectDrop": "Select drop rule",

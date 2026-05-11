@@ -115,7 +115,7 @@ function createStore(calls = [], options = {}) {
   const alchemyManagedItemOptions = options.emptyComponents ? [] : [
     { id: 'c1', name: 'Iron Ore', img: 'icons/commodities/metal/ore-chunk-grey.webp', sourceItemUuid: 'Compendium.fabricate.items.iron-ore' },
     { id: 'c2', name: 'Glass Vial', img: 'icons/containers/kitchenware/vase-clay-blue.webp' },
-    { id: 'c3', name: 'Nightshade', img: 'icons/consumables/plants/nightshade.jpg' },
+    { id: 'c3', name: 'Nightshade With An Exceptionally Long Localized Component Name', img: 'icons/consumables/plants/nightshade.jpg', sourceItemUuid: 'Compendium.fabricate.items.nightshade-with-a-long-source-reference' },
     { id: 'c4', name: 'Coal', img: 'icons/commodities/materials/bowl-powder-black.webp' }
   ];
   const systemDetails = {
@@ -463,7 +463,10 @@ function createStore(calls = [], options = {}) {
                   dropRate: 80,
                   enabled: true,
                   conditionModifiers: {
-                    timeOfDay: [{ id: 'night-bonus', conditionId: 'night', value: 20 }],
+                    timeOfDay: [
+                      { id: 'night-bonus', conditionId: 'night', value: 20 },
+                      { id: 'day-neutral', conditionId: 'day', value: 0 }
+                    ],
                     weather: [{ id: 'clear-penalty', conditionId: 'clear', value: -15 }]
                   }
                 }
@@ -2048,7 +2051,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
       null,
       'selected gathering task identity card should not contain an action group'
     );
-    assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Nightshade x2 (80%)'));
+    assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Nightshade With An Exceptionally Long Localized Component Name x2 (80%)'));
     assert.equal(target.querySelector('[data-gathering-task-fact="environments"] strong').textContent.trim(), '1');
 
     const taskSearch = target.querySelector('[data-gathering-tasks-browser] input[type="search"]');
@@ -2122,6 +2125,25 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(target.querySelector('[data-gathering-task-matching-logic]'), null);
     assert.ok(target.textContent.includes('Drop chance'));
     assert.ok(target.textContent.includes('Final chance'));
+    const populatedDropRow = target.querySelector('[data-gathering-task-drop-id="drop-nightshade"]');
+    const populatedComponentCell = populatedDropRow.querySelector('[data-gathering-task-drop-component-cell]');
+    assert.ok(populatedComponentCell.querySelector('.manager-v2-gathering-task-thumb'));
+    assert.ok(populatedComponentCell.textContent.includes('Nightshade With An Exceptionally Long Localized Component Name'));
+    assert.ok(populatedComponentCell.textContent.includes('Compendium.fabricate.items.nightshade-with-a-long-source-reference'));
+    const populatedChanceCell = populatedDropRow.querySelector('[data-gathering-task-drop-chance-cell]');
+    assert.equal(populatedChanceCell.querySelector('strong').textContent.trim(), '80%');
+    assert.ok(populatedChanceCell.querySelector('.manager-v2-drop-rate-tier-track'));
+    assert.ok(populatedChanceCell.querySelector('input[type="range"]').parentElement.classList.contains('manager-v2-drop-rate-control'));
+    const modifierPills = populatedDropRow.querySelectorAll('.manager-v2-drop-modifier-pill');
+    assert.equal(modifierPills.length, 3);
+    assert.ok(Array.from(modifierPills).some(pill => pill.classList.contains('is-positive') && pill.textContent.includes('Deep Night') && pill.textContent.includes('+20%')));
+    assert.ok(Array.from(modifierPills).some(pill => pill.classList.contains('is-negative') && pill.textContent.includes('Clear Sky') && pill.textContent.includes('-15%')));
+    assert.ok(Array.from(modifierPills).some(pill => pill.classList.contains('is-neutral') && pill.textContent.includes('High Day') && pill.textContent.includes('+0%')));
+    const dropActionButtons = populatedDropRow.querySelectorAll('[data-gathering-task-drop-actions] .manager-v2-icon-button');
+    assert.equal(dropActionButtons.length, 2);
+    assert.equal(populatedDropRow.querySelector('[aria-label="Select drop rule"]'), null);
+    assert.ok(populatedDropRow.querySelector('[aria-label="Duplicate drop rule"]'));
+    assert.ok(populatedDropRow.querySelector('[aria-label="Delete drop rule"]'));
     const mediaColumn = coreEditor.querySelector('.manager-v2-task-media-column');
     const taskImagePicker = coreEditor.querySelector('.manager-v2-task-image-picker');
     const taskStatus = coreEditor.querySelector('.manager-v2-task-core-status');
@@ -2560,8 +2582,26 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     const addCall = calls.findLast(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.componentId === '' && row.dropRate === 25 && row.enabled === false));
     assert.ok(addCall, 'add drop should persist an unresolved selected drop row');
     const addedRow = addCall[3].dropRows.find(row => row.componentId === '');
-    assert.ok(target.querySelector(`[data-gathering-task-drop-id="${addedRow.id}"] [data-gathering-task-drop-zone]`));
-    assert.ok(target.textContent.includes('or create/select component'));
+    const addedDropRow = target.querySelector(`[data-gathering-task-drop-id="${addedRow.id}"]`);
+    assert.ok(addedDropRow.querySelector('[data-gathering-task-drop-zone]'));
+    assert.ok(addedDropRow.textContent.includes('No Component'));
+    assert.ok(addedDropRow.textContent.includes('Create or assign'));
+    assert.equal(addedDropRow.querySelector('[aria-label="Select drop rule"]'), null);
+    target.querySelector('[data-gathering-task-drop-id="drop-nightshade"]').click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-gathering-task-drop-inspector]').textContent.includes('Nightshade With An Exceptionally Long Localized Component Name'));
+    addedDropRow.click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('[data-gathering-task-drop-inspector] select').value, '');
+    target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] [aria-label="Duplicate drop rule"]')
+      .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] [aria-label="Delete drop rule"]')
+      .dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }));
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('[data-gathering-task-drop-inspector] select').value, '');
 
     const componentSelect = target.querySelector('[data-gathering-task-drop-inspector] select');
     componentSelect.value = 'c2';

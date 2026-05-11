@@ -622,6 +622,14 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'data-gathering-task-drops-table',
       'data-gathering-task-availability-option',
       'data-gathering-task-availability-pill',
+      'data-gathering-task-drop-component-cell',
+      'data-gathering-task-drop-chance-cell',
+      'data-gathering-task-drop-actions',
+      'manager-v2-drop-component-cell',
+      'manager-v2-drop-modifier-pill',
+      'manager-v2-drop-modifier-list',
+      'manager-v2-drop-rate-value',
+      'manager-v2-drop-rate-tier-track',
       'use:dragDrop',
       'onImportDrop(rowId, data)',
       'onPickImagePath',
@@ -638,6 +646,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(!gatheringTaskEditSource.includes('type="checkbox"'), 'task editor status toggle should use the shared button pattern');
     assert.ok(!gatheringTaskEditSource.includes('<select value={selectedCondition'), 'task availability should not use native single-select controls');
     assert.ok(!gatheringTaskEditSource.includes('function selectedCondition('), 'task availability should not collapse arrays to a single selection');
+    assert.ok(!gatheringTaskEditSource.includes('Tasks.SelectDrop'), 'drop rows should not render a row-level edit/select quick action');
     assert.ok(gatheringTaskEditSource.includes('manager-v2-task-media-column'), 'task editor should group image and status in the media column');
     assert.ok(gatheringTaskEditSource.includes('availableConditionOptions'), 'task editor should filter selected availability options out of menus');
     assert.ok(gatheringTaskEditSource.includes('selectedConditionOptions'), 'task editor should render selected availability values as pills');
@@ -645,6 +654,8 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(gatheringTaskEditSource.includes('StatusOn'), 'task editor should use shared On status copy');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.EmptyTitle, 'No gathering tasks yet');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChance, 'Drop chance');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.NoComponent, 'No Component');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.CreateOrAssign, 'Create or assign');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.TaskIdentity, undefined);
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.TaskId, undefined);
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask, 'New Gathering Task');

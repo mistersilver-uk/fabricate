@@ -24,6 +24,8 @@ The editor updates through `updateGatheringLibraryTask`, preserving the existing
 
 Task editor fields use the Manager V2 library immediate-save convention: field edits call the store update path directly and the Back to task library control returns to the browser. The table keeps chance and quantity inline for fast scan-and-tune edits, while the right inspector owns detailed component assignment, modifier editing, and final chance diagnostics.
 
+The drop rules section reserves a larger bounded scroll region in the central editor so a GM can scan and tune several rules without losing the inspector. At normal Manager V2 widths, each drop rule stays on one horizontal grid row: the component cell shows thumbnail, name, and reference copy; the chance cell keeps the percent and slider together over a flat token-based rarity tier track; quantity stays compact; modifiers render as signed condition chips; and row actions are limited to duplicate/delete. Narrow shells may still stack cells once the row cannot remain readable.
+
 Rendered validation should cover both a normal desktop manager window and a narrow manager width where the editor table stacks before columns become unreadable.
 
 ## Rules Notice

@@ -18,8 +18,7 @@
     onUpdateDrop = () => {},
     onDuplicateDrop = () => {},
     onDeleteDrop = () => {},
-    onImportDrop = () => {},
-    onShowComponents = () => {}
+    onImportDrop = () => {}
   } = $props();
 
   let searchTerm = $state('');
@@ -146,6 +145,11 @@
     return managedItem(row?.componentId)?.img || 'icons/svg/item-bag.svg';
   }
 
+  function componentDescription(row) {
+    const item = managedItem(row?.componentId);
+    return item?.sourceItemUuid || row?.itemUuid || row?.componentId || item?.description || text('FABRICATE.Admin.ManagerV2.Environment.Tasks.UnresolvedDrop', 'Unresolved drop');
+  }
+
   function modifierEntries(row) {
     const modifiers = row?.conditionModifiers || {};
     return [
@@ -156,15 +160,24 @@
 
   function modifierLabel(entry) {
     const options = entry.kind === 'weather' ? weatherOptions : timeOfDayOptions;
-    const label = conditionLabel((options || []).find(option => conditionId(option) === entry.conditionId)) || entry.conditionId;
+    return conditionLabel((options || []).find(option => conditionId(option) === entry.conditionId)) || entry.conditionId;
+  }
+
+  function modifierIcon(entry) {
+    const options = entry.kind === 'weather' ? weatherOptions : timeOfDayOptions;
+    const option = (options || []).find(option => conditionId(option) === entry.conditionId);
+    return conditionIcon(option || { icon: entry.kind === 'weather' ? 'fas fa-cloud-sun' : 'fas fa-clock' });
+  }
+
+  function modifierValueLabel(entry) {
     const sign = Number(entry.value || 0) >= 0 ? '+' : '';
-    return `${label} ${sign}${Number(entry.value || 0)}%`;
+    return `${sign}${Number(entry.value || 0)}%`;
   }
 
   function modifierClass(value) {
     const number = Number(value || 0);
-    if (number < 0) return 'is-danger';
-    if (number > 0) return 'is-active';
+    if (number < 0) return 'is-negative';
+    if (number > 0) return 'is-positive';
     return 'is-neutral';
   }
 
@@ -341,57 +354,79 @@
               <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Column.Actions', 'Actions')}</span>
             </div>
             {#each paginatedRows as row (row.id)}
-              <div class={`manager-v2-gathering-task-drop-row ${selectedDrop?.id === row.id ? 'is-selected' : ''}`} role="row" data-gathering-task-drop-id={row.id} aria-selected={selectedDrop?.id === row.id}>
-                <span role="cell" class="manager-v2-labeled-cell" data-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropComponent', 'Component')}>
+              <div
+                class={`manager-v2-gathering-task-drop-row ${selectedDrop?.id === row.id ? 'is-selected' : ''}`}
+                role="row"
+                data-gathering-task-drop-id={row.id}
+                aria-selected={selectedDrop?.id === row.id}
+                tabindex="0"
+                onclick={() => onSelectDrop(row.id)}
+                onkeydown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelectDrop(row.id); } }}
+              >
+                <span role="cell" class="manager-v2-labeled-cell manager-v2-drop-component-cell" data-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropComponent', 'Component')} data-gathering-task-drop-component-cell>
                   {#if row.componentId || row.itemUuid}
-                    <button type="button" class="manager-v2-gathering-task-identity" onclick={() => onSelectDrop(row.id)}>
+                    <button type="button" class="manager-v2-gathering-task-identity manager-v2-drop-component-button" onclick={(event) => { event.stopPropagation(); onSelectDrop(row.id); }} onkeydown={(event) => event.stopPropagation()}>
                       <img class="manager-v2-gathering-task-thumb" src={componentImage(row)} alt="" />
                       <span class="manager-v2-system-copy">
                         <span class="manager-v2-system-name">{componentLabel(row)}</span>
-                        <span class="manager-v2-system-description">{row.componentId || row.itemUuid}</span>
+                        <span class="manager-v2-system-description">{componentDescription(row)}</span>
                       </span>
                     </button>
                   {:else}
-                    <div class="manager-v2-gathering-task-identity is-empty">
-                      <span class="manager-v2-empty-drop-cell">
-                        <span
-                          class="manager-v2-inline-drop-zone"
-                          use:dragDrop={{ onDrop: (data) => handleDropZoneDrop(row.id, data), activeClass: 'is-drop-active' }}
-                          data-gathering-task-drop-zone={row.id}
-                        >
-                          <i class="fas fa-file-import" aria-hidden="true"></i>
-                          <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropComponentHere', 'Drop component here')}</span>
-                        </span>
-                        <button type="button" class="manager-v2-empty-drop-action" onclick={(event) => { event.stopPropagation(); onShowComponents(row.id); }}>
-                          {text('FABRICATE.Admin.ManagerV2.Environment.Tasks.OrCreateComponent', 'or create/select component')}
-                        </button>
+                    <div class="manager-v2-gathering-task-identity manager-v2-drop-empty-component is-empty">
+                      <span
+                        class="manager-v2-inline-drop-zone"
+                        use:dragDrop={{ onDrop: (data) => handleDropZoneDrop(row.id, data), activeClass: 'is-drop-active' }}
+                        data-gathering-task-drop-zone={row.id}
+                      >
+                        <i class="fas fa-file-import" aria-hidden="true"></i>
+                      </span>
+                      <span class="manager-v2-system-copy">
+                        <span class="manager-v2-system-name">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.NoComponent', 'No Component')}</span>
+                        <span class="manager-v2-system-description">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.CreateOrAssign', 'Create or assign')}</span>
                       </span>
                     </div>
                   {/if}
                 </span>
-                <span role="cell" class="manager-v2-labeled-cell manager-v2-drop-rate-cell" data-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChance', 'Drop chance')}>
-                  <input type="range" min="0" max="100" step="1" value={row.dropRate ?? 1} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChance', 'Drop chance')} oninput={(event) => onUpdateDrop(row.id, { dropRate: Number(event.currentTarget.value) })} />
-                  <strong>{row.dropRate ?? 1}%</strong>
+                <span role="cell" class="manager-v2-labeled-cell manager-v2-drop-rate-cell" data-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChance', 'Drop chance')} data-gathering-task-drop-chance-cell>
+                  <span class="manager-v2-drop-rate-value">
+                    <strong>{row.dropRate ?? 1}%</strong>
+                    <span class="manager-v2-drop-rate-control">
+                      <span class="manager-v2-drop-rate-tier-track" aria-hidden="true">
+                        <span class="is-mythic"></span>
+                        <span class="is-very-rare"></span>
+                        <span class="is-rare"></span>
+                        <span class="is-uncommon"></span>
+                        <span class="is-common"></span>
+                      </span>
+                      <input type="range" min="0" max="100" step="1" value={row.dropRate ?? 1} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChance', 'Drop chance')} oninput={(event) => onUpdateDrop(row.id, { dropRate: Number(event.currentTarget.value) })} onclick={(event) => event.stopPropagation()} onkeydown={(event) => event.stopPropagation()} />
+                    </span>
+                  </span>
                 </span>
                 <span role="cell" class="manager-v2-labeled-cell" data-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Quantity', 'Quantity')}>
                   <label class="manager-v2-quantity-input">
-                    <input type="number" min="1" step="1" value={row.quantity || 1} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Quantity', 'Quantity')} oninput={(event) => onUpdateDrop(row.id, { quantity: Number(event.currentTarget.value || 1) })} />
+                    <input type="number" min="1" step="1" value={row.quantity || 1} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Quantity', 'Quantity')} oninput={(event) => onUpdateDrop(row.id, { quantity: Number(event.currentTarget.value || 1) })} onclick={(event) => event.stopPropagation()} onkeydown={(event) => event.stopPropagation()} />
                     <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.QuantityShortHint', 'award')}</span>
                   </label>
                 </span>
                 <span role="cell" class="manager-v2-chip-row manager-v2-labeled-cell" data-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Modifiers', 'Modifiers')}>
-                  {#if modifierEntries(row).length > 0}
-                    {#each modifierEntries(row) as modifier (modifier.id)}
-                      <span class={`manager-v2-chip ${modifierClass(modifier.value)}`}>{modifierLabel(modifier)}</span>
-                    {/each}
-                  {:else}
-                    <span class="manager-v2-chip is-neutral">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.NoModifiers', 'Not specified')}</span>
-                  {/if}
+                  <span class="manager-v2-drop-modifier-list">
+                    {#if modifierEntries(row).length > 0}
+                      {#each modifierEntries(row) as modifier (modifier.id)}
+                        <span class={`manager-v2-chip manager-v2-drop-modifier-pill ${modifierClass(modifier.value)}`}>
+                          <i class={modifierIcon(modifier)} aria-hidden="true"></i>
+                          <span>{modifierLabel(modifier)}</span>
+                          <strong>{modifierValueLabel(modifier)}</strong>
+                        </span>
+                      {/each}
+                    {:else}
+                      <span class="manager-v2-chip is-neutral">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.NoModifiers', 'Not specified')}</span>
+                    {/if}
+                  </span>
                 </span>
-                <span role="cell" class="manager-v2-action-group manager-v2-labeled-cell" data-label={text('FABRICATE.Admin.ManagerV2.Column.Actions', 'Actions')}>
-                  <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SelectDrop', 'Select drop rule')} onclick={() => onSelectDrop(row.id)}><i class="fas fa-pen" aria-hidden="true"></i></button>
-                  <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DuplicateDrop', 'Duplicate drop rule')} onclick={() => onDuplicateDrop(row.id)}><i class="fas fa-copy" aria-hidden="true"></i></button>
-                  <button type="button" class="manager-v2-icon-button is-danger" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DeleteDrop', 'Delete drop rule')} onclick={() => onDeleteDrop(row.id)}><i class="fas fa-trash" aria-hidden="true"></i></button>
+                <span role="cell" class="manager-v2-action-group manager-v2-labeled-cell manager-v2-drop-actions" data-label={text('FABRICATE.Admin.ManagerV2.Column.Actions', 'Actions')} data-gathering-task-drop-actions>
+                  <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DuplicateDrop', 'Duplicate drop rule')} onclick={(event) => { event.stopPropagation(); onDuplicateDrop(row.id); }} onkeydown={(event) => event.stopPropagation()}><i class="fas fa-copy" aria-hidden="true"></i></button>
+                  <button type="button" class="manager-v2-icon-button is-danger" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DeleteDrop', 'Delete drop rule')} onclick={(event) => { event.stopPropagation(); onDeleteDrop(row.id); }} onkeydown={(event) => event.stopPropagation()}><i class="fas fa-trash" aria-hidden="true"></i></button>
                 </span>
               </div>
             {/each}

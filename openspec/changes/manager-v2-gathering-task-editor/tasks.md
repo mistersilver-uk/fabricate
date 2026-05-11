@@ -36,3 +36,11 @@
 - [x] Add or update focused mounted/layout/contract tests.
 - [ ] Capture normal and narrow rendered evidence for the task editor when live Foundry/Vite validation is available.
 - [x] Run targeted tests, `npm test`, and `npm run build`.
+
+## 6. Drop Rules Row Expansion
+
+- [x] Expand the central drop rules card height and keep its table in a bounded vertical scroll region.
+- [x] Rework drop rule rows into single-line desktop grid rows with compact component, chance, quantity, modifiers, and duplicate/delete action cells.
+- [x] Add empty component copy for `No Component` and `Create or assign`.
+- [x] Update mounted/layout/contract tests for the expanded row layout and removed edit quick action.
+- [x] Run targeted tests, `npm test`, and `npm run build`.
