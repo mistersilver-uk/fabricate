@@ -908,6 +908,7 @@
             "SelectComponent": "Select a component",
             "DropChance": "Drop chance",
             "DropChancePercent": "Drop chance percent",
+            "DropQuantityColumn": "Count",
             "Quantity": "Quantity",
             "QuantityShortHint": "award",
             "Modifiers": "Modifiers",

@@ -479,7 +479,7 @@
             <div class="manager-v2-table-head manager-v2-gathering-task-drop-table-head" role="row">
               <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropComponent', 'Component')}</span>
               <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChance', 'Drop chance')}</span>
-              <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Quantity', 'Quantity')}</span>
+              <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropQuantityColumn', '#')}</span>
               <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Modifiers', 'Modifiers')}</span>
               <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Column.Actions', 'Actions')}</span>
             </div>

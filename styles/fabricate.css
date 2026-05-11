@@ -9009,7 +9009,7 @@
 }
 
 .fabricate-manager-v2 .manager-v2-gathering-task-drops-table {
-  --fab-mv2-task-drop-grid: minmax(0, 1.2fr) minmax(180px, 1.12fr) 74px minmax(0, 1fr) 88px;
+  --fab-mv2-task-drop-grid: minmax(0, 1.2fr) minmax(198px, 1.2fr) 56px minmax(0, 1fr) 88px;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -9281,10 +9281,22 @@
 
 .fabricate-manager-v2 .manager-v2-drop-quantity-cell input[type="text"] {
   width: 100%;
-  max-width: 52px;
+  max-width: 44px;
   min-width: 0;
-  text-align: right;
+  box-sizing: border-box;
+  text-align: center;
   font-variant-numeric: tabular-nums;
+}
+
+.fabricate-manager-v2 .manager-v2-gathering-task-drop-row > .manager-v2-drop-quantity-cell {
+  display: flex;
+  justify-content: center;
+  padding: 6px;
+}
+
+.fabricate-manager-v2 .manager-v2-gathering-task-edit-view .manager-v2-drop-quantity-cell input[type="text"] {
+  min-height: 28px;
+  padding: 4px;
 }
 
 .fabricate-manager-v2 .manager-v2-gathering-task-drop-row:hover {
@@ -10201,7 +10213,7 @@
   }
 
   .fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"] .manager-v2-gathering-task-drops-table {
-    --fab-mv2-task-drop-grid: minmax(0, 1.32fr) minmax(118px, 0.78fr) 72px minmax(0, 0.92fr) 88px;
+    --fab-mv2-task-drop-grid: minmax(0, 1.32fr) minmax(136px, 0.9fr) 54px minmax(0, 0.92fr) 88px;
   }
 
   .fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"] .manager-v2-task-drops-card .manager-v2-task-card-header {

@@ -381,7 +381,9 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const positiveDropModifierPillBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-modifier-pill.is-positive');
   const negativeDropModifierPillBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-modifier-pill.is-negative');
   const dropActionsBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-actions');
+  const dropQuantityCellBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-drop-row > .manager-v2-drop-quantity-cell');
   const dropQuantityInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-quantity-cell input[type="text"]');
+  const dropQuantityInputOverrideBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-edit-view .manager-v2-drop-quantity-cell input[type="text"]');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager-v2 (max-width: 1120px)'));
   const taskEditorIntermediateQuery = css.slice(css.indexOf('@container fabricate-manager-v2 (max-width: 1320px)'), css.indexOf('@container fabricate-manager-v2 (max-width: 1120px)'));
 
@@ -404,7 +406,7 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(dropScrollBlock.includes('padding: 10px 0 0;'), 'drop rules table scroll region should not add horizontal inset');
   assert.ok(dropScrollBlock.includes('overflow-x: hidden;') && dropScrollBlock.includes('overflow-y: auto;'), 'drop rules table should suppress horizontal scroll while retaining vertical scrolling');
   assert.ok(dropTableBlock.includes('--fab-mv2-task-drop-grid:'), 'task editor drop rows should define compact desktop geometry');
-  assert.ok(dropTableBlock.includes('minmax(0, 1.2fr)') && dropTableBlock.includes('minmax(180px, 1.12fr)') && dropTableBlock.includes('88px'), 'drop row desktop grid should give more room to chance while preserving horizontal action columns');
+  assert.ok(dropTableBlock.includes('minmax(0, 1.2fr)') && dropTableBlock.includes('minmax(198px, 1.2fr)') && dropTableBlock.includes('56px') && dropTableBlock.includes('88px'), 'drop row desktop grid should make quantity narrower and give more room to chance while preserving horizontal action columns');
   assert.ok(dropTableBlock.includes('width: 100%;') && dropTableBlock.includes('max-width: 100%;'), 'drop table should fill the drop rules card without exceeding it');
   assert.ok(dropTableHeadBlock.includes('padding: 0;'), 'drop rules header row should clear generic table-head padding so columns align with value rows');
   assert.ok(dropRowBlock.includes('grid-template-columns: var(--fab-mv2-task-drop-grid);'), 'drop rows should use the shared single-line editor grid');
@@ -442,12 +444,15 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
       && noneDropRateControlBlock.includes('var(--fab-drop-rate-none)'),
     'drop chance control classes should map the selected rarity palette to the current value'
   );
-  assert.ok(dropQuantityInputBlock.includes('max-width: 52px;') && dropQuantityInputBlock.includes('font-variant-numeric: tabular-nums;'), 'quantity should remain a compact numeric text input');
+  assert.ok(dropQuantityCellBlock.includes('display: flex;') && dropQuantityCellBlock.includes('justify-content: center;') && dropQuantityCellBlock.includes('padding: 6px;'), 'quantity cells should spend less horizontal space while centering the input');
+  assert.ok(dropQuantityInputBlock.includes('max-width: 44px;') && dropQuantityInputBlock.includes('box-sizing: border-box;') && dropQuantityInputBlock.includes('text-align: center;') && dropQuantityInputBlock.includes('font-variant-numeric: tabular-nums;'), 'quantity should remain a compact numeric text input sized for three digits');
+  assert.ok(dropQuantityInputOverrideBlock.includes('min-height: 28px;') && dropQuantityInputOverrideBlock.includes('padding: 4px;'), 'quantity should override generic gathering input padding without widening the column');
   assert.ok(dropModifierListBlock.includes('flex-wrap: nowrap;') && dropModifierListBlock.includes('overflow: hidden;'), 'drop modifiers should remain a single clipped content group');
   assert.ok(dropModifierPillBlock.includes('background: var(--fab-overlay-light-06);'), 'drop modifier pills should use restrained neutral chip backgrounds');
   assert.ok(positiveDropModifierPillBlock.includes('color: var(--fab-mv2-text);') && negativeDropModifierPillBlock.includes('color: var(--fab-mv2-text);'), 'drop modifier chips should avoid saturated text across the whole pill');
   assert.ok(dropActionsBlock.includes('flex-wrap: nowrap;') && dropActionsBlock.includes('gap: 6px;') && dropActionsBlock.includes('padding: 6px 7px;'), 'drop row actions should stay on one horizontal line');
   assert.equal(taskEditorIntermediateQuery.includes('.manager-v2-gathering-task-drop-row {\n    grid-template-columns: minmax(0, 1fr);'), false, 'task editor should not stack drop rows at the intermediate desktop width');
+  assert.ok(taskEditorIntermediateQuery.includes('minmax(136px, 0.9fr) 54px'), 'intermediate task editor drop grid should keep quantity narrow and preserve drop chance width');
   assert.ok(
     mediumQuery.includes('.fabricate-manager-v2 .manager-v2-gathering-task-drop-table-head,\n  .fabricate-manager-v2 .manager-v2-gathering-task-drop-row') && mediumQuery.includes('grid-template-columns: var(--fab-mv2-task-drop-grid);'),
     'medium manager-v2 layout should preserve the drop row grid and headers instead of duplicate row labels'
