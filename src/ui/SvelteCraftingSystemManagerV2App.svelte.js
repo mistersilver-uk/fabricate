@@ -6,6 +6,7 @@ import { confirmDialog } from './foundryCompat.js';
 
 export class SvelteCraftingSystemManagerV2App extends SvelteRecipeManagerApp {
   static SVELTE_COMPONENT = CraftingSystemManagerV2Root;
+  static _pendingReadyOpen = false;
 
   _confirmDiscardDirtyEssenceDraft = null;
 
@@ -66,9 +67,37 @@ export class SvelteCraftingSystemManagerV2App extends SvelteRecipeManagerApp {
       ui.notifications.error(localize('FABRICATE.Admin.ManagerV2.GMOnly'));
       return null;
     }
+
+    if (!this._isFabricateReady()) {
+      ui.notifications.warn(localize('FABRICATE.Admin.ManagerV2.StartupPending'));
+      if (!SvelteCraftingSystemManagerV2App._pendingReadyOpen) {
+        SvelteCraftingSystemManagerV2App._pendingReadyOpen = true;
+        const openWhenReady = () => {
+          SvelteCraftingSystemManagerV2App._pendingReadyOpen = false;
+          if (!game.user.isGM) return;
+          const app = new SvelteCraftingSystemManagerV2App();
+          app.render(true);
+        };
+        const hooks = globalThis.Hooks;
+        if (typeof hooks?.once === 'function') {
+          hooks.once('fabricate.ready', openWhenReady);
+        } else {
+          SvelteCraftingSystemManagerV2App._pendingReadyOpen = false;
+        }
+      }
+      return null;
+    }
+
     const app = new SvelteCraftingSystemManagerV2App();
     app.render(true);
     return app;
+  }
+
+  static _isFabricateReady() {
+    const fabricate = game?.fabricate;
+    return fabricate?.ready === true
+      && fabricate?.getRecipeManager?.()?.initialized === true
+      && fabricate?.getCraftingSystemManager?.()?.initialized === true;
   }
 }
 

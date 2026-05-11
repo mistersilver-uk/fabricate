@@ -27,8 +27,8 @@ Each environment belongs to one crafting system and stores:
 | **Description** | Optional notes shown by the authoring UI |
 | **Enabled** | Disabled environments are ignored by normal player listing |
 | **Selection Mode** | `targeted` for multiple visible tasks, or `blind` for exactly one opaque task |
-| **Region** | Optional single region tag used to match reusable tasks and hazards |
-| **Biomes** | Optional biome tags used to match reusable tasks and hazards |
+| **Region** | Optional single region tag used to match Gathering Tasks and hazards |
+| **Biomes** | Optional biome tags used to match Gathering Tasks and hazards |
 | **Danger Tags** | Optional danger tags used to match reusable hazards |
 | **Scene UUID** | Optional scene gate for environments tied to a specific scene |
 
@@ -67,17 +67,19 @@ Manager V2 stores d100 gathering rules per selected crafting system under `gathe
 
 Legacy per-task item selection, per-environment hazard selection, and per-environment hazard policy fields may still be read when an existing system has no `rules` object. Manager V2 no longer exposes those fields as authoring controls.
 
-## Reusable Task And Hazard Libraries
+## Gathering Task And Hazard Libraries
 
-Manager V2 exposes reusable task and hazard authoring for the selected crafting system. Environments compose those reusable records by matching environment region, biome, danger, and the current global weather/time state. GMs can toggle matched task and hazard records on or off per environment; row details stay behind expandable library rows so the environment workspace remains scan-friendly.
+Manager V2 exposes the selected crafting system's Gathering Tasks from the Gathering **Tasks** tab. The task browser supports search, status/region/biome/availability filters, pagination, row selection, enabled toggles, duplicate/delete actions, and a right-side inspector with availability, matching-environment count, and drop summaries. The row **Edit** action opens a one-page Gathering Task editor for identity, availability, drop rules, unresolved drop rows, and selected-drop modifier tuning.
 
-Reusable task records support:
+Environment authoring still composes Gathering Tasks and reusable hazards by matching environment region, biome, danger, and the current global weather and time-of-day state. GMs can toggle matched task and hazard records on or off per environment. Reusable hazard authoring is not part of this slice.
+
+Gathering Task records support:
 
 | Field | Description |
 |:------|:------------|
 | **Name, description, image, enabled** | GM-authored task identity and availability |
 | **Region, biomes, weather, time of day** | Optional match tags; empty means any |
-| **Drop rows** | Ordered d100 item/component rows with quantity and `dropRate` from 1 to 100. Authored order is the rank used by system Gathering Rules. |
+| **Drop rows** | Ordered d100 item/component rows with quantity, `dropRate` from 0 to 100, and optional per-drop time/weather modifiers. Authored order is the rank used by system Gathering Rules. |
 | **Stamina and modifiers** | Optional stamina cost and gathering roll modifier provider |
 
 Reusable hazard records support:
@@ -89,17 +91,19 @@ Reusable hazard records support:
 | **Drop rate** | d100 hazard trigger rate from 1 to 100 |
 | **Modifier** | Optional hazard roll modifier provider |
 
-Disabled reusable tasks and hazards never match for player gathering.
+Disabled Gathering Tasks and hazards never match for player gathering.
 
 ## D100 Resolution
 
-Reusable gathering tasks use gathering-native d100 rows. For each enabled item row, Fabricate rolls `d100 + gatheringModifier`; the row drops when the effective roll is at least `101 - dropRate`. Matched enabled hazards roll independently with `d100 + hazardModifier` and the same threshold rule.
+Gathering Tasks use gathering-native d100 rows. Task-level weather and time-of-day availability gates decide whether the task can be attempted. For each enabled item row, Fabricate computes `finalDropRate = clamp(dropRate + matching drop-level time/weather modifiers, 0, 100)`, rolls `d100 + gatheringModifier`, and drops the row when the effective roll is at least `101 - finalDropRate`. Gathering modifiers affect the d100 roll, not the final drop chance. Matched enabled hazards roll independently with `d100 + hazardModifier` and their authored hazard drop-rate threshold.
+
+Drop-level modifiers do not make an unavailable task available. They only adjust individual row chance after the task already matches. Multiple rows can reference the same component with different quantities and chances; each row rolls independently before the selected system's Gathering Rules choose awarded rows.
 
 The selected crafting system's Gathering Rules choose reward and hazard rows after rolling. `highestRankedDrop` selects the first successful row by authored order, `allDrops` selects every successful row, and `limitedDrops` selects the first `N` successful rows by authored order. `successWithHazard` records selected hazards while the gathering still succeeds. `failureWithHazard` records selected hazards and makes the attempt fail, so no selected rewards are awarded. If no hazards are enabled or matched, the environment is mechanically safe even when danger tags are present.
 
 ## Task Authoring
 
-An environment contains one or more gathering tasks. The current GM editor supports selected-task authoring for:
+An environment contains one or more Environment Tasks. The current GM editor supports selected Environment Task authoring for:
 
 | Area | Supported fields |
 |:-----|:-----------------|

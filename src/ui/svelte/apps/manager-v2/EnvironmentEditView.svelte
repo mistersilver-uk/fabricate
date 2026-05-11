@@ -1167,10 +1167,10 @@
         <section>
           <div class="manager-v2-edit-card-heading">
             <div>
-              <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Environment.ReusableTasks', 'Reusable tasks')}</p>
+              <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Environment.ReusableTasks', 'Gathering Tasks')}</p>
               <h4>{libraryTasks.length}</h4>
             </div>
-            <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.AddReusableTask', 'Add reusable task')} title={text('FABRICATE.Admin.ManagerV2.Environment.AddReusableTask', 'Add reusable task')} onclick={() => onAddGatheringLibraryTask?.(environmentDraft?.craftingSystemId)}>
+            <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.AddReusableTask', 'Add gathering task')} title={text('FABRICATE.Admin.ManagerV2.Environment.AddReusableTask', 'Add gathering task')} onclick={() => onAddGatheringLibraryTask?.(environmentDraft?.craftingSystemId)}>
               <i class="fas fa-plus" aria-hidden="true"></i>
             </button>
           </div>
@@ -1195,16 +1195,16 @@
                   <label class="manager-v2-field"><span>{text('FABRICATE.Admin.ManagerV2.Environment.MatchWeather', 'Match weather')}</span><input value={tagCsv(task.weather)} oninput={(event) => onUpdateGatheringLibraryTask?.(environmentDraft?.craftingSystemId, task.id, { weather: parseTags(event.target.value) })} /></label>
                   <label class="manager-v2-field"><span>{text('FABRICATE.Admin.ManagerV2.Environment.MatchTimeOfDay', 'Match time')}</span><input value={tagCsv(task.timeOfDay)} oninput={(event) => onUpdateGatheringLibraryTask?.(environmentDraft?.craftingSystemId, task.id, { timeOfDay: parseTags(event.target.value) })} /></label>
                   <label class="manager-v2-field"><span>{text('FABRICATE.Admin.ManagerV2.Environment.DropComponent', 'Drop component')}</span><select value={row.componentId || ''} onchange={(event) => updateTaskFirstDropRow(task, { componentId: event.target.value })}><option value=""></option>{#each managedItemOptions as item (item.id)}<option value={item.id}>{item.name}</option>{/each}</select></label>
-                  <label class="manager-v2-field"><span>{text('FABRICATE.Admin.ManagerV2.Environment.DropRate', 'Drop rate')}</span><input type="number" min="1" max="100" step="1" value={row.dropRate || 1} oninput={(event) => updateTaskFirstDropRow(task, { dropRate: Number(event.target.value || 1) })} /></label>
+                  <label class="manager-v2-field"><span>{text('FABRICATE.Admin.ManagerV2.Environment.DropRate', 'Drop rate')}</span><input type="number" min="0" max="100" step="1" value={row.dropRate ?? 1} oninput={(event) => updateTaskFirstDropRow(task, { dropRate: Number(event.target.value || 0) })} /></label>
                   <label class="manager-v2-field"><span>{text('FABRICATE.Admin.ManagerV2.Environment.Quantity', 'Quantity')}</span><input type="number" min="1" step="1" value={row.quantity || 1} oninput={(event) => updateTaskFirstDropRow(task, { quantity: Number(event.target.value || 1) })} /></label>
                 </div>
                 <button type="button" class="manager-v2-button is-danger" onclick={() => onDeleteGatheringLibraryTask?.(environmentDraft?.craftingSystemId, task.id)}>
                   <i class="fas fa-trash" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.DeleteReusableTask', 'Delete reusable task')}</span>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.DeleteReusableTask', 'Delete gathering task')}</span>
                 </button>
               </details>
             {:else}
-              <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Environment.NoReusableTasks', 'No reusable tasks yet.')}</p>
+              <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Environment.NoReusableTasks', 'No gathering tasks yet.')}</p>
             {/each}
           </div>
         </section>

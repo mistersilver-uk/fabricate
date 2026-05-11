@@ -8,6 +8,7 @@
   import EnvironmentsBrowserView from './EnvironmentsBrowserView.svelte';
   import EssenceBrowserView from './EssenceBrowserView.svelte';
   import EssenceEditView from './EssenceEditView.svelte';
+  import GatheringTaskEditView from './GatheringTaskEditView.svelte';
   import EssenceSourceSelector from '../../components/EssenceSourceSelector.svelte';
   import RecipesBrowserView from './RecipesBrowserView.svelte';
   import SystemEditView from './SystemEditView.svelte';
@@ -33,6 +34,8 @@
   let componentEditSaving = $state(false);
   let componentEditDraft = $state(null);
   let activeGatheringTab = $state('environments');
+  let selectedGatheringTaskId = $state('');
+  let selectedGatheringDropId = $state('');
   const placeholderViews = [
     { id: 'rules', icon: 'fas fa-sliders-h', labelKey: 'FABRICATE.Admin.ManagerV2.Nav.Rules', fallback: 'Rules' },
     { id: 'graph', icon: 'fas fa-project-diagram', labelKey: 'FABRICATE.Admin.ManagerV2.Nav.Graph', fallback: 'Graph' }
@@ -40,6 +43,7 @@
 
   const selectedSystem = $derived($viewState.selectedSystem);
   const selectedSystemId = $derived(selectedSystem?.id || '');
+  const systemsLoading = $derived($viewState.systemsLoading === true);
   const canShowEnvironments = $derived(selectedSystem?.features?.gathering === true);
   const canShowEssences = $derived(selectedSystem?.features?.essences === true);
   const showEssenceSourceUi = $derived(selectedSystem?.features?.effectTransfer === true);
@@ -142,10 +146,10 @@
     {
       id: 'tasks',
       icon: 'fas fa-list-check',
-      titleKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksPlaceholderTitle',
-      titleFallback: 'Gathering tasks',
-      hintKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksPlaceholderHint',
-      hintFallback: 'Reusable gathering task management is planned for a later slice.'
+      titleKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksTitle',
+      titleFallback: 'Gathering Tasks',
+      hintKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksHint',
+      hintFallback: 'Browse gathering tasks before attaching them to environments.'
     },
     {
       id: 'encounters',
@@ -174,6 +178,18 @@
     hazardLimit: 1,
     hazardPolicy: 'successWithHazard'
   });
+  const selectedGatheringSystemConfig = $derived($viewState.gatheringConfig?.systems?.[selectedSystemId] || {});
+  const gatheringTaskDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.tasks) ? selectedGatheringSystemConfig.tasks : []);
+  const selectedGatheringTask = $derived(
+    gatheringTaskDefinitions.find(task => task.id === selectedGatheringTaskId)
+      || gatheringTaskDefinitions[0]
+      || null
+  );
+  const selectedGatheringDrop = $derived(
+    gatheringTaskDropRows(selectedGatheringTask).find(row => row.id === selectedGatheringDropId)
+      || gatheringTaskDropRows(selectedGatheringTask)[0]
+      || null
+  );
 
   $effect(() => {
     if (selectedSystemId === lastComponentSystemId) return;
@@ -196,13 +212,35 @@
   $effect(() => {
     if (selectedSystemId === lastGatheringSystemId) return;
     activeGatheringTab = 'environments';
+    selectedGatheringTaskId = '';
     lastGatheringSystemId = selectedSystemId;
   });
 
   $effect(() => {
     if (activeGatheringTab === 'environments') return;
     if (currentView === 'environments' && canShowEnvironments) return;
+    if (currentView === 'gathering-task-edit' && canShowEnvironments) return;
     activeGatheringTab = 'environments';
+  });
+
+  $effect(() => {
+    if (!canShowEnvironments) {
+      selectedGatheringTaskId = '';
+      selectedGatheringDropId = '';
+      return;
+    }
+    if (selectedGatheringTaskId && gatheringTaskDefinitions.some(task => task.id === selectedGatheringTaskId)) return;
+    selectedGatheringTaskId = gatheringTaskDefinitions[0]?.id || '';
+  });
+
+  $effect(() => {
+    if (!selectedGatheringTask) {
+      selectedGatheringDropId = '';
+      return;
+    }
+    const rows = gatheringTaskDropRows(selectedGatheringTask);
+    if (selectedGatheringDropId && rows.some(row => row.id === selectedGatheringDropId)) return;
+    selectedGatheringDropId = rows[0]?.id || '';
   });
 
   $effect(() => {
@@ -371,7 +409,7 @@
 
   function normalizedActiveView(view, system, environmentsAvailable, essencesAvailable) {
     if (!system) return 'systems';
-    if ((view === 'environments' || view === 'environment-edit') && !environmentsAvailable) return 'systems';
+    if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit') && !environmentsAvailable) return 'systems';
     if ((view === 'essences' || view === 'essence-edit') && !essencesAvailable) return 'systems';
     return view;
   }
@@ -405,8 +443,10 @@
     if (currentView === 'essence-edit') return isCreatingEssenceDraft
       ? text('FABRICATE.Admin.ManagerV2.Essence.CreateTitle', 'Create essence')
       : text('FABRICATE.Admin.ManagerV2.Essence.EditTitle', 'Edit essence');
+    if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksTitle', 'Gathering Tasks');
     if (currentView === 'environments') return text('FABRICATE.Admin.ManagerV2.Environment.Title', 'Environments');
     if (currentView === 'environment-edit') return text('FABRICATE.Admin.ManagerV2.Environment.EditTitle', 'Edit environment');
+    if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EditTitle', 'Edit gathering task');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.ManagerV2.SystemEdit.Title', 'System settings');
     return text('FABRICATE.Admin.ManagerV2.Title', 'Crafting systems');
   }
@@ -421,8 +461,10 @@
     if (currentView === 'essence-edit' && isCreatingEssenceDraft) return text('FABRICATE.Admin.ManagerV2.Essence.CreateNoSourceSubtitle', 'Define identity and icon for a new essence.');
     if (currentView === 'essence-edit' && showEssenceSourceUi) return text('FABRICATE.Admin.ManagerV2.Essence.EditSubtitle', 'Update identity, icon, and source linkage for this essence.');
     if (currentView === 'essence-edit') return text('FABRICATE.Admin.ManagerV2.Essence.EditNoSourceSubtitle', 'Update identity and icon for this essence.');
+    if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksHint', 'Browse gathering tasks before attaching them to environments.');
     if (currentView === 'environments') return text('FABRICATE.Admin.ManagerV2.Environment.Subtitle', 'Manage gathering environments for the selected crafting system.');
     if (currentView === 'environment-edit') return text('FABRICATE.Admin.ManagerV2.Environment.EditSubtitle', 'Edit scene linkage, environment details, tasks, results, catalysts, visibility, timing, and validation in the v2 workspace.');
+    if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EditSubtitle', 'Edit availability, identity, and drop rules for the selected gathering task.');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.ManagerV2.SystemEdit.Subtitle', 'Edit base settings for the selected crafting system without leaving manager v2.');
     return text('FABRICATE.Admin.ManagerV2.Subtitle', 'Manage the system definitions that organize Fabricate components, recipes, gathering, and feature rules.');
   }
@@ -449,6 +491,28 @@
     }
     if (result !== false) callback();
     return result;
+  }
+
+  function headerActionsLabel() {
+    if (currentView === 'recipes') return text('FABRICATE.Admin.ManagerV2.Recipe.Actions', 'Recipe actions');
+    if (currentView === 'components' || currentView === 'component-edit') return text('FABRICATE.Admin.ManagerV2.Component.Actions', 'Component actions');
+    if (currentView === 'tags') return text('FABRICATE.Admin.ManagerV2.TagsCategories.Actions', 'Tags and categories actions');
+    if (currentView === 'essences' || currentView === 'essence-edit') return text('FABRICATE.Admin.ManagerV2.Essence.Actions', 'Essence actions');
+    if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Actions', 'Gathering task actions');
+    if (currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit') return text('FABRICATE.Admin.ManagerV2.Environment.Actions', 'Environment actions');
+    if (currentView === 'system-edit') return text('FABRICATE.Admin.ManagerV2.SystemEdit.Actions', 'System edit actions');
+    return text('FABRICATE.Admin.ManagerV2.SystemActions', 'System actions');
+  }
+
+  function inspectorLabel() {
+    if (currentView === 'recipes') return text('FABRICATE.Admin.ManagerV2.Recipe.Inspector', 'Selected recipe inspector');
+    if (currentView === 'components') return text('FABRICATE.Admin.ManagerV2.Component.Inspector', 'Selected component inspector');
+    if (currentView === 'tags') return text('FABRICATE.Admin.ManagerV2.TagsCategories.Inspector', 'Tags and categories inspector');
+    if (currentView === 'essences' || currentView === 'essence-edit') return text('FABRICATE.Admin.ManagerV2.Essence.Inspector', 'Selected essence inspector');
+    if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Inspector', 'Selected gathering task inspector');
+    if (currentView === 'environments') return text('FABRICATE.Admin.ManagerV2.Environment.Inspector', 'Selected environment inspector');
+    if (currentView === 'system-edit') return text('FABRICATE.Admin.ManagerV2.SystemEdit.Inspector', 'System edit evidence');
+    return text('FABRICATE.Admin.ManagerV2.SelectedSystemInspector', 'Selected system inspector');
   }
 
   function finishEnvironmentRouteExit(confirmed) {
@@ -528,7 +592,7 @@
 
   function setView(view) {
     if ((view === 'recipes' || view === 'components' || view === 'component-edit' || view === 'tags' || view === 'system-edit') && !selectedSystem) return;
-    if ((view === 'environments' || view === 'environment-edit') && !canShowEnvironments) return;
+    if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit') && !canShowEnvironments) return;
     if ((view === 'essences' || view === 'essence-edit') && !canShowEssences) return;
     afterTruthyResult(confirmRouteExit(view), () => { activeView = view; });
   }
@@ -887,6 +951,172 @@
     store.deleteEnvironmentDraft?.(environmentId);
   }
 
+  function selectGatheringTask(taskId = selectedGatheringTask?.id) {
+    selectedGatheringTaskId = taskId || '';
+  }
+
+  function createGatheringTask(systemId = selectedSystemId) {
+    if (!systemId) return;
+    const created = store.addGatheringLibraryTask?.(systemId);
+    if (isPromise(created)) {
+      created.then(task => {
+        if (task?.id) selectedGatheringTaskId = task.id;
+      });
+      return;
+    }
+    if (created?.id) selectedGatheringTaskId = created.id;
+  }
+
+  function editGatheringTask(taskId = selectedGatheringTask?.id) {
+    if (!taskId || !canShowEnvironments) return;
+    selectedGatheringTaskId = taskId;
+    activeGatheringTab = 'tasks';
+    activeView = 'gathering-task-edit';
+  }
+
+  function backToGatheringTaskLibrary() {
+    activeGatheringTab = 'tasks';
+    activeView = 'environments';
+  }
+
+  function duplicateGatheringTask(systemId = selectedSystemId, taskId = selectedGatheringTask?.id) {
+    if (!systemId || !taskId) return;
+    const duplicated = store.duplicateGatheringLibraryTask?.(systemId, taskId);
+    if (isPromise(duplicated)) {
+      duplicated.then(task => {
+        if (task?.id) selectedGatheringTaskId = task.id;
+      });
+      return;
+    }
+    if (duplicated?.id) selectedGatheringTaskId = duplicated.id;
+  }
+
+  function deleteGatheringTask(systemId = selectedSystemId, taskId = selectedGatheringTask?.id) {
+    if (!systemId || !taskId) return;
+    const deleted = store.deleteGatheringLibraryTask?.(systemId, taskId);
+    if (isPromise(deleted)) {
+      deleted.then(value => {
+        if (value !== false && selectedGatheringTaskId === taskId) selectedGatheringTaskId = '';
+      });
+      return;
+    }
+    if (deleted !== false && selectedGatheringTaskId === taskId) selectedGatheringTaskId = '';
+  }
+
+  function toggleGatheringTaskEnabled(systemId = selectedSystemId, taskId = selectedGatheringTask?.id, enabled = true) {
+    if (!systemId || !taskId) return;
+    store.updateGatheringLibraryTask?.(systemId, taskId, { enabled });
+  }
+
+  function updateSelectedGatheringTask(updates = {}) {
+    if (!selectedSystemId || !selectedGatheringTask?.id) return false;
+    return store.updateGatheringLibraryTask?.(selectedSystemId, selectedGatheringTask.id, updates);
+  }
+
+  function gatheringDropRowId() {
+    return `drop-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  }
+
+  function addGatheringTaskDrop() {
+    if (!selectedGatheringTask) return;
+    const row = {
+      id: gatheringDropRowId(),
+      name: '',
+      componentId: '',
+      itemUuid: '',
+      quantity: 1,
+      dropRate: 25,
+      conditionModifiers: { timeOfDay: [], weather: [] },
+      enabled: false
+    };
+    selectedGatheringDropId = row.id;
+    updateSelectedGatheringTask({ dropRows: [...gatheringTaskDropRows(selectedGatheringTask), row] });
+  }
+
+  function updateGatheringTaskDrop(rowId, updates = {}) {
+    if (!selectedGatheringTask || !rowId) return;
+    const rows = gatheringTaskDropRows(selectedGatheringTask).map(row => row.id === rowId ? { ...row, ...updates } : row);
+    updateSelectedGatheringTask({ dropRows: rows });
+  }
+
+  function duplicateGatheringTaskDrop(rowId = selectedGatheringDrop?.id) {
+    if (!selectedGatheringTask || !rowId) return;
+    const rows = gatheringTaskDropRows(selectedGatheringTask);
+    const index = rows.findIndex(row => row.id === rowId);
+    if (index < 0) return;
+    const duplicate = { ...JSON.parse(JSON.stringify(rows[index])), id: gatheringDropRowId() };
+    selectedGatheringDropId = duplicate.id;
+    updateSelectedGatheringTask({ dropRows: [...rows.slice(0, index + 1), duplicate, ...rows.slice(index + 1)] });
+  }
+
+  function deleteGatheringTaskDrop(rowId = selectedGatheringDrop?.id) {
+    if (!selectedGatheringTask || !rowId) return;
+    const rows = gatheringTaskDropRows(selectedGatheringTask);
+    const index = rows.findIndex(row => row.id === rowId);
+    const nextRows = rows.filter(row => row.id !== rowId);
+    selectedGatheringDropId = nextRows[Math.min(index, nextRows.length - 1)]?.id || '';
+    updateSelectedGatheringTask({ dropRows: nextRows });
+  }
+
+  async function importGatheringTaskDrop(rowId, data) {
+    if (!rowId) return false;
+    const item = await services?.importSingleManagedItemFromDrop?.(data);
+    if (!item?.id) return false;
+    updateGatheringTaskDrop(rowId, { componentId: item.id, itemUuid: '', name: '', enabled: true });
+    selectedGatheringDropId = rowId;
+    return true;
+  }
+
+  function gatheringConditionOptions(kind) {
+    const setting = selectedGatheringSystemConfig.conditions?.[kind] || {};
+    return Array.isArray(setting.values) ? setting.values : [];
+  }
+
+  function gatheringConditionModifierRows(row, kind) {
+    const values = row?.conditionModifiers?.[kind];
+    return Array.isArray(values) ? values : [];
+  }
+
+  function updateGatheringDropModifier(rowId, kind, modifierId, updates = {}) {
+    if (!selectedGatheringTask || !rowId || !kind || !modifierId) return;
+    const row = gatheringTaskDropRows(selectedGatheringTask).find(entry => entry.id === rowId);
+    if (!row) return;
+    const conditionModifiers = {
+      timeOfDay: gatheringConditionModifierRows(row, 'timeOfDay'),
+      weather: gatheringConditionModifierRows(row, 'weather')
+    };
+    conditionModifiers[kind] = conditionModifiers[kind].map(modifier => modifier.id === modifierId ? { ...modifier, ...updates } : modifier);
+    updateGatheringTaskDrop(rowId, { conditionModifiers });
+  }
+
+  function addGatheringDropModifier(rowId, kind) {
+    if (!selectedGatheringTask || !rowId || !kind) return;
+    const row = gatheringTaskDropRows(selectedGatheringTask).find(entry => entry.id === rowId);
+    const firstConditionId = gatheringConditionOptions(kind)[0]?.id || '';
+    if (!row || !firstConditionId) return;
+    const conditionModifiers = {
+      timeOfDay: gatheringConditionModifierRows(row, 'timeOfDay'),
+      weather: gatheringConditionModifierRows(row, 'weather')
+    };
+    conditionModifiers[kind] = [
+      ...conditionModifiers[kind],
+      { id: `${kind}-${gatheringDropRowId()}`, conditionId: firstConditionId, value: 0 }
+    ];
+    updateGatheringTaskDrop(rowId, { conditionModifiers });
+  }
+
+  function deleteGatheringDropModifier(rowId, kind, modifierId) {
+    if (!selectedGatheringTask || !rowId || !kind || !modifierId) return;
+    const row = gatheringTaskDropRows(selectedGatheringTask).find(entry => entry.id === rowId);
+    if (!row) return;
+    const conditionModifiers = {
+      timeOfDay: gatheringConditionModifierRows(row, 'timeOfDay'),
+      weather: gatheringConditionModifierRows(row, 'weather')
+    };
+    conditionModifiers[kind] = conditionModifiers[kind].filter(modifier => modifier.id !== modifierId);
+    updateGatheringTaskDrop(rowId, { conditionModifiers });
+  }
+
   function moveEnvironment(environmentId = selectedEnvironment?.id, direction) {
     if (!environmentId || !direction) return;
     store.moveEnvironmentDraft?.(environmentId, direction);
@@ -1103,6 +1333,151 @@
   function environmentCatalystCount(environment) {
     return (Array.isArray(environment?.tasks) ? environment.tasks : [])
       .reduce((total, task) => total + (Array.isArray(task?.catalysts) ? task.catalysts.length : 0), 0);
+  }
+
+  function gatheringTaskName(task) {
+    return String(task?.name || text('FABRICATE.Admin.ManagerV2.Environment.Tasks.UnnamedTask', 'Unnamed gathering task')).trim();
+  }
+
+  function gatheringTaskImage(task) {
+    return task?.img || 'icons/svg/item-bag.svg';
+  }
+
+  function gatheringTaskDropRows(task) {
+    return Array.isArray(task?.dropRows) ? task.dropRows : [];
+  }
+
+  function gatheringManagedItemLabel(componentId) {
+    const item = (selectedSystem?.managedItemOptions || []).find(option => String(option.id || '') === String(componentId || ''));
+    return item?.name || componentId || '';
+  }
+
+  function gatheringManagedItemImage(componentId) {
+    const item = (selectedSystem?.managedItemOptions || []).find(option => String(option.id || '') === String(componentId || ''));
+    return item?.img || 'icons/svg/item-bag.svg';
+  }
+
+  function gatheringDropName(row) {
+    return row?.name || gatheringManagedItemLabel(row?.componentId) || row?.itemUuid || text('FABRICATE.Admin.ManagerV2.Environment.Tasks.UnresolvedDrop', 'Unresolved drop');
+  }
+
+  function gatheringDropImage(row) {
+    return row?.img || gatheringManagedItemImage(row?.componentId) || 'icons/svg/item-bag.svg';
+  }
+
+  function gatheringTaskDropLabel(row) {
+    const name = gatheringDropName(row);
+    return `${name} x${row?.quantity || 1} (${row?.dropRate ?? 1}%)`;
+  }
+
+  function gatheringOptionLabel(kind, id) {
+    const options = kind === 'biome'
+      ? selectedGatheringSystemConfig.vocabularies?.biomes?.values
+      : selectedGatheringSystemConfig.vocabularies?.regions?.values;
+    const option = (Array.isArray(options) ? options : []).find(value => String(value?.id || value) === String(id || ''));
+    return String(option?.label || option?.id || id || '').trim();
+  }
+
+  function gatheringConditionLabel(kind, id) {
+    const setting = selectedGatheringSystemConfig.conditions?.[kind] || {};
+    const option = (Array.isArray(setting.values) ? setting.values : [])
+      .find(value => String(value?.id || value) === String(id || ''));
+    return String(option?.label || option?.id || id || '').trim();
+  }
+
+  function gatheringConditionCurrent(kind) {
+    return selectedGatheringSystemConfig.conditions?.[kind]?.current || '';
+  }
+
+  function gatheringCurrentConditionLabel(kind) {
+    return gatheringConditionLabel(kind, gatheringConditionCurrent(kind))
+      || (kind === 'weather'
+        ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyWeather', 'Any weather')
+        : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyTime', 'Any time'));
+  }
+
+  function gatheringSignedPercent(value) {
+    const number = Number(value || 0);
+    return `${number >= 0 ? '+' : ''}${number}%`;
+  }
+
+  function gatheringAppliedDropModifiers(row) {
+    if (!row) return [];
+    return ['timeOfDay', 'weather'].flatMap(kind => {
+      const current = gatheringConditionCurrent(kind);
+      if (!current) return [];
+      return gatheringConditionModifierRows(row, kind)
+        .filter(modifier => modifier.conditionId === current)
+        .map(modifier => ({
+          ...modifier,
+          kind,
+          label: gatheringConditionLabel(kind, modifier.conditionId) || modifier.conditionId
+        }));
+    });
+  }
+
+  function gatheringDropConditionModifierTotal(row) {
+    if (!row) return 0;
+    return ['timeOfDay', 'weather'].reduce((total, kind) => {
+      const current = gatheringConditionCurrent(kind);
+      if (!current) return total;
+      return total + gatheringConditionModifierRows(row, kind)
+        .filter(modifier => modifier.conditionId === current)
+        .reduce((sum, modifier) => sum + Number(modifier.value || 0), 0);
+    }, 0);
+  }
+
+  function gatheringDropFinalChance(row) {
+    return Math.min(100, Math.max(0, Math.floor(Number(row?.dropRate || 0) + gatheringDropConditionModifierTotal(row))));
+  }
+
+  function gatheringDropModifierClass(value) {
+    const number = Number(value || 0);
+    if (number < 0) return 'is-danger';
+    if (number > 0) return 'is-active';
+    return 'is-neutral';
+  }
+
+  function gatheringTaskAvailability(task) {
+    const timeValues = Array.isArray(task?.timeOfDay) ? task.timeOfDay : [];
+    const weatherValues = Array.isArray(task?.weather) ? task.weather : [];
+    const times = timeValues.length > 0
+      ? timeValues.map(id => gatheringConditionLabel('timeOfDay', id)).filter(Boolean).join(', ')
+      : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyTime', 'Any time');
+    const weather = weatherValues.length > 0
+      ? weatherValues.map(id => gatheringConditionLabel('weather', id)).filter(Boolean).join(', ')
+      : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyWeather', 'Any weather');
+    return `${times}, ${weather}`;
+  }
+
+  function gatheringTaskAllowedInEnvironment(task, environment) {
+    const enabledIds = Array.isArray(environment?.enabledTaskIds) ? environment.enabledTaskIds.map(String) : [];
+    const disabledIds = Array.isArray(environment?.disabledTaskIds) ? environment.disabledTaskIds.map(String) : [];
+    if (disabledIds.includes(String(task?.id))) return false;
+    if (enabledIds.length > 0 && !enabledIds.includes(String(task?.id))) return false;
+    return true;
+  }
+
+  function activeGatheringTaskEnvironmentCount(task) {
+    if (!task || task.enabled === false) return 0;
+    const weatherSetting = selectedGatheringSystemConfig.conditions?.weather || {};
+    const timeSetting = selectedGatheringSystemConfig.conditions?.timeOfDay || {};
+    const taskBiomes = Array.isArray(task.biomes) ? task.biomes : [];
+    const taskWeather = Array.isArray(task.weather) ? task.weather : [];
+    const taskTime = Array.isArray(task.timeOfDay) ? task.timeOfDay : [];
+    return environmentList.filter(environment => {
+      if (environment?.enabled === false) return false;
+      if (String(environment?.craftingSystemId || selectedSystemId) !== String(selectedSystemId || '')) return false;
+      if (!gatheringTaskAllowedInEnvironment(task, environment)) return false;
+      if (task.region && task.region !== String(environment?.region || '')) return false;
+      const environmentBiomes = Array.isArray(environment?.biomes)
+        ? environment.biomes
+        : (environment?.biome ? [environment.biome] : []);
+      if (taskBiomes.length > 0 && !taskBiomes.some(biome => environmentBiomes.includes(biome))) return false;
+      if (weatherSetting.enabled !== false && taskWeather.length > 0 && !taskWeather.includes(weatherSetting.current)) return false;
+      if (timeSetting.enabled !== false && taskTime.length > 0 && !taskTime.includes(timeSetting.current)) return false;
+      return true;
+    }).length;
   }
 
   function environmentFacts(environment) {
@@ -1362,6 +1737,12 @@
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.ManagerV2.Environment.EditBreadcrumb', 'Edit environment')}</span>
         {/if}
+        {#if currentView === 'gathering-task-edit'}
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <button type="button" onclick={backToGatheringTaskLibrary}>{text('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Tasks', 'Tasks')}</button>
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EditBreadcrumb', 'Edit gathering task')}</span>
+        {/if}
         {#if currentView === 'system-edit'}
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.ManagerV2.SystemEdit.Breadcrumb', 'System settings')}</span>
@@ -1370,7 +1751,7 @@
       <h1 class="manager-v2-title">{viewTitle()}</h1>
       <p class="manager-v2-subtitle">{viewSubtitle()}</p>
     </div>
-    <div class="manager-v2-header-actions" aria-label={currentView === 'recipes' ? text('FABRICATE.Admin.ManagerV2.Recipe.Actions', 'Recipe actions') : currentView === 'components' || currentView === 'component-edit' ? text('FABRICATE.Admin.ManagerV2.Component.Actions', 'Component actions') : currentView === 'tags' ? text('FABRICATE.Admin.ManagerV2.TagsCategories.Actions', 'Tags and categories actions') : currentView === 'essences' || currentView === 'essence-edit' ? text('FABRICATE.Admin.ManagerV2.Essence.Actions', 'Essence actions') : currentView === 'environments' || currentView === 'environment-edit' ? text('FABRICATE.Admin.ManagerV2.Environment.Actions', 'Environment actions') : currentView === 'system-edit' ? text('FABRICATE.Admin.ManagerV2.SystemEdit.Actions', 'System edit actions') : text('FABRICATE.Admin.ManagerV2.SystemActions', 'System actions')}>
+    <div class="manager-v2-header-actions" aria-label={headerActionsLabel()}>
       {#if currentView === 'recipes'}
         <button type="button" class="manager-v2-button" onclick={importRecipes} disabled={!selectedSystemId}>
           <i class="fas fa-file-import" aria-hidden="true"></i>
@@ -1423,6 +1804,11 @@
           <i class={essenceEditSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
           <span>{essenceEditSaveLabel()}</span>
         </button>
+      {:else if currentView === 'environments' && activeGatheringTab === 'tasks'}
+        <button type="button" class="manager-v2-button is-primary" onclick={() => createGatheringTask(selectedSystemId)} disabled={!canShowEnvironments}>
+          <i class="fas fa-plus" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Create', 'Create gathering task')}</span>
+        </button>
       {:else if currentView === 'environments'}
         <button type="button" class="manager-v2-button is-primary" onclick={createEnvironment} disabled={!canShowEnvironments}>
           <i class="fas fa-plus" aria-hidden="true"></i>
@@ -1439,6 +1825,11 @@
         <button type="button" class="manager-v2-button is-primary" onclick={saveEnvironmentEdit} disabled={!$viewState.environmentDraftDirty || $viewState.environmentSaving}>
           <i class={$viewState.environmentSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Environments.Save', 'Save Environment')}</span>
+        </button>
+      {:else if currentView === 'gathering-task-edit'}
+        <button type="button" class="manager-v2-button" onclick={backToGatheringTaskLibrary}>
+          <i class="fas fa-arrow-left" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.BackToLibrary', 'Back to task library')}</span>
         </button>
       {:else if currentView === 'system-edit'}
         <button type="button" class="manager-v2-button" onclick={backToSystemsBrowser}>
@@ -1518,7 +1909,7 @@
             </button>
           {/if}
           {#if canShowEnvironments}
-            <button type="button" class={`manager-v2-nav-button ${currentView === 'environments' || currentView === 'environment-edit' ? 'is-active' : ''}`} aria-current={currentView === 'environments' || currentView === 'environment-edit' ? 'page' : undefined} onclick={() => setView('environments')}>
+            <button type="button" class={`manager-v2-nav-button ${currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' ? 'is-active' : ''}`} aria-current={currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' ? 'page' : undefined} onclick={() => setView('environments')}>
               <i class="fas fa-seedling" aria-hidden="true"></i>
               <span class="manager-v2-nav-label">{text('FABRICATE.Admin.ManagerV2.Nav.Environments', 'Gathering')}</span>
               <span class="manager-v2-nav-count">{selectedCounts.environments ?? 0}</span>
@@ -1550,7 +1941,15 @@
         sceneOptions={selectedSystem?.sceneOptions || []}
         {shouldUseEnvironmentDraftForDisplay}
         {activeGatheringTab}
+        selectedTaskId={selectedGatheringTask?.id || selectedGatheringTaskId}
+        managedItemOptions={selectedSystem?.managedItemOptions || []}
         onSelectGatheringTab={selectGatheringTab}
+        onSelectGatheringTask={selectGatheringTask}
+        onCreateGatheringTask={createGatheringTask}
+        onEditGatheringTask={editGatheringTask}
+        onDuplicateGatheringTask={duplicateGatheringTask}
+        onDeleteGatheringTask={deleteGatheringTask}
+        onToggleGatheringTaskEnabled={toggleGatheringTaskEnabled}
         onSelectEnvironment={(id) => selectEnvironment(id)}
         onEditEnvironment={(id) => editEnvironment(id)}
         onCreateEnvironment={createEnvironment}
@@ -1626,6 +2025,26 @@
           />
         </section>
       </main>
+    {:else if currentView === 'gathering-task-edit' && selectedSystem}
+      <GatheringTaskEditView
+        task={selectedGatheringTask}
+        managedItemOptions={selectedSystem.managedItemOptions || []}
+        weatherOptions={gatheringConditionOptions('weather')}
+        timeOfDayOptions={gatheringConditionOptions('timeOfDay')}
+        selectedDropId={selectedGatheringDrop?.id || selectedGatheringDropId}
+        rewardRules={selectedGatheringRules}
+        onPickImagePath={services?.pickImagePath}
+        onUpdateTask={updateSelectedGatheringTask}
+        onSelectDrop={(rowId) => { selectedGatheringDropId = rowId; }}
+        onAddDrop={addGatheringTaskDrop}
+        onUpdateDrop={updateGatheringTaskDrop}
+        onDuplicateDrop={duplicateGatheringTaskDrop}
+        onDeleteDrop={deleteGatheringTaskDrop}
+        onImportDrop={importGatheringTaskDrop}
+        onAddModifier={addGatheringDropModifier}
+        onUpdateModifier={updateGatheringDropModifier}
+        onDeleteModifier={deleteGatheringDropModifier}
+      />
     {:else if currentView === 'essences' && selectedSystem}
       <EssenceBrowserView
         {essenceCards}
@@ -1730,6 +2149,7 @@
     {:else}
       <SystemsBrowserView
         systems={$viewState.systems || []}
+        {systemsLoading}
         {selectedSystemId}
         onSelectSystem={(id) => selectSystemRow(id)}
         onCreateSystem={createSystem}
@@ -1741,7 +2161,7 @@
     {/if}
 
     {#if currentView !== 'environment-edit' && currentView !== 'component-edit'}
-    <aside class="manager-v2-inspector" aria-label={currentView === 'recipes' ? text('FABRICATE.Admin.ManagerV2.Recipe.Inspector', 'Selected recipe inspector') : currentView === 'components' ? text('FABRICATE.Admin.ManagerV2.Component.Inspector', 'Selected component inspector') : currentView === 'tags' ? text('FABRICATE.Admin.ManagerV2.TagsCategories.Inspector', 'Tags and categories inspector') : currentView === 'essences' || currentView === 'essence-edit' ? text('FABRICATE.Admin.ManagerV2.Essence.Inspector', 'Selected essence inspector') : currentView === 'environments' ? text('FABRICATE.Admin.ManagerV2.Environment.Inspector', 'Selected environment inspector') : currentView === 'system-edit' ? text('FABRICATE.Admin.ManagerV2.SystemEdit.Inspector', 'System edit evidence') : text('FABRICATE.Admin.ManagerV2.SelectedSystemInspector', 'Selected system inspector')}>
+    <aside class="manager-v2-inspector" aria-label={inspectorLabel()}>
       {#if currentView === 'tags' && selectedSystem}
         <section class="manager-v2-inspector-card">
           <div class="manager-v2-inspector-title-row">
@@ -1820,8 +2240,171 @@
           <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.TagsCategories.GeneralTitle', 'General category')}</h3>
           <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.TagsCategories.GeneralInspectorHint', 'General is the built-in category for recipes without a custom category and cannot be removed.')}</p>
         </section>
-      {:else if currentView === 'environments' || currentView === 'environment-edit'}
-        {#if currentView === 'environments' && activeGatheringTab === 'settings'}
+      {:else if currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit'}
+        {#if (currentView === 'environments' && activeGatheringTab === 'tasks') || currentView === 'gathering-task-edit'}
+          {#if selectedGatheringTask}
+            {#if currentView !== 'gathering-task-edit'}
+            <section class="manager-v2-inspector-card" data-gathering-task-inspector>
+              <div class="manager-v2-inspector-title-row is-hero-large">
+                <img class="manager-v2-recipe-preview" src={gatheringTaskImage(selectedGatheringTask)} alt="" />
+                <div class="manager-v2-inspector-copy">
+                  <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Selected', 'Selected gathering task')}</p>
+                  <h2 class="manager-v2-inspector-name" title={gatheringTaskName(selectedGatheringTask)}>{gatheringTaskName(selectedGatheringTask)}</h2>
+                  <div class="manager-v2-chip-row">
+                    <span class={`manager-v2-chip ${selectedGatheringTask.enabled === false ? 'is-disabled' : 'is-active'}`}>
+                      {selectedGatheringTask.enabled === false ? text('FABRICATE.Admin.ManagerV2.StatusDisabled', 'Disabled') : text('FABRICATE.Admin.ManagerV2.StatusActive', 'Active')}
+                    </span>
+                    <span class="manager-v2-chip">{gatheringTaskAvailability(selectedGatheringTask)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <p class="manager-v2-muted">
+                {selectedGatheringTask.description || text('FABRICATE.Admin.ManagerV2.NoDescriptionAdded', 'No description has been added.')}
+              </p>
+            </section>
+
+            <section class="manager-v2-inspector-card">
+              <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Details', 'Gathering task details')}</h3>
+              <div class="manager-v2-fact-grid">
+                <div class="manager-v2-fact" data-gathering-task-fact="region">
+                  <strong>{gatheringOptionLabel('region', selectedGatheringTask.region) || text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyRegion', 'Any region')}</strong>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Region', 'Region')}</span>
+                </div>
+                <div class="manager-v2-fact" data-gathering-task-fact="biomes">
+                  <strong>{Array.isArray(selectedGatheringTask.biomes) && selectedGatheringTask.biomes.length > 0 ? selectedGatheringTask.biomes.length : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyBiome', 'Any biome')}</strong>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Biome', 'Biome')}</span>
+                </div>
+                <div class="manager-v2-fact" data-gathering-task-fact="drops">
+                  <strong>{gatheringTaskDropRows(selectedGatheringTask).length}</strong>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Drops', 'Drops')}</span>
+                </div>
+                <div class="manager-v2-fact" data-gathering-task-fact="environments">
+                  <strong>{activeGatheringTaskEnvironmentCount(selectedGatheringTask)}</strong>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ActiveEnvironments', 'Active environments')}</span>
+                </div>
+              </div>
+            </section>
+            {/if}
+
+            {#if currentView === 'gathering-task-edit'}
+            {#if selectedGatheringDrop}
+            <section class="manager-v2-inspector-card manager-v2-drop-editor-card" data-gathering-task-drop-inspector>
+              <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SelectedDrop', 'Selected Drop Rule')}</h3>
+              <div class="manager-v2-inspector-title-row">
+                <img class="manager-v2-recipe-preview" src={gatheringDropImage(selectedGatheringDrop)} alt="" />
+                <div class="manager-v2-inspector-copy">
+                  <h2 class="manager-v2-inspector-name">{gatheringDropName(selectedGatheringDrop)}</h2>
+                  <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ModifiersApplyOnlyThisDrop', 'Modifiers below apply only to this drop.')}</p>
+                </div>
+              </div>
+
+              <label class="manager-v2-field">
+                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropComponent', 'Drop component')}</span>
+                <select value={selectedGatheringDrop.componentId || ''} onchange={(event) => { if (event.currentTarget.value) updateGatheringTaskDrop(selectedGatheringDrop.id, { componentId: event.currentTarget.value, itemUuid: '', enabled: true }); }}>
+                  <option value="">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SelectComponent', 'Select a component')}</option>
+                  {#each selectedSystem.managedItemOptions || [] as item (item.id)}
+                    <option value={item.id}>{item.name || item.id}</option>
+                  {/each}
+                </select>
+              </label>
+
+              <label class="manager-v2-field manager-v2-drop-rate-editor">
+                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChance', 'Drop chance')}</span>
+                <input type="range" min="0" max="100" step="1" value={selectedGatheringDrop.dropRate ?? 1} oninput={(event) => updateGatheringTaskDrop(selectedGatheringDrop.id, { dropRate: Number(event.currentTarget.value) })} />
+                <strong>{selectedGatheringDrop.dropRate ?? 1}%</strong>
+              </label>
+
+              <label class="manager-v2-field">
+                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Quantity', 'Quantity')}</span>
+                <input type="number" min="1" step="1" value={selectedGatheringDrop.quantity || 1} oninput={(event) => updateGatheringTaskDrop(selectedGatheringDrop.id, { quantity: Number(event.currentTarget.value || 1) })} />
+              </label>
+
+              <div class="manager-v2-drop-editor-modifiers">
+                {#each ['timeOfDay', 'weather'] as kind}
+                  <section class="manager-v2-drop-editor-modifier-group" data-gathering-drop-modifier-kind={kind}>
+                    <div class="manager-v2-inspector-subhead">
+                      <h4>{kind === 'weather' ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.WeatherModifiers', 'Weather modifiers') : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.TimeModifiers', 'Time modifiers')}</h4>
+                      <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AddModifier', 'Add modifier')} onclick={() => addGatheringDropModifier(selectedGatheringDrop.id, kind)}>
+                        <i class="fas fa-plus" aria-hidden="true"></i>
+                      </button>
+                    </div>
+                    <div class="manager-v2-requirements-list">
+                      {#each gatheringConditionModifierRows(selectedGatheringDrop, kind) as modifier (modifier.id)}
+                        <div class="manager-v2-requirement-row manager-v2-modifier-row" data-gathering-drop-modifier-id={modifier.id}>
+                          <select value={modifier.conditionId} onchange={(event) => updateGatheringDropModifier(selectedGatheringDrop.id, kind, modifier.id, { conditionId: event.currentTarget.value })}>
+                            {#each gatheringConditionOptions(kind) as option (option.id)}
+                              <option value={option.id}>{option.label || option.id}</option>
+                            {/each}
+                          </select>
+                          <span class={`manager-v2-modifier-arrow ${gatheringDropModifierClass(modifier.value)}`}>{Number(modifier.value || 0) < 0 ? '-' : '+'}</span>
+                          <input class={`manager-v2-modifier-value ${gatheringDropModifierClass(modifier.value)}`} type="number" step="1" value={modifier.value || 0} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ModifierValue', 'Modifier value')} oninput={(event) => updateGatheringDropModifier(selectedGatheringDrop.id, kind, modifier.id, { value: Number(event.currentTarget.value || 0) })} />
+                          <button type="button" class="manager-v2-icon-button is-danger" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DeleteModifier', 'Delete modifier')} onclick={() => deleteGatheringDropModifier(selectedGatheringDrop.id, kind, modifier.id)}>
+                            <i class="fas fa-trash" aria-hidden="true"></i>
+                          </button>
+                        </div>
+                      {:else}
+                        <div class="manager-v2-requirement-row">
+                          <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.NotSpecified', 'Not specified')}</span>
+                          <strong>0%</strong>
+                        </div>
+                      {/each}
+                    </div>
+                  </section>
+                {/each}
+              </div>
+
+              <div class="manager-v2-final-chance" data-gathering-task-drop-fact="final-chance">
+                <div class="manager-v2-final-chance-heading">
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.FinalChanceThisDrop', 'Final chance')}</span>
+                  <strong>{gatheringDropFinalChance(selectedGatheringDrop)}%</strong>
+                </div>
+                <div class="manager-v2-final-chance-lines">
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.CurrentTimeOfDay', 'Current time')}: <strong>{gatheringCurrentConditionLabel('timeOfDay')}</strong></span>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.CurrentWeather', 'Current weather')}: <strong>{gatheringCurrentConditionLabel('weather')}</strong></span>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.BaseChance', 'Base chance')}: <strong>{selectedGatheringDrop.dropRate ?? 1}%</strong></span>
+                  {#each gatheringAppliedDropModifiers(selectedGatheringDrop) as modifier (modifier.id)}
+                    <span class={gatheringDropModifierClass(modifier.value)}>{modifier.label}: <strong>{gatheringSignedPercent(modifier.value)}</strong></span>
+                  {:else}
+                    <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.NoMatchingModifiers', 'No matching modifiers')}: <strong>0%</strong></span>
+                  {/each}
+                </div>
+              </div>
+            </section>
+            {:else}
+            <section class="manager-v2-inspector-card" data-gathering-task-drop-inspector>
+              <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SelectedDrop', 'Selected drop rule')}</h3>
+              <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.NoDrops', 'No drops have been added.')}</p>
+            </section>
+            {/if}
+            {:else}
+            <section class="manager-v2-inspector-card">
+              <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropSummary', 'Drop summary')}</h3>
+              {#if gatheringTaskDropRows(selectedGatheringTask).length > 0}
+                <div class="manager-v2-requirements-list">
+                  {#each gatheringTaskDropRows(selectedGatheringTask) as row (row.id)}
+                    <div class="manager-v2-requirement-row">
+                      <span>{gatheringTaskDropLabel(row)}</span>
+                      <strong>{row.enabled === false ? text('FABRICATE.Admin.ManagerV2.StatusDisabled', 'Disabled') : text('FABRICATE.Admin.ManagerV2.StatusActive', 'Active')}</strong>
+                    </div>
+                  {/each}
+                </div>
+              {:else}
+                <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.NoDrops', 'No drops have been added.')}</p>
+              {/if}
+            </section>
+            {/if}
+
+          {:else}
+            <div class="manager-v2-empty">
+              <div>
+                <i class="fas fa-list-check" aria-hidden="true"></i>
+                <h3>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SelectTask', 'Select a gathering task')}</h3>
+                <p>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.InspectorHint', 'The inspector shows gathering task availability, active environment matches, and drop summaries for the selected row.')}</p>
+              </div>
+            </div>
+          {/if}
+        {:else if currentView === 'environments' && activeGatheringTab === 'settings'}
           <section class="manager-v2-inspector-card manager-v2-gathering-rules-card" data-gathering-inspector-rules>
             <div class="manager-v2-inspector-title-row">
               <span class="manager-v2-inspector-icon" aria-hidden="true">
@@ -1838,7 +2421,7 @@
                 <span class="manager-v2-rule-icon" aria-hidden="true"><i class="fas fa-gift"></i></span>
                 <label class="manager-v2-rule-copy" for="manager-v2-gathering-rule-rewards">
                   <strong>{text('FABRICATE.Admin.ManagerV2.Environment.Rules.Rewards', 'Rewards')}</strong>
-                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Rules.RewardsDescription', 'Choose which successful d100 reward rows are granted.')}</span>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Rules.RewardsDescription', 'Choose which successful drop rows are granted.')}</span>
                 </label>
                 <span class="manager-v2-rule-field">
                   <select id="manager-v2-gathering-rule-rewards" value={selectedGatheringRules.rewardSelectionMode} onchange={(event) => updateSelectedGatheringRules({ rewardSelectionMode: event.target.value })}>
@@ -1972,11 +2555,11 @@
                 <h3>{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Title', 'Plan gathering content')}</h3>
               </div>
             </div>
-            <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Hint', 'Reusable tasks and hazards give environments consistent activities, risks, and rewards across gathering locations.')}</p>
+            <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Hint', 'Gathering tasks and hazards give environments consistent activities, risks, and rewards across gathering locations.')}</p>
             <ol class="manager-v2-setup-list">
-              <li>{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.StepTasks', 'Define reusable gathering tasks with their checks, timing, result groups, and failure outcomes.')}</li>
+              <li>{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.StepTasks', 'Define gathering tasks with their checks, timing, result groups, and failure outcomes.')}</li>
               <li>{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.StepHazards', 'Prepare encounter and hazard options that can be reused across risky locations.')}</li>
-              <li>{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.StepCreate', 'Create environments after the reusable task and hazard libraries are ready to attach.')}</li>
+              <li>{text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.StepCreate', 'Create environments after the gathering task and hazard libraries are ready to attach.')}</li>
             </ol>
             <div class="manager-v2-setup-links" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Resources', 'Environment resources')}>
               <a class="manager-v2-button" href="https://misterpotts.github.io/fabricate/gathering-environments/" target="_blank" rel="noreferrer">
@@ -2494,6 +3077,17 @@
             </div>
           </section>
         {/if}
+      {:else if systemsLoading}
+        <section class="manager-v2-setup-card" aria-label={text('FABRICATE.Admin.ManagerV2.LoadingSystems', 'Loading crafting systems...')}>
+          <div class="manager-v2-setup-card-header">
+            <i class="fas fa-spinner" aria-hidden="true"></i>
+            <div>
+              <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.LoadingSystemsKicker', 'Startup')}</p>
+              <h3>{text('FABRICATE.Admin.ManagerV2.LoadingSystems', 'Loading crafting systems...')}</h3>
+            </div>
+          </div>
+          <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.LoadingSystemsHint', 'Fabricate is finishing startup before the system library is shown.')}</p>
+        </section>
       {:else if ($viewState.systems || []).length === 0}
         <section class="manager-v2-setup-card" aria-label={text('FABRICATE.Admin.ManagerV2.EmptySetup.Title', 'Set up your first system')}>
           <div class="manager-v2-setup-card-header">

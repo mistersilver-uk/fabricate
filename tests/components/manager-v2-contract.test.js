@@ -17,7 +17,10 @@ const componentEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/Compo
 const componentsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/ComponentsBrowserView.svelte');
 const environmentEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/EnvironmentEditView.svelte');
 const environmentsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/EnvironmentsBrowserView.svelte');
+const gatheringTaskEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/GatheringTaskEditView.svelte');
+const gatheringTasksBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/GatheringTasksBrowserView.svelte');
 const appPath = resolve(repoRoot, 'src/ui/SvelteCraftingSystemManagerV2App.svelte.js');
+const recipeManagerAppPath = resolve(repoRoot, 'src/ui/SvelteRecipeManagerApp.svelte.js');
 const mainPath = resolve(repoRoot, 'src/main.js');
 const langPath = resolve(repoRoot, 'lang/en.json');
 
@@ -32,11 +35,14 @@ const componentEditSource = readFileSync(componentEditPath, 'utf8');
 const componentsBrowserSource = readFileSync(componentsBrowserPath, 'utf8');
 const environmentEditSource = readFileSync(environmentEditPath, 'utf8');
 const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
+const gatheringTaskEditSource = readFileSync(gatheringTaskEditPath, 'utf8');
+const gatheringTasksBrowserSource = readFileSync(gatheringTasksBrowserPath, 'utf8');
 const appSource = readFileSync(appPath, 'utf8');
+const recipeManagerAppSource = readFileSync(recipeManagerAppPath, 'utf8');
 const mainSource = readFileSync(mainPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
-const managerV2Source = [rootSource, essenceBrowserSource, essenceEditSource, tagsCategoriesSource, systemEditSource, systemsBrowserSource, recipesBrowserSource, componentsBrowserSource, componentEditSource, environmentEditSource, environmentsBrowserSource].join('\n');
+const managerV2Source = [rootSource, essenceBrowserSource, essenceEditSource, tagsCategoriesSource, systemEditSource, systemsBrowserSource, recipesBrowserSource, componentsBrowserSource, componentEditSource, environmentEditSource, environmentsBrowserSource, gatheringTaskEditSource, gatheringTasksBrowserSource].join('\n');
 
 describe('CraftingSystemManagerV2 source contract', () => {
   it('self-registers as a parallel manager app without replacing the legacy manager', () => {
@@ -59,6 +65,22 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(
       mainSource.includes("import './ui/SvelteCraftingSystemManagerV2App.svelte.js';"),
       'v2 manager side-effect import should be present for registry wiring'
+    );
+  });
+
+  it('guards manager-v2 startup against unready Fabricate services', () => {
+    assert.ok(recipeManagerAppSource.includes('isFabricateReady'), 'base manager app should expose readiness through services');
+    assert.ok(recipeManagerAppSource.includes('onFabricateReady'), 'base manager app should expose a ready callback service');
+    assert.ok(recipeManagerAppSource.includes("hooks.once('fabricate.ready'"), 'ready callback should listen at the Foundry edge');
+    assert.ok(appSource.includes('_pendingReadyOpen'), 'v2 app should prevent duplicate deferred opens');
+    assert.ok(appSource.includes('StartupPending'), 'v2 app should notify when startup defers the window open');
+    assert.ok(appSource.includes("hooks.once('fabricate.ready', openWhenReady)"), 'v2 app should defer direct opens until fabricate.ready');
+    assert.ok(systemsBrowserSource.includes('systemsLoading'), 'systems browser should receive loading state');
+    assert.ok(rootSource.includes('systemsLoading'), 'root should pass loading state to systems browser and inspector');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.LoadingSystems, 'Loading crafting systems...');
+    assert.equal(
+      lang.FABRICATE.Admin.ManagerV2.StartupPending,
+      'Fabricate is still loading. The crafting system manager will open when startup finishes.'
     );
   });
 
@@ -234,7 +256,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.EmptyTitle, 'Prepare gathering building blocks first');
     assert.equal(
       lang.FABRICATE.Admin.ManagerV2.Environment.EmptyHint,
-      'Define reusable tasks and hazards before creating environments, then attach those building blocks to each location players can gather from.'
+      'Define gathering tasks and hazards before creating environments, then attach those building blocks to each location players can gather from.'
     );
     assert.ok(environmentsBrowserSource.includes('manager-v2-gathering-tabs'), 'gathering page should render local section tabs');
     assert.ok(rootSource.includes("let activeGatheringTab = $state('environments')"), 'root should own gathering tab state for inspector coordination');
@@ -250,7 +272,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
       !rootSource.includes("<h3 class=\"manager-v2-card-title\">{text('FABRICATE.Admin.ManagerV2.Environment.Actions', 'Environment actions')}</h3>"),
       'selected environment inspector should not render a redundant Environment actions card'
     );
-    assert.ok(environmentsBrowserSource.includes('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksPlaceholderHint'), 'gathering placeholder copy should be localized');
+    assert.ok(environmentsBrowserSource.includes('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksHint'), 'gathering task browser copy should be localized');
     assert.ok(environmentsBrowserSource.includes("selectGatheringTab('tasks')"), 'empty environments guidance should route to the Tasks tab');
     assert.ok(environmentsBrowserSource.includes("selectGatheringTab('encounters')"), 'empty environments guidance should route hazards to the Hazards tab');
     assert.ok(environmentsBrowserSource.includes('manager-v2-environment-action-grid'), 'environment rows should keep quick action wiring');
@@ -264,9 +286,9 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Settings, 'Settings');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.OpenTasks, 'Review tasks');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.OpenHazards, 'Review hazards');
-    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksPlaceholderHint, 'Reusable gathering task management is planned for a later slice.');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksHint, 'Browse gathering tasks before attaching them to environments.');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.EncountersPlaceholderHint, 'Reusable hazard authoring is planned for a later slice.');
-    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderHint, 'Set system-level d100 reward and hazard rules for gathering.');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderHint, 'Set system-level drop resolution and hazard rules for gathering.');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Conditions.TimeOfDayTitle, 'Times of day');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Conditions.WeatherTitle, 'Weather conditions');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.EmptySetup.Title, 'Plan gathering content');
@@ -553,6 +575,115 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.SceneDropHint, 'Drag a scene from the Scenes sidebar to link it');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.SceneDropZoneLabel, 'Scene drop zone');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.ChooseImage, 'Choose environment image');
+  });
+
+  it('wires Manager V2 Gathering Tasks browser through root-owned selection and store callbacks', () => {
+    for (const snippet of [
+      'selectedGatheringTaskId',
+      'onSelectGatheringTask={selectGatheringTask}',
+      'onCreateGatheringTask={createGatheringTask}',
+      'onEditGatheringTask={editGatheringTask}',
+      'onDuplicateGatheringTask={duplicateGatheringTask}',
+      'onDeleteGatheringTask={deleteGatheringTask}',
+      'onToggleGatheringTaskEnabled={toggleGatheringTaskEnabled}',
+      'store.duplicateGatheringLibraryTask',
+      'data-gathering-task-inspector',
+      'GatheringTaskEditView',
+      'data-gathering-task-drop-inspector',
+      'addGatheringDropModifier',
+      'updateGatheringDropModifier',
+      'gatheringDropFinalChance'
+    ]) {
+      assert.ok(rootSource.includes(snippet), `root should include ${snippet}`);
+    }
+    for (const snippet of [
+      'GatheringTasksBrowserView',
+      'tasks={selectedGatheringSystemConfig.tasks || []}',
+      'selectedTaskId',
+      'managedItemOptions'
+    ]) {
+      assert.ok(environmentsBrowserSource.includes(snippet), `environment browser should include ${snippet}`);
+    }
+    for (const snippet of [
+      'data-gathering-tasks-browser',
+      'manager-v2-gathering-tasks-table',
+      'availabilityLabels(task)',
+      'activeEnvironmentCount(task)',
+      'onDuplicateTask(selectedSystemId, task.id)',
+      'onDeleteTask(selectedSystemId, task.id)',
+      'onToggleTaskEnabled(selectedSystemId, task.id'
+    ]) {
+      assert.ok(gatheringTasksBrowserSource.includes(snippet), `task browser should include ${snippet}`);
+    }
+    for (const snippet of [
+      'data-gathering-task-editor',
+      'data-gathering-task-core-editor',
+      'data-gathering-task-availability',
+      'data-gathering-task-drops-table',
+      'data-gathering-task-availability-option',
+      'data-gathering-task-availability-pill',
+      'data-gathering-task-drop-component-cell',
+      'data-gathering-task-drop-chance-cell',
+      'data-gathering-task-drop-actions',
+      'data-gathering-task-drop-count',
+      'manager-v2-task-drop-controls',
+      'manager-v2-task-drop-footer',
+      'manager-v2-drop-cell',
+      'manager-v2-drop-component-cell',
+      'manager-v2-drop-quantity-cell',
+      'manager-v2-drop-modifier-pill',
+      'manager-v2-drop-modifier-list',
+      'manager-v2-drop-rate-value',
+      'manager-v2-drop-rate-tier-track',
+      'inputmode="numeric"',
+      'pattern="[1-9][0-9]*"',
+      'onQuantityInput',
+      'use:dragDrop',
+      'onImportDrop(rowId, data)',
+      'onPickImagePath',
+      'DropChance',
+      'RewardRuleNotice'
+    ]) {
+      assert.ok(gatheringTaskEditSource.includes(snippet), `task editor should include ${snippet}`);
+    }
+    assert.ok(!gatheringTaskEditSource.includes('manager-v2-task-editor-tabs'), 'task editor should be a one-page editor without tab navigation');
+    assert.ok(!gatheringTaskEditSource.includes('TaskIdentity'), 'task editor should not render a visible task identity heading');
+    assert.ok(!gatheringTaskEditSource.includes('Tasks.TaskId'), 'task editor should not render the raw internal task id localization');
+    assert.ok(!gatheringTaskEditSource.includes('Internal ID'), 'task editor should not render the raw internal task id label');
+    assert.ok(!gatheringTaskEditSource.includes('BackToLibrary'), 'task editor should not render a duplicate central back-to-library control');
+    assert.ok(!gatheringTaskEditSource.includes('type="checkbox"'), 'task editor status toggle should use the shared button pattern');
+    assert.ok(!gatheringTaskEditSource.includes('<select value={selectedCondition'), 'task availability should not use native single-select controls');
+    assert.ok(!gatheringTaskEditSource.includes('function selectedCondition('), 'task availability should not collapse arrays to a single selection');
+    assert.ok(!gatheringTaskEditSource.includes('Tasks.SelectDrop'), 'drop rows should not render a row-level edit/select quick action');
+    assert.ok(!gatheringTaskEditSource.includes('data-gathering-task-drop-row-number'), 'drop rows should not add a leading row number column');
+    assert.ok(!gatheringTaskEditSource.includes('EditDrop'), 'drop rows should not add an edit quick action');
+    assert.ok(!gatheringTaskEditSource.includes('manager-v2-labeled-cell manager-v2-drop-component-cell'), 'drop component row values should not render responsive duplicate labels');
+    assert.ok(!gatheringTaskEditSource.includes('manager-v2-labeled-cell manager-v2-drop-rate-cell'), 'drop chance row values should not render responsive duplicate labels');
+    assert.ok(!gatheringTaskEditSource.includes('QuantityShortHint'), 'drop quantity row values should not render an extra helper label');
+    assert.ok(gatheringTaskEditSource.includes('manager-v2-task-media-column'), 'task editor should group image and status in the media column');
+    assert.ok(gatheringTaskEditSource.includes('availableConditionOptions'), 'task editor should filter selected availability options out of menus');
+    assert.ok(gatheringTaskEditSource.includes('selectedConditionOptions'), 'task editor should render selected availability values as pills');
+    assert.ok(gatheringTaskEditSource.includes('StatusOff'), 'task editor should use shared Off status copy');
+    assert.ok(gatheringTaskEditSource.includes('StatusOn'), 'task editor should use shared On status copy');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.EmptyTitle, 'No gathering tasks yet');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChance, 'Drop chance');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.NoComponent, 'No Component');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.CreateOrAssign, 'Create or assign');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.TaskIdentity, undefined);
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.TaskId, undefined);
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask, 'New Gathering Task');
+    assert.equal(
+      rootSource.match(/FABRICATE\.Admin\.ManagerV2\.Environment\.Tasks\.Actions/g)?.length ?? 0,
+      1,
+      'gathering task actions localization should remain only for the header aria label, not a redundant inspector card'
+    );
+    assert.ok(
+      !rootSource.includes("<h3 class=\"manager-v2-card-title\">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Actions', 'Gathering task actions')}</h3>"),
+      'gathering task inspector should not keep an action card heading'
+    );
+    assert.ok(!rootSource.includes('duplicateGatheringTask(selectedSystemId, selectedGatheringTask.id)'), 'gathering task inspector should not duplicate row-level duplicate actions');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.BackToLibrary, 'Back to task library');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.CopySuffix, 'Copy');
   });
 
   it('replaces the environment status checkbox with the shared status toggle', () => {

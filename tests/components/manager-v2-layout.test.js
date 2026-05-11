@@ -297,7 +297,7 @@ test('manager-v2 gathering settings condition panels use a two-column responsive
 test('manager-v2 recipes browser defines compact responsive table geometry', () => {
   const tableBlock = blockFor('.fabricate-manager-v2 .manager-v2-recipes-table');
   const identityBlock = blockFor('.fabricate-manager-v2 .manager-v2-recipe-identity');
-  const statusCellBlock = blockFor('.fabricate-manager-v2 .manager-v2-system-row .manager-v2-status-cell,\n.fabricate-manager-v2 .manager-v2-recipe-row .manager-v2-status-cell,\n.fabricate-manager-v2 .manager-v2-environment-row .manager-v2-status-cell');
+  const statusCellBlock = blockFor('.fabricate-manager-v2 .manager-v2-system-row .manager-v2-status-cell,\n.fabricate-manager-v2 .manager-v2-recipe-row .manager-v2-status-cell,\n.fabricate-manager-v2 .manager-v2-environment-row .manager-v2-status-cell,\n.fabricate-manager-v2 .manager-v2-gathering-task-row .manager-v2-status-cell');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager-v2 (max-width: 1120px)'));
 
   assert.ok(
@@ -309,8 +309,8 @@ test('manager-v2 recipes browser defines compact responsive table geometry', () 
     'recipes table should have a no-category grid variant'
   );
   assert.ok(
-    css.includes('.fabricate-manager-v2 .manager-v2-recipe-row,\n.fabricate-manager-v2 .manager-v2-component-row,\n.fabricate-manager-v2 .manager-v2-environment-row,\n.fabricate-manager-v2 .manager-v2-essence-row {\n  width: 100%;\n  min-height: 76px;'),
-    'recipe, component, environment, and essence rows should have stable row height'
+    css.includes('.fabricate-manager-v2 .manager-v2-recipe-row,\n.fabricate-manager-v2 .manager-v2-component-row,\n.fabricate-manager-v2 .manager-v2-environment-row,\n.fabricate-manager-v2 .manager-v2-gathering-task-row,\n.fabricate-manager-v2 .manager-v2-essence-row {\n  width: 100%;\n  min-height: 76px;'),
+    'recipe, component, environment, gathering task, and essence rows should have stable row height'
   );
   assert.ok(
     identityBlock.includes('grid-template-columns: 46px minmax(0, 1fr);')
@@ -330,6 +330,84 @@ test('manager-v2 recipes browser defines compact responsive table geometry', () 
     mediumQuery.includes('.fabricate-manager-v2 .manager-v2-labeled-cell::before') && mediumQuery.includes('content: attr(data-label);'),
     'stacked recipe cells should expose visible labels after table headers are hidden'
   );
+});
+
+test('manager-v2 gathering task browser defines bounded toolbar and compact table geometry without reorder controls', () => {
+  const toolbarBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-toolbar');
+  const panelBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-panel-tasks');
+  const tableBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-tasks-table');
+  const rowBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-table-head,\n.fabricate-manager-v2 .manager-v2-gathering-task-row');
+  const identityBlock = blockFor('.fabricate-manager-v2 .manager-v2-recipe-identity,\n.fabricate-manager-v2 .manager-v2-component-identity,\n.fabricate-manager-v2 .manager-v2-environment-identity,\n.fabricate-manager-v2 .manager-v2-gathering-task-identity');
+  const editorBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-edit-view');
+  const dropCardBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drops-card');
+  const dropHeaderBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drops-card .manager-v2-task-card-header');
+  const dropControlsBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drop-controls');
+  const dropFooterBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drop-footer');
+  const dropFooterPaginationBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drop-footer .manager-v2-pagination');
+  const dropScrollBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drops-card .manager-v2-table-scroll');
+  const dropTableBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-drops-table');
+  const dropRowBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-drop-table-head,\n.fabricate-manager-v2 .manager-v2-gathering-task-drop-row');
+  const dropCellBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-drop-table-head > *,\n.fabricate-manager-v2 .manager-v2-gathering-task-drop-row > *');
+  const dropCellSeparatorBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-drop-table-head > * + *,\n.fabricate-manager-v2 .manager-v2-gathering-task-drop-row > * + *');
+  const selectedDropRowBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-drop-row.is-selected');
+  const dropRateBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-cell');
+  const dropRateValueBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-value');
+  const dropTierTrackBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-tier-track');
+  const dropTierBlocks = [
+    '.fabricate-manager-v2 .manager-v2-drop-rate-tier-track .is-mythic',
+    '.fabricate-manager-v2 .manager-v2-drop-rate-tier-track .is-very-rare',
+    '.fabricate-manager-v2 .manager-v2-drop-rate-tier-track .is-rare',
+    '.fabricate-manager-v2 .manager-v2-drop-rate-tier-track .is-uncommon',
+    '.fabricate-manager-v2 .manager-v2-drop-rate-tier-track .is-common'
+  ].map(selector => blockFor(selector)).join('\n');
+  const dropModifierListBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-modifier-list');
+  const dropModifierPillBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-modifier-pill');
+  const positiveDropModifierPillBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-modifier-pill.is-positive');
+  const negativeDropModifierPillBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-modifier-pill.is-negative');
+  const dropActionsBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-actions');
+  const dropQuantityInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-quantity-cell input[type="text"]');
+  const mediumQuery = css.slice(css.indexOf('@container fabricate-manager-v2 (max-width: 1120px)'));
+  const taskEditorIntermediateQuery = css.slice(css.indexOf('@container fabricate-manager-v2 (max-width: 1320px)'), css.indexOf('@container fabricate-manager-v2 (max-width: 1120px)'));
+
+  assert.ok(toolbarBlock.includes('max-height: 112px;') && toolbarBlock.includes('overflow-y: auto;'), 'task toolbar should stay bounded when filters wrap or labels are long');
+  assert.ok(panelBlock.includes('grid-template-rows: auto minmax(0, 1fr) auto;'), 'task panel should reserve toolbar, table scroll, and pagination rows');
+  assert.ok(tableBlock.includes('--fab-mv2-gathering-task-grid:'), 'task browser should define a compact desktop grid');
+  assert.ok(!tableBlock.includes('reorder'), 'task browser should not reserve a reorder column');
+  assert.ok(rowBlock.includes('grid-template-columns: var(--fab-mv2-gathering-task-grid);'), 'task rows should use the shared task grid');
+  assert.ok(identityBlock.includes('grid-template-columns: 46px minmax(0, 1fr);'), 'task identity should reserve thumbnail space');
+  assert.ok(editorBlock.includes('grid-template-rows: auto auto minmax(min(420px, 52vh), 1fr) auto;'), 'task edit route should reserve expanded vertical space for drop rules');
+  assert.ok(editorBlock.includes('overflow: auto;'), 'task editor should allow vertical scrolling without horizontal overflow');
+  assert.ok(dropCardBlock.includes('min-height: min(420px, 52vh);'), 'task editor drop rules card should own expanded vertical sizing');
+  assert.ok(dropHeaderBlock.includes('grid-template-columns: minmax(0, 1fr) auto;'), 'drop rules header should put copy left and controls right');
+  assert.ok(dropControlsBlock.includes('display: inline-flex;') && dropControlsBlock.includes('justify-content: flex-end;'), 'drop rules search and add action should share a compact toolbar');
+  assert.ok(dropFooterBlock.includes('border-top: 1px solid var(--fab-mv2-border);'), 'drop rules count should live in a footer area with pagination');
+  assert.ok(dropFooterPaginationBlock.includes('background: transparent;'), 'drop rules footer should not nest pagination chrome');
+  assert.ok(dropScrollBlock.includes('overflow-x: hidden;') && dropScrollBlock.includes('overflow-y: auto;'), 'drop rules table should suppress horizontal scroll while retaining vertical scrolling');
+  assert.ok(dropTableBlock.includes('--fab-mv2-task-drop-grid:'), 'task editor drop rows should define compact desktop geometry');
+  assert.ok(dropTableBlock.includes('minmax(0, 1.4fr)') && dropTableBlock.includes('minmax(124px, 0.82fr)') && dropTableBlock.includes('88px'), 'drop row desktop grid should reserve readable chance and horizontal action columns');
+  assert.ok(dropTableBlock.includes('width: 100%;') && dropTableBlock.includes('max-width: 100%;'), 'drop table should fill the drop rules card without exceeding it');
+  assert.ok(dropRowBlock.includes('grid-template-columns: var(--fab-mv2-task-drop-grid);'), 'drop rows should use the shared single-line editor grid');
+  assert.ok(dropRowBlock.includes('gap: 0;') && dropRowBlock.includes('max-width: 100%;'), 'drop rows should use separators instead of gap-driven overflow');
+  assert.ok(dropCellBlock.includes('padding: 8px 10px;') && dropCellBlock.includes('box-sizing: border-box;'), 'drop cells should keep padding inside full-width rows');
+  assert.ok(dropCellSeparatorBlock.includes('border-left: 1px solid var(--fab-mv2-border);'), 'drop cells should use vertical separators');
+  assert.ok(selectedDropRowBlock.includes('background: var(--fab-success-soft);') && selectedDropRowBlock.includes('var(--fab-mv2-accent)'), 'selected drop rows should use the component-browser success/accent family');
+  assert.equal(selectedDropRowBlock.includes('var(--fab-info'), false, 'selected drop rows should not use the info family');
+  assert.equal(selectedDropRowBlock.includes('var(--fab-warning'), false, 'selected drop rows should not use the warning family');
+  assert.ok(dropRateBlock.includes('display: block;'), 'drop chance cell should expose one wrapped value');
+  assert.ok(dropRateValueBlock.includes('grid-template-columns: 44px minmax(0, 1fr);'), 'drop chance value should keep percent and slider on the same line');
+  assert.ok(dropTierTrackBlock.includes('background: var(--fab-overlay-dark-18);'), 'drop chance slider should use a neutral manager-v2 track');
+  assert.equal(/var\(--fab-(danger|warning|info|success)/.test(dropTierBlocks), false, 'drop chance tier segments should not use secondary theme colour bands');
+  assert.ok(dropQuantityInputBlock.includes('max-width: 52px;') && dropQuantityInputBlock.includes('font-variant-numeric: tabular-nums;'), 'quantity should remain a compact numeric text input');
+  assert.ok(dropModifierListBlock.includes('flex-wrap: nowrap;') && dropModifierListBlock.includes('overflow: hidden;'), 'drop modifiers should remain a single clipped content group');
+  assert.ok(dropModifierPillBlock.includes('background: var(--fab-overlay-light-06);'), 'drop modifier pills should use restrained neutral chip backgrounds');
+  assert.ok(positiveDropModifierPillBlock.includes('color: var(--fab-mv2-text);') && negativeDropModifierPillBlock.includes('color: var(--fab-mv2-text);'), 'drop modifier chips should avoid saturated text across the whole pill');
+  assert.ok(dropActionsBlock.includes('flex-wrap: nowrap;') && dropActionsBlock.includes('gap: 6px;') && dropActionsBlock.includes('padding: 6px 7px;'), 'drop row actions should stay on one horizontal line');
+  assert.equal(taskEditorIntermediateQuery.includes('.manager-v2-gathering-task-drop-row {\n    grid-template-columns: minmax(0, 1fr);'), false, 'task editor should not stack drop rows at the intermediate desktop width');
+  assert.ok(
+    mediumQuery.includes('.fabricate-manager-v2 .manager-v2-gathering-task-drop-table-head,\n  .fabricate-manager-v2 .manager-v2-gathering-task-drop-row') && mediumQuery.includes('grid-template-columns: var(--fab-mv2-task-drop-grid);'),
+    'medium manager-v2 layout should preserve the drop row grid and headers instead of duplicate row labels'
+  );
+  assert.equal(css.includes('.fabricate-manager-v2 .manager-v2-gathering-task-row .manager-v2-environment-reorder-stack'), false, 'task rows should not render environment reorder controls');
 });
 
 test('manager-v2 components browser defines drop target and compact responsive table geometry', () => {

@@ -183,13 +183,15 @@ export class GatheringRichStateService {
   resolveD100Attempt({ task, environment, gatheringModifier = 0, hazardModifier = 0 } = {}) {
     const itemRows = normalizeList(task?.dropRows ?? task?.itemDrops);
     const taskModifier = numericModifier(task?.gatheringModifier, gatheringModifier);
+    const conditions = environment?.conditions || {};
     const droppedItems = itemRows
       .filter(row => row?.enabled !== false)
       .map((row, index) => rollDropRow({
         row: normalizeItemDrop(row),
         index,
         roll: this.rollD100(),
-        modifier: taskModifier
+        modifier: taskModifier,
+        conditions
       }))
       .filter(result => result.dropped);
     const rules = resolveRulesForAttempt(task, environment);
@@ -624,6 +626,7 @@ function normalizeItemDrop(row = {}) {
     itemUuid: stringOrFallback(row.itemUuid, ''),
     quantity: Math.max(1, nonNegativeInteger(row.quantity, 1)),
     dropRate: clampDropRate(row.dropRate),
+    conditionModifiers: normalizeDropConditionModifiers(row.conditionModifiers),
     enabled: row.enabled !== false
   };
 }
@@ -668,18 +671,54 @@ function numericModifier(provider = null, fallback = 0) {
   return Number.isFinite(fallbackNumber) ? fallbackNumber : 0;
 }
 
-function rollDropRow({ row, index, roll, modifier }) {
+function rollDropRow({ row, index, roll, modifier, conditions = {} }) {
   const effectiveRoll = Number(roll) + Number(modifier || 0);
-  const threshold = 101 - Number(row.dropRate);
+  const conditionModifier = matchingConditionModifier(row.conditionModifiers, conditions);
+  const finalDropRate = Math.min(100, Math.max(0, Number(row.dropRate) + conditionModifier));
+  const threshold = 101 - finalDropRate;
   return {
     ...cloneJson(row),
     rank: index,
     roll: Number(roll),
     modifier: Number(modifier || 0),
+    conditionModifier,
+    finalDropRate,
     effectiveRoll,
     threshold,
     dropped: effectiveRoll >= threshold
   };
+}
+
+function normalizeDropConditionModifiers(modifiers = {}) {
+  return {
+    timeOfDay: normalizeDropConditionModifierList(modifiers?.timeOfDay),
+    weather: normalizeDropConditionModifierList(modifiers?.weather)
+  };
+}
+
+function normalizeDropConditionModifierList(values = []) {
+  return (Array.isArray(values) ? values : [])
+    .map((modifier, index) => {
+      const conditionId = normalizeConditionId(modifier?.conditionId ?? modifier?.id);
+      const value = Number(modifier?.value);
+      if (!conditionId || !Number.isFinite(value)) return null;
+      return {
+        id: stringOrFallback(modifier?.id, `${conditionId}-${index + 1}`),
+        conditionId,
+        value: Math.trunc(value)
+      };
+    })
+    .filter(Boolean);
+}
+
+function matchingConditionModifier(modifiers = {}, conditions = {}) {
+  return ['timeOfDay', 'weather'].reduce((total, kind) => {
+    const current = normalizeConditionId(conditions?.[kind]);
+    if (!current) return total;
+    return total + normalizeDropConditionModifierList(modifiers?.[kind])
+      .filter(modifier => modifier.conditionId === current)
+      .reduce((sum, modifier) => sum + Number(modifier.value || 0), 0);
+  }, 0);
 }
 
 function normalizeGatheringRules(rules = {}) {
@@ -868,7 +907,7 @@ function hasAny(left, right) {
 function clampDropRate(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return 1;
-  return Math.min(100, Math.max(1, Math.floor(number)));
+  return Math.min(100, Math.max(0, Math.floor(number)));
 }
 
 function stringOrFallback(value, fallback) {

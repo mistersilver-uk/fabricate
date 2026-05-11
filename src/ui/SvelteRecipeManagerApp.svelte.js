@@ -75,12 +75,43 @@ export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
   };
 
   _buildServices() {
+    const managerInitialized = (manager) => manager?.initialized === true;
+    const isFabricateReady = () => {
+      const fabricate = game?.fabricate;
+      return fabricate?.ready === true
+        && managerInitialized(fabricate?.getRecipeManager?.())
+        && managerInitialized(fabricate?.getCraftingSystemManager?.());
+    };
+
     return {
       getSetting: (key) => getSetting(key),
       setSetting: async (key, value) => setSetting(key, value),
       getCraftingSystemManager: () => game?.fabricate?.getCraftingSystemManager?.() ?? null,
       getRecipeManager: () => game?.fabricate?.getRecipeManager?.() ?? null,
       getGatheringEnvironmentStore: () => game?.fabricate?.getGatheringEnvironmentStore?.() ?? null,
+      isFabricateReady,
+      onFabricateReady: (callback) => {
+        if (typeof callback !== 'function') return () => {};
+        if (isFabricateReady()) {
+          callback();
+          return () => {};
+        }
+        const hooks = globalThis.Hooks;
+        if (typeof hooks?.once !== 'function') return () => {};
+
+        let active = true;
+        const wrapped = (...args) => {
+          if (!active) return;
+          active = false;
+          callback(...args);
+        };
+        hooks.once('fabricate.ready', wrapped);
+        return () => {
+          if (!active) return;
+          active = false;
+          hooks?.off?.('fabricate.ready', wrapped);
+        };
+      },
       setGatheringConditions: async (conditions) => game?.fabricate?.gathering?.setConditions?.(conditions),
       getScriptMacros: () =>
         Array.from(game.macros?.contents || [])
