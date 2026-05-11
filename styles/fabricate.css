@@ -9045,7 +9045,7 @@
 }
 
 .fabricate-manager-v2 .manager-v2-gathering-task-drop-row {
-  min-height: 56px;
+  min-height: 72px;
   padding: 0;
   border: 0;
   border-top: 1px solid var(--fab-mv2-border);
@@ -9389,9 +9389,11 @@
 .fabricate-manager-v2 .manager-v2-drop-modifier-list {
   display: flex;
   align-items: center;
+  align-content: center;
   gap: 6px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   min-width: 0;
+  max-height: 58px;
   overflow: hidden;
 }
 

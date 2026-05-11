@@ -2829,15 +2829,15 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.every(row => row.id !== addedRow.id)));
   });
 
-  it('summarizes crowded gathering task drop modifiers after six labels', async () => {
-    const sixModifiers = Array.from({ length: 6 }, (_, index) => ({
-      id: `six-${index}`,
-      conditionId: `six-${index}`,
+  it('summarizes crowded gathering task drop modifiers at five or more labels', async () => {
+    const fourModifiers = Array.from({ length: 4 }, (_, index) => ({
+      id: `four-${index}`,
+      conditionId: `four-${index}`,
       value: index + 1
     }));
-    const sevenModifiers = Array.from({ length: 7 }, (_, index) => ({
-      id: `seven-${index}`,
-      conditionId: `seven-${index}`,
+    const fiveModifiers = Array.from({ length: 5 }, (_, index) => ({
+      id: `five-${index}`,
+      conditionId: `five-${index}`,
       value: index + 1
     }));
     target = document.createElement('div');
@@ -2848,20 +2848,20 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
         store: createStore([], {
           taskDropRows: [
             {
-              id: 'drop-six-modifiers',
+              id: 'drop-four-modifiers',
               componentId: 'c1',
               quantity: 1,
               dropRate: 25,
               enabled: true,
-              conditionModifiers: { timeOfDay: sixModifiers, weather: [] }
+              conditionModifiers: { timeOfDay: fourModifiers, weather: [] }
             },
             {
-              id: 'drop-seven-modifiers',
+              id: 'drop-five-modifiers',
               componentId: 'c3',
               quantity: 1,
               dropRate: 25,
               enabled: true,
-              conditionModifiers: { timeOfDay: sevenModifiers, weather: [] }
+              conditionModifiers: { timeOfDay: fiveModifiers, weather: [] }
             }
           ]
         }),
@@ -2880,13 +2880,13 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    const sixModifierRow = target.querySelector('[data-gathering-task-drop-id="drop-six-modifiers"]');
-    const sevenModifierRow = target.querySelector('[data-gathering-task-drop-id="drop-seven-modifiers"]');
-    assert.equal(sixModifierRow.querySelectorAll('.manager-v2-drop-modifier-pill').length, 6);
-    assert.equal(sixModifierRow.textContent.includes('See selected rule for modifiers'), false);
-    assert.equal(sevenModifierRow.querySelectorAll('.manager-v2-drop-modifier-pill').length, 0);
-    assert.ok(sevenModifierRow.querySelector('.manager-v2-drop-modifier-overflow'));
-    assert.ok(sevenModifierRow.textContent.includes('See selected rule for modifiers'));
+    const fourModifierRow = target.querySelector('[data-gathering-task-drop-id="drop-four-modifiers"]');
+    const fiveModifierRow = target.querySelector('[data-gathering-task-drop-id="drop-five-modifiers"]');
+    assert.equal(fourModifierRow.querySelectorAll('.manager-v2-drop-modifier-pill').length, 4);
+    assert.equal(fourModifierRow.textContent.includes('See selected rule for modifiers'), false);
+    assert.equal(fiveModifierRow.querySelectorAll('.manager-v2-drop-modifier-pill').length, 0);
+    assert.ok(fiveModifierRow.querySelector('.manager-v2-drop-modifier-overflow'));
+    assert.ok(fiveModifierRow.textContent.includes('See selected rule for modifiers'));
   });
 
   it('colours gathering task drop chance sliders by rarity threshold', async () => {

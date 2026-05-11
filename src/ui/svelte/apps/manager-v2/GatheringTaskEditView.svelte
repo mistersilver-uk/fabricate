@@ -42,7 +42,7 @@
   const showRewardRuleNotice = $derived(selectedDrop?.componentId
     && repeatedComponentRows.length > 1
     && rewardRules?.rewardSelectionMode !== 'allDrops');
-  const maxVisibleModifiers = 6;
+  const maxVisibleModifiers = 4;
 
   $effect(() => {
     if (task?.id === lastTaskId) return;
@@ -200,7 +200,7 @@
   }
 
   function hasModifierOverflow(row) {
-    return modifierEntries(row).length > maxVisibleModifiers;
+    return modifierEntries(row).length >= maxVisibleModifiers + 1;
   }
 
   function visibleModifierEntries(row) {
