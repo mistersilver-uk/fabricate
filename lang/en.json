@@ -908,7 +908,7 @@
             "SelectComponent": "Select a component",
             "DropChance": "Drop chance",
             "DropChancePercent": "Drop chance percent",
-            "DropQuantityColumn": "#",
+            "DropQuantityColumn": "Count",
             "Quantity": "Quantity",
             "ClearDropComponentHint": "Right-click to clear component",
             "QuantityShortHint": "award",
