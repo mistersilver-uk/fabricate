@@ -12,6 +12,9 @@ Gathering task drop rows can be edited, but assigning existing managed component
 - Render draggable managed component cards and allow dropping them onto any drop rule row.
 - Preserve existing Foundry/import drop handling for non-managed-component drag payloads.
 - Keep drop rules visible by bounding the new browser and the existing drop rules card with internal scroll regions.
+- Increase the Manager V2 default window height and gathering editor card heights so drag/drop has enough vertical room.
+- Default gathering task drop-rule pagination to five rows.
+- Render selected component tag filters as removable pills.
 
 ## Scope Notes
 

@@ -16,6 +16,8 @@ The component browser owns independent local state:
 
 Filtering is intentionally narrow: name search checks only `item.name`, and selected tags use an all-tags match against `item.tags`. Tag suggestions are derived from the current component cards and exclude already-selected tags.
 
+Selected component tags render as removable selected-tag pills, matching the Manager V2 component browser pill language instead of inline bare text plus a detached button.
+
 ## Drag And Drop
 
 Each component card is draggable and writes a `text/plain` JSON payload:
@@ -34,6 +36,8 @@ All other parsed payloads continue through `onImportDrop(row.id, data)`.
 
 ## Layout
 
-The task editor grid gains a bounded component browser row between task availability and drop rules. The browser card uses a compact header, filter row, fixed two-row card viewport, and local pagination footer. The grid is three columns at normal widths and collapses only under the existing Manager V2 container breakpoints.
+The task editor grid gains a bounded component browser row between task availability and drop rules. The browser card uses a compact header, filter row, fixed two-row card viewport, and local pagination footer. The component browser card is tall enough to keep its footer visible, and the drop-rules card is tall enough to show the table header plus three drop rows before scrolling. The grid is three columns at normal widths and collapses only under the existing Manager V2 container breakpoints.
 
 Drop-rule rows remain full-row drop targets, including already-populated rows. Right-click-to-clear remains scoped to the component button and is unchanged.
+
+Manager V2 opens at `1280x940` by default so the gathering task editor has enough vertical drag/drop room. Drop-rule pagination defaults to `5` rows per page while component browser pagination remains fixed at `6`.

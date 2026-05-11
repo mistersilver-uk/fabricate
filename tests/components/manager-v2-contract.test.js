@@ -58,6 +58,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
       appSource.includes('openCurrentAdmin'),
       'v2 wrapper should expose an explicit legacy admin launch service during additive rollout'
     );
+    assert.ok(appSource.includes('height: 940'), 'v2 wrapper should open tall enough for gathering task drag/drop');
     assert.ok(
       mainSource.includes("import './ui/SvelteRecipeManagerApp.svelte.js';"),
       'legacy manager side-effect import should remain'
@@ -626,6 +627,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'data-gathering-component-card',
       'data-gathering-component-name-search',
       'data-gathering-component-tag-search',
+      'manager-v2-selected-tag-pill',
       'data-gathering-task-drops-table',
       'data-gathering-task-availability-option',
       'data-gathering-task-availability-pill',
@@ -637,6 +639,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'manager-v2-task-component-browser-card',
       'manager-v2-task-component-grid',
       'manager-v2-task-component-card-grip',
+      'let pageSize = $state(5)',
       'manager-v2-drop-cell',
       'manager-v2-drop-component-cell',
       'manager-v2-drop-quantity-cell',

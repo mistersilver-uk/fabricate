@@ -3014,6 +3014,8 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     flushSync();
     assert.equal(target.querySelectorAll('[data-gathering-component-card]').length, 1, 'selected component tags should require all tags');
     assert.ok(browser.textContent.includes('Moon Fern'));
+    const selectedTagPills = Array.from(target.querySelectorAll('[data-gathering-component-tag-pill]'));
+    assert.ok(selectedTagPills.every(pill => pill.classList.contains('manager-v2-selected-tag-pill')), 'selected component tags should render as removable pills');
 
     for (const pill of Array.from(target.querySelectorAll('[data-gathering-component-tag-pill] button'))) {
       pill.click();
@@ -3127,7 +3129,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
   });
 
   it('colours gathering task drop chance sliders by rarity threshold', async () => {
-    const dropRows = [
+    const rarityRows = [
       ['drop-guaranteed', 100, 'is-guaranteed', 'var(--fab-drop-rate-guaranteed)'],
       ['drop-common', 70, 'is-common', 'var(--fab-drop-rate-common)'],
       ['drop-uncommon', 69, 'is-uncommon', 'var(--fab-drop-rate-uncommon)'],
@@ -3135,7 +3137,8 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
       ['drop-very-rare', 5, 'is-very-rare', 'var(--fab-drop-rate-very-rare)'],
       ['drop-legendary', 4, 'is-legendary', 'var(--fab-drop-rate-legendary)'],
       ['drop-zero', 0, 'is-none', 'var(--fab-drop-rate-none)']
-    ].map(([id, dropRate]) => ({
+    ];
+    const dropRows = rarityRows.map(([id, dropRate]) => ({
       id,
       componentId: 'c1',
       quantity: 1,
@@ -3163,20 +3166,20 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    for (const [id, dropRate, tierClass, color] of [
-      ['drop-guaranteed', 100, 'is-guaranteed', 'var(--fab-drop-rate-guaranteed)'],
-      ['drop-common', 70, 'is-common', 'var(--fab-drop-rate-common)'],
-      ['drop-uncommon', 69, 'is-uncommon', 'var(--fab-drop-rate-uncommon)'],
-      ['drop-rare', 15, 'is-rare', 'var(--fab-drop-rate-rare)'],
-      ['drop-very-rare', 5, 'is-very-rare', 'var(--fab-drop-rate-very-rare)'],
-      ['drop-legendary', 4, 'is-legendary', 'var(--fab-drop-rate-legendary)'],
-      ['drop-zero', 0, 'is-none', 'var(--fab-drop-rate-none)']
-    ]) {
-      const control = target.querySelector(`[data-gathering-task-drop-id="${id}"] .manager-v2-drop-rate-control`);
-      assert.ok(control.classList.contains(tierClass), `${id} should use ${tierClass}`);
-      assert.ok(control.getAttribute('style').includes(`--fab-drop-rate-value: ${dropRate}%;`), `${id} should expose its slider fill value`);
-      assert.ok(control.getAttribute('style').includes(`--fab-drop-rate-color: ${color};`), `${id} should expose ${color}`);
+    function assertRenderedRarityRows(rows) {
+      for (const [id, dropRate, tierClass, color] of rows) {
+        const control = target.querySelector(`[data-gathering-task-drop-id="${id}"] .manager-v2-drop-rate-control`);
+        assert.ok(control.classList.contains(tierClass), `${id} should use ${tierClass}`);
+        assert.ok(control.getAttribute('style').includes(`--fab-drop-rate-value: ${dropRate}%;`), `${id} should expose its slider fill value`);
+        assert.ok(control.getAttribute('style').includes(`--fab-drop-rate-color: ${color};`), `${id} should expose ${color}`);
+      }
     }
+
+    assertRenderedRarityRows(rarityRows.slice(0, 5));
+    target.querySelector('.manager-v2-task-drops-card [data-pagination-next]').click();
+    await tick();
+    flushSync();
+    assertRenderedRarityRows(rarityRows.slice(5));
   });
 
   it('paginates gathering task editor drop rules without snapping back to the selected row', async () => {
@@ -3208,15 +3211,17 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
+    const dropRulesCard = target.querySelector('.manager-v2-task-drops-card');
     assert.ok(target.querySelector('[data-gathering-task-drop-id="drop-page-1"]'));
-    assert.equal(target.querySelector('[data-pagination-page]').textContent.trim(), 'Page 1 of 2');
-    target.querySelector('[data-pagination-next]').click();
+    assert.equal(dropRulesCard.querySelectorAll('[data-gathering-task-drop-id]').length, 5, 'drop rules should default to five rows per page');
+    assert.equal(dropRulesCard.querySelector('[data-pagination-page]').textContent.trim(), 'Page 1 of 3');
+    dropRulesCard.querySelector('[data-pagination-next]').click();
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('[data-pagination-page]').textContent.trim(), 'Page 2 of 2');
+    assert.equal(dropRulesCard.querySelector('[data-pagination-page]').textContent.trim(), 'Page 2 of 3');
     assert.equal(target.querySelector('[data-gathering-task-drop-id="drop-page-1"]'), null);
-    assert.ok(target.querySelector('[data-gathering-task-drop-id="drop-page-11"]'));
+    assert.ok(target.querySelector('[data-gathering-task-drop-id="drop-page-6"]'));
   });
 
   it('shows setup guidance and keeps create routing when a gathering system has no environments', async () => {

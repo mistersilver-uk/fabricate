@@ -15,3 +15,15 @@
 - [x] Run targeted component tests.
 - [x] Run `npm test`.
 - [x] Run `npm run build`.
+
+## 4. Refinement
+
+- [x] Plan taller Manager V2 default window and gathering editor card sizing.
+- [x] Increase default Manager V2 height to `940`.
+- [x] Increase component browser and drop-rules card heights.
+- [x] Default drop-rule pagination to `5`.
+- [x] Render selected component tags as removable pills.
+- [x] Update tests for the refined sizing, pagination, and pill behavior.
+- [x] Re-run targeted component tests.
+- [x] Re-run `npm test`.
+- [x] Re-run `npm run build`.

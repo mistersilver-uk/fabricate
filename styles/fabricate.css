@@ -8345,7 +8345,7 @@
 
 .fabricate-manager-v2 .manager-v2-gathering-task-edit-view {
   display: grid;
-  grid-template-rows: auto auto 292px minmax(min(320px, 40vh), 1fr) auto;
+  grid-template-rows: auto auto 340px minmax(380px, 1fr) auto;
   gap: 12px;
   min-height: 0;
   min-width: 0;
@@ -8539,9 +8539,9 @@
 .fabricate-manager-v2 .manager-v2-task-component-browser-card {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
-  height: 292px;
-  min-height: 292px;
-  max-height: 292px;
+  height: 340px;
+  min-height: 340px;
+  max-height: 340px;
   overflow: hidden;
 }
 
@@ -8803,7 +8803,7 @@
 .fabricate-manager-v2 .manager-v2-task-drops-card {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  min-height: min(320px, 40vh);
+  min-height: 380px;
   overflow: hidden;
 }
 

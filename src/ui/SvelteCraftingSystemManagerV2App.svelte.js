@@ -21,7 +21,7 @@ export class SvelteCraftingSystemManagerV2App extends SvelteRecipeManagerApp {
     },
     position: {
       width: 1280,
-      height: 820
+      height: 940
     }
   };
 

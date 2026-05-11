@@ -24,7 +24,7 @@
 
   let searchTerm = $state('');
   let pageIndex = $state(0);
-  let pageSize = $state(10);
+  let pageSize = $state(5);
   let componentSearchTerm = $state('');
   let componentTagSearchTerm = $state('');
   let selectedComponentTags = $state([]);
@@ -591,9 +591,9 @@
       </div>
 
       {#if selectedComponentTags.length > 0}
-        <div class="manager-v2-toolbar-pills manager-v2-task-component-pills" data-gathering-component-tag-pills>
+        <div class="manager-v2-toolbar-pills manager-v2-selected-tag-row manager-v2-task-component-pills" role="list" aria-label={text('FABRICATE.Admin.ManagerV2.Component.SelectedTags', 'Selected component tags')} data-gathering-component-tag-pills>
           {#each selectedComponentTags as tag (tag)}
-            <span class="manager-v2-tag-pill" data-gathering-component-tag-pill={tag}>
+            <span class="manager-v2-chip manager-v2-selected-tag-pill" role="listitem" data-gathering-component-tag-pill={tag}>
               {tag}
               <button type="button" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.RemoveComponentTagFilter', 'Remove {tag}').replace('{tag}', tag)} onclick={() => removeComponentTag(tag)}>
                 <i class="fas fa-xmark" aria-hidden="true"></i>
