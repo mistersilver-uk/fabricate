@@ -9415,7 +9415,6 @@
   height: 18px;
   border: 0;
   accent-color: var(--fab-drop-rate-color);
-  background: transparent;
   cursor: pointer;
 }
 
@@ -9728,7 +9727,7 @@
 }
 
 .fabricate-manager-v2 .manager-v2-drop-editor-card [data-gathering-drop-inspector-rate] .manager-v2-drop-rate-percent input[type="text"] {
-  padding: 4px 28px 4px 6px;
+  padding: 4px 16px 4px 6px;
 }
 
 .fabricate-manager-v2 .manager-v2-drop-editor-card [data-gathering-drop-inspector-rate] .manager-v2-drop-rate-percent > span[aria-hidden="true"] {
