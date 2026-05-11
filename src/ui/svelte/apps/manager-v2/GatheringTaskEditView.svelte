@@ -147,7 +147,7 @@
 
   function componentDescription(row) {
     const item = managedItem(row?.componentId);
-    return item?.sourceItemUuid || row?.itemUuid || row?.componentId || item?.description || text('FABRICATE.Admin.ManagerV2.Environment.Tasks.UnresolvedDrop', 'Unresolved drop');
+    return item?.description || text('FABRICATE.Admin.ManagerV2.Environment.Tasks.UnresolvedDrop', 'Unresolved drop');
   }
 
   function modifierEntries(row) {
@@ -330,15 +330,16 @@
           <h3>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropRules', 'Drop Rules')}</h3>
           <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropRulesHint', 'Configure what can drop, how often, and which conditions modify each drop.')}</p>
         </div>
-        <label class="manager-v2-search is-compact">
-          <i class="fas fa-search" aria-hidden="true"></i>
-          <input type="search" bind:value={searchTerm} placeholder={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SearchDropsPlaceholder', 'Search drop rules...')} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SearchDrops', 'Search drop rules')} />
-        </label>
-        <span class="manager-v2-muted manager-v2-drop-count">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ShowingDrops', 'Showing {start}-{end} of {total} drops').replace('{start}', showingStart).replace('{end}', showingEnd).replace('{total}', filteredRows.length)}</span>
-        <button type="button" class="manager-v2-button" onclick={onAddDrop}>
-          <i class="fas fa-plus" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AddDrop', 'Add drop rule')}</span>
-        </button>
+        <div class="manager-v2-task-drop-controls">
+          <label class="manager-v2-search is-compact">
+            <i class="fas fa-search" aria-hidden="true"></i>
+            <input type="search" bind:value={searchTerm} placeholder={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SearchDropsPlaceholder', 'Search drop rules...')} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SearchDrops', 'Search drop rules')} />
+          </label>
+          <button type="button" class="manager-v2-button" onclick={onAddDrop}>
+            <i class="fas fa-plus" aria-hidden="true"></i>
+            <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AddDrop', 'Add drop rule')}</span>
+          </button>
+        </div>
       </div>
 
       <section class="manager-v2-table-scroll" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropRulesTable', 'Drop rules table')}>
@@ -444,13 +445,16 @@
         {/if}
       </section>
 
-      <Pagination
-        totalCount={filteredRows.length}
-        {pageSize}
-        {pageIndex}
-        onPageChange={(next) => pageIndex = next}
-        onPageSizeChange={(next) => { pageSize = next; pageIndex = 0; }}
-      />
+      <div class="manager-v2-task-drop-footer">
+        <span class="manager-v2-muted manager-v2-drop-count" data-gathering-task-drop-count>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ShowingDrops', 'Showing {start}-{end} of {total} drops').replace('{start}', showingStart).replace('{end}', showingEnd).replace('{total}', filteredRows.length)}</span>
+        <Pagination
+          totalCount={filteredRows.length}
+          {pageSize}
+          {pageIndex}
+          onPageChange={(next) => pageIndex = next}
+          onPageSizeChange={(next) => { pageSize = next; pageIndex = 0; }}
+        />
+      </div>
     </section>
 
     <section class="manager-v2-warning-band is-formula">

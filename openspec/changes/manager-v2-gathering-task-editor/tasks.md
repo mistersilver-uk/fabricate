@@ -51,3 +51,10 @@
 - [x] Replace the quantity cell helper with a compact positive-integer text input.
 - [x] Keep drop rows full width inside the card, suppress horizontal scrolling, and separate columns with vertical borders.
 - [x] Update mounted/layout/contract tests for unlabeled row values, quantity input constraints, and non-overflow row geometry.
+
+## 8. Drop Rules Visual Alignment
+
+- [x] Rework the drop rules header and footer so search/actions sit in a toolbar and the showing count lives with pagination.
+- [x] Align drop row colours with Manager V2 browser tables: neutral default rows, subtle hover, and success/accent selection.
+- [x] Retune drop row grid proportions so chance, quantity, modifiers, and duplicate/delete actions stay readable without horizontal scroll.
+- [x] Replace secondary-colour rarity styling with a neutral slider track and restrained modifier chip colours.

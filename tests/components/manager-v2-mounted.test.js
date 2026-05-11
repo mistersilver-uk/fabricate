@@ -2125,11 +2125,14 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(target.querySelector('[data-gathering-task-matching-logic]'), null);
     assert.ok(target.textContent.includes('Drop chance'));
     assert.ok(target.textContent.includes('Final chance'));
+    assert.equal(target.querySelector('.manager-v2-task-card-header .manager-v2-drop-count'), null);
+    assert.ok(target.querySelector('.manager-v2-task-drop-footer [data-gathering-task-drop-count]'));
     const populatedDropRow = target.querySelector('[data-gathering-task-drop-id="drop-nightshade"]');
+    assert.equal(populatedDropRow.querySelector('[data-gathering-task-drop-row-number]'), null);
     const populatedComponentCell = populatedDropRow.querySelector('[data-gathering-task-drop-component-cell]');
     assert.ok(populatedComponentCell.querySelector('.manager-v2-gathering-task-thumb'));
     assert.ok(populatedComponentCell.textContent.includes('Nightshade With An Exceptionally Long Localized Component Name'));
-    assert.ok(populatedComponentCell.textContent.includes('Compendium.fabricate.items.nightshade-with-a-long-source-reference'));
+    assert.ok(populatedComponentCell.querySelector('.manager-v2-system-description').textContent.trim().length > 0);
     assert.equal(populatedDropRow.textContent.includes('Drop component'), false);
     assert.equal(populatedDropRow.textContent.includes('Drop chance'), false);
     assert.equal(populatedDropRow.textContent.includes('Quantity'), false);
@@ -2161,6 +2164,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     const dropActionButtons = populatedDropRow.querySelectorAll('[data-gathering-task-drop-actions] .manager-v2-icon-button');
     assert.equal(dropActionButtons.length, 2);
     assert.equal(populatedDropRow.querySelector('[aria-label="Select drop rule"]'), null);
+    assert.equal(populatedDropRow.querySelector('[aria-label="Edit drop rule"]'), null);
     assert.ok(populatedDropRow.querySelector('[aria-label="Duplicate drop rule"]'));
     assert.ok(populatedDropRow.querySelector('[aria-label="Delete drop rule"]'));
     const mediaColumn = coreEditor.querySelector('.manager-v2-task-media-column');

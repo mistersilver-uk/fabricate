@@ -625,6 +625,9 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'data-gathering-task-drop-component-cell',
       'data-gathering-task-drop-chance-cell',
       'data-gathering-task-drop-actions',
+      'data-gathering-task-drop-count',
+      'manager-v2-task-drop-controls',
+      'manager-v2-task-drop-footer',
       'manager-v2-drop-cell',
       'manager-v2-drop-component-cell',
       'manager-v2-drop-quantity-cell',
@@ -652,6 +655,8 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(!gatheringTaskEditSource.includes('<select value={selectedCondition'), 'task availability should not use native single-select controls');
     assert.ok(!gatheringTaskEditSource.includes('function selectedCondition('), 'task availability should not collapse arrays to a single selection');
     assert.ok(!gatheringTaskEditSource.includes('Tasks.SelectDrop'), 'drop rows should not render a row-level edit/select quick action');
+    assert.ok(!gatheringTaskEditSource.includes('data-gathering-task-drop-row-number'), 'drop rows should not add a leading row number column');
+    assert.ok(!gatheringTaskEditSource.includes('EditDrop'), 'drop rows should not add an edit quick action');
     assert.ok(!gatheringTaskEditSource.includes('manager-v2-labeled-cell manager-v2-drop-component-cell'), 'drop component row values should not render responsive duplicate labels');
     assert.ok(!gatheringTaskEditSource.includes('manager-v2-labeled-cell manager-v2-drop-rate-cell'), 'drop chance row values should not render responsive duplicate labels');
     assert.ok(!gatheringTaskEditSource.includes('QuantityShortHint'), 'drop quantity row values should not render an extra helper label');

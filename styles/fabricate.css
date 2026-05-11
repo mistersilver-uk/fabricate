@@ -8755,6 +8755,13 @@
   overflow: hidden;
 }
 
+.fabricate-manager-v2 .manager-v2-task-drops-card .manager-v2-task-card-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
 .fabricate-manager-v2 .manager-v2-task-overview-card {
   display: grid;
   grid-template-columns: minmax(230px, 0.88fr) minmax(280px, 1.18fr) minmax(180px, 0.64fr);
@@ -8788,6 +8795,10 @@
   margin: 0;
   color: var(--fab-warning-text);
   font-size: 1rem;
+}
+
+.fabricate-manager-v2 .manager-v2-task-drops-card .manager-v2-task-card-header h3 {
+  color: var(--fab-mv2-text);
 }
 
 .fabricate-manager-v2 .manager-v2-task-overview-card label,
@@ -8887,10 +8898,50 @@
   min-height: 32px;
 }
 
+.fabricate-manager-v2 .manager-v2-task-drop-controls {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-task-drop-controls .manager-v2-search.is-compact {
+  flex: 1 1 260px;
+  width: min(320px, 34vw);
+  max-width: 320px;
+}
+
 .fabricate-manager-v2 .manager-v2-drop-count {
   flex: 0 0 auto;
   font-size: 0.76rem;
   white-space: nowrap;
+}
+
+.fabricate-manager-v2 .manager-v2-task-drop-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px 12px;
+  border-top: 1px solid var(--fab-mv2-border);
+  background: var(--fab-overlay-light-03);
+}
+
+.fabricate-manager-v2 .manager-v2-task-drop-footer .manager-v2-pagination {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
+  padding: 0;
+  border-top: 0;
+  background: transparent;
+}
+
+.fabricate-manager-v2 .manager-v2-task-drop-footer .manager-v2-pagination-summary {
+  display: none;
 }
 
 .fabricate-manager-v2 .manager-v2-warning-band {
@@ -8911,7 +8962,7 @@
 }
 
 .fabricate-manager-v2 .manager-v2-gathering-task-drops-table {
-  --fab-mv2-task-drop-grid: minmax(0, 1.55fr) minmax(0, 0.95fr) 54px minmax(0, 0.9fr) 64px;
+  --fab-mv2-task-drop-grid: minmax(0, 1.4fr) minmax(124px, 0.82fr) 74px minmax(0, 1fr) 88px;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -8922,6 +8973,7 @@
 }
 
 .fabricate-manager-v2 .manager-v2-task-drops-card .manager-v2-table-scroll {
+  padding: 10px 12px 0;
   overflow-x: hidden;
   overflow-y: auto;
 }
@@ -8939,8 +8991,13 @@
   box-sizing: border-box;
 }
 
+.fabricate-manager-v2 .manager-v2-gathering-task-drop-table-head {
+  min-height: 36px;
+  border-bottom: 1px solid var(--fab-mv2-border);
+}
+
 .fabricate-manager-v2 .manager-v2-gathering-task-drop-row {
-  min-height: 52px;
+  min-height: 56px;
   padding: 0;
   border: 0;
   border-top: 1px solid var(--fab-mv2-border);
@@ -8953,7 +9010,7 @@
 .fabricate-manager-v2 .manager-v2-gathering-task-drop-table-head > *,
 .fabricate-manager-v2 .manager-v2-gathering-task-drop-row > * {
   min-width: 0;
-  padding: 6px 8px;
+  padding: 8px 10px;
   box-sizing: border-box;
 }
 
@@ -8982,15 +9039,15 @@
 
 .fabricate-manager-v2 .manager-v2-drop-component-button,
 .fabricate-manager-v2 .manager-v2-drop-empty-component {
-  grid-template-columns: 38px minmax(0, 1fr);
+  grid-template-columns: 42px minmax(0, 1fr);
   gap: 8px;
-  min-height: 38px;
+  min-height: 40px;
 }
 
 .fabricate-manager-v2 .manager-v2-drop-component-button .manager-v2-gathering-task-thumb {
-  width: 38px;
-  height: 38px;
-  border-radius: 7px;
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
 }
 
 .fabricate-manager-v2 .manager-v2-drop-component-button .manager-v2-system-copy,
@@ -9042,31 +9099,32 @@
   display: grid;
   grid-template-columns: 5fr 10fr 20fr 30fr 35fr;
   height: 6px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-overlay-light-10);
   border-radius: 999px;
+  background: var(--fab-overlay-dark-18);
   overflow: hidden;
   pointer-events: none;
   transform: translateY(-50%);
 }
 
 .fabricate-manager-v2 .manager-v2-drop-rate-tier-track .is-mythic {
-  background: var(--fab-danger-border);
+  background: var(--fab-overlay-light-08);
 }
 
 .fabricate-manager-v2 .manager-v2-drop-rate-tier-track .is-very-rare {
-  background: var(--fab-warning-border);
+  background: var(--fab-overlay-light-08);
 }
 
 .fabricate-manager-v2 .manager-v2-drop-rate-tier-track .is-rare {
-  background: var(--fab-info-border);
+  background: var(--fab-overlay-light-08);
 }
 
 .fabricate-manager-v2 .manager-v2-drop-rate-tier-track .is-uncommon {
-  background: var(--fab-success-border);
+  background: var(--fab-overlay-light-08);
 }
 
 .fabricate-manager-v2 .manager-v2-drop-rate-tier-track .is-common {
-  background: var(--fab-mv2-border-strong);
+  background: var(--fab-overlay-light-08);
 }
 
 .fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"] {
@@ -9087,9 +9145,9 @@
 }
 
 .fabricate-manager-v2 .manager-v2-gathering-task-drop-row.is-selected {
-  border-color: var(--fab-info-border);
-  background: var(--fab-info-soft);
-  box-shadow: inset 3px 0 0 var(--fab-warning-text), inset 0 0 0 1px var(--fab-info-border);
+  border-color: var(--fab-mv2-border-strong);
+  background: var(--fab-success-soft);
+  box-shadow: inset 3px 0 0 var(--fab-mv2-accent), inset 0 0 0 1px var(--fab-mv2-border-strong);
 }
 
 .fabricate-manager-v2 .manager-v2-inline-drop-zone {
@@ -9108,10 +9166,10 @@
 }
 
 .fabricate-manager-v2 .manager-v2-drop-empty-component .manager-v2-inline-drop-zone {
-  width: 38px;
-  min-height: 38px;
+  width: 42px;
+  min-height: 40px;
   padding: 0;
-  border-radius: 7px;
+  border-radius: 8px;
 }
 
 .fabricate-manager-v2 .manager-v2-empty-drop-cell {
@@ -9182,7 +9240,30 @@
 
 .fabricate-manager-v2 .manager-v2-drop-modifier-pill {
   max-width: 100%;
+  border-color: var(--fab-mv2-border);
+  color: var(--fab-mv2-text);
+  background: var(--fab-overlay-light-06);
   white-space: nowrap;
+}
+
+.fabricate-manager-v2 .manager-v2-drop-modifier-pill.is-positive {
+  border-color: var(--fab-success-border);
+  color: var(--fab-mv2-text);
+  background: var(--fab-overlay-light-06);
+}
+
+.fabricate-manager-v2 .manager-v2-drop-modifier-pill.is-negative {
+  border-color: var(--fab-danger-border);
+  color: var(--fab-mv2-text);
+  background: var(--fab-overlay-light-06);
+}
+
+.fabricate-manager-v2 .manager-v2-drop-modifier-pill.is-positive strong {
+  color: var(--fab-success-text);
+}
+
+.fabricate-manager-v2 .manager-v2-drop-modifier-pill.is-negative strong {
+  color: var(--fab-danger-text);
 }
 
 .fabricate-manager-v2 .manager-v2-drop-modifier-pill span {
@@ -9193,6 +9274,9 @@
 
 .fabricate-manager-v2 .manager-v2-drop-actions {
   justify-content: flex-end;
+  flex-wrap: nowrap;
+  gap: 6px;
+  padding: 6px 7px;
 }
 
 .fabricate-manager-v2 .manager-v2-rank-chip {
@@ -9967,7 +10051,20 @@
   }
 
   .fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"] .manager-v2-gathering-task-drops-table {
-    --fab-mv2-task-drop-grid: minmax(0, 1.45fr) minmax(0, 0.9fr) 52px minmax(0, 0.78fr) 62px;
+    --fab-mv2-task-drop-grid: minmax(0, 1.32fr) minmax(118px, 0.78fr) 72px minmax(0, 0.92fr) 88px;
+  }
+
+  .fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"] .manager-v2-task-drops-card .manager-v2-task-card-header {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"] .manager-v2-task-drop-controls {
+    justify-content: space-between;
+  }
+
+  .fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"] .manager-v2-task-drop-controls .manager-v2-search.is-compact {
+    width: auto;
+    max-width: none;
   }
 }
 
