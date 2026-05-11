@@ -44,3 +44,10 @@
 - [x] Add empty component copy for `No Component` and `Create or assign`.
 - [x] Update mounted/layout/contract tests for the expanded row layout and removed edit quick action.
 - [x] Run targeted tests, `npm test`, and `npm run build`.
+
+## 7. Drop Rules Row Cleanup
+
+- [x] Remove repeated row-value labels from drop component, chance, and quantity cells so the column header is the only visible label.
+- [x] Replace the quantity cell helper with a compact positive-integer text input.
+- [x] Keep drop rows full width inside the card, suppress horizontal scrolling, and separate columns with vertical borders.
+- [x] Update mounted/layout/contract tests for unlabeled row values, quantity input constraints, and non-overflow row geometry.

@@ -181,6 +181,19 @@
     return 'is-neutral';
   }
 
+  function onQuantityInput(rowId, event) {
+    const input = event.currentTarget;
+    const normalized = String(input.value || '').replace(/\D+/g, '').replace(/^0+/, '');
+    input.value = normalized;
+    const quantity = Number(normalized);
+    if (Number.isInteger(quantity) && quantity > 0) onUpdateDrop(rowId, { quantity });
+  }
+
+  function onQuantityBlur(row, event) {
+    const quantity = Number(String(event.currentTarget.value || '').replace(/\D+/g, ''));
+    if (!Number.isInteger(quantity) || quantity < 1) event.currentTarget.value = String(row.quantity || 1);
+  }
+
   function handleDropZoneDrop(rowId, data) {
     onImportDrop(rowId, data);
   }
@@ -363,7 +376,7 @@
                 onclick={() => onSelectDrop(row.id)}
                 onkeydown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelectDrop(row.id); } }}
               >
-                <span role="cell" class="manager-v2-labeled-cell manager-v2-drop-component-cell" data-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropComponent', 'Component')} data-gathering-task-drop-component-cell>
+                <span role="cell" class="manager-v2-drop-cell manager-v2-drop-component-cell" data-gathering-task-drop-component-cell>
                   {#if row.componentId || row.itemUuid}
                     <button type="button" class="manager-v2-gathering-task-identity manager-v2-drop-component-button" onclick={(event) => { event.stopPropagation(); onSelectDrop(row.id); }} onkeydown={(event) => event.stopPropagation()}>
                       <img class="manager-v2-gathering-task-thumb" src={componentImage(row)} alt="" />
@@ -388,7 +401,7 @@
                     </div>
                   {/if}
                 </span>
-                <span role="cell" class="manager-v2-labeled-cell manager-v2-drop-rate-cell" data-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChance', 'Drop chance')} data-gathering-task-drop-chance-cell>
+                <span role="cell" class="manager-v2-drop-cell manager-v2-drop-rate-cell" data-gathering-task-drop-chance-cell>
                   <span class="manager-v2-drop-rate-value">
                     <strong>{row.dropRate ?? 1}%</strong>
                     <span class="manager-v2-drop-rate-control">
@@ -403,13 +416,10 @@
                     </span>
                   </span>
                 </span>
-                <span role="cell" class="manager-v2-labeled-cell" data-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Quantity', 'Quantity')}>
-                  <label class="manager-v2-quantity-input">
-                    <input type="number" min="1" step="1" value={row.quantity || 1} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Quantity', 'Quantity')} oninput={(event) => onUpdateDrop(row.id, { quantity: Number(event.currentTarget.value || 1) })} onclick={(event) => event.stopPropagation()} onkeydown={(event) => event.stopPropagation()} />
-                    <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.QuantityShortHint', 'award')}</span>
-                  </label>
+                <span role="cell" class="manager-v2-drop-cell manager-v2-drop-quantity-cell">
+                  <input type="text" inputmode="numeric" pattern="[1-9][0-9]*" value={row.quantity || 1} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Quantity', 'Quantity')} oninput={(event) => onQuantityInput(row.id, event)} onblur={(event) => onQuantityBlur(row, event)} onclick={(event) => event.stopPropagation()} onkeydown={(event) => event.stopPropagation()} />
                 </span>
-                <span role="cell" class="manager-v2-chip-row manager-v2-labeled-cell" data-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Modifiers', 'Modifiers')}>
+                <span role="cell" class="manager-v2-drop-cell manager-v2-chip-row">
                   <span class="manager-v2-drop-modifier-list">
                     {#if modifierEntries(row).length > 0}
                       {#each modifierEntries(row) as modifier (modifier.id)}
@@ -424,7 +434,7 @@
                     {/if}
                   </span>
                 </span>
-                <span role="cell" class="manager-v2-action-group manager-v2-labeled-cell manager-v2-drop-actions" data-label={text('FABRICATE.Admin.ManagerV2.Column.Actions', 'Actions')} data-gathering-task-drop-actions>
+                <span role="cell" class="manager-v2-drop-cell manager-v2-action-group manager-v2-drop-actions" data-gathering-task-drop-actions>
                   <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DuplicateDrop', 'Duplicate drop rule')} onclick={(event) => { event.stopPropagation(); onDuplicateDrop(row.id); }} onkeydown={(event) => event.stopPropagation()}><i class="fas fa-copy" aria-hidden="true"></i></button>
                   <button type="button" class="manager-v2-icon-button is-danger" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DeleteDrop', 'Delete drop rule')} onclick={(event) => { event.stopPropagation(); onDeleteDrop(row.id); }} onkeydown={(event) => event.stopPropagation()}><i class="fas fa-trash" aria-hidden="true"></i></button>
                 </span>
