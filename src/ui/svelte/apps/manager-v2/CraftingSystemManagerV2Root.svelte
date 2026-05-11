@@ -1072,6 +1072,11 @@
     return Array.isArray(setting.values) ? setting.values : [];
   }
 
+  function gatheringVocabularyOptions(kind) {
+    const vocabulary = selectedGatheringSystemConfig.vocabularies?.[kind] || {};
+    return Array.isArray(vocabulary.values) ? vocabulary.values : [];
+  }
+
   function gatheringConditionModifierRows(row, kind) {
     const values = row?.conditionModifiers?.[kind];
     return Array.isArray(values) ? values : [];
@@ -2031,6 +2036,8 @@
         managedItemOptions={selectedSystem.managedItemOptions || []}
         weatherOptions={gatheringConditionOptions('weather')}
         timeOfDayOptions={gatheringConditionOptions('timeOfDay')}
+        regionOptions={gatheringVocabularyOptions('regions')}
+        biomeOptions={gatheringVocabularyOptions('biomes')}
         selectedDropId={selectedGatheringDrop?.id || selectedGatheringDropId}
         rewardRules={selectedGatheringRules}
         onPickImagePath={services?.pickImagePath}

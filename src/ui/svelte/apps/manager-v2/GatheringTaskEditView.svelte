@@ -9,6 +9,8 @@
     managedItemOptions = [],
     weatherOptions = [],
     timeOfDayOptions = [],
+    regionOptions = [],
+    biomeOptions = [],
     selectedDropId = '',
     rewardRules = null,
     onPickImagePath = null,
@@ -81,11 +83,17 @@
   }
 
   function conditionOptions(kind) {
-    return kind === 'weather' ? weatherOptions : timeOfDayOptions;
+    if (kind === 'weather') return weatherOptions;
+    if (kind === 'biomes') return biomeOptions;
+    return timeOfDayOptions;
   }
 
   function selectedConditionIds(kind) {
-    const values = kind === 'weather' ? task?.weather : task?.timeOfDay;
+    const values = kind === 'weather'
+      ? task?.weather
+      : kind === 'biomes'
+        ? task?.biomes
+        : task?.timeOfDay;
     return Array.isArray(values)
       ? values.map(value => String(value || '').trim()).filter(Boolean)
       : [];
@@ -107,19 +115,58 @@
   function availabilityMenuLabel(kind) {
     const available = availableConditionOptions(kind);
     if (available.length === 0) {
-      return kind === 'weather'
-        ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AllWeatherSelected', 'All weather selected')
+      if (kind === 'weather') {
+        return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AllWeatherSelected', 'All weather selected');
+      }
+      return kind === 'biomes'
+        ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AllBiomesSelected', 'All biomes selected')
         : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AllTimesSelected', 'All times selected');
     }
-    return kind === 'weather'
-      ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AddWeatherCondition', 'Add weather')
+    if (kind === 'weather') {
+      return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AddWeatherCondition', 'Add weather');
+    }
+    return kind === 'biomes'
+      ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AddBiomeCondition', 'Add biome')
       : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AddTimeOfDayCondition', 'Add time of day');
   }
 
+  function availabilityFieldLabel(kind) {
+    if (kind === 'weather') {
+      return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Weather', 'Weather');
+    }
+    return kind === 'biomes'
+      ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Biome', 'Biome')
+      : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.TimeOfDay', 'Time of day');
+  }
+
   function emptyAvailabilityLabel(kind) {
-    return kind === 'weather'
-      ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyWeatherTitle', 'Any Weather')
+    if (kind === 'weather') {
+      return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyWeatherTitle', 'Any Weather');
+    }
+    return kind === 'biomes'
+      ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyBiomeTitle', 'Any Biome')
       : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyTimeTitle', 'Any Time');
+  }
+
+  function removeAvailabilityLabel(option) {
+    return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.RemoveAvailabilityCondition', 'Remove {name}')
+      .replace('{name}', conditionLabel(option));
+  }
+
+  function regionLabel(option) {
+    return conditionLabel(option);
+  }
+
+  function regionId(option) {
+    return conditionId(option);
+  }
+
+  function selectedRegionId() {
+    return String(task?.region || '').trim();
+  }
+
+  function updateRegion(event) {
+    onUpdateTask({ region: String(event.currentTarget.value || '').trim() });
   }
 
   function addAvailability(kind, id) {
@@ -264,9 +311,20 @@
         </div>
       </div>
       <div class="manager-v2-task-availability-row" data-gathering-task-availability>
-        {#each ['timeOfDay', 'weather'] as kind (kind)}
+        <label class="manager-v2-field" data-gathering-task-field="region">
+          <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Region', 'Region')}</span>
+          <select value={selectedRegionId()} onchange={updateRegion}>
+            <option value="">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AllRegionsTitle', 'All regions')}</option>
+            {#each regionOptions as option (regionId(option))}
+              {#if regionId(option)}
+                <option value={regionId(option)}>{regionLabel(option)}</option>
+              {/if}
+            {/each}
+          </select>
+        </label>
+        {#each ['biomes', 'timeOfDay', 'weather'] as kind (kind)}
           <div class="manager-v2-field manager-v2-availability-multi" data-gathering-task-field={kind}>
-            <span>{kind === 'timeOfDay' ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.TimeOfDay', 'Time of day') : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Weather', 'Weather')}</span>
+            <span>{availabilityFieldLabel(kind)}</span>
             <div class="manager-v2-availability-picker">
               <button
                 type="button"
@@ -279,7 +337,7 @@
                 <i class="fas fa-chevron-down" aria-hidden="true"></i>
               </button>
               {#if openAvailabilityMenu === kind}
-                <div class="manager-v2-availability-menu" role="listbox" aria-label={kind === 'timeOfDay' ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.TimeOfDay', 'Time of day') : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Weather', 'Weather')}>
+                <div class="manager-v2-availability-menu" role="listbox" aria-label={availabilityFieldLabel(kind)}>
                   {#if availableConditionOptions(kind).length > 0}
                     {#each availableConditionOptions(kind) as option (conditionId(option))}
                       <button
@@ -307,7 +365,7 @@
                   <span class="manager-v2-availability-pill" data-gathering-task-availability-pill={kind} data-condition-id={conditionId(option)}>
                     <i class={conditionIcon(option)} aria-hidden="true"></i>
                     <span>{conditionLabel(option)}</span>
-                    <button type="button" class="manager-v2-availability-remove" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.RemoveAvailabilityCondition', 'Remove {name}').replace('{name}', conditionLabel(option))} onclick={() => removeAvailability(kind, conditionId(option))}>
+                    <button type="button" class="manager-v2-availability-remove" aria-label={removeAvailabilityLabel(option)} onclick={() => removeAvailability(kind, conditionId(option))}>
                       <i class="fas fa-xmark" aria-hidden="true"></i>
                     </button>
                   </span>

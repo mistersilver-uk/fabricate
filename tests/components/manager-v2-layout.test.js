@@ -339,9 +339,12 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const rowBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-table-head,\n.fabricate-manager-v2 .manager-v2-gathering-task-row');
   const identityBlock = blockFor('.fabricate-manager-v2 .manager-v2-recipe-identity,\n.fabricate-manager-v2 .manager-v2-component-identity,\n.fabricate-manager-v2 .manager-v2-environment-identity,\n.fabricate-manager-v2 .manager-v2-gathering-task-identity');
   const editorBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-edit-view');
+  const availabilityBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-availability-row');
   const dropCardBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drops-card');
   const dropHeaderBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drops-card .manager-v2-task-card-header');
   const dropControlsBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drop-controls');
+  const dropSearchBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drop-controls .manager-v2-search.is-compact');
+  const dropSearchInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drop-controls .manager-v2-search.is-compact input');
   const dropFooterBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drop-footer');
   const dropFooterPaginationBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drop-footer .manager-v2-pagination');
   const dropScrollBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drops-card .manager-v2-table-scroll');
@@ -377,11 +380,15 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(identityBlock.includes('grid-template-columns: 46px minmax(0, 1fr);'), 'task identity should reserve thumbnail space');
   assert.ok(editorBlock.includes('grid-template-rows: auto auto minmax(min(420px, 52vh), 1fr) auto;'), 'task edit route should reserve expanded vertical space for drop rules');
   assert.ok(editorBlock.includes('overflow: auto;'), 'task editor should allow vertical scrolling without horizontal overflow');
+  assert.ok(availabilityBlock.includes('grid-template-columns: repeat(2, minmax(160px, 1fr));'), 'task availability controls should form a stable two-column grid');
   assert.ok(dropCardBlock.includes('min-height: min(420px, 52vh);'), 'task editor drop rules card should own expanded vertical sizing');
   assert.ok(dropHeaderBlock.includes('grid-template-columns: minmax(0, 1fr) auto;'), 'drop rules header should put copy left and controls right');
   assert.ok(dropControlsBlock.includes('display: inline-flex;') && dropControlsBlock.includes('justify-content: flex-end;'), 'drop rules search and add action should share a compact toolbar');
+  assert.ok(dropSearchBlock.includes('min-width: min(220px, 100%);'), 'drop rules search should not collapse until its icon overlaps the text area');
+  assert.ok(dropSearchInputBlock.includes('padding-left: 36px;'), 'drop rules search input should reserve text inset for the leading search icon');
   assert.ok(dropFooterBlock.includes('border-top: 1px solid var(--fab-mv2-border);'), 'drop rules count should live in a footer area with pagination');
   assert.ok(dropFooterPaginationBlock.includes('background: transparent;'), 'drop rules footer should not nest pagination chrome');
+  assert.ok(dropScrollBlock.includes('padding: 10px 0 0;'), 'drop rules table scroll region should not add horizontal inset');
   assert.ok(dropScrollBlock.includes('overflow-x: hidden;') && dropScrollBlock.includes('overflow-y: auto;'), 'drop rules table should suppress horizontal scroll while retaining vertical scrolling');
   assert.ok(dropTableBlock.includes('--fab-mv2-task-drop-grid:'), 'task editor drop rows should define compact desktop geometry');
   assert.ok(dropTableBlock.includes('minmax(0, 1.4fr)') && dropTableBlock.includes('minmax(124px, 0.82fr)') && dropTableBlock.includes('88px'), 'drop row desktop grid should reserve readable chance and horizontal action columns');

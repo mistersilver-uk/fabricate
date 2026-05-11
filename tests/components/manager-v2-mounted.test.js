@@ -2196,18 +2196,67 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].name === 'Gather Sun Herbs'));
+    const regionAvailability = target.querySelector('[data-gathering-task-field="region"]');
+    const biomeAvailability = target.querySelector('[data-gathering-task-field="biomes"]');
     const timeAvailability = target.querySelector('[data-gathering-task-field="timeOfDay"]');
     const weatherAvailability = target.querySelector('[data-gathering-task-field="weather"]');
+    const regionSelect = regionAvailability.querySelector('select');
+    assert.deepEqual(
+      Array.from(regionSelect.options).map(option => option.textContent.trim()),
+      ['All regions', 'Northlands', 'South Coast']
+    );
+    assert.equal(regionSelect.value, 'north');
+    regionSelect.value = 'south';
+    regionSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[1] === 'alchemy' && call[2] === 'task-herbs' && call[3].region === 'south'));
+    regionSelect.value = '';
+    regionSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[1] === 'alchemy' && call[2] === 'task-herbs' && call[3].region === ''));
     assert.equal(timeAvailability.querySelector('select'), null);
     assert.equal(weatherAvailability.querySelector('select'), null);
+    assert.equal(biomeAvailability.querySelector('select'), null);
+    const biomePill = biomeAvailability.querySelector('[data-gathering-task-availability-pill="biomes"][data-condition-id="forest"]');
     const timePill = timeAvailability.querySelector('[data-gathering-task-availability-pill="timeOfDay"][data-condition-id="day"]');
     const weatherPill = weatherAvailability.querySelector('[data-gathering-task-availability-pill="weather"][data-condition-id="clear"]');
+    assert.ok(biomePill);
+    assert.ok(biomePill.textContent.includes('Moon Forest'));
+    assert.ok(biomePill.querySelector('i.fas.fa-tree'));
     assert.ok(timePill);
     assert.ok(timePill.textContent.includes('High Day'));
     assert.ok(timePill.querySelector('i.fas.fa-sun'));
     assert.ok(weatherPill);
     assert.ok(weatherPill.textContent.includes('Clear Sky'));
     assert.ok(weatherPill.querySelector('i.fas.fa-sun'));
+
+    biomeAvailability.querySelector('.manager-v2-availability-menu-button').click();
+    await tick();
+    flushSync();
+    assert.equal(biomeAvailability.querySelector('[data-gathering-task-availability-option="biomes"][data-condition-id="forest"]'), null);
+    assert.deepEqual(
+      Array.from(biomeAvailability.querySelectorAll('[data-gathering-task-availability-option="biomes"]')).map(option => option.textContent.trim()),
+      ['Crystal Cavern']
+    );
+    assert.ok(biomeAvailability.querySelector('[data-condition-id="cavern"] i.fas.fa-gem'));
+    biomeAvailability.querySelector('[data-gathering-task-availability-option="biomes"][data-condition-id="cavern"]').click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && Array.isArray(call[3].biomes) && call[3].biomes.join(',') === 'forest,cavern'));
+    assert.ok(biomeAvailability.querySelector('[data-gathering-task-availability-pill="biomes"][data-condition-id="cavern"]'));
+
+    biomeAvailability.querySelector('[data-gathering-task-availability-pill="biomes"][data-condition-id="forest"] .manager-v2-availability-remove').click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && Array.isArray(call[3].biomes) && call[3].biomes.length === 1 && call[3].biomes[0] === 'cavern'));
+
+    biomeAvailability.querySelector('[data-gathering-task-availability-pill="biomes"][data-condition-id="cavern"] .manager-v2-availability-remove').click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && Array.isArray(call[3].biomes) && call[3].biomes.length === 0));
+    assert.ok(biomeAvailability.textContent.includes('Any Biome'));
 
     timeAvailability.querySelector('.manager-v2-availability-menu-button').click();
     await tick();

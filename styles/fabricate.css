@@ -8909,7 +8909,12 @@
 .fabricate-manager-v2 .manager-v2-task-drop-controls .manager-v2-search.is-compact {
   flex: 1 1 260px;
   width: min(320px, 34vw);
+  min-width: min(220px, 100%);
   max-width: 320px;
+}
+
+.fabricate-manager-v2 .manager-v2-task-drop-controls .manager-v2-search.is-compact input {
+  padding-left: 36px;
 }
 
 .fabricate-manager-v2 .manager-v2-drop-count {
@@ -8973,7 +8978,7 @@
 }
 
 .fabricate-manager-v2 .manager-v2-task-drops-card .manager-v2-table-scroll {
-  padding: 10px 12px 0;
+  padding: 10px 0 0;
   overflow-x: hidden;
   overflow-y: auto;
 }
