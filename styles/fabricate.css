@@ -8345,7 +8345,7 @@
 
 .fabricate-manager-v2 .manager-v2-gathering-task-edit-view {
   display: grid;
-  grid-template-rows: auto auto minmax(min(420px, 52vh), 1fr) auto;
+  grid-template-rows: auto auto 292px minmax(min(320px, 40vh), 1fr) auto;
   gap: 12px;
   min-height: 0;
   min-width: 0;
@@ -8514,6 +8514,7 @@
 
 .fabricate-manager-v2 .manager-v2-task-core-card,
 .fabricate-manager-v2 .manager-v2-task-availability-card,
+.fabricate-manager-v2 .manager-v2-task-component-browser-card,
 .fabricate-manager-v2 .manager-v2-task-overview-card,
 .fabricate-manager-v2 .manager-v2-task-drops-card,
 .fabricate-manager-v2 .manager-v2-selected-drop-editor {
@@ -8533,6 +8534,15 @@
   display: grid;
   gap: 10px;
   padding: 12px 16px;
+}
+
+.fabricate-manager-v2 .manager-v2-task-component-browser-card {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  height: 292px;
+  min-height: 292px;
+  max-height: 292px;
+  overflow: hidden;
 }
 
 .fabricate-manager-v2 .manager-v2-task-card-heading {
@@ -8793,7 +8803,7 @@
 .fabricate-manager-v2 .manager-v2-task-drops-card {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  min-height: min(420px, 52vh);
+  min-height: min(320px, 40vh);
   overflow: hidden;
 }
 
@@ -8957,6 +8967,159 @@
 
 .fabricate-manager-v2 .manager-v2-task-drop-controls .manager-v2-search.is-compact input {
   padding-left: 36px;
+}
+
+.fabricate-manager-v2 .manager-v2-task-component-browser-controls {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.9fr) minmax(180px, 0.9fr);
+  gap: 8px;
+  align-items: start;
+  justify-content: end;
+  min-width: min(420px, 100%);
+}
+
+.fabricate-manager-v2 .manager-v2-task-component-browser-controls .manager-v2-search.is-compact {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-task-component-browser-controls .manager-v2-search.is-compact input {
+  padding-left: 36px;
+}
+
+.fabricate-manager-v2 .manager-v2-task-component-tag-search .manager-v2-tag-suggestions {
+  position: absolute;
+  z-index: 5;
+  inset: calc(100% + 4px) 0 auto 0;
+  max-height: 132px;
+  overflow-y: auto;
+}
+
+.fabricate-manager-v2 .manager-v2-task-component-pills {
+  min-height: 0;
+  padding: 7px 12px 0;
+  border-top: 1px solid var(--fab-mv2-border);
+}
+
+.fabricate-manager-v2 .manager-v2-task-component-browser-scroll {
+  min-height: 0;
+  padding: 10px 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.fabricate-manager-v2 .manager-v2-task-component-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-task-component-card {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 18px;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  min-height: 72px;
+  padding: 7px 8px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-surface-1);
+  cursor: grab;
+  user-select: none;
+}
+
+.fabricate-manager-v2 .manager-v2-task-component-card:active {
+  cursor: grabbing;
+}
+
+.fabricate-manager-v2 .manager-v2-task-component-card-image {
+  width: 38px;
+  height: 38px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--fab-mv2-surface-2);
+}
+
+.fabricate-manager-v2 .manager-v2-task-component-card-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-task-component-card-copy strong,
+.fabricate-manager-v2 .manager-v2-task-component-card-copy > span:not(.manager-v2-task-component-card-tags) {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+}
+
+.fabricate-manager-v2 .manager-v2-task-component-card-copy strong {
+  -webkit-line-clamp: 1;
+  font-size: 0.84rem;
+  line-height: 1.15;
+}
+
+.fabricate-manager-v2 .manager-v2-task-component-card-copy > span:not(.manager-v2-task-component-card-tags) {
+  -webkit-line-clamp: 1;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.74rem;
+  line-height: 1.2;
+}
+
+.fabricate-manager-v2 .manager-v2-task-component-card-tags {
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.fabricate-manager-v2 .manager-v2-task-component-card-tags small {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 72px;
+  padding: 1px 5px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 999px;
+  color: var(--fab-mv2-text-muted);
+  background: var(--fab-overlay-light-06);
+  font-size: 0.66rem;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager-v2 .manager-v2-task-component-card-grip {
+  justify-self: end;
+  color: var(--fab-mv2-text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-task-component-browser-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  padding: 7px 12px;
+  border-top: 1px solid var(--fab-mv2-border);
+  background: var(--fab-overlay-light-03);
+}
+
+.fabricate-manager-v2 .manager-v2-task-component-browser-footer .manager-v2-pagination {
+  padding: 0;
+  border-top: 0;
+  background: transparent;
 }
 
 .fabricate-manager-v2 .manager-v2-drop-count {
@@ -9308,6 +9471,12 @@
 
 .fabricate-manager-v2 .manager-v2-gathering-task-drop-row:hover {
   background: var(--fab-mv2-surface-3);
+}
+
+.fabricate-manager-v2 .manager-v2-gathering-task-drop-row.is-drop-active {
+  border-color: var(--fab-mv2-accent);
+  background: var(--fab-success-soft);
+  box-shadow: inset 0 0 0 1px var(--fab-mv2-accent);
 }
 
 .fabricate-manager-v2 .manager-v2-gathering-task-drop-row.is-selected {
@@ -10246,6 +10415,11 @@
     justify-content: space-between;
   }
 
+  .fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"] .manager-v2-task-component-browser-controls {
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+  }
+
   .fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"] .manager-v2-task-drop-controls .manager-v2-search.is-compact {
     width: auto;
     max-width: none;
@@ -10281,6 +10455,7 @@
   .fabricate-manager-v2 .manager-v2-task-core-grid,
   .fabricate-manager-v2 .manager-v2-task-card-heading,
   .fabricate-manager-v2 .manager-v2-task-identity-fields,
+  .fabricate-manager-v2 .manager-v2-task-component-grid,
   .fabricate-manager-v2 .manager-v2-task-availability-row {
     grid-template-columns: minmax(0, 1fr);
   }

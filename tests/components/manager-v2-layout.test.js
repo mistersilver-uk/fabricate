@@ -340,6 +340,15 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const identityBlock = blockFor('.fabricate-manager-v2 .manager-v2-recipe-identity,\n.fabricate-manager-v2 .manager-v2-component-identity,\n.fabricate-manager-v2 .manager-v2-environment-identity,\n.fabricate-manager-v2 .manager-v2-gathering-task-identity');
   const editorBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-edit-view');
   const availabilityBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-availability-row');
+  const componentBrowserBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-browser-card');
+  const componentBrowserControlsBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-browser-controls');
+  const componentBrowserScrollBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-browser-scroll');
+  const componentGridBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-grid');
+  const componentCardBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-card');
+  const componentCardCopySharedBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-card-copy strong,\n.fabricate-manager-v2 .manager-v2-task-component-card-copy > span:not(.manager-v2-task-component-card-tags)');
+  const componentCardGripBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-card-grip');
+  const componentBrowserFooterBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-browser-footer');
+  const componentBrowserFooterPaginationBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-browser-footer .manager-v2-pagination');
   const dropCardBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drops-card');
   const dropHeaderBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drops-card .manager-v2-task-card-header');
   const dropControlsBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drop-controls');
@@ -397,10 +406,25 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(!tableBlock.includes('reorder'), 'task browser should not reserve a reorder column');
   assert.ok(rowBlock.includes('grid-template-columns: var(--fab-mv2-gathering-task-grid);'), 'task rows should use the shared task grid');
   assert.ok(identityBlock.includes('grid-template-columns: 46px minmax(0, 1fr);'), 'task identity should reserve thumbnail space');
-  assert.ok(editorBlock.includes('grid-template-rows: auto auto minmax(min(420px, 52vh), 1fr) auto;'), 'task edit route should reserve expanded vertical space for drop rules');
+  assert.ok(editorBlock.includes('grid-template-rows: auto auto 292px minmax(min(320px, 40vh), 1fr) auto;'), 'task edit route should reserve a fixed component browser row plus bounded drop rules');
   assert.ok(editorBlock.includes('overflow: auto;'), 'task editor should allow vertical scrolling without horizontal overflow');
   assert.ok(availabilityBlock.includes('grid-template-columns: repeat(2, minmax(160px, 1fr));'), 'task availability controls should form a stable two-column grid');
-  assert.ok(dropCardBlock.includes('min-height: min(420px, 52vh);'), 'task editor drop rules card should own expanded vertical sizing');
+  assert.ok(componentBrowserBlock.includes('height: 292px;') && componentBrowserBlock.includes('max-height: 292px;') && componentBrowserBlock.includes('overflow: hidden;'), 'component browser should own a fixed bounded height');
+  assert.ok(componentBrowserBlock.includes('grid-template-rows: auto auto minmax(0, 1fr) auto;'), 'component browser should reserve header, optional pills, card scroll, and footer rows');
+  assert.ok(componentBrowserControlsBlock.includes('grid-template-columns: minmax(180px, 0.9fr) minmax(180px, 0.9fr);'), 'component browser should keep name and tag search in a compact control grid');
+  assert.ok(componentBrowserScrollBlock.includes('overflow-x: hidden;') && componentBrowserScrollBlock.includes('overflow-y: auto;'), 'component browser card area should scroll internally without horizontal overflow');
+  assert.ok(componentGridBlock.includes('grid-template-columns: repeat(3, minmax(0, 1fr));'), 'component browser should use a three-column card grid');
+  assert.ok(componentCardBlock.includes('grid-template-columns: 38px minmax(0, 1fr) 18px;') && componentCardBlock.includes('min-height: 72px;'), 'component browser cards should reserve image, copy, and grip columns');
+  assert.ok(componentCardCopySharedBlock.includes('text-overflow: ellipsis;'), 'component card shared copy should truncate within the card');
+  assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-task-component-card-copy strong {\n  -webkit-line-clamp: 1;')
+      && css.includes('.fabricate-manager-v2 .manager-v2-task-component-card-copy > span:not(.manager-v2-task-component-card-tags) {\n  -webkit-line-clamp: 1;'),
+    'component card name and description should clamp to one line'
+  );
+  assert.ok(componentCardGripBlock.includes('letter-spacing: 0;'), 'component grip should avoid viewport-scaled or negative tracking');
+  assert.ok(componentBrowserFooterBlock.includes('border-top: 1px solid var(--fab-mv2-border);'), 'component browser should own a pagination footer');
+  assert.ok(componentBrowserFooterPaginationBlock.includes('background: transparent;'), 'component browser footer should not nest pagination chrome');
+  assert.ok(dropCardBlock.includes('min-height: min(320px, 40vh);'), 'task editor drop rules card should own bounded vertical sizing under the component browser');
   assert.ok(dropHeaderBlock.includes('grid-template-columns: minmax(0, 1fr) auto;'), 'drop rules header should put copy left and controls right');
   assert.ok(dropControlsBlock.includes('display: inline-flex;') && dropControlsBlock.includes('justify-content: flex-end;'), 'drop rules search and add action should share a compact toolbar');
   assert.ok(dropSearchBlock.includes('min-width: min(220px, 100%);'), 'drop rules search should not collapse until its icon overlaps the text area');
@@ -420,6 +444,7 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(css.includes('.fabricate-manager-v2 .manager-v2-gathering-task-drop-row {\n  min-height: 72px;'), 'drop rows should be tall enough for two visible modifier chip lines');
   assert.ok(dropCellBlock.includes('padding: 8px 10px;') && dropCellBlock.includes('box-sizing: border-box;'), 'drop cells should keep padding inside full-width rows');
   assert.ok(dropCellSeparatorBlock.includes('border-left: 1px solid var(--fab-mv2-border);'), 'drop cells should use vertical separators');
+  assert.ok(css.includes('.fabricate-manager-v2 .manager-v2-gathering-task-drop-row.is-drop-active'), 'drop rows should expose a full-row active drop target state');
   assert.ok(selectedDropRowBlock.includes('background: var(--fab-success-soft);') && selectedDropRowBlock.includes('var(--fab-mv2-accent)'), 'selected drop rows should use the component-browser success/accent family');
   assert.ok(selectedDropRowBlock.includes('inset 0 1px 0 var(--fab-mv2-border-strong)') && selectedDropRowBlock.includes('inset 0 -1px 0 var(--fab-mv2-border-strong)'), 'selected drop row outline should avoid a right edge next to the card border');
   assert.equal(selectedDropRowBlock.includes('inset 0 0 0 1px'), false, 'selected drop row should not draw a full inset border against the card edge');

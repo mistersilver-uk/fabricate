@@ -6,6 +6,7 @@
 
   let {
     task = null,
+    itemCards = [],
     managedItemOptions = [],
     weatherOptions = [],
     timeOfDayOptions = [],
@@ -24,8 +25,13 @@
   let searchTerm = $state('');
   let pageIndex = $state(0);
   let pageSize = $state(10);
+  let componentSearchTerm = $state('');
+  let componentTagSearchTerm = $state('');
+  let selectedComponentTags = $state([]);
+  let componentPageIndex = $state(0);
   let lastTaskId = $state('');
   let openAvailabilityMenu = $state('');
+  const componentPageSize = 6;
 
   const dropRows = $derived(Array.isArray(task?.dropRows) ? task.dropRows : []);
   const normalizedSearchTerm = $derived(searchTerm.trim().toLowerCase());
@@ -42,12 +48,36 @@
   const showRewardRuleNotice = $derived(selectedDrop?.componentId
     && repeatedComponentRows.length > 1
     && rewardRules?.rewardSelectionMode !== 'allDrops');
+  const componentCards = $derived(Array.isArray(itemCards) ? itemCards : []);
+  const normalizedComponentSearchTerm = $derived(componentSearchTerm.trim().toLowerCase());
+  const componentTagOptions = $derived(uniqueSorted(componentCards.flatMap(item => Array.isArray(item.tags) ? item.tags : [])));
+  const normalizedComponentTagSearchTerm = $derived(componentTagSearchTerm.trim().toLowerCase());
+  const componentTagSuggestions = $derived(normalizedComponentTagSearchTerm
+    ? componentTagOptions.filter(tag => !selectedComponentTags.includes(tag) && tag.toLowerCase().includes(normalizedComponentTagSearchTerm))
+    : []);
+  const filteredComponentCards = $derived(componentCards.filter(item => {
+    const name = String(item?.name || '').toLowerCase();
+    const itemTags = Array.isArray(item?.tags) ? item.tags : [];
+    const matchesName = !normalizedComponentSearchTerm || name.includes(normalizedComponentSearchTerm);
+    const matchesTags = selectedComponentTags.length === 0 || selectedComponentTags.every(tag => itemTags.includes(tag));
+    return matchesName && matchesTags;
+  }));
+  const paginatedComponentCards = $derived(filteredComponentCards.slice(
+    componentPageIndex * componentPageSize,
+    (componentPageIndex + 1) * componentPageSize
+  ));
+  const componentShowingStart = $derived(filteredComponentCards.length === 0 ? 0 : componentPageIndex * componentPageSize + 1);
+  const componentShowingEnd = $derived(Math.min(filteredComponentCards.length, (componentPageIndex + 1) * componentPageSize));
   const maxVisibleModifiers = 4;
 
   $effect(() => {
     if (task?.id === lastTaskId) return;
     searchTerm = '';
     pageIndex = 0;
+    componentSearchTerm = '';
+    componentTagSearchTerm = '';
+    selectedComponentTags = [];
+    componentPageIndex = 0;
     openAvailabilityMenu = '';
     lastTaskId = task?.id || '';
   });
@@ -56,13 +86,62 @@
     if (pageIndex > 0 && pageIndex * pageSize >= filteredRows.length) pageIndex = 0;
   });
 
+  $effect(() => {
+    if (componentPageIndex > 0 && componentPageIndex * componentPageSize >= filteredComponentCards.length) componentPageIndex = 0;
+  });
+
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
 
+  function uniqueSorted(values) {
+    return Array.from(new Set(values.map(value => String(value || '').trim()).filter(Boolean)))
+      .sort((a, b) => a.localeCompare(b));
+  }
+
   function managedItem(componentId) {
     return (managedItemOptions || []).find(option => String(option.id || '') === String(componentId || '')) || null;
+  }
+
+  function componentCardImage(item) {
+    return item?.img || 'icons/svg/item-bag.svg';
+  }
+
+  function componentDescription(item) {
+    return String(item?.description || '').trim();
+  }
+
+  function addComponentTag(tag) {
+    const normalizedTag = String(tag || '').trim();
+    if (!normalizedTag || selectedComponentTags.includes(normalizedTag)) return;
+    selectedComponentTags = [...selectedComponentTags, normalizedTag];
+    componentTagSearchTerm = '';
+    componentPageIndex = 0;
+  }
+
+  function removeComponentTag(tag) {
+    selectedComponentTags = selectedComponentTags.filter(value => value !== tag);
+    componentPageIndex = 0;
+  }
+
+  function onComponentSearchInput(event) {
+    componentSearchTerm = event.currentTarget.value;
+    componentPageIndex = 0;
+  }
+
+  function onComponentTagSearchInput(event) {
+    componentTagSearchTerm = event.currentTarget.value;
+  }
+
+  function onComponentDragStart(item, event) {
+    const componentId = String(item?.id || '').trim();
+    if (!componentId) return;
+    event.dataTransfer?.setData?.('text/plain', JSON.stringify({
+      type: 'FabricateManagedComponent',
+      componentId
+    }));
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'copy';
   }
 
   function taskImage() {
@@ -346,6 +425,11 @@
   }
 
   function handleDropZoneDrop(rowId, data) {
+    if (data?.type === 'FabricateManagedComponent' && data.componentId) {
+      onUpdateDrop(rowId, { componentId: data.componentId, itemUuid: '', systemItemId: '', name: '', enabled: true });
+      onSelectDrop(rowId);
+      return;
+    }
     onImportDrop(rowId, data);
   }
 
@@ -479,6 +563,103 @@
       </div>
     </section>
 
+    <section class="manager-v2-task-component-browser-card" data-gathering-task-component-browser>
+      <div class="manager-v2-task-card-header">
+        <div class="manager-v2-task-drop-header-copy">
+          <h3>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ComponentBrowser', 'Components')}</h3>
+          <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ComponentBrowserHint', 'Drag a component onto any drop rule row to assign or replace it.')}</p>
+        </div>
+        <div class="manager-v2-task-component-browser-controls">
+          <label class="manager-v2-search is-compact" data-gathering-component-name-search>
+            <i class="fas fa-search" aria-hidden="true"></i>
+            <input type="search" value={componentSearchTerm} oninput={onComponentSearchInput} placeholder={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SearchComponentsPlaceholder', 'Search components...')} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SearchComponentsByName', 'Search component names')} />
+          </label>
+          <label class="manager-v2-search is-compact manager-v2-task-component-tag-search" data-gathering-component-tag-search>
+            <i class="fas fa-tags" aria-hidden="true"></i>
+            <input type="search" value={componentTagSearchTerm} oninput={onComponentTagSearchInput} placeholder={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SearchTagsPlaceholder', 'Search tags...')} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SearchComponentTags', 'Search component tags')} />
+            {#if componentTagSuggestions.length > 0}
+              <div class="manager-v2-tag-suggestions" data-gathering-component-tag-suggestions>
+                {#each componentTagSuggestions as tag (tag)}
+                  <button type="button" class="manager-v2-tag-suggestion" data-gathering-component-tag-suggestion={tag} onclick={() => addComponentTag(tag)}>
+                    {tag}
+                  </button>
+                {/each}
+              </div>
+            {/if}
+          </label>
+        </div>
+      </div>
+
+      {#if selectedComponentTags.length > 0}
+        <div class="manager-v2-toolbar-pills manager-v2-task-component-pills" data-gathering-component-tag-pills>
+          {#each selectedComponentTags as tag (tag)}
+            <span class="manager-v2-tag-pill" data-gathering-component-tag-pill={tag}>
+              {tag}
+              <button type="button" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.RemoveComponentTagFilter', 'Remove {tag}').replace('{tag}', tag)} onclick={() => removeComponentTag(tag)}>
+                <i class="fas fa-xmark" aria-hidden="true"></i>
+              </button>
+            </span>
+          {/each}
+        </div>
+      {/if}
+
+      <div class="manager-v2-task-component-browser-scroll" data-gathering-task-component-browser-scroll>
+        {#if componentCards.length === 0}
+          <div class="manager-v2-empty is-compact">
+            <div>
+              <i class="fas fa-box-open" aria-hidden="true"></i>
+              <h3>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.NoComponents', 'No components available')}</h3>
+            </div>
+          </div>
+        {:else if filteredComponentCards.length === 0}
+          <div class="manager-v2-empty is-compact">
+            <div>
+              <i class="fas fa-search" aria-hidden="true"></i>
+              <h3>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EmptyComponentSearchTitle', 'No components match these filters')}</h3>
+            </div>
+          </div>
+        {:else}
+          <div class="manager-v2-task-component-grid" data-gathering-task-component-grid role="list">
+            {#each paginatedComponentCards as item (item.id)}
+              <div
+                class="manager-v2-task-component-card"
+                role="listitem"
+                draggable="true"
+                data-gathering-component-card={item.id}
+                ondragstart={(event) => onComponentDragStart(item, event)}
+              >
+                <img class="manager-v2-task-component-card-image" src={componentCardImage(item)} alt="" />
+                <span class="manager-v2-task-component-card-copy">
+                  <strong>{item.name}</strong>
+                  <span>{componentDescription(item) || text('FABRICATE.Admin.ManagerV2.NoDescriptionAdded', 'No description has been added.')}</span>
+                  {#if Array.isArray(item.tags) && item.tags.length > 0}
+                    <span class="manager-v2-task-component-card-tags">
+                      {#each item.tags.slice(0, 3) as tag (tag)}
+                        <small>{tag}</small>
+                      {/each}
+                    </span>
+                  {/if}
+                </span>
+                <span class="manager-v2-task-component-card-grip" aria-hidden="true">⋮⋮</span>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </div>
+
+      <div class="manager-v2-task-component-browser-footer">
+        <span class="manager-v2-muted manager-v2-drop-count" data-gathering-component-count>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ShowingComponents', 'Showing {start}-{end} of {total} components').replace('{start}', componentShowingStart).replace('{end}', componentShowingEnd).replace('{total}', filteredComponentCards.length)}</span>
+        <Pagination
+          totalCount={filteredComponentCards.length}
+          pageSize={componentPageSize}
+          pageIndex={componentPageIndex}
+          pageSizeOptions={[componentPageSize]}
+          onPageChange={(next) => componentPageIndex = next}
+          onPageSizeChange={() => {}}
+        />
+      </div>
+    </section>
+
     {#if showRewardRuleNotice}
       <section class="manager-v2-warning-band" data-gathering-task-reward-rule-notice>
         <i class="fas fa-circle-info" aria-hidden="true"></i>
@@ -533,8 +714,10 @@
                 class={`manager-v2-gathering-task-drop-row ${selectedDrop?.id === row.id ? 'is-selected' : ''}`}
                 role="row"
                 data-gathering-task-drop-id={row.id}
+                data-gathering-task-drop-zone={row.id}
                 aria-selected={selectedDrop?.id === row.id}
                 tabindex="0"
+                use:dragDrop={{ onDrop: (data) => handleDropZoneDrop(row.id, data), activeClass: 'is-drop-active' }}
                 onclick={() => onSelectDrop(row.id)}
                 onkeydown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelectDrop(row.id); } }}
               >
@@ -550,8 +733,8 @@
                     <div class="manager-v2-gathering-task-identity manager-v2-drop-empty-component is-empty">
                       <span
                         class="manager-v2-inline-drop-zone"
-                        use:dragDrop={{ onDrop: (data) => handleDropZoneDrop(row.id, data), activeClass: 'is-drop-active' }}
                         data-gathering-task-drop-zone={row.id}
+                        data-gathering-task-inline-drop-zone={row.id}
                       >
                         <i class="fas fa-file-import" aria-hidden="true"></i>
                       </span>

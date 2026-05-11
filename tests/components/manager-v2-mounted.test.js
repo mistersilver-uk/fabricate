@@ -190,7 +190,99 @@ function createStore(calls = [], options = {}) {
         sourceMissing: false,
         showTags: true,
         showEssences: true
-      }
+      },
+      ...(options.extendedComponentCards ? [
+        {
+          id: 'c3',
+          name: 'Nightshade With An Exceptionally Long Localized Component Name',
+          img: 'icons/consumables/plants/nightshade.jpg',
+          description: 'A dusky flowering herb used in careful doses.',
+          tags: ['herb', 'night'],
+          essences: [],
+          sourceUuidDisplay: '',
+          hasSourceUuid: false,
+          sourceOrigin: 'unknown',
+          sourceOriginLabel: 'Unknown',
+          sourceMissing: false,
+          showTags: true,
+          showEssences: true
+        },
+        {
+          id: 'c4',
+          name: 'Coal',
+          img: 'icons/commodities/materials/bowl-powder-black.webp',
+          description: 'Fuel for a steady forge.',
+          tags: ['fuel', 'mineral'],
+          essences: [],
+          sourceUuidDisplay: '',
+          hasSourceUuid: false,
+          sourceOrigin: 'unknown',
+          sourceOriginLabel: 'Unknown',
+          sourceMissing: false,
+          showTags: true,
+          showEssences: true
+        },
+        {
+          id: 'c5',
+          name: 'Moon Fern',
+          img: 'icons/consumables/plants/leaf-green.webp',
+          description: 'Soft fronds that glow under moonlight.',
+          tags: ['herb', 'moon'],
+          essences: [],
+          sourceUuidDisplay: '',
+          hasSourceUuid: false,
+          sourceOrigin: 'unknown',
+          sourceOriginLabel: 'Unknown',
+          sourceMissing: false,
+          showTags: true,
+          showEssences: true
+        },
+        {
+          id: 'c6',
+          name: 'Crystal Dust',
+          img: 'icons/commodities/gems/gem-powder-blue.webp',
+          description: 'Fine shimmering mineral powder.',
+          tags: ['mineral', 'crystal'],
+          essences: [],
+          sourceUuidDisplay: '',
+          hasSourceUuid: false,
+          sourceOrigin: 'unknown',
+          sourceOriginLabel: 'Unknown',
+          sourceMissing: false,
+          showTags: true,
+          showEssences: true
+        },
+        {
+          id: 'c7',
+          name: 'Sun Petal',
+          img: 'icons/consumables/plants/flower-yellow.webp',
+          description: 'A warm yellow flower used in tonics.',
+          tags: ['herb', 'sun'],
+          essences: [],
+          sourceUuidDisplay: '',
+          hasSourceUuid: false,
+          sourceOrigin: 'unknown',
+          sourceOriginLabel: 'Unknown',
+          sourceMissing: false,
+          showTags: true,
+          showEssences: true
+        },
+        {
+          id: 'c8',
+          name: 'River Salt',
+          img: 'icons/commodities/materials/powder-white.webp',
+          description: 'Coarse salt gathered from river stones.',
+          tags: ['mineral', 'water'],
+          essences: [],
+          sourceUuidDisplay: '',
+          hasSourceUuid: false,
+          sourceOrigin: 'unknown',
+          sourceOriginLabel: 'Unknown',
+          sourceMissing: false,
+          showTags: true,
+          showEssences: true
+        }
+      ] : [])
     ],
     smithing: [
       {
@@ -2827,6 +2919,151 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.every(row => row.id !== addedRow.id)));
+  });
+
+  it('browses and drags managed components inside the gathering task editor', async () => {
+    const calls = [];
+    const importedDrops = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          extendedComponentCards: true,
+          taskDropRows: [
+            { id: 'drop-empty', componentId: '', itemUuid: '', systemItemId: '', name: '', quantity: 1, dropRate: 25, enabled: false },
+            { id: 'drop-stale', componentId: 'c3', itemUuid: 'Item.stale', systemItemId: 'legacy-system-item', name: 'Legacy Name', quantity: 1, dropRate: 40, enabled: true }
+          ]
+        }),
+        services: {
+          openCurrentAdmin: () => {},
+          importSingleManagedItemFromDrop: async (data) => {
+            importedDrops.push(data);
+            return { id: 'c1', name: 'Iron Ore' };
+          }
+        }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    target.querySelector('#manager-v2-gathering-tab-tasks').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]').click();
+    await tick();
+    flushSync();
+
+    const browser = target.querySelector('[data-gathering-task-component-browser]');
+    const dropsCard = target.querySelector('.manager-v2-task-drops-card');
+    assert.ok(browser, 'component browser should render in the task editor');
+    assert.equal(
+      Boolean(browser.compareDocumentPosition(dropsCard) & Node.DOCUMENT_POSITION_FOLLOWING),
+      true,
+      'component browser should render above drop rules'
+    );
+    assert.equal(target.querySelectorAll('[data-gathering-component-card]').length, 6, 'component browser should default to six cards per page');
+    assert.ok(browser.textContent.includes('Iron Ore'));
+    assert.equal(browser.textContent.includes('River Salt'), false, 'seventh component should start on the next page');
+
+    const nameSearch = target.querySelector('[aria-label="Search component names"]');
+    nameSearch.value = 'coal';
+    nameSearch.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(target.querySelectorAll('[data-gathering-component-card]').length, 1);
+    assert.ok(browser.textContent.includes('Coal'));
+
+    nameSearch.value = 'fuel';
+    nameSearch.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(target.querySelectorAll('[data-gathering-component-card]').length, 0, 'component browser name search should not match descriptions');
+
+    nameSearch.value = '';
+    nameSearch.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+
+    const tagSearch = target.querySelector('[aria-label="Search component tags"]');
+    tagSearch.value = 'her';
+    tagSearch.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    Array.from(target.querySelectorAll('[data-gathering-component-tag-suggestion]'))
+      .find(button => button.textContent.includes('herb'))
+      .click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelectorAll('[data-gathering-component-card]').length, 3);
+    assert.ok(browser.textContent.includes('Nightshade'));
+    assert.ok(browser.textContent.includes('Moon Fern'));
+    assert.ok(browser.textContent.includes('Sun Petal'));
+
+    tagSearch.value = 'moo';
+    tagSearch.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    Array.from(target.querySelectorAll('[data-gathering-component-tag-suggestion]'))
+      .find(button => button.textContent.includes('moon'))
+      .click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelectorAll('[data-gathering-component-card]').length, 1, 'selected component tags should require all tags');
+    assert.ok(browser.textContent.includes('Moon Fern'));
+
+    for (const pill of Array.from(target.querySelectorAll('[data-gathering-component-tag-pill] button'))) {
+      pill.click();
+      await tick();
+      flushSync();
+    }
+
+    function dragPayloadFrom(card) {
+      let raw = '';
+      const dragStart = new Event('dragstart', { bubbles: true, cancelable: true });
+      Object.defineProperty(dragStart, 'dataTransfer', {
+        value: {
+          setData: (type, value) => {
+            if (type === 'text/plain') raw = value;
+          },
+          effectAllowed: ''
+        }
+      });
+      card.dispatchEvent(dragStart);
+      return raw;
+    }
+
+    function dropPayloadOn(row, raw) {
+      const dropEvent = new Event('drop', { bubbles: true, cancelable: true });
+      Object.defineProperty(dropEvent, 'dataTransfer', {
+        value: { getData: (type) => type === 'text/plain' ? raw : '' }
+      });
+      row.dispatchEvent(dropEvent);
+    }
+
+    const emptyRow = target.querySelector('[data-gathering-task-drop-id="drop-empty"]');
+    const glassPayload = dragPayloadFrom(target.querySelector('[data-gathering-component-card="c2"]'));
+    assert.deepEqual(JSON.parse(glassPayload), { type: 'FabricateManagedComponent', componentId: 'c2' });
+    dropPayloadOn(emptyRow, glassPayload);
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.id === 'drop-empty' && row.componentId === 'c2' && row.itemUuid === '' && row.systemItemId === '' && row.name === '' && row.enabled === true)));
+
+    const staleRow = target.querySelector('[data-gathering-task-drop-id="drop-stale"]');
+    const coalPayload = dragPayloadFrom(target.querySelector('[data-gathering-component-card="c4"]'));
+    dropPayloadOn(staleRow, coalPayload);
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.id === 'drop-stale' && row.componentId === 'c4' && row.itemUuid === '' && row.systemItemId === '' && row.name === '' && row.enabled === true)));
+
+    dropPayloadOn(staleRow, JSON.stringify({ type: 'Item', uuid: 'Item.imported' }));
+    await Promise.resolve();
+    await tick();
+    flushSync();
+    assert.deepEqual(importedDrops, [{ type: 'Item', uuid: 'Item.imported' }], 'non-managed drops should keep using the import flow');
   });
 
   it('summarizes crowded gathering task drop modifiers at five or more labels', async () => {
