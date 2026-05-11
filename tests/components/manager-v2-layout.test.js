@@ -339,33 +339,82 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const rowBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-table-head,\n.fabricate-manager-v2 .manager-v2-gathering-task-row');
   const identityBlock = blockFor('.fabricate-manager-v2 .manager-v2-recipe-identity,\n.fabricate-manager-v2 .manager-v2-component-identity,\n.fabricate-manager-v2 .manager-v2-environment-identity,\n.fabricate-manager-v2 .manager-v2-gathering-task-identity');
   const editorBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-edit-view');
+  const editorWithNoticeBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-edit-view.has-reward-rule-notice');
+  const availabilityBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-availability-row');
+  const componentBrowserBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-browser-card');
+  const componentBrowserControlsBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-browser-controls');
+  const componentBrowserScrollBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-browser-scroll');
+  const componentGridBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-grid');
+  const componentCardBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-card');
+  const componentCardCopySharedBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-card-copy strong,\n.fabricate-manager-v2 .manager-v2-task-component-card-copy > span:not(.manager-v2-task-component-card-tags)');
+  const componentCardGripBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-card-grip');
+  const componentBrowserFooterBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-browser-footer');
+  const componentBrowserFooterPaginationBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-browser-footer .manager-v2-pagination');
+  const componentPillsBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-pills');
+  const selectedTagPillBlock = blockFor('.fabricate-manager-v2 .manager-v2-selected-tag-pill');
   const dropCardBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drops-card');
   const dropHeaderBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drops-card .manager-v2-task-card-header');
   const dropControlsBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drop-controls');
+  const dropSearchBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drop-controls .manager-v2-search.is-compact');
+  const dropSearchInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drop-controls .manager-v2-search.is-compact input');
   const dropFooterBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drop-footer');
   const dropFooterPaginationBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drop-footer .manager-v2-pagination');
   const dropScrollBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drops-card .manager-v2-table-scroll');
   const dropTableBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-drops-table');
+  const dropTableHeadBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-drop-table-head');
   const dropRowBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-drop-table-head,\n.fabricate-manager-v2 .manager-v2-gathering-task-drop-row');
+  const firstDropRowBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-drop-table-head + .manager-v2-gathering-task-drop-row');
   const dropCellBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-drop-table-head > *,\n.fabricate-manager-v2 .manager-v2-gathering-task-drop-row > *');
   const dropCellSeparatorBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-drop-table-head > * + *,\n.fabricate-manager-v2 .manager-v2-gathering-task-drop-row > * + *');
   const selectedDropRowBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-drop-row.is-selected');
+  const dropComponentButtonBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-component-button,\n.fabricate-manager-v2 .manager-v2-drop-empty-component');
+  const dropComponentCopyBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-component-button .manager-v2-system-copy,\n.fabricate-manager-v2 .manager-v2-drop-empty-component .manager-v2-system-copy');
+  const dropComponentNameBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-component-button .manager-v2-system-name');
   const dropRateBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-cell');
   const dropRateValueBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-value');
-  const dropTierTrackBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-tier-track');
-  const dropTierBlocks = [
-    '.fabricate-manager-v2 .manager-v2-drop-rate-tier-track .is-mythic',
-    '.fabricate-manager-v2 .manager-v2-drop-rate-tier-track .is-very-rare',
-    '.fabricate-manager-v2 .manager-v2-drop-rate-tier-track .is-rare',
-    '.fabricate-manager-v2 .manager-v2-drop-rate-tier-track .is-uncommon',
-    '.fabricate-manager-v2 .manager-v2-drop-rate-tier-track .is-common'
-  ].map(selector => blockFor(selector)).join('\n');
+  const dropRatePercentBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-percent');
+  const dropRatePercentInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-percent input[type="text"]');
+  const dropRatePercentInputOverrideBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-edit-view .manager-v2-drop-rate-percent input[type="text"]');
+  const dropRatePercentSuffixBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-percent > span[aria-hidden="true"]');
+  const dropRateControlBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control');
+  const guaranteedDropRateControlBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control.is-guaranteed');
+  const commonDropRateControlBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control.is-common');
+  const uncommonDropRateControlBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control.is-uncommon');
+  const rareDropRateControlBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control.is-rare');
+  const veryRareDropRateControlBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control.is-very-rare');
+  const legendaryDropRateControlBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control.is-legendary');
+  const noneDropRateControlBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control.is-none');
+  const dropRateTrackBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-track');
+  const dropRateFillBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-fill');
+  const dropRateRangeBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]');
+  const dropRateWebkitTrackBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-webkit-slider-runnable-track');
+  const dropRateWebkitThumbBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-webkit-slider-thumb');
+  const dropRateMozProgressBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-moz-range-progress');
+  const dropRateMozThumbBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-moz-range-thumb');
   const dropModifierListBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-modifier-list');
   const dropModifierPillBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-modifier-pill');
   const positiveDropModifierPillBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-modifier-pill.is-positive');
   const negativeDropModifierPillBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-modifier-pill.is-negative');
-  const dropActionsBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-actions');
+  const dropModifierOverflowBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-modifier-overflow');
+  const dropEditorInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-card :is(select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]))');
+  const dropEditorValuesBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-values');
+  const dropEditorRatePercentBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-card .manager-v2-drop-rate-percent input[type="text"]');
+  const dropEditorRateValueBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-card [data-gathering-drop-inspector-rate] .manager-v2-drop-rate-value');
+  const dropEditorRateInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-card [data-gathering-drop-inspector-rate] .manager-v2-drop-rate-percent input[type="text"]');
+  const dropEditorRateSuffixBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-card [data-gathering-drop-inspector-rate] .manager-v2-drop-rate-percent > span[aria-hidden="true"]');
+  const dropEditorRateControlBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-card [data-gathering-drop-inspector-rate] .manager-v2-drop-rate-control');
+  const dropEditorRateTrackBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-card [data-gathering-drop-inspector-rate] .manager-v2-drop-rate-track');
+  const dropEditorRateFillBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-card [data-gathering-drop-inspector-rate] .manager-v2-drop-rate-fill');
+  const dropEditorRateRangeBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-card [data-gathering-drop-inspector-rate] .manager-v2-drop-rate-control input[type="range"]');
+  const dropEditorRateWebkitTrackBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-card [data-gathering-drop-inspector-rate] .manager-v2-drop-rate-control input[type="range"]::-webkit-slider-runnable-track');
+  const dropEditorRateMozTrackBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-card [data-gathering-drop-inspector-rate] .manager-v2-drop-rate-control input[type="range"]::-moz-range-track');
+  const dropEditorCountBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-count-editor');
+  const dropEditorCountInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-count-editor input[type="text"]');
+  const dropEditorInspectorCountInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-card .manager-v2-drop-count-editor[data-gathering-drop-inspector-count] input[type="text"]');
+  const dropEditorActionsBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-actions');
+  const dropQuantityCellBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-drop-row > .manager-v2-drop-quantity-cell');
   const dropQuantityInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-quantity-cell input[type="text"]');
+  const dropQuantityInputOverrideBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-edit-view .manager-v2-drop-quantity-cell input[type="text"]');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager-v2 (max-width: 1120px)'));
   const taskEditorIntermediateQuery = css.slice(css.indexOf('@container fabricate-manager-v2 (max-width: 1320px)'), css.indexOf('@container fabricate-manager-v2 (max-width: 1120px)'));
 
@@ -375,34 +424,113 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(!tableBlock.includes('reorder'), 'task browser should not reserve a reorder column');
   assert.ok(rowBlock.includes('grid-template-columns: var(--fab-mv2-gathering-task-grid);'), 'task rows should use the shared task grid');
   assert.ok(identityBlock.includes('grid-template-columns: 46px minmax(0, 1fr);'), 'task identity should reserve thumbnail space');
-  assert.ok(editorBlock.includes('grid-template-rows: auto auto minmax(min(420px, 52vh), 1fr) auto;'), 'task edit route should reserve expanded vertical space for drop rules');
+  assert.ok(editorBlock.includes('grid-template-rows: auto auto 340px minmax(410px, 1fr) auto;'), 'task edit route should reserve taller component browser and exact three-row drop-rule rows for drag/drop');
+  assert.ok(editorWithNoticeBlock.includes('grid-template-rows: auto auto 340px auto minmax(410px, 1fr) auto;'), 'task edit route should give the duplicate-drop warning a compact auto row before drop rules');
   assert.ok(editorBlock.includes('overflow: auto;'), 'task editor should allow vertical scrolling without horizontal overflow');
-  assert.ok(dropCardBlock.includes('min-height: min(420px, 52vh);'), 'task editor drop rules card should own expanded vertical sizing');
+  assert.ok(availabilityBlock.includes('grid-template-columns: repeat(2, minmax(160px, 1fr));'), 'task availability controls should form a stable two-column grid');
+  assert.ok(componentBrowserBlock.includes('height: 340px;') && componentBrowserBlock.includes('max-height: 340px;') && componentBrowserBlock.includes('overflow: hidden;'), 'component browser should own a fixed bounded height that keeps the footer visible');
+  assert.ok(componentBrowserBlock.includes('grid-template-rows: auto auto minmax(0, 1fr) auto;'), 'component browser should reserve header, optional pills, card scroll, and footer rows');
+  assert.ok(componentPillsBlock.includes('border-top: 1px solid var(--fab-mv2-border);'), 'component browser selected tags should occupy a distinct pill row');
+  assert.ok(selectedTagPillBlock.includes('background: var(--fab-success-soft);'), 'selected component tag filters should use removable selected-tag pill styling');
+  assert.ok(componentBrowserControlsBlock.includes('grid-template-columns: minmax(180px, 0.9fr) minmax(180px, 0.9fr);'), 'component browser should keep name and tag search in a compact control grid');
+  assert.ok(componentBrowserScrollBlock.includes('overflow-x: hidden;') && componentBrowserScrollBlock.includes('overflow-y: auto;'), 'component browser card area should scroll internally without horizontal overflow');
+  assert.ok(componentGridBlock.includes('grid-template-columns: repeat(3, minmax(0, 1fr));'), 'component browser should use a three-column card grid');
+  assert.ok(componentCardBlock.includes('grid-template-columns: 38px minmax(0, 1fr) 18px;') && componentCardBlock.includes('min-height: 72px;'), 'component browser cards should reserve image, copy, and grip columns');
+  assert.ok(componentCardCopySharedBlock.includes('text-overflow: ellipsis;'), 'component card shared copy should truncate within the card');
+  assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-task-component-card-copy strong {\n  -webkit-line-clamp: 1;')
+      && css.includes('.fabricate-manager-v2 .manager-v2-task-component-card-copy > span:not(.manager-v2-task-component-card-tags) {\n  -webkit-line-clamp: 1;'),
+    'component card name and description should clamp to one line'
+  );
+  assert.ok(componentCardGripBlock.includes('letter-spacing: 0;'), 'component grip should avoid viewport-scaled or negative tracking');
+  assert.ok(componentBrowserFooterBlock.includes('border-top: 1px solid var(--fab-mv2-border);'), 'component browser should own a pagination footer');
+  assert.ok(componentBrowserFooterPaginationBlock.includes('background: transparent;'), 'component browser footer should not nest pagination chrome');
+  assert.ok(dropCardBlock.includes('--fab-mv2-task-drop-table-visible-height: 262px;'), 'drop rules card should define an exact table viewport equal to header plus three rows');
+  assert.ok(dropCardBlock.includes('grid-template-rows: auto var(--fab-mv2-task-drop-table-visible-height) auto;'), 'drop rules card should keep the table viewport definite between the card header and footer');
+  assert.ok(dropCardBlock.includes('height: 410px;') && dropCardBlock.includes('max-height: 410px;'), 'task editor drop rules card should be exactly tall enough for the three-row table viewport and footer');
   assert.ok(dropHeaderBlock.includes('grid-template-columns: minmax(0, 1fr) auto;'), 'drop rules header should put copy left and controls right');
   assert.ok(dropControlsBlock.includes('display: inline-flex;') && dropControlsBlock.includes('justify-content: flex-end;'), 'drop rules search and add action should share a compact toolbar');
+  assert.ok(dropSearchBlock.includes('min-width: min(220px, 100%);'), 'drop rules search should not collapse until its icon overlaps the text area');
+  assert.ok(dropSearchInputBlock.includes('padding-left: 36px;'), 'drop rules search input should reserve text inset for the leading search icon');
   assert.ok(dropFooterBlock.includes('border-top: 1px solid var(--fab-mv2-border);'), 'drop rules count should live in a footer area with pagination');
   assert.ok(dropFooterPaginationBlock.includes('background: transparent;'), 'drop rules footer should not nest pagination chrome');
+  assert.ok(dropScrollBlock.includes('height: var(--fab-mv2-task-drop-table-visible-height);') && dropScrollBlock.includes('max-height: var(--fab-mv2-task-drop-table-visible-height);'), 'drop rules table scroll region should show exactly three complete rows before scrolling');
+  assert.ok(dropScrollBlock.includes('padding: 10px 0 0;'), 'drop rules table scroll region should not add horizontal inset');
   assert.ok(dropScrollBlock.includes('overflow-x: hidden;') && dropScrollBlock.includes('overflow-y: auto;'), 'drop rules table should suppress horizontal scroll while retaining vertical scrolling');
   assert.ok(dropTableBlock.includes('--fab-mv2-task-drop-grid:'), 'task editor drop rows should define compact desktop geometry');
-  assert.ok(dropTableBlock.includes('minmax(0, 1.4fr)') && dropTableBlock.includes('minmax(124px, 0.82fr)') && dropTableBlock.includes('88px'), 'drop row desktop grid should reserve readable chance and horizontal action columns');
+  assert.ok(dropTableBlock.includes('minmax(0, 1.05fr)') && dropTableBlock.includes('minmax(220px, 1.35fr)') && dropTableBlock.includes('56px') && dropTableBlock.includes('minmax(180px, 1.65fr)'), 'drop row desktop grid should keep component/chance/quantity geometry while widening modifiers');
+  assert.equal(dropTableBlock.includes('88px'), false, 'drop row desktop grid should not reserve a row actions column');
   assert.ok(dropTableBlock.includes('width: 100%;') && dropTableBlock.includes('max-width: 100%;'), 'drop table should fill the drop rules card without exceeding it');
+  assert.ok(dropTableHeadBlock.includes('padding: 0;'), 'drop rules header row should clear generic table-head padding so columns align with value rows');
   assert.ok(dropRowBlock.includes('grid-template-columns: var(--fab-mv2-task-drop-grid);'), 'drop rows should use the shared single-line editor grid');
   assert.ok(dropRowBlock.includes('gap: 0;') && dropRowBlock.includes('max-width: 100%;'), 'drop rows should use separators instead of gap-driven overflow');
+  assert.ok(firstDropRowBlock.includes('border-top: 0;'), 'first drop row should not double the header bottom border');
+  assert.ok(css.includes('.fabricate-manager-v2 .manager-v2-gathering-task-drop-row {\n  min-height: 72px;'), 'drop rows should be tall enough for two visible modifier chip lines');
   assert.ok(dropCellBlock.includes('padding: 8px 10px;') && dropCellBlock.includes('box-sizing: border-box;'), 'drop cells should keep padding inside full-width rows');
   assert.ok(dropCellSeparatorBlock.includes('border-left: 1px solid var(--fab-mv2-border);'), 'drop cells should use vertical separators');
+  assert.ok(css.includes('.fabricate-manager-v2 .manager-v2-gathering-task-drop-row.is-drop-active'), 'drop rows should expose a full-row active drop target state');
   assert.ok(selectedDropRowBlock.includes('background: var(--fab-success-soft);') && selectedDropRowBlock.includes('var(--fab-mv2-accent)'), 'selected drop rows should use the component-browser success/accent family');
+  assert.ok(selectedDropRowBlock.includes('inset 0 1px 0 var(--fab-mv2-border-strong)') && selectedDropRowBlock.includes('inset 0 -1px 0 var(--fab-mv2-border-strong)'), 'selected drop row outline should avoid a right edge next to the card border');
+  assert.equal(selectedDropRowBlock.includes('inset 0 0 0 1px'), false, 'selected drop row should not draw a full inset border against the card edge');
   assert.equal(selectedDropRowBlock.includes('var(--fab-info'), false, 'selected drop rows should not use the info family');
   assert.equal(selectedDropRowBlock.includes('var(--fab-warning'), false, 'selected drop rows should not use the warning family');
+  assert.ok(dropComponentButtonBlock.includes('grid-template-columns: 42px minmax(0, 1fr);') && dropComponentButtonBlock.includes('min-height: 40px;'), 'drop component cells should keep compact thumbnail/name geometry');
+  assert.ok(dropComponentCopyBlock.includes('align-content: center;'), 'drop component text should be vertically centered after description removal');
+  assert.ok(dropComponentNameBlock.includes('display: -webkit-box;') && dropComponentNameBlock.includes('-webkit-line-clamp: 2;') && dropComponentNameBlock.includes('white-space: normal;'), 'drop component names should wrap to two lines instead of relying on descriptions');
   assert.ok(dropRateBlock.includes('display: block;'), 'drop chance cell should expose one wrapped value');
-  assert.ok(dropRateValueBlock.includes('grid-template-columns: 44px minmax(0, 1fr);'), 'drop chance value should keep percent and slider on the same line');
-  assert.ok(dropTierTrackBlock.includes('background: var(--fab-overlay-dark-18);'), 'drop chance slider should use a neutral manager-v2 track');
-  assert.equal(/var\(--fab-(danger|warning|info|success)/.test(dropTierBlocks), false, 'drop chance tier segments should not use secondary theme colour bands');
-  assert.ok(dropQuantityInputBlock.includes('max-width: 52px;') && dropQuantityInputBlock.includes('font-variant-numeric: tabular-nums;'), 'quantity should remain a compact numeric text input');
-  assert.ok(dropModifierListBlock.includes('flex-wrap: nowrap;') && dropModifierListBlock.includes('overflow: hidden;'), 'drop modifiers should remain a single clipped content group');
+  assert.ok(dropRateValueBlock.includes('grid-template-columns: 52px minmax(0, 1fr);') && dropRateValueBlock.includes('gap: 4px;'), 'drop chance value should keep the row editable percent close to a wider slider');
+  assert.ok(dropRatePercentBlock.includes('position: relative;') && dropRatePercentBlock.includes('display: block;'), 'drop chance percent should overlay the suffix without taking slider width');
+  assert.ok(css.includes('--fab-drop-rate-none: #E26F6B;'), 'drop chance slider should define a distinct exact-zero colour token');
+  assert.ok(dropRatePercentInputBlock.includes('height: 28px;') && dropRatePercentInputBlock.includes('box-sizing: border-box;') && dropRatePercentInputBlock.includes('padding: 4px 16px 4px 2px;') && dropRatePercentInputBlock.includes('text-align: center;'), 'drop chance row percent should keep its existing compact centered editable numeric field');
+  assert.ok(dropRatePercentInputOverrideBlock.includes('min-height: 28px;') && dropRatePercentInputOverrideBlock.includes('padding: 4px 16px 4px 2px;') && dropRatePercentInputOverrideBlock.includes('box-shadow: none;'), 'drop chance row percent should override generic gathering task input chrome without affecting other fields');
+  assert.ok(dropRatePercentSuffixBlock.includes('position: absolute;') && dropRatePercentSuffixBlock.includes('right: 7px;') && dropRatePercentSuffixBlock.includes('pointer-events: none;'), 'drop chance row percent suffix should keep its existing placement');
+  assert.ok(dropRateControlBlock.includes('--fab-drop-rate-value: 1%;') && dropRateControlBlock.includes('--fab-drop-rate-color: var(--fab-drop-rate-very-rare);'), 'drop chance slider should expose value and tier colour variables');
+  assert.ok(dropRateTrackBlock.includes('background: var(--fab-overlay-dark-18);') && dropRateTrackBlock.includes('overflow: hidden;'), 'drop chance slider should render a neutral clipped track under the native range input');
+  assert.ok(dropRateFillBlock.includes('width: var(--fab-drop-rate-value);') && dropRateFillBlock.includes('background: var(--fab-drop-rate-color);'), 'drop chance slider should fill the active track segment with the current tier colour');
+  assert.ok(dropRateRangeBlock.includes('appearance: none;') && dropRateRangeBlock.includes('-webkit-appearance: none;'), 'drop chance range should clear native host slider rendering');
+  assert.ok(dropRateRangeBlock.includes('accent-color: var(--fab-drop-rate-color);') && dropRateRangeBlock.includes('background: transparent;'), 'drop chance native range should inherit the current tier colour without adding row chrome');
+  assert.ok(dropRateWebkitTrackBlock.includes('border: 1px solid var(--fab-overlay-light-10);') && dropRateWebkitTrackBlock.includes('background: transparent;'), 'drop chance row WebKit range track should keep its existing native track geometry');
+  assert.ok(blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-moz-range-track').includes('border: 1px solid var(--fab-overlay-light-10);'), 'drop chance row Firefox range track should keep its existing native track geometry');
+  assert.ok(dropRateMozProgressBlock.includes('background: var(--fab-drop-rate-color);'), 'drop chance Firefox progress should paint the active segment in the current tier colour');
+  assert.ok(dropRateWebkitThumbBlock.includes('background: var(--fab-drop-rate-color);') && dropRateMozThumbBlock.includes('background: var(--fab-drop-rate-color);'), 'drop chance range thumbs should retain current-tier colour');
+  assert.ok(
+    guaranteedDropRateControlBlock.includes('var(--fab-drop-rate-guaranteed)')
+      && commonDropRateControlBlock.includes('var(--fab-drop-rate-common)')
+      && uncommonDropRateControlBlock.includes('var(--fab-drop-rate-uncommon)')
+      && rareDropRateControlBlock.includes('var(--fab-drop-rate-rare)')
+      && veryRareDropRateControlBlock.includes('var(--fab-drop-rate-very-rare)')
+      && legendaryDropRateControlBlock.includes('var(--fab-drop-rate-legendary)')
+      && noneDropRateControlBlock.includes('var(--fab-drop-rate-none)'),
+    'drop chance control classes should map the selected rarity palette to the current value'
+  );
+  assert.ok(dropQuantityCellBlock.includes('display: flex;') && dropQuantityCellBlock.includes('justify-content: center;') && dropQuantityCellBlock.includes('padding: 6px;'), 'quantity cells should spend less horizontal space while centering the input');
+  assert.ok(dropQuantityInputBlock.includes('max-width: 44px;') && dropQuantityInputBlock.includes('box-sizing: border-box;') && dropQuantityInputBlock.includes('text-align: center;') && dropQuantityInputBlock.includes('font-variant-numeric: tabular-nums;'), 'quantity should remain a compact numeric text input sized for three digits');
+  assert.ok(dropQuantityInputOverrideBlock.includes('min-height: 28px;') && dropQuantityInputOverrideBlock.includes('padding: 4px;'), 'quantity should override generic gathering input padding without widening the column');
+  assert.ok(dropModifierListBlock.includes('flex-wrap: wrap;') && dropModifierListBlock.includes('align-content: center;'), 'drop modifiers should wrap into a compact two-line chip group');
+  assert.ok(dropModifierListBlock.includes('max-height: 58px;') && dropModifierListBlock.includes('overflow: hidden;'), 'drop modifiers should clip after the two-line chip budget');
   assert.ok(dropModifierPillBlock.includes('background: var(--fab-overlay-light-06);'), 'drop modifier pills should use restrained neutral chip backgrounds');
   assert.ok(positiveDropModifierPillBlock.includes('color: var(--fab-mv2-text);') && negativeDropModifierPillBlock.includes('color: var(--fab-mv2-text);'), 'drop modifier chips should avoid saturated text across the whole pill');
-  assert.ok(dropActionsBlock.includes('flex-wrap: nowrap;') && dropActionsBlock.includes('gap: 6px;') && dropActionsBlock.includes('padding: 6px 7px;'), 'drop row actions should stay on one horizontal line');
+  assert.ok(dropModifierOverflowBlock.includes('text-overflow: ellipsis;') && dropModifierOverflowBlock.includes('white-space: nowrap;'), 'overflow modifier hints should stay as one clipped table label');
+  assert.ok(dropEditorInputBlock.includes(':not([type="range"])'), 'selected drop inspector generic input chrome should not override row-style range sliders');
+  assert.ok(dropEditorValuesBlock.includes('grid-template-columns: minmax(0, 1fr) 72px;') && dropEditorValuesBlock.includes('align-items: end;'), 'selected drop inspector should place chance and count in a compact two-column grid');
+  assert.ok(dropEditorRateValueBlock.includes('grid-template-columns: 64px minmax(0, 1fr);'), 'selected drop inspector chance should widen only the right-menu percent column');
+  assert.ok(dropEditorRatePercentBlock.includes('height: 28px;') && dropEditorRatePercentBlock.includes('padding: 4px 16px 4px 2px;') && dropEditorRatePercentBlock.includes('background: var(--fab-overlay-dark-18);'), 'selected drop inspector broad chance input rule should not carry the right-menu suffix padding');
+  assert.ok(dropEditorRateInputBlock.includes('height: 28px;') && dropEditorRateInputBlock.includes('min-height: 28px;') && dropEditorRateInputBlock.includes('padding: 4px 16px 4px 6px;') && dropEditorRateInputBlock.includes('box-shadow: none;'), 'selected drop inspector chance input should keep compact row-style geometry without extra suffix padding');
+  assert.ok(dropEditorRateSuffixBlock.includes('right: 8px;'), 'selected drop inspector percent suffix should sit away from three-digit values');
+  assert.ok(dropEditorRateControlBlock.includes('height: 28px;') && dropEditorRateControlBlock.includes('padding: 0 7px;') && dropEditorRateControlBlock.includes('background: var(--fab-overlay-dark-18);') && dropEditorRateControlBlock.includes('overflow: hidden;'), 'selected drop inspector slider should own the dark backing box instead of relying on native range chrome');
+  assert.ok(dropEditorRateTrackBlock.includes('left: 7px;') && dropEditorRateTrackBlock.includes('right: 7px;') && dropEditorRateTrackBlock.includes('border: 0;') && dropEditorRateTrackBlock.includes('background: var(--fab-overlay-dark-18);'), 'selected drop inspector custom track should be inset to the thumb radius to avoid endpoint tails');
+  assert.ok(dropEditorRateFillBlock.includes('border-radius: 999px;'), 'selected drop inspector fill should be rounded without relying on a wider track border');
+  assert.equal(css.includes('linear-gradient'), false, 'drop chance slider styling should keep the flat-ui no-gradient contract');
+  assert.ok(dropEditorRateRangeBlock.includes('height: 26px;') && dropEditorRateRangeBlock.includes('padding: 0;') && dropEditorRateRangeBlock.includes('background: transparent;') && dropEditorRateRangeBlock.includes('box-shadow: none;'), 'selected drop inspector native range should remain a transparent thumb hit target over the custom track');
+  assert.ok(dropEditorRateWebkitTrackBlock.includes('border: 0;') && dropEditorRateWebkitTrackBlock.includes('background: transparent;'), 'selected drop inspector WebKit native range track should not draw over the custom track');
+  assert.ok(dropEditorRateMozTrackBlock.includes('border: 0;') && dropEditorRateMozTrackBlock.includes('background: transparent;'), 'selected drop inspector Firefox native range track should not draw over the custom track');
+  assert.ok(dropEditorCountBlock.includes('display: grid;') && dropEditorCountBlock.includes('gap: 6px;'), 'selected drop inspector count editor should use a compact labeled field');
+  assert.ok(dropEditorCountInputBlock.includes('min-height: 28px;') && dropEditorCountInputBlock.includes('text-align: center;'), 'selected drop inspector count input should match row count input geometry');
+  assert.ok(dropEditorInspectorCountInputBlock.includes('height: 28px;') && dropEditorInspectorCountInputBlock.includes('min-height: 28px;') && dropEditorInspectorCountInputBlock.includes('padding: 4px;') && dropEditorInspectorCountInputBlock.includes('box-shadow: none;'), 'selected drop inspector count input should override generic inspector input chrome with chance-field geometry');
+  assert.ok(dropEditorActionsBlock.includes('grid-template-columns: repeat(2, minmax(0, 1fr));') && dropEditorActionsBlock.includes('margin-top: 0;'), 'selected drop rule actions should sit beneath the inspector title row');
+  assert.equal(css.includes('.fabricate-manager-v2 .manager-v2-drop-actions'), false, 'drop row actions should not reserve row layout or styling');
   assert.equal(taskEditorIntermediateQuery.includes('.manager-v2-gathering-task-drop-row {\n    grid-template-columns: minmax(0, 1fr);'), false, 'task editor should not stack drop rows at the intermediate desktop width');
+  assert.ok(taskEditorIntermediateQuery.includes('minmax(154px, 1.04fr) 54px minmax(150px, 1.38fr)'), 'intermediate task editor drop grid should preserve drop chance width while widening modifiers');
   assert.ok(
     mediumQuery.includes('.fabricate-manager-v2 .manager-v2-gathering-task-drop-table-head,\n  .fabricate-manager-v2 .manager-v2-gathering-task-drop-row') && mediumQuery.includes('grid-template-columns: var(--fab-mv2-task-drop-grid);'),
     'medium manager-v2 layout should preserve the drop row grid and headers instead of duplicate row labels'

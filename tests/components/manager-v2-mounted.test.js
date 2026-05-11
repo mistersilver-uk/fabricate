@@ -190,7 +190,99 @@ function createStore(calls = [], options = {}) {
         sourceMissing: false,
         showTags: true,
         showEssences: true
-      }
+      },
+      ...(options.extendedComponentCards ? [
+        {
+          id: 'c3',
+          name: 'Nightshade With An Exceptionally Long Localized Component Name',
+          img: 'icons/consumables/plants/nightshade.jpg',
+          description: 'A dusky flowering herb used in careful doses.',
+          tags: ['herb', 'night'],
+          essences: [],
+          sourceUuidDisplay: '',
+          hasSourceUuid: false,
+          sourceOrigin: 'unknown',
+          sourceOriginLabel: 'Unknown',
+          sourceMissing: false,
+          showTags: true,
+          showEssences: true
+        },
+        {
+          id: 'c4',
+          name: 'Coal',
+          img: 'icons/commodities/materials/bowl-powder-black.webp',
+          description: 'Fuel for a steady forge.',
+          tags: ['fuel', 'mineral'],
+          essences: [],
+          sourceUuidDisplay: '',
+          hasSourceUuid: false,
+          sourceOrigin: 'unknown',
+          sourceOriginLabel: 'Unknown',
+          sourceMissing: false,
+          showTags: true,
+          showEssences: true
+        },
+        {
+          id: 'c5',
+          name: 'Moon Fern',
+          img: 'icons/consumables/plants/leaf-green.webp',
+          description: 'Soft fronds that glow under moonlight.',
+          tags: ['herb', 'moon'],
+          essences: [],
+          sourceUuidDisplay: '',
+          hasSourceUuid: false,
+          sourceOrigin: 'unknown',
+          sourceOriginLabel: 'Unknown',
+          sourceMissing: false,
+          showTags: true,
+          showEssences: true
+        },
+        {
+          id: 'c6',
+          name: 'Crystal Dust',
+          img: 'icons/commodities/gems/gem-powder-blue.webp',
+          description: 'Fine shimmering mineral powder.',
+          tags: ['mineral', 'crystal'],
+          essences: [],
+          sourceUuidDisplay: '',
+          hasSourceUuid: false,
+          sourceOrigin: 'unknown',
+          sourceOriginLabel: 'Unknown',
+          sourceMissing: false,
+          showTags: true,
+          showEssences: true
+        },
+        {
+          id: 'c7',
+          name: 'Sun Petal',
+          img: 'icons/consumables/plants/flower-yellow.webp',
+          description: 'A warm yellow flower used in tonics.',
+          tags: ['herb', 'sun'],
+          essences: [],
+          sourceUuidDisplay: '',
+          hasSourceUuid: false,
+          sourceOrigin: 'unknown',
+          sourceOriginLabel: 'Unknown',
+          sourceMissing: false,
+          showTags: true,
+          showEssences: true
+        },
+        {
+          id: 'c8',
+          name: 'River Salt',
+          img: 'icons/commodities/materials/powder-white.webp',
+          description: 'Coarse salt gathered from river stones.',
+          tags: ['mineral', 'water'],
+          essences: [],
+          sourceUuidDisplay: '',
+          hasSourceUuid: false,
+          sourceOrigin: 'unknown',
+          sourceOriginLabel: 'Unknown',
+          sourceMissing: false,
+          showTags: true,
+          showEssences: true
+        }
+      ] : [])
     ],
     smithing: [
       {
@@ -2127,28 +2219,85 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Final chance'));
     assert.equal(target.querySelector('.manager-v2-task-card-header .manager-v2-drop-count'), null);
     assert.ok(target.querySelector('.manager-v2-task-drop-footer [data-gathering-task-drop-count]'));
+    const dropColumnHeaders = Array.from(target.querySelectorAll('[data-gathering-task-drops-table] [role="columnheader"]')).map(node => node.textContent.trim());
+    assert.ok(dropColumnHeaders.includes('Count'));
+    assert.equal(dropColumnHeaders.includes('#'), false);
+    assert.equal(dropColumnHeaders.includes('Quantity'), false);
+    assert.equal(dropColumnHeaders.includes('Actions'), false);
     const populatedDropRow = target.querySelector('[data-gathering-task-drop-id="drop-nightshade"]');
     assert.equal(populatedDropRow.querySelector('[data-gathering-task-drop-row-number]'), null);
     const populatedComponentCell = populatedDropRow.querySelector('[data-gathering-task-drop-component-cell]');
-    assert.ok(populatedComponentCell.querySelector('.manager-v2-gathering-task-thumb'));
+    const populatedComponentButton = populatedComponentCell.querySelector('.manager-v2-drop-component-button');
+    assert.ok(populatedComponentButton);
+    const populatedComponentThumb = populatedComponentCell.querySelector('.manager-v2-gathering-task-thumb');
+    assert.ok(populatedComponentThumb);
+    assert.equal(populatedComponentButton.getAttribute('title'), 'Right-click to clear component');
     assert.ok(populatedComponentCell.textContent.includes('Nightshade With An Exceptionally Long Localized Component Name'));
-    assert.equal(
-      populatedComponentCell.querySelector('.manager-v2-system-description').textContent.trim(),
-      'A dusky flowering herb used in careful doses.'
-    );
+    assert.equal(populatedComponentCell.querySelector('.manager-v2-drop-component-button .manager-v2-system-description'), null);
+    assert.equal(populatedComponentCell.textContent.includes('A dusky flowering herb used in careful doses.'), false);
     assert.equal(populatedComponentCell.textContent.includes('Unresolved drop'), false);
     assert.equal(populatedDropRow.textContent.includes('Drop component'), false);
     assert.equal(populatedDropRow.textContent.includes('Drop chance'), false);
     assert.equal(populatedDropRow.textContent.includes('Quantity'), false);
     assert.equal(populatedDropRow.textContent.includes('award'), false);
     const populatedChanceCell = populatedDropRow.querySelector('[data-gathering-task-drop-chance-cell]');
-    assert.equal(populatedChanceCell.querySelector('strong').textContent.trim(), '80%');
-    assert.ok(populatedChanceCell.querySelector('.manager-v2-drop-rate-tier-track'));
-    assert.ok(populatedChanceCell.querySelector('input[type="range"]').parentElement.classList.contains('manager-v2-drop-rate-control'));
+    const dropRateInput = populatedChanceCell.querySelector('.manager-v2-drop-rate-percent input');
+    assert.equal(dropRateInput.getAttribute('type'), 'text');
+    assert.equal(dropRateInput.getAttribute('inputmode'), 'numeric');
+    assert.equal(dropRateInput.getAttribute('pattern'), '[0-9]*');
+    assert.equal(dropRateInput.value, '80');
+    const dropRateControl = populatedChanceCell.querySelector('input[type="range"]').parentElement;
+    assert.ok(dropRateControl.classList.contains('manager-v2-drop-rate-control'));
+    assert.ok(dropRateControl.classList.contains('is-common'));
+    assert.ok(dropRateControl.getAttribute('style').includes('--fab-drop-rate-value: 80%;'));
+    assert.ok(dropRateControl.getAttribute('style').includes('--fab-drop-rate-color: var(--fab-drop-rate-common);'));
+    dropRateInput.value = '07a';
+    dropRateInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(dropRateInput.value, '7');
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.id === 'drop-nightshade' && row.dropRate === 7)));
+    const updatedDropRateInput = populatedDropRow.querySelector('.manager-v2-drop-rate-percent input');
+    const invalidDropRateCallCount = calls.length;
+    updatedDropRateInput.value = '150';
+    updatedDropRateInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(updatedDropRateInput.value, '150');
+    assert.equal(calls.slice(invalidDropRateCallCount).some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.id === 'drop-nightshade' && row.dropRate === 150)), false);
+    updatedDropRateInput.dispatchEvent(new Event('blur', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(updatedDropRateInput.value, '7');
+    let stepDropRateInput = populatedDropRow.querySelector('.manager-v2-drop-rate-percent input');
+    const dropRateArrowUpEvent = new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true });
+    stepDropRateInput.dispatchEvent(dropRateArrowUpEvent);
+    await tick();
+    flushSync();
+    assert.equal(dropRateArrowUpEvent.defaultPrevented, true);
+    assert.equal(stepDropRateInput.value, '8');
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.id === 'drop-nightshade' && row.dropRate === 8)));
+    stepDropRateInput = populatedDropRow.querySelector('.manager-v2-drop-rate-percent input');
+    stepDropRateInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+    await tick();
+    flushSync();
+    assert.equal(stepDropRateInput.value, '7');
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.id === 'drop-nightshade' && row.dropRate === 7)));
+    stepDropRateInput = populatedDropRow.querySelector('.manager-v2-drop-rate-percent input');
+    stepDropRateInput.value = '100';
+    stepDropRateInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }));
+    await tick();
+    flushSync();
+    assert.equal(stepDropRateInput.value, '100');
+    stepDropRateInput.value = '0';
+    stepDropRateInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+    await tick();
+    flushSync();
+    assert.equal(stepDropRateInput.value, '0');
     const quantityInput = populatedDropRow.querySelector('.manager-v2-drop-quantity-cell input');
     assert.equal(quantityInput.getAttribute('type'), 'text');
     assert.equal(quantityInput.getAttribute('inputmode'), 'numeric');
-    assert.equal(quantityInput.getAttribute('pattern'), '[1-9][0-9]*');
+    assert.equal(quantityInput.getAttribute('pattern'), '[1-9][0-9]{0,2}');
     assert.equal(quantityInput.value, '2');
     quantityInput.value = 'abc0';
     quantityInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -2160,17 +2309,120 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.id === 'drop-nightshade' && row.quantity === 3)));
+    let stepQuantityInput = populatedDropRow.querySelector('.manager-v2-drop-quantity-cell input');
+    const quantityArrowUpEvent = new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true });
+    stepQuantityInput.dispatchEvent(quantityArrowUpEvent);
+    await tick();
+    flushSync();
+    assert.equal(quantityArrowUpEvent.defaultPrevented, true);
+    assert.equal(stepQuantityInput.value, '4');
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.id === 'drop-nightshade' && row.quantity === 4)));
+    stepQuantityInput = populatedDropRow.querySelector('.manager-v2-drop-quantity-cell input');
+    stepQuantityInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+    await tick();
+    flushSync();
+    assert.equal(stepQuantityInput.value, '3');
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.id === 'drop-nightshade' && row.quantity === 3)));
+    stepQuantityInput = populatedDropRow.querySelector('.manager-v2-drop-quantity-cell input');
+    stepQuantityInput.value = '999';
+    stepQuantityInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }));
+    await tick();
+    flushSync();
+    assert.equal(stepQuantityInput.value, '999');
+    stepQuantityInput = populatedDropRow.querySelector('.manager-v2-drop-quantity-cell input');
+    stepQuantityInput.value = '1';
+    stepQuantityInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+    await tick();
+    flushSync();
+    assert.equal(stepQuantityInput.value, '1');
+    const invalidHighQuantityCallCount = calls.length;
+    stepQuantityInput = populatedDropRow.querySelector('.manager-v2-drop-quantity-cell input');
+    stepQuantityInput.value = '1000';
+    stepQuantityInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(stepQuantityInput.value, '1000');
+    assert.equal(calls.slice(invalidHighQuantityCallCount).some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.id === 'drop-nightshade' && row.quantity === 1000)), false);
+    stepQuantityInput.dispatchEvent(new Event('blur', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(stepQuantityInput.value, '1');
     const modifierPills = populatedDropRow.querySelectorAll('.manager-v2-drop-modifier-pill');
     assert.equal(modifierPills.length, 3);
     assert.ok(Array.from(modifierPills).some(pill => pill.classList.contains('is-positive') && pill.textContent.includes('Deep Night') && pill.textContent.includes('+20%')));
     assert.ok(Array.from(modifierPills).some(pill => pill.classList.contains('is-negative') && pill.textContent.includes('Clear Sky') && pill.textContent.includes('-15%')));
     assert.ok(Array.from(modifierPills).some(pill => pill.classList.contains('is-neutral') && pill.textContent.includes('High Day') && pill.textContent.includes('+0%')));
-    const dropActionButtons = populatedDropRow.querySelectorAll('[data-gathering-task-drop-actions] .manager-v2-icon-button');
-    assert.equal(dropActionButtons.length, 2);
+    assert.equal(populatedDropRow.querySelector('[aria-label="Duplicate drop rule"]'), null);
+    assert.equal(populatedDropRow.querySelector('[aria-label="Delete drop rule"]'), null);
+    const selectedDropInspector = target.querySelector('[data-gathering-task-drop-inspector]');
+    const selectedDropActions = selectedDropInspector.querySelector('.manager-v2-drop-editor-actions');
+    assert.ok(selectedDropActions);
+    assert.ok(selectedDropActions.previousElementSibling?.classList.contains('manager-v2-inspector-title-row'));
+    assert.ok(selectedDropActions.querySelector('[aria-label="Duplicate drop rule"]'));
+    assert.ok(selectedDropActions.querySelector('[aria-label="Delete drop rule"]'));
+    assert.equal(selectedDropInspector.textContent.includes('Drop component'), false);
+    assert.equal(selectedDropInspector.textContent.includes('Select a component'), false);
+    const inspectorRateEditor = selectedDropInspector.querySelector('[data-gathering-drop-inspector-rate]');
+    assert.ok(inspectorRateEditor.textContent.includes('Drop chance'));
+    const inspectorRateInput = inspectorRateEditor.querySelector('.manager-v2-drop-rate-percent input');
+    assert.equal(inspectorRateInput.getAttribute('type'), 'text');
+    assert.equal(inspectorRateInput.getAttribute('inputmode'), 'numeric');
+    assert.equal(inspectorRateInput.value, '0');
+    const inspectorRateControl = inspectorRateEditor.querySelector('.manager-v2-drop-rate-control');
+    assert.ok(inspectorRateControl.classList.contains('is-none'));
+    assert.ok(inspectorRateControl.getAttribute('style').includes('--fab-drop-rate-value: 0%;'));
+    assert.ok(inspectorRateControl.getAttribute('style').includes('--fab-drop-rate-color: var(--fab-drop-rate-none);'));
+    inspectorRateInput.value = '09x';
+    inspectorRateInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(inspectorRateInput.value, '9');
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.id === 'drop-nightshade' && row.dropRate === 9)));
+    let refreshedInspectorRateInput = selectedDropInspector.querySelector('[data-gathering-drop-inspector-rate] .manager-v2-drop-rate-percent input');
+    const inspectorRateArrowUpEvent = new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true });
+    refreshedInspectorRateInput.dispatchEvent(inspectorRateArrowUpEvent);
+    await tick();
+    flushSync();
+    assert.equal(inspectorRateArrowUpEvent.defaultPrevented, true);
+    assert.equal(refreshedInspectorRateInput.value, '10');
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.id === 'drop-nightshade' && row.dropRate === 10)));
+    refreshedInspectorRateInput = selectedDropInspector.querySelector('[data-gathering-drop-inspector-rate] .manager-v2-drop-rate-percent input');
+    refreshedInspectorRateInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+    await tick();
+    flushSync();
+    assert.equal(refreshedInspectorRateInput.value, '9');
+    const inspectorCountEditor = selectedDropInspector.querySelector('[data-gathering-drop-inspector-count]');
+    assert.ok(inspectorCountEditor.textContent.includes('Count'));
+    const inspectorCountInput = inspectorCountEditor.querySelector('input');
+    assert.equal(inspectorCountInput.getAttribute('type'), 'text');
+    assert.equal(inspectorCountInput.getAttribute('inputmode'), 'numeric');
+    assert.equal(inspectorCountInput.getAttribute('pattern'), '[1-9][0-9]{0,2}');
+    assert.equal(inspectorCountInput.value, '1');
+    inspectorCountInput.value = '06x';
+    inspectorCountInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(inspectorCountInput.value, '6');
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.id === 'drop-nightshade' && row.quantity === 6)));
+    let refreshedInspectorCountInput = selectedDropInspector.querySelector('[data-gathering-drop-inspector-count] input');
+    const inspectorCountArrowDownEvent = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true });
+    refreshedInspectorCountInput.dispatchEvent(inspectorCountArrowDownEvent);
+    await tick();
+    flushSync();
+    assert.equal(inspectorCountArrowDownEvent.defaultPrevented, true);
+    assert.equal(refreshedInspectorCountInput.value, '5');
+    refreshedInspectorCountInput = selectedDropInspector.querySelector('[data-gathering-drop-inspector-count] input');
+    refreshedInspectorCountInput.value = '1000';
+    refreshedInspectorCountInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(refreshedInspectorCountInput.value, '1000');
+    refreshedInspectorCountInput.dispatchEvent(new Event('blur', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(refreshedInspectorCountInput.value, '5');
     assert.equal(populatedDropRow.querySelector('[aria-label="Select drop rule"]'), null);
     assert.equal(populatedDropRow.querySelector('[aria-label="Edit drop rule"]'), null);
-    assert.ok(populatedDropRow.querySelector('[aria-label="Duplicate drop rule"]'));
-    assert.ok(populatedDropRow.querySelector('[aria-label="Delete drop rule"]'));
     const mediaColumn = coreEditor.querySelector('.manager-v2-task-media-column');
     const taskImagePicker = coreEditor.querySelector('.manager-v2-task-image-picker');
     const taskStatus = coreEditor.querySelector('.manager-v2-task-core-status');
@@ -2196,18 +2448,67 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].name === 'Gather Sun Herbs'));
+    const regionAvailability = target.querySelector('[data-gathering-task-field="region"]');
+    const biomeAvailability = target.querySelector('[data-gathering-task-field="biomes"]');
     const timeAvailability = target.querySelector('[data-gathering-task-field="timeOfDay"]');
     const weatherAvailability = target.querySelector('[data-gathering-task-field="weather"]');
+    const regionSelect = regionAvailability.querySelector('select');
+    assert.deepEqual(
+      Array.from(regionSelect.options).map(option => option.textContent.trim()),
+      ['All regions', 'Northlands', 'South Coast']
+    );
+    assert.equal(regionSelect.value, 'north');
+    regionSelect.value = 'south';
+    regionSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[1] === 'alchemy' && call[2] === 'task-herbs' && call[3].region === 'south'));
+    regionSelect.value = '';
+    regionSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[1] === 'alchemy' && call[2] === 'task-herbs' && call[3].region === ''));
     assert.equal(timeAvailability.querySelector('select'), null);
     assert.equal(weatherAvailability.querySelector('select'), null);
+    assert.equal(biomeAvailability.querySelector('select'), null);
+    const biomePill = biomeAvailability.querySelector('[data-gathering-task-availability-pill="biomes"][data-condition-id="forest"]');
     const timePill = timeAvailability.querySelector('[data-gathering-task-availability-pill="timeOfDay"][data-condition-id="day"]');
     const weatherPill = weatherAvailability.querySelector('[data-gathering-task-availability-pill="weather"][data-condition-id="clear"]');
+    assert.ok(biomePill);
+    assert.ok(biomePill.textContent.includes('Moon Forest'));
+    assert.ok(biomePill.querySelector('i.fas.fa-tree'));
     assert.ok(timePill);
     assert.ok(timePill.textContent.includes('High Day'));
     assert.ok(timePill.querySelector('i.fas.fa-sun'));
     assert.ok(weatherPill);
     assert.ok(weatherPill.textContent.includes('Clear Sky'));
     assert.ok(weatherPill.querySelector('i.fas.fa-sun'));
+
+    biomeAvailability.querySelector('.manager-v2-availability-menu-button').click();
+    await tick();
+    flushSync();
+    assert.equal(biomeAvailability.querySelector('[data-gathering-task-availability-option="biomes"][data-condition-id="forest"]'), null);
+    assert.deepEqual(
+      Array.from(biomeAvailability.querySelectorAll('[data-gathering-task-availability-option="biomes"]')).map(option => option.textContent.trim()),
+      ['Crystal Cavern']
+    );
+    assert.ok(biomeAvailability.querySelector('[data-condition-id="cavern"] i.fas.fa-gem'));
+    biomeAvailability.querySelector('[data-gathering-task-availability-option="biomes"][data-condition-id="cavern"]').click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && Array.isArray(call[3].biomes) && call[3].biomes.join(',') === 'forest,cavern'));
+    assert.ok(biomeAvailability.querySelector('[data-gathering-task-availability-pill="biomes"][data-condition-id="cavern"]'));
+
+    biomeAvailability.querySelector('[data-gathering-task-availability-pill="biomes"][data-condition-id="forest"] .manager-v2-availability-remove').click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && Array.isArray(call[3].biomes) && call[3].biomes.length === 1 && call[3].biomes[0] === 'cavern'));
+
+    biomeAvailability.querySelector('[data-gathering-task-availability-pill="biomes"][data-condition-id="cavern"] .manager-v2-availability-remove').click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && Array.isArray(call[3].biomes) && call[3].biomes.length === 0));
+    assert.ok(biomeAvailability.textContent.includes('Any Biome'));
 
     timeAvailability.querySelector('.manager-v2-availability-menu-button').click();
     await tick();
@@ -2259,10 +2560,18 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.id === 'drop-nightshade' && row.dropRate === 25)));
-    target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] [aria-label="Duplicate drop rule"]').click();
+    target.querySelector('[data-gathering-task-drop-inspector] [aria-label="Duplicate drop rule"]').click();
     await tick();
     flushSync();
     assert.ok(target.querySelector('[data-gathering-task-reward-rule-notice]'));
+    const clearableComponentThumb = target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] .manager-v2-gathering-task-thumb');
+    assert.ok(clearableComponentThumb);
+    const clearComponentEvent = new MouseEvent('mousedown', { button: 2, bubbles: true, cancelable: true });
+    clearableComponentThumb.dispatchEvent(clearComponentEvent);
+    await tick();
+    flushSync();
+    assert.equal(clearComponentEvent.defaultPrevented, true);
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.id === 'drop-nightshade' && row.componentId === '' && row.systemItemId === '' && row.itemUuid === '' && row.name === '')));
     target.querySelector('.manager-v2-header-actions .manager-v2-button').click();
     await tick();
     flushSync();
@@ -2624,21 +2933,11 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     addedDropRow.click();
     await tick();
     flushSync();
-    assert.equal(target.querySelector('[data-gathering-task-drop-inspector] select').value, '');
-    target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] [aria-label="Duplicate drop rule"]')
-      .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
-    target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] [aria-label="Delete drop rule"]')
-      .dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }));
-    await tick();
-    flushSync();
-    assert.equal(target.querySelector('[data-gathering-task-drop-inspector] select').value, '');
-
-    const componentSelect = target.querySelector('[data-gathering-task-drop-inspector] select');
-    componentSelect.value = 'c2';
-    componentSelect.dispatchEvent(new Event('change', { bubbles: true }));
-    await tick();
-    flushSync();
-    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.id === addedRow.id && row.componentId === 'c2' && row.enabled === true)));
+    assert.equal(target.querySelector('[data-gathering-task-drop-inspector]').textContent.includes('Drop component'), false);
+    assert.equal(target.querySelector('[data-gathering-task-drop-inspector] [data-gathering-drop-inspector-rate] input[type="text"]').value, '25');
+    assert.equal(target.querySelector('[data-gathering-task-drop-inspector] [data-gathering-drop-inspector-count] input').value, '1');
+    assert.equal(target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] [aria-label="Duplicate drop rule"]'), null);
+    assert.equal(target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] [aria-label="Delete drop rule"]'), null);
 
     const inspectorSlider = target.querySelector('[data-gathering-task-drop-inspector] input[type="range"]');
     inspectorSlider.value = '100';
@@ -2663,14 +2962,278 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     flushSync();
     assert.ok(target.querySelector('[data-gathering-task-drop-fact="final-chance"]').textContent.includes('0%'));
 
-    target.querySelector(`[data-gathering-task-drop-id="${addedRow.id}"] [aria-label="Duplicate drop rule"]`).click();
+    target.querySelector('[data-gathering-task-drop-inspector] [aria-label="Duplicate drop rule"]').click();
     await tick();
     flushSync();
-    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.filter(row => row.componentId === 'c2').length >= 2));
-    target.querySelector(`[data-gathering-task-drop-id="${addedRow.id}"] [aria-label="Delete drop rule"]`).click();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.filter(row => row.componentId === '' && row.dropRate === 100).length >= 2));
+    target.querySelector(`[data-gathering-task-drop-id="${addedRow.id}"]`).click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-gathering-task-drop-inspector] [aria-label="Delete drop rule"]').click();
     await tick();
     flushSync();
     assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.every(row => row.id !== addedRow.id)));
+  });
+
+  it('browses and drags managed components inside the gathering task editor', async () => {
+    const calls = [];
+    const importedDrops = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          extendedComponentCards: true,
+          taskDropRows: [
+            { id: 'drop-empty', componentId: '', itemUuid: '', systemItemId: '', name: '', quantity: 1, dropRate: 25, enabled: false },
+            { id: 'drop-stale', componentId: 'c3', itemUuid: 'Item.stale', systemItemId: 'legacy-system-item', name: 'Legacy Name', quantity: 1, dropRate: 40, enabled: true }
+          ]
+        }),
+        services: {
+          openCurrentAdmin: () => {},
+          importSingleManagedItemFromDrop: async (data) => {
+            importedDrops.push(data);
+            return { id: 'c1', name: 'Iron Ore' };
+          }
+        }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    target.querySelector('#manager-v2-gathering-tab-tasks').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]').click();
+    await tick();
+    flushSync();
+
+    const browser = target.querySelector('[data-gathering-task-component-browser]');
+    const dropsCard = target.querySelector('.manager-v2-task-drops-card');
+    assert.ok(browser, 'component browser should render in the task editor');
+    assert.equal(
+      Boolean(browser.compareDocumentPosition(dropsCard) & Node.DOCUMENT_POSITION_FOLLOWING),
+      true,
+      'component browser should render above drop rules'
+    );
+    assert.equal(target.querySelectorAll('[data-gathering-component-card]').length, 6, 'component browser should default to six cards per page');
+    assert.ok(browser.textContent.includes('Iron Ore'));
+    assert.equal(browser.textContent.includes('River Salt'), false, 'seventh component should start on the next page');
+
+    const nameSearch = target.querySelector('[aria-label="Search component names"]');
+    nameSearch.value = 'coal';
+    nameSearch.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(target.querySelectorAll('[data-gathering-component-card]').length, 1);
+    assert.ok(browser.textContent.includes('Coal'));
+
+    nameSearch.value = 'fuel';
+    nameSearch.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(target.querySelectorAll('[data-gathering-component-card]').length, 0, 'component browser name search should not match descriptions');
+
+    nameSearch.value = '';
+    nameSearch.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+
+    const tagSearch = target.querySelector('[aria-label="Search component tags"]');
+    tagSearch.value = 'her';
+    tagSearch.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    Array.from(target.querySelectorAll('[data-gathering-component-tag-suggestion]'))
+      .find(button => button.textContent.includes('herb'))
+      .click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelectorAll('[data-gathering-component-card]').length, 3);
+    assert.ok(browser.textContent.includes('Nightshade'));
+    assert.ok(browser.textContent.includes('Moon Fern'));
+    assert.ok(browser.textContent.includes('Sun Petal'));
+
+    tagSearch.value = 'moo';
+    tagSearch.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    Array.from(target.querySelectorAll('[data-gathering-component-tag-suggestion]'))
+      .find(button => button.textContent.includes('moon'))
+      .click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelectorAll('[data-gathering-component-card]').length, 1, 'selected component tags should require all tags');
+    assert.ok(browser.textContent.includes('Moon Fern'));
+    const selectedTagPills = Array.from(target.querySelectorAll('[data-gathering-component-tag-pill]'));
+    assert.ok(selectedTagPills.every(pill => pill.classList.contains('manager-v2-selected-tag-pill')), 'selected component tags should render as removable pills');
+
+    for (const pill of Array.from(target.querySelectorAll('[data-gathering-component-tag-pill] button'))) {
+      pill.click();
+      await tick();
+      flushSync();
+    }
+
+    function dragPayloadFrom(card) {
+      let raw = '';
+      const dragStart = new Event('dragstart', { bubbles: true, cancelable: true });
+      Object.defineProperty(dragStart, 'dataTransfer', {
+        value: {
+          setData: (type, value) => {
+            if (type === 'text/plain') raw = value;
+          },
+          effectAllowed: ''
+        }
+      });
+      card.dispatchEvent(dragStart);
+      return raw;
+    }
+
+    function dropPayloadOn(row, raw) {
+      const dropEvent = new Event('drop', { bubbles: true, cancelable: true });
+      Object.defineProperty(dropEvent, 'dataTransfer', {
+        value: { getData: (type) => type === 'text/plain' ? raw : '' }
+      });
+      row.dispatchEvent(dropEvent);
+    }
+
+    const emptyRow = target.querySelector('[data-gathering-task-drop-id="drop-empty"]');
+    const glassPayload = dragPayloadFrom(target.querySelector('[data-gathering-component-card="c2"]'));
+    assert.deepEqual(JSON.parse(glassPayload), { type: 'FabricateManagedComponent', componentId: 'c2' });
+    dropPayloadOn(emptyRow, glassPayload);
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.id === 'drop-empty' && row.componentId === 'c2' && row.itemUuid === '' && row.systemItemId === '' && row.name === '' && row.enabled === true)));
+
+    const staleRow = target.querySelector('[data-gathering-task-drop-id="drop-stale"]');
+    const coalPayload = dragPayloadFrom(target.querySelector('[data-gathering-component-card="c4"]'));
+    dropPayloadOn(staleRow, coalPayload);
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.id === 'drop-stale' && row.componentId === 'c4' && row.itemUuid === '' && row.systemItemId === '' && row.name === '' && row.enabled === true)));
+
+    dropPayloadOn(staleRow, JSON.stringify({ type: 'Item', uuid: 'Item.imported' }));
+    await Promise.resolve();
+    await tick();
+    flushSync();
+    assert.deepEqual(importedDrops, [{ type: 'Item', uuid: 'Item.imported' }], 'non-managed drops should keep using the import flow');
+  });
+
+  it('summarizes crowded gathering task drop modifiers at five or more labels', async () => {
+    const fourModifiers = Array.from({ length: 4 }, (_, index) => ({
+      id: `four-${index}`,
+      conditionId: `four-${index}`,
+      value: index + 1
+    }));
+    const fiveModifiers = Array.from({ length: 5 }, (_, index) => ({
+      id: `five-${index}`,
+      conditionId: `five-${index}`,
+      value: index + 1
+    }));
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], {
+          taskDropRows: [
+            {
+              id: 'drop-four-modifiers',
+              componentId: 'c1',
+              quantity: 1,
+              dropRate: 25,
+              enabled: true,
+              conditionModifiers: { timeOfDay: fourModifiers, weather: [] }
+            },
+            {
+              id: 'drop-five-modifiers',
+              componentId: 'c3',
+              quantity: 1,
+              dropRate: 25,
+              enabled: true,
+              conditionModifiers: { timeOfDay: fiveModifiers, weather: [] }
+            }
+          ]
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    target.querySelector('#manager-v2-gathering-tab-tasks').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]').click();
+    await tick();
+    flushSync();
+
+    const fourModifierRow = target.querySelector('[data-gathering-task-drop-id="drop-four-modifiers"]');
+    const fiveModifierRow = target.querySelector('[data-gathering-task-drop-id="drop-five-modifiers"]');
+    assert.equal(fourModifierRow.querySelectorAll('.manager-v2-drop-modifier-pill').length, 4);
+    assert.equal(fourModifierRow.textContent.includes('See selected rule for modifiers'), false);
+    assert.equal(fiveModifierRow.querySelectorAll('.manager-v2-drop-modifier-pill').length, 0);
+    assert.ok(fiveModifierRow.querySelector('.manager-v2-drop-modifier-overflow'));
+    assert.ok(fiveModifierRow.textContent.includes('See selected rule for modifiers'));
+  });
+
+  it('colours gathering task drop chance sliders by rarity threshold', async () => {
+    const rarityRows = [
+      ['drop-guaranteed', 100, 'is-guaranteed', 'var(--fab-drop-rate-guaranteed)'],
+      ['drop-common', 70, 'is-common', 'var(--fab-drop-rate-common)'],
+      ['drop-uncommon', 69, 'is-uncommon', 'var(--fab-drop-rate-uncommon)'],
+      ['drop-rare', 15, 'is-rare', 'var(--fab-drop-rate-rare)'],
+      ['drop-very-rare', 5, 'is-very-rare', 'var(--fab-drop-rate-very-rare)'],
+      ['drop-legendary', 4, 'is-legendary', 'var(--fab-drop-rate-legendary)'],
+      ['drop-zero', 0, 'is-none', 'var(--fab-drop-rate-none)']
+    ];
+    const dropRows = rarityRows.map(([id, dropRate]) => ({
+      id,
+      componentId: 'c1',
+      quantity: 1,
+      dropRate,
+      enabled: true
+    }));
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], { taskDropRows: dropRows }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    target.querySelector('#manager-v2-gathering-tab-tasks').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]').click();
+    await tick();
+    flushSync();
+
+    function assertRenderedRarityRows(rows) {
+      for (const [id, dropRate, tierClass, color] of rows) {
+        const control = target.querySelector(`[data-gathering-task-drop-id="${id}"] .manager-v2-drop-rate-control`);
+        assert.ok(control.classList.contains(tierClass), `${id} should use ${tierClass}`);
+        assert.ok(control.getAttribute('style').includes(`--fab-drop-rate-value: ${dropRate}%;`), `${id} should expose its slider fill value`);
+        assert.ok(control.getAttribute('style').includes(`--fab-drop-rate-color: ${color};`), `${id} should expose ${color}`);
+      }
+    }
+
+    assertRenderedRarityRows(rarityRows.slice(0, 5));
+    target.querySelector('.manager-v2-task-drops-card [data-pagination-next]').click();
+    await tick();
+    flushSync();
+    assertRenderedRarityRows(rarityRows.slice(5));
   });
 
   it('paginates gathering task editor drop rules without snapping back to the selected row', async () => {
@@ -2702,15 +3265,17 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
+    const dropRulesCard = target.querySelector('.manager-v2-task-drops-card');
     assert.ok(target.querySelector('[data-gathering-task-drop-id="drop-page-1"]'));
-    assert.equal(target.querySelector('[data-pagination-page]').textContent.trim(), 'Page 1 of 2');
-    target.querySelector('[data-pagination-next]').click();
+    assert.equal(dropRulesCard.querySelectorAll('[data-gathering-task-drop-id]').length, 5, 'drop rules should default to five rows per page');
+    assert.equal(dropRulesCard.querySelector('[data-pagination-page]').textContent.trim(), 'Page 1 of 3');
+    dropRulesCard.querySelector('[data-pagination-next]').click();
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('[data-pagination-page]').textContent.trim(), 'Page 2 of 2');
+    assert.equal(dropRulesCard.querySelector('[data-pagination-page]').textContent.trim(), 'Page 2 of 3');
     assert.equal(target.querySelector('[data-gathering-task-drop-id="drop-page-1"]'), null);
-    assert.ok(target.querySelector('[data-gathering-task-drop-id="drop-page-11"]'));
+    assert.ok(target.querySelector('[data-gathering-task-drop-id="drop-page-6"]'));
   });
 
   it('shows setup guidance and keeps create routing when a gathering system has no environments', async () => {

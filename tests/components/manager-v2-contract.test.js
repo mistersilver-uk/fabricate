@@ -58,6 +58,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
       appSource.includes('openCurrentAdmin'),
       'v2 wrapper should expose an explicit legacy admin launch service during additive rollout'
     );
+    assert.ok(appSource.includes('height: 940'), 'v2 wrapper should open tall enough for gathering task drag/drop');
     assert.ok(
       mainSource.includes("import './ui/SvelteRecipeManagerApp.svelte.js';"),
       'legacy manager side-effect import should remain'
@@ -589,10 +590,12 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'store.duplicateGatheringLibraryTask',
       'data-gathering-task-inspector',
       'GatheringTaskEditView',
+      '{itemCards}',
       'data-gathering-task-drop-inspector',
       'addGatheringDropModifier',
       'updateGatheringDropModifier',
-      'gatheringDropFinalChance'
+      'gatheringDropFinalChance',
+      'manager-v2-drop-editor-actions'
     ]) {
       assert.ok(rootSource.includes(snippet), `root should include ${snippet}`);
     }
@@ -617,34 +620,77 @@ describe('CraftingSystemManagerV2 source contract', () => {
     }
     for (const snippet of [
       'data-gathering-task-editor',
+      'class:has-reward-rule-notice={showRewardRuleNotice}',
       'data-gathering-task-core-editor',
       'data-gathering-task-availability',
+      'data-gathering-task-component-browser',
+      'data-gathering-task-component-grid',
+      'data-gathering-component-card',
+      'data-gathering-component-name-search',
+      'data-gathering-component-tag-search',
+      'manager-v2-selected-tag-pill',
       'data-gathering-task-drops-table',
       'data-gathering-task-availability-option',
       'data-gathering-task-availability-pill',
       'data-gathering-task-drop-component-cell',
       'data-gathering-task-drop-chance-cell',
-      'data-gathering-task-drop-actions',
       'data-gathering-task-drop-count',
       'manager-v2-task-drop-controls',
       'manager-v2-task-drop-footer',
+      'manager-v2-task-component-browser-card',
+      'manager-v2-task-component-grid',
+      'manager-v2-task-component-card-grip',
+      'let pageSize = $state(5)',
       'manager-v2-drop-cell',
       'manager-v2-drop-component-cell',
       'manager-v2-drop-quantity-cell',
       'manager-v2-drop-modifier-pill',
       'manager-v2-drop-modifier-list',
+      'manager-v2-drop-modifier-overflow',
       'manager-v2-drop-rate-value',
-      'manager-v2-drop-rate-tier-track',
+      'manager-v2-drop-rate-percent',
+      'manager-v2-drop-rate-track',
+      'manager-v2-drop-rate-fill',
       'inputmode="numeric"',
-      'pattern="[1-9][0-9]*"',
+      "pattern={'[1-9][0-9]{0,2}'}",
+      'pattern="[0-9]*"',
+      'onClearDropComponent',
+      'onDropComponentMouseDown',
+      'onDropRateInput',
+      'onDropRateBlur',
+      'onDropRateKeydown',
+      'onComponentDragStart',
+      'FabricateManagedComponent',
+      "onUpdateDrop(rowId, { componentId: data.componentId, itemUuid: '', systemItemId: '', name: '', enabled: true })",
+      'dropRateTierClass',
+      'dropRateTierColor',
       'onQuantityInput',
+      'onQuantityKeydown',
+      'oncontextmenu',
       'use:dragDrop',
       'onImportDrop(rowId, data)',
       'onPickImagePath',
       'DropChance',
+      'ClearDropComponentHint',
+      'DropQuantityColumn',
+      'DropModifierOverflowHint',
       'RewardRuleNotice'
     ]) {
       assert.ok(gatheringTaskEditSource.includes(snippet), `task editor should include ${snippet}`);
+    }
+    for (const snippet of [
+      'manager-v2-drop-editor-values',
+      'data-gathering-drop-inspector-rate',
+      'data-gathering-drop-inspector-count',
+      'gatheringDropRateTierClass',
+      'gatheringDropRateTierColor',
+      'onGatheringDropRateKeydown',
+      'onGatheringDropCountKeydown',
+      'manager-v2-drop-rate-control',
+      'manager-v2-drop-rate-track',
+      'manager-v2-drop-rate-fill'
+    ]) {
+      assert.ok(rootSource.includes(snippet), `root should include selected drop inspector ${snippet}`);
     }
     assert.ok(!gatheringTaskEditSource.includes('manager-v2-task-editor-tabs'), 'task editor should be a one-page editor without tab navigation');
     assert.ok(!gatheringTaskEditSource.includes('TaskIdentity'), 'task editor should not render a visible task identity heading');
@@ -655,11 +701,13 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(!gatheringTaskEditSource.includes('<select value={selectedCondition'), 'task availability should not use native single-select controls');
     assert.ok(!gatheringTaskEditSource.includes('function selectedCondition('), 'task availability should not collapse arrays to a single selection');
     assert.ok(!gatheringTaskEditSource.includes('Tasks.SelectDrop'), 'drop rows should not render a row-level edit/select quick action');
+    assert.ok(!gatheringTaskEditSource.includes('data-gathering-task-drop-actions'), 'drop rows should not render row-level duplicate/delete actions');
     assert.ok(!gatheringTaskEditSource.includes('data-gathering-task-drop-row-number'), 'drop rows should not add a leading row number column');
     assert.ok(!gatheringTaskEditSource.includes('EditDrop'), 'drop rows should not add an edit quick action');
     assert.ok(!gatheringTaskEditSource.includes('manager-v2-labeled-cell manager-v2-drop-component-cell'), 'drop component row values should not render responsive duplicate labels');
     assert.ok(!gatheringTaskEditSource.includes('manager-v2-labeled-cell manager-v2-drop-rate-cell'), 'drop chance row values should not render responsive duplicate labels');
     assert.ok(!gatheringTaskEditSource.includes('QuantityShortHint'), 'drop quantity row values should not render an extra helper label');
+    assert.ok(!rootSource.includes('selectedGatheringDrop.componentId ||'), 'selected drop inspector should not render a component selector');
     assert.ok(gatheringTaskEditSource.includes('manager-v2-task-media-column'), 'task editor should group image and status in the media column');
     assert.ok(gatheringTaskEditSource.includes('availableConditionOptions'), 'task editor should filter selected availability options out of menus');
     assert.ok(gatheringTaskEditSource.includes('selectedConditionOptions'), 'task editor should render selected availability values as pills');
@@ -667,6 +715,10 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(gatheringTaskEditSource.includes('StatusOn'), 'task editor should use shared On status copy');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.EmptyTitle, 'No gathering tasks yet');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChance, 'Drop chance');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChancePercent, 'Drop chance percent');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.DropQuantityColumn, 'Count');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.ClearDropComponentHint, 'Right-click to clear component');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.DropModifierOverflowHint, 'See selected rule for modifiers');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.NoComponent, 'No Component');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.CreateOrAssign, 'Create or assign');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.TaskIdentity, undefined);
