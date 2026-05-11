@@ -408,6 +408,7 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const dropEditorRateMozTrackBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-card [data-gathering-drop-inspector-rate] .manager-v2-drop-rate-control input[type="range"]::-moz-range-track');
   const dropEditorCountBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-count-editor');
   const dropEditorCountInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-count-editor input[type="text"]');
+  const dropEditorInspectorCountInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-card [data-gathering-drop-inspector-count] input[type="text"]');
   const dropEditorActionsBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-actions');
   const dropQuantityCellBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-drop-row > .manager-v2-drop-quantity-cell');
   const dropQuantityInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-quantity-cell input[type="text"]');
@@ -514,13 +515,14 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(dropEditorRatePercentBlock.includes('height: 28px;') && dropEditorRatePercentBlock.includes('padding: 4px 16px 4px 2px;') && dropEditorRatePercentBlock.includes('background: var(--fab-overlay-dark-18);'), 'selected drop inspector broad chance input rule should not carry the right-menu suffix padding');
   assert.ok(dropEditorRateInputBlock.includes('padding: 4px 28px 4px 6px;'), 'selected drop inspector chance input should add room before the percent suffix through an inspector-specific override');
   assert.ok(dropEditorRateSuffixBlock.includes('right: 8px;'), 'selected drop inspector percent suffix should sit away from three-digit values');
-  assert.ok(dropEditorRateTrackBlock.includes('left: 0;') && dropEditorRateTrackBlock.includes('right: 0;') && dropEditorRateTrackBlock.includes('border: 0;') && dropEditorRateTrackBlock.includes('background: var(--fab-overlay-dark-18);'), 'selected drop inspector custom track should provide the right-menu background without separate endpoint tails');
+  assert.ok(dropEditorRateTrackBlock.includes('left: 0;') && dropEditorRateTrackBlock.includes('right: 0;') && dropEditorRateTrackBlock.includes('border: 1px solid var(--fab-overlay-light-10);') && dropEditorRateTrackBlock.includes('background: var(--fab-overlay-dark-18);'), 'selected drop inspector custom track should keep a visible neutral empty segment');
   assert.ok(dropEditorRateFillBlock.includes('border-radius: 999px;'), 'selected drop inspector fill should be rounded without relying on a wider track border');
   assert.equal(css.includes('linear-gradient'), false, 'drop chance slider styling should keep the flat-ui no-gradient contract');
   assert.ok(dropEditorRateWebkitTrackBlock.includes('border: 0;') && dropEditorRateWebkitTrackBlock.includes('background: transparent;'), 'selected drop inspector WebKit native range track should not draw over the custom track');
   assert.ok(dropEditorRateMozTrackBlock.includes('border: 0;') && dropEditorRateMozTrackBlock.includes('background: transparent;'), 'selected drop inspector Firefox native range track should not draw over the custom track');
   assert.ok(dropEditorCountBlock.includes('display: grid;') && dropEditorCountBlock.includes('gap: 6px;'), 'selected drop inspector count editor should use a compact labeled field');
   assert.ok(dropEditorCountInputBlock.includes('min-height: 28px;') && dropEditorCountInputBlock.includes('text-align: center;'), 'selected drop inspector count input should match row count input geometry');
+  assert.ok(dropEditorInspectorCountInputBlock.includes('height: 28px;') && dropEditorInspectorCountInputBlock.includes('min-height: 28px;') && dropEditorInspectorCountInputBlock.includes('padding: 4px;') && dropEditorInspectorCountInputBlock.includes('box-shadow: none;'), 'selected drop inspector count input should override generic inspector input chrome with chance-field geometry');
   assert.ok(dropEditorActionsBlock.includes('grid-template-columns: repeat(2, minmax(0, 1fr));') && dropEditorActionsBlock.includes('margin-top: 0;'), 'selected drop rule actions should sit beneath the inspector title row');
   assert.equal(css.includes('.fabricate-manager-v2 .manager-v2-drop-actions'), false, 'drop row actions should not reserve row layout or styling');
   assert.equal(taskEditorIntermediateQuery.includes('.manager-v2-gathering-task-drop-row {\n    grid-template-columns: minmax(0, 1fr);'), false, 'task editor should not stack drop rows at the intermediate desktop width');
