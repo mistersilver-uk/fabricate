@@ -2133,9 +2133,11 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     const populatedDropRow = target.querySelector('[data-gathering-task-drop-id="drop-nightshade"]');
     assert.equal(populatedDropRow.querySelector('[data-gathering-task-drop-row-number]'), null);
     const populatedComponentCell = populatedDropRow.querySelector('[data-gathering-task-drop-component-cell]');
+    const populatedComponentButton = populatedComponentCell.querySelector('.manager-v2-drop-component-button');
+    assert.ok(populatedComponentButton);
     const populatedComponentThumb = populatedComponentCell.querySelector('.manager-v2-gathering-task-thumb');
     assert.ok(populatedComponentThumb);
-    assert.equal(populatedComponentThumb.getAttribute('title'), 'Right-click to clear component');
+    assert.equal(populatedComponentButton.getAttribute('title'), 'Right-click to clear component');
     assert.ok(populatedComponentCell.textContent.includes('Nightshade With An Exceptionally Long Localized Component Name'));
     assert.equal(populatedComponentCell.querySelector('.manager-v2-drop-component-button .manager-v2-system-description'), null);
     assert.equal(populatedComponentCell.textContent.includes('A dusky flowering herb used in careful doses.'), false);
@@ -2405,12 +2407,12 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.querySelector('[data-gathering-task-reward-rule-notice]'));
     const clearableComponentThumb = target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] .manager-v2-gathering-task-thumb');
     assert.ok(clearableComponentThumb);
-    const clearComponentEvent = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    const clearComponentEvent = new MouseEvent('mousedown', { button: 2, bubbles: true, cancelable: true });
     clearableComponentThumb.dispatchEvent(clearComponentEvent);
     await tick();
     flushSync();
     assert.equal(clearComponentEvent.defaultPrevented, true);
-    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.id === 'drop-nightshade' && row.componentId === '' && row.itemUuid === '' && row.name === '')));
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.id === 'drop-nightshade' && row.componentId === '' && row.systemItemId === '' && row.itemUuid === '' && row.name === '')));
     target.querySelector('.manager-v2-header-actions .manager-v2-button').click();
     await tick();
     flushSync();

@@ -641,6 +641,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
       "pattern={'[1-9][0-9]{0,2}'}",
       'pattern="[0-9]*"',
       'onClearDropComponent',
+      'onDropComponentMouseDown',
       'onDropRateInput',
       'onDropRateBlur',
       'onDropRateKeydown',

@@ -330,7 +330,12 @@
   function onClearDropComponent(rowId, event) {
     event.preventDefault();
     event.stopPropagation();
-    onUpdateDrop(rowId, { componentId: '', itemUuid: '', name: '' });
+    onUpdateDrop(rowId, { componentId: '', systemItemId: '', itemUuid: '', name: '' });
+  }
+
+  function onDropComponentMouseDown(rowId, event) {
+    if (event.button !== 2) return;
+    onClearDropComponent(rowId, event);
   }
 
   function handleDropZoneDrop(rowId, data) {
@@ -529,8 +534,8 @@
               >
                 <span role="cell" class="manager-v2-drop-cell manager-v2-drop-component-cell" data-gathering-task-drop-component-cell>
                   {#if row.componentId || row.itemUuid}
-                    <button type="button" class="manager-v2-gathering-task-identity manager-v2-drop-component-button" onclick={(event) => { event.stopPropagation(); onSelectDrop(row.id); }} onkeydown={(event) => event.stopPropagation()}>
-                      <img class="manager-v2-gathering-task-thumb" src={componentImage(row)} alt="" title={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ClearDropComponentHint', 'Right-click to clear component')} oncontextmenu={(event) => onClearDropComponent(row.id, event)} />
+                    <button type="button" class="manager-v2-gathering-task-identity manager-v2-drop-component-button" title={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ClearDropComponentHint', 'Right-click to clear component')} onclick={(event) => { event.stopPropagation(); onSelectDrop(row.id); }} onkeydown={(event) => event.stopPropagation()} onmousedown={(event) => onDropComponentMouseDown(row.id, event)} oncontextmenu={(event) => onClearDropComponent(row.id, event)}>
+                      <img class="manager-v2-gathering-task-thumb" src={componentImage(row)} alt="" />
                       <span class="manager-v2-system-copy">
                         <span class="manager-v2-system-name">{componentLabel(row)}</span>
                       </span>
