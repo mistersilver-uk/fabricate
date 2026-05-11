@@ -20,6 +20,7 @@ const environmentsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2
 const gatheringTaskEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/GatheringTaskEditView.svelte');
 const gatheringTasksBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/GatheringTasksBrowserView.svelte');
 const appPath = resolve(repoRoot, 'src/ui/SvelteCraftingSystemManagerV2App.svelte.js');
+const recipeManagerAppPath = resolve(repoRoot, 'src/ui/SvelteRecipeManagerApp.svelte.js');
 const mainPath = resolve(repoRoot, 'src/main.js');
 const langPath = resolve(repoRoot, 'lang/en.json');
 
@@ -37,6 +38,7 @@ const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
 const gatheringTaskEditSource = readFileSync(gatheringTaskEditPath, 'utf8');
 const gatheringTasksBrowserSource = readFileSync(gatheringTasksBrowserPath, 'utf8');
 const appSource = readFileSync(appPath, 'utf8');
+const recipeManagerAppSource = readFileSync(recipeManagerAppPath, 'utf8');
 const mainSource = readFileSync(mainPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
@@ -63,6 +65,22 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(
       mainSource.includes("import './ui/SvelteCraftingSystemManagerV2App.svelte.js';"),
       'v2 manager side-effect import should be present for registry wiring'
+    );
+  });
+
+  it('guards manager-v2 startup against unready Fabricate services', () => {
+    assert.ok(recipeManagerAppSource.includes('isFabricateReady'), 'base manager app should expose readiness through services');
+    assert.ok(recipeManagerAppSource.includes('onFabricateReady'), 'base manager app should expose a ready callback service');
+    assert.ok(recipeManagerAppSource.includes("hooks.once('fabricate.ready'"), 'ready callback should listen at the Foundry edge');
+    assert.ok(appSource.includes('_pendingReadyOpen'), 'v2 app should prevent duplicate deferred opens');
+    assert.ok(appSource.includes('StartupPending'), 'v2 app should notify when startup defers the window open');
+    assert.ok(appSource.includes("hooks.once('fabricate.ready', openWhenReady)"), 'v2 app should defer direct opens until fabricate.ready');
+    assert.ok(systemsBrowserSource.includes('systemsLoading'), 'systems browser should receive loading state');
+    assert.ok(rootSource.includes('systemsLoading'), 'root should pass loading state to systems browser and inspector');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.LoadingSystems, 'Loading crafting systems...');
+    assert.equal(
+      lang.FABRICATE.Admin.ManagerV2.StartupPending,
+      'Fabricate is still loading. The crafting system manager will open when startup finishes.'
     );
   });
 

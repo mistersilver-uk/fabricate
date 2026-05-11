@@ -73,6 +73,7 @@ Header hierarchy:
 
 Selected-system navigation:
 
+- Manager V2 must distinguish unready/loading Fabricate services from a true empty systems library. While Fabricate is still initializing or the recipe/crafting system managers have not finished loading persisted data, Manager V2 shows a loading state and must not render `No crafting systems yet`.
 - When at least one crafting system exists, manager v2 always has a selected crafting system. An empty or stale persisted selection resolves to the first available crafting system.
 - When no crafting systems exist, selected-system feature tabs are hidden and the systems browser is the active management surface.
 - When a crafting system is selected, `System settings` is the first left-nav item and stays in that position regardless of feature gates.

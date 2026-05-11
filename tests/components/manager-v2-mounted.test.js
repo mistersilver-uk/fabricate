@@ -333,6 +333,7 @@ function createStore(calls = [], options = {}) {
         selected: false
       }
     ],
+    systemsLoading: options.systemsLoading === true,
     selectedSystem,
     recipes: options.emptyRecipes ? [] : [
       {
@@ -954,6 +955,24 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Quickstart'));
     assert.equal(target.textContent.includes('Select a system'), false);
     assert.equal(target.querySelectorAll('.manager-v2-setup-card').length, 1);
+  });
+
+  it('shows systems loading instead of the empty systems setup while startup is pending', () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], { noSystems: true, systemsLoading: true }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    assert.ok(target.textContent.includes('Loading crafting systems...'));
+    assert.equal(target.textContent.includes('No crafting systems yet'), false);
+    assert.equal(target.textContent.includes('Set up your first system'), false);
+    assert.ok(target.querySelector('[data-systems-loading]'));
   });
 
   it('toggles systems library row status without selecting the row', async () => {

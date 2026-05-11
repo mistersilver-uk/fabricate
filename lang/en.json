@@ -275,6 +275,7 @@
       "ManagerV2": {
         "WindowTitle": "Crafting Systems",
         "GMOnly": "Only GMs can manage crafting systems.",
+        "StartupPending": "Fabricate is still loading. The crafting system manager will open when startup finishes.",
         "Kicker": "Systems View",
         "Title": "Crafting systems",
         "Subtitle": "Manage the system definitions that organize Fabricate components, recipes, gathering, and feature rules.",
@@ -294,6 +295,9 @@
         "SystemLibrary": "System library",
         "SystemLibraryHint": "Select a row to view counts and enabled features.",
         "SystemFilters": "System filters",
+        "LoadingSystemsKicker": "Startup",
+        "LoadingSystems": "Loading crafting systems...",
+        "LoadingSystemsHint": "Fabricate is finishing startup before the system library is shown.",
         "SearchPlaceholder": "Search by name or description",
         "SearchLabel": "Search systems",
         "SearchCount": "{shown} of {total}",

@@ -1381,10 +1381,13 @@ export function createAdminStore(services) {
   const environmentValidationState = writable(null);
   let environmentValidationAttempt = 0;
   let dirtyEnvironmentDiscardConfirmation = null;
+  let unsubscribeFabricateReady = null;
+  let readyRefreshScheduled = false;
 
   // --- Computed state ---
   const viewState = writable({
     systems: [],
+    systemsLoading: false,
     hasSystem: false,
     selectedSystemName: '',
     selectedSystem: null,
@@ -1612,6 +1615,45 @@ export function createAdminStore(services) {
     return _buildManagedItemOptions(_getManagedItems(selectedSystem));
   }
 
+  function _managerReady(manager) {
+    return !!manager && (manager.initialized === true || manager.initialized === undefined);
+  }
+
+  function _fabricateReady(systemManager, recipeManager) {
+    if (typeof services.isFabricateReady === 'function') {
+      return services.isFabricateReady() === true;
+    }
+    return _managerReady(systemManager) && _managerReady(recipeManager);
+  }
+
+  function _publishSystemsLoading() {
+    viewState.update(prev => ({
+      ...prev,
+      systemsLoading: true,
+      hasSystem: prev.systems.length > 0 ? prev.hasSystem : false,
+      selectedSystemName: prev.systems.length > 0 ? prev.selectedSystemName : '',
+      selectedSystem: prev.systems.length > 0 ? prev.selectedSystem : null,
+      itemCards: [],
+      essenceCards: prev.systems.length > 0 ? prev.essenceCards : [],
+      recipes: [],
+      recipeCategories: [],
+      showVisibilitySummary: false,
+      recipeSearchTerm: get(recipeSearch),
+      itemSearchTerm: get(itemSearch)
+    }));
+  }
+
+  function _scheduleReadyRefresh() {
+    if (readyRefreshScheduled) return;
+    if (typeof services.onFabricateReady !== 'function') return;
+    readyRefreshScheduled = true;
+    unsubscribeFabricateReady = services.onFabricateReady(async () => {
+      readyRefreshScheduled = false;
+      unsubscribeFabricateReady = null;
+      await refresh();
+    });
+  }
+
   function _newEnvironmentResultGroup(existingGroups = []) {
     const baseName = services.localize?.('FABRICATE.Admin.Environments.NewResultGroupName') || 'Results';
     const existingNames = new Set((Array.isArray(existingGroups) ? existingGroups : [])
@@ -1783,7 +1825,11 @@ export function createAdminStore(services) {
   async function refresh() {
     const systemManager = services.getCraftingSystemManager();
     const recipeManager = services.getRecipeManager();
-    if (!systemManager || !recipeManager) return;
+    if (!_fabricateReady(systemManager, recipeManager)) {
+      _publishSystemsLoading();
+      _scheduleReadyRefresh();
+      return;
+    }
 
     const allSystems = systemManager.getSystems();
     const currentSystemId = get(selectedSystemId);
@@ -1868,6 +1914,7 @@ export function createAdminStore(services) {
     viewState.update(prev => ({
       ...prev,
       systems: systemList,
+      systemsLoading: false,
       hasSystem: !!selectedSystem,
       selectedSystemName: selectedSystem?.name || '',
       selectedSystem: selectedSystemData,
@@ -1913,6 +1960,7 @@ export function createAdminStore(services) {
     viewState.update(prev => ({
       ...prev,
       systems: systemList,
+      systemsLoading: false,
       hasSystem: !!selectedSystem,
       selectedSystemName: selectedSystem?.name || '',
       selectedSystem: selectedSystemData,
@@ -3755,7 +3803,9 @@ export function createAdminStore(services) {
   }
 
   function destroy() {
-    // No-op for now — hook cleanup would go here
+    unsubscribeFabricateReady?.();
+    unsubscribeFabricateReady = null;
+    readyRefreshScheduled = false;
   }
 
   // Trigger initial computation

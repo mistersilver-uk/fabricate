@@ -43,6 +43,7 @@
 
   const selectedSystem = $derived($viewState.selectedSystem);
   const selectedSystemId = $derived(selectedSystem?.id || '');
+  const systemsLoading = $derived($viewState.systemsLoading === true);
   const canShowEnvironments = $derived(selectedSystem?.features?.gathering === true);
   const canShowEssences = $derived(selectedSystem?.features?.essences === true);
   const showEssenceSourceUi = $derived(selectedSystem?.features?.effectTransfer === true);
@@ -2154,6 +2155,7 @@
     {:else}
       <SystemsBrowserView
         systems={$viewState.systems || []}
+        {systemsLoading}
         {selectedSystemId}
         onSelectSystem={(id) => selectSystemRow(id)}
         onCreateSystem={createSystem}
@@ -3081,6 +3083,17 @@
             </div>
           </section>
         {/if}
+      {:else if systemsLoading}
+        <section class="manager-v2-setup-card" aria-label={text('FABRICATE.Admin.ManagerV2.LoadingSystems', 'Loading crafting systems...')}>
+          <div class="manager-v2-setup-card-header">
+            <i class="fas fa-spinner" aria-hidden="true"></i>
+            <div>
+              <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.LoadingSystemsKicker', 'Startup')}</p>
+              <h3>{text('FABRICATE.Admin.ManagerV2.LoadingSystems', 'Loading crafting systems...')}</h3>
+            </div>
+          </div>
+          <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.LoadingSystemsHint', 'Fabricate is finishing startup before the system library is shown.')}</p>
+        </section>
       {:else if ($viewState.systems || []).length === 0}
         <section class="manager-v2-setup-card" aria-label={text('FABRICATE.Admin.ManagerV2.EmptySetup.Title', 'Set up your first system')}>
           <div class="manager-v2-setup-card-header">

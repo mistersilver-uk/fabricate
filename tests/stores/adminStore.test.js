@@ -252,6 +252,64 @@ describe('createAdminStore', () => {
       await store.refresh();
     });
 
+    it('publishes loading instead of a true empty state while managers are uninitialized', () => {
+      let readyCallback = null;
+      const services = createMockServices({
+        isFabricateReady: () => false,
+        onFabricateReady: (callback) => {
+          readyCallback = callback;
+          return () => {};
+        }
+      });
+      const store = createAdminStore(services);
+      const vs = get(store.viewState);
+
+      assert.equal(vs.systemsLoading, true);
+      assert.deepEqual(vs.systems, []);
+      assert.equal(vs.hasSystem, false);
+      assert.equal(typeof readyCallback, 'function');
+    });
+
+    it('refreshes and selects the first system when fabricate.ready fires', async () => {
+      let ready = false;
+      let readyCallback = null;
+      const services = createMockServices({
+        getSetting: () => '',
+        isFabricateReady: () => ready,
+        onFabricateReady: (callback) => {
+          readyCallback = callback;
+          return () => {};
+        }
+      });
+      const store = createAdminStore(services);
+
+      assert.equal(get(store.viewState).systemsLoading, true);
+      ready = true;
+      await readyCallback();
+
+      const vs = get(store.viewState);
+      assert.equal(vs.systemsLoading, false);
+      assert.equal(vs.systems.length, 1);
+      assert.equal(vs.systems[0].id, 'sys1');
+      assert.equal(vs.systems[0].selected, true);
+      assert.equal(get(store.selectedSystemId), 'sys1');
+    });
+
+    it('destroy unregisters a pending fabricate.ready refresh callback', () => {
+      let cleanupCalled = false;
+      const services = createMockServices({
+        isFabricateReady: () => false,
+        onFabricateReady: () => () => {
+          cleanupCalled = true;
+        }
+      });
+      const store = createAdminStore(services);
+
+      store.destroy();
+
+      assert.equal(cleanupCalled, true);
+    });
+
     it('leaves selection empty when no systems exist', async () => {
       const services = createMockServices({
         getSetting: () => ''
