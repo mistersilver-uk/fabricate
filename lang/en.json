@@ -910,6 +910,7 @@
             "DropChancePercent": "Drop chance percent",
             "DropQuantityColumn": "#",
             "Quantity": "Quantity",
+            "ClearDropComponentHint": "Right-click to clear component",
             "QuantityShortHint": "award",
             "Modifiers": "Modifiers",
             "NoModifiers": "Not specified",

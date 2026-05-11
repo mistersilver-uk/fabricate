@@ -229,8 +229,18 @@
     return Math.min(100, Math.max(0, number));
   }
 
+  function normalizeQuantity(value) {
+    const number = Math.trunc(Number(value));
+    if (!Number.isFinite(number)) return 1;
+    return Math.min(999, Math.max(1, number));
+  }
+
   function dropRateValue(row) {
     return normalizeDropRate(row?.dropRate ?? 1);
+  }
+
+  function quantityValue(row) {
+    return normalizeQuantity(row?.quantity ?? 1);
   }
 
   function dropRateTierClass(value) {
@@ -277,17 +287,50 @@
     input.value = String(dropRateValue(row));
   }
 
+  function onDropRateKeydown(row, event) {
+    event.stopPropagation();
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    event.preventDefault();
+    const currentValue = event.currentTarget.value === '' ? dropRateValue(row) : Number(event.currentTarget.value);
+    const dropRate = normalizeDropRate((Number.isFinite(currentValue) ? currentValue : dropRateValue(row)) + (event.key === 'ArrowUp' ? 1 : -1));
+    event.currentTarget.value = String(dropRate);
+    onUpdateDrop(row.id, { dropRate });
+  }
+
   function onQuantityInput(rowId, event) {
     const input = event.currentTarget;
     const normalized = String(input.value || '').replace(/\D+/g, '').replace(/^0+/, '');
     input.value = normalized;
     const quantity = Number(normalized);
-    if (Number.isInteger(quantity) && quantity > 0) onUpdateDrop(rowId, { quantity });
+    if (Number.isInteger(quantity) && quantity >= 1 && quantity <= 999) onUpdateDrop(rowId, { quantity });
   }
 
   function onQuantityBlur(row, event) {
-    const quantity = Number(String(event.currentTarget.value || '').replace(/\D+/g, ''));
-    if (!Number.isInteger(quantity) || quantity < 1) event.currentTarget.value = String(row.quantity || 1);
+    const input = event.currentTarget;
+    const normalized = String(input.value || '').replace(/\D+/g, '').replace(/^0+/, '');
+    const quantity = Number(normalized);
+    if (normalized !== '' && Number.isInteger(quantity) && quantity >= 1 && quantity <= 999) {
+      input.value = String(quantity);
+      onUpdateDrop(row.id, { quantity });
+      return;
+    }
+    input.value = String(quantityValue(row));
+  }
+
+  function onQuantityKeydown(row, event) {
+    event.stopPropagation();
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    event.preventDefault();
+    const currentValue = event.currentTarget.value === '' ? quantityValue(row) : Number(event.currentTarget.value);
+    const quantity = normalizeQuantity((Number.isFinite(currentValue) ? currentValue : quantityValue(row)) + (event.key === 'ArrowUp' ? 1 : -1));
+    event.currentTarget.value = String(quantity);
+    onUpdateDrop(row.id, { quantity });
+  }
+
+  function onClearDropComponent(rowId, event) {
+    event.preventDefault();
+    event.stopPropagation();
+    onUpdateDrop(rowId, { componentId: '', itemUuid: '', name: '' });
   }
 
   function handleDropZoneDrop(rowId, data) {
@@ -487,7 +530,7 @@
                 <span role="cell" class="manager-v2-drop-cell manager-v2-drop-component-cell" data-gathering-task-drop-component-cell>
                   {#if row.componentId || row.itemUuid}
                     <button type="button" class="manager-v2-gathering-task-identity manager-v2-drop-component-button" onclick={(event) => { event.stopPropagation(); onSelectDrop(row.id); }} onkeydown={(event) => event.stopPropagation()}>
-                      <img class="manager-v2-gathering-task-thumb" src={componentImage(row)} alt="" />
+                      <img class="manager-v2-gathering-task-thumb" src={componentImage(row)} alt="" title={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ClearDropComponentHint', 'Right-click to clear component')} oncontextmenu={(event) => onClearDropComponent(row.id, event)} />
                       <span class="manager-v2-system-copy">
                         <span class="manager-v2-system-name">{componentLabel(row)}</span>
                       </span>
@@ -511,7 +554,7 @@
                 <span role="cell" class="manager-v2-drop-cell manager-v2-drop-rate-cell" data-gathering-task-drop-chance-cell>
                   <span class="manager-v2-drop-rate-value">
                     <span class="manager-v2-drop-rate-percent">
-                      <input type="text" inputmode="numeric" pattern="[0-9]*" value={dropRateValue(row)} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChancePercent', 'Drop chance percent')} oninput={(event) => onDropRateInput(row.id, event)} onblur={(event) => onDropRateBlur(row, event)} onclick={(event) => event.stopPropagation()} onkeydown={(event) => event.stopPropagation()} />
+                      <input type="text" inputmode="numeric" pattern="[0-9]*" value={dropRateValue(row)} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChancePercent', 'Drop chance percent')} oninput={(event) => onDropRateInput(row.id, event)} onblur={(event) => onDropRateBlur(row, event)} onclick={(event) => event.stopPropagation()} onkeydown={(event) => onDropRateKeydown(row, event)} />
                       <span aria-hidden="true">%</span>
                     </span>
                     <span class={`manager-v2-drop-rate-control ${dropRateTierClass(row.dropRate)}`} style={`--fab-drop-rate-value: ${dropRateValue(row)}%; --fab-drop-rate-color: ${dropRateTierColor(row.dropRate)};`}>
@@ -523,7 +566,7 @@
                   </span>
                 </span>
                 <span role="cell" class="manager-v2-drop-cell manager-v2-drop-quantity-cell">
-                  <input type="text" inputmode="numeric" pattern="[1-9][0-9]*" value={row.quantity || 1} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Quantity', 'Quantity')} oninput={(event) => onQuantityInput(row.id, event)} onblur={(event) => onQuantityBlur(row, event)} onclick={(event) => event.stopPropagation()} onkeydown={(event) => event.stopPropagation()} />
+                  <input type="text" inputmode="numeric" pattern={'[1-9][0-9]{0,2}'} value={quantityValue(row)} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Quantity', 'Quantity')} oninput={(event) => onQuantityInput(row.id, event)} onblur={(event) => onQuantityBlur(row, event)} onclick={(event) => event.stopPropagation()} onkeydown={(event) => onQuantityKeydown(row, event)} />
                 </span>
                 <span role="cell" class="manager-v2-drop-cell manager-v2-chip-row">
                   <span class="manager-v2-drop-modifier-list">

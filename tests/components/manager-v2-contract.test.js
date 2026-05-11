@@ -638,17 +638,22 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'manager-v2-drop-rate-track',
       'manager-v2-drop-rate-fill',
       'inputmode="numeric"',
-      'pattern="[1-9][0-9]*"',
+      "pattern={'[1-9][0-9]{0,2}'}",
       'pattern="[0-9]*"',
+      'onClearDropComponent',
       'onDropRateInput',
       'onDropRateBlur',
+      'onDropRateKeydown',
       'dropRateTierClass',
       'dropRateTierColor',
       'onQuantityInput',
+      'onQuantityKeydown',
+      'oncontextmenu',
       'use:dragDrop',
       'onImportDrop(rowId, data)',
       'onPickImagePath',
       'DropChance',
+      'ClearDropComponentHint',
       'DropQuantityColumn',
       'RewardRuleNotice'
     ]) {
@@ -677,6 +682,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChance, 'Drop chance');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChancePercent, 'Drop chance percent');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.DropQuantityColumn, '#');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.ClearDropComponentHint, 'Right-click to clear component');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.NoComponent, 'No Component');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.CreateOrAssign, 'Create or assign');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.TaskIdentity, undefined);
