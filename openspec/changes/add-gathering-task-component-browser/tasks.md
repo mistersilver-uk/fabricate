@@ -28,6 +28,18 @@
 - [x] Re-run `npm test`.
 - [x] Re-run `npm run build`.
 
+## 6. Selected Drop Inspector Refinement
+
+- [x] Plan removal of right-inspector component assignment.
+- [x] Remove the selected drop component selector from the right inspector.
+- [x] Restyle selected drop chance to match row sliders.
+- [x] Add selected drop Count input with row-style numeric behavior.
+- [x] Rename the drop rules quantity column to Count.
+- [x] Update contract, layout, localization, and mounted tests.
+- [x] Re-run targeted component tests.
+- [x] Re-run `npm test`.
+- [x] Re-run `npm run build`.
+
 ## 5. Drop Rules Viewport Refinement
 
 - [x] Plan exact three-row drop rules table viewport sizing.

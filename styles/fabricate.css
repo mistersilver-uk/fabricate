@@ -9697,7 +9697,7 @@
   min-width: 0;
 }
 
-.fabricate-manager-v2 .manager-v2-drop-editor-card :is(select, input:not([type="checkbox"]):not([type="radio"])) {
+.fabricate-manager-v2 .manager-v2-drop-editor-card :is(select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"])) {
   width: 100%;
   min-width: 0;
   min-height: 32px;
@@ -9710,28 +9710,43 @@
   font: inherit;
 }
 
-.fabricate-manager-v2 .manager-v2-drop-editor-card input[type="range"] {
-  height: 22px;
-  min-height: 22px;
-  padding: 0;
-  border: 0;
-  background: transparent;
+.fabricate-manager-v2 .manager-v2-drop-editor-card .manager-v2-drop-rate-percent input[type="text"] {
+  height: 28px;
+  min-height: 28px;
+  padding: 4px 16px 4px 2px;
+  background: var(--fab-overlay-dark-18);
   box-shadow: none;
-  accent-color: var(--fab-mv2-accent);
+  text-align: center;
+}
+
+.fabricate-manager-v2 .manager-v2-drop-editor-values {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px;
+  gap: 10px;
+  align-items: end;
+  min-width: 0;
 }
 
 .fabricate-manager-v2 .manager-v2-drop-rate-editor {
-  grid-template-columns: minmax(0, 1fr) 52px;
-  align-items: end;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  min-width: 0;
 }
 
-.fabricate-manager-v2 .manager-v2-drop-rate-editor > span {
-  grid-column: 1 / -1;
+.fabricate-manager-v2 .manager-v2-drop-count-editor {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
 }
 
-.fabricate-manager-v2 .manager-v2-drop-rate-editor strong {
-  color: var(--fab-warning-text);
-  text-align: right;
+.fabricate-manager-v2 .manager-v2-drop-count-editor input[type="text"] {
+  width: 100%;
+  min-width: 0;
+  min-height: 28px;
+  padding: 4px;
+  box-sizing: border-box;
+  text-align: center;
   font-variant-numeric: tabular-nums;
 }
 

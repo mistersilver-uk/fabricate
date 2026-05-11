@@ -677,6 +677,20 @@ describe('CraftingSystemManagerV2 source contract', () => {
     ]) {
       assert.ok(gatheringTaskEditSource.includes(snippet), `task editor should include ${snippet}`);
     }
+    for (const snippet of [
+      'manager-v2-drop-editor-values',
+      'data-gathering-drop-inspector-rate',
+      'data-gathering-drop-inspector-count',
+      'gatheringDropRateTierClass',
+      'gatheringDropRateTierColor',
+      'onGatheringDropRateKeydown',
+      'onGatheringDropCountKeydown',
+      'manager-v2-drop-rate-control',
+      'manager-v2-drop-rate-track',
+      'manager-v2-drop-rate-fill'
+    ]) {
+      assert.ok(rootSource.includes(snippet), `root should include selected drop inspector ${snippet}`);
+    }
     assert.ok(!gatheringTaskEditSource.includes('manager-v2-task-editor-tabs'), 'task editor should be a one-page editor without tab navigation');
     assert.ok(!gatheringTaskEditSource.includes('TaskIdentity'), 'task editor should not render a visible task identity heading');
     assert.ok(!gatheringTaskEditSource.includes('Tasks.TaskId'), 'task editor should not render the raw internal task id localization');
@@ -692,6 +706,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(!gatheringTaskEditSource.includes('manager-v2-labeled-cell manager-v2-drop-component-cell'), 'drop component row values should not render responsive duplicate labels');
     assert.ok(!gatheringTaskEditSource.includes('manager-v2-labeled-cell manager-v2-drop-rate-cell'), 'drop chance row values should not render responsive duplicate labels');
     assert.ok(!gatheringTaskEditSource.includes('QuantityShortHint'), 'drop quantity row values should not render an extra helper label');
+    assert.ok(!rootSource.includes('selectedGatheringDrop.componentId ||'), 'selected drop inspector should not render a component selector');
     assert.ok(gatheringTaskEditSource.includes('manager-v2-task-media-column'), 'task editor should group image and status in the media column');
     assert.ok(gatheringTaskEditSource.includes('availableConditionOptions'), 'task editor should filter selected availability options out of menus');
     assert.ok(gatheringTaskEditSource.includes('selectedConditionOptions'), 'task editor should render selected availability values as pills');
@@ -700,7 +715,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.EmptyTitle, 'No gathering tasks yet');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChance, 'Drop chance');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChancePercent, 'Drop chance percent');
-    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.DropQuantityColumn, '#');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.DropQuantityColumn, 'Count');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.ClearDropComponentHint, 'Right-click to clear component');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.DropModifierOverflowHint, 'See selected rule for modifiers');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.NoComponent, 'No Component');

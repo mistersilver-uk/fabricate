@@ -1436,6 +1436,102 @@
     return Math.min(100, Math.max(0, Math.floor(Number(row?.dropRate || 0) + gatheringDropConditionModifierTotal(row))));
   }
 
+  function gatheringDropRateValue(row) {
+    const number = Math.trunc(Number(row?.dropRate ?? 1));
+    if (!Number.isFinite(number)) return 1;
+    return Math.min(100, Math.max(0, number));
+  }
+
+  function gatheringDropCountValue(row) {
+    const number = Math.trunc(Number(row?.quantity ?? 1));
+    if (!Number.isFinite(number)) return 1;
+    return Math.min(999, Math.max(1, number));
+  }
+
+  function gatheringDropRateTierClass(value) {
+    const rate = gatheringDropRateValue({ dropRate: value });
+    if (rate === 0) return 'is-none';
+    if (rate >= 100) return 'is-guaranteed';
+    if (rate >= 70) return 'is-common';
+    if (rate >= 35) return 'is-uncommon';
+    if (rate >= 15) return 'is-rare';
+    if (rate >= 5) return 'is-very-rare';
+    return 'is-legendary';
+  }
+
+  function gatheringDropRateTierColor(value) {
+    const rate = gatheringDropRateValue({ dropRate: value });
+    if (rate === 0) return 'var(--fab-drop-rate-none)';
+    if (rate >= 100) return 'var(--fab-drop-rate-guaranteed)';
+    if (rate >= 70) return 'var(--fab-drop-rate-common)';
+    if (rate >= 35) return 'var(--fab-drop-rate-uncommon)';
+    if (rate >= 15) return 'var(--fab-drop-rate-rare)';
+    if (rate >= 5) return 'var(--fab-drop-rate-very-rare)';
+    return 'var(--fab-drop-rate-legendary)';
+  }
+
+  function onGatheringDropRateInput(rowId, event) {
+    const input = event.currentTarget;
+    const normalized = String(input.value || '').replace(/\D+/g, '').replace(/^0+(?=\d)/, '');
+    input.value = normalized;
+    const dropRate = Number(normalized);
+    if (normalized !== '' && Number.isInteger(dropRate) && dropRate >= 0 && dropRate <= 100) {
+      updateGatheringTaskDrop(rowId, { dropRate });
+    }
+  }
+
+  function onGatheringDropRateBlur(row, event) {
+    const input = event.currentTarget;
+    const normalized = String(input.value || '').replace(/\D+/g, '').replace(/^0+(?=\d)/, '');
+    const dropRate = Number(normalized);
+    if (normalized !== '' && Number.isInteger(dropRate) && dropRate >= 0 && dropRate <= 100) {
+      input.value = String(dropRate);
+      updateGatheringTaskDrop(row.id, { dropRate });
+      return;
+    }
+    input.value = String(gatheringDropRateValue(row));
+  }
+
+  function onGatheringDropRateKeydown(row, event) {
+    event.stopPropagation();
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    event.preventDefault();
+    const currentValue = event.currentTarget.value === '' ? gatheringDropRateValue(row) : Number(event.currentTarget.value);
+    const dropRate = gatheringDropRateValue({ dropRate: (Number.isFinite(currentValue) ? currentValue : gatheringDropRateValue(row)) + (event.key === 'ArrowUp' ? 1 : -1) });
+    event.currentTarget.value = String(dropRate);
+    updateGatheringTaskDrop(row.id, { dropRate });
+  }
+
+  function onGatheringDropCountInput(rowId, event) {
+    const input = event.currentTarget;
+    const normalized = String(input.value || '').replace(/\D+/g, '').replace(/^0+/, '');
+    input.value = normalized;
+    const quantity = Number(normalized);
+    if (Number.isInteger(quantity) && quantity >= 1 && quantity <= 999) updateGatheringTaskDrop(rowId, { quantity });
+  }
+
+  function onGatheringDropCountBlur(row, event) {
+    const input = event.currentTarget;
+    const normalized = String(input.value || '').replace(/\D+/g, '').replace(/^0+/, '');
+    const quantity = Number(normalized);
+    if (normalized !== '' && Number.isInteger(quantity) && quantity >= 1 && quantity <= 999) {
+      input.value = String(quantity);
+      updateGatheringTaskDrop(row.id, { quantity });
+      return;
+    }
+    input.value = String(gatheringDropCountValue(row));
+  }
+
+  function onGatheringDropCountKeydown(row, event) {
+    event.stopPropagation();
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    event.preventDefault();
+    const currentValue = event.currentTarget.value === '' ? gatheringDropCountValue(row) : Number(event.currentTarget.value);
+    const quantity = gatheringDropCountValue({ quantity: (Number.isFinite(currentValue) ? currentValue : gatheringDropCountValue(row)) + (event.key === 'ArrowUp' ? 1 : -1) });
+    event.currentTarget.value = String(quantity);
+    updateGatheringTaskDrop(row.id, { quantity });
+  }
+
   function gatheringDropModifierClass(value) {
     const number = Number(value || 0);
     if (number < 0) return 'is-danger';
@@ -2315,26 +2411,28 @@
                 </button>
               </div>
 
-              <label class="manager-v2-field">
-                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropComponent', 'Drop component')}</span>
-                <select value={selectedGatheringDrop.componentId || ''} onchange={(event) => { if (event.currentTarget.value) updateGatheringTaskDrop(selectedGatheringDrop.id, { componentId: event.currentTarget.value, itemUuid: '', enabled: true }); }}>
-                  <option value="">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SelectComponent', 'Select a component')}</option>
-                  {#each selectedSystem.managedItemOptions || [] as item (item.id)}
-                    <option value={item.id}>{item.name || item.id}</option>
-                  {/each}
-                </select>
-              </label>
+              <div class="manager-v2-drop-editor-values">
+                <label class="manager-v2-field manager-v2-drop-rate-editor" data-gathering-drop-inspector-rate>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChance', 'Drop chance')}</span>
+                  <span class="manager-v2-drop-rate-value">
+                    <span class="manager-v2-drop-rate-percent">
+                      <input type="text" inputmode="numeric" pattern="[0-9]*" value={gatheringDropRateValue(selectedGatheringDrop)} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChancePercent', 'Drop chance percent')} oninput={(event) => onGatheringDropRateInput(selectedGatheringDrop.id, event)} onblur={(event) => onGatheringDropRateBlur(selectedGatheringDrop, event)} onkeydown={(event) => onGatheringDropRateKeydown(selectedGatheringDrop, event)} />
+                      <span aria-hidden="true">%</span>
+                    </span>
+                    <span class={`manager-v2-drop-rate-control ${gatheringDropRateTierClass(selectedGatheringDrop.dropRate)}`} style={`--fab-drop-rate-value: ${gatheringDropRateValue(selectedGatheringDrop)}%; --fab-drop-rate-color: ${gatheringDropRateTierColor(selectedGatheringDrop.dropRate)};`}>
+                      <span class="manager-v2-drop-rate-track" aria-hidden="true">
+                        <span class="manager-v2-drop-rate-fill"></span>
+                      </span>
+                      <input type="range" min="0" max="100" step="1" value={gatheringDropRateValue(selectedGatheringDrop)} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChance', 'Drop chance')} oninput={(event) => updateGatheringTaskDrop(selectedGatheringDrop.id, { dropRate: Number(event.currentTarget.value) })} onkeydown={(event) => event.stopPropagation()} />
+                    </span>
+                  </span>
+                </label>
 
-              <label class="manager-v2-field manager-v2-drop-rate-editor">
-                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChance', 'Drop chance')}</span>
-                <input type="range" min="0" max="100" step="1" value={selectedGatheringDrop.dropRate ?? 1} oninput={(event) => updateGatheringTaskDrop(selectedGatheringDrop.id, { dropRate: Number(event.currentTarget.value) })} />
-                <strong>{selectedGatheringDrop.dropRate ?? 1}%</strong>
-              </label>
-
-              <label class="manager-v2-field">
-                <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Quantity', 'Quantity')}</span>
-                <input type="number" min="1" step="1" value={selectedGatheringDrop.quantity || 1} oninput={(event) => updateGatheringTaskDrop(selectedGatheringDrop.id, { quantity: Number(event.currentTarget.value || 1) })} />
-              </label>
+                <label class="manager-v2-field manager-v2-drop-count-editor" data-gathering-drop-inspector-count>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropQuantityColumn', 'Count')}</span>
+                  <input type="text" inputmode="numeric" pattern={'[1-9][0-9]{0,2}'} value={gatheringDropCountValue(selectedGatheringDrop)} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropQuantityColumn', 'Count')} oninput={(event) => onGatheringDropCountInput(selectedGatheringDrop.id, event)} onblur={(event) => onGatheringDropCountBlur(selectedGatheringDrop, event)} onkeydown={(event) => onGatheringDropCountKeydown(selectedGatheringDrop, event)} />
+                </label>
+              </div>
 
               <div class="manager-v2-drop-editor-modifiers">
                 {#each ['timeOfDay', 'weather'] as kind}

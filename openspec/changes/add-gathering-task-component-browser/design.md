@@ -41,3 +41,5 @@ The task editor grid gains a bounded component browser row between task availabi
 Drop-rule rows remain full-row drop targets, including already-populated rows. Right-click-to-clear remains scoped to the component button and is unchanged.
 
 Manager V2 opens at `1280x940` by default so the gathering task editor has enough vertical drag/drop room. Drop-rule pagination defaults to `5` rows per page while component browser pagination remains fixed at `6`.
+
+The selected drop inspector no longer includes a component selector. Its drop chance editor uses the same percent input, tier-coloured range track, and ArrowUp/ArrowDown step behavior as table rows. The adjacent count editor uses the same numeric sanitization and ArrowUp/ArrowDown step behavior as row count inputs. The drop table quantity header reads `Count`.

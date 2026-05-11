@@ -15,6 +15,7 @@ Gathering task drop rows can be edited, but assigning existing managed component
 - Increase the Manager V2 default window height and gathering editor card heights so drag/drop has enough vertical room.
 - Default gathering task drop-rule pagination to five rows.
 - Render selected component tag filters as removable pills.
+- Remove right-inspector component assignment so drop rows are assigned through drag/drop, and align the inspector chance/count controls with row controls.
 
 ## Scope Notes
 
