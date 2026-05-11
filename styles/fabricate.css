@@ -8484,7 +8484,6 @@
 
 .fabricate-manager-v2 .manager-v2-task-core-card {
   display: grid;
-  gap: 11px;
   padding: 13px 16px;
 }
 
@@ -8501,10 +8500,6 @@
   flex-wrap: wrap;
   gap: 12px;
   min-width: 0;
-}
-
-.fabricate-manager-v2 .manager-v2-task-card-heading.is-action-only {
-  justify-content: flex-end;
 }
 
 .fabricate-manager-v2 .manager-v2-task-card-heading > div {
@@ -8528,9 +8523,17 @@
 
 .fabricate-manager-v2 .manager-v2-task-core-grid {
   display: grid;
-  grid-template-columns: 84px minmax(0, 1fr) minmax(144px, 0.22fr);
+  grid-template-columns: 96px minmax(0, 1fr);
   gap: 14px;
-  align-items: stretch;
+  align-items: start;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-task-media-column {
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -8539,8 +8542,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 84px;
-  height: 84px;
+  width: 96px;
+  height: 96px;
   padding: 0;
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
@@ -8573,32 +8576,32 @@
 
 .fabricate-manager-v2 .manager-v2-task-identity-fields {
   display: grid;
-  grid-template-columns: minmax(160px, 0.38fr) minmax(260px, 0.62fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   min-width: 0;
 }
 
 .fabricate-manager-v2 .manager-v2-task-identity-fields textarea {
-  min-height: 76px;
+  min-height: 80px;
 }
 
 .fabricate-manager-v2 .manager-v2-task-core-status {
   display: grid;
   align-content: start;
-  justify-items: end;
-  gap: 8px;
+  justify-items: center;
+  gap: 6px;
   min-width: 0;
 }
 
 .fabricate-manager-v2 .manager-v2-task-core-status p {
   margin: 0;
-  max-width: 18ch;
-  text-align: right;
+  max-width: 14ch;
+  text-align: center;
   line-height: 1.35;
 }
 
 .fabricate-manager-v2 .manager-v2-task-core-status .manager-v2-status-toggle {
-  max-width: none;
+  max-width: 64px;
 }
 
 .fabricate-manager-v2 .manager-v2-task-availability-row {
@@ -9643,18 +9646,17 @@
 }
 
 @container fabricate-manager-v2 (max-width: 1320px) {
-  .fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"] .manager-v2-task-core-grid,
-  .fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"] .manager-v2-task-identity-fields {
-    grid-template-columns: minmax(0, 1fr);
+  .fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"] .manager-v2-task-core-grid {
+    grid-template-columns: 88px minmax(0, 1fr);
   }
 
-  .fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"] .manager-v2-task-core-status {
-    justify-items: start;
+  .fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"] .manager-v2-task-image-picker {
+    width: 88px;
+    height: 88px;
   }
 
   .fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"] .manager-v2-task-core-status p {
-    max-width: none;
-    text-align: left;
+    max-width: 12ch;
   }
 
   .fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"] .manager-v2-task-card-header {
@@ -9725,8 +9727,17 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .fabricate-manager-v2 .manager-v2-task-media-column {
+    justify-items: start;
+  }
+
   .fabricate-manager-v2 .manager-v2-task-core-status {
     justify-items: start;
+  }
+
+  .fabricate-manager-v2 .manager-v2-task-core-status p {
+    max-width: none;
+    text-align: left;
   }
 
   .fabricate-manager-v2 .manager-v2-gathering-tabs {

@@ -614,6 +614,11 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(!gatheringTaskEditSource.includes('TaskIdentity'), 'task editor should not render a visible task identity heading');
     assert.ok(!gatheringTaskEditSource.includes('Tasks.TaskId'), 'task editor should not render the raw internal task id localization');
     assert.ok(!gatheringTaskEditSource.includes('Internal ID'), 'task editor should not render the raw internal task id label');
+    assert.ok(!gatheringTaskEditSource.includes('BackToLibrary'), 'task editor should not render a duplicate central back-to-library control');
+    assert.ok(!gatheringTaskEditSource.includes('type="checkbox"'), 'task editor status toggle should use the shared button pattern');
+    assert.ok(gatheringTaskEditSource.includes('manager-v2-task-media-column'), 'task editor should group image and status in the media column');
+    assert.ok(gatheringTaskEditSource.includes('StatusOff'), 'task editor should use shared Off status copy');
+    assert.ok(gatheringTaskEditSource.includes('StatusOn'), 'task editor should use shared On status copy');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.EmptyTitle, 'No gathering tasks yet');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChance, 'Drop chance');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.TaskIdentity, undefined);

@@ -31,6 +31,7 @@
 - [x] Improve drop table scanability, modifier chips, row actions, search, pagination count, and duplicate component support.
 - [x] Refine the selected-drop inspector with component summary, component selection, signed time/weather modifier rows, and a clamped final chance breakdown.
 - [x] Remove the task identity heading and internal id display from the gathering task editor while keeping editable identity fields.
+- [x] Remove the duplicate central back action and reflow the task image, identity fields, and On/Off status toggle.
 - [x] Add or update focused mounted/layout/contract tests.
 - [ ] Capture normal and narrow rendered evidence for the task editor when live Foundry/Vite validation is available.
 - [x] Run targeted tests, `npm test`, and `npm run build`.

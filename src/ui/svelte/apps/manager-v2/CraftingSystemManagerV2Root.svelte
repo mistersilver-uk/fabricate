@@ -2038,7 +2038,6 @@
         selectedDropId={selectedGatheringDrop?.id || selectedGatheringDropId}
         rewardRules={selectedGatheringRules}
         onPickImagePath={services?.pickImagePath}
-        onBack={backToGatheringTaskLibrary}
         onUpdateTask={updateSelectedGatheringTask}
         onSelectDrop={(rowId) => { selectedGatheringDropId = rowId; }}
         onAddDrop={addGatheringTaskDrop}

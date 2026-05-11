@@ -12,7 +12,6 @@
     selectedDropId = '',
     rewardRules = null,
     onPickImagePath = null,
-    onBack = () => {},
     onUpdateTask = () => {},
     onSelectDrop = () => {},
     onAddDrop = () => {},
@@ -134,17 +133,32 @@
 >
   {#if task}
     <section class="manager-v2-task-core-card" data-gathering-task-core-editor>
-      <div class="manager-v2-task-card-heading is-action-only">
-        <button type="button" class="manager-v2-link-button" onclick={onBack}>
-          <i class="fas fa-arrow-left" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.BackToLibrary', 'Back to task library')}</span>
-        </button>
-      </div>
       <div class="manager-v2-task-core-grid">
-        <button type="button" class="manager-v2-task-image-picker" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ChooseImage', 'Choose task image')} onclick={chooseTaskImage} disabled={typeof onPickImagePath !== 'function'}>
-          <img src={taskImage()} alt="" />
-          <i class="fas fa-pen" aria-hidden="true"></i>
-        </button>
+        <div class="manager-v2-task-media-column">
+          <button type="button" class="manager-v2-task-image-picker" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ChooseImage', 'Choose task image')} onclick={chooseTaskImage} disabled={typeof onPickImagePath !== 'function'}>
+            <img src={taskImage()} alt="" />
+            <i class="fas fa-pen" aria-hidden="true"></i>
+          </button>
+
+          <div class="manager-v2-task-core-status">
+            <button
+              type="button"
+              class={`manager-v2-status-toggle ${task.enabled === false ? 'is-off' : 'is-on'}`}
+              data-gathering-task-field="enabled"
+              aria-pressed={task.enabled !== false}
+              aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ToggleNamed', 'Toggle {name}').replace('{name}', task.name || text('FABRICATE.Admin.ManagerV2.Environment.Tasks.UnnamedTask', 'Unnamed gathering task'))}
+              onclick={() => onUpdateTask({ enabled: task.enabled === false })}
+            >
+              <span class="manager-v2-status-toggle-track" aria-hidden="true">
+                <span class="manager-v2-status-toggle-knob"></span>
+              </span>
+              <span class="manager-v2-status-toggle-label">
+                {task.enabled === false ? text('FABRICATE.Admin.ManagerV2.StatusOff', 'Off') : text('FABRICATE.Admin.ManagerV2.StatusOn', 'On')}
+              </span>
+            </button>
+            <p class="manager-v2-muted">{task.enabled === false ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DisabledHint', 'Players cannot attempt this task while it is disabled.') : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EnabledHint', 'This task is available when its gates match.')}</p>
+          </div>
+        </div>
 
         <div class="manager-v2-task-identity-fields">
           <label class="manager-v2-field">
@@ -155,15 +169,6 @@
             <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Description', 'Description')}</span>
             <textarea data-gathering-task-field="description" value={task.description || ''} oninput={(event) => onUpdateTask({ description: event.currentTarget.value })}></textarea>
           </label>
-        </div>
-
-        <div class="manager-v2-task-core-status">
-          <label class="manager-v2-status-toggle {task.enabled === false ? 'is-off' : 'is-on'}" data-gathering-task-field="enabled">
-            <input type="checkbox" checked={task.enabled !== false} onchange={(event) => onUpdateTask({ enabled: event.currentTarget.checked })} />
-            <span class="manager-v2-status-toggle-track" aria-hidden="true"><span class="manager-v2-status-toggle-knob"></span></span>
-            <span class="manager-v2-status-toggle-label">{task.enabled === false ? text('FABRICATE.Admin.ManagerV2.StatusDisabled', 'Disabled') : text('FABRICATE.Admin.ManagerV2.StatusEnabled', 'Enabled')}</span>
-          </label>
-          <p class="manager-v2-muted">{task.enabled === false ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DisabledHint', 'Players cannot attempt this task while it is disabled.') : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EnabledHint', 'This task is available when its gates match.')}</p>
         </div>
       </div>
     </section>
@@ -323,7 +328,6 @@
       <div>
         <i class="fas fa-list-check" aria-hidden="true"></i>
         <h3>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SelectTask', 'Select a gathering task')}</h3>
-        <button type="button" class="manager-v2-button" onclick={onBack}>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.BackToLibrary', 'Back to tasks')}</button>
       </div>
     </div>
   {/if}

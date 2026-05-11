@@ -2089,7 +2089,10 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     flushSync();
     assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'gathering-task-edit');
     assert.ok(target.querySelector('[data-gathering-task-editor]'));
-    assert.ok(target.querySelector('[data-gathering-task-core-editor]'));
+    const coreEditor = target.querySelector('[data-gathering-task-core-editor]');
+    assert.ok(coreEditor);
+    assert.equal(coreEditor.querySelector('.manager-v2-link-button'), null);
+    assert.equal(coreEditor.textContent.includes('Back to task library'), false);
     assert.equal(target.textContent.includes('Task Identity'), false);
     assert.equal(target.textContent.includes('Internal ID'), false);
     assert.ok(target.textContent.includes('Edit availability, identity, and drop rules for the selected gathering task.'));
@@ -2100,7 +2103,26 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(target.querySelector('[data-gathering-task-matching-logic]'), null);
     assert.ok(target.textContent.includes('Drop chance'));
     assert.ok(target.textContent.includes('Final chance'));
+    const mediaColumn = coreEditor.querySelector('.manager-v2-task-media-column');
+    const taskImagePicker = coreEditor.querySelector('.manager-v2-task-image-picker');
+    const taskStatus = coreEditor.querySelector('.manager-v2-task-core-status');
+    const taskStatusToggle = taskStatus.querySelector('.manager-v2-status-toggle');
+    assert.equal(mediaColumn.firstElementChild, taskImagePicker);
+    assert.equal(mediaColumn.children[1], taskStatus);
+    assert.equal(taskStatusToggle.tagName, 'BUTTON');
+    assert.equal(taskStatusToggle.querySelector('input'), null);
+    assert.equal(taskStatusToggle.querySelector('.manager-v2-status-toggle-label').textContent.trim(), 'Off');
+    taskStatusToggle.click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[1] === 'alchemy' && call[2] === 'task-herbs' && call[3].enabled === true));
+    assert.equal(taskStatusToggle.querySelector('.manager-v2-status-toggle-label').textContent.trim(), 'On');
     const taskNameInput = target.querySelector('[data-gathering-task-field="name"]');
+    assert.equal(
+      Boolean(taskNameInput.compareDocumentPosition(taskImagePicker) & Node.DOCUMENT_POSITION_PRECEDING),
+      true,
+      'task name should be positioned after the image column in the core editor'
+    );
     taskNameInput.value = 'Gather Sun Herbs';
     taskNameInput.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
