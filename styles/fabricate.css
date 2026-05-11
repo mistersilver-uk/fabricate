@@ -8345,7 +8345,7 @@
 
 .fabricate-manager-v2 .manager-v2-gathering-task-edit-view {
   display: grid;
-  grid-template-rows: auto auto 340px minmax(380px, 1fr) auto;
+  grid-template-rows: auto auto 340px minmax(410px, 1fr) auto;
   gap: 12px;
   min-height: 0;
   min-width: 0;
@@ -8801,9 +8801,12 @@
 }
 
 .fabricate-manager-v2 .manager-v2-task-drops-card {
+  --fab-mv2-task-drop-table-visible-height: 262px;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  min-height: 380px;
+  grid-template-rows: auto var(--fab-mv2-task-drop-table-visible-height) auto;
+  height: 410px;
+  min-height: 410px;
+  max-height: 410px;
   overflow: hidden;
 }
 
@@ -9183,6 +9186,8 @@
 }
 
 .fabricate-manager-v2 .manager-v2-task-drops-card .manager-v2-table-scroll {
+  height: var(--fab-mv2-task-drop-table-visible-height);
+  max-height: var(--fab-mv2-task-drop-table-visible-height);
   padding: 10px 0 0;
   overflow-x: hidden;
   overflow-y: auto;

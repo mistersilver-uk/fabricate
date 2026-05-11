@@ -36,7 +36,7 @@ All other parsed payloads continue through `onImportDrop(row.id, data)`.
 
 ## Layout
 
-The task editor grid gains a bounded component browser row between task availability and drop rules. The browser card uses a compact header, filter row, fixed two-row card viewport, and local pagination footer. The component browser card is tall enough to keep its footer visible, and the drop-rules card is tall enough to show the table header plus three drop rows before scrolling. The grid is three columns at normal widths and collapses only under the existing Manager V2 container breakpoints.
+The task editor grid gains a bounded component browser row between task availability and drop rules. The browser card uses a compact header, filter row, fixed two-row card viewport, and local pagination footer. The component browser card is tall enough to keep its footer visible. The drop-rules table viewport is fixed at `262px`, equal to the `36px` table header plus exactly three complete `72px` drop rows after the `10px` scroll top padding. The grid is three columns at normal widths and collapses only under the existing Manager V2 container breakpoints.
 
 Drop-rule rows remain full-row drop targets, including already-populated rows. Right-click-to-clear remains scoped to the component button and is unchanged.
 

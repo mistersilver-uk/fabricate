@@ -27,3 +27,13 @@
 - [x] Re-run targeted component tests.
 - [x] Re-run `npm test`.
 - [x] Re-run `npm run build`.
+
+## 5. Drop Rules Viewport Refinement
+
+- [x] Plan exact three-row drop rules table viewport sizing.
+- [x] Fix the drop-rules table viewport to `262px`.
+- [x] Increase the drop-rules card and editor row budget to fit that viewport.
+- [x] Update layout tests for the exact three-row budget.
+- [x] Re-run targeted component tests.
+- [x] Re-run `npm test`.
+- [x] Re-run `npm run build`.
