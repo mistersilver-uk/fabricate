@@ -339,6 +339,7 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const rowBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-table-head,\n.fabricate-manager-v2 .manager-v2-gathering-task-row');
   const identityBlock = blockFor('.fabricate-manager-v2 .manager-v2-recipe-identity,\n.fabricate-manager-v2 .manager-v2-component-identity,\n.fabricate-manager-v2 .manager-v2-environment-identity,\n.fabricate-manager-v2 .manager-v2-gathering-task-identity');
   const editorBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-edit-view');
+  const editorWithNoticeBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-edit-view.has-reward-rule-notice');
   const availabilityBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-availability-row');
   const componentBrowserBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-browser-card');
   const componentBrowserControlsBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-browser-controls');
@@ -414,6 +415,7 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(rowBlock.includes('grid-template-columns: var(--fab-mv2-gathering-task-grid);'), 'task rows should use the shared task grid');
   assert.ok(identityBlock.includes('grid-template-columns: 46px minmax(0, 1fr);'), 'task identity should reserve thumbnail space');
   assert.ok(editorBlock.includes('grid-template-rows: auto auto 340px minmax(410px, 1fr) auto;'), 'task edit route should reserve taller component browser and exact three-row drop-rule rows for drag/drop');
+  assert.ok(editorWithNoticeBlock.includes('grid-template-rows: auto auto 340px auto minmax(410px, 1fr) auto;'), 'task edit route should give the duplicate-drop warning a compact auto row before drop rules');
   assert.ok(editorBlock.includes('overflow: auto;'), 'task editor should allow vertical scrolling without horizontal overflow');
   assert.ok(availabilityBlock.includes('grid-template-columns: repeat(2, minmax(160px, 1fr));'), 'task availability controls should form a stable two-column grid');
   assert.ok(componentBrowserBlock.includes('height: 340px;') && componentBrowserBlock.includes('max-height: 340px;') && componentBrowserBlock.includes('overflow: hidden;'), 'component browser should own a fixed bounded height that keeps the footer visible');
@@ -466,18 +468,19 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(dropComponentCopyBlock.includes('align-content: center;'), 'drop component text should be vertically centered after description removal');
   assert.ok(dropComponentNameBlock.includes('display: -webkit-box;') && dropComponentNameBlock.includes('-webkit-line-clamp: 2;') && dropComponentNameBlock.includes('white-space: normal;'), 'drop component names should wrap to two lines instead of relying on descriptions');
   assert.ok(dropRateBlock.includes('display: block;'), 'drop chance cell should expose one wrapped value');
-  assert.ok(dropRateValueBlock.includes('grid-template-columns: 52px minmax(0, 1fr);') && dropRateValueBlock.includes('gap: 4px;'), 'drop chance value should keep the editable percent close to a wider slider');
+  assert.ok(dropRateValueBlock.includes('grid-template-columns: 56px minmax(0, 1fr);') && dropRateValueBlock.includes('gap: 4px;'), 'drop chance value should keep the editable percent close to a wider slider');
   assert.ok(dropRatePercentBlock.includes('position: relative;') && dropRatePercentBlock.includes('display: block;'), 'drop chance percent should overlay the suffix without taking slider width');
   assert.ok(css.includes('--fab-drop-rate-none: #E26F6B;'), 'drop chance slider should define a distinct exact-zero colour token');
-  assert.ok(dropRatePercentInputBlock.includes('height: 28px;') && dropRatePercentInputBlock.includes('box-sizing: border-box;') && dropRatePercentInputBlock.includes('padding: 4px 16px 4px 2px;') && dropRatePercentInputBlock.includes('text-align: center;'), 'drop chance percent should be a compact centered editable numeric field');
-  assert.ok(dropRatePercentInputOverrideBlock.includes('min-height: 28px;') && dropRatePercentInputOverrideBlock.includes('padding: 4px 16px 4px 2px;') && dropRatePercentInputOverrideBlock.includes('box-shadow: none;'), 'drop chance percent should override generic gathering task input chrome without affecting other fields');
-  assert.ok(dropRatePercentSuffixBlock.includes('position: absolute;') && dropRatePercentSuffixBlock.includes('right: 7px;') && dropRatePercentSuffixBlock.includes('pointer-events: none;'), 'drop chance percent suffix should sit inside the compact editor without stealing layout width');
+  assert.ok(dropRatePercentInputBlock.includes('height: 28px;') && dropRatePercentInputBlock.includes('box-sizing: border-box;') && dropRatePercentInputBlock.includes('padding: 4px 18px 4px 6px;') && dropRatePercentInputBlock.includes('text-align: center;'), 'drop chance percent should be a compact centered editable numeric field with room before the suffix');
+  assert.ok(dropRatePercentInputOverrideBlock.includes('min-height: 28px;') && dropRatePercentInputOverrideBlock.includes('padding: 4px 18px 4px 6px;') && dropRatePercentInputOverrideBlock.includes('box-shadow: none;'), 'drop chance percent should override generic gathering task input chrome without affecting other fields');
+  assert.ok(dropRatePercentSuffixBlock.includes('position: absolute;') && dropRatePercentSuffixBlock.includes('right: 6px;') && dropRatePercentSuffixBlock.includes('pointer-events: none;'), 'drop chance percent suffix should sit inside the compact editor without stealing layout width');
   assert.ok(dropRateControlBlock.includes('--fab-drop-rate-value: 1%;') && dropRateControlBlock.includes('--fab-drop-rate-color: var(--fab-drop-rate-very-rare);'), 'drop chance slider should expose value and tier colour variables');
   assert.ok(dropRateTrackBlock.includes('background: var(--fab-overlay-dark-18);') && dropRateTrackBlock.includes('overflow: hidden;'), 'drop chance slider should render a neutral clipped track under the native range input');
   assert.ok(dropRateFillBlock.includes('width: var(--fab-drop-rate-value);') && dropRateFillBlock.includes('background: var(--fab-drop-rate-color);'), 'drop chance slider should fill the active track segment with the current tier colour');
   assert.ok(dropRateRangeBlock.includes('appearance: none;') && dropRateRangeBlock.includes('-webkit-appearance: none;'), 'drop chance range should clear native host slider rendering');
   assert.ok(dropRateRangeBlock.includes('accent-color: var(--fab-drop-rate-color);') && dropRateRangeBlock.includes('background: transparent;'), 'drop chance native range should inherit the current tier colour without adding row chrome');
-  assert.ok(dropRateWebkitTrackBlock.includes('background: transparent;'), 'drop chance WebKit range track should expose the visible current-tier fill track');
+  assert.ok(dropRateWebkitTrackBlock.includes('border: 0;') && dropRateWebkitTrackBlock.includes('background: transparent;'), 'drop chance WebKit range track should expose the visible current-tier fill track without native end caps');
+  assert.ok(blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-moz-range-track').includes('border: 0;'), 'drop chance Firefox range track should not add native end caps over the custom track');
   assert.ok(dropRateMozProgressBlock.includes('background: var(--fab-drop-rate-color);'), 'drop chance Firefox progress should paint the active segment in the current tier colour');
   assert.ok(dropRateWebkitThumbBlock.includes('background: var(--fab-drop-rate-color);') && dropRateMozThumbBlock.includes('background: var(--fab-drop-rate-color);'), 'drop chance range thumbs should retain current-tier colour');
   assert.ok(
@@ -500,7 +503,7 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(dropModifierOverflowBlock.includes('text-overflow: ellipsis;') && dropModifierOverflowBlock.includes('white-space: nowrap;'), 'overflow modifier hints should stay as one clipped table label');
   assert.ok(dropEditorInputBlock.includes(':not([type="range"])'), 'selected drop inspector generic input chrome should not override row-style range sliders');
   assert.ok(dropEditorValuesBlock.includes('grid-template-columns: minmax(0, 1fr) 72px;') && dropEditorValuesBlock.includes('align-items: end;'), 'selected drop inspector should place chance and count in a compact two-column grid');
-  assert.ok(dropEditorRatePercentBlock.includes('height: 28px;') && dropEditorRatePercentBlock.includes('background: var(--fab-overlay-dark-18);'), 'selected drop inspector chance input should reuse row percent input styling');
+  assert.ok(dropEditorRatePercentBlock.includes('height: 28px;') && dropEditorRatePercentBlock.includes('padding: 4px 18px 4px 6px;') && dropEditorRatePercentBlock.includes('background: var(--fab-overlay-dark-18);'), 'selected drop inspector chance input should reuse row percent input styling');
   assert.ok(dropEditorCountBlock.includes('display: grid;') && dropEditorCountBlock.includes('gap: 6px;'), 'selected drop inspector count editor should use a compact labeled field');
   assert.ok(dropEditorCountInputBlock.includes('min-height: 28px;') && dropEditorCountInputBlock.includes('text-align: center;'), 'selected drop inspector count input should match row count input geometry');
   assert.ok(dropEditorActionsBlock.includes('grid-template-columns: repeat(2, minmax(0, 1fr));') && dropEditorActionsBlock.includes('margin-top: 0;'), 'selected drop rule actions should sit beneath the inspector title row');

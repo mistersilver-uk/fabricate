@@ -442,6 +442,7 @@
 
 <main
   class="manager-v2-main manager-v2-gathering-task-edit-view"
+  class:has-reward-rule-notice={showRewardRuleNotice}
   aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EditTitle', 'Edit gathering task')}
   data-gathering-task-editor
 >

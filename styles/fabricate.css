@@ -8353,6 +8353,10 @@
   overflow: auto;
 }
 
+.fabricate-manager-v2 .manager-v2-gathering-task-edit-view.has-reward-rule-notice {
+  grid-template-rows: auto auto 340px auto minmax(410px, 1fr) auto;
+}
+
 .fabricate-manager-v2 .manager-v2-gathering-task-edit-view :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
   width: 100%;
   min-width: 0;
@@ -9300,7 +9304,7 @@
 
 .fabricate-manager-v2 .manager-v2-drop-rate-value {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr);
+  grid-template-columns: 56px minmax(0, 1fr);
   align-items: center;
   gap: 4px;
 }
@@ -9317,7 +9321,7 @@
   min-width: 0;
   height: 28px;
   box-sizing: border-box;
-  padding: 4px 16px 4px 2px;
+  padding: 4px 18px 4px 6px;
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   color: var(--fab-mv2-text);
@@ -9329,14 +9333,14 @@
 
 .fabricate-manager-v2 .manager-v2-gathering-task-edit-view .manager-v2-drop-rate-percent input[type="text"] {
   min-height: 28px;
-  padding: 4px 16px 4px 2px;
+  padding: 4px 18px 4px 6px;
   background: var(--fab-overlay-dark-18);
   box-shadow: none;
 }
 
 .fabricate-manager-v2 .manager-v2-drop-rate-percent > span[aria-hidden="true"] {
   position: absolute;
-  right: 7px;
+  right: 6px;
   top: 50%;
   pointer-events: none;
   transform: translateY(-50%);
@@ -9417,7 +9421,7 @@
 
 .fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-webkit-slider-runnable-track {
   height: 6px;
-  border: 1px solid var(--fab-overlay-light-10);
+  border: 0;
   border-radius: 999px;
   background: transparent;
 }
@@ -9435,9 +9439,9 @@
 
 .fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-moz-range-track {
   height: 6px;
-  border: 1px solid var(--fab-overlay-light-10);
+  border: 0;
   border-radius: 999px;
-  background: var(--fab-overlay-dark-18);
+  background: transparent;
 }
 
 .fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-moz-range-progress {
@@ -9713,7 +9717,7 @@
 .fabricate-manager-v2 .manager-v2-drop-editor-card .manager-v2-drop-rate-percent input[type="text"] {
   height: 28px;
   min-height: 28px;
-  padding: 4px 16px 4px 2px;
+  padding: 4px 18px 4px 6px;
   background: var(--fab-overlay-dark-18);
   box-shadow: none;
   text-align: center;

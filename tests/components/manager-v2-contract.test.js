@@ -620,6 +620,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
     }
     for (const snippet of [
       'data-gathering-task-editor',
+      'class:has-reward-rule-notice={showRewardRuleNotice}',
       'data-gathering-task-core-editor',
       'data-gathering-task-availability',
       'data-gathering-task-component-browser',
