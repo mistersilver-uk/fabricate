@@ -357,14 +357,22 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const selectedDropRowBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-drop-row.is-selected');
   const dropRateBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-cell');
   const dropRateValueBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-value');
-  const dropTierTrackBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-tier-track');
-  const dropTierBlocks = [
-    '.fabricate-manager-v2 .manager-v2-drop-rate-tier-track .is-mythic',
-    '.fabricate-manager-v2 .manager-v2-drop-rate-tier-track .is-very-rare',
-    '.fabricate-manager-v2 .manager-v2-drop-rate-tier-track .is-rare',
-    '.fabricate-manager-v2 .manager-v2-drop-rate-tier-track .is-uncommon',
-    '.fabricate-manager-v2 .manager-v2-drop-rate-tier-track .is-common'
-  ].map(selector => blockFor(selector)).join('\n');
+  const dropRatePercentBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-percent');
+  const dropRatePercentInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-percent input[type="text"]');
+  const dropRateControlBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control');
+  const guaranteedDropRateControlBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control.is-guaranteed');
+  const commonDropRateControlBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control.is-common');
+  const uncommonDropRateControlBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control.is-uncommon');
+  const rareDropRateControlBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control.is-rare');
+  const veryRareDropRateControlBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control.is-very-rare');
+  const legendaryDropRateControlBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control.is-legendary');
+  const dropRateTrackBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-track');
+  const dropRateFillBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-fill');
+  const dropRateRangeBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]');
+  const dropRateWebkitTrackBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-webkit-slider-runnable-track');
+  const dropRateWebkitThumbBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-webkit-slider-thumb');
+  const dropRateMozProgressBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-moz-range-progress');
+  const dropRateMozThumbBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-moz-range-thumb');
   const dropModifierListBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-modifier-list');
   const dropModifierPillBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-modifier-pill');
   const positiveDropModifierPillBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-modifier-pill.is-positive');
@@ -393,7 +401,7 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(dropScrollBlock.includes('padding: 10px 0 0;'), 'drop rules table scroll region should not add horizontal inset');
   assert.ok(dropScrollBlock.includes('overflow-x: hidden;') && dropScrollBlock.includes('overflow-y: auto;'), 'drop rules table should suppress horizontal scroll while retaining vertical scrolling');
   assert.ok(dropTableBlock.includes('--fab-mv2-task-drop-grid:'), 'task editor drop rows should define compact desktop geometry');
-  assert.ok(dropTableBlock.includes('minmax(0, 1.4fr)') && dropTableBlock.includes('minmax(124px, 0.82fr)') && dropTableBlock.includes('88px'), 'drop row desktop grid should reserve readable chance and horizontal action columns');
+  assert.ok(dropTableBlock.includes('minmax(0, 1.2fr)') && dropTableBlock.includes('minmax(180px, 1.12fr)') && dropTableBlock.includes('88px'), 'drop row desktop grid should give more room to chance while preserving horizontal action columns');
   assert.ok(dropTableBlock.includes('width: 100%;') && dropTableBlock.includes('max-width: 100%;'), 'drop table should fill the drop rules card without exceeding it');
   assert.ok(dropTableHeadBlock.includes('padding: 0;'), 'drop rules header row should clear generic table-head padding so columns align with value rows');
   assert.ok(dropRowBlock.includes('grid-template-columns: var(--fab-mv2-task-drop-grid);'), 'drop rows should use the shared single-line editor grid');
@@ -407,9 +415,26 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.equal(selectedDropRowBlock.includes('var(--fab-info'), false, 'selected drop rows should not use the info family');
   assert.equal(selectedDropRowBlock.includes('var(--fab-warning'), false, 'selected drop rows should not use the warning family');
   assert.ok(dropRateBlock.includes('display: block;'), 'drop chance cell should expose one wrapped value');
-  assert.ok(dropRateValueBlock.includes('grid-template-columns: 44px minmax(0, 1fr);'), 'drop chance value should keep percent and slider on the same line');
-  assert.ok(dropTierTrackBlock.includes('background: var(--fab-overlay-dark-18);'), 'drop chance slider should use a neutral manager-v2 track');
-  assert.equal(/var\(--fab-(danger|warning|info|success)/.test(dropTierBlocks), false, 'drop chance tier segments should not use secondary theme colour bands');
+  assert.ok(dropRateValueBlock.includes('grid-template-columns: 52px minmax(0, 1fr);') && dropRateValueBlock.includes('gap: 4px;'), 'drop chance value should keep the editable percent close to a wider slider');
+  assert.ok(dropRatePercentBlock.includes('grid-template-columns: minmax(0, 1fr) auto;'), 'drop chance percent should reserve inline space for the suffix');
+  assert.ok(dropRatePercentInputBlock.includes('height: 28px;') && dropRatePercentInputBlock.includes('text-align: right;'), 'drop chance percent should be a compact editable numeric field');
+  assert.ok(dropRateControlBlock.includes('--fab-drop-rate-value: 1%;') && dropRateControlBlock.includes('--fab-drop-rate-color: var(--fab-drop-rate-very-rare);'), 'drop chance slider should expose value and tier colour variables');
+  assert.ok(dropRateTrackBlock.includes('background: var(--fab-overlay-dark-18);') && dropRateTrackBlock.includes('overflow: hidden;'), 'drop chance slider should render a neutral clipped track under the native range input');
+  assert.ok(dropRateFillBlock.includes('width: var(--fab-drop-rate-value);') && dropRateFillBlock.includes('background: var(--fab-drop-rate-color);'), 'drop chance slider should fill the active track segment with the current tier colour');
+  assert.ok(dropRateRangeBlock.includes('appearance: none;') && dropRateRangeBlock.includes('-webkit-appearance: none;'), 'drop chance range should clear native host slider rendering');
+  assert.ok(dropRateRangeBlock.includes('accent-color: var(--fab-drop-rate-color);') && dropRateRangeBlock.includes('background: transparent;'), 'drop chance native range should inherit the current tier colour without adding row chrome');
+  assert.ok(dropRateWebkitTrackBlock.includes('background: transparent;'), 'drop chance WebKit range track should expose the visible current-tier fill track');
+  assert.ok(dropRateMozProgressBlock.includes('background: var(--fab-drop-rate-color);'), 'drop chance Firefox progress should paint the active segment in the current tier colour');
+  assert.ok(dropRateWebkitThumbBlock.includes('background: var(--fab-drop-rate-color);') && dropRateMozThumbBlock.includes('background: var(--fab-drop-rate-color);'), 'drop chance range thumbs should retain current-tier colour');
+  assert.ok(
+    guaranteedDropRateControlBlock.includes('var(--fab-drop-rate-guaranteed)')
+      && commonDropRateControlBlock.includes('var(--fab-drop-rate-common)')
+      && uncommonDropRateControlBlock.includes('var(--fab-drop-rate-uncommon)')
+      && rareDropRateControlBlock.includes('var(--fab-drop-rate-rare)')
+      && veryRareDropRateControlBlock.includes('var(--fab-drop-rate-very-rare)')
+      && legendaryDropRateControlBlock.includes('var(--fab-drop-rate-legendary)'),
+    'drop chance control classes should map the selected rarity palette to the current value'
+  );
   assert.ok(dropQuantityInputBlock.includes('max-width: 52px;') && dropQuantityInputBlock.includes('font-variant-numeric: tabular-nums;'), 'quantity should remain a compact numeric text input');
   assert.ok(dropModifierListBlock.includes('flex-wrap: nowrap;') && dropModifierListBlock.includes('overflow: hidden;'), 'drop modifiers should remain a single clipped content group');
   assert.ok(dropModifierPillBlock.includes('background: var(--fab-overlay-light-06);'), 'drop modifier pills should use restrained neutral chip backgrounds');

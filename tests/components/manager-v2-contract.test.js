@@ -634,9 +634,16 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'manager-v2-drop-modifier-pill',
       'manager-v2-drop-modifier-list',
       'manager-v2-drop-rate-value',
-      'manager-v2-drop-rate-tier-track',
+      'manager-v2-drop-rate-percent',
+      'manager-v2-drop-rate-track',
+      'manager-v2-drop-rate-fill',
       'inputmode="numeric"',
       'pattern="[1-9][0-9]*"',
+      'pattern="[0-9]*"',
+      'onDropRateInput',
+      'onDropRateBlur',
+      'dropRateTierClass',
+      'dropRateTierColor',
       'onQuantityInput',
       'use:dragDrop',
       'onImportDrop(rowId, data)',
@@ -667,6 +674,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(gatheringTaskEditSource.includes('StatusOn'), 'task editor should use shared On status copy');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.EmptyTitle, 'No gathering tasks yet');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChance, 'Drop chance');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChancePercent, 'Drop chance percent');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.NoComponent, 'No Component');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.CreateOrAssign, 'Create or assign');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.TaskIdentity, undefined);

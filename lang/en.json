@@ -907,6 +907,7 @@
             "DropComponent": "Drop component",
             "SelectComponent": "Select a component",
             "DropChance": "Drop chance",
+            "DropChancePercent": "Drop chance percent",
             "Quantity": "Quantity",
             "QuantityShortHint": "award",
             "Modifiers": "Modifiers",

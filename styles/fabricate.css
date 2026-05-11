@@ -136,6 +136,12 @@
   --fab-tag-butter: #E7DBB1;
   --fab-tag-aqua: #B9DDD7;
   --fab-tag-mauve: #D8BED4;
+  --fab-drop-rate-guaranteed: #75C98E;
+  --fab-drop-rate-common: #5EC3B0;
+  --fab-drop-rate-uncommon: #6FA8E8;
+  --fab-drop-rate-rare: #A78BFA;
+  --fab-drop-rate-very-rare: #D86CCB;
+  --fab-drop-rate-legendary: #E5C558;
   --fab-overlay-dark-05: rgba(17, 26, 35, 0.05);
   --fab-overlay-dark-08: rgba(17, 26, 35, 0.08);
   --fab-overlay-dark-10: rgba(17, 26, 35, 0.1);
@@ -247,6 +253,12 @@
   --fab-tag-butter: #E7DBB1;
   --fab-tag-aqua: #B9DDD7;
   --fab-tag-mauve: #D8BED4;
+  --fab-drop-rate-guaranteed: #75C98E;
+  --fab-drop-rate-common: #5EC3B0;
+  --fab-drop-rate-uncommon: #6FA8E8;
+  --fab-drop-rate-rare: #A78BFA;
+  --fab-drop-rate-very-rare: #D86CCB;
+  --fab-drop-rate-legendary: #E5C558;
   --fab-overlay-dark-05: rgba(0, 0, 0, 0.05);
   --fab-overlay-dark-08: rgba(0, 0, 0, 0.08);
   --fab-overlay-dark-10: rgba(0, 0, 0, 0.1);
@@ -358,6 +370,12 @@
   --fab-tag-butter: #D6C08E;
   --fab-tag-aqua: #B8C4CB;
   --fab-tag-mauve: #A39AA2;
+  --fab-drop-rate-guaranteed: #75C98E;
+  --fab-drop-rate-common: #5EC3B0;
+  --fab-drop-rate-uncommon: #6FA8E8;
+  --fab-drop-rate-rare: #A78BFA;
+  --fab-drop-rate-very-rare: #D86CCB;
+  --fab-drop-rate-legendary: #E5C558;
   --fab-overlay-dark-05: rgba(20, 18, 20, 0.05);
   --fab-overlay-dark-08: rgba(20, 18, 20, 0.08);
   --fab-overlay-dark-10: rgba(20, 18, 20, 0.1);
@@ -469,6 +487,12 @@
   --fab-tag-butter: #E7D8A2;
   --fab-tag-aqua: #B8C8A5;
   --fab-tag-mauve: #E7D9B8;
+  --fab-drop-rate-guaranteed: #75C98E;
+  --fab-drop-rate-common: #5EC3B0;
+  --fab-drop-rate-uncommon: #6FA8E8;
+  --fab-drop-rate-rare: #A78BFA;
+  --fab-drop-rate-very-rare: #D86CCB;
+  --fab-drop-rate-legendary: #E5C558;
   --fab-overlay-dark-05: rgba(22, 28, 25, 0.05);
   --fab-overlay-dark-08: rgba(22, 28, 25, 0.08);
   --fab-overlay-dark-10: rgba(22, 28, 25, 0.1);
@@ -580,6 +604,12 @@
   --fab-tag-butter: #E6E0C8;
   --fab-tag-aqua: #9DC9BD;
   --fab-tag-mauve: #C3C2DA;
+  --fab-drop-rate-guaranteed: #75C98E;
+  --fab-drop-rate-common: #5EC3B0;
+  --fab-drop-rate-uncommon: #6FA8E8;
+  --fab-drop-rate-rare: #A78BFA;
+  --fab-drop-rate-very-rare: #D86CCB;
+  --fab-drop-rate-legendary: #E5C558;
   --fab-overlay-dark-05: rgba(18, 24, 36, 0.05);
   --fab-overlay-dark-08: rgba(18, 24, 36, 0.08);
   --fab-overlay-dark-10: rgba(18, 24, 36, 0.1);
@@ -691,6 +721,12 @@
   --fab-tag-butter: #D5C09A;
   --fab-tag-aqua: #948F90;
   --fab-tag-mauve: #706B70;
+  --fab-drop-rate-guaranteed: #75C98E;
+  --fab-drop-rate-common: #5EC3B0;
+  --fab-drop-rate-uncommon: #6FA8E8;
+  --fab-drop-rate-rare: #A78BFA;
+  --fab-drop-rate-very-rare: #D86CCB;
+  --fab-drop-rate-legendary: #E5C558;
   --fab-overlay-dark-05: rgba(12, 10, 20, 0.05);
   --fab-overlay-dark-08: rgba(12, 10, 20, 0.08);
   --fab-overlay-dark-10: rgba(12, 10, 20, 0.1);
@@ -8967,7 +9003,7 @@
 }
 
 .fabricate-manager-v2 .manager-v2-gathering-task-drops-table {
-  --fab-mv2-task-drop-grid: minmax(0, 1.4fr) minmax(124px, 0.82fr) 74px minmax(0, 1fr) 88px;
+  --fab-mv2-task-drop-grid: minmax(0, 1.2fr) minmax(180px, 1.12fr) 74px minmax(0, 1fr) 88px;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -9083,31 +9119,73 @@
 
 .fabricate-manager-v2 .manager-v2-drop-rate-value {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-columns: 52px minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
+  gap: 4px;
 }
 
-.fabricate-manager-v2 .manager-v2-drop-rate-cell strong {
+.fabricate-manager-v2 .manager-v2-drop-rate-percent {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px;
   color: var(--fab-mv2-text);
-  text-align: left;
   font-variant-numeric: tabular-nums;
 }
 
+.fabricate-manager-v2 .manager-v2-drop-rate-percent input[type="text"] {
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  padding: 4px 3px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-overlay-dark-18);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
 .fabricate-manager-v2 .manager-v2-drop-rate-control {
+  --fab-drop-rate-value: 1%;
+  --fab-drop-rate-color: var(--fab-drop-rate-very-rare);
   position: relative;
   display: grid;
   align-items: center;
   min-width: 0;
 }
 
-.fabricate-manager-v2 .manager-v2-drop-rate-tier-track {
+.fabricate-manager-v2 .manager-v2-drop-rate-control.is-guaranteed {
+  --fab-drop-rate-color: var(--fab-drop-rate-guaranteed);
+}
+
+.fabricate-manager-v2 .manager-v2-drop-rate-control.is-common {
+  --fab-drop-rate-color: var(--fab-drop-rate-common);
+}
+
+.fabricate-manager-v2 .manager-v2-drop-rate-control.is-uncommon {
+  --fab-drop-rate-color: var(--fab-drop-rate-uncommon);
+}
+
+.fabricate-manager-v2 .manager-v2-drop-rate-control.is-rare {
+  --fab-drop-rate-color: var(--fab-drop-rate-rare);
+}
+
+.fabricate-manager-v2 .manager-v2-drop-rate-control.is-very-rare {
+  --fab-drop-rate-color: var(--fab-drop-rate-very-rare);
+}
+
+.fabricate-manager-v2 .manager-v2-drop-rate-control.is-legendary {
+  --fab-drop-rate-color: var(--fab-drop-rate-legendary);
+}
+
+.fabricate-manager-v2 .manager-v2-drop-rate-track {
   position: absolute;
   left: 0;
   right: 0;
   top: 50%;
-  display: grid;
-  grid-template-columns: 5fr 10fr 20fr 30fr 35fr;
+  z-index: 0;
   height: 6px;
   border: 1px solid var(--fab-overlay-light-10);
   border-radius: 999px;
@@ -9117,29 +9195,64 @@
   transform: translateY(-50%);
 }
 
-.fabricate-manager-v2 .manager-v2-drop-rate-tier-track .is-mythic {
-  background: var(--fab-overlay-light-08);
-}
-
-.fabricate-manager-v2 .manager-v2-drop-rate-tier-track .is-very-rare {
-  background: var(--fab-overlay-light-08);
-}
-
-.fabricate-manager-v2 .manager-v2-drop-rate-tier-track .is-rare {
-  background: var(--fab-overlay-light-08);
-}
-
-.fabricate-manager-v2 .manager-v2-drop-rate-tier-track .is-uncommon {
-  background: var(--fab-overlay-light-08);
-}
-
-.fabricate-manager-v2 .manager-v2-drop-rate-tier-track .is-common {
-  background: var(--fab-overlay-light-08);
+.fabricate-manager-v2 .manager-v2-drop-rate-fill {
+  display: block;
+  width: var(--fab-drop-rate-value);
+  height: 100%;
+  background: var(--fab-drop-rate-color);
 }
 
 .fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"] {
+  appearance: none;
+  -webkit-appearance: none;
   position: relative;
   z-index: 1;
+  width: 100%;
+  min-width: 0;
+  height: 18px;
+  border: 0;
+  accent-color: var(--fab-drop-rate-color);
+  background: transparent;
+  cursor: pointer;
+}
+
+.fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  border: 1px solid var(--fab-overlay-light-10);
+  border-radius: 999px;
+  background: transparent;
+}
+
+.fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -4px;
+  border: 2px solid var(--fab-mv2-bg);
+  border-radius: 999px;
+  background: var(--fab-drop-rate-color);
+}
+
+.fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-moz-range-track {
+  height: 6px;
+  border: 1px solid var(--fab-overlay-light-10);
+  border-radius: 999px;
+  background: var(--fab-overlay-dark-18);
+}
+
+.fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-moz-range-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--fab-drop-rate-color);
+}
+
+.fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--fab-mv2-bg);
+  border-radius: 999px;
+  background: var(--fab-drop-rate-color);
 }
 
 .fabricate-manager-v2 .manager-v2-drop-quantity-cell input[type="text"] {

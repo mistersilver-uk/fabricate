@@ -232,6 +232,58 @@
     return 'is-neutral';
   }
 
+  function normalizeDropRate(value) {
+    const number = Math.trunc(Number(value));
+    if (!Number.isFinite(number)) return 1;
+    return Math.min(100, Math.max(0, number));
+  }
+
+  function dropRateValue(row) {
+    return normalizeDropRate(row?.dropRate ?? 1);
+  }
+
+  function dropRateTierClass(value) {
+    const rate = normalizeDropRate(value);
+    if (rate >= 100) return 'is-guaranteed';
+    if (rate >= 70) return 'is-common';
+    if (rate >= 35) return 'is-uncommon';
+    if (rate >= 15) return 'is-rare';
+    if (rate >= 5) return 'is-very-rare';
+    return 'is-legendary';
+  }
+
+  function dropRateTierColor(value) {
+    const rate = normalizeDropRate(value);
+    if (rate >= 100) return 'var(--fab-drop-rate-guaranteed)';
+    if (rate >= 70) return 'var(--fab-drop-rate-common)';
+    if (rate >= 35) return 'var(--fab-drop-rate-uncommon)';
+    if (rate >= 15) return 'var(--fab-drop-rate-rare)';
+    if (rate >= 5) return 'var(--fab-drop-rate-very-rare)';
+    return 'var(--fab-drop-rate-legendary)';
+  }
+
+  function onDropRateInput(rowId, event) {
+    const input = event.currentTarget;
+    const normalized = String(input.value || '').replace(/\D+/g, '').replace(/^0+(?=\d)/, '');
+    input.value = normalized;
+    const dropRate = Number(normalized);
+    if (normalized !== '' && Number.isInteger(dropRate) && dropRate >= 0 && dropRate <= 100) {
+      onUpdateDrop(rowId, { dropRate });
+    }
+  }
+
+  function onDropRateBlur(row, event) {
+    const input = event.currentTarget;
+    const normalized = String(input.value || '').replace(/\D+/g, '').replace(/^0+(?=\d)/, '');
+    const dropRate = Number(normalized);
+    if (normalized !== '' && Number.isInteger(dropRate) && dropRate >= 0 && dropRate <= 100) {
+      input.value = String(dropRate);
+      onUpdateDrop(row.id, { dropRate });
+      return;
+    }
+    input.value = String(dropRateValue(row));
+  }
+
   function onQuantityInput(rowId, event) {
     const input = event.currentTarget;
     const normalized = String(input.value || '').replace(/\D+/g, '').replace(/^0+/, '');
@@ -466,16 +518,15 @@
                 </span>
                 <span role="cell" class="manager-v2-drop-cell manager-v2-drop-rate-cell" data-gathering-task-drop-chance-cell>
                   <span class="manager-v2-drop-rate-value">
-                    <strong>{row.dropRate ?? 1}%</strong>
-                    <span class="manager-v2-drop-rate-control">
-                      <span class="manager-v2-drop-rate-tier-track" aria-hidden="true">
-                        <span class="is-mythic"></span>
-                        <span class="is-very-rare"></span>
-                        <span class="is-rare"></span>
-                        <span class="is-uncommon"></span>
-                        <span class="is-common"></span>
+                    <span class="manager-v2-drop-rate-percent">
+                      <input type="text" inputmode="numeric" pattern="[0-9]*" value={dropRateValue(row)} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChancePercent', 'Drop chance percent')} oninput={(event) => onDropRateInput(row.id, event)} onblur={(event) => onDropRateBlur(row, event)} onclick={(event) => event.stopPropagation()} onkeydown={(event) => event.stopPropagation()} />
+                      <span aria-hidden="true">%</span>
+                    </span>
+                    <span class={`manager-v2-drop-rate-control ${dropRateTierClass(row.dropRate)}`} style={`--fab-drop-rate-value: ${dropRateValue(row)}%; --fab-drop-rate-color: ${dropRateTierColor(row.dropRate)};`}>
+                      <span class="manager-v2-drop-rate-track" aria-hidden="true">
+                        <span class="manager-v2-drop-rate-fill"></span>
                       </span>
-                      <input type="range" min="0" max="100" step="1" value={row.dropRate ?? 1} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChance', 'Drop chance')} oninput={(event) => onUpdateDrop(row.id, { dropRate: Number(event.currentTarget.value) })} onclick={(event) => event.stopPropagation()} onkeydown={(event) => event.stopPropagation()} />
+                      <input type="range" min="0" max="100" step="1" value={dropRateValue(row)} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChance', 'Drop chance')} oninput={(event) => onUpdateDrop(row.id, { dropRate: Number(event.currentTarget.value) })} onclick={(event) => event.stopPropagation()} onkeydown={(event) => event.stopPropagation()} />
                     </span>
                   </span>
                 </span>

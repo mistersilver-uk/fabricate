@@ -2142,9 +2142,34 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(populatedDropRow.textContent.includes('Quantity'), false);
     assert.equal(populatedDropRow.textContent.includes('award'), false);
     const populatedChanceCell = populatedDropRow.querySelector('[data-gathering-task-drop-chance-cell]');
-    assert.equal(populatedChanceCell.querySelector('strong').textContent.trim(), '80%');
-    assert.ok(populatedChanceCell.querySelector('.manager-v2-drop-rate-tier-track'));
-    assert.ok(populatedChanceCell.querySelector('input[type="range"]').parentElement.classList.contains('manager-v2-drop-rate-control'));
+    const dropRateInput = populatedChanceCell.querySelector('.manager-v2-drop-rate-percent input');
+    assert.equal(dropRateInput.getAttribute('type'), 'text');
+    assert.equal(dropRateInput.getAttribute('inputmode'), 'numeric');
+    assert.equal(dropRateInput.getAttribute('pattern'), '[0-9]*');
+    assert.equal(dropRateInput.value, '80');
+    const dropRateControl = populatedChanceCell.querySelector('input[type="range"]').parentElement;
+    assert.ok(dropRateControl.classList.contains('manager-v2-drop-rate-control'));
+    assert.ok(dropRateControl.classList.contains('is-common'));
+    assert.ok(dropRateControl.getAttribute('style').includes('--fab-drop-rate-value: 80%;'));
+    assert.ok(dropRateControl.getAttribute('style').includes('--fab-drop-rate-color: var(--fab-drop-rate-common);'));
+    dropRateInput.value = '07a';
+    dropRateInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(dropRateInput.value, '7');
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.id === 'drop-nightshade' && row.dropRate === 7)));
+    const updatedDropRateInput = populatedDropRow.querySelector('.manager-v2-drop-rate-percent input');
+    const invalidDropRateCallCount = calls.length;
+    updatedDropRateInput.value = '150';
+    updatedDropRateInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(updatedDropRateInput.value, '150');
+    assert.equal(calls.slice(invalidDropRateCallCount).some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.id === 'drop-nightshade' && row.dropRate === 150)), false);
+    updatedDropRateInput.dispatchEvent(new Event('blur', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(updatedDropRateInput.value, '7');
     const quantityInput = populatedDropRow.querySelector('.manager-v2-drop-quantity-cell input');
     assert.equal(quantityInput.getAttribute('type'), 'text');
     assert.equal(quantityInput.getAttribute('inputmode'), 'numeric');
@@ -2720,6 +2745,59 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.every(row => row.id !== addedRow.id)));
+  });
+
+  it('colours gathering task drop chance sliders by rarity threshold', async () => {
+    const dropRows = [
+      ['drop-guaranteed', 100, 'is-guaranteed', 'var(--fab-drop-rate-guaranteed)'],
+      ['drop-common', 70, 'is-common', 'var(--fab-drop-rate-common)'],
+      ['drop-uncommon', 69, 'is-uncommon', 'var(--fab-drop-rate-uncommon)'],
+      ['drop-rare', 15, 'is-rare', 'var(--fab-drop-rate-rare)'],
+      ['drop-very-rare', 5, 'is-very-rare', 'var(--fab-drop-rate-very-rare)'],
+      ['drop-legendary', 4, 'is-legendary', 'var(--fab-drop-rate-legendary)'],
+      ['drop-zero', 0, 'is-legendary', 'var(--fab-drop-rate-legendary)']
+    ].map(([id, dropRate]) => ({
+      id,
+      componentId: 'c1',
+      quantity: 1,
+      dropRate,
+      enabled: true
+    }));
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], { taskDropRows: dropRows }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    target.querySelector('#manager-v2-gathering-tab-tasks').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]').click();
+    await tick();
+    flushSync();
+
+    for (const [id, dropRate, tierClass, color] of [
+      ['drop-guaranteed', 100, 'is-guaranteed', 'var(--fab-drop-rate-guaranteed)'],
+      ['drop-common', 70, 'is-common', 'var(--fab-drop-rate-common)'],
+      ['drop-uncommon', 69, 'is-uncommon', 'var(--fab-drop-rate-uncommon)'],
+      ['drop-rare', 15, 'is-rare', 'var(--fab-drop-rate-rare)'],
+      ['drop-very-rare', 5, 'is-very-rare', 'var(--fab-drop-rate-very-rare)'],
+      ['drop-legendary', 4, 'is-legendary', 'var(--fab-drop-rate-legendary)'],
+      ['drop-zero', 0, 'is-legendary', 'var(--fab-drop-rate-legendary)']
+    ]) {
+      const control = target.querySelector(`[data-gathering-task-drop-id="${id}"] .manager-v2-drop-rate-control`);
+      assert.ok(control.classList.contains(tierClass), `${id} should use ${tierClass}`);
+      assert.ok(control.getAttribute('style').includes(`--fab-drop-rate-value: ${dropRate}%;`), `${id} should expose its slider fill value`);
+      assert.ok(control.getAttribute('style').includes(`--fab-drop-rate-color: ${color};`), `${id} should expose ${color}`);
+    }
   });
 
   it('paginates gathering task editor drop rules without snapping back to the selected row', async () => {
