@@ -715,15 +715,15 @@ function normalizeDropRow(data = {}, randomID) {
 }
 
 function validateDropRows(rows, label) {
-  const entries = Array.isArray(rows) ? rows : [];
+  const entries = Array.isArray(rows) ? rows.filter(row => row?.enabled !== false) : [];
   const errors = [];
   if (entries.length < 1) {
     errors.push(`${label} d100 resolution requires at least one drop row`);
   }
   for (const row of entries) {
     const dropRate = Number(row?.dropRate);
-    if (!Number.isInteger(dropRate) || dropRate < 1 || dropRate > 100) {
-      errors.push(`${label} drop row "${row?.id || 'row'}" dropRate must be an integer from 1 to 100`);
+    if (!Number.isInteger(dropRate) || dropRate < 0 || dropRate > 100) {
+      errors.push(`${label} drop row "${row?.id || 'row'}" dropRate must be an integer from 0 to 100`);
     }
     if (!row?.componentId && !row?.itemUuid) {
       errors.push(`${label} drop row "${row?.id || 'row'}" requires componentId or itemUuid`);

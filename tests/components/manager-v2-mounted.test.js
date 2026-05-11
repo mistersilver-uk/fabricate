@@ -53,6 +53,8 @@ function compileManagerV2Root() {
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EnvironmentsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EssenceBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EssenceEditView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/GatheringTaskEditView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/GatheringTasksBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/RecipesBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/SystemEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/SystemsBrowserView.svelte');
@@ -111,10 +113,10 @@ function createStore(calls = [], options = {}) {
     recipeCategories: true
   };
   const alchemyManagedItemOptions = options.emptyComponents ? [] : [
-    { id: 'c1', name: 'Iron Ore', img: 'icons/commodities/metal/ore-chunk-grey.webp', sourceItemUuid: 'Compendium.fabricate.items.iron-ore' },
-    { id: 'c2', name: 'Glass Vial', img: 'icons/containers/kitchenware/vase-clay-blue.webp' },
-    { id: 'c3', name: 'Nightshade', img: 'icons/consumables/plants/nightshade.jpg' },
-    { id: 'c4', name: 'Coal', img: 'icons/commodities/materials/bowl-powder-black.webp' }
+    { id: 'c1', name: 'Iron Ore', img: 'icons/commodities/metal/ore-chunk-grey.webp', description: 'Unrefined metal.', sourceItemUuid: 'Compendium.fabricate.items.iron-ore' },
+    { id: 'c2', name: 'Glass Vial', img: 'icons/containers/kitchenware/vase-clay-blue.webp', description: '' },
+    { id: 'c3', name: 'Nightshade With An Exceptionally Long Localized Component Name', img: 'icons/consumables/plants/nightshade.jpg', description: 'A dusky flowering herb used in careful doses.', sourceItemUuid: 'Compendium.fabricate.items.nightshade-with-a-long-source-reference' },
+    { id: 'c4', name: 'Coal', img: 'icons/commodities/materials/bowl-powder-black.webp', description: 'Fuel for a steady forge.' }
   ];
   const systemDetails = {
     alchemy: {
@@ -216,6 +218,9 @@ function createStore(calls = [], options = {}) {
     enabled: true,
     selectionMode: 'targeted',
     sceneUuid: 'Scene.forest',
+    region: 'north',
+    biomes: ['forest'],
+    enabledTaskIds: ['task-herbs'],
     tasks: [{
       id: 'task-forage',
       name: 'Forage',
@@ -242,6 +247,9 @@ function createStore(calls = [], options = {}) {
       enabled: false,
       selectionMode: 'blind',
       sceneUuid: 'Scene.missing',
+      region: 'north',
+      biomes: ['cavern'],
+      disabledTaskIds: ['task-cavern'],
       tasks: [{
         id: 'task-prospect',
         name: 'Prospect',
@@ -325,6 +333,7 @@ function createStore(calls = [], options = {}) {
         selected: false
       }
     ],
+    systemsLoading: options.systemsLoading === true,
     selectedSystem,
     recipes: options.emptyRecipes ? [] : [
       {
@@ -435,7 +444,61 @@ function createStore(calls = [], options = {}) {
             hazardLimit: 1,
             hazardPolicy: 'successWithHazard'
           },
-          tasks: [],
+          tasks: options.emptyGatheringTasks ? [] : [
+            {
+              id: 'task-herbs',
+              name: 'Gather Moon Herbs',
+              description: 'Collect luminous herbs near old roots.',
+              img: 'icons/consumables/plants/leaf-glowing-green.webp',
+              enabled: true,
+              region: 'north',
+              biomes: ['forest'],
+              weather: ['clear'],
+              timeOfDay: ['day'],
+              dropRows: options.taskDropRows || [
+                {
+                  id: 'drop-nightshade',
+                  componentId: 'c3',
+                  quantity: 2,
+                  dropRate: 80,
+                  enabled: true,
+                  conditionModifiers: {
+                    timeOfDay: [
+                      { id: 'night-bonus', conditionId: 'night', value: 20 },
+                      { id: 'day-neutral', conditionId: 'day', value: 0 }
+                    ],
+                    weather: [{ id: 'clear-penalty', conditionId: 'clear', value: -15 }]
+                  }
+                }
+              ]
+            },
+            {
+              id: 'task-cavern',
+              name: 'Prospect Crystal Veins',
+              description: 'Search cavern walls for mineral blooms.',
+              img: 'icons/commodities/gems/gem-rough-teal.webp',
+              enabled: true,
+              region: 'north',
+              biomes: ['cavern'],
+              weather: [],
+              timeOfDay: ['night'],
+              dropRows: [
+                { id: 'drop-ore', componentId: 'c1', quantity: 1, dropRate: 45, enabled: true }
+              ]
+            },
+            {
+              id: 'task-south',
+              name: 'South Coast Driftwood',
+              description: 'Gather beach wood after storms.',
+              img: 'icons/commodities/wood/log-stack-brown.webp',
+              enabled: false,
+              region: 'south',
+              biomes: ['forest'],
+              weather: ['heavy-rain'],
+              timeOfDay: [],
+              dropRows: []
+            }
+          ],
           hazards: []
         }
       }
@@ -630,7 +693,37 @@ function createStore(calls = [], options = {}) {
     deleteGatheringConditionValue: (...args) => calls.push(['deleteGatheringConditionValue', ...args]),
     addGatheringVocabularyValue: (...args) => calls.push(['addGatheringVocabularyValue', ...args]),
     updateGatheringVocabularyValue: (...args) => calls.push(['updateGatheringVocabularyValue', ...args]),
-    deleteGatheringVocabularyValue: (...args) => calls.push(['deleteGatheringVocabularyValue', ...args])
+    deleteGatheringVocabularyValue: (...args) => calls.push(['deleteGatheringVocabularyValue', ...args]),
+    addGatheringLibraryTask: (systemId) => {
+      calls.push(['addGatheringLibraryTask', systemId]);
+      return { id: 'task-new', name: 'New Gathering Task', dropRows: [] };
+    },
+    updateGatheringLibraryTask: (systemId, taskId, updates = {}) => {
+      calls.push(['updateGatheringLibraryTask', systemId, taskId, updates]);
+      viewState.update(state => {
+        const systemConfig = state.gatheringConfig?.systems?.[systemId];
+        if (!systemConfig) return state;
+        return {
+          ...state,
+          gatheringConfig: {
+            ...state.gatheringConfig,
+            systems: {
+              ...state.gatheringConfig.systems,
+              [systemId]: {
+                ...systemConfig,
+                tasks: systemConfig.tasks.map(task => task.id === taskId ? { ...task, ...updates } : task)
+              }
+            }
+          }
+        };
+      });
+      return true;
+    },
+    duplicateGatheringLibraryTask: (...args) => {
+      calls.push(['duplicateGatheringLibraryTask', ...args]);
+      return { id: 'task-copy', name: 'Gather Moon Herbs (Copy)', dropRows: [] };
+    },
+    deleteGatheringLibraryTask: (...args) => calls.push(['deleteGatheringLibraryTask', ...args])
   };
 }
 
@@ -865,6 +958,24 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Quickstart'));
     assert.equal(target.textContent.includes('Select a system'), false);
     assert.equal(target.querySelectorAll('.manager-v2-setup-card').length, 1);
+  });
+
+  it('shows systems loading instead of the empty systems setup while startup is pending', () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], { noSystems: true, systemsLoading: true }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    assert.ok(target.textContent.includes('Loading crafting systems...'));
+    assert.equal(target.textContent.includes('No crafting systems yet'), false);
+    assert.equal(target.textContent.includes('Set up your first system'), false);
+    assert.ok(target.querySelector('[data-systems-loading]'));
   });
 
   it('toggles systems library row status without selecting the row', async () => {
@@ -1902,11 +2013,268 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
       'true'
     );
 
+    gatheringTabs.find(tab => tab.textContent.includes('Tasks')).click();
+    await tick();
+    flushSync();
+
+    assert.equal(
+      target.querySelector(`.manager-v2-gathering-tab[aria-selected="true"]`).textContent.trim(),
+      'Tasks'
+    );
+    assert.equal(target.querySelectorAll('.manager-v2-gathering-task-row').length, 3);
+    assert.ok(target.textContent.includes('Gather Moon Herbs'));
+    assert.ok(target.textContent.includes('Prospect Crystal Veins'));
+    assert.ok(target.textContent.includes('High Day, Clear Sky'));
+    assert.ok(target.querySelector('[data-gathering-task-inspector]').textContent.includes('Selected gathering task'));
+    assert.equal(
+      target.querySelector('.manager-v2-inspector').textContent.includes('Gathering task actions'),
+      false,
+      'selected gathering task inspector should not duplicate row actions'
+    );
+    assert.equal(
+      target.querySelector('.manager-v2-inspector [aria-label="Edit Gather Moon Herbs"]'),
+      null,
+      'selected gathering task inspector should not render edit action buttons'
+    );
+    assert.equal(
+      target.querySelector('.manager-v2-inspector [aria-label="Duplicate Gather Moon Herbs"]'),
+      null,
+      'selected gathering task inspector should not render duplicate action buttons'
+    );
+    assert.equal(
+      target.querySelector('.manager-v2-inspector [aria-label="Delete Gather Moon Herbs"]'),
+      null,
+      'selected gathering task inspector should not render delete action buttons'
+    );
+    assert.equal(
+      target.querySelector('[data-gathering-task-inspector] .manager-v2-action-group'),
+      null,
+      'selected gathering task identity card should not contain an action group'
+    );
+    assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Nightshade With An Exceptionally Long Localized Component Name x2 (80%)'));
+    assert.equal(target.querySelector('[data-gathering-task-fact="environments"] strong').textContent.trim(), '1');
+
+    const taskSearch = target.querySelector('[data-gathering-tasks-browser] input[type="search"]');
+    taskSearch.value = 'crystal';
+    taskSearch.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(target.querySelectorAll('.manager-v2-gathering-task-row').length, 1);
+    assert.ok(target.textContent.includes('Prospect Crystal Veins'));
+
+    target.querySelector('[data-clear-filters="gathering-tasks"]').click();
+    await tick();
+    flushSync();
+    const taskSelects = target.querySelectorAll('[data-gathering-tasks-browser] .manager-v2-filter select');
+    taskSelects[0].value = 'disabled';
+    taskSelects[0].dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(target.querySelectorAll('.manager-v2-gathering-task-row').length, 1);
+    assert.ok(target.textContent.includes('South Coast Driftwood'));
+
+    target.querySelector('[data-clear-filters="gathering-tasks"]').click();
+    await tick();
+    flushSync();
+    taskSelects[1].value = 'north';
+    taskSelects[1].dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(target.querySelectorAll('.manager-v2-gathering-task-row').length, 2);
+    taskSelects[2].value = 'cavern';
+    taskSelects[2].dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(target.querySelectorAll('.manager-v2-gathering-task-row').length, 1);
+    assert.ok(target.textContent.includes('Prospect Crystal Veins'));
+    target.querySelector('[data-clear-filters="gathering-tasks"]').click();
+    await tick();
+    flushSync();
+    taskSelects[3].value = 'mismatch';
+    taskSelects[3].dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(target.querySelectorAll('.manager-v2-gathering-task-row').length, 2);
+
+    target.querySelector('[data-clear-filters="gathering-tasks"]').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-gathering-task-id="task-herbs"] .manager-v2-status-toggle').click();
+    target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Duplicate Gather Moon Herbs"]').click();
+    target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Delete Gather Moon Herbs"]').click();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[1] === 'alchemy' && call[2] === 'task-herbs' && call[3].enabled === false));
+    assert.ok(calls.some(call => call[0] === 'duplicateGatheringLibraryTask' && call[1] === 'alchemy' && call[2] === 'task-herbs'));
+    assert.ok(calls.some(call => call[0] === 'deleteGatheringLibraryTask' && call[1] === 'alchemy' && call[2] === 'task-herbs'));
+
+    target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'gathering-task-edit');
+    assert.ok(target.querySelector('[data-gathering-task-editor]'));
+    const coreEditor = target.querySelector('[data-gathering-task-core-editor]');
+    assert.ok(coreEditor);
+    assert.equal(coreEditor.querySelector('.manager-v2-link-button'), null);
+    assert.equal(coreEditor.textContent.includes('Back to task library'), false);
+    assert.equal(target.textContent.includes('Task Identity'), false);
+    assert.equal(target.textContent.includes('Internal ID'), false);
+    assert.ok(target.textContent.includes('Edit availability, identity, and drop rules for the selected gathering task.'));
+    assert.ok(target.querySelector('[data-gathering-task-drops-table]'));
+    assert.ok(target.querySelector('[data-gathering-task-drop-inspector]'));
+    assert.equal(target.querySelector('.manager-v2-task-editor-tabs'), null);
+    assert.equal(target.querySelector('[data-gathering-task-summary]'), null);
+    assert.equal(target.querySelector('[data-gathering-task-matching-logic]'), null);
+    assert.ok(target.textContent.includes('Drop chance'));
+    assert.ok(target.textContent.includes('Final chance'));
+    assert.equal(target.querySelector('.manager-v2-task-card-header .manager-v2-drop-count'), null);
+    assert.ok(target.querySelector('.manager-v2-task-drop-footer [data-gathering-task-drop-count]'));
+    const populatedDropRow = target.querySelector('[data-gathering-task-drop-id="drop-nightshade"]');
+    assert.equal(populatedDropRow.querySelector('[data-gathering-task-drop-row-number]'), null);
+    const populatedComponentCell = populatedDropRow.querySelector('[data-gathering-task-drop-component-cell]');
+    assert.ok(populatedComponentCell.querySelector('.manager-v2-gathering-task-thumb'));
+    assert.ok(populatedComponentCell.textContent.includes('Nightshade With An Exceptionally Long Localized Component Name'));
+    assert.equal(
+      populatedComponentCell.querySelector('.manager-v2-system-description').textContent.trim(),
+      'A dusky flowering herb used in careful doses.'
+    );
+    assert.equal(populatedComponentCell.textContent.includes('Unresolved drop'), false);
+    assert.equal(populatedDropRow.textContent.includes('Drop component'), false);
+    assert.equal(populatedDropRow.textContent.includes('Drop chance'), false);
+    assert.equal(populatedDropRow.textContent.includes('Quantity'), false);
+    assert.equal(populatedDropRow.textContent.includes('award'), false);
+    const populatedChanceCell = populatedDropRow.querySelector('[data-gathering-task-drop-chance-cell]');
+    assert.equal(populatedChanceCell.querySelector('strong').textContent.trim(), '80%');
+    assert.ok(populatedChanceCell.querySelector('.manager-v2-drop-rate-tier-track'));
+    assert.ok(populatedChanceCell.querySelector('input[type="range"]').parentElement.classList.contains('manager-v2-drop-rate-control'));
+    const quantityInput = populatedDropRow.querySelector('.manager-v2-drop-quantity-cell input');
+    assert.equal(quantityInput.getAttribute('type'), 'text');
+    assert.equal(quantityInput.getAttribute('inputmode'), 'numeric');
+    assert.equal(quantityInput.getAttribute('pattern'), '[1-9][0-9]*');
+    assert.equal(quantityInput.value, '2');
+    quantityInput.value = 'abc0';
+    quantityInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(quantityInput.value, '');
+    quantityInput.value = '03a';
+    quantityInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.id === 'drop-nightshade' && row.quantity === 3)));
+    const modifierPills = populatedDropRow.querySelectorAll('.manager-v2-drop-modifier-pill');
+    assert.equal(modifierPills.length, 3);
+    assert.ok(Array.from(modifierPills).some(pill => pill.classList.contains('is-positive') && pill.textContent.includes('Deep Night') && pill.textContent.includes('+20%')));
+    assert.ok(Array.from(modifierPills).some(pill => pill.classList.contains('is-negative') && pill.textContent.includes('Clear Sky') && pill.textContent.includes('-15%')));
+    assert.ok(Array.from(modifierPills).some(pill => pill.classList.contains('is-neutral') && pill.textContent.includes('High Day') && pill.textContent.includes('+0%')));
+    const dropActionButtons = populatedDropRow.querySelectorAll('[data-gathering-task-drop-actions] .manager-v2-icon-button');
+    assert.equal(dropActionButtons.length, 2);
+    assert.equal(populatedDropRow.querySelector('[aria-label="Select drop rule"]'), null);
+    assert.equal(populatedDropRow.querySelector('[aria-label="Edit drop rule"]'), null);
+    assert.ok(populatedDropRow.querySelector('[aria-label="Duplicate drop rule"]'));
+    assert.ok(populatedDropRow.querySelector('[aria-label="Delete drop rule"]'));
+    const mediaColumn = coreEditor.querySelector('.manager-v2-task-media-column');
+    const taskImagePicker = coreEditor.querySelector('.manager-v2-task-image-picker');
+    const taskStatus = coreEditor.querySelector('.manager-v2-task-core-status');
+    const taskStatusToggle = taskStatus.querySelector('.manager-v2-status-toggle');
+    assert.equal(mediaColumn.firstElementChild, taskImagePicker);
+    assert.equal(mediaColumn.children[1], taskStatus);
+    assert.equal(taskStatusToggle.tagName, 'BUTTON');
+    assert.equal(taskStatusToggle.querySelector('input'), null);
+    assert.equal(taskStatusToggle.querySelector('.manager-v2-status-toggle-label').textContent.trim(), 'Off');
+    taskStatusToggle.click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[1] === 'alchemy' && call[2] === 'task-herbs' && call[3].enabled === true));
+    assert.equal(taskStatusToggle.querySelector('.manager-v2-status-toggle-label').textContent.trim(), 'On');
+    const taskNameInput = target.querySelector('[data-gathering-task-field="name"]');
+    assert.equal(
+      Boolean(taskNameInput.compareDocumentPosition(taskImagePicker) & Node.DOCUMENT_POSITION_PRECEDING),
+      true,
+      'task name should be positioned after the image column in the core editor'
+    );
+    taskNameInput.value = 'Gather Sun Herbs';
+    taskNameInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].name === 'Gather Sun Herbs'));
+    const timeAvailability = target.querySelector('[data-gathering-task-field="timeOfDay"]');
+    const weatherAvailability = target.querySelector('[data-gathering-task-field="weather"]');
+    assert.equal(timeAvailability.querySelector('select'), null);
+    assert.equal(weatherAvailability.querySelector('select'), null);
+    const timePill = timeAvailability.querySelector('[data-gathering-task-availability-pill="timeOfDay"][data-condition-id="day"]');
+    const weatherPill = weatherAvailability.querySelector('[data-gathering-task-availability-pill="weather"][data-condition-id="clear"]');
+    assert.ok(timePill);
+    assert.ok(timePill.textContent.includes('High Day'));
+    assert.ok(timePill.querySelector('i.fas.fa-sun'));
+    assert.ok(weatherPill);
+    assert.ok(weatherPill.textContent.includes('Clear Sky'));
+    assert.ok(weatherPill.querySelector('i.fas.fa-sun'));
+
+    timeAvailability.querySelector('.manager-v2-availability-menu-button').click();
+    await tick();
+    flushSync();
+    assert.equal(timeAvailability.querySelector('[data-gathering-task-availability-option="timeOfDay"][data-condition-id="day"]'), null);
+    assert.deepEqual(
+      Array.from(timeAvailability.querySelectorAll('[data-gathering-task-availability-option="timeOfDay"]')).map(option => option.textContent.trim()),
+      ['First Light', 'Deep Night']
+    );
+    assert.ok(timeAvailability.querySelector('[data-condition-id="night"] i.fas.fa-moon'));
+    timeAvailability.querySelector('[data-gathering-task-availability-option="timeOfDay"][data-condition-id="night"]').click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && Array.isArray(call[3].timeOfDay) && call[3].timeOfDay.join(',') === 'day,night'));
+    assert.ok(timeAvailability.querySelector('[data-gathering-task-availability-pill="timeOfDay"][data-condition-id="night"]'));
+
+    timeAvailability.querySelector('[data-gathering-task-availability-pill="timeOfDay"][data-condition-id="day"] .manager-v2-availability-remove').click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && Array.isArray(call[3].timeOfDay) && call[3].timeOfDay.length === 1 && call[3].timeOfDay[0] === 'night'));
+
+    weatherAvailability.querySelector('.manager-v2-availability-menu-button').click();
+    await tick();
+    flushSync();
+    assert.equal(weatherAvailability.querySelector('[data-gathering-task-availability-option="weather"][data-condition-id="clear"]'), null);
+    assert.deepEqual(
+      Array.from(weatherAvailability.querySelectorAll('[data-gathering-task-availability-option="weather"]')).map(option => option.textContent.trim()),
+      ['Storm Rain']
+    );
+    assert.ok(weatherAvailability.querySelector('[data-condition-id="heavy-rain"] i.fas.fa-cloud-showers-heavy'));
+    weatherAvailability.querySelector('[data-gathering-task-availability-option="weather"][data-condition-id="heavy-rain"]').click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && Array.isArray(call[3].weather) && call[3].weather.join(',') === 'clear,heavy-rain'));
+
+    weatherAvailability.querySelector('[data-gathering-task-availability-pill="weather"][data-condition-id="clear"] .manager-v2-availability-remove').click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && Array.isArray(call[3].weather) && call[3].weather.length === 1 && call[3].weather[0] === 'heavy-rain'));
+    const inspectorSlider = target.querySelector('[data-gathering-task-drop-inspector] input[type="range"]');
+    inspectorSlider.value = '35';
+    inspectorSlider.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.id === 'drop-nightshade' && row.dropRate === 35)));
+    const chanceSlider = target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] input[type="range"]');
+    chanceSlider.value = '25';
+    chanceSlider.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.id === 'drop-nightshade' && row.dropRate === 25)));
+    target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] [aria-label="Duplicate drop rule"]').click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-gathering-task-reward-rule-notice]'));
+    target.querySelector('.manager-v2-header-actions .manager-v2-button').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'environments');
+    assert.equal(target.querySelector('#manager-v2-gathering-tab-tasks').getAttribute('aria-selected'), 'true');
+
     for (const [label, placeholder] of [
-      ['Tasks', 'Reusable gathering task management is planned for a later slice.'],
       ['Hazards', 'Reusable hazard authoring is planned for a later slice.']
     ]) {
-      gatheringTabs.find(tab => tab.textContent.includes(label)).click();
+      Array.from(target.querySelectorAll('.manager-v2-gathering-tab'))
+        .find(tab => tab.textContent.includes(label))
+        .click();
       await tick();
       flushSync();
 
@@ -1919,7 +2287,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
       assert.equal(target.querySelector('.manager-v2-environments-table'), null);
       assert.equal(
         target.querySelector('.manager-v2-inspector [data-gathering-inspector-placeholder] h2').textContent.trim(),
-        label === 'Tasks' ? 'Gathering tasks' : label === 'Hazards' ? 'Gathering hazards' : 'Gathering settings'
+        label === 'Hazards' ? 'Gathering hazards' : 'Gathering settings'
       );
       assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes(placeholder));
       assert.equal(
@@ -1928,7 +2296,9 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
       );
     }
 
-    gatheringTabs.find(tab => tab.textContent.includes('Settings')).click();
+    Array.from(target.querySelectorAll('.manager-v2-gathering-tab'))
+      .find(tab => tab.textContent.includes('Settings'))
+      .click();
     await tick();
     flushSync();
     assert.equal(
@@ -1937,7 +2307,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     );
     assert.equal(target.querySelector('.manager-v2-toolbar'), null);
     assert.equal(target.querySelector('.manager-v2-environments-table'), null);
-    assert.ok(target.textContent.includes('Set system-level d100 reward and hazard rules for gathering.'));
+    assert.ok(target.textContent.includes('Set system-level drop resolution and hazard rules for gathering.'));
     assert.equal(target.querySelectorAll('[data-gathering-condition-panel]').length, 2);
     assert.equal(target.querySelectorAll('[data-gathering-vocabulary-panel]').length, 2);
     assert.ok(target.querySelector('[data-gathering-condition-panel="timeOfDay"]'));
@@ -1948,8 +2318,8 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Weather conditions'));
     assert.ok(target.textContent.includes('Regions'));
     assert.ok(target.textContent.includes('Biomes'));
-    assert.ok(target.textContent.includes('These values control current time matching for reusable tasks and hazards.'));
-    assert.ok(target.textContent.includes('These values control current weather matching for reusable tasks and hazards.'));
+    assert.ok(target.textContent.includes('These values control current time matching for gathering tasks and hazards.'));
+    assert.ok(target.textContent.includes('These values control current weather matching for gathering tasks and hazards.'));
     assert.ok(target.textContent.includes('Environments use one region. Labels can be renamed without changing ids.'));
     assert.ok(target.textContent.includes('Environments can use multiple biomes. Left-click the coloured icon to edit icon; right-click to edit colour.'));
     assert.equal(target.querySelectorAll('.manager-v2-condition-add input').length, 4);
@@ -2090,7 +2460,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     biomeColorTrigger.getBoundingClientRect = originalBiomeTriggerRect;
     assert.equal(target.querySelector('.manager-v2-gathering-settings-summary'), null);
     assert.equal(target.querySelector('[data-gathering-rule-fact]'), null);
-    assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Choose which successful d100 reward rows are granted.'));
+    assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Choose which successful drop rows are granted.'));
     assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Choose which matching hazards are applied after a gathering roll.'));
     assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Decide whether selected hazards still allow the gathering attempt to succeed.'));
     const rewardsSelect = target.querySelector('#manager-v2-gathering-rule-rewards');
@@ -2204,6 +2574,145 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(calls.some(call => call[0] === 'saveEnvironmentDraft'));
   });
 
+  it('edits gathering task drop rules from unresolved row through inspector modifiers', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls),
+        services: {
+          openCurrentAdmin: () => {},
+          importSingleManagedItemFromDrop: async () => ({ id: 'c2', name: 'Glass Vial' })
+        }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    target.querySelector('#manager-v2-gathering-tab-tasks').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]').click();
+    await tick();
+    flushSync();
+
+    Array.from(target.querySelectorAll('.manager-v2-task-card-header .manager-v2-button'))
+      .find(button => button.textContent.includes('Add drop rule'))
+      .click();
+    await tick();
+    flushSync();
+
+    const addCall = calls.findLast(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.componentId === '' && row.dropRate === 25 && row.enabled === false));
+    assert.ok(addCall, 'add drop should persist an unresolved selected drop row');
+    const addedRow = addCall[3].dropRows.find(row => row.componentId === '');
+    const addedDropRow = target.querySelector(`[data-gathering-task-drop-id="${addedRow.id}"]`);
+    assert.ok(addedDropRow.querySelector('[data-gathering-task-drop-zone]'));
+    assert.ok(addedDropRow.textContent.includes('No Component'));
+    assert.ok(addedDropRow.textContent.includes('Create or assign'));
+    assert.equal(addedDropRow.textContent.includes('Drop component'), false);
+    assert.equal(addedDropRow.textContent.includes('Drop chance'), false);
+    assert.equal(addedDropRow.textContent.includes('Quantity'), false);
+    assert.equal(addedDropRow.querySelector('[aria-label="Select drop rule"]'), null);
+    target.querySelector('[data-gathering-task-drop-id="drop-nightshade"]').click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-gathering-task-drop-inspector]').textContent.includes('Nightshade With An Exceptionally Long Localized Component Name'));
+    addedDropRow.click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('[data-gathering-task-drop-inspector] select').value, '');
+    target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] [aria-label="Duplicate drop rule"]')
+      .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] [aria-label="Delete drop rule"]')
+      .dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }));
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('[data-gathering-task-drop-inspector] select').value, '');
+
+    const componentSelect = target.querySelector('[data-gathering-task-drop-inspector] select');
+    componentSelect.value = 'c2';
+    componentSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.some(row => row.id === addedRow.id && row.componentId === 'c2' && row.enabled === true)));
+
+    const inspectorSlider = target.querySelector('[data-gathering-task-drop-inspector] input[type="range"]');
+    inspectorSlider.value = '100';
+    inspectorSlider.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+
+    const addModifierButtons = target.querySelectorAll('[data-gathering-task-drop-inspector] .manager-v2-drop-editor-modifier-group .manager-v2-icon-button');
+    addModifierButtons[1].click();
+    await tick();
+    flushSync();
+    const weatherModifierInput = target.querySelector('[data-gathering-drop-modifier-kind="weather"] [aria-label="Modifier value"]');
+    weatherModifierInput.value = '20';
+    weatherModifierInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-gathering-task-drop-fact="final-chance"]').textContent.includes('100%'));
+
+    weatherModifierInput.value = '-150';
+    weatherModifierInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-gathering-task-drop-fact="final-chance"]').textContent.includes('0%'));
+
+    target.querySelector(`[data-gathering-task-drop-id="${addedRow.id}"] [aria-label="Duplicate drop rule"]`).click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.filter(row => row.componentId === 'c2').length >= 2));
+    target.querySelector(`[data-gathering-task-drop-id="${addedRow.id}"] [aria-label="Delete drop rule"]`).click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].dropRows?.every(row => row.id !== addedRow.id)));
+  });
+
+  it('paginates gathering task editor drop rules without snapping back to the selected row', async () => {
+    const dropRows = Array.from({ length: 12 }, (_, index) => ({
+      id: `drop-page-${index + 1}`,
+      componentId: index % 2 === 0 ? 'c1' : 'c3',
+      quantity: 1,
+      dropRate: 10 + index,
+      enabled: true
+    }));
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], { taskDropRows: dropRows }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    target.querySelector('#manager-v2-gathering-tab-tasks').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]').click();
+    await tick();
+    flushSync();
+
+    assert.ok(target.querySelector('[data-gathering-task-drop-id="drop-page-1"]'));
+    assert.equal(target.querySelector('[data-pagination-page]').textContent.trim(), 'Page 1 of 2');
+    target.querySelector('[data-pagination-next]').click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('[data-pagination-page]').textContent.trim(), 'Page 2 of 2');
+    assert.equal(target.querySelector('[data-gathering-task-drop-id="drop-page-1"]'), null);
+    assert.ok(target.querySelector('[data-gathering-task-drop-id="drop-page-11"]'));
+  });
+
   it('shows setup guidance and keeps create routing when a gathering system has no environments', async () => {
     const calls = [];
     target = document.createElement('div');
@@ -2229,13 +2738,13 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     );
     assert.equal(target.querySelector('#manager-v2-gathering-tab-environments').getAttribute('aria-selected'), 'true');
     assert.ok(target.textContent.includes('Prepare gathering building blocks first'));
-    assert.ok(target.textContent.includes('Define reusable tasks and hazards before creating environments'));
+    assert.ok(target.textContent.includes('Define gathering tasks and hazards before creating environments'));
     assert.ok(target.textContent.includes('Review tasks'));
     assert.ok(target.textContent.includes('Review hazards'));
     assert.ok(target.textContent.includes('Plan gathering content'));
-    assert.ok(target.textContent.includes('Define reusable gathering tasks with their checks'));
+    assert.ok(target.textContent.includes('Define gathering tasks with their checks'));
     assert.ok(target.textContent.includes('Prepare encounter and hazard options'));
-    assert.ok(target.textContent.includes('Create environments after the reusable task and hazard libraries are ready to attach.'));
+    assert.ok(target.textContent.includes('Create environments after the gathering task and hazard libraries are ready to attach.'));
     assert.ok(target.textContent.includes('Gathering docs'));
     assert.equal(target.textContent.includes('Select an environment'), false);
 
@@ -2246,11 +2755,9 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     flushSync();
 
     assert.equal(target.querySelector('#manager-v2-gathering-tab-tasks').getAttribute('aria-selected'), 'true');
-    assert.ok(target.textContent.includes('Reusable gathering task management is planned for a later slice.'));
-    assert.equal(
-      target.querySelector('.manager-v2-inspector [data-gathering-inspector-placeholder]').getAttribute('data-gathering-inspector-placeholder'),
-      'tasks'
-    );
+    assert.ok(target.textContent.includes('Gather Moon Herbs'));
+    assert.ok(target.querySelector('[data-gathering-tasks-browser]'));
+    assert.ok(target.querySelector('[data-gathering-task-inspector]'));
     assert.equal(target.querySelector('.manager-v2-inspector').textContent.includes('Plan gathering content'), false);
 
     target.querySelector('#manager-v2-gathering-tab-environments').click();
@@ -2276,6 +2783,35 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
 
     assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'environment-edit');
     assert.ok(calls.some(call => call[0] === 'createEnvironmentDraft'));
+  });
+
+  it('shows create guidance when the gathering task library is empty', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { emptyGatheringTasks: true }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    target.querySelector('#manager-v2-gathering-tab-tasks').click();
+    await tick();
+    flushSync();
+
+    assert.ok(target.textContent.includes('No gathering tasks yet'));
+    assert.ok(target.textContent.includes('Create gathering tasks before attaching them to environments.'));
+    target.querySelector('[data-gathering-tasks-browser] .manager-v2-button.is-primary').click();
+    await tick();
+    flushSync();
+
+    assert.deepEqual(calls.find(call => call[0] === 'addGatheringLibraryTask'), ['addGatheringLibraryTask', 'alchemy']);
   });
 
   it('shows setup guidance and keeps create routing when a system has no recipes', async () => {

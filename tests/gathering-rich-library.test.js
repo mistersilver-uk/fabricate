@@ -325,11 +325,39 @@ test('environment task and hazard toggles preserve mixed-case library IDs', asyn
   assert.deepEqual(composed.hazards.map(hazard => hazard.id), ['hazard-other']);
 });
 
-test('d100 drop-row save validation rejects missing dropRate and non-positive quantity', () => {
+test('d100 drop-row save validation accepts zero chance and rejects invalid dropRate values', () => {
   const store = makeEnvironmentStore();
+
+  const zeroRate = store.validate(environment({
+    tasks: [{
+      id: 'd100-zero',
+      name: 'Valid Zero D100',
+      enabled: true,
+      resolutionMode: 'd100',
+      dropRows: [{ id: 'zero-rate', componentId: 'herb', quantity: 1, dropRate: 0 }]
+    }]
+  }));
+  assert.equal(zeroRate.valid, true);
+
+  const unresolvedDisabled = store.validate(environment({
+    tasks: [{
+      id: 'd100-unresolved-authoring-row',
+      name: 'Valid With Unresolved Authoring Row',
+      enabled: true,
+      resolutionMode: 'd100',
+      dropRows: [
+        { id: 'ready-row', componentId: 'herb', quantity: 1, dropRate: 50 },
+        { id: 'unresolved-row', componentId: '', itemUuid: '', quantity: 1, dropRate: 25, enabled: false }
+      ]
+    }]
+  }));
+  assert.equal(unresolvedDisabled.valid, true);
 
   for (const row of [
     { id: 'missing-rate', componentId: 'herb', quantity: 1 },
+    { id: 'negative-rate', componentId: 'herb', quantity: 1, dropRate: -1 },
+    { id: 'overflow-rate', componentId: 'herb', quantity: 1, dropRate: 101 },
+    { id: 'fractional-rate', componentId: 'herb', quantity: 1, dropRate: 20.5 },
     { id: 'zero-quantity', componentId: 'herb', quantity: 0, dropRate: 50 }
   ]) {
     const result = store.validate(environment({
@@ -634,6 +662,97 @@ test('d100 resolution applies numeric task and hazard modifier providers', () =>
   assert.equal(result.status, 'succeeded');
   assert.deepEqual(result.items.map(row => [row.id, row.effectiveRoll, row.modifier]), [['drop-modified', 91, 1]]);
   assert.deepEqual(result.hazards.map(row => [row.id, row.effectiveRoll, row.modifier]), [['hazard-modified', 91, 1]]);
+});
+
+test('drop resolution applies matching weather and time modifiers and ignores non-matches', () => {
+  const { service } = makeRichState({ rolls: [100, 100] });
+  const result = service.resolveD100Attempt({
+    task: {
+      id: 'task-conditions',
+      dropRows: [
+        {
+          id: 'drop-bonus',
+          componentId: 'herb',
+          quantity: 1,
+          dropRate: 80,
+          conditionModifiers: {
+            weather: [
+              { id: 'rain-bonus', conditionId: 'rain', value: 25 },
+              { id: 'clear-ignored', conditionId: 'clear', value: -50 }
+            ],
+            timeOfDay: [{ id: 'night-penalty', conditionId: 'night', value: -10 }]
+          }
+        },
+        {
+          id: 'drop-clamped',
+          componentId: 'herb',
+          quantity: 1,
+          dropRate: 95,
+          conditionModifiers: {
+            weather: [{ id: 'rain-bonus', conditionId: 'rain', value: 25 }],
+            timeOfDay: []
+          }
+        }
+      ]
+    },
+    environment: {
+      conditions: { weather: 'rain', timeOfDay: 'night' },
+      rules: { rewardSelectionMode: 'allDrops' }
+    }
+  });
+
+  assert.deepEqual(result.items.map(row => [row.id, row.conditionModifier, row.finalDropRate]), [
+    ['drop-bonus', 15, 95],
+    ['drop-clamped', 25, 100]
+  ]);
+});
+
+test('drop resolution clamps negative condition modifiers at zero drop chance', () => {
+  const { service } = makeRichState({ rolls: [100] });
+  const result = service.resolveD100Attempt({
+    task: {
+      id: 'task-zero',
+      dropRows: [{
+        id: 'drop-zero',
+        componentId: 'herb',
+        quantity: 1,
+        dropRate: 5,
+        conditionModifiers: {
+          weather: [{ id: 'rain-penalty', conditionId: 'rain', value: -20 }]
+        }
+      }]
+    },
+    environment: {
+      conditions: { weather: 'rain', timeOfDay: 'day' },
+      rules: { rewardSelectionMode: 'allDrops' }
+    }
+  });
+
+  assert.deepEqual(result.items, []);
+});
+
+test('gathering start validation accepts zero drop chance rows', async () => {
+  const { service } = makeRichState({
+    rolls: [100],
+    config: {
+      systems: {
+        'system-a': {
+          tasks: [{
+            id: 'task-zero-chance',
+            name: 'Zero Chance Forage',
+            dropRows: [{ id: 'drop-zero', componentId: 'herb', quantity: 1, dropRate: 0 }]
+          }]
+        }
+      }
+    }
+  });
+  const calls = {};
+  const engine = makeEngine({ richState: service, calls });
+
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-zero-chance' });
+
+  assert.equal(result.accepted, true);
+  assert.deepEqual(calls.terminal[0].payload.checkResult.items, []);
 });
 
 test('timed d100 runs complete from their start-time library snapshot after conditions and rules change', async () => {

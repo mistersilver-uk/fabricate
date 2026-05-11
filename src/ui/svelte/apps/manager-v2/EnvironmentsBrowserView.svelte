@@ -6,6 +6,7 @@
   import IconPicker from '../../components/IconPicker.svelte';
   import ManagerV2ColorPicker from '../../components/ManagerV2ColorPicker.svelte';
   import ManagerV2ColorPopover from '../../components/ManagerV2ColorPopover.svelte';
+  import GatheringTasksBrowserView from './GatheringTasksBrowserView.svelte';
 
   let {
     environments = [],
@@ -21,7 +22,15 @@
     sceneOptions = [],
     shouldUseEnvironmentDraftForDisplay = false,
     activeGatheringTab = 'environments',
+    selectedTaskId = '',
+    managedItemOptions = [],
     onSelectGatheringTab = () => {},
+    onSelectGatheringTask = () => {},
+    onCreateGatheringTask = () => {},
+    onEditGatheringTask = () => {},
+    onDuplicateGatheringTask = () => {},
+    onDeleteGatheringTask = () => {},
+    onToggleGatheringTaskEnabled = () => {},
     onSelectEnvironment = () => {},
     onEditEnvironment = () => {},
     onCreateEnvironment = () => {},
@@ -74,10 +83,10 @@
       labelKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Tasks',
       labelFallback: 'Tasks',
       icon: 'fas fa-list-check',
-      titleKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksPlaceholderTitle',
-      titleFallback: 'Gathering tasks',
-      hintKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksPlaceholderHint',
-      hintFallback: 'Reusable gathering task management is planned for a later slice.'
+      titleKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksTitle',
+      titleFallback: 'Gathering Tasks',
+      hintKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksHint',
+      hintFallback: 'Browse gathering tasks before attaching them to environments.'
     },
     {
       id: 'encounters',
@@ -97,7 +106,7 @@
       titleKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderTitle',
       titleFallback: 'Gathering settings',
       hintKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderHint',
-      hintFallback: 'Set system-level d100 reward and hazard rules for gathering.'
+      hintFallback: 'Set system-level drop resolution and hazard rules for gathering.'
     }
   ];
 
@@ -287,8 +296,8 @@
 
   function conditionHint(kind) {
     return kind === 'timeOfDay'
-      ? text('FABRICATE.Admin.ManagerV2.Environment.Conditions.TimeOfDayHint', 'These values control current time matching for reusable tasks and hazards.')
-      : text('FABRICATE.Admin.ManagerV2.Environment.Conditions.WeatherHint', 'These values control current weather matching for reusable tasks and hazards.');
+      ? text('FABRICATE.Admin.ManagerV2.Environment.Conditions.TimeOfDayHint', 'These values control current time matching for gathering tasks and hazards.')
+      : text('FABRICATE.Admin.ManagerV2.Environment.Conditions.WeatherHint', 'These values control current weather matching for gathering tasks and hazards.');
   }
 
   function conditionInputPlaceholder(kind) {
@@ -673,7 +682,7 @@
             <div>
               <i class="fas fa-seedling" aria-hidden="true"></i>
               <h3>{text('FABRICATE.Admin.ManagerV2.Environment.EmptyTitle', 'Prepare gathering building blocks first')}</h3>
-              <p>{text('FABRICATE.Admin.ManagerV2.Environment.EmptyHint', 'Define reusable tasks and hazards before creating environments, then attach those building blocks to each location players can gather from.')}</p>
+              <p>{text('FABRICATE.Admin.ManagerV2.Environment.EmptyHint', 'Define gathering tasks and hazards before creating environments, then attach those building blocks to each location players can gather from.')}</p>
               <div class="manager-v2-action-group">
                 <button type="button" class="manager-v2-button is-primary" onclick={onCreateEnvironment}>
                   <i class="fas fa-plus" aria-hidden="true"></i>
@@ -788,6 +797,21 @@
         onPageSizeChange={(next) => { pageSize = next; pageIndex = 0; }}
       />
     </div>
+  {:else if activeGatheringTab === 'tasks'}
+    <GatheringTasksBrowserView
+      tasks={selectedGatheringSystemConfig.tasks || []}
+      environments={environmentList}
+      {selectedTaskId}
+      {selectedSystemId}
+      {gatheringConfig}
+      {managedItemOptions}
+      onSelectTask={onSelectGatheringTask}
+      onCreateTask={onCreateGatheringTask}
+      onEditTask={onEditGatheringTask}
+      onDuplicateTask={onDuplicateGatheringTask}
+      onDeleteTask={onDeleteGatheringTask}
+      onToggleTaskEnabled={onToggleGatheringTaskEnabled}
+    />
   {:else if activeGatheringTab === 'settings'}
     <div
       class="manager-v2-gathering-panel manager-v2-gathering-settings"

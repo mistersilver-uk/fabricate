@@ -255,6 +255,7 @@ function _buildManagedItemOptions(managedItems = []) {
     id: item.id,
     name: item.name,
     img: item.img || 'icons/svg/item-bag.svg',
+    description: _plainTextDescription(item.description),
     ...(item.sourceItemUuid ? { sourceItemUuid: item.sourceItemUuid } : {}),
     ...(item.sourceUuid ? { sourceUuid: item.sourceUuid } : {}),
     ...(Object.prototype.hasOwnProperty.call(item, 'difficulty') ? { difficulty: item.difficulty } : {})
@@ -441,9 +442,32 @@ function _normalizeGatheringDropRow(row = {}, randomID = () => Math.random().toS
     componentId: String(row.componentId || row.systemItemId || ''),
     itemUuid: String(row.itemUuid || ''),
     quantity: Number.isFinite(Number(row.quantity)) && Number(row.quantity) > 0 ? Number(row.quantity) : 1,
-    dropRate: Number.isFinite(Number(row.dropRate)) ? Math.min(100, Math.max(1, Math.floor(Number(row.dropRate)))) : 1,
+    dropRate: Number.isFinite(Number(row.dropRate)) ? Math.min(100, Math.max(0, Math.floor(Number(row.dropRate)))) : 1,
+    conditionModifiers: _normalizeGatheringDropConditionModifiers(row.conditionModifiers),
     enabled: row.enabled !== false
   };
+}
+
+function _normalizeGatheringDropConditionModifiers(modifiers = {}) {
+  return {
+    timeOfDay: _normalizeGatheringDropConditionModifierList(modifiers?.timeOfDay),
+    weather: _normalizeGatheringDropConditionModifierList(modifiers?.weather)
+  };
+}
+
+function _normalizeGatheringDropConditionModifierList(values = []) {
+  return (Array.isArray(values) ? values : [])
+    .map((modifier, index) => {
+      const conditionId = _normalizeGatheringConditionId(modifier?.conditionId ?? modifier?.id);
+      const value = Number(modifier?.value);
+      if (!conditionId || !Number.isFinite(value)) return null;
+      return {
+        id: String(modifier?.id || `${conditionId}-${index + 1}`),
+        conditionId,
+        value: Math.trunc(value)
+      };
+    })
+    .filter(Boolean);
 }
 
 function _normalizeGatheringTask(task = {}, randomID = () => Math.random().toString(36).slice(2, 10)) {
@@ -1167,11 +1191,14 @@ function _buildEssenceCards(essenceDefinitions, managedItems, managedItemOptions
   const managedItemById = new Map(managedItemOptions.map(item => [item.id, item]));
   return essenceDefinitions.map(def => {
     const sourceComponentId = _sourceComponentIdForEssence(def, managedItemById);
-    const associatedItem = managedItemById.get(sourceComponentId) || null;
-    const sourceItemUuid = def.sourceItemUuid || associatedItem?.sourceItemUuid || associatedItem?.sourceUuid || null;
+    const sourceItem = managedItemById.get(sourceComponentId) || null;
+    const associatedItem = sourceItem
+      ? { id: sourceItem.id, name: sourceItem.name, img: sourceItem.img }
+      : null;
+    const sourceItemUuid = def.sourceItemUuid || sourceItem?.sourceItemUuid || sourceItem?.sourceUuid || null;
     const componentUsageCount = _essenceUsageCount(def.id, managedItems);
     const componentUsageItems = _essenceUsageItems(def.id, managedItems);
-    const sourceState = _essenceSourceState({ sourceComponentId, sourceItemUuid, associatedItem });
+    const sourceState = _essenceSourceState({ sourceComponentId, sourceItemUuid, associatedItem: sourceItem });
     return {
       ...def,
       icon: normalizeEssenceIcon(def.icon || DEFAULT_ESSENCE_ICON),
@@ -1358,10 +1385,13 @@ export function createAdminStore(services) {
   const environmentValidationState = writable(null);
   let environmentValidationAttempt = 0;
   let dirtyEnvironmentDiscardConfirmation = null;
+  let unsubscribeFabricateReady = null;
+  let readyRefreshScheduled = false;
 
   // --- Computed state ---
   const viewState = writable({
     systems: [],
+    systemsLoading: false,
     hasSystem: false,
     selectedSystemName: '',
     selectedSystem: null,
@@ -1538,15 +1568,15 @@ export function createAdminStore(services) {
   async function _confirmGatheringLibraryRecordDelete({ config, systemId, record, kind }) {
     const usages = _gatheringLibraryRecordUsages(config, systemId, record, kind);
     if (usages.length === 0) return true;
-    const label = kind === 'hazard' ? 'hazard' : 'task';
+    const label = kind === 'hazard' ? 'reusable gathering hazard' : 'gathering task';
     const usageList = usages
       .slice(0, 6)
       .map(usage => `<li>${_escapeHtml(usage.name)}</li>`)
       .join('');
     const overflow = usages.length > 6 ? `<li>${_escapeHtml(`and ${usages.length - 6} more`)}</li>` : '';
     return await services.confirmDialog?.({
-      title: `Delete reusable gathering ${label}?`,
-      content: `<p>Delete reusable gathering ${label} <strong>${_escapeHtml(record?.name || record?.id || label)}</strong>?</p><p>This ${label} is currently used by ${usages.length} environment(s):</p><ul>${usageList}${overflow}</ul>`,
+      title: `Delete ${label}?`,
+      content: `<p>Delete ${label} <strong>${_escapeHtml(record?.name || record?.id || label)}</strong>?</p><p>This ${label} is currently used by ${usages.length} environment(s):</p><ul>${usageList}${overflow}</ul>`,
       yes: () => true,
       no: () => false
     }) === true;
@@ -1587,6 +1617,45 @@ export function createAdminStore(services) {
     const systemManager = services.getCraftingSystemManager();
     const selectedSystem = systemManager?.getSystem?.(get(selectedSystemId)) || null;
     return _buildManagedItemOptions(_getManagedItems(selectedSystem));
+  }
+
+  function _managerReady(manager) {
+    return !!manager && (manager.initialized === true || manager.initialized === undefined);
+  }
+
+  function _fabricateReady(systemManager, recipeManager) {
+    if (typeof services.isFabricateReady === 'function') {
+      return services.isFabricateReady() === true;
+    }
+    return _managerReady(systemManager) && _managerReady(recipeManager);
+  }
+
+  function _publishSystemsLoading() {
+    viewState.update(prev => ({
+      ...prev,
+      systemsLoading: true,
+      hasSystem: prev.systems.length > 0 ? prev.hasSystem : false,
+      selectedSystemName: prev.systems.length > 0 ? prev.selectedSystemName : '',
+      selectedSystem: prev.systems.length > 0 ? prev.selectedSystem : null,
+      itemCards: [],
+      essenceCards: prev.systems.length > 0 ? prev.essenceCards : [],
+      recipes: [],
+      recipeCategories: [],
+      showVisibilitySummary: false,
+      recipeSearchTerm: get(recipeSearch),
+      itemSearchTerm: get(itemSearch)
+    }));
+  }
+
+  function _scheduleReadyRefresh() {
+    if (readyRefreshScheduled) return;
+    if (typeof services.onFabricateReady !== 'function') return;
+    readyRefreshScheduled = true;
+    unsubscribeFabricateReady = services.onFabricateReady(async () => {
+      readyRefreshScheduled = false;
+      unsubscribeFabricateReady = null;
+      await refresh();
+    });
   }
 
   function _newEnvironmentResultGroup(existingGroups = []) {
@@ -1760,7 +1829,11 @@ export function createAdminStore(services) {
   async function refresh() {
     const systemManager = services.getCraftingSystemManager();
     const recipeManager = services.getRecipeManager();
-    if (!systemManager || !recipeManager) return;
+    if (!_fabricateReady(systemManager, recipeManager)) {
+      _publishSystemsLoading();
+      _scheduleReadyRefresh();
+      return;
+    }
 
     const allSystems = systemManager.getSystems();
     const currentSystemId = get(selectedSystemId);
@@ -1806,7 +1879,10 @@ export function createAdminStore(services) {
         : [];
       const essenceDefinitions = rawEssenceDefinitions.map(def => {
         const sourceComponentId = _sourceComponentIdForEssence(def, managedItemById);
-        const associatedItem = managedItemById.get(sourceComponentId) || null;
+        const sourceItem = managedItemById.get(sourceComponentId) || null;
+        const associatedItem = sourceItem
+          ? { id: sourceItem.id, name: sourceItem.name, img: sourceItem.img }
+          : null;
         return {
           ...def,
           sourceComponentId,
@@ -1845,6 +1921,7 @@ export function createAdminStore(services) {
     viewState.update(prev => ({
       ...prev,
       systems: systemList,
+      systemsLoading: false,
       hasSystem: !!selectedSystem,
       selectedSystemName: selectedSystem?.name || '',
       selectedSystem: selectedSystemData,
@@ -1890,6 +1967,7 @@ export function createAdminStore(services) {
     viewState.update(prev => ({
       ...prev,
       systems: systemList,
+      systemsLoading: false,
       hasSystem: !!selectedSystem,
       selectedSystemName: selectedSystem?.name || '',
       selectedSystem: selectedSystemData,
@@ -3336,7 +3414,7 @@ export function createAdminStore(services) {
     const firstComponent = _selectedManagedItemOptions()[0];
     const task = _normalizeGatheringTask({
       id: _randomID(),
-      name: services.localize?.('FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask') || 'Reusable gathering task',
+      name: services.localize?.('FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask') || 'New Gathering Task',
       dropRows: [{
         id: _randomID(),
         componentId: firstComponent?.id || '',
@@ -3372,6 +3450,26 @@ export function createAdminStore(services) {
     await _saveGatheringConfig(config);
     await refresh();
     return true;
+  }
+
+  async function duplicateGatheringLibraryTask(systemId = get(selectedSystemId), taskId) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig || !taskId) return null;
+    const task = systemConfig.tasks.find(task => task.id === taskId);
+    if (!task) return null;
+    const copySuffix = services.localize?.('FABRICATE.Admin.ManagerV2.Environment.Tasks.CopySuffix') || 'Copy';
+    const duplicate = _normalizeGatheringTask({
+      ..._clonePlain(task),
+      id: _randomID(),
+      name: `${task.name || 'Gather'} (${copySuffix})`,
+      dropRows: (Array.isArray(task.dropRows) ? task.dropRows : [])
+        .map(row => ({ ..._clonePlain(row), id: _randomID() }))
+    }, _randomID);
+    systemConfig.tasks = [...systemConfig.tasks, duplicate];
+    await _saveGatheringConfig(config);
+    await refresh();
+    return duplicate;
   }
 
   async function addGatheringLibraryHazard(systemId = get(selectedSystemId)) {
@@ -3712,7 +3810,9 @@ export function createAdminStore(services) {
   }
 
   function destroy() {
-    // No-op for now — hook cleanup would go here
+    unsubscribeFabricateReady?.();
+    unsubscribeFabricateReady = null;
+    readyRefreshScheduled = false;
   }
 
   // Trigger initial computation
@@ -3796,6 +3896,7 @@ export function createAdminStore(services) {
     addGatheringLibraryTask,
     updateGatheringLibraryTask,
     deleteGatheringLibraryTask,
+    duplicateGatheringLibraryTask,
     addGatheringLibraryHazard,
     updateGatheringLibraryHazard,
     deleteGatheringLibraryHazard,

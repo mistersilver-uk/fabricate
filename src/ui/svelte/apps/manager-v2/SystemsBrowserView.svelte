@@ -11,7 +11,8 @@
     onEditSystem = () => {},
     onExportSystem = () => {},
     onDeleteSystem = () => {},
-    onToggleSystemEnabled = () => {}
+    onToggleSystemEnabled = () => {},
+    systemsLoading = false
   } = $props();
 
   let searchTerm = $state('');
@@ -121,7 +122,15 @@
   </section>
 
   <section class="manager-v2-table-scroll" aria-label={text('FABRICATE.Admin.ManagerV2.SystemsTable', 'Crafting systems table')}>
-    {#if (systems || []).length === 0}
+    {#if systemsLoading}
+      <div class="manager-v2-empty" data-systems-loading>
+        <div>
+          <i class="fas fa-spinner" aria-hidden="true"></i>
+          <h3>{text('FABRICATE.Admin.ManagerV2.LoadingSystems', 'Loading crafting systems...')}</h3>
+          <p>{text('FABRICATE.Admin.ManagerV2.LoadingSystemsHint', 'Fabricate is finishing startup before the system library is shown.')}</p>
+        </div>
+      </div>
+    {:else if (systems || []).length === 0}
       <div class="manager-v2-empty">
         <div>
           <i class="fas fa-layer-group" aria-hidden="true"></i>
