@@ -26,6 +26,7 @@
   let pageIndex = $state(0);
   let pageSize = $state(10);
   let lastTaskId = $state('');
+  let openAvailabilityMenu = $state('');
 
   const dropRows = $derived(Array.isArray(task?.dropRows) ? task.dropRows : []);
   const normalizedSearchTerm = $derived(searchTerm.trim().toLowerCase());
@@ -47,6 +48,7 @@
     if (task?.id === lastTaskId) return;
     searchTerm = '';
     pageIndex = 0;
+    openAvailabilityMenu = '';
     lastTaskId = task?.id || '';
   });
 
@@ -75,13 +77,64 @@
     return String(option?.label || option?.id || option || '').trim();
   }
 
-  function selectedCondition(kind) {
-    const values = kind === 'weather' ? task?.weather : task?.timeOfDay;
-    return Array.isArray(values) && values.length > 0 ? String(values[0]) : '';
+  function conditionIcon(option) {
+    return String(option?.icon || 'fas fa-circle').trim();
   }
 
-  function updateAvailability(kind, value) {
-    onUpdateTask({ [kind]: value ? [value] : [] });
+  function conditionOptions(kind) {
+    return kind === 'weather' ? weatherOptions : timeOfDayOptions;
+  }
+
+  function selectedConditionIds(kind) {
+    const values = kind === 'weather' ? task?.weather : task?.timeOfDay;
+    return Array.isArray(values)
+      ? values.map(value => String(value || '').trim()).filter(Boolean)
+      : [];
+  }
+
+  function selectedConditionOptions(kind) {
+    const selectedIds = selectedConditionIds(kind);
+    return selectedIds.map(id => (conditionOptions(kind) || []).find(option => conditionId(option) === id) || { id, label: id });
+  }
+
+  function availableConditionOptions(kind) {
+    const selectedIds = new Set(selectedConditionIds(kind));
+    return (conditionOptions(kind) || []).filter(option => {
+      const id = conditionId(option);
+      return id && !selectedIds.has(id);
+    });
+  }
+
+  function availabilityMenuLabel(kind) {
+    const available = availableConditionOptions(kind);
+    if (available.length === 0) {
+      return kind === 'weather'
+        ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AllWeatherSelected', 'All weather selected')
+        : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AllTimesSelected', 'All times selected');
+    }
+    return kind === 'weather'
+      ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AddWeatherCondition', 'Add weather')
+      : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AddTimeOfDayCondition', 'Add time of day');
+  }
+
+  function emptyAvailabilityLabel(kind) {
+    return kind === 'weather'
+      ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyWeatherTitle', 'Any Weather')
+      : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyTimeTitle', 'Any Time');
+  }
+
+  function addAvailability(kind, id) {
+    const normalizedId = String(id || '').trim();
+    if (!normalizedId) return;
+    const selectedIds = selectedConditionIds(kind);
+    if (selectedIds.includes(normalizedId)) return;
+    onUpdateTask({ [kind]: [...selectedIds, normalizedId] });
+    openAvailabilityMenu = '';
+  }
+
+  function removeAvailability(kind, id) {
+    const normalizedId = String(id || '').trim();
+    onUpdateTask({ [kind]: selectedConditionIds(kind).filter(value => value !== normalizedId) });
   }
 
   function componentLabel(row) {
@@ -181,24 +234,60 @@
         </div>
       </div>
       <div class="manager-v2-task-availability-row" data-gathering-task-availability>
-        <label class="manager-v2-field" data-gathering-task-field="timeOfDay">
-          <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.TimeOfDay', 'Time of day')}</span>
-          <select value={selectedCondition('timeOfDay')} onchange={(event) => updateAvailability('timeOfDay', event.currentTarget.value)}>
-            <option value="">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyTimeTitle', 'Any Time')}</option>
-            {#each timeOfDayOptions as option (conditionId(option))}
-              <option value={conditionId(option)}>{conditionLabel(option)}</option>
-            {/each}
-          </select>
-        </label>
-        <label class="manager-v2-field" data-gathering-task-field="weather">
-          <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Weather', 'Weather')}</span>
-          <select value={selectedCondition('weather')} onchange={(event) => updateAvailability('weather', event.currentTarget.value)}>
-            <option value="">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyWeatherTitle', 'Any Weather')}</option>
-            {#each weatherOptions as option (conditionId(option))}
-              <option value={conditionId(option)}>{conditionLabel(option)}</option>
-            {/each}
-          </select>
-        </label>
+        {#each ['timeOfDay', 'weather'] as kind (kind)}
+          <div class="manager-v2-field manager-v2-availability-multi" data-gathering-task-field={kind}>
+            <span>{kind === 'timeOfDay' ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.TimeOfDay', 'Time of day') : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Weather', 'Weather')}</span>
+            <div class="manager-v2-availability-picker">
+              <button
+                type="button"
+                class="manager-v2-availability-menu-button"
+                aria-haspopup="listbox"
+                aria-expanded={openAvailabilityMenu === kind}
+                onclick={() => openAvailabilityMenu = openAvailabilityMenu === kind ? '' : kind}
+              >
+                <span>{availabilityMenuLabel(kind)}</span>
+                <i class="fas fa-chevron-down" aria-hidden="true"></i>
+              </button>
+              {#if openAvailabilityMenu === kind}
+                <div class="manager-v2-availability-menu" role="listbox" aria-label={kind === 'timeOfDay' ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.TimeOfDay', 'Time of day') : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Weather', 'Weather')}>
+                  {#if availableConditionOptions(kind).length > 0}
+                    {#each availableConditionOptions(kind) as option (conditionId(option))}
+                      <button
+                        type="button"
+                        class="manager-v2-availability-option"
+                        role="option"
+                        aria-selected="false"
+                        data-gathering-task-availability-option={kind}
+                        data-condition-id={conditionId(option)}
+                        onclick={() => addAvailability(kind, conditionId(option))}
+                      >
+                        <i class={conditionIcon(option)} aria-hidden="true"></i>
+                        <span>{conditionLabel(option)}</span>
+                      </button>
+                    {/each}
+                  {:else}
+                    <span class="manager-v2-availability-empty">{availabilityMenuLabel(kind)}</span>
+                  {/if}
+                </div>
+              {/if}
+            </div>
+            <div class="manager-v2-availability-pill-row" data-gathering-task-availability-pills={kind}>
+              {#if selectedConditionOptions(kind).length > 0}
+                {#each selectedConditionOptions(kind) as option (conditionId(option))}
+                  <span class="manager-v2-availability-pill" data-gathering-task-availability-pill={kind} data-condition-id={conditionId(option)}>
+                    <i class={conditionIcon(option)} aria-hidden="true"></i>
+                    <span>{conditionLabel(option)}</span>
+                    <button type="button" class="manager-v2-availability-remove" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.RemoveAvailabilityCondition', 'Remove {name}').replace('{name}', conditionLabel(option))} onclick={() => removeAvailability(kind, conditionId(option))}>
+                      <i class="fas fa-xmark" aria-hidden="true"></i>
+                    </button>
+                  </span>
+                {/each}
+              {:else}
+                <span class="manager-v2-muted manager-v2-availability-any">{emptyAvailabilityLabel(kind)}</span>
+              {/if}
+            </div>
+          </div>
+        {/each}
       </div>
     </section>
 

@@ -8611,6 +8611,143 @@
   min-width: 0;
 }
 
+.fabricate-manager-v2 .manager-v2-availability-multi {
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-availability-picker {
+  position: relative;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-availability-menu-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-bg);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.fabricate-manager-v2 .manager-v2-availability-menu-button:hover,
+.fabricate-manager-v2 .manager-v2-availability-menu-button:focus-visible {
+  border-color: var(--fab-warning-border);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--fab-warning-soft);
+}
+
+.fabricate-manager-v2 .manager-v2-availability-menu {
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  display: grid;
+  gap: 4px;
+  max-height: 190px;
+  padding: 6px;
+  border: 1px solid var(--fab-mv2-border-strong);
+  border-radius: 6px;
+  background: var(--fab-mv2-surface-2);
+  box-shadow: var(--fab-v2-shadow);
+  overflow-y: auto;
+}
+
+.fabricate-manager-v2 .manager-v2-availability-option {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-height: 32px;
+  padding: 5px 7px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--fab-mv2-text);
+  background: transparent;
+  text-align: left;
+}
+
+.fabricate-manager-v2 .manager-v2-availability-option:hover,
+.fabricate-manager-v2 .manager-v2-availability-option:focus-visible {
+  border-color: var(--fab-warning-border);
+  background: var(--fab-warning-soft);
+  outline: none;
+}
+
+.fabricate-manager-v2 .manager-v2-availability-option i,
+.fabricate-manager-v2 .manager-v2-availability-pill > i {
+  color: var(--fab-warning-text);
+  text-align: center;
+}
+
+.fabricate-manager-v2 .manager-v2-availability-empty {
+  padding: 6px 8px;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.78rem;
+}
+
+.fabricate-manager-v2 .manager-v2-availability-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-availability-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  max-width: 100%;
+  padding: 3px 4px 3px 8px;
+  border: 1px solid var(--fab-warning-border);
+  border-radius: 999px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-warning-soft);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.fabricate-manager-v2 .manager-v2-availability-pill span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager-v2 .manager-v2-availability-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--fab-mv2-text-muted);
+  background: transparent;
+}
+
+.fabricate-manager-v2 .manager-v2-availability-remove:hover,
+.fabricate-manager-v2 .manager-v2-availability-remove:focus-visible {
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
+  outline: none;
+}
+
+.fabricate-manager-v2 .manager-v2-availability-any {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+}
+
 .fabricate-manager-v2 .manager-v2-task-drops-card {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;

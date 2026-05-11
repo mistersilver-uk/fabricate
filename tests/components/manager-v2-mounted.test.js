@@ -2128,28 +2128,57 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].name === 'Gather Sun Herbs'));
-    const timeSelect = target.querySelector('[data-gathering-task-field="timeOfDay"] select');
-    const weatherSelect = target.querySelector('[data-gathering-task-field="weather"] select');
-    assert.deepEqual(
-      Array.from(timeSelect.options).map(option => option.textContent.trim()).slice(0, 2),
-      ['Any Time', 'First Light']
-    );
-    assert.deepEqual(
-      Array.from(weatherSelect.options).map(option => option.textContent.trim()).slice(0, 2),
-      ['Any Weather', 'Clear Sky']
-    );
-    assert.equal(timeSelect.value, 'day');
-    assert.equal(weatherSelect.value, 'clear');
-    timeSelect.value = 'night';
-    timeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    const timeAvailability = target.querySelector('[data-gathering-task-field="timeOfDay"]');
+    const weatherAvailability = target.querySelector('[data-gathering-task-field="weather"]');
+    assert.equal(timeAvailability.querySelector('select'), null);
+    assert.equal(weatherAvailability.querySelector('select'), null);
+    const timePill = timeAvailability.querySelector('[data-gathering-task-availability-pill="timeOfDay"][data-condition-id="day"]');
+    const weatherPill = weatherAvailability.querySelector('[data-gathering-task-availability-pill="weather"][data-condition-id="clear"]');
+    assert.ok(timePill);
+    assert.ok(timePill.textContent.includes('High Day'));
+    assert.ok(timePill.querySelector('i.fas.fa-sun'));
+    assert.ok(weatherPill);
+    assert.ok(weatherPill.textContent.includes('Clear Sky'));
+    assert.ok(weatherPill.querySelector('i.fas.fa-sun'));
+
+    timeAvailability.querySelector('.manager-v2-availability-menu-button').click();
     await tick();
     flushSync();
-    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && Array.isArray(call[3].timeOfDay) && call[3].timeOfDay[0] === 'night'));
-    timeSelect.value = '';
-    timeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    assert.equal(timeAvailability.querySelector('[data-gathering-task-availability-option="timeOfDay"][data-condition-id="day"]'), null);
+    assert.deepEqual(
+      Array.from(timeAvailability.querySelectorAll('[data-gathering-task-availability-option="timeOfDay"]')).map(option => option.textContent.trim()),
+      ['First Light', 'Deep Night']
+    );
+    assert.ok(timeAvailability.querySelector('[data-condition-id="night"] i.fas.fa-moon'));
+    timeAvailability.querySelector('[data-gathering-task-availability-option="timeOfDay"][data-condition-id="night"]').click();
     await tick();
     flushSync();
-    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && Array.isArray(call[3].timeOfDay) && call[3].timeOfDay.length === 0));
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && Array.isArray(call[3].timeOfDay) && call[3].timeOfDay.join(',') === 'day,night'));
+    assert.ok(timeAvailability.querySelector('[data-gathering-task-availability-pill="timeOfDay"][data-condition-id="night"]'));
+
+    timeAvailability.querySelector('[data-gathering-task-availability-pill="timeOfDay"][data-condition-id="day"] .manager-v2-availability-remove').click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && Array.isArray(call[3].timeOfDay) && call[3].timeOfDay.length === 1 && call[3].timeOfDay[0] === 'night'));
+
+    weatherAvailability.querySelector('.manager-v2-availability-menu-button').click();
+    await tick();
+    flushSync();
+    assert.equal(weatherAvailability.querySelector('[data-gathering-task-availability-option="weather"][data-condition-id="clear"]'), null);
+    assert.deepEqual(
+      Array.from(weatherAvailability.querySelectorAll('[data-gathering-task-availability-option="weather"]')).map(option => option.textContent.trim()),
+      ['Storm Rain']
+    );
+    assert.ok(weatherAvailability.querySelector('[data-condition-id="heavy-rain"] i.fas.fa-cloud-showers-heavy'));
+    weatherAvailability.querySelector('[data-gathering-task-availability-option="weather"][data-condition-id="heavy-rain"]').click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && Array.isArray(call[3].weather) && call[3].weather.join(',') === 'clear,heavy-rain'));
+
+    weatherAvailability.querySelector('[data-gathering-task-availability-pill="weather"][data-condition-id="clear"] .manager-v2-availability-remove').click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && Array.isArray(call[3].weather) && call[3].weather.length === 1 && call[3].weather[0] === 'heavy-rain'));
     const inspectorSlider = target.querySelector('[data-gathering-task-drop-inspector] input[type="range"]');
     inspectorSlider.value = '35';
     inspectorSlider.dispatchEvent(new Event('input', { bubbles: true }));
