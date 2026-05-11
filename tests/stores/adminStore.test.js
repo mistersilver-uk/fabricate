@@ -2977,8 +2977,18 @@ describe('createAdminStore', () => {
         sys.features = { essences: true };
         sys.advancedOptionsEnabled = true;
         sys.components = [
-          makeItem({ id: 'comp-1', name: 'Blazing Herb', img: 'blazing-herb.png' }),
-          makeItem({ id: 'comp-2', name: 'Moon Salt', img: '' })
+          makeItem({
+            id: 'comp-1',
+            name: 'Blazing Herb',
+            img: 'blazing-herb.png',
+            description: { value: '<p>Bright <strong>ember</strong> leaf.</p>' }
+          }),
+          makeItem({
+            id: 'comp-2',
+            name: 'Moon Salt',
+            img: '',
+            description: { unexpected: 'shape' }
+          })
         ];
         sys.essenceDefinitions = [
           {
@@ -3006,8 +3016,8 @@ describe('createAdminStore', () => {
       const [linkedEssence, unlinkedEssence] = vs.selectedSystem.essenceDefinitions;
 
       assert.deepEqual(vs.selectedSystem.managedItemOptions, [
-        { id: 'comp-1', name: 'Blazing Herb', img: 'blazing-herb.png' },
-        { id: 'comp-2', name: 'Moon Salt', img: 'icons/svg/item-bag.svg' }
+        { id: 'comp-1', name: 'Blazing Herb', img: 'blazing-herb.png', description: 'Bright ember leaf.' },
+        { id: 'comp-2', name: 'Moon Salt', img: 'icons/svg/item-bag.svg', description: '' }
       ]);
       assert.deepEqual(linkedEssence.associatedItem, {
         id: 'comp-1',

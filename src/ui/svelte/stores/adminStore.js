@@ -255,6 +255,7 @@ function _buildManagedItemOptions(managedItems = []) {
     id: item.id,
     name: item.name,
     img: item.img || 'icons/svg/item-bag.svg',
+    description: _plainTextDescription(item.description),
     ...(item.sourceItemUuid ? { sourceItemUuid: item.sourceItemUuid } : {}),
     ...(item.sourceUuid ? { sourceUuid: item.sourceUuid } : {}),
     ...(Object.prototype.hasOwnProperty.call(item, 'difficulty') ? { difficulty: item.difficulty } : {})
@@ -1190,11 +1191,14 @@ function _buildEssenceCards(essenceDefinitions, managedItems, managedItemOptions
   const managedItemById = new Map(managedItemOptions.map(item => [item.id, item]));
   return essenceDefinitions.map(def => {
     const sourceComponentId = _sourceComponentIdForEssence(def, managedItemById);
-    const associatedItem = managedItemById.get(sourceComponentId) || null;
-    const sourceItemUuid = def.sourceItemUuid || associatedItem?.sourceItemUuid || associatedItem?.sourceUuid || null;
+    const sourceItem = managedItemById.get(sourceComponentId) || null;
+    const associatedItem = sourceItem
+      ? { id: sourceItem.id, name: sourceItem.name, img: sourceItem.img }
+      : null;
+    const sourceItemUuid = def.sourceItemUuid || sourceItem?.sourceItemUuid || sourceItem?.sourceUuid || null;
     const componentUsageCount = _essenceUsageCount(def.id, managedItems);
     const componentUsageItems = _essenceUsageItems(def.id, managedItems);
-    const sourceState = _essenceSourceState({ sourceComponentId, sourceItemUuid, associatedItem });
+    const sourceState = _essenceSourceState({ sourceComponentId, sourceItemUuid, associatedItem: sourceItem });
     return {
       ...def,
       icon: normalizeEssenceIcon(def.icon || DEFAULT_ESSENCE_ICON),
@@ -1875,7 +1879,10 @@ export function createAdminStore(services) {
         : [];
       const essenceDefinitions = rawEssenceDefinitions.map(def => {
         const sourceComponentId = _sourceComponentIdForEssence(def, managedItemById);
-        const associatedItem = managedItemById.get(sourceComponentId) || null;
+        const sourceItem = managedItemById.get(sourceComponentId) || null;
+        const associatedItem = sourceItem
+          ? { id: sourceItem.id, name: sourceItem.name, img: sourceItem.img }
+          : null;
         return {
           ...def,
           sourceComponentId,

@@ -924,7 +924,7 @@
             "DeleteModifier": "Delete modifier",
             "ModifierValue": "Modifier value",
             "EmptyDropSearchTitle": "No drop rules match this search",
-            "DropCalculationHelp": "Final drop chance = base chance + matching drop-level time/weather modifiers. Gathering modifiers affect the d100 roll.",
+            "DropCalculationHelp": "Final drop chance = base chance + matching drop modifiers + environment-specific modifiers",
             "RewardRuleNotice": "Multiple drop rows use this component. Current drop rules may award only one matching row."
           },
           "Rules": {

@@ -147,7 +147,11 @@
 
   function componentDescription(row) {
     const item = managedItem(row?.componentId);
-    return item?.description || text('FABRICATE.Admin.ManagerV2.Environment.Tasks.UnresolvedDrop', 'Unresolved drop');
+    const description = String(item?.description || row?.description || '').trim();
+    if (description) return description;
+    return item
+      ? text('FABRICATE.Admin.ManagerV2.NoDescription', 'No description')
+      : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.UnresolvedDrop', 'Unresolved drop');
   }
 
   function modifierEntries(row) {

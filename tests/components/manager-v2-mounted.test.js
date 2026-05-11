@@ -113,10 +113,10 @@ function createStore(calls = [], options = {}) {
     recipeCategories: true
   };
   const alchemyManagedItemOptions = options.emptyComponents ? [] : [
-    { id: 'c1', name: 'Iron Ore', img: 'icons/commodities/metal/ore-chunk-grey.webp', sourceItemUuid: 'Compendium.fabricate.items.iron-ore' },
-    { id: 'c2', name: 'Glass Vial', img: 'icons/containers/kitchenware/vase-clay-blue.webp' },
-    { id: 'c3', name: 'Nightshade With An Exceptionally Long Localized Component Name', img: 'icons/consumables/plants/nightshade.jpg', sourceItemUuid: 'Compendium.fabricate.items.nightshade-with-a-long-source-reference' },
-    { id: 'c4', name: 'Coal', img: 'icons/commodities/materials/bowl-powder-black.webp' }
+    { id: 'c1', name: 'Iron Ore', img: 'icons/commodities/metal/ore-chunk-grey.webp', description: 'Unrefined metal.', sourceItemUuid: 'Compendium.fabricate.items.iron-ore' },
+    { id: 'c2', name: 'Glass Vial', img: 'icons/containers/kitchenware/vase-clay-blue.webp', description: '' },
+    { id: 'c3', name: 'Nightshade With An Exceptionally Long Localized Component Name', img: 'icons/consumables/plants/nightshade.jpg', description: 'A dusky flowering herb used in careful doses.', sourceItemUuid: 'Compendium.fabricate.items.nightshade-with-a-long-source-reference' },
+    { id: 'c4', name: 'Coal', img: 'icons/commodities/materials/bowl-powder-black.webp', description: 'Fuel for a steady forge.' }
   ];
   const systemDetails = {
     alchemy: {
@@ -2132,7 +2132,11 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     const populatedComponentCell = populatedDropRow.querySelector('[data-gathering-task-drop-component-cell]');
     assert.ok(populatedComponentCell.querySelector('.manager-v2-gathering-task-thumb'));
     assert.ok(populatedComponentCell.textContent.includes('Nightshade With An Exceptionally Long Localized Component Name'));
-    assert.ok(populatedComponentCell.querySelector('.manager-v2-system-description').textContent.trim().length > 0);
+    assert.equal(
+      populatedComponentCell.querySelector('.manager-v2-system-description').textContent.trim(),
+      'A dusky flowering herb used in careful doses.'
+    );
+    assert.equal(populatedComponentCell.textContent.includes('Unresolved drop'), false);
     assert.equal(populatedDropRow.textContent.includes('Drop component'), false);
     assert.equal(populatedDropRow.textContent.includes('Drop chance'), false);
     assert.equal(populatedDropRow.textContent.includes('Quantity'), false);
