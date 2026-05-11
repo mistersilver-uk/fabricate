@@ -400,8 +400,10 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const dropEditorValuesBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-values');
   const dropEditorRatePercentBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-card .manager-v2-drop-rate-percent input[type="text"]');
   const dropEditorRateValueBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-card [data-gathering-drop-inspector-rate] .manager-v2-drop-rate-value');
+  const dropEditorRateInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-card [data-gathering-drop-inspector-rate] .manager-v2-drop-rate-percent input[type="text"]');
   const dropEditorRateSuffixBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-card [data-gathering-drop-inspector-rate] .manager-v2-drop-rate-percent > span[aria-hidden="true"]');
   const dropEditorRateTrackBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-card [data-gathering-drop-inspector-rate] .manager-v2-drop-rate-track');
+  const dropEditorRateFillBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-card [data-gathering-drop-inspector-rate] .manager-v2-drop-rate-fill');
   const dropEditorRateWebkitTrackBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-card [data-gathering-drop-inspector-rate] .manager-v2-drop-rate-control input[type="range"]::-webkit-slider-runnable-track');
   const dropEditorRateMozTrackBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-card [data-gathering-drop-inspector-rate] .manager-v2-drop-rate-control input[type="range"]::-moz-range-track');
   const dropEditorCountBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-count-editor');
@@ -509,9 +511,12 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(dropEditorInputBlock.includes(':not([type="range"])'), 'selected drop inspector generic input chrome should not override row-style range sliders');
   assert.ok(dropEditorValuesBlock.includes('grid-template-columns: minmax(0, 1fr) 72px;') && dropEditorValuesBlock.includes('align-items: end;'), 'selected drop inspector should place chance and count in a compact two-column grid');
   assert.ok(dropEditorRateValueBlock.includes('grid-template-columns: 64px minmax(0, 1fr);'), 'selected drop inspector chance should widen only the right-menu percent column');
-  assert.ok(dropEditorRatePercentBlock.includes('height: 28px;') && dropEditorRatePercentBlock.includes('padding: 4px 24px 4px 6px;') && dropEditorRatePercentBlock.includes('background: var(--fab-overlay-dark-18);'), 'selected drop inspector chance input should add room before the percent suffix without changing row inputs');
+  assert.ok(dropEditorRatePercentBlock.includes('height: 28px;') && dropEditorRatePercentBlock.includes('padding: 4px 16px 4px 2px;') && dropEditorRatePercentBlock.includes('background: var(--fab-overlay-dark-18);'), 'selected drop inspector broad chance input rule should not carry the right-menu suffix padding');
+  assert.ok(dropEditorRateInputBlock.includes('padding: 4px 28px 4px 6px;'), 'selected drop inspector chance input should add room before the percent suffix through an inspector-specific override');
   assert.ok(dropEditorRateSuffixBlock.includes('right: 8px;'), 'selected drop inspector percent suffix should sit away from three-digit values');
-  assert.ok(dropEditorRateTrackBlock.includes('left: 7px;') && dropEditorRateTrackBlock.includes('right: 7px;'), 'selected drop inspector slider track should align to the thumb centers to avoid endpoint tails');
+  assert.ok(dropEditorRateTrackBlock.includes('left: 0;') && dropEditorRateTrackBlock.includes('right: 0;') && dropEditorRateTrackBlock.includes('border: 0;') && dropEditorRateTrackBlock.includes('background: var(--fab-overlay-dark-18);'), 'selected drop inspector custom track should provide the right-menu background without separate endpoint tails');
+  assert.ok(dropEditorRateFillBlock.includes('border-radius: 999px;'), 'selected drop inspector fill should be rounded without relying on a wider track border');
+  assert.equal(css.includes('linear-gradient'), false, 'drop chance slider styling should keep the flat-ui no-gradient contract');
   assert.ok(dropEditorRateWebkitTrackBlock.includes('border: 0;') && dropEditorRateWebkitTrackBlock.includes('background: transparent;'), 'selected drop inspector WebKit native range track should not draw over the custom track');
   assert.ok(dropEditorRateMozTrackBlock.includes('border: 0;') && dropEditorRateMozTrackBlock.includes('background: transparent;'), 'selected drop inspector Firefox native range track should not draw over the custom track');
   assert.ok(dropEditorCountBlock.includes('display: grid;') && dropEditorCountBlock.includes('gap: 6px;'), 'selected drop inspector count editor should use a compact labeled field');
