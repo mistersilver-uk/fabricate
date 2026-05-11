@@ -592,7 +592,8 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'data-gathering-task-drop-inspector',
       'addGatheringDropModifier',
       'updateGatheringDropModifier',
-      'gatheringDropFinalChance'
+      'gatheringDropFinalChance',
+      'manager-v2-drop-editor-actions'
     ]) {
       assert.ok(rootSource.includes(snippet), `root should include ${snippet}`);
     }
@@ -624,7 +625,6 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'data-gathering-task-availability-pill',
       'data-gathering-task-drop-component-cell',
       'data-gathering-task-drop-chance-cell',
-      'data-gathering-task-drop-actions',
       'data-gathering-task-drop-count',
       'manager-v2-task-drop-controls',
       'manager-v2-task-drop-footer',
@@ -633,6 +633,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'manager-v2-drop-quantity-cell',
       'manager-v2-drop-modifier-pill',
       'manager-v2-drop-modifier-list',
+      'manager-v2-drop-modifier-overflow',
       'manager-v2-drop-rate-value',
       'manager-v2-drop-rate-percent',
       'manager-v2-drop-rate-track',
@@ -656,6 +657,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'DropChance',
       'ClearDropComponentHint',
       'DropQuantityColumn',
+      'DropModifierOverflowHint',
       'RewardRuleNotice'
     ]) {
       assert.ok(gatheringTaskEditSource.includes(snippet), `task editor should include ${snippet}`);
@@ -669,6 +671,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(!gatheringTaskEditSource.includes('<select value={selectedCondition'), 'task availability should not use native single-select controls');
     assert.ok(!gatheringTaskEditSource.includes('function selectedCondition('), 'task availability should not collapse arrays to a single selection');
     assert.ok(!gatheringTaskEditSource.includes('Tasks.SelectDrop'), 'drop rows should not render a row-level edit/select quick action');
+    assert.ok(!gatheringTaskEditSource.includes('data-gathering-task-drop-actions'), 'drop rows should not render row-level duplicate/delete actions');
     assert.ok(!gatheringTaskEditSource.includes('data-gathering-task-drop-row-number'), 'drop rows should not add a leading row number column');
     assert.ok(!gatheringTaskEditSource.includes('EditDrop'), 'drop rows should not add an edit quick action');
     assert.ok(!gatheringTaskEditSource.includes('manager-v2-labeled-cell manager-v2-drop-component-cell'), 'drop component row values should not render responsive duplicate labels');
@@ -684,6 +687,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChancePercent, 'Drop chance percent');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.DropQuantityColumn, '#');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.ClearDropComponentHint, 'Right-click to clear component');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.DropModifierOverflowHint, 'See selected rule for modifiers');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.NoComponent, 'No Component');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.CreateOrAssign, 'Create or assign');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.TaskIdentity, undefined);

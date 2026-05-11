@@ -18,8 +18,6 @@
     onSelectDrop = () => {},
     onAddDrop = () => {},
     onUpdateDrop = () => {},
-    onDuplicateDrop = () => {},
-    onDeleteDrop = () => {},
     onImportDrop = () => {}
   } = $props();
 
@@ -44,6 +42,7 @@
   const showRewardRuleNotice = $derived(selectedDrop?.componentId
     && repeatedComponentRows.length > 1
     && rewardRules?.rewardSelectionMode !== 'allDrops');
+  const maxVisibleModifiers = 6;
 
   $effect(() => {
     if (task?.id === lastTaskId) return;
@@ -198,6 +197,14 @@
       ...(Array.isArray(modifiers.timeOfDay) ? modifiers.timeOfDay.map(entry => ({ ...entry, kind: 'timeOfDay' })) : []),
       ...(Array.isArray(modifiers.weather) ? modifiers.weather.map(entry => ({ ...entry, kind: 'weather' })) : [])
     ];
+  }
+
+  function hasModifierOverflow(row) {
+    return modifierEntries(row).length > maxVisibleModifiers;
+  }
+
+  function visibleModifierEntries(row) {
+    return hasModifierOverflow(row) ? [] : modifierEntries(row);
   }
 
   function modifierLabel(entry) {
@@ -520,7 +527,6 @@
               <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChance', 'Drop chance')}</span>
               <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropQuantityColumn', '#')}</span>
               <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Modifiers', 'Modifiers')}</span>
-              <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Column.Actions', 'Actions')}</span>
             </div>
             {#each paginatedRows as row (row.id)}
               <div
@@ -575,8 +581,10 @@
                 </span>
                 <span role="cell" class="manager-v2-drop-cell manager-v2-chip-row">
                   <span class="manager-v2-drop-modifier-list">
-                    {#if modifierEntries(row).length > 0}
-                      {#each modifierEntries(row) as modifier (modifier.id)}
+                    {#if hasModifierOverflow(row)}
+                      <span class="manager-v2-chip is-neutral manager-v2-drop-modifier-overflow">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropModifierOverflowHint', 'See selected rule for modifiers')}</span>
+                    {:else if visibleModifierEntries(row).length > 0}
+                      {#each visibleModifierEntries(row) as modifier (modifier.id)}
                         <span class={`manager-v2-chip manager-v2-drop-modifier-pill ${modifierClass(modifier.value)}`}>
                           <i class={modifierIcon(modifier)} aria-hidden="true"></i>
                           <span>{modifierLabel(modifier)}</span>
@@ -587,10 +595,6 @@
                       <span class="manager-v2-chip is-neutral">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.NoModifiers', 'Not specified')}</span>
                     {/if}
                   </span>
-                </span>
-                <span role="cell" class="manager-v2-drop-cell manager-v2-action-group manager-v2-drop-actions" data-gathering-task-drop-actions>
-                  <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DuplicateDrop', 'Duplicate drop rule')} onclick={(event) => { event.stopPropagation(); onDuplicateDrop(row.id); }} onkeydown={(event) => event.stopPropagation()}><i class="fas fa-copy" aria-hidden="true"></i></button>
-                  <button type="button" class="manager-v2-icon-button is-danger" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DeleteDrop', 'Delete drop rule')} onclick={(event) => { event.stopPropagation(); onDeleteDrop(row.id); }} onkeydown={(event) => event.stopPropagation()}><i class="fas fa-trash" aria-hidden="true"></i></button>
                 </span>
               </div>
             {/each}

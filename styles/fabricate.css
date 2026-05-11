@@ -9009,7 +9009,7 @@
 }
 
 .fabricate-manager-v2 .manager-v2-gathering-task-drops-table {
-  --fab-mv2-task-drop-grid: minmax(0, 1.05fr) minmax(220px, 1.35fr) 56px minmax(0, 1fr) 88px;
+  --fab-mv2-task-drop-grid: minmax(0, 1.05fr) minmax(220px, 1.35fr) 56px minmax(180px, 1.65fr);
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -9441,11 +9441,11 @@
   text-overflow: ellipsis;
 }
 
-.fabricate-manager-v2 .manager-v2-drop-actions {
-  justify-content: flex-end;
-  flex-wrap: nowrap;
-  gap: 6px;
-  padding: 6px 7px;
+.fabricate-manager-v2 .manager-v2-drop-modifier-overflow {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .fabricate-manager-v2 .manager-v2-rank-chip {
@@ -9505,6 +9505,19 @@
 .fabricate-manager-v2 .manager-v2-drop-editor-card .manager-v2-field {
   display: grid;
   gap: 6px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-drop-editor-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 0;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-drop-editor-actions .manager-v2-button {
+  justify-content: center;
   min-width: 0;
 }
 
@@ -10220,7 +10233,7 @@
   }
 
   .fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"] .manager-v2-gathering-task-drops-table {
-    --fab-mv2-task-drop-grid: minmax(0, 1.18fr) minmax(154px, 1.04fr) 54px minmax(0, 0.92fr) 88px;
+    --fab-mv2-task-drop-grid: minmax(0, 1.18fr) minmax(154px, 1.04fr) 54px minmax(150px, 1.38fr);
   }
 
   .fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"] .manager-v2-task-drops-card .manager-v2-task-card-header {

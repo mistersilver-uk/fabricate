@@ -2045,8 +2045,6 @@
         onSelectDrop={(rowId) => { selectedGatheringDropId = rowId; }}
         onAddDrop={addGatheringTaskDrop}
         onUpdateDrop={updateGatheringTaskDrop}
-        onDuplicateDrop={duplicateGatheringTaskDrop}
-        onDeleteDrop={deleteGatheringTaskDrop}
         onImportDrop={importGatheringTaskDrop}
         onAddModifier={addGatheringDropModifier}
         onUpdateModifier={updateGatheringDropModifier}
@@ -2304,6 +2302,16 @@
                   <h2 class="manager-v2-inspector-name">{gatheringDropName(selectedGatheringDrop)}</h2>
                   <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ModifiersApplyOnlyThisDrop', 'Modifiers below apply only to this drop.')}</p>
                 </div>
+              </div>
+              <div class="manager-v2-drop-editor-actions">
+                <button type="button" class="manager-v2-button" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DuplicateDrop', 'Duplicate drop rule')} onclick={() => duplicateGatheringTaskDrop(selectedGatheringDrop.id)}>
+                  <i class="fas fa-copy" aria-hidden="true"></i>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DuplicateDrop', 'Duplicate drop rule')}</span>
+                </button>
+                <button type="button" class="manager-v2-button is-danger" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DeleteDrop', 'Delete drop rule')} onclick={() => deleteGatheringTaskDrop(selectedGatheringDrop.id)}>
+                  <i class="fas fa-trash" aria-hidden="true"></i>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DeleteDrop', 'Delete drop rule')}</span>
+                </button>
               </div>
 
               <label class="manager-v2-field">
