@@ -2127,15 +2127,16 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Final chance'));
     assert.equal(target.querySelector('.manager-v2-task-card-header .manager-v2-drop-count'), null);
     assert.ok(target.querySelector('.manager-v2-task-drop-footer [data-gathering-task-drop-count]'));
+    const dropColumnHeaders = Array.from(target.querySelectorAll('[data-gathering-task-drops-table] [role="columnheader"]')).map(node => node.textContent.trim());
+    assert.ok(dropColumnHeaders.includes('#'));
+    assert.equal(dropColumnHeaders.includes('Quantity'), false);
     const populatedDropRow = target.querySelector('[data-gathering-task-drop-id="drop-nightshade"]');
     assert.equal(populatedDropRow.querySelector('[data-gathering-task-drop-row-number]'), null);
     const populatedComponentCell = populatedDropRow.querySelector('[data-gathering-task-drop-component-cell]');
     assert.ok(populatedComponentCell.querySelector('.manager-v2-gathering-task-thumb'));
     assert.ok(populatedComponentCell.textContent.includes('Nightshade With An Exceptionally Long Localized Component Name'));
-    assert.equal(
-      populatedComponentCell.querySelector('.manager-v2-system-description').textContent.trim(),
-      'A dusky flowering herb used in careful doses.'
-    );
+    assert.equal(populatedComponentCell.querySelector('.manager-v2-drop-component-button .manager-v2-system-description'), null);
+    assert.equal(populatedComponentCell.textContent.includes('A dusky flowering herb used in careful doses.'), false);
     assert.equal(populatedComponentCell.textContent.includes('Unresolved drop'), false);
     assert.equal(populatedDropRow.textContent.includes('Drop component'), false);
     assert.equal(populatedDropRow.textContent.includes('Drop chance'), false);

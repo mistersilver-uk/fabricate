@@ -192,15 +192,6 @@
     return managedItem(row?.componentId)?.img || 'icons/svg/item-bag.svg';
   }
 
-  function componentDescription(row) {
-    const item = managedItem(row?.componentId);
-    const description = String(item?.description || row?.description || '').trim();
-    if (description) return description;
-    return item
-      ? text('FABRICATE.Admin.ManagerV2.NoDescription', 'No description')
-      : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.UnresolvedDrop', 'Unresolved drop');
-  }
-
   function modifierEntries(row) {
     const modifiers = row?.conditionModifiers || {};
     return [
@@ -499,7 +490,6 @@
                       <img class="manager-v2-gathering-task-thumb" src={componentImage(row)} alt="" />
                       <span class="manager-v2-system-copy">
                         <span class="manager-v2-system-name">{componentLabel(row)}</span>
-                        <span class="manager-v2-system-description">{componentDescription(row)}</span>
                       </span>
                     </button>
                   {:else}
