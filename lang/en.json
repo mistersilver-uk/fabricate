@@ -873,6 +873,8 @@
             "PlaceholderKicker": "Gathering task",
             "PlaceholderHint": "Detailed authoring fields for gathering tasks are coming later. Use the task browser for selection, duplication, deletion, and status for now.",
             "CopySuffix": "Copy",
+            "TaskIdentity": "Task Identity",
+            "TaskIdentityHint": "Name the task, give it a description, choose an image, and toggle whether it is enabled.",
             "TaskAvailability": "Task Availability",
             "Name": "Name",
             "Description": "Description",

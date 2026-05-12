@@ -8939,6 +8939,7 @@
 
 .fabricate-manager-v2 .manager-v2-task-core-card {
   display: grid;
+  gap: 10px;
   padding: 13px 16px;
 }
 

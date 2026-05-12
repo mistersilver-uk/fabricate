@@ -481,6 +481,12 @@
 >
   {#if task}
     <section class="manager-v2-task-core-card" data-gathering-task-core-editor>
+      <div class="manager-v2-task-card-heading">
+        <div>
+          <h3>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.TaskIdentity', 'Task Identity')}</h3>
+          <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.TaskIdentityHint', 'Name the task, give it a description, choose an image, and toggle whether it is enabled.')}</p>
+        </div>
+      </div>
       <div class="manager-v2-task-core-grid">
         <div class="manager-v2-task-media-column">
           <button type="button" class="manager-v2-task-image-picker" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ChooseImage', 'Choose task image')} onclick={chooseTaskImage} disabled={typeof onPickImagePath !== 'function'}>
