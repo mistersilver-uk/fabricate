@@ -2571,13 +2571,14 @@
                   </label>
                   <button
                     type="button"
-                    class="manager-v2-button is-primary manager-v2-condition-modifier-add-button"
+                    class="manager-v2-icon-button"
+                    aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AddConditionModifier', 'Add modifier')}
+                    title={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AddConditionModifier', 'Add modifier')}
                     disabled={availableConditions.length === 0 || !pickerSelection}
                     data-tooltip={availableConditions.length === 0 ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AllConditionsAdded', 'All conditions already added.') : null}
                     onclick={() => addGatheringDropModifier(selectedGatheringDrop.id, kind, pickerSelection)}
                   >
                     <i class="fas fa-plus" aria-hidden="true"></i>
-                    <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AddConditionModifier', 'Add modifier')}</span>
                   </button>
                 </div>
                 <div class="manager-v2-condition-modifier-row-list">

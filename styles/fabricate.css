@@ -5830,11 +5830,6 @@
   min-width: 0;
 }
 
-.fabricate-manager-v2 .manager-v2-condition-modifier-add-button {
-  justify-content: center;
-  white-space: nowrap;
-}
-
 .fabricate-manager-v2 .manager-v2-character-modifier-row-reference-label {
   flex: 1 1 auto;
   font-weight: 600;
