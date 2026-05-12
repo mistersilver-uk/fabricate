@@ -48,6 +48,9 @@ const FALLBACK_CONDITION_ICONS = Object.freeze({
 const DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops', 'limitedDrops']);
 const LEGACY_DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops']);
 const HAZARD_POLICIES = new Set(['successWithHazard', 'failureWithHazard']);
+const CHARACTER_MODIFIER_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
+const CHARACTER_MODIFIER_OPERATORS = new Set(['+', '-']);
+const ROLL_EXPRESSION_PATTERN = /\d\s*d\s*\d|[*/()]/i;
 const DEFAULT_GATHERING_RULES = Object.freeze({
   rewardSelectionMode: 'highestRankedDrop',
   rewardLimit: 1,
@@ -70,6 +73,28 @@ const BLOCKED_REASON_KEYS = Object.freeze({
  * ordering.
  */
 export class GatheringRichStateService {
+  /**
+   * Construct the service with injected runtime seams. `evaluateExpression`
+   * and `runMacro` were added by the gathering character modifiers feature so
+   * d100 resolution can evaluate provider expressions and macro UUIDs against
+   * the acting actor without coupling the service to Foundry globals.
+   *
+   * @param {object} options
+   * @param {object} [options.environmentStore] Gathering environment store.
+   * @param {Function} [options.getSetting] Read accessor for gathering config.
+   * @param {Function} [options.setSetting] Write accessor for gathering config.
+   * @param {string} [options.settingKey] Config setting key.
+   * @param {Function} [options.nowWorldTime] Current world-time getter.
+   * @param {Function} [options.getUserId] Current Foundry user id getter.
+   * @param {Function} [options.rollD100] D100 roller (test seam).
+   * @param {object} [options.hooks] Foundry Hooks bridge.
+   * @param {Function} [options.evaluateExpression] Async provider-expression
+   *   evaluator (signature matches `evaluateGatheringExpression`); used to
+   *   resolve character modifier expressions to numeric contributions.
+   * @param {Function} [options.runMacro] Async macro runner for the `macro`
+   *   character modifier provider; receives a context payload and returns a
+   *   finite number.
+   */
   constructor({
     environmentStore = null,
     getSetting = null,
@@ -78,7 +103,9 @@ export class GatheringRichStateService {
     nowWorldTime = () => Number(globalThis.game?.time?.worldTime || 0),
     getUserId = () => globalThis.game?.user?.id || null,
     rollD100 = () => Math.floor(Math.random() * 100) + 1,
-    hooks = globalThis.Hooks ?? null
+    hooks = globalThis.Hooks ?? null,
+    evaluateExpression = null,
+    runMacro = null
   } = {}) {
     this.environmentStore = environmentStore;
     this.getSetting = getSetting;
@@ -88,6 +115,8 @@ export class GatheringRichStateService {
     this.getUserId = getUserId;
     this.rollD100 = rollD100;
     this.hooks = hooks;
+    this.evaluateExpression = evaluateExpression;
+    this.runMacro = runMacro;
   }
 
   getConditions() {
@@ -165,7 +194,12 @@ export class GatheringRichStateService {
       .filter(hazard => this._environmentAllowsLibraryRecord(environment, hazard.id, 'hazard'))
       .map(hazard => normalizeHazard(hazard));
 
-    return {
+    const libraryCharacterModifiers = new Map();
+    for (const entry of normalizeList(libraries.characterModifiers)) {
+      if (entry?.id) libraryCharacterModifiers.set(String(entry.id), cloneJson(entry));
+    }
+
+    const composed = {
       ...cloneJson(environment),
       conditions: cloneJson(currentConditions),
       biomes: normalizeTagList(environment.biomes ?? environment.biome),
@@ -178,32 +212,142 @@ export class GatheringRichStateService {
       hazardLimit: rules.hazardLimit,
       hazardPolicy: rules.hazardPolicy
     };
+    Object.defineProperty(composed, '__libraryCharacterModifiers', {
+      value: libraryCharacterModifiers,
+      enumerable: false,
+      configurable: true,
+      writable: true
+    });
+    Object.defineProperty(composed, '__systemId', {
+      value: systemId,
+      enumerable: false,
+      configurable: true,
+      writable: true
+    });
+    return composed;
   }
 
-  resolveD100Attempt({ task, environment, gatheringModifier = 0, hazardModifier = 0 } = {}) {
+  /**
+   * Resolve a d100 gathering attempt against the supplied task/environment.
+   *
+   * Now async because character modifier references invoke the injected
+   * expression evaluator and (optional) macro runner, both of which return
+   * promises. Returns `{ status: 'misconfigured', diagnostics }` when any
+   * reference or override cannot resolve so the caller short-circuits before
+   * touching nodes, stamina, or attempt-limit state.
+   *
+   * @param {object} options
+   * @param {object} options.task Task being resolved.
+   * @param {object} options.environment Composed environment.
+   * @param {object} [options.actor] Acting Foundry actor.
+   * @param {object} [options.viewer] Active viewer payload.
+   * @param {object} [options.system] Crafting system.
+   * @param {number} [options.gatheringModifier] Fallback gathering modifier value.
+   * @param {number} [options.hazardModifier] Fallback hazard modifier value.
+   * @returns {Promise<object>} Resolution payload (status, items, hazards,
+   *   hazardPolicy, characterModifierSnapshot, [diagnostics]).
+   */
+  async resolveD100Attempt({ task, environment, actor = null, viewer = null, system = null, gatheringModifier = 0, hazardModifier = 0 } = {}) {
     const itemRows = normalizeList(task?.dropRows ?? task?.itemDrops);
     const taskModifier = numericModifier(task?.gatheringModifier, gatheringModifier);
     const conditions = environment?.conditions || {};
-    const droppedItems = itemRows
-      .filter(row => row?.enabled !== false)
-      .map((row, index) => rollDropRow({
-        row: normalizeItemDrop(row),
+    const library = environment?.__libraryCharacterModifiers instanceof Map
+      ? environment.__libraryCharacterModifiers
+      : new Map();
+
+    const diagnostics = [];
+    const enabledRows = itemRows.filter(row => row?.enabled !== false).map(row => normalizeItemDrop(row));
+    const enabledHazards = normalizeList(environment?.hazards).filter(hazard => hazard?.enabled !== false).map(hazard => normalizeHazard(hazard));
+
+    const rowSnapshots = [];
+    const rowContributions = [];
+    for (const row of enabledRows) {
+      const contributions = [];
+      const rowEvidence = [];
+      for (const reference of normalizeList(row.characterModifiers)) {
+        const entry = library.get(String(reference.modifierId)) || null;
+        const resolved = await this._resolveCharacterModifierContribution({
+          reference,
+          libraryEntry: entry,
+          actor,
+          environment,
+          task,
+          row,
+          hazard: null,
+          viewer,
+          system
+        });
+        if (!resolved.ok) {
+          diagnostics.push(resolved.diagnostic);
+          continue;
+        }
+        contributions.push(resolved.contribution);
+        rowEvidence.push(resolved.evidence);
+      }
+      rowSnapshots.push({ rowId: row.id, contributions: rowEvidence });
+      rowContributions.push({ row, contributions, characterModifierTotal: contributions.reduce((sum, value) => sum + value, 0) });
+    }
+
+    const hazardSnapshots = [];
+    const hazardContributions = [];
+    for (const hazard of enabledHazards) {
+      const contributions = [];
+      const hazardEvidence = [];
+      for (const reference of normalizeList(hazard.characterModifiers)) {
+        const entry = library.get(String(reference.modifierId)) || null;
+        const resolved = await this._resolveCharacterModifierContribution({
+          reference,
+          libraryEntry: entry,
+          actor,
+          environment,
+          task,
+          row: null,
+          hazard,
+          viewer,
+          system
+        });
+        if (!resolved.ok) {
+          diagnostics.push(resolved.diagnostic);
+          continue;
+        }
+        contributions.push(resolved.contribution);
+        hazardEvidence.push(resolved.evidence);
+      }
+      hazardSnapshots.push({ hazardId: hazard.id, contributions: hazardEvidence });
+      hazardContributions.push({ hazard, contributions, characterModifierTotal: contributions.reduce((sum, value) => sum + value, 0) });
+    }
+
+    if (diagnostics.length > 0) {
+      return {
+        status: 'misconfigured',
+        items: [],
+        hazards: [],
+        hazardPolicy: null,
+        characterModifierSnapshot: { rows: rowSnapshots, hazards: hazardSnapshots },
+        diagnostics
+      };
+    }
+
+    const droppedItems = rowContributions
+      .map((entry, index) => rollDropRow({
+        row: entry.row,
         index,
         roll: this.rollD100(),
         modifier: taskModifier,
-        conditions
+        conditions,
+        characterModifierContributions: entry.contributions
       }))
       .filter(result => result.dropped);
     const rules = resolveRulesForAttempt(task, environment);
     const selectedItems = selectDrops(droppedItems, rules.rewardSelectionMode, rules.rewardLimit);
 
-    const droppedHazards = normalizeList(environment?.hazards)
-      .filter(hazard => hazard?.enabled !== false)
-      .map((hazard, index) => rollDropRow({
-        row: normalizeHazard(hazard),
+    const droppedHazards = hazardContributions
+      .map((entry, index) => rollDropRow({
+        row: entry.hazard,
         index,
         roll: this.rollD100(),
-        modifier: numericModifier(hazard?.hazardModifier, hazardModifier)
+        modifier: numericModifier(entry.hazard?.hazardModifier, hazardModifier),
+        characterModifierContributions: entry.contributions
       }))
       .filter(result => result.dropped);
     const selectedHazards = selectDrops(droppedHazards, rules.hazardSelectionMode, rules.hazardLimit);
@@ -213,8 +357,180 @@ export class GatheringRichStateService {
       status: selectedHazards.length > 0 && hazardPolicy === 'failureWithHazard' ? 'failed' : 'succeeded',
       items: selectedItems,
       hazards: selectedHazards,
-      hazardPolicy
+      hazardPolicy,
+      characterModifierSnapshot: { rows: rowSnapshots, hazards: hazardSnapshots }
     };
+  }
+
+  /**
+   * Resolve a single character modifier reference against the actor.
+   *
+   * Applies override-first inheritance (provider, expression, macroUuid),
+   * detects misconfiguration (missing entry, macro override without uuid,
+   * `min > max`, non-finite resolution), invokes the injected evaluator or
+   * macro runner, clamps by min/max, then applies operator. The returned
+   * evidence is suitable for the per-row snapshot.
+   *
+   * @param {object} payload Resolution payload.
+   * @param {object} payload.reference Row-scoped reference shape.
+   * @param {object|null} payload.libraryEntry Matching library modifier.
+   * @param {object} payload.actor Acting actor.
+   * @param {object} [payload.environment]
+   * @param {object} [payload.task]
+   * @param {object|null} [payload.row]
+   * @param {object|null} [payload.hazard]
+   * @param {object} [payload.viewer]
+   * @param {object} [payload.system]
+   * @returns {Promise<{ok: boolean, contribution: number, evidence: object, diagnostic?: object}>}
+   */
+  async _resolveCharacterModifierContribution({ reference, libraryEntry, actor, environment, task, row, hazard, viewer, system }) {
+    const referenceId = stringOrFallback(reference?.id, '');
+    const modifierId = stringOrFallback(reference?.modifierId, '');
+    const operator = CHARACTER_MODIFIER_OPERATORS.has(reference?.operator) ? reference.operator : '+';
+    const min = numberOrNullStrict(reference?.min);
+    const max = numberOrNullStrict(reference?.max);
+
+    const providerOverride = stringOrFallback(reference?.providerOverride, '');
+    const expressionOverride = stringOrFallback(reference?.expressionOverride, '');
+    const macroUuidOverride = stringOrFallback(reference?.macroUuidOverride, '');
+    const hasFullOverride = Boolean(expressionOverride) || Boolean(macroUuidOverride);
+
+    if (!libraryEntry && !hasFullOverride) {
+      return {
+        ok: false,
+        diagnostic: {
+          code: 'MISSING_CHARACTER_MODIFIER',
+          message: `Character modifier "${modifierId}" is not defined in the library`,
+          modifierId,
+          referenceId,
+          rowId: row?.id || null,
+          hazardId: hazard?.id || null
+        }
+      };
+    }
+
+    const effectiveProvider = providerOverride
+      || libraryEntry?.provider
+      || (macroUuidOverride ? 'macro' : null);
+    const effectiveExpression = expressionOverride || libraryEntry?.expression || '';
+    const effectiveMacroUuid = macroUuidOverride || libraryEntry?.macroUuid || '';
+
+    if (effectiveProvider === 'macro' && !effectiveMacroUuid) {
+      return {
+        ok: false,
+        diagnostic: {
+          code: 'MACRO_OVERRIDE_MISSING_UUID',
+          message: `Macro override for character modifier "${modifierId}" is missing macroUuid`,
+          modifierId,
+          referenceId,
+          rowId: row?.id || null,
+          hazardId: hazard?.id || null
+        }
+      };
+    }
+
+    if (min !== null && max !== null && min > max) {
+      return {
+        ok: false,
+        diagnostic: {
+          code: 'INVALID_CHARACTER_MODIFIER_BOUNDS',
+          message: `Character modifier "${modifierId}" has min > max`,
+          modifierId,
+          referenceId,
+          rowId: row?.id || null,
+          hazardId: hazard?.id || null
+        }
+      };
+    }
+
+    const conditions = environment?.conditions || {};
+    let rawValue = null;
+    try {
+      if (effectiveProvider === 'macro') {
+        if (typeof this.runMacro === 'function') {
+          rawValue = await this.runMacro(effectiveMacroUuid, {
+            kind: 'characterModifier',
+            actor,
+            environment,
+            task,
+            row,
+            hazard,
+            conditions,
+            modifier: { id: modifierId, label: libraryEntry?.label || modifierId },
+            viewer,
+            system
+          });
+        }
+      } else if (typeof this.evaluateExpression === 'function') {
+        rawValue = await this.evaluateExpression({
+          expression: effectiveExpression,
+          provider: effectiveProvider,
+          actor,
+          kind: 'characterModifier',
+          environment,
+          task,
+          row,
+          hazard,
+          viewer,
+          system,
+          modifier: { id: modifierId, label: libraryEntry?.label || modifierId }
+        });
+      }
+    } catch (_err) {
+      rawValue = null;
+    }
+
+    if (rawValue === null || rawValue === undefined || rawValue === '') {
+      return {
+        ok: false,
+        diagnostic: {
+          code: 'CHARACTER_MODIFIER_NON_FINITE',
+          message: `Character modifier "${modifierId}" did not resolve to a finite number`,
+          modifierId,
+          referenceId,
+          rowId: row?.id || null,
+          hazardId: hazard?.id || null
+        }
+      };
+    }
+    const numeric = Number(rawValue);
+    if (!Number.isFinite(numeric)) {
+      return {
+        ok: false,
+        diagnostic: {
+          code: 'CHARACTER_MODIFIER_NON_FINITE',
+          message: `Character modifier "${modifierId}" did not resolve to a finite number`,
+          modifierId,
+          referenceId,
+          rowId: row?.id || null,
+          hazardId: hazard?.id || null
+        }
+      };
+    }
+
+    let clamped = numeric;
+    if (min !== null) clamped = Math.max(clamped, min);
+    if (max !== null) clamped = Math.min(clamped, max);
+    const contribution = operator === '-' ? -clamped : clamped;
+
+    const evidence = {
+      rowId: row?.id || null,
+      hazardId: hazard?.id || null,
+      referenceId,
+      modifierId,
+      label: libraryEntry?.label || modifierId,
+      icon: libraryEntry?.icon || '',
+      effectiveProvider: effectiveProvider || '',
+      effectiveExpression: effectiveExpression || '',
+      effectiveMacroUuid: effectiveMacroUuid || '',
+      rawValue: numeric,
+      clampedValue: clamped,
+      operator,
+      contribution,
+      bounds: { min, max }
+    };
+
+    return { ok: true, contribution, evidence };
   }
 
   inspectEnvironment(environmentId) {
@@ -388,7 +704,12 @@ export class GatheringRichStateService {
       risk: task?.riskOverride || environment?.risk || 'safe',
       node: null,
       stamina: null,
-      attemptLimit: null
+      attemptLimit: null,
+      characterModifierSnapshot: cloneJson(
+        outcome?.characterModifierSnapshot
+          ?? outcome?.checkResult?.characterModifierSnapshot
+          ?? null
+      )
     };
 
     if (task?.nodes && shouldDepleteNode(task, outcome)) {
@@ -544,7 +865,10 @@ function normalizeGatheringConfig(raw = {}) {
       conditions: normalizeSystemConditions(config?.conditions, { vocabularies, conditions: { weather, timeOfDay } }),
       vocabularies: normalizeSystemVocabularies(config?.vocabularies, vocabularies),
       tasks: normalizeList(config?.tasks).map(normalizeLibraryTask),
-      hazards: normalizeList(config?.hazards).map(normalizeHazard)
+      hazards: normalizeList(config?.hazards).map(normalizeHazard),
+      characterModifiers: normalizeList(config?.characterModifiers)
+        .map(entry => normalizeCharacterModifierLibraryEntry(entry))
+        .filter(Boolean)
     };
   }
   return {
@@ -632,6 +956,7 @@ function normalizeItemDrop(row = {}) {
     quantity: Math.max(1, nonNegativeInteger(row.quantity, 1)),
     dropRate: clampDropRate(row.dropRate),
     conditionModifiers: normalizeDropConditionModifiers(row.conditionModifiers),
+    characterModifiers: normalizeDropCharacterModifiers(row.characterModifiers),
     enabled: row.enabled !== false
   };
 }
@@ -651,8 +976,85 @@ function normalizeHazard(hazard = {}) {
     weather: normalizeConditionIdList(hazard.weather),
     timeOfDay: normalizeConditionIdList(hazard.timeOfDay),
     dropRate: clampDropRate(hazard.dropRate),
-    hazardModifier: normalizeModifierProvider(hazard.hazardModifier ?? hazard.modifier)
+    hazardModifier: normalizeModifierProvider(hazard.hazardModifier ?? hazard.modifier),
+    characterModifiers: normalizeHazardCharacterModifiers(hazard.characterModifiers)
   };
+}
+
+/**
+ * Normalize a per-system character modifier library entry. Returns null when
+ * the entry lacks a resolvable id or has neither an expression nor a
+ * macroUuid (an entry that cannot resolve to a number is dropped).
+ *
+ * @param {object} entry Raw library entry.
+ * @returns {object|null} Normalized entry or null when invalid.
+ */
+function normalizeCharacterModifierLibraryEntry(entry = {}) {
+  if (!entry || typeof entry !== 'object') return null;
+  const id = stringOrFallback(entry.id, '');
+  if (!id) return null;
+  const provider = CHARACTER_MODIFIER_PROVIDERS.has(entry.provider) ? entry.provider : 'dnd5e';
+  const expression = stringOrFallback(entry.expression, '');
+  const macroUuid = stringOrFallback(entry.macroUuid, '');
+  if (!expression && !macroUuid) return null;
+  return {
+    id,
+    label: stringOrFallback(entry.label, id),
+    icon: stringOrFallback(entry.icon, 'fa-solid fa-user'),
+    provider,
+    expression,
+    macroUuid,
+    isRollExpression: ROLL_EXPRESSION_PATTERN.test(expression || '')
+  };
+}
+
+/**
+ * Normalize drop-row character modifier references.
+ *
+ * @param {Array} refs Raw reference list.
+ * @returns {Array<object>} Normalized references.
+ */
+export function normalizeDropCharacterModifiers(refs) {
+  return normalizeCharacterModifierReferenceList(refs);
+}
+
+/**
+ * Normalize hazard-row character modifier references.
+ *
+ * @param {Array} refs Raw reference list.
+ * @returns {Array<object>} Normalized references.
+ */
+export function normalizeHazardCharacterModifiers(refs) {
+  return normalizeCharacterModifierReferenceList(refs);
+}
+
+function normalizeCharacterModifierReferenceList(refs) {
+  return (Array.isArray(refs) ? refs : [])
+    .map((ref, index) => normalizeCharacterModifierReference(ref, index))
+    .filter(Boolean);
+}
+
+function normalizeCharacterModifierReference(ref, index) {
+  if (!ref || typeof ref !== 'object') return null;
+  const modifierId = stringOrFallback(ref.modifierId, '');
+  if (!modifierId) return null;
+  const providerOverride = CHARACTER_MODIFIER_PROVIDERS.has(ref.providerOverride) ? ref.providerOverride : null;
+  return {
+    id: stringOrFallback(ref.id, `char-mod-${modifierId}-${index + 1}`),
+    modifierId,
+    operator: CHARACTER_MODIFIER_OPERATORS.has(ref.operator) ? ref.operator : '+',
+    min: numberOrNullStrict(ref.min),
+    max: numberOrNullStrict(ref.max),
+    providerOverride,
+    expressionOverride: stringOrFallback(ref.expressionOverride, ''),
+    macroUuidOverride: stringOrFallback(ref.macroUuidOverride, '')
+  };
+}
+
+function numberOrNullStrict(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
 }
 
 function normalizeModifierProvider(provider = null) {
@@ -678,10 +1080,12 @@ function numericModifier(provider = null, fallback = 0) {
   return Number.isFinite(fallbackNumber) ? fallbackNumber : 0;
 }
 
-function rollDropRow({ row, index, roll, modifier, conditions = {} }) {
+function rollDropRow({ row, index, roll, modifier, conditions = {}, characterModifierContributions = [] }) {
   const effectiveRoll = Number(roll) + Number(modifier || 0);
   const conditionModifier = matchingConditionModifier(row.conditionModifiers, conditions);
-  const finalDropRate = Math.min(100, Math.max(0, Number(row.dropRate) + conditionModifier));
+  const characterModifierTotal = (Array.isArray(characterModifierContributions) ? characterModifierContributions : [])
+    .reduce((sum, value) => sum + Number(value || 0), 0);
+  const finalDropRate = Math.min(100, Math.max(0, Number(row.dropRate) + conditionModifier + characterModifierTotal));
   const threshold = 101 - finalDropRate;
   return {
     ...cloneJson(row),
@@ -689,6 +1093,7 @@ function rollDropRow({ row, index, roll, modifier, conditions = {} }) {
     roll: Number(roll),
     modifier: Number(modifier || 0),
     conditionModifier,
+    characterModifierTotal,
     finalDropRate,
     effectiveRoll,
     threshold,

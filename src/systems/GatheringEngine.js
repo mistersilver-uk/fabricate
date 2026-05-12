@@ -1194,7 +1194,7 @@ export class GatheringEngine {
       checkResult,
       plan
     });
-    const richPayload = this._richHistoryPayload({ environment, task, richAttempt, viewer });
+    const richPayload = this._richHistoryPayload({ environment, task, richAttempt, viewer, characterModifierSnapshot: outcome?.characterModifierSnapshot ?? null });
     Object.assign(runData, richPayload);
     Object.assign(payload, richPayload);
     let run;
@@ -1284,6 +1284,7 @@ export class GatheringEngine {
   }
 
   _terminalHistoryWrite({ viewer, system, environment, task, outcome, checkResult, plan }) {
+    const characterModifierSnapshot = outcome?.characterModifierSnapshot ?? null;
     const opaqueBlind = this._isOpaqueBlindTask({ environment, viewer });
     if (opaqueBlind) {
       return {
@@ -1296,7 +1297,7 @@ export class GatheringEngine {
           createdResults: [],
           usedCatalysts: [],
           checkResult: { blind: true, status: outcome.status },
-          ...this._richHistoryPayload({ environment, task, viewer })
+          ...this._richHistoryPayload({ environment, task, viewer, characterModifierSnapshot })
         }
       };
     }
@@ -1306,7 +1307,7 @@ export class GatheringEngine {
       usedCatalysts: plan.usedCatalysts
     };
     if (checkResult !== undefined) payload.checkResult = checkResult;
-    Object.assign(payload, this._richHistoryPayload({ environment, task, viewer }));
+    Object.assign(payload, this._richHistoryPayload({ environment, task, viewer, characterModifierSnapshot }));
 
     return {
       runData: {
@@ -1318,15 +1319,27 @@ export class GatheringEngine {
     };
   }
 
-  _richHistoryPayload({ environment, task, richAttempt = null, viewer = null }) {
+  _richHistoryPayload({ environment, task, richAttempt = null, viewer = null, characterModifierSnapshot = null }) {
     if (!hasRichGatheringData(environment, task)) return {};
     const opaqueBlind = viewer ? this._isOpaqueBlindTask({ environment, viewer }) : false;
     const evidence = plainObjectOrNull(richAttempt?.evidence) || this._richListingMetadata({ environment, task, viewer });
-    return {
-      economyEvidence: opaqueBlind ? redactRichEvidence(evidence) : evidence,
+    if (characterModifierSnapshot && typeof characterModifierSnapshot === 'object') {
+      evidence.characterModifierSnapshot = cloneJson(characterModifierSnapshot);
+    }
+    const payload = {
+      economyEvidence: opaqueBlind ? redactRichEvidence(evidence, { viewer }) : evidence,
       conditionSnapshot: plainObjectOrNull(environment?.conditions) || {},
       riskLevel: stringOrNull(task?.riskOverride) || stringOrNull(environment?.risk) || 'safe'
     };
+    if (characterModifierSnapshot && typeof characterModifierSnapshot === 'object') {
+      const cloned = cloneJson(characterModifierSnapshot);
+      payload.characterModifierSnapshot = opaqueBlind
+        ? redactCharacterModifierSnapshot(cloned)
+        : cloned;
+    } else {
+      payload.characterModifierSnapshot = null;
+    }
+    return payload;
   }
 
   _runtimeSnapshot({ environment, task }) {
@@ -1395,7 +1408,7 @@ export class GatheringEngine {
     }
     const gatheringModifier = Number(task?.gatheringModifier?.value ?? task?.gatheringModifier ?? 0);
     const hazardModifier = Number(environment?.hazardModifier?.value ?? environment?.hazardModifier ?? 0);
-    const resolved = this.richState.resolveD100Attempt({
+    const resolved = await this.richState.resolveD100Attempt({
       task,
       environment,
       actor,
@@ -1404,6 +1417,12 @@ export class GatheringEngine {
       gatheringModifier: Number.isFinite(gatheringModifier) ? gatheringModifier : 0,
       hazardModifier: Number.isFinite(hazardModifier) ? hazardModifier : 0
     });
+    if (resolved?.status === 'misconfigured') {
+      return misconfiguredOutcome({
+        code: 'CHARACTER_MODIFIER_MISCONFIGURED',
+        diagnostics: normalizeList(resolved.diagnostics)
+      });
+    }
     const resultGroups = [{
       id: `${task.id}-d100-results`,
       name: task.name || 'Gathered',
@@ -1417,11 +1436,13 @@ export class GatheringEngine {
     return {
       status: resolved?.status === 'failed' ? 'failed' : 'succeeded',
       resultGroups,
+      characterModifierSnapshot: resolved?.characterModifierSnapshot || null,
       checkResult: {
         provider: 'd100',
         items: normalizeList(resolved?.items),
         hazards: normalizeList(resolved?.hazards),
-        hazardPolicy: stringOrNull(resolved?.hazardPolicy)
+        hazardPolicy: stringOrNull(resolved?.hazardPolicy),
+        characterModifierSnapshot: resolved?.characterModifierSnapshot || null
       }
     };
   }
@@ -2297,13 +2318,48 @@ function enrichPublicTerminalRun(run, { createdResults, usedCatalysts, checkResu
   return enriched;
 }
 
-function redactRichEvidence(evidence = {}) {
+function redactCharacterModifierSnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object') return snapshot;
+  if (!snapshot?.rows && !snapshot?.hazards) return snapshot;
+  return {
+    rows: normalizeList(snapshot.rows).map(row => ({
+      rowId: null,
+      contributions: normalizeList(row?.contributions).map(entry => ({
+        contribution: Number(entry?.contribution ?? 0)
+      }))
+    })),
+    hazards: normalizeList(snapshot.hazards).map(hazard => ({
+      hazardId: null,
+      contributions: normalizeList(hazard?.contributions).map(entry => ({
+        contribution: Number(entry?.contribution ?? 0)
+      }))
+    }))
+  };
+}
+
+function redactRichEvidence(evidence = {}, _options = {}) {
   const redacted = cloneJson(evidence) || {};
   if (redacted.node) {
     redacted.node = { available: Number(redacted.node.remaining ?? redacted.node.current ?? 0) > 0 };
   }
   if (Array.isArray(redacted.hazards)) {
     redacted.hazards = redacted.hazards.map(() => ({ matched: true }));
+  }
+  if (redacted.characterModifierSnapshot && typeof redacted.characterModifierSnapshot === 'object') {
+    redacted.characterModifierSnapshot = {
+      rows: normalizeList(redacted.characterModifierSnapshot.rows).map(row => ({
+        rowId: null,
+        contributions: normalizeList(row?.contributions).map(entry => ({
+          contribution: Number(entry?.contribution ?? 0)
+        }))
+      })),
+      hazards: normalizeList(redacted.characterModifierSnapshot.hazards).map(hazard => ({
+        hazardId: null,
+        contributions: normalizeList(hazard?.contributions).map(entry => ({
+          contribution: Number(entry?.contribution ?? 0)
+        }))
+      }))
+    };
   }
   delete redacted.items;
   delete redacted.rolls;

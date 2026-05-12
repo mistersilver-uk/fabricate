@@ -10,6 +10,7 @@
   import EssenceEditView from './EssenceEditView.svelte';
   import GatheringTaskEditView from './GatheringTaskEditView.svelte';
   import EssenceSourceSelector from '../../components/EssenceSourceSelector.svelte';
+  import ProviderExpressionInput from '../../components/ProviderExpressionInput.svelte';
   import RecipesBrowserView from './RecipesBrowserView.svelte';
   import SystemEditView from './SystemEditView.svelte';
   import SystemsBrowserView from './SystemsBrowserView.svelte';
@@ -83,6 +84,98 @@
     selectedSystem,
     $viewState.gatheringConfig
   ));
+  const selectedGatheringCharacterModifiers = $derived(
+    Array.isArray($viewState.gatheringConfig?.systems?.[selectedSystemId]?.characterModifiers)
+      ? $viewState.gatheringConfig.systems[selectedSystemId].characterModifiers
+      : []
+  );
+  const foundrySystemId = $derived(String($viewState.foundrySystemId || ''));
+  const characterModifierPresetsSupported = $derived(['dnd5e', 'pf2e'].includes(foundrySystemId));
+  async function onAddCharacterModifier() {
+    if (!selectedSystemId) return null;
+    return await store.addGatheringCharacterModifier(selectedSystemId);
+  }
+  async function onSeedCharacterModifierPresets() {
+    if (!selectedSystemId || !characterModifierPresetsSupported) return;
+    await store.seedGatheringCharacterModifierPresets(selectedSystemId);
+  }
+  async function onUpdateCharacterModifier(modifierId, patch) {
+    if (!selectedSystemId) return;
+    await store.updateGatheringCharacterModifier(selectedSystemId, modifierId, patch);
+  }
+  async function onDeleteCharacterModifier(modifierId) {
+    if (!selectedSystemId) return;
+    await store.deleteGatheringCharacterModifier(selectedSystemId, modifierId);
+  }
+
+  function characterModifierLibraryEntry(modifierId) {
+    if (!modifierId) return null;
+    return selectedGatheringCharacterModifiers.find(entry => entry.id === modifierId) || null;
+  }
+
+  function characterModifierLabelForRef(ref) {
+    const entry = characterModifierLibraryEntry(ref?.modifierId);
+    if (entry) return entry.label || entry.id;
+    return text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.UnknownModifier', 'Unknown modifier ({id})').replace('{id}', ref?.modifierId || '');
+  }
+
+  function characterModifierIconForRef(ref) {
+    return characterModifierLibraryEntry(ref?.modifierId)?.icon || 'fa-solid fa-user';
+  }
+
+  function characterModifierIsCustomized(ref) {
+    if (!ref) return false;
+    return Boolean(ref.providerOverride || ref.expressionOverride || ref.macroUuidOverride);
+  }
+
+  function rowCharacterModifiers(row) {
+    return Array.isArray(row?.characterModifiers) ? row.characterModifiers : [];
+  }
+
+  async function onAddDropCharacterModifier(rowId, modifierId = null) {
+    if (!selectedSystemId || !selectedGatheringTask?.id || !rowId) return;
+    const id = modifierId ?? selectedGatheringCharacterModifiers[0]?.id ?? '';
+    await store.addGatheringDropRowCharacterModifier?.(selectedSystemId, selectedGatheringTask.id, rowId, { modifierId: id });
+  }
+
+  let characterModifierAddMenuOpen = $state(false);
+  function toggleCharacterModifierAddMenu() {
+    characterModifierAddMenuOpen = !characterModifierAddMenuOpen;
+  }
+  async function pickCharacterModifierForRow(rowId, modifierId) {
+    characterModifierAddMenuOpen = false;
+    await onAddDropCharacterModifier(rowId, modifierId);
+  }
+
+  function characterModifierOperatorClass(operator) {
+    return operator === '-' ? 'is-negative' : 'is-positive';
+  }
+  async function setCharacterModifierOverrideEnabled(rowId, ref, enabled, libraryEntry) {
+    if (enabled) {
+      const provider = ref.providerOverride || libraryEntry?.provider || 'dnd5e';
+      await onUpdateDropCharacterModifier(rowId, ref.id, { providerOverride: provider });
+    } else {
+      await onUpdateDropCharacterModifier(rowId, ref.id, { providerOverride: null, expressionOverride: '', macroUuidOverride: '' });
+    }
+  }
+
+  async function onUpdateDropCharacterModifier(rowId, refId, patch) {
+    if (!selectedSystemId || !selectedGatheringTask?.id || !rowId || !refId) return;
+    await store.updateGatheringDropRowCharacterModifier?.(selectedSystemId, selectedGatheringTask.id, rowId, refId, patch);
+  }
+
+  async function onDeleteDropCharacterModifier(rowId, refId) {
+    if (!selectedSystemId || !selectedGatheringTask?.id || !rowId || !refId) return;
+    await store.deleteGatheringDropRowCharacterModifier?.(selectedSystemId, selectedGatheringTask.id, rowId, refId);
+  }
+
+  async function onRestoreDropCharacterModifierDefaults(rowId, refId) {
+    await onUpdateDropCharacterModifier(rowId, refId, {
+      providerOverride: null,
+      expressionOverride: '',
+      macroUuidOverride: ''
+    });
+  }
   const visiblePlaceholderViews = $derived(selectedSystem
     ? placeholderViews.filter(view => isViewAvailableForSystem(view, selectedSystem))
     : []
@@ -2098,6 +2191,9 @@
             onAddGatheringLibraryHazard={store.addGatheringLibraryHazard}
             onUpdateGatheringLibraryHazard={store.updateGatheringLibraryHazard}
             onDeleteGatheringLibraryHazard={store.deleteGatheringLibraryHazard}
+            onAddGatheringHazardCharacterModifier={store.addGatheringHazardCharacterModifier}
+            onUpdateGatheringHazardCharacterModifier={store.updateGatheringHazardCharacterModifier}
+            onDeleteGatheringHazardCharacterModifier={store.deleteGatheringHazardCharacterModifier}
             onCancelEnvironment={store.cancelEnvironmentDraft}
             onSaveEnvironment={store.saveEnvironmentDraft}
             onDuplicateEnvironment={store.duplicateEnvironmentDraft}
@@ -2140,6 +2236,7 @@
         biomeOptions={gatheringVocabularyOptions('biomes')}
         selectedDropId={selectedGatheringDrop?.id || selectedGatheringDropId}
         rewardRules={selectedGatheringRules}
+        characterModifierLibrary={selectedGatheringCharacterModifiers}
         onPickImagePath={services?.pickImagePath}
         onUpdateTask={updateSelectedGatheringTask}
         onSelectDrop={(rowId) => { selectedGatheringDropId = rowId; }}
@@ -2250,6 +2347,12 @@
         onSetResolutionMode={(nextMode) => store.setResolutionMode?.(nextMode)}
         onToggleAdvancedOptions={(checked) => store.toggleAdvancedOptions?.(checked)}
         onToggleFeature={(storeKey, checked) => store.toggleFeature?.(storeKey, checked)}
+        characterModifierLibrary={selectedGatheringCharacterModifiers}
+        {characterModifierPresetsSupported}
+        onAddCharacterModifier={onAddCharacterModifier}
+        onUpdateCharacterModifier={onUpdateCharacterModifier}
+        onDeleteCharacterModifier={onDeleteCharacterModifier}
+        onSeedCharacterModifierPresets={onSeedCharacterModifierPresets}
       />
     {:else}
       <SystemsBrowserView
@@ -2402,7 +2505,8 @@
 
             {#if currentView === 'gathering-task-edit'}
             {#if selectedGatheringDrop}
-            <section class="manager-v2-inspector-card manager-v2-drop-editor-card" data-gathering-task-drop-inspector>
+            <div class="manager-v2-drop-inspector-stack" data-gathering-task-drop-inspector>
+            <section class="manager-v2-inspector-card manager-v2-drop-editor-header-card is-sticky">
               <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SelectedDrop', 'Selected Drop Rule')}</h3>
               <div class="manager-v2-inspector-title-row">
                 <img class="manager-v2-recipe-preview" src={gatheringDropImage(selectedGatheringDrop)} alt="" />
@@ -2421,7 +2525,9 @@
                   <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DeleteDrop', 'Delete drop rule')}</span>
                 </button>
               </div>
+            </section>
 
+            <section class="manager-v2-inspector-card manager-v2-drop-editor-card">
               <div class="manager-v2-drop-editor-values">
                 <label class="manager-v2-field manager-v2-drop-rate-editor" data-gathering-drop-inspector-rate>
                   <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChance', 'Drop chance')}</span>
@@ -2496,6 +2602,100 @@
                 </div>
               </div>
             </section>
+
+            <section class="manager-v2-inspector-card manager-v2-character-modifier-row-card" data-gathering-drop-character-modifiers>
+              <header class="manager-v2-character-modifier-row-card-header">
+                <div class="manager-v2-character-modifier-row-card-heading">
+                  <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.RowSectionTitle', 'Character modifiers')}</h3>
+                  <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.RowSectionHint', 'Modifiers adjust the final chance based on the attempting character.')}</p>
+                </div>
+                <div class="manager-v2-character-modifier-add-control">
+                  <button type="button"
+                          class="manager-v2-action"
+                          disabled={selectedGatheringCharacterModifiers.length === 0}
+                          data-tooltip={selectedGatheringCharacterModifiers.length === 0 ? text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.LibraryEmptyHint', 'Add a modifier to the system library first to reference it here.') : null}
+                          onclick={toggleCharacterModifierAddMenu}>
+                    <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                    {text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.AddRowReference', 'Add modifier')}
+                  </button>
+                  {#if characterModifierAddMenuOpen && selectedGatheringCharacterModifiers.length > 0}
+                    <ul class="manager-v2-character-modifier-add-menu" role="menu">
+                      {#each selectedGatheringCharacterModifiers as option (option.id)}
+                        <li role="none">
+                          <button type="button" role="menuitem" class="manager-v2-character-modifier-add-menu-item" onclick={() => pickCharacterModifierForRow(selectedGatheringDrop.id, option.id)}>
+                            <i class={option.icon || 'fa-solid fa-user'} aria-hidden="true"></i>
+                            <span>{option.label || option.id}</span>
+                          </button>
+                        </li>
+                      {/each}
+                    </ul>
+                  {/if}
+                </div>
+              </header>
+              <div class="manager-v2-character-modifier-row-list">
+                {#each rowCharacterModifiers(selectedGatheringDrop) as ref (ref.id)}
+                  {@const libraryEntry = characterModifierLibraryEntry(ref.modifierId)}
+                  {@const hasOverride = characterModifierIsCustomized(ref)}
+                  {@const operatorClass = characterModifierOperatorClass(ref.operator)}
+                  <article class="manager-v2-character-modifier-row-reference" data-gathering-drop-character-modifier-ref={ref.id}>
+                    <header class="manager-v2-character-modifier-row-reference-header">
+                      <span class="manager-v2-character-modifier-icon"><i class={characterModifierIconForRef(ref)} aria-hidden="true"></i></span>
+                      <span class="manager-v2-character-modifier-row-reference-label">{characterModifierLabelForRef(ref)}</span>
+                      {#if !libraryEntry}
+                        <span class="manager-v2-character-modifier-stale-warning" data-tooltip={text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.UnknownModifier', 'Unknown modifier ({id})').replace('{id}', ref.modifierId)}>
+                          <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                        </span>
+                      {/if}
+                      <label class={`manager-v2-character-modifier-operator-select ${operatorClass}`}>
+                        <span class="visually-hidden">{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.Operator', 'Operator')}</span>
+                        <select value={ref.operator || '+'} onchange={(event) => onUpdateDropCharacterModifier(selectedGatheringDrop.id, ref.id, { operator: event.currentTarget.value })}>
+                          <option value="+">{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.OperatorPositive', 'Positive')}</option>
+                          <option value="-">{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.OperatorNegative', 'Negative')}</option>
+                        </select>
+                      </label>
+                      <button type="button" class="manager-v2-icon-button is-danger manager-v2-character-modifier-row-reference-delete" aria-label={text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.DeleteRowReference', 'Delete character modifier reference')} onclick={() => onDeleteDropCharacterModifier(selectedGatheringDrop.id, ref.id)}>
+                        <i class="fas fa-trash" aria-hidden="true"></i>
+                      </button>
+                    </header>
+                    <div class="manager-v2-character-modifier-row-bounds">
+                      <label class="manager-v2-field">
+                        <span>{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.Min', 'Min')}</span>
+                        <input type="number" step="1" value={ref.min ?? ''} oninput={(event) => onUpdateDropCharacterModifier(selectedGatheringDrop.id, ref.id, { min: event.currentTarget.value === '' ? null : Number(event.currentTarget.value) })} />
+                      </label>
+                      <label class="manager-v2-field">
+                        <span>{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.Max', 'Max')}</span>
+                        <input type="number" step="1" value={ref.max ?? ''} oninput={(event) => onUpdateDropCharacterModifier(selectedGatheringDrop.id, ref.id, { max: event.currentTarget.value === '' ? null : Number(event.currentTarget.value) })} />
+                      </label>
+                    </div>
+                    <div class="manager-v2-character-modifier-override-row">
+                      <label class="manager-v2-character-modifier-override-toggle">
+                        <span>{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.OverrideToggle', 'Override?')}</span>
+                        <input type="checkbox" checked={hasOverride} onchange={(event) => setCharacterModifierOverrideEnabled(selectedGatheringDrop.id, ref, event.currentTarget.checked, libraryEntry)} />
+                      </label>
+                    </div>
+                    {#if hasOverride}
+                      <p class="manager-v2-muted manager-v2-character-modifier-override-hint">{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.OverrideHint', 'Overrides system-level definitions for expressions.')}</p>
+                      <ProviderExpressionInput
+                        provider={ref.providerOverride || libraryEntry?.provider || 'dnd5e'}
+                        expression={ref.expressionOverride || ''}
+                        macroUuid={ref.macroUuidOverride || ''}
+                        idPrefix={`drop-${selectedGatheringDrop.id}-character-modifier-${ref.id}`}
+                        onProviderChange={(value) => onUpdateDropCharacterModifier(selectedGatheringDrop.id, ref.id, { providerOverride: value })}
+                        onExpressionChange={(value) => onUpdateDropCharacterModifier(selectedGatheringDrop.id, ref.id, { expressionOverride: value })}
+                        onMacroUuidChange={(value) => onUpdateDropCharacterModifier(selectedGatheringDrop.id, ref.id, { macroUuidOverride: value })}
+                      />
+                      <button type="button" class="manager-v2-action" onclick={() => onRestoreDropCharacterModifierDefaults(selectedGatheringDrop.id, ref.id)}>
+                        <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+                        {text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.RestoreLibraryDefaults', 'Restore library defaults')}
+                      </button>
+                    {/if}
+                  </article>
+                {:else}
+                  <p class="manager-v2-muted manager-v2-character-modifier-row-empty">{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.RowEmpty', 'No character modifiers attached.')}</p>
+                {/each}
+              </div>
+            </section>
+            </div>
             {:else}
             <section class="manager-v2-inspector-card" data-gathering-task-drop-inspector>
               <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SelectedDrop', 'Selected drop rule')}</h3>
@@ -3202,6 +3402,7 @@
             </div>
           </section>
         {/if}
+
       {:else if systemsLoading}
         <section class="manager-v2-setup-card" aria-label={text('FABRICATE.Admin.ManagerV2.LoadingSystems', 'Loading crafting systems...')}>
           <div class="manager-v2-setup-card-header">

@@ -28,6 +28,17 @@ export function createGatheringSelectableActorsGetter({
  * are supplied by their actor roll data and the active Foundry Roll
  * implementation.
  *
+ * Callsites:
+ *  - `kind: 'check'` — gathering check evaluation.
+ *  - `kind: 'gate'` — visibility/attempt gates.
+ *  - `kind: 'stamina'` / `kind: 'attemptLimit'` — formula-driven economy.
+ *  - `kind: 'characterModifier'` — per-row character modifier resolution
+ *    (added by the gathering character modifiers feature). The extra
+ *    `environment`, `task`, `row`, `hazard`, `viewer`, and `modifier` keys
+ *    on the payload give macros enough context to inspect the surrounding
+ *    attempt; this implementation forwards them only when the underlying
+ *    Roll engine reads them as part of `actor.getRollData()`.
+ *
  * @param {object} payload
  * @param {string|number} payload.expression Formula or literal number to evaluate.
  * @param {Actor} [payload.actor] Actor supplying roll data.

@@ -12,6 +12,7 @@
   import TimeRequirementFields from '../environments/TimeRequirementFields.svelte';
   import VisibilityFields from '../environments/VisibilityFields.svelte';
   import ImagePathPicker from '../../components/ImagePathPicker.svelte';
+  import ProviderExpressionInput from '../../components/ProviderExpressionInput.svelte';
 
   let {
     environments = [],
@@ -37,6 +38,9 @@
     onAddGatheringLibraryHazard,
     onUpdateGatheringLibraryHazard,
     onDeleteGatheringLibraryHazard,
+    onAddGatheringHazardCharacterModifier = null,
+    onUpdateGatheringHazardCharacterModifier = null,
+    onDeleteGatheringHazardCharacterModifier = null,
     onSaveEnvironment,
     onDuplicateEnvironment,
     onDeleteEnvironment,
@@ -123,6 +127,59 @@
   const timeOfDaySetting = $derived(gatheringSystemConditions.timeOfDay || { current: gatheringConditions.timeOfDay || 'day', values: gatheringVocabularies.timeOfDay || ['day'] });
   const libraryTasks = $derived(Array.isArray(gatheringSystemConfig.tasks) ? gatheringSystemConfig.tasks : []);
   const libraryHazards = $derived(Array.isArray(gatheringSystemConfig.hazards) ? gatheringSystemConfig.hazards : []);
+  const libraryCharacterModifiers = $derived(Array.isArray(gatheringSystemConfig.characterModifiers) ? gatheringSystemConfig.characterModifiers : []);
+
+  function libraryCharacterModifierEntry(modifierId) {
+    if (!modifierId) return null;
+    return libraryCharacterModifiers.find(entry => entry.id === modifierId) || null;
+  }
+
+  function hazardCharacterModifierLabel(ref) {
+    const entry = libraryCharacterModifierEntry(ref?.modifierId);
+    if (entry) return entry.label || entry.id;
+    return text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.UnknownModifier', 'Unknown modifier ({id})').replace('{id}', ref?.modifierId || '');
+  }
+
+  function hazardCharacterModifierIcon(ref) {
+    return libraryCharacterModifierEntry(ref?.modifierId)?.icon || 'fa-solid fa-user';
+  }
+
+  function hazardCharacterModifierIsCustomized(ref) {
+    if (!ref) return false;
+    return Boolean(ref.providerOverride || ref.expressionOverride || ref.macroUuidOverride);
+  }
+
+  function hazardCharacterModifierRefs(hazard) {
+    return Array.isArray(hazard?.characterModifiers) ? hazard.characterModifiers : [];
+  }
+
+  async function onAddHazardCharacterModifier(hazardId) {
+    if (!onAddGatheringHazardCharacterModifier) return;
+    const firstId = libraryCharacterModifiers[0]?.id || '';
+    await onAddGatheringHazardCharacterModifier(
+      environmentDraft?.craftingSystemId,
+      hazardId,
+      firstId ? { modifierId: firstId } : { modifierId: '' }
+    );
+  }
+
+  async function onUpdateHazardCharacterModifier(hazardId, refId, patch) {
+    if (!onUpdateGatheringHazardCharacterModifier) return;
+    await onUpdateGatheringHazardCharacterModifier(environmentDraft?.craftingSystemId, hazardId, refId, patch);
+  }
+
+  async function onDeleteHazardCharacterModifier(hazardId, refId) {
+    if (!onDeleteGatheringHazardCharacterModifier) return;
+    await onDeleteGatheringHazardCharacterModifier(environmentDraft?.craftingSystemId, hazardId, refId);
+  }
+
+  async function onRestoreHazardCharacterModifierDefaults(hazardId, refId) {
+    await onUpdateHazardCharacterModifier(hazardId, refId, {
+      providerOverride: null,
+      expressionOverride: '',
+      macroUuidOverride: ''
+    });
+  }
   const activeVisibilityKey = $derived(`${environmentDraft?.id || 'new'}:${environmentDraft?.craftingSystemId || ''}:${activeTaskId}`);
   const editorVisibility = $derived(pendingVisibility || activeTaskVisibility);
   const normalizedValidationErrors = $derived(validationErrors.map(error => normalizedValidationTarget(error)));
@@ -1241,6 +1298,91 @@
                   <label class="manager-v2-field"><span>{text('FABRICATE.Admin.ManagerV2.Environment.MatchTimeOfDay', 'Match time')}</span><input value={tagCsv(hazard.timeOfDay)} oninput={(event) => onUpdateGatheringLibraryHazard?.(environmentDraft?.craftingSystemId, hazard.id, { timeOfDay: parseTags(event.target.value) })} /></label>
                   <label class="manager-v2-field"><span>{text('FABRICATE.Admin.ManagerV2.Environment.DropRate', 'Drop rate')}</span><input type="number" min="1" max="100" step="1" value={hazard.dropRate || 1} oninput={(event) => onUpdateGatheringLibraryHazard?.(environmentDraft?.craftingSystemId, hazard.id, { dropRate: Number(event.target.value || 1) })} /></label>
                 </div>
+                <section class="manager-v2-character-modifier-row-editor manager-v2-hazard-character-modifiers" data-gathering-hazard-character-modifiers={hazard.id}>
+                  <div class="manager-v2-inspector-subhead">
+                    <h4>{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.RowSectionTitle', 'Character modifiers')}</h4>
+                    <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.AddRowReference', 'Add character modifier reference')} onclick={() => onAddHazardCharacterModifier(hazard.id)}>
+                      <i class="fas fa-plus" aria-hidden="true"></i>
+                    </button>
+                  </div>
+                  <div class="manager-v2-character-modifier-row-list">
+                    {#each hazardCharacterModifierRefs(hazard) as ref (ref.id)}
+                      {@const libraryEntry = libraryCharacterModifierEntry(ref.modifierId)}
+                      {@const customized = hazardCharacterModifierIsCustomized(ref)}
+                      <div class="manager-v2-character-modifier-row-reference" data-gathering-hazard-character-modifier-ref={ref.id}>
+                        <div class="manager-v2-character-modifier-row-summary">
+                          <span class="manager-v2-character-modifier-icon"><i class={hazardCharacterModifierIcon(ref)} aria-hidden="true"></i></span>
+                          <label class="manager-v2-field manager-v2-character-modifier-picker">
+                            <span class="visually-hidden">{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.PickerLabel', 'Modifier')}</span>
+                            <select value={ref.modifierId} onchange={(event) => onUpdateHazardCharacterModifier(hazard.id, ref.id, { modifierId: event.currentTarget.value })}>
+                              {#if !libraryEntry}
+                                <option value={ref.modifierId} disabled>{hazardCharacterModifierLabel(ref)}</option>
+                              {/if}
+                              {#each libraryCharacterModifiers as option (option.id)}
+                                <option value={option.id}>{option.label || option.id}</option>
+                              {/each}
+                            </select>
+                          </label>
+                          <label class="manager-v2-field manager-v2-character-modifier-operator-toggle">
+                            <span class="visually-hidden">{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.Operator', 'Operator')}</span>
+                            <select value={ref.operator || '+'} onchange={(event) => onUpdateHazardCharacterModifier(hazard.id, ref.id, { operator: event.currentTarget.value })}>
+                              <option value="+">+</option>
+                              <option value="-">-</option>
+                            </select>
+                          </label>
+                          {#if customized}
+                            <span class="manager-v2-chip manager-v2-character-modifier-customized-badge" data-tooltip={text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.CustomizedTooltip', 'This reference overrides library defaults.')}>
+                              <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+                              {text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.Customized', 'Customized')}
+                            </span>
+                          {/if}
+                          {#if !libraryEntry}
+                            <span class="manager-v2-character-modifier-stale-warning" data-tooltip={text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.UnknownModifier', 'Unknown modifier ({id})').replace('{id}', ref.modifierId)}>
+                              <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                            </span>
+                          {/if}
+                          <button type="button" class="manager-v2-icon-button is-danger" aria-label={text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.DeleteRowReference', 'Delete character modifier reference')} onclick={() => onDeleteHazardCharacterModifier(hazard.id, ref.id)}>
+                            <i class="fas fa-trash" aria-hidden="true"></i>
+                          </button>
+                        </div>
+                        <details class="manager-v2-character-modifier-bounds">
+                          <summary>{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.Bounds', 'Bounds')}</summary>
+                          <div class="manager-v2-form-grid">
+                            <label class="manager-v2-field">
+                              <span>{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.Min', 'Min')}</span>
+                              <input type="number" step="1" value={ref.min ?? ''} oninput={(event) => onUpdateHazardCharacterModifier(hazard.id, ref.id, { min: event.currentTarget.value === '' ? null : Number(event.currentTarget.value) })} />
+                            </label>
+                            <label class="manager-v2-field">
+                              <span>{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.Max', 'Max')}</span>
+                              <input type="number" step="1" value={ref.max ?? ''} oninput={(event) => onUpdateHazardCharacterModifier(hazard.id, ref.id, { max: event.currentTarget.value === '' ? null : Number(event.currentTarget.value) })} />
+                            </label>
+                          </div>
+                        </details>
+                        <details class="manager-v2-character-modifier-override">
+                          <summary>{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.Customize', 'Customize for this row')}</summary>
+                          <ProviderExpressionInput
+                            provider={ref.providerOverride || libraryEntry?.provider || 'dnd5e'}
+                            expression={ref.expressionOverride || ''}
+                            macroUuid={ref.macroUuidOverride || ''}
+                            idPrefix={`hazard-${hazard.id}-character-modifier-${ref.id}`}
+                            onProviderChange={(value) => onUpdateHazardCharacterModifier(hazard.id, ref.id, { providerOverride: value })}
+                            onExpressionChange={(value) => onUpdateHazardCharacterModifier(hazard.id, ref.id, { expressionOverride: value })}
+                            onMacroUuidChange={(value) => onUpdateHazardCharacterModifier(hazard.id, ref.id, { macroUuidOverride: value })}
+                          />
+                          <button type="button" class="manager-v2-action" onclick={() => onRestoreHazardCharacterModifierDefaults(hazard.id, ref.id)}>
+                            <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+                            {text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.RestoreLibraryDefaults', 'Restore library defaults')}
+                          </button>
+                        </details>
+                      </div>
+                    {:else}
+                      <p class="manager-v2-muted manager-v2-character-modifier-row-empty">{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.RowEmpty', 'No character modifiers attached.')}</p>
+                    {/each}
+                  </div>
+                  {#if libraryCharacterModifiers.length === 0}
+                    <p class="manager-v2-muted manager-v2-character-modifier-empty-hint">{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.LibraryEmptyHint', 'Add a modifier to the system library first to reference it here.')}</p>
+                  {/if}
+                </section>
                 <button type="button" class="manager-v2-button is-danger" onclick={() => onDeleteGatheringLibraryHazard?.(environmentDraft?.craftingSystemId, hazard.id)}>
                   <i class="fas fa-trash" aria-hidden="true"></i>
                   <span>{text('FABRICATE.Admin.ManagerV2.Environment.DeleteReusableHazard', 'Delete reusable hazard')}</span>

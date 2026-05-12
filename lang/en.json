@@ -1126,6 +1126,54 @@
           "NoCheckTaskFields": "No check fields",
           "NoCheckTaskFieldsHint": "Routed tasks use result selection from the Results tab."
         },
+        "Gathering": {
+          "CharacterModifiers": {
+            "Title": "Character modifiers",
+            "Hint": "Define reusable actor-driven modifiers for this system's gathering rows and hazards.",
+            "Empty": "No character modifiers yet.",
+            "Add": "Add character modifier",
+            "Edit": "Edit character modifier",
+            "Delete": "Delete character modifier",
+            "NewLabel": "New character modifier",
+            "Label": "Label",
+            "Icon": "Icon",
+            "Provider": "Provider",
+            "Expression": "Expression",
+            "MacroUuid": "Macro UUID",
+            "SeedPresets": "Seed presets",
+            "SeedPresetsUnsupported": "Preset seeding is only available for dnd5e or pf2e worlds.",
+            "RollTag": "Roll",
+            "UnknownModifier": "Unknown modifier ({id})",
+            "Customize": "Customize for this row",
+            "Customized": "Customized",
+            "Min": "Min",
+            "Max": "Max",
+            "Operator": "Operator",
+            "Plus": "Add",
+            "Minus": "Subtract",
+            "Repoint": "Re-point",
+            "ProviderDnd5e": "D&D 5e",
+            "ProviderPf2e": "Pathfinder 2e",
+            "ProviderMacro": "Macro",
+            "SectionTitle": "Character modifiers",
+            "EmptyForRow": "No character modifier references on this row.",
+            "RowSectionTitle": "Character modifiers",
+            "AddRowReference": "Add",
+            "DeleteRowReference": "Delete character modifier reference",
+            "PickerLabel": "Modifier",
+            "Bounds": "Bounds",
+            "CustomizedTooltip": "This reference overrides library defaults.",
+            "RestoreLibraryDefaults": "Restore library defaults",
+            "RowEmpty": "No character modifiers attached.",
+            "LibraryEmptyHint": "Add a modifier to the system library first to reference it here.",
+            "RowSectionHint": "Modifiers adjust the final chance based on the attempting character.",
+            "OverrideToggle": "Override?",
+            "OverrideHint": "Overrides system-level definitions for expressions.",
+            "OperatorPositive": "Positive",
+            "OperatorNegative": "Negative",
+            "UnknownModifierShort": "Unknown"
+          }
+        },
         "Column": {
           "System": "System",
           "Resolution": "Resolution",
@@ -1865,7 +1913,15 @@
       },
       "History": {
         "Title": "Recent History",
-        "SucceededSummary": "{results} results, {catalysts} catalysts used"
+        "SucceededSummary": "{results} results, {catalysts} catalysts used",
+        "CharacterModifiers": {
+          "Title": "Character Modifiers",
+          "RowsHeading": "Drop rows",
+          "HazardsHeading": "Hazards",
+          "RowEmpty": "No character modifier contributions.",
+          "UnknownModifier": "Unknown modifier",
+          "RedactedSummary": "modifiers contributed {positive} / {negative}"
+        }
       },
       "Status": {
         "waitingTime": "Waiting",
@@ -1946,6 +2002,12 @@
         "deadly": "Deadly",
         "unsafe": "Unsafe",
         "extreme": "Extreme"
+      },
+      "Diagnostics": {
+        "MissingCharacterModifier": "Character modifier \"{id}\" is not defined in this system's library.",
+        "MacroOverrideMissingUuid": "A row override using the macro provider is missing a macro UUID.",
+        "CharacterModifierBoundsInvalid": "A row character modifier has min > max.",
+        "CharacterModifierNonFinite": "A character modifier expression did not resolve to a finite number."
       }
     },
     "Workbench": {

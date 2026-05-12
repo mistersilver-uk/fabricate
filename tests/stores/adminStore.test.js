@@ -2036,6 +2036,7 @@ describe('createAdminStore', () => {
         quantity: 2,
         dropRate: 80,
         conditionModifiers: { timeOfDay: [], weather: [] },
+        characterModifiers: [],
         enabled: true
       });
       assert.equal(config.systems.sys1.hazards[0].name, 'Thorns');
@@ -2521,6 +2522,112 @@ describe('createAdminStore', () => {
       assert.equal(confirmationCount, 2);
       assert.equal(services._store.gatheringConfig.systems.sys1.tasks.length, 0);
       assert.equal(services._store.gatheringConfig.systems.sys1.hazards.length, 0);
+    });
+
+    it('adds, updates, and deletes character modifier references on drop rows and hazards', async () => {
+      const services = createMockServices({
+        randomID: (() => {
+          let id = 0;
+          return () => `cmref-${++id}`;
+        })()
+      });
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      services._store.gatheringConfig = {
+        systems: {
+          sys1: {
+            characterModifiers: [
+              { id: 'strength', label: 'Strength', icon: 'fa-solid fa-dumbbell', provider: 'dnd5e', expression: '@abilities.str.mod' },
+              { id: 'dexterity', label: 'Dexterity', icon: 'fa-solid fa-running', provider: 'dnd5e', expression: '@abilities.dex.mod' }
+            ],
+            tasks: [{
+              id: 'task-iron',
+              name: 'Iron Vein',
+              dropRows: [
+                { id: 'row-iron', componentId: 'iron', quantity: 1, dropRate: 50 }
+              ]
+            }],
+            hazards: [
+              { id: 'hazard-cave-in', name: 'Cave-in', dropRate: 25 }
+            ]
+          }
+        }
+      };
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const dropRef = await store.addGatheringDropRowCharacterModifier('sys1', 'task-iron', 'row-iron');
+      assert.ok(dropRef, 'drop ref was created');
+      assert.equal(dropRef.modifierId, 'strength');
+      assert.equal(dropRef.operator, '+');
+      let task = services._store.gatheringConfig.systems.sys1.tasks[0];
+      assert.equal(task.dropRows[0].characterModifiers.length, 1);
+      assert.equal(task.dropRows[0].characterModifiers[0].id, dropRef.id);
+
+      const updated = await store.updateGatheringDropRowCharacterModifier('sys1', 'task-iron', 'row-iron', dropRef.id, {
+        modifierId: 'dexterity',
+        operator: '-',
+        min: -2,
+        max: 5,
+        expressionOverride: '1d4 + @abilities.dex.mod'
+      });
+      assert.equal(updated, true);
+      task = services._store.gatheringConfig.systems.sys1.tasks[0];
+      assert.equal(task.dropRows[0].characterModifiers[0].modifierId, 'dexterity');
+      assert.equal(task.dropRows[0].characterModifiers[0].operator, '-');
+      assert.equal(task.dropRows[0].characterModifiers[0].min, -2);
+      assert.equal(task.dropRows[0].characterModifiers[0].max, 5);
+      assert.equal(task.dropRows[0].characterModifiers[0].expressionOverride, '1d4 + @abilities.dex.mod');
+
+      const hazardRef = await store.addGatheringHazardCharacterModifier('sys1', 'hazard-cave-in', {
+        modifierId: 'strength',
+        operator: '-'
+      });
+      assert.ok(hazardRef, 'hazard ref was created');
+      assert.equal(hazardRef.modifierId, 'strength');
+      assert.equal(hazardRef.operator, '-');
+      let hazard = services._store.gatheringConfig.systems.sys1.hazards[0];
+      assert.equal(hazard.characterModifiers.length, 1);
+      assert.equal(hazard.characterModifiers[0].id, hazardRef.id);
+
+      const hazardUpdated = await store.updateGatheringHazardCharacterModifier('sys1', 'hazard-cave-in', hazardRef.id, {
+        providerOverride: 'macro',
+        macroUuidOverride: 'Macro.x'
+      });
+      assert.equal(hazardUpdated, true);
+      hazard = services._store.gatheringConfig.systems.sys1.hazards[0];
+      assert.equal(hazard.characterModifiers[0].providerOverride, 'macro');
+      assert.equal(hazard.characterModifiers[0].macroUuidOverride, 'Macro.x');
+
+      const dropDeleted = await store.deleteGatheringDropRowCharacterModifier('sys1', 'task-iron', 'row-iron', dropRef.id);
+      assert.equal(dropDeleted, true);
+      task = services._store.gatheringConfig.systems.sys1.tasks[0];
+      assert.equal(task.dropRows[0].characterModifiers.length, 0);
+
+      const hazardDeleted = await store.deleteGatheringHazardCharacterModifier('sys1', 'hazard-cave-in', hazardRef.id);
+      assert.equal(hazardDeleted, true);
+      hazard = services._store.gatheringConfig.systems.sys1.hazards[0];
+      assert.equal(hazard.characterModifiers.length, 0);
+    });
+
+    it('returns null when adding a character modifier reference to an unknown row', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      services._store.gatheringConfig = {
+        systems: {
+          sys1: {
+            characterModifiers: [{ id: 'strength', label: 'Strength', icon: '', provider: 'dnd5e', expression: '@abilities.str.mod' }],
+            tasks: [{ id: 'task-iron', name: 'Iron', dropRows: [{ id: 'row-iron', dropRate: 50 }] }],
+            hazards: []
+          }
+        }
+      };
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      assert.equal(await store.addGatheringDropRowCharacterModifier('sys1', 'unknown-task', 'row-iron'), null);
+      assert.equal(await store.addGatheringDropRowCharacterModifier('sys1', 'task-iron', 'unknown-row'), null);
+      assert.equal(await store.addGatheringHazardCharacterModifier('sys1', 'unknown-hazard'), null);
     });
 
     it('viewState.selectedSystem.craftingCheck.outcomesText is comma-separated string from outcomes array', async () => {

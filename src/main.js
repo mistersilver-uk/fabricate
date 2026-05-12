@@ -460,7 +460,9 @@ class Fabricate {
       settingKey: SETTING_KEYS.GATHERING_CONFIG,
       nowWorldTime: () => Number(game.time?.worldTime || 0),
       getUserId: () => game.user?.id || null,
-      hooks: Hooks
+      hooks: Hooks,
+      evaluateExpression: evaluateGatheringExpression,
+      runMacro: runGatheringMacro
     });
     gatheringEngine = new GatheringEngine({
       environmentStore: this.gatheringEnvironmentStore,

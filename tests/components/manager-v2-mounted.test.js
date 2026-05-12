@@ -31,7 +31,8 @@ const sharedComponentNames = [
   'ManagerV2ColorPicker',
   'ManagerV2ColorPopover',
   'EssenceSourceSelector',
-  'Pagination'
+  'Pagination',
+  'ProviderExpressionInput'
 ];
 
 let tempRoot;
