@@ -34,6 +34,7 @@
   let componentEditSaving = $state(false);
   let componentEditDraft = $state(null);
   let activeGatheringTab = $state('environments');
+  let gatheringMenuExpanded = $state(false);
   let selectedGatheringTaskId = $state('');
   let selectedGatheringDropId = $state('');
   let gatheringTaskDraft = $state(null);
@@ -340,10 +341,18 @@
   );
   const selectedEnvironmentFacts = $derived(environmentFacts(selectedEnvironment));
   const selectedEnvironmentSceneState = $derived(environmentSceneState(selectedEnvironment));
-  const gatheringInspectorTabs = [
+  const gatheringNavItems = [
+    {
+      id: 'environments',
+      icon: 'fas fa-seedling',
+      labelKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Environments',
+      labelFallback: 'Environments'
+    },
     {
       id: 'tasks',
       icon: 'fas fa-list-check',
+      labelKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Tasks',
+      labelFallback: 'Tasks',
       titleKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksTitle',
       titleFallback: 'Gathering Tasks',
       hintKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksHint',
@@ -352,6 +361,8 @@
     {
       id: 'encounters',
       icon: 'fas fa-exclamation-triangle',
+      labelKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Encounters',
+      labelFallback: 'Hazards',
       titleKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.EncountersPlaceholderTitle',
       titleFallback: 'Gathering hazards',
       hintKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.EncountersPlaceholderHint',
@@ -360,12 +371,16 @@
     {
       id: 'settings',
       icon: 'fas fa-sliders',
+      labelKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Settings',
+      labelFallback: 'Settings',
       titleKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderTitle',
       titleFallback: 'Gathering settings',
       hintKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.SettingsPlaceholderHint',
       hintFallback: 'Set system-level rules for gathering.'
     }
   ];
+  const gatheringInspectorTabs = gatheringNavItems.filter(tab => tab.id !== 'environments');
+  const isGatheringRoute = $derived(currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit');
   const activeGatheringInspectorTab = $derived(
     gatheringInspectorTabs.find(tab => tab.id === activeGatheringTab) || null
   );
@@ -425,6 +440,7 @@
     gatheringTaskDraftBaseline = null;
     gatheringTaskSaving = false;
     gatheringTaskSaveError = '';
+    gatheringMenuExpanded = isGatheringRoute;
     lastGatheringSystemId = selectedSystemId;
   });
 
@@ -869,6 +885,7 @@
   function backToEnvironmentsBrowse() {
     afterTruthyResult(confirmRouteExit('environments'), () => {
       activeView = canShowEnvironments ? 'environments' : 'systems';
+      if (canShowEnvironments) gatheringMenuExpanded = true;
     });
   }
 
@@ -1217,6 +1234,7 @@
     gatheringTaskDraftBaseline = snapshot ? JSON.parse(JSON.stringify(snapshot)) : null;
     gatheringTaskSaveError = '';
     activeGatheringTab = 'tasks';
+    gatheringMenuExpanded = true;
     activeView = 'gathering-task-edit';
   }
 
@@ -1229,6 +1247,7 @@
   function backToGatheringTaskLibrary() {
     afterTruthyResult(confirmRouteExit('environments'), () => {
       activeGatheringTab = 'tasks';
+      gatheringMenuExpanded = true;
       activeView = 'environments';
     });
   }
@@ -1267,6 +1286,7 @@
     gatheringTaskDraftBaseline = null;
     gatheringTaskSaveError = '';
     activeGatheringTab = 'tasks';
+    gatheringMenuExpanded = true;
     activeView = 'environments';
   }
 
@@ -1430,7 +1450,23 @@
   }
 
   function selectGatheringTab(tabId) {
-    activeGatheringTab = gatheringInspectorTabs.some(tab => tab.id === tabId) ? tabId : 'environments';
+    activeGatheringTab = gatheringNavItems.some(tab => tab.id === tabId) ? tabId : 'environments';
+    gatheringMenuExpanded = true;
+  }
+
+  function openGatheringSection(tabId = 'environments') {
+    if (!canShowEnvironments) return;
+    const nextTab = gatheringNavItems.some(tab => tab.id === tabId) ? tabId : 'environments';
+    afterTruthyResult(confirmRouteExit('environments'), () => {
+      activeGatheringTab = nextTab;
+      gatheringMenuExpanded = true;
+      activeView = 'environments';
+    });
+  }
+
+  function toggleGatheringMenu(event) {
+    event?.stopPropagation?.();
+    gatheringMenuExpanded = !gatheringMenuExpanded;
   }
 
   function environmentListIndex(environmentId) {
@@ -2285,11 +2321,47 @@
             </button>
           {/if}
           {#if canShowEnvironments}
-            <button type="button" class={`manager-v2-nav-button ${currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' ? 'is-active' : ''}`} aria-current={currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' ? 'page' : undefined} onclick={() => setView('environments')}>
-              <i class="fas fa-seedling" aria-hidden="true"></i>
-              <span class="manager-v2-nav-label">{text('FABRICATE.Admin.ManagerV2.Nav.Environments', 'Gathering')}</span>
-              <span class="manager-v2-nav-count">{selectedCounts.environments ?? 0}</span>
-            </button>
+            <div class="manager-v2-nav-group">
+              <button
+                type="button"
+                class={`manager-v2-nav-button manager-v2-nav-parent ${isGatheringRoute ? 'is-active' : ''}`}
+                id="manager-v2-nav-gathering"
+                aria-current={isGatheringRoute ? 'page' : undefined}
+                aria-expanded={gatheringMenuExpanded}
+                onclick={() => openGatheringSection('environments')}
+              >
+                <i class="fas fa-seedling" aria-hidden="true"></i>
+                <span class="manager-v2-nav-label">{text('FABRICATE.Admin.ManagerV2.Nav.Environments', 'Gathering')}</span>
+              </button>
+              <button
+                type="button"
+                class="manager-v2-nav-toggle"
+                aria-label={gatheringMenuExpanded
+                  ? text('FABRICATE.Admin.ManagerV2.Nav.CollapseGathering', 'Collapse gathering menu')
+                  : text('FABRICATE.Admin.ManagerV2.Nav.ExpandGathering', 'Expand gathering menu')}
+                aria-controls="manager-v2-gathering-submenu"
+                aria-expanded={gatheringMenuExpanded}
+                onclick={toggleGatheringMenu}
+              >
+                <i class={gatheringMenuExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>
+              </button>
+              {#if gatheringMenuExpanded}
+                <div class="manager-v2-nav-submenu" id="manager-v2-gathering-submenu" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Label', 'Gathering sections')}>
+                  {#each gatheringNavItems as gatheringItem (gatheringItem.id)}
+                    <button
+                      type="button"
+                      class={`manager-v2-nav-subitem ${isGatheringRoute && activeGatheringTab === gatheringItem.id ? 'is-active' : ''}`}
+                      id={`manager-v2-gathering-nav-${gatheringItem.id}`}
+                      aria-current={isGatheringRoute && activeGatheringTab === gatheringItem.id ? 'page' : undefined}
+                      onclick={() => openGatheringSection(gatheringItem.id)}
+                    >
+                      <i class={gatheringItem.icon} aria-hidden="true"></i>
+                      <span class="manager-v2-nav-label">{text(gatheringItem.labelKey, gatheringItem.labelFallback)}</span>
+                    </button>
+                  {/each}
+                </div>
+              {/if}
+            </div>
           {/if}
         {/if}
         {#each visiblePlaceholderViews as view}

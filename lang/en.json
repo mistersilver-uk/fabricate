@@ -415,6 +415,8 @@
           "Components": "Components",
           "Recipes": "Recipes",
           "Environments": "Gathering",
+          "ExpandGathering": "Expand gathering menu",
+          "CollapseGathering": "Collapse gathering menu",
           "Essences": "Essences",
           "TagsCategories": "Tags & Categories",
           "Rules": "Rules",

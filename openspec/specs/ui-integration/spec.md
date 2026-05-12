@@ -79,6 +79,7 @@ Selected-system navigation:
 - When a crafting system is selected, `System settings` is the first left-nav item and stays in that position regardless of feature gates.
 - Feature-scoped left-nav items are visible only when their feature is enabled or otherwise available for the selected system.
 - Feature-scoped routes that have been implemented must be enabled navigation controls, not disabled placeholders. If a route is still planned only, it may remain in the placeholder/deferred-view set.
+- The selected-system Gathering rail item shows an expand/collapse control instead of an environment count. Activating the parent item opens the Environments browser by default and expands the submenu; activating only the expand/collapse control toggles the submenu without navigation. The expanded submenu contains Environments, Tasks, Hazards, and Settings, with both the Gathering parent and the selected subsection visibly highlighted. Gathering section navigation must not be duplicated as an in-page horizontal tab strip.
 - The root `Crafting Systems` breadcrumb returns to the systems browser. The selected-system breadcrumb opens that system's in-manager System settings route.
 - The selected-system rail scope shows the selected system name as static text plus a `Return to System Library` icon button. Activating that button returns to the systems browser without clearing the real selected-system store state.
 

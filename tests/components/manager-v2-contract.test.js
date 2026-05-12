@@ -259,7 +259,11 @@ describe('CraftingSystemManagerV2 source contract', () => {
       lang.FABRICATE.Admin.ManagerV2.Environment.EmptyHint,
       'Define gathering tasks and hazards before creating environments, then attach those building blocks to each location players can gather from.'
     );
-    assert.ok(environmentsBrowserSource.includes('manager-v2-gathering-tabs'), 'gathering page should render local section tabs');
+    assert.ok(rootSource.includes('manager-v2-nav-submenu'), 'gathering sections should render in the left rail submenu');
+    assert.ok(rootSource.includes('manager-v2-nav-toggle'), 'gathering rail should expose an expand/collapse control');
+    assert.ok(rootSource.includes('FABRICATE.Admin.ManagerV2.Nav.ExpandGathering'), 'gathering rail expand label should be localized');
+    assert.ok(rootSource.includes('FABRICATE.Admin.ManagerV2.Nav.CollapseGathering'), 'gathering rail collapse label should be localized');
+    assert.equal(environmentsBrowserSource.includes('manager-v2-gathering-tabs'), false, 'gathering page should not render local section tabs');
     assert.ok(rootSource.includes("let activeGatheringTab = $state('environments')"), 'root should own gathering tab state for inspector coordination');
     assert.ok(environmentsBrowserSource.includes("activeGatheringTab = 'environments'"), 'gathering page should accept environments as the default active tab');
     assert.ok(environmentsBrowserSource.includes('onSelectGatheringTab(tabId)'), 'gathering page should report tab changes to the root');
@@ -285,6 +289,8 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Tasks, 'Tasks');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Encounters, 'Hazards');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Settings, 'Settings');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Nav.ExpandGathering, 'Expand gathering menu');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Nav.CollapseGathering, 'Collapse gathering menu');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.OpenTasks, 'Review tasks');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.OpenHazards, 'Review hazards');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksHint, 'Browse gathering tasks before attaching them to environments.');
