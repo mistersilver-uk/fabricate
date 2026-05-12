@@ -2213,6 +2213,14 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Edit availability, identity, and drop rules for the selected gathering task.'));
     assert.ok(target.querySelector('[data-gathering-task-drops-table]'));
     assert.ok(target.querySelector('[data-gathering-task-drop-inspector]'));
+    const dropInspector = target.querySelector('[data-gathering-task-drop-inspector]');
+    const dropInspectorChildren = Array.from(dropInspector.children);
+    assert.ok(dropInspectorChildren[0].classList.contains('manager-v2-drop-editor-header-card'));
+    assert.equal(dropInspectorChildren[0].classList.contains('is-sticky'), false);
+    assert.ok(dropInspectorChildren[1].classList.contains('manager-v2-drop-inspector-divider'));
+    assert.ok(dropInspectorChildren[2].classList.contains('manager-v2-drop-inspector-scroll'));
+    assert.ok(dropInspectorChildren[2].querySelector('.manager-v2-drop-editor-card'));
+    assert.ok(dropInspectorChildren[2].querySelector('[data-gathering-drop-character-modifiers]'));
     assert.equal(target.querySelector('.manager-v2-task-editor-tabs'), null);
     assert.equal(target.querySelector('[data-gathering-task-summary]'), null);
     assert.equal(target.querySelector('[data-gathering-task-matching-logic]'), null);

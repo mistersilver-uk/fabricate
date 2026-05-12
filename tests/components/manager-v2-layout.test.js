@@ -412,6 +412,10 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const dropEditorCountInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-count-editor input[type="text"]');
   const dropEditorInspectorCountInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-card .manager-v2-drop-count-editor[data-gathering-drop-inspector-count] input[type="text"]');
   const dropEditorActionsBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-actions');
+  const dropInspectorStackBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-inspector-stack');
+  const dropInspectorRouteBlock = blockFor('.fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"] .manager-v2-inspector');
+  const dropInspectorDividerBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-inspector-divider');
+  const dropInspectorScrollBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-inspector-scroll');
   const dropQuantityCellBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-drop-row > .manager-v2-drop-quantity-cell');
   const dropQuantityInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-quantity-cell input[type="text"]');
   const dropQuantityInputOverrideBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-edit-view .manager-v2-drop-quantity-cell input[type="text"]');
@@ -528,6 +532,13 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(dropEditorCountInputBlock.includes('min-height: 28px;') && dropEditorCountInputBlock.includes('text-align: center;'), 'selected drop inspector count input should match row count input geometry');
   assert.ok(dropEditorInspectorCountInputBlock.includes('height: 28px;') && dropEditorInspectorCountInputBlock.includes('min-height: 28px;') && dropEditorInspectorCountInputBlock.includes('padding: 4px;') && dropEditorInspectorCountInputBlock.includes('box-shadow: none;'), 'selected drop inspector count input should override generic inspector input chrome with chance-field geometry');
   assert.ok(dropEditorActionsBlock.includes('grid-template-columns: repeat(2, minmax(0, 1fr));') && dropEditorActionsBlock.includes('margin-top: 0;'), 'selected drop rule actions should sit beneath the inspector title row');
+  assert.ok(dropInspectorStackBlock.includes('grid-template-rows: auto auto minmax(0, 1fr);'), 'selected drop inspector should reserve fixed header, divider, and lower scroll rows');
+  assert.ok(dropInspectorStackBlock.includes('height: 100%;') && dropInspectorStackBlock.includes('overflow: visible;'), 'selected drop inspector stack should allow the divider to span the full right inspector width');
+  assert.ok(dropInspectorRouteBlock.includes('overflow: hidden;'), 'gathering task edit inspector should delegate selected-drop scrolling to the lower viewport');
+  assert.ok(dropInspectorDividerBlock.includes('width: calc(100% + 24px);') && dropInspectorDividerBlock.includes('margin: 10px -12px 0;'), 'selected drop inspector divider should bleed through the right inspector padding');
+  assert.ok(dropInspectorDividerBlock.includes('height: 1px;') && dropInspectorDividerBlock.includes('background: var(--fab-mv2-border);'), 'selected drop inspector should render a visible divider below the header');
+  assert.ok(dropInspectorScrollBlock.includes('overflow-y: auto;') && dropInspectorScrollBlock.includes('overflow-x: hidden;'), 'selected drop lower editor content should own vertical scrolling without horizontal overflow');
+  assert.ok(dropInspectorScrollBlock.includes('padding-top: 12px;') && dropInspectorScrollBlock.includes('gap: 12px;'), 'selected drop scroll viewport should visually separate lower cards from the divider');
   assert.equal(css.includes('.fabricate-manager-v2 .manager-v2-drop-actions'), false, 'drop row actions should not reserve row layout or styling');
   assert.equal(taskEditorIntermediateQuery.includes('.manager-v2-gathering-task-drop-row {\n    grid-template-columns: minmax(0, 1fr);'), false, 'task editor should not stack drop rows at the intermediate desktop width');
   assert.ok(taskEditorIntermediateQuery.includes('minmax(154px, 1.04fr) 54px minmax(150px, 1.38fr)'), 'intermediate task editor drop grid should preserve drop chance width while widening modifiers');

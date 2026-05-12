@@ -138,12 +138,25 @@
     await store.addGatheringDropRowCharacterModifier?.(selectedSystemId, selectedGatheringTask.id, rowId, { modifierId: id });
   }
 
-  let characterModifierAddMenuOpen = $state(false);
-  function toggleCharacterModifierAddMenu() {
-    characterModifierAddMenuOpen = !characterModifierAddMenuOpen;
-  }
+  let characterModifierSearchTerm = $state('');
+  const characterModifierSearchSuggestions = $derived.by(() => {
+    const term = characterModifierSearchTerm.trim().toLowerCase();
+    if (!term) return [];
+    const attached = new Set((selectedGatheringDrop?.characterModifiers || []).map(ref => ref.modifierId).filter(Boolean));
+    return selectedGatheringCharacterModifiers.filter(entry => {
+      if (attached.has(entry.id)) return false;
+      const label = String(entry.label || '').toLowerCase();
+      const id = String(entry.id || '').toLowerCase();
+      return label.includes(term) || id.includes(term);
+    });
+  });
+  $effect(() => {
+    if (selectedGatheringDrop?.id) {
+      characterModifierSearchTerm = '';
+    }
+  });
   async function pickCharacterModifierForRow(rowId, modifierId) {
-    characterModifierAddMenuOpen = false;
+    characterModifierSearchTerm = '';
     await onAddDropCharacterModifier(rowId, modifierId);
   }
 
@@ -2506,7 +2519,7 @@
             {#if currentView === 'gathering-task-edit'}
             {#if selectedGatheringDrop}
             <div class="manager-v2-drop-inspector-stack" data-gathering-task-drop-inspector>
-            <section class="manager-v2-inspector-card manager-v2-drop-editor-header-card is-sticky">
+            <section class="manager-v2-inspector-card manager-v2-drop-editor-header-card">
               <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SelectedDrop', 'Selected Drop Rule')}</h3>
               <div class="manager-v2-inspector-title-row">
                 <img class="manager-v2-recipe-preview" src={gatheringDropImage(selectedGatheringDrop)} alt="" />
@@ -2527,6 +2540,9 @@
               </div>
             </section>
 
+            <div class="manager-v2-drop-inspector-divider" aria-hidden="true"></div>
+
+            <div class="manager-v2-drop-inspector-scroll">
             <section class="manager-v2-inspector-card manager-v2-drop-editor-card">
               <div class="manager-v2-drop-editor-values">
                 <label class="manager-v2-field manager-v2-drop-rate-editor" data-gathering-drop-inspector-rate>
@@ -2609,29 +2625,32 @@
                   <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.RowSectionTitle', 'Character modifiers')}</h3>
                   <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.RowSectionHint', 'Modifiers adjust the final chance based on the attempting character.')}</p>
                 </div>
-                <div class="manager-v2-character-modifier-add-control">
-                  <button type="button"
-                          class="manager-v2-action"
-                          disabled={selectedGatheringCharacterModifiers.length === 0}
-                          data-tooltip={selectedGatheringCharacterModifiers.length === 0 ? text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.LibraryEmptyHint', 'Add a modifier to the system library first to reference it here.') : null}
-                          onclick={toggleCharacterModifierAddMenu}>
-                    <i class="fa-solid fa-plus" aria-hidden="true"></i>
-                    {text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.AddRowReference', 'Add modifier')}
-                  </button>
-                  {#if characterModifierAddMenuOpen && selectedGatheringCharacterModifiers.length > 0}
-                    <ul class="manager-v2-character-modifier-add-menu" role="menu">
-                      {#each selectedGatheringCharacterModifiers as option (option.id)}
-                        <li role="none">
-                          <button type="button" role="menuitem" class="manager-v2-character-modifier-add-menu-item" onclick={() => pickCharacterModifierForRow(selectedGatheringDrop.id, option.id)}>
-                            <i class={option.icon || 'fa-solid fa-user'} aria-hidden="true"></i>
-                            <span>{option.label || option.id}</span>
-                          </button>
-                        </li>
-                      {/each}
-                    </ul>
-                  {/if}
-                </div>
               </header>
+              <div class="manager-v2-character-modifier-add-search-row">
+                <label class="manager-v2-search is-compact manager-v2-character-modifier-add-search" data-gathering-drop-character-modifier-search>
+                  <i class="fas fa-search" aria-hidden="true"></i>
+                  <input type="search"
+                         value={characterModifierSearchTerm}
+                         oninput={(event) => { characterModifierSearchTerm = event.currentTarget.value; }}
+                         placeholder={text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.AddSearchPlaceholder', 'Search character modifiers...')}
+                         aria-label={text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.AddSearchLabel', 'Search character modifiers to add')}
+                         disabled={selectedGatheringCharacterModifiers.length === 0}
+                         data-tooltip={selectedGatheringCharacterModifiers.length === 0 ? text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.LibraryEmptyHint', 'Add a modifier to the system library first to reference it here.') : null} />
+                  {#if characterModifierSearchSuggestions.length > 0}
+                    <div class="manager-v2-tag-suggestions manager-v2-character-modifier-add-suggestions" data-gathering-drop-character-modifier-suggestions>
+                      {#each characterModifierSearchSuggestions as option (option.id)}
+                        <button type="button"
+                                class="manager-v2-tag-suggestion manager-v2-character-modifier-add-suggestion"
+                                data-gathering-drop-character-modifier-suggestion={option.id}
+                                onclick={() => pickCharacterModifierForRow(selectedGatheringDrop.id, option.id)}>
+                          <i class={option.icon || 'fa-solid fa-user'} aria-hidden="true"></i>
+                          <span>{option.label || option.id}</span>
+                        </button>
+                      {/each}
+                    </div>
+                  {/if}
+                </label>
+              </div>
               <div class="manager-v2-character-modifier-row-list">
                 {#each rowCharacterModifiers(selectedGatheringDrop) as ref (ref.id)}
                   {@const libraryEntry = characterModifierLibraryEntry(ref.modifierId)}
@@ -2695,6 +2714,7 @@
                 {/each}
               </div>
             </section>
+            </div>
             </div>
             {:else}
             <section class="manager-v2-inspector-card" data-gathering-task-drop-inspector>

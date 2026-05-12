@@ -936,7 +936,7 @@
             "DeleteModifier": "Delete modifier",
             "ModifierValue": "Modifier value",
             "EmptyDropSearchTitle": "No drop rules match this search",
-            "DropCalculationHelp": "Final drop chance = base chance + matching drop modifiers + environment-specific modifiers",
+            "DropCalculationHelp": "Final drop chance = base chance + matching drop modifiers + environment and actor specific modifiers",
             "RewardRuleNotice": "Multiple drop rows use this component. Current drop rules may award only one matching row."
           },
           "Rules": {
@@ -1171,7 +1171,9 @@
             "OverrideHint": "Overrides system-level definitions for expressions.",
             "OperatorPositive": "Positive",
             "OperatorNegative": "Negative",
-            "UnknownModifierShort": "Unknown"
+            "UnknownModifierShort": "Unknown",
+            "AddSearchPlaceholder": "Search character modifiers...",
+            "AddSearchLabel": "Search character modifiers to add"
           }
         },
         "Column": {
