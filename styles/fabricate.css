@@ -8977,7 +8977,7 @@
 
 .fabricate-manager-v2 .manager-v2-task-card-heading h3 {
   margin: 0 0 3px;
-  color: var(--fab-warning-text);
+  color: var(--fab-mv2-text);
   font-size: 1rem;
 }
 
@@ -9260,12 +9260,8 @@
 .fabricate-manager-v2 .manager-v2-selected-drop-editor h3,
 .fabricate-manager-v2 .manager-v2-drop-modifier-panel h4 {
   margin: 0;
-  color: var(--fab-warning-text);
-  font-size: 1rem;
-}
-
-.fabricate-manager-v2 .manager-v2-task-drops-card .manager-v2-task-card-header h3 {
   color: var(--fab-mv2-text);
+  font-size: 1rem;
 }
 
 .fabricate-manager-v2 .manager-v2-task-overview-card label,
