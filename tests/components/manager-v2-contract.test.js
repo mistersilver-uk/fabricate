@@ -594,7 +594,6 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'data-gathering-task-drop-inspector',
       'addGatheringDropModifier',
       'updateGatheringDropModifier',
-      'gatheringDropFinalChance',
       'manager-v2-drop-editor-actions'
     ]) {
       assert.ok(rootSource.includes(snippet), `root should include ${snippet}`);

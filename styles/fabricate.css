@@ -10268,53 +10268,6 @@
   min-width: 0;
 }
 
-.fabricate-manager-v2 .manager-v2-final-chance {
-  display: grid;
-  gap: 8px;
-  margin-top: 12px;
-  padding: 10px;
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
-  background: var(--fab-overlay-light-035);
-}
-
-.fabricate-manager-v2 .manager-v2-final-chance-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.fabricate-manager-v2 .manager-v2-final-chance strong {
-  color: var(--fab-warning-text);
-}
-
-.fabricate-manager-v2 .manager-v2-final-chance-heading > strong {
-  font-size: 1.42rem;
-}
-
-.fabricate-manager-v2 .manager-v2-final-chance-lines {
-  display: grid;
-  gap: 5px;
-  color: var(--fab-mv2-text-muted);
-  font-size: 0.78rem;
-}
-
-.fabricate-manager-v2 .manager-v2-final-chance-lines span {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  min-width: 0;
-}
-
-.fabricate-manager-v2 .manager-v2-final-chance-lines .is-active strong {
-  color: var(--fab-success-text);
-}
-
-.fabricate-manager-v2 .manager-v2-final-chance-lines .is-danger strong {
-  color: var(--fab-danger-text);
-}
-
 .fabricate-manager-v2 .manager-v2-matching-logic-card ol {
   display: grid;
   gap: 8px;

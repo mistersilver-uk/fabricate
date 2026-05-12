@@ -1496,52 +1496,6 @@
     return String(option?.label || option?.id || id || '').trim();
   }
 
-  function gatheringConditionCurrent(kind) {
-    return selectedGatheringSystemConfig.conditions?.[kind]?.current || '';
-  }
-
-  function gatheringCurrentConditionLabel(kind) {
-    return gatheringConditionLabel(kind, gatheringConditionCurrent(kind))
-      || (kind === 'weather'
-        ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyWeather', 'Any weather')
-        : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyTime', 'Any time'));
-  }
-
-  function gatheringSignedPercent(value) {
-    const number = Number(value || 0);
-    return `${number >= 0 ? '+' : ''}${number}%`;
-  }
-
-  function gatheringAppliedDropModifiers(row) {
-    if (!row) return [];
-    return ['timeOfDay', 'weather'].flatMap(kind => {
-      const current = gatheringConditionCurrent(kind);
-      if (!current) return [];
-      return gatheringConditionModifierRows(row, kind)
-        .filter(modifier => modifier.conditionId === current)
-        .map(modifier => ({
-          ...modifier,
-          kind,
-          label: gatheringConditionLabel(kind, modifier.conditionId) || modifier.conditionId
-        }));
-    });
-  }
-
-  function gatheringDropConditionModifierTotal(row) {
-    if (!row) return 0;
-    return ['timeOfDay', 'weather'].reduce((total, kind) => {
-      const current = gatheringConditionCurrent(kind);
-      if (!current) return total;
-      return total + gatheringConditionModifierRows(row, kind)
-        .filter(modifier => modifier.conditionId === current)
-        .reduce((sum, modifier) => sum + Number(modifier.value || 0), 0);
-    }, 0);
-  }
-
-  function gatheringDropFinalChance(row) {
-    return Math.min(100, Math.max(0, Math.floor(Number(row?.dropRate || 0) + gatheringDropConditionModifierTotal(row))));
-  }
-
   function gatheringDropRateValue(row) {
     const number = Math.trunc(Number(row?.dropRate ?? 1));
     if (!Number.isFinite(number)) return 1;
@@ -2601,22 +2555,6 @@
                 {/each}
               </div>
 
-              <div class="manager-v2-final-chance" data-gathering-task-drop-fact="final-chance">
-                <div class="manager-v2-final-chance-heading">
-                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.FinalChanceThisDrop', 'Final chance')}</span>
-                  <strong>{gatheringDropFinalChance(selectedGatheringDrop)}%</strong>
-                </div>
-                <div class="manager-v2-final-chance-lines">
-                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.CurrentTimeOfDay', 'Current time')}: <strong>{gatheringCurrentConditionLabel('timeOfDay')}</strong></span>
-                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.CurrentWeather', 'Current weather')}: <strong>{gatheringCurrentConditionLabel('weather')}</strong></span>
-                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.BaseChance', 'Base chance')}: <strong>{selectedGatheringDrop.dropRate ?? 1}%</strong></span>
-                  {#each gatheringAppliedDropModifiers(selectedGatheringDrop) as modifier (modifier.id)}
-                    <span class={gatheringDropModifierClass(modifier.value)}>{modifier.label}: <strong>{gatheringSignedPercent(modifier.value)}</strong></span>
-                  {:else}
-                    <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.NoMatchingModifiers', 'No matching modifiers')}: <strong>0%</strong></span>
-                  {/each}
-                </div>
-              </div>
             </section>
 
             <section class="manager-v2-inspector-card manager-v2-character-modifier-row-card" data-gathering-drop-character-modifiers>
