@@ -2591,13 +2591,11 @@ describe('createAdminStore', () => {
       assert.equal(hazard.characterModifiers[0].id, hazardRef.id);
 
       const hazardUpdated = await store.updateGatheringHazardCharacterModifier('sys1', 'hazard-cave-in', hazardRef.id, {
-        providerOverride: 'macro',
-        macroUuidOverride: 'Macro.x'
+        expressionOverride: '1d6 + @abilities.con.mod'
       });
       assert.equal(hazardUpdated, true);
       hazard = services._store.gatheringConfig.systems.sys1.hazards[0];
-      assert.equal(hazard.characterModifiers[0].providerOverride, 'macro');
-      assert.equal(hazard.characterModifiers[0].macroUuidOverride, 'Macro.x');
+      assert.equal(hazard.characterModifiers[0].expressionOverride, '1d6 + @abilities.con.mod');
 
       const dropDeleted = await store.deleteGatheringDropRowCharacterModifier('sys1', 'task-iron', 'row-iron', dropRef.id);
       assert.equal(dropDeleted, true);

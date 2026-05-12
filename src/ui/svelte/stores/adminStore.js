@@ -484,7 +484,6 @@ function _normalizeGatheringCharacterModifierReference(ref, index, randomID = ()
   if (!ref || typeof ref !== 'object') return null;
   const modifierId = String(ref.modifierId || '').trim();
   if (!modifierId) return null;
-  const provider = GATHERING_CHARACTER_MODIFIER_PROVIDERS.has(ref.providerOverride) ? ref.providerOverride : null;
   const min = Number.isFinite(Number(ref.min)) && ref.min !== null && ref.min !== '' ? Number(ref.min) : null;
   const max = Number.isFinite(Number(ref.max)) && ref.max !== null && ref.max !== '' ? Number(ref.max) : null;
   return {
@@ -493,9 +492,7 @@ function _normalizeGatheringCharacterModifierReference(ref, index, randomID = ()
     operator: GATHERING_CHARACTER_MODIFIER_OPERATORS.has(ref.operator) ? ref.operator : '+',
     min,
     max,
-    providerOverride: provider,
-    expressionOverride: String(ref.expressionOverride || ''),
-    macroUuidOverride: String(ref.macroUuidOverride || '')
+    expressionOverride: String(ref.expressionOverride || '')
   };
 }
 
@@ -3737,9 +3734,7 @@ export function createAdminStore(services) {
         operator: partial?.operator || '+',
         min: partial?.min ?? null,
         max: partial?.max ?? null,
-        providerOverride: partial?.providerOverride || null,
-        expressionOverride: partial?.expressionOverride || '',
-        macroUuidOverride: partial?.macroUuidOverride || ''
+        expressionOverride: partial?.expressionOverride || ''
       }, refs.length, _randomID);
       if (!ref) return null;
       created = ref;
@@ -3837,9 +3832,7 @@ export function createAdminStore(services) {
       operator: partial?.operator || '+',
       min: partial?.min ?? null,
       max: partial?.max ?? null,
-      providerOverride: partial?.providerOverride || null,
-      expressionOverride: partial?.expressionOverride || '',
-      macroUuidOverride: partial?.macroUuidOverride || ''
+      expressionOverride: partial?.expressionOverride || ''
     }, refs.length, _randomID);
     if (!ref) return null;
     const nextHazard = _normalizeGatheringHazard({ ...hazard, characterModifiers: [...refs, ref] }, _randomID);

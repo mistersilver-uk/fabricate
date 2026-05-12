@@ -1158,7 +1158,6 @@
             "PickerLabel": "Modifier",
             "Bounds": "Bounds",
             "CustomizedTooltip": "This reference overrides library defaults.",
-            "RestoreLibraryDefaults": "Restore library defaults",
             "RowEmpty": "No character modifiers attached.",
             "LibraryEmptyHint": "Add a modifier to the system library first to reference it here.",
             "RowSectionHint": "Modifiers adjust the final chance based on the attempting character.",

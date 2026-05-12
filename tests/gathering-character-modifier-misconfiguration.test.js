@@ -45,23 +45,6 @@ test('missing library modifier aborts attempt with diagnostic', async () => {
   assert.equal(result.diagnostics[0].modifierId, 'gone');
 });
 
-test('macro override without UUID aborts', async () => {
-  const { service } = makeRichState({
-    config: configFor({ entries: [{ id: 'str', provider: 'dnd5e', label: 'Strength', expression: '@s' }] }),
-    rolls: [100],
-    evaluateExpression: () => 1,
-    runMacro: () => 1
-  });
-  const env = environmentWithLibrary(service);
-  const result = await service.resolveD100Attempt({
-    task: { id: 't', dropRows: [{ id: 'd1', componentId: 'herb', quantity: 1, dropRate: 30, characterModifiers: [{ id: 'r', modifierId: 'str', operator: '+', providerOverride: 'macro' }] }] },
-    environment: env,
-    actor: { uuid: 'Actor.x' }
-  });
-  assert.equal(result.status, 'misconfigured');
-  assert.equal(result.diagnostics[0].code, 'MACRO_OVERRIDE_MISSING_UUID');
-});
-
 test('min > max aborts attempt with diagnostic', async () => {
   const { service } = makeRichState({
     config: configFor({ entries: [{ id: 'str', provider: 'dnd5e', label: 'Strength', expression: '@s' }] }),

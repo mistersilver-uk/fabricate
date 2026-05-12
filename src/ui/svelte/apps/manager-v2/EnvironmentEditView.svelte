@@ -12,7 +12,6 @@
   import TimeRequirementFields from '../environments/TimeRequirementFields.svelte';
   import VisibilityFields from '../environments/VisibilityFields.svelte';
   import ImagePathPicker from '../../components/ImagePathPicker.svelte';
-  import ProviderExpressionInput from '../../components/ProviderExpressionInput.svelte';
 
   let {
     environments = [],
@@ -146,7 +145,7 @@
 
   function hazardCharacterModifierIsCustomized(ref) {
     if (!ref) return false;
-    return Boolean(ref.providerOverride || ref.expressionOverride || ref.macroUuidOverride);
+    return Boolean(ref.expressionOverride);
   }
 
   function hazardCharacterModifierRefs(hazard) {
@@ -173,13 +172,6 @@
     await onDeleteGatheringHazardCharacterModifier(environmentDraft?.craftingSystemId, hazardId, refId);
   }
 
-  async function onRestoreHazardCharacterModifierDefaults(hazardId, refId) {
-    await onUpdateHazardCharacterModifier(hazardId, refId, {
-      providerOverride: null,
-      expressionOverride: '',
-      macroUuidOverride: ''
-    });
-  }
   const activeVisibilityKey = $derived(`${environmentDraft?.id || 'new'}:${environmentDraft?.craftingSystemId || ''}:${activeTaskId}`);
   const editorVisibility = $derived(pendingVisibility || activeTaskVisibility);
   const normalizedValidationErrors = $derived(validationErrors.map(error => normalizedValidationTarget(error)));
@@ -1360,19 +1352,15 @@
                         </details>
                         <details class="manager-v2-character-modifier-override">
                           <summary>{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.Customize', 'Customize for this row')}</summary>
-                          <ProviderExpressionInput
-                            provider={ref.providerOverride || libraryEntry?.provider || 'dnd5e'}
-                            expression={ref.expressionOverride || ''}
-                            macroUuid={ref.macroUuidOverride || ''}
-                            idPrefix={`hazard-${hazard.id}-character-modifier-${ref.id}`}
-                            onProviderChange={(value) => onUpdateHazardCharacterModifier(hazard.id, ref.id, { providerOverride: value })}
-                            onExpressionChange={(value) => onUpdateHazardCharacterModifier(hazard.id, ref.id, { expressionOverride: value })}
-                            onMacroUuidChange={(value) => onUpdateHazardCharacterModifier(hazard.id, ref.id, { macroUuidOverride: value })}
-                          />
-                          <button type="button" class="manager-v2-action" onclick={() => onRestoreHazardCharacterModifierDefaults(hazard.id, ref.id)}>
-                            <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
-                            {text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.RestoreLibraryDefaults', 'Restore library defaults')}
-                          </button>
+                          <label class="manager-v2-field" for={`hazard-${hazard.id}-character-modifier-${ref.id}-expression`}>
+                            <span>{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.Expression', 'Expression')}</span>
+                            <input
+                              type="text"
+                              id={`hazard-${hazard.id}-character-modifier-${ref.id}-expression`}
+                              value={ref.expressionOverride || ''}
+                              oninput={(event) => onUpdateHazardCharacterModifier(hazard.id, ref.id, { expressionOverride: event.currentTarget.value })}
+                            />
+                          </label>
                         </details>
                       </div>
                     {:else}

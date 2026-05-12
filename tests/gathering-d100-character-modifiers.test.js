@@ -247,7 +247,7 @@ test('partial override inherits unset fields from library entry', async () => {
   assert.equal(lastPayload.provider, 'dnd5e');
 });
 
-test('full override replaces library expression and provider', async () => {
+test('expression override replaces library expression but keeps library provider', async () => {
   let lastPayload;
   const { service } = makeRichState({
     config: configFor({ entries: STR_LIBRARY }),
@@ -259,12 +259,12 @@ test('full override replaces library expression and provider', async () => {
       id: 't',
       dropRows: [{
         id: 'd1', componentId: 'herb', quantity: 1, dropRate: 10,
-        characterModifiers: [{ id: 'r', modifierId: 'strength', operator: '+', providerOverride: 'pf2e', expressionOverride: '@a.b.c' }]
+        characterModifiers: [{ id: 'r', modifierId: 'strength', operator: '+', expressionOverride: '@a.b.c' }]
       }]
     }
   });
   assert.equal(lastPayload.expression, '@a.b.c');
-  assert.equal(lastPayload.provider, 'pf2e');
+  assert.equal(lastPayload.provider, 'dnd5e');
 });
 
 test('macro modifier receives correct context shape', async () => {

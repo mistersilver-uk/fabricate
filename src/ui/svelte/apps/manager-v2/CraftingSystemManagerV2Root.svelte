@@ -10,7 +10,6 @@
   import EssenceEditView from './EssenceEditView.svelte';
   import GatheringTaskEditView from './GatheringTaskEditView.svelte';
   import EssenceSourceSelector from '../../components/EssenceSourceSelector.svelte';
-  import ProviderExpressionInput from '../../components/ProviderExpressionInput.svelte';
   import RecipesBrowserView from './RecipesBrowserView.svelte';
   import SystemEditView from './SystemEditView.svelte';
   import SystemsBrowserView from './SystemsBrowserView.svelte';
@@ -125,7 +124,7 @@
 
   function characterModifierIsCustomized(ref) {
     if (!ref) return false;
-    return Boolean(ref.providerOverride || ref.expressionOverride || ref.macroUuidOverride);
+    return Boolean(ref.expressionOverride);
   }
 
   function rowCharacterModifiers(row) {
@@ -164,12 +163,8 @@
     return operator === '-' ? 'is-negative' : 'is-positive';
   }
   async function setCharacterModifierOverrideEnabled(rowId, ref, enabled, libraryEntry) {
-    if (enabled) {
-      const provider = ref.providerOverride || libraryEntry?.provider || 'dnd5e';
-      await onUpdateDropCharacterModifier(rowId, ref.id, { providerOverride: provider });
-    } else {
-      await onUpdateDropCharacterModifier(rowId, ref.id, { providerOverride: null, expressionOverride: '', macroUuidOverride: '' });
-    }
+    const expressionOverride = enabled ? (libraryEntry?.expression || '') : '';
+    await onUpdateDropCharacterModifier(rowId, ref.id, { expressionOverride });
   }
 
   async function onUpdateDropCharacterModifier(rowId, refId, patch) {
@@ -182,13 +177,6 @@
     await store.deleteGatheringDropRowCharacterModifier?.(selectedSystemId, selectedGatheringTask.id, rowId, refId);
   }
 
-  async function onRestoreDropCharacterModifierDefaults(rowId, refId) {
-    await onUpdateDropCharacterModifier(rowId, refId, {
-      providerOverride: null,
-      expressionOverride: '',
-      macroUuidOverride: ''
-    });
-  }
   const visiblePlaceholderViews = $derived(selectedSystem
     ? placeholderViews.filter(view => isViewAvailableForSystem(view, selectedSystem))
     : []
@@ -2643,20 +2631,16 @@
                       </button>
                     </div>
                     {#if hasOverride}
-                      <p class="manager-v2-muted manager-v2-character-modifier-override-hint">{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.OverrideHint', 'Overrides system-level definitions for expressions.')}</p>
-                      <ProviderExpressionInput
-                        provider={ref.providerOverride || libraryEntry?.provider || 'dnd5e'}
-                        expression={ref.expressionOverride || ''}
-                        macroUuid={ref.macroUuidOverride || ''}
-                        idPrefix={`drop-${selectedGatheringDrop.id}-character-modifier-${ref.id}`}
-                        onProviderChange={(value) => onUpdateDropCharacterModifier(selectedGatheringDrop.id, ref.id, { providerOverride: value })}
-                        onExpressionChange={(value) => onUpdateDropCharacterModifier(selectedGatheringDrop.id, ref.id, { expressionOverride: value })}
-                        onMacroUuidChange={(value) => onUpdateDropCharacterModifier(selectedGatheringDrop.id, ref.id, { macroUuidOverride: value })}
-                      />
-                      <button type="button" class="manager-v2-action" onclick={() => onRestoreDropCharacterModifierDefaults(selectedGatheringDrop.id, ref.id)}>
-                        <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
-                        {text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.RestoreLibraryDefaults', 'Restore library defaults')}
-                      </button>
+                      <p class="manager-v2-muted manager-v2-character-modifier-override-hint">{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.OverrideHint', 'Overrides the library expression for this row.')}</p>
+                      <label class="manager-v2-field" for={`drop-${selectedGatheringDrop.id}-character-modifier-${ref.id}-expression`}>
+                        <span>{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.Expression', 'Expression')}</span>
+                        <input
+                          type="text"
+                          id={`drop-${selectedGatheringDrop.id}-character-modifier-${ref.id}-expression`}
+                          value={ref.expressionOverride || ''}
+                          oninput={(event) => onUpdateDropCharacterModifier(selectedGatheringDrop.id, ref.id, { expressionOverride: event.currentTarget.value })}
+                        />
+                      </label>
                     {/if}
                   </article>
                 {:else}
