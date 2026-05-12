@@ -8562,6 +8562,8 @@
   flex-direction: column;
   gap: 3px;
   padding-left: 12px;
+  padding-bottom: 6px;
+  padding-right: 6px;
 }
 
 .fabricate-manager-v2 .manager-v2-nav-subitem {
