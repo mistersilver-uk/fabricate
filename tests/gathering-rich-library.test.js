@@ -644,9 +644,9 @@ test('d100 resolution preserves legacy selection fields when system rules are mi
   assert.equal(calls.created.length, 0);
 });
 
-test('d100 resolution applies numeric task and hazard modifier providers', () => {
+test('d100 resolution applies numeric task and hazard modifier providers', async () => {
   const { service } = makeRichState({ rolls: [90, 90] });
-  const result = service.resolveD100Attempt({
+  const result = await service.resolveD100Attempt({
     task: {
       id: 'task-modified',
       itemSelectionMode: 'allDrops',
@@ -664,9 +664,9 @@ test('d100 resolution applies numeric task and hazard modifier providers', () =>
   assert.deepEqual(result.hazards.map(row => [row.id, row.effectiveRoll, row.modifier]), [['hazard-modified', 91, 1]]);
 });
 
-test('drop resolution applies matching weather and time modifiers and ignores non-matches', () => {
+test('drop resolution applies matching weather and time modifiers and ignores non-matches', async () => {
   const { service } = makeRichState({ rolls: [100, 100] });
-  const result = service.resolveD100Attempt({
+  const result = await service.resolveD100Attempt({
     task: {
       id: 'task-conditions',
       dropRows: [
@@ -707,9 +707,9 @@ test('drop resolution applies matching weather and time modifiers and ignores no
   ]);
 });
 
-test('drop resolution clamps negative condition modifiers at zero drop chance', () => {
+test('drop resolution clamps negative condition modifiers at zero drop chance', async () => {
   const { service } = makeRichState({ rolls: [100] });
-  const result = service.resolveD100Attempt({
+  const result = await service.resolveD100Attempt({
     task: {
       id: 'task-zero',
       dropRows: [{

@@ -36,6 +36,10 @@ import {
   normalizeCustomRecipeCategories,
   normalizeRecipeCategory
 } from '../../../utils/recipeCategories.js';
+import {
+  getCharacterModifierPresetsForFoundrySystem,
+  seedCharacterModifierPresets
+} from '../../../config/gatheringCharacterModifierPresets.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -444,7 +448,54 @@ function _normalizeGatheringDropRow(row = {}, randomID = () => Math.random().toS
     quantity: Number.isFinite(Number(row.quantity)) && Number(row.quantity) > 0 ? Number(row.quantity) : 1,
     dropRate: Number.isFinite(Number(row.dropRate)) ? Math.min(100, Math.max(0, Math.floor(Number(row.dropRate)))) : 1,
     conditionModifiers: _normalizeGatheringDropConditionModifiers(row.conditionModifiers),
+    characterModifiers: _normalizeGatheringCharacterModifierReferences(row.characterModifiers, randomID),
     enabled: row.enabled !== false
+  };
+}
+
+const GATHERING_CHARACTER_MODIFIER_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
+const GATHERING_CHARACTER_MODIFIER_OPERATORS = new Set(['+', '-']);
+
+function _normalizeGatheringCharacterModifier(entry = {}, randomID = () => Math.random().toString(36).slice(2, 10)) {
+  if (!entry || typeof entry !== 'object') return null;
+  const id = entry.id ? String(entry.id) : '';
+  if (!id) return null;
+  const provider = GATHERING_CHARACTER_MODIFIER_PROVIDERS.has(entry.provider) ? entry.provider : 'dnd5e';
+  const expression = String(entry.expression ?? '').trim();
+  const macroUuid = String(entry.macroUuid ?? '').trim();
+  return {
+    id,
+    label: String(entry.label || id),
+    icon: String(entry.icon || 'fa-solid fa-user'),
+    provider,
+    expression,
+    macroUuid
+  };
+}
+
+function _normalizeGatheringCharacterModifierReferences(refs, randomID = () => Math.random().toString(36).slice(2, 10)) {
+  if (!Array.isArray(refs)) return [];
+  return refs
+    .map((ref, index) => _normalizeGatheringCharacterModifierReference(ref, index, randomID))
+    .filter(Boolean);
+}
+
+function _normalizeGatheringCharacterModifierReference(ref, index, randomID = () => Math.random().toString(36).slice(2, 10)) {
+  if (!ref || typeof ref !== 'object') return null;
+  const modifierId = String(ref.modifierId || '').trim();
+  if (!modifierId) return null;
+  const provider = GATHERING_CHARACTER_MODIFIER_PROVIDERS.has(ref.providerOverride) ? ref.providerOverride : null;
+  const min = Number.isFinite(Number(ref.min)) && ref.min !== null && ref.min !== '' ? Number(ref.min) : null;
+  const max = Number.isFinite(Number(ref.max)) && ref.max !== null && ref.max !== '' ? Number(ref.max) : null;
+  return {
+    id: ref.id ? String(ref.id) : `char-mod-${modifierId}-${index + 1}`,
+    modifierId,
+    operator: GATHERING_CHARACTER_MODIFIER_OPERATORS.has(ref.operator) ? ref.operator : '+',
+    min,
+    max,
+    providerOverride: provider,
+    expressionOverride: String(ref.expressionOverride || ''),
+    macroUuidOverride: String(ref.macroUuidOverride || '')
   };
 }
 
@@ -508,7 +559,8 @@ function _normalizeGatheringHazard(hazard = {}, randomID = () => Math.random().t
     weather: _normalizeGatheringConditionIdList(hazard.weather),
     timeOfDay: _normalizeGatheringConditionIdList(hazard.timeOfDay),
     dropRate: Number.isFinite(Number(hazard.dropRate)) ? Math.min(100, Math.max(1, Math.floor(Number(hazard.dropRate)))) : 1,
-    hazardModifier: hazard.hazardModifier && typeof hazard.hazardModifier === 'object' ? _clonePlain(hazard.hazardModifier) : null
+    hazardModifier: hazard.hazardModifier && typeof hazard.hazardModifier === 'object' ? _clonePlain(hazard.hazardModifier) : null,
+    characterModifiers: _normalizeGatheringCharacterModifierReferences(hazard.characterModifiers, randomID)
   };
 }
 
@@ -554,7 +606,10 @@ function _normalizeGatheringConfig(raw = {}, randomID = () => Math.random().toSt
       conditions: _normalizeGatheringSystemConditions(systemConfig?.conditions, { vocabularies, conditions: { weather, timeOfDay } }),
       vocabularies: _normalizeGatheringSystemVocabularies(systemConfig?.vocabularies, vocabularies),
       tasks: (Array.isArray(systemConfig?.tasks) ? systemConfig.tasks : []).map(task => _normalizeGatheringTask(task, randomID)),
-      hazards: (Array.isArray(systemConfig?.hazards) ? systemConfig.hazards : []).map(hazard => _normalizeGatheringHazard(hazard, randomID))
+      hazards: (Array.isArray(systemConfig?.hazards) ? systemConfig.hazards : []).map(hazard => _normalizeGatheringHazard(hazard, randomID)),
+      characterModifiers: (Array.isArray(systemConfig?.characterModifiers) ? systemConfig.characterModifiers : [])
+        .map(entry => _normalizeGatheringCharacterModifier(entry, randomID))
+        .filter(Boolean)
     };
   }
   return {
@@ -1409,6 +1464,7 @@ export function createAdminStore(services) {
     graphData: { nodes: [], edges: [], width: 0, height: 0 },
     graphSearchTerm: '',
     gatheringConfig: _normalizeGatheringConfig(services.getSetting?.(GATHERING_CONFIG_SETTING) || {}),
+    foundrySystemId: typeof services.getFoundrySystemId === 'function' ? String(services.getFoundrySystemId() || '') : '',
     ..._emptyEnvironmentState(false)
   });
 
@@ -3523,6 +3579,331 @@ export function createAdminStore(services) {
     return true;
   }
 
+  /**
+   * Append a new character modifier entry to the selected system's library.
+   * Returns the normalized entry, or null when the system has no gathering
+   * shell or the proposed id already exists.
+   *
+   * @param {string} [systemId] Target crafting system id.
+   * @param {object} [partial] Partial entry (id, label, icon, provider, expression, macroUuid).
+   * @returns {Promise<object|null>}
+   */
+  async function addGatheringCharacterModifier(systemId = get(selectedSystemId), partial = {}) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig) return null;
+    const id = String(partial?.id || _randomID());
+    if ((systemConfig.characterModifiers || []).some(entry => entry.id === id)) return null;
+    const entry = _normalizeGatheringCharacterModifier({
+      id,
+      label: partial?.label || services.localize?.('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.NewLabel') || 'Character modifier',
+      icon: partial?.icon || 'fa-solid fa-user',
+      provider: partial?.provider || 'dnd5e',
+      expression: partial?.expression || '',
+      macroUuid: partial?.macroUuid || ''
+    }, _randomID);
+    if (!entry) return null;
+    systemConfig.characterModifiers = [...(systemConfig.characterModifiers || []), entry];
+    await _saveGatheringConfig(config);
+    await refresh();
+    return entry;
+  }
+
+  /**
+   * Update one library character modifier entry by id. Updates that fail
+   * normalization (e.g. no expression and no macroUuid) preserve the prior
+   * entry. Returns true when the library changed.
+   *
+   * @param {string} [systemId] Target crafting system id.
+   * @param {string} modifierId Library entry id.
+   * @param {object} [updates] Partial replacement fields.
+   * @returns {Promise<boolean>}
+   */
+  async function updateGatheringCharacterModifier(systemId = get(selectedSystemId), modifierId, updates = {}) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig || !modifierId) return false;
+    const list = systemConfig.characterModifiers || [];
+    const next = list.map(entry => entry.id === modifierId
+      ? _normalizeGatheringCharacterModifier({ ...entry, ...updates }, _randomID) || entry
+      : entry);
+    if (next.length === list.length && next.every((entry, index) => entry === list[index])) return false;
+    systemConfig.characterModifiers = next;
+    await _saveGatheringConfig(config);
+    await refresh();
+    return true;
+  }
+
+  /**
+   * Remove one library character modifier entry by id. Row references to the
+   * deleted id are intentionally left intact so the GM can repoint or remove
+   * them at authoring time (the runtime treats unresolved references as
+   * misconfiguration).
+   *
+   * @param {string} [systemId] Target crafting system id.
+   * @param {string} modifierId Library entry id to remove.
+   * @returns {Promise<boolean>}
+   */
+  async function deleteGatheringCharacterModifier(systemId = get(selectedSystemId), modifierId) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig || !modifierId) return false;
+    const next = (systemConfig.characterModifiers || []).filter(entry => entry.id !== modifierId);
+    if (next.length === (systemConfig.characterModifiers || []).length) return false;
+    systemConfig.characterModifiers = next;
+    await _saveGatheringConfig(config);
+    await refresh();
+    return true;
+  }
+
+  /**
+   * Idempotently seed the active Foundry game system's preset bundle into the
+   * selected crafting system's character modifier library. Existing ids are
+   * preserved; the return value identifies added vs. skipped presets and
+   * flags unsupported Foundry systems for the caller to surface to the GM.
+   *
+   * @param {string} [systemId] Target crafting system id.
+   * @returns {Promise<{added: Array, skipped: Array, unsupported: boolean, foundrySystemId?: string}>}
+   */
+  async function seedGatheringCharacterModifierPresets(systemId = get(selectedSystemId)) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig) return { added: [], skipped: [], unsupported: true };
+    const foundrySystemId = typeof services.getFoundrySystemId === 'function'
+      ? String(services.getFoundrySystemId() || '')
+      : '';
+    const presets = getCharacterModifierPresetsForFoundrySystem(foundrySystemId);
+    if (!presets || presets.length === 0) {
+      return { added: [], skipped: [], unsupported: true, foundrySystemId };
+    }
+    const result = seedCharacterModifierPresets({
+      presets,
+      currentLibrary: systemConfig.characterModifiers || []
+    });
+    systemConfig.characterModifiers = result.next.map(entry => _normalizeGatheringCharacterModifier(entry, _randomID)).filter(Boolean);
+    await _saveGatheringConfig(config);
+    await refresh();
+    return { added: result.added, skipped: result.skipped, unsupported: false, foundrySystemId };
+  }
+
+  function _firstCharacterModifierId(systemConfig) {
+    const list = Array.isArray(systemConfig?.characterModifiers) ? systemConfig.characterModifiers : [];
+    return list[0]?.id || '';
+  }
+
+  function _updateDropRowOnTask(systemConfig, taskId, rowId, mutate) {
+    const taskIndex = systemConfig.tasks.findIndex(task => task.id === taskId);
+    if (taskIndex < 0) return false;
+    const task = systemConfig.tasks[taskIndex];
+    const rows = Array.isArray(task.dropRows) ? task.dropRows : [];
+    const rowIndex = rows.findIndex(row => row.id === rowId);
+    if (rowIndex < 0) return false;
+    const nextRow = mutate({ ...rows[rowIndex] });
+    if (!nextRow) return false;
+    const nextRows = [...rows];
+    nextRows[rowIndex] = nextRow;
+    systemConfig.tasks = systemConfig.tasks.map((existing, index) => index === taskIndex
+      ? _normalizeGatheringTask({ ...existing, dropRows: nextRows }, _randomID)
+      : existing);
+    return true;
+  }
+
+  /**
+   * Add a character modifier reference to one drop row on one library task.
+   * Defaults `modifierId` to the system's first library entry when not
+   * supplied so the editor can append a usable row without forcing a picker
+   * choice up-front. Returns the normalized reference or null when the
+   * system/task/row cannot be resolved.
+   *
+   * @param {string} [systemId] Target crafting system id.
+   * @param {string} taskId Library task id.
+   * @param {string} rowId Drop row id on the task.
+   * @param {object} [partial] Reference fields (modifierId, operator, min, max, overrides).
+   * @returns {Promise<object|null>}
+   */
+  async function addGatheringDropRowCharacterModifier(systemId = get(selectedSystemId), taskId, rowId, partial = {}) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig || !taskId || !rowId) return null;
+    const modifierId = String(partial?.modifierId || _firstCharacterModifierId(systemConfig) || '').trim();
+    if (!modifierId) return null;
+    let created = null;
+    const changed = _updateDropRowOnTask(systemConfig, taskId, rowId, (row) => {
+      const refs = Array.isArray(row.characterModifiers) ? row.characterModifiers : [];
+      const id = String(partial?.id || _randomID());
+      const ref = _normalizeGatheringCharacterModifierReference({
+        id,
+        modifierId,
+        operator: partial?.operator || '+',
+        min: partial?.min ?? null,
+        max: partial?.max ?? null,
+        providerOverride: partial?.providerOverride || null,
+        expressionOverride: partial?.expressionOverride || '',
+        macroUuidOverride: partial?.macroUuidOverride || ''
+      }, refs.length, _randomID);
+      if (!ref) return null;
+      created = ref;
+      row.characterModifiers = [...refs, ref];
+      return row;
+    });
+    if (!changed) return null;
+    await _saveGatheringConfig(config);
+    await refresh();
+    return created;
+  }
+
+  /**
+   * Patch one drop-row character modifier reference in place. Patches that
+   * fail normalization are rejected (the existing reference is preserved).
+   *
+   * @param {string} [systemId] Target crafting system id.
+   * @param {string} taskId Library task id.
+   * @param {string} rowId Drop row id on the task.
+   * @param {string} refId Reference id on the row.
+   * @param {object} [patch] Partial replacement fields.
+   * @returns {Promise<boolean>}
+   */
+  async function updateGatheringDropRowCharacterModifier(systemId = get(selectedSystemId), taskId, rowId, refId, patch = {}) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig || !taskId || !rowId || !refId) return false;
+    const changed = _updateDropRowOnTask(systemConfig, taskId, rowId, (row) => {
+      const refs = Array.isArray(row.characterModifiers) ? row.characterModifiers : [];
+      const index = refs.findIndex(ref => ref.id === refId);
+      if (index < 0) return null;
+      const merged = { ...refs[index], ...patch };
+      const normalized = _normalizeGatheringCharacterModifierReference(merged, index, _randomID);
+      if (!normalized) return null;
+      row.characterModifiers = refs.map((ref, refIndex) => refIndex === index ? normalized : ref);
+      return row;
+    });
+    if (!changed) return false;
+    await _saveGatheringConfig(config);
+    await refresh();
+    return true;
+  }
+
+  /**
+   * Remove one drop-row character modifier reference by id.
+   *
+   * @param {string} [systemId] Target crafting system id.
+   * @param {string} taskId Library task id.
+   * @param {string} rowId Drop row id on the task.
+   * @param {string} refId Reference id to remove.
+   * @returns {Promise<boolean>}
+   */
+  async function deleteGatheringDropRowCharacterModifier(systemId = get(selectedSystemId), taskId, rowId, refId) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig || !taskId || !rowId || !refId) return false;
+    const changed = _updateDropRowOnTask(systemConfig, taskId, rowId, (row) => {
+      const refs = Array.isArray(row.characterModifiers) ? row.characterModifiers : [];
+      const next = refs.filter(ref => ref.id !== refId);
+      if (next.length === refs.length) return null;
+      row.characterModifiers = next;
+      return row;
+    });
+    if (!changed) return false;
+    await _saveGatheringConfig(config);
+    await refresh();
+    return true;
+  }
+
+  /**
+   * Add a character modifier reference to one library hazard. Mirrors the
+   * drop-row equivalent: defaults `modifierId` to the system's first library
+   * entry when not supplied. Returns the normalized reference or null on
+   * lookup failure.
+   *
+   * @param {string} [systemId] Target crafting system id.
+   * @param {string} hazardId Library hazard id.
+   * @param {object} [partial] Reference fields.
+   * @returns {Promise<object|null>}
+   */
+  async function addGatheringHazardCharacterModifier(systemId = get(selectedSystemId), hazardId, partial = {}) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig || !hazardId) return null;
+    const modifierId = String(partial?.modifierId || _firstCharacterModifierId(systemConfig) || '').trim();
+    if (!modifierId) return null;
+    const hazardIndex = systemConfig.hazards.findIndex(hazard => hazard.id === hazardId);
+    if (hazardIndex < 0) return null;
+    const hazard = systemConfig.hazards[hazardIndex];
+    const refs = Array.isArray(hazard.characterModifiers) ? hazard.characterModifiers : [];
+    const id = String(partial?.id || _randomID());
+    const ref = _normalizeGatheringCharacterModifierReference({
+      id,
+      modifierId,
+      operator: partial?.operator || '+',
+      min: partial?.min ?? null,
+      max: partial?.max ?? null,
+      providerOverride: partial?.providerOverride || null,
+      expressionOverride: partial?.expressionOverride || '',
+      macroUuidOverride: partial?.macroUuidOverride || ''
+    }, refs.length, _randomID);
+    if (!ref) return null;
+    const nextHazard = _normalizeGatheringHazard({ ...hazard, characterModifiers: [...refs, ref] }, _randomID);
+    systemConfig.hazards = systemConfig.hazards.map((existing, index) => index === hazardIndex ? nextHazard : existing);
+    await _saveGatheringConfig(config);
+    await refresh();
+    return ref;
+  }
+
+  /**
+   * Patch one hazard character modifier reference in place.
+   *
+   * @param {string} [systemId] Target crafting system id.
+   * @param {string} hazardId Library hazard id.
+   * @param {string} refId Reference id on the hazard.
+   * @param {object} [patch] Partial replacement fields.
+   * @returns {Promise<boolean>}
+   */
+  async function updateGatheringHazardCharacterModifier(systemId = get(selectedSystemId), hazardId, refId, patch = {}) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig || !hazardId || !refId) return false;
+    const hazardIndex = systemConfig.hazards.findIndex(hazard => hazard.id === hazardId);
+    if (hazardIndex < 0) return false;
+    const hazard = systemConfig.hazards[hazardIndex];
+    const refs = Array.isArray(hazard.characterModifiers) ? hazard.characterModifiers : [];
+    const index = refs.findIndex(ref => ref.id === refId);
+    if (index < 0) return false;
+    const merged = { ...refs[index], ...patch };
+    const normalized = _normalizeGatheringCharacterModifierReference(merged, index, _randomID);
+    if (!normalized) return false;
+    const nextRefs = refs.map((ref, refIndex) => refIndex === index ? normalized : ref);
+    const nextHazard = _normalizeGatheringHazard({ ...hazard, characterModifiers: nextRefs }, _randomID);
+    systemConfig.hazards = systemConfig.hazards.map((existing, hIndex) => hIndex === hazardIndex ? nextHazard : existing);
+    await _saveGatheringConfig(config);
+    await refresh();
+    return true;
+  }
+
+  /**
+   * Remove one hazard character modifier reference by id.
+   *
+   * @param {string} [systemId] Target crafting system id.
+   * @param {string} hazardId Library hazard id.
+   * @param {string} refId Reference id to remove.
+   * @returns {Promise<boolean>}
+   */
+  async function deleteGatheringHazardCharacterModifier(systemId = get(selectedSystemId), hazardId, refId) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig || !hazardId || !refId) return false;
+    const hazardIndex = systemConfig.hazards.findIndex(hazard => hazard.id === hazardId);
+    if (hazardIndex < 0) return false;
+    const hazard = systemConfig.hazards[hazardIndex];
+    const refs = Array.isArray(hazard.characterModifiers) ? hazard.characterModifiers : [];
+    const nextRefs = refs.filter(ref => ref.id !== refId);
+    if (nextRefs.length === refs.length) return false;
+    const nextHazard = _normalizeGatheringHazard({ ...hazard, characterModifiers: nextRefs }, _randomID);
+    systemConfig.hazards = systemConfig.hazards.map((existing, hIndex) => hIndex === hazardIndex ? nextHazard : existing);
+    await _saveGatheringConfig(config);
+    await refresh();
+    return true;
+  }
+
   // --- Config save actions ---
 
   async function saveCraftingCheckConfig(configOrMode, macroUuid, outcomesText) {
@@ -3911,6 +4292,16 @@ export function createAdminStore(services) {
     addGatheringLibraryHazard,
     updateGatheringLibraryHazard,
     deleteGatheringLibraryHazard,
+    addGatheringCharacterModifier,
+    updateGatheringCharacterModifier,
+    deleteGatheringCharacterModifier,
+    seedGatheringCharacterModifierPresets,
+    addGatheringDropRowCharacterModifier,
+    updateGatheringDropRowCharacterModifier,
+    deleteGatheringDropRowCharacterModifier,
+    addGatheringHazardCharacterModifier,
+    updateGatheringHazardCharacterModifier,
+    deleteGatheringHazardCharacterModifier,
     saveCraftingCheckConfig,
     saveCurrencyConfig,
     saveAlchemyConfig,

@@ -1,14 +1,46 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import ProviderExpressionInput from '../../components/ProviderExpressionInput.svelte';
 
   let {
     selectedSystem = null,
     onSaveDetails = () => {},
     onSetResolutionMode = async () => true,
     onToggleAdvancedOptions = async () => true,
-    onToggleFeature = async () => true
+    onToggleFeature = async () => true,
+    characterModifierLibrary = [],
+    characterModifierPresetsSupported = false,
+    onAddCharacterModifier = async () => null,
+    onUpdateCharacterModifier = async () => {},
+    onDeleteCharacterModifier = async () => {},
+    onSeedCharacterModifierPresets = async () => {}
   } = $props();
+
+  let characterModifierEditingId = $state('');
+  const ROLL_EXPRESSION_PATTERN_UI = /\bd\d|[*/()]/;
+
+  const gatheringEnabled = $derived(selectedSystem?.features?.gathering === true);
+
+  function characterModifierIsRoll(entry) {
+    return Boolean(entry?.expression) && ROLL_EXPRESSION_PATTERN_UI.test(entry.expression);
+  }
+
+  function characterModifierProviderLabel(provider) {
+    if (provider === 'pf2e') return text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.ProviderPf2e', 'Pathfinder 2e');
+    if (provider === 'macro') return text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.ProviderMacro', 'Macro');
+    return text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.ProviderDnd5e', 'D&D 5e');
+  }
+
+  async function handleAddCharacterModifier() {
+    const entry = await onAddCharacterModifier();
+    if (entry?.id) characterModifierEditingId = entry.id;
+  }
+
+  async function handleDeleteCharacterModifier(modifierId) {
+    await onDeleteCharacterModifier(modifierId);
+    if (characterModifierEditingId === modifierId) characterModifierEditingId = '';
+  }
 
   let systemNameValue = $state('');
   let systemDescriptionValue = $state('');
@@ -155,6 +187,84 @@
           <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.SystemEdit.NoFeatureToggles', 'No optional feature toggles are present on this system.')}</p>
         {/if}
       </section>
+
+      {#if gatheringEnabled}
+        <section class="manager-v2-edit-card manager-v2-character-modifier-card" data-system-character-modifiers aria-label={text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.Title', 'Character modifiers')}>
+          <header class="manager-v2-character-modifier-card-header">
+            <div class="manager-v2-character-modifier-card-header-copy">
+              <h3 class="manager-v2-card-title">
+                <i class="fa-solid fa-user-gear" aria-hidden="true"></i>
+                {text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.Title', 'Character modifiers')}
+              </h3>
+              <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.Hint', 'Define reusable actor-driven modifiers for this system\'s d100 gathering rows and hazards.')}</p>
+            </div>
+            <div class="manager-v2-character-modifier-card-header-actions">
+              <button type="button" class="manager-v2-action" onclick={handleAddCharacterModifier}>
+                <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                {text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.Add', 'Add character modifier')}
+              </button>
+              <button type="button"
+                      class="manager-v2-action"
+                      disabled={!characterModifierPresetsSupported}
+                      data-tooltip={!characterModifierPresetsSupported ? text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.SeedPresetsUnsupported', 'Preset seeding is only available for dnd5e or pf2e worlds.') : null}
+                      onclick={onSeedCharacterModifierPresets}>
+                <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+                {text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.SeedPresets', 'Seed presets')}
+              </button>
+            </div>
+          </header>
+          {#if characterModifierLibrary.length === 0}
+            <p class="manager-v2-muted manager-v2-character-modifier-empty">{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.Empty', 'No character modifiers yet.')}</p>
+          {:else}
+            <ul class="manager-v2-character-modifier-list">
+              {#each characterModifierLibrary as entry (entry.id)}
+                <li class="manager-v2-character-modifier-row" data-system-character-modifier={entry.id}>
+                  {#if characterModifierEditingId === entry.id}
+                    <div class="manager-v2-character-modifier-editor">
+                      <label class="manager-v2-field">
+                        <span>{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.Label', 'Label')}</span>
+                        <input type="text" value={entry.label} oninput={(event) => onUpdateCharacterModifier(entry.id, { label: event.currentTarget.value })} />
+                      </label>
+                      <label class="manager-v2-field">
+                        <span>{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.Icon', 'Icon')}</span>
+                        <input type="text" value={entry.icon} oninput={(event) => onUpdateCharacterModifier(entry.id, { icon: event.currentTarget.value })} />
+                      </label>
+                      <ProviderExpressionInput
+                        provider={entry.provider}
+                        expression={entry.expression}
+                        macroUuid={entry.macroUuid}
+                        idPrefix={`character-modifier-${entry.id}`}
+                        onProviderChange={(value) => onUpdateCharacterModifier(entry.id, { provider: value })}
+                        onExpressionChange={(value) => onUpdateCharacterModifier(entry.id, { expression: value })}
+                        onMacroUuidChange={(value) => onUpdateCharacterModifier(entry.id, { macroUuid: value })}
+                      />
+                      <div class="manager-v2-character-modifier-actions">
+                        <button type="button" class="manager-v2-action" onclick={() => characterModifierEditingId = ''}>{text('FABRICATE.Admin.ManagerV2.Done', 'Done')}</button>
+                        <button type="button" class="manager-v2-action manager-v2-action-danger" onclick={() => handleDeleteCharacterModifier(entry.id)}>{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.Delete', 'Delete character modifier')}</button>
+                      </div>
+                    </div>
+                  {:else}
+                    <div class="manager-v2-character-modifier-summary">
+                      <span class="manager-v2-character-modifier-icon"><i class={entry.icon || 'fa-solid fa-user'} aria-hidden="true"></i></span>
+                      <span class="manager-v2-character-modifier-label">{entry.label}</span>
+                      <span class="manager-v2-chip manager-v2-character-modifier-provider">{characterModifierProviderLabel(entry.provider)}</span>
+                      {#if characterModifierIsRoll(entry)}
+                        <span class="manager-v2-chip manager-v2-character-modifier-roll-tag">{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.RollTag', 'Roll')}</span>
+                      {/if}
+                      <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.Edit', 'Edit character modifier')} onclick={() => characterModifierEditingId = entry.id}>
+                        <i class="fa-solid fa-pen" aria-hidden="true"></i>
+                      </button>
+                      <button type="button" class="manager-v2-icon-button manager-v2-icon-button-danger" aria-label={text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.Delete', 'Delete character modifier')} onclick={() => handleDeleteCharacterModifier(entry.id)}>
+                        <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                      </button>
+                    </div>
+                  {/if}
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </section>
+      {/if}
     </form>
   </main>
 {/if}

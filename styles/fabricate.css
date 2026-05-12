@@ -5567,6 +5567,382 @@
   border-left: 1px solid var(--fab-mv2-border);
   background: var(--fab-mv2-surface-2);
   overflow-y: auto;
+  max-height: 100%;
+  min-height: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-card-header {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-card-header-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 60ch;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-card-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-empty {
+  font-style: italic;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-mv2-surface-1);
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-label {
+  flex: 1 1 auto;
+  font-weight: 600;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-provider {
+  font-size: 0.75rem;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-roll-tag {
+  font-size: 0.7rem;
+  background: var(--fab-mv2-surface-2);
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-customized-badge {
+  font-size: 0.7rem;
+  border: 1px solid var(--fab-mv2-border);
+  background: var(--fab-mv2-surface-1);
+  padding: 2px 6px;
+  border-radius: 999px;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-stale-warning {
+  color: var(--fab-mv2-danger);
+  font-size: 0.75rem;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.fabricate-manager-v2 .manager-v2-drop-inspector-stack {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 0;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: visible;
+}
+
+.fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"] .manager-v2-inspector {
+  overflow: hidden;
+}
+
+.fabricate-manager-v2 .manager-v2-drop-inspector-divider {
+  width: calc(100% + 24px);
+  height: 1px;
+  margin: 10px -12px 0;
+  background: var(--fab-mv2-border);
+}
+
+.fabricate-manager-v2 .manager-v2-drop-inspector-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  padding-top: 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.fabricate-manager-v2 .manager-v2-inspector-card.is-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--fab-mv2-surface-1);
+  border-bottom: 1px solid var(--fab-mv2-border);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  box-shadow: 0 2px 6px var(--fab-overlay-dark-25);
+}
+
+.fabricate-manager-v2 .manager-v2-drop-editor-header-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-row-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-row-card-header {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-row-card-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 36ch;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-add-search-row {
+  display: block;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-add-search {
+  width: 100%;
+}
+
+.fabricate-manager-v2 .manager-v2-tag-suggestion.manager-v2-character-modifier-add-suggestion {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 5px 7px;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-add-suggestion > i {
+  text-align: center;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-row-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-row-reference {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-mv2-surface-1);
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-row-reference-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-row-reference-label {
+  flex: 1 1 auto;
+  font-weight: 600;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-operator-select {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 4px;
+  padding: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-operator-select select {
+  appearance: auto;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-weight: 600;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-operator-select.is-positive {
+  border-color: var(--fab-success-border);
+  background: var(--fab-overlay-light-06);
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-operator-select.is-positive select {
+  color: var(--fab-success-text);
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-operator-select.is-negative {
+  border-color: var(--fab-danger-border);
+  background: var(--fab-overlay-light-06);
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-operator-select.is-negative select {
+  color: var(--fab-danger-text);
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-row-reference-delete {
+  margin-left: auto;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-row-bounds {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-row-bounds .manager-v2-field {
+  flex: 1 1 80px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-override-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-override-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-override-hint {
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-row-empty,
+.fabricate-manager-v2 .manager-v2-character-modifier-empty-hint {
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
+.fabricate-manager-v2 .manager-v2-provider-expression-input {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fabricate-manager-v2 .visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.fabricate-gathering-app .gathering-history-character-modifiers {
+  margin-top: 4px;
+}
+
+.fabricate-gathering-app .gathering-history-character-modifiers summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.fabricate-gathering-app .gathering-history-character-modifier-section {
+  margin-top: 4px;
+  padding-left: 12px;
+}
+
+.fabricate-gathering-app .gathering-history-character-modifier-section h5 {
+  font-size: 0.8rem;
+  margin: 4px 0;
+}
+
+.fabricate-gathering-app .gathering-history-character-modifier-evidence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 0.8rem;
+  align-items: baseline;
+  padding: 2px 0;
+}
+
+.fabricate-gathering-app .gathering-history-character-modifier-expression {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+  padding: 0 4px;
+  background: var(--fab-mv2-surface-2);
+  border-radius: 3px;
+}
+
+.fabricate-gathering-app .gathering-history-character-modifier-redacted {
+  font-style: italic;
+  font-size: 0.8rem;
+}
+
+.fabricate-gathering-app .gathering-history-character-modifier-diagnostic {
+  color: var(--fab-warning);
+  font-size: 0.75rem;
 }
 
 .fabricate-manager-v2 .manager-v2-section-header,
@@ -5765,7 +6141,7 @@
   background: var(--fab-overlay-light-12);
 }
 
-.fabricate-manager-v2 .manager-v2-search i {
+.fabricate-manager-v2 .manager-v2-search > i {
   position: absolute;
   top: 50%;
   left: 11px;
@@ -9897,53 +10273,6 @@
   align-items: center;
   gap: 7px;
   min-width: 0;
-}
-
-.fabricate-manager-v2 .manager-v2-final-chance {
-  display: grid;
-  gap: 8px;
-  margin-top: 12px;
-  padding: 10px;
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
-  background: var(--fab-overlay-light-035);
-}
-
-.fabricate-manager-v2 .manager-v2-final-chance-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.fabricate-manager-v2 .manager-v2-final-chance strong {
-  color: var(--fab-warning-text);
-}
-
-.fabricate-manager-v2 .manager-v2-final-chance-heading > strong {
-  font-size: 1.42rem;
-}
-
-.fabricate-manager-v2 .manager-v2-final-chance-lines {
-  display: grid;
-  gap: 5px;
-  color: var(--fab-mv2-text-muted);
-  font-size: 0.78rem;
-}
-
-.fabricate-manager-v2 .manager-v2-final-chance-lines span {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  min-width: 0;
-}
-
-.fabricate-manager-v2 .manager-v2-final-chance-lines .is-active strong {
-  color: var(--fab-success-text);
-}
-
-.fabricate-manager-v2 .manager-v2-final-chance-lines .is-danger strong {
-  color: var(--fab-danger-text);
 }
 
 .fabricate-manager-v2 .manager-v2-matching-logic-card ol {

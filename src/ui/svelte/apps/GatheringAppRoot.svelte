@@ -144,6 +144,80 @@
     return statusLabel(run.status);
   }
 
+  function runCharacterModifierSnapshot(run) {
+    const snapshot = run?.characterModifierSnapshot;
+    if (!snapshot || typeof snapshot !== 'object') return null;
+    const rows = Array.isArray(snapshot.rows) ? snapshot.rows : [];
+    const hazards = Array.isArray(snapshot.hazards) ? snapshot.hazards : [];
+    if (rows.length === 0 && hazards.length === 0) return null;
+    return { rows, hazards };
+  }
+
+  function characterModifierContributions(entry) {
+    return Array.isArray(entry?.contributions) ? entry.contributions : [];
+  }
+
+  function characterModifierRedactedTotal(entry) {
+    let positive = 0;
+    let negative = 0;
+    for (const contribution of characterModifierContributions(entry)) {
+      const value = Number(contribution?.contribution ?? 0);
+      if (!Number.isFinite(value)) continue;
+      if (value >= 0) positive += value;
+      else negative += value;
+    }
+    return { positive, negative };
+  }
+
+  function characterModifierContributionIsRedacted(contribution) {
+    if (!contribution || typeof contribution !== 'object') return true;
+    // GM payload includes modifierId / label / effectiveExpression / effectiveProvider.
+    // Redacted payload contains only { contribution }.
+    return !('modifierId' in contribution) && !('label' in contribution) && !('effectiveExpression' in contribution);
+  }
+
+  function characterModifierContributionLabel(contribution) {
+    if (contribution?.label) return contribution.label;
+    if (contribution?.modifierId) return contribution.modifierId;
+    return localize('FABRICATE.Gathering.History.CharacterModifiers.UnknownModifier') || 'Unknown modifier';
+  }
+
+  function characterModifierContributionIcon(contribution) {
+    return contribution?.icon || 'fa-solid fa-user';
+  }
+
+  function characterModifierContributionEffective(contribution) {
+    if (contribution?.effectiveMacroUuid) return contribution.effectiveMacroUuid;
+    if (contribution?.effectiveExpression) return contribution.effectiveExpression;
+    return '';
+  }
+
+  function characterModifierContributionRawDisplay(contribution) {
+    const raw = Number(contribution?.rawValue ?? 0);
+    const clamped = Number(contribution?.clampedValue ?? raw);
+    if (Number.isFinite(raw) && Number.isFinite(clamped) && raw !== clamped) {
+      const bounds = contribution?.bounds || {};
+      const boundsLabel = `${bounds.min ?? '-∞'}..${bounds.max ?? '+∞'}`;
+      return `${raw} → ${clamped} (${boundsLabel})`;
+    }
+    return Number.isFinite(raw) ? String(raw) : '—';
+  }
+
+  function characterModifierContributionFinal(contribution) {
+    const value = Number(contribution?.contribution ?? 0);
+    if (!Number.isFinite(value)) return '—';
+    const sign = value >= 0 ? '+' : '';
+    return `${sign}${value}`;
+  }
+
+  function characterModifierRedactedSummary(entry) {
+    const { positive, negative } = characterModifierRedactedTotal(entry);
+    return localize('FABRICATE.Gathering.History.CharacterModifiers.RedactedSummary', {
+      positive: `+${positive}`,
+      negative: `${negative}`
+    }) || `modifiers contributed +${positive} / ${negative}`;
+  }
+
   function uniqueSorted(values) {
     return Array.from(new Set(values.map(value => String(value || '').trim()).filter(Boolean)))
       .sort((a, b) => a.localeCompare(b));
@@ -338,12 +412,78 @@
         <div class="gathering-section-heading"><h3>{localize('FABRICATE.Gathering.History.Title')}</h3></div>
         <div class="gathering-history-list">
           {#each $viewState.history as run, index (runKey(run, index, 'history'))}
+            {@const characterModifierSnapshot = runCharacterModifierSnapshot(run)}
             <article class="gathering-history-row">
               <div>
                 <strong>{displayRunLabel(run)}</strong>
                 {#each runEvidence(run) as part (part)}<span>{part}</span>{/each}
               </div>
               <span>{historySummary(run)}</span>
+              {#if characterModifierSnapshot}
+                <details class="gathering-history-character-modifiers" data-gathering-character-modifier-evidence>
+                  <summary>{localize('FABRICATE.Gathering.History.CharacterModifiers.Title') || 'Character Modifiers'}</summary>
+                  {#if characterModifierSnapshot.rows.length > 0}
+                    <div class="gathering-history-character-modifier-section">
+                      <h5>{localize('FABRICATE.Gathering.History.CharacterModifiers.RowsHeading') || 'Drop rows'}</h5>
+                      {#each characterModifierSnapshot.rows as rowEntry, rowIndex (rowEntry?.rowId || `row-${rowIndex}`)}
+                        <div class="gathering-history-character-modifier-row" data-gathering-character-modifier-row={rowEntry?.rowId || ''}>
+                          {#if characterModifierContributions(rowEntry).length === 0}
+                            <span class="gathering-empty-state is-compact">{localize('FABRICATE.Gathering.History.CharacterModifiers.RowEmpty') || 'No character modifier contributions.'}</span>
+                          {:else if characterModifierContributionIsRedacted(characterModifierContributions(rowEntry)[0])}
+                            <span class="gathering-history-character-modifier-redacted">{characterModifierRedactedSummary(rowEntry)}</span>
+                          {:else}
+                            {#each characterModifierContributions(rowEntry) as contribution, contributionIndex (`row-${rowIndex}-${contributionIndex}`)}
+                              <div class="gathering-history-character-modifier-evidence">
+                                <span class="gathering-history-character-modifier-label"><i class={characterModifierContributionIcon(contribution)} aria-hidden="true"></i> {characterModifierContributionLabel(contribution)}</span>
+                                {#if characterModifierContributionEffective(contribution)}
+                                  <code class="gathering-history-character-modifier-expression">{characterModifierContributionEffective(contribution)}</code>
+                                {/if}
+                                <span class="gathering-history-character-modifier-raw">{characterModifierContributionRawDisplay(contribution)}</span>
+                                <span class="gathering-history-character-modifier-final" data-operator={contribution?.operator || '+'}>{contribution?.operator || '+'} {characterModifierContributionFinal(contribution)}</span>
+                                {#if contribution?.diagnostic}
+                                  <span class="gathering-history-character-modifier-diagnostic" role="alert">
+                                    <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> {contribution.diagnostic}
+                                  </span>
+                                {/if}
+                              </div>
+                            {/each}
+                          {/if}
+                        </div>
+                      {/each}
+                    </div>
+                  {/if}
+                  {#if characterModifierSnapshot.hazards.length > 0}
+                    <div class="gathering-history-character-modifier-section">
+                      <h5>{localize('FABRICATE.Gathering.History.CharacterModifiers.HazardsHeading') || 'Hazards'}</h5>
+                      {#each characterModifierSnapshot.hazards as hazardEntry, hazardIndex (hazardEntry?.hazardId || `hazard-${hazardIndex}`)}
+                        <div class="gathering-history-character-modifier-row" data-gathering-character-modifier-hazard={hazardEntry?.hazardId || ''}>
+                          {#if characterModifierContributions(hazardEntry).length === 0}
+                            <span class="gathering-empty-state is-compact">{localize('FABRICATE.Gathering.History.CharacterModifiers.RowEmpty') || 'No character modifier contributions.'}</span>
+                          {:else if characterModifierContributionIsRedacted(characterModifierContributions(hazardEntry)[0])}
+                            <span class="gathering-history-character-modifier-redacted">{characterModifierRedactedSummary(hazardEntry)}</span>
+                          {:else}
+                            {#each characterModifierContributions(hazardEntry) as contribution, contributionIndex (`hazard-${hazardIndex}-${contributionIndex}`)}
+                              <div class="gathering-history-character-modifier-evidence">
+                                <span class="gathering-history-character-modifier-label"><i class={characterModifierContributionIcon(contribution)} aria-hidden="true"></i> {characterModifierContributionLabel(contribution)}</span>
+                                {#if characterModifierContributionEffective(contribution)}
+                                  <code class="gathering-history-character-modifier-expression">{characterModifierContributionEffective(contribution)}</code>
+                                {/if}
+                                <span class="gathering-history-character-modifier-raw">{characterModifierContributionRawDisplay(contribution)}</span>
+                                <span class="gathering-history-character-modifier-final" data-operator={contribution?.operator || '+'}>{contribution?.operator || '+'} {characterModifierContributionFinal(contribution)}</span>
+                                {#if contribution?.diagnostic}
+                                  <span class="gathering-history-character-modifier-diagnostic" role="alert">
+                                    <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> {contribution.diagnostic}
+                                  </span>
+                                {/if}
+                              </div>
+                            {/each}
+                          {/if}
+                        </div>
+                      {/each}
+                    </div>
+                  {/if}
+                </details>
+              {/if}
             </article>
           {:else}
             <div class="gathering-empty-state is-compact">{localize('FABRICATE.Gathering.Empty.NoHistory')}</div>

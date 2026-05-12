@@ -89,6 +89,7 @@ export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
       getCraftingSystemManager: () => game?.fabricate?.getCraftingSystemManager?.() ?? null,
       getRecipeManager: () => game?.fabricate?.getRecipeManager?.() ?? null,
       getGatheringEnvironmentStore: () => game?.fabricate?.getGatheringEnvironmentStore?.() ?? null,
+      getFoundrySystemId: () => game?.system?.id || '',
       isFabricateReady,
       onFabricateReady: (callback) => {
         if (typeof callback !== 'function') return () => {};

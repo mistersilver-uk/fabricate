@@ -15,6 +15,7 @@
     biomeOptions = [],
     selectedDropId = '',
     rewardRules = null,
+    characterModifierLibrary = [],
     onPickImagePath = null,
     onUpdateTask = () => {},
     onSelectDrop = () => {},
@@ -274,11 +275,18 @@
     return managedItem(row?.componentId)?.img || 'icons/svg/item-bag.svg';
   }
 
+  function characterModifierLibraryEntry(modifierId) {
+    if (!modifierId) return null;
+    return (characterModifierLibrary || []).find(entry => entry.id === modifierId) || null;
+  }
+
   function modifierEntries(row) {
     const modifiers = row?.conditionModifiers || {};
+    const characterRefs = Array.isArray(row?.characterModifiers) ? row.characterModifiers : [];
     return [
       ...(Array.isArray(modifiers.timeOfDay) ? modifiers.timeOfDay.map(entry => ({ ...entry, kind: 'timeOfDay' })) : []),
-      ...(Array.isArray(modifiers.weather) ? modifiers.weather.map(entry => ({ ...entry, kind: 'weather' })) : [])
+      ...(Array.isArray(modifiers.weather) ? modifiers.weather.map(entry => ({ ...entry, kind: 'weather' })) : []),
+      ...characterRefs.map(ref => ({ ...ref, kind: 'character' }))
     ];
   }
 
@@ -291,23 +299,34 @@
   }
 
   function modifierLabel(entry) {
+    if (entry.kind === 'character') {
+      const libraryEntry = characterModifierLibraryEntry(entry.modifierId);
+      return libraryEntry?.label || libraryEntry?.id || entry.modifierId || text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.UnknownModifierShort', 'Unknown');
+    }
     const options = entry.kind === 'weather' ? weatherOptions : timeOfDayOptions;
     return conditionLabel((options || []).find(option => conditionId(option) === entry.conditionId)) || entry.conditionId;
   }
 
   function modifierIcon(entry) {
+    if (entry.kind === 'character') {
+      return characterModifierLibraryEntry(entry.modifierId)?.icon || 'fa-solid fa-user';
+    }
     const options = entry.kind === 'weather' ? weatherOptions : timeOfDayOptions;
     const option = (options || []).find(option => conditionId(option) === entry.conditionId);
     return conditionIcon(option || { icon: entry.kind === 'weather' ? 'fas fa-cloud-sun' : 'fas fa-clock' });
   }
 
   function modifierValueLabel(entry) {
+    if (entry.kind === 'character') return '';
     const sign = Number(entry.value || 0) >= 0 ? '+' : '';
     return `${sign}${Number(entry.value || 0)}%`;
   }
 
-  function modifierClass(value) {
-    const number = Number(value || 0);
+  function modifierClass(entry) {
+    if (entry && entry.kind === 'character') {
+      return entry.operator === '-' ? 'is-negative' : 'is-positive';
+    }
+    const number = Number((entry && typeof entry === 'object' ? entry.value : entry) || 0);
     if (number < 0) return 'is-negative';
     if (number > 0) return 'is-positive';
     return 'is-neutral';
@@ -768,10 +787,12 @@
                       <span class="manager-v2-chip is-neutral manager-v2-drop-modifier-overflow">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropModifierOverflowHint', 'See selected rule for modifiers')}</span>
                     {:else if visibleModifierEntries(row).length > 0}
                       {#each visibleModifierEntries(row) as modifier (modifier.id)}
-                        <span class={`manager-v2-chip manager-v2-drop-modifier-pill ${modifierClass(modifier.value)}`}>
+                        <span class={`manager-v2-chip manager-v2-drop-modifier-pill ${modifierClass(modifier)}`}>
                           <i class={modifierIcon(modifier)} aria-hidden="true"></i>
                           <span>{modifierLabel(modifier)}</span>
-                          <strong>{modifierValueLabel(modifier)}</strong>
+                          {#if modifier.kind !== 'character'}
+                            <strong>{modifierValueLabel(modifier)}</strong>
+                          {/if}
                         </span>
                       {/each}
                     {:else}

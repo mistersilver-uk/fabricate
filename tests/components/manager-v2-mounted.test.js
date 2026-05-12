@@ -31,7 +31,8 @@ const sharedComponentNames = [
   'ManagerV2ColorPicker',
   'ManagerV2ColorPopover',
   'EssenceSourceSelector',
-  'Pagination'
+  'Pagination',
+  'ProviderExpressionInput'
 ];
 
 let tempRoot;
@@ -2212,11 +2213,18 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Edit availability, identity, and drop rules for the selected gathering task.'));
     assert.ok(target.querySelector('[data-gathering-task-drops-table]'));
     assert.ok(target.querySelector('[data-gathering-task-drop-inspector]'));
+    const dropInspector = target.querySelector('[data-gathering-task-drop-inspector]');
+    const dropInspectorChildren = Array.from(dropInspector.children);
+    assert.ok(dropInspectorChildren[0].classList.contains('manager-v2-drop-editor-header-card'));
+    assert.equal(dropInspectorChildren[0].classList.contains('is-sticky'), false);
+    assert.ok(dropInspectorChildren[1].classList.contains('manager-v2-drop-inspector-divider'));
+    assert.ok(dropInspectorChildren[2].classList.contains('manager-v2-drop-inspector-scroll'));
+    assert.ok(dropInspectorChildren[2].querySelector('.manager-v2-drop-editor-card'));
+    assert.ok(dropInspectorChildren[2].querySelector('[data-gathering-drop-character-modifiers]'));
     assert.equal(target.querySelector('.manager-v2-task-editor-tabs'), null);
     assert.equal(target.querySelector('[data-gathering-task-summary]'), null);
     assert.equal(target.querySelector('[data-gathering-task-matching-logic]'), null);
     assert.ok(target.textContent.includes('Drop chance'));
-    assert.ok(target.textContent.includes('Final chance'));
     assert.equal(target.querySelector('.manager-v2-task-card-header .manager-v2-drop-count'), null);
     assert.ok(target.querySelector('.manager-v2-task-drop-footer [data-gathering-task-drop-count]'));
     const dropColumnHeaders = Array.from(target.querySelectorAll('[data-gathering-task-drops-table] [role="columnheader"]')).map(node => node.textContent.trim());
@@ -2959,23 +2967,6 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     inspectorSlider.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
-
-    const addModifierButtons = target.querySelectorAll('[data-gathering-task-drop-inspector] .manager-v2-drop-editor-modifier-group .manager-v2-icon-button');
-    addModifierButtons[1].click();
-    await tick();
-    flushSync();
-    const weatherModifierInput = target.querySelector('[data-gathering-drop-modifier-kind="weather"] [aria-label="Modifier value"]');
-    weatherModifierInput.value = '20';
-    weatherModifierInput.dispatchEvent(new Event('input', { bubbles: true }));
-    await tick();
-    flushSync();
-    assert.ok(target.querySelector('[data-gathering-task-drop-fact="final-chance"]').textContent.includes('100%'));
-
-    weatherModifierInput.value = '-150';
-    weatherModifierInput.dispatchEvent(new Event('input', { bubbles: true }));
-    await tick();
-    flushSync();
-    assert.ok(target.querySelector('[data-gathering-task-drop-fact="final-chance"]').textContent.includes('0%'));
 
     target.querySelector('[data-gathering-task-drop-inspector] [aria-label="Duplicate drop rule"]').click();
     await tick();

@@ -306,6 +306,9 @@ export class GatheringRunManager {
     if (record.conditionSnapshot && typeof record.conditionSnapshot === 'object') {
       run.conditionSnapshot = cloneJson(record.conditionSnapshot);
     }
+    if (record.characterModifierSnapshot && typeof record.characterModifierSnapshot === 'object') {
+      run.characterModifierSnapshot = cloneJson(record.characterModifierSnapshot);
+    }
     if (record.riskLevel) {
       run.riskLevel = stringOrNull(record.riskLevel);
     }
@@ -397,6 +400,7 @@ export class GatheringRunManager {
     if (payload.checkResult !== undefined) terminalPayload.checkResult = payload.checkResult;
     if (payload.economyEvidence !== undefined) terminalPayload.economyEvidence = payload.economyEvidence;
     if (payload.conditionSnapshot !== undefined) terminalPayload.conditionSnapshot = payload.conditionSnapshot;
+    if (payload.characterModifierSnapshot !== undefined) terminalPayload.characterModifierSnapshot = payload.characterModifierSnapshot;
     if (payload.riskLevel !== undefined) terminalPayload.riskLevel = payload.riskLevel;
     if (payload.encounterOutcome !== undefined) terminalPayload.encounterOutcome = payload.encounterOutcome;
     if (payload.chatMessageIds !== undefined) terminalPayload.chatMessageIds = payload.chatMessageIds;
@@ -452,6 +456,7 @@ function pickRunPayload(data = {}) {
     'checkResult',
     'economyEvidence',
     'conditionSnapshot',
+    'characterModifierSnapshot',
     'riskLevel',
     'encounterOutcome',
     'chatMessageIds',
