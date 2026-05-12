@@ -2,22 +2,29 @@
 
 ## Data Model
 
-### World-Global Library
+### Per-System Library
 
-Stored at `gatheringConfig.characterModifiers`:
+Stored at `gatheringConfig.systems[systemId].characterModifiers`, alongside the existing per-system `conditions`, `rules`, `tasks`, and `hazards`:
 
 ```js
-characterModifiers: Array<{
-  id: string,        // stable kebab-case id
-  label: string,
-  icon: string,      // Font Awesome class
-  provider: "dnd5e" | "pf2e" | "macro",
-  expression?: string,
-  macroUuid?: string,
-}>
+systems: {
+  [systemId]: {
+    // ...existing fields (rules, conditions, vocabularies, tasks, hazards)
+    characterModifiers: Array<{
+      id: string,        // stable kebab-case id
+      label: string,
+      icon: string,      // Font Awesome class
+      provider: "dnd5e" | "pf2e" | "macro",
+      expression?: string,
+      macroUuid?: string,
+    }>,
+  },
+}
 ```
 
-The library lives **at the gathering-config root**, not under `systems[systemId]`, intentionally. A `@abilities.str.mod` value derived from the selected actor is meaningful to every crafting system the world has installed. Per-row `providerOverride` already covers the rare case where one crafting system needs a different evaluation path than the library default. This is a deliberate divergence from the per-system condition library precedent and is justified by the actor-derived nature of the value.
+The library is **per crafting system** to match the precedent of `conditions` and to keep provider-tagged expressions co-located with the system that owns them. A `@abilities.str.mod` expression authored for `dnd5e` does not necessarily resolve the same way under `pf2e` — co-locating the modifier with the system that owns the provider keeps definitions and their provider in lockstep. This also makes the data shape import/export-friendly: a GM can bundle one system's complete gathering setup (rules, conditions, tasks, hazards, character modifiers) and ship it to another world running the same Foundry game system.
+
+Per-row `providerOverride` remains available for one-off rows that need to evaluate against a different provider than the library entry (for example, swapping to a `macro` provider for a single row's calculation).
 
 ### Row Reference Shape
 
@@ -84,11 +91,20 @@ The library editor SHOULD detect dice terms or non-trivial operators and surface
 
 ### Manager V2: Character Modifier Library Panel
 
-Lives at the gathering settings root, alongside the existing weather and time-of-day editors. Layout:
+Lives in the **system inspector** on the right side of the crafting system library browser when a system is selected — the same surface that currently renders the system conditions card in `src/ui/svelte/apps/manager-v2/CraftingSystemManagerV2Root.svelte` (around line 3186, the inspector card marked with `data-systems-gathering-conditions`).
 
-- List of modifiers with icon, label, provider badge, and "Edit / Delete" controls.
+Inspector layout, top to bottom:
+
+1. Existing system conditions card (weather, time-of-day).
+2. **New character modifiers card** (this change).
+
+Inside the card:
+
+- List of the selected system's modifiers with icon, label, provider badge, and "Edit / Delete" controls.
 - Add button opens an editor card: label, icon picker (existing icon picker component), provider select (`dnd5e` | `pf2e` | `macro`), expression input (or macro UUID picker when provider is `macro`).
-- "Seed presets" button enabled when the world's Foundry system matches a known preset. Shows preview of presets that will be added; existing ids are skipped.
+- "Seed presets" button at the bottom of the card. Enabled when the world's Foundry game system is recognized (`dnd5e` or `pf2e`); disabled with an explanatory tooltip otherwise. Shows preview of presets that will be added to the selected system's library; existing ids are skipped (idempotent).
+
+The inspector container becomes long enough that overflow scrolling matters. Set `overflow-y: auto` and a sensible `max-height` on the inspector wrapper so the cards scroll independently of the rest of the manager shell. This may require a small CSS tweak to the existing inspector container in `styles/fabricate.css`.
 
 ### Manager V2: Row Editor Integration
 
@@ -108,6 +124,7 @@ GM-only attempt history detail view gains a "Character Modifiers" sub-section pe
 - The library has no `enabled` flag. To temporarily silence a modifier, GMs delete it or rename it; existing rows surface the stale-reference state.
 - Preset seeding never mutates existing modifiers with matching ids. Unknown-system seeding is a no-op with a GM-facing message.
 - `min > max` on a row reference is treated as misconfigured at runtime and surfaced at authoring time as a validation error.
+- Deleting a crafting system removes that system's character modifier library along with its other per-system gathering settings (rules, conditions, tasks, hazards), matching the existing per-system cleanup behaviour.
 
 ## Tests
 

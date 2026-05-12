@@ -1,8 +1,8 @@
 ## ADDED Requirements
 
-### Requirement: Global Gathering Character Modifiers Library
+### Requirement: Per-System Gathering Character Modifiers Library
 
-Fabricate SHALL maintain a world-global library of reusable gathering character modifiers stored in gathering configuration.
+Fabricate SHALL maintain a per-crafting-system library of reusable gathering character modifiers stored alongside other per-system gathering settings under `gatheringConfig.systems[systemId].characterModifiers`.
 
 Character modifiers SHALL have this shape:
 
@@ -17,14 +17,14 @@ GatheringCharacterModifier = {
 }
 ```
 
-The library is world-scoped (not per crafting system) because a single actor-derived value such as `@abilities.str.mod` is meaningful across every crafting system the world has installed, and per-row `providerOverride` already lets rows targeting a system-specific provider differ when needed.
+The library is scoped to the crafting system because modifier expressions depend on game-system-specific actor paths and providers. Co-locating each system's modifiers with that system's other gathering settings (conditions, rules, tasks, hazards) keeps definitions and their provider in lockstep and lets GMs import or export a system's complete gathering setup to other worlds running the same Foundry game system. Per-row `providerOverride` remains available for one-off rows that need to evaluate against a different provider than the library entry.
 
 #### Scenario: GM defines a reusable character modifier
 
-- **GIVEN** a GM opens gathering configuration
+- **GIVEN** a GM has selected a crafting system in the manager
 - **WHEN** the GM creates a character modifier with label `Strength`, icon `fa-solid fa-dumbbell`, provider `dnd5e`, and expression `@abilities.str.mod`
-- **THEN** Fabricate SHALL persist the modifier in the world-global character modifier library
-- **AND** the modifier SHALL be available for reference from any d100 drop row or hazard row in any crafting system.
+- **THEN** Fabricate SHALL persist the modifier in the selected system's character modifier library
+- **AND** the modifier SHALL be available for reference from any d100 drop row or hazard row in that system.
 
 #### Scenario: Row references use the latest library definition
 
@@ -51,33 +51,35 @@ The library is world-scoped (not per crafting system) because a single actor-der
 
 ### Requirement: Character Modifier Presets
 
-Fabricate SHALL provide opt-in preset seeding for known Foundry game systems.
+Fabricate SHALL provide opt-in preset seeding for known Foundry game systems, scoped to the currently selected crafting system.
 
-#### Scenario: GM seeds presets for a known system
+#### Scenario: GM seeds presets into the selected system
 
 - **GIVEN** the current Foundry game system is recognized as `dnd5e` or `pf2e`
-- **WHEN** the GM invokes "Seed character modifier presets"
-- **THEN** Fabricate SHALL add preset ability and skill modifiers for that system to the world-global library
-- **AND** SHALL skip any preset whose id already exists in the library.
+- **AND** the GM has selected a crafting system in the manager
+- **WHEN** the GM invokes "Seed character modifier presets" from that system's panel
+- **THEN** Fabricate SHALL add preset ability and skill modifiers for the Foundry game system to the selected crafting system's character modifier library
+- **AND** SHALL skip any preset whose id already exists in that library.
 
 #### Scenario: Preset seeding is not automatic
 
 - **WHEN** gathering configuration loads
-- **THEN** Fabricate SHALL NOT mutate the character modifier library
+- **OR** a new crafting system shell is created
+- **THEN** Fabricate SHALL initialize the system's `characterModifiers` library as an empty array
 - **AND** SHALL NOT add system presets without explicit GM action.
 
 #### Scenario: Presets remain editable
 
-- **WHEN** preset modifiers have been seeded
+- **WHEN** preset modifiers have been seeded into a system's library
 - **THEN** the GM SHALL be able to rename, change icons, change provider, change expression, or delete them
 - **AND** edited presets SHALL NOT be reverted on subsequent loads.
 
 #### Scenario: Unknown system seeding is a no-op
 
 - **GIVEN** the current Foundry game system is not recognized
-- **WHEN** the GM invokes preset seeding
-- **THEN** Fabricate SHALL add no presets
-- **AND** SHALL surface a GM-facing message identifying the unsupported system.
+- **WHEN** the GM invokes preset seeding for a selected crafting system
+- **THEN** Fabricate SHALL add no presets to that system's library
+- **AND** SHALL surface a GM-facing message identifying the unsupported Foundry system.
 
 ### Requirement: Drop Row Character Modifier References
 
