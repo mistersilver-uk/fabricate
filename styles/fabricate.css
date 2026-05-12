@@ -9426,6 +9426,7 @@
 }
 
 .fabricate-manager-v2 .manager-v2-task-component-browser-scroll {
+  grid-row-start: 3;
   min-height: 0;
   padding: 10px 12px;
   overflow-x: hidden;
@@ -9528,6 +9529,7 @@
 }
 
 .fabricate-manager-v2 .manager-v2-task-component-browser-footer {
+  grid-row-start: 4;
   display: flex;
   align-items: center;
   justify-content: space-between;

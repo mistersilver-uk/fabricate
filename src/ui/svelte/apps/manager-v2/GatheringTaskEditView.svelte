@@ -33,7 +33,7 @@
   let componentPageIndex = $state(0);
   let lastTaskId = $state('');
   let openAvailabilityMenu = $state('');
-  const componentPageSize = 6;
+  let componentPageSize = $state(6);
 
   const dropRows = $derived(Array.isArray(task?.dropRows) ? task.dropRows : []);
   const normalizedSearchTerm = $derived(searchTerm.trim().toLowerCase());
@@ -688,9 +688,9 @@
           totalCount={filteredComponentCards.length}
           pageSize={componentPageSize}
           pageIndex={componentPageIndex}
-          pageSizeOptions={[componentPageSize]}
+          pageSizeOptions={[6, 9, 12]}
           onPageChange={(next) => componentPageIndex = next}
-          onPageSizeChange={() => {}}
+          onPageSizeChange={(next) => { componentPageSize = next; componentPageIndex = 0; }}
         />
       </div>
     </section>
