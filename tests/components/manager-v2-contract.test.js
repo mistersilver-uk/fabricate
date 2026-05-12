@@ -261,6 +261,8 @@ describe('CraftingSystemManagerV2 source contract', () => {
     );
     assert.ok(rootSource.includes('manager-v2-nav-submenu'), 'gathering sections should render in the left rail submenu');
     assert.ok(rootSource.includes('manager-v2-nav-toggle'), 'gathering rail should expose an expand/collapse control');
+    assert.ok(rootSource.includes("manager-v2-nav-group ${gatheringMenuExpanded ? 'is-expanded' : ''}"), 'expanded gathering rail should style as one submenu group');
+    assert.equal(rootSource.includes("manager-v2-nav-parent ${isGatheringRoute ? 'is-active' : ''}"), false, 'gathering parent should not use the selected pill class');
     assert.ok(rootSource.includes('FABRICATE.Admin.ManagerV2.Nav.ExpandGathering'), 'gathering rail expand label should be localized');
     assert.ok(rootSource.includes('FABRICATE.Admin.ManagerV2.Nav.CollapseGathering'), 'gathering rail collapse label should be localized');
     assert.equal(environmentsBrowserSource.includes('manager-v2-gathering-tabs'), false, 'gathering page should not render local section tabs');

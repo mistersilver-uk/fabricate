@@ -4,7 +4,7 @@
 
 `CraftingSystemManagerV2Root` owns the expanded state for the Gathering rail submenu and continues to own `activeGatheringTab`. The parent Gathering rail item remains the route entry point for the feature. Its label opens `activeView = 'environments'`, sets `activeGatheringTab = 'environments'`, and expands the submenu. The trailing icon button toggles expansion only.
 
-Nested submenu buttons are rendered below the parent item when expanded. They set `activeGatheringTab` to `environments`, `tasks`, `encounters`, or `settings`, route to the Gathering browser surface, and keep the submenu expanded. The parent item is highlighted for all Gathering routes, while the selected child button has its own active state.
+Nested submenu buttons are rendered below the parent item when expanded. They set `activeGatheringTab` to `environments`, `tasks`, `encounters`, or `settings`, route to the Gathering browser surface, and keep the submenu expanded. The expanded parent group uses a soft container background; the parent `Gathering` row stays visually neutral, and only the selected child button uses the selected menu-item treatment.
 
 `EnvironmentsBrowserView` no longer renders the horizontal tab list. It continues to render the existing panel body for the active Gathering section.
 
@@ -14,7 +14,7 @@ The parent Gathering item exposes `aria-expanded`. The icon button has explicit 
 
 ## Tests And Review
 
-Focused mounted tests cover parent navigation, icon-only expansion, child selection, active highlighting, and existing Gathering panel behavior. CSS tests cover submenu geometry and removal of horizontal tab focus styling. Contract tests cover source wiring and localization.
+Focused mounted tests cover parent navigation, icon-only expansion, child selection, neutral parent styling, selected child highlighting, and existing Gathering panel behavior. CSS tests cover grouped submenu geometry, soft background, selected child styling, and removal of horizontal tab focus styling. Contract tests cover source wiring and localization.
 
 ## Out Of Scope
 

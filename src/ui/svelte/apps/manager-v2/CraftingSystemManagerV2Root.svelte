@@ -2321,10 +2321,10 @@
             </button>
           {/if}
           {#if canShowEnvironments}
-            <div class="manager-v2-nav-group">
+            <div class={`manager-v2-nav-group ${gatheringMenuExpanded ? 'is-expanded' : ''}`}>
               <button
                 type="button"
-                class={`manager-v2-nav-button manager-v2-nav-parent ${isGatheringRoute ? 'is-active' : ''}`}
+                class="manager-v2-nav-button manager-v2-nav-parent"
                 id="manager-v2-nav-gathering"
                 aria-current={isGatheringRoute ? 'page' : undefined}
                 aria-expanded={gatheringMenuExpanded}

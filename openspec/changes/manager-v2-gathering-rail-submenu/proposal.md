@@ -16,7 +16,7 @@ The Gathering browser currently has two levels of navigation: the left rail open
 - Render Environments, Tasks, Hazards, and Settings as nested Gathering rail entries.
 - Remove the horizontal Gathering tabs from the main Gathering browser.
 - Keep existing Gathering panels, actions, placeholders, settings, and inspectors driven by the current active Gathering section.
-- Highlight both the parent Gathering rail item and the selected child subsection.
+- Render the expanded Gathering rail item as a soft grouped container, with selected visual treatment only on the active child subsection.
 
 ## Impact
 

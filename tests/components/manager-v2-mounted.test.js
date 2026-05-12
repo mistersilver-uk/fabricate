@@ -2107,7 +2107,8 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Quiet Cavern'));
     const gatheringParent = target.querySelector('#manager-v2-nav-gathering');
     assert.equal(gatheringParent.getAttribute('aria-expanded'), 'true');
-    assert.equal(gatheringParent.classList.contains('is-active'), true);
+    assert.equal(gatheringParent.classList.contains('is-active'), false);
+    assert.equal(target.querySelector('.manager-v2-nav-group').classList.contains('is-expanded'), true);
     assert.equal(gatheringParent.querySelector('.manager-v2-nav-count'), null);
     assert.equal(gatheringToggle().getAttribute('aria-label'), 'Collapse gathering menu');
     const gatheringItems = Array.from(target.querySelectorAll('.manager-v2-nav-subitem'));
@@ -2127,6 +2128,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'environments');
     assert.equal(target.querySelectorAll('.manager-v2-nav-subitem').length, 0);
     assert.equal(target.querySelector('#manager-v2-nav-gathering').getAttribute('aria-expanded'), 'false');
+    assert.equal(target.querySelector('.manager-v2-nav-group').classList.contains('is-expanded'), false);
     gatheringToggle().click();
     await tick();
     flushSync();
@@ -2137,7 +2139,8 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     flushSync();
 
     assert.equal(gatheringSubitem('Tasks').getAttribute('aria-current'), 'page');
-    assert.equal(target.querySelector('#manager-v2-nav-gathering').classList.contains('is-active'), true);
+    assert.equal(target.querySelector('#manager-v2-nav-gathering').classList.contains('is-active'), false);
+    assert.equal(gatheringSubitem('Tasks').classList.contains('is-active'), true);
     assert.equal(target.querySelectorAll('.manager-v2-gathering-task-row').length, 3);
     assert.ok(target.textContent.includes('Gather Moon Herbs'));
     assert.ok(target.textContent.includes('Prospect Crystal Veins'));

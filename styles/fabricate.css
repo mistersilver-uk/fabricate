@@ -8501,9 +8501,28 @@
   min-width: 0;
 }
 
+.fabricate-manager-v2 .manager-v2-nav-group.is-expanded {
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-overlay-light-035);
+}
+
 .fabricate-manager-v2 .manager-v2-nav-parent {
   grid-template-columns: 24px minmax(0, 1fr);
   padding-right: 40px;
+}
+
+.fabricate-manager-v2 .manager-v2-nav-group.is-expanded .manager-v2-nav-parent {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.fabricate-manager-v2 .manager-v2-nav-group.is-expanded .manager-v2-nav-parent:hover {
+  border-color: transparent;
+  background: var(--fab-overlay-light-04);
 }
 
 .fabricate-manager-v2 .manager-v2-nav-toggle {
@@ -8521,6 +8540,11 @@
   color: var(--fab-mv2-text-muted);
   background: transparent;
   cursor: pointer;
+}
+
+.fabricate-manager-v2 .manager-v2-nav-group.is-expanded .manager-v2-nav-toggle {
+  top: 9px;
+  right: 9px;
 }
 
 .fabricate-manager-v2 .manager-v2-nav-toggle:hover {
@@ -8543,7 +8567,7 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
-  padding-left: 15px;
+  padding-left: 12px;
 }
 
 .fabricate-manager-v2 .manager-v2-nav-subitem {
