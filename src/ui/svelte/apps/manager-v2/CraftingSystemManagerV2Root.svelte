@@ -1373,6 +1373,18 @@
     updateSelectedGatheringTask({ dropRows: nextRows });
   }
 
+  function moveGatheringTaskDrop(rowId, direction) {
+    if (!editingGatheringTask || !rowId) return;
+    const rows = gatheringTaskDropRows(editingGatheringTask);
+    const index = rows.findIndex(row => row.id === rowId);
+    if (index < 0) return;
+    const target = direction === 'up' ? index - 1 : index + 1;
+    if (target < 0 || target >= rows.length) return;
+    const next = [...rows];
+    [next[index], next[target]] = [next[target], next[index]];
+    updateSelectedGatheringTask({ dropRows: next });
+  }
+
   async function importGatheringTaskDrop(rowId, data) {
     if (!rowId) return false;
     const item = await services?.importSingleManagedItemFromDrop?.(data);
@@ -2493,6 +2505,7 @@
         onSelectDrop={(rowId) => { selectedGatheringDropId = rowId; }}
         onAddDrop={addGatheringTaskDrop}
         onUpdateDrop={updateGatheringTaskDrop}
+        onMoveDrop={moveGatheringTaskDrop}
         onImportDrop={importGatheringTaskDrop}
         onAddModifier={addGatheringDropModifier}
         onUpdateModifier={updateGatheringDropModifier}

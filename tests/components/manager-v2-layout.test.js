@@ -554,6 +554,10 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const dropFooterPaginationBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drop-footer .manager-v2-pagination');
   const dropScrollBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drops-card .manager-v2-table-scroll');
   const dropTableBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-drops-table');
+  const dropTableRankedBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-drops-table.is-ranked-mode');
+  const dropRankCellBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rank-cell');
+  const dropRankControlsBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rank-controls');
+  const dropRankControlsButtonBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rank-controls .manager-v2-icon-button');
   const dropTableHeadBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-drop-table-head');
   const dropRowBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-drop-table-head,\n.fabricate-manager-v2 .manager-v2-gathering-task-drop-row');
   const firstDropRowBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-drop-table-head + .manager-v2-gathering-task-drop-row');
@@ -746,6 +750,11 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.equal(css.includes('.fabricate-manager-v2 .manager-v2-drop-actions'), false, 'drop row actions should not reserve row layout or styling');
   assert.equal(taskEditorIntermediateQuery.includes('.manager-v2-gathering-task-drop-row {\n    grid-template-columns: minmax(0, 1fr);'), false, 'task editor should not stack drop rows at the intermediate desktop width');
   assert.ok(taskEditorIntermediateQuery.includes('minmax(154px, 1.04fr) 54px minmax(150px, 1.38fr)'), 'intermediate task editor drop grid should preserve drop chance width while widening modifiers');
+  assert.ok(dropTableRankedBlock.includes('--fab-mv2-task-drop-grid: 56px minmax(0, 0.85fr) minmax(220px, 1.35fr) 56px minmax(180px, 1.65fr);'), 'ranked-mode drop grid should prepend a 56px rank column and take width from the component column while preserving drop chance and quantity widths');
+  assert.ok(taskEditorIntermediateQuery.includes('--fab-mv2-task-drop-grid: 56px minmax(0, 0.92fr) minmax(154px, 1.04fr) 54px minmax(150px, 1.38fr);'), 'intermediate ranked-mode drop grid should keep drop chance and quantity widths while reducing the component column');
+  assert.ok(dropRankCellBlock.includes('display: grid;') && dropRankCellBlock.includes('grid-template-columns: minmax(0, 1fr) auto;'), 'rank cell should split label and reorder controls across a tight two-column layout');
+  assert.ok(dropRankControlsBlock.includes('grid-template-rows: 1fr 1fr;'), 'rank controls should stack the up and down buttons in two equal rows');
+  assert.ok(dropRankControlsButtonBlock.includes('width: 22px;') && dropRankControlsButtonBlock.includes('height: 22px;'), 'rank reorder buttons should be small enough to stack inside the row');
   assert.ok(
     mediumQuery.includes('.fabricate-manager-v2 .manager-v2-gathering-task-drop-table-head,\n  .fabricate-manager-v2 .manager-v2-gathering-task-drop-row') && mediumQuery.includes('grid-template-columns: var(--fab-mv2-task-drop-grid);'),
     'medium manager-v2 layout should preserve the drop row grid and headers instead of duplicate row labels'
