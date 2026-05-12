@@ -5738,7 +5738,8 @@
   gap: 8px;
 }
 
-.fabricate-manager-v2 .manager-v2-character-modifier-row-card {
+.fabricate-manager-v2 .manager-v2-character-modifier-row-card,
+.fabricate-manager-v2 .manager-v2-drop-editor-condition-modifier-card {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -5783,13 +5784,15 @@
   text-align: center;
 }
 
-.fabricate-manager-v2 .manager-v2-character-modifier-row-list {
+.fabricate-manager-v2 .manager-v2-character-modifier-row-list,
+.fabricate-manager-v2 .manager-v2-condition-modifier-row-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.fabricate-manager-v2 .manager-v2-character-modifier-row-reference {
+.fabricate-manager-v2 .manager-v2-character-modifier-row-reference,
+.fabricate-manager-v2 .manager-v2-condition-modifier-row-reference {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -5804,6 +5807,32 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.fabricate-manager-v2 .manager-v2-condition-modifier-row-reference .manager-v2-character-modifier-row-reference-header {
+  flex-wrap: nowrap;
+}
+
+.fabricate-manager-v2 .manager-v2-condition-modifier-row-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fabricate-manager-v2 .manager-v2-condition-modifier-add-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.fabricate-manager-v2 .manager-v2-condition-modifier-picker {
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-condition-modifier-add-button {
+  justify-content: center;
+  white-space: nowrap;
 }
 
 .fabricate-manager-v2 .manager-v2-character-modifier-row-reference-label {
@@ -5882,7 +5911,8 @@
 }
 
 .fabricate-manager-v2 .manager-v2-character-modifier-row-empty,
-.fabricate-manager-v2 .manager-v2-character-modifier-empty-hint {
+.fabricate-manager-v2 .manager-v2-character-modifier-empty-hint,
+.fabricate-manager-v2 .manager-v2-condition-modifier-row-empty {
   font-size: 0.8rem;
   font-style: italic;
 }
@@ -9147,7 +9177,7 @@
   max-width: 100%;
   padding: 3px 4px 3px 8px;
   border: 1px solid var(--fab-warning-border);
-  border-radius: 999px;
+  border-radius: 5px;
   color: var(--fab-mv2-text);
   background: var(--fab-warning-soft);
   font-size: 0.76rem;
@@ -10054,11 +10084,6 @@
   background: var(--fab-overlay-light-035);
 }
 
-.fabricate-manager-v2 .manager-v2-modifier-row {
-  grid-template-columns: minmax(0, 1fr) 24px 72px 32px;
-  gap: 8px;
-}
-
 .fabricate-manager-v2 .manager-v2-drop-editor-card {
   display: grid;
   align-content: start;
@@ -10116,6 +10141,12 @@
 }
 
 .fabricate-manager-v2 .manager-v2-character-modifier-row-card .manager-v2-field :is(select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"])) {
+  height: 28px;
+  min-height: 28px;
+  padding: 3px 8px;
+}
+
+.fabricate-manager-v2 .manager-v2-drop-editor-condition-modifier-card .manager-v2-field :is(select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"])) {
   height: 28px;
   min-height: 28px;
   padding: 3px 8px;
@@ -10230,22 +10261,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.fabricate-manager-v2 .manager-v2-drop-editor-modifiers {
-  display: grid;
-  gap: 12px;
-  min-width: 0;
-}
-
-.fabricate-manager-v2 .manager-v2-drop-editor-modifier-group {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-  padding: 10px;
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
-  background: var(--fab-overlay-light-035);
-}
-
 .fabricate-manager-v2 .manager-v2-inspector-subhead {
   display: flex;
   align-items: center;
@@ -10260,27 +10275,7 @@
   font-size: 0.9rem;
 }
 
-.fabricate-manager-v2 .manager-v2-modifier-arrow {
-  display: inline-flex;
-  justify-content: center;
-  font-weight: 900;
-}
-
-.fabricate-manager-v2 .manager-v2-modifier-arrow.is-active,
-.fabricate-manager-v2 .manager-v2-modifier-value.is-active {
-  color: var(--fab-success-text);
-  border-color: var(--fab-success-border);
-}
-
-.fabricate-manager-v2 .manager-v2-modifier-arrow.is-danger,
-.fabricate-manager-v2 .manager-v2-modifier-value.is-danger {
-  color: var(--fab-danger-text);
-  border-color: var(--fab-danger-border);
-}
-
-.fabricate-manager-v2 .manager-v2-chip.is-neutral,
-.fabricate-manager-v2 .manager-v2-modifier-arrow.is-neutral,
-.fabricate-manager-v2 .manager-v2-modifier-value.is-neutral {
+.fabricate-manager-v2 .manager-v2-chip.is-neutral {
   color: var(--fab-mv2-text-muted);
   border-color: var(--fab-mv2-border);
 }

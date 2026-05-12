@@ -2136,8 +2136,8 @@ describe('createAdminStore', () => {
       assert.deepEqual(saved.timeOfDay, []);
       assert.equal(saved.dropRows[0].dropRate, 0);
       assert.deepEqual(saved.dropRows[0].conditionModifiers, {
-        timeOfDay: [{ id: 'night-penalty', conditionId: 'night', value: -5 }],
-        weather: [{ id: 'rain-bonus', conditionId: 'rain', value: 15 }]
+        timeOfDay: [{ id: 'night-penalty', conditionId: 'night', operator: '-', value: 5 }],
+        weather: [{ id: 'rain-bonus', conditionId: 'rain', operator: '+', value: 15 }]
       });
     });
 

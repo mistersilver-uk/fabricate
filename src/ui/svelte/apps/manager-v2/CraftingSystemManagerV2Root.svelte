@@ -162,6 +162,33 @@
   function characterModifierOperatorClass(operator) {
     return operator === '-' ? 'is-negative' : 'is-positive';
   }
+
+  let gatheringTimeOfDayPickerSelection = $state('');
+  let gatheringWeatherPickerSelection = $state('');
+  $effect(() => {
+    const timeAvailable = gatheringConditionAvailableOptions(selectedGatheringDrop, 'timeOfDay');
+    if (!timeAvailable.some(option => option.id === gatheringTimeOfDayPickerSelection)) {
+      gatheringTimeOfDayPickerSelection = timeAvailable[0]?.id || '';
+    }
+    const weatherAvailable = gatheringConditionAvailableOptions(selectedGatheringDrop, 'weather');
+    if (!weatherAvailable.some(option => option.id === gatheringWeatherPickerSelection)) {
+      gatheringWeatherPickerSelection = weatherAvailable[0]?.id || '';
+    }
+  });
+
+  function gatheringDropModifierPickerSelection(kind) {
+    return kind === 'weather' ? gatheringWeatherPickerSelection : gatheringTimeOfDayPickerSelection;
+  }
+
+  function setGatheringDropModifierPickerSelection(kind, value) {
+    if (kind === 'weather') gatheringWeatherPickerSelection = value;
+    else gatheringTimeOfDayPickerSelection = value;
+  }
+
+  function gatheringDropModifierOperatorClass(operator) {
+    return operator === '-' ? 'is-negative' : 'is-positive';
+  }
+
   async function setCharacterModifierOverrideEnabled(rowId, ref, enabled, libraryEntry) {
     const expressionOverride = enabled ? (libraryEntry?.expression || '') : '';
     await onUpdateDropCharacterModifier(rowId, ref.id, { expressionOverride });
@@ -1176,6 +1203,13 @@
     return Array.isArray(values) ? values : [];
   }
 
+  function gatheringConditionAvailableOptions(row, kind) {
+    const options = gatheringConditionOptions(kind);
+    if (!row) return options;
+    const attached = new Set(gatheringConditionModifierRows(row, kind).map(modifier => modifier.conditionId));
+    return options.filter(option => !attached.has(option.id));
+  }
+
   function updateGatheringDropModifier(rowId, kind, modifierId, updates = {}) {
     if (!selectedGatheringTask || !rowId || !kind || !modifierId) return;
     const row = gatheringTaskDropRows(selectedGatheringTask).find(entry => entry.id === rowId);
@@ -1188,18 +1222,18 @@
     updateGatheringTaskDrop(rowId, { conditionModifiers });
   }
 
-  function addGatheringDropModifier(rowId, kind) {
-    if (!selectedGatheringTask || !rowId || !kind) return;
+  function addGatheringDropModifier(rowId, kind, conditionId) {
+    if (!selectedGatheringTask || !rowId || !kind || !conditionId) return;
     const row = gatheringTaskDropRows(selectedGatheringTask).find(entry => entry.id === rowId);
-    const firstConditionId = gatheringConditionOptions(kind)[0]?.id || '';
-    if (!row || !firstConditionId) return;
+    if (!row) return;
     const conditionModifiers = {
       timeOfDay: gatheringConditionModifierRows(row, 'timeOfDay'),
       weather: gatheringConditionModifierRows(row, 'weather')
     };
+    if (conditionModifiers[kind].some(modifier => modifier.conditionId === conditionId)) return;
     conditionModifiers[kind] = [
       ...conditionModifiers[kind],
-      { id: `${kind}-${gatheringDropRowId()}`, conditionId: firstConditionId, value: 0 }
+      { id: `${kind}-${gatheringDropRowId()}`, conditionId, operator: '+', value: 0 }
     ];
     updateGatheringTaskDrop(rowId, { conditionModifiers });
   }
@@ -1578,13 +1612,6 @@
     const quantity = gatheringDropCountValue({ quantity: (Number.isFinite(currentValue) ? currentValue : gatheringDropCountValue(row)) + (event.key === 'ArrowUp' ? 1 : -1) });
     event.currentTarget.value = String(quantity);
     updateGatheringTaskDrop(row.id, { quantity });
-  }
-
-  function gatheringDropModifierClass(value) {
-    const number = Number(value || 0);
-    if (number < 0) return 'is-danger';
-    if (number > 0) return 'is-active';
-    return 'is-neutral';
   }
 
   function gatheringTaskAvailability(task) {
@@ -2508,42 +2535,96 @@
                   <input type="text" inputmode="numeric" pattern={'[1-9][0-9]{0,2}'} value={gatheringDropCountValue(selectedGatheringDrop)} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropQuantityColumn', 'Count')} oninput={(event) => onGatheringDropCountInput(selectedGatheringDrop.id, event)} onblur={(event) => onGatheringDropCountBlur(selectedGatheringDrop, event)} onkeydown={(event) => onGatheringDropCountKeydown(selectedGatheringDrop, event)} />
                 </label>
               </div>
-
-              <div class="manager-v2-drop-editor-modifiers">
-                {#each ['timeOfDay', 'weather'] as kind}
-                  <section class="manager-v2-drop-editor-modifier-group" data-gathering-drop-modifier-kind={kind}>
-                    <div class="manager-v2-inspector-subhead">
-                      <h5>{kind === 'weather' ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.WeatherModifiers', 'Weather modifiers') : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.TimeModifiers', 'Time modifiers')}</h5>
-                      <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AddModifier', 'Add modifier')} onclick={() => addGatheringDropModifier(selectedGatheringDrop.id, kind)}>
-                        <i class="fas fa-plus" aria-hidden="true"></i>
-                      </button>
-                    </div>
-                    <div class="manager-v2-requirements-list">
-                      {#each gatheringConditionModifierRows(selectedGatheringDrop, kind) as modifier (modifier.id)}
-                        <div class="manager-v2-requirement-row manager-v2-modifier-row" data-gathering-drop-modifier-id={modifier.id}>
-                          <select value={modifier.conditionId} onchange={(event) => updateGatheringDropModifier(selectedGatheringDrop.id, kind, modifier.id, { conditionId: event.currentTarget.value })}>
-                            {#each gatheringConditionOptions(kind) as option (option.id)}
-                              <option value={option.id}>{option.label || option.id}</option>
-                            {/each}
-                          </select>
-                          <span class={`manager-v2-modifier-arrow ${gatheringDropModifierClass(modifier.value)}`}>{Number(modifier.value || 0) < 0 ? '-' : '+'}</span>
-                          <input class={`manager-v2-modifier-value ${gatheringDropModifierClass(modifier.value)}`} type="number" step="1" value={modifier.value || 0} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ModifierValue', 'Modifier value')} oninput={(event) => updateGatheringDropModifier(selectedGatheringDrop.id, kind, modifier.id, { value: Number(event.currentTarget.value || 0) })} />
-                          <button type="button" class="manager-v2-icon-button is-danger" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DeleteModifier', 'Delete modifier')} onclick={() => deleteGatheringDropModifier(selectedGatheringDrop.id, kind, modifier.id)}>
-                            <i class="fas fa-trash" aria-hidden="true"></i>
-                          </button>
-                        </div>
-                      {:else}
-                        <div class="manager-v2-requirement-row">
-                          <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.NotSpecified', 'Not specified')}</span>
-                          <strong>0%</strong>
-                        </div>
-                      {/each}
-                    </div>
-                  </section>
-                {/each}
-              </div>
-
             </section>
+
+            {#each ['timeOfDay', 'weather'] as kind}
+              {@const isWeather = kind === 'weather'}
+              {@const cardTitle = isWeather
+                ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.WeatherModifiers', 'Weather modifiers')
+                : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.TimeModifiers', 'Time modifiers')}
+              {@const cardHint = isWeather
+                ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.WeatherModifiersHint', "Adjust this drop's chance based on the active weather condition.")
+                : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.TimeModifiersHint', "Adjust this drop's chance based on the active time of day.")}
+              {@const availableConditions = gatheringConditionAvailableOptions(selectedGatheringDrop, kind)}
+              {@const pickerSelection = gatheringDropModifierPickerSelection(kind)}
+              {@const attachedModifiers = gatheringConditionModifierRows(selectedGatheringDrop, kind)}
+              <section class="manager-v2-inspector-card manager-v2-drop-editor-condition-modifier-card" data-gathering-drop-condition-modifiers={kind}>
+                <header class="manager-v2-character-modifier-row-card-header">
+                  <div class="manager-v2-character-modifier-row-card-heading">
+                    <h3 class="manager-v2-card-title">{cardTitle}</h3>
+                    <p class="manager-v2-muted">{cardHint}</p>
+                  </div>
+                </header>
+                <div class="manager-v2-condition-modifier-add-row" data-gathering-drop-condition-modifier-picker={kind}>
+                  <label class="manager-v2-field manager-v2-condition-modifier-picker">
+                    <span class="visually-hidden">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ConditionPickerLabel', 'Condition')}</span>
+                    <select
+                      value={pickerSelection}
+                      disabled={availableConditions.length === 0}
+                      data-tooltip={availableConditions.length === 0 ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AllConditionsAdded', 'All conditions already added.') : null}
+                      onchange={(event) => setGatheringDropModifierPickerSelection(kind, event.currentTarget.value)}
+                    >
+                      {#each availableConditions as option (option.id)}
+                        <option value={option.id}>{option.label || option.id}</option>
+                      {/each}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    class="manager-v2-button is-primary manager-v2-condition-modifier-add-button"
+                    disabled={availableConditions.length === 0 || !pickerSelection}
+                    data-tooltip={availableConditions.length === 0 ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AllConditionsAdded', 'All conditions already added.') : null}
+                    onclick={() => addGatheringDropModifier(selectedGatheringDrop.id, kind, pickerSelection)}
+                  >
+                    <i class="fas fa-plus" aria-hidden="true"></i>
+                    <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AddConditionModifier', 'Add modifier')}</span>
+                  </button>
+                </div>
+                <div class="manager-v2-condition-modifier-row-list">
+                  {#each attachedModifiers as modifier (modifier.id)}
+                    {@const operatorClass = gatheringDropModifierOperatorClass(modifier.operator)}
+                    <article class="manager-v2-condition-modifier-row-reference" data-gathering-drop-modifier-id={modifier.id}>
+                      <header class="manager-v2-character-modifier-row-reference-header">
+                        <span class="manager-v2-character-modifier-icon">
+                          <i class={isWeather ? 'fas fa-cloud-sun' : 'fas fa-clock'} aria-hidden="true"></i>
+                        </span>
+                        <span class="manager-v2-character-modifier-row-reference-label">{gatheringConditionLabel(kind, modifier.conditionId) || modifier.conditionId}</span>
+                        <label class={`manager-v2-character-modifier-operator-select ${operatorClass}`}>
+                          <span class="visually-hidden">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Operator', 'Operator')}</span>
+                          <select value={modifier.operator || '+'} onchange={(event) => updateGatheringDropModifier(selectedGatheringDrop.id, kind, modifier.id, { operator: event.currentTarget.value === '-' ? '-' : '+' })}>
+                            <option value="+">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.OperatorPositive', 'Positive')}</option>
+                            <option value="-">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.OperatorNegative', 'Negative')}</option>
+                          </select>
+                        </label>
+                        <button
+                          type="button"
+                          class="manager-v2-icon-button is-danger manager-v2-character-modifier-row-reference-delete"
+                          aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DeleteModifier', 'Delete modifier')}
+                          onclick={() => deleteGatheringDropModifier(selectedGatheringDrop.id, kind, modifier.id)}
+                        >
+                          <i class="fas fa-trash" aria-hidden="true"></i>
+                        </button>
+                      </header>
+                      <div class="manager-v2-condition-modifier-row-body">
+                        <label class="manager-v2-field">
+                          <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ModifierValue', 'Modifier value')}</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={Math.abs(Math.trunc(Number(modifier.value || 0)))}
+                            aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ModifierValue', 'Modifier value')}
+                            oninput={(event) => updateGatheringDropModifier(selectedGatheringDrop.id, kind, modifier.id, { value: Math.abs(Math.trunc(Number(event.currentTarget.value || 0))) })}
+                          />
+                        </label>
+                      </div>
+                    </article>
+                  {:else}
+                    <p class="manager-v2-muted manager-v2-condition-modifier-row-empty">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.NoConditionModifiers', 'No modifiers attached.')}</p>
+                  {/each}
+                </div>
+              </section>
+            {/each}
 
             <section class="manager-v2-inspector-card manager-v2-character-modifier-row-card" data-gathering-drop-character-modifiers>
               <header class="manager-v2-character-modifier-row-card-header">

@@ -316,15 +316,25 @@
     return conditionIcon(option || { icon: entry.kind === 'weather' ? 'fas fa-cloud-sun' : 'fas fa-clock' });
   }
 
+  function modifierEffectiveOperator(entry) {
+    if (entry?.operator === '-' || entry?.operator === '+') return entry.operator;
+    return Number(entry?.value || 0) < 0 ? '-' : '+';
+  }
+
   function modifierValueLabel(entry) {
     if (entry.kind === 'character') return '';
-    const sign = Number(entry.value || 0) >= 0 ? '+' : '';
-    return `${sign}${Number(entry.value || 0)}%`;
+    const magnitude = Math.abs(Math.trunc(Number(entry.value || 0)));
+    return `${modifierEffectiveOperator(entry)}${magnitude}%`;
   }
 
   function modifierClass(entry) {
     if (entry && entry.kind === 'character') {
       return entry.operator === '-' ? 'is-negative' : 'is-positive';
+    }
+    if (entry && (entry.kind === 'weather' || entry.kind === 'timeOfDay')) {
+      const magnitude = Math.abs(Math.trunc(Number(entry.value || 0)));
+      if (magnitude === 0) return 'is-neutral';
+      return modifierEffectiveOperator(entry) === '-' ? 'is-negative' : 'is-positive';
     }
     const number = Number((entry && typeof entry === 'object' ? entry.value : entry) || 0);
     if (number < 0) return 'is-negative';

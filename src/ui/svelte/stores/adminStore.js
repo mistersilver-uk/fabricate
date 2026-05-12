@@ -507,12 +507,18 @@ function _normalizeGatheringDropConditionModifierList(values = []) {
   return (Array.isArray(values) ? values : [])
     .map((modifier, index) => {
       const conditionId = _normalizeGatheringConditionId(modifier?.conditionId ?? modifier?.id);
-      const value = Number(modifier?.value);
-      if (!conditionId || !Number.isFinite(value)) return null;
+      const rawValue = Number(modifier?.value);
+      if (!conditionId || !Number.isFinite(rawValue)) return null;
+      const truncated = Math.trunc(rawValue);
+      const explicitOperator = modifier?.operator === '-' || modifier?.operator === '+'
+        ? modifier.operator
+        : null;
+      const operator = explicitOperator ?? (truncated < 0 ? '-' : '+');
       return {
         id: String(modifier?.id || `${conditionId}-${index + 1}`),
         conditionId,
-        value: Math.trunc(value)
+        operator,
+        value: Math.abs(truncated)
       };
     })
     .filter(Boolean);

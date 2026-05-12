@@ -1090,12 +1090,18 @@ function normalizeDropConditionModifierList(values = []) {
   return (Array.isArray(values) ? values : [])
     .map((modifier, index) => {
       const conditionId = normalizeConditionId(modifier?.conditionId ?? modifier?.id);
-      const value = Number(modifier?.value);
-      if (!conditionId || !Number.isFinite(value)) return null;
+      const rawValue = Number(modifier?.value);
+      if (!conditionId || !Number.isFinite(rawValue)) return null;
+      const truncated = Math.trunc(rawValue);
+      const explicitOperator = modifier?.operator === '-' || modifier?.operator === '+'
+        ? modifier.operator
+        : null;
+      const operator = explicitOperator ?? (truncated < 0 ? '-' : '+');
       return {
         id: stringOrFallback(modifier?.id, `${conditionId}-${index + 1}`),
         conditionId,
-        value: Math.trunc(value)
+        operator,
+        value: Math.abs(truncated)
       };
     })
     .filter(Boolean);
@@ -1107,7 +1113,7 @@ function matchingConditionModifier(modifiers = {}, conditions = {}) {
     if (!current) return total;
     return total + normalizeDropConditionModifierList(modifiers?.[kind])
       .filter(modifier => modifier.conditionId === current)
-      .reduce((sum, modifier) => sum + Number(modifier.value || 0), 0);
+      .reduce((sum, modifier) => sum + (modifier.operator === '-' ? -modifier.value : modifier.value), 0);
   }, 0);
 }
 
