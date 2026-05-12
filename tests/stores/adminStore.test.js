@@ -2141,6 +2141,71 @@ describe('createAdminStore', () => {
       });
     });
 
+    it('creates new gathering library tasks with no default drops', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      sys.components = [{ id: 'herb', name: 'Herb', img: 'herb.webp' }];
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const task = await store.addGatheringLibraryTask('sys1');
+
+      assert.deepEqual(task.dropRows, []);
+      assert.deepEqual(services._store.gatheringConfig.systems.sys1.tasks[0].dropRows, []);
+    });
+
+    it('rejects gathering library task save when drops are missing or unresolved', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      sys.components = [{ id: 'herb', name: 'Herb', img: 'herb.webp' }];
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const empty = store.validateGatheringLibraryTask({ id: 't1', name: 'Gather', dropRows: [] });
+      assert.equal(empty.valid, false);
+      assert.ok(
+        empty.errors.some(error => error.includes('requires at least one drop row')),
+        `expected "requires at least one drop row" in errors: ${empty.errors.join(' | ')}`
+      );
+
+      const unresolved = store.validateGatheringLibraryTask({
+        id: 't2',
+        name: 'Gather',
+        dropRows: [{ id: 'row-1', componentId: '', itemUuid: '', quantity: 1, dropRate: 50, enabled: true }]
+      });
+      assert.equal(unresolved.valid, false);
+      assert.ok(
+        unresolved.errors.some(error => error.includes('requires componentId or itemUuid')),
+        `expected "requires componentId or itemUuid" in errors: ${unresolved.errors.join(' | ')}`
+      );
+
+      const resolved = store.validateGatheringLibraryTask({
+        id: 't3',
+        name: 'Gather',
+        dropRows: [{ id: 'row-1', componentId: 'herb', itemUuid: '', quantity: 1, dropRate: 50, enabled: true }]
+      });
+      assert.equal(resolved.valid, true);
+      assert.deepEqual(resolved.errors, []);
+
+      const enabledResolvedPlusDisabledUnresolved = store.validateGatheringLibraryTask({
+        id: 't4',
+        name: 'Gather',
+        dropRows: [
+          { id: 'row-1', componentId: 'herb', itemUuid: '', quantity: 1, dropRate: 50, enabled: true },
+          { id: 'row-2', componentId: '', itemUuid: '', quantity: 1, dropRate: 25, enabled: false }
+        ]
+      });
+      assert.equal(enabledResolvedPlusDisabledUnresolved.valid, false);
+      assert.ok(
+        enabledResolvedPlusDisabledUnresolved.errors.some(error =>
+          error.includes('row-2') && error.includes('requires componentId or itemUuid')
+        ),
+        `expected disabled unresolved row to be rejected: ${enabledResolvedPlusDisabledUnresolved.errors.join(' | ')}`
+      );
+    });
+
     it('returns null when duplicating a missing gathering task', async () => {
       const services = createMockServices();
       services._store.gatheringConfig = {
