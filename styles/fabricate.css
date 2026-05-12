@@ -5761,10 +5761,17 @@
   width: 100%;
 }
 
-.fabricate-manager-v2 .manager-v2-character-modifier-add-suggestion {
-  display: flex;
+.fabricate-manager-v2 .manager-v2-tag-suggestion.manager-v2-character-modifier-add-suggestion {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
+  min-height: 32px;
+  padding: 5px 7px;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-add-suggestion > i {
+  text-align: center;
 }
 
 .fabricate-manager-v2 .manager-v2-character-modifier-row-list {
@@ -6134,7 +6141,7 @@
   background: var(--fab-overlay-light-12);
 }
 
-.fabricate-manager-v2 .manager-v2-search i {
+.fabricate-manager-v2 .manager-v2-search > i {
   position: absolute;
   top: 50%;
   left: 11px;

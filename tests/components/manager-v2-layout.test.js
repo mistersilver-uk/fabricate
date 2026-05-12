@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { chromium } from 'playwright';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const cssPath = resolve(__dirname, '../../styles/fabricate.css');
@@ -40,6 +41,170 @@ test('Fabricate app shells suppress host click focus outlines while preserving k
     'classic crafting app controls should clear host click focus outlines'
   );
   assert.ok(managerFocusVisibleBlock.includes('outline: 2px solid var(--fab-mv2-accent);'), 'manager-v2 keyboard focus should remain visible');
+});
+
+test('manager-v2 character modifier search suggestions keep icons in row flow', () => {
+  const searchIconBlock = blockFor('.fabricate-manager-v2 .manager-v2-search > i');
+  const characterModifierSuggestionBlock = blockFor('.fabricate-manager-v2 .manager-v2-tag-suggestion.manager-v2-character-modifier-add-suggestion');
+  const characterModifierSuggestionIconBlock = blockFor('.fabricate-manager-v2 .manager-v2-character-modifier-add-suggestion > i');
+
+  assert.ok(
+    searchIconBlock.includes('position: absolute;') && searchIconBlock.includes('left: 11px;'),
+    'search field leading icon should remain positioned inside the input chrome'
+  );
+  assert.equal(
+    css.includes('.fabricate-manager-v2 .manager-v2-search i {\n  position: absolute;'),
+    false,
+    'search icon positioning must not catch suggestion icons inside search popovers'
+  );
+  assert.ok(
+    characterModifierSuggestionBlock.includes('grid-template-columns: 22px minmax(0, 1fr);')
+      && characterModifierSuggestionBlock.includes('min-height: 32px;')
+      && characterModifierSuggestionBlock.includes('padding: 5px 7px;'),
+    'character modifier suggestions should use the same icon column and row rhythm as availability menu options'
+  );
+  assert.ok(
+    characterModifierSuggestionIconBlock.includes('text-align: center;'),
+    'character modifier suggestion icons should be centered inside the fixed icon column'
+  );
+});
+
+test('manager-v2 character modifier search suggestions render with availability-style icon geometry', async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 760, height: 320 }, deviceScaleFactor: 1 });
+
+  try {
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            ${css}
+            body {
+              margin: 0;
+              padding: 24px;
+              font-family: Arial, sans-serif;
+            }
+            .harness-grid {
+              display: grid;
+              grid-template-columns: 320px 320px;
+              gap: 32px;
+              align-items: start;
+            }
+            .harness-availability-anchor {
+              position: relative;
+              width: 260px;
+            }
+            .fa-solid::before {
+              content: "■";
+            }
+          </style>
+        </head>
+        <body>
+          <main class="fabricate-manager-v2">
+            <div class="harness-grid">
+              <section>
+                <div class="harness-availability-anchor">
+                  <button type="button" class="manager-v2-availability-menu-button">
+                    <span>Biomes</span>
+                    <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                  </button>
+                  <div class="manager-v2-availability-menu" role="listbox" aria-label="Biomes">
+                    <button type="button" class="manager-v2-availability-option" role="option">
+                      <i class="fa-solid fa-tree" aria-hidden="true"></i>
+                      <span>Ancient Forest</span>
+                    </button>
+                    <button type="button" class="manager-v2-availability-option" role="option">
+                      <i class="fa-solid fa-mountain" aria-hidden="true"></i>
+                      <span>High Mountain</span>
+                    </button>
+                  </div>
+                </div>
+              </section>
+
+              <section>
+                <label class="manager-v2-search is-compact manager-v2-character-modifier-add-search">
+                  <i class="fa-solid fa-search" aria-hidden="true"></i>
+                  <input type="search" value="wis" aria-label="Search character modifiers">
+                  <div class="manager-v2-tag-suggestions manager-v2-character-modifier-add-suggestions" role="listbox" aria-label="Character modifiers">
+                    <button type="button" class="manager-v2-tag-suggestion manager-v2-character-modifier-add-suggestion" role="option">
+                      <i class="fa-solid fa-user" aria-hidden="true"></i>
+                      <span>Wisdom modifier</span>
+                    </button>
+                    <button type="button" class="manager-v2-tag-suggestion manager-v2-character-modifier-add-suggestion" role="option">
+                      <i class="fa-solid fa-hand-fist" aria-hidden="true"></i>
+                      <span>Strength modifier</span>
+                    </button>
+                  </div>
+                </label>
+              </section>
+            </div>
+          </main>
+        </body>
+      </html>
+    `);
+
+    const report = await page.evaluate(() => {
+      const rectFor = element => {
+        const rect = element.getBoundingClientRect();
+        return {
+          left: rect.left,
+          top: rect.top,
+          right: rect.right,
+          bottom: rect.bottom,
+          width: rect.width,
+          height: rect.height
+        };
+      };
+      const rowFor = element => {
+        const icon = element.querySelector('i');
+        const label = element.querySelector('span');
+        const rowStyle = getComputedStyle(element);
+        const iconStyle = getComputedStyle(icon);
+        return {
+          row: rectFor(element),
+          icon: rectFor(icon),
+          label: rectFor(label),
+          rowStyle: {
+            display: rowStyle.display,
+            gridTemplateColumns: rowStyle.gridTemplateColumns
+          },
+          iconStyle: {
+            position: iconStyle.position,
+            textAlign: iconStyle.textAlign,
+            transform: iconStyle.transform
+          }
+        };
+      };
+
+      return {
+        availabilityRows: Array.from(document.querySelectorAll('.manager-v2-availability-option')).map(rowFor),
+        characterRows: Array.from(document.querySelectorAll('.manager-v2-character-modifier-add-suggestion')).map(rowFor)
+      };
+    });
+
+    const availabilityFirst = report.availabilityRows[0];
+    const characterFirst = report.characterRows[0];
+    const availabilityInset = availabilityFirst.icon.left - availabilityFirst.row.left;
+    const characterInset = characterFirst.icon.left - characterFirst.row.left;
+    const availabilityGap = availabilityFirst.label.left - availabilityFirst.icon.right;
+    const characterGap = characterFirst.label.left - characterFirst.icon.right;
+
+    assert.equal(characterFirst.iconStyle.position, 'static', 'character suggestion icons should remain in normal row flow');
+    assert.equal(characterFirst.iconStyle.textAlign, 'center', 'character suggestion icons should be centered in their icon column');
+    assert.equal(characterFirst.rowStyle.gridTemplateColumns.startsWith('22px '), true, 'character suggestion rows should reserve the availability icon column');
+    assert.ok(characterFirst.icon.right <= characterFirst.label.left, 'character suggestion icons should sit before labels');
+    assert.ok(
+      report.characterRows[0].icon.bottom <= report.characterRows[1].icon.top || report.characterRows[1].icon.bottom <= report.characterRows[0].icon.top,
+      'character suggestion icons from different rows should not overlap'
+    );
+    assert.ok(Math.abs(availabilityInset - characterInset) <= 3, 'character suggestion icon inset should match availability rows');
+    assert.ok(Math.abs(availabilityGap - characterGap) <= 3, 'character suggestion icon gap should match availability rows');
+  } finally {
+    await page.close();
+    await browser.close();
+  }
 });
 
 test('manager-v2 body starts as a three-region grid and stacks at narrow width', () => {
