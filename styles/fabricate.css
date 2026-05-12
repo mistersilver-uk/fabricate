@@ -5407,6 +5407,15 @@
   font: inherit;
 }
 
+.fabricate-manager-v2 h1,
+.fabricate-manager-v2 h2,
+.fabricate-manager-v2 h3,
+.fabricate-manager-v2 h4,
+.fabricate-manager-v2 h5,
+.fabricate-manager-v2 h6 {
+  font-family: var(--font-primary);
+}
+
 .fabricate-manager-v2 button:focus,
 .fabricate-manager-v2 input:focus,
 .fabricate-manager-v2 select:focus,
