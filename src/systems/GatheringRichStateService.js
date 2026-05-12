@@ -424,7 +424,10 @@ export class GatheringRichStateService {
     const envRegion = normalizeTag(environment?.region);
     const envBiomes = normalizeTagList(environment?.biomes ?? environment?.biome);
     const envDanger = normalizeTagList(environment?.dangerTags ?? environment?.risk);
-    if (record.region && normalizeTag(record.region) !== envRegion) return false;
+    const recordRegions = normalizeTagList(Array.isArray(record.regions)
+      ? record.regions
+      : record.region ? [record.region] : []);
+    if (recordRegions.length > 0 && !recordRegions.includes(envRegion)) return false;
     if (normalizeTagList(record.biomes).length > 0 && !hasAny(normalizeTagList(record.biomes), envBiomes)) return false;
     if (conditionSettings?.weather?.enabled !== false && normalizeConditionIdList(record.weather).length > 0 && !normalizeConditionIdList(record.weather).includes(normalizeConditionId(conditions.weather))) return false;
     if (conditionSettings?.timeOfDay?.enabled !== false && normalizeConditionIdList(record.timeOfDay).length > 0 && !normalizeConditionIdList(record.timeOfDay).includes(normalizeConditionId(conditions.timeOfDay))) return false;
@@ -606,7 +609,9 @@ function normalizeLibraryTask(task = {}) {
     description: stringOrFallback(task.description, ''),
     img: stringOrFallback(task.img, 'icons/svg/item-bag.svg'),
     enabled: task.enabled !== false,
-    region: normalizeTag(task.region),
+    regions: normalizeTagList(Array.isArray(task.regions)
+      ? task.regions
+      : task.region ? [task.region] : []),
     biomes: normalizeTagList(task.biomes),
     weather: normalizeConditionIdList(task.weather),
     timeOfDay: normalizeConditionIdList(task.timeOfDay),
@@ -639,7 +644,9 @@ function normalizeHazard(hazard = {}) {
     img: stringOrFallback(hazard.img, 'icons/svg/hazard.svg'),
     enabled: hazard.enabled !== false,
     dangerTags: normalizeTagList(hazard.dangerTags),
-    region: normalizeTag(hazard.region),
+    regions: normalizeTagList(Array.isArray(hazard.regions)
+      ? hazard.regions
+      : hazard.region ? [hazard.region] : []),
     biomes: normalizeTagList(hazard.biomes),
     weather: normalizeConditionIdList(hazard.weather),
     timeOfDay: normalizeConditionIdList(hazard.timeOfDay),

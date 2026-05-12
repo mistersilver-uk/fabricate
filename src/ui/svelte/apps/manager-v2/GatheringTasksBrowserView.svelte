@@ -36,7 +36,9 @@
   const timeCondition = $derived(systemConfig.conditions?.timeOfDay || {});
   const normalizedSearchTerm = $derived(searchTerm.trim().toLowerCase());
   const regionOptions = $derived(uniqueSorted([
-    ...taskList.map(task => task.region),
+    ...taskList.flatMap(task => Array.isArray(task.regions)
+      ? task.regions
+      : (task.region ? [task.region] : [])),
     ...vocabularyIds(systemConfig.vocabularies?.regions?.values)
   ]));
   const biomeOptions = $derived(uniqueSorted([
@@ -49,7 +51,10 @@
     const matchesStatus = statusFilter === 'all'
       || (statusFilter === 'active' && task.enabled !== false)
       || (statusFilter === 'disabled' && task.enabled === false);
-    const matchesRegion = regionFilter === 'all' || (task.region || '') === regionFilter;
+    const taskRegions = Array.isArray(task.regions)
+      ? task.regions
+      : (task.region ? [task.region] : []);
+    const matchesRegion = regionFilter === 'all' || taskRegions.includes(regionFilter);
     const taskBiomes = Array.isArray(task.biomes) ? task.biomes : [];
     const matchesBiome = biomeFilter === 'all' || taskBiomes.includes(biomeFilter);
     const availability = availabilityState(task);
@@ -185,11 +190,14 @@
     const taskBiomes = Array.isArray(task.biomes) ? task.biomes : [];
     const taskWeather = Array.isArray(task.weather) ? task.weather : [];
     const taskTime = Array.isArray(task.timeOfDay) ? task.timeOfDay : [];
+    const taskRegions = Array.isArray(task.regions)
+      ? task.regions
+      : (task.region ? [task.region] : []);
     return environmentList.filter(environment => {
       if (environment?.enabled === false) return false;
       if (String(environment?.craftingSystemId || selectedSystemId) !== String(selectedSystemId || '')) return false;
       if (!taskAllowedInEnvironment(task, environment)) return false;
-      if (task.region && task.region !== String(environment?.region || '')) return false;
+      if (taskRegions.length > 0 && !taskRegions.includes(String(environment?.region || ''))) return false;
       const environmentBiomes = Array.isArray(environment?.biomes)
         ? environment.biomes
         : (environment?.biome ? [environment.biome] : []);
@@ -318,7 +326,11 @@
               </span>
             </button>
             <span role="cell" class="manager-v2-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.ManagerV2.Environment.Region', 'Region')}>
-              <span class="manager-v2-chip">{optionLabel('region', task.region) || text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyRegion', 'Any region')}</span>
+              {#if (Array.isArray(task.regions) ? task.regions : (task.region ? [task.region] : [])).length > 0}
+                <span class="manager-v2-muted">{(Array.isArray(task.regions) ? task.regions : [task.region]).map(region => optionLabel('region', region) || region).join(', ')}</span>
+              {:else}
+                <span class="manager-v2-chip">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyRegion', 'Any region')}</span>
+              {/if}
             </span>
             <span role="cell" class="manager-v2-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.ManagerV2.Environment.Biome', 'Biome')}>
               <span class="manager-v2-muted">{(Array.isArray(task.biomes) && task.biomes.length > 0) ? task.biomes.map(biome => optionLabel('biome', biome) || biome).join(', ') : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyBiome', 'Any biome')}</span>

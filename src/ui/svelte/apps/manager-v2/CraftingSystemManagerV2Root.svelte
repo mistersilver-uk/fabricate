@@ -1566,11 +1566,14 @@
     const taskBiomes = Array.isArray(task.biomes) ? task.biomes : [];
     const taskWeather = Array.isArray(task.weather) ? task.weather : [];
     const taskTime = Array.isArray(task.timeOfDay) ? task.timeOfDay : [];
+    const taskRegions = Array.isArray(task.regions)
+      ? task.regions
+      : (task.region ? [task.region] : []);
     return environmentList.filter(environment => {
       if (environment?.enabled === false) return false;
       if (String(environment?.craftingSystemId || selectedSystemId) !== String(selectedSystemId || '')) return false;
       if (!gatheringTaskAllowedInEnvironment(task, environment)) return false;
-      if (task.region && task.region !== String(environment?.region || '')) return false;
+      if (taskRegions.length > 0 && !taskRegions.includes(String(environment?.region || ''))) return false;
       const environmentBiomes = Array.isArray(environment?.biomes)
         ? environment.biomes
         : (environment?.biome ? [environment.biome] : []);
@@ -2370,7 +2373,15 @@
               <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Details', 'Gathering task details')}</h3>
               <div class="manager-v2-fact-grid">
                 <div class="manager-v2-fact" data-gathering-task-fact="region">
-                  <strong>{gatheringOptionLabel('region', selectedGatheringTask.region) || text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyRegion', 'Any region')}</strong>
+                  <strong>{
+                    (() => {
+                      const regions = Array.isArray(selectedGatheringTask.regions)
+                        ? selectedGatheringTask.regions
+                        : (selectedGatheringTask.region ? [selectedGatheringTask.region] : []);
+                      if (regions.length === 0) return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyRegion', 'Any region');
+                      return regions.map(id => gatheringOptionLabel('region', id) || id).join(', ');
+                    })()
+                  }</strong>
                   <span>{text('FABRICATE.Admin.ManagerV2.Environment.Region', 'Region')}</span>
                 </div>
                 <div class="manager-v2-fact" data-gathering-task-fact="biomes">

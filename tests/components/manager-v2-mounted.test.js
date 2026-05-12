@@ -2448,29 +2448,34 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[3].name === 'Gather Sun Herbs'));
-    const regionAvailability = target.querySelector('[data-gathering-task-field="region"]');
+    const regionAvailability = target.querySelector('[data-gathering-task-field="regions"]');
     const biomeAvailability = target.querySelector('[data-gathering-task-field="biomes"]');
     const timeAvailability = target.querySelector('[data-gathering-task-field="timeOfDay"]');
     const weatherAvailability = target.querySelector('[data-gathering-task-field="weather"]');
-    const regionSelect = regionAvailability.querySelector('select');
-    assert.deepEqual(
-      Array.from(regionSelect.options).map(option => option.textContent.trim()),
-      ['All regions', 'Northlands', 'South Coast']
-    );
-    assert.equal(regionSelect.value, 'north');
-    regionSelect.value = 'south';
-    regionSelect.dispatchEvent(new Event('change', { bubbles: true }));
-    await tick();
-    flushSync();
-    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[1] === 'alchemy' && call[2] === 'task-herbs' && call[3].region === 'south'));
-    regionSelect.value = '';
-    regionSelect.dispatchEvent(new Event('change', { bubbles: true }));
-    await tick();
-    flushSync();
-    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[1] === 'alchemy' && call[2] === 'task-herbs' && call[3].region === ''));
+    assert.equal(regionAvailability.querySelector('select'), null);
     assert.equal(timeAvailability.querySelector('select'), null);
     assert.equal(weatherAvailability.querySelector('select'), null);
     assert.equal(biomeAvailability.querySelector('select'), null);
+    const regionPillNorth = regionAvailability.querySelector('[data-gathering-task-availability-pill="regions"][data-condition-id="north"]');
+    assert.ok(regionPillNorth);
+    assert.ok(regionPillNorth.textContent.includes('Northlands'));
+    regionAvailability.querySelector('.manager-v2-availability-menu-button').click();
+    await tick();
+    flushSync();
+    assert.equal(regionAvailability.querySelector('[data-gathering-task-availability-option="regions"][data-condition-id="north"]'), null);
+    assert.deepEqual(
+      Array.from(regionAvailability.querySelectorAll('[data-gathering-task-availability-option="regions"]')).map(option => option.textContent.trim()),
+      ['South Coast']
+    );
+    regionAvailability.querySelector('[data-gathering-task-availability-option="regions"][data-condition-id="south"]').click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[1] === 'alchemy' && call[2] === 'task-herbs' && Array.isArray(call[3].regions) && call[3].regions.join(',') === 'north,south'));
+    assert.ok(regionAvailability.querySelector('[data-gathering-task-availability-pill="regions"][data-condition-id="south"]'));
+    regionAvailability.querySelector('[data-gathering-task-availability-pill="regions"][data-condition-id="north"] .manager-v2-availability-remove').click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[1] === 'alchemy' && call[2] === 'task-herbs' && Array.isArray(call[3].regions) && call[3].regions.length === 1 && call[3].regions[0] === 'south'));
     const biomePill = biomeAvailability.querySelector('[data-gathering-task-availability-pill="biomes"][data-condition-id="forest"]');
     const timePill = timeAvailability.querySelector('[data-gathering-task-availability-pill="timeOfDay"][data-condition-id="day"]');
     const weatherPill = weatherAvailability.querySelector('[data-gathering-task-availability-pill="weather"][data-condition-id="clear"]');
@@ -2548,6 +2553,16 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && Array.isArray(call[3].weather) && call[3].weather.length === 1 && call[3].weather[0] === 'heavy-rain'));
+    for (const availability of [regionAvailability, biomeAvailability, timeAvailability, weatherAvailability]) {
+      availability.querySelector('.manager-v2-availability-menu-button').click();
+      await tick();
+      flushSync();
+      assert.ok(availability.querySelector('.manager-v2-availability-menu'), 'picker menu should open on trigger click');
+      document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+      await tick();
+      flushSync();
+      assert.equal(availability.querySelector('.manager-v2-availability-menu'), null, 'picker menu should dismiss on outside mousedown');
+    }
     const inspectorSlider = target.querySelector('[data-gathering-task-drop-inspector] input[type="range"]');
     inspectorSlider.value = '35';
     inspectorSlider.dispatchEvent(new Event('input', { bubbles: true }));
