@@ -2525,7 +2525,7 @@
                 {#each ['timeOfDay', 'weather'] as kind}
                   <section class="manager-v2-drop-editor-modifier-group" data-gathering-drop-modifier-kind={kind}>
                     <div class="manager-v2-inspector-subhead">
-                      <h4>{kind === 'weather' ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.WeatherModifiers', 'Weather modifiers') : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.TimeModifiers', 'Time modifiers')}</h4>
+                      <h5>{kind === 'weather' ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.WeatherModifiers', 'Weather modifiers') : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.TimeModifiers', 'Time modifiers')}</h5>
                       <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AddModifier', 'Add modifier')} onclick={() => addGatheringDropModifier(selectedGatheringDrop.id, kind)}>
                         <i class="fas fa-plus" aria-hidden="true"></i>
                       </button>
