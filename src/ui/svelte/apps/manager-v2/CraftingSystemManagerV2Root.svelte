@@ -36,6 +36,10 @@
   let activeGatheringTab = $state('environments');
   let selectedGatheringTaskId = $state('');
   let selectedGatheringDropId = $state('');
+  let gatheringTaskDraft = $state(null);
+  let gatheringTaskDraftBaseline = $state(null);
+  let gatheringTaskSaving = $state(false);
+  let gatheringTaskSaveError = $state('');
   const placeholderViews = [
     { id: 'rules', icon: 'fas fa-sliders-h', labelKey: 'FABRICATE.Admin.ManagerV2.Nav.Rules', fallback: 'Rules' },
     { id: 'graph', icon: 'fas fa-project-diagram', labelKey: 'FABRICATE.Admin.ManagerV2.Nav.Graph', fallback: 'Graph' }
@@ -132,9 +136,22 @@
   }
 
   async function onAddDropCharacterModifier(rowId, modifierId = null) {
-    if (!selectedSystemId || !selectedGatheringTask?.id || !rowId) return;
+    if (!editingGatheringTask?.id || !rowId) return;
     const id = modifierId ?? selectedGatheringCharacterModifiers[0]?.id ?? '';
-    await store.addGatheringDropRowCharacterModifier?.(selectedSystemId, selectedGatheringTask.id, rowId, { modifierId: id });
+    if (!id) return;
+    const rows = gatheringTaskDropRows(editingGatheringTask);
+    const row = rows.find(entry => entry.id === rowId);
+    if (!row) return;
+    const refs = Array.isArray(row.characterModifiers) ? row.characterModifiers : [];
+    const newRef = {
+      id: `char-mod-${id}-${refs.length + 1}-${Math.random().toString(36).slice(2, 6)}`,
+      modifierId: id,
+      operator: '+',
+      min: null,
+      max: null,
+      expressionOverride: ''
+    };
+    updateGatheringTaskDrop(rowId, { characterModifiers: [...refs, newRef] });
   }
 
   let characterModifierSearchTerm = $state('');
@@ -195,13 +212,24 @@
   }
 
   async function onUpdateDropCharacterModifier(rowId, refId, patch) {
-    if (!selectedSystemId || !selectedGatheringTask?.id || !rowId || !refId) return;
-    await store.updateGatheringDropRowCharacterModifier?.(selectedSystemId, selectedGatheringTask.id, rowId, refId, patch);
+    if (!editingGatheringTask?.id || !rowId || !refId) return;
+    const rows = gatheringTaskDropRows(editingGatheringTask);
+    const row = rows.find(entry => entry.id === rowId);
+    if (!row) return;
+    const refs = Array.isArray(row.characterModifiers) ? row.characterModifiers : [];
+    const nextRefs = refs.map(ref => ref.id === refId ? { ...ref, ...patch } : ref);
+    updateGatheringTaskDrop(rowId, { characterModifiers: nextRefs });
   }
 
   async function onDeleteDropCharacterModifier(rowId, refId) {
-    if (!selectedSystemId || !selectedGatheringTask?.id || !rowId || !refId) return;
-    await store.deleteGatheringDropRowCharacterModifier?.(selectedSystemId, selectedGatheringTask.id, rowId, refId);
+    if (!editingGatheringTask?.id || !rowId || !refId) return;
+    const rows = gatheringTaskDropRows(editingGatheringTask);
+    const row = rows.find(entry => entry.id === rowId);
+    if (!row) return;
+    const refs = Array.isArray(row.characterModifiers) ? row.characterModifiers : [];
+    const nextRefs = refs.filter(ref => ref.id !== refId);
+    if (nextRefs.length === refs.length) return;
+    updateGatheringTaskDrop(rowId, { characterModifiers: nextRefs });
   }
 
   const visiblePlaceholderViews = $derived(selectedSystem
@@ -306,10 +334,20 @@
       || gatheringTaskDefinitions[0]
       || null
   );
+  const editingGatheringTask = $derived(gatheringTaskDraft || selectedGatheringTask);
   const selectedGatheringDrop = $derived(
-    gatheringTaskDropRows(selectedGatheringTask).find(row => row.id === selectedGatheringDropId)
-      || gatheringTaskDropRows(selectedGatheringTask)[0]
+    gatheringTaskDropRows(editingGatheringTask).find(row => row.id === selectedGatheringDropId)
+      || gatheringTaskDropRows(editingGatheringTask)[0]
       || null
+  );
+  const gatheringTaskDraftDirty = $derived(
+    !!(gatheringTaskDraft && gatheringTaskDraftBaseline
+      && JSON.stringify(gatheringTaskDraft) !== JSON.stringify(gatheringTaskDraftBaseline))
+  );
+  const gatheringTaskValidation = $derived(
+    gatheringTaskDraft
+      ? (store.validateGatheringLibraryTask?.(gatheringTaskDraft) || { valid: true, errors: [] })
+      : { valid: true, errors: [] }
   );
 
   $effect(() => {
@@ -334,6 +372,10 @@
     if (selectedSystemId === lastGatheringSystemId) return;
     activeGatheringTab = 'environments';
     selectedGatheringTaskId = '';
+    gatheringTaskDraft = null;
+    gatheringTaskDraftBaseline = null;
+    gatheringTaskSaving = false;
+    gatheringTaskSaveError = '';
     lastGatheringSystemId = selectedSystemId;
   });
 
@@ -355,11 +397,11 @@
   });
 
   $effect(() => {
-    if (!selectedGatheringTask) {
+    if (!editingGatheringTask) {
       selectedGatheringDropId = '';
       return;
     }
-    const rows = gatheringTaskDropRows(selectedGatheringTask);
+    const rows = gatheringTaskDropRows(editingGatheringTask);
     if (selectedGatheringDropId && rows.some(row => row.id === selectedGatheringDropId)) return;
     selectedGatheringDropId = rows[0]?.id || '';
   });
@@ -657,6 +699,12 @@
     return true;
   }
 
+  function finishGatheringTaskRouteExit(confirmed) {
+    if (confirmed === false) return false;
+    clearGatheringTaskDraft();
+    return true;
+  }
+
   function confirmComponentRouteExit(nextView) {
     if (activeView !== 'component-edit') return true;
     if (componentEditDirty !== true) return true;
@@ -690,6 +738,18 @@
     return finishEssenceRouteExit(confirmed);
   }
 
+  function confirmGatheringTaskRouteExit(nextView) {
+    if (activeView !== 'gathering-task-edit') return true;
+    if (!gatheringTaskDraftDirty) return finishGatheringTaskRouteExit(true);
+    const message = text(
+      'FABRICATE.Admin.ManagerV2.Environment.Tasks.DiscardChangesPrompt',
+      'The current gathering task has unsaved changes. Discard them and continue?'
+    );
+    const confirmed = typeof globalThis.confirm === 'function' ? globalThis.confirm(message) : false;
+    if (isPromise(confirmed)) return confirmed.then(finishGatheringTaskRouteExit);
+    return finishGatheringTaskRouteExit(confirmed);
+  }
+
   function confirmRouteExit(nextView) {
     const environmentConfirmed = confirmEnvironmentRouteExit(nextView);
     if (isPromise(environmentConfirmed)) {
@@ -697,18 +757,29 @@
         if (value === false) return false;
         const essenceResult = confirmEssenceRouteExit(nextView);
         if (isPromise(essenceResult)) {
-          return essenceResult.then(essenceValue => essenceValue === false ? false : confirmComponentRouteExit(nextView));
+          return essenceResult.then(essenceValue => essenceValue === false
+            ? false
+            : continueRouteExitAfterEssence(nextView));
         }
-        return essenceResult === false ? false : confirmComponentRouteExit(nextView);
+        return essenceResult === false ? false : continueRouteExitAfterEssence(nextView);
       });
     }
     if (environmentConfirmed === false) return false;
     const essenceResult = confirmEssenceRouteExit(nextView);
     if (isPromise(essenceResult)) {
-      return essenceResult.then(value => value === false ? false : confirmComponentRouteExit(nextView));
+      return essenceResult.then(value => value === false ? false : continueRouteExitAfterEssence(nextView));
     }
     if (essenceResult === false) return false;
-    return confirmComponentRouteExit(nextView);
+    return continueRouteExitAfterEssence(nextView);
+  }
+
+  function continueRouteExitAfterEssence(nextView) {
+    const componentResult = confirmComponentRouteExit(nextView);
+    if (isPromise(componentResult)) {
+      return componentResult.then(value => value === false ? false : confirmGatheringTaskRouteExit(nextView));
+    }
+    if (componentResult === false) return false;
+    return confirmGatheringTaskRouteExit(nextView);
   }
 
   function setView(view) {
@@ -1091,13 +1162,50 @@
   function editGatheringTask(taskId = selectedGatheringTask?.id) {
     if (!taskId || !canShowEnvironments) return;
     selectedGatheringTaskId = taskId;
+    const source = gatheringTaskDefinitions.find(task => task.id === taskId) || null;
+    const snapshot = source ? JSON.parse(JSON.stringify(source)) : null;
+    gatheringTaskDraft = snapshot;
+    gatheringTaskDraftBaseline = snapshot ? JSON.parse(JSON.stringify(snapshot)) : null;
+    gatheringTaskSaveError = '';
     activeGatheringTab = 'tasks';
     activeView = 'gathering-task-edit';
   }
 
+  function clearGatheringTaskDraft() {
+    gatheringTaskDraft = null;
+    gatheringTaskDraftBaseline = null;
+    gatheringTaskSaveError = '';
+  }
+
   function backToGatheringTaskLibrary() {
-    activeGatheringTab = 'tasks';
-    activeView = 'environments';
+    afterTruthyResult(confirmRouteExit('environments'), () => {
+      activeGatheringTab = 'tasks';
+      activeView = 'environments';
+    });
+  }
+
+  async function saveGatheringTaskDraft() {
+    if (!gatheringTaskDraft || !selectedSystemId || !selectedGatheringTaskId) return;
+    const { valid, errors } = gatheringTaskValidation;
+    if (!valid) {
+      gatheringTaskSaveError = errors[0] || '';
+      return;
+    }
+    gatheringTaskSaving = true;
+    try {
+      const ok = await store.updateGatheringLibraryTask?.(selectedSystemId, selectedGatheringTaskId, gatheringTaskDraft);
+      if (ok) {
+        gatheringTaskDraftBaseline = JSON.parse(JSON.stringify(gatheringTaskDraft));
+        gatheringTaskSaveError = '';
+      } else {
+        gatheringTaskSaveError = text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SaveFailed', 'Save failed. Try again.');
+      }
+    } catch (error) {
+      console.error('Failed to save gathering task draft', error);
+      gatheringTaskSaveError = text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SaveFailed', 'Save failed. Try again.');
+    } finally {
+      gatheringTaskSaving = false;
+    }
   }
 
   function duplicateGatheringTask(systemId = selectedSystemId, taskId = selectedGatheringTask?.id) {
@@ -1130,6 +1238,10 @@
   }
 
   function updateSelectedGatheringTask(updates = {}) {
+    if (gatheringTaskDraft) {
+      gatheringTaskDraft = { ...gatheringTaskDraft, ...updates };
+      return true;
+    }
     if (!selectedSystemId || !selectedGatheringTask?.id) return false;
     return store.updateGatheringLibraryTask?.(selectedSystemId, selectedGatheringTask.id, updates);
   }
@@ -1139,7 +1251,7 @@
   }
 
   function addGatheringTaskDrop() {
-    if (!selectedGatheringTask) return;
+    if (!editingGatheringTask) return;
     const row = {
       id: gatheringDropRowId(),
       name: '',
@@ -1151,18 +1263,18 @@
       enabled: false
     };
     selectedGatheringDropId = row.id;
-    updateSelectedGatheringTask({ dropRows: [...gatheringTaskDropRows(selectedGatheringTask), row] });
+    updateSelectedGatheringTask({ dropRows: [...gatheringTaskDropRows(editingGatheringTask), row] });
   }
 
   function updateGatheringTaskDrop(rowId, updates = {}) {
-    if (!selectedGatheringTask || !rowId) return;
-    const rows = gatheringTaskDropRows(selectedGatheringTask).map(row => row.id === rowId ? { ...row, ...updates } : row);
+    if (!editingGatheringTask || !rowId) return;
+    const rows = gatheringTaskDropRows(editingGatheringTask).map(row => row.id === rowId ? { ...row, ...updates } : row);
     updateSelectedGatheringTask({ dropRows: rows });
   }
 
   function duplicateGatheringTaskDrop(rowId = selectedGatheringDrop?.id) {
-    if (!selectedGatheringTask || !rowId) return;
-    const rows = gatheringTaskDropRows(selectedGatheringTask);
+    if (!editingGatheringTask || !rowId) return;
+    const rows = gatheringTaskDropRows(editingGatheringTask);
     const index = rows.findIndex(row => row.id === rowId);
     if (index < 0) return;
     const duplicate = { ...JSON.parse(JSON.stringify(rows[index])), id: gatheringDropRowId() };
@@ -1171,8 +1283,8 @@
   }
 
   function deleteGatheringTaskDrop(rowId = selectedGatheringDrop?.id) {
-    if (!selectedGatheringTask || !rowId) return;
-    const rows = gatheringTaskDropRows(selectedGatheringTask);
+    if (!editingGatheringTask || !rowId) return;
+    const rows = gatheringTaskDropRows(editingGatheringTask);
     const index = rows.findIndex(row => row.id === rowId);
     const nextRows = rows.filter(row => row.id !== rowId);
     selectedGatheringDropId = nextRows[Math.min(index, nextRows.length - 1)]?.id || '';
@@ -1211,8 +1323,8 @@
   }
 
   function updateGatheringDropModifier(rowId, kind, modifierId, updates = {}) {
-    if (!selectedGatheringTask || !rowId || !kind || !modifierId) return;
-    const row = gatheringTaskDropRows(selectedGatheringTask).find(entry => entry.id === rowId);
+    if (!editingGatheringTask || !rowId || !kind || !modifierId) return;
+    const row = gatheringTaskDropRows(editingGatheringTask).find(entry => entry.id === rowId);
     if (!row) return;
     const conditionModifiers = {
       timeOfDay: gatheringConditionModifierRows(row, 'timeOfDay'),
@@ -1223,8 +1335,8 @@
   }
 
   function addGatheringDropModifier(rowId, kind, conditionId) {
-    if (!selectedGatheringTask || !rowId || !kind || !conditionId) return;
-    const row = gatheringTaskDropRows(selectedGatheringTask).find(entry => entry.id === rowId);
+    if (!editingGatheringTask || !rowId || !kind || !conditionId) return;
+    const row = gatheringTaskDropRows(editingGatheringTask).find(entry => entry.id === rowId);
     if (!row) return;
     const conditionModifiers = {
       timeOfDay: gatheringConditionModifierRows(row, 'timeOfDay'),
@@ -1239,8 +1351,8 @@
   }
 
   function deleteGatheringDropModifier(rowId, kind, modifierId) {
-    if (!selectedGatheringTask || !rowId || !kind || !modifierId) return;
-    const row = gatheringTaskDropRows(selectedGatheringTask).find(entry => entry.id === rowId);
+    if (!editingGatheringTask || !rowId || !kind || !modifierId) return;
+    const row = gatheringTaskDropRows(editingGatheringTask).find(entry => entry.id === rowId);
     if (!row) return;
     const conditionModifiers = {
       timeOfDay: gatheringConditionModifierRows(row, 'timeOfDay'),
@@ -2010,6 +2122,19 @@
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.BackToLibrary', 'Back to task library')}</span>
         </button>
+        {#if gatheringTaskDraftDirty}
+          <span class="manager-v2-chip is-warning">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Dirty', 'Unsaved')}</span>
+        {/if}
+        <button
+          type="button"
+          class="manager-v2-button is-primary"
+          onclick={saveGatheringTaskDraft}
+          disabled={!gatheringTaskDraftDirty || !gatheringTaskValidation.valid || gatheringTaskSaving}
+          title={gatheringTaskValidation.valid ? '' : gatheringTaskValidation.errors.join('\n')}
+        >
+          <i class={gatheringTaskSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Save', 'Save task')}</span>
+        </button>
       {:else if currentView === 'system-edit'}
         <button type="button" class="manager-v2-button" onclick={backToSystemsBrowser}>
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
@@ -2209,7 +2334,7 @@
       </main>
     {:else if currentView === 'gathering-task-edit' && selectedSystem}
       <GatheringTaskEditView
-        task={selectedGatheringTask}
+        task={editingGatheringTask}
         {itemCards}
         managedItemOptions={selectedSystem.managedItemOptions || []}
         weatherOptions={gatheringConditionOptions('weather')}

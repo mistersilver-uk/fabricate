@@ -40,6 +40,7 @@ import {
   getCharacterModifierPresetsForFoundrySystem,
   seedCharacterModifierPresets
 } from '../../../config/gatheringCharacterModifierPresets.js';
+import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -3498,6 +3499,21 @@ export function createAdminStore(services) {
     return task;
   }
 
+  function validateGatheringLibraryTask(task) {
+    const errors = [];
+    if (!task || typeof task !== 'object') {
+      errors.push('Task is required');
+      return { valid: false, errors };
+    }
+    const name = String(task.name || '').trim();
+    if (!name) {
+      errors.push('Task name is required');
+    }
+    const label = `Task "${name || task.id || 'unnamed'}"`;
+    errors.push(...validateDropRows(task.dropRows, label));
+    return { valid: errors.length === 0, errors };
+  }
+
   async function updateGatheringLibraryTask(systemId = get(selectedSystemId), taskId, updates = {}) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
@@ -4286,6 +4302,7 @@ export function createAdminStore(services) {
     updateGatheringRules,
     addGatheringLibraryTask,
     updateGatheringLibraryTask,
+    validateGatheringLibraryTask,
     deleteGatheringLibraryTask,
     duplicateGatheringLibraryTask,
     addGatheringLibraryHazard,

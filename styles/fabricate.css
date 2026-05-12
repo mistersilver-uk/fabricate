@@ -5481,6 +5481,11 @@
   flex-wrap: wrap;
 }
 
+.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-chip,
+.fabricate-manager-v2 .manager-v2-action-group .manager-v2-chip {
+  min-height: 34px;
+}
+
 .fabricate-manager-v2 .manager-v2-breadcrumbs {
   display: flex;
   align-items: center;

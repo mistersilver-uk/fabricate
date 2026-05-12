@@ -692,8 +692,8 @@ describe('CraftingSystemManagerV2 source contract', () => {
       assert.ok(rootSource.includes(snippet), `root should include selected drop inspector ${snippet}`);
     }
     assert.ok(!gatheringTaskEditSource.includes('manager-v2-task-editor-tabs'), 'task editor should be a one-page editor without tab navigation');
-    assert.ok(!gatheringTaskEditSource.includes('TaskIdentity'), 'task editor should not render a visible task identity heading');
-    assert.ok(!gatheringTaskEditSource.includes('Tasks.TaskId'), 'task editor should not render the raw internal task id localization');
+    assert.ok(gatheringTaskEditSource.includes('TaskIdentity'), 'task editor should render a visible task identity heading');
+    assert.ok(!/Tasks\.TaskId(?!entity)/.test(gatheringTaskEditSource), 'task editor should not render the raw internal task id localization');
     assert.ok(!gatheringTaskEditSource.includes('Internal ID'), 'task editor should not render the raw internal task id label');
     assert.ok(!gatheringTaskEditSource.includes('BackToLibrary'), 'task editor should not render a duplicate central back-to-library control');
     assert.ok(!gatheringTaskEditSource.includes('type="checkbox"'), 'task editor status toggle should use the shared button pattern');
@@ -720,7 +720,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.DropModifierOverflowHint, 'See selected rule for modifiers');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.NoComponent, 'No Component');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.CreateOrAssign, 'Create or assign');
-    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.TaskIdentity, undefined);
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.TaskIdentity, 'Task Identity');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.TaskId, undefined);
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask, 'New Gathering Task');
     assert.equal(
