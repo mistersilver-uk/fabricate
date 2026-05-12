@@ -1257,6 +1257,19 @@
     }
   }
 
+  async function deleteGatheringTaskDraft() {
+    if (!selectedSystemId || !selectedGatheringTaskId) return;
+    const deletedTaskId = selectedGatheringTaskId;
+    const result = await store.deleteGatheringLibraryTask?.(selectedSystemId, deletedTaskId);
+    if (result === false) return;
+    if (selectedGatheringTaskId === deletedTaskId) selectedGatheringTaskId = '';
+    gatheringTaskDraft = null;
+    gatheringTaskDraftBaseline = null;
+    gatheringTaskSaveError = '';
+    activeGatheringTab = 'tasks';
+    activeView = 'environments';
+  }
+
   function duplicateGatheringTask(systemId = selectedSystemId, taskId = selectedGatheringTask?.id) {
     if (!systemId || !taskId) return;
     const duplicated = store.duplicateGatheringLibraryTask?.(systemId, taskId);
@@ -2174,6 +2187,16 @@
         {#if gatheringTaskDraftDirty}
           <span class="manager-v2-chip is-warning">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Dirty', 'Unsaved')}</span>
         {/if}
+        <button
+          type="button"
+          class="manager-v2-button is-danger"
+          onclick={deleteGatheringTaskDraft}
+          disabled={!selectedGatheringTaskId || gatheringTaskSaving}
+          title={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Delete', 'Delete gathering task')}
+        >
+          <i class="fas fa-trash" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Delete', 'Delete gathering task')}</span>
+        </button>
         <button
           type="button"
           class="manager-v2-button is-primary"

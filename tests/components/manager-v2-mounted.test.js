@@ -2896,6 +2896,48 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(calls.some(call => call[0] === 'saveEnvironmentDraft'));
   });
 
+  it('deletes the editing gathering task from the editor toolbar and returns to the task browser', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+
+    const tasksTab = Array.from(target.querySelectorAll('.manager-v2-gathering-tab'))
+      .find(tab => tab.textContent.trim() === 'Tasks');
+    tasksTab.click();
+    await tick();
+    flushSync();
+
+    target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'gathering-task-edit');
+
+    const headerDeleteButton = target.querySelector('.manager-v2-header-actions .manager-v2-button.is-danger');
+    assert.ok(headerDeleteButton, 'editor toolbar should expose a destructive delete button');
+    assert.ok(headerDeleteButton.textContent.includes('Delete gathering task'));
+    headerDeleteButton.click();
+    await tick();
+    flushSync();
+
+    assert.ok(
+      calls.some(call => call[0] === 'deleteGatheringLibraryTask' && call[1] === 'alchemy' && call[2] === 'task-herbs'),
+      `expected deleteGatheringLibraryTask call for task-herbs, got ${JSON.stringify(calls)}`
+    );
+    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'environments');
+  });
+
   it('edits gathering task drop rules from unresolved row through inspector modifiers', async () => {
     const calls = [];
     target = document.createElement('div');

@@ -735,6 +735,15 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(!rootSource.includes('duplicateGatheringTask(selectedSystemId, selectedGatheringTask.id)'), 'gathering task inspector should not duplicate row-level duplicate actions');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.BackToLibrary, 'Back to task library');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.CopySuffix, 'Copy');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.Delete, 'Delete gathering task');
+    assert.ok(
+      rootSource.includes('onclick={deleteGatheringTaskDraft}'),
+      'gathering task editor toolbar should wire the delete button to deleteGatheringTaskDraft'
+    );
+    assert.ok(
+      /manager-v2-button is-danger[\s\S]{0,200}deleteGatheringTaskDraft/.test(rootSource),
+      'gathering task editor delete button should use the is-danger destructive style'
+    );
   });
 
   it('replaces the environment status checkbox with the shared status toggle', () => {
