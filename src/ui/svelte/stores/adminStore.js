@@ -3482,16 +3482,10 @@ export function createAdminStore(services) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig) return null;
-    const firstComponent = _selectedManagedItemOptions()[0];
     const task = _normalizeGatheringTask({
       id: _randomID(),
       name: services.localize?.('FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask') || 'New Gathering Task',
-      dropRows: [{
-        id: _randomID(),
-        componentId: firstComponent?.id || '',
-        quantity: 1,
-        dropRate: 100
-      }]
+      dropRows: []
     }, _randomID);
     systemConfig.tasks = [...systemConfig.tasks, task];
     await _saveGatheringConfig(config);
@@ -3511,6 +3505,13 @@ export function createAdminStore(services) {
     }
     const label = `Task "${name || task.id || 'unnamed'}"`;
     errors.push(...validateDropRows(task.dropRows, label));
+    if (Array.isArray(task.dropRows)) {
+      for (const row of task.dropRows) {
+        if (row?.enabled === false && !row?.componentId && !row?.itemUuid) {
+          errors.push(`${label} drop row "${row?.id || 'row'}" requires componentId or itemUuid`);
+        }
+      }
+    }
     return { valid: errors.length === 0, errors };
   }
 

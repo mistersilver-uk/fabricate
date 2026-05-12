@@ -718,7 +718,7 @@ export function validateDropRows(rows, label) {
   const entries = Array.isArray(rows) ? rows.filter(row => row?.enabled !== false) : [];
   const errors = [];
   if (entries.length < 1) {
-    errors.push(`${label} d100 resolution requires at least one drop row`);
+    errors.push(`${label} requires at least one drop row`);
   }
   for (const row of entries) {
     const dropRate = Number(row?.dropRate);
