@@ -40,6 +40,7 @@ import {
   getCharacterModifierPresetsForFoundrySystem,
   seedCharacterModifierPresets
 } from '../../../config/gatheringCharacterModifierPresets.js';
+import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -484,7 +485,6 @@ function _normalizeGatheringCharacterModifierReference(ref, index, randomID = ()
   if (!ref || typeof ref !== 'object') return null;
   const modifierId = String(ref.modifierId || '').trim();
   if (!modifierId) return null;
-  const provider = GATHERING_CHARACTER_MODIFIER_PROVIDERS.has(ref.providerOverride) ? ref.providerOverride : null;
   const min = Number.isFinite(Number(ref.min)) && ref.min !== null && ref.min !== '' ? Number(ref.min) : null;
   const max = Number.isFinite(Number(ref.max)) && ref.max !== null && ref.max !== '' ? Number(ref.max) : null;
   return {
@@ -493,9 +493,7 @@ function _normalizeGatheringCharacterModifierReference(ref, index, randomID = ()
     operator: GATHERING_CHARACTER_MODIFIER_OPERATORS.has(ref.operator) ? ref.operator : '+',
     min,
     max,
-    providerOverride: provider,
-    expressionOverride: String(ref.expressionOverride || ''),
-    macroUuidOverride: String(ref.macroUuidOverride || '')
+    expressionOverride: String(ref.expressionOverride || '')
   };
 }
 
@@ -510,12 +508,18 @@ function _normalizeGatheringDropConditionModifierList(values = []) {
   return (Array.isArray(values) ? values : [])
     .map((modifier, index) => {
       const conditionId = _normalizeGatheringConditionId(modifier?.conditionId ?? modifier?.id);
-      const value = Number(modifier?.value);
-      if (!conditionId || !Number.isFinite(value)) return null;
+      const rawValue = Number(modifier?.value);
+      if (!conditionId || !Number.isFinite(rawValue)) return null;
+      const truncated = Math.trunc(rawValue);
+      const explicitOperator = modifier?.operator === '-' || modifier?.operator === '+'
+        ? modifier.operator
+        : null;
+      const operator = explicitOperator ?? (truncated < 0 ? '-' : '+');
       return {
         id: String(modifier?.id || `${conditionId}-${index + 1}`),
         conditionId,
-        value: Math.trunc(value)
+        operator,
+        value: Math.abs(truncated)
       };
     })
     .filter(Boolean);
@@ -3495,6 +3499,21 @@ export function createAdminStore(services) {
     return task;
   }
 
+  function validateGatheringLibraryTask(task) {
+    const errors = [];
+    if (!task || typeof task !== 'object') {
+      errors.push('Task is required');
+      return { valid: false, errors };
+    }
+    const name = String(task.name || '').trim();
+    if (!name) {
+      errors.push('Task name is required');
+    }
+    const label = `Task "${name || task.id || 'unnamed'}"`;
+    errors.push(...validateDropRows(task.dropRows, label));
+    return { valid: errors.length === 0, errors };
+  }
+
   async function updateGatheringLibraryTask(systemId = get(selectedSystemId), taskId, updates = {}) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
@@ -3737,9 +3756,7 @@ export function createAdminStore(services) {
         operator: partial?.operator || '+',
         min: partial?.min ?? null,
         max: partial?.max ?? null,
-        providerOverride: partial?.providerOverride || null,
-        expressionOverride: partial?.expressionOverride || '',
-        macroUuidOverride: partial?.macroUuidOverride || ''
+        expressionOverride: partial?.expressionOverride || ''
       }, refs.length, _randomID);
       if (!ref) return null;
       created = ref;
@@ -3837,9 +3854,7 @@ export function createAdminStore(services) {
       operator: partial?.operator || '+',
       min: partial?.min ?? null,
       max: partial?.max ?? null,
-      providerOverride: partial?.providerOverride || null,
-      expressionOverride: partial?.expressionOverride || '',
-      macroUuidOverride: partial?.macroUuidOverride || ''
+      expressionOverride: partial?.expressionOverride || ''
     }, refs.length, _randomID);
     if (!ref) return null;
     const nextHazard = _normalizeGatheringHazard({ ...hazard, characterModifiers: [...refs, ref] }, _randomID);
@@ -4287,6 +4302,7 @@ export function createAdminStore(services) {
     updateGatheringRules,
     addGatheringLibraryTask,
     updateGatheringLibraryTask,
+    validateGatheringLibraryTask,
     deleteGatheringLibraryTask,
     duplicateGatheringLibraryTask,
     addGatheringLibraryHazard,

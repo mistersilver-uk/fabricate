@@ -5407,6 +5407,15 @@
   font: inherit;
 }
 
+.fabricate-manager-v2 h1,
+.fabricate-manager-v2 h2,
+.fabricate-manager-v2 h3,
+.fabricate-manager-v2 h4,
+.fabricate-manager-v2 h5,
+.fabricate-manager-v2 h6 {
+  font-family: var(--font-primary);
+}
+
 .fabricate-manager-v2 button:focus,
 .fabricate-manager-v2 input:focus,
 .fabricate-manager-v2 select:focus,
@@ -5470,6 +5479,11 @@
   justify-content: flex-end;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-chip,
+.fabricate-manager-v2 .manager-v2-action-group .manager-v2-chip {
+  min-height: 34px;
 }
 
 .fabricate-manager-v2 .manager-v2-breadcrumbs {
@@ -5729,7 +5743,8 @@
   gap: 8px;
 }
 
-.fabricate-manager-v2 .manager-v2-character-modifier-row-card {
+.fabricate-manager-v2 .manager-v2-character-modifier-row-card,
+.fabricate-manager-v2 .manager-v2-drop-editor-condition-modifier-card {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -5774,13 +5789,20 @@
   text-align: center;
 }
 
-.fabricate-manager-v2 .manager-v2-character-modifier-row-list {
+.fabricate-manager-v2 .manager-v2-character-modifier-add-suggestions.is-above {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-row-list,
+.fabricate-manager-v2 .manager-v2-condition-modifier-row-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.fabricate-manager-v2 .manager-v2-character-modifier-row-reference {
+.fabricate-manager-v2 .manager-v2-character-modifier-row-reference,
+.fabricate-manager-v2 .manager-v2-condition-modifier-row-reference {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -5795,6 +5817,38 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.fabricate-manager-v2 .manager-v2-condition-modifier-row-reference .manager-v2-character-modifier-row-reference-header {
+  flex-wrap: nowrap;
+}
+
+.fabricate-manager-v2 .manager-v2-condition-modifier-row-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fabricate-manager-v2 .manager-v2-condition-modifier-row-body .manager-v2-field {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.fabricate-manager-v2 .manager-v2-condition-modifier-row-body .manager-v2-field input {
+  flex: 0 0 80px;
+  width: auto;
+}
+
+.fabricate-manager-v2 .manager-v2-condition-modifier-add-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.fabricate-manager-v2 .manager-v2-condition-modifier-picker {
+  min-width: 0;
 }
 
 .fabricate-manager-v2 .manager-v2-character-modifier-row-reference-label {
@@ -5813,12 +5867,19 @@
 
 .fabricate-manager-v2 .manager-v2-character-modifier-operator-select select {
   appearance: auto;
+  height: 28px;
+  min-height: 28px;
   border: none;
-  background: transparent;
+  background: var(--fab-mv2-bg);
   color: inherit;
-  font-weight: 600;
-  padding: 4px 6px;
+  font-size: 0.75rem;
+  padding: 0 6px;
   cursor: pointer;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-operator-select select option {
+  background: var(--fab-mv2-bg);
+  color: var(--fab-mv2-text);
 }
 
 .fabricate-manager-v2 .manager-v2-character-modifier-operator-select.is-positive {
@@ -5830,12 +5891,20 @@
   color: var(--fab-success-text);
 }
 
+.fabricate-manager-v2 .manager-v2-character-modifier-operator-select.is-positive select option {
+  color: var(--fab-success-text);
+}
+
 .fabricate-manager-v2 .manager-v2-character-modifier-operator-select.is-negative {
   border-color: var(--fab-danger-border);
   background: var(--fab-overlay-light-06);
 }
 
 .fabricate-manager-v2 .manager-v2-character-modifier-operator-select.is-negative select {
+  color: var(--fab-danger-text);
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-operator-select.is-negative select option {
   color: var(--fab-danger-text);
 }
 
@@ -5861,12 +5930,8 @@
   gap: 8px;
 }
 
-.fabricate-manager-v2 .manager-v2-character-modifier-override-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  font-size: 0.85rem;
+.fabricate-manager-v2 .manager-v2-character-modifier-override-row .manager-v2-status-toggle {
+  max-width: 100px;
 }
 
 .fabricate-manager-v2 .manager-v2-character-modifier-override-hint {
@@ -5875,7 +5940,8 @@
 }
 
 .fabricate-manager-v2 .manager-v2-character-modifier-row-empty,
-.fabricate-manager-v2 .manager-v2-character-modifier-empty-hint {
+.fabricate-manager-v2 .manager-v2-character-modifier-empty-hint,
+.fabricate-manager-v2 .manager-v2-condition-modifier-row-empty {
   font-size: 0.8rem;
   font-style: italic;
 }
@@ -8646,6 +8712,12 @@
   flex: 0 0 34px;
 }
 
+.fabricate-manager-v2 .manager-v2-pagination .manager-v2-icon-button {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+}
+
 .fabricate-manager-v2 .manager-v2-icon-button i,
 .fabricate-manager-v2 .manager-v2-button i {
   position: static;
@@ -8907,6 +8979,7 @@
 
 .fabricate-manager-v2 .manager-v2-task-core-card {
   display: grid;
+  gap: 10px;
   padding: 13px 16px;
 }
 
@@ -8945,7 +9018,7 @@
 
 .fabricate-manager-v2 .manager-v2-task-card-heading h3 {
   margin: 0 0 3px;
-  color: var(--fab-warning-text);
+  color: var(--fab-mv2-text);
   font-size: 1rem;
 }
 
@@ -9140,7 +9213,7 @@
   max-width: 100%;
   padding: 3px 4px 3px 8px;
   border: 1px solid var(--fab-warning-border);
-  border-radius: 999px;
+  border-radius: 5px;
   color: var(--fab-mv2-text);
   background: var(--fab-warning-soft);
   font-size: 0.76rem;
@@ -9228,12 +9301,8 @@
 .fabricate-manager-v2 .manager-v2-selected-drop-editor h3,
 .fabricate-manager-v2 .manager-v2-drop-modifier-panel h4 {
   margin: 0;
-  color: var(--fab-warning-text);
-  font-size: 1rem;
-}
-
-.fabricate-manager-v2 .manager-v2-task-drops-card .manager-v2-task-card-header h3 {
   color: var(--fab-mv2-text);
+  font-size: 1rem;
 }
 
 .fabricate-manager-v2 .manager-v2-task-overview-card label,
@@ -9386,6 +9455,7 @@
 }
 
 .fabricate-manager-v2 .manager-v2-task-component-browser-scroll {
+  grid-row-start: 3;
   min-height: 0;
   padding: 10px 12px;
   overflow-x: hidden;
@@ -9488,6 +9558,7 @@
 }
 
 .fabricate-manager-v2 .manager-v2-task-component-browser-footer {
+  grid-row-start: 4;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -10047,11 +10118,6 @@
   background: var(--fab-overlay-light-035);
 }
 
-.fabricate-manager-v2 .manager-v2-modifier-row {
-  grid-template-columns: minmax(0, 1fr) 24px 72px 32px;
-  gap: 8px;
-}
-
 .fabricate-manager-v2 .manager-v2-drop-editor-card {
   display: grid;
   align-content: start;
@@ -10077,17 +10143,47 @@
   min-width: 0;
 }
 
+.fabricate-manager-v2 .manager-v2-drop-inspector-stack .manager-v2-button {
+  min-height: 28px;
+  padding: 0 9px;
+}
+
+.fabricate-manager-v2 .manager-v2-drop-inspector-stack .manager-v2-icon-button {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+}
+
 .fabricate-manager-v2 .manager-v2-drop-editor-card :is(select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"])) {
   width: 100%;
   min-width: 0;
-  min-height: 32px;
-  padding: 5px 9px;
+  height: 28px;
+  min-height: 28px;
+  padding: 3px 8px;
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   color: var(--fab-mv2-text);
   background: var(--fab-mv2-surface-1);
   box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
   font: inherit;
+}
+
+.fabricate-manager-v2 .manager-v2-drop-inspector-stack .manager-v2-search input {
+  height: 28px;
+  min-height: 28px;
+  padding-block: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-row-card .manager-v2-field :is(select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"])) {
+  height: 28px;
+  min-height: 28px;
+  padding: 3px 8px;
+}
+
+.fabricate-manager-v2 .manager-v2-drop-editor-condition-modifier-card .manager-v2-field :is(select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"])) {
+  height: 28px;
+  min-height: 28px;
+  padding: 3px 8px;
 }
 
 .fabricate-manager-v2 .manager-v2-drop-editor-card .manager-v2-drop-rate-percent input[type="text"] {
@@ -10199,22 +10295,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.fabricate-manager-v2 .manager-v2-drop-editor-modifiers {
-  display: grid;
-  gap: 12px;
-  min-width: 0;
-}
-
-.fabricate-manager-v2 .manager-v2-drop-editor-modifier-group {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-  padding: 10px;
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
-  background: var(--fab-overlay-light-035);
-}
-
 .fabricate-manager-v2 .manager-v2-inspector-subhead {
   display: flex;
   align-items: center;
@@ -10229,27 +10309,7 @@
   font-size: 0.9rem;
 }
 
-.fabricate-manager-v2 .manager-v2-modifier-arrow {
-  display: inline-flex;
-  justify-content: center;
-  font-weight: 900;
-}
-
-.fabricate-manager-v2 .manager-v2-modifier-arrow.is-active,
-.fabricate-manager-v2 .manager-v2-modifier-value.is-active {
-  color: var(--fab-success-text);
-  border-color: var(--fab-success-border);
-}
-
-.fabricate-manager-v2 .manager-v2-modifier-arrow.is-danger,
-.fabricate-manager-v2 .manager-v2-modifier-value.is-danger {
-  color: var(--fab-danger-text);
-  border-color: var(--fab-danger-border);
-}
-
-.fabricate-manager-v2 .manager-v2-chip.is-neutral,
-.fabricate-manager-v2 .manager-v2-modifier-arrow.is-neutral,
-.fabricate-manager-v2 .manager-v2-modifier-value.is-neutral {
+.fabricate-manager-v2 .manager-v2-chip.is-neutral {
   color: var(--fab-mv2-text-muted);
   border-color: var(--fab-mv2-border);
 }

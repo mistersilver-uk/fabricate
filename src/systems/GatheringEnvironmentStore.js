@@ -714,7 +714,7 @@ function normalizeDropRow(data = {}, randomID) {
   };
 }
 
-function validateDropRows(rows, label) {
+export function validateDropRows(rows, label) {
   const entries = Array.isArray(rows) ? rows.filter(row => row?.enabled !== false) : [];
   const errors = [];
   if (entries.length < 1) {

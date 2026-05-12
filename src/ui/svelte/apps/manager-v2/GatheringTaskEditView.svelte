@@ -33,7 +33,7 @@
   let componentPageIndex = $state(0);
   let lastTaskId = $state('');
   let openAvailabilityMenu = $state('');
-  const componentPageSize = 6;
+  let componentPageSize = $state(6);
 
   const dropRows = $derived(Array.isArray(task?.dropRows) ? task.dropRows : []);
   const normalizedSearchTerm = $derived(searchTerm.trim().toLowerCase());
@@ -316,15 +316,25 @@
     return conditionIcon(option || { icon: entry.kind === 'weather' ? 'fas fa-cloud-sun' : 'fas fa-clock' });
   }
 
+  function modifierEffectiveOperator(entry) {
+    if (entry?.operator === '-' || entry?.operator === '+') return entry.operator;
+    return Number(entry?.value || 0) < 0 ? '-' : '+';
+  }
+
   function modifierValueLabel(entry) {
     if (entry.kind === 'character') return '';
-    const sign = Number(entry.value || 0) >= 0 ? '+' : '';
-    return `${sign}${Number(entry.value || 0)}%`;
+    const magnitude = Math.abs(Math.trunc(Number(entry.value || 0)));
+    return `${modifierEffectiveOperator(entry)}${magnitude}%`;
   }
 
   function modifierClass(entry) {
     if (entry && entry.kind === 'character') {
       return entry.operator === '-' ? 'is-negative' : 'is-positive';
+    }
+    if (entry && (entry.kind === 'weather' || entry.kind === 'timeOfDay')) {
+      const magnitude = Math.abs(Math.trunc(Number(entry.value || 0)));
+      if (magnitude === 0) return 'is-neutral';
+      return modifierEffectiveOperator(entry) === '-' ? 'is-negative' : 'is-positive';
     }
     const number = Number((entry && typeof entry === 'object' ? entry.value : entry) || 0);
     if (number < 0) return 'is-negative';
@@ -471,6 +481,12 @@
 >
   {#if task}
     <section class="manager-v2-task-core-card" data-gathering-task-core-editor>
+      <div class="manager-v2-task-card-heading">
+        <div>
+          <h3>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.TaskIdentity', 'Task Identity')}</h3>
+          <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.TaskIdentityHint', 'Name the task, give it a description, choose an image, and toggle whether it is enabled.')}</p>
+        </div>
+      </div>
       <div class="manager-v2-task-core-grid">
         <div class="manager-v2-task-media-column">
           <button type="button" class="manager-v2-task-image-picker" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ChooseImage', 'Choose task image')} onclick={chooseTaskImage} disabled={typeof onPickImagePath !== 'function'}>
@@ -672,9 +688,9 @@
           totalCount={filteredComponentCards.length}
           pageSize={componentPageSize}
           pageIndex={componentPageIndex}
-          pageSizeOptions={[componentPageSize]}
+          pageSizeOptions={[6, 9, 12]}
           onPageChange={(next) => componentPageIndex = next}
-          onPageSizeChange={() => {}}
+          onPageSizeChange={(next) => { componentPageSize = next; componentPageIndex = 0; }}
         />
       </div>
     </section>

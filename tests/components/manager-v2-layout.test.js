@@ -576,6 +576,11 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const dropEditorCountBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-count-editor');
   const dropEditorCountInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-count-editor input[type="text"]');
   const dropEditorInspectorCountInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-card .manager-v2-drop-count-editor[data-gathering-drop-inspector-count] input[type="text"]');
+  const dropInspectorButtonBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-inspector-stack .manager-v2-button');
+  const dropInspectorIconButtonBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-inspector-stack .manager-v2-icon-button');
+  const dropInspectorSearchInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-inspector-stack .manager-v2-search input');
+  const dropInspectorCharacterFieldBlock = blockFor('.fabricate-manager-v2 .manager-v2-character-modifier-row-card .manager-v2-field :is(select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]))');
+  const dropInspectorCharacterOperatorBlock = blockFor('.fabricate-manager-v2 .manager-v2-character-modifier-operator-select select');
   const dropEditorActionsBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-editor-actions');
   const dropInspectorStackBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-inspector-stack');
   const dropInspectorRouteBlock = blockFor('.fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"] .manager-v2-inspector');
@@ -681,6 +686,7 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(positiveDropModifierPillBlock.includes('color: var(--fab-mv2-text);') && negativeDropModifierPillBlock.includes('color: var(--fab-mv2-text);'), 'drop modifier chips should avoid saturated text across the whole pill');
   assert.ok(dropModifierOverflowBlock.includes('text-overflow: ellipsis;') && dropModifierOverflowBlock.includes('white-space: nowrap;'), 'overflow modifier hints should stay as one clipped table label');
   assert.ok(dropEditorInputBlock.includes(':not([type="range"])'), 'selected drop inspector generic input chrome should not override row-style range sliders');
+  assert.ok(dropEditorInputBlock.includes('height: 28px;') && dropEditorInputBlock.includes('min-height: 28px;') && dropEditorInputBlock.includes('padding: 3px 8px;'), 'selected drop inspector generic inputs and selects should use compact 28px right-sidebar geometry');
   assert.ok(dropEditorValuesBlock.includes('grid-template-columns: minmax(0, 1fr) 72px;') && dropEditorValuesBlock.includes('align-items: end;'), 'selected drop inspector should place chance and count in a compact two-column grid');
   assert.ok(dropEditorRateValueBlock.includes('grid-template-columns: 64px minmax(0, 1fr);'), 'selected drop inspector chance should widen only the right-menu percent column');
   assert.ok(dropEditorRatePercentBlock.includes('height: 28px;') && dropEditorRatePercentBlock.includes('padding: 4px 16px 4px 2px;') && dropEditorRatePercentBlock.includes('background: var(--fab-overlay-dark-18);'), 'selected drop inspector broad chance input rule should not carry the right-menu suffix padding');
@@ -696,6 +702,11 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(dropEditorCountBlock.includes('display: grid;') && dropEditorCountBlock.includes('gap: 6px;'), 'selected drop inspector count editor should use a compact labeled field');
   assert.ok(dropEditorCountInputBlock.includes('min-height: 28px;') && dropEditorCountInputBlock.includes('text-align: center;'), 'selected drop inspector count input should match row count input geometry');
   assert.ok(dropEditorInspectorCountInputBlock.includes('height: 28px;') && dropEditorInspectorCountInputBlock.includes('min-height: 28px;') && dropEditorInspectorCountInputBlock.includes('padding: 4px;') && dropEditorInspectorCountInputBlock.includes('box-shadow: none;'), 'selected drop inspector count input should override generic inspector input chrome with chance-field geometry');
+  assert.ok(dropInspectorButtonBlock.includes('min-height: 28px;') && dropInspectorButtonBlock.includes('padding: 0 9px;'), 'selected drop inspector text buttons should match the compact 28px sidebar rhythm');
+  assert.ok(dropInspectorIconButtonBlock.includes('width: 28px;') && dropInspectorIconButtonBlock.includes('height: 28px;') && dropInspectorIconButtonBlock.includes('flex: 0 0 28px;'), 'selected drop inspector icon buttons should match the compact 28px sidebar rhythm');
+  assert.ok(dropInspectorSearchInputBlock.includes('height: 28px;') && dropInspectorSearchInputBlock.includes('min-height: 28px;') && dropInspectorSearchInputBlock.includes('padding-block: 0;'), 'selected drop inspector search input should keep icon padding while using 28px height');
+  assert.ok(dropInspectorCharacterFieldBlock.includes('height: 28px;') && dropInspectorCharacterFieldBlock.includes('min-height: 28px;') && dropInspectorCharacterFieldBlock.includes('padding: 3px 8px;'), 'selected drop inspector character modifier fields should override shared 36px field height');
+  assert.ok(dropInspectorCharacterOperatorBlock.includes('height: 28px;') && dropInspectorCharacterOperatorBlock.includes('min-height: 28px;') && dropInspectorCharacterOperatorBlock.includes('padding: 0 6px;'), 'selected drop inspector character modifier operator select should keep compact 28px height');
   assert.ok(dropEditorActionsBlock.includes('grid-template-columns: repeat(2, minmax(0, 1fr));') && dropEditorActionsBlock.includes('margin-top: 0;'), 'selected drop rule actions should sit beneath the inspector title row');
   assert.ok(dropInspectorStackBlock.includes('grid-template-rows: auto auto minmax(0, 1fr);'), 'selected drop inspector should reserve fixed header, divider, and lower scroll rows');
   assert.ok(dropInspectorStackBlock.includes('height: 100%;') && dropInspectorStackBlock.includes('overflow: visible;'), 'selected drop inspector stack should allow the divider to span the full right inspector width');

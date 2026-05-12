@@ -390,12 +390,9 @@ export class GatheringRichStateService {
     const min = numberOrNullStrict(reference?.min);
     const max = numberOrNullStrict(reference?.max);
 
-    const providerOverride = stringOrFallback(reference?.providerOverride, '');
     const expressionOverride = stringOrFallback(reference?.expressionOverride, '');
-    const macroUuidOverride = stringOrFallback(reference?.macroUuidOverride, '');
-    const hasFullOverride = Boolean(expressionOverride) || Boolean(macroUuidOverride);
 
-    if (!libraryEntry && !hasFullOverride) {
+    if (!libraryEntry && !expressionOverride) {
       return {
         ok: false,
         diagnostic: {
@@ -409,25 +406,9 @@ export class GatheringRichStateService {
       };
     }
 
-    const effectiveProvider = providerOverride
-      || libraryEntry?.provider
-      || (macroUuidOverride ? 'macro' : null);
+    const effectiveProvider = libraryEntry?.provider || null;
     const effectiveExpression = expressionOverride || libraryEntry?.expression || '';
-    const effectiveMacroUuid = macroUuidOverride || libraryEntry?.macroUuid || '';
-
-    if (effectiveProvider === 'macro' && !effectiveMacroUuid) {
-      return {
-        ok: false,
-        diagnostic: {
-          code: 'MACRO_OVERRIDE_MISSING_UUID',
-          message: `Macro override for character modifier "${modifierId}" is missing macroUuid`,
-          modifierId,
-          referenceId,
-          rowId: row?.id || null,
-          hazardId: hazard?.id || null
-        }
-      };
-    }
+    const effectiveMacroUuid = libraryEntry?.macroUuid || '';
 
     if (min !== null && max !== null && min > max) {
       return {
@@ -1038,16 +1019,13 @@ function normalizeCharacterModifierReference(ref, index) {
   if (!ref || typeof ref !== 'object') return null;
   const modifierId = stringOrFallback(ref.modifierId, '');
   if (!modifierId) return null;
-  const providerOverride = CHARACTER_MODIFIER_PROVIDERS.has(ref.providerOverride) ? ref.providerOverride : null;
   return {
     id: stringOrFallback(ref.id, `char-mod-${modifierId}-${index + 1}`),
     modifierId,
     operator: CHARACTER_MODIFIER_OPERATORS.has(ref.operator) ? ref.operator : '+',
     min: numberOrNullStrict(ref.min),
     max: numberOrNullStrict(ref.max),
-    providerOverride,
-    expressionOverride: stringOrFallback(ref.expressionOverride, ''),
-    macroUuidOverride: stringOrFallback(ref.macroUuidOverride, '')
+    expressionOverride: stringOrFallback(ref.expressionOverride, '')
   };
 }
 
@@ -1112,12 +1090,18 @@ function normalizeDropConditionModifierList(values = []) {
   return (Array.isArray(values) ? values : [])
     .map((modifier, index) => {
       const conditionId = normalizeConditionId(modifier?.conditionId ?? modifier?.id);
-      const value = Number(modifier?.value);
-      if (!conditionId || !Number.isFinite(value)) return null;
+      const rawValue = Number(modifier?.value);
+      if (!conditionId || !Number.isFinite(rawValue)) return null;
+      const truncated = Math.trunc(rawValue);
+      const explicitOperator = modifier?.operator === '-' || modifier?.operator === '+'
+        ? modifier.operator
+        : null;
+      const operator = explicitOperator ?? (truncated < 0 ? '-' : '+');
       return {
         id: stringOrFallback(modifier?.id, `${conditionId}-${index + 1}`),
         conditionId,
-        value: Math.trunc(value)
+        operator,
+        value: Math.abs(truncated)
       };
     })
     .filter(Boolean);
@@ -1129,7 +1113,7 @@ function matchingConditionModifier(modifiers = {}, conditions = {}) {
     if (!current) return total;
     return total + normalizeDropConditionModifierList(modifiers?.[kind])
       .filter(modifier => modifier.conditionId === current)
-      .reduce((sum, modifier) => sum + Number(modifier.value || 0), 0);
+      .reduce((sum, modifier) => sum + (modifier.operator === '-' ? -modifier.value : modifier.value), 0);
   }, 0);
 }
 

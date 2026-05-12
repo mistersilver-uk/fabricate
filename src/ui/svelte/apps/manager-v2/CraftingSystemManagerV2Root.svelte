@@ -10,7 +10,6 @@
   import EssenceEditView from './EssenceEditView.svelte';
   import GatheringTaskEditView from './GatheringTaskEditView.svelte';
   import EssenceSourceSelector from '../../components/EssenceSourceSelector.svelte';
-  import ProviderExpressionInput from '../../components/ProviderExpressionInput.svelte';
   import RecipesBrowserView from './RecipesBrowserView.svelte';
   import SystemEditView from './SystemEditView.svelte';
   import SystemsBrowserView from './SystemsBrowserView.svelte';
@@ -37,6 +36,10 @@
   let activeGatheringTab = $state('environments');
   let selectedGatheringTaskId = $state('');
   let selectedGatheringDropId = $state('');
+  let gatheringTaskDraft = $state(null);
+  let gatheringTaskDraftBaseline = $state(null);
+  let gatheringTaskSaving = $state(false);
+  let gatheringTaskSaveError = $state('');
   const placeholderViews = [
     { id: 'rules', icon: 'fas fa-sliders-h', labelKey: 'FABRICATE.Admin.ManagerV2.Nav.Rules', fallback: 'Rules' },
     { id: 'graph', icon: 'fas fa-project-diagram', labelKey: 'FABRICATE.Admin.ManagerV2.Nav.Graph', fallback: 'Graph' }
@@ -125,7 +128,7 @@
 
   function characterModifierIsCustomized(ref) {
     if (!ref) return false;
-    return Boolean(ref.providerOverride || ref.expressionOverride || ref.macroUuidOverride);
+    return Boolean(ref.expressionOverride);
   }
 
   function rowCharacterModifiers(row) {
@@ -133,9 +136,22 @@
   }
 
   async function onAddDropCharacterModifier(rowId, modifierId = null) {
-    if (!selectedSystemId || !selectedGatheringTask?.id || !rowId) return;
+    if (!editingGatheringTask?.id || !rowId) return;
     const id = modifierId ?? selectedGatheringCharacterModifiers[0]?.id ?? '';
-    await store.addGatheringDropRowCharacterModifier?.(selectedSystemId, selectedGatheringTask.id, rowId, { modifierId: id });
+    if (!id) return;
+    const rows = gatheringTaskDropRows(editingGatheringTask);
+    const row = rows.find(entry => entry.id === rowId);
+    if (!row) return;
+    const refs = Array.isArray(row.characterModifiers) ? row.characterModifiers : [];
+    const newRef = {
+      id: `char-mod-${id}-${refs.length + 1}-${Math.random().toString(36).slice(2, 6)}`,
+      modifierId: id,
+      operator: '+',
+      min: null,
+      max: null,
+      expressionOverride: ''
+    };
+    updateGatheringTaskDrop(rowId, { characterModifiers: [...refs, newRef] });
   }
 
   let characterModifierSearchTerm = $state('');
@@ -155,6 +171,55 @@
       characterModifierSearchTerm = '';
     }
   });
+
+  let characterModifierSearchAnchor = $state(null);
+  let characterModifierSearchOpenUp = $state(false);
+
+  function characterModifierSearchClippingBounds(node) {
+    const documentRef = globalThis.document;
+    const windowRef = globalThis.window || globalThis;
+    const viewportTop = 0;
+    const viewportBottom = Number(globalThis.innerHeight || windowRef.innerHeight) || documentRef?.documentElement?.clientHeight || 0;
+    let parent = node?.parentElement;
+    while (parent && parent !== documentRef?.documentElement) {
+      const style = globalThis.getComputedStyle?.(parent);
+      const overflow = `${style?.overflow || ''} ${style?.overflowY || ''} ${style?.overflowX || ''}`;
+      if (/(auto|scroll|hidden|clip)/.test(overflow)) {
+        const rect = parent.getBoundingClientRect?.();
+        if (rect) {
+          return {
+            top: Math.max(viewportTop, rect.top),
+            bottom: Math.min(viewportBottom || rect.bottom, rect.bottom)
+          };
+        }
+      }
+      parent = parent.parentElement;
+    }
+    return { top: viewportTop, bottom: viewportBottom };
+  }
+
+  function updateCharacterModifierSearchDirection() {
+    const node = characterModifierSearchAnchor;
+    const rect = node?.getBoundingClientRect?.();
+    if (!rect) {
+      characterModifierSearchOpenUp = false;
+      return;
+    }
+    const bounds = characterModifierSearchClippingBounds(node);
+    const spaceBelow = bounds.bottom - rect.bottom;
+    const spaceAbove = rect.top - bounds.top;
+    const openUpThreshold = 160;
+    characterModifierSearchOpenUp = spaceBelow < openUpThreshold && spaceAbove > spaceBelow;
+  }
+
+  $effect(() => {
+    if (characterModifierSearchSuggestions.length === 0) {
+      characterModifierSearchOpenUp = false;
+      return;
+    }
+    updateCharacterModifierSearchDirection();
+  });
+
   async function pickCharacterModifierForRow(rowId, modifierId) {
     characterModifierSearchTerm = '';
     await onAddDropCharacterModifier(rowId, modifierId);
@@ -163,32 +228,59 @@
   function characterModifierOperatorClass(operator) {
     return operator === '-' ? 'is-negative' : 'is-positive';
   }
-  async function setCharacterModifierOverrideEnabled(rowId, ref, enabled, libraryEntry) {
-    if (enabled) {
-      const provider = ref.providerOverride || libraryEntry?.provider || 'dnd5e';
-      await onUpdateDropCharacterModifier(rowId, ref.id, { providerOverride: provider });
-    } else {
-      await onUpdateDropCharacterModifier(rowId, ref.id, { providerOverride: null, expressionOverride: '', macroUuidOverride: '' });
+
+  let gatheringTimeOfDayPickerSelection = $state('');
+  let gatheringWeatherPickerSelection = $state('');
+  $effect(() => {
+    const timeAvailable = gatheringConditionAvailableOptions(selectedGatheringDrop, 'timeOfDay');
+    if (!timeAvailable.some(option => option.id === gatheringTimeOfDayPickerSelection)) {
+      gatheringTimeOfDayPickerSelection = timeAvailable[0]?.id || '';
     }
+    const weatherAvailable = gatheringConditionAvailableOptions(selectedGatheringDrop, 'weather');
+    if (!weatherAvailable.some(option => option.id === gatheringWeatherPickerSelection)) {
+      gatheringWeatherPickerSelection = weatherAvailable[0]?.id || '';
+    }
+  });
+
+  function gatheringDropModifierPickerSelection(kind) {
+    return kind === 'weather' ? gatheringWeatherPickerSelection : gatheringTimeOfDayPickerSelection;
+  }
+
+  function setGatheringDropModifierPickerSelection(kind, value) {
+    if (kind === 'weather') gatheringWeatherPickerSelection = value;
+    else gatheringTimeOfDayPickerSelection = value;
+  }
+
+  function gatheringDropModifierOperatorClass(operator) {
+    return operator === '-' ? 'is-negative' : 'is-positive';
+  }
+
+  async function setCharacterModifierOverrideEnabled(rowId, ref, enabled, libraryEntry) {
+    const expressionOverride = enabled ? (libraryEntry?.expression || '') : '';
+    await onUpdateDropCharacterModifier(rowId, ref.id, { expressionOverride });
   }
 
   async function onUpdateDropCharacterModifier(rowId, refId, patch) {
-    if (!selectedSystemId || !selectedGatheringTask?.id || !rowId || !refId) return;
-    await store.updateGatheringDropRowCharacterModifier?.(selectedSystemId, selectedGatheringTask.id, rowId, refId, patch);
+    if (!editingGatheringTask?.id || !rowId || !refId) return;
+    const rows = gatheringTaskDropRows(editingGatheringTask);
+    const row = rows.find(entry => entry.id === rowId);
+    if (!row) return;
+    const refs = Array.isArray(row.characterModifiers) ? row.characterModifiers : [];
+    const nextRefs = refs.map(ref => ref.id === refId ? { ...ref, ...patch } : ref);
+    updateGatheringTaskDrop(rowId, { characterModifiers: nextRefs });
   }
 
   async function onDeleteDropCharacterModifier(rowId, refId) {
-    if (!selectedSystemId || !selectedGatheringTask?.id || !rowId || !refId) return;
-    await store.deleteGatheringDropRowCharacterModifier?.(selectedSystemId, selectedGatheringTask.id, rowId, refId);
+    if (!editingGatheringTask?.id || !rowId || !refId) return;
+    const rows = gatheringTaskDropRows(editingGatheringTask);
+    const row = rows.find(entry => entry.id === rowId);
+    if (!row) return;
+    const refs = Array.isArray(row.characterModifiers) ? row.characterModifiers : [];
+    const nextRefs = refs.filter(ref => ref.id !== refId);
+    if (nextRefs.length === refs.length) return;
+    updateGatheringTaskDrop(rowId, { characterModifiers: nextRefs });
   }
 
-  async function onRestoreDropCharacterModifierDefaults(rowId, refId) {
-    await onUpdateDropCharacterModifier(rowId, refId, {
-      providerOverride: null,
-      expressionOverride: '',
-      macroUuidOverride: ''
-    });
-  }
   const visiblePlaceholderViews = $derived(selectedSystem
     ? placeholderViews.filter(view => isViewAvailableForSystem(view, selectedSystem))
     : []
@@ -291,10 +383,20 @@
       || gatheringTaskDefinitions[0]
       || null
   );
+  const editingGatheringTask = $derived(gatheringTaskDraft || selectedGatheringTask);
   const selectedGatheringDrop = $derived(
-    gatheringTaskDropRows(selectedGatheringTask).find(row => row.id === selectedGatheringDropId)
-      || gatheringTaskDropRows(selectedGatheringTask)[0]
+    gatheringTaskDropRows(editingGatheringTask).find(row => row.id === selectedGatheringDropId)
+      || gatheringTaskDropRows(editingGatheringTask)[0]
       || null
+  );
+  const gatheringTaskDraftDirty = $derived(
+    !!(gatheringTaskDraft && gatheringTaskDraftBaseline
+      && JSON.stringify(gatheringTaskDraft) !== JSON.stringify(gatheringTaskDraftBaseline))
+  );
+  const gatheringTaskValidation = $derived(
+    gatheringTaskDraft
+      ? (store.validateGatheringLibraryTask?.(gatheringTaskDraft) || { valid: true, errors: [] })
+      : { valid: true, errors: [] }
   );
 
   $effect(() => {
@@ -319,6 +421,10 @@
     if (selectedSystemId === lastGatheringSystemId) return;
     activeGatheringTab = 'environments';
     selectedGatheringTaskId = '';
+    gatheringTaskDraft = null;
+    gatheringTaskDraftBaseline = null;
+    gatheringTaskSaving = false;
+    gatheringTaskSaveError = '';
     lastGatheringSystemId = selectedSystemId;
   });
 
@@ -340,11 +446,11 @@
   });
 
   $effect(() => {
-    if (!selectedGatheringTask) {
+    if (!editingGatheringTask) {
       selectedGatheringDropId = '';
       return;
     }
-    const rows = gatheringTaskDropRows(selectedGatheringTask);
+    const rows = gatheringTaskDropRows(editingGatheringTask);
     if (selectedGatheringDropId && rows.some(row => row.id === selectedGatheringDropId)) return;
     selectedGatheringDropId = rows[0]?.id || '';
   });
@@ -642,6 +748,12 @@
     return true;
   }
 
+  function finishGatheringTaskRouteExit(confirmed) {
+    if (confirmed === false) return false;
+    clearGatheringTaskDraft();
+    return true;
+  }
+
   function confirmComponentRouteExit(nextView) {
     if (activeView !== 'component-edit') return true;
     if (componentEditDirty !== true) return true;
@@ -675,6 +787,18 @@
     return finishEssenceRouteExit(confirmed);
   }
 
+  function confirmGatheringTaskRouteExit(nextView) {
+    if (activeView !== 'gathering-task-edit') return true;
+    if (!gatheringTaskDraftDirty) return finishGatheringTaskRouteExit(true);
+    const message = text(
+      'FABRICATE.Admin.ManagerV2.Environment.Tasks.DiscardChangesPrompt',
+      'The current gathering task has unsaved changes. Discard them and continue?'
+    );
+    const confirmed = typeof globalThis.confirm === 'function' ? globalThis.confirm(message) : false;
+    if (isPromise(confirmed)) return confirmed.then(finishGatheringTaskRouteExit);
+    return finishGatheringTaskRouteExit(confirmed);
+  }
+
   function confirmRouteExit(nextView) {
     const environmentConfirmed = confirmEnvironmentRouteExit(nextView);
     if (isPromise(environmentConfirmed)) {
@@ -682,18 +806,29 @@
         if (value === false) return false;
         const essenceResult = confirmEssenceRouteExit(nextView);
         if (isPromise(essenceResult)) {
-          return essenceResult.then(essenceValue => essenceValue === false ? false : confirmComponentRouteExit(nextView));
+          return essenceResult.then(essenceValue => essenceValue === false
+            ? false
+            : continueRouteExitAfterEssence(nextView));
         }
-        return essenceResult === false ? false : confirmComponentRouteExit(nextView);
+        return essenceResult === false ? false : continueRouteExitAfterEssence(nextView);
       });
     }
     if (environmentConfirmed === false) return false;
     const essenceResult = confirmEssenceRouteExit(nextView);
     if (isPromise(essenceResult)) {
-      return essenceResult.then(value => value === false ? false : confirmComponentRouteExit(nextView));
+      return essenceResult.then(value => value === false ? false : continueRouteExitAfterEssence(nextView));
     }
     if (essenceResult === false) return false;
-    return confirmComponentRouteExit(nextView);
+    return continueRouteExitAfterEssence(nextView);
+  }
+
+  function continueRouteExitAfterEssence(nextView) {
+    const componentResult = confirmComponentRouteExit(nextView);
+    if (isPromise(componentResult)) {
+      return componentResult.then(value => value === false ? false : confirmGatheringTaskRouteExit(nextView));
+    }
+    if (componentResult === false) return false;
+    return confirmGatheringTaskRouteExit(nextView);
   }
 
   function setView(view) {
@@ -1076,13 +1211,50 @@
   function editGatheringTask(taskId = selectedGatheringTask?.id) {
     if (!taskId || !canShowEnvironments) return;
     selectedGatheringTaskId = taskId;
+    const source = gatheringTaskDefinitions.find(task => task.id === taskId) || null;
+    const snapshot = source ? JSON.parse(JSON.stringify(source)) : null;
+    gatheringTaskDraft = snapshot;
+    gatheringTaskDraftBaseline = snapshot ? JSON.parse(JSON.stringify(snapshot)) : null;
+    gatheringTaskSaveError = '';
     activeGatheringTab = 'tasks';
     activeView = 'gathering-task-edit';
   }
 
+  function clearGatheringTaskDraft() {
+    gatheringTaskDraft = null;
+    gatheringTaskDraftBaseline = null;
+    gatheringTaskSaveError = '';
+  }
+
   function backToGatheringTaskLibrary() {
-    activeGatheringTab = 'tasks';
-    activeView = 'environments';
+    afterTruthyResult(confirmRouteExit('environments'), () => {
+      activeGatheringTab = 'tasks';
+      activeView = 'environments';
+    });
+  }
+
+  async function saveGatheringTaskDraft() {
+    if (!gatheringTaskDraft || !selectedSystemId || !selectedGatheringTaskId) return;
+    const { valid, errors } = gatheringTaskValidation;
+    if (!valid) {
+      gatheringTaskSaveError = errors[0] || '';
+      return;
+    }
+    gatheringTaskSaving = true;
+    try {
+      const ok = await store.updateGatheringLibraryTask?.(selectedSystemId, selectedGatheringTaskId, gatheringTaskDraft);
+      if (ok) {
+        gatheringTaskDraftBaseline = JSON.parse(JSON.stringify(gatheringTaskDraft));
+        gatheringTaskSaveError = '';
+      } else {
+        gatheringTaskSaveError = text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SaveFailed', 'Save failed. Try again.');
+      }
+    } catch (error) {
+      console.error('Failed to save gathering task draft', error);
+      gatheringTaskSaveError = text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SaveFailed', 'Save failed. Try again.');
+    } finally {
+      gatheringTaskSaving = false;
+    }
   }
 
   function duplicateGatheringTask(systemId = selectedSystemId, taskId = selectedGatheringTask?.id) {
@@ -1115,6 +1287,10 @@
   }
 
   function updateSelectedGatheringTask(updates = {}) {
+    if (gatheringTaskDraft) {
+      gatheringTaskDraft = { ...gatheringTaskDraft, ...updates };
+      return true;
+    }
     if (!selectedSystemId || !selectedGatheringTask?.id) return false;
     return store.updateGatheringLibraryTask?.(selectedSystemId, selectedGatheringTask.id, updates);
   }
@@ -1124,7 +1300,7 @@
   }
 
   function addGatheringTaskDrop() {
-    if (!selectedGatheringTask) return;
+    if (!editingGatheringTask) return;
     const row = {
       id: gatheringDropRowId(),
       name: '',
@@ -1136,18 +1312,18 @@
       enabled: false
     };
     selectedGatheringDropId = row.id;
-    updateSelectedGatheringTask({ dropRows: [...gatheringTaskDropRows(selectedGatheringTask), row] });
+    updateSelectedGatheringTask({ dropRows: [...gatheringTaskDropRows(editingGatheringTask), row] });
   }
 
   function updateGatheringTaskDrop(rowId, updates = {}) {
-    if (!selectedGatheringTask || !rowId) return;
-    const rows = gatheringTaskDropRows(selectedGatheringTask).map(row => row.id === rowId ? { ...row, ...updates } : row);
+    if (!editingGatheringTask || !rowId) return;
+    const rows = gatheringTaskDropRows(editingGatheringTask).map(row => row.id === rowId ? { ...row, ...updates } : row);
     updateSelectedGatheringTask({ dropRows: rows });
   }
 
   function duplicateGatheringTaskDrop(rowId = selectedGatheringDrop?.id) {
-    if (!selectedGatheringTask || !rowId) return;
-    const rows = gatheringTaskDropRows(selectedGatheringTask);
+    if (!editingGatheringTask || !rowId) return;
+    const rows = gatheringTaskDropRows(editingGatheringTask);
     const index = rows.findIndex(row => row.id === rowId);
     if (index < 0) return;
     const duplicate = { ...JSON.parse(JSON.stringify(rows[index])), id: gatheringDropRowId() };
@@ -1156,8 +1332,8 @@
   }
 
   function deleteGatheringTaskDrop(rowId = selectedGatheringDrop?.id) {
-    if (!selectedGatheringTask || !rowId) return;
-    const rows = gatheringTaskDropRows(selectedGatheringTask);
+    if (!editingGatheringTask || !rowId) return;
+    const rows = gatheringTaskDropRows(editingGatheringTask);
     const index = rows.findIndex(row => row.id === rowId);
     const nextRows = rows.filter(row => row.id !== rowId);
     selectedGatheringDropId = nextRows[Math.min(index, nextRows.length - 1)]?.id || '';
@@ -1188,9 +1364,16 @@
     return Array.isArray(values) ? values : [];
   }
 
+  function gatheringConditionAvailableOptions(row, kind) {
+    const options = gatheringConditionOptions(kind);
+    if (!row) return options;
+    const attached = new Set(gatheringConditionModifierRows(row, kind).map(modifier => modifier.conditionId));
+    return options.filter(option => !attached.has(option.id));
+  }
+
   function updateGatheringDropModifier(rowId, kind, modifierId, updates = {}) {
-    if (!selectedGatheringTask || !rowId || !kind || !modifierId) return;
-    const row = gatheringTaskDropRows(selectedGatheringTask).find(entry => entry.id === rowId);
+    if (!editingGatheringTask || !rowId || !kind || !modifierId) return;
+    const row = gatheringTaskDropRows(editingGatheringTask).find(entry => entry.id === rowId);
     if (!row) return;
     const conditionModifiers = {
       timeOfDay: gatheringConditionModifierRows(row, 'timeOfDay'),
@@ -1200,25 +1383,25 @@
     updateGatheringTaskDrop(rowId, { conditionModifiers });
   }
 
-  function addGatheringDropModifier(rowId, kind) {
-    if (!selectedGatheringTask || !rowId || !kind) return;
-    const row = gatheringTaskDropRows(selectedGatheringTask).find(entry => entry.id === rowId);
-    const firstConditionId = gatheringConditionOptions(kind)[0]?.id || '';
-    if (!row || !firstConditionId) return;
+  function addGatheringDropModifier(rowId, kind, conditionId) {
+    if (!editingGatheringTask || !rowId || !kind || !conditionId) return;
+    const row = gatheringTaskDropRows(editingGatheringTask).find(entry => entry.id === rowId);
+    if (!row) return;
     const conditionModifiers = {
       timeOfDay: gatheringConditionModifierRows(row, 'timeOfDay'),
       weather: gatheringConditionModifierRows(row, 'weather')
     };
+    if (conditionModifiers[kind].some(modifier => modifier.conditionId === conditionId)) return;
     conditionModifiers[kind] = [
       ...conditionModifiers[kind],
-      { id: `${kind}-${gatheringDropRowId()}`, conditionId: firstConditionId, value: 0 }
+      { id: `${kind}-${gatheringDropRowId()}`, conditionId, operator: '+', value: 0 }
     ];
     updateGatheringTaskDrop(rowId, { conditionModifiers });
   }
 
   function deleteGatheringDropModifier(rowId, kind, modifierId) {
-    if (!selectedGatheringTask || !rowId || !kind || !modifierId) return;
-    const row = gatheringTaskDropRows(selectedGatheringTask).find(entry => entry.id === rowId);
+    if (!editingGatheringTask || !rowId || !kind || !modifierId) return;
+    const row = gatheringTaskDropRows(editingGatheringTask).find(entry => entry.id === rowId);
     if (!row) return;
     const conditionModifiers = {
       timeOfDay: gatheringConditionModifierRows(row, 'timeOfDay'),
@@ -1590,13 +1773,6 @@
     const quantity = gatheringDropCountValue({ quantity: (Number.isFinite(currentValue) ? currentValue : gatheringDropCountValue(row)) + (event.key === 'ArrowUp' ? 1 : -1) });
     event.currentTarget.value = String(quantity);
     updateGatheringTaskDrop(row.id, { quantity });
-  }
-
-  function gatheringDropModifierClass(value) {
-    const number = Number(value || 0);
-    if (number < 0) return 'is-danger';
-    if (number > 0) return 'is-active';
-    return 'is-neutral';
   }
 
   function gatheringTaskAvailability(task) {
@@ -1995,6 +2171,19 @@
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.BackToLibrary', 'Back to task library')}</span>
         </button>
+        {#if gatheringTaskDraftDirty}
+          <span class="manager-v2-chip is-warning">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Dirty', 'Unsaved')}</span>
+        {/if}
+        <button
+          type="button"
+          class="manager-v2-button is-primary"
+          onclick={saveGatheringTaskDraft}
+          disabled={!gatheringTaskDraftDirty || !gatheringTaskValidation.valid || gatheringTaskSaving}
+          title={gatheringTaskValidation.valid ? '' : gatheringTaskValidation.errors.join('\n')}
+        >
+          <i class={gatheringTaskSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Save', 'Save task')}</span>
+        </button>
       {:else if currentView === 'system-edit'}
         <button type="button" class="manager-v2-button" onclick={backToSystemsBrowser}>
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
@@ -2194,7 +2383,7 @@
       </main>
     {:else if currentView === 'gathering-task-edit' && selectedSystem}
       <GatheringTaskEditView
-        task={selectedGatheringTask}
+        task={editingGatheringTask}
         {itemCards}
         managedItemOptions={selectedSystem.managedItemOptions || []}
         weatherOptions={gatheringConditionOptions('weather')}
@@ -2520,42 +2709,97 @@
                   <input type="text" inputmode="numeric" pattern={'[1-9][0-9]{0,2}'} value={gatheringDropCountValue(selectedGatheringDrop)} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropQuantityColumn', 'Count')} oninput={(event) => onGatheringDropCountInput(selectedGatheringDrop.id, event)} onblur={(event) => onGatheringDropCountBlur(selectedGatheringDrop, event)} onkeydown={(event) => onGatheringDropCountKeydown(selectedGatheringDrop, event)} />
                 </label>
               </div>
-
-              <div class="manager-v2-drop-editor-modifiers">
-                {#each ['timeOfDay', 'weather'] as kind}
-                  <section class="manager-v2-drop-editor-modifier-group" data-gathering-drop-modifier-kind={kind}>
-                    <div class="manager-v2-inspector-subhead">
-                      <h4>{kind === 'weather' ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.WeatherModifiers', 'Weather modifiers') : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.TimeModifiers', 'Time modifiers')}</h4>
-                      <button type="button" class="manager-v2-icon-button" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AddModifier', 'Add modifier')} onclick={() => addGatheringDropModifier(selectedGatheringDrop.id, kind)}>
-                        <i class="fas fa-plus" aria-hidden="true"></i>
-                      </button>
-                    </div>
-                    <div class="manager-v2-requirements-list">
-                      {#each gatheringConditionModifierRows(selectedGatheringDrop, kind) as modifier (modifier.id)}
-                        <div class="manager-v2-requirement-row manager-v2-modifier-row" data-gathering-drop-modifier-id={modifier.id}>
-                          <select value={modifier.conditionId} onchange={(event) => updateGatheringDropModifier(selectedGatheringDrop.id, kind, modifier.id, { conditionId: event.currentTarget.value })}>
-                            {#each gatheringConditionOptions(kind) as option (option.id)}
-                              <option value={option.id}>{option.label || option.id}</option>
-                            {/each}
-                          </select>
-                          <span class={`manager-v2-modifier-arrow ${gatheringDropModifierClass(modifier.value)}`}>{Number(modifier.value || 0) < 0 ? '-' : '+'}</span>
-                          <input class={`manager-v2-modifier-value ${gatheringDropModifierClass(modifier.value)}`} type="number" step="1" value={modifier.value || 0} aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ModifierValue', 'Modifier value')} oninput={(event) => updateGatheringDropModifier(selectedGatheringDrop.id, kind, modifier.id, { value: Number(event.currentTarget.value || 0) })} />
-                          <button type="button" class="manager-v2-icon-button is-danger" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DeleteModifier', 'Delete modifier')} onclick={() => deleteGatheringDropModifier(selectedGatheringDrop.id, kind, modifier.id)}>
-                            <i class="fas fa-trash" aria-hidden="true"></i>
-                          </button>
-                        </div>
-                      {:else}
-                        <div class="manager-v2-requirement-row">
-                          <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.NotSpecified', 'Not specified')}</span>
-                          <strong>0%</strong>
-                        </div>
-                      {/each}
-                    </div>
-                  </section>
-                {/each}
-              </div>
-
             </section>
+
+            {#each ['timeOfDay', 'weather'] as kind}
+              {@const isWeather = kind === 'weather'}
+              {@const cardTitle = isWeather
+                ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.WeatherModifiers', 'Weather modifiers')
+                : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.TimeModifiers', 'Time modifiers')}
+              {@const cardHint = isWeather
+                ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.WeatherModifiersHint', "Adjust this drop's chance based on the active weather condition.")
+                : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.TimeModifiersHint', "Adjust this drop's chance based on the active time of day.")}
+              {@const availableConditions = gatheringConditionAvailableOptions(selectedGatheringDrop, kind)}
+              {@const pickerSelection = gatheringDropModifierPickerSelection(kind)}
+              {@const attachedModifiers = gatheringConditionModifierRows(selectedGatheringDrop, kind)}
+              <section class="manager-v2-inspector-card manager-v2-drop-editor-condition-modifier-card" data-gathering-drop-condition-modifiers={kind}>
+                <header class="manager-v2-character-modifier-row-card-header">
+                  <div class="manager-v2-character-modifier-row-card-heading">
+                    <h3 class="manager-v2-card-title">{cardTitle}</h3>
+                    <p class="manager-v2-muted">{cardHint}</p>
+                  </div>
+                </header>
+                <div class="manager-v2-condition-modifier-add-row" data-gathering-drop-condition-modifier-picker={kind}>
+                  <label class="manager-v2-field manager-v2-condition-modifier-picker">
+                    <span class="visually-hidden">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ConditionPickerLabel', 'Condition')}</span>
+                    <select
+                      value={pickerSelection}
+                      disabled={availableConditions.length === 0}
+                      data-tooltip={availableConditions.length === 0 ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AllConditionsAdded', 'All conditions already added.') : null}
+                      onchange={(event) => setGatheringDropModifierPickerSelection(kind, event.currentTarget.value)}
+                    >
+                      {#each availableConditions as option (option.id)}
+                        <option value={option.id}>{option.label || option.id}</option>
+                      {/each}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    class="manager-v2-icon-button"
+                    aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AddConditionModifier', 'Add modifier')}
+                    title={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AddConditionModifier', 'Add modifier')}
+                    disabled={availableConditions.length === 0 || !pickerSelection}
+                    data-tooltip={availableConditions.length === 0 ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AllConditionsAdded', 'All conditions already added.') : null}
+                    onclick={() => addGatheringDropModifier(selectedGatheringDrop.id, kind, pickerSelection)}
+                  >
+                    <i class="fas fa-plus" aria-hidden="true"></i>
+                  </button>
+                </div>
+                <div class="manager-v2-condition-modifier-row-list">
+                  {#each attachedModifiers as modifier (modifier.id)}
+                    {@const operatorClass = gatheringDropModifierOperatorClass(modifier.operator)}
+                    <article class="manager-v2-condition-modifier-row-reference" data-gathering-drop-modifier-id={modifier.id}>
+                      <header class="manager-v2-character-modifier-row-reference-header">
+                        <span class="manager-v2-character-modifier-icon">
+                          <i class={isWeather ? 'fas fa-cloud-sun' : 'fas fa-clock'} aria-hidden="true"></i>
+                        </span>
+                        <span class="manager-v2-character-modifier-row-reference-label">{gatheringConditionLabel(kind, modifier.conditionId) || modifier.conditionId}</span>
+                        <label class={`manager-v2-character-modifier-operator-select ${operatorClass}`}>
+                          <span class="visually-hidden">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Operator', 'Operator')}</span>
+                          <select value={modifier.operator || '+'} onchange={(event) => updateGatheringDropModifier(selectedGatheringDrop.id, kind, modifier.id, { operator: event.currentTarget.value === '-' ? '-' : '+' })}>
+                            <option value="+">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.OperatorPositive', 'Positive')}</option>
+                            <option value="-">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.OperatorNegative', 'Negative')}</option>
+                          </select>
+                        </label>
+                        <button
+                          type="button"
+                          class="manager-v2-icon-button is-danger manager-v2-character-modifier-row-reference-delete"
+                          aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DeleteModifier', 'Delete modifier')}
+                          onclick={() => deleteGatheringDropModifier(selectedGatheringDrop.id, kind, modifier.id)}
+                        >
+                          <i class="fas fa-trash" aria-hidden="true"></i>
+                        </button>
+                      </header>
+                      <div class="manager-v2-condition-modifier-row-body">
+                        <label class="manager-v2-field">
+                          <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ModifierValue', 'Modifier value')}</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={Math.abs(Math.trunc(Number(modifier.value || 0)))}
+                            aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ModifierValue', 'Modifier value')}
+                            oninput={(event) => updateGatheringDropModifier(selectedGatheringDrop.id, kind, modifier.id, { value: Math.abs(Math.trunc(Number(event.currentTarget.value || 0))) })}
+                          />
+                        </label>
+                      </div>
+                    </article>
+                  {:else}
+                    <p class="manager-v2-muted manager-v2-condition-modifier-row-empty">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.NoConditionModifiers', 'No modifiers attached.')}</p>
+                  {/each}
+                </div>
+              </section>
+            {/each}
 
             <section class="manager-v2-inspector-card manager-v2-character-modifier-row-card" data-gathering-drop-character-modifiers>
               <header class="manager-v2-character-modifier-row-card-header">
@@ -2565,7 +2809,7 @@
                 </div>
               </header>
               <div class="manager-v2-character-modifier-add-search-row">
-                <label class="manager-v2-search is-compact manager-v2-character-modifier-add-search" data-gathering-drop-character-modifier-search>
+                <label bind:this={characterModifierSearchAnchor} class="manager-v2-search is-compact manager-v2-character-modifier-add-search" data-gathering-drop-character-modifier-search>
                   <i class="fas fa-search" aria-hidden="true"></i>
                   <input type="search"
                          value={characterModifierSearchTerm}
@@ -2575,7 +2819,7 @@
                          disabled={selectedGatheringCharacterModifiers.length === 0}
                          data-tooltip={selectedGatheringCharacterModifiers.length === 0 ? text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.LibraryEmptyHint', 'Add a modifier to the system library first to reference it here.') : null} />
                   {#if characterModifierSearchSuggestions.length > 0}
-                    <div class="manager-v2-tag-suggestions manager-v2-character-modifier-add-suggestions" data-gathering-drop-character-modifier-suggestions>
+                    <div class="manager-v2-tag-suggestions manager-v2-character-modifier-add-suggestions" class:is-above={characterModifierSearchOpenUp} data-gathering-drop-character-modifier-suggestions>
                       {#each characterModifierSearchSuggestions as option (option.id)}
                         <button type="button"
                                 class="manager-v2-tag-suggestion manager-v2-character-modifier-add-suggestion"
@@ -2625,26 +2869,34 @@
                       </label>
                     </div>
                     <div class="manager-v2-character-modifier-override-row">
-                      <label class="manager-v2-character-modifier-override-toggle">
-                        <span>{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.OverrideToggle', 'Override?')}</span>
-                        <input type="checkbox" checked={hasOverride} onchange={(event) => setCharacterModifierOverrideEnabled(selectedGatheringDrop.id, ref, event.currentTarget.checked, libraryEntry)} />
-                      </label>
+                      <button
+                        type="button"
+                        class={`manager-v2-status-toggle ${hasOverride ? 'is-on' : 'is-off'}`}
+                        aria-pressed={hasOverride}
+                        aria-label={text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.OverrideToggle', 'Override?')}
+                        onclick={() => setCharacterModifierOverrideEnabled(selectedGatheringDrop.id, ref, !hasOverride, libraryEntry)}
+                      >
+                        <span class="manager-v2-status-toggle-track" aria-hidden="true">
+                          <span class="manager-v2-status-toggle-knob"></span>
+                        </span>
+                        <span class="manager-v2-status-toggle-label">
+                          {hasOverride
+                            ? text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.OverrideToggleOn', 'Overridden')
+                            : text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.OverrideToggle', 'Override?')}
+                        </span>
+                      </button>
                     </div>
                     {#if hasOverride}
-                      <p class="manager-v2-muted manager-v2-character-modifier-override-hint">{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.OverrideHint', 'Overrides system-level definitions for expressions.')}</p>
-                      <ProviderExpressionInput
-                        provider={ref.providerOverride || libraryEntry?.provider || 'dnd5e'}
-                        expression={ref.expressionOverride || ''}
-                        macroUuid={ref.macroUuidOverride || ''}
-                        idPrefix={`drop-${selectedGatheringDrop.id}-character-modifier-${ref.id}`}
-                        onProviderChange={(value) => onUpdateDropCharacterModifier(selectedGatheringDrop.id, ref.id, { providerOverride: value })}
-                        onExpressionChange={(value) => onUpdateDropCharacterModifier(selectedGatheringDrop.id, ref.id, { expressionOverride: value })}
-                        onMacroUuidChange={(value) => onUpdateDropCharacterModifier(selectedGatheringDrop.id, ref.id, { macroUuidOverride: value })}
-                      />
-                      <button type="button" class="manager-v2-action" onclick={() => onRestoreDropCharacterModifierDefaults(selectedGatheringDrop.id, ref.id)}>
-                        <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
-                        {text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.RestoreLibraryDefaults', 'Restore library defaults')}
-                      </button>
+                      <p class="manager-v2-muted manager-v2-character-modifier-override-hint">{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.OverrideHint', 'Overrides the library expression for this row.')}</p>
+                      <label class="manager-v2-field" for={`drop-${selectedGatheringDrop.id}-character-modifier-${ref.id}-expression`}>
+                        <span>{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.Expression', 'Expression')}</span>
+                        <input
+                          type="text"
+                          id={`drop-${selectedGatheringDrop.id}-character-modifier-${ref.id}-expression`}
+                          value={ref.expressionOverride || ''}
+                          oninput={(event) => onUpdateDropCharacterModifier(selectedGatheringDrop.id, ref.id, { expressionOverride: event.currentTarget.value })}
+                        />
+                      </label>
                     {/if}
                   </article>
                 {:else}
