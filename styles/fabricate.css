@@ -5872,12 +5872,8 @@
   gap: 8px;
 }
 
-.fabricate-manager-v2 .manager-v2-character-modifier-override-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  font-size: 0.85rem;
+.fabricate-manager-v2 .manager-v2-character-modifier-override-row .manager-v2-status-toggle {
+  max-width: 100px;
 }
 
 .fabricate-manager-v2 .manager-v2-character-modifier-override-hint {

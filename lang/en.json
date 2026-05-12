@@ -1163,6 +1163,7 @@
             "LibraryEmptyHint": "Add a modifier to the system library first to reference it here.",
             "RowSectionHint": "Modifiers adjust the final chance based on the attempting character.",
             "OverrideToggle": "Override?",
+            "OverrideToggleOn": "Overridden",
             "OverrideHint": "Overrides system-level definitions for expressions.",
             "OperatorPositive": "Positive",
             "OperatorNegative": "Negative",

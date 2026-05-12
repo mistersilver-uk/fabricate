@@ -2625,10 +2625,22 @@
                       </label>
                     </div>
                     <div class="manager-v2-character-modifier-override-row">
-                      <label class="manager-v2-character-modifier-override-toggle">
-                        <span>{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.OverrideToggle', 'Override?')}</span>
-                        <input type="checkbox" checked={hasOverride} onchange={(event) => setCharacterModifierOverrideEnabled(selectedGatheringDrop.id, ref, event.currentTarget.checked, libraryEntry)} />
-                      </label>
+                      <button
+                        type="button"
+                        class={`manager-v2-status-toggle ${hasOverride ? 'is-on' : 'is-off'}`}
+                        aria-pressed={hasOverride}
+                        aria-label={text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.OverrideToggle', 'Override?')}
+                        onclick={() => setCharacterModifierOverrideEnabled(selectedGatheringDrop.id, ref, !hasOverride, libraryEntry)}
+                      >
+                        <span class="manager-v2-status-toggle-track" aria-hidden="true">
+                          <span class="manager-v2-status-toggle-knob"></span>
+                        </span>
+                        <span class="manager-v2-status-toggle-label">
+                          {hasOverride
+                            ? text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.OverrideToggleOn', 'Overridden')
+                            : text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.OverrideToggle', 'Override?')}
+                        </span>
+                      </button>
                     </div>
                     {#if hasOverride}
                       <p class="manager-v2-muted manager-v2-character-modifier-override-hint">{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.OverrideHint', 'Overrides system-level definitions for expressions.')}</p>
