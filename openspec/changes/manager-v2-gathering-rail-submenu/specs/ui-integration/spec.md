@@ -10,6 +10,7 @@ Manager V2 SHALL expose selected-system navigation through the left rail and SHA
 - **AND** clicking the expand/collapse control toggles the submenu without changing the active page
 - **AND** the expanded submenu contains Environments, Tasks, Hazards, and Settings entries
 - **AND** the expanded Gathering group has a soft container background
+- **AND** expanding the Gathering group does not move the parent Gathering row, icon, label, or expand/collapse control
 - **AND** the parent Gathering row does not use the selected-pill visual treatment
 - **AND** the selected submenu entry is the only selected-looking row
 - **AND** the Gathering main panel does not render a duplicate horizontal section tab strip

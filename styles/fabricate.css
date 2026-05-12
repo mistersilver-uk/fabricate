@@ -8503,10 +8503,9 @@
 
 .fabricate-manager-v2 .manager-v2-nav-group.is-expanded {
   gap: 6px;
-  padding: 5px;
-  border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-035);
+  box-shadow: inset 0 0 0 1px var(--fab-mv2-border);
 }
 
 .fabricate-manager-v2 .manager-v2-nav-parent {
@@ -8540,11 +8539,6 @@
   color: var(--fab-mv2-text-muted);
   background: transparent;
   cursor: pointer;
-}
-
-.fabricate-manager-v2 .manager-v2-nav-group.is-expanded .manager-v2-nav-toggle {
-  top: 9px;
-  right: 9px;
 }
 
 .fabricate-manager-v2 .manager-v2-nav-toggle:hover {

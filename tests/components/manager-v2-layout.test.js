@@ -327,8 +327,9 @@ test('manager-v2 gathering rail submenu controls clear host mouse focus and keep
   const expandedGroupBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-group.is-expanded');
   const expandedParentBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-group.is-expanded .manager-v2-nav-parent');
   const expandedParentHoverBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-group.is-expanded .manager-v2-nav-parent:hover');
-  const expandedToggleBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-group.is-expanded .manager-v2-nav-toggle');
   const submenuBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-submenu');
+  const toggleBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-toggle');
+  const expandedToggleBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-group.is-expanded .manager-v2-nav-toggle');
   const toggleFocusBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-toggle:focus');
   const toggleFocusVisibleBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-toggle:focus-visible');
   const subitemFocusBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-subitem:focus');
@@ -338,11 +339,15 @@ test('manager-v2 gathering rail submenu controls clear host mouse focus and keep
 
   assert.ok(expandedGroupBlock.includes('border-radius: 8px;'), 'expanded gathering nav should read as one grouped container');
   assert.ok(expandedGroupBlock.includes('background: var(--fab-overlay-light-035);'), 'expanded gathering nav should use a soft background');
+  assert.ok(expandedGroupBlock.includes('box-shadow: inset 0 0 0 1px var(--fab-mv2-border);'), 'expanded gathering nav should draw chrome without shifting contents');
+  assert.equal(expandedGroupBlock.includes('padding:'), false, 'expanded gathering nav should not add layout padding that shifts the parent row');
+  assert.equal(expandedGroupBlock.includes('border:'), false, 'expanded gathering nav should not add layout border that shifts the parent row');
   assert.ok(expandedParentBlock.includes('border-color: transparent;'), 'expanded gathering parent should not use selected border styling');
   assert.ok(expandedParentBlock.includes('background: transparent;'), 'expanded gathering parent should not use selected fill styling');
   assert.ok(expandedParentBlock.includes('box-shadow: none;'), 'expanded gathering parent should not use the selected left accent');
   assert.ok(expandedParentHoverBlock.includes('background: var(--fab-overlay-light-04);'), 'expanded gathering parent may have a subtle hover without becoming selected');
-  assert.ok(expandedToggleBlock.includes('top: 9px;') && expandedToggleBlock.includes('right: 9px;'), 'expanded gathering toggle should align within the padded group container');
+  assert.ok(toggleBlock.includes('top: 4px;') && toggleBlock.includes('right: 4px;'), 'gathering toggle should have stable collapsed geometry');
+  assert.equal(expandedToggleBlock, '', 'expanded gathering toggle should not override collapsed geometry');
   assert.ok(submenuBlock.includes('padding-left: 12px;'), 'gathering submenu entries should be nested inside the group');
   assert.ok(activeSubitemBlock.includes('background: var(--fab-success-soft);'), 'only selected gathering submenu entries should use selected fill');
   assert.ok(activeSubitemBlock.includes('box-shadow: inset 3px 0 0 var(--fab-mv2-accent);'), 'selected gathering submenu entries should keep the active left accent');
