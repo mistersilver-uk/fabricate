@@ -92,6 +92,15 @@ function navButton(labelText) {
     .find(button => button.textContent.includes(labelText));
 }
 
+function gatheringSubitem(labelText) {
+  return Array.from(target.querySelectorAll('.manager-v2-nav-subitem'))
+    .find(button => button.textContent.includes(labelText));
+}
+
+function gatheringToggle() {
+  return target.querySelector('.manager-v2-nav-toggle');
+}
+
 function writeCompiledSvelte(sourcePath) {
   const source = readFileSync(resolve(repoRoot, sourcePath), 'utf8');
   const compiled = compile(source, {
@@ -2096,24 +2105,42 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Gathering environments'));
     assert.ok(target.textContent.includes('Moonlit Forest'));
     assert.ok(target.textContent.includes('Quiet Cavern'));
-    const gatheringTabs = Array.from(target.querySelectorAll('.manager-v2-gathering-tab'));
+    const gatheringParent = target.querySelector('#manager-v2-nav-gathering');
+    assert.equal(gatheringParent.getAttribute('aria-expanded'), 'true');
+    assert.equal(gatheringParent.classList.contains('is-active'), false);
+    assert.equal(target.querySelector('.manager-v2-nav-group').classList.contains('is-expanded'), true);
+    assert.equal(gatheringParent.querySelector('.manager-v2-nav-count'), null);
+    assert.equal(gatheringToggle().getAttribute('aria-label'), 'Collapse gathering menu');
+    const gatheringItems = Array.from(target.querySelectorAll('.manager-v2-nav-subitem'));
     assert.deepEqual(
-      gatheringTabs.map(tab => tab.textContent.trim()),
+      gatheringItems.map(item => item.textContent.trim()),
       ['Environments', 'Tasks', 'Hazards', 'Settings']
     );
     assert.equal(
-      gatheringTabs.find(tab => tab.textContent.includes('Environments')).getAttribute('aria-selected'),
-      'true'
+      gatheringSubitem('Environments').getAttribute('aria-current'),
+      'page'
     );
+    assert.equal(target.querySelectorAll('.manager-v2-gathering-tab').length, 0);
 
-    gatheringTabs.find(tab => tab.textContent.includes('Tasks')).click();
+    gatheringToggle().click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'environments');
+    assert.equal(target.querySelectorAll('.manager-v2-nav-subitem').length, 0);
+    assert.equal(target.querySelector('#manager-v2-nav-gathering').getAttribute('aria-expanded'), 'false');
+    assert.equal(target.querySelector('.manager-v2-nav-group').classList.contains('is-expanded'), false);
+    gatheringToggle().click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelectorAll('.manager-v2-nav-subitem').length, 4);
+
+    gatheringSubitem('Tasks').click();
     await tick();
     flushSync();
 
-    assert.equal(
-      target.querySelector(`.manager-v2-gathering-tab[aria-selected="true"]`).textContent.trim(),
-      'Tasks'
-    );
+    assert.equal(gatheringSubitem('Tasks').getAttribute('aria-current'), 'page');
+    assert.equal(target.querySelector('#manager-v2-nav-gathering').classList.contains('is-active'), false);
+    assert.equal(gatheringSubitem('Tasks').classList.contains('is-active'), true);
     assert.equal(target.querySelectorAll('.manager-v2-gathering-task-row').length, 3);
     assert.ok(target.textContent.includes('Gather Moon Herbs'));
     assert.ok(target.textContent.includes('Prospect Crystal Veins'));
@@ -2589,21 +2616,16 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'environments');
-    assert.equal(target.querySelector('#manager-v2-gathering-tab-tasks').getAttribute('aria-selected'), 'true');
+    assert.equal(gatheringSubitem('Tasks').getAttribute('aria-current'), 'page');
 
     for (const [label, placeholder] of [
       ['Hazards', 'Reusable hazard authoring is planned for a later slice.']
     ]) {
-      Array.from(target.querySelectorAll('.manager-v2-gathering-tab'))
-        .find(tab => tab.textContent.includes(label))
-        .click();
+      gatheringSubitem(label).click();
       await tick();
       flushSync();
 
-      assert.equal(
-        target.querySelector(`.manager-v2-gathering-tab[aria-selected="true"]`).textContent.trim(),
-        label
-      );
+      assert.equal(gatheringSubitem(label).getAttribute('aria-current'), 'page');
       assert.ok(target.textContent.includes(placeholder));
       assert.equal(target.querySelector('.manager-v2-toolbar'), null);
       assert.equal(target.querySelector('.manager-v2-environments-table'), null);
@@ -2618,15 +2640,10 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
       );
     }
 
-    Array.from(target.querySelectorAll('.manager-v2-gathering-tab'))
-      .find(tab => tab.textContent.includes('Settings'))
-      .click();
+    gatheringSubitem('Settings').click();
     await tick();
     flushSync();
-    assert.equal(
-      target.querySelector(`.manager-v2-gathering-tab[aria-selected="true"]`).textContent.trim(),
-      'Settings'
-    );
+    assert.equal(gatheringSubitem('Settings').getAttribute('aria-current'), 'page');
     assert.equal(target.querySelector('.manager-v2-toolbar'), null);
     assert.equal(target.querySelector('.manager-v2-environments-table'), null);
     assert.ok(target.textContent.includes('Set system-level drop resolution and hazard rules for gathering.'));
@@ -2807,10 +2824,10 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
       false
     );
 
-    target.querySelector('#manager-v2-gathering-tab-environments').click();
+    gatheringSubitem('Environments').click();
     await tick();
     flushSync();
-    assert.equal(target.querySelector('#manager-v2-gathering-tab-environments').getAttribute('aria-selected'), 'true');
+    assert.equal(gatheringSubitem('Environments').getAttribute('aria-current'), 'page');
     assert.equal(target.querySelectorAll('.manager-v2-environment-row').length, 2);
 
     const environmentTable = target.querySelector('.manager-v2-environments-table');
@@ -2913,9 +2930,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    const tasksTab = Array.from(target.querySelectorAll('.manager-v2-gathering-tab'))
-      .find(tab => tab.textContent.trim() === 'Tasks');
-    tasksTab.click();
+    gatheringSubitem('Tasks').click();
     await tick();
     flushSync();
 
@@ -2957,7 +2972,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     navButton('Gathering').click();
     await tick();
     flushSync();
-    target.querySelector('#manager-v2-gathering-tab-tasks').click();
+    gatheringSubitem('Tasks').click();
     await tick();
     flushSync();
     target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]').click();
@@ -3046,7 +3061,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     navButton('Gathering').click();
     await tick();
     flushSync();
-    target.querySelector('#manager-v2-gathering-tab-tasks').click();
+    gatheringSubitem('Tasks').click();
     await tick();
     flushSync();
     target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]').click();
@@ -3210,7 +3225,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     navButton('Gathering').click();
     await tick();
     flushSync();
-    target.querySelector('#manager-v2-gathering-tab-tasks').click();
+    gatheringSubitem('Tasks').click();
     await tick();
     flushSync();
     target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]').click();
@@ -3257,7 +3272,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     navButton('Gathering').click();
     await tick();
     flushSync();
-    target.querySelector('#manager-v2-gathering-tab-tasks').click();
+    gatheringSubitem('Tasks').click();
     await tick();
     flushSync();
     target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]').click();
@@ -3302,7 +3317,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     navButton('Gathering').click();
     await tick();
     flushSync();
-    target.querySelector('#manager-v2-gathering-tab-tasks').click();
+    gatheringSubitem('Tasks').click();
     await tick();
     flushSync();
     target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]').click();
@@ -3340,12 +3355,12 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     flushSync();
 
     assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'environments');
-    const gatheringTabs = Array.from(target.querySelectorAll('.manager-v2-gathering-tab'));
+    const gatheringItems = Array.from(target.querySelectorAll('.manager-v2-nav-subitem'));
     assert.deepEqual(
-      gatheringTabs.map(tab => tab.textContent.trim()),
+      gatheringItems.map(item => item.textContent.trim()),
       ['Environments', 'Tasks', 'Hazards', 'Settings']
     );
-    assert.equal(target.querySelector('#manager-v2-gathering-tab-environments').getAttribute('aria-selected'), 'true');
+    assert.equal(gatheringSubitem('Environments').getAttribute('aria-current'), 'page');
     assert.ok(target.textContent.includes('Prepare gathering building blocks first'));
     assert.ok(target.textContent.includes('Define gathering tasks and hazards before creating environments'));
     assert.ok(target.textContent.includes('Review tasks'));
@@ -3363,13 +3378,13 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('#manager-v2-gathering-tab-tasks').getAttribute('aria-selected'), 'true');
+    assert.equal(gatheringSubitem('Tasks').getAttribute('aria-current'), 'page');
     assert.ok(target.textContent.includes('Gather Moon Herbs'));
     assert.ok(target.querySelector('[data-gathering-tasks-browser]'));
     assert.ok(target.querySelector('[data-gathering-task-inspector]'));
     assert.equal(target.querySelector('.manager-v2-inspector').textContent.includes('Plan gathering content'), false);
 
-    target.querySelector('#manager-v2-gathering-tab-environments').click();
+    gatheringSubitem('Environments').click();
     await tick();
     flushSync();
 
@@ -3379,10 +3394,10 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('#manager-v2-gathering-tab-encounters').getAttribute('aria-selected'), 'true');
+    assert.equal(gatheringSubitem('Hazards').getAttribute('aria-current'), 'page');
     assert.ok(target.textContent.includes('Reusable hazard authoring is planned for a later slice.'));
 
-    target.querySelector('#manager-v2-gathering-tab-environments').click();
+    gatheringSubitem('Environments').click();
     await tick();
     flushSync();
 
@@ -3410,7 +3425,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     navButton('Gathering').click();
     await tick();
     flushSync();
-    target.querySelector('#manager-v2-gathering-tab-tasks').click();
+    gatheringSubitem('Tasks').click();
     await tick();
     flushSync();
 

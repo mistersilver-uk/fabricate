@@ -323,15 +323,43 @@ test('manager-v2 nav buttons clear host mouse focus and keep green keyboard focu
   assert.equal(navFocusVisibleBlock.includes('orange'), false, 'nav keyboard focus should not use orange');
 });
 
-test('manager-v2 gathering tab buttons clear host mouse focus and keep green keyboard focus', () => {
-  const gatheringTabFocusBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-tab:focus');
-  const gatheringTabFocusVisibleBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-tab:focus-visible');
+test('manager-v2 gathering rail submenu controls clear host mouse focus and keep green keyboard focus', () => {
+  const expandedGroupBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-group.is-expanded');
+  const expandedParentBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-group.is-expanded .manager-v2-nav-parent');
+  const expandedParentHoverBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-group.is-expanded .manager-v2-nav-parent:hover');
+  const submenuBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-submenu');
+  const toggleBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-toggle');
+  const expandedToggleBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-group.is-expanded .manager-v2-nav-toggle');
+  const toggleFocusBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-toggle:focus');
+  const toggleFocusVisibleBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-toggle:focus-visible');
+  const subitemFocusBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-subitem:focus');
+  const activeSubitemBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-subitem.is-active');
+  const activeSubitemFocusBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-subitem.is-active:focus');
+  const subitemFocusVisibleBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-subitem:focus-visible');
 
-  assert.ok(gatheringTabFocusBlock.includes('outline: none;'), 'mouse focus on gathering tabs should not inherit the host outline');
-  assert.ok(gatheringTabFocusBlock.includes('box-shadow: none;'), 'mouse focus on gathering tabs should not inherit the host orange focus shadow');
-  assert.ok(gatheringTabFocusVisibleBlock.includes('outline: 2px solid var(--fab-success-border);'), 'keyboard focus on gathering tabs should use the manager-v2 accent');
-  assert.equal(gatheringTabFocusBlock.includes('orange'), false, 'gathering tab focus should not use orange');
-  assert.equal(gatheringTabFocusVisibleBlock.includes('orange'), false, 'gathering tab keyboard focus should not use orange');
+  assert.ok(expandedGroupBlock.includes('border-radius: 8px;'), 'expanded gathering nav should read as one grouped container');
+  assert.ok(expandedGroupBlock.includes('background: var(--fab-overlay-light-035);'), 'expanded gathering nav should use a soft background');
+  assert.ok(expandedGroupBlock.includes('box-shadow: inset 0 0 0 1px var(--fab-mv2-border);'), 'expanded gathering nav should draw chrome without shifting contents');
+  assert.equal(expandedGroupBlock.includes('padding:'), false, 'expanded gathering nav should not add layout padding that shifts the parent row');
+  assert.equal(expandedGroupBlock.includes('border:'), false, 'expanded gathering nav should not add layout border that shifts the parent row');
+  assert.ok(expandedParentBlock.includes('border-color: transparent;'), 'expanded gathering parent should not use selected border styling');
+  assert.ok(expandedParentBlock.includes('background: transparent;'), 'expanded gathering parent should not use selected fill styling');
+  assert.ok(expandedParentBlock.includes('box-shadow: none;'), 'expanded gathering parent should not use the selected left accent');
+  assert.ok(expandedParentHoverBlock.includes('background: var(--fab-overlay-light-04);'), 'expanded gathering parent may have a subtle hover without becoming selected');
+  assert.ok(toggleBlock.includes('top: 4px;') && toggleBlock.includes('right: 4px;'), 'gathering toggle should have stable collapsed geometry');
+  assert.equal(expandedToggleBlock, '', 'expanded gathering toggle should not override collapsed geometry');
+  assert.ok(submenuBlock.includes('padding-left: 12px;'), 'gathering submenu entries should be nested inside the group');
+  assert.ok(activeSubitemBlock.includes('background: var(--fab-success-soft);'), 'only selected gathering submenu entries should use selected fill');
+  assert.ok(activeSubitemBlock.includes('box-shadow: inset 3px 0 0 var(--fab-mv2-accent);'), 'selected gathering submenu entries should keep the active left accent');
+  assert.ok(toggleFocusBlock.includes('outline: none;'), 'mouse focus on gathering toggle should not inherit the host outline');
+  assert.ok(toggleFocusBlock.includes('box-shadow: none;'), 'mouse focus on gathering toggle should not inherit the host orange focus shadow');
+  assert.ok(toggleFocusVisibleBlock.includes('outline: 2px solid var(--fab-mv2-accent);'), 'keyboard focus on gathering toggle should use the manager-v2 accent');
+  assert.ok(subitemFocusBlock.includes('outline: none;'), 'mouse focus on gathering submenu entries should not inherit the host outline');
+  assert.ok(subitemFocusBlock.includes('box-shadow: none;'), 'mouse focus on gathering submenu entries should not inherit the host orange focus shadow');
+  assert.ok(activeSubitemFocusBlock.includes('box-shadow: inset 3px 0 0 var(--fab-mv2-accent);'), 'active gathering submenu focus should keep the active left accent');
+  assert.ok(subitemFocusVisibleBlock.includes('outline: 2px solid var(--fab-mv2-accent);'), 'keyboard focus on gathering submenu entries should use the manager-v2 accent');
+  assert.equal(toggleFocusBlock.includes('orange'), false, 'gathering toggle focus should not use orange');
+  assert.equal(subitemFocusVisibleBlock.includes('orange'), false, 'gathering submenu keyboard focus should not use orange');
 });
 
 test('manager-v2 inspector count labels wrap without truncation', () => {

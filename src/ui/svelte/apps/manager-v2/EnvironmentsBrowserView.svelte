@@ -572,29 +572,12 @@
     </div>
   </section>
 
-  <div class="manager-v2-gathering-tabs" role="tablist" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Label', 'Gathering sections')}>
-    {#each gatheringTabs as tab (tab.id)}
-      <button
-        type="button"
-        class={`manager-v2-gathering-tab ${activeGatheringTab === tab.id ? 'is-active' : ''}`}
-        id={`manager-v2-gathering-tab-${tab.id}`}
-        role="tab"
-        aria-selected={activeGatheringTab === tab.id}
-        aria-controls={`manager-v2-gathering-panel-${tab.id}`}
-        onclick={() => selectGatheringTab(tab.id)}
-      >
-        <i class={tab.icon} aria-hidden="true"></i>
-        <span>{text(tab.labelKey, tab.labelFallback)}</span>
-      </button>
-    {/each}
-  </div>
-
   {#if activeGatheringTab === 'environments'}
     <div
       class="manager-v2-gathering-panel manager-v2-gathering-panel-environments"
       id="manager-v2-gathering-panel-environments"
       role="tabpanel"
-      aria-labelledby="manager-v2-gathering-tab-environments"
+      aria-labelledby="manager-v2-gathering-nav-environments"
     >
       <section class="manager-v2-toolbar manager-v2-environments-toolbar" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Filters', 'Environment filters')}>
         <label class="manager-v2-search">
@@ -805,6 +788,7 @@
       {selectedSystemId}
       {gatheringConfig}
       {managedItemOptions}
+      labelledBy="manager-v2-gathering-nav-tasks"
       onSelectTask={onSelectGatheringTask}
       onCreateTask={onCreateGatheringTask}
       onEditTask={onEditGatheringTask}
@@ -817,7 +801,7 @@
       class="manager-v2-gathering-panel manager-v2-gathering-settings"
       id="manager-v2-gathering-panel-settings"
       role="tabpanel"
-      aria-labelledby="manager-v2-gathering-tab-settings"
+      aria-labelledby="manager-v2-gathering-nav-settings"
     >
       {#each [
         { kind: 'timeOfDay', icon: 'fas fa-clock', setting: timeOfDayCondition },
@@ -1024,7 +1008,7 @@
       class="manager-v2-gathering-panel"
       id={`manager-v2-gathering-panel-${activeGatheringTab}`}
       role="tabpanel"
-      aria-labelledby={`manager-v2-gathering-tab-${activeGatheringTab}`}
+      aria-labelledby={`manager-v2-gathering-nav-${activeGatheringTab}`}
     >
       <div class="manager-v2-empty manager-v2-gathering-placeholder">
         <div>

@@ -11,7 +11,7 @@
     gatheringConfig = null,
     managedItemOptions = [],
     panelId = 'manager-v2-gathering-panel-tasks',
-    labelledBy = 'manager-v2-gathering-tab-tasks',
+    labelledBy = 'manager-v2-gathering-nav-tasks',
     onSelectTask = () => {},
     onCreateTask = () => {},
     onEditTask = () => {},
