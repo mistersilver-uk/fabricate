@@ -171,6 +171,55 @@
       characterModifierSearchTerm = '';
     }
   });
+
+  let characterModifierSearchAnchor = $state(null);
+  let characterModifierSearchOpenUp = $state(false);
+
+  function characterModifierSearchClippingBounds(node) {
+    const documentRef = globalThis.document;
+    const windowRef = globalThis.window || globalThis;
+    const viewportTop = 0;
+    const viewportBottom = Number(globalThis.innerHeight || windowRef.innerHeight) || documentRef?.documentElement?.clientHeight || 0;
+    let parent = node?.parentElement;
+    while (parent && parent !== documentRef?.documentElement) {
+      const style = globalThis.getComputedStyle?.(parent);
+      const overflow = `${style?.overflow || ''} ${style?.overflowY || ''} ${style?.overflowX || ''}`;
+      if (/(auto|scroll|hidden|clip)/.test(overflow)) {
+        const rect = parent.getBoundingClientRect?.();
+        if (rect) {
+          return {
+            top: Math.max(viewportTop, rect.top),
+            bottom: Math.min(viewportBottom || rect.bottom, rect.bottom)
+          };
+        }
+      }
+      parent = parent.parentElement;
+    }
+    return { top: viewportTop, bottom: viewportBottom };
+  }
+
+  function updateCharacterModifierSearchDirection() {
+    const node = characterModifierSearchAnchor;
+    const rect = node?.getBoundingClientRect?.();
+    if (!rect) {
+      characterModifierSearchOpenUp = false;
+      return;
+    }
+    const bounds = characterModifierSearchClippingBounds(node);
+    const spaceBelow = bounds.bottom - rect.bottom;
+    const spaceAbove = rect.top - bounds.top;
+    const openUpThreshold = 160;
+    characterModifierSearchOpenUp = spaceBelow < openUpThreshold && spaceAbove > spaceBelow;
+  }
+
+  $effect(() => {
+    if (characterModifierSearchSuggestions.length === 0) {
+      characterModifierSearchOpenUp = false;
+      return;
+    }
+    updateCharacterModifierSearchDirection();
+  });
+
   async function pickCharacterModifierForRow(rowId, modifierId) {
     characterModifierSearchTerm = '';
     await onAddDropCharacterModifier(rowId, modifierId);
@@ -2760,7 +2809,7 @@
                 </div>
               </header>
               <div class="manager-v2-character-modifier-add-search-row">
-                <label class="manager-v2-search is-compact manager-v2-character-modifier-add-search" data-gathering-drop-character-modifier-search>
+                <label bind:this={characterModifierSearchAnchor} class="manager-v2-search is-compact manager-v2-character-modifier-add-search" data-gathering-drop-character-modifier-search>
                   <i class="fas fa-search" aria-hidden="true"></i>
                   <input type="search"
                          value={characterModifierSearchTerm}
@@ -2770,7 +2819,7 @@
                          disabled={selectedGatheringCharacterModifiers.length === 0}
                          data-tooltip={selectedGatheringCharacterModifiers.length === 0 ? text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.LibraryEmptyHint', 'Add a modifier to the system library first to reference it here.') : null} />
                   {#if characterModifierSearchSuggestions.length > 0}
-                    <div class="manager-v2-tag-suggestions manager-v2-character-modifier-add-suggestions" data-gathering-drop-character-modifier-suggestions>
+                    <div class="manager-v2-tag-suggestions manager-v2-character-modifier-add-suggestions" class:is-above={characterModifierSearchOpenUp} data-gathering-drop-character-modifier-suggestions>
                       {#each characterModifierSearchSuggestions as option (option.id)}
                         <button type="button"
                                 class="manager-v2-tag-suggestion manager-v2-character-modifier-add-suggestion"

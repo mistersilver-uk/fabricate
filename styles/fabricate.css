@@ -5789,6 +5789,11 @@
   text-align: center;
 }
 
+.fabricate-manager-v2 .manager-v2-character-modifier-add-suggestions.is-above {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
 .fabricate-manager-v2 .manager-v2-character-modifier-row-list,
 .fabricate-manager-v2 .manager-v2-condition-modifier-row-list {
   display: flex;
