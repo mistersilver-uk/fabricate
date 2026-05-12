@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { dragDrop } from '../../actions/dragDrop.js';
+  import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import Pagination from '../../components/Pagination.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
@@ -163,15 +164,18 @@
   function conditionOptions(kind) {
     if (kind === 'weather') return weatherOptions;
     if (kind === 'biomes') return biomeOptions;
+    if (kind === 'regions') return regionOptions;
     return timeOfDayOptions;
   }
 
   function selectedConditionIds(kind) {
-    const values = kind === 'weather'
-      ? task?.weather
-      : kind === 'biomes'
-        ? task?.biomes
-        : task?.timeOfDay;
+    let values;
+    if (kind === 'weather') values = task?.weather;
+    else if (kind === 'biomes') values = task?.biomes;
+    else if (kind === 'regions') values = Array.isArray(task?.regions)
+      ? task.regions
+      : (task?.region ? [task.region] : []);
+    else values = task?.timeOfDay;
     return Array.isArray(values)
       ? values.map(value => String(value || '').trim()).filter(Boolean)
       : [];
@@ -196,55 +200,55 @@
       if (kind === 'weather') {
         return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AllWeatherSelected', 'All weather selected');
       }
-      return kind === 'biomes'
-        ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AllBiomesSelected', 'All biomes selected')
-        : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AllTimesSelected', 'All times selected');
+      if (kind === 'biomes') {
+        return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AllBiomesSelected', 'All biomes selected');
+      }
+      if (kind === 'regions') {
+        return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AllRegionsSelected', 'All regions selected');
+      }
+      return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AllTimesSelected', 'All times selected');
     }
     if (kind === 'weather') {
       return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AddWeatherCondition', 'Add weather');
     }
-    return kind === 'biomes'
-      ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AddBiomeCondition', 'Add biome')
-      : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AddTimeOfDayCondition', 'Add time of day');
+    if (kind === 'biomes') {
+      return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AddBiomeCondition', 'Add biome');
+    }
+    if (kind === 'regions') {
+      return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AddRegionCondition', 'Add region');
+    }
+    return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AddTimeOfDayCondition', 'Add time of day');
   }
 
   function availabilityFieldLabel(kind) {
     if (kind === 'weather') {
       return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Weather', 'Weather');
     }
-    return kind === 'biomes'
-      ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Biome', 'Biome')
-      : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.TimeOfDay', 'Time of day');
+    if (kind === 'biomes') {
+      return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Biome', 'Biome');
+    }
+    if (kind === 'regions') {
+      return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Region', 'Region');
+    }
+    return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.TimeOfDay', 'Time of day');
   }
 
   function emptyAvailabilityLabel(kind) {
     if (kind === 'weather') {
       return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyWeatherTitle', 'Any Weather');
     }
-    return kind === 'biomes'
-      ? text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyBiomeTitle', 'Any Biome')
-      : text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyTimeTitle', 'Any Time');
+    if (kind === 'biomes') {
+      return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyBiomeTitle', 'Any Biome');
+    }
+    if (kind === 'regions') {
+      return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyRegion', 'Any region');
+    }
+    return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AnyTimeTitle', 'Any Time');
   }
 
   function removeAvailabilityLabel(option) {
     return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.RemoveAvailabilityCondition', 'Remove {name}')
       .replace('{name}', conditionLabel(option));
-  }
-
-  function regionLabel(option) {
-    return conditionLabel(option);
-  }
-
-  function regionId(option) {
-    return conditionId(option);
-  }
-
-  function selectedRegionId() {
-    return String(task?.region || '').trim();
-  }
-
-  function updateRegion(event) {
-    onUpdateTask({ region: String(event.currentTarget.value || '').trim() });
   }
 
   function addAvailability(kind, id) {
@@ -496,21 +500,16 @@
         </div>
       </div>
       <div class="manager-v2-task-availability-row" data-gathering-task-availability>
-        <label class="manager-v2-field" data-gathering-task-field="region">
-          <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Region', 'Region')}</span>
-          <select value={selectedRegionId()} onchange={updateRegion}>
-            <option value="">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AllRegionsTitle', 'All regions')}</option>
-            {#each regionOptions as option (regionId(option))}
-              {#if regionId(option)}
-                <option value={regionId(option)}>{regionLabel(option)}</option>
-              {/if}
-            {/each}
-          </select>
-        </label>
-        {#each ['biomes', 'timeOfDay', 'weather'] as kind (kind)}
+        {#each ['regions', 'biomes', 'timeOfDay', 'weather'] as kind (kind)}
           <div class="manager-v2-field manager-v2-availability-multi" data-gathering-task-field={kind}>
             <span>{availabilityFieldLabel(kind)}</span>
-            <div class="manager-v2-availability-picker">
+            <div
+              class="manager-v2-availability-picker"
+              use:dismissOnOutsideClick={{
+                enabled: openAvailabilityMenu === kind,
+                onDismiss: () => { if (openAvailabilityMenu === kind) openAvailabilityMenu = ''; }
+              }}
+            >
               <button
                 type="button"
                 class="manager-v2-availability-menu-button"

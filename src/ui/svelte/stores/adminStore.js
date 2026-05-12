@@ -478,7 +478,9 @@ function _normalizeGatheringTask(task = {}, randomID = () => Math.random().toStr
     description: String(task.description || ''),
     img: String(task.img || DEFAULT_GATHERING_TASK_IMG),
     enabled: task.enabled !== false,
-    region: _normalizeGatheringTag(task.region),
+    regions: _normalizeGatheringTagList(Array.isArray(task.regions)
+      ? task.regions
+      : task.region ? [task.region] : []),
     biomes: _normalizeGatheringTagList(task.biomes),
     weather: _normalizeGatheringConditionIdList(task.weather),
     timeOfDay: _normalizeGatheringConditionIdList(task.timeOfDay),
@@ -499,7 +501,9 @@ function _normalizeGatheringHazard(hazard = {}, randomID = () => Math.random().t
     img: String(hazard.img || 'icons/svg/hazard.svg'),
     enabled: hazard.enabled !== false,
     dangerTags: _normalizeGatheringTagList(hazard.dangerTags),
-    region: _normalizeGatheringTag(hazard.region),
+    regions: _normalizeGatheringTagList(Array.isArray(hazard.regions)
+      ? hazard.regions
+      : hazard.region ? [hazard.region] : []),
     biomes: _normalizeGatheringTagList(hazard.biomes),
     weather: _normalizeGatheringConditionIdList(hazard.weather),
     timeOfDay: _normalizeGatheringConditionIdList(hazard.timeOfDay),
@@ -1514,7 +1518,10 @@ export function createAdminStore(services) {
     const recordWeather = _normalizeGatheringConditionIdList(record?.weather);
     const recordTimeOfDay = _normalizeGatheringConditionIdList(record?.timeOfDay);
     const recordDanger = _normalizeGatheringTagList(record?.dangerTags);
-    if (record?.region && _normalizeGatheringTag(record.region) !== environmentRegion) return false;
+    const recordRegions = _normalizeGatheringTagList(Array.isArray(record?.regions)
+      ? record.regions
+      : record?.region ? [record.region] : []);
+    if (recordRegions.length > 0 && !recordRegions.includes(environmentRegion)) return false;
     if (recordBiomes.length > 0 && !recordBiomes.some(tag => environmentBiomes.includes(tag))) return false;
     if (conditionSettings?.weather?.enabled !== false && recordWeather.length > 0 && !recordWeather.includes(_normalizeGatheringConditionId(conditions?.weather))) return false;
     if (conditionSettings?.timeOfDay?.enabled !== false && recordTimeOfDay.length > 0 && !recordTimeOfDay.includes(_normalizeGatheringConditionId(conditions?.timeOfDay))) return false;
@@ -3371,11 +3378,15 @@ export function createAdminStore(services) {
     if (kind === 'regions') {
       systemConfig.tasks = systemConfig.tasks.map(task => ({
         ...task,
-        region: _normalizeGatheringVocabularyId(task.region) === id ? '' : task.region
+        regions: _normalizeGatheringTagList(Array.isArray(task.regions)
+          ? task.regions
+          : task.region ? [task.region] : []).filter(existing => _normalizeGatheringVocabularyId(existing) !== id)
       }));
       systemConfig.hazards = systemConfig.hazards.map(hazard => ({
         ...hazard,
-        region: _normalizeGatheringVocabularyId(hazard.region) === id ? '' : hazard.region
+        regions: _normalizeGatheringTagList(Array.isArray(hazard.regions)
+          ? hazard.regions
+          : hazard.region ? [hazard.region] : []).filter(existing => _normalizeGatheringVocabularyId(existing) !== id)
       }));
     }
     if (kind === 'biomes') {

@@ -2087,7 +2087,7 @@ describe('createAdminStore', () => {
       assert.equal(duplicate.id, 'copy-id-1');
       assert.equal(duplicate.name, 'Moon Herbs (Copy)');
       assert.deepEqual(duplicate.dropRows.map(row => row.id), ['copy-id-2', 'copy-id-3']);
-      assert.deepEqual(duplicate.region, 'north');
+      assert.deepEqual(duplicate.regions, ['north']);
       assert.deepEqual(duplicate.biomes, ['forest']);
       assert.deepEqual(duplicate.weather, ['clear']);
       assert.deepEqual(duplicate.timeOfDay, ['night']);
@@ -2366,11 +2366,11 @@ describe('createAdminStore', () => {
       const sys2 = services._store.gatheringConfig.systems.sys2;
       assert.deepEqual(sys1.vocabularies.regions.values, []);
       assert.deepEqual(sys1.vocabularies.biomes.values, []);
-      assert.equal(sys1.tasks[0].region, '');
+      assert.deepEqual(sys1.tasks[0].regions, []);
       assert.deepEqual(sys1.tasks[0].biomes, []);
-      assert.equal(sys1.hazards[0].region, '');
+      assert.deepEqual(sys1.hazards[0].regions, []);
       assert.deepEqual(sys1.hazards[0].biomes, []);
-      assert.equal(sys2.tasks[0].region, 'north');
+      assert.deepEqual(sys2.tasks[0].regions, ['north']);
       assert.deepEqual(sys2.tasks[0].biomes, ['forest']);
       assert.deepEqual(environmentUpdates.map(update => update[0]), ['env-sys1', 'env-sys1']);
       assert.equal(environments[0].region, '');
