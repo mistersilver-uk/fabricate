@@ -5824,6 +5824,17 @@
   gap: 6px;
 }
 
+.fabricate-manager-v2 .manager-v2-condition-modifier-row-body .manager-v2-field {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.fabricate-manager-v2 .manager-v2-condition-modifier-row-body .manager-v2-field input {
+  flex: 0 0 80px;
+  width: auto;
+}
+
 .fabricate-manager-v2 .manager-v2-condition-modifier-add-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -5854,11 +5865,16 @@
   height: 28px;
   min-height: 28px;
   border: none;
-  background: transparent;
+  background: var(--fab-mv2-bg);
   color: inherit;
-  font-weight: 600;
+  font-size: 0.75rem;
   padding: 0 6px;
   cursor: pointer;
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-operator-select select option {
+  background: var(--fab-mv2-bg);
+  color: var(--fab-mv2-text);
 }
 
 .fabricate-manager-v2 .manager-v2-character-modifier-operator-select.is-positive {
@@ -5870,12 +5886,20 @@
   color: var(--fab-success-text);
 }
 
+.fabricate-manager-v2 .manager-v2-character-modifier-operator-select.is-positive select option {
+  color: var(--fab-success-text);
+}
+
 .fabricate-manager-v2 .manager-v2-character-modifier-operator-select.is-negative {
   border-color: var(--fab-danger-border);
   background: var(--fab-overlay-light-06);
 }
 
 .fabricate-manager-v2 .manager-v2-character-modifier-operator-select.is-negative select {
+  color: var(--fab-danger-text);
+}
+
+.fabricate-manager-v2 .manager-v2-character-modifier-operator-select.is-negative select option {
   color: var(--fab-danger-text);
 }
 
