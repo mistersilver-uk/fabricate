@@ -259,6 +259,16 @@ GatheringTaskDefinition = {
       timeOfDay?: Array<{ id: string, conditionId: string, value: number }>,
       weather?: Array<{ id: string, conditionId: string, value: number }>,
     },
+    characterModifiers?: Array<{
+      id: string,
+      modifierId: string,
+      operator: "+" | "-",
+      min?: number,
+      max?: number,
+      providerOverride?: "dnd5e" | "pf2e" | "macro",
+      expressionOverride?: string,
+      macroUuidOverride?: string,
+    }>,
     enabled: boolean,
   }>,
   itemSelectionMode: "highestRankedDrop" | "allDrops", // legacy compatibility-read only
@@ -279,9 +289,58 @@ GatheringTaskDefinition = {
 8. Drop row condition modifier values are signed integer percentage-point adjustments. Matching time-of-day and weather modifiers are summed into final drop chance; gathering modifiers affect the d100 roll instead.
 9. `itemSelectionMode` is a legacy compatibility field. New Manager V2 authoring and d100 runtime behavior use system Gathering Rules once they are authored.
 10. Row order is authoritative for `highestRankedDrop` and `limitedDrops`.
-11. A Gathering Task may declare stamina cost, node availability, attempt limits, risk overrides, encounter hooks, and condition or roll modifier providers where the selected gathering economy uses them.
-12. Per-environment overrides remain associated with the environment and must not rewrite the Gathering Task.
-13. Legacy Environment Tasks remain valid as inline compatibility tasks.
+11. Drop rows may reference per-system character modifiers. Character modifiers adjust the threshold side of d100 resolution and do not replace task visibility, pass/fail gates, stamina gates, node gates, catalyst gates, or attempt limits.
+12. A Gathering Task may declare stamina cost, node availability, attempt limits, risk overrides, encounter hooks, and condition or roll modifier providers where the selected gathering economy uses them.
+13. Per-environment overrides remain associated with the environment and must not rewrite the Gathering Task.
+14. Legacy Environment Tasks remain valid as inline compatibility tasks.
+
+## Gathering Character Modifiers
+
+### Purpose
+
+Represent reusable actor-driven modifiers that a GM can apply to d100 drop rows and hazards for one crafting system.
+
+### Properties
+
+```js
+GatheringCharacterModifier = {
+  id: string,
+  label: string,
+  icon: string,
+  provider: "dnd5e" | "pf2e" | "macro",
+  expression?: string,
+  macroUuid?: string,
+}
+```
+
+Character modifier row references use this shape:
+
+```js
+GatheringCharacterModifierReference = {
+  id: string,
+  modifierId: string,
+  operator: "+" | "-",
+  min?: number,
+  max?: number,
+  providerOverride?: "dnd5e" | "pf2e" | "macro",
+  expressionOverride?: string,
+  macroUuidOverride?: string,
+}
+```
+
+### Requirements
+
+1. Character modifier libraries are scoped to one crafting system at `gatheringConfig.systems[systemId].characterModifiers`.
+2. New system gathering shells initialize `characterModifiers` to an empty array. Presets are never seeded automatically.
+3. Fabricate may provide opt-in preset seeding for recognized Foundry systems such as `dnd5e` and `pf2e`; seeding skips existing ids and leaves seeded entries editable.
+4. Drop row and hazard references resolve against the selected gathering actor using the effective provider, expression, and macro UUID from the row override when present, otherwise from the library entry.
+5. Operators are restricted to `+` and `-`; contributions are signed percentage-point threshold adjustments, not multiplicative adjustments.
+6. Row `min` and `max` bounds clamp the resolved numeric contribution before the operator is applied. `min > max` is misconfigured.
+7. Missing referenced library entries, macro-provider overrides without a macro UUID, non-finite resolution results, and invalid bounds are misconfigured attempts. They must abort before result creation, hazard application, history side effects that imply success, or player-visible reward output.
+8. Multiple character modifier references on the same row or hazard are evaluated independently and summed.
+9. Timed d100 runs snapshot referenced library entries and resolved evidence at start time so later library edits do not alter completion behavior.
+10. GM-facing evidence records the modifier id, effective provider, effective expression or macro UUID, raw resolved value, signed contribution, and clamp information.
+11. Non-GM blind gathering history redacts expressions, macro UUIDs, provider diagnostics, hidden row identities, and hidden hazard identities.
 
 ## Reusable Gathering Hazard Library
 
@@ -305,6 +364,7 @@ GatheringHazardDefinition = {
   timeOfDay?: string[],
   dropRate: number,
   hazardModifier?: ModifierProvider,
+  characterModifiers?: GatheringCharacterModifierReference[],
 }
 ```
 
@@ -316,7 +376,8 @@ GatheringHazardDefinition = {
 4. Danger matches when omitted or at least one hazard danger tag is present on the environment.
 5. Region, biome, weather, and time-of-day matching use the same rules as Gathering Tasks.
 6. `dropRate` must be an integer from 1 to 100.
-7. Hazard output must respect blind task and GM-only redaction rules.
+7. Hazards may reference per-system character modifiers. `hazardModifier` adjusts the d100 roll; `characterModifiers` adjust the threshold. The two surfaces are evaluated independently.
+8. Hazard output must respect blind task and GM-only redaction rules.
 
 ## EnvironmentTask
 
@@ -391,8 +452,8 @@ Resolve gathering-native Gathering Task drops and matched hazards through ordere
 ### Runtime Requirements
 
 1. Before any player attempt starts, Fabricate rejects gathering if Foundry is paused.
-2. For every enabled item row in the selected Gathering Task, calculate `finalDropRate = clamp(dropRate + matchingConditionModifiers, 0, 100)`, roll `d100`, add the gathering modifier, and drop the row when `effectiveRoll >= 101 - finalDropRate`.
-3. For every enabled matched hazard in the environment, roll `d100`, add the hazard modifier, and drop the hazard when `effectiveRoll >= 101 - dropRate`.
+2. For every enabled item row in the selected Gathering Task, resolve row character modifier references, calculate `finalDropRate = clamp(dropRate + matchingConditionModifiers + resolvedCharacterModifiers, 0, 100)`, roll `d100`, add the gathering modifier, and drop the row when `effectiveRoll >= 101 - finalDropRate`.
+3. For every enabled matched hazard in the environment, resolve hazard character modifier references, calculate `finalHazardRate = clamp(dropRate + resolvedCharacterModifiers, 0, 100)`, roll `d100`, add the hazard modifier, and drop the hazard when `effectiveRoll >= 101 - finalHazardRate`.
 4. System Gathering Rules select rewards after item rows roll once rules are authored.
 5. Reward `highestRankedDrop` awards the first dropped item row in authored row order.
 6. Reward `allDrops` awards every dropped item row.
@@ -406,8 +467,8 @@ Resolve gathering-native Gathering Task drops and matched hazards through ordere
 14. Legacy `task.itemSelectionMode`, `environment.hazardSelectionMode`, and `environment.hazardPolicy` fields may be read only when a system has no authored `rules` object; authored system rules override them.
 15. If no hazards are enabled or matched, the environment is mechanically safe even when danger tags are present.
 16. Attempt history and player-facing output must redact d100 rows, hazards, provider diagnostics, and task identity when the environment is blind and the viewer is not allowed to inspect the underlying task.
-17. D100 resolution must write roll, modifier, threshold, selected item rows, selected hazards, condition snapshot, and hazard policy evidence where safe to reveal.
-18. Timed d100 runs must snapshot the start-time task, hazards, conditions, and rules so later configuration changes do not alter completion.
+17. D100 resolution must write roll, roll-side modifier, threshold-side modifier, selected item rows, selected hazards, condition snapshot, character modifier evidence, and hazard policy evidence where safe to reveal.
+18. Timed d100 runs must snapshot the start-time task, hazards, conditions, character modifier library evidence, and rules so later configuration changes do not alter completion.
 19. D100 resolution must preserve history-before-side-effects ordering.
 20. Existing routed and progressive task resolution modes remain valid compatibility behavior.
 
@@ -415,7 +476,7 @@ Resolve gathering-native Gathering Task drops and matched hazards through ordere
 
 ### Purpose
 
-Allow supported system expressions and macros to configure gathering checks, condition modifiers, stamina formulas, and attempt-limit formulas without hardcoding system-specific logic in Fabricate core.
+Allow supported system expressions and macros to configure gathering checks, condition modifiers, stamina formulas, attempt-limit formulas, character modifiers, and per-row character modifier overrides without hardcoding system-specific logic in Fabricate core.
 
 ### Requirements
 
@@ -428,6 +489,7 @@ Allow supported system expressions and macros to configure gathering checks, con
 7. Macro providers must receive enough context to make equivalent decisions: environment, task, actor, current conditions, stamina state where enabled, node/attempt state where enabled, risk, and triggering lifecycle event.
 8. Provider diagnostics from invalid expressions, unsupported data paths, macro exceptions, or malformed macro return values are GM-fix-required diagnostics, not normal player failure outcomes.
 9. Player-facing UI must show safe failure/blocking copy for provider diagnostics without exposing macro internals, expression source, or GM-only data to non-GM users.
+10. Fabricate core must not hardcode game-system-specific actor paths for character modifiers. Known system paths may be shipped only as editable opt-in preset data.
 
 ## Gathering Resource Nodes
 
