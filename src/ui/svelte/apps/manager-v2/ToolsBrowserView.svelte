@@ -171,6 +171,12 @@
     </div>
   </section>
 
+  <div
+    class="manager-v2-gathering-panel manager-v2-gathering-panel-tools"
+    id="manager-v2-gathering-panel-tools"
+    role="tabpanel"
+    aria-labelledby="manager-v2-gathering-nav-tools"
+  >
   <section class="manager-v2-inspector-card manager-v2-tools-card" data-manager-v2-tools-browser>
     <div class="manager-v2-tools-card-header">
       <div>
@@ -461,4 +467,5 @@
       </div>
     {/if}
   </section>
+  </div>
 </main>

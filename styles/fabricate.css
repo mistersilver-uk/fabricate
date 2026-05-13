@@ -8859,6 +8859,12 @@
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
+.fabricate-manager-v2 .manager-v2-gathering-panel-tools {
+  grid-template-rows: auto;
+  padding: 12px;
+  overflow: auto;
+}
+
 .fabricate-manager-v2 .manager-v2-gathering-task-edit-view {
   display: grid;
   grid-template-rows: auto auto 340px minmax(410px, 1fr) auto;
