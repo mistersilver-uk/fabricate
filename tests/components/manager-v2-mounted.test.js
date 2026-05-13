@@ -3357,7 +3357,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     navButton('Gathering').click();
     await tick();
     flushSync();
-    target.querySelector('#manager-v2-gathering-tab-tasks').click();
+    gatheringSubitem('Tasks').click();
     await tick();
     flushSync();
     target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]').click();
@@ -3405,7 +3405,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     navButton('Gathering').click();
     await tick();
     flushSync();
-    target.querySelector('#manager-v2-gathering-tab-tasks').click();
+    gatheringSubitem('Tasks').click();
     await tick();
     flushSync();
     target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]').click();

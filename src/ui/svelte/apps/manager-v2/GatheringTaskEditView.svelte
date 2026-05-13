@@ -764,33 +764,31 @@
               >
                 {#if rankedMode}
                   <span role="cell" class="manager-v2-drop-cell manager-v2-drop-rank-cell" data-gathering-task-drop-rank-cell>
+                    <button
+                      type="button"
+                      class="manager-v2-icon-button manager-v2-drop-rank-button"
+                      aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.MoveDropUp', 'Move drop up')}
+                      title={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.MoveDropUp', 'Move drop up')}
+                      disabled={rankIndex <= 0}
+                      data-gathering-task-drop-move="up"
+                      onclick={(event) => { event.stopPropagation(); onMoveDrop(row.id, 'up'); }}
+                      onkeydown={(event) => event.stopPropagation()}
+                    >
+                      <i class="fas fa-chevron-up" aria-hidden="true"></i>
+                    </button>
                     <span class="manager-v2-drop-rank-value" data-gathering-task-drop-rank>#{rankIndex + 1}</span>
-                    <span class="manager-v2-drop-rank-controls">
-                      <button
-                        type="button"
-                        class="manager-v2-icon-button"
-                        aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.MoveDropUp', 'Move drop up')}
-                        title={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.MoveDropUp', 'Move drop up')}
-                        disabled={rankIndex <= 0}
-                        data-gathering-task-drop-move="up"
-                        onclick={(event) => { event.stopPropagation(); onMoveDrop(row.id, 'up'); }}
-                        onkeydown={(event) => event.stopPropagation()}
-                      >
-                        <i class="fas fa-chevron-up" aria-hidden="true"></i>
-                      </button>
-                      <button
-                        type="button"
-                        class="manager-v2-icon-button"
-                        aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.MoveDropDown', 'Move drop down')}
-                        title={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.MoveDropDown', 'Move drop down')}
-                        disabled={rankIndex < 0 || rankIndex >= dropRows.length - 1}
-                        data-gathering-task-drop-move="down"
-                        onclick={(event) => { event.stopPropagation(); onMoveDrop(row.id, 'down'); }}
-                        onkeydown={(event) => event.stopPropagation()}
-                      >
-                        <i class="fas fa-chevron-down" aria-hidden="true"></i>
-                      </button>
-                    </span>
+                    <button
+                      type="button"
+                      class="manager-v2-icon-button manager-v2-drop-rank-button"
+                      aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.MoveDropDown', 'Move drop down')}
+                      title={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.MoveDropDown', 'Move drop down')}
+                      disabled={rankIndex < 0 || rankIndex >= dropRows.length - 1}
+                      data-gathering-task-drop-move="down"
+                      onclick={(event) => { event.stopPropagation(); onMoveDrop(row.id, 'down'); }}
+                      onkeydown={(event) => event.stopPropagation()}
+                    >
+                      <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                    </button>
                   </span>
                 {/if}
                 <span role="cell" class="manager-v2-drop-cell manager-v2-drop-component-cell" data-gathering-task-drop-component-cell>
