@@ -672,7 +672,7 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(dropRowBlock.includes('gap: 0;') && dropRowBlock.includes('max-width: 100%;'), 'drop rows should use separators instead of gap-driven overflow');
   assert.ok(firstDropRowBlock.includes('border-top: 0;'), 'first drop row should not double the header bottom border');
   assert.ok(css.includes('.fabricate-manager-v2 .manager-v2-gathering-task-drop-row {\n  min-height: 72px;'), 'drop rows should be tall enough for two visible modifier chip lines');
-  assert.ok(dropCellBlock.includes('padding: 8px 10px;') && dropCellBlock.includes('box-sizing: border-box;'), 'drop cells should keep padding inside full-width rows');
+  assert.ok(dropCellBlock.includes('padding: 4px 10px;') && dropCellBlock.includes('box-sizing: border-box;'), 'drop cells should keep padding inside full-width rows');
   assert.ok(dropCellSeparatorBlock.includes('border-left: 1px solid var(--fab-mv2-border);'), 'drop cells should use vertical separators');
   assert.ok(css.includes('.fabricate-manager-v2 .manager-v2-gathering-task-drop-row.is-drop-active'), 'drop rows should expose a full-row active drop target state');
   assert.ok(selectedDropRowBlock.includes('background: var(--fab-success-soft);') && selectedDropRowBlock.includes('var(--fab-mv2-accent)'), 'selected drop rows should use the component-browser success/accent family');
