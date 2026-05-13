@@ -41,6 +41,7 @@ import {
   seedCharacterModifierPresets
 } from '../../../config/gatheringCharacterModifierPresets.js';
 import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js';
+import { Tool } from '../../../models/Tool.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -527,6 +528,68 @@ function _normalizeGatheringDropConditionModifierList(values = []) {
     .filter(Boolean);
 }
 
+const GATHERING_TOOL_BREAKAGE_MODES = new Set(['limitedUses', 'breakageChance', 'diceExpression']);
+const GATHERING_TOOL_ON_BREAK_MODES = new Set(['destroy', 'flagBroken', 'replaceWith']);
+const GATHERING_TOOL_REQUIREMENT_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
+
+function _normalizeToolRequirement(input) {
+  if (input === null || input === undefined) return null;
+  if (typeof input !== 'object') return null;
+  const provider = GATHERING_TOOL_REQUIREMENT_PROVIDERS.has(input.provider) ? input.provider : 'dnd5e';
+  return {
+    provider,
+    formula: typeof input.formula === 'string' ? input.formula : '',
+    macroUuid: typeof input.macroUuid === 'string' ? input.macroUuid : ''
+  };
+}
+
+function _normalizeToolBreakage(input) {
+  const mode = GATHERING_TOOL_BREAKAGE_MODES.has(input?.mode) ? input.mode : 'limitedUses';
+  if (mode === 'limitedUses') {
+    return { mode, maxUses: _normalizeNullablePositiveInteger(input?.maxUses) };
+  }
+  if (mode === 'breakageChance') {
+    const raw = Number(input?.breakageChance);
+    return { mode, breakageChance: Number.isFinite(raw) ? raw : 0 };
+  }
+  const threshold = Number(input?.threshold);
+  return {
+    mode,
+    formula: typeof input?.formula === 'string' ? input.formula : '',
+    threshold: Number.isFinite(threshold) ? threshold : 0
+  };
+}
+
+function _normalizeToolOnBreak(input) {
+  const mode = GATHERING_TOOL_ON_BREAK_MODES.has(input?.mode) ? input.mode : 'destroy';
+  if (mode === 'replaceWith') {
+    return {
+      mode,
+      replacementComponentId: typeof input?.replacementComponentId === 'string'
+        ? input.replacementComponentId
+        : null
+    };
+  }
+  return { mode };
+}
+
+function _normalizeGatheringLibraryTool(tool = {}, randomID = () => Math.random().toString(36).slice(2, 10)) {
+  const id = String(tool.id || randomID());
+  const rawLabel = typeof tool.label === 'string' ? tool.label.trim() : '';
+  const componentId = typeof tool.componentId === 'string' && tool.componentId.trim()
+    ? tool.componentId.trim()
+    : null;
+  return {
+    id,
+    label: rawLabel,
+    enabled: tool.enabled !== false,
+    componentId,
+    requirement: _normalizeToolRequirement(tool.requirement),
+    breakage: _normalizeToolBreakage(tool.breakage),
+    onBreak: _normalizeToolOnBreak(tool.onBreak)
+  };
+}
+
 function _normalizeGatheringTask(task = {}, randomID = () => Math.random().toString(36).slice(2, 10)) {
   const id = String(task.id || randomID());
   return {
@@ -616,6 +679,7 @@ function _normalizeGatheringConfig(raw = {}, randomID = () => Math.random().toSt
       conditions: _normalizeGatheringSystemConditions(systemConfig?.conditions, { vocabularies, conditions: { weather, timeOfDay } }),
       vocabularies: _normalizeGatheringSystemVocabularies(systemConfig?.vocabularies, vocabularies),
       tasks: (Array.isArray(systemConfig?.tasks) ? systemConfig.tasks : []).map(task => _normalizeGatheringTask(task, randomID)),
+      tools: (Array.isArray(systemConfig?.tools) ? systemConfig.tools : []).map(tool => _normalizeGatheringLibraryTool(tool, randomID)),
       hazards: (Array.isArray(systemConfig?.hazards) ? systemConfig.hazards : []).map(hazard => _normalizeGatheringHazard(hazard, randomID)),
       characterModifiers: (Array.isArray(systemConfig?.characterModifiers) ? systemConfig.characterModifiers : [])
         .map(entry => _normalizeGatheringCharacterModifier(entry, randomID))
@@ -1454,6 +1518,15 @@ export function createAdminStore(services) {
   const environmentValidationState = writable(null);
   let environmentValidationAttempt = 0;
   let dirtyEnvironmentDiscardConfirmation = null;
+  const toolsDraft = writable(null);
+  const toolsDraftBaseline = writable(null);
+  const toolsDraftSystemId = writable('');
+  const toolsDraftDirty = writable(false);
+  const toolsDraftSaving = writable(false);
+  const toolsDraftSaveError = writable(null);
+  const toolsDraftSelectedToolId = writable('');
+  const toolsDraftExpandedToolId = writable('');
+  let dirtyToolsDraftDiscardConfirmation = null;
   let unsubscribeFabricateReady = null;
   let readyRefreshScheduled = false;
 
@@ -1527,6 +1600,195 @@ export function createAdminStore(services) {
       ...state,
       ..._currentEnvironmentViewPatch()
     }));
+  }
+
+  function _currentToolsDraftViewPatch() {
+    return {
+      toolsDraft: _clonePlain(get(toolsDraft)),
+      toolsDraftBaseline: _clonePlain(get(toolsDraftBaseline)),
+      toolsDraftSystemId: get(toolsDraftSystemId),
+      toolsDraftDirty: get(toolsDraftDirty),
+      toolsDraftSaving: get(toolsDraftSaving),
+      toolsDraftSaveError: get(toolsDraftSaveError),
+      toolsDraftSelectedToolId: get(toolsDraftSelectedToolId),
+      toolsDraftExpandedToolId: get(toolsDraftExpandedToolId)
+    };
+  }
+
+  function _patchToolsDraftViewState() {
+    viewState.update(state => ({
+      ...state,
+      ..._currentToolsDraftViewPatch()
+    }));
+  }
+
+  function _recomputeToolsDraftDirty() {
+    const current = get(toolsDraft) || [];
+    const baseline = get(toolsDraftBaseline) || [];
+    toolsDraftDirty.set(JSON.stringify(current) !== JSON.stringify(baseline));
+  }
+
+  function enterToolsDraft(systemId = get(selectedSystemId)) {
+    if (!systemId) return false;
+    const systemConfig = _currentGatheringConfig().systems?.[String(systemId)] || {};
+    const snapshot = (Array.isArray(systemConfig.tools) ? systemConfig.tools : [])
+      .map(tool => _normalizeGatheringLibraryTool(tool, _randomID));
+    toolsDraft.set(_clonePlain(snapshot));
+    toolsDraftBaseline.set(_clonePlain(snapshot));
+    toolsDraftSystemId.set(String(systemId));
+    toolsDraftDirty.set(false);
+    toolsDraftSaveError.set(null);
+    toolsDraftSelectedToolId.set(snapshot[0]?.id || '');
+    toolsDraftExpandedToolId.set('');
+    _patchToolsDraftViewState();
+    return true;
+  }
+
+  function updateToolsDraft(mutator) {
+    if (typeof mutator !== 'function') return false;
+    const current = get(toolsDraft);
+    if (!Array.isArray(current)) return false;
+    const next = mutator(current.map(tool => _clonePlain(tool)));
+    if (!Array.isArray(next)) return false;
+    toolsDraft.set(next);
+    _recomputeToolsDraftDirty();
+    _patchToolsDraftViewState();
+    return true;
+  }
+
+  function addToolToDraft() {
+    const created = _normalizeGatheringLibraryTool({ id: _randomID() }, _randomID);
+    const success = updateToolsDraft(list => [...list, created]);
+    if (success) {
+      toolsDraftSelectedToolId.set(created.id);
+      toolsDraftExpandedToolId.set(created.id);
+      _patchToolsDraftViewState();
+    }
+    return success ? created : null;
+  }
+
+  function updateToolInDraft(toolId, patch = {}) {
+    if (!toolId || typeof patch !== 'object' || patch === null) return false;
+    return updateToolsDraft(list => list.map(tool => tool.id === toolId
+      ? _normalizeGatheringLibraryTool({ ...tool, ...patch }, _randomID)
+      : tool));
+  }
+
+  function deleteToolFromDraft(toolId) {
+    if (!toolId) return false;
+    const ok = updateToolsDraft(list => list.filter(tool => tool.id !== toolId));
+    if (!ok) return false;
+    if (get(toolsDraftSelectedToolId) === toolId) {
+      const remaining = get(toolsDraft) || [];
+      toolsDraftSelectedToolId.set(remaining[0]?.id || '');
+    }
+    if (get(toolsDraftExpandedToolId) === toolId) {
+      toolsDraftExpandedToolId.set('');
+    }
+    _patchToolsDraftViewState();
+    return true;
+  }
+
+  function selectDraftTool(toolId) {
+    toolsDraftSelectedToolId.set(toolId || '');
+    if (toolId) toolsDraftExpandedToolId.set(toolId);
+    _patchToolsDraftViewState();
+  }
+
+  function setExpandedDraftTool(toolId) {
+    toolsDraftExpandedToolId.set(toolId || '');
+    _patchToolsDraftViewState();
+  }
+
+  function validateToolsDraft() {
+    const tools = get(toolsDraft) || [];
+    const errors = [];
+    for (const raw of tools) {
+      const result = Tool.fromJSON(raw).validate();
+      if (!result.valid) errors.push({ id: raw.id, errors: result.errors });
+    }
+    return { valid: errors.length === 0, errors };
+  }
+
+  async function saveToolsDraft() {
+    const systemId = get(toolsDraftSystemId);
+    if (!systemId) return false;
+    const validation = validateToolsDraft();
+    if (!validation.valid) {
+      toolsDraftSaveError.set('invalid');
+      _patchToolsDraftViewState();
+      return false;
+    }
+    toolsDraftSaving.set(true);
+    _patchToolsDraftViewState();
+    try {
+      const config = _currentGatheringConfig();
+      const systemConfig = _gatheringSystemConfig(config, systemId);
+      if (!systemConfig) return false;
+      const baseline = get(toolsDraftBaseline) || [];
+      const live = Array.isArray(systemConfig.tools) ? systemConfig.tools : [];
+      if (JSON.stringify(baseline) !== JSON.stringify(live)) {
+        const overwrite = await services.confirmDialog?.({
+          title: services.localize?.('FABRICATE.Admin.ManagerV2.Tools.ConcurrentEdit.Title') || 'Tools were modified elsewhere',
+          content: services.localize?.('FABRICATE.Admin.ManagerV2.Tools.ConcurrentEdit.Content') || 'The library has been modified outside this editor. Overwrite with your changes?',
+          yes: () => true,
+          no: () => false
+        });
+        if (overwrite !== true) {
+          toolsDraftSaving.set(false);
+          _patchToolsDraftViewState();
+          return false;
+        }
+      }
+      const next = (get(toolsDraft) || []).map(tool => _normalizeGatheringLibraryTool(tool, _randomID));
+      systemConfig.tools = next;
+      await _saveGatheringConfig(config);
+      toolsDraftBaseline.set(_clonePlain(next));
+      toolsDraft.set(_clonePlain(next));
+      toolsDraftDirty.set(false);
+      toolsDraftSaveError.set(null);
+      _patchToolsDraftViewState();
+      await refresh();
+      return true;
+    } finally {
+      toolsDraftSaving.set(false);
+      _patchToolsDraftViewState();
+    }
+  }
+
+  function cancelToolsDraft() {
+    toolsDraft.set(null);
+    toolsDraftBaseline.set(null);
+    toolsDraftSystemId.set('');
+    toolsDraftDirty.set(false);
+    toolsDraftSaveError.set(null);
+    toolsDraftSelectedToolId.set('');
+    toolsDraftExpandedToolId.set('');
+    _patchToolsDraftViewState();
+    return true;
+  }
+
+  function isToolsDraftDirty() {
+    return get(toolsDraftDirty) === true && Array.isArray(get(toolsDraft));
+  }
+
+  async function confirmDiscardDirtyToolsDraft() {
+    if (!isToolsDraftDirty()) return true;
+    if (dirtyToolsDraftDiscardConfirmation) return dirtyToolsDraftDiscardConfirmation;
+    dirtyToolsDraftDiscardConfirmation = (async () => {
+      const result = await services.confirmDialog?.({
+        title: services.localize?.('FABRICATE.Admin.ManagerV2.Tools.DiscardDirty.Title') || 'Discard unsaved tool changes?',
+        content: services.localize?.('FABRICATE.Admin.ManagerV2.Tools.DiscardDirty.Content') || 'The tools library has unsaved changes. Discard them and continue?',
+        yes: () => true,
+        no: () => false
+      });
+      return result === true;
+    })();
+    try {
+      return await dirtyToolsDraftDiscardConfirmation;
+    } finally {
+      dirtyToolsDraftDiscardConfirmation = null;
+    }
   }
 
   function _getEnvironmentStore() {
@@ -1630,8 +1892,11 @@ export function createAdminStore(services) {
 
   async function _confirmGatheringLibraryRecordDelete({ systemId, record, kind }) {
     const usages = _gatheringLibraryRecordUsages(systemId, record, kind);
-    const label = kind === 'hazard' ? 'reusable gathering hazard' : 'gathering task';
-    const name = _escapeHtml(record?.name || record?.id || label);
+    const label = kind === 'hazard'
+      ? 'reusable gathering hazard'
+      : (kind === 'tool' ? 'reusable gathering tool' : 'gathering task');
+    const recordLabel = record?.label || record?.name || record?.id || label;
+    const name = _escapeHtml(recordLabel);
     let content = `<p>Delete ${label} <strong>${name}</strong>? This action cannot be undone.</p>`;
     if (usages.length > 0) {
       const usageList = usages
@@ -1761,60 +2026,6 @@ export function createAdminStore(services) {
       destroyWhenExhausted: false,
       maxUses: null
     };
-  }
-
-  function _newEnvironmentTool() {
-    const firstComponent = _selectedManagedItemOptions()[0];
-    return {
-      componentId: firstComponent?.id || null,
-      requirement: null,
-      breakage: { mode: 'limitedUses', maxUses: null },
-      onBreak: { mode: 'destroy' }
-    };
-  }
-
-  function _normalizeToolRequirement(input) {
-    if (input === null || input === undefined) return null;
-    if (typeof input !== 'object') return null;
-    const validProviders = new Set(['dnd5e', 'pf2e', 'macro']);
-    const provider = validProviders.has(input.provider) ? input.provider : 'dnd5e';
-    return {
-      provider,
-      formula: typeof input.formula === 'string' ? input.formula : '',
-      macroUuid: typeof input.macroUuid === 'string' ? input.macroUuid : ''
-    };
-  }
-
-  function _normalizeToolBreakage(input) {
-    const mode = ['limitedUses', 'breakageChance', 'diceExpression'].includes(input?.mode)
-      ? input.mode
-      : 'limitedUses';
-    if (mode === 'limitedUses') {
-      return { mode, maxUses: _normalizeNullablePositiveInteger(input?.maxUses) };
-    }
-    if (mode === 'breakageChance') {
-      const raw = Number(input?.breakageChance);
-      return { mode, breakageChance: Number.isFinite(raw) ? raw : 0 };
-    }
-    const threshold = Number(input?.threshold);
-    return {
-      mode,
-      formula: typeof input?.formula === 'string' ? input.formula : '',
-      threshold: Number.isFinite(threshold) ? threshold : 0
-    };
-  }
-
-  function _normalizeToolOnBreak(input) {
-    const mode = ['destroy', 'flagBroken', 'replaceWith'].includes(input?.mode) ? input.mode : 'destroy';
-    if (mode === 'replaceWith') {
-      return {
-        mode,
-        replacementComponentId: typeof input?.replacementComponentId === 'string'
-          ? input.replacementComponentId
-          : null
-      };
-    }
-    return { mode };
   }
 
   function _newEnvironmentDraft(systemId) {
@@ -2651,67 +2862,6 @@ export function createAdminStore(services) {
       return {
         ...task,
         catalysts: catalysts.filter((_, candidateIndex) => candidateIndex !== index)
-      };
-    });
-    return !!updated;
-  }
-
-  function addEnvironmentTaskTool(taskId = get(selectedEnvironmentTaskId)) {
-    let added = null;
-    _updateEnvironmentTaskDraft(taskId, task => {
-      const tools = Array.isArray(task.tools) ? _clonePlain(task.tools) : [];
-      added = _newEnvironmentTool();
-      return { ...task, tools: [...tools, added] };
-    });
-    return _clonePlain(added);
-  }
-
-  function updateEnvironmentTaskTool(taskId = get(selectedEnvironmentTaskId), toolIndex, updates = {}) {
-    const index = Number(toolIndex);
-    if (!Number.isInteger(index) || index < 0 || typeof updates !== 'object' || updates === null) return false;
-
-    const updated = _updateEnvironmentTaskDraft(taskId, task => {
-      const tools = Array.isArray(task.tools) ? _clonePlain(task.tools) : [];
-      if (index >= tools.length) return null;
-
-      const current = tools[index] || {};
-      const nextTool = {
-        componentId: current.componentId || null,
-        requirement: current.requirement ? { ..._normalizeToolRequirement(current.requirement) } : null,
-        breakage: _normalizeToolBreakage(current.breakage),
-        onBreak: _normalizeToolOnBreak(current.onBreak)
-      };
-
-      if (Object.prototype.hasOwnProperty.call(updates, 'componentId')) {
-        const componentId = String(updates.componentId ?? '').trim();
-        nextTool.componentId = componentId || null;
-      }
-      if (Object.prototype.hasOwnProperty.call(updates, 'requirement')) {
-        nextTool.requirement = _normalizeToolRequirement(updates.requirement);
-      }
-      if (Object.prototype.hasOwnProperty.call(updates, 'breakage')) {
-        nextTool.breakage = _normalizeToolBreakage(updates.breakage);
-      }
-      if (Object.prototype.hasOwnProperty.call(updates, 'onBreak')) {
-        nextTool.onBreak = _normalizeToolOnBreak(updates.onBreak);
-      }
-
-      tools[index] = nextTool;
-      return { ...task, tools };
-    });
-    return !!updated;
-  }
-
-  function deleteEnvironmentTaskTool(taskId = get(selectedEnvironmentTaskId), toolIndex) {
-    const index = Number(toolIndex);
-    if (!Number.isInteger(index) || index < 0) return false;
-
-    const updated = _updateEnvironmentTaskDraft(taskId, task => {
-      const tools = Array.isArray(task.tools) ? _clonePlain(task.tools) : [];
-      if (index >= tools.length) return null;
-      return {
-        ...task,
-        tools: tools.filter((_, candidateIndex) => candidateIndex !== index)
       };
     });
     return !!updated;
@@ -3696,6 +3846,46 @@ export function createAdminStore(services) {
     return true;
   }
 
+  async function addGatheringLibraryTool(systemId = get(selectedSystemId)) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig) return null;
+    const tool = _normalizeGatheringLibraryTool({ id: _randomID() }, _randomID);
+    systemConfig.tools = [...(systemConfig.tools || []), tool];
+    await _saveGatheringConfig(config);
+    await refresh();
+    return tool;
+  }
+
+  async function updateGatheringLibraryTool(systemId = get(selectedSystemId), toolId, updates = {}) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig || !toolId) return false;
+    systemConfig.tools = (systemConfig.tools || []).map(tool => tool.id === toolId
+      ? _normalizeGatheringLibraryTool({ ...tool, ...updates }, _randomID)
+      : tool);
+    await _saveGatheringConfig(config);
+    await refresh();
+    return true;
+  }
+
+  async function deleteGatheringLibraryTool(systemId = get(selectedSystemId), toolId) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig || !toolId) return false;
+    const tool = (systemConfig.tools || []).find(t => t.id === toolId);
+    if (tool && !await _confirmGatheringLibraryRecordDelete({ systemId, record: tool, kind: 'tool' })) return false;
+    systemConfig.tools = (systemConfig.tools || []).filter(t => t.id !== toolId);
+    await _saveGatheringConfig(config);
+    await refresh();
+    return true;
+  }
+
+  function validateGatheringLibraryTool(tool) {
+    if (!tool || typeof tool !== 'object') return { valid: false, errors: ['Tool is required'] };
+    return Tool.fromJSON(tool).validate();
+  }
+
   async function duplicateGatheringLibraryTask(systemId = get(selectedSystemId), taskId) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
@@ -4423,9 +4613,6 @@ export function createAdminStore(services) {
     addEnvironmentTaskCatalyst,
     updateEnvironmentTaskCatalyst,
     deleteEnvironmentTaskCatalyst,
-    addEnvironmentTaskTool,
-    updateEnvironmentTaskTool,
-    deleteEnvironmentTaskTool,
     updateEnvironmentTaskVisibility,
     updateEnvironmentTaskResultSelection,
     updateEnvironmentTaskProgressive,
@@ -4466,6 +4653,22 @@ export function createAdminStore(services) {
     validateGatheringLibraryTask,
     deleteGatheringLibraryTask,
     duplicateGatheringLibraryTask,
+    addGatheringLibraryTool,
+    updateGatheringLibraryTool,
+    deleteGatheringLibraryTool,
+    validateGatheringLibraryTool,
+    enterToolsDraft,
+    updateToolsDraft,
+    addToolToDraft,
+    updateToolInDraft,
+    deleteToolFromDraft,
+    selectDraftTool,
+    setExpandedDraftTool,
+    validateToolsDraft,
+    saveToolsDraft,
+    cancelToolsDraft,
+    isToolsDraftDirty,
+    confirmDiscardDirtyToolsDraft,
     gatheringTaskAutopopulateFromComponent,
     addGatheringLibraryHazard,
     updateGatheringLibraryHazard,

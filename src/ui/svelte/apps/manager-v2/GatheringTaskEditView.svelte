@@ -4,6 +4,7 @@
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import Pagination from '../../components/Pagination.svelte';
   import { localize } from '../../util/foundryBridge.js';
+  import { dropRateTierClass, dropRateTierColor } from '../../util/dropRateTier.js';
 
   let {
     task = null,
@@ -362,28 +363,6 @@
 
   function quantityValue(row) {
     return normalizeQuantity(row?.quantity ?? 1);
-  }
-
-  function dropRateTierClass(value) {
-    const rate = normalizeDropRate(value);
-    if (rate === 0) return 'is-none';
-    if (rate >= 100) return 'is-guaranteed';
-    if (rate >= 70) return 'is-common';
-    if (rate >= 35) return 'is-uncommon';
-    if (rate >= 15) return 'is-rare';
-    if (rate >= 5) return 'is-very-rare';
-    return 'is-legendary';
-  }
-
-  function dropRateTierColor(value) {
-    const rate = normalizeDropRate(value);
-    if (rate === 0) return 'var(--fab-drop-rate-none)';
-    if (rate >= 100) return 'var(--fab-drop-rate-guaranteed)';
-    if (rate >= 70) return 'var(--fab-drop-rate-common)';
-    if (rate >= 35) return 'var(--fab-drop-rate-uncommon)';
-    if (rate >= 15) return 'var(--fab-drop-rate-rare)';
-    if (rate >= 5) return 'var(--fab-drop-rate-very-rare)';
-    return 'var(--fab-drop-rate-legendary)';
   }
 
   function onDropRateInput(rowId, event) {

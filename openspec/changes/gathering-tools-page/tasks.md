@@ -1,0 +1,21 @@
+# Tasks
+
+- [x] Extract `dropRateTier` helpers to `src/ui/svelte/util/dropRateTier.js` and update `GatheringTaskEditView` to import them.
+- [x] Add `_normalizeGatheringLibraryTool` and lift `_normalizeTool*` helpers to module scope in `adminStore.js`.
+- [x] Add `tools: []` to `_normalizeGatheringConfig` system block (legacy configs default to `[]`).
+- [x] Add `normalizeLibraryTool` helper + `tools` field to `normalizeGatheringConfig` in `GatheringRichStateService.js`.
+- [x] Add `__libraryTools` non-enumerable Map to `composeEnvironment`.
+- [x] Add `addGatheringLibraryTool` / `updateGatheringLibraryTool` / `deleteGatheringLibraryTool` / `validateGatheringLibraryTool` and extend `_confirmGatheringLibraryRecordDelete` with the `'tool'` branch.
+- [x] Remove dead `addEnvironmentTaskTool` family + `_newEnvironmentTool` helper.
+- [x] Add `toolsDraft` writables, viewState patcher, and lifecycle functions (`enterToolsDraft`, `addToolToDraft`, `updateToolInDraft`, `deleteToolFromDraft`, `selectDraftTool`, `setExpandedDraftTool`, `validateToolsDraft`, `saveToolsDraft`, `cancelToolsDraft`, `confirmDiscardDirtyToolsDraft`, `isToolsDraftDirty`) and export them.
+- [x] Add `FABRICATE.Admin.ManagerV2.Tools.*` localization block + `GatheringTabs.{Tools,ToolsTitle,ToolsHint}`.
+- [x] Build `ToolsBrowserView.svelte` with rows, inline editor, and empty state.
+- [x] Append `manager-v2-tools-*` and `manager-v2-radio-*` CSS to `styles/fabricate.css` (all colours via tokens).
+- [x] Wire nav, route, breadcrumb, header actions, mount, derivations, inspector, and `confirmRouteExit` chain into `CraftingSystemManagerV2Root.svelte`.
+- [x] Add `tests/admin-store-gathering-tools.test.js` covering normalization, library CRUD, and draft lifecycle.
+- [x] Extend `tests/gathering-rich-library.test.js` with `__libraryTools` composition tests.
+- [x] Extend `tests/components/manager-v2-mounted.test.js` (compile entry + nav/label assertions).
+- [x] Extend `tests/components/manager-v2-contract.test.js` with source-text assertions for the new view, store hooks, and lang block.
+- [x] Update `openspec/specs/gathering-and-harvesting/spec.md` with the `Gathering Tools Library` section.
+- [ ] Update `docs/gathering-environments.md` with a Tools library subsection.
+- [ ] Run `npm test` and `npm run build`; commit and push.

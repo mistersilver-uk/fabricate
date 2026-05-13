@@ -1,0 +1,70 @@
+# Design: Gathering Tools Page
+
+## Persistence
+
+New per-system library at `gatheringConfig.systems[systemId].tools[]`. Each entry:
+
+```
+{ id, label?, enabled, componentId, requirement, breakage, onBreak }
+```
+
+`requirement`, `breakage`, and `onBreak` use the existing Tool model shape (`src/models/Tool.js`). `_normalizeGatheringLibraryTool` (`src/ui/svelte/stores/adminStore.js`) is total — fills defaults, never rejects. Validation happens at the editor save boundary via `Tool.fromJSON(...).validate()`.
+
+CRUD helpers in `adminStore.js` next to the existing library-task helpers:
+
+- `addGatheringLibraryTool(systemId)`
+- `updateGatheringLibraryTool(systemId, toolId, updates)`
+- `deleteGatheringLibraryTool(systemId, toolId)` (uses the existing confirm-delete dialog with a new `'tool'` branch)
+- `validateGatheringLibraryTool(tool)` — wraps `Tool.validate()`.
+
+`_normalizeGatheringConfig` accepts `tools: []` per system block; legacy configs without the field normalize to `[]`. The runtime `normalizeGatheringConfig` (`src/systems/GatheringRichStateService.js`) gains a `normalizeLibraryTool` helper used in the same system block.
+
+Cleanup: the previously dead inline `addEnvironmentTaskTool` family (only ever wired to the placeholder env editor) is removed alongside `_newEnvironmentTool`.
+
+## Draft + Save
+
+A `toolsDraft` writable parallel to `environmentDraft` holds the in-memory list while the page is open. A `toolsDraftBaseline` snapshot enables JSON-stable dirty tracking. Functions on the store:
+
+- `enterToolsDraft(systemId)` snapshots the live `tools` array.
+- `addToolToDraft()` / `updateToolInDraft(id, patch)` / `deleteToolFromDraft(id)` mutate the draft and recompute dirty.
+- `selectDraftTool(id)` / `setExpandedDraftTool(id)` track selection and inline-expansion state.
+- `validateToolsDraft()` returns `{ valid, errors[{ id, errors[] }] }`.
+- `saveToolsDraft()` re-reads the live config, hash-checks against the baseline, and surfaces an overwrite confirm when concurrent edits are detected. On confirm (or no divergence), writes the validated draft to `systems[id].tools` and clears dirty.
+- `cancelToolsDraft()` clears all draft state.
+- `confirmDiscardDirtyToolsDraft()` mirrors the environment-draft confirm dialog.
+
+## Composition seam
+
+`composeEnvironment` (`src/systems/GatheringRichStateService.js`) attaches a non-enumerable `__libraryTools` Map keyed by tool id, mirroring `__libraryCharacterModifiers`. No runtime consumer reads it yet. The next change wires gathering task→tool references through this map.
+
+## Manager V2 wiring
+
+`CraftingSystemManagerV2Root.svelte`:
+
+- New `gatheringNavItems` entry (`id: 'tools'`, icon `fas fa-screwdriver-wrench`).
+- New `currentView === 'gathering-tools'` value, threaded through `normalizedActiveView`, `isGatheringRoute`, `viewTitle`, `viewSubtitle`, `headerActionsLabel`, `inspectorLabel`, and `setView`.
+- `openGatheringSection('tools')` calls `enterToolsDraft(systemId)`.
+- `confirmRouteExit` chain extended with `confirmToolsRouteExit` so dirty drafts prompt before navigation.
+- Breadcrumb extension `Crafting Systems > {System} > Gathering > Tools`.
+- Header actions block: `Back to Gathering`, conditional `Unsaved` chip, conditional `Delete tool` (when a tool is selected), `Save changes` (disabled when not dirty or invalid; `title` shows the first validation error).
+- New child view `ToolsBrowserView.svelte` mounted for the route.
+- Inspector branch with seven cards: SELECTED TOOL hero, OVERVIEW fact grid, REQUIREMENT, BREAKAGE MECHANIC, ON-BREAK ACTION, USAGE (rendered in a "Not linked" state), and a closing warning band.
+
+`ToolsBrowserView.svelte`:
+
+- Section header + `Tools (N)` browser card with `Add tool` action.
+- Compact rows with managed-component identity (thumbnail + name + secondary), three summary chips, overflow placeholder, expand/collapse chevron.
+- Inline editor for the selected/expanded row: optional label, component picker (with `dragDrop` action), optional requirement (using `ProviderExpressionInput`), breakage mechanic radio group with mode-specific subforms, on-break action radio group with replacement component picker for `replaceWith`, and an inline `Delete tool` button.
+- Empty state when zero tools; `+ Add tool` ghost row appended when at least one tool exists.
+
+## Radio group accessibility
+
+A new `manager-v2-radio-group` / `manager-v2-radio-option` pattern using `<fieldset role="radiogroup">` with native `<input type="radio">` (visually hidden, keyboard navigable). Defer extraction to a generic component until a second consumer appears.
+
+## CSS
+
+New `manager-v2-tools-*` and `manager-v2-radio-*` classes appended to `styles/fabricate.css`. All colours through `var(--fab-…)` tokens; the breakage-chance slider reuses the shared `dropRateTierClass` / `dropRateTierColor` helpers extracted to `src/ui/svelte/util/dropRateTier.js`.
+
+## Localization
+
+New block `FABRICATE.Admin.ManagerV2.Tools.*` plus `FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.{Tools,ToolsTitle,ToolsHint}`.

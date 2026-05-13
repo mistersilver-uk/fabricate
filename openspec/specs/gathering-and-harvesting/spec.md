@@ -297,6 +297,49 @@ GatheringTaskDefinition = {
 13. Per-environment overrides remain associated with the environment and must not rewrite the Gathering Task.
 14. Legacy Environment Tasks remain valid as inline compatibility tasks.
 
+## Gathering Tools Library
+
+### Purpose
+
+Represent reusable Gathering Tools authored once per crafting system and (in a follow-up change) referenced by gathering tasks. This library lives next to the per-system task, hazard, and character modifier libraries and uses the existing Tool data model.
+
+### Properties
+
+```js
+GatheringToolLibraryEntry = {
+  id: string,                                  // client-generated, stable
+  label: string,                               // optional display label; "" falls back to the component name
+  enabled: boolean,                            // disabled tools cannot be referenced by tasks
+  componentId: string | null,
+  requirement: null | {
+    provider: "dnd5e" | "pf2e" | "macro",
+    formula?: string,
+    macroUuid?: string,
+  },
+  breakage: {
+    mode: "limitedUses" | "breakageChance" | "diceExpression",
+    maxUses?: number | null,                   // limitedUses; null is unlimited
+    breakageChance?: number,                   // breakageChance; integer 0..100
+    formula?: string,                          // diceExpression
+    threshold?: number,                        // diceExpression
+  },
+  onBreak: {
+    mode: "destroy" | "flagBroken" | "replaceWith",
+    replacementComponentId?: string,           // replaceWith; must !== componentId
+  },
+}
+```
+
+### Requirements
+
+1. Tools are stored under `gatheringConfig.systems[systemId].tools`.
+2. Library tools follow the existing `Tool` validation contract (`src/models/Tool.js`); persistence layer normalisation never rejects, but Save in the editor blocks until every tool passes `Tool.validate()`.
+3. Legacy gathering configs without a `tools` array on a system normalize to `tools: []` on load. No migration runner entry is required.
+4. The Manager V2 page authors tools through a draft (`toolsDraft`) parallel to the environment draft. Draft writes do not touch persistence until the GM saves; cancel/discard reverts to the live config.
+5. Save reads the live `systems[id].tools` immediately before writing and surfaces an overwrite-confirm dialog when the live array diverges from the draft baseline (concurrent-edit guard).
+6. The runtime `composeEnvironment` exposes a non-enumerable `__libraryTools` Map keyed by tool id on the composed environment, alongside `__libraryCharacterModifiers`. The map is the seam for the future task→tool reference change; no runtime consumer reads it today.
+7. The library is per crafting system. Tools are not shared across crafting systems.
+
 ## Gathering Character Modifiers
 
 ### Purpose

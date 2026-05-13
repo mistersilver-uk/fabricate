@@ -11548,3 +11548,275 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ==========================================================================
+ * Manager V2 — Tools page
+ * ========================================================================== */
+
+.fabricate-manager-v2 .manager-v2-tools-main {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-card-header > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-empty {
+  margin-top: 6px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-overlay-light-03);
+  transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row.is-selected {
+  border-color: var(--fab-accent);
+  background: var(--fab-overlay-light-06);
+  box-shadow: 0 0 0 1px var(--fab-accent);
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  text-align: left;
+  color: inherit;
+  border-radius: 8px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row-body:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-identity {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-thumb {
+  width: 42px;
+  height: 42px;
+  border-radius: 6px;
+  border: 1px solid var(--fab-mv2-border);
+  background: var(--fab-overlay-light-04);
+  object-fit: cover;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-identity-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--fab-mv2-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-secondary {
+  font-size: 0.82rem;
+  color: var(--fab-mv2-text-muted);
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row-summary {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row-actions {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  border-top: 1px solid var(--fab-mv2-border);
+  background: var(--fab-overlay-light-04);
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-section {
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-section > legend {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fab-mv2-text-muted);
+  padding: 0 4px;
+}
+
+.fabricate-manager-v2 .manager-v2-tool-component-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.fabricate-manager-v2 .manager-v2-tool-component-row.is-drop-active {
+  outline: 2px dashed var(--fab-accent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+.fabricate-manager-v2 .manager-v2-tool-breakage-slider {
+  min-width: 200px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-empty-stub {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px;
+  border: 1px dashed var(--fab-mv2-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fab-mv2-text-muted);
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-empty-stub:hover,
+.fabricate-manager-v2 .manager-v2-tools-empty-stub:focus-visible {
+  border-color: var(--fab-accent);
+  color: var(--fab-mv2-text);
+  background: var(--fab-overlay-light-04);
+  outline: none;
+}
+
+/* ==========================================================================
+ * Manager V2 — Radio group (segmented control)
+ * ========================================================================== */
+
+.fabricate-manager-v2 .manager-v2-radio-group {
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fabricate-manager-v2 .manager-v2-radio-group-legend {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fab-mv2-text-muted);
+  padding: 0 4px;
+}
+
+.fabricate-manager-v2 .manager-v2-radio-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.fabricate-manager-v2 .manager-v2-radio-option {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-03);
+  color: var(--fab-mv2-text);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.fabricate-manager-v2 .manager-v2-radio-option:hover {
+  border-color: var(--fab-accent);
+}
+
+.fabricate-manager-v2 .manager-v2-radio-option > input[type="radio"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.fabricate-manager-v2 .manager-v2-radio-option.is-selected {
+  border-color: var(--fab-accent);
+  background: var(--fab-accent-soft);
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager-v2 .manager-v2-radio-option:focus-within {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}

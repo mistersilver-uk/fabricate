@@ -201,6 +201,11 @@ export class GatheringRichStateService {
       if (entry?.id) libraryCharacterModifiers.set(String(entry.id), cloneJson(entry));
     }
 
+    const libraryTools = new Map();
+    for (const tool of normalizeList(libraries.tools)) {
+      if (tool?.id) libraryTools.set(String(tool.id), cloneJson(tool));
+    }
+
     const composed = {
       ...cloneJson(environment),
       conditions: cloneJson(currentConditions),
@@ -216,6 +221,12 @@ export class GatheringRichStateService {
     };
     Object.defineProperty(composed, '__libraryCharacterModifiers', {
       value: libraryCharacterModifiers,
+      enumerable: false,
+      configurable: true,
+      writable: true
+    });
+    Object.defineProperty(composed, '__libraryTools', {
+      value: libraryTools,
       enumerable: false,
       configurable: true,
       writable: true
@@ -848,6 +859,7 @@ function normalizeGatheringConfig(raw = {}) {
       conditions: normalizeSystemConditions(config?.conditions, { vocabularies, conditions: { weather, timeOfDay } }),
       vocabularies: normalizeSystemVocabularies(config?.vocabularies, vocabularies),
       tasks: normalizeList(config?.tasks).map(normalizeLibraryTask),
+      tools: normalizeList(config?.tools).map(normalizeLibraryTool).filter(Boolean),
       hazards: normalizeList(config?.hazards).map(normalizeHazard),
       characterModifiers: normalizeList(config?.characterModifiers)
         .map(entry => normalizeCharacterModifierLibraryEntry(entry))
@@ -941,6 +953,71 @@ function normalizeItemDrop(row = {}) {
     conditionModifiers: normalizeDropConditionModifiers(row.conditionModifiers),
     characterModifiers: normalizeDropCharacterModifiers(row.characterModifiers),
     enabled: row.enabled !== false
+  };
+}
+
+const TOOL_BREAKAGE_MODES = new Set(['limitedUses', 'breakageChance', 'diceExpression']);
+const TOOL_ON_BREAK_MODES = new Set(['destroy', 'flagBroken', 'replaceWith']);
+const TOOL_REQUIREMENT_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
+
+function normalizeToolRequirement(input) {
+  if (input === null || input === undefined) return null;
+  if (typeof input !== 'object') return null;
+  const provider = TOOL_REQUIREMENT_PROVIDERS.has(input.provider) ? input.provider : 'dnd5e';
+  return {
+    provider,
+    formula: typeof input.formula === 'string' ? input.formula : '',
+    macroUuid: typeof input.macroUuid === 'string' ? input.macroUuid : ''
+  };
+}
+
+function normalizeToolBreakage(input) {
+  const mode = TOOL_BREAKAGE_MODES.has(input?.mode) ? input.mode : 'limitedUses';
+  if (mode === 'limitedUses') {
+    const raw = input?.maxUses;
+    const isSet = raw !== null && raw !== undefined && raw !== '';
+    const numeric = isSet ? Number(raw) : null;
+    return { mode, maxUses: Number.isFinite(numeric) ? numeric : null };
+  }
+  if (mode === 'breakageChance') {
+    const numeric = Number(input?.breakageChance);
+    return { mode, breakageChance: Number.isFinite(numeric) ? numeric : 0 };
+  }
+  const threshold = Number(input?.threshold);
+  return {
+    mode,
+    formula: typeof input?.formula === 'string' ? input.formula : '',
+    threshold: Number.isFinite(threshold) ? threshold : 0
+  };
+}
+
+function normalizeToolOnBreak(input) {
+  const mode = TOOL_ON_BREAK_MODES.has(input?.mode) ? input.mode : 'destroy';
+  if (mode === 'replaceWith') {
+    return {
+      mode,
+      replacementComponentId: typeof input?.replacementComponentId === 'string'
+        ? input.replacementComponentId
+        : null
+    };
+  }
+  return { mode };
+}
+
+function normalizeLibraryTool(tool = {}) {
+  if (!tool || typeof tool !== 'object') return null;
+  const id = stringOrFallback(tool.id, '');
+  if (!id) return null;
+  const label = stringOrFallback(tool.label, '').trim();
+  const componentId = stringOrFallback(tool.componentId, '').trim() || null;
+  return {
+    id,
+    label,
+    enabled: tool.enabled !== false,
+    componentId,
+    requirement: normalizeToolRequirement(tool.requirement),
+    breakage: normalizeToolBreakage(tool.breakage),
+    onBreak: normalizeToolOnBreak(tool.onBreak)
   };
 }
 

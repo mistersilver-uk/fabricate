@@ -9,6 +9,7 @@
   import EssenceBrowserView from './EssenceBrowserView.svelte';
   import EssenceEditView from './EssenceEditView.svelte';
   import GatheringTaskEditView from './GatheringTaskEditView.svelte';
+  import ToolsBrowserView from './ToolsBrowserView.svelte';
   import EssenceSourceSelector from '../../components/EssenceSourceSelector.svelte';
   import RecipesBrowserView from './RecipesBrowserView.svelte';
   import SystemEditView from './SystemEditView.svelte';
@@ -359,6 +360,16 @@
       hintFallback: 'Browse gathering tasks before attaching them to environments.'
     },
     {
+      id: 'tools',
+      icon: 'fas fa-screwdriver-wrench',
+      labelKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Tools',
+      labelFallback: 'Tools',
+      titleKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.ToolsTitle',
+      titleFallback: 'Gathering Tools',
+      hintKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.ToolsHint',
+      hintFallback: 'Manage reusable gathering tools for this crafting system.'
+    },
+    {
       id: 'encounters',
       icon: 'fas fa-exclamation-triangle',
       labelKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Encounters',
@@ -380,7 +391,7 @@
     }
   ];
   const gatheringInspectorTabs = gatheringNavItems.filter(tab => tab.id !== 'environments');
-  const isGatheringRoute = $derived(currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit');
+  const isGatheringRoute = $derived(currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-tools');
   const isActiveGatheringChildRoute = $derived(
     isGatheringRoute && gatheringNavItems.some(tab => tab.id === activeGatheringTab)
   );
@@ -418,6 +429,16 @@
       : { valid: true, errors: [] }
   );
 
+  const libraryToolsList = $derived(Array.isArray($viewState.toolsDraft) ? $viewState.toolsDraft : []);
+  const selectedLibraryTool = $derived(
+    libraryToolsList.find(tool => tool.id === $viewState.toolsDraftSelectedToolId) || null
+  );
+  const toolsDraftValidation = $derived(
+    currentView === 'gathering-tools'
+      ? (store.validateToolsDraft?.() || { valid: true, errors: [] })
+      : { valid: true, errors: [] }
+  );
+
   $effect(() => {
     if (selectedSystemId === lastComponentSystemId) return;
     selectedComponentId = '';
@@ -445,6 +466,7 @@
     gatheringTaskSaving = false;
     gatheringTaskSaveError = '';
     gatheringMenuExpanded = isGatheringRoute;
+    store?.cancelToolsDraft?.();
     lastGatheringSystemId = selectedSystemId;
   });
 
@@ -452,6 +474,7 @@
     if (activeGatheringTab === 'environments') return;
     if (currentView === 'environments' && canShowEnvironments) return;
     if (currentView === 'gathering-task-edit' && canShowEnvironments) return;
+    if (currentView === 'gathering-tools' && canShowEnvironments) return;
     activeGatheringTab = 'environments';
   });
 
@@ -646,7 +669,7 @@
 
   function normalizedActiveView(view, system, environmentsAvailable, essencesAvailable) {
     if (!system) return 'systems';
-    if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit') && !environmentsAvailable) return 'systems';
+    if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit' || view === 'gathering-tools') && !environmentsAvailable) return 'systems';
     if ((view === 'essences' || view === 'essence-edit') && !essencesAvailable) return 'systems';
     return view;
   }
@@ -681,6 +704,7 @@
       ? text('FABRICATE.Admin.ManagerV2.Essence.CreateTitle', 'Create essence')
       : text('FABRICATE.Admin.ManagerV2.Essence.EditTitle', 'Edit essence');
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksTitle', 'Gathering Tasks');
+    if (currentView === 'gathering-tools') return text('FABRICATE.Admin.ManagerV2.Tools.Title', 'Tools');
     if (currentView === 'environments') return text('FABRICATE.Admin.ManagerV2.Environment.Title', 'Environments');
     if (currentView === 'environment-edit') return text('FABRICATE.Admin.ManagerV2.Environment.EditTitle', 'Edit environment');
     if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EditTitle', 'Edit gathering task');
@@ -699,6 +723,7 @@
     if (currentView === 'essence-edit' && showEssenceSourceUi) return text('FABRICATE.Admin.ManagerV2.Essence.EditSubtitle', 'Update identity, icon, and source linkage for this essence.');
     if (currentView === 'essence-edit') return text('FABRICATE.Admin.ManagerV2.Essence.EditNoSourceSubtitle', 'Update identity and icon for this essence.');
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksHint', 'Browse gathering tasks before attaching them to environments.');
+    if (currentView === 'gathering-tools') return text('FABRICATE.Admin.ManagerV2.Tools.Subtitle', 'Manage reusable gathering tools and configure how they behave when required by tasks.');
     if (currentView === 'environments') return text('FABRICATE.Admin.ManagerV2.Environment.Subtitle', 'Manage gathering environments for the selected crafting system.');
     if (currentView === 'environment-edit') return text('FABRICATE.Admin.ManagerV2.Environment.EditSubtitle', 'Edit scene linkage, environment details, tasks, results, catalysts, visibility, timing, and validation in the v2 workspace.');
     if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EditSubtitle', 'Edit availability, identity, and drop rules for the selected gathering task.');
@@ -736,6 +761,7 @@
     if (currentView === 'tags') return text('FABRICATE.Admin.ManagerV2.TagsCategories.Actions', 'Tags and categories actions');
     if (currentView === 'essences' || currentView === 'essence-edit') return text('FABRICATE.Admin.ManagerV2.Essence.Actions', 'Essence actions');
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Actions', 'Gathering task actions');
+    if (currentView === 'gathering-tools') return text('FABRICATE.Admin.ManagerV2.Tools.Actions', 'Tools actions');
     if (currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit') return text('FABRICATE.Admin.ManagerV2.Environment.Actions', 'Environment actions');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.ManagerV2.SystemEdit.Actions', 'System edit actions');
     return text('FABRICATE.Admin.ManagerV2.SystemActions', 'System actions');
@@ -747,6 +773,7 @@
     if (currentView === 'tags') return text('FABRICATE.Admin.ManagerV2.TagsCategories.Inspector', 'Tags and categories inspector');
     if (currentView === 'essences' || currentView === 'essence-edit') return text('FABRICATE.Admin.ManagerV2.Essence.Inspector', 'Selected essence inspector');
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Inspector', 'Selected gathering task inspector');
+    if (currentView === 'gathering-tools') return text('FABRICATE.Admin.ManagerV2.Tools.Inspector', 'Selected tool inspector');
     if (currentView === 'environments') return text('FABRICATE.Admin.ManagerV2.Environment.Inspector', 'Selected environment inspector');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.ManagerV2.SystemEdit.Inspector', 'System edit evidence');
     return text('FABRICATE.Admin.ManagerV2.SelectedSystemInspector', 'Selected system inspector');
@@ -850,15 +877,44 @@
   function continueRouteExitAfterEssence(nextView) {
     const componentResult = confirmComponentRouteExit(nextView);
     if (isPromise(componentResult)) {
-      return componentResult.then(value => value === false ? false : confirmGatheringTaskRouteExit(nextView));
+      return componentResult.then(value => value === false ? false : continueRouteExitAfterComponent(nextView));
     }
     if (componentResult === false) return false;
-    return confirmGatheringTaskRouteExit(nextView);
+    return continueRouteExitAfterComponent(nextView);
+  }
+
+  function continueRouteExitAfterComponent(nextView) {
+    const taskResult = confirmGatheringTaskRouteExit(nextView);
+    if (isPromise(taskResult)) {
+      return taskResult.then(value => value === false ? false : confirmToolsRouteExit(nextView));
+    }
+    if (taskResult === false) return false;
+    return confirmToolsRouteExit(nextView);
+  }
+
+  function confirmToolsRouteExit(nextView) {
+    if (activeView !== 'gathering-tools') return true;
+    if (nextView === 'gathering-tools') return true;
+    if (!store?.isToolsDraftDirty?.()) {
+      store?.cancelToolsDraft?.();
+      return true;
+    }
+    const confirmation = store?.confirmDiscardDirtyToolsDraft?.();
+    if (isPromise(confirmation)) {
+      return confirmation.then(confirmed => {
+        if (confirmed === false) return false;
+        store?.cancelToolsDraft?.();
+        return true;
+      });
+    }
+    if (confirmation === false) return false;
+    store?.cancelToolsDraft?.();
+    return true;
   }
 
   function setView(view) {
     if ((view === 'recipes' || view === 'components' || view === 'component-edit' || view === 'tags' || view === 'system-edit') && !selectedSystem) return;
-    if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit') && !canShowEnvironments) return;
+    if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit' || view === 'gathering-tools') && !canShowEnvironments) return;
     if ((view === 'essences' || view === 'essence-edit') && !canShowEssences) return;
     afterTruthyResult(confirmRouteExit(view), () => { activeView = view; });
   }
@@ -1479,11 +1535,34 @@
   function openGatheringSection(tabId = 'environments') {
     if (!canShowEnvironments) return;
     const nextTab = gatheringNavItems.some(tab => tab.id === tabId) ? tabId : 'environments';
-    afterTruthyResult(confirmRouteExit('environments'), () => {
+    const nextView = nextTab === 'tools' ? 'gathering-tools' : 'environments';
+    afterTruthyResult(confirmRouteExit(nextView), () => {
       activeGatheringTab = nextTab;
       gatheringMenuExpanded = true;
-      activeView = 'environments';
+      activeView = nextView;
+      if (nextTab === 'tools') {
+        store?.enterToolsDraft?.(selectedSystemId);
+      }
     });
+  }
+
+  function backToGatheringFromTools() {
+    afterTruthyResult(confirmRouteExit('environments'), () => {
+      activeGatheringTab = 'environments';
+      activeView = 'environments';
+      gatheringMenuExpanded = true;
+    });
+  }
+
+  async function saveToolsDraftFromHeader() {
+    if (!store?.saveToolsDraft) return;
+    await store.saveToolsDraft();
+  }
+
+  function deleteSelectedLibraryTool() {
+    const toolId = $viewState.toolsDraftSelectedToolId;
+    if (!toolId) return;
+    store?.deleteToolFromDraft?.(toolId);
   }
 
   function activateGatheringParent() {
@@ -2166,6 +2245,10 @@
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EditBreadcrumb', 'Edit gathering task')}</span>
         {/if}
+        {#if currentView === 'gathering-tools'}
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Tools', 'Tools')}</span>
+        {/if}
         {#if currentView === 'system-edit'}
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.ManagerV2.SystemEdit.Breadcrumb', 'System settings')}</span>
@@ -2248,6 +2331,31 @@
         <button type="button" class="manager-v2-button is-primary" onclick={saveEnvironmentEdit} disabled={!$viewState.environmentDraftDirty || $viewState.environmentSaving}>
           <i class={$viewState.environmentSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Environments.Save', 'Save Environment')}</span>
+        </button>
+      {:else if currentView === 'gathering-tools'}
+        <button type="button" class="manager-v2-button" onclick={backToGatheringFromTools}>
+          <i class="fas fa-arrow-left" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.ManagerV2.Tools.BackToGathering', 'Back to Gathering')}</span>
+        </button>
+        {#if $viewState.toolsDraftDirty}
+          <span class="manager-v2-chip is-warning">{text('FABRICATE.Admin.ManagerV2.Tools.Dirty', 'Unsaved')}</span>
+        {/if}
+        {#if $viewState.toolsDraftSelectedToolId}
+          <button type="button"
+            class="manager-v2-button is-danger"
+            onclick={deleteSelectedLibraryTool}
+            disabled={$viewState.toolsDraftSaving}>
+            <i class="fas fa-trash" aria-hidden="true"></i>
+            <span>{text('FABRICATE.Admin.ManagerV2.Tools.Delete', 'Delete tool')}</span>
+          </button>
+        {/if}
+        <button type="button"
+          class="manager-v2-button is-primary"
+          onclick={saveToolsDraftFromHeader}
+          disabled={!$viewState.toolsDraftDirty || !toolsDraftValidation.valid || $viewState.toolsDraftSaving}
+          title={toolsDraftValidation.valid ? '' : toolsDraftValidation.errors.map(error => error.errors.join('; ')).join('\n')}>
+          <i class={$viewState.toolsDraftSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.ManagerV2.Tools.Save', 'Save changes')}</span>
         </button>
       {:else if currentView === 'gathering-task-edit'}
         <button type="button" class="manager-v2-button" onclick={backToGatheringTaskLibrary}>
@@ -2532,6 +2640,18 @@
         onAddModifier={addGatheringDropModifier}
         onUpdateModifier={updateGatheringDropModifier}
         onDeleteModifier={deleteGatheringDropModifier}
+      />
+    {:else if currentView === 'gathering-tools' && selectedSystem}
+      <ToolsBrowserView
+        tools={$viewState.toolsDraft || []}
+        selectedToolId={$viewState.toolsDraftSelectedToolId || ''}
+        expandedToolId={$viewState.toolsDraftExpandedToolId || ''}
+        managedItemOptions={selectedSystem?.managedItemOptions || []}
+        onSelectTool={(id) => store.selectDraftTool?.(id)}
+        onToggleExpand={(id) => store.setExpandedDraftTool?.(id === $viewState.toolsDraftExpandedToolId ? '' : id)}
+        onAddTool={() => store.addToolToDraft?.()}
+        onUpdateTool={(id, patch) => store.updateToolInDraft?.(id, patch)}
+        onDeleteTool={(id) => store.deleteToolFromDraft?.(id)}
       />
     {:else if currentView === 'essences' && selectedSystem}
       <EssenceBrowserView
@@ -3628,6 +3748,191 @@
               <i class="fas fa-scroll" aria-hidden="true"></i>
               <h3>{text('FABRICATE.Admin.ManagerV2.Recipe.SelectRecipe', 'Select a recipe')}</h3>
               <p>{text('FABRICATE.Admin.ManagerV2.Recipe.InspectorHint', 'The inspector shows recipe status, structure, and requirements for the selected row.')}</p>
+            </div>
+          </div>
+        {/if}
+      {:else if currentView === 'gathering-tools'}
+        {#if selectedLibraryTool}
+          {@const toolImageSrc = (selectedSystem?.managedItemOptions || []).find(item => String(item.id) === String(selectedLibraryTool.componentId))?.img || 'icons/svg/item-bag.svg'}
+          {@const toolComponent = (selectedSystem?.managedItemOptions || []).find(item => String(item.id) === String(selectedLibraryTool.componentId))}
+          {@const toolValid = (toolsDraftValidation.errors || []).every(error => error.id !== selectedLibraryTool.id)}
+          <section class="manager-v2-inspector-card" data-manager-v2-tool-inspector>
+            <div class="manager-v2-inspector-title-row is-hero-large">
+              <img class="manager-v2-recipe-preview" src={toolImageSrc} alt="" />
+              <div class="manager-v2-inspector-copy">
+                <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Tools.SelectedKicker', 'Selected tool')}</p>
+                <h2 class="manager-v2-inspector-name" title={selectedLibraryTool.label || toolComponent?.name || ''}>{selectedLibraryTool.label || toolComponent?.name || text('FABRICATE.Admin.ManagerV2.Tools.OverviewComponentMissing', 'Not set')}</h2>
+                <div class="manager-v2-chip-row">
+                  <span class={`manager-v2-chip ${toolValid ? 'is-active' : 'is-danger'}`}>
+                    <i class={toolValid ? 'fas fa-circle-check' : 'fas fa-triangle-exclamation'} aria-hidden="true"></i>
+                    <span>{toolValid ? text('FABRICATE.Admin.ManagerV2.Tools.ValidChip', 'Valid tool') : text('FABRICATE.Admin.ManagerV2.Tools.InvalidChip', 'Invalid')}</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="manager-v2-inspector-card">
+            <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Tools.OverviewTitle', 'Overview')}</h3>
+            <div class="manager-v2-fact-grid">
+              <div class="manager-v2-fact">
+                <strong>{toolComponent?.name || text('FABRICATE.Admin.ManagerV2.Tools.OverviewComponentMissing', 'Not set')}</strong>
+                <span>{text('FABRICATE.Admin.ManagerV2.Tools.OverviewComponent', 'Component')}</span>
+              </div>
+              {#if toolComponent?.rarity}
+                <div class="manager-v2-fact">
+                  <strong>{toolComponent.rarity}</strong>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.OverviewRarity', 'Rarity')}</span>
+                </div>
+              {/if}
+            </div>
+          </section>
+
+          <section class="manager-v2-inspector-card">
+            <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Tools.RequirementTitle', 'Requirement')}</h3>
+            {#if selectedLibraryTool.requirement}
+              <div class="manager-v2-chip-row">
+                <span class="manager-v2-chip is-active">
+                  <i class="fas fa-shield-halved" aria-hidden="true"></i>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.RequirementPresent', 'Requirement set')}</span>
+                </span>
+              </div>
+              <div class="manager-v2-fact-grid">
+                <div class="manager-v2-fact">
+                  <strong>{selectedLibraryTool.requirement.provider}</strong>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.RequirementProvider', 'Provider')}</span>
+                </div>
+                {#if selectedLibraryTool.requirement.provider === 'macro'}
+                  <div class="manager-v2-fact">
+                    <strong>{selectedLibraryTool.requirement.macroUuid || '—'}</strong>
+                    <span>{text('FABRICATE.Admin.ManagerV2.Tools.RequirementMacro', 'Macro UUID')}</span>
+                  </div>
+                {:else}
+                  <div class="manager-v2-fact">
+                    <strong>{selectedLibraryTool.requirement.formula || '—'}</strong>
+                    <span>{text('FABRICATE.Admin.ManagerV2.Tools.RequirementExpression', 'Expression')}</span>
+                  </div>
+                {/if}
+              </div>
+            {:else}
+              <div class="manager-v2-chip-row">
+                <span class="manager-v2-chip is-neutral">
+                  <i class="fas fa-shield-halved" aria-hidden="true"></i>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.RequirementNone', 'No requirement')}</span>
+                </span>
+              </div>
+            {/if}
+          </section>
+
+          <section class="manager-v2-inspector-card">
+            <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Tools.BreakageTitle', 'Breakage mechanic')}</h3>
+            {#if selectedLibraryTool.breakage?.mode === 'limitedUses'}
+              <div class="manager-v2-chip-row">
+                <span class="manager-v2-chip is-neutral">
+                  <i class="fas fa-hashtag" aria-hidden="true"></i>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.BreakageLimitedUses', 'Limited uses')}</span>
+                </span>
+              </div>
+              <div class="manager-v2-fact-grid">
+                <div class="manager-v2-fact">
+                  <strong>{selectedLibraryTool.breakage.maxUses === null || selectedLibraryTool.breakage.maxUses === undefined ? text('FABRICATE.Admin.ManagerV2.Tools.BreakageSummaryUnlimited', 'Unlimited uses') : selectedLibraryTool.breakage.maxUses}</strong>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.BreakageMaxUses', 'Maximum uses')}</span>
+                </div>
+              </div>
+            {:else if selectedLibraryTool.breakage?.mode === 'breakageChance'}
+              <div class="manager-v2-chip-row">
+                <span class="manager-v2-chip is-warning">
+                  <i class="fas fa-percent" aria-hidden="true"></i>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.BreakageChance', 'Breakage chance')}</span>
+                </span>
+              </div>
+              <div class="manager-v2-fact-grid">
+                <div class="manager-v2-fact">
+                  <strong>{selectedLibraryTool.breakage.breakageChance ?? 0}%</strong>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.BreakageChancePercent', 'Break chance (%)')}</span>
+                </div>
+              </div>
+            {:else if selectedLibraryTool.breakage?.mode === 'diceExpression'}
+              <div class="manager-v2-chip-row">
+                <span class="manager-v2-chip is-warning">
+                  <i class="fas fa-dice-d20" aria-hidden="true"></i>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.BreakageDice', 'Dice expression')}</span>
+                </span>
+              </div>
+              <div class="manager-v2-fact-grid">
+                <div class="manager-v2-fact">
+                  <strong>{selectedLibraryTool.breakage.formula || '—'}</strong>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.BreakageFormula', 'Formula')}</span>
+                </div>
+                <div class="manager-v2-fact">
+                  <strong>{selectedLibraryTool.breakage.threshold ?? 0}</strong>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.BreakageThreshold', 'Break below')}</span>
+                </div>
+              </div>
+            {/if}
+          </section>
+
+          <section class="manager-v2-inspector-card">
+            <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Tools.OnBreakTitle', 'On-break action')}</h3>
+            {#if selectedLibraryTool.onBreak?.mode === 'destroy'}
+              <div class="manager-v2-chip-row">
+                <span class="manager-v2-chip is-danger">
+                  <i class="fas fa-circle-xmark" aria-hidden="true"></i>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.OnBreakDestroy', 'Destroy item')}</span>
+                </span>
+              </div>
+              <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Tools.OnBreakDestroyHint', "The item is removed from the actor's inventory.")}</p>
+            {:else if selectedLibraryTool.onBreak?.mode === 'flagBroken'}
+              <div class="manager-v2-chip-row">
+                <span class="manager-v2-chip is-warning">
+                  <i class="fas fa-shield-halved" aria-hidden="true"></i>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.OnBreakFlag', 'Mark as broken')}</span>
+                </span>
+              </div>
+              <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Tools.OnBreakFlagHint', 'The item remains but is flagged as broken.')}</p>
+            {:else if selectedLibraryTool.onBreak?.mode === 'replaceWith'}
+              {@const replacement = (selectedSystem?.managedItemOptions || []).find(item => String(item.id) === String(selectedLibraryTool.onBreak.replacementComponentId))}
+              <div class="manager-v2-chip-row">
+                <span class="manager-v2-chip is-positive">
+                  <i class="fas fa-right-left" aria-hidden="true"></i>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.OnBreakReplace', 'Replace with item')}</span>
+                </span>
+              </div>
+              <div class="manager-v2-fact-grid">
+                <div class="manager-v2-fact">
+                  <strong>{replacement?.name || text('FABRICATE.Admin.ManagerV2.Tools.OverviewComponentMissing', 'Not set')}</strong>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.ReplacementComponent', 'Replacement component')}</span>
+                </div>
+              </div>
+            {/if}
+          </section>
+
+          <section class="manager-v2-inspector-card" data-manager-v2-tool-usage>
+            <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Tools.UsageTitle', 'Usage')}</h3>
+            <div class="manager-v2-fact-grid">
+              <div class="manager-v2-fact">
+                <strong>0</strong>
+                <span>{text('FABRICATE.Admin.ManagerV2.Tools.UsageCount', 'Used in tasks: {count}').replace('{count}', '0')}</span>
+              </div>
+            </div>
+            <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Tools.NotLinkedHint', 'No linked tasks yet.')}</p>
+            <button type="button" class="manager-v2-button" disabled aria-disabled="true">
+              <i class="fas fa-up-right-from-square" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.ManagerV2.Tools.ViewTasks', 'View tasks')}</span>
+            </button>
+          </section>
+
+          <section class="manager-v2-inspector-card">
+            <p class="manager-v2-muted">
+              <i class="fas fa-circle-info" aria-hidden="true"></i>
+              {text('FABRICATE.Admin.ManagerV2.Tools.ChangesWarning', 'Changes to this tool will affect all tasks that require it.')}
+            </p>
+          </section>
+        {:else}
+          <div class="manager-v2-empty">
+            <div>
+              <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
+              <h3>{text('FABRICATE.Admin.ManagerV2.Tools.SelectEmpty', 'Select a tool to inspect.')}</h3>
             </div>
           </div>
         {/if}

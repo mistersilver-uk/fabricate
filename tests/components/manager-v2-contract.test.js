@@ -725,4 +725,39 @@ describe('CraftingSystemManagerV2 source contract', () => {
 
   // NOTE: status-toggle contract on environmentEditSource removed when the editor
   // was placeholder'd out pending redesign.
+
+  it('wires the Gathering Tools page through root-owned draft callbacks', () => {
+    assert.ok(
+      rootSource.includes("import ToolsBrowserView from './ToolsBrowserView.svelte';"),
+      'root should import ToolsBrowserView'
+    );
+    for (const snippet of [
+      "currentView === 'gathering-tools'",
+      'enterToolsDraft',
+      'saveToolsDraft',
+      'cancelToolsDraft',
+      'addToolToDraft',
+      'updateToolInDraft',
+      'deleteToolFromDraft',
+      'selectDraftTool',
+      'setExpandedDraftTool',
+      'toolsDraftDirty',
+      'toolsDraftSelectedToolId',
+      'toolsDraftValidation'
+    ]) {
+      assert.ok(rootSource.includes(snippet), `root should reference ${snippet}`);
+    }
+    assert.ok(
+      rootSource.includes("id: 'tools',"),
+      'root should declare a tools entry in gatheringNavItems'
+    );
+    assert.ok(
+      lang.FABRICATE.Admin.ManagerV2.Tools && typeof lang.FABRICATE.Admin.ManagerV2.Tools === 'object',
+      'lang should expose a FABRICATE.Admin.ManagerV2.Tools block'
+    );
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Tools.Title, 'Tools');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Tools.Add, 'Add tool');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Tools.Save, 'Save changes');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Tools, 'Tools');
+  });
 });

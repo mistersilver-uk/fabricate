@@ -13,14 +13,14 @@ How do I require an actor to wield a tool for a gathering task, have that tool w
 
 ## Short answer
 
-Add the tool as a **Tool** on the gathering task. Pick one of three breakage mechanics (limited uses, breakage chance, or dice expression), pick what happens when it breaks (destroy, mark broken, or replace with another component), and set the system-level **Tool breakage outcome** policy in the gathering rules.
+Author the tool once on the **Gathering → Tools** page. Pick one of three breakage mechanics (limited uses, breakage chance, or dice expression), pick what happens when it breaks (destroy, mark broken, or replace with another component), and set the system-level **Tool breakage outcome** policy in the gathering rules. Task-side wiring — having a specific gathering task require this tool — is a separate change still in progress.
 
 ## Steps
 
 1. **Define the tool component.** In the crafting system's Items tab, add the tool item as a managed component. If you plan to use the `Replace with` on-break action, also add the broken-tool variant as a separate managed component.
-2. **Open the gathering task editor.** From Manager V2 → Environments, edit the task and switch to the **Tools** tab.
-3. **Add a tool.** Click *Add Tool*. Pick the tool component from the picker.
-4. **(Optional) Add a tool requirement.** Click *Add Requirement* to require an actor-side condition. The requirement is a Foundry expression; if it does not evaluate truthy when the player attempts the task, the attempt is blocked. Examples:
+2. **Open the Tools page.** In Manager V2, expand the **Gathering** menu and pick **Tools**. The page lists the per-system library of reusable tools and opens an in-memory draft you can edit before saving.
+3. **Add a tool.** Click *Add tool*. Pick the tool component from the picker (drag-drop from the Items directory or use the dropdown). Optionally set a display label.
+4. **(Optional) Add a tool requirement.** Click *Add requirement* to require an actor-side condition. The requirement is a Foundry expression; if it does not evaluate truthy when the player attempts a task that uses this tool, the attempt is blocked. Examples:
    - dnd5e: `@flags.dnd5e.proficient` (set on actors that have the relevant proficiency)
    - Any system: a macro that returns `true`/`false` or `{ allowed, description }`
 5. **Pick a breakage mechanic.** Each tool uses exactly one:
@@ -29,9 +29,10 @@ Add the tool as a **Tool** on the gathering task. Pick one of three breakage mec
    - **Dice expression** — author a Foundry roll formula (for example `1d20 + @abilities.str.mod`) and a numeric threshold. The tool breaks when the roll result is below the threshold.
 6. **Pick an on-break action.** Each tool picks one:
    - **Destroy item** — the owned tool is removed from the actor's inventory.
-   - **Mark as broken** — the tool stays in inventory but receives the `flags.fabricate.toolBroken = true` flag. Broken tools fail the presence gate on future attempts, so the task is blocked until a GM clears the flag (Foundry item flag editor).
+   - **Mark as broken** — the tool stays in inventory but receives the `flags.fabricate.toolBroken = true` flag. Broken tools fail the presence gate on future attempts, so a task is blocked until a GM clears the flag (Foundry item flag editor).
    - **Replace with...** — pick a second managed component (the "broken" variant). On break, the original is deleted and the replacement is created on the actor. The replacement is a normal component, so you can build a recipe that consumes it to produce the repaired tool.
-7. **Decide the system-level outcome.** In Manager V2 → System Settings → Gathering Rules, set **Tool breakage outcome** to either *Attempt fails on break* (the default — a broken tool fails the whole attempt and clears its drops) or *Attempt succeeds despite break* (drops are awarded; the breakage is reported alongside).
+7. **Click *Save changes*.** The page tracks dirty state with an *Unsaved* chip; navigation away while dirty prompts before discarding.
+8. **Decide the system-level outcome.** In Manager V2 → System Settings → Gathering Rules, set **Tool breakage outcome** to either *Attempt fails on break* (the default — a broken tool fails the whole attempt and clears its drops) or *Attempt succeeds despite break* (drops are awarded; the breakage is reported alongside).
 
 ## What happens at the table
 

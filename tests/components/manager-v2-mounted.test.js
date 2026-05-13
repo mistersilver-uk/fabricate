@@ -56,6 +56,7 @@ function compileManagerV2Root() {
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EssenceBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EssenceEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/GatheringTaskEditView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/ToolsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/GatheringTasksBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/RecipesBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/SystemEditView.svelte');
@@ -69,7 +70,7 @@ function compileManagerV2Root() {
     writeCompiledSvelte(`src/ui/svelte/components/${componentName}.svelte`);
   }
 
-  for (const utilPath of ['foundryBridge.js', 'essenceIcons.js', 'fontAwesomeFreeClassicIcons.js', 'iconPickerPopover.js', 'componentEditor.js']) {
+  for (const utilPath of ['foundryBridge.js', 'essenceIcons.js', 'fontAwesomeFreeClassicIcons.js', 'iconPickerPopover.js', 'componentEditor.js', 'dropRateTier.js']) {
     const utilDestination = join(tempRoot, `src/ui/svelte/util/${utilPath}`);
     mkdirSync(dirname(utilDestination), { recursive: true });
     writeFileSync(
@@ -2115,7 +2116,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     const gatheringItems = Array.from(target.querySelectorAll('.manager-v2-nav-subitem'));
     assert.deepEqual(
       gatheringItems.map(item => item.textContent.trim()),
-      ['Environments', 'Tasks', 'Hazards', 'Settings']
+      ['Environments', 'Tasks', 'Tools', 'Hazards', 'Settings']
     );
     assert.equal(
       gatheringSubitem('Environments').getAttribute('aria-current'),
@@ -2127,7 +2128,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'environments');
-    assert.equal(target.querySelectorAll('.manager-v2-nav-subitem').length, 4);
+    assert.equal(target.querySelectorAll('.manager-v2-nav-subitem').length, 5);
     assert.equal(target.querySelector('#manager-v2-nav-gathering').getAttribute('aria-expanded'), 'true');
     assert.equal(target.querySelector('.manager-v2-nav-group').classList.contains('is-expanded'), true);
 
@@ -2146,7 +2147,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     gatheringToggle().click();
     await tick();
     flushSync();
-    assert.equal(target.querySelectorAll('.manager-v2-nav-subitem').length, 4);
+    assert.equal(target.querySelectorAll('.manager-v2-nav-subitem').length, 5);
     assert.equal(target.querySelector('#manager-v2-nav-gathering').getAttribute('aria-expanded'), 'true');
     assert.equal(target.querySelectorAll('.manager-v2-gathering-task-row').length, 3);
     assert.ok(target.textContent.includes('Gather Moon Herbs'));
@@ -2244,7 +2245,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     gatheringToggle().click();
     await tick();
     flushSync();
-    assert.equal(target.querySelectorAll('.manager-v2-nav-subitem').length, 4);
+    assert.equal(target.querySelectorAll('.manager-v2-nav-subitem').length, 5);
     assert.equal(target.querySelector('#manager-v2-nav-gathering').getAttribute('aria-expanded'), 'true');
     assert.ok(target.querySelector('[data-gathering-task-editor]'));
     const coreEditor = target.querySelector('[data-gathering-task-core-editor]');
@@ -3440,7 +3441,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     const gatheringItems = Array.from(target.querySelectorAll('.manager-v2-nav-subitem'));
     assert.deepEqual(
       gatheringItems.map(item => item.textContent.trim()),
-      ['Environments', 'Tasks', 'Hazards', 'Settings']
+      ['Environments', 'Tasks', 'Tools', 'Hazards', 'Settings']
     );
     assert.equal(gatheringSubitem('Environments').getAttribute('aria-current'), 'page');
     assert.ok(target.textContent.includes('Prepare gathering building blocks first'));
