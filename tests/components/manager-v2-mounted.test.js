@@ -3880,6 +3880,61 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(calls.some(call => call[0] === 'addToolToDraft' && call[1]?.componentId === 'c2'));
   });
 
+  it('edits gathering tool requirements as a single expression without exposing provider selection', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          toolsDraftSelectedToolId: 'tool-catalyst',
+          toolsDraftExpandedToolId: 'tool-catalyst',
+          toolsDraft: [{
+            id: 'tool-catalyst',
+            label: 'Artisan Catalyst',
+            enabled: true,
+            componentId: 'c1',
+            requirement: { provider: 'pf2e', formula: '@tools.alchemist.value', macroUuid: 'Macro.old' },
+            breakage: { mode: 'limitedUses', maxUses: null },
+            onBreak: { mode: 'destroy' }
+          }]
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Tools').click();
+    await tick();
+    flushSync();
+
+    const editor = target.querySelector('[data-manager-v2-tool-editor]');
+    assert.ok(editor);
+    assert.equal(editor.querySelector('.manager-v2-provider-expression-input'), null);
+    assert.equal(editor.querySelector('select[id$="-provider"]'), null);
+    assert.ok(editor.textContent.includes('Enter an actor roll-data property'));
+    assert.ok(editor.textContent.includes('Example: @tools.alchemist.value'));
+    assert.ok(!editor.textContent.includes('Example: @abilities.str.mod'));
+    assert.ok(!editor.textContent.includes('Example: @skills.prc.total'));
+
+    const expressionInput = editor.querySelector('.manager-v2-tools-requirement-expression input');
+    assert.equal(expressionInput.value, '@tools.alchemist.value');
+    expressionInput.value = '@tools.smith.value';
+    expressionInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+
+    assert.ok(calls.some(call => call[0] === 'updateToolInDraft'
+      && call[1] === 'tool-catalyst'
+      && call[2].requirement?.provider === 'dnd5e'
+      && call[2].requirement?.formula === '@tools.smith.value'
+      && call[2].requirement?.macroUuid === ''));
+  });
+
   it('uses the primary component drop-zone layout for replacement tools', async () => {
     const calls = [];
     target = document.createElement('div');

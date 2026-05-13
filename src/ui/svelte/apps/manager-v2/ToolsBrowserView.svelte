@@ -11,7 +11,6 @@
   import { dragDrop } from '../../actions/dragDrop.js';
   import { localize } from '../../util/foundryBridge.js';
   import { dropRateTierClass, dropRateTierColor } from '../../util/dropRateTier.js';
-  import ProviderExpressionInput from '../../components/ProviderExpressionInput.svelte';
 
   let {
     tools = [],
@@ -171,6 +170,16 @@
 
   function defaultRequirement() {
     return { provider: 'dnd5e', formula: '', macroUuid: '' };
+  }
+
+  function updateRequirementExpression(tool, formula) {
+    onUpdateTool?.(tool.id, {
+      requirement: {
+        provider: 'dnd5e',
+        formula,
+        macroUuid: ''
+      }
+    });
   }
 
   function setBreakageMode(tool, mode) {
@@ -377,21 +386,19 @@
                 <fieldset class="manager-v2-tools-section">
                   <legend>{text('FABRICATE.Admin.ManagerV2.Tools.RequirementTitle', 'Requirement')}</legend>
                   {#if tool.requirement}
-                    <ProviderExpressionInput
-                      provider={tool.requirement.provider}
-                      expression={tool.requirement.formula}
-                      macroUuid={tool.requirement.macroUuid}
-                      idPrefix={`tool-${tool.id}-requirement`}
-                      providerLabelKey="FABRICATE.Admin.ManagerV2.Tools.RequirementProvider"
-                      providerLabelFallback="Provider"
-                      expressionLabelKey="FABRICATE.Admin.ManagerV2.Tools.RequirementExpression"
-                      expressionLabelFallback="Expression"
-                      macroUuidLabelKey="FABRICATE.Admin.ManagerV2.Tools.RequirementMacro"
-                      macroUuidLabelFallback="Macro UUID"
-                      onProviderChange={(value) => onUpdateTool?.(tool.id, { requirement: { ...tool.requirement, provider: value } })}
-                      onExpressionChange={(value) => onUpdateTool?.(tool.id, { requirement: { ...tool.requirement, formula: value } })}
-                      onMacroUuidChange={(value) => onUpdateTool?.(tool.id, { requirement: { ...tool.requirement, macroUuid: value } })}
-                    />
+                    <label class="manager-v2-field manager-v2-tools-requirement-expression">
+                      <span>{text('FABRICATE.Admin.ManagerV2.Tools.RequirementExpression', 'Expression')}</span>
+                      <input type="text"
+                        value={tool.requirement.formula || ''}
+                        placeholder={text('FABRICATE.Admin.ManagerV2.Tools.RequirementExpressionPlaceholder', '@tools.alchemist.value')}
+                        oninput={(event) => updateRequirementExpression(tool, event.currentTarget.value)} />
+                    </label>
+                    <div class="manager-v2-tools-requirement-help">
+                      <p>{text('FABRICATE.Admin.ManagerV2.Tools.RequirementInstructions', 'Enter an actor roll-data property. The tool is available when the value is greater than zero.')}</p>
+                      <ul>
+                        <li>{text('FABRICATE.Admin.ManagerV2.Tools.RequirementExampleActorProperty', 'Example: @tools.alchemist.value')}</li>
+                      </ul>
+                    </div>
                     <button type="button"
                       class="manager-v2-button"
                       onclick={() => onUpdateTool?.(tool.id, { requirement: null })}>
@@ -399,7 +406,7 @@
                       <span>{text('FABRICATE.Admin.ManagerV2.Tools.RequirementRemove', 'Remove requirement')}</span>
                     </button>
                   {:else}
-                    <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Tools.RequirementHint', 'Optional expression that must be truthy for the actor to use this tool.')}</p>
+                    <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Tools.RequirementHint', 'Optional actor property that must be greater than zero for the actor to use this tool.')}</p>
                     <button type="button"
                       class="manager-v2-button"
                       onclick={() => onUpdateTool?.(tool.id, { requirement: defaultRequirement() })}>

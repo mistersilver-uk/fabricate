@@ -19,6 +19,7 @@ const environmentEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/Env
 const environmentsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/EnvironmentsBrowserView.svelte');
 const gatheringTaskEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/GatheringTaskEditView.svelte');
 const gatheringTasksBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/GatheringTasksBrowserView.svelte');
+const toolsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/ToolsBrowserView.svelte');
 const appPath = resolve(repoRoot, 'src/ui/SvelteCraftingSystemManagerV2App.svelte.js');
 const recipeManagerAppPath = resolve(repoRoot, 'src/ui/SvelteRecipeManagerApp.svelte.js');
 const mainPath = resolve(repoRoot, 'src/main.js');
@@ -37,12 +38,13 @@ const environmentEditSource = readFileSync(environmentEditPath, 'utf8');
 const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
 const gatheringTaskEditSource = readFileSync(gatheringTaskEditPath, 'utf8');
 const gatheringTasksBrowserSource = readFileSync(gatheringTasksBrowserPath, 'utf8');
+const toolsBrowserSource = readFileSync(toolsBrowserPath, 'utf8');
 const appSource = readFileSync(appPath, 'utf8');
 const recipeManagerAppSource = readFileSync(recipeManagerAppPath, 'utf8');
 const mainSource = readFileSync(mainPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
-const managerV2Source = [rootSource, essenceBrowserSource, essenceEditSource, tagsCategoriesSource, systemEditSource, systemsBrowserSource, recipesBrowserSource, componentsBrowserSource, componentEditSource, environmentEditSource, environmentsBrowserSource, gatheringTaskEditSource, gatheringTasksBrowserSource].join('\n');
+const managerV2Source = [rootSource, essenceBrowserSource, essenceEditSource, tagsCategoriesSource, systemEditSource, systemsBrowserSource, recipesBrowserSource, componentsBrowserSource, componentEditSource, environmentEditSource, environmentsBrowserSource, gatheringTaskEditSource, gatheringTasksBrowserSource, toolsBrowserSource].join('\n');
 
 describe('CraftingSystemManagerV2 source contract', () => {
   it('self-registers as a parallel manager app without replacing the legacy manager', () => {
@@ -760,6 +762,10 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Tools.Add, 'Add tool');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Tools.Save, 'Save changes');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Tools.NavigationDirty.SaveAll, 'Save All');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Tools.RequirementInstructions, 'Enter an actor roll-data property. The tool is available when the value is greater than zero.');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Tools.RequirementExampleActorProperty, 'Example: @tools.alchemist.value');
+    assert.ok(!toolsBrowserSource.includes('ProviderExpressionInput'), 'tools requirement editor should not expose provider selection');
+    assert.ok(toolsBrowserSource.includes('manager-v2-tools-requirement-expression'), 'tools requirement editor should expose a single expression input');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Tools, 'Tools');
   });
 });

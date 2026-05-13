@@ -11895,6 +11895,30 @@
   min-width: 0;
 }
 
+.fabricate-manager-v2 .manager-v2-tools-requirement-expression input {
+  width: 100%;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-requirement-help {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-requirement-help p,
+.fabricate-manager-v2 .manager-v2-tools-requirement-help ul {
+  margin: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-requirement-help ul {
+  display: grid;
+  gap: 3px;
+  padding-left: 18px;
+}
+
 .fabricate-manager-v2 .manager-v2-tools-inline-fields {
   display: grid;
   grid-template-columns: minmax(260px, 1fr) minmax(180px, 0.55fr);

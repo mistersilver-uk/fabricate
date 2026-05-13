@@ -27,5 +27,6 @@
 - [x] Convert Tools draft saving from page-level to per-tool dirty/save semantics with immediate persisted deletes.
 - [x] Move Tools dirty pips into the selected-tool inspector card and dirty tool rows.
 - [x] Remove the inert Tools row overflow menu and stabilize row component/pip/action widths.
+- [x] Replace the Tools requirement provider selector with a single actor-property expression field and proficiency example.
 - [ ] Update `docs/gathering-environments.md` with a Tools library subsection.
 - [ ] Run `npm test` and `npm run build`; commit and push.

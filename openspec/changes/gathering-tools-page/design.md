@@ -60,7 +60,7 @@ A `toolsDraft` writable parallel to `environmentDraft` holds the in-memory list 
 - Compact rows with fixed-width managed-component identity/drop-zone column (thumbnail + name + secondary), fixed summary/pip/action columns, three summary chips, conditional per-row `Unsaved` pip, and expand/collapse chevron.
 - Rows with an existing mapped component render that component identity as a subtle dashed drop zone; dropping a managed component from the right-side component browser replaces the tool's `componentId`.
 - The bottom Add tool stub is also a drop target; dropping a managed component or importable Foundry item creates a new tool pre-mapped to that component.
-- Inline editor for the selected/expanded row: optional label, component picker (with `dragDrop` action), optional requirement (using `ProviderExpressionInput`), breakage mechanic radio group with single-line mode-specific controls, on-break action radio group with a matching replacement component drop zone for `replaceWith`, and an inline `Delete tool` button.
+- Inline editor for the selected/expanded row: optional label, component picker (with `dragDrop` action), optional requirement as a single actor roll-data property field with a proficiency-style example (`@tools.alchemist.value`), breakage mechanic radio group with single-line mode-specific controls, on-break action radio group with a matching replacement component drop zone for `replaceWith`, and an inline `Delete tool` button.
 - Empty state when zero tools; `+ Add tool` ghost row appended when at least one tool exists.
 
 ## Radio group accessibility

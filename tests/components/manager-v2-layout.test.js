@@ -573,6 +573,8 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const toolsInlineFieldLabelBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-inline-field > span:first-child');
   const toolsInlineNumberInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-inline-field > input[type="number"]');
   const toolsMaxUsesInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-inline-field > .manager-v2-tools-max-uses-input');
+  const toolsRequirementExpressionInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-requirement-expression input');
+  const toolsRequirementHelpBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-requirement-help');
   const toolsInlineFieldsBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-inline-fields');
   const toolsEditorInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-row-editor .manager-v2-field input:not([type="range"]),\n.fabricate-manager-v2 .manager-v2-tools-row-editor .manager-v2-field select');
   const toolsEditorPercentInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-row-editor .manager-v2-drop-rate-percent input[type="text"]');
@@ -720,6 +722,15 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(toolsInlineFieldLabelBlock.includes('white-space: nowrap;'), 'tools inline labels should not wrap above their inputs');
   assert.ok(toolsInlineNumberInputBlock.includes('max-width: 122px;'), 'tools inline number inputs should remain compact without clipping placeholders');
   assert.ok(toolsMaxUsesInputBlock.includes('max-width: 190px;'), 'tools maximum-uses input should be wide enough for its placeholder');
+  assert.ok(toolsRequirementExpressionInputBlock.includes('width: 100%;'), 'tools requirement expression should use the full row width');
+  assert.ok(
+    toolsRequirementHelpBlock.includes('font-size: 0.8rem;') && toolsRequirementHelpBlock.includes('line-height: 1.35;'),
+    'tools requirement instructions should be compact helper copy'
+  );
+  assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-tools-requirement-help ul {\n  display: grid;'),
+    'tools requirement examples should be listed compactly'
+  );
   assert.ok(
     toolsInlineFieldsBlock.includes('grid-template-columns: minmax(260px, 1fr) minmax(180px, 0.55fr);'),
     'tools two-input breakage controls should remain side-by-side'
