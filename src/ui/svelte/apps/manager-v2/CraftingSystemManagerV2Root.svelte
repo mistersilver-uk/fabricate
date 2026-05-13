@@ -2300,6 +2300,7 @@
       <h1 class="manager-v2-title">{viewTitle()}</h1>
       <p class="manager-v2-subtitle">{viewSubtitle()}</p>
     </div>
+    {#if currentView !== 'tools'}
     <div class="manager-v2-header-actions" aria-label={headerActionsLabel()}>
       {#if currentView === 'recipes'}
         <button type="button" class="manager-v2-button" onclick={importRecipes} disabled={!selectedSystemId}>
@@ -2427,6 +2428,7 @@
         </button>
       {/if}
     </div>
+    {/if}
   </header>
 
   <div class="manager-v2-body">

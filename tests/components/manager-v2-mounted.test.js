@@ -3520,11 +3520,14 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    const headerActions = target.querySelector('.manager-v2-header-actions');
-    assert.equal(headerActions.textContent.includes('Back to Gathering'), false);
-    assert.equal(headerActions.textContent.includes('Unsaved'), false);
-    assert.equal(headerActions.textContent.includes('Delete tool'), false);
-    assert.equal(headerActions.textContent.includes('Save changes'), false);
+    assert.equal(target.querySelector('.manager-v2-header-actions'), null);
+    assert.equal(target.querySelector('.manager-v2-header').textContent.includes('Back to Gathering'), false);
+    assert.equal(target.querySelector('.manager-v2-header').textContent.includes('Unsaved'), false);
+    assert.equal(target.querySelector('.manager-v2-header').textContent.includes('Delete tool'), false);
+    assert.equal(target.querySelector('.manager-v2-header').textContent.includes('Save changes'), false);
+    assert.equal(target.querySelector('.manager-v2-header').textContent.includes('Import'), false);
+    assert.equal(target.querySelector('.manager-v2-header').textContent.includes('Export'), false);
+    assert.equal(target.querySelector('.manager-v2-header').textContent.includes('Create'), false);
 
     const toolInspector = target.querySelector('[data-manager-v2-tool-inspector]');
     assert.ok(toolInspector.textContent.includes('Artisan Catalyst'));
