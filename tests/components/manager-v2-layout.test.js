@@ -923,7 +923,8 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(dropRateMozProgressBlock.includes('background: var(--fab-drop-rate-color);'), 'drop chance Firefox progress should paint the active segment in the current tier colour');
   assert.ok(dropRateWebkitThumbBlock.includes('background: var(--fab-drop-rate-color);') && dropRateMozThumbBlock.includes('background: var(--fab-drop-rate-color);'), 'drop chance range thumbs should retain current-tier colour');
   assert.ok(
-    toolBreakageChanceControlBlock.includes('--fab-tool-breakage-chance-low: var(--fab-success);')
+    toolBreakageChanceControlBlock.includes('--fab-tool-breakage-chance-thumb-radius: 7px;')
+      && toolBreakageChanceControlBlock.includes('--fab-tool-breakage-chance-low: var(--fab-success);')
       && toolBreakageChanceControlBlock.includes('--fab-tool-breakage-chance-mid: var(--fab-warning);')
       && toolBreakageChanceControlBlock.includes('--fab-tool-breakage-chance-high: var(--fab-danger);')
       && toolBreakageChanceControlBlock.includes('--fab-tool-breakage-chance-track: linear-gradient('),
@@ -936,7 +937,13 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
       && toolBreakageChanceControlBlock.includes('var(--fab-tool-breakage-chance-high) 100%'),
     'tool breakage chance slider should define the full green-yellow-red gradient across the whole rail'
   );
-  assert.ok(toolBreakageChanceTrackBlock.includes('background: var(--fab-tool-breakage-chance-track);'), 'tool breakage chance custom rail should paint the semantic gradient');
+  assert.ok(
+    toolBreakageChanceTrackBlock.includes('left: var(--fab-tool-breakage-chance-thumb-radius);')
+      && toolBreakageChanceTrackBlock.includes('right: var(--fab-tool-breakage-chance-thumb-radius);')
+      && toolBreakageChanceTrackBlock.includes('border: 0;')
+      && toolBreakageChanceTrackBlock.includes('background: var(--fab-tool-breakage-chance-track);'),
+    'tool breakage chance custom rail should be inset to the thumb radius and paint the semantic gradient without endpoint tails'
+  );
   assert.ok(toolBreakageChanceFillBlock.includes('display: none;'), 'tool breakage chance slider should not render a tier-coloured filled segment over the full gradient');
   assert.ok(
     toolBreakageChanceRangeBlock.includes('padding: 0;')
@@ -945,7 +952,13 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
       && toolBreakageChanceRangeBlock.includes('accent-color: var(--fab-tool-breakage-chance-color);'),
     'tool breakage chance native range should not cover the custom rail and should use the dynamic current-risk colour'
   );
-  assert.ok(toolBreakageChanceWebkitTrackBlock.includes('background: var(--fab-tool-breakage-chance-track);') && toolBreakageChanceMozTrackBlock.includes('background: var(--fab-tool-breakage-chance-track);'), 'tool breakage chance native tracks should also paint the semantic gradient so the rail remains visible');
+  assert.ok(
+    toolBreakageChanceWebkitTrackBlock.includes('border: 0;')
+      && toolBreakageChanceWebkitTrackBlock.includes('background: transparent;')
+      && toolBreakageChanceMozTrackBlock.includes('border: 0;')
+      && toolBreakageChanceMozTrackBlock.includes('background: transparent;'),
+    'tool breakage chance native tracks should stay transparent so the inset custom rail is the only visible rail'
+  );
   assert.ok(toolBreakageChanceWebkitThumbBlock.includes('background: var(--fab-tool-breakage-chance-color);') && toolBreakageChanceMozThumbBlock.includes('background: var(--fab-tool-breakage-chance-color);'), 'tool breakage chance slider thumbs should use the dynamic current-risk colour');
   assert.ok(toolBreakageChanceMozProgressBlock.includes('background: transparent;'), 'tool breakage chance Firefox native progress should not draw over the full gradient rail');
   assert.ok(
