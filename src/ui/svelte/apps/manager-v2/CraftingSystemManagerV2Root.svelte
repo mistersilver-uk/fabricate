@@ -1584,14 +1584,6 @@
     });
   }
 
-  function backToGatheringFromTools() {
-    afterTruthyResult(confirmRouteExit('environments'), () => {
-      activeGatheringTab = 'environments';
-      activeView = 'environments';
-      gatheringMenuExpanded = true;
-    });
-  }
-
   async function saveToolsDraftFromHeader() {
     if (!store?.saveToolsDraft) return;
     await store.saveToolsDraft();
@@ -2371,10 +2363,6 @@
           <span>{text('FABRICATE.Admin.Environments.Save', 'Save Environment')}</span>
         </button>
       {:else if currentView === 'gathering-tools'}
-        <button type="button" class="manager-v2-button" onclick={backToGatheringFromTools}>
-          <i class="fas fa-arrow-left" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.ManagerV2.Tools.BackToGathering', 'Back to Gathering')}</span>
-        </button>
         {#if $viewState.toolsDraftDirty}
           <span class="manager-v2-chip is-warning">{text('FABRICATE.Admin.ManagerV2.Tools.Dirty', 'Unsaved')}</span>
         {/if}

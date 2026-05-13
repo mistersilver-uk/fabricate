@@ -3494,7 +3494,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     flushSync();
 
     const headerActions = target.querySelector('.manager-v2-header-actions');
-    assert.ok(headerActions.textContent.includes('Back to Gathering'));
+    assert.equal(headerActions.textContent.includes('Back to Gathering'), false);
     assert.ok(headerActions.textContent.includes('Unsaved'));
     assert.equal(headerActions.textContent.includes('Delete tool'), false);
     assert.equal(headerActions.textContent.includes('Save changes'), false);
