@@ -13,6 +13,7 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const environmentComponentNames = [
   'EnvironmentActionMenu',
   'CatalystList',
+  'ToolsList',
   'EnvironmentFields',
   'EnvironmentList',
   'EnvironmentValidationFeedback',
@@ -2832,7 +2833,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Gathering succeeds'));
     assert.ok(target.querySelector('.manager-v2-inspector [data-gathering-inspector-rules]'));
     assert.equal(target.querySelector('.manager-v2-inspector [data-gathering-inspector-rules] h2').textContent.trim(), 'Rules');
-    assert.equal(target.querySelectorAll('.manager-v2-inspector [data-gathering-inspector-rules] select').length, 3);
+    assert.equal(target.querySelectorAll('.manager-v2-inspector [data-gathering-inspector-rules] select').length, 4);
     assert.equal(target.querySelector('.manager-v2-inspector [data-gathering-rule-stepper]'), null);
     assert.equal(
       target.querySelector('.manager-v2-inspector').textContent.includes('Selected environment'),

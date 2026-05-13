@@ -125,12 +125,14 @@ const FALLBACK_GATHERING_CONDITION_ICONS = Object.freeze({
 });
 const GATHERING_DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops', 'limitedDrops']);
 const GATHERING_HAZARD_POLICIES = new Set(['successWithHazard', 'failureWithHazard']);
+const GATHERING_TOOL_BREAKAGE_POLICIES = new Set(['failureOnBreak', 'successDespiteBreak']);
 const DEFAULT_GATHERING_RULES = Object.freeze({
   rewardSelectionMode: 'highestRankedDrop',
   rewardLimit: 1,
   hazardSelectionMode: 'allDrops',
   hazardLimit: 1,
-  hazardPolicy: 'successWithHazard'
+  hazardPolicy: 'successWithHazard',
+  toolBreakagePolicy: 'failureOnBreak'
 });
 
 // ---------------------------------------------------------------------------
@@ -584,12 +586,16 @@ function _normalizeGatheringRules(rules = {}) {
   const hazardPolicy = GATHERING_HAZARD_POLICIES.has(rules?.hazardPolicy)
     ? rules.hazardPolicy
     : DEFAULT_GATHERING_RULES.hazardPolicy;
+  const toolBreakagePolicy = GATHERING_TOOL_BREAKAGE_POLICIES.has(rules?.toolBreakagePolicy)
+    ? rules.toolBreakagePolicy
+    : DEFAULT_GATHERING_RULES.toolBreakagePolicy;
   return {
     rewardSelectionMode,
     rewardLimit: _normalizePositiveInteger(rules?.rewardLimit, DEFAULT_GATHERING_RULES.rewardLimit),
     hazardSelectionMode,
     hazardLimit: _normalizePositiveInteger(rules?.hazardLimit, DEFAULT_GATHERING_RULES.hazardLimit),
-    hazardPolicy
+    hazardPolicy,
+    toolBreakagePolicy
   };
 }
 
@@ -1757,6 +1763,60 @@ export function createAdminStore(services) {
     };
   }
 
+  function _newEnvironmentTool() {
+    const firstComponent = _selectedManagedItemOptions()[0];
+    return {
+      componentId: firstComponent?.id || null,
+      requirement: null,
+      breakage: { mode: 'limitedUses', maxUses: null },
+      onBreak: { mode: 'destroy' }
+    };
+  }
+
+  function _normalizeToolRequirement(input) {
+    if (input === null || input === undefined) return null;
+    if (typeof input !== 'object') return null;
+    const validProviders = new Set(['dnd5e', 'pf2e', 'macro']);
+    const provider = validProviders.has(input.provider) ? input.provider : 'dnd5e';
+    return {
+      provider,
+      formula: typeof input.formula === 'string' ? input.formula : '',
+      macroUuid: typeof input.macroUuid === 'string' ? input.macroUuid : ''
+    };
+  }
+
+  function _normalizeToolBreakage(input) {
+    const mode = ['limitedUses', 'breakageChance', 'diceExpression'].includes(input?.mode)
+      ? input.mode
+      : 'limitedUses';
+    if (mode === 'limitedUses') {
+      return { mode, maxUses: _normalizeNullablePositiveInteger(input?.maxUses) };
+    }
+    if (mode === 'breakageChance') {
+      const raw = Number(input?.breakageChance);
+      return { mode, breakageChance: Number.isFinite(raw) ? raw : 0 };
+    }
+    const threshold = Number(input?.threshold);
+    return {
+      mode,
+      formula: typeof input?.formula === 'string' ? input.formula : '',
+      threshold: Number.isFinite(threshold) ? threshold : 0
+    };
+  }
+
+  function _normalizeToolOnBreak(input) {
+    const mode = ['destroy', 'flagBroken', 'replaceWith'].includes(input?.mode) ? input.mode : 'destroy';
+    if (mode === 'replaceWith') {
+      return {
+        mode,
+        replacementComponentId: typeof input?.replacementComponentId === 'string'
+          ? input.replacementComponentId
+          : null
+      };
+    }
+    return { mode };
+  }
+
   function _newEnvironmentDraft(systemId) {
     return {
       craftingSystemId: systemId,
@@ -2591,6 +2651,67 @@ export function createAdminStore(services) {
       return {
         ...task,
         catalysts: catalysts.filter((_, candidateIndex) => candidateIndex !== index)
+      };
+    });
+    return !!updated;
+  }
+
+  function addEnvironmentTaskTool(taskId = get(selectedEnvironmentTaskId)) {
+    let added = null;
+    _updateEnvironmentTaskDraft(taskId, task => {
+      const tools = Array.isArray(task.tools) ? _clonePlain(task.tools) : [];
+      added = _newEnvironmentTool();
+      return { ...task, tools: [...tools, added] };
+    });
+    return _clonePlain(added);
+  }
+
+  function updateEnvironmentTaskTool(taskId = get(selectedEnvironmentTaskId), toolIndex, updates = {}) {
+    const index = Number(toolIndex);
+    if (!Number.isInteger(index) || index < 0 || typeof updates !== 'object' || updates === null) return false;
+
+    const updated = _updateEnvironmentTaskDraft(taskId, task => {
+      const tools = Array.isArray(task.tools) ? _clonePlain(task.tools) : [];
+      if (index >= tools.length) return null;
+
+      const current = tools[index] || {};
+      const nextTool = {
+        componentId: current.componentId || null,
+        requirement: current.requirement ? { ..._normalizeToolRequirement(current.requirement) } : null,
+        breakage: _normalizeToolBreakage(current.breakage),
+        onBreak: _normalizeToolOnBreak(current.onBreak)
+      };
+
+      if (Object.prototype.hasOwnProperty.call(updates, 'componentId')) {
+        const componentId = String(updates.componentId ?? '').trim();
+        nextTool.componentId = componentId || null;
+      }
+      if (Object.prototype.hasOwnProperty.call(updates, 'requirement')) {
+        nextTool.requirement = _normalizeToolRequirement(updates.requirement);
+      }
+      if (Object.prototype.hasOwnProperty.call(updates, 'breakage')) {
+        nextTool.breakage = _normalizeToolBreakage(updates.breakage);
+      }
+      if (Object.prototype.hasOwnProperty.call(updates, 'onBreak')) {
+        nextTool.onBreak = _normalizeToolOnBreak(updates.onBreak);
+      }
+
+      tools[index] = nextTool;
+      return { ...task, tools };
+    });
+    return !!updated;
+  }
+
+  function deleteEnvironmentTaskTool(taskId = get(selectedEnvironmentTaskId), toolIndex) {
+    const index = Number(toolIndex);
+    if (!Number.isInteger(index) || index < 0) return false;
+
+    const updated = _updateEnvironmentTaskDraft(taskId, task => {
+      const tools = Array.isArray(task.tools) ? _clonePlain(task.tools) : [];
+      if (index >= tools.length) return null;
+      return {
+        ...task,
+        tools: tools.filter((_, candidateIndex) => candidateIndex !== index)
       };
     });
     return !!updated;
@@ -4302,6 +4423,9 @@ export function createAdminStore(services) {
     addEnvironmentTaskCatalyst,
     updateEnvironmentTaskCatalyst,
     deleteEnvironmentTaskCatalyst,
+    addEnvironmentTaskTool,
+    updateEnvironmentTaskTool,
+    deleteEnvironmentTaskTool,
     updateEnvironmentTaskVisibility,
     updateEnvironmentTaskResultSelection,
     updateEnvironmentTaskProgressive,

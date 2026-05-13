@@ -48,6 +48,7 @@ const FALLBACK_CONDITION_ICONS = Object.freeze({
 const DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops', 'limitedDrops']);
 const LEGACY_DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops']);
 const HAZARD_POLICIES = new Set(['successWithHazard', 'failureWithHazard']);
+const TOOL_BREAKAGE_POLICIES = new Set(['failureOnBreak', 'successDespiteBreak']);
 const CHARACTER_MODIFIER_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
 const CHARACTER_MODIFIER_OPERATORS = new Set(['+', '-']);
 const ROLL_EXPRESSION_PATTERN = /\d\s*d\s*\d|[*/()]/i;
@@ -56,7 +57,8 @@ const DEFAULT_GATHERING_RULES = Object.freeze({
   rewardLimit: 1,
   hazardSelectionMode: 'allDrops',
   hazardLimit: 1,
-  hazardPolicy: 'successWithHazard'
+  hazardPolicy: 'successWithHazard',
+  toolBreakagePolicy: 'failureOnBreak'
 });
 
 const BLOCKED_REASON_KEYS = Object.freeze({
@@ -1129,7 +1131,10 @@ function normalizeGatheringRules(rules = {}) {
     hazardLimit: positiveInteger(rules?.hazardLimit, DEFAULT_GATHERING_RULES.hazardLimit),
     hazardPolicy: HAZARD_POLICIES.has(rules?.hazardPolicy)
       ? rules.hazardPolicy
-      : DEFAULT_GATHERING_RULES.hazardPolicy
+      : DEFAULT_GATHERING_RULES.hazardPolicy,
+    toolBreakagePolicy: TOOL_BREAKAGE_POLICIES.has(rules?.toolBreakagePolicy)
+      ? rules.toolBreakagePolicy
+      : DEFAULT_GATHERING_RULES.toolBreakagePolicy
   };
 }
 

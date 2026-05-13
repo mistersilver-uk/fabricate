@@ -1,0 +1,24 @@
+# Tasks
+
+- [ ] Add `src/models/Tool.js` (data model, validation, evaluateBreakage, applyUsage, applyBreakage).
+- [ ] Normalize and validate `tools` in `src/systems/GatheringEnvironmentStore.js`.
+- [ ] Add `evaluateRequirement` to `src/systems/GatheringGateAndCheckEvaluator.js`.
+- [ ] Expose `getGatheringRules(systemId)` on `src/systems/GatheringRichStateService.js`.
+- [ ] Add `createGatheringToolAvailability` and `createGatheringToolBreakage` factories in `src/main.js`; wire them into `GatheringEngine`.
+- [ ] Add `TOOL_BLOCKED` reason, start-attempt gate, `_planTerminalTools`, `_applyTerminalTools`, and policy override to `src/systems/GatheringEngine.js`.
+- [ ] Create `src/ui/svelte/apps/environments/ToolsList.svelte`.
+- [ ] Wire `tools` tab and handlers into `src/ui/svelte/apps/manager-v2/EnvironmentEditView.svelte`.
+- [ ] Plumb `toolBreakagePolicy` through `src/ui/svelte/stores/adminStore.js` (constant, default, normalization).
+- [ ] Add the `toolBreakagePolicy` select row to `src/ui/svelte/apps/manager-v2/CraftingSystemManagerV2Root.svelte`.
+- [ ] Add localization keys to `lang/en.json`; retag the Catalysts label.
+- [ ] Update `openspec/specs/data-models/spec.md` with a `Tool` entry.
+- [ ] Update `openspec/specs/gathering-and-harvesting/spec.md` with `toolBreakagePolicy` and a `Gathering Task Tools` section.
+- [ ] Add `docs/how-to/breakable-gathering-tools.md`.
+- [ ] Update `docs/gathering-environments.md` with a Tools subsection (insert if missing).
+- [ ] Add `tests/tool-model.test.js`.
+- [ ] Add `tests/gathering-environment-store-tools.test.js`.
+- [ ] Add `tests/gathering-tool-runtime.test.js`.
+- [ ] Extend `tests/gathering-gate-and-check-evaluator.test.js`.
+- [ ] Extend `tests/gathering-bootstrap-api.test.js`.
+- [ ] Run `npm test`.
+- [ ] Run `npm run build`.

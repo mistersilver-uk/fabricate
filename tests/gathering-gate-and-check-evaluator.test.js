@@ -398,3 +398,116 @@ test('thrown macro and expression errors return provider diagnostics without raw
   assert.equal(expressionCheck.reasonCode, 'PROVIDER_ERROR');
   assert.equal(expressionCheck.diagnostic.message, 'expression exploded');
 });
+
+// ---------------------------------------------------------------------------
+// evaluateRequirement
+// ---------------------------------------------------------------------------
+
+test('null requirement is allowed with NO_REQUIREMENT reason', async () => {
+  const { evaluator } = makeEvaluator();
+  const result = await evaluator.evaluateRequirement({ actor });
+  assert.equal(result.allowed, true);
+  assert.equal(result.reasonCode, 'NO_REQUIREMENT');
+});
+
+test('system requirement allows when expression is truthy', async () => {
+  const { evaluator, expressionCalls } = makeEvaluator({
+    expressionResults: new Map([['dnd5e:@flags.proficient', 1]])
+  });
+  const result = await evaluator.evaluateRequirement({
+    requirement: { provider: 'dnd5e', formula: '@flags.proficient' },
+    actor
+  });
+  assert.equal(result.allowed, true);
+  assert.equal(result.reasonCode, 'REQUIREMENT_MET');
+  assert.equal(expressionCalls[0].kind, 'toolRequirement');
+});
+
+test('system requirement blocks when expression is zero', async () => {
+  const { evaluator } = makeEvaluator({
+    expressionResults: new Map([['dnd5e:@flags.proficient', 0]])
+  });
+  const result = await evaluator.evaluateRequirement({
+    requirement: { provider: 'dnd5e', formula: '@flags.proficient' },
+    actor
+  });
+  assert.equal(result.allowed, false);
+  assert.equal(result.reasonCode, 'REQUIREMENT_FAILED');
+});
+
+test('system requirement blocks when expression returns boolean false', async () => {
+  const { evaluator } = makeEvaluator({
+    expressionResults: new Map([['dnd5e:@flags.proficient', false]])
+  });
+  const result = await evaluator.evaluateRequirement({
+    requirement: { provider: 'dnd5e', formula: '@flags.proficient' },
+    actor
+  });
+  assert.equal(result.allowed, false);
+});
+
+test('macro requirement returns boolean directly', async () => {
+  const { evaluator } = makeEvaluator({
+    macroResults: new Map([['Macro.allow', true]])
+  });
+  const result = await evaluator.evaluateRequirement({
+    requirement: { provider: 'macro', macroUuid: 'Macro.allow' },
+    actor
+  });
+  assert.equal(result.allowed, true);
+  assert.equal(result.reasonCode, 'REQUIREMENT_MET');
+});
+
+test('macro requirement accepts { allowed, description }', async () => {
+  const { evaluator } = makeEvaluator({
+    macroResults: new Map([['Macro.allow', { allowed: false, description: 'no proficiency' }]])
+  });
+  const result = await evaluator.evaluateRequirement({
+    requirement: { provider: 'macro', macroUuid: 'Macro.allow' },
+    actor
+  });
+  assert.equal(result.allowed, false);
+  assert.equal(result.description, 'no proficiency');
+});
+
+test('macro requirement returning malformed value is a diagnostic', async () => {
+  const { evaluator } = makeEvaluator({
+    macroResults: new Map([['Macro.allow', 'not a boolean']])
+  });
+  const result = await evaluator.evaluateRequirement({
+    requirement: { provider: 'macro', macroUuid: 'Macro.allow' },
+    actor
+  });
+  assert.equal(result.allowed, false);
+  assert.equal(result.reasonCode, 'MALFORMED_RESULT');
+});
+
+test('macro requirement without macroUuid is misconfigured', async () => {
+  const { evaluator } = makeEvaluator();
+  const result = await evaluator.evaluateRequirement({
+    requirement: { provider: 'macro', macroUuid: '' },
+    actor
+  });
+  assert.equal(result.allowed, false);
+  assert.equal(result.reasonCode, 'MISCONFIGURED_PROVIDER');
+});
+
+test('system requirement without formula is misconfigured', async () => {
+  const { evaluator } = makeEvaluator();
+  const result = await evaluator.evaluateRequirement({
+    requirement: { provider: 'dnd5e', formula: '' },
+    actor
+  });
+  assert.equal(result.allowed, false);
+  assert.equal(result.reasonCode, 'MISCONFIGURED_PROVIDER');
+});
+
+test('unsupported provider yields UNSUPPORTED_PROVIDER', async () => {
+  const { evaluator } = makeEvaluator();
+  const result = await evaluator.evaluateRequirement({
+    requirement: { provider: 'mystery', formula: '1' },
+    actor
+  });
+  assert.equal(result.allowed, false);
+  assert.equal(result.reasonCode, 'UNSUPPORTED_PROVIDER');
+});

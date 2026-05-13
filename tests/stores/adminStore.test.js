@@ -2611,7 +2611,8 @@ describe('createAdminStore', () => {
         rewardLimit: 1,
         hazardSelectionMode: 'limitedDrops',
         hazardLimit: 3,
-        hazardPolicy: 'successWithHazard'
+        hazardPolicy: 'successWithHazard',
+        toolBreakagePolicy: 'failureOnBreak'
       });
 
       await store.updateGatheringRules('sys1', {
@@ -2627,7 +2628,8 @@ describe('createAdminStore', () => {
         rewardLimit: 2,
         hazardSelectionMode: 'highestRankedDrop',
         hazardLimit: 1,
-        hazardPolicy: 'failureWithHazard'
+        hazardPolicy: 'failureWithHazard',
+        toolBreakagePolicy: 'failureOnBreak'
       });
       assert.deepEqual(get(store.viewState).gatheringConfig.systems.sys1.rules, services._store.gatheringConfig.systems.sys1.rules);
     });

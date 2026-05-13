@@ -3,6 +3,7 @@
   import { tick } from 'svelte';
   import { localize } from '../../util/foundryBridge.js';
   import CatalystList from '../environments/CatalystList.svelte';
+  import ToolsList from '../environments/ToolsList.svelte';
   import EnvironmentActionMenu from '../environments/EnvironmentActionMenu.svelte';
   import FailureOutcomeFields from '../environments/FailureOutcomeFields.svelte';
   import ProgressiveFields from '../environments/ProgressiveFields.svelte';
@@ -61,6 +62,9 @@
     onAddCatalyst,
     onUpdateCatalyst,
     onDeleteCatalyst,
+    onAddTool,
+    onUpdateTool,
+    onDeleteTool,
     onUpdateVisibility,
     onUpdateResultSelection,
     onUpdateProgressive,
@@ -81,6 +85,7 @@
     { id: 'details', section: 'base', icon: 'fas fa-pen', labelKey: 'FABRICATE.Admin.ManagerV2.Environment.TaskTabDetails', fallback: 'Task Details' },
     { id: 'results', section: 'resultGroups', icon: 'fas fa-box-open', labelKey: 'FABRICATE.Admin.ManagerV2.Environment.TaskTabResults', fallback: 'Results' },
     { id: 'catalysts', section: 'catalysts', icon: 'fas fa-key', labelKey: 'FABRICATE.Admin.ManagerV2.Environment.TaskTabCatalysts', fallback: 'Catalysts' },
+    { id: 'tools', section: 'tools', icon: 'fas fa-screwdriver-wrench', labelKey: 'FABRICATE.Admin.ManagerV2.Environment.TaskTabTools', fallback: 'Tools' },
     { id: 'visibility', section: 'visibility', icon: 'fas fa-eye', labelKey: 'FABRICATE.Admin.ManagerV2.Environment.TaskTabVisibility', fallback: 'Visibility' },
     { id: 'timing', section: 'time', icon: 'fas fa-clock', labelKey: 'FABRICATE.Admin.ManagerV2.Environment.TaskTabTiming', fallback: 'Timing' },
     { id: 'check', section: 'check', icon: 'fas fa-dice-d20', labelKey: 'FABRICATE.Admin.ManagerV2.Environment.TaskTabCheck', fallback: 'Check' }
@@ -108,6 +113,7 @@
   const activeTaskProgressive = $derived(activeTask?.progressive || null);
   const activeTaskCheck = $derived(activeTask?.check || null);
   const activeTaskCatalysts = $derived(Array.isArray(activeTask?.catalysts) ? activeTask.catalysts : []);
+  const activeTaskTools = $derived(Array.isArray(activeTask?.tools) ? activeTask.tools : []);
   const activeTaskResultGroups = $derived(Array.isArray(activeTask?.resultGroups) ? activeTask.resultGroups : []);
   const validationErrors = $derived(Array.isArray(validationState?.errors) ? validationState.errors : []);
   const managedItemMap = $derived(new Map((Array.isArray(managedItemOptions) ? managedItemOptions : []).map(item => [item.id, item])));
@@ -302,6 +308,10 @@
     return localize('FABRICATE.Admin.Environments.CatalystCount', { count });
   }
 
+  function toolCountLabel(count) {
+    return localize('FABRICATE.Admin.Environments.ToolCount', { count });
+  }
+
   function taskEnabledLabel(task) {
     return task?.enabled
       ? localize('FABRICATE.Admin.Environments.Enabled')
@@ -418,6 +428,7 @@
     if (taskPath.startsWith('resultSelection')) return 'resolution';
     if (taskPath.startsWith('progressive') || taskPath.startsWith('check')) return 'check';
     if (taskPath.startsWith('catalysts')) return 'catalysts';
+    if (taskPath.startsWith('tools')) return 'tools';
     if (taskPath.startsWith('resultGroups') || taskPath.startsWith('result.')) return 'resultGroups';
     return 'base';
   }
@@ -426,6 +437,7 @@
     if (sectionKey === 'base') return 'details';
     if (sectionKey === 'resolution' || sectionKey === 'resultGroups') return 'results';
     if (sectionKey === 'catalysts') return 'catalysts';
+    if (sectionKey === 'tools') return 'tools';
     if (sectionKey === 'visibility') return 'visibility';
     if (sectionKey === 'time' || sectionKey === 'failure') return 'timing';
     if (sectionKey === 'check') return 'check';
@@ -669,6 +681,10 @@
     return activeTask?.id ? `task.${activeTask.id}.catalysts.${index}.${field}` : '';
   }
 
+  function toolField(index, field) {
+    return activeTask?.id ? `task.${activeTask.id}.tools.${index}.${field}` : '';
+  }
+
   function resultGroupField(groupId, field) {
     return activeTask?.id && groupId ? `task.${activeTask.id}.resultGroups.${groupId}.${field}` : '';
   }
@@ -846,6 +862,21 @@
   function deleteCatalyst(catalystIndex) {
     if (!activeTask?.id) return;
     onDeleteCatalyst?.(activeTask.id, catalystIndex);
+  }
+
+  function addTool() {
+    if (!activeTask?.id) return;
+    onAddTool?.(activeTask.id);
+  }
+
+  function updateTool(toolIndex, updates) {
+    if (!activeTask?.id) return;
+    onUpdateTool?.(activeTask.id, toolIndex, updates);
+  }
+
+  function deleteTool(toolIndex) {
+    if (!activeTask?.id) return;
+    onDeleteTool?.(activeTask.id, toolIndex);
   }
 
   function isCompleteVisibility(config) {
@@ -1610,6 +1641,23 @@
                 {updateCatalyst}
                 {deleteCatalyst}
                 {catalystField}
+                {fieldInvalid}
+                {fieldDescribedBy}
+                {fieldErrors}
+                {fieldErrorId}
+              />
+            {:else if activeTaskTab === 'tools'}
+              <ToolsList
+                {activeTaskTools}
+                {managedItemOptions}
+                sectionOpen={true}
+                sectionSummary={toolCountLabel(activeTaskTools.length)}
+                sectionInvalid={taskSectionInvalid('tools')}
+                setSectionOpen={() => {}}
+                {addTool}
+                {updateTool}
+                {deleteTool}
+                {toolField}
                 {fieldInvalid}
                 {fieldDescribedBy}
                 {fieldErrors}

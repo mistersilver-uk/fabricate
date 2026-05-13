@@ -392,7 +392,8 @@
     rewardLimit: 1,
     hazardSelectionMode: 'allDrops',
     hazardLimit: 1,
-    hazardPolicy: 'successWithHazard'
+    hazardPolicy: 'successWithHazard',
+    toolBreakagePolicy: 'failureOnBreak'
   });
   const selectedGatheringSystemConfig = $derived($viewState.gatheringConfig?.systems?.[selectedSystemId] || {});
   const gatheringTaskDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.tasks) ? selectedGatheringSystemConfig.tasks : []);
@@ -2500,6 +2501,9 @@
             onAddCatalyst={store.addEnvironmentTaskCatalyst}
             onUpdateCatalyst={store.updateEnvironmentTaskCatalyst}
             onDeleteCatalyst={store.deleteEnvironmentTaskCatalyst}
+            onAddTool={store.addEnvironmentTaskTool}
+            onUpdateTool={store.updateEnvironmentTaskTool}
+            onDeleteTool={store.deleteEnvironmentTaskTool}
             onUpdateVisibility={store.updateEnvironmentTaskVisibility}
             onUpdateResultSelection={store.updateEnvironmentTaskResultSelection}
             onUpdateProgressive={store.updateEnvironmentTaskProgressive}
@@ -3135,6 +3139,20 @@
                   <select id="manager-v2-gathering-rule-outcome" value={selectedGatheringRules.hazardPolicy} onchange={(event) => updateSelectedGatheringRules({ hazardPolicy: event.target.value })}>
                     <option value="successWithHazard">{text('FABRICATE.Admin.ManagerV2.Environment.Rules.GatheringSucceeds', 'Gathering succeeds')}</option>
                     <option value="failureWithHazard">{text('FABRICATE.Admin.ManagerV2.Environment.Rules.GatheringFails', 'Gathering fails')}</option>
+                  </select>
+                </span>
+              </div>
+
+              <div class="manager-v2-rule-row">
+                <span class="manager-v2-rule-icon" aria-hidden="true"><i class="fas fa-screwdriver-wrench"></i></span>
+                <label class="manager-v2-rule-copy" for="manager-v2-gathering-rule-tool-breakage">
+                  <strong>{text('FABRICATE.Admin.ManagerV2.Environment.Rules.ToolBreakageOutcome', 'Tool breakage outcome')}</strong>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Rules.ToolBreakageDescription', 'Decide whether a broken tool fails the gathering attempt or only reports the breakage.')}</span>
+                </label>
+                <span class="manager-v2-rule-field">
+                  <select id="manager-v2-gathering-rule-tool-breakage" value={selectedGatheringRules.toolBreakagePolicy ?? 'failureOnBreak'} onchange={(event) => updateSelectedGatheringRules({ toolBreakagePolicy: event.target.value })}>
+                    <option value="failureOnBreak">{text('FABRICATE.Admin.ManagerV2.Environment.Rules.ToolFailureOnBreak', 'Attempt fails on break')}</option>
+                    <option value="successDespiteBreak">{text('FABRICATE.Admin.ManagerV2.Environment.Rules.ToolSuccessDespiteBreak', 'Attempt succeeds despite break')}</option>
                   </select>
                 </span>
               </div>

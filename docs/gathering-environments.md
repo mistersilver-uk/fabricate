@@ -116,6 +116,7 @@ An environment contains one or more Environment Tasks. The current GM editor sup
 | Result groups | Add, rename, delete, and reorder groups |
 | Results | Add, edit, delete, and reorder component results with `componentId` and `quantity` |
 | Catalysts | Add and delete catalyst rows; edit `componentId`, `degradesOnUse`, `destroyWhenExhausted`, and `maxUses` |
+| Tools | Add and delete tool rows; edit `componentId`, the optional tool requirement, the breakage mechanic (limited uses, % chance, or dice expression), and the on-break action (destroy, mark broken, or replace) |
 
 Progressive task result difficulty comes from the selected managed component's `difficulty`; result rows do not store their own difficulty value.
 
@@ -217,6 +218,25 @@ Gathering catalysts use the same component identifiers and degradation fields as
 | `maxUses` | Optional positive integer usage limit; blank means unlimited |
 
 Save validation rejects catalyst rows without a `componentId`. `maxUses` is nullable and is validated as a positive integer only when `degradesOnUse` is enabled.
+
+## Tools
+
+Gathering tasks may declare one or more required tools, separate from catalysts. All listed tools must be present in the actor's inventory and pass their requirement before the attempt may start.
+
+| Field | Description |
+|:------|:------------|
+| `componentId` | Required component from the current crafting system's managed item list |
+| `requirement` | Optional Foundry expression (per provider) or macro UUID; must evaluate truthy for the actor to use the tool |
+| `breakage.mode` | One of `limitedUses`, `breakageChance`, or `diceExpression` |
+| `breakage.maxUses` | `limitedUses`: positive integer or blank (unlimited); tracked on the item via `flags.fabricate.toolUsage.timesUsed` |
+| `breakage.breakageChance` | `breakageChance`: integer percent in `0..100` |
+| `breakage.formula` + `breakage.threshold` | `diceExpression`: Foundry roll formula and numeric threshold (broken when result < threshold) |
+| `onBreak.mode` | One of `destroy`, `flagBroken`, or `replaceWith` |
+| `onBreak.replacementComponentId` | `replaceWith`: a different managed component spawned on the actor when the tool breaks |
+
+The system-level Gathering Rules setting **Tool breakage outcome** controls what happens when any tool breaks: `failureOnBreak` (default) overrides the attempt to `failed` and clears drops; `successDespiteBreak` preserves the success state. Either way, the on-break action always commits.
+
+See the [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}) how-to for a worked example.
 
 ## Save Validation
 

@@ -345,3 +345,39 @@ test('scene access adapter accepts Foundry V13 TokenDocument parent scene shape'
     'scene access should accept V13 TokenDocument parent UUID and legacy fake/placeable shapes'
   );
 });
+
+test('GatheringEngine is constructed with tool availability and breakage injectables', () => {
+  assert.match(
+    mainSource,
+    /toolAvailability: createGatheringToolAvailability\(/,
+    'GatheringEngine should be given a toolAvailability factory'
+  );
+  assert.match(
+    mainSource,
+    /toolBreakage: createGatheringToolBreakage\(/,
+    'GatheringEngine should be given a toolBreakage factory'
+  );
+});
+
+test('tool availability injectable matches by componentId and skips broken-flagged items', () => {
+  assert.match(
+    mainSource,
+    /function createGatheringToolAvailability\(/,
+    'main.js should declare createGatheringToolAvailability'
+  );
+  assert.match(
+    mainSource,
+    /function createGatheringToolBreakage\(/,
+    'main.js should declare createGatheringToolBreakage'
+  );
+  assert.match(
+    mainSource,
+    /toolBroken/,
+    'tool availability should consider the toolBroken flag'
+  );
+  assert.match(
+    mainSource,
+    /evaluateRequirement\?\.\(/,
+    'tool availability should evaluate per-tool requirement'
+  );
+});

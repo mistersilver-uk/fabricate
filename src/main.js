@@ -21,6 +21,7 @@ import { Recipe } from './models/Recipe.js';
 import { Ingredient } from './models/Ingredient.js';
 import { IngredientGroup } from './models/IngredientGroup.js';
 import { Catalyst } from './models/Catalyst.js';
+import { Tool } from './models/Tool.js';
 import { MacroExecutor } from './utils/MacroExecutor.js';
 import {
   callGatheringRuntimeWithCurrentViewer,
@@ -174,6 +175,122 @@ function createGatheringCatalystUsage(craftingSystemManager) {
       return matched.items.map(({ item }) => gatheringRunItemRef(actor, item));
     }
   };
+}
+
+function createGatheringToolAvailability({ craftingSystemManager, evaluator }) {
+  return {
+    async check({ actor, viewer, system, environment, task, tools = [] } = {}) {
+      const matched = matchGatheringTools({ actor, system, task, tools, craftingSystemManager });
+      const failedRequirements = [];
+      for (const { tool } of matched.items) {
+        if (!tool?.requirement) continue;
+        const result = await evaluator?.evaluateRequirement?.({
+          requirement: tool.requirement,
+          actor,
+          environment,
+          task
+        });
+        if (result && result.allowed !== true) {
+          failedRequirements.push({ tool, diagnostic: result.diagnostic, reasonCode: result.reasonCode });
+        }
+      }
+      return {
+        available: matched.missing.length === 0 && failedRequirements.length === 0,
+        missing: matched.missing,
+        failedRequirements,
+        items: matched.items.map(({ item }) => item)
+      };
+    }
+  };
+}
+
+function createGatheringToolBreakage({ craftingSystemManager, evaluateExpression, resultCreator }) {
+  return {
+    async plan({ actor, system, task, tools = [] } = {}) {
+      const matched = matchGatheringTools({ actor, system, task, tools, craftingSystemManager });
+      const planned = [];
+      for (const { tool, item } of matched.items) {
+        planned.push({ ref: gatheringRunItemRef(actor, item), componentId: tool.componentId });
+      }
+      return planned;
+    },
+
+    async apply({ actor, system, environment, task, tools = [] } = {}) {
+      const matched = matchGatheringTools({ actor, system, task, tools, craftingSystemManager });
+      const evidence = [];
+      for (const { tool: toolData, item } of matched.items) {
+        const tool = Tool.fromJSON(toolData);
+        await tool.applyUsage(item);
+        const breakageResult = await tool.evaluateBreakage({
+          actor,
+          item,
+          evaluateExpression
+        });
+        const entry = {
+          componentId: tool.componentId,
+          itemRef: gatheringRunItemRef(actor, item),
+          mode: breakageResult.mode,
+          broken: breakageResult.broken,
+          evidence: breakageResult.evidence
+        };
+        if (breakageResult.broken) {
+          const breakOutcome = await tool.applyBreakage({
+            item,
+            actor,
+            createReplacement: async ({ actor: replacementActor, componentId }) => {
+              const source = resolveGatheringResultSource(
+                { componentId, quantity: 1 },
+                system,
+                craftingSystemManager
+              );
+              if (!source || typeof replacementActor?.createEmbeddedDocuments !== 'function') return;
+              const itemData = source.toObject?.() ?? {
+                name: source.name ?? 'Replacement Item',
+                img: source.img ?? 'icons/svg/item-bag.svg',
+                type: source.type ?? 'loot',
+                system: source.system ? globalThis.foundry?.utils?.deepClone?.(source.system) ?? { ...source.system } : {}
+              };
+              itemData.system ??= {};
+              if (itemData.system.quantity !== undefined) itemData.system.quantity = 1;
+              if (source.uuid) {
+                globalThis.foundry?.utils?.setProperty?.(itemData, 'flags.core.sourceId', source.uuid);
+              }
+              await replacementActor.createEmbeddedDocuments('Item', [itemData]);
+            }
+          });
+          entry.onBreak = breakOutcome;
+        }
+        evidence.push(entry);
+      }
+      return evidence;
+    }
+  };
+}
+
+function matchGatheringTools({ actor, system, task, tools = [], craftingSystemManager } = {}) {
+  const matchedItems = [];
+  const missing = [];
+  const syntheticRecipe = {
+    id: `gathering:${task?.id ?? 'task'}`,
+    craftingSystemId: system?.id ?? task?.craftingSystemId ?? null
+  };
+  const items = normalizeFoundryCollection(actor?.items);
+
+  for (const tool of tools) {
+    const item = items.find(candidate => {
+      const broken = candidate?.getFlag?.('fabricate', 'fabricate.toolBroken') === true
+        || globalThis.foundry?.utils?.getProperty?.(candidate, 'flags.fabricate.fabricate.toolBroken') === true;
+      if (broken) return false;
+      return craftingSystemManager?.catalystMatchesItem?.(syntheticRecipe, tool, candidate);
+    });
+    if (item) {
+      matchedItems.push({ tool, item });
+    } else {
+      missing.push(tool);
+    }
+  }
+
+  return { items: matchedItems, missing };
 }
 
 function matchGatheringCatalysts({ actor, system, task, catalysts = [], craftingSystemManager } = {}) {
@@ -475,9 +592,18 @@ class Fabricate {
       isGamePaused: isCurrentWorldPaused,
       sceneAccess: { canAttempt: canAttemptGatheringInScene },
       catalystAvailability: createGatheringCatalystAvailability(this.craftingSystemManager),
+      toolAvailability: createGatheringToolAvailability({
+        craftingSystemManager: this.craftingSystemManager,
+        evaluator: this.gatheringGateAndCheckEvaluator
+      }),
       resultResolver: createGatheringResultResolver(this.resolutionModeService),
       resultCreator: createGatheringResultCreator(this.craftingSystemManager),
       catalystUsage: createGatheringCatalystUsage(this.craftingSystemManager),
+      toolBreakage: createGatheringToolBreakage({
+        craftingSystemManager: this.craftingSystemManager,
+        evaluateExpression: evaluateGatheringExpression,
+        resultCreator: createGatheringResultCreator(this.craftingSystemManager)
+      }),
       failureFeedback: createGatheringFailureFeedback(),
       getRunViewer: getGatheringRunViewer,
       localize: localizeGathering
