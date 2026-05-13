@@ -4,7 +4,6 @@
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import Pagination from '../../components/Pagination.svelte';
   import { localize } from '../../util/foundryBridge.js';
-  import ToolsList from '../environments/ToolsList.svelte';
 
   let {
     task = null,
@@ -23,17 +22,8 @@
     onAddDrop = () => {},
     onUpdateDrop = () => {},
     onMoveDrop = () => {},
-    onImportDrop = () => {},
-    onAddTool = () => {},
-    onUpdateTool = () => {},
-    onDeleteTool = () => {}
+    onImportDrop = () => {}
   } = $props();
-
-  const taskTools = $derived(Array.isArray(task?.tools) ? task.tools : []);
-  const noopToolField = (index, field) => `task.${task?.id || ''}.tools.${index}.${field}`;
-  const noopReturnsFalse = () => false;
-  const noopReturnsEmpty = () => '';
-  const noopReturnsArray = () => [];
 
   let searchTerm = $state('');
   let pageIndex = $state(0);
@@ -877,31 +867,6 @@
           onPageSizeChange={(next) => { pageSize = next; pageIndex = 0; }}
         />
       </div>
-    </section>
-
-    <section class="manager-v2-task-tools-card" data-gathering-task-tools-editor>
-      <div class="manager-v2-task-card-heading">
-        <div>
-          <h3>{text('FABRICATE.Admin.Environments.Tools', 'Tools')}</h3>
-          <p class="manager-v2-muted">{text('FABRICATE.Admin.Environments.NoToolsHint', 'Add a tool when this task should require equipment that can break or wear out.')}</p>
-        </div>
-      </div>
-      <ToolsList
-        activeTaskTools={taskTools}
-        {managedItemOptions}
-        sectionOpen={true}
-        sectionSummary={text('FABRICATE.Admin.Environments.ToolCount', '{count} tools').replace('{count}', taskTools.length)}
-        sectionInvalid={false}
-        setSectionOpen={() => {}}
-        addTool={onAddTool}
-        updateTool={onUpdateTool}
-        deleteTool={onDeleteTool}
-        toolField={noopToolField}
-        fieldInvalid={noopReturnsFalse}
-        fieldDescribedBy={noopReturnsEmpty}
-        fieldErrors={noopReturnsArray}
-        fieldErrorId={noopReturnsEmpty}
-      />
     </section>
 
     <section class="manager-v2-warning-band is-formula">
