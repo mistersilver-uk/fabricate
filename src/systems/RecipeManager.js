@@ -57,9 +57,10 @@ export class RecipeManager {
   /**
    * Create a new recipe
    * @param {Object} recipeData - Recipe configuration
+   * @param {{notify?: boolean}} [options] - Set notify=false for batch callers that emit their own summary
    * @returns {Recipe}
    */
-  async createRecipe(recipeData) {
+  async createRecipe(recipeData, options = {}) {
     this._assertGM('create recipe');
 
     const recipe = new Recipe(recipeData);
@@ -73,7 +74,9 @@ export class RecipeManager {
     await this.save();
     console.debug(`Fabricate | Created recipe "${recipe.name}" (${recipe.id})`);
 
-    ui.notifications.info(`Recipe "${recipe.name}" created`);
+    if (options.notify !== false) {
+      ui.notifications.info(`Recipe "${recipe.name}" created`);
+    }
     return recipe;
   }
 
@@ -81,9 +84,10 @@ export class RecipeManager {
    * Update an existing recipe
    * @param {string} recipeId - Recipe ID to update
    * @param {Object} updates - Properties to update
+   * @param {{notify?: boolean}} [options] - Set notify=false for batch callers that emit their own summary
    * @returns {Recipe}
    */
-  async updateRecipe(recipeId, updates) {
+  async updateRecipe(recipeId, updates, options = {}) {
     this._assertGM('update recipe');
 
     const recipe = this.recipes.get(recipeId);
@@ -106,15 +110,18 @@ export class RecipeManager {
     this.recipes.set(recipeId, updatedRecipe);
     await this.save();
     console.debug(`Fabricate | Updated recipe "${updatedRecipe.name}" (${updatedRecipe.id})`);
-    ui.notifications.info(`Recipe "${updatedRecipe.name}" updated`);
+    if (options.notify !== false) {
+      ui.notifications.info(`Recipe "${updatedRecipe.name}" updated`);
+    }
     return updatedRecipe;
   }
 
   /**
    * Delete a recipe
    * @param {string} recipeId - Recipe ID to delete
+   * @param {{notify?: boolean}} [options] - Set notify=false for batch callers that emit their own summary
    */
-  async deleteRecipe(recipeId) {
+  async deleteRecipe(recipeId, options = {}) {
     this._assertGM('delete recipe');
 
     const recipe = this.recipes.get(recipeId);
@@ -125,7 +132,9 @@ export class RecipeManager {
     this.recipes.delete(recipeId);
     await this.save();
     await this._cleanupFlagsAfterRecipeMutation();
-    ui.notifications.info(`Recipe "${recipe.name}" deleted`);
+    if (options.notify !== false) {
+      ui.notifications.info(`Recipe "${recipe.name}" deleted`);
+    }
   }
 
   /**
@@ -888,6 +897,7 @@ export class RecipeManager {
     await this.save();
     await this._cleanupFlagsAfterRecipeMutation();
     ui.notifications.info(`Imported ${imported} recipes (${skipped} skipped)`);
+    return { imported, skipped, total: recipesData.length };
   }
 
   /**

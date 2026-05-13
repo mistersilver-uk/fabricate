@@ -982,19 +982,31 @@ export class CraftingSystemManager {
 
   async deleteSystem(systemId) {
     this._assertGM('delete crafting system');
-    if (!this.systems.has(systemId)) {
+    const system = this.systems.get(systemId);
+    if (!system) {
       throw new Error(`Crafting system not found: ${systemId}`);
     }
 
     // Delete recipes that belong to this crafting system.
     const affected = this.recipeManager.getRecipes({ craftingSystemId: systemId });
     for (const recipe of affected) {
-      await this.recipeManager.deleteRecipe(recipe.id);
+      await this.recipeManager.deleteRecipe(recipe.id, { notify: false });
     }
 
     this.systems.delete(systemId);
     await this.save();
     this._notifySystemsChanged();
+
+    const componentCount = Array.isArray(system.components)
+      ? system.components.length
+      : (Array.isArray(system.items) ? system.items.length : 0);
+    const essenceCount = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions.length : 0;
+    const recipeItemCount = Array.isArray(system.recipeItemDefinitions) ? system.recipeItemDefinitions.length : 0;
+    const relatedCount = affected.length + componentCount + essenceCount + recipeItemCount;
+    const entityLabel = relatedCount === 1 ? 'entity' : 'entities';
+    ui?.notifications?.info?.(
+      `Deleted crafting system "${system.name || systemId}" and ${relatedCount} related ${entityLabel}.`
+    );
   }
 
   _notifySystemsChanged() {

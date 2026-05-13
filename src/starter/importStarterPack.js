@@ -24,9 +24,13 @@ export async function importStarterPack(packId = 'alchemists-supplies') {
   const recipes = [];
   for (const recipeData of data.recipes) {
     const resolved = { ...recipeData, craftingSystemId: system.id };
-    const recipe = await recipeManager.createRecipe(resolved);
+    const recipe = await recipeManager.createRecipe(resolved, { notify: false });
     recipes.push(recipe);
   }
+
+  ui?.notifications?.info?.(
+    `Imported starter pack "${system.name}" with ${recipes.length} recipes.`
+  );
 
   return {
     system,

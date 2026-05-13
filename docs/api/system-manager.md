@@ -208,6 +208,8 @@ Deletes a system and all its recipes. GM only.
 
 **Returns:** `Promise<void>`
 
+Deleting a system emits one summary notification naming the crafting system and counting related entities deleted with it. It does not emit one notification per deleted recipe.
+
 ---
 
 ## Component Methods

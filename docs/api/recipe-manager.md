@@ -15,13 +15,14 @@ Handles recipe CRUD operations, filtering, and craftability checks.
 
 ## Methods
 
-### createRecipe(recipeData)
+### createRecipe(recipeData, options)
 
 Creates a new recipe. GM only.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
 | `recipeData` | `object` | Recipe data (see [Recipe model]({% link api/models.md %}#recipe)) |
+| `options.notify` | `boolean` | Optional. Set to `false` for batch callers that emit their own summary notification. Defaults to `true`. |
 
 **Returns:** `Promise<Recipe>`
 
@@ -36,7 +37,7 @@ const recipe = await rm.createRecipe({
 console.log(`Created: ${recipe.id}`);
 ```
 
-### updateRecipe(recipeId, updates)
+### updateRecipe(recipeId, updates, options)
 
 Updates an existing recipe. GM only. Merges `updates` into the current recipe data.
 
@@ -44,18 +45,22 @@ Updates an existing recipe. GM only. Merges `updates` into the current recipe da
 |:----------|:-----|:------------|
 | `recipeId` | `string` | Recipe ID |
 | `updates` | `object` | Partial recipe data to merge |
+| `options.notify` | `boolean` | Optional. Set to `false` for batch callers that emit their own summary notification. Defaults to `true`. |
 
 **Returns:** `Promise<Recipe>`
 
-### deleteRecipe(recipeId)
+### deleteRecipe(recipeId, options)
 
 Deletes a recipe. GM only. Also cleans up associated runs and learned entries.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
 | `recipeId` | `string` | Recipe ID |
+| `options.notify` | `boolean` | Optional. Set to `false` for batch callers that emit their own summary notification. Defaults to `true`. |
 
 **Returns:** `Promise<void>`
+
+When `notify` is not `false`, recipe create, update, and delete calls emit the same single-recipe success notifications as the UI.
 
 ### getRecipe(recipeId)
 
@@ -244,4 +249,6 @@ Imports recipes from JSON. GM only.
 | `recipesData` | `object[]` | Array of recipe data objects |
 | `overwrite` | `boolean` | Whether to overwrite existing recipes with the same ID |
 
-**Returns:** `Promise<void>`
+**Returns:** `Promise<{ imported: number, skipped: number, total: number }>`
+
+The import emits one aggregate success notification. It does not emit per-recipe create/update notifications.

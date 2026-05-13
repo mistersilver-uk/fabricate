@@ -119,7 +119,7 @@ export class CompendiumImporter {
 
       try {
         if (existing && overwriteExisting) {
-          await this._recipeManager.updateRecipe(resolved.id, resolved);
+          await this._recipeManager.updateRecipe(resolved.id, resolved, { notify: false });
           summary.collisions.push({
             type: 'recipe',
             id: resolved.id,
@@ -127,7 +127,7 @@ export class CompendiumImporter {
             resolution: 'overwritten'
           });
         } else {
-          await this._recipeManager.createRecipe(resolved);
+          await this._recipeManager.createRecipe(resolved, { notify: false });
         }
         summary.recipes.imported++;
       } catch (err) {

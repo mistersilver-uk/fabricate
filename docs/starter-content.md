@@ -31,9 +31,7 @@ Call `game.fabricate.importStarterPack()` from a Foundry **Script Macro** or fro
 
 Hooks.once("fabricate.ready", async () => {
   const result = await game.fabricate.importStarterPack();
-  ui.notifications.info(
-    `Imported "${result.system.name}" with ${result.recipes.length} recipes.`
-  );
+  console.log(`Imported "${result.system.name}" with ${result.recipes.length} recipes.`);
 });
 ```
 
@@ -41,12 +39,10 @@ If Fabricate is already ready (for example, you are running the macro interactiv
 
 ```javascript
 const result = await game.fabricate.importStarterPack();
-ui.notifications.info(
-  `Imported "${result.system.name}" with ${result.recipes.length} recipes.`
-);
+console.log(`Imported "${result.system.name}" with ${result.recipes.length} recipes.`);
 ```
 
-The function returns an object with three properties:
+The function shows one summary notification and returns an object with three properties:
 
 | Property | Type | Description |
 |:---------|:-----|:------------|

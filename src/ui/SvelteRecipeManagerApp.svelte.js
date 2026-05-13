@@ -211,7 +211,6 @@ export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
             const data = JSON.parse(result.raw).map(r => ({ ...r, craftingSystemId: systemId }));
             await game.fabricate.getRecipeManager().importRecipes(data, result.overwrite);
             await this._adminStore.refresh();
-            ui.notifications.info(`Imported ${data.length} recipe(s).`);
           } catch (err) {
             ui.notifications.error(`Import failed: ${err.message}`);
           }
@@ -300,13 +299,12 @@ export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
           } else {
             const verb = summary.collisions.some(c => c.type === 'system' && c.resolution === 'overwritten')
               ? 'Updated' : 'Imported';
-            ui.notifications.info(
-              `${verb} "${summary.system.name}" with ${summary.components.total} components and ${summary.recipes.imported} recipes.`
-            );
-          }
-
-          if (summary.recipes.errors.length > 0) {
-            ui.notifications.warn(`${summary.recipes.errors.length} recipe(s) failed to import.`);
+            const message = `${verb} "${summary.system.name}" with ${summary.components.total} components, ${summary.recipes.imported} imported recipes, ${summary.recipes.skipped} skipped recipes, and ${summary.recipes.errors.length} failed recipes.`;
+            if (summary.recipes.errors.length > 0) {
+              ui.notifications.warn(message);
+            } else {
+              ui.notifications.info(message);
+            }
           }
 
           await this._adminStore.refresh();
