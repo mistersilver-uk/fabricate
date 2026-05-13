@@ -23,10 +23,15 @@
 - [x] Add row-level component drop-zone styling and swap behavior for mapped tools.
 - [x] Add drop-to-create behavior for the Tools add stub.
 - [x] Align replacement component editor with the primary component drop-zone behavior.
+- [x] Make the replacement component drop zone full-width without a separate inline label.
 - [x] Keep tool breakage and on-break editor controls on single-line rows.
 - [x] Convert Tools draft saving from page-level to per-tool dirty/save semantics with immediate persisted deletes.
 - [x] Move Tools dirty pips into the selected-tool inspector card and dirty tool rows.
 - [x] Remove the inert Tools row overflow menu and stabilize row component/pip/action widths.
+- [x] Move dirty tool row pips out of header flow and overlay them on the row corner.
+- [x] Keep overlaid dirty tool row pips readable over selected-row highlighting.
+- [x] Remove the accent-coloured outer border from selected tool rows.
+- [x] Replace the selected tool row inset marker with a selected header background fill.
 - [x] Replace the Tools requirement provider selector with a single actor-property expression field and proficiency example.
 - [ ] Update `docs/gathering-environments.md` with a Tools library subsection.
 - [ ] Run `npm test` and `npm run build`; commit and push.

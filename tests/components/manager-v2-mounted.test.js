@@ -3594,6 +3594,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     const cleanRow = target.querySelector('[data-manager-v2-tool-id="tool-mail"]');
     assert.ok(dirtyRow.querySelector('.manager-v2-tools-row-dirty-slot .manager-v2-tools-dirty-chip').textContent.includes('Unsaved'));
     assert.ok(dirtyRow.querySelector('.manager-v2-tools-row-dirty-slot .fa-save'), 'row dirty pip should include the save icon');
+    assert.equal(dirtyRow.querySelector('.manager-v2-tools-row-actions .manager-v2-tools-dirty-chip'), null);
     assert.equal(cleanRow.querySelector('.manager-v2-tools-row-dirty-slot .manager-v2-tools-dirty-chip'), null);
     assert.equal(dirtyRow.querySelector('[aria-label="More actions"]'), null);
     assert.equal(dirtyRow.querySelectorAll('.manager-v2-tools-row-actions .manager-v2-icon-button').length, 1);
@@ -3969,6 +3970,14 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
 
     const replacementDropZone = target.querySelector('[data-manager-v2-tool-replacement-drop-zone="tool-catalyst"]');
     assert.ok(replacementDropZone);
+    const replacementField = replacementDropZone.parentElement;
+    assert.ok(replacementField.classList.contains('manager-v2-tools-replacement-field'));
+    assert.equal(replacementField.classList.contains('manager-v2-tools-inline-field'), false);
+    assert.equal(replacementField.firstElementChild, replacementDropZone);
+    assert.equal(
+      Array.from(replacementField.children).some(child => child.tagName === 'SPAN' && child.textContent.trim() === 'Replacement component'),
+      false
+    );
     assert.equal(replacementDropZone.querySelector('select'), null, 'replacement component should use the primary drop-zone layout instead of a select');
     assert.ok(replacementDropZone.querySelector('.manager-v2-drop-empty-component'));
     assert.ok(replacementDropZone.textContent.includes('No Component'));

@@ -57,10 +57,10 @@ A `toolsDraft` writable parallel to `environmentDraft` holds the in-memory list 
 `ToolsBrowserView.svelte`:
 
 - Section header + `Tools (N)` browser card with `Add tool` action.
-- Compact rows with fixed-width managed-component identity/drop-zone column (thumbnail + name + secondary), fixed summary/pip/action columns, three summary chips, conditional per-row `Unsaved` pip, and expand/collapse chevron.
+- Compact rows with fixed-width managed-component identity/drop-zone column (thumbnail + name + secondary), fixed summary and chevron action columns, three summary chips, conditional per-row `Unsaved` pip overlaid at the top-left row corner on an opaque chip surface, selected row headers indicated by a subtle background fill rather than accent borders, and expand/collapse chevron.
 - Rows with an existing mapped component render that component identity as a subtle dashed drop zone; dropping a managed component from the right-side component browser replaces the tool's `componentId`.
 - The bottom Add tool stub is also a drop target; dropping a managed component or importable Foundry item creates a new tool pre-mapped to that component.
-- Inline editor for the selected/expanded row: optional label, component picker (with `dragDrop` action), optional requirement as a single actor roll-data property field with a proficiency-style example (`@tools.alchemist.value`), breakage mechanic radio group with single-line mode-specific controls, on-break action radio group with a matching replacement component drop zone for `replaceWith`, and an inline `Delete tool` button.
+- Inline editor for the selected/expanded row: optional label, component picker (with `dragDrop` action), optional requirement as a single actor roll-data property field with a proficiency-style example (`@tools.alchemist.value`), breakage mechanic radio group with single-line mode-specific controls, on-break action radio group with a full-width replacement component drop zone for `replaceWith` that keeps its empty-state copy inside the drop zone rather than using a separate side label, and an inline `Delete tool` button.
 - Empty state when zero tools; `+ Add tool` ghost row appended when at least one tool exists.
 
 ## Radio group accessibility

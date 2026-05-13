@@ -11712,6 +11712,7 @@
 .fabricate-manager-v2 .manager-v2-tools-row {
   display: flex;
   flex-direction: column;
+  position: relative;
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-03);
@@ -11719,9 +11720,18 @@
 }
 
 .fabricate-manager-v2 .manager-v2-tools-row.is-selected {
-  border-color: var(--fab-accent);
-  background: var(--fab-overlay-light-06);
-  box-shadow: 0 0 0 1px var(--fab-accent);
+  border-color: var(--fab-mv2-border-strong);
+  background: var(--fab-overlay-light-03);
+  box-shadow: none;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row.is-selected > .manager-v2-tools-row-body {
+  background: var(--fab-success-soft);
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row.is-selected.is-expanded > .manager-v2-tools-row-body {
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
 }
 
 .fabricate-manager-v2 .manager-v2-tools-row-body {
@@ -11814,24 +11824,33 @@
 
 .fabricate-manager-v2 .manager-v2-tools-row-actions {
   display: grid;
-  grid-template-columns: minmax(0, max-content) 34px;
-  gap: 6px;
+  grid-template-columns: 34px;
   align-items: center;
   justify-content: end;
   justify-self: end;
   min-width: 34px;
-  max-width: 124px;
+  max-width: 34px;
 }
 
 .fabricate-manager-v2 .manager-v2-tools-row-dirty-slot {
+  position: absolute;
+  top: 0;
+  left: 10px;
+  z-index: 4;
   display: flex;
-  justify-content: flex-end;
-  min-width: 0;
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 
 .fabricate-manager-v2 .manager-v2-tools-dirty-chip {
+  border-color: var(--fab-warning-border);
+  color: var(--fab-warning-text);
+  background: var(--fab-mv2-surface-1);
   gap: 5px;
   white-space: nowrap;
+  box-shadow:
+    inset 0 0 0 999px var(--fab-warning-soft),
+    0 2px 8px var(--fab-overlay-dark-28);
 }
 
 .fabricate-manager-v2 .manager-v2-tool-inspector-heading {
@@ -11892,6 +11911,20 @@
 }
 
 .fabricate-manager-v2 .manager-v2-tools-inline-field > .manager-v2-tool-component-row {
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-replacement-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-replacement-field > .manager-v2-tool-component-row {
+  width: 100%;
   min-width: 0;
 }
 

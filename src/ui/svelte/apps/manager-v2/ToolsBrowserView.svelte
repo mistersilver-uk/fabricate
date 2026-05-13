@@ -289,6 +289,14 @@
           <div class={`manager-v2-tools-row ${isSelected ? 'is-selected' : ''} ${isExpanded ? 'is-expanded' : ''}`}
             role="listitem"
             data-manager-v2-tool-id={tool.id}>
+            {#if isDirty}
+              <span class="manager-v2-tools-row-dirty-slot">
+                <span class="manager-v2-chip is-warning manager-v2-tools-dirty-chip" title={text('FABRICATE.Admin.ManagerV2.Tools.Dirty', 'Unsaved')}>
+                  <i class="fas fa-save" aria-hidden="true"></i>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.Dirty', 'Unsaved')}</span>
+                </span>
+              </span>
+            {/if}
             <div class="manager-v2-tools-row-body"
               role="button"
               tabindex="0"
@@ -323,14 +331,6 @@
                 </span>
               </div>
               <div class="manager-v2-tools-row-actions">
-                <span class="manager-v2-tools-row-dirty-slot">
-                  {#if isDirty}
-                    <span class="manager-v2-chip is-warning manager-v2-tools-dirty-chip" title={text('FABRICATE.Admin.ManagerV2.Tools.Dirty', 'Unsaved')}>
-                      <i class="fas fa-save" aria-hidden="true"></i>
-                      <span>{text('FABRICATE.Admin.ManagerV2.Tools.Dirty', 'Unsaved')}</span>
-                    </span>
-                  {/if}
-                </span>
                 <button type="button"
                   class="manager-v2-icon-button"
                   title={isExpanded ? text('FABRICATE.Admin.ManagerV2.Tools.CollapseRow', 'Collapse tool editor') : text('FABRICATE.Admin.ManagerV2.Tools.ExpandRow', 'Expand tool editor')}
@@ -520,8 +520,7 @@
                     {/each}
                   </div>
                   {#if tool.onBreak?.mode === 'replaceWith'}
-                    <div class="manager-v2-field manager-v2-tools-inline-field">
-                      <span>{text('FABRICATE.Admin.ManagerV2.Tools.ReplacementComponent', 'Replacement component')}</span>
+                    <div class="manager-v2-field manager-v2-tools-replacement-field">
                       <div class="manager-v2-tool-component-row"
                         data-manager-v2-tool-replacement-drop-zone={tool.id}
                         use:dragDrop={{ onDrop: (data) => handleReplacementDrop(tool, data), activeClass: 'is-drop-active' }}>

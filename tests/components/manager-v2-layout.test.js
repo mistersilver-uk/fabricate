@@ -533,6 +533,10 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const identityBlock = blockFor('.fabricate-manager-v2 .manager-v2-recipe-identity,\n.fabricate-manager-v2 .manager-v2-component-identity,\n.fabricate-manager-v2 .manager-v2-environment-identity,\n.fabricate-manager-v2 .manager-v2-gathering-task-identity');
   const toolsIdentityDropZoneBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-identity.is-component-drop-zone');
   const toolsIdentityDropZoneActiveBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-identity.is-component-drop-zone.is-drop-active');
+  const toolsRowBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-row');
+  const toolsSelectedRowBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-row.is-selected');
+  const toolsSelectedRowBodyBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-row.is-selected > .manager-v2-tools-row-body');
+  const toolsSelectedExpandedRowBodyBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-row.is-selected.is-expanded > .manager-v2-tools-row-body');
   const toolsRowBodyBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-row-body');
   const toolsIdentityBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-identity');
   const toolsRowSummaryBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-row-summary');
@@ -573,6 +577,8 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const toolsInlineFieldLabelBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-inline-field > span:first-child');
   const toolsInlineNumberInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-inline-field > input[type="number"]');
   const toolsMaxUsesInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-inline-field > .manager-v2-tools-max-uses-input');
+  const toolsReplacementFieldBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-replacement-field');
+  const toolsReplacementComponentRowBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-replacement-field > .manager-v2-tool-component-row');
   const toolsRequirementExpressionInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-requirement-expression input');
   const toolsRequirementHelpBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-requirement-help');
   const toolsInlineFieldsBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-inline-fields');
@@ -667,6 +673,23 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(!tableBlock.includes('reorder'), 'task browser should not reserve a reorder column');
   assert.ok(rowBlock.includes('grid-template-columns: var(--fab-mv2-gathering-task-grid);'), 'task rows should use the shared task grid');
   assert.ok(identityBlock.includes('grid-template-columns: 46px minmax(0, 1fr);'), 'task identity should reserve thumbnail space');
+  assert.ok(toolsRowBlock.includes('position: relative;'), 'tool rows should anchor the dirty pip overlay without involving header flow');
+  assert.ok(
+    toolsSelectedRowBlock.includes('border-color: var(--fab-mv2-border-strong);')
+      && !toolsSelectedRowBlock.includes('border-color: var(--fab-accent);')
+      && toolsSelectedRowBlock.includes('box-shadow: none;')
+      && !toolsSelectedRowBlock.includes('box-shadow: inset 3px 0 0 var(--fab-accent);'),
+    'selected tool rows should not use accent borders or inset line markers'
+  );
+  assert.ok(
+    toolsSelectedRowBodyBlock.includes('background: var(--fab-success-soft);'),
+    'selected tool rows should indicate selection through a legible header background'
+  );
+  assert.ok(
+    toolsSelectedExpandedRowBodyBlock.includes('border-bottom-right-radius: 0;')
+      && toolsSelectedExpandedRowBodyBlock.includes('border-bottom-left-radius: 0;'),
+    'expanded selected tool headers should meet the editor panel cleanly'
+  );
   assert.ok(
     toolsRowBodyBlock.includes('grid-template-columns: minmax(260px, 300px) minmax(0, 1fr) max-content;'),
     'tool rows should reserve a stable component column while keeping action width compact'
@@ -680,14 +703,21 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
     'tool row summary chips should align from a consistent summary column and never spill into a third line'
   );
   assert.ok(
-    toolsRowActionsBlock.includes('grid-template-columns: minmax(0, max-content) 34px;')
+    toolsRowActionsBlock.includes('grid-template-columns: 34px;')
       && toolsRowActionsBlock.includes('justify-self: end;')
-      && toolsRowActionsBlock.includes('max-width: 124px;'),
-    'tool row dirty pip and chevron columns should stay compact and inside the row'
+      && toolsRowActionsBlock.includes('max-width: 34px;'),
+    'tool row actions should reserve only the chevron column'
   );
   assert.ok(
-    toolsRowDirtySlotBlock.includes('justify-content: flex-end;') && toolsDirtyChipBlock.includes('white-space: nowrap;'),
-    'tool row dirty pip should align next to the chevron without wrapping'
+    toolsRowDirtySlotBlock.includes('position: absolute;')
+      && toolsRowDirtySlotBlock.includes('top: 0;')
+      && toolsRowDirtySlotBlock.includes('left: 10px;')
+      && toolsRowDirtySlotBlock.includes('z-index: 4;')
+      && toolsRowDirtySlotBlock.includes('transform: translateY(-50%);')
+      && toolsDirtyChipBlock.includes('white-space: nowrap;')
+      && toolsDirtyChipBlock.includes('background: var(--fab-mv2-surface-1);')
+      && toolsDirtyChipBlock.includes('inset 0 0 0 999px var(--fab-warning-soft),'),
+    'tool row dirty pip should overlay the top-left row corner with an opaque readable surface'
   );
   assert.ok(
     toolsInspectorHeadingBlock.includes('display: flex;') && toolsInspectorHeadingBlock.includes('flex-wrap: wrap;'),
@@ -722,6 +752,17 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(toolsInlineFieldLabelBlock.includes('white-space: nowrap;'), 'tools inline labels should not wrap above their inputs');
   assert.ok(toolsInlineNumberInputBlock.includes('max-width: 122px;'), 'tools inline number inputs should remain compact without clipping placeholders');
   assert.ok(toolsMaxUsesInputBlock.includes('max-width: 190px;'), 'tools maximum-uses input should be wide enough for its placeholder');
+  assert.ok(
+    toolsReplacementFieldBlock.includes('grid-template-columns: minmax(0, 1fr);')
+      && !toolsReplacementFieldBlock.includes('max-content')
+      && toolsReplacementFieldBlock.includes('align-items: stretch;')
+      && toolsReplacementFieldBlock.includes('width: 100%;'),
+    'tools replacement component field should fill the editor row without the inline label grid'
+  );
+  assert.ok(
+    toolsReplacementComponentRowBlock.includes('width: 100%;') && toolsReplacementComponentRowBlock.includes('min-width: 0;'),
+    'tools replacement component drop zone should span the full replacement field width'
+  );
   assert.ok(toolsRequirementExpressionInputBlock.includes('width: 100%;'), 'tools requirement expression should use the full row width');
   assert.ok(
     toolsRequirementHelpBlock.includes('font-size: 0.8rem;') && toolsRequirementHelpBlock.includes('line-height: 1.35;'),
