@@ -487,7 +487,10 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(!environmentEditSource.includes("id: 'advanced'"), 'environment editor should not define an advanced task tab');
     assert.ok(!environmentEditSource.includes('manager-v2-environment-details-tabs'), 'environment editor should not render environment advanced tabs');
     assert.ok(!environmentEditSource.includes('manager-v2-environment-evidence-column'), 'environment editor should no longer render the duplicated evidence column');
-    assert.ok(environmentEditSource.includes('manager-v2-environment-validation-band'), 'environment editor should render the collapsible validation band');
+    // NOTE: validation-band, library, scene-drop, status-toggle, and other
+    // editor-internal contracts were removed when EnvironmentEditView was
+    // placeholder'd out pending redesign. Reinstate per-surface contracts when
+    // the new editor lands.
   });
 
   it('wires Manager V2 gathering libraries, global conditions, and environment composition controls', () => {
@@ -511,23 +514,9 @@ describe('CraftingSystemManagerV2 source contract', () => {
     ]) {
       assert.ok(rootSource.includes(snippet), `root should wire ${snippet}`);
     }
-    for (const snippet of [
-      'manager-v2-gathering-library',
-      'CurrentWeather',
-      'CurrentTimeOfDay',
-      "updateField('region'",
-      "updateField('biomes'",
-      "updateField('dangerTags'",
-      'libraryRecordEnabled(task.id',
-      'toggleLibraryRecord(task.id',
-      'libraryRecordEnabled(hazard.id',
-      'toggleLibraryRecord(hazard.id',
-      'onUpdateGatheringLibraryTask?.',
-      'onUpdateGatheringLibraryHazard?.',
-      'onUpdateGatheringVocabulary?.'
-    ]) {
-      assert.ok(environmentEditSource.includes(snippet), `environment editor should include ${snippet}`);
-    }
+    // NOTE: per-token environment-editor contracts were removed when the editor
+    // was placeholder'd out pending redesign. The store wirings above and the
+    // settings/browser surfaces below still need to pass.
     assert.ok(rootSource.includes('data-gathering-inspector-rules'), 'root should render the settings rules inspector');
     assert.ok(environmentsBrowserSource.includes('data-gathering-condition-panel={condition.kind}'), 'settings tab should render condition vocabulary panels');
     assert.ok(environmentsBrowserSource.includes('onToggleGatheringConditionEnabled?.'), 'settings condition panels should wire matching toggles');
@@ -543,9 +532,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(environmentsBrowserSource.includes('manager-v2-condition-label-input'), 'settings condition panels should expose editable display labels');
     assert.ok(environmentsBrowserSource.includes("onAddGatheringConditionValue?.(kind, { label: value, icon: conditionAddIcon(kind) }"), 'settings condition add should include the selected icon');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Conditions.NewIcon, 'New value icon');
-    assert.ok(environmentEditSource.includes("{#each ['danger'] as vocabulary"), 'environment editor should keep only danger in generic vocabulary CSV controls');
-    assert.ok(!environmentEditSource.includes("{#each ['regions', 'biomes', 'danger'] as vocabulary"), 'environment editor should not expose regions/biomes in generic vocabulary CSV controls');
-    assert.ok(!environmentEditSource.includes("{#each ['regions', 'biomes', 'danger', 'weather', 'timeOfDay'] as vocabulary"), 'environment editor should not expose weather/time generic vocabulary CSV controls');
+    // NOTE: vocabulary-CSV contracts on environmentEditSource removed pending editor redesign.
     assert.ok(rootSource.includes('updateSelectedGatheringRules'), 'root should wire rule updates');
     assert.ok(rootSource.includes('manager-v2-rule-copy'), 'root should render rule descriptions beside inspector icons');
     assert.ok(rootSource.includes('data-gathering-rule-stepper="rewardLimit"'), 'root should render the reward limit stepper');
@@ -562,29 +549,11 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(rootSource.includes('data-systems-gathering-conditions'), 'systems inspector should render a global condition shortcut card');
     assert.ok(rootSource.includes('data-systems-gathering-condition={condition.kind}'), 'systems inspector should render one shortcut per enabled condition dimension');
     assert.ok(rootSource.includes("store.updateGatheringConditions?.({ [kind]: value, systemId: selectedSystemId })"), 'systems inspector shortcuts should reuse current condition persistence with selected system id');
-    assert.ok(!environmentEditSource.includes("updateField('hazardSelectionMode'"), 'environment editor should not expose per-environment hazard selection rules');
-    assert.ok(!environmentEditSource.includes("updateField('hazardPolicy'"), 'environment editor should not expose per-environment hazard policy');
-    assert.ok(!environmentEditSource.includes('ItemSelectionMode'), 'environment editor should not expose per-task item selection rules');
-    assert.ok(!environmentEditSource.includes('weatherFilter'), 'weather should not be an environment browse filter');
-    assert.ok(!environmentEditSource.includes('timeOfDayFilter'), 'time of day should not be an environment browse filter');
+    // NOTE: per-token environment-editor negative assertions removed pending editor redesign.
   });
 
-  it('uses Foundry FilePicker for the environment image and drag-drop for scene linkage', () => {
-    assert.ok(
-      environmentEditSource.includes("import ImagePathPicker from '../../components/ImagePathPicker.svelte';"),
-      'environment editor should import the shared ImagePathPicker component'
-    );
-    assert.ok(environmentEditSource.includes('showInput={false}'), 'environment image control should render in button-only mode');
-    assert.ok(environmentEditSource.includes("onPickImagePath={onPickImagePath}"), 'environment image control should be wired to the FilePicker service');
-    assert.ok(!environmentEditSource.includes('manager-v2-raw-scene-field'), 'environment editor should no longer render a raw scene UUID input');
-    assert.ok(!environmentEditSource.includes("Environments.SceneSelect"), 'environment editor should no longer render the global scene dropdown');
-    assert.ok(environmentEditSource.includes('manager-v2-scene-drop-zone'), 'environment editor should render a drag-drop zone for scene linking');
-    assert.ok(environmentEditSource.includes('handleSceneDrop'), 'environment editor should define a scene drop handler');
-    assert.ok(environmentEditSource.includes("payload.type !== 'Scene'"), 'scene drop handler should ignore non-Scene drag payloads');
-    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.SceneDropHint, 'Drag a scene from the Scenes sidebar to link it');
-    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.SceneDropZoneLabel, 'Scene drop zone');
-    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.ChooseImage, 'Choose environment image');
-  });
+  // NOTE: FilePicker and scene-drop-zone contracts on environmentEditSource removed
+  // when the editor was placeholder'd out pending redesign.
 
   it('wires Manager V2 Gathering Tasks browser through root-owned selection and store callbacks', () => {
     for (const snippet of [
@@ -754,16 +723,6 @@ describe('CraftingSystemManagerV2 source contract', () => {
     );
   });
 
-  it('replaces the environment status checkbox with the shared status toggle', () => {
-    assert.ok(
-      environmentEditSource.includes('manager-v2-status-toggle'),
-      'environment editor should render the shared manager-v2 status-toggle button for enabled state'
-    );
-    assert.ok(
-      !/manager-v2-environment-status-card[\s\S]{0,160}type="checkbox"/.test(environmentEditSource),
-      'environment editor should not render a native checkbox inside the status card'
-    );
-    assert.equal(lang.FABRICATE.Admin.ManagerV2.EnableEnvironment, 'Enable environment');
-    assert.equal(lang.FABRICATE.Admin.ManagerV2.DisableEnvironment, 'Disable environment');
-  });
+  // NOTE: status-toggle contract on environmentEditSource removed when the editor
+  // was placeholder'd out pending redesign.
 });

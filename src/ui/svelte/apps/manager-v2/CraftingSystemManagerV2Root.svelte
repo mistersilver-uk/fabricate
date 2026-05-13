@@ -2532,9 +2532,6 @@
             onAddCatalyst={store.addEnvironmentTaskCatalyst}
             onUpdateCatalyst={store.updateEnvironmentTaskCatalyst}
             onDeleteCatalyst={store.deleteEnvironmentTaskCatalyst}
-            onAddTool={store.addEnvironmentTaskTool}
-            onUpdateTool={store.updateEnvironmentTaskTool}
-            onDeleteTool={store.deleteEnvironmentTaskTool}
             onUpdateVisibility={store.updateEnvironmentTaskVisibility}
             onUpdateResultSelection={store.updateEnvironmentTaskResultSelection}
             onUpdateProgressive={store.updateEnvironmentTaskProgressive}

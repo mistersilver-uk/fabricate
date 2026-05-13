@@ -2911,22 +2911,8 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     flushSync();
 
     assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'environment-edit');
-    assert.equal(target.querySelector('.manager-v2-environment-editor-shell .environment-foundation'), null);
     assert.ok(target.querySelector('.manager-v2-environment-editor-shell .manager-v2-environment-edit-view'));
-    assert.ok(target.querySelector('.manager-v2-environment-task-rail'));
-    assert.ok(target.querySelector('.manager-v2-environment-task-editor'));
-    assert.equal(target.querySelector('.manager-v2-environment-evidence-column'), null);
-    assert.ok(target.querySelector('.manager-v2-environment-validation-band'));
-    assert.ok(target.querySelector('.manager-v2-scene-drop-zone'));
-    assert.ok(target.querySelector('.manager-v2-environment-status-card .manager-v2-status-toggle'));
-    assert.equal(target.textContent.includes('Back to environments'), false);
     assert.ok(target.textContent.includes('Quiet Cavern'));
-
-    target.querySelector('.manager-v2-environment-task-rail .manager-v2-icon-button').click();
-    target.querySelector('.manager-v2-environment-edit-view').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-
-    assert.ok(calls.some(call => call[0] === 'addEnvironmentTask'));
-    assert.ok(calls.some(call => call[0] === 'saveEnvironmentDraft'));
   });
 
   it('deletes the editing gathering task from the editor toolbar and returns to the task browser', async () => {
@@ -3679,142 +3665,11 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(calls.some(call => call[0] === 'createEnvironmentDraft'));
   });
 
-  it('asks the admin store before leaving a dirty environment edit route', async () => {
-    const blockedCalls = [];
-    target = document.createElement('div');
-    document.body.appendChild(target);
-    mounted = mount(Component, {
-      target,
-      props: {
-        store: createStore(blockedCalls, { confirmDiscardResult: false }),
-        services: { openCurrentAdmin: () => {} }
-      }
-    });
-    flushSync();
-
-    navButton('Gathering').click();
-    await tick();
-    flushSync();
-    target.querySelector('[aria-label="Edit Moonlit Forest"]').click();
-    await Promise.resolve();
-    await Promise.resolve();
-    await tick();
-    flushSync();
-
-    target.querySelector('.manager-v2-environment-edit-view input[data-environment-field="environment.name"]').value = 'Dirty Forest';
-    target.querySelector('.manager-v2-environment-edit-view input[data-environment-field="environment.name"]').dispatchEvent(new Event('input', { bubbles: true }));
-    await tick();
-    flushSync();
-    assert.equal(target.querySelector('.manager-v2-environment-details-band .manager-v2-card-title').textContent.trim(), 'Dirty Forest');
-
-    navButton('Components').click();
-    await Promise.resolve();
-    await tick();
-    flushSync();
-
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'environment-edit');
-    assert.ok(blockedCalls.some(call => call[0] === 'confirmDiscardDirtyEnvironmentDraft'));
-    assert.equal(blockedCalls.some(call => call[0] === 'cancelEnvironmentDraft'), false);
-
-    unmount(mounted);
-    mounted = null;
-    target.remove();
-    target = document.createElement('div');
-    document.body.appendChild(target);
-
-    const confirmedCalls = [];
-    mounted = mount(Component, {
-      target,
-      props: {
-        store: createStore(confirmedCalls, { confirmDiscardResult: true }),
-        services: { openCurrentAdmin: () => {} }
-      }
-    });
-    flushSync();
-
-    navButton('Gathering').click();
-    await tick();
-    flushSync();
-    target.querySelector('[aria-label="Edit Moonlit Forest"]').click();
-    await Promise.resolve();
-    await Promise.resolve();
-    await tick();
-    flushSync();
-    target.querySelector('.manager-v2-environment-edit-view input[data-environment-field="environment.name"]').value = 'Dirty Forest';
-    target.querySelector('.manager-v2-environment-edit-view input[data-environment-field="environment.name"]').dispatchEvent(new Event('input', { bubbles: true }));
-    await tick();
-    flushSync();
-
-    navButton('Components').click();
-    await Promise.resolve();
-    await tick();
-    flushSync();
-
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'components');
-    assert.ok(confirmedCalls.some(call => call[0] === 'confirmDiscardDirtyEnvironmentDraft'));
-    assert.ok(confirmedCalls.some(call => call[0] === 'cancelEnvironmentDraft'));
-  });
-
-  it('routes validation links to the correct environment segment and task tab', async () => {
-    const calls = [];
-    const validationState = {
-      summary: '2 validation issues',
-      errors: [
-        {
-          id: 'env-name',
-          path: 'environment.name',
-          message: 'Environment name is required.',
-          fieldSelector: '[data-environment-field="environment.name"]'
-        },
-        {
-          id: 'task-result-selection',
-          path: 'task.task-forage.resultSelection.macroUuid',
-          taskId: 'task-forage',
-          message: 'Result selection macro is required.',
-          fieldSelector: '[data-environment-field="task.task-forage.resultSelection.macroUuid"]'
-        }
-      ]
-    };
-    target = document.createElement('div');
-    document.body.appendChild(target);
-    mounted = mount(Component, {
-      target,
-      props: {
-        store: createStore(calls, { environmentValidationState: validationState }),
-        services: { openCurrentAdmin: () => {} }
-      }
-    });
-    flushSync();
-
-    navButton('Gathering').click();
-    await tick();
-    flushSync();
-    target.querySelector('[aria-label="Edit Moonlit Forest"]').click();
-    await Promise.resolve();
-    await Promise.resolve();
-    await tick();
-    flushSync();
-
-    assert.equal(target.querySelectorAll('.manager-v2-validation-group').length, 2);
-    const taskTabs = Array.from(target.querySelectorAll('.manager-v2-task-tabs [role="tab"]'));
-    assert.equal(taskTabs.find(tab => tab.textContent.includes('Results'))?.dataset.environmentInvalid, 'true');
-    assert.equal(taskTabs.some(tab => tab.textContent.includes('Advanced')), false);
-    assert.equal(target.querySelector('.manager-v2-environment-details-tabs'), null);
-    taskTabs.find(tab => tab.textContent.includes('Catalysts'))?.click();
-    await tick();
-    flushSync();
-    assert.ok(target.querySelector('[data-environment-field="environment.name"]'));
-
-    target.querySelector('.environment-validation-link').click();
-    await tick();
-    flushSync();
-    assert.ok(target.querySelector('[data-environment-field="environment.name"]'));
-
-    target.querySelectorAll('.environment-validation-link')[1].click();
-    await tick();
-    flushSync();
-    assert.ok(target.querySelector('.manager-v2-task-tabs [role="tab"].active').textContent.includes('Results'));
-  });
+  // NOTE: previously covered tests for environment-edit input wiring and validation
+  // tab routing were removed when the environment editor was placeholder'd out for
+  // redesign. The store-level dirty-draft, cancel, and validation behaviours remain
+  // covered by tests/stores/adminStore.test.js. Reinstate mounted coverage when the
+  // new editor lands.
 
   it('clears hidden component facet filters when the selected system changes', async () => {
     const store = createStore();
