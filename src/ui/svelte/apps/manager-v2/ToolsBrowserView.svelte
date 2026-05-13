@@ -304,15 +304,6 @@
             {#if isExpanded}
               <div class="manager-v2-tools-row-editor" data-manager-v2-tool-editor>
                 <div class="manager-v2-tools-identity-row">
-                  <label class="manager-v2-field">
-                    <span>{text('FABRICATE.Admin.ManagerV2.Tools.LabelField', 'Display label')}</span>
-                    <input type="text"
-                      value={tool.label || ''}
-                      placeholder={managedItem(tool.componentId)?.name || ''}
-                      oninput={(event) => onUpdateTool?.(tool.id, { label: event.currentTarget.value })} />
-                    <span class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Tools.LabelHint', 'Optional. Falls back to the component name.')}</span>
-                  </label>
-
                   <div class="manager-v2-field">
                     <span>{text('FABRICATE.Admin.ManagerV2.Tools.ComponentLabel', 'Component')}</span>
                     <div class="manager-v2-tool-component-row"
@@ -341,6 +332,15 @@
                       {/if}
                     </div>
                   </div>
+
+                  <label class="manager-v2-field">
+                    <span>{text('FABRICATE.Admin.ManagerV2.Tools.LabelField', 'Display label')}</span>
+                    <input type="text"
+                      value={tool.label || ''}
+                      placeholder={managedItem(tool.componentId)?.name || ''}
+                      oninput={(event) => onUpdateTool?.(tool.id, { label: event.currentTarget.value })} />
+                    <span class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Tools.LabelHint', 'Optional. Falls back to the component name.')}</span>
+                  </label>
                 </div>
 
                 <fieldset class="manager-v2-tools-section">

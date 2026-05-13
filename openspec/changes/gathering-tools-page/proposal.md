@@ -12,6 +12,7 @@ Adds a dedicated Manager V2 page where GMs author a per-system library of reusab
 - Draft + `Save changes` model parallel to the environment draft, with dirty tracking, confirm-discard on navigation away, and a concurrent-edit overwrite confirm on save.
 - Backwards compatible: legacy `gatheringConfig` without a `tools` array on a system normalizes to `[]`.
 - Composition seam (`__libraryTools` Map on the composed environment) ready for the future task→tool reference change.
+- Follow-up fix: tighten the Tools inspector component browser so the search icon sits inside the search input, the results area shows complete component cards before scrolling, and pagination reads as a full-width centered footer in the narrow inspector.
 
 ## Out of Scope
 

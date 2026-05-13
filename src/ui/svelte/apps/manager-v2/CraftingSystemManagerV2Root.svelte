@@ -11,6 +11,7 @@
   import GatheringTaskEditView from './GatheringTaskEditView.svelte';
   import ToolsBrowserView from './ToolsBrowserView.svelte';
   import EssenceSourceSelector from '../../components/EssenceSourceSelector.svelte';
+  import Pagination from '../../components/Pagination.svelte';
   import RecipesBrowserView from './RecipesBrowserView.svelte';
   import SystemEditView from './SystemEditView.svelte';
   import SystemsBrowserView from './SystemsBrowserView.svelte';
@@ -42,6 +43,9 @@
   let gatheringTaskDraftBaseline = $state(null);
   let gatheringTaskSaving = $state(false);
   let gatheringTaskSaveError = $state('');
+  let toolsComponentSearchTerm = $state('');
+  let toolsComponentPageIndex = $state(0);
+  let toolsComponentPageSize = $state(6);
   const placeholderViews = [
     { id: 'rules', icon: 'fas fa-sliders-h', labelKey: 'FABRICATE.Admin.ManagerV2.Nav.Rules', fallback: 'Rules' },
     { id: 'graph', icon: 'fas fa-project-diagram', labelKey: 'FABRICATE.Admin.ManagerV2.Nav.Graph', fallback: 'Graph' }
@@ -63,6 +67,16 @@
     recipeCategories: selectedSystem?.categories?.length || 0
   });
   const itemCards = $derived($viewState.itemCards || []);
+  const toolsComponentCards = $derived(Array.isArray(itemCards) ? itemCards : []);
+  const toolsNormalizedComponentSearchTerm = $derived(toolsComponentSearchTerm.trim().toLowerCase());
+  const toolsFilteredComponentCards = $derived(toolsComponentCards.filter(item => {
+    const name = String(item?.name || '').toLowerCase();
+    return !toolsNormalizedComponentSearchTerm || name.includes(toolsNormalizedComponentSearchTerm);
+  }));
+  const toolsPaginatedComponentCards = $derived(toolsFilteredComponentCards.slice(
+    toolsComponentPageIndex * toolsComponentPageSize,
+    (toolsComponentPageIndex + 1) * toolsComponentPageSize
+  ));
   const tagCategoryUsage = $derived(buildTagCategoryUsage(selectedSystem, $viewState.recipes || [], itemCards));
   const categoryRows = $derived(buildCategoryRows(selectedSystem?.categories || [], tagCategoryUsage.categoryUsage));
   const tagRows = $derived(buildTagRows(selectedSystem?.itemTags || [], tagCategoryUsage.tagUsage));
@@ -508,9 +522,33 @@
     return () => services?.registerEssenceDirtyGuard?.(null);
   });
 
+  $effect(() => {
+    if (toolsComponentPageIndex > 0 && toolsComponentPageIndex * toolsComponentPageSize >= toolsFilteredComponentCards.length) toolsComponentPageIndex = 0;
+  });
+
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
+  }
+
+  function toolsComponentCardImage(item) {
+    return item?.img || 'icons/svg/item-bag.svg';
+  }
+
+  function toolsComponentDescription(item) {
+    return String(item?.description || '').trim();
+  }
+
+  function onToolsComponentSearchInput(event) {
+    toolsComponentSearchTerm = event.currentTarget.value;
+    toolsComponentPageIndex = 0;
+  }
+
+  function onToolsComponentDragStart(item, event) {
+    const componentId = String(item?.id || '').trim();
+    if (!componentId) return;
+    event.dataTransfer?.setData?.('text/plain', JSON.stringify({ type: 'FabricateManagedComponent', componentId }));
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'copy';
   }
 
   function gatheringDropModeLabel(mode) {
@@ -3755,178 +3793,81 @@
         {#if selectedLibraryTool}
           {@const toolImageSrc = (selectedSystem?.managedItemOptions || []).find(item => String(item.id) === String(selectedLibraryTool.componentId))?.img || 'icons/svg/item-bag.svg'}
           {@const toolComponent = (selectedSystem?.managedItemOptions || []).find(item => String(item.id) === String(selectedLibraryTool.componentId))}
-          {@const toolValid = (toolsDraftValidation.errors || []).every(error => error.id !== selectedLibraryTool.id)}
           <section class="manager-v2-inspector-card" data-manager-v2-tool-inspector>
             <div class="manager-v2-inspector-title-row is-hero-large">
               <img class="manager-v2-recipe-preview" src={toolImageSrc} alt="" />
               <div class="manager-v2-inspector-copy">
                 <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Tools.SelectedKicker', 'Selected tool')}</p>
                 <h2 class="manager-v2-inspector-name" title={selectedLibraryTool.label || toolComponent?.name || ''}>{selectedLibraryTool.label || toolComponent?.name || text('FABRICATE.Admin.ManagerV2.Tools.OverviewComponentMissing', 'Not set')}</h2>
-                <div class="manager-v2-chip-row">
-                  <span class={`manager-v2-chip ${toolValid ? 'is-active' : 'is-danger'}`}>
-                    <i class={toolValid ? 'fas fa-circle-check' : 'fas fa-triangle-exclamation'} aria-hidden="true"></i>
-                    <span>{toolValid ? text('FABRICATE.Admin.ManagerV2.Tools.ValidChip', 'Valid tool') : text('FABRICATE.Admin.ManagerV2.Tools.InvalidChip', 'Invalid')}</span>
-                  </span>
-                </div>
               </div>
             </div>
           </section>
 
-          <section class="manager-v2-inspector-card">
-            <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Tools.OverviewTitle', 'Overview')}</h3>
-            <div class="manager-v2-fact-grid">
-              <div class="manager-v2-fact">
-                <strong>{toolComponent?.name || text('FABRICATE.Admin.ManagerV2.Tools.OverviewComponentMissing', 'Not set')}</strong>
-                <span>{text('FABRICATE.Admin.ManagerV2.Tools.OverviewComponent', 'Component')}</span>
-              </div>
-              {#if toolComponent?.rarity}
-                <div class="manager-v2-fact">
-                  <strong>{toolComponent.rarity}</strong>
-                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.OverviewRarity', 'Rarity')}</span>
+          <section class="manager-v2-inspector-card manager-v2-tools-component-browser-card" data-manager-v2-tools-component-browser>
+            <div class="manager-v2-tools-component-browser-header">
+              <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ComponentBrowser', 'Components')}</h3>
+              <label class="manager-v2-search is-compact" data-manager-v2-tools-component-search>
+                <i class="fas fa-search" aria-hidden="true"></i>
+                <input type="search"
+                  value={toolsComponentSearchTerm}
+                  oninput={onToolsComponentSearchInput}
+                  placeholder={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SearchComponentsPlaceholder', 'Search components...')}
+                  aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SearchComponentsByName', 'Search component names')} />
+              </label>
+            </div>
+
+            <div class="manager-v2-tools-component-browser-scroll">
+              {#if toolsComponentCards.length === 0}
+                <div class="manager-v2-empty is-compact">
+                  <div>
+                    <i class="fas fa-box-open" aria-hidden="true"></i>
+                    <h3>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.NoComponents', 'No components available')}</h3>
+                  </div>
+                </div>
+              {:else if toolsFilteredComponentCards.length === 0}
+                <div class="manager-v2-empty is-compact">
+                  <div>
+                    <i class="fas fa-search" aria-hidden="true"></i>
+                    <h3>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EmptyComponentSearchTitle', 'No components match these filters')}</h3>
+                  </div>
+                </div>
+              {:else}
+                <div class="manager-v2-tools-component-grid" role="list">
+                  {#each toolsPaginatedComponentCards as item (item.id)}
+                    <div class="manager-v2-task-component-card"
+                      role="listitem"
+                      draggable="true"
+                      data-manager-v2-tools-component-card={item.id}
+                      ondragstart={(event) => onToolsComponentDragStart(item, event)}>
+                      <img class="manager-v2-task-component-card-image" src={toolsComponentCardImage(item)} alt="" />
+                      <span class="manager-v2-task-component-card-copy">
+                        <strong>{item.name}</strong>
+                        <span>{toolsComponentDescription(item) || text('FABRICATE.Admin.ManagerV2.NoDescriptionAdded', 'No description has been added.')}</span>
+                        {#if Array.isArray(item.tags) && item.tags.length > 0}
+                          <span class="manager-v2-task-component-card-tags">
+                            {#each item.tags.slice(0, 3) as tag (tag)}
+                              <small>{tag}</small>
+                            {/each}
+                          </span>
+                        {/if}
+                      </span>
+                      <span class="manager-v2-task-component-card-grip" aria-hidden="true">⋮⋮</span>
+                    </div>
+                  {/each}
                 </div>
               {/if}
             </div>
-          </section>
 
-          <section class="manager-v2-inspector-card">
-            <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Tools.RequirementTitle', 'Requirement')}</h3>
-            {#if selectedLibraryTool.requirement}
-              <div class="manager-v2-chip-row">
-                <span class="manager-v2-chip is-active">
-                  <i class="fas fa-shield-halved" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.RequirementPresent', 'Requirement set')}</span>
-                </span>
-              </div>
-              <div class="manager-v2-fact-grid">
-                <div class="manager-v2-fact">
-                  <strong>{selectedLibraryTool.requirement.provider}</strong>
-                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.RequirementProvider', 'Provider')}</span>
-                </div>
-                {#if selectedLibraryTool.requirement.provider === 'macro'}
-                  <div class="manager-v2-fact">
-                    <strong>{selectedLibraryTool.requirement.macroUuid || '—'}</strong>
-                    <span>{text('FABRICATE.Admin.ManagerV2.Tools.RequirementMacro', 'Macro UUID')}</span>
-                  </div>
-                {:else}
-                  <div class="manager-v2-fact">
-                    <strong>{selectedLibraryTool.requirement.formula || '—'}</strong>
-                    <span>{text('FABRICATE.Admin.ManagerV2.Tools.RequirementExpression', 'Expression')}</span>
-                  </div>
-                {/if}
-              </div>
-            {:else}
-              <div class="manager-v2-chip-row">
-                <span class="manager-v2-chip is-neutral">
-                  <i class="fas fa-shield-halved" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.RequirementNone', 'No requirement')}</span>
-                </span>
-              </div>
-            {/if}
-          </section>
-
-          <section class="manager-v2-inspector-card">
-            <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Tools.BreakageTitle', 'Breakage mechanic')}</h3>
-            {#if selectedLibraryTool.breakage?.mode === 'limitedUses'}
-              <div class="manager-v2-chip-row">
-                <span class="manager-v2-chip is-neutral">
-                  <i class="fas fa-hashtag" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.BreakageLimitedUses', 'Limited uses')}</span>
-                </span>
-              </div>
-              <div class="manager-v2-fact-grid">
-                <div class="manager-v2-fact">
-                  <strong>{selectedLibraryTool.breakage.maxUses === null || selectedLibraryTool.breakage.maxUses === undefined ? text('FABRICATE.Admin.ManagerV2.Tools.BreakageSummaryUnlimited', 'Unlimited uses') : selectedLibraryTool.breakage.maxUses}</strong>
-                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.BreakageMaxUses', 'Maximum uses')}</span>
-                </div>
-              </div>
-            {:else if selectedLibraryTool.breakage?.mode === 'breakageChance'}
-              <div class="manager-v2-chip-row">
-                <span class="manager-v2-chip is-warning">
-                  <i class="fas fa-percent" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.BreakageChance', 'Breakage chance')}</span>
-                </span>
-              </div>
-              <div class="manager-v2-fact-grid">
-                <div class="manager-v2-fact">
-                  <strong>{selectedLibraryTool.breakage.breakageChance ?? 0}%</strong>
-                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.BreakageChancePercent', 'Break chance (%)')}</span>
-                </div>
-              </div>
-            {:else if selectedLibraryTool.breakage?.mode === 'diceExpression'}
-              <div class="manager-v2-chip-row">
-                <span class="manager-v2-chip is-warning">
-                  <i class="fas fa-dice-d20" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.BreakageDice', 'Dice expression')}</span>
-                </span>
-              </div>
-              <div class="manager-v2-fact-grid">
-                <div class="manager-v2-fact">
-                  <strong>{selectedLibraryTool.breakage.formula || '—'}</strong>
-                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.BreakageFormula', 'Formula')}</span>
-                </div>
-                <div class="manager-v2-fact">
-                  <strong>{selectedLibraryTool.breakage.threshold ?? 0}</strong>
-                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.BreakageThreshold', 'Break below')}</span>
-                </div>
-              </div>
-            {/if}
-          </section>
-
-          <section class="manager-v2-inspector-card">
-            <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Tools.OnBreakTitle', 'On-break action')}</h3>
-            {#if selectedLibraryTool.onBreak?.mode === 'destroy'}
-              <div class="manager-v2-chip-row">
-                <span class="manager-v2-chip is-danger">
-                  <i class="fas fa-circle-xmark" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.OnBreakDestroy', 'Destroy item')}</span>
-                </span>
-              </div>
-              <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Tools.OnBreakDestroyHint', "The item is removed from the actor's inventory.")}</p>
-            {:else if selectedLibraryTool.onBreak?.mode === 'flagBroken'}
-              <div class="manager-v2-chip-row">
-                <span class="manager-v2-chip is-warning">
-                  <i class="fas fa-shield-halved" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.OnBreakFlag', 'Mark as broken')}</span>
-                </span>
-              </div>
-              <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Tools.OnBreakFlagHint', 'The item remains but is flagged as broken.')}</p>
-            {:else if selectedLibraryTool.onBreak?.mode === 'replaceWith'}
-              {@const replacement = (selectedSystem?.managedItemOptions || []).find(item => String(item.id) === String(selectedLibraryTool.onBreak.replacementComponentId))}
-              <div class="manager-v2-chip-row">
-                <span class="manager-v2-chip is-positive">
-                  <i class="fas fa-right-left" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.OnBreakReplace', 'Replace with item')}</span>
-                </span>
-              </div>
-              <div class="manager-v2-fact-grid">
-                <div class="manager-v2-fact">
-                  <strong>{replacement?.name || text('FABRICATE.Admin.ManagerV2.Tools.OverviewComponentMissing', 'Not set')}</strong>
-                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.ReplacementComponent', 'Replacement component')}</span>
-                </div>
-              </div>
-            {/if}
-          </section>
-
-          <section class="manager-v2-inspector-card" data-manager-v2-tool-usage>
-            <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Tools.UsageTitle', 'Usage')}</h3>
-            <div class="manager-v2-fact-grid">
-              <div class="manager-v2-fact">
-                <strong>0</strong>
-                <span>{text('FABRICATE.Admin.ManagerV2.Tools.UsageCount', 'Used in tasks: {count}').replace('{count}', '0')}</span>
-              </div>
+            <div class="manager-v2-tools-component-browser-footer">
+              <Pagination
+                totalCount={toolsFilteredComponentCards.length}
+                pageSize={toolsComponentPageSize}
+                pageIndex={toolsComponentPageIndex}
+                pageSizeOptions={[6, 9, 12]}
+                onPageChange={(next) => toolsComponentPageIndex = next}
+                onPageSizeChange={(next) => { toolsComponentPageSize = next; toolsComponentPageIndex = 0; }}
+              />
             </div>
-            <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Tools.NotLinkedHint', 'No linked tasks yet.')}</p>
-            <button type="button" class="manager-v2-button" disabled aria-disabled="true">
-              <i class="fas fa-up-right-from-square" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.ManagerV2.Tools.ViewTasks', 'View tasks')}</span>
-            </button>
-          </section>
-
-          <section class="manager-v2-inspector-card">
-            <p class="manager-v2-muted">
-              <i class="fas fa-circle-info" aria-hidden="true"></i>
-              {text('FABRICATE.Admin.ManagerV2.Tools.ChangesWarning', 'Changes to this tool will affect all tasks that require it.')}
-            </p>
           </section>
         {:else}
           <div class="manager-v2-empty">

@@ -543,6 +543,18 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const componentCardGripBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-card-grip');
   const componentBrowserFooterBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-browser-footer');
   const componentBrowserFooterPaginationBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-browser-footer .manager-v2-pagination');
+  const toolsComponentBrowserBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-browser-card');
+  const toolsComponentBrowserHeaderBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-browser-header');
+  const toolsComponentBrowserSearchBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-browser-card .manager-v2-search.is-compact');
+  const toolsComponentBrowserSearchInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-browser-card .manager-v2-search.is-compact input');
+  const toolsComponentBrowserScrollBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-browser-scroll');
+  const toolsComponentBrowserGridBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-grid');
+  const toolsComponentBrowserFooterBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-browser-footer');
+  const toolsComponentBrowserFooterPaginationBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-browser-footer .manager-v2-pagination');
+  const toolsComponentBrowserFooterSummaryBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-browser-footer .manager-v2-pagination-summary');
+  const toolsComponentBrowserFooterControlsBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-browser-footer .manager-v2-pagination-nav,\n.fabricate-manager-v2 .manager-v2-tools-component-browser-footer .manager-v2-pagination-size');
+  const toolsComponentBrowserFooterPageSizeSelectBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-browser-footer .manager-v2-pagination-size select');
+  const toolsComponentBrowserFooterPageBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-browser-footer .manager-v2-pagination-page');
   const componentPillsBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-pills');
   const selectedTagPillBlock = blockFor('.fabricate-manager-v2 .manager-v2-selected-tag-pill');
   const dropCardBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drops-card');
@@ -651,6 +663,47 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(componentCardGripBlock.includes('letter-spacing: 0;'), 'component grip should avoid viewport-scaled or negative tracking');
   assert.ok(componentBrowserFooterBlock.includes('border-top: 1px solid var(--fab-mv2-border);'), 'component browser should own a pagination footer');
   assert.ok(componentBrowserFooterPaginationBlock.includes('background: transparent;'), 'component browser footer should not nest pagination chrome');
+  assert.ok(
+    toolsComponentBrowserBlock.includes('grid-template-rows: auto minmax(96px, 1fr) auto;')
+      && toolsComponentBrowserBlock.includes('gap: 0;')
+      && toolsComponentBrowserBlock.includes('height: clamp(300px, 54vh, 440px);')
+      && toolsComponentBrowserBlock.includes('min-height: 0;')
+      && toolsComponentBrowserBlock.includes('max-height: none;')
+      && toolsComponentBrowserBlock.includes('overflow: hidden;'),
+    'tools component browser should reserve deterministic header, result scroll, and footer rows without forcing a tall inspector card'
+  );
+  assert.ok(toolsComponentBrowserHeaderBlock.includes('padding: 0 0 10px;'), 'tools component browser header should own spacing without creating a large blank scroll gap');
+  assert.ok(
+    toolsComponentBrowserSearchBlock.includes('position: relative;')
+      && toolsComponentBrowserSearchBlock.includes('display: block;')
+      && toolsComponentBrowserSearchBlock.includes('flex: 0 0 auto;')
+      && toolsComponentBrowserSearchBlock.includes('width: 100%;'),
+    'tools component browser search should anchor its icon inside a full-width input box without inheriting the global 260px flex basis as height'
+  );
+  assert.ok(toolsComponentBrowserSearchInputBlock.includes('padding-left: 36px;'), 'tools component browser search input should reserve text inset for the leading search icon');
+  assert.ok(toolsComponentBrowserScrollBlock.includes('padding: 10px 0 12px;') && toolsComponentBrowserScrollBlock.includes('overflow-x: hidden;') && toolsComponentBrowserScrollBlock.includes('overflow-y: auto;'), 'tools component browser results should show complete cards before scrolling without horizontal overflow');
+  assert.ok(toolsComponentBrowserGridBlock.includes('grid-template-columns: minmax(0, 1fr);'), 'tools component browser should keep a one-column card grid in the narrow inspector');
+  assert.ok(toolsComponentBrowserFooterBlock.includes('border-top: 1px solid var(--fab-mv2-border);') && toolsComponentBrowserFooterBlock.includes('background: transparent;'), 'tools component browser footer should separate pagination without adding nested card chrome');
+  assert.ok(
+    toolsComponentBrowserFooterPaginationBlock.includes('display: grid;')
+      && toolsComponentBrowserFooterPaginationBlock.includes('grid-template-columns: minmax(0, 1fr);')
+      && toolsComponentBrowserFooterPaginationBlock.includes('justify-items: center;')
+      && toolsComponentBrowserFooterPaginationBlock.includes('width: 100%;')
+      && toolsComponentBrowserFooterPaginationBlock.includes('border-top: 0;')
+      && toolsComponentBrowserFooterPaginationBlock.includes('background: transparent;'),
+    'tools component browser pagination should fill the footer and center its narrow-card controls'
+  );
+  assert.ok(
+    toolsComponentBrowserFooterSummaryBlock.includes('width: 100%;')
+      && toolsComponentBrowserFooterSummaryBlock.includes('max-width: 100%;')
+      && toolsComponentBrowserFooterSummaryBlock.includes('text-align: center;')
+      && toolsComponentBrowserFooterSummaryBlock.includes('white-space: normal;')
+      && toolsComponentBrowserFooterSummaryBlock.includes('overflow-wrap: anywhere;'),
+    'tools component browser pagination summary should center and wrap within the narrow footer'
+  );
+  assert.ok(toolsComponentBrowserFooterControlsBlock.includes('justify-content: center;') && toolsComponentBrowserFooterControlsBlock.includes('width: 100%;'), 'tools component browser pagination nav and page-size controls should be centered full-width rows');
+  assert.ok(toolsComponentBrowserFooterPageSizeSelectBlock.includes('width: 52px;') && toolsComponentBrowserFooterPageSizeSelectBlock.includes('min-width: 52px;'), 'tools component browser per-page select should stay narrow in the centered footer');
+  assert.ok(toolsComponentBrowserFooterPageBlock.includes('min-width: 0;'), 'tools component browser page label should not force overflow in the narrow inspector');
   assert.ok(dropCardBlock.includes('--fab-mv2-task-drop-table-visible-height: 262px;'), 'drop rules card should define an exact table viewport equal to header plus three rows');
   assert.ok(dropCardBlock.includes('grid-template-rows: auto var(--fab-mv2-task-drop-table-visible-height) auto;'), 'drop rules card should keep the table viewport definite between the card header and footer');
   assert.ok(dropCardBlock.includes('height: 410px;') && dropCardBlock.includes('max-height: 410px;'), 'task editor drop rules card should be exactly tall enough for the three-row table viewport and footer');

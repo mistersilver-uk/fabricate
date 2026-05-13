@@ -17,5 +17,7 @@
 - [x] Extend `tests/components/manager-v2-mounted.test.js` (compile entry + nav/label assertions).
 - [x] Extend `tests/components/manager-v2-contract.test.js` with source-text assertions for the new view, store hooks, and lang block.
 - [x] Update `openspec/specs/gathering-and-harvesting/spec.md` with the `Gathering Tools Library` section.
+- [x] Tighten the Tools inspector component browser layout so search, results scrolling, and pagination fit the right rail.
+- [x] Add CSS contract coverage for the Tools inspector component browser.
 - [ ] Update `docs/gathering-environments.md` with a Tools library subsection.
 - [ ] Run `npm test` and `npm run build`; commit and push.
