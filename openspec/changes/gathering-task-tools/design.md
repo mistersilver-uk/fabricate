@@ -2,7 +2,9 @@
 
 ## Data Model
 
-New `src/models/Tool.js` (sibling to `src/models/Catalyst.js`).
+The `Tool` model and the per-system Tools library are delivered in `gathering-tools-page`. Tasks reference library tools by id (`task.toolIds: string[]`, normalized in both `_normalizeGatheringTask` and runtime `normalizeLibraryTask`). There is no inline `tools: Tool[]` array on tasks; the library is the single source of truth.
+
+The `Tool` model lives at `src/models/Tool.js`:
 
 ```
 Tool {
@@ -46,7 +48,7 @@ Item-flag conventions:
 
 ## Persistence & Normalization
 
-`src/systems/GatheringEnvironmentStore.js` gets a `normalizeTool(data)` helper next to `normalizeCatalyst` and a `validateTools(...)` helper next to `validateCatalysts`. `_normalizeTask` adds `tools: Array.isArray(data?.tools) ? data.tools.map(normalizeTool) : []`. `_validateTask` invokes `validateTools` after the catalyst validation. Normalization defaults a missing `requirement` to `null`, `breakage.mode` to `'limitedUses'` with `maxUses: null`, and `onBreak.mode` to `'destroy'`. Unknown enum values fall through to defaults.
+Tasks store `toolIds: string[]`. Both `_normalizeGatheringTask` (`src/ui/svelte/stores/adminStore.js`) and the runtime `normalizeLibraryTask` (`src/systems/GatheringRichStateService.js`) coerce each id to a trimmed string and drop empties; missing field normalizes to `[]`. Library Tool authoring/validation already lives in the Tools page from `gathering-tools-page`.
 
 No migration runner entry is required.
 
@@ -54,10 +56,11 @@ No migration runner entry is required.
 
 `src/systems/GatheringEngine.js`:
 
-1. **Start-attempt gate.** Immediately after the catalyst gate, run the tool availability injectable. On failure, return `_blockedStart({ reason: 'TOOL_BLOCKED', data: { taskId, missing, failedRequirements } })`. Add `TOOL_BLOCKED` to `BLOCKED_REASON_KEYS` and mirror the gate in `_taskBlockedReasons` for listing parity.
-2. **Terminal plan/apply.** Mirror `_planTerminalCatalysts` / `_applyTerminalCatalysts` with `_planTerminalTools` / `_applyTerminalTools`. The plan increments `timesUsed` for `limitedUses` tools, evaluates breakage, and records evidence. The apply step destroys, flags, or replaces broken tools.
-3. **Policy override.** Read `gatheringRules.toolBreakagePolicy` from `GatheringRichStateService.getGatheringRules(systemId)`. When at least one tool broke and the policy is `failureOnBreak` (default), set `outcome.status = 'failed'` and clear `outcome.resultGroups` before the result-creation step. `successDespiteBreak` leaves the outcome untouched. Tool destruction/flagging/replacement always resolves regardless of policy.
-4. **Evidence.** Add `usedTools` to the terminal response next to `usedCatalysts`. Surface in `enrichPublicTerminalRun`.
+1. **Reference resolution.** For each `taskId in task.toolIds`, resolve `environment.__libraryTools.get(toolId)`. Ids that miss the library are logged and dropped (mirrors the editor's stale-chip behaviour); resolved Tool objects feed every subsequent stage.
+2. **Start-attempt gate.** Immediately after the catalyst gate, run the tool availability injectable across the resolved tools. On failure, return `_blockedStart({ reason: 'TOOL_BLOCKED', data: { taskId, missing, failedRequirements } })`. Add `TOOL_BLOCKED` to `BLOCKED_REASON_KEYS` and mirror the gate in `_taskBlockedReasons` for listing parity.
+3. **Terminal plan/apply.** Mirror `_planTerminalCatalysts` / `_applyTerminalCatalysts` with `_planTerminalTools` / `_applyTerminalTools`, again over the resolved tools. The plan increments `timesUsed` for `limitedUses` tools, evaluates breakage, and records evidence. The apply step destroys, flags, or replaces broken tools.
+4. **Policy override.** Read `gatheringRules.toolBreakagePolicy` from `GatheringRichStateService.getGatheringRules(systemId)`. When at least one tool broke and the policy is `failureOnBreak` (default), set `outcome.status = 'failed'` and clear `outcome.resultGroups` before the result-creation step. `successDespiteBreak` leaves the outcome untouched. Tool destruction/flagging/replacement always resolves regardless of policy.
+5. **Evidence.** Add `usedTools` to the terminal response next to `usedCatalysts`. Surface in `enrichPublicTerminalRun`.
 
 `src/systems/GatheringGateAndCheckEvaluator.js` gains `evaluateRequirement({ requirement, actor, environment, task })` returning `{ allowed: boolean, diagnostic }`. System providers evaluate the formula through the injected `evaluateExpression` and coerce with `Boolean(value)`. Macro providers accept either a bare boolean or `{ allowed, description }`.
 
@@ -70,15 +73,7 @@ Both inject `evaluateGatheringExpression` so the engine remains system-agnostic.
 
 ## UI Editor
 
-`src/ui/svelte/apps/environments/ToolsList.svelte` (new), modeled on `CatalystList.svelte`. Per-row layout:
-
-1. Component picker (same `<select>` as `CatalystList`).
-2. Tool requirement via reused `ProviderExpressionInput` (with an "Add requirement" affordance when `requirement` is `null`).
-3. Breakage mechanic segmented radio with conditional subform per mode.
-4. On-break action radio; when `replaceWith` is selected, a second component picker for `replacementComponentId`.
-5. Delete button.
-
-`src/ui/svelte/apps/manager-v2/EnvironmentEditView.svelte` adds a `'tools'` task tab between `'catalysts'` and `'visibility'`, hosts `ToolsList`, threads `addTool`/`updateTool`/`deleteTool`/`toolField` callbacks (parallel to the catalyst equivalents), and maps `tools` paths into the section/tab focus helpers.
+Already shipped in `gathering-tools-page`: the per-system Tools page (`ToolsBrowserView.svelte`) authors tools, and `GatheringTaskEditView.svelte` exposes a `Required Tools` section that searches the library and adds/removes references on `task.toolIds`. No additional editor surfaces are needed for this change.
 
 ## System-Level Setting
 

@@ -164,6 +164,35 @@ describe('adminStore gathering tools library', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // Task → tool reference normalization (task.toolIds: string[])
+  // ---------------------------------------------------------------------------
+
+  describe('task toolIds normalization', () => {
+    it('legacy tasks without toolIds default to an empty array', async () => {
+      const services = createMockServices({
+        gatheringConfig: { systems: { sys1: { tasks: [{ id: 'task-a' }] } } }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const task = get(store.viewState).gatheringConfig.systems.sys1.tasks[0];
+      assert.deepEqual(task.toolIds, []);
+    });
+
+    it('stores task.toolIds as trimmed string ids and drops empties', async () => {
+      const services = createMockServices({
+        gatheringConfig: { systems: { sys1: { tasks: [{
+          id: 'task-a',
+          toolIds: ['  tool-a  ', '', null, 42, 'tool-b']
+        }] } } }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const task = get(store.viewState).gatheringConfig.systems.sys1.tasks[0];
+      assert.deepEqual(task.toolIds, ['tool-a', '42', 'tool-b']);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // Library CRUD
   // ---------------------------------------------------------------------------
 

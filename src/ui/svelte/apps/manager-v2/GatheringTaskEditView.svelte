@@ -17,13 +17,16 @@
     selectedDropId = '',
     rewardRules = null,
     characterModifierLibrary = [],
+    libraryTools = [],
     onPickImagePath = null,
     onUpdateTask = () => {},
     onSelectDrop = () => {},
     onAddDrop = () => {},
     onUpdateDrop = () => {},
     onMoveDrop = () => {},
-    onImportDrop = () => {}
+    onImportDrop = () => {},
+    onAddToolReference = () => {},
+    onRemoveToolReference = () => {}
   } = $props();
 
   let searchTerm = $state('');
@@ -36,6 +39,9 @@
   let lastTaskId = $state('');
   let openAvailabilityMenu = $state('');
   let componentPageSize = $state(6);
+  let toolSearchTerm = $state('');
+  let toolPageIndex = $state(0);
+  let toolPageSize = $state(6);
 
   const dropRows = $derived(Array.isArray(task?.dropRows) ? task.dropRows : []);
   const normalizedSearchTerm = $derived(searchTerm.trim().toLowerCase());
@@ -75,6 +81,28 @@
   const componentShowingEnd = $derived(Math.min(filteredComponentCards.length, (componentPageIndex + 1) * componentPageSize));
   const maxVisibleModifiers = 4;
 
+  const libraryToolList = $derived(Array.isArray(libraryTools) ? libraryTools : []);
+  const attachedToolIds = $derived(Array.isArray(task?.toolIds) ? task.toolIds : []);
+  const libraryToolIndex = $derived(new Map(libraryToolList.map(tool => [String(tool?.id || ''), tool])));
+  const attachedToolEntries = $derived(attachedToolIds.map(id => ({
+    id,
+    tool: libraryToolIndex.get(String(id)) || null
+  })));
+  const normalizedToolSearchTerm = $derived(toolSearchTerm.trim().toLowerCase());
+  const unattachedLibraryTools = $derived(libraryToolList.filter(tool => !attachedToolIds.includes(tool?.id)));
+  const filteredLibraryTools = $derived(unattachedLibraryTools.filter(tool => {
+    if (!normalizedToolSearchTerm) return true;
+    const component = managedItem(tool?.componentId);
+    const haystack = `${tool?.label || ''} ${component?.name || ''}`.toLowerCase();
+    return haystack.includes(normalizedToolSearchTerm);
+  }));
+  const paginatedLibraryTools = $derived(filteredLibraryTools.slice(
+    toolPageIndex * toolPageSize,
+    (toolPageIndex + 1) * toolPageSize
+  ));
+  const toolShowingStart = $derived(filteredLibraryTools.length === 0 ? 0 : toolPageIndex * toolPageSize + 1);
+  const toolShowingEnd = $derived(Math.min(filteredLibraryTools.length, (toolPageIndex + 1) * toolPageSize));
+
   $effect(() => {
     if (task?.id === lastTaskId) return;
     searchTerm = '';
@@ -84,7 +112,13 @@
     selectedComponentTags = [];
     componentPageIndex = 0;
     openAvailabilityMenu = '';
+    toolSearchTerm = '';
+    toolPageIndex = 0;
     lastTaskId = task?.id || '';
+  });
+
+  $effect(() => {
+    if (toolPageIndex > 0 && toolPageIndex * toolPageSize >= filteredLibraryTools.length) toolPageIndex = 0;
   });
 
   $effect(() => {
@@ -115,6 +149,28 @@
 
   function componentDescription(item) {
     return String(item?.description || '').trim();
+  }
+
+  function toolDisplayLabel(tool) {
+    const label = String(tool?.label || '').trim();
+    if (label) return label;
+    const component = managedItem(tool?.componentId);
+    return component?.name || text('FABRICATE.Admin.ManagerV2.Environment.Tasks.UnnamedTool', 'Unnamed tool');
+  }
+
+  function toolDisplayImage(tool) {
+    const component = managedItem(tool?.componentId);
+    return component?.img || 'icons/svg/item-bag.svg';
+  }
+
+  function toolSummary(tool) {
+    const component = managedItem(tool?.componentId);
+    return component?.name || '';
+  }
+
+  function onToolSearchInput(event) {
+    toolSearchTerm = event.currentTarget.value;
+    toolPageIndex = 0;
   }
 
   function addComponentTag(tag) {
@@ -577,6 +633,115 @@
           </div>
         {/each}
       </div>
+    </section>
+
+    <section class="manager-v2-task-required-tools-card" data-gathering-task-required-tools>
+      <div class="manager-v2-task-card-heading">
+        <div>
+          <h3>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.RequiredToolsTitle', 'Required Tools')}</h3>
+          <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.RequiredToolsHint', 'Pick tools the actor must wield to attempt this task. All listed tools are required.')}</p>
+        </div>
+      </div>
+
+      <div class="manager-v2-task-required-tools-attached" data-gathering-task-required-tools-attached>
+        {#if attachedToolEntries.length === 0}
+          <span class="manager-v2-muted manager-v2-availability-any">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.RequiredToolsEmpty', 'No tools required.')}</span>
+        {:else}
+          <div class="manager-v2-availability-pill-row">
+            {#each attachedToolEntries as entry (entry.id)}
+              {#if entry.tool}
+                <span class="manager-v2-availability-pill manager-v2-required-tool-pill" data-gathering-task-required-tool-pill={entry.id}>
+                  <img class="manager-v2-required-tool-thumb" src={toolDisplayImage(entry.tool)} alt="" />
+                  <span>{toolDisplayLabel(entry.tool)}</span>
+                  <button type="button" class="manager-v2-availability-remove"
+                    aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.RemoveToolFromTask', 'Remove {name} from required tools').replace('{name}', toolDisplayLabel(entry.tool))}
+                    onclick={() => onRemoveToolReference(entry.id)}>
+                    <i class="fas fa-xmark" aria-hidden="true"></i>
+                  </button>
+                </span>
+              {:else}
+                <span class="manager-v2-availability-pill manager-v2-required-tool-pill is-stale" data-gathering-task-required-tool-pill={entry.id}>
+                  <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.StaleToolChip', 'Deleted tool')}</span>
+                  <button type="button" class="manager-v2-availability-remove"
+                    aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.RemoveStaleToolFromTask', 'Remove deleted tool reference')}
+                    onclick={() => onRemoveToolReference(entry.id)}>
+                    <i class="fas fa-xmark" aria-hidden="true"></i>
+                  </button>
+                </span>
+              {/if}
+            {/each}
+          </div>
+        {/if}
+      </div>
+
+      {#if libraryToolList.length > 0}
+        <div class="manager-v2-task-required-tools-search">
+          <label class="manager-v2-search is-compact" data-gathering-task-required-tools-search>
+            <i class="fas fa-search" aria-hidden="true"></i>
+            <input type="search"
+              value={toolSearchTerm}
+              oninput={onToolSearchInput}
+              placeholder={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SearchTools', 'Search tools...')}
+              aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SearchToolsByName', 'Search tools by name')} />
+          </label>
+        </div>
+      {/if}
+
+      <div class="manager-v2-task-required-tools-scroll" data-gathering-task-required-tools-scroll>
+        {#if libraryToolList.length === 0}
+          <div class="manager-v2-empty is-compact" data-gathering-task-required-tools-library-empty>
+            <div>
+              <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
+              <h3>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.RequiredToolsLibraryEmptyTitle', 'No tools in this system’s library')}</h3>
+              <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.RequiredToolsLibraryEmptyHint', 'Open the Tools page from the left rail to add tools first.')}</p>
+            </div>
+          </div>
+        {:else if filteredLibraryTools.length === 0}
+          <div class="manager-v2-empty is-compact">
+            <div>
+              <i class="fas fa-search" aria-hidden="true"></i>
+              <h3>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EmptyToolSearchTitle', 'No tools match your search')}</h3>
+            </div>
+          </div>
+        {:else}
+          <div class="manager-v2-task-required-tools-grid" data-gathering-task-required-tools-grid>
+            {#each paginatedLibraryTools as tool (tool.id)}
+              <button type="button"
+                class="manager-v2-task-component-card manager-v2-task-required-tools-card-item"
+                data-gathering-task-required-tools-card={tool.id}
+                aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.AddToolToTask', 'Add {name} to required tools').replace('{name}', toolDisplayLabel(tool))}
+                onclick={() => onAddToolReference(tool.id)}>
+                <img class="manager-v2-task-component-card-image" src={toolDisplayImage(tool)} alt="" />
+                <span class="manager-v2-task-component-card-copy">
+                  <strong>{toolDisplayLabel(tool)}</strong>
+                  <span>{toolSummary(tool) || text('FABRICATE.Admin.ManagerV2.NoDescriptionAdded', 'No description has been added.')}</span>
+                </span>
+                <i class="fas fa-plus manager-v2-task-required-tools-add-icon" aria-hidden="true"></i>
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
+
+      {#if libraryToolList.length > 0}
+        <div class="manager-v2-task-required-tools-footer">
+          <span class="manager-v2-muted manager-v2-drop-count" data-gathering-task-required-tools-count>
+            {text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ShowingTools', 'Showing {start}-{end} of {total} tools')
+              .replace('{start}', toolShowingStart)
+              .replace('{end}', toolShowingEnd)
+              .replace('{total}', filteredLibraryTools.length)}
+          </span>
+          <Pagination
+            totalCount={filteredLibraryTools.length}
+            pageSize={toolPageSize}
+            pageIndex={toolPageIndex}
+            pageSizeOptions={[6, 9, 12]}
+            onPageChange={(next) => toolPageIndex = next}
+            onPageSizeChange={(next) => { toolPageSize = next; toolPageIndex = 0; }}
+          />
+        </div>
+      {/if}
     </section>
 
     <section class="manager-v2-task-component-browser-card" data-gathering-task-component-browser>

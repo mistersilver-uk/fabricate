@@ -1031,3 +1031,35 @@ test('composeEnvironment skips library tools without an id', () => {
   assert.ok(composed.__libraryTools instanceof Map);
   assert.equal(composed.__libraryTools.size, 0);
 });
+
+test('normalizeLibraryTask defaults a missing toolIds field to []', () => {
+  const { service } = makeRichState({
+    config: {
+      systems: {
+        'system-a': {
+          tasks: [{ id: 'task-no-tools', name: 'Pluck Mushrooms' }]
+        }
+      }
+    }
+  });
+  const composed = service.composeEnvironment(environment(), system);
+  const task = composed.tasks.find(t => t.id === 'task-no-tools');
+  assert.ok(task, 'expected library task to be composed');
+  assert.deepEqual(task.toolIds, []);
+});
+
+test('normalizeLibraryTask coerces toolIds entries to trimmed strings and drops empties', () => {
+  const { service } = makeRichState({
+    config: {
+      systems: {
+        'system-a': {
+          tasks: [{ id: 'task-with-tools', toolIds: ['  tool-axe  ', '', null, 7, 'tool-saw'] }]
+        }
+      }
+    }
+  });
+  const composed = service.composeEnvironment(environment(), system);
+  const task = composed.tasks.find(t => t.id === 'task-with-tools');
+  assert.ok(task, 'expected library task to be composed');
+  assert.deepEqual(task.toolIds, ['tool-axe', '7', 'tool-saw']);
+});

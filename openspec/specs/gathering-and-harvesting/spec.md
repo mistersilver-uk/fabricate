@@ -444,7 +444,7 @@ GatheringTask = {
   resolutionMode: "progressive" | "routed" | "d100",
 
   catalysts: Catalyst[],
-  tools: Tool[],
+  toolIds: string[],  // references gatheringConfig.systems[id].tools[].id; legacy tasks default to []
   visibility?: GatheringVisibilityGate,
   timeRequirement?: {
     minutes?: number,
@@ -922,7 +922,7 @@ Tool = {
 
 ### Requirements
 
-1. A task may define zero or more required tools. All listed tools are required (catalyst-style); the start-attempt gate blocks the attempt with `TOOL_BLOCKED` when any tool is missing, broken, or fails its requirement.
+1. A task may reference zero or more required tools via `toolIds: string[]`. Each id references an entry in `gatheringConfig.systems[id].tools[]`; the composed environment's `__libraryTools` Map resolves each id to a `Tool` object at runtime. References whose id is no longer in the library are treated as not-present (and reported, but they do not by themselves block start). Task authoring UI lets the GM add and remove tool ids; inline `Tool` authoring on tasks is not supported — the per-system library is the single source of truth. All resolved tools are required (catalyst-style); the start-attempt gate blocks the attempt with `TOOL_BLOCKED` when any resolved tool is missing, broken, or fails its requirement.
 2. Owned items with `flags.fabricate.toolBroken === true` do not satisfy tool presence; the gate must treat them as not-present until a GM clears the flag.
 3. The optional `requirement` is evaluated against the selected acting actor through the existing system-agnostic expression adapter. A system-provider truthy value (non-zero number, non-empty string, `true`) satisfies the requirement; macro returns may be a bare boolean or `{ allowed: boolean, description?: string }`.
 4. Exactly one `breakage.mode` is configured per tool. `limitedUses` uses the `flags.fabricate.toolUsage = { timesUsed }` item flag, incremented on each attempt; the tool breaks when `timesUsed >= maxUses` (after the increment) when `maxUses` is non-null. `breakageChance` breaks when `Math.random() * 100 < breakageChance`. `diceExpression` evaluates `formula` through the expression adapter; the tool breaks when the numeric result is `< threshold`.

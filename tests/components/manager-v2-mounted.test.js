@@ -569,6 +569,7 @@ function createStore(calls = [], options = {}) {
               biomes: ['forest'],
               weather: ['clear'],
               timeOfDay: ['day'],
+              toolIds: Array.isArray(options.taskInitialToolIds) ? options.taskInitialToolIds : [],
               dropRows: options.taskDropRows || [
                 {
                   id: 'drop-nightshade',
@@ -613,7 +614,8 @@ function createStore(calls = [], options = {}) {
               dropRows: []
             }
           ],
-          hazards: []
+          hazards: [],
+          tools: options.gatheringLibraryTools || []
         }
       }
     }
@@ -4534,5 +4536,176 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
 
     assert.ok(calls.some(call => call[0] === 'setResolutionMode' && call[1] === 'progressive'));
     assert.ok(calls.some(call => call[0] === 'toggleFeature' && call[1] === 'gathering' && call[2] === false));
+  });
+
+  it('renders the Required Tools picker in the gathering task editor and adds/removes references', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          gatheringLibraryTools: [
+            { id: 'tool-pickaxe', label: 'Pickaxe', enabled: true, componentId: 'c1', requirement: null, breakage: { mode: 'limitedUses', maxUses: null }, onBreak: { mode: 'destroy' } },
+            { id: 'tool-lantern', label: 'Lantern', enabled: true, componentId: 'c2', requirement: null, breakage: { mode: 'limitedUses', maxUses: null }, onBreak: { mode: 'destroy' } }
+          ],
+          taskInitialToolIds: ['tool-pickaxe']
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Tasks').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]').click();
+    await tick();
+    flushSync();
+
+    const section = target.querySelector('[data-gathering-task-required-tools]');
+    assert.ok(section, 'required tools section should render in the task editor');
+
+    const attached = section.querySelectorAll('[data-gathering-task-required-tool-pill]');
+    assert.equal(attached.length, 1);
+    assert.equal(attached[0].getAttribute('data-gathering-task-required-tool-pill'), 'tool-pickaxe');
+    assert.ok(attached[0].textContent.includes('Pickaxe'));
+
+    const resultCards = section.querySelectorAll('[data-gathering-task-required-tools-card]');
+    assert.equal(resultCards.length, 1);
+    assert.equal(resultCards[0].getAttribute('data-gathering-task-required-tools-card'), 'tool-lantern');
+
+    resultCards[0].click();
+    await tick();
+    flushSync();
+
+    const afterAddPills = target.querySelectorAll('[data-gathering-task-required-tool-pill]');
+    assert.equal(afterAddPills.length, 2);
+    const afterAddPillIds = Array.from(afterAddPills).map(node => node.getAttribute('data-gathering-task-required-tool-pill'));
+    assert.deepEqual(afterAddPillIds.sort(), ['tool-lantern', 'tool-pickaxe']);
+    assert.equal(target.querySelectorAll('[data-gathering-task-required-tools-card]').length, 0, 'attached tools should be removed from the result grid');
+
+    const lanternPill = Array.from(afterAddPills).find(node => node.getAttribute('data-gathering-task-required-tool-pill') === 'tool-pickaxe');
+    lanternPill.querySelector('.manager-v2-availability-remove').click();
+    await tick();
+    flushSync();
+    const afterRemovePills = target.querySelectorAll('[data-gathering-task-required-tool-pill]');
+    assert.equal(afterRemovePills.length, 1);
+    assert.equal(afterRemovePills[0].getAttribute('data-gathering-task-required-tool-pill'), 'tool-lantern');
+
+    target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      calls.some(call => call[0] === 'updateGatheringLibraryTask'
+        && call[1] === 'alchemy'
+        && call[2] === 'task-herbs'
+        && Array.isArray(call[3].toolIds)
+        && call[3].toolIds.length === 1
+        && call[3].toolIds[0] === 'tool-lantern'),
+      `expected Save to persist toolIds: ['tool-lantern'], got ${JSON.stringify(calls.filter(c => c[0] === 'updateGatheringLibraryTask'))}`
+    );
+  });
+
+  it('renders a stale chip for task toolIds whose library entry is missing and lets the user clear it', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          gatheringLibraryTools: [],
+          taskInitialToolIds: ['tool-ghost']
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Tasks').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]').click();
+    await tick();
+    flushSync();
+
+    const section = target.querySelector('[data-gathering-task-required-tools]');
+    const stalePill = section.querySelector('[data-gathering-task-required-tool-pill="tool-ghost"]');
+    assert.ok(stalePill, 'stale tool reference should render as a pill');
+    assert.ok(stalePill.classList.contains('is-stale'));
+    assert.ok(stalePill.textContent.includes('Deleted tool'));
+
+    assert.ok(section.querySelector('[data-gathering-task-required-tools-library-empty]'), 'library-empty placeholder should render when no tools exist');
+    assert.equal(section.querySelector('[data-gathering-task-required-tools-search]'), null, 'search input should hide when library is empty');
+
+    stalePill.querySelector('.manager-v2-availability-remove').click();
+    await tick();
+    flushSync();
+
+    const afterClearPills = target.querySelectorAll('[data-gathering-task-required-tool-pill]');
+    assert.equal(afterClearPills.length, 0, 'removing the stale chip should clear the dangling reference');
+    assert.ok(target.querySelector('[data-gathering-task-required-tools]').textContent.includes('No tools required'));
+
+    target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      calls.some(call => call[0] === 'updateGatheringLibraryTask'
+        && call[1] === 'alchemy'
+        && call[2] === 'task-herbs'
+        && Array.isArray(call[3].toolIds)
+        && call[3].toolIds.length === 0),
+      'saving after stale-chip removal should persist toolIds: []'
+    );
+  });
+
+  it('filters required-tools results by the search input', async () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], {
+          gatheringLibraryTools: [
+            { id: 'tool-pickaxe', label: 'Pickaxe', enabled: true, componentId: 'c1', requirement: null, breakage: { mode: 'limitedUses', maxUses: null }, onBreak: { mode: 'destroy' } },
+            { id: 'tool-lantern', label: 'Lantern', enabled: true, componentId: 'c2', requirement: null, breakage: { mode: 'limitedUses', maxUses: null }, onBreak: { mode: 'destroy' } }
+          ]
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Tasks').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]').click();
+    await tick();
+    flushSync();
+
+    const section = target.querySelector('[data-gathering-task-required-tools]');
+    const initialCards = section.querySelectorAll('[data-gathering-task-required-tools-card]');
+    assert.equal(initialCards.length, 2);
+
+    const searchInput = section.querySelector('[data-gathering-task-required-tools-search] input');
+    searchInput.value = 'lant';
+    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+
+    const filteredCards = section.querySelectorAll('[data-gathering-task-required-tools-card]');
+    assert.equal(filteredCards.length, 1);
+    assert.equal(filteredCards[0].getAttribute('data-gathering-task-required-tools-card'), 'tool-lantern');
   });
 });

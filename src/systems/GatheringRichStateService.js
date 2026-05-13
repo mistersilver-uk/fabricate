@@ -774,7 +774,8 @@ export class GatheringRichStateService {
       gatheringModifier: normalized.gatheringModifier,
       resultGroups: [{ id: `${normalized.id}-d100`, name: normalized.name, results: [] }],
       resultSelection: { provider: 'd100Rows' },
-      catalysts: []
+      catalysts: [],
+      toolIds: Array.isArray(normalized.toolIds) ? [...normalized.toolIds] : []
     };
     if (normalized.timeRequirement) runtimeTask.timeRequirement = cloneJson(normalized.timeRequirement);
     return runtimeTask;
@@ -938,7 +939,10 @@ function normalizeLibraryTask(task = {}) {
     dropRows: normalizeList(task.dropRows ?? task.itemDrops).map(normalizeItemDrop),
     staminaCost: nonNegativeNumber(task.staminaCost, 0),
     gatheringModifier: normalizeModifierProvider(task.gatheringModifier ?? task.modifier),
-    timeRequirement: plainObjectOrNull(task.timeRequirement)
+    timeRequirement: plainObjectOrNull(task.timeRequirement),
+    toolIds: Array.isArray(task.toolIds)
+      ? task.toolIds.map(id => String(id ?? '').trim()).filter(Boolean)
+      : []
   };
 }
 

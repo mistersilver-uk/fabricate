@@ -691,6 +691,17 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(gatheringTaskEditSource.includes('selectedConditionOptions'), 'task editor should render selected availability values as pills');
     assert.ok(gatheringTaskEditSource.includes('StatusOff'), 'task editor should use shared Off status copy');
     assert.ok(gatheringTaskEditSource.includes('StatusOn'), 'task editor should use shared On status copy');
+    assert.ok(gatheringTaskEditSource.includes('manager-v2-task-required-tools-card'), 'task editor should render the Required Tools section');
+    assert.ok(gatheringTaskEditSource.includes('data-gathering-task-required-tools'), 'Required Tools section should expose a stable data hook');
+    assert.ok(gatheringTaskEditSource.includes('onAddToolReference'), 'task editor should call back to the root for tool-reference additions');
+    assert.ok(gatheringTaskEditSource.includes('onRemoveToolReference'), 'task editor should call back to the root for tool-reference removals');
+    assert.ok(rootSource.includes('selectedGatheringSystemTools'), 'root should derive the per-system tools library for the task editor');
+    assert.ok(rootSource.includes('addToolReferenceToSelectedTask'), 'root should expose an add-tool-reference handler');
+    assert.ok(rootSource.includes('removeToolReferenceFromSelectedTask'), 'root should expose a remove-tool-reference handler');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.RequiredToolsTitle, 'Required Tools');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.RequiredToolsEmpty, 'No tools required.');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.StaleToolChip, 'Deleted tool');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.SearchTools, 'Search tools...');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.EmptyTitle, 'No gathering tasks yet');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChance, 'Drop chance');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChancePercent, 'Drop chance percent');

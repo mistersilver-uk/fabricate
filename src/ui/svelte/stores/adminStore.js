@@ -609,7 +609,10 @@ function _normalizeGatheringTask(task = {}, randomID = () => Math.random().toStr
       .map(row => _normalizeGatheringDropRow(row, randomID)),
     staminaCost: Number.isFinite(Number(task.staminaCost)) && Number(task.staminaCost) > 0 ? Number(task.staminaCost) : 0,
     gatheringModifier: task.gatheringModifier && typeof task.gatheringModifier === 'object' ? _clonePlain(task.gatheringModifier) : null,
-    timeRequirement: task.timeRequirement && typeof task.timeRequirement === 'object' ? _clonePlain(task.timeRequirement) : null
+    timeRequirement: task.timeRequirement && typeof task.timeRequirement === 'object' ? _clonePlain(task.timeRequirement) : null,
+    toolIds: Array.isArray(task.toolIds)
+      ? task.toolIds.map(id => String(id ?? '').trim()).filter(Boolean)
+      : []
   };
 }
 

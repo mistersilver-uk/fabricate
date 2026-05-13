@@ -412,6 +412,7 @@
   });
   const selectedGatheringSystemConfig = $derived($viewState.gatheringConfig?.systems?.[selectedSystemId] || {});
   const gatheringTaskDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.tasks) ? selectedGatheringSystemConfig.tasks : []);
+  const selectedGatheringSystemTools = $derived(Array.isArray(selectedGatheringSystemConfig.tools) ? selectedGatheringSystemConfig.tools : []);
   const selectedGatheringTask = $derived(
     gatheringTaskDefinitions.find(task => task.id === selectedGatheringTaskId)
       || gatheringTaskDefinitions[0]
@@ -1433,6 +1434,19 @@
     }
     if (!selectedSystemId || !selectedGatheringTask?.id) return false;
     return store.updateGatheringLibraryTask?.(selectedSystemId, selectedGatheringTask.id, updates);
+  }
+
+  function addToolReferenceToSelectedTask(toolId) {
+    if (!editingGatheringTask || !toolId) return;
+    const existing = Array.isArray(editingGatheringTask.toolIds) ? editingGatheringTask.toolIds : [];
+    if (existing.includes(toolId)) return;
+    updateSelectedGatheringTask({ toolIds: [...existing, toolId] });
+  }
+
+  function removeToolReferenceFromSelectedTask(toolId) {
+    if (!editingGatheringTask || !toolId) return;
+    const existing = Array.isArray(editingGatheringTask.toolIds) ? editingGatheringTask.toolIds : [];
+    updateSelectedGatheringTask({ toolIds: existing.filter(id => id !== toolId) });
   }
 
   function gatheringDropRowId() {
@@ -2654,6 +2668,7 @@
         selectedDropId={selectedGatheringDrop?.id || selectedGatheringDropId}
         rewardRules={selectedGatheringRules}
         characterModifierLibrary={selectedGatheringCharacterModifiers}
+        libraryTools={selectedGatheringSystemTools}
         onPickImagePath={services?.pickImagePath}
         onUpdateTask={updateSelectedGatheringTask}
         onSelectDrop={(rowId) => { selectedGatheringDropId = rowId; }}
@@ -2664,6 +2679,8 @@
         onAddModifier={addGatheringDropModifier}
         onUpdateModifier={updateGatheringDropModifier}
         onDeleteModifier={deleteGatheringDropModifier}
+        onAddToolReference={addToolReferenceToSelectedTask}
+        onRemoveToolReference={removeToolReferenceFromSelectedTask}
       />
     {:else if currentView === 'tools' && selectedSystem}
       <ToolsBrowserView

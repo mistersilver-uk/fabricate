@@ -39,7 +39,22 @@ A `toolsDraft` writable parallel to `environmentDraft` holds the in-memory list 
 
 ## Composition seam
 
-`composeEnvironment` (`src/systems/GatheringRichStateService.js`) attaches a non-enumerable `__libraryTools` Map keyed by tool id, mirroring `__libraryCharacterModifiers`. No runtime consumer reads it yet. The next change wires gathering task→tool references through this map.
+`composeEnvironment` (`src/systems/GatheringRichStateService.js`) attaches a non-enumerable `__libraryTools` Map keyed by tool id, mirroring `__libraryCharacterModifiers`. Task→tool references are stored as `task.toolIds: string[]`. The editor resolves each id against the per-system tools array; the runtime resolves through the `__libraryTools` Map. Missing references are tolerated (the runtime treats them as not-present; the editor renders them as a stale warning chip).
+
+## Task editor wiring
+
+`GatheringTaskEditView.svelte` gains a `Required Tools` section between Task Availability and Components. It accepts three additional props:
+
+- `libraryTools: Tool[]` — the persisted per-system tools library (`gatheringConfig.systems[id].tools`), exposed by the root via a `selectedGatheringSystemTools` derivation.
+- `onAddToolReference(toolId)` / `onRemoveToolReference(toolId)` — root-supplied handlers that append/filter `task.toolIds` via the existing `updateSelectedGatheringTask` path (which routes through the draft when one exists).
+
+Local state owned by the editor: `toolSearchTerm`, `toolPageIndex`, `toolPageSize`. All reset on task switch (existing `task.id` $effect). The section renders three regions:
+
+1. **Attached pill row.** One chip per `toolIds` entry, using the `manager-v2-availability-pill` base with a thumbnail of the resolved managed component. Chip shows a `×` button that calls `onRemoveToolReference`. References whose id is missing from the library render as an `is-stale` warning chip with a warning icon and a `×` to clear the dangling reference.
+2. **Search + paginated result grid.** A compact `manager-v2-search` input filters unattached library tools by tool label and underlying component name. Results render as `manager-v2-task-component-card` items (with a `manager-v2-task-required-tools-card-item` modifier that replaces the drag grip with a `fas fa-plus` add affordance). Clicking a card calls `onAddToolReference`.
+3. **Library-empty placeholder.** When the per-system library is empty, the picker hides the search/grid/footer and shows a hint pointing the GM to the Tools page in the left rail.
+
+The card's visual identity reuses the existing `manager-v2-task-*-card` shell (border, surface, radius, inset highlight) and the existing component-card grid so the new section reads as a sibling of the Components browser.
 
 ## Manager V2 wiring
 
