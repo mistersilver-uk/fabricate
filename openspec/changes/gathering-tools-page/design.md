@@ -54,6 +54,7 @@ A `toolsDraft` writable parallel to `environmentDraft` holds the in-memory list 
 
 - Section header + `Tools (N)` browser card with `Add tool` action.
 - Compact rows with managed-component identity (thumbnail + name + secondary), three summary chips, overflow placeholder, expand/collapse chevron.
+- Rows with an existing mapped component render that component identity as a subtle dashed drop zone; dropping a managed component from the right-side component browser replaces the tool's `componentId`.
 - Inline editor for the selected/expanded row: optional label, component picker (with `dragDrop` action), optional requirement (using `ProviderExpressionInput`), breakage mechanic radio group with mode-specific subforms, on-break action radio group with replacement component picker for `replaceWith`, and an inline `Delete tool` button.
 - Empty state when zero tools; `+ Add tool` ghost row appended when at least one tool exists.
 

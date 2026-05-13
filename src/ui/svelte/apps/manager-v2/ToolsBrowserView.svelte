@@ -262,7 +262,12 @@
               aria-expanded={isExpanded}
               onclick={() => handleSelectRow(tool)}
               onkeydown={(event) => handleRowKey(event, tool)}>
-              <div class="manager-v2-tools-identity">
+              <div
+                class={`manager-v2-tools-identity ${tool.componentId ? 'is-component-drop-zone' : ''}`}
+                data-manager-v2-tool-component-drop-zone={tool.componentId ? tool.id : undefined}
+                title={tool.componentId ? text('FABRICATE.Admin.ManagerV2.Tools.DropToReplaceComponent', 'Drop a component here to replace this tool component') : undefined}
+                use:dragDrop={{ onDrop: (data) => handleComponentDrop(tool, data), activeClass: 'is-drop-active', disabled: !tool.componentId }}
+              >
                 <img class="manager-v2-tools-thumb" src={toolImage(tool)} alt="" />
                 <div class="manager-v2-tools-identity-copy">
                   <span class="manager-v2-tools-name">{toolPrimaryLabel(tool)}</span>

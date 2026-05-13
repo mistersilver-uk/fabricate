@@ -20,5 +20,6 @@
 - [x] Tighten the Tools inspector component browser layout so search, results scrolling, and pagination fit the right rail.
 - [x] Add CSS contract coverage for the Tools inspector component browser.
 - [x] Move selected tool delete/save actions from the top bar into the selected-tool inspector card.
+- [x] Add row-level component drop-zone styling and swap behavior for mapped tools.
 - [ ] Update `docs/gathering-environments.md` with a Tools library subsection.
 - [ ] Run `npm test` and `npm run build`; commit and push.

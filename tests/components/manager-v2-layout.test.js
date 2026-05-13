@@ -531,6 +531,8 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const tableBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-tasks-table');
   const rowBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-table-head,\n.fabricate-manager-v2 .manager-v2-gathering-task-row');
   const identityBlock = blockFor('.fabricate-manager-v2 .manager-v2-recipe-identity,\n.fabricate-manager-v2 .manager-v2-component-identity,\n.fabricate-manager-v2 .manager-v2-environment-identity,\n.fabricate-manager-v2 .manager-v2-gathering-task-identity');
+  const toolsIdentityDropZoneBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-identity.is-component-drop-zone');
+  const toolsIdentityDropZoneActiveBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-identity.is-component-drop-zone.is-drop-active');
   const editorBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-edit-view');
   const editorWithNoticeBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-edit-view.has-reward-rule-notice');
   const availabilityBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-availability-row');
@@ -645,6 +647,17 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(!tableBlock.includes('reorder'), 'task browser should not reserve a reorder column');
   assert.ok(rowBlock.includes('grid-template-columns: var(--fab-mv2-gathering-task-grid);'), 'task rows should use the shared task grid');
   assert.ok(identityBlock.includes('grid-template-columns: 46px minmax(0, 1fr);'), 'task identity should reserve thumbnail space');
+  assert.ok(
+    toolsIdentityDropZoneBlock.includes('border: 1px dashed var(--fab-mv2-border-strong);')
+      && toolsIdentityDropZoneBlock.includes('border-radius: 8px;')
+      && toolsIdentityDropZoneBlock.includes('background: var(--fab-overlay-light-03);'),
+    'mapped tool row identities should present a subtle dashed component drop zone'
+  );
+  assert.ok(
+    toolsIdentityDropZoneActiveBlock.includes('border-color: var(--fab-mv2-accent);')
+      && toolsIdentityDropZoneActiveBlock.includes('background: var(--fab-success-soft);'),
+    'mapped tool row component drop zones should show an active drag-over state'
+  );
   assert.ok(editorBlock.includes('grid-template-rows: auto auto 340px minmax(410px, 1fr) auto;'), 'task edit route should reserve taller component browser and exact three-row drop-rule rows for drag/drop');
   assert.ok(editorWithNoticeBlock.includes('grid-template-rows: auto auto 340px auto minmax(410px, 1fr) auto;'), 'task edit route should give the duplicate-drop warning a compact auto row before drop rules');
   assert.ok(editorBlock.includes('overflow: auto;'), 'task editor should allow vertical scrolling without horizontal overflow');

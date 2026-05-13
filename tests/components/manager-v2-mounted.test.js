@@ -839,7 +839,17 @@ function createStore(calls = [], options = {}) {
     deleteGatheringLibraryTask: (...args) => calls.push(['deleteGatheringLibraryTask', ...args]),
     enterToolsDraft: (systemId) => calls.push(['enterToolsDraft', systemId]),
     addToolToDraft: () => calls.push(['addToolToDraft']),
-    updateToolInDraft: (...args) => calls.push(['updateToolInDraft', ...args]),
+    updateToolInDraft: (toolId, patch = {}) => {
+      calls.push(['updateToolInDraft', toolId, patch]);
+      viewState.update(state => ({
+        ...state,
+        toolsDraft: Array.isArray(state.toolsDraft)
+          ? state.toolsDraft.map(tool => tool.id === toolId ? { ...tool, ...patch } : tool)
+          : state.toolsDraft,
+        toolsDraftDirty: true
+      }));
+      return true;
+    },
     deleteToolFromDraft: (...args) => calls.push(['deleteToolFromDraft', ...args]),
     selectDraftTool: (...args) => calls.push(['selectDraftTool', ...args]),
     setExpandedDraftTool: (id = '') => {
@@ -3556,6 +3566,74 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(row.querySelector('[data-manager-v2-tool-editor]'), null, 'chevron button should remain the explicit collapse control');
+  });
+
+  it('swaps a mapped gathering tool component from the row drop zone', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          toolsDraftSelectedToolId: 'tool-catalyst',
+          toolsDraft: [{
+            id: 'tool-catalyst',
+            label: '',
+            enabled: true,
+            componentId: 'c1',
+            requirement: null,
+            breakage: { mode: 'limitedUses', maxUses: null },
+            onBreak: { mode: 'destroy' }
+          }]
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Tools').click();
+    await tick();
+    flushSync();
+
+    function dragPayloadFrom(card) {
+      let raw = '';
+      const dragStart = new Event('dragstart', { bubbles: true, cancelable: true });
+      Object.defineProperty(dragStart, 'dataTransfer', {
+        value: {
+          setData: (type, value) => {
+            if (type === 'text/plain') raw = value;
+          },
+          effectAllowed: ''
+        }
+      });
+      card.dispatchEvent(dragStart);
+      return raw;
+    }
+
+    function dropPayloadOn(node, raw) {
+      const dropEvent = new Event('drop', { bubbles: true, cancelable: true });
+      Object.defineProperty(dropEvent, 'dataTransfer', {
+        value: { getData: (type) => type === 'text/plain' ? raw : '' }
+      });
+      node.dispatchEvent(dropEvent);
+    }
+
+    const dropZone = target.querySelector('[data-manager-v2-tool-component-drop-zone="tool-catalyst"]');
+    assert.ok(dropZone);
+    assert.ok(dropZone.classList.contains('is-component-drop-zone'));
+
+    const payload = dragPayloadFrom(target.querySelector('[data-manager-v2-tools-component-card="c2"]'));
+    assert.deepEqual(JSON.parse(payload), { type: 'FabricateManagedComponent', componentId: 'c2' });
+    dropPayloadOn(dropZone, payload);
+    await tick();
+    flushSync();
+
+    assert.ok(calls.some(call => call[0] === 'updateToolInDraft' && call[1] === 'tool-catalyst' && call[2].componentId === 'c2'));
+    assert.ok(target.querySelector('[data-manager-v2-tool-id="tool-catalyst"]').textContent.includes('Glass Vial'), 'row drop should stage the replacement component on the tool');
   });
 
   it('shows setup guidance and keeps create routing when a gathering system has no environments', async () => {

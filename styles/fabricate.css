@@ -11741,6 +11741,19 @@
   min-width: 0;
 }
 
+.fabricate-manager-v2 .manager-v2-tools-identity.is-component-drop-zone {
+  padding: 6px 8px;
+  border: 1px dashed var(--fab-mv2-border-strong);
+  border-radius: 8px;
+  background: var(--fab-overlay-light-03);
+}
+
+.fabricate-manager-v2 .manager-v2-tools-identity.is-component-drop-zone.is-drop-active {
+  border-color: var(--fab-mv2-accent);
+  background: var(--fab-success-soft);
+  box-shadow: inset 0 0 0 1px var(--fab-mv2-accent);
+}
+
 .fabricate-manager-v2 .manager-v2-tools-thumb {
   width: 42px;
   height: 42px;
