@@ -11826,3 +11826,26 @@
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
 }
+
+/* Tools editor — compact 28 px control sizing for visual density. */
+.fabricate-manager-v2 .manager-v2-tools-row-editor .manager-v2-field input,
+.fabricate-manager-v2 .manager-v2-tools-row-editor .manager-v2-field select {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 10px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row-editor .manager-v2-button {
+  min-height: 28px;
+  padding: 0 12px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row-editor .manager-v2-icon-button {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row-editor .manager-v2-radio-option {
+  padding: 6px 12px;
+}
