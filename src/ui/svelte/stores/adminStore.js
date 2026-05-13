@@ -544,10 +544,65 @@ function _normalizeGatheringTask(task = {}, randomID = () => Math.random().toStr
     itemSelectionMode: task.itemSelectionMode === 'allDrops' ? 'allDrops' : 'highestRankedDrop',
     dropRows: (Array.isArray(task.dropRows ?? task.itemDrops) ? (task.dropRows ?? task.itemDrops) : [])
       .map(row => _normalizeGatheringDropRow(row, randomID)),
+    tools: (Array.isArray(task.tools) ? task.tools : []).map(_normalizeGatheringTaskTool),
     staminaCost: Number.isFinite(Number(task.staminaCost)) && Number(task.staminaCost) > 0 ? Number(task.staminaCost) : 0,
     gatheringModifier: task.gatheringModifier && typeof task.gatheringModifier === 'object' ? _clonePlain(task.gatheringModifier) : null,
     timeRequirement: task.timeRequirement && typeof task.timeRequirement === 'object' ? _clonePlain(task.timeRequirement) : null
   };
+}
+
+function _normalizeGatheringTaskTool(tool = {}) {
+  const componentId = typeof tool?.componentId === 'string' && tool.componentId
+    ? tool.componentId
+    : (typeof tool?.systemItemId === 'string' && tool.systemItemId ? tool.systemItemId : null);
+  return {
+    componentId,
+    requirement: _normalizeGatheringTaskToolRequirement(tool?.requirement),
+    breakage: _normalizeGatheringTaskToolBreakage(tool?.breakage),
+    onBreak: _normalizeGatheringTaskToolOnBreak(tool?.onBreak)
+  };
+}
+
+function _normalizeGatheringTaskToolRequirement(input) {
+  if (input === null || input === undefined || typeof input !== 'object') return null;
+  const validProviders = new Set(['dnd5e', 'pf2e', 'macro']);
+  const provider = validProviders.has(input.provider) ? input.provider : 'dnd5e';
+  return {
+    provider,
+    formula: typeof input.formula === 'string' ? input.formula : '',
+    macroUuid: typeof input.macroUuid === 'string' ? input.macroUuid : ''
+  };
+}
+
+function _normalizeGatheringTaskToolBreakage(input) {
+  const mode = ['limitedUses', 'breakageChance', 'diceExpression'].includes(input?.mode) ? input.mode : 'limitedUses';
+  if (mode === 'limitedUses') {
+    const raw = input?.maxUses;
+    const isSet = raw !== null && raw !== undefined && raw !== '';
+    const numeric = isSet ? Number(raw) : null;
+    return { mode, maxUses: Number.isFinite(numeric) ? numeric : null };
+  }
+  if (mode === 'breakageChance') {
+    const numeric = Number(input?.breakageChance);
+    return { mode, breakageChance: Number.isFinite(numeric) ? numeric : 0 };
+  }
+  const threshold = Number(input?.threshold);
+  return {
+    mode,
+    formula: typeof input?.formula === 'string' ? input.formula : '',
+    threshold: Number.isFinite(threshold) ? threshold : 0
+  };
+}
+
+function _normalizeGatheringTaskToolOnBreak(input) {
+  const mode = ['destroy', 'flagBroken', 'replaceWith'].includes(input?.mode) ? input.mode : 'destroy';
+  if (mode === 'replaceWith') {
+    return {
+      mode,
+      replacementComponentId: typeof input?.replacementComponentId === 'string' ? input.replacementComponentId : null
+    };
+  }
+  return { mode };
 }
 
 function _normalizeGatheringHazard(hazard = {}, randomID = () => Math.random().toString(36).slice(2, 10)) {

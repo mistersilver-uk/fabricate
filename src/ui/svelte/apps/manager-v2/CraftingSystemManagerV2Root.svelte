@@ -1383,6 +1383,37 @@
     updateSelectedGatheringTask({ dropRows: nextRows });
   }
 
+  function gatheringTaskTools(taskRecord) {
+    return Array.isArray(taskRecord?.tools) ? taskRecord.tools : [];
+  }
+
+  function addGatheringTaskTool() {
+    if (!editingGatheringTask) return;
+    const componentOptions = selectedSystem?.managedItemOptions || [];
+    const newTool = {
+      componentId: componentOptions[0]?.id || null,
+      requirement: null,
+      breakage: { mode: 'limitedUses', maxUses: null },
+      onBreak: { mode: 'destroy' }
+    };
+    updateSelectedGatheringTask({ tools: [...gatheringTaskTools(editingGatheringTask), newTool] });
+  }
+
+  function updateGatheringTaskTool(toolIndex, updates = {}) {
+    if (!editingGatheringTask || typeof toolIndex !== 'number' || toolIndex < 0) return;
+    const tools = gatheringTaskTools(editingGatheringTask);
+    if (toolIndex >= tools.length) return;
+    const next = tools.map((tool, index) => index === toolIndex ? { ...tool, ...updates } : tool);
+    updateSelectedGatheringTask({ tools: next });
+  }
+
+  function deleteGatheringTaskTool(toolIndex) {
+    if (!editingGatheringTask || typeof toolIndex !== 'number' || toolIndex < 0) return;
+    const tools = gatheringTaskTools(editingGatheringTask);
+    if (toolIndex >= tools.length) return;
+    updateSelectedGatheringTask({ tools: tools.filter((_, index) => index !== toolIndex) });
+  }
+
   function moveGatheringTaskDrop(rowId, direction) {
     if (!editingGatheringTask || !rowId) return;
     const rows = gatheringTaskDropRows(editingGatheringTask);
@@ -2532,6 +2563,9 @@
         onUpdateDrop={updateGatheringTaskDrop}
         onMoveDrop={moveGatheringTaskDrop}
         onImportDrop={importGatheringTaskDrop}
+        onAddTool={addGatheringTaskTool}
+        onUpdateTool={updateGatheringTaskTool}
+        onDeleteTool={deleteGatheringTaskTool}
         onAddModifier={addGatheringDropModifier}
         onUpdateModifier={updateGatheringDropModifier}
         onDeleteModifier={deleteGatheringDropModifier}

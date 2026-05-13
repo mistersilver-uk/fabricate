@@ -763,7 +763,8 @@ export class GatheringRichStateService {
       gatheringModifier: normalized.gatheringModifier,
       resultGroups: [{ id: `${normalized.id}-d100`, name: normalized.name, results: [] }],
       resultSelection: { provider: 'd100Rows' },
-      catalysts: []
+      catalysts: [],
+      tools: Array.isArray(normalized.tools) ? cloneJson(normalized.tools) : []
     };
     if (normalized.timeRequirement) runtimeTask.timeRequirement = cloneJson(normalized.timeRequirement);
     return runtimeTask;
@@ -924,6 +925,7 @@ function normalizeLibraryTask(task = {}) {
     timeOfDay: normalizeConditionIdList(task.timeOfDay),
     itemSelectionMode: LEGACY_DROP_SELECTION_MODES.has(task.itemSelectionMode) ? task.itemSelectionMode : 'highestRankedDrop',
     dropRows: normalizeList(task.dropRows ?? task.itemDrops).map(normalizeItemDrop),
+    tools: normalizeList(task.tools).map(tool => cloneJson(tool)),
     staminaCost: nonNegativeNumber(task.staminaCost, 0),
     gatheringModifier: normalizeModifierProvider(task.gatheringModifier ?? task.modifier),
     timeRequirement: plainObjectOrNull(task.timeRequirement)
