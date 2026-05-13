@@ -497,6 +497,15 @@ function createStore(calls = [], options = {}) {
     environmentSaveError: null,
     environmentValidationState: options.environmentValidationState || null,
     selectedEnvironmentTaskId: 'task-forage',
+    toolsDraft: options.toolsDraft || [],
+    toolsDraftBaseline: options.toolsDraftBaseline || options.toolsDraft || [],
+    toolsDraftSystemId: options.toolsDraftSystemId || 'alchemy',
+    toolsDraftDirty: options.toolsDraftDirty === true,
+    toolsDraftSaving: options.toolsDraftSaving === true,
+    toolsDraftSaveError: null,
+    toolsDraftSelectedToolId: options.toolsDraftSelectedToolId || '',
+    toolsDraftExpandedToolId: options.toolsDraftExpandedToolId || '',
+    toolsDraftValidation: options.toolsDraftValidation || { valid: true, errors: [] },
     gatheringConfig: options.gatheringConfig || {
       conditions: { weather: 'clear', timeOfDay: 'day' },
       vocabularies: {
@@ -827,7 +836,22 @@ function createStore(calls = [], options = {}) {
       calls.push(['duplicateGatheringLibraryTask', ...args]);
       return { id: 'task-copy', name: 'Gather Moon Herbs (Copy)', dropRows: [] };
     },
-    deleteGatheringLibraryTask: (...args) => calls.push(['deleteGatheringLibraryTask', ...args])
+    deleteGatheringLibraryTask: (...args) => calls.push(['deleteGatheringLibraryTask', ...args]),
+    enterToolsDraft: (systemId) => calls.push(['enterToolsDraft', systemId]),
+    addToolToDraft: () => calls.push(['addToolToDraft']),
+    updateToolInDraft: (...args) => calls.push(['updateToolInDraft', ...args]),
+    deleteToolFromDraft: (...args) => calls.push(['deleteToolFromDraft', ...args]),
+    selectDraftTool: (...args) => calls.push(['selectDraftTool', ...args]),
+    setExpandedDraftTool: (...args) => calls.push(['setExpandedDraftTool', ...args]),
+    saveToolsDraft: () => {
+      calls.push(['saveToolsDraft']);
+      viewState.update(state => ({
+        ...state,
+        toolsDraftDirty: false
+      }));
+      return true;
+    },
+    cancelToolsDraft: () => true
   };
 }
 
@@ -3418,6 +3442,63 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     const table = target.querySelector('[data-gathering-task-drops-table]');
     assert.equal(table.classList.contains('is-ranked-mode'), false, 'allDrops mode should not opt into ranked layout');
     assert.equal(table.querySelectorAll('[data-gathering-task-drop-rank-cell]').length, 0, 'allDrops mode should not render rank cells');
+  });
+
+  it('renders selected gathering tool save and delete actions in the inspector header card', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          toolsDraftDirty: true,
+          toolsDraftSelectedToolId: 'tool-catalyst',
+          toolsDraft: [{
+            id: 'tool-catalyst',
+            label: 'Artisan Catalyst',
+            enabled: true,
+            componentId: 'c1',
+            requirement: null,
+            breakage: { mode: 'limitedUses', maxUses: null },
+            onBreak: { mode: 'destroy' }
+          }]
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Tools').click();
+    await tick();
+    flushSync();
+
+    const headerActions = target.querySelector('.manager-v2-header-actions');
+    assert.ok(headerActions.textContent.includes('Back to Gathering'));
+    assert.ok(headerActions.textContent.includes('Unsaved'));
+    assert.equal(headerActions.textContent.includes('Delete tool'), false);
+    assert.equal(headerActions.textContent.includes('Save changes'), false);
+
+    const toolInspector = target.querySelector('[data-manager-v2-tool-inspector]');
+    assert.ok(toolInspector.textContent.includes('Artisan Catalyst'));
+    const inspectorActions = toolInspector.querySelector('.manager-v2-tool-inspector-actions');
+    assert.ok(inspectorActions, 'selected tool inspector header card should own tool actions');
+    assert.equal(inspectorActions.querySelectorAll('.manager-v2-button').length, 2);
+    assert.ok(inspectorActions.querySelector('.manager-v2-button.is-danger').textContent.includes('Delete tool'));
+    assert.ok(inspectorActions.querySelector('.manager-v2-button.is-primary').textContent.includes('Save changes'));
+
+    inspectorActions.querySelector('.manager-v2-button.is-primary').click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'saveToolsDraft'));
+
+    inspectorActions.querySelector('.manager-v2-button.is-danger').click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'deleteToolFromDraft' && call[1] === 'tool-catalyst'));
   });
 
   it('shows setup guidance and keeps create routing when a gathering system has no environments', async () => {

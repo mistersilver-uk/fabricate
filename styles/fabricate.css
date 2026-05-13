@@ -9553,6 +9553,23 @@
   overflow: hidden;
 }
 
+.fabricate-manager-v2 .manager-v2-tool-inspector-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-tool-inspector-actions .manager-v2-button {
+  width: 100%;
+  padding: 0 8px;
+}
+
+.fabricate-manager-v2 .manager-v2-tool-inspector-actions .manager-v2-button span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .fabricate-manager-v2 .manager-v2-tools-component-browser-header {
   display: flex;
   flex-direction: column;

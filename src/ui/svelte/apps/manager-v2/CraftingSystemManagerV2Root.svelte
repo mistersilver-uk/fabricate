@@ -2378,23 +2378,6 @@
         {#if $viewState.toolsDraftDirty}
           <span class="manager-v2-chip is-warning">{text('FABRICATE.Admin.ManagerV2.Tools.Dirty', 'Unsaved')}</span>
         {/if}
-        {#if $viewState.toolsDraftSelectedToolId}
-          <button type="button"
-            class="manager-v2-button is-danger"
-            onclick={deleteSelectedLibraryTool}
-            disabled={$viewState.toolsDraftSaving}>
-            <i class="fas fa-trash" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.ManagerV2.Tools.Delete', 'Delete tool')}</span>
-          </button>
-        {/if}
-        <button type="button"
-          class="manager-v2-button is-primary"
-          onclick={saveToolsDraftFromHeader}
-          disabled={!$viewState.toolsDraftDirty || !toolsDraftValidation.valid || $viewState.toolsDraftSaving}
-          title={toolsDraftValidation.valid ? '' : toolsDraftValidation.errors.map(error => error.errors.join('; ')).join('\n')}>
-          <i class={$viewState.toolsDraftSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.ManagerV2.Tools.Save', 'Save changes')}</span>
-        </button>
       {:else if currentView === 'gathering-task-edit'}
         <button type="button" class="manager-v2-button" onclick={backToGatheringTaskLibrary}>
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
@@ -3800,6 +3783,23 @@
                 <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Tools.SelectedKicker', 'Selected tool')}</p>
                 <h2 class="manager-v2-inspector-name" title={selectedLibraryTool.label || toolComponent?.name || ''}>{selectedLibraryTool.label || toolComponent?.name || text('FABRICATE.Admin.ManagerV2.Tools.OverviewComponentMissing', 'Not set')}</h2>
               </div>
+            </div>
+            <div class="manager-v2-tool-inspector-actions">
+              <button type="button"
+                class="manager-v2-button is-danger"
+                onclick={deleteSelectedLibraryTool}
+                disabled={$viewState.toolsDraftSaving}>
+                <i class="fas fa-trash" aria-hidden="true"></i>
+                <span>{text('FABRICATE.Admin.ManagerV2.Tools.Delete', 'Delete tool')}</span>
+              </button>
+              <button type="button"
+                class="manager-v2-button is-primary"
+                onclick={saveToolsDraftFromHeader}
+                disabled={!$viewState.toolsDraftDirty || !toolsDraftValidation.valid || $viewState.toolsDraftSaving}
+                title={toolsDraftValidation.valid ? '' : toolsDraftValidation.errors.map(error => error.errors.join('; ')).join('\n')}>
+                <i class={$viewState.toolsDraftSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
+                <span>{text('FABRICATE.Admin.ManagerV2.Tools.Save', 'Save changes')}</span>
+              </button>
             </div>
           </section>
 

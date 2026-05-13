@@ -46,9 +46,9 @@ A `toolsDraft` writable parallel to `environmentDraft` holds the in-memory list 
 - `openGatheringSection('tools')` calls `enterToolsDraft(systemId)`.
 - `confirmRouteExit` chain extended with `confirmToolsRouteExit` so dirty drafts prompt before navigation.
 - Breadcrumb extension `Crafting Systems > {System} > Gathering > Tools`.
-- Header actions block: `Back to Gathering`, conditional `Unsaved` chip, conditional `Delete tool` (when a tool is selected), `Save changes` (disabled when not dirty or invalid; `title` shows the first validation error).
+- Header actions block: `Back to Gathering` plus the conditional `Unsaved` chip. The selected-tool inspector card owns `Delete tool` and `Save changes` so destructive and persistence actions stay in the right-side tool context.
 - New child view `ToolsBrowserView.svelte` mounted for the route.
-- Inspector branch with seven cards: SELECTED TOOL hero, OVERVIEW fact grid, REQUIREMENT, BREAKAGE MECHANIC, ON-BREAK ACTION, USAGE (rendered in a "Not linked" state), and a closing warning band.
+- Inspector branch with a SELECTED TOOL hero/action card plus supporting cards for overview, requirement, breakage, on-break action, usage (rendered in a "Not linked" state), and a closing warning band.
 
 `ToolsBrowserView.svelte`:
 

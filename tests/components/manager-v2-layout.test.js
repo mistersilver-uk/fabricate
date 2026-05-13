@@ -544,6 +544,9 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const componentBrowserFooterBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-browser-footer');
   const componentBrowserFooterPaginationBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-browser-footer .manager-v2-pagination');
   const toolsComponentBrowserBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-browser-card');
+  const toolInspectorActionsBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-inspector-actions');
+  const toolInspectorActionButtonsBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-inspector-actions .manager-v2-button');
+  const toolInspectorActionButtonLabelBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-inspector-actions .manager-v2-button span');
   const toolsComponentBrowserHeaderBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-browser-header');
   const toolsComponentBrowserSearchBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-browser-card .manager-v2-search.is-compact');
   const toolsComponentBrowserSearchInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-browser-card .manager-v2-search.is-compact input');
@@ -663,6 +666,14 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(componentCardGripBlock.includes('letter-spacing: 0;'), 'component grip should avoid viewport-scaled or negative tracking');
   assert.ok(componentBrowserFooterBlock.includes('border-top: 1px solid var(--fab-mv2-border);'), 'component browser should own a pagination footer');
   assert.ok(componentBrowserFooterPaginationBlock.includes('background: transparent;'), 'component browser footer should not nest pagination chrome');
+  assert.ok(
+    toolInspectorActionsBlock.includes('display: grid;')
+      && toolInspectorActionsBlock.includes('grid-template-columns: repeat(2, minmax(0, 1fr));')
+      && toolInspectorActionsBlock.includes('gap: 8px;'),
+    'selected tool inspector actions should sit in a stable two-column action row inside the header card'
+  );
+  assert.ok(toolInspectorActionButtonsBlock.includes('width: 100%;') && toolInspectorActionButtonsBlock.includes('padding: 0 8px;'), 'selected tool inspector action buttons should fill their grid columns without overflowing the right rail');
+  assert.ok(toolInspectorActionButtonLabelBlock.includes('overflow-wrap: anywhere;'), 'selected tool inspector action labels should be allowed to wrap in narrow localized layouts');
   assert.ok(
     toolsComponentBrowserBlock.includes('grid-template-rows: auto minmax(96px, 1fr) auto;')
       && toolsComponentBrowserBlock.includes('gap: 0;')
