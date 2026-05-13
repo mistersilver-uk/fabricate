@@ -127,6 +127,17 @@
     onUpdateTool?.(tool.id, { componentId: payload.componentId || payload.id });
   }
 
+  function onClearToolComponent(tool, event) {
+    event.preventDefault();
+    event.stopPropagation();
+    onUpdateTool?.(tool.id, { componentId: null });
+  }
+
+  function onToolComponentMouseDown(tool, event) {
+    if (event.button !== 2) return;
+    onClearToolComponent(tool, event);
+  }
+
   function handleReplacementDrop(tool, payload) {
     if (!payload || payload.type !== 'FabricateManagedComponent') return;
     const replacementComponentId = payload.componentId || payload.id;
@@ -292,36 +303,43 @@
 
             {#if isExpanded}
               <div class="manager-v2-tools-row-editor" data-manager-v2-tool-editor>
-                <label class="manager-v2-field">
-                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.LabelField', 'Display label')}</span>
-                  <input type="text"
-                    value={tool.label || ''}
-                    placeholder={managedItem(tool.componentId)?.name || ''}
-                    oninput={(event) => onUpdateTool?.(tool.id, { label: event.currentTarget.value })} />
-                  <span class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Tools.LabelHint', 'Optional. Falls back to the component name.')}</span>
-                </label>
+                <div class="manager-v2-tools-identity-row">
+                  <label class="manager-v2-field">
+                    <span>{text('FABRICATE.Admin.ManagerV2.Tools.LabelField', 'Display label')}</span>
+                    <input type="text"
+                      value={tool.label || ''}
+                      placeholder={managedItem(tool.componentId)?.name || ''}
+                      oninput={(event) => onUpdateTool?.(tool.id, { label: event.currentTarget.value })} />
+                    <span class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Tools.LabelHint', 'Optional. Falls back to the component name.')}</span>
+                  </label>
 
-                <div class="manager-v2-field">
-                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.ComponentLabel', 'Component')}</span>
-                  <div class="manager-v2-tool-component-row"
-                    use:dragDrop={{ onDrop: (data) => handleComponentDrop(tool, data), activeClass: 'is-drop-active' }}>
-                    <button type="button"
-                      class="manager-v2-gathering-task-identity manager-v2-drop-component-button"
-                      title={text('FABRICATE.Admin.ManagerV2.Tools.ComponentChooseHint', 'Drop a component to assign.')}
-                      oncontextmenu={(event) => { event.preventDefault(); onUpdateTool?.(tool.id, { componentId: null }); }}>
-                      <img class="manager-v2-gathering-task-thumb" src={toolImage(tool)} alt="" />
-                      <span class="manager-v2-system-copy">
-                        <span class="manager-v2-system-name">{managedItem(tool.componentId)?.name || text('FABRICATE.Admin.ManagerV2.Tools.OverviewComponentMissing', 'Not set')}</span>
-                      </span>
-                    </button>
-                    <select aria-label={text('FABRICATE.Admin.ManagerV2.Tools.ComponentLabel', 'Component')}
-                      value={tool.componentId || ''}
-                      onchange={(event) => onUpdateTool?.(tool.id, { componentId: event.currentTarget.value || null })}>
-                      <option value="">{text('FABRICATE.Admin.ManagerV2.Tools.OverviewComponentMissing', 'Not set')}</option>
-                      {#each managedItemOptions as item (item.id)}
-                        <option value={item.id}>{item.name}</option>
-                      {/each}
-                    </select>
+                  <div class="manager-v2-field">
+                    <span>{text('FABRICATE.Admin.ManagerV2.Tools.ComponentLabel', 'Component')}</span>
+                    <div class="manager-v2-tool-component-row"
+                      use:dragDrop={{ onDrop: (data) => handleComponentDrop(tool, data), activeClass: 'is-drop-active' }}>
+                      {#if tool.componentId}
+                        <button type="button"
+                          class="manager-v2-gathering-task-identity manager-v2-drop-component-button"
+                          title={text('FABRICATE.Admin.ManagerV2.Tools.ClearComponentHint', 'Right-click to clear component')}
+                          onmousedown={(event) => onToolComponentMouseDown(tool, event)}
+                          oncontextmenu={(event) => onClearToolComponent(tool, event)}>
+                          <img class="manager-v2-gathering-task-thumb" src={toolImage(tool)} alt="" />
+                          <span class="manager-v2-system-copy">
+                            <span class="manager-v2-system-name">{managedItem(tool.componentId)?.name || text('FABRICATE.Admin.ManagerV2.Tools.OverviewComponentMissing', 'Not set')}</span>
+                          </span>
+                        </button>
+                      {:else}
+                        <div class="manager-v2-gathering-task-identity manager-v2-drop-empty-component is-empty">
+                          <span class="manager-v2-inline-drop-zone" aria-hidden="true">
+                            <i class="fas fa-file-import"></i>
+                          </span>
+                          <span class="manager-v2-system-copy">
+                            <span class="manager-v2-system-name">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.NoComponent', 'No Component')}</span>
+                            <span class="manager-v2-system-description">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.CreateOrAssign', 'Create or assign')}</span>
+                          </span>
+                        </div>
+                      {/if}
+                    </div>
                   </div>
                 </div>
 

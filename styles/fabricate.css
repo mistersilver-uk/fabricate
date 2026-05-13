@@ -9969,7 +9969,7 @@
   z-index: 1;
   width: 100%;
   min-width: 0;
-  height: 18px;
+  height: 28px;
   border: 0;
   accent-color: var(--fab-drop-rate-color);
   cursor: pointer;
@@ -11674,6 +11674,10 @@
   justify-content: flex-end;
 }
 
+.fabricate-manager-v2 .manager-v2-tools-row-summary .manager-v2-chip {
+  min-height: 34px;
+}
+
 .fabricate-manager-v2 .manager-v2-tools-row-actions {
   display: inline-flex;
   gap: 4px;
@@ -11710,11 +11714,21 @@
   padding: 0 4px;
 }
 
-.fabricate-manager-v2 .manager-v2-tool-component-row {
+.fabricate-manager-v2 .manager-v2-tools-identity-row {
   display: flex;
-  gap: 8px;
-  align-items: center;
+  gap: 12px;
+  align-items: flex-start;
   flex-wrap: wrap;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-identity-row > .manager-v2-field {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-tool-component-row {
+  display: block;
+  position: relative;
 }
 
 .fabricate-manager-v2 .manager-v2-tool-component-row.is-drop-active {
