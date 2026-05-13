@@ -3748,6 +3748,82 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(calls.some(call => call[0] === 'addToolToDraft' && call[1]?.componentId === 'c2'));
   });
 
+  it('uses the primary component drop-zone layout for replacement tools', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          toolsDraftSelectedToolId: 'tool-catalyst',
+          toolsDraftExpandedToolId: 'tool-catalyst',
+          toolsDraft: [{
+            id: 'tool-catalyst',
+            label: 'Artisan Catalyst',
+            enabled: true,
+            componentId: 'c1',
+            requirement: null,
+            breakage: { mode: 'limitedUses', maxUses: null },
+            onBreak: { mode: 'replaceWith', replacementComponentId: null }
+          }]
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Tools').click();
+    await tick();
+    flushSync();
+
+    const replacementDropZone = target.querySelector('[data-manager-v2-tool-replacement-drop-zone="tool-catalyst"]');
+    assert.ok(replacementDropZone);
+    assert.equal(replacementDropZone.querySelector('select'), null, 'replacement component should use the primary drop-zone layout instead of a select');
+    assert.ok(replacementDropZone.querySelector('.manager-v2-drop-empty-component'));
+    assert.ok(replacementDropZone.textContent.includes('No Component'));
+    assert.ok(replacementDropZone.textContent.includes('Create or assign'));
+
+    let raw = '';
+    const dragStart = new Event('dragstart', { bubbles: true, cancelable: true });
+    Object.defineProperty(dragStart, 'dataTransfer', {
+      value: {
+        setData: (type, value) => {
+          if (type === 'text/plain') raw = value;
+        },
+        effectAllowed: ''
+      }
+    });
+    target.querySelector('[data-manager-v2-tools-component-card="c2"]').dispatchEvent(dragStart);
+
+    const dropEvent = new Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(dropEvent, 'dataTransfer', {
+      value: { getData: (type) => type === 'text/plain' ? raw : '' }
+    });
+    replacementDropZone.dispatchEvent(dropEvent);
+    await tick();
+    flushSync();
+
+    assert.ok(calls.some(call => call[0] === 'updateToolInDraft'
+      && call[1] === 'tool-catalyst'
+      && call[2].onBreak?.mode === 'replaceWith'
+      && call[2].onBreak?.replacementComponentId === 'c2'));
+    assert.ok(replacementDropZone.textContent.includes('Glass Vial'));
+
+    const clearEvent = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    replacementDropZone.querySelector('.manager-v2-drop-component-button').dispatchEvent(clearEvent);
+    await tick();
+    flushSync();
+
+    assert.ok(calls.some(call => call[0] === 'updateToolInDraft'
+      && call[1] === 'tool-catalyst'
+      && call[2].onBreak?.mode === 'replaceWith'
+      && call[2].onBreak?.replacementComponentId === null));
+  });
+
   it('shows setup guidance and keeps create routing when a gathering system has no environments', async () => {
     const calls = [];
     target = document.createElement('div');

@@ -9930,6 +9930,14 @@
   min-height: 40px;
 }
 
+.fabricate-manager-v2 .manager-v2-drop-empty-component {
+  min-height: 52px;
+  padding: 6px 8px;
+  border: 1px dashed var(--fab-mv2-border-strong);
+  border-radius: 8px;
+  background: var(--fab-overlay-light-03);
+}
+
 .fabricate-manager-v2 .manager-v2-drop-component-button .manager-v2-gathering-task-thumb {
   width: 42px;
   height: 42px;
@@ -10002,7 +10010,7 @@
 
 .fabricate-manager-v2 .manager-v2-drop-rate-percent > span[aria-hidden="true"] {
   position: absolute;
-  right: 7px;
+  right: 6px;
   top: 50%;
   pointer-events: none;
   transform: translateY(-50%);
@@ -10177,7 +10185,9 @@
   width: 42px;
   min-height: 40px;
   padding: 0;
+  border: 0;
   border-radius: 8px;
+  background: var(--fab-overlay-light-06);
 }
 
 .fabricate-manager-v2 .manager-v2-empty-drop-cell {
@@ -11964,7 +11974,7 @@
 .fabricate-manager-v2 .manager-v2-tools-row-editor .manager-v2-field select {
   height: 28px;
   min-height: 28px;
-  padding: 0 10px;
+  padding: 0 10px 0 0;
 }
 
 .fabricate-manager-v2 .manager-v2-tools-row-editor .manager-v2-button {

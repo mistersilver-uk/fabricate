@@ -156,6 +156,17 @@
     onUpdateTool?.(tool.id, { onBreak: { mode: 'replaceWith', replacementComponentId } });
   }
 
+  function onClearReplacementComponent(tool, event) {
+    event.preventDefault();
+    event.stopPropagation();
+    onUpdateTool?.(tool.id, { onBreak: { mode: 'replaceWith', replacementComponentId: null } });
+  }
+
+  function onReplacementComponentMouseDown(tool, event) {
+    if (event.button !== 2) return;
+    onClearReplacementComponent(tool, event);
+  }
+
   function defaultRequirement() {
     return { provider: 'dnd5e', formula: '', macroUuid: '' };
   }
@@ -499,23 +510,30 @@
                     <div class="manager-v2-field">
                       <span>{text('FABRICATE.Admin.ManagerV2.Tools.ReplacementComponent', 'Replacement component')}</span>
                       <div class="manager-v2-tool-component-row"
+                        data-manager-v2-tool-replacement-drop-zone={tool.id}
                         use:dragDrop={{ onDrop: (data) => handleReplacementDrop(tool, data), activeClass: 'is-drop-active' }}>
-                        <button type="button"
-                          class="manager-v2-gathering-task-identity manager-v2-drop-component-button"
-                          oncontextmenu={(event) => { event.preventDefault(); onUpdateTool?.(tool.id, { onBreak: { mode: 'replaceWith', replacementComponentId: null } }); }}>
-                          <img class="manager-v2-gathering-task-thumb" src={managedItem(tool.onBreak.replacementComponentId)?.img || 'icons/svg/item-bag.svg'} alt="" />
-                          <span class="manager-v2-system-copy">
-                            <span class="manager-v2-system-name">{managedItem(tool.onBreak.replacementComponentId)?.name || text('FABRICATE.Admin.ManagerV2.Tools.OverviewComponentMissing', 'Not set')}</span>
-                          </span>
-                        </button>
-                        <select aria-label={text('FABRICATE.Admin.ManagerV2.Tools.ReplacementComponent', 'Replacement component')}
-                          value={tool.onBreak.replacementComponentId || ''}
-                          onchange={(event) => onUpdateTool?.(tool.id, { onBreak: { mode: 'replaceWith', replacementComponentId: event.currentTarget.value || null } })}>
-                          <option value="">{text('FABRICATE.Admin.ManagerV2.Tools.OverviewComponentMissing', 'Not set')}</option>
-                          {#each managedItemOptions as item (item.id)}
-                            <option value={item.id}>{item.name}</option>
-                          {/each}
-                        </select>
+                        {#if tool.onBreak.replacementComponentId}
+                          <button type="button"
+                            class="manager-v2-gathering-task-identity manager-v2-drop-component-button"
+                            title={text('FABRICATE.Admin.ManagerV2.Tools.ClearComponentHint', 'Right-click to clear component')}
+                            onmousedown={(event) => onReplacementComponentMouseDown(tool, event)}
+                            oncontextmenu={(event) => onClearReplacementComponent(tool, event)}>
+                            <img class="manager-v2-gathering-task-thumb" src={managedItem(tool.onBreak.replacementComponentId)?.img || 'icons/svg/item-bag.svg'} alt="" />
+                            <span class="manager-v2-system-copy">
+                              <span class="manager-v2-system-name">{managedItem(tool.onBreak.replacementComponentId)?.name || text('FABRICATE.Admin.ManagerV2.Tools.OverviewComponentMissing', 'Not set')}</span>
+                            </span>
+                          </button>
+                        {:else}
+                          <div class="manager-v2-gathering-task-identity manager-v2-drop-empty-component is-empty">
+                            <span class="manager-v2-inline-drop-zone" aria-hidden="true">
+                              <i class="fas fa-file-import"></i>
+                            </span>
+                            <span class="manager-v2-system-copy">
+                              <span class="manager-v2-system-name">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.NoComponent', 'No Component')}</span>
+                              <span class="manager-v2-system-description">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.CreateOrAssign', 'Create or assign')}</span>
+                            </span>
+                          </div>
+                        {/if}
                       </div>
                       {#if replacementSameAsComponent(tool)}
                         <span class="manager-v2-chip is-danger" role="alert">

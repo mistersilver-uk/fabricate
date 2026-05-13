@@ -584,6 +584,8 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const dropCellSeparatorBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-drop-table-head > * + *,\n.fabricate-manager-v2 .manager-v2-gathering-task-drop-row > * + *');
   const selectedDropRowBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-drop-row.is-selected');
   const dropComponentButtonBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-component-button,\n.fabricate-manager-v2 .manager-v2-drop-empty-component');
+  const dropEmptyComponentBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-empty-component');
+  const dropEmptyComponentIconBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-empty-component .manager-v2-inline-drop-zone');
   const dropComponentCopyBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-component-button .manager-v2-system-copy,\n.fabricate-manager-v2 .manager-v2-drop-empty-component .manager-v2-system-copy');
   const dropComponentNameBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-component-button .manager-v2-system-name');
   const dropRateBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-cell');
@@ -770,6 +772,11 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.equal(selectedDropRowBlock.includes('var(--fab-info'), false, 'selected drop rows should not use the info family');
   assert.equal(selectedDropRowBlock.includes('var(--fab-warning'), false, 'selected drop rows should not use the warning family');
   assert.ok(dropComponentButtonBlock.includes('grid-template-columns: 42px minmax(0, 1fr);') && dropComponentButtonBlock.includes('min-height: 40px;'), 'drop component cells should keep compact thumbnail/name geometry');
+  assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-drop-empty-component {\n  min-height: 52px;\n  padding: 6px 8px;\n  border: 1px dashed var(--fab-mv2-border-strong);'),
+    'empty component placeholders should show the full drop-zone boundary'
+  );
+  assert.ok(dropEmptyComponentIconBlock.includes('border: 0;'), 'empty component placeholders should avoid a nested icon-only dashed border');
   assert.ok(dropComponentCopyBlock.includes('align-content: center;'), 'drop component text should be vertically centered after description removal');
   assert.ok(dropComponentNameBlock.includes('display: -webkit-box;') && dropComponentNameBlock.includes('-webkit-line-clamp: 2;') && dropComponentNameBlock.includes('white-space: normal;'), 'drop component names should wrap to two lines instead of relying on descriptions');
   assert.ok(dropRateBlock.includes('display: block;'), 'drop chance cell should expose one wrapped value');
