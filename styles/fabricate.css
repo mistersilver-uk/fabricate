@@ -11827,8 +11827,11 @@
   outline-offset: 2px;
 }
 
-/* Tools editor — compact 28 px control sizing for visual density. */
-.fabricate-manager-v2 .manager-v2-tools-row-editor .manager-v2-field input,
+/* Tools editor — compact 28 px control sizing for visual density.
+ * Excludes input[type="range"] so the breakage-chance slider keeps its tuned
+ * 18 px height and zero horizontal padding; otherwise the custom track ends
+ * extend past the narrower native track and render as visible nibs. */
+.fabricate-manager-v2 .manager-v2-tools-row-editor .manager-v2-field input:not([type="range"]),
 .fabricate-manager-v2 .manager-v2-tools-row-editor .manager-v2-field select {
   height: 28px;
   min-height: 28px;
