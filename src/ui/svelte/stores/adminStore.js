@@ -1598,28 +1598,18 @@ export function createAdminStore(services) {
     return enabled.length === 0 || enabled.includes(String(recordId));
   }
 
-  function _gatheringLibraryRecordUsages(config, systemId, record, kind) {
+  function _gatheringLibraryRecordUsages(systemId, record, kind) {
     if (!record?.id) return [];
     const enabledKey = kind === 'hazard' ? 'enabledHazardIds' : 'enabledTaskIds';
-    const disabledKey = kind === 'hazard' ? 'disabledHazardIds' : 'disabledTaskIds';
-    const includeDanger = kind === 'hazard';
+    const recordId = String(record.id);
     const usages = [];
     for (const environment of _environmentList()) {
       if (String(environment?.craftingSystemId || '') !== String(systemId || '')) continue;
       const enabled = Array.isArray(environment?.[enabledKey]) ? environment[enabledKey].map(String) : [];
-      const disabled = Array.isArray(environment?.[disabledKey]) ? environment[disabledKey].map(String) : [];
-      const explicitlyReferenced = enabled.includes(String(record.id)) || disabled.includes(String(record.id));
-      const systemConditions = config.systems?.[String(systemId || '')]?.conditions
-        || _normalizeGatheringSystemConditions(null, config);
-      const currentConditions = _gatheringCurrentConditions(systemConditions);
-      const matched = _gatheringLibraryRecordMatchesEnvironment(record, environment, currentConditions, includeDanger, systemConditions)
-        && _environmentAllowsGatheringLibraryRecord(environment, record.id, kind);
-      if (!explicitlyReferenced && !matched) continue;
+      if (!enabled.includes(recordId)) continue;
       usages.push({
         id: String(environment.id || ''),
-        name: String(environment.name || environment.id || 'Unnamed environment'),
-        explicitlyReferenced,
-        matched
+        name: String(environment.name || environment.id || 'Unnamed environment')
       });
     }
     return usages;
@@ -1632,18 +1622,22 @@ export function createAdminStore(services) {
     };
   }
 
-  async function _confirmGatheringLibraryRecordDelete({ config, systemId, record, kind }) {
-    const usages = _gatheringLibraryRecordUsages(config, systemId, record, kind);
-    if (usages.length === 0) return true;
+  async function _confirmGatheringLibraryRecordDelete({ systemId, record, kind }) {
+    const usages = _gatheringLibraryRecordUsages(systemId, record, kind);
     const label = kind === 'hazard' ? 'reusable gathering hazard' : 'gathering task';
-    const usageList = usages
-      .slice(0, 6)
-      .map(usage => `<li>${_escapeHtml(usage.name)}</li>`)
-      .join('');
-    const overflow = usages.length > 6 ? `<li>${_escapeHtml(`and ${usages.length - 6} more`)}</li>` : '';
+    const name = _escapeHtml(record?.name || record?.id || label);
+    let content = `<p>Delete ${label} <strong>${name}</strong>? This action cannot be undone.</p>`;
+    if (usages.length > 0) {
+      const usageList = usages
+        .slice(0, 6)
+        .map(usage => `<li>${_escapeHtml(usage.name)}</li>`)
+        .join('');
+      const overflow = usages.length > 6 ? `<li>${_escapeHtml(`and ${usages.length - 6} more`)}</li>` : '';
+      content += `<p>This ${label} is currently used by ${usages.length} environment(s):</p><ul>${usageList}${overflow}</ul>`;
+    }
     return await services.confirmDialog?.({
       title: `Delete ${label}?`,
-      content: `<p>Delete ${label} <strong>${_escapeHtml(record?.name || record?.id || label)}</strong>?</p><p>This ${label} is currently used by ${usages.length} environment(s):</p><ul>${usageList}${overflow}</ul>`,
+      content,
       yes: () => true,
       no: () => false
     }) === true;
@@ -3515,12 +3509,54 @@ export function createAdminStore(services) {
     return { valid: errors.length === 0, errors };
   }
 
+  function _gatheringTaskIsAtDefaults(task) {
+    if (!task) return false;
+    const localizedDefault = services.localize?.('FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask');
+    const isDefaultName = task.name === localizedDefault
+      || task.name === 'New Gathering Task'
+      || task.name === 'Gather';
+    const isDefaultImg = task.img === DEFAULT_GATHERING_TASK_IMG;
+    return isDefaultName && isDefaultImg;
+  }
+
+  function _firstDropAutopopulatePatch(existingTask, nextDropRows, managedItemById) {
+    if (!_gatheringTaskIsAtDefaults(existingTask)) return null;
+    const hadComponentBefore = (existingTask?.dropRows || []).some(row => row?.componentId);
+    if (hadComponentBefore) return null;
+    const firstRowWithComponent = (nextDropRows || []).find(row => row?.componentId);
+    if (!firstRowWithComponent) return null;
+    const component = managedItemById?.get?.(String(firstRowWithComponent.componentId));
+    const componentName = String(component?.name || '').trim();
+    if (!componentName) return null;
+    const template = services.localize?.('FABRICATE.Admin.ManagerV2.Environment.Tasks.AutoNameTemplate')
+      || 'Gather {component}';
+    return {
+      name: template.replace('{component}', componentName),
+      img: component.img || DEFAULT_GATHERING_TASK_IMG
+    };
+  }
+
+  function gatheringTaskAutopopulateFromComponent(systemId, existingTask, nextDropRows) {
+    const system = services.getCraftingSystemManager?.()?.getSystem?.(systemId);
+    const options = _buildManagedItemOptions(_getManagedItems(system));
+    const managedItemById = new Map(options.map(item => [String(item.id), item]));
+    return _firstDropAutopopulatePatch(existingTask, nextDropRows, managedItemById) || {};
+  }
+
   async function updateGatheringLibraryTask(systemId = get(selectedSystemId), taskId, updates = {}) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !taskId) return false;
+    const existing = systemConfig.tasks.find(task => task.id === taskId);
+    let mergedUpdates = updates;
+    if (existing && Array.isArray(updates.dropRows)) {
+      const patch = gatheringTaskAutopopulateFromComponent(systemId, existing, updates.dropRows);
+      if (patch.name || patch.img) {
+        mergedUpdates = { ...patch, ...updates };
+      }
+    }
     systemConfig.tasks = systemConfig.tasks.map(task => task.id === taskId
-      ? _normalizeGatheringTask({ ...task, ...updates }, _randomID)
+      ? _normalizeGatheringTask({ ...task, ...mergedUpdates }, _randomID)
       : task);
     await _saveGatheringConfig(config);
     await refresh();
@@ -3532,7 +3568,7 @@ export function createAdminStore(services) {
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !taskId) return false;
     const task = systemConfig.tasks.find(task => task.id === taskId);
-    if (task && !await _confirmGatheringLibraryRecordDelete({ config, systemId, record: task, kind: 'task' })) return false;
+    if (task && !await _confirmGatheringLibraryRecordDelete({ systemId, record: task, kind: 'task' })) return false;
     systemConfig.tasks = systemConfig.tasks.filter(task => task.id !== taskId);
     await _saveGatheringConfig(config);
     await refresh();
@@ -3592,7 +3628,7 @@ export function createAdminStore(services) {
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !hazardId) return false;
     const hazard = systemConfig.hazards.find(hazard => hazard.id === hazardId);
-    if (hazard && !await _confirmGatheringLibraryRecordDelete({ config, systemId, record: hazard, kind: 'hazard' })) return false;
+    if (hazard && !await _confirmGatheringLibraryRecordDelete({ systemId, record: hazard, kind: 'hazard' })) return false;
     systemConfig.hazards = systemConfig.hazards.filter(hazard => hazard.id !== hazardId);
     await _saveGatheringConfig(config);
     await refresh();
@@ -4306,6 +4342,7 @@ export function createAdminStore(services) {
     validateGatheringLibraryTask,
     deleteGatheringLibraryTask,
     duplicateGatheringLibraryTask,
+    gatheringTaskAutopopulateFromComponent,
     addGatheringLibraryHazard,
     updateGatheringLibraryHazard,
     deleteGatheringLibraryHazard,

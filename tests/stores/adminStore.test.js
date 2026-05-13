@@ -2043,6 +2043,143 @@ describe('createAdminStore', () => {
       assert.equal(get(store.viewState).gatheringConfig.systems.sys1.hazards[0].dropRate, 30);
     });
 
+    it('auto-populates default task name and image when the first drop row receives a component', async () => {
+      const services = createMockServices({
+        localize: (key) => {
+          if (key === 'FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask') return 'New Gathering Task';
+          if (key === 'FABRICATE.Admin.ManagerV2.Environment.Tasks.AutoNameTemplate') return 'Gather {component}';
+          return key;
+        }
+      });
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      sys.components = [{ id: 'ore', name: 'Raw Ore', img: 'icons/raw-ore.png' }];
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const task = await store.addGatheringLibraryTask('sys1');
+
+      await store.updateGatheringLibraryTask('sys1', task.id, {
+        dropRows: [{ id: 'drop-a', componentId: 'ore', quantity: 1, dropRate: 50 }]
+      });
+
+      const persisted = services._store.gatheringConfig.systems.sys1.tasks[0];
+      assert.equal(persisted.name, 'Gather Raw Ore');
+      assert.equal(persisted.img, 'icons/raw-ore.png');
+    });
+
+    it('does not auto-populate the task name and image when the task name has been customized', async () => {
+      const services = createMockServices({
+        localize: (key) => {
+          if (key === 'FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask') return 'New Gathering Task';
+          if (key === 'FABRICATE.Admin.ManagerV2.Environment.Tasks.AutoNameTemplate') return 'Gather {component}';
+          return key;
+        }
+      });
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      sys.components = [{ id: 'ore', name: 'Raw Ore', img: 'icons/raw-ore.png' }];
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const task = await store.addGatheringLibraryTask('sys1');
+      await store.updateGatheringLibraryTask('sys1', task.id, { name: 'Forage Roots' });
+
+      await store.updateGatheringLibraryTask('sys1', task.id, {
+        dropRows: [{ id: 'drop-a', componentId: 'ore', quantity: 1, dropRate: 50 }]
+      });
+
+      const persisted = services._store.gatheringConfig.systems.sys1.tasks[0];
+      assert.equal(persisted.name, 'Forage Roots');
+      assert.equal(persisted.img, 'icons/svg/item-bag.svg');
+    });
+
+    it('does not auto-populate the task name and image when the task image has been customized', async () => {
+      const services = createMockServices({
+        localize: (key) => {
+          if (key === 'FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask') return 'New Gathering Task';
+          if (key === 'FABRICATE.Admin.ManagerV2.Environment.Tasks.AutoNameTemplate') return 'Gather {component}';
+          return key;
+        }
+      });
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      sys.components = [{ id: 'ore', name: 'Raw Ore', img: 'icons/raw-ore.png' }];
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const task = await store.addGatheringLibraryTask('sys1');
+      await store.updateGatheringLibraryTask('sys1', task.id, { img: 'icons/svg/leaf.svg' });
+
+      await store.updateGatheringLibraryTask('sys1', task.id, {
+        dropRows: [{ id: 'drop-a', componentId: 'ore', quantity: 1, dropRate: 50 }]
+      });
+
+      const persisted = services._store.gatheringConfig.systems.sys1.tasks[0];
+      assert.equal(persisted.name, 'New Gathering Task');
+      assert.equal(persisted.img, 'icons/svg/leaf.svg');
+    });
+
+    it('does not auto-populate the task name and image when a second drop row receives a component', async () => {
+      const services = createMockServices({
+        localize: (key) => {
+          if (key === 'FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask') return 'New Gathering Task';
+          if (key === 'FABRICATE.Admin.ManagerV2.Environment.Tasks.AutoNameTemplate') return 'Gather {component}';
+          return key;
+        }
+      });
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      sys.components = [
+        { id: 'ore', name: 'Raw Ore', img: 'icons/raw-ore.png' },
+        { id: 'gem', name: 'Rough Gem', img: 'icons/gem.png' }
+      ];
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const task = await store.addGatheringLibraryTask('sys1');
+      await store.updateGatheringLibraryTask('sys1', task.id, { name: 'Mining Run', img: 'icons/pickaxe.png' });
+      await store.updateGatheringLibraryTask('sys1', task.id, {
+        dropRows: [{ id: 'drop-a', componentId: 'ore', quantity: 1, dropRate: 50 }]
+      });
+
+      await store.updateGatheringLibraryTask('sys1', task.id, {
+        dropRows: [
+          { id: 'drop-a', componentId: 'ore', quantity: 1, dropRate: 50 },
+          { id: 'drop-b', componentId: 'gem', quantity: 1, dropRate: 10 }
+        ]
+      });
+
+      const persisted = services._store.gatheringConfig.systems.sys1.tasks[0];
+      assert.equal(persisted.name, 'Mining Run');
+      assert.equal(persisted.img, 'icons/pickaxe.png');
+    });
+
+    it('does not auto-populate the task name and image when an empty drop row is added', async () => {
+      const services = createMockServices({
+        localize: (key) => {
+          if (key === 'FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask') return 'New Gathering Task';
+          if (key === 'FABRICATE.Admin.ManagerV2.Environment.Tasks.AutoNameTemplate') return 'Gather {component}';
+          return key;
+        }
+      });
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      sys.components = [{ id: 'ore', name: 'Raw Ore', img: 'icons/raw-ore.png' }];
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const task = await store.addGatheringLibraryTask('sys1');
+
+      await store.updateGatheringLibraryTask('sys1', task.id, {
+        dropRows: [{ id: 'drop-a', componentId: '', quantity: 1, dropRate: 50 }]
+      });
+
+      const persisted = services._store.gatheringConfig.systems.sys1.tasks[0];
+      assert.equal(persisted.name, 'New Gathering Task');
+      assert.equal(persisted.img, 'icons/svg/item-bag.svg');
+    });
+
     it('duplicates gathering tasks with fresh task and drop ids', async () => {
       const services = createMockServices({
         randomID: (() => {
@@ -2540,8 +2677,72 @@ describe('createAdminStore', () => {
       assert.equal(confirmations.length, 2);
       assert.ok(confirmations[0].content.includes('Used Grove'));
       assert.ok(confirmations[1].content.includes('Used Grove'));
+      assert.ok(confirmations[0].content.includes('cannot be undone'));
+      assert.ok(confirmations[1].content.includes('cannot be undone'));
       assert.equal(services._store.gatheringConfig.systems.sys1.tasks.length, 1);
       assert.equal(services._store.gatheringConfig.systems.sys1.hazards.length, 1);
+    });
+
+    it('requires confirmation before deleting unused gathering library records and keeps them on decline', async () => {
+      const confirmations = [];
+      const services = createMockServices({
+        confirmDialog: async (options) => {
+          confirmations.push(options);
+          return false;
+        },
+        getGatheringEnvironmentStore: () => ({ list: () => [] })
+      });
+      services._store.gatheringConfig = {
+        systems: {
+          sys1: {
+            tasks: [{ id: 'task-unused', name: 'Lone Task', dropRows: [] }],
+            hazards: [{ id: 'hazard-unused', name: 'Lone Hazard', dropRate: 10 }]
+          }
+        }
+      };
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      assert.equal(await store.deleteGatheringLibraryTask('sys1', 'task-unused'), false);
+      assert.equal(await store.deleteGatheringLibraryHazard('sys1', 'hazard-unused'), false);
+      assert.equal(confirmations.length, 2);
+      assert.ok(confirmations[0].content.includes('Lone Task'));
+      assert.ok(confirmations[0].content.includes('cannot be undone'));
+      assert.ok(!confirmations[0].content.includes('currently used by'));
+      assert.ok(confirmations[1].content.includes('Lone Hazard'));
+      assert.ok(confirmations[1].content.includes('cannot be undone'));
+      assert.ok(!confirmations[1].content.includes('currently used by'));
+      assert.equal(services._store.gatheringConfig.systems.sys1.tasks.length, 1);
+      assert.equal(services._store.gatheringConfig.systems.sys1.hazards.length, 1);
+    });
+
+    it('deletes unused gathering library records when the confirmation is accepted', async () => {
+      let confirmationCount = 0;
+      const services = createMockServices({
+        confirmDialog: async () => {
+          confirmationCount += 1;
+          return true;
+        },
+        getGatheringEnvironmentStore: () => ({ list: () => [] })
+      });
+      services._store.gatheringConfig = {
+        systems: {
+          sys1: {
+            tasks: [{ id: 'task-unused', name: 'Lone Task', dropRows: [] }],
+            hazards: [{ id: 'hazard-unused', name: 'Lone Hazard', dropRate: 10 }]
+          }
+        }
+      };
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      assert.equal(await store.deleteGatheringLibraryTask('sys1', 'task-unused'), true);
+      assert.equal(await store.deleteGatheringLibraryHazard('sys1', 'hazard-unused'), true);
+      assert.equal(confirmationCount, 2);
+      assert.equal(services._store.gatheringConfig.systems.sys1.tasks.length, 0);
+      assert.equal(services._store.gatheringConfig.systems.sys1.hazards.length, 0);
     });
 
     it('deletes gathering library records after used-record confirmation is accepted', async () => {
@@ -2558,7 +2759,9 @@ describe('createAdminStore', () => {
             craftingSystemId: 'sys1',
             region: 'north',
             biomes: ['forest'],
-            dangerTags: ['hazardous']
+            dangerTags: ['hazardous'],
+            enabledTaskIds: ['task-used'],
+            enabledHazardIds: ['hazard-used']
           }]
         })
       });
