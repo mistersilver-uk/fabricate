@@ -562,6 +562,13 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const toolsComponentBrowserFooterControlsBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-browser-footer .manager-v2-pagination-nav,\n.fabricate-manager-v2 .manager-v2-tools-component-browser-footer .manager-v2-pagination-size');
   const toolsComponentBrowserFooterPageSizeSelectBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-browser-footer .manager-v2-pagination-size select');
   const toolsComponentBrowserFooterPageBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-browser-footer .manager-v2-pagination-page');
+  const toolsInlineFieldBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-inline-field');
+  const toolsInlineFieldLabelBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-inline-field > span:first-child');
+  const toolsInlineNumberInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-inline-field > input[type="number"]');
+  const toolsMaxUsesInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-inline-field > .manager-v2-tools-max-uses-input');
+  const toolsInlineFieldsBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-inline-fields');
+  const toolsEditorInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-row-editor .manager-v2-field input:not([type="range"]),\n.fabricate-manager-v2 .manager-v2-tools-row-editor .manager-v2-field select');
+  const toolsEditorPercentInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-row-editor .manager-v2-drop-rate-percent input[type="text"]');
   const componentPillsBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-pills');
   const selectedTagPillBlock = blockFor('.fabricate-manager-v2 .manager-v2-selected-tag-pill');
   const dropCardBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drops-card');
@@ -671,6 +678,28 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
     toolsEmptyStubActiveBlock.includes('.manager-v2-tools-empty-stub.is-drop-active')
       && toolsEmptyStubActiveBlock.includes('border-color: var(--fab-accent);'),
     'tools add stub should share hover/focus styling with active drag-over state'
+  );
+  assert.ok(
+    toolsInlineFieldBlock.includes('grid-template-columns: max-content minmax(0, 1fr);')
+      && toolsInlineFieldBlock.includes('align-items: center;'),
+    'tools breakage and on-break controls should keep labels and inputs on one row'
+  );
+  assert.ok(toolsInlineFieldLabelBlock.includes('white-space: nowrap;'), 'tools inline labels should not wrap above their inputs');
+  assert.ok(toolsInlineNumberInputBlock.includes('max-width: 122px;'), 'tools inline number inputs should remain compact without clipping placeholders');
+  assert.ok(toolsMaxUsesInputBlock.includes('max-width: 190px;'), 'tools maximum-uses input should be wide enough for its placeholder');
+  assert.ok(
+    toolsInlineFieldsBlock.includes('grid-template-columns: minmax(260px, 1fr) minmax(180px, 0.55fr);'),
+    'tools two-input breakage controls should remain side-by-side'
+  );
+  assert.ok(
+    toolsEditorInputBlock.includes('height: 28px;')
+      && toolsEditorInputBlock.includes('min-height: 28px;')
+      && !toolsEditorInputBlock.includes('padding:'),
+    'tools editor broad input sizing should not force specialized padding onto every field'
+  );
+  assert.ok(
+    toolsEditorPercentInputBlock.includes('padding: 0 10px 0 0;'),
+    'tools breakage chance percent input should keep its specialized compact padding'
   );
   assert.ok(editorBlock.includes('grid-template-rows: auto auto 340px minmax(410px, 1fr) auto;'), 'task edit route should reserve taller component browser and exact three-row drop-rule rows for drag/drop');
   assert.ok(editorWithNoticeBlock.includes('grid-template-rows: auto auto 340px auto minmax(410px, 1fr) auto;'), 'task edit route should give the duplicate-drop warning a compact auto row before drop rules');
@@ -785,7 +814,11 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(css.includes('--fab-drop-rate-none: #E26F6B;'), 'drop chance slider should define a distinct exact-zero colour token');
   assert.ok(dropRatePercentInputBlock.includes('height: 28px;') && dropRatePercentInputBlock.includes('box-sizing: border-box;') && dropRatePercentInputBlock.includes('padding: 4px 16px 4px 2px;') && dropRatePercentInputBlock.includes('text-align: center;'), 'drop chance row percent should keep its existing compact centered editable numeric field');
   assert.ok(dropRatePercentInputOverrideBlock.includes('min-height: 28px;') && dropRatePercentInputOverrideBlock.includes('padding: 4px 16px 4px 2px;') && dropRatePercentInputOverrideBlock.includes('box-shadow: none;'), 'drop chance row percent should override generic gathering task input chrome without affecting other fields');
-  assert.ok(dropRatePercentSuffixBlock.includes('position: absolute;') && dropRatePercentSuffixBlock.includes('right: 7px;') && dropRatePercentSuffixBlock.includes('pointer-events: none;'), 'drop chance row percent suffix should keep its existing placement');
+  assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-drop-rate-percent > span[aria-hidden="true"] {\n  position: absolute;\n  right: 6px;')
+      && css.includes('pointer-events: none;'),
+    'drop chance row percent suffix should keep its existing placement'
+  );
   assert.ok(dropRateControlBlock.includes('--fab-drop-rate-value: 1%;') && dropRateControlBlock.includes('--fab-drop-rate-color: var(--fab-drop-rate-very-rare);'), 'drop chance slider should expose value and tier colour variables');
   assert.ok(dropRateTrackBlock.includes('background: var(--fab-overlay-dark-18);') && dropRateTrackBlock.includes('overflow: hidden;'), 'drop chance slider should render a neutral clipped track under the native range input');
   assert.ok(dropRateFillBlock.includes('width: var(--fab-drop-rate-value);') && dropRateFillBlock.includes('background: var(--fab-drop-rate-color);'), 'drop chance slider should fill the active track segment with the current tier colour');

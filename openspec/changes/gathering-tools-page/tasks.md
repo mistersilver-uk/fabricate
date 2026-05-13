@@ -23,5 +23,6 @@
 - [x] Add row-level component drop-zone styling and swap behavior for mapped tools.
 - [x] Add drop-to-create behavior for the Tools add stub.
 - [x] Align replacement component editor with the primary component drop-zone behavior.
+- [x] Keep tool breakage and on-break editor controls on single-line rows.
 - [ ] Update `docs/gathering-environments.md` with a Tools library subsection.
 - [ ] Run `npm test` and `npm run build`; commit and push.

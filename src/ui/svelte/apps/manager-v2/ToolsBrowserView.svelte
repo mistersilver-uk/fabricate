@@ -426,9 +426,10 @@
                     {/each}
                   </div>
                   {#if tool.breakage?.mode === 'limitedUses'}
-                    <label class="manager-v2-field">
+                    <label class="manager-v2-field manager-v2-tools-inline-field">
                       <span>{text('FABRICATE.Admin.ManagerV2.Tools.BreakageMaxUses', 'Maximum uses')}</span>
                       <input type="number"
+                        class="manager-v2-tools-max-uses-input"
                         min="1"
                         step="1"
                         placeholder={text('FABRICATE.Admin.ManagerV2.Tools.BreakageMaxUsesHint', 'Blank = unlimited')}
@@ -440,7 +441,7 @@
                         }} />
                     </label>
                   {:else if tool.breakage?.mode === 'breakageChance'}
-                    <label class="manager-v2-field">
+                    <label class="manager-v2-field manager-v2-tools-inline-field">
                       <span>{text('FABRICATE.Admin.ManagerV2.Tools.BreakageChance', 'Breakage chance')}</span>
                       <span class="manager-v2-drop-rate-value">
                         <span class="manager-v2-drop-rate-percent">
@@ -470,20 +471,22 @@
                       </span>
                     </label>
                   {:else if tool.breakage?.mode === 'diceExpression'}
-                    <label class="manager-v2-field">
-                      <span>{text('FABRICATE.Admin.ManagerV2.Tools.BreakageFormula', 'Formula')}</span>
-                      <input type="text"
-                        value={tool.breakage.formula || ''}
-                        placeholder="1d20 + @abilities.str.mod"
-                        oninput={(event) => onUpdateTool?.(tool.id, { breakage: { mode: 'diceExpression', formula: event.currentTarget.value, threshold: tool.breakage.threshold ?? 0 } })} />
-                    </label>
-                    <label class="manager-v2-field">
-                      <span>{text('FABRICATE.Admin.ManagerV2.Tools.BreakageThreshold', 'Break below')}</span>
-                      <input type="number"
-                        step="1"
-                        value={tool.breakage.threshold ?? 0}
-                        oninput={(event) => onUpdateTool?.(tool.id, { breakage: { mode: 'diceExpression', formula: tool.breakage.formula || '', threshold: Number(event.currentTarget.value) } })} />
-                    </label>
+                    <div class="manager-v2-tools-inline-fields">
+                      <label class="manager-v2-field manager-v2-tools-inline-field">
+                        <span>{text('FABRICATE.Admin.ManagerV2.Tools.BreakageFormula', 'Formula')}</span>
+                        <input type="text"
+                          value={tool.breakage.formula || ''}
+                          placeholder="1d20 + @abilities.str.mod"
+                          oninput={(event) => onUpdateTool?.(tool.id, { breakage: { mode: 'diceExpression', formula: event.currentTarget.value, threshold: tool.breakage.threshold ?? 0 } })} />
+                      </label>
+                      <label class="manager-v2-field manager-v2-tools-inline-field">
+                        <span>{text('FABRICATE.Admin.ManagerV2.Tools.BreakageThreshold', 'Break below')}</span>
+                        <input type="number"
+                          step="1"
+                          value={tool.breakage.threshold ?? 0}
+                          oninput={(event) => onUpdateTool?.(tool.id, { breakage: { mode: 'diceExpression', formula: tool.breakage.formula || '', threshold: Number(event.currentTarget.value) } })} />
+                      </label>
+                    </div>
                   {/if}
                 </fieldset>
 
@@ -507,7 +510,7 @@
                     {/each}
                   </div>
                   {#if tool.onBreak?.mode === 'replaceWith'}
-                    <div class="manager-v2-field">
+                    <div class="manager-v2-field manager-v2-tools-inline-field">
                       <span>{text('FABRICATE.Admin.ManagerV2.Tools.ReplacementComponent', 'Replacement component')}</span>
                       <div class="manager-v2-tool-component-row"
                         data-manager-v2-tool-replacement-drop-zone={tool.id}

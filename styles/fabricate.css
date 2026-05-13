@@ -11842,6 +11842,36 @@
   padding: 0 4px;
 }
 
+.fabricate-manager-v2 .manager-v2-tools-inline-field {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  column-gap: 10px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-inline-field > span:first-child {
+  white-space: nowrap;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-inline-field > input[type="number"] {
+  max-width: 122px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-inline-field > .manager-v2-tools-max-uses-input {
+  max-width: 190px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-inline-field > .manager-v2-tool-component-row {
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-inline-fields {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(180px, 0.55fr);
+  gap: 12px;
+  align-items: center;
+}
+
 .fabricate-manager-v2 .manager-v2-tools-identity-row {
   display: flex;
   gap: 12px;
@@ -11974,6 +12004,9 @@
 .fabricate-manager-v2 .manager-v2-tools-row-editor .manager-v2-field select {
   height: 28px;
   min-height: 28px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row-editor .manager-v2-drop-rate-percent input[type="text"] {
   padding: 0 10px 0 0;
 }
 
