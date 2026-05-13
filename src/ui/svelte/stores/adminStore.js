@@ -3505,12 +3505,54 @@ export function createAdminStore(services) {
     return { valid: errors.length === 0, errors };
   }
 
+  function _gatheringTaskIsAtDefaults(task) {
+    if (!task) return false;
+    const localizedDefault = services.localize?.('FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask');
+    const isDefaultName = task.name === localizedDefault
+      || task.name === 'New Gathering Task'
+      || task.name === 'Gather';
+    const isDefaultImg = task.img === DEFAULT_GATHERING_TASK_IMG;
+    return isDefaultName && isDefaultImg;
+  }
+
+  function _firstDropAutopopulatePatch(existingTask, nextDropRows, managedItemById) {
+    if (!_gatheringTaskIsAtDefaults(existingTask)) return null;
+    const hadComponentBefore = (existingTask?.dropRows || []).some(row => row?.componentId);
+    if (hadComponentBefore) return null;
+    const firstRowWithComponent = (nextDropRows || []).find(row => row?.componentId);
+    if (!firstRowWithComponent) return null;
+    const component = managedItemById?.get?.(String(firstRowWithComponent.componentId));
+    const componentName = String(component?.name || '').trim();
+    if (!componentName) return null;
+    const template = services.localize?.('FABRICATE.Admin.ManagerV2.Environment.Tasks.AutoNameTemplate')
+      || 'Gather {component}';
+    return {
+      name: template.replace('{component}', componentName),
+      img: component.img || DEFAULT_GATHERING_TASK_IMG
+    };
+  }
+
+  function gatheringTaskAutopopulateFromComponent(systemId, existingTask, nextDropRows) {
+    const system = services.getCraftingSystemManager?.()?.getSystem?.(systemId);
+    const options = _buildManagedItemOptions(_getManagedItems(system));
+    const managedItemById = new Map(options.map(item => [String(item.id), item]));
+    return _firstDropAutopopulatePatch(existingTask, nextDropRows, managedItemById) || {};
+  }
+
   async function updateGatheringLibraryTask(systemId = get(selectedSystemId), taskId, updates = {}) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !taskId) return false;
+    const existing = systemConfig.tasks.find(task => task.id === taskId);
+    let mergedUpdates = updates;
+    if (existing && Array.isArray(updates.dropRows)) {
+      const patch = gatheringTaskAutopopulateFromComponent(systemId, existing, updates.dropRows);
+      if (patch.name || patch.img) {
+        mergedUpdates = { ...patch, ...updates };
+      }
+    }
     systemConfig.tasks = systemConfig.tasks.map(task => task.id === taskId
-      ? _normalizeGatheringTask({ ...task, ...updates }, _randomID)
+      ? _normalizeGatheringTask({ ...task, ...mergedUpdates }, _randomID)
       : task);
     await _saveGatheringConfig(config);
     await refresh();
@@ -4296,6 +4338,7 @@ export function createAdminStore(services) {
     validateGatheringLibraryTask,
     deleteGatheringLibraryTask,
     duplicateGatheringLibraryTask,
+    gatheringTaskAutopopulateFromComponent,
     addGatheringLibraryHazard,
     updateGatheringLibraryHazard,
     deleteGatheringLibraryHazard,

@@ -2043,6 +2043,143 @@ describe('createAdminStore', () => {
       assert.equal(get(store.viewState).gatheringConfig.systems.sys1.hazards[0].dropRate, 30);
     });
 
+    it('auto-populates default task name and image when the first drop row receives a component', async () => {
+      const services = createMockServices({
+        localize: (key) => {
+          if (key === 'FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask') return 'New Gathering Task';
+          if (key === 'FABRICATE.Admin.ManagerV2.Environment.Tasks.AutoNameTemplate') return 'Gather {component}';
+          return key;
+        }
+      });
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      sys.components = [{ id: 'ore', name: 'Raw Ore', img: 'icons/raw-ore.png' }];
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const task = await store.addGatheringLibraryTask('sys1');
+
+      await store.updateGatheringLibraryTask('sys1', task.id, {
+        dropRows: [{ id: 'drop-a', componentId: 'ore', quantity: 1, dropRate: 50 }]
+      });
+
+      const persisted = services._store.gatheringConfig.systems.sys1.tasks[0];
+      assert.equal(persisted.name, 'Gather Raw Ore');
+      assert.equal(persisted.img, 'icons/raw-ore.png');
+    });
+
+    it('does not auto-populate the task name and image when the task name has been customized', async () => {
+      const services = createMockServices({
+        localize: (key) => {
+          if (key === 'FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask') return 'New Gathering Task';
+          if (key === 'FABRICATE.Admin.ManagerV2.Environment.Tasks.AutoNameTemplate') return 'Gather {component}';
+          return key;
+        }
+      });
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      sys.components = [{ id: 'ore', name: 'Raw Ore', img: 'icons/raw-ore.png' }];
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const task = await store.addGatheringLibraryTask('sys1');
+      await store.updateGatheringLibraryTask('sys1', task.id, { name: 'Forage Roots' });
+
+      await store.updateGatheringLibraryTask('sys1', task.id, {
+        dropRows: [{ id: 'drop-a', componentId: 'ore', quantity: 1, dropRate: 50 }]
+      });
+
+      const persisted = services._store.gatheringConfig.systems.sys1.tasks[0];
+      assert.equal(persisted.name, 'Forage Roots');
+      assert.equal(persisted.img, 'icons/svg/item-bag.svg');
+    });
+
+    it('does not auto-populate the task name and image when the task image has been customized', async () => {
+      const services = createMockServices({
+        localize: (key) => {
+          if (key === 'FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask') return 'New Gathering Task';
+          if (key === 'FABRICATE.Admin.ManagerV2.Environment.Tasks.AutoNameTemplate') return 'Gather {component}';
+          return key;
+        }
+      });
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      sys.components = [{ id: 'ore', name: 'Raw Ore', img: 'icons/raw-ore.png' }];
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const task = await store.addGatheringLibraryTask('sys1');
+      await store.updateGatheringLibraryTask('sys1', task.id, { img: 'icons/svg/leaf.svg' });
+
+      await store.updateGatheringLibraryTask('sys1', task.id, {
+        dropRows: [{ id: 'drop-a', componentId: 'ore', quantity: 1, dropRate: 50 }]
+      });
+
+      const persisted = services._store.gatheringConfig.systems.sys1.tasks[0];
+      assert.equal(persisted.name, 'New Gathering Task');
+      assert.equal(persisted.img, 'icons/svg/leaf.svg');
+    });
+
+    it('does not auto-populate the task name and image when a second drop row receives a component', async () => {
+      const services = createMockServices({
+        localize: (key) => {
+          if (key === 'FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask') return 'New Gathering Task';
+          if (key === 'FABRICATE.Admin.ManagerV2.Environment.Tasks.AutoNameTemplate') return 'Gather {component}';
+          return key;
+        }
+      });
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      sys.components = [
+        { id: 'ore', name: 'Raw Ore', img: 'icons/raw-ore.png' },
+        { id: 'gem', name: 'Rough Gem', img: 'icons/gem.png' }
+      ];
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const task = await store.addGatheringLibraryTask('sys1');
+      await store.updateGatheringLibraryTask('sys1', task.id, { name: 'Mining Run', img: 'icons/pickaxe.png' });
+      await store.updateGatheringLibraryTask('sys1', task.id, {
+        dropRows: [{ id: 'drop-a', componentId: 'ore', quantity: 1, dropRate: 50 }]
+      });
+
+      await store.updateGatheringLibraryTask('sys1', task.id, {
+        dropRows: [
+          { id: 'drop-a', componentId: 'ore', quantity: 1, dropRate: 50 },
+          { id: 'drop-b', componentId: 'gem', quantity: 1, dropRate: 10 }
+        ]
+      });
+
+      const persisted = services._store.gatheringConfig.systems.sys1.tasks[0];
+      assert.equal(persisted.name, 'Mining Run');
+      assert.equal(persisted.img, 'icons/pickaxe.png');
+    });
+
+    it('does not auto-populate the task name and image when an empty drop row is added', async () => {
+      const services = createMockServices({
+        localize: (key) => {
+          if (key === 'FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask') return 'New Gathering Task';
+          if (key === 'FABRICATE.Admin.ManagerV2.Environment.Tasks.AutoNameTemplate') return 'Gather {component}';
+          return key;
+        }
+      });
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      sys.components = [{ id: 'ore', name: 'Raw Ore', img: 'icons/raw-ore.png' }];
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const task = await store.addGatheringLibraryTask('sys1');
+
+      await store.updateGatheringLibraryTask('sys1', task.id, {
+        dropRows: [{ id: 'drop-a', componentId: '', quantity: 1, dropRate: 50 }]
+      });
+
+      const persisted = services._store.gatheringConfig.systems.sys1.tasks[0];
+      assert.equal(persisted.name, 'New Gathering Task');
+      assert.equal(persisted.img, 'icons/svg/item-bag.svg');
+    });
+
     it('duplicates gathering tasks with fresh task and drop ids', async () => {
       const services = createMockServices({
         randomID: (() => {

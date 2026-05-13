@@ -1359,7 +1359,8 @@
   function updateGatheringTaskDrop(rowId, updates = {}) {
     if (!editingGatheringTask || !rowId) return;
     const rows = gatheringTaskDropRows(editingGatheringTask).map(row => row.id === rowId ? { ...row, ...updates } : row);
-    updateSelectedGatheringTask({ dropRows: rows });
+    const patch = store.gatheringTaskAutopopulateFromComponent?.(selectedSystemId, editingGatheringTask, rows) || {};
+    updateSelectedGatheringTask({ dropRows: rows, ...patch });
   }
 
   function duplicateGatheringTaskDrop(rowId = selectedGatheringDrop?.id) {
