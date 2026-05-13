@@ -842,7 +842,14 @@ function createStore(calls = [], options = {}) {
     updateToolInDraft: (...args) => calls.push(['updateToolInDraft', ...args]),
     deleteToolFromDraft: (...args) => calls.push(['deleteToolFromDraft', ...args]),
     selectDraftTool: (...args) => calls.push(['selectDraftTool', ...args]),
-    setExpandedDraftTool: (...args) => calls.push(['setExpandedDraftTool', ...args]),
+    setExpandedDraftTool: (id = '') => {
+      calls.push(['setExpandedDraftTool', id]);
+      viewState.update(state => ({
+        ...state,
+        toolsDraftExpandedToolId: id
+      }));
+      return true;
+    },
     saveToolsDraft: () => {
       calls.push(['saveToolsDraft']);
       viewState.update(state => ({
@@ -3499,6 +3506,56 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.ok(calls.some(call => call[0] === 'deleteToolFromDraft' && call[1] === 'tool-catalyst'));
+  });
+
+  it('expands a gathering tool row when the row is clicked', async () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], {
+          toolsDraftSelectedToolId: 'tool-catalyst',
+          toolsDraft: [{
+            id: 'tool-catalyst',
+            label: 'Artisan Catalyst',
+            enabled: true,
+            componentId: 'c1',
+            requirement: null,
+            breakage: { mode: 'limitedUses', maxUses: null },
+            onBreak: { mode: 'destroy' }
+          }]
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Tools').click();
+    await tick();
+    flushSync();
+
+    const row = target.querySelector('[data-manager-v2-tool-id="tool-catalyst"]');
+    assert.ok(row);
+    assert.equal(row.querySelector('[data-manager-v2-tool-editor]'), null);
+
+    row.querySelector('.manager-v2-tools-row-body').click();
+    await tick();
+    flushSync();
+    assert.ok(row.querySelector('[data-manager-v2-tool-editor]'), 'row click should expand the tool editor');
+
+    row.querySelector('.manager-v2-tools-row-body').click();
+    await tick();
+    flushSync();
+    assert.ok(row.querySelector('[data-manager-v2-tool-editor]'), 'row click should keep an already expanded tool open');
+
+    row.querySelector('.manager-v2-tools-row-actions .manager-v2-icon-button:last-child').click();
+    await tick();
+    flushSync();
+    assert.equal(row.querySelector('[data-manager-v2-tool-editor]'), null, 'chevron button should remain the explicit collapse control');
   });
 
   it('shows setup guidance and keeps create routing when a gathering system has no environments', async () => {

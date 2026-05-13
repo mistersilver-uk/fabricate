@@ -19,6 +19,7 @@
     expandedToolId = '',
     managedItemOptions = [],
     onSelectTool = () => {},
+    onExpandTool = () => {},
     onToggleExpand = () => {},
     onAddTool = () => {},
     onUpdateTool = () => {},
@@ -112,7 +113,7 @@
 
   function handleSelectRow(tool) {
     onSelectTool?.(tool.id);
-    onToggleExpand?.(tool.id);
+    onExpandTool?.(tool.id);
   }
 
   function handleRowKey(event, tool) {

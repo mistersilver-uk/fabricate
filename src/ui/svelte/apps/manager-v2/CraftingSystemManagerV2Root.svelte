@@ -2669,6 +2669,7 @@
         expandedToolId={$viewState.toolsDraftExpandedToolId || ''}
         managedItemOptions={selectedSystem?.managedItemOptions || []}
         onSelectTool={(id) => store.selectDraftTool?.(id)}
+        onExpandTool={(id) => store.setExpandedDraftTool?.(id)}
         onToggleExpand={(id) => store.setExpandedDraftTool?.(id === $viewState.toolsDraftExpandedToolId ? '' : id)}
         onAddTool={() => store.addToolToDraft?.()}
         onUpdateTool={(id, patch) => store.updateToolInDraft?.(id, patch)}
