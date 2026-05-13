@@ -635,8 +635,10 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const toolBreakageChanceTrackBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control .manager-v2-drop-rate-track');
   const toolBreakageChanceFillBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control .manager-v2-drop-rate-fill');
   const toolBreakageChanceRangeBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]');
+  const toolBreakageChanceWebkitTrackBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-webkit-slider-runnable-track');
   const toolBreakageChanceWebkitThumbBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-webkit-slider-thumb');
-  const toolBreakageChanceMozTrackBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-moz-range-track,\n.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-moz-range-progress');
+  const toolBreakageChanceMozTrackBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-moz-range-track');
+  const toolBreakageChanceMozProgressBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-moz-range-progress');
   const toolBreakageChanceMozThumbBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-moz-range-thumb');
   const dropModifierListBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-modifier-list');
   const dropModifierPillBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-modifier-pill');
@@ -923,21 +925,29 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(
     toolBreakageChanceControlBlock.includes('--fab-tool-breakage-chance-low: var(--fab-success);')
       && toolBreakageChanceControlBlock.includes('--fab-tool-breakage-chance-mid: var(--fab-warning);')
-      && toolBreakageChanceControlBlock.includes('--fab-tool-breakage-chance-high: var(--fab-danger);'),
+      && toolBreakageChanceControlBlock.includes('--fab-tool-breakage-chance-high: var(--fab-danger);')
+      && toolBreakageChanceControlBlock.includes('--fab-tool-breakage-chance-track: linear-gradient('),
     'tool breakage chance slider should define a semantic green-yellow-red scale from theme tokens'
   );
   assert.ok(
-    toolBreakageChanceTrackBlock.includes('linear-gradient(')
-      && toolBreakageChanceTrackBlock.includes('90deg')
-      && toolBreakageChanceTrackBlock.includes('var(--fab-tool-breakage-chance-low) 0%')
-      && toolBreakageChanceTrackBlock.includes('var(--fab-tool-breakage-chance-mid) 50%')
-      && toolBreakageChanceTrackBlock.includes('var(--fab-tool-breakage-chance-high) 100%'),
-    'tool breakage chance slider should show the full green-yellow-red gradient across the whole rail'
+    toolBreakageChanceControlBlock.includes('90deg')
+      && toolBreakageChanceControlBlock.includes('var(--fab-tool-breakage-chance-low) 0%')
+      && toolBreakageChanceControlBlock.includes('var(--fab-tool-breakage-chance-mid) 50%')
+      && toolBreakageChanceControlBlock.includes('var(--fab-tool-breakage-chance-high) 100%'),
+    'tool breakage chance slider should define the full green-yellow-red gradient across the whole rail'
   );
+  assert.ok(toolBreakageChanceTrackBlock.includes('background: var(--fab-tool-breakage-chance-track);'), 'tool breakage chance custom rail should paint the semantic gradient');
   assert.ok(toolBreakageChanceFillBlock.includes('display: none;'), 'tool breakage chance slider should not render a tier-coloured filled segment over the full gradient');
-  assert.ok(toolBreakageChanceRangeBlock.includes('accent-color: var(--fab-tool-breakage-chance-color);'), 'tool breakage chance native range should use the dynamic current-risk colour');
+  assert.ok(
+    toolBreakageChanceRangeBlock.includes('padding: 0;')
+      && toolBreakageChanceRangeBlock.includes('background: transparent;')
+      && toolBreakageChanceRangeBlock.includes('box-shadow: none;')
+      && toolBreakageChanceRangeBlock.includes('accent-color: var(--fab-tool-breakage-chance-color);'),
+    'tool breakage chance native range should not cover the custom rail and should use the dynamic current-risk colour'
+  );
+  assert.ok(toolBreakageChanceWebkitTrackBlock.includes('background: var(--fab-tool-breakage-chance-track);') && toolBreakageChanceMozTrackBlock.includes('background: var(--fab-tool-breakage-chance-track);'), 'tool breakage chance native tracks should also paint the semantic gradient so the rail remains visible');
   assert.ok(toolBreakageChanceWebkitThumbBlock.includes('background: var(--fab-tool-breakage-chance-color);') && toolBreakageChanceMozThumbBlock.includes('background: var(--fab-tool-breakage-chance-color);'), 'tool breakage chance slider thumbs should use the dynamic current-risk colour');
-  assert.ok(toolBreakageChanceMozTrackBlock.includes('background: transparent;'), 'tool breakage chance Firefox native track/progress should not draw over the custom gradient rail');
+  assert.ok(toolBreakageChanceMozProgressBlock.includes('background: transparent;'), 'tool breakage chance Firefox native progress should not draw over the full gradient rail');
   assert.ok(
     guaranteedDropRateControlBlock.includes('var(--fab-drop-rate-guaranteed)')
       && commonDropRateControlBlock.includes('var(--fab-drop-rate-common)')

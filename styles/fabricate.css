@@ -10132,10 +10132,7 @@
   --fab-tool-breakage-chance-mid: var(--fab-warning);
   --fab-tool-breakage-chance-high: var(--fab-danger);
   --fab-tool-breakage-chance-color: var(--fab-success);
-}
-
-.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control .manager-v2-drop-rate-track {
-  background: linear-gradient(
+  --fab-tool-breakage-chance-track: linear-gradient(
     90deg,
     var(--fab-tool-breakage-chance-low) 0%,
     var(--fab-tool-breakage-chance-mid) 50%,
@@ -10143,23 +10140,33 @@
   );
 }
 
+.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control .manager-v2-drop-rate-track {
+  background: var(--fab-tool-breakage-chance-track);
+}
+
 .fabricate-manager-v2 .manager-v2-tool-breakage-chance-control .manager-v2-drop-rate-fill {
   display: none;
 }
 
 .fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"] {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
   accent-color: var(--fab-tool-breakage-chance-color);
 }
 
 .fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-webkit-slider-runnable-track {
-  background: transparent;
+  background: var(--fab-tool-breakage-chance-track);
 }
 
 .fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-webkit-slider-thumb {
   background: var(--fab-tool-breakage-chance-color);
 }
 
-.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-moz-range-track,
+.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-moz-range-track {
+  background: var(--fab-tool-breakage-chance-track);
+}
+
 .fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-moz-range-progress {
   background: transparent;
 }
