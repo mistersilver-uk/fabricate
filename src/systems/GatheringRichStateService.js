@@ -48,6 +48,7 @@ const FALLBACK_CONDITION_ICONS = Object.freeze({
 const DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops', 'limitedDrops']);
 const LEGACY_DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops']);
 const HAZARD_POLICIES = new Set(['successWithHazard', 'failureWithHazard']);
+const TOOL_BREAKAGE_POLICIES = new Set(['failureOnBreak', 'successDespiteBreak']);
 const CHARACTER_MODIFIER_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
 const CHARACTER_MODIFIER_OPERATORS = new Set(['+', '-']);
 const ROLL_EXPRESSION_PATTERN = /\d\s*d\s*\d|[*/()]/i;
@@ -56,7 +57,8 @@ const DEFAULT_GATHERING_RULES = Object.freeze({
   rewardLimit: 1,
   hazardSelectionMode: 'allDrops',
   hazardLimit: 1,
-  hazardPolicy: 'successWithHazard'
+  hazardPolicy: 'successWithHazard',
+  toolBreakagePolicy: 'failureOnBreak'
 });
 
 const BLOCKED_REASON_KEYS = Object.freeze({
@@ -199,6 +201,11 @@ export class GatheringRichStateService {
       if (entry?.id) libraryCharacterModifiers.set(String(entry.id), cloneJson(entry));
     }
 
+    const libraryTools = new Map();
+    for (const tool of normalizeList(libraries.tools)) {
+      if (tool?.id) libraryTools.set(String(tool.id), cloneJson(tool));
+    }
+
     const composed = {
       ...cloneJson(environment),
       conditions: cloneJson(currentConditions),
@@ -214,6 +221,12 @@ export class GatheringRichStateService {
     };
     Object.defineProperty(composed, '__libraryCharacterModifiers', {
       value: libraryCharacterModifiers,
+      enumerable: false,
+      configurable: true,
+      writable: true
+    });
+    Object.defineProperty(composed, '__libraryTools', {
+      value: libraryTools,
       enumerable: false,
       configurable: true,
       writable: true
@@ -761,7 +774,8 @@ export class GatheringRichStateService {
       gatheringModifier: normalized.gatheringModifier,
       resultGroups: [{ id: `${normalized.id}-d100`, name: normalized.name, results: [] }],
       resultSelection: { provider: 'd100Rows' },
-      catalysts: []
+      catalysts: [],
+      toolIds: Array.isArray(normalized.toolIds) ? [...normalized.toolIds] : []
     };
     if (normalized.timeRequirement) runtimeTask.timeRequirement = cloneJson(normalized.timeRequirement);
     return runtimeTask;
@@ -846,6 +860,7 @@ function normalizeGatheringConfig(raw = {}) {
       conditions: normalizeSystemConditions(config?.conditions, { vocabularies, conditions: { weather, timeOfDay } }),
       vocabularies: normalizeSystemVocabularies(config?.vocabularies, vocabularies),
       tasks: normalizeList(config?.tasks).map(normalizeLibraryTask),
+      tools: normalizeList(config?.tools).map(normalizeLibraryTool).filter(Boolean),
       hazards: normalizeList(config?.hazards).map(normalizeHazard),
       characterModifiers: normalizeList(config?.characterModifiers)
         .map(entry => normalizeCharacterModifierLibraryEntry(entry))
@@ -924,7 +939,10 @@ function normalizeLibraryTask(task = {}) {
     dropRows: normalizeList(task.dropRows ?? task.itemDrops).map(normalizeItemDrop),
     staminaCost: nonNegativeNumber(task.staminaCost, 0),
     gatheringModifier: normalizeModifierProvider(task.gatheringModifier ?? task.modifier),
-    timeRequirement: plainObjectOrNull(task.timeRequirement)
+    timeRequirement: plainObjectOrNull(task.timeRequirement),
+    toolIds: Array.isArray(task.toolIds)
+      ? task.toolIds.map(id => String(id ?? '').trim()).filter(Boolean)
+      : []
   };
 }
 
@@ -939,6 +957,71 @@ function normalizeItemDrop(row = {}) {
     conditionModifiers: normalizeDropConditionModifiers(row.conditionModifiers),
     characterModifiers: normalizeDropCharacterModifiers(row.characterModifiers),
     enabled: row.enabled !== false
+  };
+}
+
+const TOOL_BREAKAGE_MODES = new Set(['limitedUses', 'breakageChance', 'diceExpression']);
+const TOOL_ON_BREAK_MODES = new Set(['destroy', 'flagBroken', 'replaceWith']);
+const TOOL_REQUIREMENT_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
+
+function normalizeToolRequirement(input) {
+  if (input === null || input === undefined) return null;
+  if (typeof input !== 'object') return null;
+  const provider = TOOL_REQUIREMENT_PROVIDERS.has(input.provider) ? input.provider : 'dnd5e';
+  return {
+    provider,
+    formula: typeof input.formula === 'string' ? input.formula : '',
+    macroUuid: typeof input.macroUuid === 'string' ? input.macroUuid : ''
+  };
+}
+
+function normalizeToolBreakage(input) {
+  const mode = TOOL_BREAKAGE_MODES.has(input?.mode) ? input.mode : 'limitedUses';
+  if (mode === 'limitedUses') {
+    const raw = input?.maxUses;
+    const isSet = raw !== null && raw !== undefined && raw !== '';
+    const numeric = isSet ? Number(raw) : null;
+    return { mode, maxUses: Number.isFinite(numeric) ? numeric : null };
+  }
+  if (mode === 'breakageChance') {
+    const numeric = Number(input?.breakageChance);
+    return { mode, breakageChance: Number.isFinite(numeric) ? numeric : 0 };
+  }
+  const threshold = Number(input?.threshold);
+  return {
+    mode,
+    formula: typeof input?.formula === 'string' ? input.formula : '',
+    threshold: Number.isFinite(threshold) ? threshold : 0
+  };
+}
+
+function normalizeToolOnBreak(input) {
+  const mode = TOOL_ON_BREAK_MODES.has(input?.mode) ? input.mode : 'destroy';
+  if (mode === 'replaceWith') {
+    return {
+      mode,
+      replacementComponentId: typeof input?.replacementComponentId === 'string'
+        ? input.replacementComponentId
+        : null
+    };
+  }
+  return { mode };
+}
+
+function normalizeLibraryTool(tool = {}) {
+  if (!tool || typeof tool !== 'object') return null;
+  const id = stringOrFallback(tool.id, '');
+  if (!id) return null;
+  const label = stringOrFallback(tool.label, '').trim();
+  const componentId = stringOrFallback(tool.componentId, '').trim() || null;
+  return {
+    id,
+    label,
+    enabled: tool.enabled !== false,
+    componentId,
+    requirement: normalizeToolRequirement(tool.requirement),
+    breakage: normalizeToolBreakage(tool.breakage),
+    onBreak: normalizeToolOnBreak(tool.onBreak)
   };
 }
 
@@ -1129,7 +1212,10 @@ function normalizeGatheringRules(rules = {}) {
     hazardLimit: positiveInteger(rules?.hazardLimit, DEFAULT_GATHERING_RULES.hazardLimit),
     hazardPolicy: HAZARD_POLICIES.has(rules?.hazardPolicy)
       ? rules.hazardPolicy
-      : DEFAULT_GATHERING_RULES.hazardPolicy
+      : DEFAULT_GATHERING_RULES.hazardPolicy,
+    toolBreakagePolicy: TOOL_BREAKAGE_POLICIES.has(rules?.toolBreakagePolicy)
+      ? rules.toolBreakagePolicy
+      : DEFAULT_GATHERING_RULES.toolBreakagePolicy
   };
 }
 

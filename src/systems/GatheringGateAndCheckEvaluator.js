@@ -38,6 +38,24 @@ export class GatheringGateAndCheckEvaluator {
     return this._evaluateSystemVisibility({ gate, actor, viewer, environment, task, provider });
   }
 
+  async evaluateRequirement({ requirement = null, actor = null, environment = null, task = null } = {}) {
+    if (!requirement) {
+      return requirementResult({ allowed: true, reasonCode: 'NO_REQUIREMENT' });
+    }
+
+    const provider = normalizeProvider(requirement.provider);
+    const providerError = this._validateProvider(provider);
+    if (providerError) {
+      return requirementDiagnostic(providerError, provider, 'UNSUPPORTED_PROVIDER');
+    }
+
+    if (provider === 'macro') {
+      return this._evaluateMacroRequirement({ requirement, actor, environment, task });
+    }
+
+    return this._evaluateSystemRequirement({ requirement, actor, environment, task, provider });
+  }
+
   async evaluateCheck({ check = null, actor = null, environment = null, task = null } = {}) {
     if (!check) {
       return checkDiagnostic('Gathering check is not configured', 'MISCONFIGURED_PROVIDER', null);
@@ -109,6 +127,51 @@ export class GatheringGateAndCheckEvaluator {
       });
     } catch (err) {
       return visibilityDiagnostic(errorMessage(err, `${provider} visibility gate failed`), provider, 'PROVIDER_ERROR');
+    }
+  }
+
+  async _evaluateMacroRequirement({ requirement, actor, environment, task }) {
+    if (!requirement?.macroUuid) {
+      return requirementDiagnostic('Macro tool requirement requires macroUuid', 'macro', 'MISCONFIGURED_PROVIDER');
+    }
+    if (typeof this.runMacro !== 'function') {
+      return requirementDiagnostic('Macro execution dependency is not configured', 'macro', 'MISCONFIGURED_PROVIDER');
+    }
+
+    try {
+      const raw = await this.runMacro(requirement.macroUuid, {
+        kind: 'toolRequirement',
+        requirement,
+        actor,
+        environment,
+        task
+      });
+      return normalizeMacroRequirement(raw, 'macro');
+    } catch (err) {
+      return requirementDiagnostic(errorMessage(err, 'Macro tool requirement failed'), 'macro', 'PROVIDER_ERROR');
+    }
+  }
+
+  async _evaluateSystemRequirement({ requirement, actor, environment, task, provider }) {
+    if (!requirement?.formula) {
+      return requirementDiagnostic(`${provider} tool requirement requires formula`, provider, 'MISCONFIGURED_PROVIDER');
+    }
+    if (typeof this.evaluateExpression !== 'function') {
+      return requirementDiagnostic('Expression evaluation dependency is not configured', provider, 'MISCONFIGURED_PROVIDER');
+    }
+
+    try {
+      const value = await this._resolveExpression(requirement.formula, {
+        provider,
+        actor,
+        environment,
+        task,
+        kind: 'toolRequirement'
+      });
+      const allowed = coerceTruthy(value);
+      return requirementResult({ allowed, reasonCode: allowed ? 'REQUIREMENT_MET' : 'REQUIREMENT_FAILED' });
+    } catch (err) {
+      return requirementDiagnostic(errorMessage(err, `${provider} tool requirement failed`), provider, 'PROVIDER_ERROR');
     }
   }
 
@@ -196,6 +259,39 @@ export class GatheringGateAndCheckEvaluator {
     }
     return null;
   }
+}
+
+function normalizeMacroRequirement(raw, provider) {
+  if (typeof raw === 'boolean') {
+    return requirementResult({
+      allowed: raw,
+      reasonCode: raw ? 'REQUIREMENT_MET' : 'REQUIREMENT_FAILED'
+    });
+  }
+
+  if (raw && typeof raw === 'object' && typeof raw.allowed === 'boolean') {
+    return requirementResult({
+      allowed: raw.allowed,
+      description: stringOrEmpty(raw.description),
+      reasonCode: raw.allowed ? 'REQUIREMENT_MET' : 'REQUIREMENT_FAILED'
+    });
+  }
+
+  return requirementDiagnostic('Macro tool requirement must return a boolean or { allowed, description }', provider, 'MALFORMED_RESULT');
+}
+
+function coerceTruthy(value) {
+  if (typeof value === 'boolean') return value;
+  if (value === null || value === undefined || value === '') return false;
+  if (typeof value === 'number') return Number.isFinite(value) && value !== 0;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed === '') return false;
+    const lowered = trimmed.toLowerCase();
+    if (lowered === 'false' || lowered === '0') return false;
+    return true;
+  }
+  return Boolean(value);
 }
 
 function normalizeMacroVisibility(raw, provider) {
@@ -352,6 +448,23 @@ function checkResult({
     reasonCode,
     diagnostic
   };
+}
+
+function requirementResult({ allowed, description = '', reasonCode, diagnostic = null }) {
+  return {
+    allowed: allowed === true,
+    description: stringOrEmpty(description),
+    reasonCode,
+    diagnostic
+  };
+}
+
+function requirementDiagnostic(message, provider, reasonCode = 'MISCONFIGURED_PROVIDER') {
+  return requirementResult({
+    allowed: false,
+    reasonCode,
+    diagnostic: diagnostic(provider, message)
+  });
 }
 
 function visibilityDiagnostic(message, provider, reasonCode = 'MISCONFIGURED_PROVIDER') {

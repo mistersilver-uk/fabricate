@@ -18,6 +18,7 @@ Global rule: if a system feature is disabled, controls for that feature are hidd
 Fabricate's Foundry-facing product UI must use a clean flat visual style.
 
 - Product UI surfaces, headers, buttons, overlays, and selected states must not use `linear-gradient`, `radial-gradient`, or `conic-gradient`.
+- Full-track semantic value scales may use `linear-gradient` only when the gradient directly communicates the numeric meaning of the control, such as a green-to-red risk slider.
 - Use solid colors or RGBA fills for shells, cards, headers, overlays, and controls.
 - Visual hierarchy should come from spacing, typography, borders, and restrained shadows rather than decorative gradients or blur-based glass effects.
 - Shared tokens in `styles/fabricate.css` and app-local editor tokens should be the source of truth for reusable surface treatments.
@@ -80,6 +81,7 @@ Selected-system navigation:
 - Feature-scoped left-nav items are visible only when their feature is enabled or otherwise available for the selected system.
 - Feature-scoped routes that have been implemented must be enabled navigation controls, not disabled placeholders. If a route is still planned only, it may remain in the placeholder/deferred-view set.
 - The selected-system Gathering rail item shows an expand/collapse control instead of an environment count. Activating the parent item opens the Environments browser by default and expands the submenu; activating only the expand/collapse control toggles the submenu without navigation. The expanded submenu contains Environments, Tasks, Hazards, and Settings inside a soft grouped container that does not shift the parent Gathering row, icon, label, or expand/collapse control. The Gathering parent row remains visually neutral, and only the selected subsection uses the selected menu-item treatment. Gathering section navigation must not be duplicated as an in-page horizontal tab strip.
+- The selected-system `Tools` rail item is a top-level entry rendered between `Essences` and `Gathering`. It is always visible when a crafting system is selected and is not gated by the gathering or essences feature flags, because tools are a cross-cutting crafting concept that will be referenced by recipes, salvage, and gathering tasks alike.
 - The root `Crafting Systems` breadcrumb returns to the systems browser. The selected-system breadcrumb opens that system's in-manager System settings route.
 - The selected-system rail scope shows the selected system name as static text plus a `Return to System Library` icon button. Activating that button returns to the systems browser without clearing the real selected-system store state.
 

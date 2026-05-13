@@ -13,6 +13,7 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const environmentComponentNames = [
   'EnvironmentActionMenu',
   'CatalystList',
+  'ToolsList',
   'EnvironmentFields',
   'EnvironmentList',
   'EnvironmentValidationFeedback',
@@ -55,6 +56,7 @@ function compileManagerV2Root() {
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EssenceBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EssenceEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/GatheringTaskEditView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/ToolsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/GatheringTasksBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/RecipesBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/SystemEditView.svelte');
@@ -68,7 +70,7 @@ function compileManagerV2Root() {
     writeCompiledSvelte(`src/ui/svelte/components/${componentName}.svelte`);
   }
 
-  for (const utilPath of ['foundryBridge.js', 'essenceIcons.js', 'fontAwesomeFreeClassicIcons.js', 'iconPickerPopover.js', 'componentEditor.js']) {
+  for (const utilPath of ['foundryBridge.js', 'essenceIcons.js', 'fontAwesomeFreeClassicIcons.js', 'iconPickerPopover.js', 'componentEditor.js', 'dropRateTier.js']) {
     const utilDestination = join(tempRoot, `src/ui/svelte/util/${utilPath}`);
     mkdirSync(dirname(utilDestination), { recursive: true });
     writeFileSync(
@@ -495,6 +497,16 @@ function createStore(calls = [], options = {}) {
     environmentSaveError: null,
     environmentValidationState: options.environmentValidationState || null,
     selectedEnvironmentTaskId: 'task-forage',
+    toolsDraft: options.toolsDraft || [],
+    toolsDraftBaseline: options.toolsDraftBaseline || options.toolsDraft || [],
+    toolsDraftSystemId: options.toolsDraftSystemId || 'alchemy',
+    toolsDraftDirty: options.toolsDraftDirty === true,
+    toolsDraftDirtyToolIds: options.toolsDraftDirtyToolIds || [],
+    toolsDraftSaving: options.toolsDraftSaving === true,
+    toolsDraftSaveError: null,
+    toolsDraftSelectedToolId: options.toolsDraftSelectedToolId || '',
+    toolsDraftExpandedToolId: options.toolsDraftExpandedToolId || '',
+    toolsDraftValidation: options.toolsDraftValidation || { valid: true, errors: [] },
     gatheringConfig: options.gatheringConfig || {
       conditions: { weather: 'clear', timeOfDay: 'day' },
       vocabularies: {
@@ -557,6 +569,7 @@ function createStore(calls = [], options = {}) {
               biomes: ['forest'],
               weather: ['clear'],
               timeOfDay: ['day'],
+              toolIds: Array.isArray(options.taskInitialToolIds) ? options.taskInitialToolIds : [],
               dropRows: options.taskDropRows || [
                 {
                   id: 'drop-nightshade',
@@ -601,7 +614,8 @@ function createStore(calls = [], options = {}) {
               dropRows: []
             }
           ],
-          hazards: []
+          hazards: [],
+          tools: options.gatheringLibraryTools || []
         }
       }
     }
@@ -825,7 +839,63 @@ function createStore(calls = [], options = {}) {
       calls.push(['duplicateGatheringLibraryTask', ...args]);
       return { id: 'task-copy', name: 'Gather Moon Herbs (Copy)', dropRows: [] };
     },
-    deleteGatheringLibraryTask: (...args) => calls.push(['deleteGatheringLibraryTask', ...args])
+    deleteGatheringLibraryTask: (...args) => calls.push(['deleteGatheringLibraryTask', ...args]),
+    enterToolsDraft: (systemId) => calls.push(['enterToolsDraft', systemId]),
+    addToolToDraft: (...args) => calls.push(['addToolToDraft', ...args]),
+    updateToolInDraft: (toolId, patch = {}) => {
+      calls.push(['updateToolInDraft', toolId, patch]);
+      viewState.update(state => ({
+        ...state,
+        toolsDraft: Array.isArray(state.toolsDraft)
+          ? state.toolsDraft.map(tool => tool.id === toolId ? { ...tool, ...patch } : tool)
+          : state.toolsDraft,
+        toolsDraftDirty: true,
+        toolsDraftDirtyToolIds: Array.from(new Set([...(state.toolsDraftDirtyToolIds || []), toolId]))
+      }));
+      return true;
+    },
+    deleteToolFromDraft: (...args) => calls.push(['deleteToolFromDraft', ...args]),
+    selectDraftTool: (...args) => calls.push(['selectDraftTool', ...args]),
+    setExpandedDraftTool: (id = '') => {
+      calls.push(['setExpandedDraftTool', id]);
+      viewState.update(state => ({
+        ...state,
+        toolsDraftExpandedToolId: id
+      }));
+      return true;
+    },
+    validateToolDraft: (toolId) => {
+      calls.push(['validateToolDraft', toolId]);
+      return options.toolValidationById?.[toolId] || { valid: true, errors: [] };
+    },
+    saveToolDraft: (toolId) => {
+      calls.push(['saveToolDraft', toolId]);
+      viewState.update(state => ({
+        ...state,
+        toolsDraftDirtyToolIds: (state.toolsDraftDirtyToolIds || []).filter(id => id !== toolId),
+        toolsDraftDirty: (state.toolsDraftDirtyToolIds || []).filter(id => id !== toolId).length > 0
+      }));
+      return true;
+    },
+    saveAllDirtyToolDrafts: () => {
+      calls.push(['saveAllDirtyToolDrafts']);
+      viewState.update(state => ({
+        ...state,
+        toolsDraftDirtyToolIds: [],
+        toolsDraftDirty: false
+      }));
+      return options.saveAllDirtyToolDraftsResult ?? true;
+    },
+    saveToolsDraft: () => calls.push(['saveToolsDraft']),
+    isToolsDraftDirty: () => options.toolsDraftDirty === true || get(viewState).toolsDraftDirty === true,
+    confirmDiscardDirtyToolsDraft: () => {
+      calls.push(['confirmDiscardDirtyToolsDraft']);
+      return options.confirmDiscardDirtyToolsResult ?? true;
+    },
+    cancelToolsDraft: () => {
+      if (options.trackCancelToolsDraft) calls.push(['cancelToolsDraft']);
+      return true;
+    }
   };
 }
 
@@ -890,7 +960,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(target.textContent.includes('Quick actions'), false);
     assert.deepEqual(
       Array.from(target.querySelectorAll('.manager-v2-nav-label')).map(label => label.textContent.trim()),
-      ['System settings', 'Recipes', 'Components', 'Tags & Categories', 'Essences', 'Gathering', 'Rules', 'Graph']
+      ['System settings', 'Recipes', 'Components', 'Tags & Categories', 'Essences', 'Tools', 'Gathering', 'Rules', 'Graph']
     );
     assert.equal(
       Array.from(target.querySelectorAll('.manager-v2-header-actions .manager-v2-button'))
@@ -1131,7 +1201,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
 
     assert.deepEqual(
       Array.from(target.querySelectorAll('.manager-v2-nav-label')).map(label => label.textContent.trim()),
-      ['System settings', 'Recipes', 'Components', 'Tags & Categories', 'Rules', 'Graph']
+      ['System settings', 'Recipes', 'Components', 'Tags & Categories', 'Tools', 'Rules', 'Graph']
     );
 
     const environmentFact = target.querySelector('[data-count-id="environments"]');
@@ -1196,7 +1266,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(target.querySelector('[data-system-id="alchemy"]').getAttribute('aria-selected'), 'true');
     assert.deepEqual(
       Array.from(target.querySelectorAll('.manager-v2-nav-label')).map(label => label.textContent.trim()),
-      ['System settings', 'Recipes', 'Components', 'Tags & Categories', 'Essences', 'Gathering', 'Rules', 'Graph']
+      ['System settings', 'Recipes', 'Components', 'Tags & Categories', 'Essences', 'Tools', 'Gathering', 'Rules', 'Graph']
     );
     assert.ok(target.textContent.includes('System library'));
   });
@@ -2832,7 +2902,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Gathering succeeds'));
     assert.ok(target.querySelector('.manager-v2-inspector [data-gathering-inspector-rules]'));
     assert.equal(target.querySelector('.manager-v2-inspector [data-gathering-inspector-rules] h2').textContent.trim(), 'Rules');
-    assert.equal(target.querySelectorAll('.manager-v2-inspector [data-gathering-inspector-rules] select').length, 3);
+    assert.equal(target.querySelectorAll('.manager-v2-inspector [data-gathering-inspector-rules] select').length, 4);
     assert.equal(target.querySelector('.manager-v2-inspector [data-gathering-rule-stepper]'), null);
     assert.equal(
       target.querySelector('.manager-v2-inspector').textContent.includes('Selected environment'),
@@ -2910,22 +2980,8 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     flushSync();
 
     assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'environment-edit');
-    assert.equal(target.querySelector('.manager-v2-environment-editor-shell .environment-foundation'), null);
     assert.ok(target.querySelector('.manager-v2-environment-editor-shell .manager-v2-environment-edit-view'));
-    assert.ok(target.querySelector('.manager-v2-environment-task-rail'));
-    assert.ok(target.querySelector('.manager-v2-environment-task-editor'));
-    assert.equal(target.querySelector('.manager-v2-environment-evidence-column'), null);
-    assert.ok(target.querySelector('.manager-v2-environment-validation-band'));
-    assert.ok(target.querySelector('.manager-v2-scene-drop-zone'));
-    assert.ok(target.querySelector('.manager-v2-environment-status-card .manager-v2-status-toggle'));
-    assert.equal(target.textContent.includes('Back to environments'), false);
     assert.ok(target.textContent.includes('Quiet Cavern'));
-
-    target.querySelector('.manager-v2-environment-task-rail .manager-v2-icon-button').click();
-    target.querySelector('.manager-v2-environment-edit-view').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-
-    assert.ok(calls.some(call => call[0] === 'addEnvironmentTask'));
-    assert.ok(calls.some(call => call[0] === 'saveEnvironmentDraft'));
   });
 
   it('deletes the editing gathering task from the editor toolbar and returns to the task browser', async () => {
@@ -3432,6 +3488,609 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(table.querySelectorAll('[data-gathering-task-drop-rank-cell]').length, 0, 'allDrops mode should not render rank cells');
   });
 
+  it('renders selected gathering tool dirty state and actions in the inspector header card', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          toolsDraftDirty: true,
+          toolsDraftDirtyToolIds: ['tool-catalyst'],
+          trackCancelToolsDraft: true,
+          toolsDraftSelectedToolId: 'tool-catalyst',
+          toolsDraft: [{
+            id: 'tool-catalyst',
+            label: 'Artisan Catalyst',
+            enabled: true,
+            componentId: 'c1',
+            requirement: null,
+            breakage: { mode: 'limitedUses', maxUses: null },
+            onBreak: { mode: 'destroy' }
+          }]
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    navButton('Tools').click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.manager-v2-header-actions'), null);
+    assert.equal(target.querySelector('.manager-v2-header').textContent.includes('Back to Gathering'), false);
+    assert.equal(target.querySelector('.manager-v2-header').textContent.includes('Unsaved'), false);
+    assert.equal(target.querySelector('.manager-v2-header').textContent.includes('Delete tool'), false);
+    assert.equal(target.querySelector('.manager-v2-header').textContent.includes('Save changes'), false);
+    assert.equal(target.querySelector('.manager-v2-header').textContent.includes('Import'), false);
+    assert.equal(target.querySelector('.manager-v2-header').textContent.includes('Export'), false);
+    assert.equal(target.querySelector('.manager-v2-header').textContent.includes('Create'), false);
+
+    const toolInspector = target.querySelector('[data-manager-v2-tool-inspector]');
+    assert.ok(toolInspector.textContent.includes('Artisan Catalyst'));
+    assert.ok(toolInspector.querySelector('.manager-v2-tools-dirty-chip').textContent.includes('Unsaved'));
+    assert.ok(toolInspector.querySelector('.manager-v2-tools-dirty-chip .fa-save'), 'inspector dirty pip should include the save icon');
+    const inspectorActions = toolInspector.querySelector('.manager-v2-tool-inspector-actions');
+    assert.ok(inspectorActions, 'selected tool inspector header card should own tool actions');
+    assert.equal(inspectorActions.querySelectorAll('.manager-v2-button').length, 2);
+    assert.ok(inspectorActions.querySelector('.manager-v2-button.is-danger').textContent.includes('Delete tool'));
+    assert.ok(inspectorActions.querySelector('.manager-v2-button.is-primary').textContent.includes('Save changes'));
+
+    inspectorActions.querySelector('.manager-v2-button.is-primary').click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'saveToolDraft' && call[1] === 'tool-catalyst'));
+
+    inspectorActions.querySelector('.manager-v2-button.is-danger').click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'deleteToolFromDraft' && call[1] === 'tool-catalyst'));
+  });
+
+  it('renders dirty pips in tool rows and removes the inert overflow menu button', async () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], {
+          toolsDraftDirty: true,
+          toolsDraftDirtyToolIds: ['tool-catalyst'],
+          toolsDraftSelectedToolId: 'tool-catalyst',
+          toolsDraft: [
+            {
+              id: 'tool-catalyst',
+              label: 'Artisan Catalyst',
+              enabled: true,
+              componentId: 'c1',
+              requirement: null,
+              breakage: { mode: 'limitedUses', maxUses: null },
+              onBreak: { mode: 'destroy' }
+            },
+            {
+              id: 'tool-mail',
+              label: 'Draconic Scale Mail',
+              enabled: true,
+              componentId: 'c2',
+              requirement: null,
+              breakage: { mode: 'limitedUses', maxUses: null },
+              onBreak: { mode: 'destroy' }
+            }
+          ]
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    navButton('Tools').click();
+    await tick();
+    flushSync();
+
+    const dirtyRow = target.querySelector('[data-manager-v2-tool-id="tool-catalyst"]');
+    const cleanRow = target.querySelector('[data-manager-v2-tool-id="tool-mail"]');
+    assert.ok(dirtyRow.querySelector('.manager-v2-tools-row-dirty-slot .manager-v2-tools-dirty-chip').textContent.includes('Unsaved'));
+    assert.ok(dirtyRow.querySelector('.manager-v2-tools-row-dirty-slot .fa-save'), 'row dirty pip should include the save icon');
+    assert.equal(dirtyRow.querySelector('.manager-v2-tools-row-actions .manager-v2-tools-dirty-chip'), null);
+    assert.equal(cleanRow.querySelector('.manager-v2-tools-row-dirty-slot .manager-v2-tools-dirty-chip'), null);
+    assert.equal(dirtyRow.querySelector('[aria-label="More actions"]'), null);
+    assert.equal(dirtyRow.querySelectorAll('.manager-v2-tools-row-actions .manager-v2-icon-button').length, 1);
+  });
+
+  it('offers save-all navigation handling when leaving with unsaved tools', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          toolsDraftDirty: true,
+          toolsDraftDirtyToolIds: ['tool-catalyst'],
+          trackCancelToolsDraft: true,
+          toolsDraftSelectedToolId: 'tool-catalyst',
+          toolsDraft: [{
+            id: 'tool-catalyst',
+            label: 'Artisan Catalyst',
+            enabled: true,
+            componentId: 'c1',
+            requirement: null,
+            breakage: { mode: 'limitedUses', maxUses: null },
+            onBreak: { mode: 'destroy' }
+          }]
+        }),
+        services: {
+          openCurrentAdmin: () => {},
+          confirmDirtyToolsNavigation: () => {
+            calls.push(['confirmDirtyToolsNavigation']);
+            return 'save';
+          }
+        }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    navButton('Tools').click();
+    await tick();
+    flushSync();
+    navButton('Components').click();
+    await Promise.resolve();
+    await Promise.resolve();
+    await tick();
+    flushSync();
+
+    assert.ok(calls.some(call => call[0] === 'confirmDirtyToolsNavigation'));
+    assert.ok(calls.some(call => call[0] === 'saveAllDirtyToolDrafts'));
+    assert.ok(calls.some(call => call[0] === 'cancelToolsDraft'));
+    assert.ok(target.textContent.includes('Components'));
+  });
+
+  it('expands a gathering tool row when the row is clicked', async () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], {
+          toolsDraftSelectedToolId: 'tool-catalyst',
+          toolsDraft: [{
+            id: 'tool-catalyst',
+            label: 'Artisan Catalyst',
+            enabled: true,
+            componentId: 'c1',
+            requirement: null,
+            breakage: { mode: 'limitedUses', maxUses: null },
+            onBreak: { mode: 'destroy' }
+          }]
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    navButton('Tools').click();
+    await tick();
+    flushSync();
+
+    const row = target.querySelector('[data-manager-v2-tool-id="tool-catalyst"]');
+    assert.ok(row);
+    assert.equal(row.querySelector('[data-manager-v2-tool-editor]'), null);
+
+    row.querySelector('.manager-v2-tools-row-body').click();
+    await tick();
+    flushSync();
+    assert.ok(row.querySelector('[data-manager-v2-tool-editor]'), 'row click should expand the tool editor');
+
+    row.querySelector('.manager-v2-tools-row-body').click();
+    await tick();
+    flushSync();
+    assert.ok(row.querySelector('[data-manager-v2-tool-editor]'), 'row click should keep an already expanded tool open');
+
+    row.querySelector('.manager-v2-tools-row-actions .manager-v2-icon-button:last-child').click();
+    await tick();
+    flushSync();
+    assert.equal(row.querySelector('[data-manager-v2-tool-editor]'), null, 'chevron button should remain the explicit collapse control');
+  });
+
+  it('swaps a mapped gathering tool component from the row drop zone', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          toolsDraftSelectedToolId: 'tool-catalyst',
+          toolsDraft: [{
+            id: 'tool-catalyst',
+            label: '',
+            enabled: true,
+            componentId: 'c1',
+            requirement: null,
+            breakage: { mode: 'limitedUses', maxUses: null },
+            onBreak: { mode: 'destroy' }
+          }]
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    navButton('Tools').click();
+    await tick();
+    flushSync();
+
+    function dragPayloadFrom(card) {
+      let raw = '';
+      const dragStart = new Event('dragstart', { bubbles: true, cancelable: true });
+      Object.defineProperty(dragStart, 'dataTransfer', {
+        value: {
+          setData: (type, value) => {
+            if (type === 'text/plain') raw = value;
+          },
+          effectAllowed: ''
+        }
+      });
+      card.dispatchEvent(dragStart);
+      return raw;
+    }
+
+    function dropPayloadOn(node, raw) {
+      const dropEvent = new Event('drop', { bubbles: true, cancelable: true });
+      Object.defineProperty(dropEvent, 'dataTransfer', {
+        value: { getData: (type) => type === 'text/plain' ? raw : '' }
+      });
+      node.dispatchEvent(dropEvent);
+    }
+
+    const dropZone = target.querySelector('[data-manager-v2-tool-component-drop-zone="tool-catalyst"]');
+    assert.ok(dropZone);
+    assert.ok(dropZone.classList.contains('is-component-drop-zone'));
+
+    const payload = dragPayloadFrom(target.querySelector('[data-manager-v2-tools-component-card="c2"]'));
+    assert.deepEqual(JSON.parse(payload), { type: 'FabricateManagedComponent', componentId: 'c2' });
+    dropPayloadOn(dropZone, payload);
+    await tick();
+    flushSync();
+
+    assert.ok(calls.some(call => call[0] === 'updateToolInDraft' && call[1] === 'tool-catalyst' && call[2].componentId === 'c2'));
+    assert.ok(target.querySelector('[data-manager-v2-tool-id="tool-catalyst"]').textContent.includes('Glass Vial'), 'row drop should stage the replacement component on the tool');
+  });
+
+  it('creates a gathering tool from a managed component dropped on the add-tool stub', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          toolsDraftSelectedToolId: 'tool-catalyst',
+          toolsDraft: [{
+            id: 'tool-catalyst',
+            label: 'Artisan Catalyst',
+            enabled: true,
+            componentId: 'c1',
+            requirement: null,
+            breakage: { mode: 'limitedUses', maxUses: null },
+            onBreak: { mode: 'destroy' }
+          }]
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    navButton('Tools').click();
+    await tick();
+    flushSync();
+
+    const addStub = target.querySelector('[data-manager-v2-tools-add-stub]');
+    assert.ok(addStub);
+    addStub.click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'addToolToDraft' && call.length === 1), 'clicking the add stub should still create a blank tool');
+
+    let raw = '';
+    const dragStart = new Event('dragstart', { bubbles: true, cancelable: true });
+    Object.defineProperty(dragStart, 'dataTransfer', {
+      value: {
+        setData: (type, value) => {
+          if (type === 'text/plain') raw = value;
+        },
+        effectAllowed: ''
+      }
+    });
+    target.querySelector('[data-manager-v2-tools-component-card="c2"]').dispatchEvent(dragStart);
+
+    const dropEvent = new Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(dropEvent, 'dataTransfer', {
+      value: { getData: (type) => type === 'text/plain' ? raw : '' }
+    });
+    addStub.dispatchEvent(dropEvent);
+    await tick();
+    flushSync();
+
+    assert.ok(calls.some(call => call[0] === 'addToolToDraft' && call[1]?.componentId === 'c2'));
+  });
+
+  it('imports an item dropped on the add-tool stub before creating the gathering tool', async () => {
+    const calls = [];
+    const importedDrops = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          toolsDraft: [{
+            id: 'tool-catalyst',
+            label: 'Artisan Catalyst',
+            enabled: true,
+            componentId: 'c1',
+            requirement: null,
+            breakage: { mode: 'limitedUses', maxUses: null },
+            onBreak: { mode: 'destroy' }
+          }]
+        }),
+        services: {
+          openCurrentAdmin: () => {},
+          importSingleManagedItemFromDrop: async (data) => {
+            importedDrops.push(data);
+            return { id: 'c2', name: 'Glass Vial' };
+          }
+        }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    navButton('Tools').click();
+    await tick();
+    flushSync();
+
+    const itemPayload = { type: 'Item', uuid: 'Actor.hero.Item.glass-vial' };
+    const dropEvent = new Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(dropEvent, 'dataTransfer', {
+      value: { getData: (type) => type === 'text/plain' ? JSON.stringify(itemPayload) : '' }
+    });
+    target.querySelector('[data-manager-v2-tools-add-stub]').dispatchEvent(dropEvent);
+    await Promise.resolve();
+    await tick();
+    flushSync();
+
+    assert.deepEqual(importedDrops, [itemPayload]);
+    assert.ok(calls.some(call => call[0] === 'addToolToDraft' && call[1]?.componentId === 'c2'));
+  });
+
+  it('edits gathering tool requirements as a single expression without exposing provider selection', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          toolsDraftSelectedToolId: 'tool-catalyst',
+          toolsDraftExpandedToolId: 'tool-catalyst',
+          toolsDraft: [{
+            id: 'tool-catalyst',
+            label: 'Artisan Catalyst',
+            enabled: true,
+            componentId: 'c1',
+            requirement: { provider: 'pf2e', formula: '@tools.alchemist.value', macroUuid: 'Macro.old' },
+            breakage: { mode: 'limitedUses', maxUses: null },
+            onBreak: { mode: 'destroy' }
+          }]
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    navButton('Tools').click();
+    await tick();
+    flushSync();
+
+    const editor = target.querySelector('[data-manager-v2-tool-editor]');
+    assert.ok(editor);
+    assert.equal(editor.querySelector('.manager-v2-provider-expression-input'), null);
+    assert.equal(editor.querySelector('select[id$="-provider"]'), null);
+    assert.ok(editor.textContent.includes('Enter an actor roll-data property'));
+    assert.ok(editor.textContent.includes('Example: @tools.alchemist.value'));
+    assert.ok(!editor.textContent.includes('Example: @abilities.str.mod'));
+    assert.ok(!editor.textContent.includes('Example: @skills.prc.total'));
+
+    const expressionInput = editor.querySelector('.manager-v2-tools-requirement-expression input');
+    assert.equal(expressionInput.value, '@tools.alchemist.value');
+    expressionInput.value = '@tools.smith.value';
+    expressionInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+
+    assert.ok(calls.some(call => call[0] === 'updateToolInDraft'
+      && call[1] === 'tool-catalyst'
+      && call[2].requirement?.provider === 'dnd5e'
+      && call[2].requirement?.formula === '@tools.smith.value'
+      && call[2].requirement?.macroUuid === ''));
+  });
+
+  it('renders gathering tool breakage chance as a full gradient slider without rarity tiers', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          toolsDraftSelectedToolId: 'tool-catalyst',
+          toolsDraftExpandedToolId: 'tool-catalyst',
+          toolsDraft: [{
+            id: 'tool-catalyst',
+            label: 'Artisan Catalyst',
+            enabled: true,
+            componentId: 'c1',
+            requirement: null,
+            breakage: { mode: 'breakageChance', breakageChance: 25 },
+            onBreak: { mode: 'destroy' }
+          }]
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    navButton('Tools').click();
+    await tick();
+    flushSync();
+
+    const control = target.querySelector('[data-manager-v2-tool-editor] .manager-v2-tool-breakage-chance-control');
+    assert.ok(control);
+    assert.ok(control.classList.contains('manager-v2-drop-rate-control'));
+    for (const tierClass of ['is-none', 'is-legendary', 'is-very-rare', 'is-rare', 'is-uncommon', 'is-common', 'is-guaranteed']) {
+      assert.equal(control.classList.contains(tierClass), false, `breakage chance slider should not use ${tierClass}`);
+    }
+    assert.ok(control.getAttribute('style').includes('--fab-drop-rate-value: 25%;'));
+    assert.ok(control.getAttribute('style').includes('--fab-tool-breakage-chance-color: color-mix(in srgb, var(--fab-warning) 50%, var(--fab-success) 50%);'));
+
+    const range = control.querySelector('input[type="range"]');
+    assert.ok(range);
+    range.value = '75';
+    range.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+
+    assert.ok(calls.some(call => call[0] === 'updateToolInDraft'
+      && call[1] === 'tool-catalyst'
+      && call[2].breakage?.mode === 'breakageChance'
+      && call[2].breakage?.breakageChance === 75));
+    assert.ok(control.getAttribute('style').includes('--fab-tool-breakage-chance-color: color-mix(in srgb, var(--fab-danger) 50%, var(--fab-warning) 50%);'));
+
+    const percentInput = target.querySelector('[data-manager-v2-tool-editor] .manager-v2-drop-rate-percent input[type="text"]');
+    percentInput.value = '42';
+    percentInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+
+    assert.ok(calls.some(call => call[0] === 'updateToolInDraft'
+      && call[1] === 'tool-catalyst'
+      && call[2].breakage?.mode === 'breakageChance'
+      && call[2].breakage?.breakageChance === 42));
+  });
+
+  it('uses the primary component drop-zone layout for replacement tools', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          toolsDraftSelectedToolId: 'tool-catalyst',
+          toolsDraftExpandedToolId: 'tool-catalyst',
+          toolsDraft: [{
+            id: 'tool-catalyst',
+            label: 'Artisan Catalyst',
+            enabled: true,
+            componentId: 'c1',
+            requirement: null,
+            breakage: { mode: 'limitedUses', maxUses: null },
+            onBreak: { mode: 'replaceWith', replacementComponentId: null }
+          }]
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    navButton('Tools').click();
+    await tick();
+    flushSync();
+
+    const replacementDropZone = target.querySelector('[data-manager-v2-tool-replacement-drop-zone="tool-catalyst"]');
+    assert.ok(replacementDropZone);
+    const replacementField = replacementDropZone.parentElement;
+    assert.ok(replacementField.classList.contains('manager-v2-tools-replacement-field'));
+    assert.equal(replacementField.classList.contains('manager-v2-tools-inline-field'), false);
+    assert.equal(replacementField.firstElementChild, replacementDropZone);
+    assert.equal(
+      Array.from(replacementField.children).some(child => child.tagName === 'SPAN' && child.textContent.trim() === 'Replacement component'),
+      false
+    );
+    assert.equal(replacementDropZone.querySelector('select'), null, 'replacement component should use the primary drop-zone layout instead of a select');
+    assert.ok(replacementDropZone.querySelector('.manager-v2-drop-empty-component'));
+    assert.ok(replacementDropZone.textContent.includes('No Component'));
+    assert.ok(replacementDropZone.textContent.includes('Create or assign'));
+
+    let raw = '';
+    const dragStart = new Event('dragstart', { bubbles: true, cancelable: true });
+    Object.defineProperty(dragStart, 'dataTransfer', {
+      value: {
+        setData: (type, value) => {
+          if (type === 'text/plain') raw = value;
+        },
+        effectAllowed: ''
+      }
+    });
+    target.querySelector('[data-manager-v2-tools-component-card="c2"]').dispatchEvent(dragStart);
+
+    const dropEvent = new Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(dropEvent, 'dataTransfer', {
+      value: { getData: (type) => type === 'text/plain' ? raw : '' }
+    });
+    replacementDropZone.dispatchEvent(dropEvent);
+    await tick();
+    flushSync();
+
+    assert.ok(calls.some(call => call[0] === 'updateToolInDraft'
+      && call[1] === 'tool-catalyst'
+      && call[2].onBreak?.mode === 'replaceWith'
+      && call[2].onBreak?.replacementComponentId === 'c2'));
+    assert.ok(replacementDropZone.textContent.includes('Glass Vial'));
+
+    const clearEvent = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    replacementDropZone.querySelector('.manager-v2-drop-component-button').dispatchEvent(clearEvent);
+    await tick();
+    flushSync();
+
+    assert.ok(calls.some(call => call[0] === 'updateToolInDraft'
+      && call[1] === 'tool-catalyst'
+      && call[2].onBreak?.mode === 'replaceWith'
+      && call[2].onBreak?.replacementComponentId === null));
+  });
+
   it('shows setup guidance and keeps create routing when a gathering system has no environments', async () => {
     const calls = [];
     target = document.createElement('div');
@@ -3678,142 +4337,11 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(calls.some(call => call[0] === 'createEnvironmentDraft'));
   });
 
-  it('asks the admin store before leaving a dirty environment edit route', async () => {
-    const blockedCalls = [];
-    target = document.createElement('div');
-    document.body.appendChild(target);
-    mounted = mount(Component, {
-      target,
-      props: {
-        store: createStore(blockedCalls, { confirmDiscardResult: false }),
-        services: { openCurrentAdmin: () => {} }
-      }
-    });
-    flushSync();
-
-    navButton('Gathering').click();
-    await tick();
-    flushSync();
-    target.querySelector('[aria-label="Edit Moonlit Forest"]').click();
-    await Promise.resolve();
-    await Promise.resolve();
-    await tick();
-    flushSync();
-
-    target.querySelector('.manager-v2-environment-edit-view input[data-environment-field="environment.name"]').value = 'Dirty Forest';
-    target.querySelector('.manager-v2-environment-edit-view input[data-environment-field="environment.name"]').dispatchEvent(new Event('input', { bubbles: true }));
-    await tick();
-    flushSync();
-    assert.equal(target.querySelector('.manager-v2-environment-details-band .manager-v2-card-title').textContent.trim(), 'Dirty Forest');
-
-    navButton('Components').click();
-    await Promise.resolve();
-    await tick();
-    flushSync();
-
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'environment-edit');
-    assert.ok(blockedCalls.some(call => call[0] === 'confirmDiscardDirtyEnvironmentDraft'));
-    assert.equal(blockedCalls.some(call => call[0] === 'cancelEnvironmentDraft'), false);
-
-    unmount(mounted);
-    mounted = null;
-    target.remove();
-    target = document.createElement('div');
-    document.body.appendChild(target);
-
-    const confirmedCalls = [];
-    mounted = mount(Component, {
-      target,
-      props: {
-        store: createStore(confirmedCalls, { confirmDiscardResult: true }),
-        services: { openCurrentAdmin: () => {} }
-      }
-    });
-    flushSync();
-
-    navButton('Gathering').click();
-    await tick();
-    flushSync();
-    target.querySelector('[aria-label="Edit Moonlit Forest"]').click();
-    await Promise.resolve();
-    await Promise.resolve();
-    await tick();
-    flushSync();
-    target.querySelector('.manager-v2-environment-edit-view input[data-environment-field="environment.name"]').value = 'Dirty Forest';
-    target.querySelector('.manager-v2-environment-edit-view input[data-environment-field="environment.name"]').dispatchEvent(new Event('input', { bubbles: true }));
-    await tick();
-    flushSync();
-
-    navButton('Components').click();
-    await Promise.resolve();
-    await tick();
-    flushSync();
-
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'components');
-    assert.ok(confirmedCalls.some(call => call[0] === 'confirmDiscardDirtyEnvironmentDraft'));
-    assert.ok(confirmedCalls.some(call => call[0] === 'cancelEnvironmentDraft'));
-  });
-
-  it('routes validation links to the correct environment segment and task tab', async () => {
-    const calls = [];
-    const validationState = {
-      summary: '2 validation issues',
-      errors: [
-        {
-          id: 'env-name',
-          path: 'environment.name',
-          message: 'Environment name is required.',
-          fieldSelector: '[data-environment-field="environment.name"]'
-        },
-        {
-          id: 'task-result-selection',
-          path: 'task.task-forage.resultSelection.macroUuid',
-          taskId: 'task-forage',
-          message: 'Result selection macro is required.',
-          fieldSelector: '[data-environment-field="task.task-forage.resultSelection.macroUuid"]'
-        }
-      ]
-    };
-    target = document.createElement('div');
-    document.body.appendChild(target);
-    mounted = mount(Component, {
-      target,
-      props: {
-        store: createStore(calls, { environmentValidationState: validationState }),
-        services: { openCurrentAdmin: () => {} }
-      }
-    });
-    flushSync();
-
-    navButton('Gathering').click();
-    await tick();
-    flushSync();
-    target.querySelector('[aria-label="Edit Moonlit Forest"]').click();
-    await Promise.resolve();
-    await Promise.resolve();
-    await tick();
-    flushSync();
-
-    assert.equal(target.querySelectorAll('.manager-v2-validation-group').length, 2);
-    const taskTabs = Array.from(target.querySelectorAll('.manager-v2-task-tabs [role="tab"]'));
-    assert.equal(taskTabs.find(tab => tab.textContent.includes('Results'))?.dataset.environmentInvalid, 'true');
-    assert.equal(taskTabs.some(tab => tab.textContent.includes('Advanced')), false);
-    assert.equal(target.querySelector('.manager-v2-environment-details-tabs'), null);
-    taskTabs.find(tab => tab.textContent.includes('Catalysts'))?.click();
-    await tick();
-    flushSync();
-    assert.ok(target.querySelector('[data-environment-field="environment.name"]'));
-
-    target.querySelector('.environment-validation-link').click();
-    await tick();
-    flushSync();
-    assert.ok(target.querySelector('[data-environment-field="environment.name"]'));
-
-    target.querySelectorAll('.environment-validation-link')[1].click();
-    await tick();
-    flushSync();
-    assert.ok(target.querySelector('.manager-v2-task-tabs [role="tab"].active').textContent.includes('Results'));
-  });
+  // NOTE: previously covered tests for environment-edit input wiring and validation
+  // tab routing were removed when the environment editor was placeholder'd out for
+  // redesign. The store-level dirty-draft, cancel, and validation behaviours remain
+  // covered by tests/stores/adminStore.test.js. Reinstate mounted coverage when the
+  // new editor lands.
 
   it('clears hidden component facet filters when the selected system changes', async () => {
     const store = createStore();
@@ -4008,5 +4536,176 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
 
     assert.ok(calls.some(call => call[0] === 'setResolutionMode' && call[1] === 'progressive'));
     assert.ok(calls.some(call => call[0] === 'toggleFeature' && call[1] === 'gathering' && call[2] === false));
+  });
+
+  it('renders the Required Tools picker in the gathering task editor and adds/removes references', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          gatheringLibraryTools: [
+            { id: 'tool-pickaxe', label: 'Pickaxe', enabled: true, componentId: 'c1', requirement: null, breakage: { mode: 'limitedUses', maxUses: null }, onBreak: { mode: 'destroy' } },
+            { id: 'tool-lantern', label: 'Lantern', enabled: true, componentId: 'c2', requirement: null, breakage: { mode: 'limitedUses', maxUses: null }, onBreak: { mode: 'destroy' } }
+          ],
+          taskInitialToolIds: ['tool-pickaxe']
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Tasks').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]').click();
+    await tick();
+    flushSync();
+
+    const section = target.querySelector('[data-gathering-task-required-tools]');
+    assert.ok(section, 'required tools section should render in the task editor');
+
+    const attached = section.querySelectorAll('[data-gathering-task-required-tool-pill]');
+    assert.equal(attached.length, 1);
+    assert.equal(attached[0].getAttribute('data-gathering-task-required-tool-pill'), 'tool-pickaxe');
+    assert.ok(attached[0].textContent.includes('Pickaxe'));
+
+    const resultCards = section.querySelectorAll('[data-gathering-task-required-tools-card]');
+    assert.equal(resultCards.length, 1);
+    assert.equal(resultCards[0].getAttribute('data-gathering-task-required-tools-card'), 'tool-lantern');
+
+    resultCards[0].click();
+    await tick();
+    flushSync();
+
+    const afterAddPills = target.querySelectorAll('[data-gathering-task-required-tool-pill]');
+    assert.equal(afterAddPills.length, 2);
+    const afterAddPillIds = Array.from(afterAddPills).map(node => node.getAttribute('data-gathering-task-required-tool-pill'));
+    assert.deepEqual(afterAddPillIds.sort(), ['tool-lantern', 'tool-pickaxe']);
+    assert.equal(target.querySelectorAll('[data-gathering-task-required-tools-card]').length, 0, 'attached tools should be removed from the result grid');
+
+    const lanternPill = Array.from(afterAddPills).find(node => node.getAttribute('data-gathering-task-required-tool-pill') === 'tool-pickaxe');
+    lanternPill.querySelector('.manager-v2-availability-remove').click();
+    await tick();
+    flushSync();
+    const afterRemovePills = target.querySelectorAll('[data-gathering-task-required-tool-pill]');
+    assert.equal(afterRemovePills.length, 1);
+    assert.equal(afterRemovePills[0].getAttribute('data-gathering-task-required-tool-pill'), 'tool-lantern');
+
+    target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      calls.some(call => call[0] === 'updateGatheringLibraryTask'
+        && call[1] === 'alchemy'
+        && call[2] === 'task-herbs'
+        && Array.isArray(call[3].toolIds)
+        && call[3].toolIds.length === 1
+        && call[3].toolIds[0] === 'tool-lantern'),
+      `expected Save to persist toolIds: ['tool-lantern'], got ${JSON.stringify(calls.filter(c => c[0] === 'updateGatheringLibraryTask'))}`
+    );
+  });
+
+  it('renders a stale chip for task toolIds whose library entry is missing and lets the user clear it', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          gatheringLibraryTools: [],
+          taskInitialToolIds: ['tool-ghost']
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Tasks').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]').click();
+    await tick();
+    flushSync();
+
+    const section = target.querySelector('[data-gathering-task-required-tools]');
+    const stalePill = section.querySelector('[data-gathering-task-required-tool-pill="tool-ghost"]');
+    assert.ok(stalePill, 'stale tool reference should render as a pill');
+    assert.ok(stalePill.classList.contains('is-stale'));
+    assert.ok(stalePill.textContent.includes('Deleted tool'));
+
+    assert.ok(section.querySelector('[data-gathering-task-required-tools-library-empty]'), 'library-empty placeholder should render when no tools exist');
+    assert.equal(section.querySelector('[data-gathering-task-required-tools-search]'), null, 'search input should hide when library is empty');
+
+    stalePill.querySelector('.manager-v2-availability-remove').click();
+    await tick();
+    flushSync();
+
+    const afterClearPills = target.querySelectorAll('[data-gathering-task-required-tool-pill]');
+    assert.equal(afterClearPills.length, 0, 'removing the stale chip should clear the dangling reference');
+    assert.ok(target.querySelector('[data-gathering-task-required-tools]').textContent.includes('No tools required'));
+
+    target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      calls.some(call => call[0] === 'updateGatheringLibraryTask'
+        && call[1] === 'alchemy'
+        && call[2] === 'task-herbs'
+        && Array.isArray(call[3].toolIds)
+        && call[3].toolIds.length === 0),
+      'saving after stale-chip removal should persist toolIds: []'
+    );
+  });
+
+  it('filters required-tools results by the search input', async () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], {
+          gatheringLibraryTools: [
+            { id: 'tool-pickaxe', label: 'Pickaxe', enabled: true, componentId: 'c1', requirement: null, breakage: { mode: 'limitedUses', maxUses: null }, onBreak: { mode: 'destroy' } },
+            { id: 'tool-lantern', label: 'Lantern', enabled: true, componentId: 'c2', requirement: null, breakage: { mode: 'limitedUses', maxUses: null }, onBreak: { mode: 'destroy' } }
+          ]
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Tasks').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]').click();
+    await tick();
+    flushSync();
+
+    const section = target.querySelector('[data-gathering-task-required-tools]');
+    const initialCards = section.querySelectorAll('[data-gathering-task-required-tools-card]');
+    assert.equal(initialCards.length, 2);
+
+    const searchInput = section.querySelector('[data-gathering-task-required-tools-search] input');
+    searchInput.value = 'lant';
+    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+
+    const filteredCards = section.querySelectorAll('[data-gathering-task-required-tools-card]');
+    assert.equal(filteredCards.length, 1);
+    assert.equal(filteredCards[0].getAttribute('data-gathering-task-required-tools-card'), 'tool-lantern');
   });
 });

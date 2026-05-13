@@ -241,6 +241,7 @@ test('startAttempt resolves a fully guarded immediate task into terminal history
   assert.deepEqual(calls.createTerminalRun[0][3], {
     createdResults: [],
     usedCatalysts: [],
+    usedTools: [],
     checkResult: { outcome: 'Iron' }
   });
   assert.deepEqual(calls.createWaitingRun, []);

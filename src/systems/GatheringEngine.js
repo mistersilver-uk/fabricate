@@ -10,6 +10,7 @@ const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
   SCENE_TOKEN_BLOCKED: 'FABRICATE.Gathering.Blocked.SceneTokenBlocked',
   DUPLICATE_ACTIVE_RUN: 'FABRICATE.Gathering.Blocked.DuplicateActiveRun',
   CATALYST_BLOCKED: 'FABRICATE.Gathering.Blocked.CatalystBlocked',
+  TOOL_BLOCKED: 'FABRICATE.Gathering.Blocked.ToolBlocked',
   GAME_PAUSED: 'FABRICATE.Gathering.Blocked.GamePaused',
   MISSING_REFERENCE: 'FABRICATE.Gathering.Blocked.MissingReference',
   SYSTEM_DISABLED: 'FABRICATE.Gathering.Blocked.SystemDisabled',
@@ -69,9 +70,11 @@ export class GatheringEngine {
     isGamePaused = null,
     sceneAccess = null,
     catalystAvailability = null,
+    toolAvailability = null,
     resultResolver = null,
     resultCreator = null,
     catalystUsage = null,
+    toolBreakage = null,
     failureFeedback = null,
     getRunViewer = null,
     localize = defaultLocalize
@@ -87,9 +90,11 @@ export class GatheringEngine {
     this.isGamePaused = isGamePaused;
     this.sceneAccess = sceneAccess;
     this.catalystAvailability = catalystAvailability;
+    this.toolAvailability = toolAvailability;
     this.resultResolver = resultResolver;
     this.resultCreator = resultCreator;
     this.catalystUsage = catalystUsage;
+    this.toolBreakage = toolBreakage;
     this.failureFeedback = failureFeedback;
     this.getRunViewer = getRunViewer;
     this.localize = localize;
@@ -289,6 +294,35 @@ export class GatheringEngine {
       }
     }
 
+    const tools = normalizeList(task.tools);
+    if (tools.length > 0) {
+      const toolResult = await this._checkTools({
+        actor: selectedActor,
+        viewer,
+        system,
+        environment,
+        task,
+        tools
+      });
+      if (toolResult.available !== true) {
+        return this._blockedStart({
+          viewer,
+          actor: selectedActor,
+          environment,
+          task,
+          reason: this._blockedReason('TOOL_BLOCKED', {
+            data: this._isOpaqueBlindTask({ environment, viewer })
+              ? null
+              : {
+                  taskId: task.id,
+                  missing: normalizeList(toolResult.missing),
+                  failedRequirements: normalizeList(toolResult.failedRequirements)
+                }
+          })
+        });
+      }
+    }
+
     const richAttempt = await this._evaluateRichAttempt({
       actor: selectedActor,
       viewer,
@@ -427,6 +461,7 @@ export class GatheringEngine {
       run: completedRunWithRichEvidence,
       createdResults: plan.createdResults,
       usedCatalysts: plan.usedCatalysts,
+      usedTools: plan.usedTools ?? [],
       checkResult
     });
   }
@@ -867,6 +902,29 @@ export class GatheringEngine {
       }
     }
 
+    const tools = normalizeList(task.tools);
+    if (tools.length > 0) {
+      const toolResult = await this._checkTools({
+        actor,
+        viewer,
+        system,
+        environment,
+        task,
+        tools
+      });
+      if (toolResult.available !== true) {
+        blockedReasons.push(this._blockedReason('TOOL_BLOCKED', {
+          data: this._isOpaqueBlindTask({ environment, viewer })
+            ? null
+            : {
+                taskId: task.id,
+                missing: normalizeList(toolResult.missing),
+                failedRequirements: normalizeList(toolResult.failedRequirements)
+              }
+        }));
+      }
+    }
+
     const richAttempt = await this._evaluateRichAttempt({ actor, viewer, system, environment, task });
     blockedReasons.push(...richAttempt.blockedReasons);
 
@@ -887,6 +945,22 @@ export class GatheringEngine {
     return catalysts.length === 0
       ? { available: true, missing: [] }
       : { available: false, missing: catalysts };
+  }
+
+  async _checkTools({ actor, viewer, system, environment, task, tools }) {
+    if (typeof this.toolAvailability?.check === 'function') {
+      return normalizeToolResult(await this.toolAvailability.check({
+        actor,
+        viewer,
+        system,
+        environment,
+        task,
+        tools
+      }));
+    }
+    return tools.length === 0
+      ? { available: true, missing: [], failedRequirements: [] }
+      : { available: false, missing: tools, failedRequirements: [] };
   }
 
   _taskModel({ task, environment, actor = null, viewer, visibility, blockedReasons }) {
@@ -1248,12 +1322,30 @@ export class GatheringEngine {
       run,
       createdResults: plan.createdResults,
       usedCatalysts: plan.usedCatalysts,
+      usedTools: plan.usedTools ?? [],
       checkResult
     });
   }
 
   async _terminalSideEffectPlan({ viewer, actor, system, environment, task, outcome, checkResult }) {
     try {
+      const usedTools = await this._planTerminalTools({
+        viewer,
+        actor,
+        system,
+        environment,
+        task,
+        outcome,
+        checkResult
+      });
+      if (usedTools?.status === 'misconfigured') return usedTools;
+
+      const toolBroke = Array.isArray(usedTools) && usedTools.some(entry => entry?.broken === true);
+      if (toolBroke && resolveToolBreakagePolicy(environment) === 'failureOnBreak') {
+        outcome.status = 'failed';
+        outcome.resultGroups = [];
+      }
+
       const createdResults = outcome.status === 'succeeded'
         ? await this._planGatheredResults({ viewer, actor, system, environment, task, outcome })
         : [];
@@ -1273,7 +1365,8 @@ export class GatheringEngine {
       return {
         status: 'ready',
         createdResults,
-        usedCatalysts
+        usedCatalysts,
+        usedTools: Array.isArray(usedTools) ? usedTools : []
       };
     } catch (error) {
       return misconfiguredOutcome({
@@ -1296,6 +1389,7 @@ export class GatheringEngine {
         payload: {
           createdResults: [],
           usedCatalysts: [],
+          usedTools: [],
           checkResult: { blind: true, status: outcome.status },
           ...this._richHistoryPayload({ environment, task, viewer, characterModifierSnapshot })
         }
@@ -1304,7 +1398,8 @@ export class GatheringEngine {
 
     const payload = {
       createdResults: plan.createdResults,
-      usedCatalysts: plan.usedCatalysts
+      usedCatalysts: plan.usedCatalysts,
+      usedTools: plan.usedTools ?? []
     };
     if (checkResult !== undefined) payload.checkResult = checkResult;
     Object.assign(payload, this._richHistoryPayload({ environment, task, viewer, characterModifierSnapshot }));
@@ -1365,6 +1460,14 @@ export class GatheringEngine {
       await this._createGatheredResults({ viewer, actor, system, environment, task, outcome });
     }
     await this._applyTerminalCatalysts({
+      viewer,
+      actor,
+      system,
+      environment,
+      task,
+      outcome
+    });
+    await this._applyTerminalTools({
       viewer,
       actor,
       system,
@@ -1600,6 +1703,48 @@ export class GatheringEngine {
     return normalizeRunItems(planned, { actor });
   }
 
+  async _planTerminalTools({ viewer, actor, system, environment, task, outcome, checkResult }) {
+    const tools = normalizeList(task.tools);
+    if (tools.length === 0 || typeof this.toolBreakage?.plan !== 'function') {
+      return [];
+    }
+    try {
+      const planned = await this.toolBreakage.plan({
+        actor,
+        viewer,
+        system,
+        environment,
+        task,
+        tools,
+        outcomeStatus: outcome.status,
+        checkResult: checkResult ?? outcome.checkResult ?? null
+      });
+      return Array.isArray(planned) ? planned : [];
+    } catch (error) {
+      return misconfiguredOutcome({
+        code: stringOrNull(error?.code) || 'TOOL_PLAN_FAILED',
+        message: stringOrNull(error?.message) || 'Tool breakage planning failed'
+      });
+    }
+  }
+
+  async _applyTerminalTools({ viewer, actor, system, environment, task, outcome }) {
+    const tools = normalizeList(task.tools);
+    if (tools.length === 0 || typeof this.toolBreakage?.apply !== 'function') {
+      return [];
+    }
+    return this.toolBreakage.apply({
+      actor,
+      viewer,
+      system,
+      environment,
+      task,
+      tools,
+      outcomeStatus: outcome.status,
+      checkResult: outcome.checkResult ?? null
+    });
+  }
+
   async _applyFailureFeedback({ viewer, actor, system, environment, task, outcome, checkResult }) {
     if (typeof this.failureFeedback?.apply !== 'function') return null;
     return this.failureFeedback.apply({
@@ -1614,11 +1759,11 @@ export class GatheringEngine {
     });
   }
 
-  _terminalStart({ viewer, actor, system, environment, task, status, run, createdResults, usedCatalysts, checkResult }) {
+  _terminalStart({ viewer, actor, system, environment, task, status, run, createdResults, usedCatalysts, usedTools = [], checkResult }) {
     const opaqueBlind = this._isOpaqueBlindTask({ environment, viewer });
     const publicRun = opaqueBlind
       ? redactBlindTerminalRun(run)
-      : enrichPublicTerminalRun(stripRuntimeSnapshotFromRun(run), { createdResults, usedCatalysts, checkResult });
+      : enrichPublicTerminalRun(stripRuntimeSnapshotFromRun(run), { createdResults, usedCatalysts, usedTools, checkResult });
     const response = {
       accepted: true,
       started: true,
@@ -1637,6 +1782,7 @@ export class GatheringEngine {
     if (!opaqueBlind) {
       response.createdResults = createdResults;
       response.usedCatalysts = usedCatalysts;
+      response.usedTools = usedTools;
       if (checkResult !== undefined) response.checkResult = checkResult;
     }
 
@@ -1889,6 +2035,18 @@ function normalizeCatalystResult(result) {
   return {
     available: result.available === true || result.valid === true,
     missing: normalizeList(result.missing)
+  };
+}
+
+function normalizeToolResult(result) {
+  if (result === true) return { available: true, missing: [], failedRequirements: [] };
+  if (result === false || !result || typeof result !== 'object') {
+    return { available: false, missing: [], failedRequirements: [] };
+  }
+  return {
+    available: result.available === true,
+    missing: normalizeList(result.missing),
+    failedRequirements: normalizeList(result.failedRequirements)
   };
 }
 
@@ -2307,15 +2465,21 @@ function stripRuntimeSnapshotFromRun(run) {
   return publicRun;
 }
 
-function enrichPublicTerminalRun(run, { createdResults, usedCatalysts, checkResult }) {
+function enrichPublicTerminalRun(run, { createdResults, usedCatalysts, usedTools = [], checkResult }) {
   if (!run || typeof run !== 'object') return run;
   const enriched = {
     ...run,
     createdResults,
-    usedCatalysts
+    usedCatalysts,
+    usedTools
   };
   if (checkResult !== undefined) enriched.checkResult = checkResult;
   return enriched;
+}
+
+function resolveToolBreakagePolicy(environment) {
+  const candidate = environment?.rules?.toolBreakagePolicy ?? environment?.toolBreakagePolicy;
+  return candidate === 'successDespiteBreak' ? 'successDespiteBreak' : 'failureOnBreak';
 }
 
 function redactCharacterModifierSnapshot(snapshot) {

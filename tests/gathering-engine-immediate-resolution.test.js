@@ -259,6 +259,7 @@ test('immediate routed success creates result items and writes succeeded termina
   assert.deepEqual(calls.createTerminalRun[0][3], {
     createdResults,
     usedCatalysts,
+    usedTools: [],
     checkResult: { outcome: 'Iron', provider: 'macroOutcome' }
   });
 });
@@ -297,6 +298,7 @@ test('immediate routed failure writes failed terminal history, creates no result
   assert.deepEqual(calls.createTerminalRun[0][3], {
     createdResults: [],
     usedCatalysts,
+    usedTools: [],
     checkResult: { outcome: 'fail', provider: 'rollTableOutcome' }
   });
 });
@@ -623,6 +625,7 @@ test('blind non-GM terminal success response redacts task, catalyst, provider, a
   assert.deepEqual(calls.createTerminalRun[0][3], {
     createdResults: [],
     usedCatalysts: [],
+    usedTools: [],
     checkResult: { blind: true, status: 'succeeded' }
   });
   assertNoBlindTerminalLeak(calls.createTerminalRun[0]);
@@ -675,6 +678,7 @@ test('blind non-GM terminal failure response redacts task, catalyst, provider di
   assert.deepEqual(calls.createTerminalRun[0][3], {
     createdResults: [],
     usedCatalysts: [],
+    usedTools: [],
     checkResult: { blind: true, status: 'failed' }
   });
   assertNoBlindTerminalLeak(calls.createTerminalRun[0]);

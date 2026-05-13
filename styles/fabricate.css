@@ -8859,6 +8859,12 @@
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
+.fabricate-manager-v2 .manager-v2-gathering-panel-tools {
+  grid-template-rows: auto;
+  padding: 12px;
+  overflow: auto;
+}
+
 .fabricate-manager-v2 .manager-v2-gathering-task-edit-view {
   display: grid;
   grid-template-rows: auto auto 340px minmax(410px, 1fr) auto;
@@ -8886,7 +8892,7 @@
 
 .fabricate-manager-v2 .manager-v2-gathering-task-edit-view :is(input:not([type="checkbox"]):not([type="radio"]), select) {
   min-height: 32px;
-  padding: 5px 9px;
+  padding: 5px 5px 5px 34px;
 }
 
 .fabricate-manager-v2 .manager-v2-gathering-task-edit-view textarea {
@@ -9537,6 +9543,111 @@
   min-width: 0;
 }
 
+.fabricate-manager-v2 .manager-v2-tools-component-browser-card {
+  display: grid;
+  grid-template-rows: auto minmax(96px, 1fr) auto;
+  gap: 0;
+  height: clamp(300px, 54vh, 440px);
+  min-height: 0;
+  max-height: none;
+  overflow: hidden;
+}
+
+.fabricate-manager-v2 .manager-v2-tool-inspector-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-tool-inspector-actions .manager-v2-button {
+  width: 100%;
+  padding: 0 8px;
+}
+
+.fabricate-manager-v2 .manager-v2-tool-inspector-actions .manager-v2-button span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-component-browser-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 0 0 10px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-component-browser-card .manager-v2-search.is-compact {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-component-browser-card .manager-v2-search.is-compact input {
+  padding-left: 36px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-component-browser-scroll {
+  min-height: 0;
+  padding: 10px 0 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-component-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-component-browser-footer {
+  display: block;
+  min-width: 0;
+  padding: 8px 0 0;
+  border-top: 1px solid var(--fab-mv2-border);
+  background: transparent;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-component-browser-footer .manager-v2-pagination {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  border-top: 0;
+  background: transparent;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-component-browser-footer .manager-v2-pagination-summary {
+  width: 100%;
+  max-width: 100%;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-component-browser-footer .manager-v2-pagination-nav,
+.fabricate-manager-v2 .manager-v2-tools-component-browser-footer .manager-v2-pagination-size {
+  justify-content: center;
+  width: 100%;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-component-browser-footer .manager-v2-pagination-size select {
+  width: 52px;
+  min-width: 52px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-component-browser-footer .manager-v2-pagination-page {
+  min-width: 0;
+}
+
 .fabricate-manager-v2 .manager-v2-task-component-card {
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr) 18px;
@@ -9639,6 +9750,164 @@
 }
 
 .fabricate-manager-v2 .manager-v2-task-component-browser-footer .manager-v2-pagination {
+  padding: 0;
+  border-top: 0;
+  background: transparent;
+}
+
+.fabricate-manager-v2 .manager-v2-task-required-tools-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  height: 340px;
+  min-height: 340px;
+  max-height: 340px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-mv2-surface-2);
+  box-shadow: inset 0 1px 0 var(--fab-overlay-light-06);
+  overflow: hidden;
+}
+
+.fabricate-manager-v2 .manager-v2-task-required-tools-card > .manager-v2-task-card-heading,
+.fabricate-manager-v2 .manager-v2-task-required-tools-card > .manager-v2-task-required-tools-attached,
+.fabricate-manager-v2 .manager-v2-task-required-tools-card > .manager-v2-task-required-tools-search,
+.fabricate-manager-v2 .manager-v2-task-required-tools-card > .manager-v2-task-required-tools-footer {
+  flex: 0 0 auto;
+}
+
+.fabricate-manager-v2 .manager-v2-task-required-tools-attached {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.fabricate-manager-v2 .manager-v2-required-tool-pill {
+  gap: 6px;
+}
+
+.fabricate-manager-v2 .manager-v2-required-tool-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  object-fit: cover;
+  background: var(--fab-mv2-surface-3);
+}
+
+.fabricate-manager-v2 .manager-v2-required-tool-pill.is-stale {
+  border-color: var(--fab-warning-border);
+  color: var(--fab-warning-text);
+  background: var(--fab-warning-soft);
+}
+
+.fabricate-manager-v2 .manager-v2-required-tool-pill.is-stale > i {
+  color: var(--fab-warning-text);
+}
+
+.fabricate-manager-v2 .manager-v2-task-required-tools-search {
+  display: flex;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-task-required-tools-search .manager-v2-search {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-task-required-tools-scroll {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+.fabricate-manager-v2 .manager-v2-task-required-tools-scroll > .manager-v2-empty {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  padding: 12px;
+}
+
+.fabricate-manager-v2 .manager-v2-task-required-tools-scroll > .manager-v2-empty > div > i {
+  width: 32px;
+  height: 32px;
+  margin-bottom: 6px;
+  font-size: 1.1rem;
+}
+
+.fabricate-manager-v2 .manager-v2-task-required-tools-scroll > .manager-v2-empty h3 {
+  font-size: 0.86rem;
+  margin: 0 0 4px;
+}
+
+.fabricate-manager-v2 .manager-v2-task-required-tools-scroll > .manager-v2-empty p {
+  font-size: 0.78rem;
+  margin: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-task-required-tools-grid {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-task-required-tools-card-item {
+  grid-template-columns: 38px minmax(0, 1fr) 22px;
+  text-align: left;
+  background: var(--fab-mv2-surface-1);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+}
+
+.fabricate-manager-v2 .manager-v2-task-required-tools-card-item:hover,
+.fabricate-manager-v2 .manager-v2-task-required-tools-card-item:focus-visible {
+  border-color: var(--fab-warning-border);
+  background: var(--fab-overlay-light-08);
+  outline: none;
+}
+
+.fabricate-manager-v2 .manager-v2-task-required-tools-card-item:active {
+  transform: translateY(1px);
+  cursor: pointer;
+}
+
+.fabricate-manager-v2 .manager-v2-task-required-tools-add-icon {
+  justify-self: end;
+  align-self: center;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 50%;
+  color: var(--fab-warning-text);
+  background: var(--fab-mv2-surface-3);
+  font-size: 0.7rem;
+}
+
+.fabricate-manager-v2 .manager-v2-task-required-tools-card-item:hover .manager-v2-task-required-tools-add-icon,
+.fabricate-manager-v2 .manager-v2-task-required-tools-card-item:focus-visible .manager-v2-task-required-tools-add-icon {
+  border-color: var(--fab-warning-border);
+  background: var(--fab-mv2-surface-2);
+}
+
+.fabricate-manager-v2 .manager-v2-task-required-tools-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-task-required-tools-footer .manager-v2-pagination {
   padding: 0;
   border-top: 0;
   background: transparent;
@@ -9819,6 +10088,14 @@
   min-height: 40px;
 }
 
+.fabricate-manager-v2 .manager-v2-drop-empty-component {
+  min-height: 52px;
+  padding: 6px 8px;
+  border: 1px dashed var(--fab-mv2-border-strong);
+  border-radius: 8px;
+  background: var(--fab-overlay-light-03);
+}
+
 .fabricate-manager-v2 .manager-v2-drop-component-button .manager-v2-gathering-task-thumb {
   width: 42px;
   height: 42px;
@@ -9891,7 +10168,7 @@
 
 .fabricate-manager-v2 .manager-v2-drop-rate-percent > span[aria-hidden="true"] {
   position: absolute;
-  right: 7px;
+  right: 6px;
   top: 50%;
   pointer-events: none;
   transform: translateY(-50%);
@@ -9963,10 +10240,9 @@
   z-index: 1;
   width: 100%;
   min-width: 0;
-  height: 18px;
+  height: 28px;
   border: 0;
   accent-color: var(--fab-drop-rate-color);
-  background: transparent;
   cursor: pointer;
 }
 
@@ -10007,6 +10283,69 @@
   border: 2px solid var(--fab-mv2-bg);
   border-radius: 999px;
   background: var(--fab-drop-rate-color);
+}
+
+.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control {
+  --fab-tool-breakage-chance-thumb-radius: 7px;
+  --fab-tool-breakage-chance-low: var(--fab-success);
+  --fab-tool-breakage-chance-mid: var(--fab-warning);
+  --fab-tool-breakage-chance-high: var(--fab-danger);
+  --fab-tool-breakage-chance-color: var(--fab-success);
+  --fab-tool-breakage-chance-track: linear-gradient(
+    90deg,
+    var(--fab-tool-breakage-chance-low) 0%,
+    var(--fab-tool-breakage-chance-mid) 50%,
+    var(--fab-tool-breakage-chance-high) 100%
+  );
+  height: 28px;
+  min-height: 28px;
+  padding: 0 var(--fab-tool-breakage-chance-thumb-radius);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-dark-18);
+  box-sizing: border-box;
+  box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
+  overflow: hidden;
+}
+
+.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control .manager-v2-drop-rate-track {
+  left: var(--fab-tool-breakage-chance-thumb-radius);
+  right: var(--fab-tool-breakage-chance-thumb-radius);
+  border: 0;
+  background: var(--fab-tool-breakage-chance-track);
+}
+
+.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control .manager-v2-drop-rate-fill {
+  display: none;
+}
+
+.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"] {
+  padding: 0;
+  box-shadow: none;
+  background: transparent;
+  accent-color: var(--fab-tool-breakage-chance-color);
+}
+
+.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-webkit-slider-runnable-track {
+  border: 0;
+  background: transparent;
+}
+
+.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-webkit-slider-thumb {
+  background: var(--fab-tool-breakage-chance-color);
+}
+
+.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-moz-range-track {
+  border: 0;
+  background: transparent;
+}
+
+.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-moz-range-progress {
+  background: transparent;
+}
+
+.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-moz-range-thumb {
+  background: var(--fab-tool-breakage-chance-color);
 }
 
 .fabricate-manager-v2 .manager-v2-drop-quantity-cell input[type="text"] {
@@ -10067,7 +10406,9 @@
   width: 42px;
   min-height: 40px;
   padding: 0;
+  border: 0;
   border-radius: 8px;
+  background: var(--fab-overlay-light-06);
 }
 
 .fabricate-manager-v2 .manager-v2-empty-drop-cell {
@@ -11547,4 +11888,447 @@
   font-size: 0.86rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ==========================================================================
+ * Manager V2 — Tools page
+ * ========================================================================== */
+
+.fabricate-manager-v2 .manager-v2-tools-main {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-card-header > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-empty {
+  margin-top: 6px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-overlay-light-03);
+  transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row.is-selected {
+  border-color: var(--fab-mv2-border-strong);
+  background: var(--fab-overlay-light-03);
+  box-shadow: none;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row.is-selected > .manager-v2-tools-row-body {
+  background: var(--fab-success-soft);
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row.is-selected.is-expanded > .manager-v2-tools-row-body {
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row-body {
+  display: grid;
+  grid-template-columns: minmax(260px, 300px) minmax(0, 1fr) max-content;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  text-align: left;
+  color: inherit;
+  border-radius: 8px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row-body:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-identity {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-identity.is-component-drop-zone {
+  padding: 6px 8px;
+  border: 1px dashed var(--fab-mv2-border-strong);
+  border-radius: 8px;
+  background: var(--fab-overlay-light-03);
+}
+
+.fabricate-manager-v2 .manager-v2-tools-identity.is-component-drop-zone.is-drop-active {
+  border-color: var(--fab-mv2-accent);
+  background: var(--fab-success-soft);
+  box-shadow: inset 0 0 0 1px var(--fab-mv2-accent);
+}
+
+.fabricate-manager-v2 .manager-v2-tools-thumb {
+  width: 42px;
+  height: 42px;
+  border-radius: 6px;
+  border: 1px solid var(--fab-mv2-border);
+  background: var(--fab-overlay-light-04);
+  object-fit: cover;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-identity-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--fab-mv2-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-secondary {
+  font-size: 0.82rem;
+  color: var(--fab-mv2-text-muted);
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row-summary {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  min-width: 0;
+  max-height: 58px;
+  overflow: hidden;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row-summary .manager-v2-chip {
+  min-height: 26px;
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row-actions {
+  display: grid;
+  grid-template-columns: 34px;
+  align-items: center;
+  justify-content: end;
+  justify-self: end;
+  min-width: 34px;
+  max-width: 34px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row-dirty-slot {
+  position: absolute;
+  top: 0;
+  left: 10px;
+  z-index: 4;
+  display: flex;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-dirty-chip {
+  border-color: var(--fab-warning-border);
+  color: var(--fab-warning-text);
+  background: var(--fab-mv2-surface-1);
+  gap: 5px;
+  white-space: nowrap;
+  box-shadow:
+    inset 0 0 0 999px var(--fab-warning-soft),
+    0 2px 8px var(--fab-overlay-dark-28);
+}
+
+.fabricate-manager-v2 .manager-v2-tool-inspector-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  border-top: 1px solid var(--fab-mv2-border);
+  background: var(--fab-overlay-light-04);
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-section {
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-section > legend {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fab-mv2-text-muted);
+  padding: 0 4px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-inline-field {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  column-gap: 10px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-inline-field > span:first-child {
+  white-space: nowrap;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-inline-field > input[type="number"] {
+  max-width: 122px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-inline-field > .manager-v2-tools-max-uses-input {
+  max-width: 190px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-inline-field > .manager-v2-tool-component-row {
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-replacement-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-replacement-field > .manager-v2-tool-component-row {
+  width: 100%;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-requirement-expression input {
+  width: 100%;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-requirement-help {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-requirement-help p,
+.fabricate-manager-v2 .manager-v2-tools-requirement-help ul {
+  margin: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-requirement-help ul {
+  display: grid;
+  gap: 3px;
+  padding-left: 18px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-inline-fields {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(180px, 0.55fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-identity-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-identity-row > .manager-v2-field {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-tool-component-row {
+  display: block;
+  position: relative;
+}
+
+.fabricate-manager-v2 .manager-v2-tool-component-row.is-drop-active {
+  outline: 2px dashed var(--fab-accent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-empty-stub {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 58px;
+  padding: 18px 14px;
+  border: 1px dashed var(--fab-mv2-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fab-mv2-text-muted);
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-empty-stub:hover,
+.fabricate-manager-v2 .manager-v2-tools-empty-stub:focus-visible,
+.fabricate-manager-v2 .manager-v2-tools-empty-stub.is-drop-active {
+  border-color: var(--fab-accent);
+  color: var(--fab-mv2-text);
+  background: var(--fab-overlay-light-04);
+  outline: none;
+}
+
+/* ==========================================================================
+ * Manager V2 — Radio group (segmented control)
+ * ========================================================================== */
+
+.fabricate-manager-v2 .manager-v2-radio-group {
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fabricate-manager-v2 .manager-v2-radio-group-legend {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fab-mv2-text-muted);
+  padding: 0 4px;
+}
+
+.fabricate-manager-v2 .manager-v2-radio-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.fabricate-manager-v2 .manager-v2-radio-option {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-03);
+  color: var(--fab-mv2-text);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.fabricate-manager-v2 .manager-v2-radio-option:hover {
+  border-color: var(--fab-accent);
+}
+
+.fabricate-manager-v2 .manager-v2-radio-option > input[type="radio"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.fabricate-manager-v2 .manager-v2-radio-option.is-selected {
+  border-color: var(--fab-accent);
+  background: var(--fab-accent-soft);
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager-v2 .manager-v2-radio-option:focus-within {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+/* Tools editor — compact 28 px control sizing for visual density.
+ * Excludes input[type="range"] so the breakage-chance slider keeps its tuned
+ * 18 px height and zero horizontal padding; otherwise the custom track ends
+ * extend past the narrower native track and render as visible nibs. */
+.fabricate-manager-v2 .manager-v2-tools-row-editor .manager-v2-field input:not([type="range"]),
+.fabricate-manager-v2 .manager-v2-tools-row-editor .manager-v2-field select {
+  height: 28px;
+  min-height: 28px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row-editor .manager-v2-drop-rate-percent input[type="text"] {
+  padding: 0 10px 0 0;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row-editor .manager-v2-button {
+  min-height: 28px;
+  padding: 0 12px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row-editor .manager-v2-icon-button {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row-editor .manager-v2-radio-option {
+  padding: 6px 12px;
 }

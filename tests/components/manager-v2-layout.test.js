@@ -531,6 +531,21 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const tableBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-tasks-table');
   const rowBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-table-head,\n.fabricate-manager-v2 .manager-v2-gathering-task-row');
   const identityBlock = blockFor('.fabricate-manager-v2 .manager-v2-recipe-identity,\n.fabricate-manager-v2 .manager-v2-component-identity,\n.fabricate-manager-v2 .manager-v2-environment-identity,\n.fabricate-manager-v2 .manager-v2-gathering-task-identity');
+  const toolsIdentityDropZoneBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-identity.is-component-drop-zone');
+  const toolsIdentityDropZoneActiveBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-identity.is-component-drop-zone.is-drop-active');
+  const toolsRowBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-row');
+  const toolsSelectedRowBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-row.is-selected');
+  const toolsSelectedRowBodyBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-row.is-selected > .manager-v2-tools-row-body');
+  const toolsSelectedExpandedRowBodyBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-row.is-selected.is-expanded > .manager-v2-tools-row-body');
+  const toolsRowBodyBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-row-body');
+  const toolsIdentityBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-identity');
+  const toolsRowSummaryBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-row-summary');
+  const toolsRowActionsBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-row-actions');
+  const toolsRowDirtySlotBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-row-dirty-slot');
+  const toolsDirtyChipBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-dirty-chip');
+  const toolsInspectorHeadingBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-inspector-heading');
+  const toolsEmptyStubBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-empty-stub');
+  const toolsEmptyStubActiveBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-empty-stub:hover,\n.fabricate-manager-v2 .manager-v2-tools-empty-stub:focus-visible,\n.fabricate-manager-v2 .manager-v2-tools-empty-stub.is-drop-active');
   const editorBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-edit-view');
   const editorWithNoticeBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-edit-view.has-reward-rule-notice');
   const availabilityBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-availability-row');
@@ -543,6 +558,32 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const componentCardGripBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-card-grip');
   const componentBrowserFooterBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-browser-footer');
   const componentBrowserFooterPaginationBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-browser-footer .manager-v2-pagination');
+  const toolsComponentBrowserBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-browser-card');
+  const toolInspectorActionsBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-inspector-actions');
+  const toolInspectorActionButtonsBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-inspector-actions .manager-v2-button');
+  const toolInspectorActionButtonLabelBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-inspector-actions .manager-v2-button span');
+  const toolsComponentBrowserHeaderBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-browser-header');
+  const toolsComponentBrowserSearchBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-browser-card .manager-v2-search.is-compact');
+  const toolsComponentBrowserSearchInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-browser-card .manager-v2-search.is-compact input');
+  const toolsComponentBrowserScrollBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-browser-scroll');
+  const toolsComponentBrowserGridBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-grid');
+  const toolsComponentBrowserFooterBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-browser-footer');
+  const toolsComponentBrowserFooterPaginationBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-browser-footer .manager-v2-pagination');
+  const toolsComponentBrowserFooterSummaryBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-browser-footer .manager-v2-pagination-summary');
+  const toolsComponentBrowserFooterControlsBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-browser-footer .manager-v2-pagination-nav,\n.fabricate-manager-v2 .manager-v2-tools-component-browser-footer .manager-v2-pagination-size');
+  const toolsComponentBrowserFooterPageSizeSelectBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-browser-footer .manager-v2-pagination-size select');
+  const toolsComponentBrowserFooterPageBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-component-browser-footer .manager-v2-pagination-page');
+  const toolsInlineFieldBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-inline-field');
+  const toolsInlineFieldLabelBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-inline-field > span:first-child');
+  const toolsInlineNumberInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-inline-field > input[type="number"]');
+  const toolsMaxUsesInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-inline-field > .manager-v2-tools-max-uses-input');
+  const toolsReplacementFieldBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-replacement-field');
+  const toolsReplacementComponentRowBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-replacement-field > .manager-v2-tool-component-row');
+  const toolsRequirementExpressionInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-requirement-expression input');
+  const toolsRequirementHelpBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-requirement-help');
+  const toolsInlineFieldsBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-inline-fields');
+  const toolsEditorInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-row-editor .manager-v2-field input:not([type="range"]),\n.fabricate-manager-v2 .manager-v2-tools-row-editor .manager-v2-field select');
+  const toolsEditorPercentInputBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-row-editor .manager-v2-drop-rate-percent input[type="text"]');
   const componentPillsBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-component-pills');
   const selectedTagPillBlock = blockFor('.fabricate-manager-v2 .manager-v2-selected-tag-pill');
   const dropCardBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-drops-card');
@@ -565,6 +606,8 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const dropCellSeparatorBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-drop-table-head > * + *,\n.fabricate-manager-v2 .manager-v2-gathering-task-drop-row > * + *');
   const selectedDropRowBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-drop-row.is-selected');
   const dropComponentButtonBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-component-button,\n.fabricate-manager-v2 .manager-v2-drop-empty-component');
+  const dropEmptyComponentBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-empty-component');
+  const dropEmptyComponentIconBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-empty-component .manager-v2-inline-drop-zone');
   const dropComponentCopyBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-component-button .manager-v2-system-copy,\n.fabricate-manager-v2 .manager-v2-drop-empty-component .manager-v2-system-copy');
   const dropComponentNameBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-component-button .manager-v2-system-name');
   const dropRateBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-cell');
@@ -588,6 +631,15 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const dropRateWebkitThumbBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-webkit-slider-thumb');
   const dropRateMozProgressBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-moz-range-progress');
   const dropRateMozThumbBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-moz-range-thumb');
+  const toolBreakageChanceControlBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control');
+  const toolBreakageChanceTrackBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control .manager-v2-drop-rate-track');
+  const toolBreakageChanceFillBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control .manager-v2-drop-rate-fill');
+  const toolBreakageChanceRangeBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]');
+  const toolBreakageChanceWebkitTrackBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-webkit-slider-runnable-track');
+  const toolBreakageChanceWebkitThumbBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-webkit-slider-thumb');
+  const toolBreakageChanceMozTrackBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-moz-range-track');
+  const toolBreakageChanceMozProgressBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-moz-range-progress');
+  const toolBreakageChanceMozThumbBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-moz-range-thumb');
   const dropModifierListBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-modifier-list');
   const dropModifierPillBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-modifier-pill');
   const positiveDropModifierPillBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-modifier-pill.is-positive');
@@ -630,6 +682,119 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(!tableBlock.includes('reorder'), 'task browser should not reserve a reorder column');
   assert.ok(rowBlock.includes('grid-template-columns: var(--fab-mv2-gathering-task-grid);'), 'task rows should use the shared task grid');
   assert.ok(identityBlock.includes('grid-template-columns: 46px minmax(0, 1fr);'), 'task identity should reserve thumbnail space');
+  assert.ok(toolsRowBlock.includes('position: relative;'), 'tool rows should anchor the dirty pip overlay without involving header flow');
+  assert.ok(
+    toolsSelectedRowBlock.includes('border-color: var(--fab-mv2-border-strong);')
+      && !toolsSelectedRowBlock.includes('border-color: var(--fab-accent);')
+      && toolsSelectedRowBlock.includes('box-shadow: none;')
+      && !toolsSelectedRowBlock.includes('box-shadow: inset 3px 0 0 var(--fab-accent);'),
+    'selected tool rows should not use accent borders or inset line markers'
+  );
+  assert.ok(
+    toolsSelectedRowBodyBlock.includes('background: var(--fab-success-soft);'),
+    'selected tool rows should indicate selection through a legible header background'
+  );
+  assert.ok(
+    toolsSelectedExpandedRowBodyBlock.includes('border-bottom-right-radius: 0;')
+      && toolsSelectedExpandedRowBodyBlock.includes('border-bottom-left-radius: 0;'),
+    'expanded selected tool headers should meet the editor panel cleanly'
+  );
+  assert.ok(
+    toolsRowBodyBlock.includes('grid-template-columns: minmax(260px, 300px) minmax(0, 1fr) max-content;'),
+    'tool rows should reserve a stable component column while keeping action width compact'
+  );
+  assert.ok(toolsIdentityBlock.includes('width: 100%;'), 'tool identity drop zones should fill the stable component column');
+  assert.ok(
+    toolsRowSummaryBlock.includes('justify-content: flex-start;')
+      && toolsRowSummaryBlock.includes('min-width: 0;')
+      && toolsRowSummaryBlock.includes('max-height: 58px;')
+      && toolsRowSummaryBlock.includes('overflow: hidden;'),
+    'tool row summary chips should align from a consistent summary column and never spill into a third line'
+  );
+  assert.ok(
+    toolsRowActionsBlock.includes('grid-template-columns: 34px;')
+      && toolsRowActionsBlock.includes('justify-self: end;')
+      && toolsRowActionsBlock.includes('max-width: 34px;'),
+    'tool row actions should reserve only the chevron column'
+  );
+  assert.ok(
+    toolsRowDirtySlotBlock.includes('position: absolute;')
+      && toolsRowDirtySlotBlock.includes('top: 0;')
+      && toolsRowDirtySlotBlock.includes('left: 10px;')
+      && toolsRowDirtySlotBlock.includes('z-index: 4;')
+      && toolsRowDirtySlotBlock.includes('transform: translateY(-50%);')
+      && toolsDirtyChipBlock.includes('white-space: nowrap;')
+      && toolsDirtyChipBlock.includes('background: var(--fab-mv2-surface-1);')
+      && toolsDirtyChipBlock.includes('inset 0 0 0 999px var(--fab-warning-soft),'),
+    'tool row dirty pip should overlay the top-left row corner with an opaque readable surface'
+  );
+  assert.ok(
+    toolsInspectorHeadingBlock.includes('display: flex;') && toolsInspectorHeadingBlock.includes('flex-wrap: wrap;'),
+    'selected tool inspector heading should hold the selected-tool dirty pip'
+  );
+  assert.ok(
+    toolsIdentityDropZoneBlock.includes('border: 1px dashed var(--fab-mv2-border-strong);')
+      && toolsIdentityDropZoneBlock.includes('border-radius: 8px;')
+      && toolsIdentityDropZoneBlock.includes('background: var(--fab-overlay-light-03);'),
+    'mapped tool row identities should present a subtle dashed component drop zone'
+  );
+  assert.ok(
+    toolsIdentityDropZoneActiveBlock.includes('border-color: var(--fab-mv2-accent);')
+      && toolsIdentityDropZoneActiveBlock.includes('background: var(--fab-success-soft);'),
+    'mapped tool row component drop zones should show an active drag-over state'
+  );
+  assert.ok(
+    toolsEmptyStubBlock.includes('min-height: 58px;')
+      && toolsEmptyStubBlock.includes('padding: 18px 14px;'),
+    'tools add stub should be tall enough to work as a drop target'
+  );
+  assert.ok(
+    toolsEmptyStubActiveBlock.includes('.manager-v2-tools-empty-stub.is-drop-active')
+      && toolsEmptyStubActiveBlock.includes('border-color: var(--fab-accent);'),
+    'tools add stub should share hover/focus styling with active drag-over state'
+  );
+  assert.ok(
+    toolsInlineFieldBlock.includes('grid-template-columns: max-content minmax(0, 1fr);')
+      && toolsInlineFieldBlock.includes('align-items: center;'),
+    'tools breakage and on-break controls should keep labels and inputs on one row'
+  );
+  assert.ok(toolsInlineFieldLabelBlock.includes('white-space: nowrap;'), 'tools inline labels should not wrap above their inputs');
+  assert.ok(toolsInlineNumberInputBlock.includes('max-width: 122px;'), 'tools inline number inputs should remain compact without clipping placeholders');
+  assert.ok(toolsMaxUsesInputBlock.includes('max-width: 190px;'), 'tools maximum-uses input should be wide enough for its placeholder');
+  assert.ok(
+    toolsReplacementFieldBlock.includes('grid-template-columns: minmax(0, 1fr);')
+      && !toolsReplacementFieldBlock.includes('max-content')
+      && toolsReplacementFieldBlock.includes('align-items: stretch;')
+      && toolsReplacementFieldBlock.includes('width: 100%;'),
+    'tools replacement component field should fill the editor row without the inline label grid'
+  );
+  assert.ok(
+    toolsReplacementComponentRowBlock.includes('width: 100%;') && toolsReplacementComponentRowBlock.includes('min-width: 0;'),
+    'tools replacement component drop zone should span the full replacement field width'
+  );
+  assert.ok(toolsRequirementExpressionInputBlock.includes('width: 100%;'), 'tools requirement expression should use the full row width');
+  assert.ok(
+    toolsRequirementHelpBlock.includes('font-size: 0.8rem;') && toolsRequirementHelpBlock.includes('line-height: 1.35;'),
+    'tools requirement instructions should be compact helper copy'
+  );
+  assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-tools-requirement-help ul {\n  display: grid;'),
+    'tools requirement examples should be listed compactly'
+  );
+  assert.ok(
+    toolsInlineFieldsBlock.includes('grid-template-columns: minmax(260px, 1fr) minmax(180px, 0.55fr);'),
+    'tools two-input breakage controls should remain side-by-side'
+  );
+  assert.ok(
+    toolsEditorInputBlock.includes('height: 28px;')
+      && toolsEditorInputBlock.includes('min-height: 28px;')
+      && !toolsEditorInputBlock.includes('padding:'),
+    'tools editor broad input sizing should not force specialized padding onto every field'
+  );
+  assert.ok(
+    toolsEditorPercentInputBlock.includes('padding: 0 10px 0 0;'),
+    'tools breakage chance percent input should keep its specialized compact padding'
+  );
   assert.ok(editorBlock.includes('grid-template-rows: auto auto 340px minmax(410px, 1fr) auto;'), 'task edit route should reserve taller component browser and exact three-row drop-rule rows for drag/drop');
   assert.ok(editorWithNoticeBlock.includes('grid-template-rows: auto auto 340px auto minmax(410px, 1fr) auto;'), 'task edit route should give the duplicate-drop warning a compact auto row before drop rules');
   assert.ok(editorBlock.includes('overflow: auto;'), 'task editor should allow vertical scrolling without horizontal overflow');
@@ -651,6 +816,55 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(componentCardGripBlock.includes('letter-spacing: 0;'), 'component grip should avoid viewport-scaled or negative tracking');
   assert.ok(componentBrowserFooterBlock.includes('border-top: 1px solid var(--fab-mv2-border);'), 'component browser should own a pagination footer');
   assert.ok(componentBrowserFooterPaginationBlock.includes('background: transparent;'), 'component browser footer should not nest pagination chrome');
+  assert.ok(
+    toolInspectorActionsBlock.includes('display: grid;')
+      && toolInspectorActionsBlock.includes('grid-template-columns: repeat(2, minmax(0, 1fr));')
+      && toolInspectorActionsBlock.includes('gap: 8px;'),
+    'selected tool inspector actions should sit in a stable two-column action row inside the header card'
+  );
+  assert.ok(toolInspectorActionButtonsBlock.includes('width: 100%;') && toolInspectorActionButtonsBlock.includes('padding: 0 8px;'), 'selected tool inspector action buttons should fill their grid columns without overflowing the right rail');
+  assert.ok(toolInspectorActionButtonLabelBlock.includes('overflow-wrap: anywhere;'), 'selected tool inspector action labels should be allowed to wrap in narrow localized layouts');
+  assert.ok(
+    toolsComponentBrowserBlock.includes('grid-template-rows: auto minmax(96px, 1fr) auto;')
+      && toolsComponentBrowserBlock.includes('gap: 0;')
+      && toolsComponentBrowserBlock.includes('height: clamp(300px, 54vh, 440px);')
+      && toolsComponentBrowserBlock.includes('min-height: 0;')
+      && toolsComponentBrowserBlock.includes('max-height: none;')
+      && toolsComponentBrowserBlock.includes('overflow: hidden;'),
+    'tools component browser should reserve deterministic header, result scroll, and footer rows without forcing a tall inspector card'
+  );
+  assert.ok(toolsComponentBrowserHeaderBlock.includes('padding: 0 0 10px;'), 'tools component browser header should own spacing without creating a large blank scroll gap');
+  assert.ok(
+    toolsComponentBrowserSearchBlock.includes('position: relative;')
+      && toolsComponentBrowserSearchBlock.includes('display: block;')
+      && toolsComponentBrowserSearchBlock.includes('flex: 0 0 auto;')
+      && toolsComponentBrowserSearchBlock.includes('width: 100%;'),
+    'tools component browser search should anchor its icon inside a full-width input box without inheriting the global 260px flex basis as height'
+  );
+  assert.ok(toolsComponentBrowserSearchInputBlock.includes('padding-left: 36px;'), 'tools component browser search input should reserve text inset for the leading search icon');
+  assert.ok(toolsComponentBrowserScrollBlock.includes('padding: 10px 0 12px;') && toolsComponentBrowserScrollBlock.includes('overflow-x: hidden;') && toolsComponentBrowserScrollBlock.includes('overflow-y: auto;'), 'tools component browser results should show complete cards before scrolling without horizontal overflow');
+  assert.ok(toolsComponentBrowserGridBlock.includes('grid-template-columns: minmax(0, 1fr);'), 'tools component browser should keep a one-column card grid in the narrow inspector');
+  assert.ok(toolsComponentBrowserFooterBlock.includes('border-top: 1px solid var(--fab-mv2-border);') && toolsComponentBrowserFooterBlock.includes('background: transparent;'), 'tools component browser footer should separate pagination without adding nested card chrome');
+  assert.ok(
+    toolsComponentBrowserFooterPaginationBlock.includes('display: grid;')
+      && toolsComponentBrowserFooterPaginationBlock.includes('grid-template-columns: minmax(0, 1fr);')
+      && toolsComponentBrowserFooterPaginationBlock.includes('justify-items: center;')
+      && toolsComponentBrowserFooterPaginationBlock.includes('width: 100%;')
+      && toolsComponentBrowserFooterPaginationBlock.includes('border-top: 0;')
+      && toolsComponentBrowserFooterPaginationBlock.includes('background: transparent;'),
+    'tools component browser pagination should fill the footer and center its narrow-card controls'
+  );
+  assert.ok(
+    toolsComponentBrowserFooterSummaryBlock.includes('width: 100%;')
+      && toolsComponentBrowserFooterSummaryBlock.includes('max-width: 100%;')
+      && toolsComponentBrowserFooterSummaryBlock.includes('text-align: center;')
+      && toolsComponentBrowserFooterSummaryBlock.includes('white-space: normal;')
+      && toolsComponentBrowserFooterSummaryBlock.includes('overflow-wrap: anywhere;'),
+    'tools component browser pagination summary should center and wrap within the narrow footer'
+  );
+  assert.ok(toolsComponentBrowserFooterControlsBlock.includes('justify-content: center;') && toolsComponentBrowserFooterControlsBlock.includes('width: 100%;'), 'tools component browser pagination nav and page-size controls should be centered full-width rows');
+  assert.ok(toolsComponentBrowserFooterPageSizeSelectBlock.includes('width: 52px;') && toolsComponentBrowserFooterPageSizeSelectBlock.includes('min-width: 52px;'), 'tools component browser per-page select should stay narrow in the centered footer');
+  assert.ok(toolsComponentBrowserFooterPageBlock.includes('min-width: 0;'), 'tools component browser page label should not force overflow in the narrow inspector');
   assert.ok(dropCardBlock.includes('--fab-mv2-task-drop-table-visible-height: 262px;'), 'drop rules card should define an exact table viewport equal to header plus three rows');
   assert.ok(dropCardBlock.includes('grid-template-rows: auto var(--fab-mv2-task-drop-table-visible-height) auto;'), 'drop rules card should keep the table viewport definite between the card header and footer');
   assert.ok(dropCardBlock.includes('height: 410px;') && dropCardBlock.includes('max-height: 410px;'), 'task editor drop rules card should be exactly tall enough for the three-row table viewport and footer');
@@ -681,6 +895,11 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.equal(selectedDropRowBlock.includes('var(--fab-info'), false, 'selected drop rows should not use the info family');
   assert.equal(selectedDropRowBlock.includes('var(--fab-warning'), false, 'selected drop rows should not use the warning family');
   assert.ok(dropComponentButtonBlock.includes('grid-template-columns: 42px minmax(0, 1fr);') && dropComponentButtonBlock.includes('min-height: 40px;'), 'drop component cells should keep compact thumbnail/name geometry');
+  assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-drop-empty-component {\n  min-height: 52px;\n  padding: 6px 8px;\n  border: 1px dashed var(--fab-mv2-border-strong);'),
+    'empty component placeholders should show the full drop-zone boundary'
+  );
+  assert.ok(dropEmptyComponentIconBlock.includes('border: 0;'), 'empty component placeholders should avoid a nested icon-only dashed border');
   assert.ok(dropComponentCopyBlock.includes('align-content: center;'), 'drop component text should be vertically centered after description removal');
   assert.ok(dropComponentNameBlock.includes('display: -webkit-box;') && dropComponentNameBlock.includes('-webkit-line-clamp: 2;') && dropComponentNameBlock.includes('white-space: normal;'), 'drop component names should wrap to two lines instead of relying on descriptions');
   assert.ok(dropRateBlock.includes('display: block;'), 'drop chance cell should expose one wrapped value');
@@ -689,16 +908,70 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(css.includes('--fab-drop-rate-none: #E26F6B;'), 'drop chance slider should define a distinct exact-zero colour token');
   assert.ok(dropRatePercentInputBlock.includes('height: 28px;') && dropRatePercentInputBlock.includes('box-sizing: border-box;') && dropRatePercentInputBlock.includes('padding: 4px 16px 4px 2px;') && dropRatePercentInputBlock.includes('text-align: center;'), 'drop chance row percent should keep its existing compact centered editable numeric field');
   assert.ok(dropRatePercentInputOverrideBlock.includes('min-height: 28px;') && dropRatePercentInputOverrideBlock.includes('padding: 4px 16px 4px 2px;') && dropRatePercentInputOverrideBlock.includes('box-shadow: none;'), 'drop chance row percent should override generic gathering task input chrome without affecting other fields');
-  assert.ok(dropRatePercentSuffixBlock.includes('position: absolute;') && dropRatePercentSuffixBlock.includes('right: 7px;') && dropRatePercentSuffixBlock.includes('pointer-events: none;'), 'drop chance row percent suffix should keep its existing placement');
+  assert.ok(
+    css.includes('.fabricate-manager-v2 .manager-v2-drop-rate-percent > span[aria-hidden="true"] {\n  position: absolute;\n  right: 6px;')
+      && css.includes('pointer-events: none;'),
+    'drop chance row percent suffix should keep its existing placement'
+  );
   assert.ok(dropRateControlBlock.includes('--fab-drop-rate-value: 1%;') && dropRateControlBlock.includes('--fab-drop-rate-color: var(--fab-drop-rate-very-rare);'), 'drop chance slider should expose value and tier colour variables');
   assert.ok(dropRateTrackBlock.includes('background: var(--fab-overlay-dark-18);') && dropRateTrackBlock.includes('overflow: hidden;'), 'drop chance slider should render a neutral clipped track under the native range input');
   assert.ok(dropRateFillBlock.includes('width: var(--fab-drop-rate-value);') && dropRateFillBlock.includes('background: var(--fab-drop-rate-color);'), 'drop chance slider should fill the active track segment with the current tier colour');
   assert.ok(dropRateRangeBlock.includes('appearance: none;') && dropRateRangeBlock.includes('-webkit-appearance: none;'), 'drop chance range should clear native host slider rendering');
-  assert.ok(dropRateRangeBlock.includes('accent-color: var(--fab-drop-rate-color);') && dropRateRangeBlock.includes('background: transparent;'), 'drop chance native range should inherit the current tier colour without adding row chrome');
+  assert.ok(dropRateRangeBlock.includes('accent-color: var(--fab-drop-rate-color);'), 'drop chance native range should inherit the current tier colour');
   assert.ok(dropRateWebkitTrackBlock.includes('border: 1px solid var(--fab-overlay-light-10);') && dropRateWebkitTrackBlock.includes('background: transparent;'), 'drop chance row WebKit range track should keep its existing native track geometry');
   assert.ok(blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-moz-range-track').includes('border: 1px solid var(--fab-overlay-light-10);'), 'drop chance row Firefox range track should keep its existing native track geometry');
   assert.ok(dropRateMozProgressBlock.includes('background: var(--fab-drop-rate-color);'), 'drop chance Firefox progress should paint the active segment in the current tier colour');
   assert.ok(dropRateWebkitThumbBlock.includes('background: var(--fab-drop-rate-color);') && dropRateMozThumbBlock.includes('background: var(--fab-drop-rate-color);'), 'drop chance range thumbs should retain current-tier colour');
+  assert.ok(
+    toolBreakageChanceControlBlock.includes('--fab-tool-breakage-chance-thumb-radius: 7px;')
+      && toolBreakageChanceControlBlock.includes('--fab-tool-breakage-chance-low: var(--fab-success);')
+      && toolBreakageChanceControlBlock.includes('--fab-tool-breakage-chance-mid: var(--fab-warning);')
+      && toolBreakageChanceControlBlock.includes('--fab-tool-breakage-chance-high: var(--fab-danger);')
+      && toolBreakageChanceControlBlock.includes('--fab-tool-breakage-chance-track: linear-gradient('),
+    'tool breakage chance slider should define a semantic green-yellow-red scale from theme tokens'
+  );
+  assert.ok(
+    toolBreakageChanceControlBlock.includes('90deg')
+      && toolBreakageChanceControlBlock.includes('var(--fab-tool-breakage-chance-low) 0%')
+      && toolBreakageChanceControlBlock.includes('var(--fab-tool-breakage-chance-mid) 50%')
+      && toolBreakageChanceControlBlock.includes('var(--fab-tool-breakage-chance-high) 100%'),
+    'tool breakage chance slider should define the full green-yellow-red gradient across the whole rail'
+  );
+  assert.ok(
+    toolBreakageChanceControlBlock.includes('height: 28px;')
+      && toolBreakageChanceControlBlock.includes('min-height: 28px;')
+      && toolBreakageChanceControlBlock.includes('padding: 0 var(--fab-tool-breakage-chance-thumb-radius);')
+      && toolBreakageChanceControlBlock.includes('border: 1px solid var(--fab-mv2-border);')
+      && toolBreakageChanceControlBlock.includes('border-radius: 6px;')
+      && toolBreakageChanceControlBlock.includes('background: var(--fab-overlay-dark-18);')
+      && toolBreakageChanceControlBlock.includes('box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);')
+      && toolBreakageChanceControlBlock.includes('overflow: hidden;'),
+    'tool breakage chance slider should keep the framed control chrome used by gathering task editing'
+  );
+  assert.ok(
+    toolBreakageChanceTrackBlock.includes('left: var(--fab-tool-breakage-chance-thumb-radius);')
+      && toolBreakageChanceTrackBlock.includes('right: var(--fab-tool-breakage-chance-thumb-radius);')
+      && toolBreakageChanceTrackBlock.includes('border: 0;')
+      && toolBreakageChanceTrackBlock.includes('background: var(--fab-tool-breakage-chance-track);'),
+    'tool breakage chance custom rail should be inset to the thumb radius and paint the semantic gradient without endpoint tails'
+  );
+  assert.ok(toolBreakageChanceFillBlock.includes('display: none;'), 'tool breakage chance slider should not render a tier-coloured filled segment over the full gradient');
+  assert.ok(
+    toolBreakageChanceRangeBlock.includes('padding: 0;')
+      && toolBreakageChanceRangeBlock.includes('background: transparent;')
+      && toolBreakageChanceRangeBlock.includes('box-shadow: none;')
+      && toolBreakageChanceRangeBlock.includes('accent-color: var(--fab-tool-breakage-chance-color);'),
+    'tool breakage chance native range should not cover the custom rail and should use the dynamic current-risk colour'
+  );
+  assert.ok(
+    toolBreakageChanceWebkitTrackBlock.includes('border: 0;')
+      && toolBreakageChanceWebkitTrackBlock.includes('background: transparent;')
+      && toolBreakageChanceMozTrackBlock.includes('border: 0;')
+      && toolBreakageChanceMozTrackBlock.includes('background: transparent;'),
+    'tool breakage chance native tracks should stay transparent so the inset custom rail is the only visible rail'
+  );
+  assert.ok(toolBreakageChanceWebkitThumbBlock.includes('background: var(--fab-tool-breakage-chance-color);') && toolBreakageChanceMozThumbBlock.includes('background: var(--fab-tool-breakage-chance-color);'), 'tool breakage chance slider thumbs should use the dynamic current-risk colour');
+  assert.ok(toolBreakageChanceMozProgressBlock.includes('background: transparent;'), 'tool breakage chance Firefox native progress should not draw over the full gradient rail');
   assert.ok(
     guaranteedDropRateControlBlock.includes('var(--fab-drop-rate-guaranteed)')
       && commonDropRateControlBlock.includes('var(--fab-drop-rate-common)')
@@ -727,7 +1000,8 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(dropEditorRateControlBlock.includes('height: 28px;') && dropEditorRateControlBlock.includes('padding: 0 7px;') && dropEditorRateControlBlock.includes('background: var(--fab-overlay-dark-18);') && dropEditorRateControlBlock.includes('overflow: hidden;'), 'selected drop inspector slider should own the dark backing box instead of relying on native range chrome');
   assert.ok(dropEditorRateTrackBlock.includes('left: 7px;') && dropEditorRateTrackBlock.includes('right: 7px;') && dropEditorRateTrackBlock.includes('border: 0;') && dropEditorRateTrackBlock.includes('background: var(--fab-overlay-dark-18);'), 'selected drop inspector custom track should be inset to the thumb radius to avoid endpoint tails');
   assert.ok(dropEditorRateFillBlock.includes('border-radius: 999px;'), 'selected drop inspector fill should be rounded without relying on a wider track border');
-  assert.equal(css.includes('linear-gradient'), false, 'drop chance slider styling should keep the flat-ui no-gradient contract');
+  assert.equal(dropRateTrackBlock.includes('linear-gradient'), false, 'drop chance slider styling should keep the flat-ui no-gradient contract');
+  assert.equal(dropEditorRateTrackBlock.includes('linear-gradient'), false, 'selected drop inspector slider styling should keep the flat-ui no-gradient contract');
   assert.ok(dropEditorRateRangeBlock.includes('height: 26px;') && dropEditorRateRangeBlock.includes('padding: 0;') && dropEditorRateRangeBlock.includes('background: transparent;') && dropEditorRateRangeBlock.includes('box-shadow: none;'), 'selected drop inspector native range should remain a transparent thumb hit target over the custom track');
   assert.ok(dropEditorRateWebkitTrackBlock.includes('border: 0;') && dropEditorRateWebkitTrackBlock.includes('background: transparent;'), 'selected drop inspector WebKit native range track should not draw over the custom track');
   assert.ok(dropEditorRateMozTrackBlock.includes('border: 0;') && dropEditorRateMozTrackBlock.includes('background: transparent;'), 'selected drop inspector Firefox native range track should not draw over the custom track');

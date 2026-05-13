@@ -321,6 +321,7 @@ export class GatheringEnvironmentStore {
       itemSelectionMode: ['highestRankedDrop', 'allDrops'].includes(data?.itemSelectionMode) ? data.itemSelectionMode : 'highestRankedDrop',
       dropRows: Array.isArray(data?.dropRows ?? data?.itemDrops) ? (data.dropRows ?? data.itemDrops).map(row => normalizeDropRow(row, this.randomID)) : [],
       catalysts: Array.isArray(data?.catalysts) ? data.catalysts.map(catalyst => normalizeCatalyst(catalyst)) : [],
+      tools: Array.isArray(data?.tools) ? data.tools.map(tool => normalizeTool(tool)) : [],
       resultGroups: Array.isArray(data?.resultGroups) ? data.resultGroups.map(group => this._normalizeResultGroup(group)) : []
     };
 
@@ -472,6 +473,7 @@ export class GatheringEnvironmentStore {
     }
 
     errors.push(...validateCatalysts(task.catalysts, `Task "${label}"`, originalTask?.catalysts));
+    errors.push(...validateTools(task.tools, `Task "${label}"`, originalTask?.tools));
     if (task.resolutionMode !== 'd100') {
       errors.push(...validateResultGroupNames(task.resultGroups, `Task "${label}"`));
     }
@@ -687,6 +689,125 @@ function validateCatalysts(catalysts, label, originalCatalysts = catalysts) {
       (!Number.isInteger(maxUses) || maxUses < 1)
     ) {
       errors.push(`${catalystLabel} maxUses must be a positive integer when set`);
+    }
+  });
+  return errors;
+}
+
+const TOOL_BREAKAGE_MODES = new Set(['limitedUses', 'breakageChance', 'diceExpression']);
+const TOOL_ON_BREAK_MODES = new Set(['destroy', 'flagBroken', 'replaceWith']);
+const TOOL_REQUIREMENT_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
+
+function normalizeToolRequirement(input) {
+  if (input === null || input === undefined) return null;
+  if (typeof input !== 'object') return null;
+  const provider = TOOL_REQUIREMENT_PROVIDERS.has(input.provider) ? input.provider : 'dnd5e';
+  return {
+    provider,
+    formula: typeof input.formula === 'string' ? input.formula : '',
+    macroUuid: typeof input.macroUuid === 'string' ? input.macroUuid : ''
+  };
+}
+
+function normalizeToolBreakage(input) {
+  const mode = TOOL_BREAKAGE_MODES.has(input?.mode) ? input.mode : 'limitedUses';
+  if (mode === 'limitedUses') {
+    const raw = input?.maxUses;
+    const isSet = raw !== null && raw !== undefined && raw !== '';
+    const numeric = isSet ? Number(raw) : null;
+    return { mode, maxUses: Number.isFinite(numeric) ? numeric : null };
+  }
+  if (mode === 'breakageChance') {
+    const numeric = Number(input?.breakageChance);
+    return { mode, breakageChance: Number.isFinite(numeric) ? numeric : 0 };
+  }
+  const numericThreshold = Number(input?.threshold);
+  return {
+    mode,
+    formula: typeof input?.formula === 'string' ? input.formula : '',
+    threshold: Number.isFinite(numericThreshold) ? numericThreshold : 0
+  };
+}
+
+function normalizeToolOnBreak(input) {
+  const mode = TOOL_ON_BREAK_MODES.has(input?.mode) ? input.mode : 'destroy';
+  if (mode === 'replaceWith') {
+    return {
+      mode,
+      replacementComponentId: typeof input?.replacementComponentId === 'string' ? input.replacementComponentId : null
+    };
+  }
+  return { mode };
+}
+
+function normalizeTool(data = {}) {
+  return {
+    componentId: normalizeOptionalString(data?.componentId ?? data?.systemItemId),
+    requirement: data?.requirement === undefined ? null : normalizeToolRequirement(data?.requirement),
+    breakage: normalizeToolBreakage(data?.breakage),
+    onBreak: normalizeToolOnBreak(data?.onBreak)
+  };
+}
+
+function validateTools(tools, label, originalTools = tools) {
+  if (!Array.isArray(tools)) return [];
+  const errors = [];
+  tools.forEach((tool, index) => {
+    const toolLabel = `${label} tool ${index + 1}`;
+    const original = Array.isArray(originalTools) ? originalTools[index] : tool;
+
+    if (!tool?.componentId) {
+      errors.push(`${toolLabel} requires componentId`);
+    }
+
+    if (tool?.requirement) {
+      const provider = tool.requirement.provider;
+      if (!TOOL_REQUIREMENT_PROVIDERS.has(provider)) {
+        errors.push(`${toolLabel} requirement.provider must be dnd5e, pf2e, or macro`);
+      } else if (provider === 'macro') {
+        if (!tool.requirement.macroUuid) {
+          errors.push(`${toolLabel} requirement.macroUuid is required when provider is macro`);
+        }
+      } else if (!tool.requirement.formula) {
+        errors.push(`${toolLabel} requirement.formula is required for system providers`);
+      }
+    }
+
+    const mode = tool?.breakage?.mode;
+    if (!TOOL_BREAKAGE_MODES.has(mode)) {
+      errors.push(`${toolLabel} breakage.mode must be limitedUses, breakageChance, or diceExpression`);
+    } else if (mode === 'limitedUses') {
+      const rawMaxUses = original?.breakage?.maxUses ?? tool?.breakage?.maxUses;
+      const isSet = rawMaxUses !== null && rawMaxUses !== undefined && rawMaxUses !== '';
+      if (isSet) {
+        const numeric = Number(rawMaxUses);
+        if (!Number.isInteger(numeric) || numeric < 1) {
+          errors.push(`${toolLabel} breakage.maxUses must be null or a positive integer`);
+        }
+      }
+    } else if (mode === 'breakageChance') {
+      const value = tool.breakage.breakageChance;
+      if (!Number.isInteger(value) || value < 0 || value > 100) {
+        errors.push(`${toolLabel} breakage.breakageChance must be an integer between 0 and 100`);
+      }
+    } else if (mode === 'diceExpression') {
+      if (!tool.breakage.formula) {
+        errors.push(`${toolLabel} breakage.formula is required for diceExpression mode`);
+      }
+      if (!Number.isFinite(tool.breakage.threshold)) {
+        errors.push(`${toolLabel} breakage.threshold must be a finite number`);
+      }
+    }
+
+    const onBreakMode = tool?.onBreak?.mode;
+    if (!TOOL_ON_BREAK_MODES.has(onBreakMode)) {
+      errors.push(`${toolLabel} onBreak.mode must be destroy, flagBroken, or replaceWith`);
+    } else if (onBreakMode === 'replaceWith') {
+      if (!tool.onBreak.replacementComponentId) {
+        errors.push(`${toolLabel} onBreak.replacementComponentId is required for replaceWith mode`);
+      } else if (tool.onBreak.replacementComponentId === tool.componentId) {
+        errors.push(`${toolLabel} onBreak.replacementComponentId must differ from componentId`);
+      }
     }
   });
   return errors;

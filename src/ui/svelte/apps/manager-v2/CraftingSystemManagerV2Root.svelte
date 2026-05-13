@@ -9,7 +9,9 @@
   import EssenceBrowserView from './EssenceBrowserView.svelte';
   import EssenceEditView from './EssenceEditView.svelte';
   import GatheringTaskEditView from './GatheringTaskEditView.svelte';
+  import ToolsBrowserView from './ToolsBrowserView.svelte';
   import EssenceSourceSelector from '../../components/EssenceSourceSelector.svelte';
+  import Pagination from '../../components/Pagination.svelte';
   import RecipesBrowserView from './RecipesBrowserView.svelte';
   import SystemEditView from './SystemEditView.svelte';
   import SystemsBrowserView from './SystemsBrowserView.svelte';
@@ -41,6 +43,9 @@
   let gatheringTaskDraftBaseline = $state(null);
   let gatheringTaskSaving = $state(false);
   let gatheringTaskSaveError = $state('');
+  let toolsComponentSearchTerm = $state('');
+  let toolsComponentPageIndex = $state(0);
+  let toolsComponentPageSize = $state(6);
   const placeholderViews = [
     { id: 'rules', icon: 'fas fa-sliders-h', labelKey: 'FABRICATE.Admin.ManagerV2.Nav.Rules', fallback: 'Rules' },
     { id: 'graph', icon: 'fas fa-project-diagram', labelKey: 'FABRICATE.Admin.ManagerV2.Nav.Graph', fallback: 'Graph' }
@@ -62,6 +67,16 @@
     recipeCategories: selectedSystem?.categories?.length || 0
   });
   const itemCards = $derived($viewState.itemCards || []);
+  const toolsComponentCards = $derived(Array.isArray(itemCards) ? itemCards : []);
+  const toolsNormalizedComponentSearchTerm = $derived(toolsComponentSearchTerm.trim().toLowerCase());
+  const toolsFilteredComponentCards = $derived(toolsComponentCards.filter(item => {
+    const name = String(item?.name || '').toLowerCase();
+    return !toolsNormalizedComponentSearchTerm || name.includes(toolsNormalizedComponentSearchTerm);
+  }));
+  const toolsPaginatedComponentCards = $derived(toolsFilteredComponentCards.slice(
+    toolsComponentPageIndex * toolsComponentPageSize,
+    (toolsComponentPageIndex + 1) * toolsComponentPageSize
+  ));
   const tagCategoryUsage = $derived(buildTagCategoryUsage(selectedSystem, $viewState.recipes || [], itemCards));
   const categoryRows = $derived(buildCategoryRows(selectedSystem?.categories || [], tagCategoryUsage.categoryUsage));
   const tagRows = $derived(buildTagRows(selectedSystem?.itemTags || [], tagCategoryUsage.tagUsage));
@@ -392,10 +407,12 @@
     rewardLimit: 1,
     hazardSelectionMode: 'allDrops',
     hazardLimit: 1,
-    hazardPolicy: 'successWithHazard'
+    hazardPolicy: 'successWithHazard',
+    toolBreakagePolicy: 'failureOnBreak'
   });
   const selectedGatheringSystemConfig = $derived($viewState.gatheringConfig?.systems?.[selectedSystemId] || {});
   const gatheringTaskDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.tasks) ? selectedGatheringSystemConfig.tasks : []);
+  const selectedGatheringSystemTools = $derived(Array.isArray(selectedGatheringSystemConfig.tools) ? selectedGatheringSystemConfig.tools : []);
   const selectedGatheringTask = $derived(
     gatheringTaskDefinitions.find(task => task.id === selectedGatheringTaskId)
       || gatheringTaskDefinitions[0]
@@ -414,6 +431,20 @@
   const gatheringTaskValidation = $derived(
     gatheringTaskDraft
       ? (store.validateGatheringLibraryTask?.(gatheringTaskDraft) || { valid: true, errors: [] })
+      : { valid: true, errors: [] }
+  );
+
+  const libraryToolsList = $derived(Array.isArray($viewState.toolsDraft) ? $viewState.toolsDraft : []);
+  const dirtyToolIds = $derived(Array.isArray($viewState.toolsDraftDirtyToolIds) ? $viewState.toolsDraftDirtyToolIds : []);
+  const selectedLibraryTool = $derived(
+    libraryToolsList.find(tool => tool.id === $viewState.toolsDraftSelectedToolId) || null
+  );
+  const selectedLibraryToolDirty = $derived(
+    selectedLibraryTool ? dirtyToolIds.includes(selectedLibraryTool.id) : false
+  );
+  const selectedToolDraftValidation = $derived(
+    currentView === 'tools' && selectedLibraryTool
+      ? (store.validateToolDraft?.(selectedLibraryTool.id) || { valid: true, errors: [] })
       : { valid: true, errors: [] }
   );
 
@@ -444,6 +475,7 @@
     gatheringTaskSaving = false;
     gatheringTaskSaveError = '';
     gatheringMenuExpanded = isGatheringRoute;
+    store?.cancelToolsDraft?.();
     lastGatheringSystemId = selectedSystemId;
   });
 
@@ -484,9 +516,33 @@
     return () => services?.registerEssenceDirtyGuard?.(null);
   });
 
+  $effect(() => {
+    if (toolsComponentPageIndex > 0 && toolsComponentPageIndex * toolsComponentPageSize >= toolsFilteredComponentCards.length) toolsComponentPageIndex = 0;
+  });
+
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
+  }
+
+  function toolsComponentCardImage(item) {
+    return item?.img || 'icons/svg/item-bag.svg';
+  }
+
+  function toolsComponentDescription(item) {
+    return String(item?.description || '').trim();
+  }
+
+  function onToolsComponentSearchInput(event) {
+    toolsComponentSearchTerm = event.currentTarget.value;
+    toolsComponentPageIndex = 0;
+  }
+
+  function onToolsComponentDragStart(item, event) {
+    const componentId = String(item?.id || '').trim();
+    if (!componentId) return;
+    event.dataTransfer?.setData?.('text/plain', JSON.stringify({ type: 'FabricateManagedComponent', componentId }));
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'copy';
   }
 
   function gatheringDropModeLabel(mode) {
@@ -680,6 +736,7 @@
       ? text('FABRICATE.Admin.ManagerV2.Essence.CreateTitle', 'Create essence')
       : text('FABRICATE.Admin.ManagerV2.Essence.EditTitle', 'Edit essence');
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksTitle', 'Gathering Tasks');
+    if (currentView === 'tools') return text('FABRICATE.Admin.ManagerV2.Tools.Title', 'Tools');
     if (currentView === 'environments') return text('FABRICATE.Admin.ManagerV2.Environment.Title', 'Environments');
     if (currentView === 'environment-edit') return text('FABRICATE.Admin.ManagerV2.Environment.EditTitle', 'Edit environment');
     if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EditTitle', 'Edit gathering task');
@@ -698,6 +755,7 @@
     if (currentView === 'essence-edit' && showEssenceSourceUi) return text('FABRICATE.Admin.ManagerV2.Essence.EditSubtitle', 'Update identity, icon, and source linkage for this essence.');
     if (currentView === 'essence-edit') return text('FABRICATE.Admin.ManagerV2.Essence.EditNoSourceSubtitle', 'Update identity and icon for this essence.');
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksHint', 'Browse gathering tasks before attaching them to environments.');
+    if (currentView === 'tools') return text('FABRICATE.Admin.ManagerV2.Tools.Subtitle', 'Manage reusable gathering tools and configure how they behave when required by tasks.');
     if (currentView === 'environments') return text('FABRICATE.Admin.ManagerV2.Environment.Subtitle', 'Manage gathering environments for the selected crafting system.');
     if (currentView === 'environment-edit') return text('FABRICATE.Admin.ManagerV2.Environment.EditSubtitle', 'Edit scene linkage, environment details, tasks, results, catalysts, visibility, timing, and validation in the v2 workspace.');
     if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EditSubtitle', 'Edit availability, identity, and drop rules for the selected gathering task.');
@@ -735,6 +793,7 @@
     if (currentView === 'tags') return text('FABRICATE.Admin.ManagerV2.TagsCategories.Actions', 'Tags and categories actions');
     if (currentView === 'essences' || currentView === 'essence-edit') return text('FABRICATE.Admin.ManagerV2.Essence.Actions', 'Essence actions');
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Actions', 'Gathering task actions');
+    if (currentView === 'tools') return text('FABRICATE.Admin.ManagerV2.Tools.Actions', 'Tools actions');
     if (currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit') return text('FABRICATE.Admin.ManagerV2.Environment.Actions', 'Environment actions');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.ManagerV2.SystemEdit.Actions', 'System edit actions');
     return text('FABRICATE.Admin.ManagerV2.SystemActions', 'System actions');
@@ -746,6 +805,7 @@
     if (currentView === 'tags') return text('FABRICATE.Admin.ManagerV2.TagsCategories.Inspector', 'Tags and categories inspector');
     if (currentView === 'essences' || currentView === 'essence-edit') return text('FABRICATE.Admin.ManagerV2.Essence.Inspector', 'Selected essence inspector');
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Inspector', 'Selected gathering task inspector');
+    if (currentView === 'tools') return text('FABRICATE.Admin.ManagerV2.Tools.Inspector', 'Selected tool inspector');
     if (currentView === 'environments') return text('FABRICATE.Admin.ManagerV2.Environment.Inspector', 'Selected environment inspector');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.ManagerV2.SystemEdit.Inspector', 'System edit evidence');
     return text('FABRICATE.Admin.ManagerV2.SelectedSystemInspector', 'Selected system inspector');
@@ -849,17 +909,57 @@
   function continueRouteExitAfterEssence(nextView) {
     const componentResult = confirmComponentRouteExit(nextView);
     if (isPromise(componentResult)) {
-      return componentResult.then(value => value === false ? false : confirmGatheringTaskRouteExit(nextView));
+      return componentResult.then(value => value === false ? false : continueRouteExitAfterComponent(nextView));
     }
     if (componentResult === false) return false;
-    return confirmGatheringTaskRouteExit(nextView);
+    return continueRouteExitAfterComponent(nextView);
+  }
+
+  function continueRouteExitAfterComponent(nextView) {
+    const taskResult = confirmGatheringTaskRouteExit(nextView);
+    if (isPromise(taskResult)) {
+      return taskResult.then(value => value === false ? false : confirmToolsRouteExit(nextView));
+    }
+    if (taskResult === false) return false;
+    return confirmToolsRouteExit(nextView);
+  }
+
+  async function finishToolsRouteExit(action) {
+    if (action === 'save') {
+      const saved = await store?.saveAllDirtyToolDrafts?.();
+      if (saved === false) return false;
+      store?.cancelToolsDraft?.();
+      return true;
+    }
+    if (action === 'discard' || action === true) {
+      store?.cancelToolsDraft?.();
+      return true;
+    }
+    return false;
+  }
+
+  function confirmToolsRouteExit(nextView) {
+    if (activeView !== 'tools') return true;
+    if (nextView === 'tools') return true;
+    if (!store?.isToolsDraftDirty?.()) {
+      store?.cancelToolsDraft?.();
+      return true;
+    }
+    const confirmation = services?.confirmDirtyToolsNavigation
+      ? services.confirmDirtyToolsNavigation({ dirtyCount: dirtyToolIds.length })
+      : store?.confirmDiscardDirtyToolsDraft?.();
+    if (isPromise(confirmation)) return confirmation.then(finishToolsRouteExit);
+    return finishToolsRouteExit(confirmation);
   }
 
   function setView(view) {
-    if ((view === 'recipes' || view === 'components' || view === 'component-edit' || view === 'tags' || view === 'system-edit') && !selectedSystem) return;
+    if ((view === 'recipes' || view === 'components' || view === 'component-edit' || view === 'tags' || view === 'system-edit' || view === 'tools') && !selectedSystem) return;
     if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit') && !canShowEnvironments) return;
     if ((view === 'essences' || view === 'essence-edit') && !canShowEssences) return;
-    afterTruthyResult(confirmRouteExit(view), () => { activeView = view; });
+    afterTruthyResult(confirmRouteExit(view), () => {
+      activeView = view;
+      if (view === 'tools') store?.enterToolsDraft?.(selectedSystemId);
+    });
   }
 
   function selectSystem(systemId, nextView = 'systems') {
@@ -1336,6 +1436,19 @@
     return store.updateGatheringLibraryTask?.(selectedSystemId, selectedGatheringTask.id, updates);
   }
 
+  function addToolReferenceToSelectedTask(toolId) {
+    if (!editingGatheringTask || !toolId) return;
+    const existing = Array.isArray(editingGatheringTask.toolIds) ? editingGatheringTask.toolIds : [];
+    if (existing.includes(toolId)) return;
+    updateSelectedGatheringTask({ toolIds: [...existing, toolId] });
+  }
+
+  function removeToolReferenceFromSelectedTask(toolId) {
+    if (!editingGatheringTask || !toolId) return;
+    const existing = Array.isArray(editingGatheringTask.toolIds) ? editingGatheringTask.toolIds : [];
+    updateSelectedGatheringTask({ toolIds: existing.filter(id => id !== toolId) });
+  }
+
   function gatheringDropRowId() {
     return `drop-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
   }
@@ -1401,6 +1514,18 @@
     updateGatheringTaskDrop(rowId, { componentId: item.id, itemUuid: '', name: '', enabled: true });
     selectedGatheringDropId = rowId;
     return true;
+  }
+
+  async function addToolFromDrop(data) {
+    if (!data) return false;
+    if (data.type === 'FabricateManagedComponent') {
+      const componentId = data.componentId || data.id;
+      if (!componentId) return false;
+      return store.addToolToDraft?.({ componentId }) ?? false;
+    }
+    const item = await services?.importSingleManagedItemFromDrop?.(data);
+    if (!item?.id) return false;
+    return store.addToolToDraft?.({ componentId: item.id }) ?? false;
   }
 
   function gatheringConditionOptions(kind) {
@@ -1483,6 +1608,18 @@
       gatheringMenuExpanded = true;
       activeView = 'environments';
     });
+  }
+
+  async function saveSelectedToolDraft() {
+    const toolId = $viewState.toolsDraftSelectedToolId;
+    if (!toolId || !store?.saveToolDraft) return;
+    await store.saveToolDraft(toolId);
+  }
+
+  function deleteSelectedLibraryTool() {
+    const toolId = $viewState.toolsDraftSelectedToolId;
+    if (!toolId) return;
+    store?.deleteToolFromDraft?.(toolId);
   }
 
   function activateGatheringParent() {
@@ -2165,6 +2302,10 @@
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EditBreadcrumb', 'Edit gathering task')}</span>
         {/if}
+        {#if currentView === 'tools'}
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.ManagerV2.Nav.Tools', 'Tools')}</span>
+        {/if}
         {#if currentView === 'system-edit'}
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.ManagerV2.SystemEdit.Breadcrumb', 'System settings')}</span>
@@ -2173,6 +2314,7 @@
       <h1 class="manager-v2-title">{viewTitle()}</h1>
       <p class="manager-v2-subtitle">{viewSubtitle()}</p>
     </div>
+    {#if currentView !== 'tools'}
     <div class="manager-v2-header-actions" aria-label={headerActionsLabel()}>
       {#if currentView === 'recipes'}
         <button type="button" class="manager-v2-button" onclick={importRecipes} disabled={!selectedSystemId}>
@@ -2300,6 +2442,7 @@
         </button>
       {/if}
     </div>
+    {/if}
   </header>
 
   <div class="manager-v2-body">
@@ -2353,6 +2496,10 @@
               <span class="manager-v2-nav-count">{selectedCounts.essences}</span>
             </button>
           {/if}
+          <button type="button" class={`manager-v2-nav-button ${currentView === 'tools' ? 'is-active' : ''}`} aria-current={currentView === 'tools' ? 'page' : undefined} onclick={() => setView('tools')}>
+            <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
+            <span class="manager-v2-nav-label">{text('FABRICATE.Admin.ManagerV2.Nav.Tools', 'Tools')}</span>
+          </button>
           {#if canShowEnvironments}
             <div class={`manager-v2-nav-group ${gatheringMenuExpanded ? 'is-expanded' : ''}`}>
               <button
@@ -2521,6 +2668,7 @@
         selectedDropId={selectedGatheringDrop?.id || selectedGatheringDropId}
         rewardRules={selectedGatheringRules}
         characterModifierLibrary={selectedGatheringCharacterModifiers}
+        libraryTools={selectedGatheringSystemTools}
         onPickImagePath={services?.pickImagePath}
         onUpdateTask={updateSelectedGatheringTask}
         onSelectDrop={(rowId) => { selectedGatheringDropId = rowId; }}
@@ -2531,6 +2679,23 @@
         onAddModifier={addGatheringDropModifier}
         onUpdateModifier={updateGatheringDropModifier}
         onDeleteModifier={deleteGatheringDropModifier}
+        onAddToolReference={addToolReferenceToSelectedTask}
+        onRemoveToolReference={removeToolReferenceFromSelectedTask}
+      />
+    {:else if currentView === 'tools' && selectedSystem}
+      <ToolsBrowserView
+        tools={$viewState.toolsDraft || []}
+        selectedToolId={$viewState.toolsDraftSelectedToolId || ''}
+        expandedToolId={$viewState.toolsDraftExpandedToolId || ''}
+        dirtyToolIds={dirtyToolIds}
+        managedItemOptions={selectedSystem?.managedItemOptions || []}
+        onSelectTool={(id) => store.selectDraftTool?.(id)}
+        onExpandTool={(id) => store.setExpandedDraftTool?.(id)}
+        onToggleExpand={(id) => store.setExpandedDraftTool?.(id === $viewState.toolsDraftExpandedToolId ? '' : id)}
+        onAddTool={(initialPatch) => initialPatch ? store.addToolToDraft?.(initialPatch) : store.addToolToDraft?.()}
+        onAddToolDrop={addToolFromDrop}
+        onUpdateTool={(id, patch) => store.updateToolInDraft?.(id, patch)}
+        onDeleteTool={(id) => store.deleteToolFromDraft?.(id)}
       />
     {:else if currentView === 'essences' && selectedSystem}
       <EssenceBrowserView
@@ -3138,6 +3303,20 @@
                   </select>
                 </span>
               </div>
+
+              <div class="manager-v2-rule-row">
+                <span class="manager-v2-rule-icon" aria-hidden="true"><i class="fas fa-screwdriver-wrench"></i></span>
+                <label class="manager-v2-rule-copy" for="manager-v2-gathering-rule-tool-breakage">
+                  <strong>{text('FABRICATE.Admin.ManagerV2.Environment.Rules.ToolBreakageOutcome', 'Tool breakage outcome')}</strong>
+                  <span>{text('FABRICATE.Admin.ManagerV2.Environment.Rules.ToolBreakageDescription', 'Decide whether a broken tool fails the gathering attempt or only reports the breakage.')}</span>
+                </label>
+                <span class="manager-v2-rule-field">
+                  <select id="manager-v2-gathering-rule-tool-breakage" value={selectedGatheringRules.toolBreakagePolicy ?? 'failureOnBreak'} onchange={(event) => updateSelectedGatheringRules({ toolBreakagePolicy: event.target.value })}>
+                    <option value="failureOnBreak">{text('FABRICATE.Admin.ManagerV2.Environment.Rules.ToolFailureOnBreak', 'Attempt fails on break')}</option>
+                    <option value="successDespiteBreak">{text('FABRICATE.Admin.ManagerV2.Environment.Rules.ToolSuccessDespiteBreak', 'Attempt succeeds despite break')}</option>
+                  </select>
+                </span>
+              </div>
             </div>
           </section>
         {:else if currentView === 'environments' && activeGatheringInspectorTab}
@@ -3613,6 +3792,119 @@
               <i class="fas fa-scroll" aria-hidden="true"></i>
               <h3>{text('FABRICATE.Admin.ManagerV2.Recipe.SelectRecipe', 'Select a recipe')}</h3>
               <p>{text('FABRICATE.Admin.ManagerV2.Recipe.InspectorHint', 'The inspector shows recipe status, structure, and requirements for the selected row.')}</p>
+            </div>
+          </div>
+        {/if}
+      {:else if currentView === 'tools'}
+        {#if selectedLibraryTool}
+          {@const toolImageSrc = (selectedSystem?.managedItemOptions || []).find(item => String(item.id) === String(selectedLibraryTool.componentId))?.img || 'icons/svg/item-bag.svg'}
+          {@const toolComponent = (selectedSystem?.managedItemOptions || []).find(item => String(item.id) === String(selectedLibraryTool.componentId))}
+          <section class="manager-v2-inspector-card" data-manager-v2-tool-inspector>
+            <div class="manager-v2-inspector-title-row is-hero-large">
+              <img class="manager-v2-recipe-preview" src={toolImageSrc} alt="" />
+              <div class="manager-v2-inspector-copy">
+                <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Tools.SelectedKicker', 'Selected tool')}</p>
+                <div class="manager-v2-tool-inspector-heading">
+                  <h2 class="manager-v2-inspector-name" title={selectedLibraryTool.label || toolComponent?.name || ''}>{selectedLibraryTool.label || toolComponent?.name || text('FABRICATE.Admin.ManagerV2.Tools.OverviewComponentMissing', 'Not set')}</h2>
+                  {#if selectedLibraryToolDirty}
+                    <span class="manager-v2-chip is-warning manager-v2-tools-dirty-chip">
+                      <i class="fas fa-save" aria-hidden="true"></i>
+                      <span>{text('FABRICATE.Admin.ManagerV2.Tools.Dirty', 'Unsaved')}</span>
+                    </span>
+                  {/if}
+                </div>
+              </div>
+            </div>
+            <div class="manager-v2-tool-inspector-actions">
+              <button type="button"
+                class="manager-v2-button is-danger"
+                onclick={deleteSelectedLibraryTool}
+                disabled={$viewState.toolsDraftSaving}>
+                <i class="fas fa-trash" aria-hidden="true"></i>
+                <span>{text('FABRICATE.Admin.ManagerV2.Tools.Delete', 'Delete tool')}</span>
+              </button>
+              <button type="button"
+                class="manager-v2-button is-primary"
+                onclick={saveSelectedToolDraft}
+                disabled={!selectedLibraryToolDirty || !selectedToolDraftValidation.valid || $viewState.toolsDraftSaving}
+                title={selectedToolDraftValidation.valid ? '' : selectedToolDraftValidation.errors.join('; ')}>
+                <i class={$viewState.toolsDraftSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
+                <span>{text('FABRICATE.Admin.ManagerV2.Tools.Save', 'Save changes')}</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="manager-v2-inspector-card manager-v2-tools-component-browser-card" data-manager-v2-tools-component-browser>
+            <div class="manager-v2-tools-component-browser-header">
+              <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ComponentBrowser', 'Components')}</h3>
+              <label class="manager-v2-search is-compact" data-manager-v2-tools-component-search>
+                <i class="fas fa-search" aria-hidden="true"></i>
+                <input type="search"
+                  value={toolsComponentSearchTerm}
+                  oninput={onToolsComponentSearchInput}
+                  placeholder={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SearchComponentsPlaceholder', 'Search components...')}
+                  aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.SearchComponentsByName', 'Search component names')} />
+              </label>
+            </div>
+
+            <div class="manager-v2-tools-component-browser-scroll">
+              {#if toolsComponentCards.length === 0}
+                <div class="manager-v2-empty is-compact">
+                  <div>
+                    <i class="fas fa-box-open" aria-hidden="true"></i>
+                    <h3>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.NoComponents', 'No components available')}</h3>
+                  </div>
+                </div>
+              {:else if toolsFilteredComponentCards.length === 0}
+                <div class="manager-v2-empty is-compact">
+                  <div>
+                    <i class="fas fa-search" aria-hidden="true"></i>
+                    <h3>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EmptyComponentSearchTitle', 'No components match these filters')}</h3>
+                  </div>
+                </div>
+              {:else}
+                <div class="manager-v2-tools-component-grid" role="list">
+                  {#each toolsPaginatedComponentCards as item (item.id)}
+                    <div class="manager-v2-task-component-card"
+                      role="listitem"
+                      draggable="true"
+                      data-manager-v2-tools-component-card={item.id}
+                      ondragstart={(event) => onToolsComponentDragStart(item, event)}>
+                      <img class="manager-v2-task-component-card-image" src={toolsComponentCardImage(item)} alt="" />
+                      <span class="manager-v2-task-component-card-copy">
+                        <strong>{item.name}</strong>
+                        <span>{toolsComponentDescription(item) || text('FABRICATE.Admin.ManagerV2.NoDescriptionAdded', 'No description has been added.')}</span>
+                        {#if Array.isArray(item.tags) && item.tags.length > 0}
+                          <span class="manager-v2-task-component-card-tags">
+                            {#each item.tags.slice(0, 3) as tag (tag)}
+                              <small>{tag}</small>
+                            {/each}
+                          </span>
+                        {/if}
+                      </span>
+                      <span class="manager-v2-task-component-card-grip" aria-hidden="true">⋮⋮</span>
+                    </div>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+
+            <div class="manager-v2-tools-component-browser-footer">
+              <Pagination
+                totalCount={toolsFilteredComponentCards.length}
+                pageSize={toolsComponentPageSize}
+                pageIndex={toolsComponentPageIndex}
+                pageSizeOptions={[6, 9, 12]}
+                onPageChange={(next) => toolsComponentPageIndex = next}
+                onPageSizeChange={(next) => { toolsComponentPageSize = next; toolsComponentPageIndex = 0; }}
+              />
+            </div>
+          </section>
+        {:else}
+          <div class="manager-v2-empty">
+            <div>
+              <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
+              <h3>{text('FABRICATE.Admin.ManagerV2.Tools.SelectEmpty', 'Select a tool to inspect.')}</h3>
             </div>
           </div>
         {/if}

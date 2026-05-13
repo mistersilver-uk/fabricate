@@ -994,3 +994,72 @@ test('timed d100 missing-reference cancellation does not expose or persist runti
   assert.equal(JSON.stringify(processed.cancelled[0].run).includes('runtimeSnapshot'), false);
   assert.equal(JSON.stringify(history[0].economyEvidence).includes('runtimeSnapshot'), false);
 });
+
+test('composeEnvironment exposes library tools through a non-enumerable __libraryTools Map', () => {
+  const { service } = makeRichState({
+    config: {
+      systems: {
+        'system-a': {
+          tools: [
+            { id: 'tool-axe', componentId: 'herb', label: 'Iron Pickaxe', breakage: { mode: 'limitedUses', maxUses: 10 } },
+            { id: 'tool-saw', componentId: 'herb', breakage: { mode: 'breakageChance', breakageChance: 25 } }
+          ]
+        }
+      }
+    }
+  });
+  const composed = service.composeEnvironment(environment(), system);
+  assert.ok(composed.__libraryTools instanceof Map);
+  assert.equal(composed.__libraryTools.size, 2);
+  assert.equal(composed.__libraryTools.get('tool-axe').label, 'Iron Pickaxe');
+  assert.equal(composed.__libraryTools.get('tool-saw').breakage.mode, 'breakageChance');
+  const descriptor = Object.getOwnPropertyDescriptor(composed, '__libraryTools');
+  assert.equal(descriptor.enumerable, false);
+});
+
+test('composeEnvironment skips library tools without an id', () => {
+  const { service } = makeRichState({
+    config: {
+      systems: {
+        'system-a': {
+          tools: [{ id: '', componentId: 'herb' }]
+        }
+      }
+    }
+  });
+  const composed = service.composeEnvironment(environment(), system);
+  assert.ok(composed.__libraryTools instanceof Map);
+  assert.equal(composed.__libraryTools.size, 0);
+});
+
+test('normalizeLibraryTask defaults a missing toolIds field to []', () => {
+  const { service } = makeRichState({
+    config: {
+      systems: {
+        'system-a': {
+          tasks: [{ id: 'task-no-tools', name: 'Pluck Mushrooms' }]
+        }
+      }
+    }
+  });
+  const composed = service.composeEnvironment(environment(), system);
+  const task = composed.tasks.find(t => t.id === 'task-no-tools');
+  assert.ok(task, 'expected library task to be composed');
+  assert.deepEqual(task.toolIds, []);
+});
+
+test('normalizeLibraryTask coerces toolIds entries to trimmed strings and drops empties', () => {
+  const { service } = makeRichState({
+    config: {
+      systems: {
+        'system-a': {
+          tasks: [{ id: 'task-with-tools', toolIds: ['  tool-axe  ', '', null, 7, 'tool-saw'] }]
+        }
+      }
+    }
+  });
+  const composed = service.composeEnvironment(environment(), system);
+  const task = composed.tasks.find(t => t.id === 'task-with-tools');
+  assert.ok(task, 'expected library task to be composed');
+  assert.deepEqual(task.toolIds, ['tool-axe', '7', 'tool-saw']);
+});

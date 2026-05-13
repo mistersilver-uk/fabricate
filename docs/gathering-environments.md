@@ -67,6 +67,24 @@ Manager V2 stores d100 gathering rules per selected crafting system under `gathe
 
 Legacy per-task item selection, per-environment hazard selection, and per-environment hazard policy fields may still be read when an existing system has no `rules` object. Manager V2 no longer exposes those fields as authoring controls.
 
+## Gathering Tools Library
+
+Manager V2 exposes a per-system **Tools** page under Gathering. Tools are reusable gathering tools that can later be required by gathering tasks. The page is a draft-and-save surface: edits are held in memory until the GM clicks **Save changes**, navigation away from a dirty draft prompts before discarding, and a concurrent-edit dialog appears if the live tool list changed while the GM was editing.
+
+Each library tool record carries:
+
+| Field | Description |
+|:------|:------------|
+| **Component** | Required managed component the tool refers to |
+| **Display label** | Optional; falls back to the component name |
+| **Tool requirement** | Optional Foundry expression evaluated against the actor's roll data; see [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}) for examples |
+| **Breakage mechanic** | One of `Limited uses` (counter on the item flag), `Breakage chance` (flat percent), or `Dice expression` (formula vs threshold) |
+| **On-break action** | One of `Destroy item`, `Mark as broken`, or `Replace with item` (replacement component must differ from the primary) |
+
+Tool authoring rejects entries with no component, with `replaceWith` and the same replacement as primary component, with out-of-range breakage chance, or with empty dice formulas. The Save button is disabled until every tool is valid; hovering it reveals the first failing reason.
+
+Library tools persist under `gatheringConfig.systems[systemId].tools[]`. Legacy worlds without a `tools` array load as `[]`. Cross-system sharing is not supported in this slice. Task-side wiring (referring to a library tool from a gathering task) is the next change in the OpenSpec backlog.
+
 ## Gathering Task And Hazard Libraries
 
 Manager V2 exposes the selected crafting system's Gathering Tasks from the Gathering **Tasks** tab. The task browser supports search, status/region/biome/availability filters, pagination, row selection, enabled toggles, duplicate/delete actions, and a right-side inspector with availability, matching-environment count, and drop summaries. The row **Edit** action opens a one-page Gathering Task editor for identity, availability, drop rules, unresolved drop rows, and selected-drop modifier tuning.
@@ -116,6 +134,7 @@ An environment contains one or more Environment Tasks. The current GM editor sup
 | Result groups | Add, rename, delete, and reorder groups |
 | Results | Add, edit, delete, and reorder component results with `componentId` and `quantity` |
 | Catalysts | Add and delete catalyst rows; edit `componentId`, `degradesOnUse`, `destroyWhenExhausted`, and `maxUses` |
+| Tools | Add and delete tool rows; edit `componentId`, the optional tool requirement, the breakage mechanic (limited uses, % chance, or dice expression), and the on-break action (destroy, mark broken, or replace) |
 
 Progressive task result difficulty comes from the selected managed component's `difficulty`; result rows do not store their own difficulty value.
 
@@ -217,6 +236,25 @@ Gathering catalysts use the same component identifiers and degradation fields as
 | `maxUses` | Optional positive integer usage limit; blank means unlimited |
 
 Save validation rejects catalyst rows without a `componentId`. `maxUses` is nullable and is validated as a positive integer only when `degradesOnUse` is enabled.
+
+## Tools
+
+Gathering tasks may declare one or more required tools, separate from catalysts. All listed tools must be present in the actor's inventory and pass their requirement before the attempt may start.
+
+| Field | Description |
+|:------|:------------|
+| `componentId` | Required component from the current crafting system's managed item list |
+| `requirement` | Optional Foundry expression (per provider) or macro UUID; must evaluate truthy for the actor to use the tool |
+| `breakage.mode` | One of `limitedUses`, `breakageChance`, or `diceExpression` |
+| `breakage.maxUses` | `limitedUses`: positive integer or blank (unlimited); tracked on the item via `flags.fabricate.toolUsage.timesUsed` |
+| `breakage.breakageChance` | `breakageChance`: integer percent in `0..100` |
+| `breakage.formula` + `breakage.threshold` | `diceExpression`: Foundry roll formula and numeric threshold (broken when result < threshold) |
+| `onBreak.mode` | One of `destroy`, `flagBroken`, or `replaceWith` |
+| `onBreak.replacementComponentId` | `replaceWith`: a different managed component spawned on the actor when the tool breaks |
+
+The system-level Gathering Rules setting **Tool breakage outcome** controls what happens when any tool breaks: `failureOnBreak` (default) overrides the attempt to `failed` and clears drops; `successDespiteBreak` preserves the success state. Either way, the on-break action always commits.
+
+See the [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}) how-to for a worked example.
 
 ## Save Validation
 
