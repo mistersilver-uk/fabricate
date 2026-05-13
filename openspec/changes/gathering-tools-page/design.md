@@ -45,11 +45,11 @@ A `toolsDraft` writable parallel to `environmentDraft` holds the in-memory list 
 
 `CraftingSystemManagerV2Root.svelte`:
 
-- New `gatheringNavItems` entry (`id: 'tools'`, icon `fas fa-screwdriver-wrench`).
-- New `currentView === 'gathering-tools'` value, threaded through `normalizedActiveView`, `isGatheringRoute`, `viewTitle`, `viewSubtitle`, `headerActionsLabel`, `inspectorLabel`, and `setView`.
-- `openGatheringSection('tools')` calls `enterToolsDraft(systemId)`.
+- New top-level nav button positioned between Essences and Gathering. Always visible when a system is selected; not gated by `canShowEnvironments` or `canShowEssences`. Icon `fas fa-screwdriver-wrench`. Label `FABRICATE.Admin.ManagerV2.Nav.Tools`.
+- New `currentView === 'tools'` value, threaded through `normalizedActiveView`, `viewTitle`, `viewSubtitle`, `headerActionsLabel`, `inspectorLabel`, and `setView`. `isGatheringRoute` does **not** include Tools — Tools is a sibling top-level route, not a gathering child.
+- `setView('tools')` calls `enterToolsDraft(systemId)` as the side-effect that initializes the draft when the route is entered.
 - `confirmRouteExit` chain extended with `confirmToolsRouteExit` so dirty drafts prompt before navigation.
-- Breadcrumb extension `Crafting Systems > {System} > Gathering > Tools`.
+- Breadcrumb extension `Crafting Systems > {System} > Tools`.
 - Header actions block has no Tools-specific navigation or dirty actions. The selected-tool inspector card owns the conditional `Unsaved` chip, `Delete tool`, and per-tool `Save changes` so destructive and persistence actions stay in the right-side tool context.
 - New child view `ToolsBrowserView.svelte` mounted for the route.
 - Inspector branch with a SELECTED TOOL hero/action card plus supporting cards for overview, requirement, breakage, on-break action, usage (rendered in a "Not linked" state), and a closing warning band.

@@ -734,7 +734,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'root should import ToolsBrowserView'
     );
     for (const snippet of [
-      "currentView === 'gathering-tools'",
+      "currentView === 'tools'",
       'enterToolsDraft',
       'saveToolDraft',
       'saveAllDirtyToolDrafts',
@@ -751,8 +751,8 @@ describe('CraftingSystemManagerV2 source contract', () => {
       assert.ok(rootSource.includes(snippet), `root should reference ${snippet}`);
     }
     assert.ok(
-      rootSource.includes("id: 'tools',"),
-      'root should declare a tools entry in gatheringNavItems'
+      /onclick=\{\(\) => setView\('tools'\)\}/.test(rootSource),
+      'root should wire a top-level Tools nav button to setView(\'tools\')'
     );
     assert.ok(
       lang.FABRICATE.Admin.ManagerV2.Tools && typeof lang.FABRICATE.Admin.ManagerV2.Tools === 'object',

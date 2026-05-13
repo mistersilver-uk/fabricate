@@ -35,4 +35,5 @@
 - [x] Replace the selected tool row inset marker with a selected header background fill.
 - [x] Replace the Tools requirement provider selector with a single actor-property expression field and proficiency example.
 - [ ] Update `docs/gathering-environments.md` with a Tools library subsection.
+- [x] Promote Tools to a top-level Manager V2 nav entry under Essences. Rename view id `gathering-tools` → `tools`, move the `enterToolsDraft` side-effect into `setView`, drop the gathering submenu entry and `openGatheringSection('tools')` branch, simplify the breadcrumb to `Crafting Systems > {System} > Tools`, add a `FABRICATE.Admin.ManagerV2.Nav.Tools` locale key, and refresh the affected nav/layout/contract tests.
 - [ ] Run `npm test` and `npm run build`; commit and push.

@@ -374,16 +374,6 @@
       hintFallback: 'Browse gathering tasks before attaching them to environments.'
     },
     {
-      id: 'tools',
-      icon: 'fas fa-screwdriver-wrench',
-      labelKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Tools',
-      labelFallback: 'Tools',
-      titleKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.ToolsTitle',
-      titleFallback: 'Gathering Tools',
-      hintKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.ToolsHint',
-      hintFallback: 'Manage reusable gathering tools for this crafting system.'
-    },
-    {
       id: 'encounters',
       icon: 'fas fa-exclamation-triangle',
       labelKey: 'FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Encounters',
@@ -405,7 +395,7 @@
     }
   ];
   const gatheringInspectorTabs = gatheringNavItems.filter(tab => tab.id !== 'environments');
-  const isGatheringRoute = $derived(currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-tools');
+  const isGatheringRoute = $derived(currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit');
   const isActiveGatheringChildRoute = $derived(
     isGatheringRoute && gatheringNavItems.some(tab => tab.id === activeGatheringTab)
   );
@@ -452,7 +442,7 @@
     selectedLibraryTool ? dirtyToolIds.includes(selectedLibraryTool.id) : false
   );
   const selectedToolDraftValidation = $derived(
-    currentView === 'gathering-tools' && selectedLibraryTool
+    currentView === 'tools' && selectedLibraryTool
       ? (store.validateToolDraft?.(selectedLibraryTool.id) || { valid: true, errors: [] })
       : { valid: true, errors: [] }
   );
@@ -492,7 +482,6 @@
     if (activeGatheringTab === 'environments') return;
     if (currentView === 'environments' && canShowEnvironments) return;
     if (currentView === 'gathering-task-edit' && canShowEnvironments) return;
-    if (currentView === 'gathering-tools' && canShowEnvironments) return;
     activeGatheringTab = 'environments';
   });
 
@@ -711,7 +700,7 @@
 
   function normalizedActiveView(view, system, environmentsAvailable, essencesAvailable) {
     if (!system) return 'systems';
-    if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit' || view === 'gathering-tools') && !environmentsAvailable) return 'systems';
+    if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit') && !environmentsAvailable) return 'systems';
     if ((view === 'essences' || view === 'essence-edit') && !essencesAvailable) return 'systems';
     return view;
   }
@@ -746,7 +735,7 @@
       ? text('FABRICATE.Admin.ManagerV2.Essence.CreateTitle', 'Create essence')
       : text('FABRICATE.Admin.ManagerV2.Essence.EditTitle', 'Edit essence');
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksTitle', 'Gathering Tasks');
-    if (currentView === 'gathering-tools') return text('FABRICATE.Admin.ManagerV2.Tools.Title', 'Tools');
+    if (currentView === 'tools') return text('FABRICATE.Admin.ManagerV2.Tools.Title', 'Tools');
     if (currentView === 'environments') return text('FABRICATE.Admin.ManagerV2.Environment.Title', 'Environments');
     if (currentView === 'environment-edit') return text('FABRICATE.Admin.ManagerV2.Environment.EditTitle', 'Edit environment');
     if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EditTitle', 'Edit gathering task');
@@ -765,7 +754,7 @@
     if (currentView === 'essence-edit' && showEssenceSourceUi) return text('FABRICATE.Admin.ManagerV2.Essence.EditSubtitle', 'Update identity, icon, and source linkage for this essence.');
     if (currentView === 'essence-edit') return text('FABRICATE.Admin.ManagerV2.Essence.EditNoSourceSubtitle', 'Update identity and icon for this essence.');
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.TasksHint', 'Browse gathering tasks before attaching them to environments.');
-    if (currentView === 'gathering-tools') return text('FABRICATE.Admin.ManagerV2.Tools.Subtitle', 'Manage reusable gathering tools and configure how they behave when required by tasks.');
+    if (currentView === 'tools') return text('FABRICATE.Admin.ManagerV2.Tools.Subtitle', 'Manage reusable gathering tools and configure how they behave when required by tasks.');
     if (currentView === 'environments') return text('FABRICATE.Admin.ManagerV2.Environment.Subtitle', 'Manage gathering environments for the selected crafting system.');
     if (currentView === 'environment-edit') return text('FABRICATE.Admin.ManagerV2.Environment.EditSubtitle', 'Edit scene linkage, environment details, tasks, results, catalysts, visibility, timing, and validation in the v2 workspace.');
     if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EditSubtitle', 'Edit availability, identity, and drop rules for the selected gathering task.');
@@ -803,7 +792,7 @@
     if (currentView === 'tags') return text('FABRICATE.Admin.ManagerV2.TagsCategories.Actions', 'Tags and categories actions');
     if (currentView === 'essences' || currentView === 'essence-edit') return text('FABRICATE.Admin.ManagerV2.Essence.Actions', 'Essence actions');
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Actions', 'Gathering task actions');
-    if (currentView === 'gathering-tools') return text('FABRICATE.Admin.ManagerV2.Tools.Actions', 'Tools actions');
+    if (currentView === 'tools') return text('FABRICATE.Admin.ManagerV2.Tools.Actions', 'Tools actions');
     if (currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit') return text('FABRICATE.Admin.ManagerV2.Environment.Actions', 'Environment actions');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.ManagerV2.SystemEdit.Actions', 'System edit actions');
     return text('FABRICATE.Admin.ManagerV2.SystemActions', 'System actions');
@@ -815,7 +804,7 @@
     if (currentView === 'tags') return text('FABRICATE.Admin.ManagerV2.TagsCategories.Inspector', 'Tags and categories inspector');
     if (currentView === 'essences' || currentView === 'essence-edit') return text('FABRICATE.Admin.ManagerV2.Essence.Inspector', 'Selected essence inspector');
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Inspector', 'Selected gathering task inspector');
-    if (currentView === 'gathering-tools') return text('FABRICATE.Admin.ManagerV2.Tools.Inspector', 'Selected tool inspector');
+    if (currentView === 'tools') return text('FABRICATE.Admin.ManagerV2.Tools.Inspector', 'Selected tool inspector');
     if (currentView === 'environments') return text('FABRICATE.Admin.ManagerV2.Environment.Inspector', 'Selected environment inspector');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.ManagerV2.SystemEdit.Inspector', 'System edit evidence');
     return text('FABRICATE.Admin.ManagerV2.SelectedSystemInspector', 'Selected system inspector');
@@ -949,8 +938,8 @@
   }
 
   function confirmToolsRouteExit(nextView) {
-    if (activeView !== 'gathering-tools') return true;
-    if (nextView === 'gathering-tools') return true;
+    if (activeView !== 'tools') return true;
+    if (nextView === 'tools') return true;
     if (!store?.isToolsDraftDirty?.()) {
       store?.cancelToolsDraft?.();
       return true;
@@ -963,10 +952,13 @@
   }
 
   function setView(view) {
-    if ((view === 'recipes' || view === 'components' || view === 'component-edit' || view === 'tags' || view === 'system-edit') && !selectedSystem) return;
-    if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit' || view === 'gathering-tools') && !canShowEnvironments) return;
+    if ((view === 'recipes' || view === 'components' || view === 'component-edit' || view === 'tags' || view === 'system-edit' || view === 'tools') && !selectedSystem) return;
+    if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit') && !canShowEnvironments) return;
     if ((view === 'essences' || view === 'essence-edit') && !canShowEssences) return;
-    afterTruthyResult(confirmRouteExit(view), () => { activeView = view; });
+    afterTruthyResult(confirmRouteExit(view), () => {
+      activeView = view;
+      if (view === 'tools') store?.enterToolsDraft?.(selectedSystemId);
+    });
   }
 
   function selectSystem(systemId, nextView = 'systems') {
@@ -1597,14 +1589,10 @@
   function openGatheringSection(tabId = 'environments') {
     if (!canShowEnvironments) return;
     const nextTab = gatheringNavItems.some(tab => tab.id === tabId) ? tabId : 'environments';
-    const nextView = nextTab === 'tools' ? 'gathering-tools' : 'environments';
-    afterTruthyResult(confirmRouteExit(nextView), () => {
+    afterTruthyResult(confirmRouteExit('environments'), () => {
       activeGatheringTab = nextTab;
       gatheringMenuExpanded = true;
-      activeView = nextView;
-      if (nextTab === 'tools') {
-        store?.enterToolsDraft?.(selectedSystemId);
-      }
+      activeView = 'environments';
     });
   }
 
@@ -2300,9 +2288,9 @@
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.EditBreadcrumb', 'Edit gathering task')}</span>
         {/if}
-        {#if currentView === 'gathering-tools'}
+        {#if currentView === 'tools'}
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Tools', 'Tools')}</span>
+          <span>{text('FABRICATE.Admin.ManagerV2.Nav.Tools', 'Tools')}</span>
         {/if}
         {#if currentView === 'system-edit'}
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
@@ -2492,6 +2480,10 @@
               <span class="manager-v2-nav-count">{selectedCounts.essences}</span>
             </button>
           {/if}
+          <button type="button" class={`manager-v2-nav-button ${currentView === 'tools' ? 'is-active' : ''}`} aria-current={currentView === 'tools' ? 'page' : undefined} onclick={() => setView('tools')}>
+            <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
+            <span class="manager-v2-nav-label">{text('FABRICATE.Admin.ManagerV2.Nav.Tools', 'Tools')}</span>
+          </button>
           {#if canShowEnvironments}
             <div class={`manager-v2-nav-group ${gatheringMenuExpanded ? 'is-expanded' : ''}`}>
               <button
@@ -2671,7 +2663,7 @@
         onUpdateModifier={updateGatheringDropModifier}
         onDeleteModifier={deleteGatheringDropModifier}
       />
-    {:else if currentView === 'gathering-tools' && selectedSystem}
+    {:else if currentView === 'tools' && selectedSystem}
       <ToolsBrowserView
         tools={$viewState.toolsDraft || []}
         selectedToolId={$viewState.toolsDraftSelectedToolId || ''}
@@ -3784,7 +3776,7 @@
             </div>
           </div>
         {/if}
-      {:else if currentView === 'gathering-tools'}
+      {:else if currentView === 'tools'}
         {#if selectedLibraryTool}
           {@const toolImageSrc = (selectedSystem?.managedItemOptions || []).find(item => String(item.id) === String(selectedLibraryTool.componentId))?.img || 'icons/svg/item-bag.svg'}
           {@const toolComponent = (selectedSystem?.managedItemOptions || []).find(item => String(item.id) === String(selectedLibraryTool.componentId))}

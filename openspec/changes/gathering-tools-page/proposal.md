@@ -2,7 +2,7 @@
 
 ## Summary
 
-Adds a dedicated Manager V2 page where GMs author a per-system library of reusable gathering tools. Tools previously had no authoring surface — earlier attempts to bolt them onto the environment editor or the standalone task editor were both removed. This change introduces a `Tools` submenu under Gathering, a draft-and-save model, and the underlying `gatheringConfig.systems[id].tools[]` library shape.
+Adds a dedicated Manager V2 page where GMs author a per-system library of reusable tools. Tools previously had no authoring surface — earlier attempts to bolt them onto the environment editor or the standalone task editor were both removed. This change introduces a top-level `Tools` nav entry positioned directly under Essences (always visible when a system is selected, not gated by the gathering feature), a draft-and-save model, and the underlying `gatheringConfig.systems[id].tools[]` library shape. Tools are referenced by gathering tasks today; recipes and salvage will reference the same library in a future change, eventually subsuming the existing Catalyst concept.
 
 ## Goals
 
