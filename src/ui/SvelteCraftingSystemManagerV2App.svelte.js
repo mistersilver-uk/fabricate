@@ -2,7 +2,7 @@ import CraftingSystemManagerV2Root from './svelte/apps/manager-v2/CraftingSystem
 import { registerCraftingSystemManagerV2App } from './appFactory.js';
 import { SvelteRecipeManagerApp } from './SvelteRecipeManagerApp.svelte.js';
 import { localize } from './svelte/util/foundryBridge.js';
-import { confirmDialog } from './foundryCompat.js';
+import { confirmDialog, renderDialog } from './foundryCompat.js';
 
 export class SvelteCraftingSystemManagerV2App extends SvelteRecipeManagerApp {
   static SVELTE_COMPONENT = CraftingSystemManagerV2Root;
@@ -42,6 +42,41 @@ export class SvelteCraftingSystemManagerV2App extends SvelteRecipeManagerApp {
             label: localize('FABRICATE.Admin.ManagerV2.Essence.DiscardDirtyCancel'),
             callback: () => false
           }
+        }),
+        confirmDirtyToolsNavigation: () => new Promise(resolve => {
+          let settled = false;
+          const settle = (value) => {
+            if (settled) return;
+            settled = true;
+            resolve(value);
+          };
+          const dialog = renderDialog({
+            window: { title: localize('FABRICATE.Admin.ManagerV2.Tools.NavigationDirty.Title') },
+            content: `<p>${localize('FABRICATE.Admin.ManagerV2.Tools.NavigationDirty.Content')}</p>`,
+            buttons: [
+              {
+                action: 'save',
+                label: localize('FABRICATE.Admin.ManagerV2.Tools.NavigationDirty.SaveAll'),
+                icon: 'fas fa-save',
+                default: true,
+                callback: () => settle('save')
+              },
+              {
+                action: 'discard',
+                label: localize('FABRICATE.Admin.ManagerV2.Tools.NavigationDirty.Discard'),
+                icon: 'fas fa-trash',
+                callback: () => settle('discard')
+              },
+              {
+                action: 'cancel',
+                label: localize('FABRICATE.Admin.ManagerV2.Tools.NavigationDirty.Cancel'),
+                icon: 'fas fa-times',
+                callback: () => settle(false)
+              }
+            ],
+            close: () => settle(false)
+          });
+          if (!dialog) settle(false);
         }),
         registerEssenceDirtyGuard: (guard) => {
           this._confirmDiscardDirtyEssenceDraft = typeof guard === 'function' ? guard : null;

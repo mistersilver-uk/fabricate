@@ -533,6 +533,13 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const identityBlock = blockFor('.fabricate-manager-v2 .manager-v2-recipe-identity,\n.fabricate-manager-v2 .manager-v2-component-identity,\n.fabricate-manager-v2 .manager-v2-environment-identity,\n.fabricate-manager-v2 .manager-v2-gathering-task-identity');
   const toolsIdentityDropZoneBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-identity.is-component-drop-zone');
   const toolsIdentityDropZoneActiveBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-identity.is-component-drop-zone.is-drop-active');
+  const toolsRowBodyBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-row-body');
+  const toolsIdentityBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-identity');
+  const toolsRowSummaryBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-row-summary');
+  const toolsRowActionsBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-row-actions');
+  const toolsRowDirtySlotBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-row-dirty-slot');
+  const toolsDirtyChipBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-dirty-chip');
+  const toolsInspectorHeadingBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-inspector-heading');
   const toolsEmptyStubBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-empty-stub');
   const toolsEmptyStubActiveBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-empty-stub:hover,\n.fabricate-manager-v2 .manager-v2-tools-empty-stub:focus-visible,\n.fabricate-manager-v2 .manager-v2-tools-empty-stub.is-drop-active');
   const editorBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-edit-view');
@@ -658,6 +665,32 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(!tableBlock.includes('reorder'), 'task browser should not reserve a reorder column');
   assert.ok(rowBlock.includes('grid-template-columns: var(--fab-mv2-gathering-task-grid);'), 'task rows should use the shared task grid');
   assert.ok(identityBlock.includes('grid-template-columns: 46px minmax(0, 1fr);'), 'task identity should reserve thumbnail space');
+  assert.ok(
+    toolsRowBodyBlock.includes('grid-template-columns: minmax(260px, 300px) minmax(0, 1fr) max-content;'),
+    'tool rows should reserve a stable component column while keeping action width compact'
+  );
+  assert.ok(toolsIdentityBlock.includes('width: 100%;'), 'tool identity drop zones should fill the stable component column');
+  assert.ok(
+    toolsRowSummaryBlock.includes('justify-content: flex-start;')
+      && toolsRowSummaryBlock.includes('min-width: 0;')
+      && toolsRowSummaryBlock.includes('max-height: 58px;')
+      && toolsRowSummaryBlock.includes('overflow: hidden;'),
+    'tool row summary chips should align from a consistent summary column and never spill into a third line'
+  );
+  assert.ok(
+    toolsRowActionsBlock.includes('grid-template-columns: minmax(0, max-content) 34px;')
+      && toolsRowActionsBlock.includes('justify-self: end;')
+      && toolsRowActionsBlock.includes('max-width: 124px;'),
+    'tool row dirty pip and chevron columns should stay compact and inside the row'
+  );
+  assert.ok(
+    toolsRowDirtySlotBlock.includes('justify-content: flex-end;') && toolsDirtyChipBlock.includes('white-space: nowrap;'),
+    'tool row dirty pip should align next to the chevron without wrapping'
+  );
+  assert.ok(
+    toolsInspectorHeadingBlock.includes('display: flex;') && toolsInspectorHeadingBlock.includes('flex-wrap: wrap;'),
+    'selected tool inspector heading should hold the selected-tool dirty pip'
+  );
   assert.ok(
     toolsIdentityDropZoneBlock.includes('border: 1px dashed var(--fab-mv2-border-strong);')
       && toolsIdentityDropZoneBlock.includes('border-radius: 8px;')

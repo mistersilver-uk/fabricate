@@ -244,6 +244,7 @@ describe('adminStore gathering tools library', () => {
       const state = get(store.viewState);
       assert.equal(state.toolsDraft.length, 1);
       assert.equal(state.toolsDraftDirty, true);
+      assert.deepEqual(state.toolsDraftDirtyToolIds, [added.id]);
       assert.equal(state.toolsDraftSelectedToolId, added.id);
       assert.equal(state.toolsDraftExpandedToolId, added.id);
     });
@@ -258,6 +259,7 @@ describe('adminStore gathering tools library', () => {
       const state = get(store.viewState);
       assert.equal(state.toolsDraft[0].componentId, 'comp-pickaxe');
       assert.equal(state.toolsDraftDirty, true);
+      assert.deepEqual(state.toolsDraftDirtyToolIds, [added.id]);
       assert.equal(state.toolsDraftSelectedToolId, added.id);
       assert.equal(state.toolsDraftExpandedToolId, added.id);
     });
@@ -272,9 +274,10 @@ describe('adminStore gathering tools library', () => {
       const draft = get(store.viewState).toolsDraft;
       assert.equal(draft[0].label, 'Iron Pickaxe');
       assert.equal(get(store.viewState).toolsDraftDirty, true);
+      assert.deepEqual(get(store.viewState).toolsDraftDirtyToolIds, [added.id]);
     });
 
-    it('saveToolsDraft writes a valid draft to the live config and clears dirty', async () => {
+    it('saveToolsDraft writes all dirty tools to the live config and clears dirty', async () => {
       const services = createMockServices();
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -287,6 +290,34 @@ describe('adminStore gathering tools library', () => {
       assert.equal(tool.label, 'Iron Pickaxe');
       assert.equal(tool.componentId, 'comp-axe');
       assert.equal(get(store.viewState).toolsDraftDirty, false);
+      assert.deepEqual(get(store.viewState).toolsDraftDirtyToolIds, []);
+    });
+
+    it('saveToolDraft writes only the selected dirty tool and leaves other dirty tools unsaved', async () => {
+      const services = createMockServices({
+        gatheringConfig: {
+          systems: {
+            sys1: {
+              tools: [
+                { id: 't1', componentId: 'comp-axe', label: 'Axe', enabled: true },
+                { id: 't2', componentId: 'comp-pick', label: 'Pick', enabled: true }
+              ]
+            }
+          }
+        }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      store.enterToolsDraft('sys1');
+      store.updateToolInDraft('t1', { label: 'Saved Axe' });
+      store.updateToolInDraft('t2', { label: 'Unsaved Pick' });
+      assert.deepEqual(get(store.viewState).toolsDraftDirtyToolIds, ['t1', 't2']);
+
+      const saved = await store.saveToolDraft('t1');
+      assert.equal(saved, true);
+      assert.equal(services._store.gatheringConfig.systems.sys1.tools.find(tool => tool.id === 't1').label, 'Saved Axe');
+      assert.equal(services._store.gatheringConfig.systems.sys1.tools.find(tool => tool.id === 't2').label, 'Pick');
+      assert.deepEqual(get(store.viewState).toolsDraftDirtyToolIds, ['t2']);
     });
 
     it('cancelToolsDraft clears the draft state', async () => {
@@ -299,6 +330,7 @@ describe('adminStore gathering tools library', () => {
       const state = get(store.viewState);
       assert.equal(state.toolsDraft, null);
       assert.equal(state.toolsDraftDirty, false);
+      assert.deepEqual(state.toolsDraftDirtyToolIds, []);
       assert.equal(state.toolsDraftSelectedToolId, '');
     });
 
@@ -322,10 +354,35 @@ describe('adminStore gathering tools library', () => {
       await store.selectSystem('sys1');
       store.enterToolsDraft('sys1');
       const added = store.addToolToDraft();
-      store.deleteToolFromDraft(added.id);
+      await store.deleteToolFromDraft(added.id);
       const state = get(store.viewState);
       assert.equal(state.toolsDraft.length, 0);
       assert.equal(state.toolsDraftSelectedToolId, '');
+    });
+
+    it('deleteToolFromDraft immediately removes persisted tools from live config', async () => {
+      const services = createMockServices({
+        gatheringConfig: {
+          systems: {
+            sys1: {
+              tools: [
+                { id: 't1', componentId: 'comp-axe', label: 'Axe', enabled: true },
+                { id: 't2', componentId: 'comp-pick', label: 'Pick', enabled: true }
+              ]
+            }
+          }
+        }
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      store.enterToolsDraft('sys1');
+
+      const deleted = await store.deleteToolFromDraft('t1');
+      assert.equal(deleted, true);
+      assert.deepEqual(services._store.gatheringConfig.systems.sys1.tools.map(tool => tool.id), ['t2']);
+      assert.deepEqual(get(store.viewState).toolsDraft.map(tool => tool.id), ['t2']);
+      assert.deepEqual(get(store.viewState).toolsDraftBaseline.map(tool => tool.id), ['t2']);
+      assert.deepEqual(get(store.viewState).toolsDraftDirtyToolIds, []);
     });
   });
 });

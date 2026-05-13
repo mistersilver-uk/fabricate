@@ -23,15 +23,19 @@ Cleanup: the previously dead inline `addEnvironmentTaskTool` family (only ever w
 
 ## Draft + Save
 
-A `toolsDraft` writable parallel to `environmentDraft` holds the in-memory list while the page is open. A `toolsDraftBaseline` snapshot enables JSON-stable dirty tracking. Functions on the store:
+A `toolsDraft` writable parallel to `environmentDraft` holds the in-memory list while the page is open. A `toolsDraftBaseline` snapshot enables JSON-stable per-tool dirty tracking. Functions on the store:
 
 - `enterToolsDraft(systemId)` snapshots the live `tools` array.
-- `addToolToDraft()` / `updateToolInDraft(id, patch)` / `deleteToolFromDraft(id)` mutate the draft and recompute dirty.
+- `addToolToDraft()` / `updateToolInDraft(id, patch)` mutate the draft and recompute the dirty tool id list.
+- `deleteToolFromDraft(id)` persists deletion immediately for saved tools; unsaved new tools are removed from the draft only.
 - `selectDraftTool(id)` / `setExpandedDraftTool(id)` track selection and inline-expansion state.
 - `validateToolsDraft()` returns `{ valid, errors[{ id, errors[] }] }`.
-- `saveToolsDraft()` re-reads the live config, hash-checks against the baseline, and surfaces an overwrite confirm when concurrent edits are detected. On confirm (or no divergence), writes the validated draft to `systems[id].tools` and clears dirty.
+- `validateToolDraft(id)` validates one tool.
+- `isToolDraftDirty(id)` checks the per-tool dirty id list.
+- `saveToolDraft(id)` re-reads the live config, hash-checks that tool against its baseline entry, and surfaces an overwrite confirm when concurrent edits are detected. On confirm (or no divergence), writes only that tool to `systems[id].tools` and clears that tool's dirty state.
+- `saveAllDirtyToolDrafts()` saves all dirty tools one at a time and leaves any failed/invalid tool dirty.
 - `cancelToolsDraft()` clears all draft state.
-- `confirmDiscardDirtyToolsDraft()` mirrors the environment-draft confirm dialog.
+- `confirmDiscardDirtyToolsDraft()` mirrors the environment-draft confirm dialog for discard-only callers; the manager v2 route guard uses a three-outcome prompt (`Save All`, `Discard Changes`, `Keep Editing`).
 
 ## Composition seam
 
@@ -46,14 +50,14 @@ A `toolsDraft` writable parallel to `environmentDraft` holds the in-memory list 
 - `openGatheringSection('tools')` calls `enterToolsDraft(systemId)`.
 - `confirmRouteExit` chain extended with `confirmToolsRouteExit` so dirty drafts prompt before navigation.
 - Breadcrumb extension `Crafting Systems > {System} > Gathering > Tools`.
-- Header actions block: `Back to Gathering` plus the conditional `Unsaved` chip. The selected-tool inspector card owns `Delete tool` and `Save changes` so destructive and persistence actions stay in the right-side tool context.
+- Header actions block has no Tools-specific navigation or dirty actions. The selected-tool inspector card owns the conditional `Unsaved` chip, `Delete tool`, and per-tool `Save changes` so destructive and persistence actions stay in the right-side tool context.
 - New child view `ToolsBrowserView.svelte` mounted for the route.
 - Inspector branch with a SELECTED TOOL hero/action card plus supporting cards for overview, requirement, breakage, on-break action, usage (rendered in a "Not linked" state), and a closing warning band.
 
 `ToolsBrowserView.svelte`:
 
 - Section header + `Tools (N)` browser card with `Add tool` action.
-- Compact rows with managed-component identity (thumbnail + name + secondary), three summary chips, overflow placeholder, expand/collapse chevron.
+- Compact rows with fixed-width managed-component identity/drop-zone column (thumbnail + name + secondary), fixed summary/pip/action columns, three summary chips, conditional per-row `Unsaved` pip, and expand/collapse chevron.
 - Rows with an existing mapped component render that component identity as a subtle dashed drop zone; dropping a managed component from the right-side component browser replaces the tool's `componentId`.
 - The bottom Add tool stub is also a drop target; dropping a managed component or importable Foundry item creates a new tool pre-mapped to that component.
 - Inline editor for the selected/expanded row: optional label, component picker (with `dragDrop` action), optional requirement (using `ProviderExpressionInput`), breakage mechanic radio group with single-line mode-specific controls, on-break action radio group with a matching replacement component drop zone for `replaceWith`, and an inline `Delete tool` button.

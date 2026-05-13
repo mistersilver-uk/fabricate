@@ -734,16 +734,17 @@ describe('CraftingSystemManagerV2 source contract', () => {
     for (const snippet of [
       "currentView === 'gathering-tools'",
       'enterToolsDraft',
-      'saveToolsDraft',
+      'saveToolDraft',
+      'saveAllDirtyToolDrafts',
       'cancelToolsDraft',
       'addToolToDraft',
       'updateToolInDraft',
       'deleteToolFromDraft',
       'selectDraftTool',
       'setExpandedDraftTool',
-      'toolsDraftDirty',
+      'toolsDraftDirtyToolIds',
       'toolsDraftSelectedToolId',
-      'toolsDraftValidation'
+      'selectedToolDraftValidation'
     ]) {
       assert.ok(rootSource.includes(snippet), `root should reference ${snippet}`);
     }
@@ -758,6 +759,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Tools.Title, 'Tools');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Tools.Add, 'Add tool');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Tools.Save, 'Save changes');
+    assert.equal(lang.FABRICATE.Admin.ManagerV2.Tools.NavigationDirty.SaveAll, 'Save All');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Tools, 'Tools');
   });
 });

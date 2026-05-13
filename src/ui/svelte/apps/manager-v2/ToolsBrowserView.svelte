@@ -17,6 +17,7 @@
     tools = [],
     selectedToolId = '',
     expandedToolId = '',
+    dirtyToolIds = [],
     managedItemOptions = [],
     onSelectTool = () => {},
     onExpandTool = () => {},
@@ -39,6 +40,7 @@
   const managedItemMap = $derived(new Map(
     (Array.isArray(managedItemOptions) ? managedItemOptions : []).map(item => [String(item.id), item])
   ));
+  const dirtyToolIdSet = $derived(new Set((Array.isArray(dirtyToolIds) ? dirtyToolIds : []).map(id => String(id))));
 
   function managedItem(componentId) {
     if (!componentId) return null;
@@ -274,6 +276,7 @@
         {#each tools as tool (tool.id)}
           {@const isExpanded = expandedToolId === tool.id}
           {@const isSelected = selectedToolId === tool.id}
+          {@const isDirty = dirtyToolIdSet.has(String(tool.id))}
           <div class={`manager-v2-tools-row ${isSelected ? 'is-selected' : ''} ${isExpanded ? 'is-expanded' : ''}`}
             role="listitem"
             data-manager-v2-tool-id={tool.id}>
@@ -311,14 +314,14 @@
                 </span>
               </div>
               <div class="manager-v2-tools-row-actions">
-                <button type="button"
-                  class="manager-v2-icon-button"
-                  title={text('FABRICATE.Admin.ManagerV2.Tools.MoreActions', 'More actions')}
-                  aria-label={text('FABRICATE.Admin.ManagerV2.Tools.MoreActions', 'More actions')}
-                  aria-haspopup="menu"
-                  onclick={(event) => event.stopPropagation()}>
-                  <i class="fas fa-ellipsis" aria-hidden="true"></i>
-                </button>
+                <span class="manager-v2-tools-row-dirty-slot">
+                  {#if isDirty}
+                    <span class="manager-v2-chip is-warning manager-v2-tools-dirty-chip" title={text('FABRICATE.Admin.ManagerV2.Tools.Dirty', 'Unsaved')}>
+                      <i class="fas fa-save" aria-hidden="true"></i>
+                      <span>{text('FABRICATE.Admin.ManagerV2.Tools.Dirty', 'Unsaved')}</span>
+                    </span>
+                  {/if}
+                </span>
                 <button type="button"
                   class="manager-v2-icon-button"
                   title={isExpanded ? text('FABRICATE.Admin.ManagerV2.Tools.CollapseRow', 'Collapse tool editor') : text('FABRICATE.Admin.ManagerV2.Tools.ExpandRow', 'Expand tool editor')}

@@ -24,5 +24,8 @@
 - [x] Add drop-to-create behavior for the Tools add stub.
 - [x] Align replacement component editor with the primary component drop-zone behavior.
 - [x] Keep tool breakage and on-break editor controls on single-line rows.
+- [x] Convert Tools draft saving from page-level to per-tool dirty/save semantics with immediate persisted deletes.
+- [x] Move Tools dirty pips into the selected-tool inspector card and dirty tool rows.
+- [x] Remove the inert Tools row overflow menu and stabilize row component/pip/action widths.
 - [ ] Update `docs/gathering-environments.md` with a Tools library subsection.
 - [ ] Run `npm test` and `npm run build`; commit and push.

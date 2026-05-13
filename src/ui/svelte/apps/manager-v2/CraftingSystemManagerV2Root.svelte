@@ -444,12 +444,16 @@
   );
 
   const libraryToolsList = $derived(Array.isArray($viewState.toolsDraft) ? $viewState.toolsDraft : []);
+  const dirtyToolIds = $derived(Array.isArray($viewState.toolsDraftDirtyToolIds) ? $viewState.toolsDraftDirtyToolIds : []);
   const selectedLibraryTool = $derived(
     libraryToolsList.find(tool => tool.id === $viewState.toolsDraftSelectedToolId) || null
   );
-  const toolsDraftValidation = $derived(
-    currentView === 'gathering-tools'
-      ? (store.validateToolsDraft?.() || { valid: true, errors: [] })
+  const selectedLibraryToolDirty = $derived(
+    selectedLibraryTool ? dirtyToolIds.includes(selectedLibraryTool.id) : false
+  );
+  const selectedToolDraftValidation = $derived(
+    currentView === 'gathering-tools' && selectedLibraryTool
+      ? (store.validateToolDraft?.(selectedLibraryTool.id) || { valid: true, errors: [] })
       : { valid: true, errors: [] }
   );
 
@@ -930,6 +934,20 @@
     return confirmToolsRouteExit(nextView);
   }
 
+  async function finishToolsRouteExit(action) {
+    if (action === 'save') {
+      const saved = await store?.saveAllDirtyToolDrafts?.();
+      if (saved === false) return false;
+      store?.cancelToolsDraft?.();
+      return true;
+    }
+    if (action === 'discard' || action === true) {
+      store?.cancelToolsDraft?.();
+      return true;
+    }
+    return false;
+  }
+
   function confirmToolsRouteExit(nextView) {
     if (activeView !== 'gathering-tools') return true;
     if (nextView === 'gathering-tools') return true;
@@ -937,17 +955,11 @@
       store?.cancelToolsDraft?.();
       return true;
     }
-    const confirmation = store?.confirmDiscardDirtyToolsDraft?.();
-    if (isPromise(confirmation)) {
-      return confirmation.then(confirmed => {
-        if (confirmed === false) return false;
-        store?.cancelToolsDraft?.();
-        return true;
-      });
-    }
-    if (confirmation === false) return false;
-    store?.cancelToolsDraft?.();
-    return true;
+    const confirmation = services?.confirmDirtyToolsNavigation
+      ? services.confirmDirtyToolsNavigation({ dirtyCount: dirtyToolIds.length })
+      : store?.confirmDiscardDirtyToolsDraft?.();
+    if (isPromise(confirmation)) return confirmation.then(finishToolsRouteExit);
+    return finishToolsRouteExit(confirmation);
   }
 
   function setView(view) {
@@ -1596,9 +1608,10 @@
     });
   }
 
-  async function saveToolsDraftFromHeader() {
-    if (!store?.saveToolsDraft) return;
-    await store.saveToolsDraft();
+  async function saveSelectedToolDraft() {
+    const toolId = $viewState.toolsDraftSelectedToolId;
+    if (!toolId || !store?.saveToolDraft) return;
+    await store.saveToolDraft(toolId);
   }
 
   function deleteSelectedLibraryTool() {
@@ -2374,10 +2387,6 @@
           <i class={$viewState.environmentSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Environments.Save', 'Save Environment')}</span>
         </button>
-      {:else if currentView === 'gathering-tools'}
-        {#if $viewState.toolsDraftDirty}
-          <span class="manager-v2-chip is-warning">{text('FABRICATE.Admin.ManagerV2.Tools.Dirty', 'Unsaved')}</span>
-        {/if}
       {:else if currentView === 'gathering-task-edit'}
         <button type="button" class="manager-v2-button" onclick={backToGatheringTaskLibrary}>
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
@@ -2667,6 +2676,7 @@
         tools={$viewState.toolsDraft || []}
         selectedToolId={$viewState.toolsDraftSelectedToolId || ''}
         expandedToolId={$viewState.toolsDraftExpandedToolId || ''}
+        dirtyToolIds={dirtyToolIds}
         managedItemOptions={selectedSystem?.managedItemOptions || []}
         onSelectTool={(id) => store.selectDraftTool?.(id)}
         onExpandTool={(id) => store.setExpandedDraftTool?.(id)}
@@ -3783,7 +3793,15 @@
               <img class="manager-v2-recipe-preview" src={toolImageSrc} alt="" />
               <div class="manager-v2-inspector-copy">
                 <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Tools.SelectedKicker', 'Selected tool')}</p>
-                <h2 class="manager-v2-inspector-name" title={selectedLibraryTool.label || toolComponent?.name || ''}>{selectedLibraryTool.label || toolComponent?.name || text('FABRICATE.Admin.ManagerV2.Tools.OverviewComponentMissing', 'Not set')}</h2>
+                <div class="manager-v2-tool-inspector-heading">
+                  <h2 class="manager-v2-inspector-name" title={selectedLibraryTool.label || toolComponent?.name || ''}>{selectedLibraryTool.label || toolComponent?.name || text('FABRICATE.Admin.ManagerV2.Tools.OverviewComponentMissing', 'Not set')}</h2>
+                  {#if selectedLibraryToolDirty}
+                    <span class="manager-v2-chip is-warning manager-v2-tools-dirty-chip">
+                      <i class="fas fa-save" aria-hidden="true"></i>
+                      <span>{text('FABRICATE.Admin.ManagerV2.Tools.Dirty', 'Unsaved')}</span>
+                    </span>
+                  {/if}
+                </div>
               </div>
             </div>
             <div class="manager-v2-tool-inspector-actions">
@@ -3796,9 +3814,9 @@
               </button>
               <button type="button"
                 class="manager-v2-button is-primary"
-                onclick={saveToolsDraftFromHeader}
-                disabled={!$viewState.toolsDraftDirty || !toolsDraftValidation.valid || $viewState.toolsDraftSaving}
-                title={toolsDraftValidation.valid ? '' : toolsDraftValidation.errors.map(error => error.errors.join('; ')).join('\n')}>
+                onclick={saveSelectedToolDraft}
+                disabled={!selectedLibraryToolDirty || !selectedToolDraftValidation.valid || $viewState.toolsDraftSaving}
+                title={selectedToolDraftValidation.valid ? '' : selectedToolDraftValidation.errors.join('; ')}>
                 <i class={$viewState.toolsDraftSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.ManagerV2.Tools.Save', 'Save changes')}</span>
               </button>

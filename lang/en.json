@@ -1292,6 +1292,13 @@
             "Content": "The library has been modified outside this editor. Overwrite with your changes?",
             "Confirm": "Overwrite",
             "Cancel": "Cancel"
+          },
+          "NavigationDirty": {
+            "Title": "Save unsaved tool changes?",
+            "Content": "One or more gathering tools have unsaved changes.",
+            "SaveAll": "Save All",
+            "Discard": "Discard Changes",
+            "Cancel": "Keep Editing"
           }
         }
       },

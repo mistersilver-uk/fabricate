@@ -11726,8 +11726,8 @@
 
 .fabricate-manager-v2 .manager-v2-tools-row-body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 12px;
+  grid-template-columns: minmax(260px, 300px) minmax(0, 1fr) max-content;
+  gap: 10px;
   align-items: center;
   padding: 12px;
   cursor: pointer;
@@ -11748,6 +11748,7 @@
   grid-template-columns: 42px minmax(0, 1fr);
   gap: 10px;
   align-items: center;
+  width: 100%;
   min-width: 0;
 }
 
@@ -11799,17 +11800,46 @@
   gap: 6px;
   align-items: center;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  justify-content: flex-start;
+  min-width: 0;
+  max-height: 58px;
+  overflow: hidden;
 }
 
 .fabricate-manager-v2 .manager-v2-tools-row-summary .manager-v2-chip {
-  min-height: 34px;
+  min-height: 26px;
+  padding: 2px 7px;
+  white-space: nowrap;
 }
 
 .fabricate-manager-v2 .manager-v2-tools-row-actions {
-  display: inline-flex;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: minmax(0, max-content) 34px;
+  gap: 6px;
   align-items: center;
+  justify-content: end;
+  justify-self: end;
+  min-width: 34px;
+  max-width: 124px;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-row-dirty-slot {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.fabricate-manager-v2 .manager-v2-tools-dirty-chip {
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.fabricate-manager-v2 .manager-v2-tool-inspector-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
 }
 
 .fabricate-manager-v2 .manager-v2-tools-row-editor {

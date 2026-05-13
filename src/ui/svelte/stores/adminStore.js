@@ -1522,6 +1522,7 @@ export function createAdminStore(services) {
   const toolsDraftBaseline = writable(null);
   const toolsDraftSystemId = writable('');
   const toolsDraftDirty = writable(false);
+  const toolsDraftDirtyToolIds = writable([]);
   const toolsDraftSaving = writable(false);
   const toolsDraftSaveError = writable(null);
   const toolsDraftSelectedToolId = writable('');
@@ -1608,6 +1609,7 @@ export function createAdminStore(services) {
       toolsDraftBaseline: _clonePlain(get(toolsDraftBaseline)),
       toolsDraftSystemId: get(toolsDraftSystemId),
       toolsDraftDirty: get(toolsDraftDirty),
+      toolsDraftDirtyToolIds: _clonePlain(get(toolsDraftDirtyToolIds)),
       toolsDraftSaving: get(toolsDraftSaving),
       toolsDraftSaveError: get(toolsDraftSaveError),
       toolsDraftSelectedToolId: get(toolsDraftSelectedToolId),
@@ -1625,7 +1627,16 @@ export function createAdminStore(services) {
   function _recomputeToolsDraftDirty() {
     const current = get(toolsDraft) || [];
     const baseline = get(toolsDraftBaseline) || [];
-    toolsDraftDirty.set(JSON.stringify(current) !== JSON.stringify(baseline));
+    const baselineById = new Map(baseline.map(tool => [String(tool.id), tool]));
+    const dirtyIds = [];
+    for (const tool of current) {
+      const id = String(tool?.id || '');
+      if (!id) continue;
+      const baselineTool = baselineById.get(id);
+      if (!baselineTool || JSON.stringify(tool) !== JSON.stringify(baselineTool)) dirtyIds.push(id);
+    }
+    toolsDraftDirtyToolIds.set(dirtyIds);
+    toolsDraftDirty.set(dirtyIds.length > 0);
   }
 
   function enterToolsDraft(systemId = get(selectedSystemId)) {
@@ -1637,6 +1648,7 @@ export function createAdminStore(services) {
     toolsDraftBaseline.set(_clonePlain(snapshot));
     toolsDraftSystemId.set(String(systemId));
     toolsDraftDirty.set(false);
+    toolsDraftDirtyToolIds.set([]);
     toolsDraftSaveError.set(null);
     toolsDraftSelectedToolId.set(snapshot[0]?.id || '');
     toolsDraftExpandedToolId.set('');
@@ -1675,15 +1687,37 @@ export function createAdminStore(services) {
       : tool));
   }
 
-  function deleteToolFromDraft(toolId) {
+  async function deleteToolFromDraft(toolId) {
     if (!toolId) return false;
-    const ok = updateToolsDraft(list => list.filter(tool => tool.id !== toolId));
-    if (!ok) return false;
-    if (get(toolsDraftSelectedToolId) === toolId) {
+    const id = String(toolId);
+    const current = get(toolsDraft);
+    if (!Array.isArray(current)) return false;
+    const baseline = get(toolsDraftBaseline) || [];
+    const wasPersisted = baseline.some(tool => String(tool.id) === id);
+    if (wasPersisted) {
+      const systemId = get(toolsDraftSystemId);
+      if (!systemId) return false;
+      toolsDraftSaving.set(true);
+      _patchToolsDraftViewState();
+      try {
+        const config = _currentGatheringConfig();
+        const systemConfig = _gatheringSystemConfig(config, systemId);
+        if (!systemConfig) return false;
+        systemConfig.tools = (Array.isArray(systemConfig.tools) ? systemConfig.tools : [])
+          .filter(tool => String(tool.id) !== id);
+        await _saveGatheringConfig(config);
+        toolsDraftBaseline.set(baseline.filter(tool => String(tool.id) !== id));
+      } finally {
+        toolsDraftSaving.set(false);
+      }
+    }
+    toolsDraft.set(current.filter(tool => String(tool.id) !== id));
+    _recomputeToolsDraftDirty();
+    if (String(get(toolsDraftSelectedToolId)) === id) {
       const remaining = get(toolsDraft) || [];
       toolsDraftSelectedToolId.set(remaining[0]?.id || '');
     }
-    if (get(toolsDraftExpandedToolId) === toolId) {
+    if (String(get(toolsDraftExpandedToolId)) === id) {
       toolsDraftExpandedToolId.set('');
     }
     _patchToolsDraftViewState();
@@ -1711,10 +1745,29 @@ export function createAdminStore(services) {
     return { valid: errors.length === 0, errors };
   }
 
-  async function saveToolsDraft() {
+  function validateToolDraft(toolId) {
+    const id = String(toolId || '');
+    const tool = (get(toolsDraft) || []).find(entry => String(entry.id) === id);
+    if (!tool) return { valid: false, errors: ['missing'] };
+    const result = Tool.fromJSON(tool).validate();
+    return { valid: result.valid, errors: result.errors };
+  }
+
+  function isToolDraftDirty(toolId) {
+    const id = String(toolId || '');
+    return id !== '' && get(toolsDraftDirtyToolIds).includes(id);
+  }
+
+  async function saveToolDraft(toolId) {
     const systemId = get(toolsDraftSystemId);
     if (!systemId) return false;
-    const validation = validateToolsDraft();
+    const id = String(toolId || '');
+    if (!id) return false;
+    if (!isToolDraftDirty(id)) return true;
+    const draft = get(toolsDraft) || [];
+    const tool = draft.find(entry => String(entry.id) === id);
+    if (!tool) return false;
+    const validation = validateToolDraft(id);
     if (!validation.valid) {
       toolsDraftSaveError.set('invalid');
       _patchToolsDraftViewState();
@@ -1727,13 +1780,25 @@ export function createAdminStore(services) {
       const systemConfig = _gatheringSystemConfig(config, systemId);
       if (!systemConfig) return false;
       const baseline = get(toolsDraftBaseline) || [];
+      const baselineTool = baseline.find(entry => String(entry.id) === id) || null;
       const live = Array.isArray(systemConfig.tools) ? systemConfig.tools : [];
-      if (JSON.stringify(baseline) !== JSON.stringify(live)) {
+      const liveIndex = live.findIndex(entry => String(entry.id) === id);
+      const liveTool = liveIndex >= 0 ? _normalizeGatheringLibraryTool(live[liveIndex], _randomID) : null;
+      const hasConflict = baselineTool
+        ? JSON.stringify(baselineTool) !== JSON.stringify(liveTool)
+        : liveTool !== null;
+      if (hasConflict) {
         const overwrite = await services.confirmDialog?.({
           title: services.localize?.('FABRICATE.Admin.ManagerV2.Tools.ConcurrentEdit.Title') || 'Tools were modified elsewhere',
           content: services.localize?.('FABRICATE.Admin.ManagerV2.Tools.ConcurrentEdit.Content') || 'The library has been modified outside this editor. Overwrite with your changes?',
-          yes: () => true,
-          no: () => false
+          yes: {
+            label: services.localize?.('FABRICATE.Admin.ManagerV2.Tools.ConcurrentEdit.Confirm') || 'Overwrite',
+            callback: () => true
+          },
+          no: {
+            label: services.localize?.('FABRICATE.Admin.ManagerV2.Tools.ConcurrentEdit.Cancel') || 'Cancel',
+            callback: () => false
+          }
         });
         if (overwrite !== true) {
           toolsDraftSaving.set(false);
@@ -1741,12 +1806,23 @@ export function createAdminStore(services) {
           return false;
         }
       }
-      const next = (get(toolsDraft) || []).map(tool => _normalizeGatheringLibraryTool(tool, _randomID));
+      const normalizedTool = _normalizeGatheringLibraryTool(tool, _randomID);
+      const next = live.map(entry => _normalizeGatheringLibraryTool(entry, _randomID));
+      if (liveIndex >= 0) {
+        next[liveIndex] = normalizedTool;
+      } else {
+        const draftIndex = draft.findIndex(entry => String(entry.id) === id);
+        next.splice(Math.max(0, Math.min(draftIndex, next.length)), 0, normalizedTool);
+      }
       systemConfig.tools = next;
       await _saveGatheringConfig(config);
-      toolsDraftBaseline.set(_clonePlain(next));
-      toolsDraft.set(_clonePlain(next));
-      toolsDraftDirty.set(false);
+      toolsDraft.set(draft.map(entry => String(entry.id) === id ? _clonePlain(normalizedTool) : entry));
+      const baselineById = new Map(baseline.map(entry => [String(entry.id), entry]));
+      baselineById.set(id, normalizedTool);
+      toolsDraftBaseline.set(draft
+        .filter(entry => String(entry.id) === id || baselineById.has(String(entry.id)))
+        .map(entry => String(entry.id) === id ? _clonePlain(normalizedTool) : _clonePlain(baselineById.get(String(entry.id)))));
+      _recomputeToolsDraftDirty();
       toolsDraftSaveError.set(null);
       _patchToolsDraftViewState();
       await refresh();
@@ -1757,11 +1833,26 @@ export function createAdminStore(services) {
     }
   }
 
+  async function saveAllDirtyToolDrafts() {
+    const dirtyIds = [...get(toolsDraftDirtyToolIds)];
+    for (const toolId of dirtyIds) {
+      if (!isToolDraftDirty(toolId)) continue;
+      const saved = await saveToolDraft(toolId);
+      if (saved !== true) return false;
+    }
+    return true;
+  }
+
+  async function saveToolsDraft() {
+    return saveAllDirtyToolDrafts();
+  }
+
   function cancelToolsDraft() {
     toolsDraft.set(null);
     toolsDraftBaseline.set(null);
     toolsDraftSystemId.set('');
     toolsDraftDirty.set(false);
+    toolsDraftDirtyToolIds.set([]);
     toolsDraftSaveError.set(null);
     toolsDraftSelectedToolId.set('');
     toolsDraftExpandedToolId.set('');
@@ -1770,7 +1861,7 @@ export function createAdminStore(services) {
   }
 
   function isToolsDraftDirty() {
-    return get(toolsDraftDirty) === true && Array.isArray(get(toolsDraft));
+    return get(toolsDraftDirtyToolIds).length > 0 && Array.isArray(get(toolsDraft));
   }
 
   async function confirmDiscardDirtyToolsDraft() {
@@ -4666,6 +4757,10 @@ export function createAdminStore(services) {
     selectDraftTool,
     setExpandedDraftTool,
     validateToolsDraft,
+    validateToolDraft,
+    isToolDraftDirty,
+    saveToolDraft,
+    saveAllDirtyToolDrafts,
     saveToolsDraft,
     cancelToolsDraft,
     isToolsDraftDirty,

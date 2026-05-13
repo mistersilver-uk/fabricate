@@ -501,6 +501,7 @@ function createStore(calls = [], options = {}) {
     toolsDraftBaseline: options.toolsDraftBaseline || options.toolsDraft || [],
     toolsDraftSystemId: options.toolsDraftSystemId || 'alchemy',
     toolsDraftDirty: options.toolsDraftDirty === true,
+    toolsDraftDirtyToolIds: options.toolsDraftDirtyToolIds || [],
     toolsDraftSaving: options.toolsDraftSaving === true,
     toolsDraftSaveError: null,
     toolsDraftSelectedToolId: options.toolsDraftSelectedToolId || '',
@@ -846,7 +847,8 @@ function createStore(calls = [], options = {}) {
         toolsDraft: Array.isArray(state.toolsDraft)
           ? state.toolsDraft.map(tool => tool.id === toolId ? { ...tool, ...patch } : tool)
           : state.toolsDraft,
-        toolsDraftDirty: true
+        toolsDraftDirty: true,
+        toolsDraftDirtyToolIds: Array.from(new Set([...(state.toolsDraftDirtyToolIds || []), toolId]))
       }));
       return true;
     },
@@ -860,15 +862,38 @@ function createStore(calls = [], options = {}) {
       }));
       return true;
     },
-    saveToolsDraft: () => {
-      calls.push(['saveToolsDraft']);
+    validateToolDraft: (toolId) => {
+      calls.push(['validateToolDraft', toolId]);
+      return options.toolValidationById?.[toolId] || { valid: true, errors: [] };
+    },
+    saveToolDraft: (toolId) => {
+      calls.push(['saveToolDraft', toolId]);
       viewState.update(state => ({
         ...state,
-        toolsDraftDirty: false
+        toolsDraftDirtyToolIds: (state.toolsDraftDirtyToolIds || []).filter(id => id !== toolId),
+        toolsDraftDirty: (state.toolsDraftDirtyToolIds || []).filter(id => id !== toolId).length > 0
       }));
       return true;
     },
-    cancelToolsDraft: () => true
+    saveAllDirtyToolDrafts: () => {
+      calls.push(['saveAllDirtyToolDrafts']);
+      viewState.update(state => ({
+        ...state,
+        toolsDraftDirtyToolIds: [],
+        toolsDraftDirty: false
+      }));
+      return options.saveAllDirtyToolDraftsResult ?? true;
+    },
+    saveToolsDraft: () => calls.push(['saveToolsDraft']),
+    isToolsDraftDirty: () => options.toolsDraftDirty === true || get(viewState).toolsDraftDirty === true,
+    confirmDiscardDirtyToolsDraft: () => {
+      calls.push(['confirmDiscardDirtyToolsDraft']);
+      return options.confirmDiscardDirtyToolsResult ?? true;
+    },
+    cancelToolsDraft: () => {
+      if (options.trackCancelToolsDraft) calls.push(['cancelToolsDraft']);
+      return true;
+    }
   };
 }
 
@@ -3461,7 +3486,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(table.querySelectorAll('[data-gathering-task-drop-rank-cell]').length, 0, 'allDrops mode should not render rank cells');
   });
 
-  it('renders selected gathering tool save and delete actions in the inspector header card', async () => {
+  it('renders selected gathering tool dirty state and actions in the inspector header card', async () => {
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -3470,6 +3495,8 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
       props: {
         store: createStore(calls, {
           toolsDraftDirty: true,
+          toolsDraftDirtyToolIds: ['tool-catalyst'],
+          trackCancelToolsDraft: true,
           toolsDraftSelectedToolId: 'tool-catalyst',
           toolsDraft: [{
             id: 'tool-catalyst',
@@ -3495,12 +3522,14 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
 
     const headerActions = target.querySelector('.manager-v2-header-actions');
     assert.equal(headerActions.textContent.includes('Back to Gathering'), false);
-    assert.ok(headerActions.textContent.includes('Unsaved'));
+    assert.equal(headerActions.textContent.includes('Unsaved'), false);
     assert.equal(headerActions.textContent.includes('Delete tool'), false);
     assert.equal(headerActions.textContent.includes('Save changes'), false);
 
     const toolInspector = target.querySelector('[data-manager-v2-tool-inspector]');
     assert.ok(toolInspector.textContent.includes('Artisan Catalyst'));
+    assert.ok(toolInspector.querySelector('.manager-v2-tools-dirty-chip').textContent.includes('Unsaved'));
+    assert.ok(toolInspector.querySelector('.manager-v2-tools-dirty-chip .fa-save'), 'inspector dirty pip should include the save icon');
     const inspectorActions = toolInspector.querySelector('.manager-v2-tool-inspector-actions');
     assert.ok(inspectorActions, 'selected tool inspector header card should own tool actions');
     assert.equal(inspectorActions.querySelectorAll('.manager-v2-button').length, 2);
@@ -3510,12 +3539,115 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     inspectorActions.querySelector('.manager-v2-button.is-primary').click();
     await tick();
     flushSync();
-    assert.ok(calls.some(call => call[0] === 'saveToolsDraft'));
+    assert.ok(calls.some(call => call[0] === 'saveToolDraft' && call[1] === 'tool-catalyst'));
 
     inspectorActions.querySelector('.manager-v2-button.is-danger').click();
     await tick();
     flushSync();
     assert.ok(calls.some(call => call[0] === 'deleteToolFromDraft' && call[1] === 'tool-catalyst'));
+  });
+
+  it('renders dirty pips in tool rows and removes the inert overflow menu button', async () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], {
+          toolsDraftDirty: true,
+          toolsDraftDirtyToolIds: ['tool-catalyst'],
+          toolsDraftSelectedToolId: 'tool-catalyst',
+          toolsDraft: [
+            {
+              id: 'tool-catalyst',
+              label: 'Artisan Catalyst',
+              enabled: true,
+              componentId: 'c1',
+              requirement: null,
+              breakage: { mode: 'limitedUses', maxUses: null },
+              onBreak: { mode: 'destroy' }
+            },
+            {
+              id: 'tool-mail',
+              label: 'Draconic Scale Mail',
+              enabled: true,
+              componentId: 'c2',
+              requirement: null,
+              breakage: { mode: 'limitedUses', maxUses: null },
+              onBreak: { mode: 'destroy' }
+            }
+          ]
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Tools').click();
+    await tick();
+    flushSync();
+
+    const dirtyRow = target.querySelector('[data-manager-v2-tool-id="tool-catalyst"]');
+    const cleanRow = target.querySelector('[data-manager-v2-tool-id="tool-mail"]');
+    assert.ok(dirtyRow.querySelector('.manager-v2-tools-row-dirty-slot .manager-v2-tools-dirty-chip').textContent.includes('Unsaved'));
+    assert.ok(dirtyRow.querySelector('.manager-v2-tools-row-dirty-slot .fa-save'), 'row dirty pip should include the save icon');
+    assert.equal(cleanRow.querySelector('.manager-v2-tools-row-dirty-slot .manager-v2-tools-dirty-chip'), null);
+    assert.equal(dirtyRow.querySelector('[aria-label="More actions"]'), null);
+    assert.equal(dirtyRow.querySelectorAll('.manager-v2-tools-row-actions .manager-v2-icon-button').length, 1);
+  });
+
+  it('offers save-all navigation handling when leaving with unsaved tools', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          toolsDraftDirty: true,
+          toolsDraftDirtyToolIds: ['tool-catalyst'],
+          trackCancelToolsDraft: true,
+          toolsDraftSelectedToolId: 'tool-catalyst',
+          toolsDraft: [{
+            id: 'tool-catalyst',
+            label: 'Artisan Catalyst',
+            enabled: true,
+            componentId: 'c1',
+            requirement: null,
+            breakage: { mode: 'limitedUses', maxUses: null },
+            onBreak: { mode: 'destroy' }
+          }]
+        }),
+        services: {
+          openCurrentAdmin: () => {},
+          confirmDirtyToolsNavigation: () => {
+            calls.push(['confirmDirtyToolsNavigation']);
+            return 'save';
+          }
+        }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Tools').click();
+    await tick();
+    flushSync();
+    navButton('Components').click();
+    await Promise.resolve();
+    await Promise.resolve();
+    await tick();
+    flushSync();
+
+    assert.ok(calls.some(call => call[0] === 'confirmDirtyToolsNavigation'));
+    assert.ok(calls.some(call => call[0] === 'saveAllDirtyToolDrafts'));
+    assert.ok(calls.some(call => call[0] === 'cancelToolsDraft'));
+    assert.ok(target.textContent.includes('Components'));
   });
 
   it('expands a gathering tool row when the row is clicked', async () => {
