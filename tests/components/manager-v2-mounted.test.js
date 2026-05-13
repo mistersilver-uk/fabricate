@@ -540,7 +540,7 @@ function createStore(calls = [], options = {}) {
             }
           },
           rules: {
-            rewardSelectionMode: 'highestRankedDrop',
+            rewardSelectionMode: options.rewardSelectionMode || 'highestRankedDrop',
             rewardLimit: 1,
             hazardSelectionMode: 'allDrops',
             hazardLimit: 1,
@@ -2256,7 +2256,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.querySelector('.manager-v2-task-drop-footer [data-gathering-task-drop-count]'));
     const dropColumnHeaders = Array.from(target.querySelectorAll('[data-gathering-task-drops-table] [role="columnheader"]')).map(node => node.textContent.trim());
     assert.ok(dropColumnHeaders.includes('Count'));
-    assert.equal(dropColumnHeaders.includes('#'), false);
+    assert.ok(dropColumnHeaders.includes('#'), 'highestRankedDrop mode should surface the rank column header');
     assert.equal(dropColumnHeaders.includes('Quantity'), false);
     assert.equal(dropColumnHeaders.includes('Actions'), false);
     const populatedDropRow = target.querySelector('[data-gathering-task-drop-id="drop-nightshade"]');
@@ -3335,6 +3335,86 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(dropRulesCard.querySelector('[data-pagination-page]').textContent.trim(), 'Page 2 of 3');
     assert.equal(target.querySelector('[data-gathering-task-drop-id="drop-page-1"]'), null);
     assert.ok(target.querySelector('[data-gathering-task-drop-id="drop-page-6"]'));
+  });
+
+  it('shows the drop rank column with boundary-aware reorder buttons under highestRankedDrop mode', async () => {
+    const dropRows = [
+      { id: 'drop-rank-1', componentId: 'c1', quantity: 1, dropRate: 90, enabled: true },
+      { id: 'drop-rank-2', componentId: 'c1', quantity: 1, dropRate: 60, enabled: true },
+      { id: 'drop-rank-3', componentId: 'c1', quantity: 1, dropRate: 30, enabled: true }
+    ];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], { taskDropRows: dropRows, rewardSelectionMode: 'highestRankedDrop' }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Tasks').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]').click();
+    await tick();
+    flushSync();
+
+    const table = target.querySelector('[data-gathering-task-drops-table]');
+    assert.ok(table.classList.contains('is-ranked-mode'), 'drop table should opt into ranked-mode layout');
+    const rankCells = table.querySelectorAll('[data-gathering-task-drop-rank-cell]');
+    assert.equal(rankCells.length, 3, 'every visible drop row should expose a rank cell');
+    const ranks = Array.from(rankCells).map(cell => cell.querySelector('[data-gathering-task-drop-rank]').textContent.trim());
+    assert.deepEqual(ranks, ['#1', '#2', '#3'], 'rank labels should reflect 1-indexed position in dropRows');
+
+    const firstRow = target.querySelector('[data-gathering-task-drop-id="drop-rank-1"]');
+    const lastRow = target.querySelector('[data-gathering-task-drop-id="drop-rank-3"]');
+    assert.equal(firstRow.querySelector('[data-gathering-task-drop-move="up"]').disabled, true, 'first row should not be movable up');
+    assert.equal(lastRow.querySelector('[data-gathering-task-drop-move="down"]').disabled, true, 'last row should not be movable down');
+
+    firstRow.querySelector('[data-gathering-task-drop-move="down"]').click();
+    await tick();
+    flushSync();
+
+    const reorderedIds = Array.from(target.querySelectorAll('[data-gathering-task-drop-id]')).map(node => node.dataset.gatheringTaskDropId);
+    assert.deepEqual(reorderedIds, ['drop-rank-2', 'drop-rank-1', 'drop-rank-3'], 'moving the top row down should swap it with its neighbor in dropRows');
+    const updatedRanks = Array.from(target.querySelectorAll('[data-gathering-task-drop-rank]')).map(node => node.textContent.trim());
+    assert.deepEqual(updatedRanks, ['#1', '#2', '#3'], 'rank labels should re-derive from the new array order');
+  });
+
+  it('hides the drop rank column when the reward selection mode is not highestRankedDrop', async () => {
+    const dropRows = [
+      { id: 'drop-unranked-1', componentId: 'c1', quantity: 1, dropRate: 70, enabled: true },
+      { id: 'drop-unranked-2', componentId: 'c1', quantity: 1, dropRate: 40, enabled: true }
+    ];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], { taskDropRows: dropRows, rewardSelectionMode: 'allDrops' }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Tasks').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]').click();
+    await tick();
+    flushSync();
+
+    const table = target.querySelector('[data-gathering-task-drops-table]');
+    assert.equal(table.classList.contains('is-ranked-mode'), false, 'allDrops mode should not opt into ranked layout');
+    assert.equal(table.querySelectorAll('[data-gathering-task-drop-rank-cell]').length, 0, 'allDrops mode should not render rank cells');
   });
 
   it('shows setup guidance and keeps create routing when a gathering system has no environments', async () => {

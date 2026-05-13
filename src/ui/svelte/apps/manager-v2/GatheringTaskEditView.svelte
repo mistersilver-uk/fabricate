@@ -21,6 +21,7 @@
     onSelectDrop = () => {},
     onAddDrop = () => {},
     onUpdateDrop = () => {},
+    onMoveDrop = () => {},
     onImportDrop = () => {}
   } = $props();
 
@@ -50,6 +51,7 @@
   const showRewardRuleNotice = $derived(selectedDrop?.componentId
     && repeatedComponentRows.length > 1
     && rewardRules?.rewardSelectionMode !== 'allDrops');
+  const rankedMode = $derived(rewardRules?.rewardSelectionMode === 'highestRankedDrop');
   const componentCards = $derived(Array.isArray(itemCards) ? itemCards : []);
   const normalizedComponentSearchTerm = $derived(componentSearchTerm.trim().toLowerCase());
   const componentTagOptions = $derived(uniqueSorted(componentCards.flatMap(item => Array.isArray(item.tags) ? item.tags : [])));
@@ -737,14 +739,18 @@
             </div>
           </div>
         {:else}
-          <div class="manager-v2-gathering-task-drops-table" role="table" data-gathering-task-drops-table>
+          <div class={`manager-v2-gathering-task-drops-table${rankedMode ? ' is-ranked-mode' : ''}`} role="table" data-gathering-task-drops-table>
             <div class="manager-v2-table-head manager-v2-gathering-task-drop-table-head" role="row">
+              {#if rankedMode}
+                <span role="columnheader" class="manager-v2-drop-rank-header" aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropRank', 'Drop rank')}>#</span>
+              {/if}
               <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropComponent', 'Component')}</span>
               <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropChance', 'Drop chance')}</span>
               <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.DropQuantityColumn', 'Count')}</span>
               <span role="columnheader">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.Modifiers', 'Modifiers')}</span>
             </div>
             {#each paginatedRows as row (row.id)}
+              {@const rankIndex = dropRows.indexOf(row)}
               <div
                 class={`manager-v2-gathering-task-drop-row ${selectedDrop?.id === row.id ? 'is-selected' : ''}`}
                 role="row"
@@ -756,6 +762,35 @@
                 onclick={() => onSelectDrop(row.id)}
                 onkeydown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelectDrop(row.id); } }}
               >
+                {#if rankedMode}
+                  <span role="cell" class="manager-v2-drop-cell manager-v2-drop-rank-cell" data-gathering-task-drop-rank-cell>
+                    <button
+                      type="button"
+                      class="manager-v2-icon-button manager-v2-drop-rank-button"
+                      aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.MoveDropUp', 'Move drop up')}
+                      title={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.MoveDropUp', 'Move drop up')}
+                      disabled={rankIndex <= 0}
+                      data-gathering-task-drop-move="up"
+                      onclick={(event) => { event.stopPropagation(); onMoveDrop(row.id, 'up'); }}
+                      onkeydown={(event) => event.stopPropagation()}
+                    >
+                      <i class="fas fa-chevron-up" aria-hidden="true"></i>
+                    </button>
+                    <span class="manager-v2-drop-rank-value" data-gathering-task-drop-rank>#{rankIndex + 1}</span>
+                    <button
+                      type="button"
+                      class="manager-v2-icon-button manager-v2-drop-rank-button"
+                      aria-label={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.MoveDropDown', 'Move drop down')}
+                      title={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.MoveDropDown', 'Move drop down')}
+                      disabled={rankIndex < 0 || rankIndex >= dropRows.length - 1}
+                      data-gathering-task-drop-move="down"
+                      onclick={(event) => { event.stopPropagation(); onMoveDrop(row.id, 'down'); }}
+                      onkeydown={(event) => event.stopPropagation()}
+                    >
+                      <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                    </button>
+                  </span>
+                {/if}
                 <span role="cell" class="manager-v2-drop-cell manager-v2-drop-component-cell" data-gathering-task-drop-component-cell>
                   {#if row.componentId || row.itemUuid}
                     <button type="button" class="manager-v2-gathering-task-identity manager-v2-drop-component-button" title={text('FABRICATE.Admin.ManagerV2.Environment.Tasks.ClearDropComponentHint', 'Right-click to clear component')} onclick={(event) => { event.stopPropagation(); onSelectDrop(row.id); }} onkeydown={(event) => event.stopPropagation()} onmousedown={(event) => onDropComponentMouseDown(row.id, event)} oncontextmenu={(event) => onClearDropComponent(row.id, event)}>

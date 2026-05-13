@@ -9704,6 +9704,42 @@
   box-sizing: border-box;
 }
 
+.fabricate-manager-v2 .manager-v2-gathering-task-drops-table.is-ranked-mode {
+  --fab-mv2-task-drop-grid: 44px minmax(0, 0.92fr) minmax(220px, 1.35fr) 56px minmax(180px, 1.65fr);
+}
+
+.fabricate-manager-v2 .manager-v2-drop-rank-header {
+  text-align: center;
+}
+
+.fabricate-manager-v2 .manager-v2-drop-rank-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 4px;
+  box-sizing: border-box;
+}
+
+.fabricate-manager-v2 .manager-v2-drop-rank-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 0.75rem;
+  line-height: 1;
+  color: var(--fab-mv2-text-muted);
+  text-align: center;
+  margin: 3px 0;
+}
+
+.fabricate-manager-v2 .manager-v2-drop-rank-button {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  flex: 0 0 18px;
+  padding: 0;
+}
+
 .fabricate-manager-v2 .manager-v2-task-drops-card .manager-v2-table-scroll {
   height: var(--fab-mv2-task-drop-table-visible-height);
   max-height: var(--fab-mv2-task-drop-table-visible-height);
@@ -9749,7 +9785,7 @@
 .fabricate-manager-v2 .manager-v2-gathering-task-drop-table-head > *,
 .fabricate-manager-v2 .manager-v2-gathering-task-drop-row > * {
   min-width: 0;
-  padding: 8px 10px;
+  padding: 4px 10px;
   box-sizing: border-box;
 }
 
@@ -10955,6 +10991,10 @@
 
   .fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"] .manager-v2-gathering-task-drops-table {
     --fab-mv2-task-drop-grid: minmax(0, 1.18fr) minmax(154px, 1.04fr) 54px minmax(150px, 1.38fr);
+  }
+
+  .fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"] .manager-v2-gathering-task-drops-table.is-ranked-mode {
+    --fab-mv2-task-drop-grid: 44px minmax(0, 0.96fr) minmax(154px, 1.04fr) 54px minmax(150px, 1.38fr);
   }
 
   .fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"] .manager-v2-task-drops-card .manager-v2-task-card-header {
