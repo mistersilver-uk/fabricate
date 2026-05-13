@@ -1498,6 +1498,18 @@
     return true;
   }
 
+  async function addToolFromDrop(data) {
+    if (!data) return false;
+    if (data.type === 'FabricateManagedComponent') {
+      const componentId = data.componentId || data.id;
+      if (!componentId) return false;
+      return store.addToolToDraft?.({ componentId }) ?? false;
+    }
+    const item = await services?.importSingleManagedItemFromDrop?.(data);
+    if (!item?.id) return false;
+    return store.addToolToDraft?.({ componentId: item.id }) ?? false;
+  }
+
   function gatheringConditionOptions(kind) {
     const setting = selectedGatheringSystemConfig.conditions?.[kind] || {};
     return Array.isArray(setting.values) ? setting.values : [];
@@ -2659,7 +2671,8 @@
         onSelectTool={(id) => store.selectDraftTool?.(id)}
         onExpandTool={(id) => store.setExpandedDraftTool?.(id)}
         onToggleExpand={(id) => store.setExpandedDraftTool?.(id === $viewState.toolsDraftExpandedToolId ? '' : id)}
-        onAddTool={() => store.addToolToDraft?.()}
+        onAddTool={(initialPatch) => initialPatch ? store.addToolToDraft?.(initialPatch) : store.addToolToDraft?.()}
+        onAddToolDrop={addToolFromDrop}
         onUpdateTool={(id, patch) => store.updateToolInDraft?.(id, patch)}
         onDeleteTool={(id) => store.deleteToolFromDraft?.(id)}
       />

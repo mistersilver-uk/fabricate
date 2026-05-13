@@ -838,7 +838,7 @@ function createStore(calls = [], options = {}) {
     },
     deleteGatheringLibraryTask: (...args) => calls.push(['deleteGatheringLibraryTask', ...args]),
     enterToolsDraft: (systemId) => calls.push(['enterToolsDraft', systemId]),
-    addToolToDraft: () => calls.push(['addToolToDraft']),
+    addToolToDraft: (...args) => calls.push(['addToolToDraft', ...args]),
     updateToolInDraft: (toolId, patch = {}) => {
       calls.push(['updateToolInDraft', toolId, patch]);
       viewState.update(state => ({
@@ -3634,6 +3634,118 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
 
     assert.ok(calls.some(call => call[0] === 'updateToolInDraft' && call[1] === 'tool-catalyst' && call[2].componentId === 'c2'));
     assert.ok(target.querySelector('[data-manager-v2-tool-id="tool-catalyst"]').textContent.includes('Glass Vial'), 'row drop should stage the replacement component on the tool');
+  });
+
+  it('creates a gathering tool from a managed component dropped on the add-tool stub', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          toolsDraftSelectedToolId: 'tool-catalyst',
+          toolsDraft: [{
+            id: 'tool-catalyst',
+            label: 'Artisan Catalyst',
+            enabled: true,
+            componentId: 'c1',
+            requirement: null,
+            breakage: { mode: 'limitedUses', maxUses: null },
+            onBreak: { mode: 'destroy' }
+          }]
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Tools').click();
+    await tick();
+    flushSync();
+
+    const addStub = target.querySelector('[data-manager-v2-tools-add-stub]');
+    assert.ok(addStub);
+    addStub.click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some(call => call[0] === 'addToolToDraft' && call.length === 1), 'clicking the add stub should still create a blank tool');
+
+    let raw = '';
+    const dragStart = new Event('dragstart', { bubbles: true, cancelable: true });
+    Object.defineProperty(dragStart, 'dataTransfer', {
+      value: {
+        setData: (type, value) => {
+          if (type === 'text/plain') raw = value;
+        },
+        effectAllowed: ''
+      }
+    });
+    target.querySelector('[data-manager-v2-tools-component-card="c2"]').dispatchEvent(dragStart);
+
+    const dropEvent = new Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(dropEvent, 'dataTransfer', {
+      value: { getData: (type) => type === 'text/plain' ? raw : '' }
+    });
+    addStub.dispatchEvent(dropEvent);
+    await tick();
+    flushSync();
+
+    assert.ok(calls.some(call => call[0] === 'addToolToDraft' && call[1]?.componentId === 'c2'));
+  });
+
+  it('imports an item dropped on the add-tool stub before creating the gathering tool', async () => {
+    const calls = [];
+    const importedDrops = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          toolsDraft: [{
+            id: 'tool-catalyst',
+            label: 'Artisan Catalyst',
+            enabled: true,
+            componentId: 'c1',
+            requirement: null,
+            breakage: { mode: 'limitedUses', maxUses: null },
+            onBreak: { mode: 'destroy' }
+          }]
+        }),
+        services: {
+          openCurrentAdmin: () => {},
+          importSingleManagedItemFromDrop: async (data) => {
+            importedDrops.push(data);
+            return { id: 'c2', name: 'Glass Vial' };
+          }
+        }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Tools').click();
+    await tick();
+    flushSync();
+
+    const itemPayload = { type: 'Item', uuid: 'Actor.hero.Item.glass-vial' };
+    const dropEvent = new Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(dropEvent, 'dataTransfer', {
+      value: { getData: (type) => type === 'text/plain' ? JSON.stringify(itemPayload) : '' }
+    });
+    target.querySelector('[data-manager-v2-tools-add-stub]').dispatchEvent(dropEvent);
+    await Promise.resolve();
+    await tick();
+    flushSync();
+
+    assert.deepEqual(importedDrops, [itemPayload]);
+    assert.ok(calls.some(call => call[0] === 'addToolToDraft' && call[1]?.componentId === 'c2'));
   });
 
   it('shows setup guidance and keeps create routing when a gathering system has no environments', async () => {

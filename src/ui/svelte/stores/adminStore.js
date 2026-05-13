@@ -1656,8 +1656,9 @@ export function createAdminStore(services) {
     return true;
   }
 
-  function addToolToDraft() {
-    const created = _normalizeGatheringLibraryTool({ id: _randomID() }, _randomID);
+  function addToolToDraft(initialPatch = {}) {
+    const patch = initialPatch && typeof initialPatch === 'object' ? initialPatch : {};
+    const created = _normalizeGatheringLibraryTool({ ...patch, id: _randomID() }, _randomID);
     const success = updateToolsDraft(list => [...list, created]);
     if (success) {
       toolsDraftSelectedToolId.set(created.id);

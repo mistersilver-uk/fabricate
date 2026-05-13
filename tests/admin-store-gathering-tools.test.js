@@ -248,6 +248,20 @@ describe('adminStore gathering tools library', () => {
       assert.equal(state.toolsDraftExpandedToolId, added.id);
     });
 
+    it('addToolToDraft accepts an initial component mapping', async () => {
+      const services = createMockServices();
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      store.enterToolsDraft('sys1');
+      const added = store.addToolToDraft({ componentId: 'comp-pickaxe' });
+      assert.ok(added && added.id);
+      const state = get(store.viewState);
+      assert.equal(state.toolsDraft[0].componentId, 'comp-pickaxe');
+      assert.equal(state.toolsDraftDirty, true);
+      assert.equal(state.toolsDraftSelectedToolId, added.id);
+      assert.equal(state.toolsDraftExpandedToolId, added.id);
+    });
+
     it('updateToolInDraft applies the patch and updates dirty', async () => {
       const services = createMockServices();
       const store = createAdminStore(services);

@@ -533,6 +533,8 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const identityBlock = blockFor('.fabricate-manager-v2 .manager-v2-recipe-identity,\n.fabricate-manager-v2 .manager-v2-component-identity,\n.fabricate-manager-v2 .manager-v2-environment-identity,\n.fabricate-manager-v2 .manager-v2-gathering-task-identity');
   const toolsIdentityDropZoneBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-identity.is-component-drop-zone');
   const toolsIdentityDropZoneActiveBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-identity.is-component-drop-zone.is-drop-active');
+  const toolsEmptyStubBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-empty-stub');
+  const toolsEmptyStubActiveBlock = blockFor('.fabricate-manager-v2 .manager-v2-tools-empty-stub:hover,\n.fabricate-manager-v2 .manager-v2-tools-empty-stub:focus-visible,\n.fabricate-manager-v2 .manager-v2-tools-empty-stub.is-drop-active');
   const editorBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-edit-view');
   const editorWithNoticeBlock = blockFor('.fabricate-manager-v2 .manager-v2-gathering-task-edit-view.has-reward-rule-notice');
   const availabilityBlock = blockFor('.fabricate-manager-v2 .manager-v2-task-availability-row');
@@ -657,6 +659,16 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
     toolsIdentityDropZoneActiveBlock.includes('border-color: var(--fab-mv2-accent);')
       && toolsIdentityDropZoneActiveBlock.includes('background: var(--fab-success-soft);'),
     'mapped tool row component drop zones should show an active drag-over state'
+  );
+  assert.ok(
+    toolsEmptyStubBlock.includes('min-height: 58px;')
+      && toolsEmptyStubBlock.includes('padding: 18px 14px;'),
+    'tools add stub should be tall enough to work as a drop target'
+  );
+  assert.ok(
+    toolsEmptyStubActiveBlock.includes('.manager-v2-tools-empty-stub.is-drop-active')
+      && toolsEmptyStubActiveBlock.includes('border-color: var(--fab-accent);'),
+    'tools add stub should share hover/focus styling with active drag-over state'
   );
   assert.ok(editorBlock.includes('grid-template-rows: auto auto 340px minmax(410px, 1fr) auto;'), 'task edit route should reserve taller component browser and exact three-row drop-rule rows for drag/drop');
   assert.ok(editorWithNoticeBlock.includes('grid-template-rows: auto auto 340px auto minmax(410px, 1fr) auto;'), 'task edit route should give the duplicate-drop warning a compact auto row before drop rules');

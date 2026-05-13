@@ -22,6 +22,7 @@
     onExpandTool = () => {},
     onToggleExpand = () => {},
     onAddTool = () => {},
+    onAddToolDrop = () => {},
     onUpdateTool = () => {},
     onDeleteTool = () => {}
   } = $props();
@@ -126,6 +127,16 @@
   function handleComponentDrop(tool, payload) {
     if (!payload || payload.type !== 'FabricateManagedComponent') return;
     onUpdateTool?.(tool.id, { componentId: payload.componentId || payload.id });
+  }
+
+  function handleAddToolDrop(payload) {
+    if (!payload) return;
+    if (payload.type === 'FabricateManagedComponent') {
+      const componentId = payload.componentId || payload.id;
+      if (componentId) onAddTool?.({ componentId });
+      return;
+    }
+    onAddToolDrop?.(payload);
   }
 
   function onClearToolComponent(tool, event) {
@@ -531,7 +542,9 @@
         {/each}
         <button type="button"
           class="manager-v2-tools-empty-stub"
-          onclick={() => onAddTool?.()}>
+          onclick={() => onAddTool?.()}
+          data-manager-v2-tools-add-stub
+          use:dragDrop={{ onDrop: handleAddToolDrop, activeClass: 'is-drop-active' }}>
           <i class="fas fa-plus" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.ManagerV2.Tools.Add', 'Add tool')}</span>
         </button>

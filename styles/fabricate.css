@@ -11867,7 +11867,8 @@
   justify-content: center;
   gap: 8px;
   width: 100%;
-  padding: 14px;
+  min-height: 58px;
+  padding: 18px 14px;
   border: 1px dashed var(--fab-mv2-border);
   border-radius: 8px;
   background: transparent;
@@ -11878,7 +11879,8 @@
 }
 
 .fabricate-manager-v2 .manager-v2-tools-empty-stub:hover,
-.fabricate-manager-v2 .manager-v2-tools-empty-stub:focus-visible {
+.fabricate-manager-v2 .manager-v2-tools-empty-stub:focus-visible,
+.fabricate-manager-v2 .manager-v2-tools-empty-stub.is-drop-active {
   border-color: var(--fab-accent);
   color: var(--fab-mv2-text);
   background: var(--fab-overlay-light-04);
