@@ -177,34 +177,13 @@
     return weatherMatches && timeMatches ? 'current' : 'mismatch';
   }
 
-  function taskAllowedInEnvironment(task, environment) {
-    const enabledIds = Array.isArray(environment?.enabledTaskIds) ? environment.enabledTaskIds.map(String) : [];
-    const disabledIds = Array.isArray(environment?.disabledTaskIds) ? environment.disabledTaskIds.map(String) : [];
-    if (disabledIds.includes(String(task.id))) return false;
-    if (enabledIds.length > 0 && !enabledIds.includes(String(task.id))) return false;
-    return true;
-  }
-
   function activeEnvironmentCount(task) {
-    if (!task || task.enabled === false) return 0;
-    const taskBiomes = Array.isArray(task.biomes) ? task.biomes : [];
-    const taskWeather = Array.isArray(task.weather) ? task.weather : [];
-    const taskTime = Array.isArray(task.timeOfDay) ? task.timeOfDay : [];
-    const taskRegions = Array.isArray(task.regions)
-      ? task.regions
-      : (task.region ? [task.region] : []);
+    if (!task?.id) return 0;
+    const taskId = String(task.id);
     return environmentList.filter(environment => {
-      if (environment?.enabled === false) return false;
-      if (String(environment?.craftingSystemId || selectedSystemId) !== String(selectedSystemId || '')) return false;
-      if (!taskAllowedInEnvironment(task, environment)) return false;
-      if (taskRegions.length > 0 && !taskRegions.includes(String(environment?.region || ''))) return false;
-      const environmentBiomes = Array.isArray(environment?.biomes)
-        ? environment.biomes
-        : (environment?.biome ? [environment.biome] : []);
-      if (taskBiomes.length > 0 && !taskBiomes.some(biome => environmentBiomes.includes(biome))) return false;
-      if (weatherCondition?.enabled !== false && taskWeather.length > 0 && !taskWeather.includes(weatherCondition?.current)) return false;
-      if (timeCondition?.enabled !== false && taskTime.length > 0 && !taskTime.includes(timeCondition?.current)) return false;
-      return true;
+      if (String(environment?.craftingSystemId || '') !== String(selectedSystemId || '')) return false;
+      const enabledIds = Array.isArray(environment?.enabledTaskIds) ? environment.enabledTaskIds.map(String) : [];
+      return enabledIds.includes(taskId);
     }).length;
   }
 

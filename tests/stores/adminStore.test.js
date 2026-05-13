@@ -2558,7 +2558,9 @@ describe('createAdminStore', () => {
             craftingSystemId: 'sys1',
             region: 'north',
             biomes: ['forest'],
-            dangerTags: ['hazardous']
+            dangerTags: ['hazardous'],
+            enabledTaskIds: ['task-used'],
+            enabledHazardIds: ['hazard-used']
           }]
         })
       });
