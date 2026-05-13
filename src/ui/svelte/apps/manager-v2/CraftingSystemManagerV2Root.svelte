@@ -381,6 +381,9 @@
   ];
   const gatheringInspectorTabs = gatheringNavItems.filter(tab => tab.id !== 'environments');
   const isGatheringRoute = $derived(currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit');
+  const isActiveGatheringChildRoute = $derived(
+    isGatheringRoute && gatheringNavItems.some(tab => tab.id === activeGatheringTab)
+  );
   const activeGatheringInspectorTab = $derived(
     gatheringInspectorTabs.find(tab => tab.id === activeGatheringTab) || null
   );
@@ -449,6 +452,11 @@
     if (currentView === 'environments' && canShowEnvironments) return;
     if (currentView === 'gathering-task-edit' && canShowEnvironments) return;
     activeGatheringTab = 'environments';
+  });
+
+  $effect(() => {
+    if (!isActiveGatheringChildRoute || gatheringMenuExpanded) return;
+    gatheringMenuExpanded = true;
   });
 
   $effect(() => {
@@ -1476,8 +1484,20 @@
     });
   }
 
+  function activateGatheringParent() {
+    if (isActiveGatheringChildRoute) {
+      gatheringMenuExpanded = true;
+      return;
+    }
+    openGatheringSection('environments');
+  }
+
   function toggleGatheringMenu(event) {
     event?.stopPropagation?.();
+    if (isActiveGatheringChildRoute) {
+      gatheringMenuExpanded = true;
+      return;
+    }
     gatheringMenuExpanded = !gatheringMenuExpanded;
   }
 
@@ -2340,7 +2360,7 @@
                 id="manager-v2-nav-gathering"
                 aria-current={isGatheringRoute ? 'page' : undefined}
                 aria-expanded={gatheringMenuExpanded}
-                onclick={() => openGatheringSection('environments')}
+                onclick={activateGatheringParent}
               >
                 <i class="fas fa-seedling" aria-hidden="true"></i>
                 <span class="manager-v2-nav-label">{text('FABRICATE.Admin.ManagerV2.Nav.Environments', 'Gathering')}</span>

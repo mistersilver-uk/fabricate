@@ -2126,13 +2126,9 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'environments');
-    assert.equal(target.querySelectorAll('.manager-v2-nav-subitem').length, 0);
-    assert.equal(target.querySelector('#manager-v2-nav-gathering').getAttribute('aria-expanded'), 'false');
-    assert.equal(target.querySelector('.manager-v2-nav-group').classList.contains('is-expanded'), false);
-    gatheringToggle().click();
-    await tick();
-    flushSync();
     assert.equal(target.querySelectorAll('.manager-v2-nav-subitem').length, 4);
+    assert.equal(target.querySelector('#manager-v2-nav-gathering').getAttribute('aria-expanded'), 'true');
+    assert.equal(target.querySelector('.manager-v2-nav-group').classList.contains('is-expanded'), true);
 
     gatheringSubitem('Tasks').click();
     await tick();
@@ -2141,6 +2137,16 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(gatheringSubitem('Tasks').getAttribute('aria-current'), 'page');
     assert.equal(target.querySelector('#manager-v2-nav-gathering').classList.contains('is-active'), false);
     assert.equal(gatheringSubitem('Tasks').classList.contains('is-active'), true);
+    target.querySelector('#manager-v2-nav-gathering').click();
+    await tick();
+    flushSync();
+    assert.equal(gatheringSubitem('Tasks').getAttribute('aria-current'), 'page');
+    assert.equal(gatheringSubitem('Tasks').classList.contains('is-active'), true);
+    gatheringToggle().click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelectorAll('.manager-v2-nav-subitem').length, 4);
+    assert.equal(target.querySelector('#manager-v2-nav-gathering').getAttribute('aria-expanded'), 'true');
     assert.equal(target.querySelectorAll('.manager-v2-gathering-task-row').length, 3);
     assert.ok(target.textContent.includes('Gather Moon Herbs'));
     assert.ok(target.textContent.includes('Prospect Crystal Veins'));
@@ -2230,6 +2236,15 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'gathering-task-edit');
+    target.querySelector('#manager-v2-nav-gathering').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'gathering-task-edit');
+    gatheringToggle().click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelectorAll('.manager-v2-nav-subitem').length, 4);
+    assert.equal(target.querySelector('#manager-v2-nav-gathering').getAttribute('aria-expanded'), 'true');
     assert.ok(target.querySelector('[data-gathering-task-editor]'));
     const coreEditor = target.querySelector('[data-gathering-task-core-editor]');
     assert.ok(coreEditor);
