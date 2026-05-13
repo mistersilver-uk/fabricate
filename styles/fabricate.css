@@ -10127,6 +10127,47 @@
   background: var(--fab-drop-rate-color);
 }
 
+.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control {
+  --fab-tool-breakage-chance-low: var(--fab-success);
+  --fab-tool-breakage-chance-mid: var(--fab-warning);
+  --fab-tool-breakage-chance-high: var(--fab-danger);
+  --fab-tool-breakage-chance-color: var(--fab-success);
+}
+
+.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control .manager-v2-drop-rate-track {
+  background: linear-gradient(
+    90deg,
+    var(--fab-tool-breakage-chance-low) 0%,
+    var(--fab-tool-breakage-chance-mid) 50%,
+    var(--fab-tool-breakage-chance-high) 100%
+  );
+}
+
+.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control .manager-v2-drop-rate-fill {
+  display: none;
+}
+
+.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"] {
+  accent-color: var(--fab-tool-breakage-chance-color);
+}
+
+.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-webkit-slider-runnable-track {
+  background: transparent;
+}
+
+.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-webkit-slider-thumb {
+  background: var(--fab-tool-breakage-chance-color);
+}
+
+.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-moz-range-track,
+.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-moz-range-progress {
+  background: transparent;
+}
+
+.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-moz-range-thumb {
+  background: var(--fab-tool-breakage-chance-color);
+}
+
 .fabricate-manager-v2 .manager-v2-drop-quantity-cell input[type="text"] {
   width: 100%;
   max-width: 44px;

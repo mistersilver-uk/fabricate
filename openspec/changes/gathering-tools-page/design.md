@@ -69,7 +69,7 @@ A new `manager-v2-radio-group` / `manager-v2-radio-option` pattern using `<field
 
 ## CSS
 
-New `manager-v2-tools-*` and `manager-v2-radio-*` classes appended to `styles/fabricate.css`. All colours through `var(--fab-…)` tokens; the breakage-chance slider reuses the shared `dropRateTierClass` / `dropRateTierColor` helpers extracted to `src/ui/svelte/util/dropRateTier.js`.
+New `manager-v2-tools-*` and `manager-v2-radio-*` classes appended to `styles/fabricate.css`. All colours through `var(--fab-…)` tokens; the task drop-rate slider reuses the shared `dropRateTierClass` / `dropRateTierColor` helpers extracted to `src/ui/svelte/util/dropRateTier.js`, while the active tool breakage-chance slider has a dedicated full-track green/yellow/red semantic gradient with a matching dynamic thumb colour.
 
 Follow-up inspector component browser rules keep the right rail card deterministic: the card owns header/scroll/footer grid rows, the compact search label is a positioned full-width block so its icon anchors inside the input chrome, the result scroll area has enough padded height for complete one-column cards, and the shared pagination component is restyled as transparent full-width centered footer content inside this narrow card.
 

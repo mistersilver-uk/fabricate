@@ -12,7 +12,10 @@ const productRoots = [
   resolve(repoRoot, 'styles')
 ];
 const allowedExtensions = new Set(['.js', '.svelte', '.css']);
-const gradientPattern = /\b(?:linear|radial|conic)-gradient\s*\(/;
+const gradientPattern = /\b(?:linear|radial|conic)-gradient\s*\(/g;
+const allowedGradientSelectors = [
+  '.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control .manager-v2-drop-rate-track'
+];
 
 function collectProductFiles(rootPath) {
   const files = [];
@@ -31,6 +34,13 @@ function collectProductFiles(rootPath) {
   }
 
   return files;
+}
+
+function isAllowedGradientUse(filePath, source, index) {
+  if (filePath !== resolve(repoRoot, 'styles/fabricate.css')) return false;
+
+  const prefix = source.slice(Math.max(0, index - 260), index);
+  return allowedGradientSelectors.some(selector => prefix.includes(selector));
 }
 
 describe('Flat UI style contract', () => {
@@ -54,14 +64,24 @@ describe('Flat UI style contract', () => {
   it('contains no gradients in product UI source files', () => {
     const offenders = productRoots
       .flatMap((rootPath) => collectProductFiles(rootPath))
-      .filter((filePath) => gradientPattern.test(readFileSync(filePath, 'utf8')))
+      .filter((filePath) => {
+        const source = readFileSync(filePath, 'utf8');
+        let match;
+
+        gradientPattern.lastIndex = 0;
+        while ((match = gradientPattern.exec(source))) {
+          if (!isAllowedGradientUse(filePath, source, match.index)) return true;
+        }
+
+        return false;
+      })
       .map((filePath) => relative(repoRoot, filePath))
       .sort();
 
     assert.deepEqual(
       offenders,
       [],
-      `product UI files should not contain gradients, but found: ${offenders.join(', ')}`
+      `product UI files should not contain unapproved gradients, but found: ${offenders.join(', ')}`
     );
   });
 });

@@ -3936,6 +3936,72 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
       && call[2].requirement?.macroUuid === ''));
   });
 
+  it('renders gathering tool breakage chance as a full gradient slider without rarity tiers', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          toolsDraftSelectedToolId: 'tool-catalyst',
+          toolsDraftExpandedToolId: 'tool-catalyst',
+          toolsDraft: [{
+            id: 'tool-catalyst',
+            label: 'Artisan Catalyst',
+            enabled: true,
+            componentId: 'c1',
+            requirement: null,
+            breakage: { mode: 'breakageChance', breakageChance: 25 },
+            onBreak: { mode: 'destroy' }
+          }]
+        }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Tools').click();
+    await tick();
+    flushSync();
+
+    const control = target.querySelector('[data-manager-v2-tool-editor] .manager-v2-tool-breakage-chance-control');
+    assert.ok(control);
+    assert.ok(control.classList.contains('manager-v2-drop-rate-control'));
+    for (const tierClass of ['is-none', 'is-legendary', 'is-very-rare', 'is-rare', 'is-uncommon', 'is-common', 'is-guaranteed']) {
+      assert.equal(control.classList.contains(tierClass), false, `breakage chance slider should not use ${tierClass}`);
+    }
+    assert.ok(control.getAttribute('style').includes('--fab-drop-rate-value: 25%;'));
+    assert.ok(control.getAttribute('style').includes('--fab-tool-breakage-chance-color: color-mix(in srgb, var(--fab-warning) 50%, var(--fab-success) 50%);'));
+
+    const range = control.querySelector('input[type="range"]');
+    assert.ok(range);
+    range.value = '75';
+    range.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+
+    assert.ok(calls.some(call => call[0] === 'updateToolInDraft'
+      && call[1] === 'tool-catalyst'
+      && call[2].breakage?.mode === 'breakageChance'
+      && call[2].breakage?.breakageChance === 75));
+    assert.ok(control.getAttribute('style').includes('--fab-tool-breakage-chance-color: color-mix(in srgb, var(--fab-danger) 50%, var(--fab-warning) 50%);'));
+
+    const percentInput = target.querySelector('[data-manager-v2-tool-editor] .manager-v2-drop-rate-percent input[type="text"]');
+    percentInput.value = '42';
+    percentInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+
+    assert.ok(calls.some(call => call[0] === 'updateToolInDraft'
+      && call[1] === 'tool-catalyst'
+      && call[2].breakage?.mode === 'breakageChance'
+      && call[2].breakage?.breakageChance === 42));
+  });
+
   it('uses the primary component drop-zone layout for replacement tools', async () => {
     const calls = [];
     target = document.createElement('div');

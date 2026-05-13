@@ -10,7 +10,6 @@
 <script>
   import { dragDrop } from '../../actions/dragDrop.js';
   import { localize } from '../../util/foundryBridge.js';
-  import { dropRateTierClass, dropRateTierColor } from '../../util/dropRateTier.js';
 
   let {
     tools = [],
@@ -224,6 +223,27 @@
     const next = Math.min(100, Math.max(0, Math.trunc(base + (event.key === 'ArrowUp' ? 1 : -1))));
     event.currentTarget.value = String(next);
     onUpdateTool?.(tool.id, { breakage: { mode: 'breakageChance', breakageChance: next } });
+  }
+
+  function normalizeBreakageChance(value) {
+    const number = Math.trunc(Number(value));
+    if (!Number.isFinite(number)) return 0;
+    return Math.min(100, Math.max(0, number));
+  }
+
+  function breakageChanceColor(value) {
+    const chance = normalizeBreakageChance(value);
+    if (chance <= 0) return 'var(--fab-success)';
+    if (chance === 50) return 'var(--fab-warning)';
+    if (chance >= 100) return 'var(--fab-danger)';
+
+    if (chance < 50) {
+      const warningWeight = chance * 2;
+      return `color-mix(in srgb, var(--fab-warning) ${warningWeight}%, var(--fab-success) ${100 - warningWeight}%)`;
+    }
+
+    const dangerWeight = (chance - 50) * 2;
+    return `color-mix(in srgb, var(--fab-danger) ${dangerWeight}%, var(--fab-warning) ${100 - dangerWeight}%)`;
   }
 
   function setOnBreakMode(tool, mode) {
@@ -465,8 +485,8 @@
                             onkeydown={(event) => onBreakageChanceKeydown(tool, event)} />
                           <span aria-hidden="true">%</span>
                         </span>
-                        <span class={`manager-v2-drop-rate-control ${dropRateTierClass(tool.breakage.breakageChance ?? 0)}`}
-                          style={`--fab-drop-rate-value: ${tool.breakage.breakageChance ?? 0}%; --fab-drop-rate-color: ${dropRateTierColor(tool.breakage.breakageChance ?? 0)};`}>
+                        <span class="manager-v2-drop-rate-control manager-v2-tool-breakage-chance-control"
+                          style={`--fab-drop-rate-value: ${tool.breakage.breakageChance ?? 0}%; --fab-tool-breakage-chance-color: ${breakageChanceColor(tool.breakage.breakageChance ?? 0)};`}>
                           <span class="manager-v2-drop-rate-track" aria-hidden="true">
                             <span class="manager-v2-drop-rate-fill"></span>
                           </span>

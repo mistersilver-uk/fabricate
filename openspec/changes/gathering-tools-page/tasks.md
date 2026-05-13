@@ -25,6 +25,7 @@
 - [x] Align replacement component editor with the primary component drop-zone behavior.
 - [x] Make the replacement component drop zone full-width without a separate inline label.
 - [x] Keep tool breakage and on-break editor controls on single-line rows.
+- [x] Give the active tool breakage chance slider a full-width green/yellow/red gradient scale.
 - [x] Convert Tools draft saving from page-level to per-tool dirty/save semantics with immediate persisted deletes.
 - [x] Move Tools dirty pips into the selected-tool inspector card and dirty tool rows.
 - [x] Remove the inert Tools row overflow menu and stabilize row component/pip/action widths.

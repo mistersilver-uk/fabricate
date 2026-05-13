@@ -631,6 +631,13 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   const dropRateWebkitThumbBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-webkit-slider-thumb');
   const dropRateMozProgressBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-moz-range-progress');
   const dropRateMozThumbBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-moz-range-thumb');
+  const toolBreakageChanceControlBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control');
+  const toolBreakageChanceTrackBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control .manager-v2-drop-rate-track');
+  const toolBreakageChanceFillBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control .manager-v2-drop-rate-fill');
+  const toolBreakageChanceRangeBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]');
+  const toolBreakageChanceWebkitThumbBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-webkit-slider-thumb');
+  const toolBreakageChanceMozTrackBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-moz-range-track,\n.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-moz-range-progress');
+  const toolBreakageChanceMozThumbBlock = blockFor('.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"]::-moz-range-thumb');
   const dropModifierListBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-modifier-list');
   const dropModifierPillBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-modifier-pill');
   const positiveDropModifierPillBlock = blockFor('.fabricate-manager-v2 .manager-v2-drop-modifier-pill.is-positive');
@@ -914,6 +921,24 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(dropRateMozProgressBlock.includes('background: var(--fab-drop-rate-color);'), 'drop chance Firefox progress should paint the active segment in the current tier colour');
   assert.ok(dropRateWebkitThumbBlock.includes('background: var(--fab-drop-rate-color);') && dropRateMozThumbBlock.includes('background: var(--fab-drop-rate-color);'), 'drop chance range thumbs should retain current-tier colour');
   assert.ok(
+    toolBreakageChanceControlBlock.includes('--fab-tool-breakage-chance-low: var(--fab-success);')
+      && toolBreakageChanceControlBlock.includes('--fab-tool-breakage-chance-mid: var(--fab-warning);')
+      && toolBreakageChanceControlBlock.includes('--fab-tool-breakage-chance-high: var(--fab-danger);'),
+    'tool breakage chance slider should define a semantic green-yellow-red scale from theme tokens'
+  );
+  assert.ok(
+    toolBreakageChanceTrackBlock.includes('linear-gradient(')
+      && toolBreakageChanceTrackBlock.includes('90deg')
+      && toolBreakageChanceTrackBlock.includes('var(--fab-tool-breakage-chance-low) 0%')
+      && toolBreakageChanceTrackBlock.includes('var(--fab-tool-breakage-chance-mid) 50%')
+      && toolBreakageChanceTrackBlock.includes('var(--fab-tool-breakage-chance-high) 100%'),
+    'tool breakage chance slider should show the full green-yellow-red gradient across the whole rail'
+  );
+  assert.ok(toolBreakageChanceFillBlock.includes('display: none;'), 'tool breakage chance slider should not render a tier-coloured filled segment over the full gradient');
+  assert.ok(toolBreakageChanceRangeBlock.includes('accent-color: var(--fab-tool-breakage-chance-color);'), 'tool breakage chance native range should use the dynamic current-risk colour');
+  assert.ok(toolBreakageChanceWebkitThumbBlock.includes('background: var(--fab-tool-breakage-chance-color);') && toolBreakageChanceMozThumbBlock.includes('background: var(--fab-tool-breakage-chance-color);'), 'tool breakage chance slider thumbs should use the dynamic current-risk colour');
+  assert.ok(toolBreakageChanceMozTrackBlock.includes('background: transparent;'), 'tool breakage chance Firefox native track/progress should not draw over the custom gradient rail');
+  assert.ok(
     guaranteedDropRateControlBlock.includes('var(--fab-drop-rate-guaranteed)')
       && commonDropRateControlBlock.includes('var(--fab-drop-rate-common)')
       && uncommonDropRateControlBlock.includes('var(--fab-drop-rate-uncommon)')
@@ -941,7 +966,8 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
   assert.ok(dropEditorRateControlBlock.includes('height: 28px;') && dropEditorRateControlBlock.includes('padding: 0 7px;') && dropEditorRateControlBlock.includes('background: var(--fab-overlay-dark-18);') && dropEditorRateControlBlock.includes('overflow: hidden;'), 'selected drop inspector slider should own the dark backing box instead of relying on native range chrome');
   assert.ok(dropEditorRateTrackBlock.includes('left: 7px;') && dropEditorRateTrackBlock.includes('right: 7px;') && dropEditorRateTrackBlock.includes('border: 0;') && dropEditorRateTrackBlock.includes('background: var(--fab-overlay-dark-18);'), 'selected drop inspector custom track should be inset to the thumb radius to avoid endpoint tails');
   assert.ok(dropEditorRateFillBlock.includes('border-radius: 999px;'), 'selected drop inspector fill should be rounded without relying on a wider track border');
-  assert.equal(css.includes('linear-gradient'), false, 'drop chance slider styling should keep the flat-ui no-gradient contract');
+  assert.equal(dropRateTrackBlock.includes('linear-gradient'), false, 'drop chance slider styling should keep the flat-ui no-gradient contract');
+  assert.equal(dropEditorRateTrackBlock.includes('linear-gradient'), false, 'selected drop inspector slider styling should keep the flat-ui no-gradient contract');
   assert.ok(dropEditorRateRangeBlock.includes('height: 26px;') && dropEditorRateRangeBlock.includes('padding: 0;') && dropEditorRateRangeBlock.includes('background: transparent;') && dropEditorRateRangeBlock.includes('box-shadow: none;'), 'selected drop inspector native range should remain a transparent thumb hit target over the custom track');
   assert.ok(dropEditorRateWebkitTrackBlock.includes('border: 0;') && dropEditorRateWebkitTrackBlock.includes('background: transparent;'), 'selected drop inspector WebKit native range track should not draw over the custom track');
   assert.ok(dropEditorRateMozTrackBlock.includes('border: 0;') && dropEditorRateMozTrackBlock.includes('background: transparent;'), 'selected drop inspector Firefox native range track should not draw over the custom track');

@@ -18,6 +18,7 @@ Global rule: if a system feature is disabled, controls for that feature are hidd
 Fabricate's Foundry-facing product UI must use a clean flat visual style.
 
 - Product UI surfaces, headers, buttons, overlays, and selected states must not use `linear-gradient`, `radial-gradient`, or `conic-gradient`.
+- Full-track semantic value scales may use `linear-gradient` only when the gradient directly communicates the numeric meaning of the control, such as a green-to-red risk slider.
 - Use solid colors or RGBA fills for shells, cards, headers, overlays, and controls.
 - Visual hierarchy should come from spacing, typography, borders, and restrained shadows rather than decorative gradients or blur-based glass effects.
 - Shared tokens in `styles/fabricate.css` and app-local editor tokens should be the source of truth for reusable surface treatments.
