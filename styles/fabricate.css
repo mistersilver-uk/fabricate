@@ -9972,18 +9972,12 @@
   height: 18px;
   border: 0;
   accent-color: var(--fab-drop-rate-color);
-  background: transparent;
   cursor: pointer;
 }
 
 .fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-webkit-slider-runnable-track {
   height: 6px;
-  /* Transparent border keeps the native track's content-box geometry (the
-   * thumb's margin-top: -4px is calibrated to an 8 px native track) while
-   * suppressing the 1 px line that would otherwise render outside the
-   * custom 6 px border-box track and appear as "nibs" past the rounded
-   * ends. The visible track border is drawn by .manager-v2-drop-rate-track. */
-  border: 1px solid transparent;
+  border: 1px solid var(--fab-overlay-light-10);
   border-radius: 999px;
   background: transparent;
 }
@@ -10001,13 +9995,9 @@
 
 .fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-moz-range-track {
   height: 6px;
-  /* See ::-webkit-slider-runnable-track above — transparent border keeps the
-   * thumb-positioning geometry while suppressing the native-track nib. The
-   * background stays transparent so the custom .manager-v2-drop-rate-track
-   * remains the only visible track. */
-  border: 1px solid transparent;
+  border: 1px solid var(--fab-overlay-light-10);
   border-radius: 999px;
-  background: transparent;
+  background: var(--fab-overlay-dark-18);
 }
 
 .fabricate-manager-v2 .manager-v2-drop-rate-control input[type="range"]::-moz-range-progress {
@@ -11731,10 +11721,6 @@
   outline: 2px dashed var(--fab-accent);
   outline-offset: 2px;
   border-radius: 8px;
-}
-
-.fabricate-manager-v2 .manager-v2-tool-breakage-slider {
-  min-width: 200px;
 }
 
 .fabricate-manager-v2 .manager-v2-tools-row-editor-actions {

@@ -147,6 +147,40 @@
     }
   }
 
+  function onBreakageChanceInput(tool, event) {
+    const input = event.currentTarget;
+    const normalized = String(input.value || '').replace(/\D+/g, '').replace(/^0+(?=\d)/, '');
+    input.value = normalized;
+    const value = Number(normalized);
+    if (normalized !== '' && Number.isInteger(value) && value >= 0 && value <= 100) {
+      onUpdateTool?.(tool.id, { breakage: { mode: 'breakageChance', breakageChance: value } });
+    }
+  }
+
+  function onBreakageChanceBlur(tool, event) {
+    const input = event.currentTarget;
+    const normalized = String(input.value || '').replace(/\D+/g, '').replace(/^0+(?=\d)/, '');
+    const value = Number(normalized);
+    const current = Number(tool?.breakage?.breakageChance ?? 0);
+    if (normalized !== '' && Number.isInteger(value) && value >= 0 && value <= 100) {
+      input.value = String(value);
+      onUpdateTool?.(tool.id, { breakage: { mode: 'breakageChance', breakageChance: value } });
+      return;
+    }
+    input.value = String(current);
+  }
+
+  function onBreakageChanceKeydown(tool, event) {
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    event.preventDefault();
+    const current = Number(tool?.breakage?.breakageChance ?? 0);
+    const raw = event.currentTarget.value === '' ? current : Number(event.currentTarget.value);
+    const base = Number.isFinite(raw) ? raw : current;
+    const next = Math.min(100, Math.max(0, Math.trunc(base + (event.key === 'ArrowUp' ? 1 : -1))));
+    event.currentTarget.value = String(next);
+    onUpdateTool?.(tool.id, { breakage: { mode: 'breakageChance', breakageChance: next } });
+  }
+
   function setOnBreakMode(tool, mode) {
     if (mode === 'replaceWith') {
       onUpdateTool?.(tool.id, { onBreak: { mode, replacementComponentId: null } });
@@ -361,20 +395,33 @@
                     </label>
                   {:else if tool.breakage?.mode === 'breakageChance'}
                     <label class="manager-v2-field">
-                      <span>{text('FABRICATE.Admin.ManagerV2.Tools.BreakageChancePercent', 'Break chance (%)')}</span>
-                      <span class={`manager-v2-drop-rate-control manager-v2-tool-breakage-slider ${dropRateTierClass(tool.breakage.breakageChance ?? 0)}`}
-                        style={`--fab-drop-rate-value: ${tool.breakage.breakageChance ?? 0}%; --fab-drop-rate-color: ${dropRateTierColor(tool.breakage.breakageChance ?? 0)};`}>
-                        <span class="manager-v2-drop-rate-track" aria-hidden="true">
-                          <span class="manager-v2-drop-rate-fill"></span>
+                      <span>{text('FABRICATE.Admin.ManagerV2.Tools.BreakageChance', 'Breakage chance')}</span>
+                      <span class="manager-v2-drop-rate-value">
+                        <span class="manager-v2-drop-rate-percent">
+                          <input type="text"
+                            inputmode="numeric"
+                            pattern="[0-9]*"
+                            value={tool.breakage.breakageChance ?? 0}
+                            aria-label={text('FABRICATE.Admin.ManagerV2.Tools.BreakageChancePercent', 'Break chance (%)')}
+                            oninput={(event) => onBreakageChanceInput(tool, event)}
+                            onblur={(event) => onBreakageChanceBlur(tool, event)}
+                            onkeydown={(event) => onBreakageChanceKeydown(tool, event)} />
+                          <span aria-hidden="true">%</span>
                         </span>
-                        <input type="range"
-                          min="0"
-                          max="100"
-                          step="1"
-                          value={tool.breakage.breakageChance ?? 0}
-                          oninput={(event) => onUpdateTool?.(tool.id, { breakage: { mode: 'breakageChance', breakageChance: Number(event.currentTarget.value) } })} />
+                        <span class={`manager-v2-drop-rate-control ${dropRateTierClass(tool.breakage.breakageChance ?? 0)}`}
+                          style={`--fab-drop-rate-value: ${tool.breakage.breakageChance ?? 0}%; --fab-drop-rate-color: ${dropRateTierColor(tool.breakage.breakageChance ?? 0)};`}>
+                          <span class="manager-v2-drop-rate-track" aria-hidden="true">
+                            <span class="manager-v2-drop-rate-fill"></span>
+                          </span>
+                          <input type="range"
+                            min="0"
+                            max="100"
+                            step="1"
+                            value={tool.breakage.breakageChance ?? 0}
+                            aria-label={text('FABRICATE.Admin.ManagerV2.Tools.BreakageChance', 'Breakage chance')}
+                            oninput={(event) => onUpdateTool?.(tool.id, { breakage: { mode: 'breakageChance', breakageChance: Number(event.currentTarget.value) } })} />
+                        </span>
                       </span>
-                      <output>{tool.breakage.breakageChance ?? 0}%</output>
                     </label>
                   {:else if tool.breakage?.mode === 'diceExpression'}
                     <label class="manager-v2-field">
