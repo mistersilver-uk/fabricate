@@ -10149,8 +10149,7 @@
 }
 
 .fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"] {
-  padding: 0;
-  background: transparent;
+  padding: 12px;
   box-shadow: none;
   accent-color: var(--fab-tool-breakage-chance-color);
 }
