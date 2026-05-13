@@ -301,7 +301,7 @@ GatheringTaskDefinition = {
 
 ### Purpose
 
-Represent reusable Gathering Tools authored once per crafting system and (in a follow-up change) referenced by gathering tasks. This library lives next to the per-system task, hazard, and character modifier libraries and uses the existing Tool data model.
+Represent reusable Gathering Tools authored once per crafting system and referenced by gathering tasks through `toolIds`. This library lives next to the per-system task, hazard, and character modifier libraries and uses the existing Tool data model.
 
 ### Properties
 
@@ -337,7 +337,7 @@ GatheringToolLibraryEntry = {
 3. Legacy gathering configs without a `tools` array on a system normalize to `tools: []` on load. No migration runner entry is required.
 4. The Manager V2 page authors tools through a draft (`toolsDraft`) parallel to the environment draft. Draft writes do not touch persistence until the GM saves; cancel/discard reverts to the live config.
 5. Save reads the live `systems[id].tools` immediately before writing and surfaces an overwrite-confirm dialog when the live array diverges from the draft baseline (concurrent-edit guard).
-6. The runtime `composeEnvironment` exposes a non-enumerable `__libraryTools` Map keyed by tool id on the composed environment, alongside `__libraryCharacterModifiers`. The map is the seam for the future task→tool reference change; no runtime consumer reads it today.
+6. The runtime `composeEnvironment` exposes a non-enumerable `__libraryTools` Map keyed by tool id on the composed environment, alongside `__libraryCharacterModifiers`. Gathering runtime consumers resolve task `toolIds` through this map before actor inventory checks, terminal breakage planning, terminal breakage application, and `usedTools` evidence.
 7. The library is per crafting system. Tools are not shared across crafting systems.
 
 ## Gathering Character Modifiers
@@ -444,7 +444,7 @@ GatheringTask = {
   resolutionMode: "progressive" | "routed" | "d100",
 
   catalysts: Catalyst[],
-  toolIds: string[],  // references gatheringConfig.systems[id].tools[].id; legacy tasks default to []
+  toolIds: string[],  // references gatheringConfig.systems[systemId].tools[].id; legacy tasks default to []
   visibility?: GatheringVisibilityGate,
   timeRequirement?: {
     minutes?: number,
@@ -894,7 +894,7 @@ For non-GM users, unrevealed blind tasks remain opaque in listing output: generi
 
 ### Purpose
 
-Tools represent per-task required equipment that may break across attempts and may need an actor-side requirement (for example a system-specific proficiency flag).
+Tools represent reusable per-system gathering tool library entries that tasks reference via `toolIds`. They may break across attempts and may need an actor-side requirement (for example a system-specific proficiency flag).
 
 ### Properties
 
@@ -922,7 +922,7 @@ Tool = {
 
 ### Requirements
 
-1. A task may reference zero or more required tools via `toolIds: string[]`. Each id references an entry in `gatheringConfig.systems[id].tools[]`; the composed environment's `__libraryTools` Map resolves each id to a `Tool` object at runtime. References whose id is no longer in the library are treated as not-present (and reported, but they do not by themselves block start). Task authoring UI lets the GM add and remove tool ids; inline `Tool` authoring on tasks is not supported — the per-system library is the single source of truth. All resolved tools are required (catalyst-style); the start-attempt gate blocks the attempt with `TOOL_BLOCKED` when any resolved tool is missing, broken, or fails its requirement.
+1. A task may reference zero or more required tools via `toolIds: string[]`. Each id references an entry in `gatheringConfig.systems[systemId].tools[]`; the composed environment's `__libraryTools` Map resolves each id to a `Tool` object at runtime. References whose id is no longer in the library, or that resolve to a disabled library tool, block start with `TOOL_BLOCKED` because the task's required equipment is misconfigured. Task authoring UI lets the GM add and remove tool ids; inline `Tool` authoring on tasks is not supported — the per-system library is the single source of truth. All resolved tools are required (catalyst-style); the start-attempt gate blocks the attempt with `TOOL_BLOCKED` when any resolved tool is missing from the actor, broken, or fails its requirement.
 2. Owned items with `flags.fabricate.toolBroken === true` do not satisfy tool presence; the gate must treat them as not-present until a GM clears the flag.
 3. The optional `requirement` is evaluated against the selected acting actor through the existing system-agnostic expression adapter. A system-provider truthy value (non-zero number, non-empty string, `true`) satisfies the requirement; macro returns may be a bare boolean or `{ allowed: boolean, description?: string }`.
 4. Exactly one `breakage.mode` is configured per tool. `limitedUses` uses the `flags.fabricate.toolUsage = { timesUsed }` item flag, incremented on each attempt; the tool breaks when `timesUsed >= maxUses` (after the increment) when `maxUses` is non-null. `breakageChance` breaks when `Math.random() * 100 < breakageChance`. `diceExpression` evaluates `formula` through the expression adapter; the tool breaks when the numeric result is `< threshold`.

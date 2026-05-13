@@ -293,6 +293,20 @@ test('validation covers selection modes, providers, progressive requirements, gr
   assert.equal(store.validate(environment({ selectionMode: 'blind', tasks: [routedTask({ id: 'a' }), routedTask({ id: 'b' })] })).valid, true);
 });
 
+test('targeted environments may compose gathering task-library records by enabledTaskIds', async () => {
+  const { store } = makeMemoryStore();
+  store.load();
+
+  const created = await store.create(environment({
+    id: 'env-library',
+    tasks: [],
+    enabledTaskIds: ['task-library-a', 'task-library-b']
+  }));
+
+  assert.deepEqual(created.tasks, []);
+  assert.deepEqual(created.enabledTaskIds, ['task-library-a', 'task-library-b']);
+});
+
 test('rich gathering metadata and task economy fields normalize and validate additively', async () => {
   const { store } = makeMemoryStore();
   store.load();

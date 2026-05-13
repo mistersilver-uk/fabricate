@@ -568,7 +568,7 @@ Unit tests must cover the full `degradesOnUse` x `maxUses` validation matrix:
 
 ### Purpose
 
-Represent one per-task required tool for gathering. Tools sit alongside catalysts on a gathering task; they may break across attempts and may require an actor-side expression to be truthy before they can be used.
+Represent one reusable gathering tool entry in a crafting system's per-system gathering tools library. Gathering tasks store `toolIds` references to these library entries; inline per-task tool authoring is not the canonical model. Tools may break across attempts and may require an actor-side expression to be truthy before they can be used.
 
 ### Properties
 
@@ -597,13 +597,14 @@ Tool = {
 ### Requirements
 
 1. `componentId` is required.
-2. `requirement` is optional. When present, the provider must be `dnd5e`, `pf2e`, or `macro`. Macro requirements require a non-empty `macroUuid`; system requirements require a non-empty `formula`.
-3. Exactly one `breakage.mode` is configured per tool:
+2. Tool entries are stored under `gatheringConfig.systems[systemId].tools` and are referenced from gathering tasks by `toolIds`.
+3. `requirement` is optional. When present, the provider must be `dnd5e`, `pf2e`, or `macro`. Macro requirements require a non-empty `macroUuid`; system requirements require a non-empty `formula`.
+4. Exactly one `breakage.mode` is configured per tool:
    - `limitedUses`: `maxUses` is null or a positive integer. Tool usage is tracked on the owned item via `flags.fabricate.toolUsage = { timesUsed }`. The tool breaks once `timesUsed >= maxUses` (after the per-attempt increment).
    - `breakageChance`: `breakageChance` is an integer in `0..100`. The tool breaks when `Math.random() * 100 < breakageChance` (so `0` never breaks and `100` always breaks).
    - `diceExpression`: `formula` is a non-empty Foundry roll formula evaluated against the actor's roll data; `threshold` is a finite number. The tool breaks when the numeric result is `< threshold`.
-4. Exactly one `onBreak.mode` is configured per tool. `replaceWith` requires `replacementComponentId !== componentId`.
-5. `flags.fabricate.toolBroken === true` on an owned item disqualifies it from satisfying a tool's presence gate until the flag is cleared.
+5. Exactly one `onBreak.mode` is configured per tool. `replaceWith` requires `replacementComponentId !== componentId`.
+6. `flags.fabricate.toolBroken === true` on an owned item disqualifies it from satisfying a tool's presence gate until the flag is cleared.
 
 ### Validation Matrix
 

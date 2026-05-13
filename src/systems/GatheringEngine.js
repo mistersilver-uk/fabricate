@@ -294,15 +294,28 @@ export class GatheringEngine {
       }
     }
 
-    const tools = normalizeList(task.tools);
-    if (tools.length > 0) {
+    const taskTools = this._resolveTaskTools({ environment, task });
+    if (this._hasBlockedToolReferences(taskTools)) {
+      return this._blockedStart({
+        viewer,
+        actor: selectedActor,
+        environment,
+        task,
+        reason: this._blockedReason('TOOL_BLOCKED', {
+          data: this._isOpaqueBlindTask({ environment, viewer })
+            ? null
+            : this._toolBlockedData({ task, resolvedTools: taskTools })
+        })
+      });
+    }
+    if (taskTools.tools.length > 0) {
       const toolResult = await this._checkTools({
         actor: selectedActor,
         viewer,
         system,
         environment,
         task,
-        tools
+        tools: taskTools.tools
       });
       if (toolResult.available !== true) {
         return this._blockedStart({
@@ -313,11 +326,7 @@ export class GatheringEngine {
           reason: this._blockedReason('TOOL_BLOCKED', {
             data: this._isOpaqueBlindTask({ environment, viewer })
               ? null
-              : {
-                  taskId: task.id,
-                  missing: normalizeList(toolResult.missing),
-                  failedRequirements: normalizeList(toolResult.failedRequirements)
-                }
+              : this._toolBlockedData({ task, resolvedTools: taskTools, toolResult })
           })
         });
       }
@@ -699,6 +708,14 @@ export class GatheringEngine {
           hazardPolicy: stringOrNull(snapshot?.hazardPolicy) || stringOrNull(environment?.hazardPolicy)
         }
       : null;
+    if (snapshotEnvironment && environment?.__libraryTools instanceof Map) {
+      Object.defineProperty(snapshotEnvironment, '__libraryTools', {
+        value: environment.__libraryTools,
+        enumerable: false,
+        configurable: true,
+        writable: true
+      });
+    }
     const currentTask = normalizeList(environment.tasks).find(task => task?.id === run.taskId) ?? null;
     const task = snapshotTask || currentTask;
     if (!task) {
@@ -902,25 +919,27 @@ export class GatheringEngine {
       }
     }
 
-    const tools = normalizeList(task.tools);
-    if (tools.length > 0) {
+    const taskTools = this._resolveTaskTools({ environment, task });
+    if (this._hasBlockedToolReferences(taskTools)) {
+      blockedReasons.push(this._blockedReason('TOOL_BLOCKED', {
+        data: this._isOpaqueBlindTask({ environment, viewer })
+          ? null
+          : this._toolBlockedData({ task, resolvedTools: taskTools })
+      }));
+    } else if (taskTools.tools.length > 0) {
       const toolResult = await this._checkTools({
         actor,
         viewer,
         system,
         environment,
         task,
-        tools
+        tools: taskTools.tools
       });
       if (toolResult.available !== true) {
         blockedReasons.push(this._blockedReason('TOOL_BLOCKED', {
           data: this._isOpaqueBlindTask({ environment, viewer })
             ? null
-            : {
-                taskId: task.id,
-                missing: normalizeList(toolResult.missing),
-                failedRequirements: normalizeList(toolResult.failedRequirements)
-              }
+            : this._toolBlockedData({ task, resolvedTools: taskTools, toolResult })
         }));
       }
     }
@@ -945,6 +964,44 @@ export class GatheringEngine {
     return catalysts.length === 0
       ? { available: true, missing: [] }
       : { available: false, missing: catalysts };
+  }
+
+  _resolveTaskTools({ environment, task }) {
+    const tools = [];
+    const missingToolIds = [];
+    const disabledToolIds = [];
+    const library = environment?.__libraryTools instanceof Map ? environment.__libraryTools : new Map();
+
+    for (const toolId of normalizeStringList(task?.toolIds)) {
+      const tool = library.get(toolId) ?? null;
+      if (!tool) {
+        missingToolIds.push(toolId);
+        continue;
+      }
+      if (tool.enabled === false) {
+        disabledToolIds.push(toolId);
+        continue;
+      }
+      tools.push(tool);
+    }
+
+    tools.push(...normalizeList(task?.tools));
+    return { tools, missingToolIds, disabledToolIds };
+  }
+
+  _hasBlockedToolReferences(resolvedTools) {
+    return normalizeList(resolvedTools?.missingToolIds).length > 0
+      || normalizeList(resolvedTools?.disabledToolIds).length > 0;
+  }
+
+  _toolBlockedData({ task, resolvedTools, toolResult = null }) {
+    return {
+      taskId: stringOrNull(task?.id),
+      missingToolIds: normalizeList(resolvedTools?.missingToolIds),
+      disabledToolIds: normalizeList(resolvedTools?.disabledToolIds),
+      missing: normalizeList(toolResult?.missing),
+      failedRequirements: normalizeList(toolResult?.failedRequirements)
+    };
   }
 
   async _checkTools({ actor, viewer, system, environment, task, tools }) {
@@ -1704,7 +1761,18 @@ export class GatheringEngine {
   }
 
   async _planTerminalTools({ viewer, actor, system, environment, task, outcome, checkResult }) {
-    const tools = normalizeList(task.tools);
+    const resolvedTools = this._resolveTaskTools({ environment, task });
+    if (this._hasBlockedToolReferences(resolvedTools)) {
+      return misconfiguredOutcome({
+        code: 'TOOL_REFERENCE_UNRESOLVED',
+        diagnostics: [{
+          code: 'TOOL_REFERENCE_UNRESOLVED',
+          missingToolIds: normalizeList(resolvedTools.missingToolIds),
+          disabledToolIds: normalizeList(resolvedTools.disabledToolIds)
+        }]
+      });
+    }
+    const tools = resolvedTools.tools;
     if (tools.length === 0 || typeof this.toolBreakage?.plan !== 'function') {
       return [];
     }
@@ -1729,7 +1797,8 @@ export class GatheringEngine {
   }
 
   async _applyTerminalTools({ viewer, actor, system, environment, task, outcome }) {
-    const tools = normalizeList(task.tools);
+    const resolvedTools = this._resolveTaskTools({ environment, task });
+    const tools = resolvedTools.tools;
     if (tools.length === 0 || typeof this.toolBreakage?.apply !== 'function') {
       return [];
     }

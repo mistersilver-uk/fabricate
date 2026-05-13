@@ -16,6 +16,19 @@ const MythwrightDnd5eBootstrap = (() => {
   const MYTHWRIGHT_ICONS = Object.freeze({
     defaultItem: DEFAULT_ITEM_ICON,
     macro: 'icons/tools/smithing/anvil.webp',
+    miningPick: 'icons/tools/hand/pickaxe-steel-white.webp',
+    woodAxe: 'icons/tools/hand/hatchet-steel-grey.webp',
+    skinningKnife: 'icons/tools/cooking/knife-cleaver-steel-grey.webp',
+    delverKit: 'icons/containers/bags/pack-leather-brown.webp',
+    planarBindingRod: 'icons/weapons/staves/staff-ornate-gold-jeweled.webp',
+    dragonTongs: 'icons/tools/smithing/tongs-steel-grey.webp',
+    brokenMiningPick: 'icons/tools/hand/pickaxe-steel-grey.webp',
+    brokenWoodAxe: 'icons/tools/hand/hatchet-steel-grey.webp',
+    brokenSkinningKnife: 'icons/tools/cooking/knife-cleaver-steel-grey.webp',
+    brokenDelverKit: 'icons/containers/bags/pack-leather-tan.webp',
+    brokenPlanarBindingRod: 'icons/weapons/staves/staff-mended.webp',
+    brokenDragonTongs: 'icons/tools/smithing/tongs-steel-grey.webp',
+    gemstone: 'icons/commodities/gems/gem-faceted-rough-blue.webp',
     rawOre: 'icons/commodities/stone/ore-pile-grey.webp',
     hardwood: 'icons/commodities/wood/lumber-stack-brown.webp',
     curedHide: 'icons/commodities/leather/leather-bolt-tan.webp',
@@ -192,6 +205,19 @@ const MythwrightDnd5eBootstrap = (() => {
   ];
 
   const BASE_ITEMS = [
+    ['tool-mining-pick', 'Mythwright Mining Pick', 'Mythwright > Tools & Catalysts', MYTHWRIGHT_ICONS.miningPick],
+    ['tool-wood-axe', 'Mythwright Wood Axe', 'Mythwright > Tools & Catalysts', MYTHWRIGHT_ICONS.woodAxe],
+    ['tool-skinning-knife', 'Mythwright Skinning Knife', 'Mythwright > Tools & Catalysts', MYTHWRIGHT_ICONS.skinningKnife],
+    ['tool-delver-kit', 'Mythwright Delver Kit', 'Mythwright > Tools & Catalysts', MYTHWRIGHT_ICONS.delverKit],
+    ['tool-planar-binding-rod', 'Mythwright Planar Binding Rod', 'Mythwright > Tools & Catalysts', MYTHWRIGHT_ICONS.planarBindingRod],
+    ['tool-dragon-tongs', 'Mythwright Dragon Tongs', 'Mythwright > Tools & Catalysts', MYTHWRIGHT_ICONS.dragonTongs],
+    ['broken-tool-mining-pick', 'Broken Mythwright Mining Pick', 'Mythwright > Tools & Catalysts', MYTHWRIGHT_ICONS.brokenMiningPick],
+    ['broken-tool-wood-axe', 'Broken Mythwright Wood Axe', 'Mythwright > Tools & Catalysts', MYTHWRIGHT_ICONS.brokenWoodAxe],
+    ['broken-tool-skinning-knife', 'Broken Mythwright Skinning Knife', 'Mythwright > Tools & Catalysts', MYTHWRIGHT_ICONS.brokenSkinningKnife],
+    ['broken-tool-delver-kit', 'Broken Mythwright Delver Kit', 'Mythwright > Tools & Catalysts', MYTHWRIGHT_ICONS.brokenDelverKit],
+    ['broken-tool-planar-binding-rod', 'Broken Mythwright Planar Binding Rod', 'Mythwright > Tools & Catalysts', MYTHWRIGHT_ICONS.brokenPlanarBindingRod],
+    ['broken-tool-dragon-tongs', 'Broken Mythwright Dragon Tongs', 'Mythwright > Tools & Catalysts', MYTHWRIGHT_ICONS.brokenDragonTongs],
+    ['gemstone', 'Gemstone', 'Mythwright > Gathered components', MYTHWRIGHT_ICONS.gemstone],
     ['raw-ore', 'Raw Ore', 'Mythwright > Ingredients > Mundane', MYTHWRIGHT_ICONS.rawOre],
     ['hardwood', 'Hardwood', 'Mythwright > Ingredients > Mundane', MYTHWRIGHT_ICONS.hardwood],
     ['cured-hide', 'Cured Hide', 'Mythwright > Ingredients > Mundane', MYTHWRIGHT_ICONS.curedHide],
@@ -216,6 +242,19 @@ const MythwrightDnd5eBootstrap = (() => {
     ['relic-shadow-dagger', 'Shadow Dagger', 'Mythwright > Relics', MYTHWRIGHT_ICONS.relicShadowDagger]
   ];
   const BASE_ITEM_DESCRIPTIONS = Object.freeze({
+    'tool-mining-pick': 'A sturdy pick balanced for splitting ore seams without shattering useful stone.',
+    'tool-wood-axe': 'A sharp camp axe for felling branches, trimming hardwood, and shaping rough hafts.',
+    'tool-skinning-knife': 'A narrow field knife made for clean cuts through hide, sinew, and trophy work.',
+    'tool-delver-kit': 'A compact kit of brushes, wedges, cord, chalk, and probes for careful ruin work.',
+    'tool-planar-binding-rod': 'An etched rod that steadies volatile planar matter long enough to bind it safely.',
+    'tool-dragon-tongs': 'Long heat-scarred tongs built to grip scale, slag, and hoard-metal without bending.',
+    'broken-tool-mining-pick': 'A cracked mining pick head and split haft, useful only as repair stock.',
+    'broken-tool-wood-axe': 'A dulled axe with a damaged eye and loose haft, waiting for careful repair.',
+    'broken-tool-skinning-knife': 'A chipped skinning knife whose edge can no longer hold a clean field cut.',
+    'broken-tool-delver-kit': 'A scattered delver kit with snapped probes, torn straps, and missing wedges.',
+    'broken-tool-planar-binding-rod': 'A binding rod with broken inlay and unstable resonance.',
+    'broken-tool-dragon-tongs': 'Heat-warped tongs that no longer close true around dangerous material.',
+    gemstone: 'A bright cut or rough gemstone worth saving for trade, inlay, or precision crafting.',
     'raw-ore': 'Unrefined ore split from stubborn stone, ready to be smelted into honest crafting metal.',
     hardwood: 'Seasoned hardwood with a tight grain, prized for handles, hafts, bows, and reinforced frames.',
     'cured-hide': 'Supple cured hide prepared for straps, grips, padding, and layered armour work.',
@@ -878,6 +917,193 @@ const MythwrightDnd5eBootstrap = (() => {
     };
   }
 
+  const MYTHWRIGHT_GATHERING_TOOL_DEFINITIONS = Object.freeze([
+    ['mythwright-tool-mining-pick', 'Mining Pick', 'tool-mining-pick', 'broken-tool-mining-pick', 8],
+    ['mythwright-tool-wood-axe', 'Wood Axe', 'tool-wood-axe', 'broken-tool-wood-axe', 6],
+    ['mythwright-tool-skinning-knife', 'Skinning Knife', 'tool-skinning-knife', 'broken-tool-skinning-knife', 5],
+    ['mythwright-tool-delver-kit', 'Delver Kit', 'tool-delver-kit', 'broken-tool-delver-kit', 10],
+    ['mythwright-tool-planar-binding-rod', 'Planar Binding Rod', 'tool-planar-binding-rod', 'broken-tool-planar-binding-rod', 12],
+    ['mythwright-tool-dragon-tongs', 'Dragon Tongs', 'tool-dragon-tongs', 'broken-tool-dragon-tongs', 15]
+  ]);
+
+  const MYTHWRIGHT_TOOL_REPAIR_MATERIALS = Object.freeze({
+    'tool-mining-pick': ['broken-tool-mining-pick', 'iron-ingot', 'hardwood'],
+    'tool-wood-axe': ['broken-tool-wood-axe', 'iron-ingot', 'hardwood'],
+    'tool-skinning-knife': ['broken-tool-skinning-knife', 'iron-ingot', 'cured-hide'],
+    'tool-delver-kit': ['broken-tool-delver-kit', 'hardwood', 'cured-hide'],
+    'tool-planar-binding-rod': ['broken-tool-planar-binding-rod', 'ancient-fragment', 'storm'],
+    'tool-dragon-tongs': ['broken-tool-dragon-tongs', 'iron-ingot', 'dragon-scale']
+  });
+
+  function buildGatheringTools() {
+    return MYTHWRIGHT_GATHERING_TOOL_DEFINITIONS.map(([id, label, componentId, replacementComponentId, breakageChance]) => ({
+      id,
+      label,
+      enabled: true,
+      componentId,
+      requirement: null,
+      breakage: { mode: 'breakageChance', breakageChance },
+      onBreak: { mode: 'replaceWith', replacementComponentId }
+    }));
+  }
+
+  function buildRepairRecipeForTool(toolDefinition) {
+    const [, label, componentId] = toolDefinition;
+    const materials = MYTHWRIGHT_TOOL_REPAIR_MATERIALS[componentId] || [];
+    const recipeId = `mythwright-repair-${componentId.replace(/^tool-/, '')}`;
+    return {
+      id: recipeId,
+      name: `Repair ${label}`,
+      description: `Repair a broken ${label.toLowerCase()} with matching Mythwright materials so it can return to the field.`,
+      img: MYTHWRIGHT_ICONS[componentIdToIconKey(componentId)] || DEFAULT_ITEM_ICON,
+      category: 'Tools',
+      craftingSystemId: SYSTEM_ID,
+      system: 'dnd5e',
+      tags: [],
+      enabled: true,
+      resultSelection: { provider: 'ingredientSet' },
+      steps: [{
+        id: `${recipeId}-restore`,
+        name: 'Restore Tool',
+        ingredientSets: [ingredientSet(`${recipeId}-restore-set`, materials, 'standard')],
+        resultSelection: { provider: 'ingredientSet' },
+        resultGroups: [resultGroup('standard', 'Standard', componentId)]
+      }]
+    };
+  }
+
+  function componentIdToIconKey(componentId) {
+    return {
+      'tool-mining-pick': 'miningPick',
+      'tool-wood-axe': 'woodAxe',
+      'tool-skinning-knife': 'skinningKnife',
+      'tool-delver-kit': 'delverKit',
+      'tool-planar-binding-rod': 'planarBindingRod',
+      'tool-dragon-tongs': 'dragonTongs'
+    }[componentId];
+  }
+
+  function buildToolRepairRecipes() {
+    return MYTHWRIGHT_GATHERING_TOOL_DEFINITIONS.map(buildRepairRecipeForTool);
+  }
+
+  function gatheringDrop({ id, name, componentId = null, itemName = null, srdByName = new Map(), quantity = 1, dropRate = 50 }) {
+    const row = {
+      id,
+      name,
+      quantity,
+      dropRate,
+      enabled: true
+    };
+    if (componentId) row.componentId = componentId;
+    const target = itemName ? srdByName.get(normalizeName(itemName)) : null;
+    if (!componentId && target?.item?.uuid) row.itemUuid = target.item.uuid;
+    if (!row.componentId && !row.itemUuid) return null;
+    return row;
+  }
+
+  function buildGatheringTasks({ srdByName = new Map() } = {}) {
+    const drop = options => gatheringDrop({ ...options, srdByName });
+    return [
+      {
+        id: 'mine-ore',
+        name: 'Extract Ore and Gemstone',
+        enabled: true,
+        biomes: ['cave', 'mountain'],
+        toolIds: ['mythwright-tool-mining-pick'],
+        itemSelectionMode: 'allDrops',
+        dropRows: [
+          drop({ id: 'mine-ore-raw', name: 'Raw Ore', componentId: 'raw-ore', quantity: 2, dropRate: 90 }),
+          drop({ id: 'mine-ore-ingot', name: 'Iron Ingot', componentId: 'iron-ingot', dropRate: 45 }),
+          drop({ id: 'mine-ore-gemstone', name: 'Gemstone', componentId: 'gemstone', dropRate: 25 }),
+          drop({ id: 'mine-ore-war-pick', name: 'Found War Pick', itemName: 'War Pick', dropRate: 8 })
+        ].filter(Boolean)
+      },
+      {
+        id: 'wild-hardwood',
+        name: 'Cut Hardwood',
+        enabled: true,
+        biomes: ['forest', 'grassland'],
+        toolIds: ['mythwright-tool-wood-axe'],
+        itemSelectionMode: 'allDrops',
+        dropRows: [
+          drop({ id: 'wild-hardwood-stock', name: 'Hardwood', componentId: 'hardwood', quantity: 2, dropRate: 85 }),
+          drop({ id: 'wild-hardwood-bow-stave', name: 'Bow Stave', componentId: 'bow-stave', dropRate: 25 }),
+          drop({ id: 'wild-hardwood-handaxe', name: 'Found Handaxe', itemName: 'Handaxe', dropRate: 10 })
+        ].filter(Boolean)
+      },
+      {
+        id: 'wild-hide',
+        name: 'Dress Hides and Trophies',
+        enabled: true,
+        biomes: ['forest', 'grassland'],
+        toolIds: ['mythwright-tool-skinning-knife'],
+        itemSelectionMode: 'allDrops',
+        dropRows: [
+          drop({ id: 'wild-hide-cured', name: 'Cured Hide', componentId: 'cured-hide', quantity: 2, dropRate: 80 }),
+          drop({ id: 'wild-hide-trophy', name: 'Monster Trophy', componentId: 'monster-trophy', dropRate: 35 }),
+          drop({ id: 'wild-hide-leather', name: 'Found Leather Armor', itemName: 'Leather Armor', dropRate: 8 })
+        ].filter(Boolean)
+      },
+      {
+        id: 'ruin-relics',
+        name: 'Excavate Ruin Relics',
+        enabled: true,
+        biomes: ['ruins', 'urban'],
+        toolIds: ['mythwright-tool-delver-kit'],
+        itemSelectionMode: 'allDrops',
+        dropRows: [
+          drop({ id: 'ruin-relics-fragment', name: 'Ancient Fragment', componentId: 'ancient-fragment', quantity: 2, dropRate: 80 }),
+          drop({ id: 'ruin-relics-gemstone', name: 'Gemstone', componentId: 'gemstone', dropRate: 30 }),
+          drop({ id: 'ruin-relics-shield', name: 'Buried Shield', itemName: 'Shield', dropRate: 12 }),
+          drop({ id: 'ruin-relics-rapier', name: 'Preserved Rapier', itemName: 'Rapier', dropRate: 7 })
+        ].filter(Boolean)
+      },
+      {
+        id: 'battlefield-salvage',
+        name: 'Salvage Battlefield Gear',
+        enabled: true,
+        biomes: ['wasteland', 'grassland'],
+        toolIds: ['mythwright-tool-delver-kit', 'mythwright-tool-skinning-knife'],
+        itemSelectionMode: 'allDrops',
+        dropRows: [
+          drop({ id: 'battlefield-salvage-trophy', name: 'Monster Trophy', componentId: 'monster-trophy', dropRate: 45 }),
+          drop({ id: 'battlefield-salvage-plates', name: 'Armour Plates', componentId: 'armour-plates', dropRate: 35 }),
+          drop({ id: 'battlefield-salvage-shield', name: 'Recovered Shield', itemName: 'Shield', dropRate: 15 }),
+          drop({ id: 'battlefield-salvage-longsword', name: 'Recovered Longsword', itemName: 'Longsword', dropRate: 8 }),
+          drop({ id: 'battlefield-salvage-chain-mail', name: 'Recovered Chain Mail', itemName: 'Chain Mail', dropRate: 4 })
+        ].filter(Boolean)
+      },
+      {
+        id: 'planar-essence',
+        name: 'Bind Planar Essence',
+        enabled: true,
+        toolIds: ['mythwright-tool-planar-binding-rod'],
+        itemSelectionMode: 'allDrops',
+        dropRows: [
+          drop({ id: 'planar-essence-ember', name: 'Ember Essence', componentId: 'ember', dropRate: 35 }),
+          drop({ id: 'planar-essence-frost', name: 'Frost Essence', componentId: 'frost', dropRate: 35 }),
+          drop({ id: 'planar-essence-storm', name: 'Storm Essence', componentId: 'storm', dropRate: 35 }),
+          drop({ id: 'planar-essence-radiance', name: 'Radiance Essence', componentId: 'radiance', dropRate: 20 }),
+          drop({ id: 'planar-essence-shadow', name: 'Shadow Essence', componentId: 'shadow', dropRate: 20 })
+        ].filter(Boolean)
+      },
+      {
+        id: 'dragon-scale',
+        name: 'Harvest Dragon Scale',
+        enabled: true,
+        toolIds: ['mythwright-tool-dragon-tongs'],
+        itemSelectionMode: 'allDrops',
+        dropRows: [
+          drop({ id: 'dragon-scale-scale', name: 'Dragon Scale', componentId: 'dragon-scale', quantity: 2, dropRate: 70 }),
+          drop({ id: 'dragon-scale-essence', name: 'Dragon Essence', componentId: 'dragon', dropRate: 35 }),
+          drop({ id: 'dragon-scale-catalyst', name: 'Mythic Catalyst', componentId: 'mythic-catalyst', dropRate: 18 }),
+          drop({ id: 'dragon-scale-gemstone', name: 'Gemstone', componentId: 'gemstone', dropRate: 30 })
+        ].filter(Boolean)
+      }
+    ];
+  }
+
   function buildRecipeForSrd(target, components) {
     const baseId = components.get(idFromName(target.type === 'weapon' ? 'weapon' : 'armor', target.name))?.id;
     const intermediate = target.type === 'weapon' ? 'weapon-core' : 'armour-plates';
@@ -1039,7 +1265,7 @@ const MythwrightDnd5eBootstrap = (() => {
         sourceItemUuid: worldItems.get(essence.id)?.uuid || null
       })),
       itemTags: itemTagsForSystem(),
-      categories: ['Weapons', 'Armour', 'Relics'],
+      categories: ['Weapons', 'Armour', 'Relics', 'Tools'],
       components
     };
   }
@@ -1054,15 +1280,44 @@ const MythwrightDnd5eBootstrap = (() => {
       economyMode: 'time',
       selectionMode: 'targeted',
       enabled: true,
-      tasks: tasks.map(task => ({
-        id: task.id,
-        name: task.name,
-        enabled: true,
-        resolutionMode: 'routed',
-        resultSelection: { provider: 'macroOutcome', macroUuid: task.macroUuid || '' },
-        resultGroups: task.groups
-      }))
+      tasks: [],
+      enabledTaskIds: tasks.map(task => task.id),
+      disabledTaskIds: []
     };
+  }
+
+  function upsertById(existing, nextEntries) {
+    const byId = new Map(collectionValues(existing).filter(entry => entry?.id).map(entry => [String(entry.id), entry]));
+    for (const entry of nextEntries) {
+      byId.set(String(entry.id), entry);
+    }
+    return Array.from(byId.values());
+  }
+
+  async function seedGatheringConfig({ tools = [], tasks = [] } = {}, summary = null) {
+    const settings = globalThis.game?.settings;
+    if (typeof settings?.get !== 'function' || typeof settings?.set !== 'function') {
+      return { updated: false, tools: 0, tasks: 0 };
+    }
+    const current = clonePlain(settings.get('fabricate', 'gatheringConfig') || {});
+    current.systems = current.systems && typeof current.systems === 'object' ? current.systems : {};
+    const systemConfig = current.systems[SYSTEM_ID] && typeof current.systems[SYSTEM_ID] === 'object'
+      ? current.systems[SYSTEM_ID]
+      : {};
+    systemConfig.tools = upsertById(systemConfig.tools || [], tools);
+    systemConfig.tasks = upsertById(systemConfig.tasks || [], tasks);
+    systemConfig.rules = {
+      ...(systemConfig.rules || {}),
+      toolBreakagePolicy: systemConfig.rules?.toolBreakagePolicy || 'failureOnBreak'
+    };
+    current.systems[SYSTEM_ID] = systemConfig;
+    await settings.set('fabricate', 'gatheringConfig', current);
+    if (summary) summary.gatheringConfig = { tools: tools.length, tasks: tasks.length };
+    return { updated: true, tools: tools.length, tasks: tasks.length };
+  }
+
+  function clonePlain(value) {
+    return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
   }
 
   function macroCommand() {
@@ -1136,6 +1391,7 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
       system: 'skipped',
       recipes: { created: 0, updated: 0 },
       environments: { created: 0, updated: 0 },
+      gatheringConfig: { tools: 0, tasks: 0 },
       macro: null
     };
 
@@ -1196,9 +1452,12 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
     }
 
     const macro = await ensureMacro(summary);
+    const gatheringTools = buildGatheringTools();
+    const gatheringTasks = buildGatheringTasks({ srdByName });
     const systemManager = globalThis.game.fabricate.getCraftingSystemManager();
     const recipeManager = globalThis.game.fabricate.getRecipeManager();
     const environmentStore = globalThis.game.fabricate.getGatheringEnvironmentStore?.();
+    await seedGatheringConfig({ tools: gatheringTools, tasks: gatheringTasks }, summary);
 
     const srdQualityComponentIds = new Set(srd.resolved.flatMap(target =>
       MUNDANE_QUALITY
@@ -1261,25 +1520,19 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
     await upsertRecipe(recipeManager, buildRelicRecipe('relic-storm-bow', 'Storm-Forged Bow', 'storm'), summary);
     await upsertRecipe(recipeManager, buildRelicRecipe('relic-radiant-shield', 'Radiant Shield', 'radiance'), summary);
     await upsertRecipe(recipeManager, buildRelicRecipe('relic-shadow-dagger', 'Shadow Dagger', 'shadow'), summary);
+    for (const recipe of buildToolRepairRecipes()) {
+      await upsertRecipe(recipeManager, recipe, summary);
+    }
 
     if (environmentStore) {
-      const standardTask = (id, name, componentId) => ({
-        id,
-        name,
-        macroUuid: macro.uuid,
-        groups: [
-          resultGroup('flawed', 'Flawed', componentId),
-          resultGroup('standard', 'Standard', componentId),
-          resultGroup('fine', 'Fine', componentId)
-        ]
-      });
+      const taskById = new Map(gatheringTasks.map(task => [task.id, task]));
       const environments = [
-        buildEnvironment('mythwright-mines', 'Mines', 'hazardous', [standardTask('mine-ore', 'Extract Ore', 'raw-ore')]),
-        buildEnvironment('mythwright-wilds', 'Wilds', 'safe', [standardTask('wild-hardwood', 'Harvest Hardwood', 'hardwood')]),
-        buildEnvironment('mythwright-ruins', 'Ruins', 'unsafe', [standardTask('ruin-fragment', 'Recover Ancient Fragments', 'ancient-fragment')]),
-        buildEnvironment('mythwright-battlefields', 'Battlefields', 'hazardous', [standardTask('battle-trophy', 'Scavenge Trophies', 'monster-trophy')]),
-        buildEnvironment('mythwright-planar-sites', 'Planar Sites', 'extreme', [standardTask('planar-essence', 'Bind Planar Essence', 'storm')]),
-        buildEnvironment('mythwright-dragon-lairs', 'Dragon Lairs', 'extreme', [standardTask('dragon-scale', 'Harvest Dragon Scale', 'dragon-scale')])
+        buildEnvironment('mythwright-mines', 'Mines', 'hazardous', [taskById.get('mine-ore')].filter(Boolean)),
+        buildEnvironment('mythwright-wilds', 'Wilds', 'safe', ['wild-hardwood', 'wild-hide'].map(id => taskById.get(id)).filter(Boolean)),
+        buildEnvironment('mythwright-ruins', 'Ruins', 'unsafe', [taskById.get('ruin-relics')].filter(Boolean)),
+        buildEnvironment('mythwright-battlefields', 'Battlefields', 'hazardous', [taskById.get('battlefield-salvage')].filter(Boolean)),
+        buildEnvironment('mythwright-planar-sites', 'Planar Sites', 'extreme', [taskById.get('planar-essence')].filter(Boolean)),
+        buildEnvironment('mythwright-dragon-lairs', 'Dragon Lairs', 'extreme', [taskById.get('dragon-scale')].filter(Boolean))
       ];
       for (const environment of environments) {
         await upsertEnvironment(environmentStore, environment, summary);
@@ -1298,6 +1551,8 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
     DND5E_EQUIPMENT24_SRD_ITEMS,
     SRD_WEAPONS,
     SRD_ARMOUR,
+    MYTHWRIGHT_GATHERING_TOOL_DEFINITIONS,
+    MYTHWRIGHT_TOOL_REPAIR_MATERIALS,
     ELEMENTAL_VARIANTS,
     ELEMENTAL_QUALITY,
     APPROVED_MYTHWRIGHT_ICON_PATHS,
@@ -1321,6 +1576,10 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
     buildRecipeForSrd,
     buildRelicRecipe,
     buildElementalRecipe,
+    buildGatheringTools,
+    buildGatheringTasks,
+    buildToolRepairRecipes,
+    seedGatheringConfig,
     elementalQualityById,
     elementalVariantQualityId,
     elementalVariantQualityName,

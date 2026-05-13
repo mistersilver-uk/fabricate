@@ -425,10 +425,11 @@ export class GatheringEnvironmentStore {
       errors.push(`Environment "${label}" selectionMode must be targeted or blind`);
     }
 
-    if (normalized.selectionMode === 'targeted' && normalized.tasks.length < 1) {
+    const hasTaskSource = normalized.tasks.length > 0 || normalized.enabledTaskIds.length > 0;
+    if (normalized.selectionMode === 'targeted' && !hasTaskSource) {
       errors.push(`Environment "${label}" targeted selection requires at least one task`);
     }
-    if (normalized.selectionMode === 'blind' && normalized.tasks.length < 1) {
+    if (normalized.selectionMode === 'blind' && !hasTaskSource) {
       errors.push(`Environment "${label}" blind selection requires at least one task`);
     }
     if (!VALID_RISK_LEVELS.has(original?.risk ?? normalized.risk)) {
