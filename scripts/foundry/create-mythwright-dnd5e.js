@@ -1007,7 +1007,7 @@ const MythwrightDnd5eBootstrap = (() => {
     return [
       {
         id: 'mine-ore',
-        name: 'Extract Ore and Gemstone',
+        name: 'Extract Ore',
         enabled: true,
         biomes: ['cave', 'mountain'],
         toolIds: ['mythwright-tool-mining-pick'],
@@ -1016,7 +1016,7 @@ const MythwrightDnd5eBootstrap = (() => {
           drop({ id: 'mine-ore-raw', name: 'Raw Ore', componentId: 'raw-ore', quantity: 2, dropRate: 90 }),
           drop({ id: 'mine-ore-ingot', name: 'Iron Ingot', componentId: 'iron-ingot', dropRate: 45 }),
           drop({ id: 'mine-ore-gemstone', name: 'Gemstone', componentId: 'gemstone', dropRate: 25 }),
-          drop({ id: 'mine-ore-war-pick', name: 'Found War Pick', itemName: 'War Pick', dropRate: 8 })
+          drop({ id: 'mine-ore-war-pick', name: 'War Pick', itemName: 'War Pick', dropRate: 8 })
         ].filter(Boolean)
       },
       {
@@ -1029,7 +1029,7 @@ const MythwrightDnd5eBootstrap = (() => {
         dropRows: [
           drop({ id: 'wild-hardwood-stock', name: 'Hardwood', componentId: 'hardwood', quantity: 2, dropRate: 85 }),
           drop({ id: 'wild-hardwood-bow-stave', name: 'Bow Stave', componentId: 'bow-stave', dropRate: 25 }),
-          drop({ id: 'wild-hardwood-handaxe', name: 'Found Handaxe', itemName: 'Handaxe', dropRate: 10 })
+          drop({ id: 'wild-hardwood-handaxe', name: 'Handaxe', itemName: 'Handaxe', dropRate: 10 })
         ].filter(Boolean)
       },
       {
@@ -1042,7 +1042,7 @@ const MythwrightDnd5eBootstrap = (() => {
         dropRows: [
           drop({ id: 'wild-hide-cured', name: 'Cured Hide', componentId: 'cured-hide', quantity: 2, dropRate: 80 }),
           drop({ id: 'wild-hide-trophy', name: 'Monster Trophy', componentId: 'monster-trophy', dropRate: 35 }),
-          drop({ id: 'wild-hide-leather', name: 'Found Leather Armor', itemName: 'Leather Armor', dropRate: 8 })
+          drop({ id: 'wild-hide-leather', name: 'Leather Armor', itemName: 'Leather Armor', dropRate: 8 })
         ].filter(Boolean)
       },
       {
@@ -1055,8 +1055,8 @@ const MythwrightDnd5eBootstrap = (() => {
         dropRows: [
           drop({ id: 'ruin-relics-fragment', name: 'Ancient Fragment', componentId: 'ancient-fragment', quantity: 2, dropRate: 80 }),
           drop({ id: 'ruin-relics-gemstone', name: 'Gemstone', componentId: 'gemstone', dropRate: 30 }),
-          drop({ id: 'ruin-relics-shield', name: 'Buried Shield', itemName: 'Shield', dropRate: 12 }),
-          drop({ id: 'ruin-relics-rapier', name: 'Preserved Rapier', itemName: 'Rapier', dropRate: 7 })
+          drop({ id: 'ruin-relics-shield', name: 'Shield', itemName: 'Shield', dropRate: 12 }),
+          drop({ id: 'ruin-relics-rapier', name: 'Rapier', itemName: 'Rapier', dropRate: 7 })
         ].filter(Boolean)
       },
       {
@@ -1069,9 +1069,9 @@ const MythwrightDnd5eBootstrap = (() => {
         dropRows: [
           drop({ id: 'battlefield-salvage-trophy', name: 'Monster Trophy', componentId: 'monster-trophy', dropRate: 45 }),
           drop({ id: 'battlefield-salvage-plates', name: 'Armour Plates', componentId: 'armour-plates', dropRate: 35 }),
-          drop({ id: 'battlefield-salvage-shield', name: 'Recovered Shield', itemName: 'Shield', dropRate: 15 }),
-          drop({ id: 'battlefield-salvage-longsword', name: 'Recovered Longsword', itemName: 'Longsword', dropRate: 8 }),
-          drop({ id: 'battlefield-salvage-chain-mail', name: 'Recovered Chain Mail', itemName: 'Chain Mail', dropRate: 4 })
+          drop({ id: 'battlefield-salvage-shield', name: 'Shield', itemName: 'Shield', dropRate: 15 }),
+          drop({ id: 'battlefield-salvage-longsword', name: 'Longsword', itemName: 'Longsword', dropRate: 8 }),
+          drop({ id: 'battlefield-salvage-chain-mail', name: 'Chain Mail', itemName: 'Chain Mail', dropRate: 4 })
         ].filter(Boolean)
       },
       {

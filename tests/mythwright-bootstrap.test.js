@@ -638,11 +638,14 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     const tasks = helper.buildGatheringTasks({
       srdByName: new Map([
         [helper.normalizeName('Longsword'), { item: { uuid: 'Compendium.dnd5e.equipment24.Item.phbwepLongsword0' } }],
+        [helper.normalizeName('Leather Armor'), { item: { uuid: 'Compendium.dnd5e.equipment24.Item.phbarmLeatherArm' } }],
         [helper.normalizeName('Shield'), { item: { uuid: 'Compendium.dnd5e.equipment24.Item.phbarmShield0000' } }]
       ])
     });
     const byId = new Map(tasks.map(task => [task.id, task]));
+    const rowNames = tasks.flatMap(task => task.dropRows.map(row => row.name));
 
+    assert.equal(byId.get('mine-ore').name, 'Extract Ore');
     assert.deepEqual(byId.get('mine-ore').toolIds, ['mythwright-tool-mining-pick']);
     assert.deepEqual(byId.get('battlefield-salvage').toolIds, [
       'mythwright-tool-delver-kit',
@@ -650,6 +653,8 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     ]);
     assert.ok(tasks.every(task => task.dropRows.length > 0));
     assert.ok(tasks.every(task => task.dropRows.every(row => row.componentId || row.itemUuid)));
+    assert.equal(rowNames.some(name => /^(Found|Recovered|Buried|Preserved)\b/.test(name)), false);
+    assert.ok(rowNames.includes('Leather Armor'));
     assert.ok(byId.get('battlefield-salvage').dropRows.some(row => row.itemUuid === 'Compendium.dnd5e.equipment24.Item.phbwepLongsword0'));
   });
 
