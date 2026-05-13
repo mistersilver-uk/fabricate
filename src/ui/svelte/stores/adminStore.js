@@ -1624,16 +1624,20 @@ export function createAdminStore(services) {
 
   async function _confirmGatheringLibraryRecordDelete({ systemId, record, kind }) {
     const usages = _gatheringLibraryRecordUsages(systemId, record, kind);
-    if (usages.length === 0) return true;
     const label = kind === 'hazard' ? 'reusable gathering hazard' : 'gathering task';
-    const usageList = usages
-      .slice(0, 6)
-      .map(usage => `<li>${_escapeHtml(usage.name)}</li>`)
-      .join('');
-    const overflow = usages.length > 6 ? `<li>${_escapeHtml(`and ${usages.length - 6} more`)}</li>` : '';
+    const name = _escapeHtml(record?.name || record?.id || label);
+    let content = `<p>Delete ${label} <strong>${name}</strong>? This action cannot be undone.</p>`;
+    if (usages.length > 0) {
+      const usageList = usages
+        .slice(0, 6)
+        .map(usage => `<li>${_escapeHtml(usage.name)}</li>`)
+        .join('');
+      const overflow = usages.length > 6 ? `<li>${_escapeHtml(`and ${usages.length - 6} more`)}</li>` : '';
+      content += `<p>This ${label} is currently used by ${usages.length} environment(s):</p><ul>${usageList}${overflow}</ul>`;
+    }
     return await services.confirmDialog?.({
       title: `Delete ${label}?`,
-      content: `<p>Delete ${label} <strong>${_escapeHtml(record?.name || record?.id || label)}</strong>?</p><p>This ${label} is currently used by ${usages.length} environment(s):</p><ul>${usageList}${overflow}</ul>`,
+      content,
       yes: () => true,
       no: () => false
     }) === true;

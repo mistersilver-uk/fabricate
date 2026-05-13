@@ -2677,8 +2677,72 @@ describe('createAdminStore', () => {
       assert.equal(confirmations.length, 2);
       assert.ok(confirmations[0].content.includes('Used Grove'));
       assert.ok(confirmations[1].content.includes('Used Grove'));
+      assert.ok(confirmations[0].content.includes('cannot be undone'));
+      assert.ok(confirmations[1].content.includes('cannot be undone'));
       assert.equal(services._store.gatheringConfig.systems.sys1.tasks.length, 1);
       assert.equal(services._store.gatheringConfig.systems.sys1.hazards.length, 1);
+    });
+
+    it('requires confirmation before deleting unused gathering library records and keeps them on decline', async () => {
+      const confirmations = [];
+      const services = createMockServices({
+        confirmDialog: async (options) => {
+          confirmations.push(options);
+          return false;
+        },
+        getGatheringEnvironmentStore: () => ({ list: () => [] })
+      });
+      services._store.gatheringConfig = {
+        systems: {
+          sys1: {
+            tasks: [{ id: 'task-unused', name: 'Lone Task', dropRows: [] }],
+            hazards: [{ id: 'hazard-unused', name: 'Lone Hazard', dropRate: 10 }]
+          }
+        }
+      };
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      assert.equal(await store.deleteGatheringLibraryTask('sys1', 'task-unused'), false);
+      assert.equal(await store.deleteGatheringLibraryHazard('sys1', 'hazard-unused'), false);
+      assert.equal(confirmations.length, 2);
+      assert.ok(confirmations[0].content.includes('Lone Task'));
+      assert.ok(confirmations[0].content.includes('cannot be undone'));
+      assert.ok(!confirmations[0].content.includes('currently used by'));
+      assert.ok(confirmations[1].content.includes('Lone Hazard'));
+      assert.ok(confirmations[1].content.includes('cannot be undone'));
+      assert.ok(!confirmations[1].content.includes('currently used by'));
+      assert.equal(services._store.gatheringConfig.systems.sys1.tasks.length, 1);
+      assert.equal(services._store.gatheringConfig.systems.sys1.hazards.length, 1);
+    });
+
+    it('deletes unused gathering library records when the confirmation is accepted', async () => {
+      let confirmationCount = 0;
+      const services = createMockServices({
+        confirmDialog: async () => {
+          confirmationCount += 1;
+          return true;
+        },
+        getGatheringEnvironmentStore: () => ({ list: () => [] })
+      });
+      services._store.gatheringConfig = {
+        systems: {
+          sys1: {
+            tasks: [{ id: 'task-unused', name: 'Lone Task', dropRows: [] }],
+            hazards: [{ id: 'hazard-unused', name: 'Lone Hazard', dropRate: 10 }]
+          }
+        }
+      };
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      assert.equal(await store.deleteGatheringLibraryTask('sys1', 'task-unused'), true);
+      assert.equal(await store.deleteGatheringLibraryHazard('sys1', 'hazard-unused'), true);
+      assert.equal(confirmationCount, 2);
+      assert.equal(services._store.gatheringConfig.systems.sys1.tasks.length, 0);
+      assert.equal(services._store.gatheringConfig.systems.sys1.hazards.length, 0);
     });
 
     it('deletes gathering library records after used-record confirmation is accepted', async () => {
