@@ -938,6 +938,17 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
     'tool breakage chance slider should define the full green-yellow-red gradient across the whole rail'
   );
   assert.ok(
+    toolBreakageChanceControlBlock.includes('height: 28px;')
+      && toolBreakageChanceControlBlock.includes('min-height: 28px;')
+      && toolBreakageChanceControlBlock.includes('padding: 0 var(--fab-tool-breakage-chance-thumb-radius);')
+      && toolBreakageChanceControlBlock.includes('border: 1px solid var(--fab-mv2-border);')
+      && toolBreakageChanceControlBlock.includes('border-radius: 6px;')
+      && toolBreakageChanceControlBlock.includes('background: var(--fab-overlay-dark-18);')
+      && toolBreakageChanceControlBlock.includes('box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);')
+      && toolBreakageChanceControlBlock.includes('overflow: hidden;'),
+    'tool breakage chance slider should keep the framed control chrome used by gathering task editing'
+  );
+  assert.ok(
     toolBreakageChanceTrackBlock.includes('left: var(--fab-tool-breakage-chance-thumb-radius);')
       && toolBreakageChanceTrackBlock.includes('right: var(--fab-tool-breakage-chance-thumb-radius);')
       && toolBreakageChanceTrackBlock.includes('border: 0;')

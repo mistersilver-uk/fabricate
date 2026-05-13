@@ -10139,6 +10139,15 @@
     var(--fab-tool-breakage-chance-mid) 50%,
     var(--fab-tool-breakage-chance-high) 100%
   );
+  height: 28px;
+  min-height: 28px;
+  padding: 0 var(--fab-tool-breakage-chance-thumb-radius);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-dark-18);
+  box-sizing: border-box;
+  box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
+  overflow: hidden;
 }
 
 .fabricate-manager-v2 .manager-v2-tool-breakage-chance-control .manager-v2-drop-rate-track {
@@ -10154,8 +10163,8 @@
 
 .fabricate-manager-v2 .manager-v2-tool-breakage-chance-control input[type="range"] {
   padding: 0;
-  background: transparent;
   box-shadow: none;
+  background: transparent;
   accent-color: var(--fab-tool-breakage-chance-color);
 }
 
