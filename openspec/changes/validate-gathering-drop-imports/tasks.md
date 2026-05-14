@@ -8,5 +8,5 @@
 - [x] Update canonical gathering/data-model specs for persisted/imported drop reference validity.
 - [x] Add focused Mythwright bootstrap, compendium importer, and admin validation tests.
 - [x] Run focused tests.
-- [ ] Run `npm test`.
-- [ ] Run `npm run build`.
+- [x] Run `npm test`.
+- [x] Run `npm run build`.

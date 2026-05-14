@@ -640,7 +640,7 @@ GatheringDropReference = {
 
 1. `quantity` must be positive.
 2. `dropRate` must be an integer from `0` to `100`.
-3. A persisted, imported, or seeded row must have exactly one resolvable reward target path:
+3. A persisted, imported, or seeded row must have at least one resolvable reward target path:
    - `componentId` resolves to a component in the owning crafting system.
    - `itemUuid` resolves through Foundry UUID lookup to an Item document.
 4. Rows with neither target, stale component ids, or unresolved item UUIDs are invalid at import/save/seed boundaries.
