@@ -8867,7 +8867,7 @@
 
 .fabricate-manager-v2 .manager-v2-gathering-task-edit-view {
   display: grid;
-  grid-template-rows: auto auto 340px minmax(410px, 1fr) auto;
+  grid-template-rows: auto auto 340px 340px 410px auto;
   gap: 12px;
   min-height: 0;
   min-width: 0;
@@ -8876,7 +8876,7 @@
 }
 
 .fabricate-manager-v2 .manager-v2-gathering-task-edit-view.has-reward-rule-notice {
-  grid-template-rows: auto auto 340px auto minmax(410px, 1fr) auto;
+  grid-template-rows: auto auto 340px 340px auto 410px auto;
 }
 
 .fabricate-manager-v2 .manager-v2-gathering-task-edit-view :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
@@ -8892,13 +8892,18 @@
 
 .fabricate-manager-v2 .manager-v2-gathering-task-edit-view :is(input:not([type="checkbox"]):not([type="radio"]), select) {
   min-height: 32px;
-  padding: 5px 5px 5px 34px;
+  padding: 5px 9px;
 }
 
 .fabricate-manager-v2 .manager-v2-gathering-task-edit-view textarea {
   min-height: 54px;
   padding: 7px 9px;
   resize: vertical;
+}
+
+.fabricate-manager-v2 .manager-v2-gathering-task-edit-view .manager-v2-search input:not([type="checkbox"]):not([type="radio"]) {
+  height: 34px;
+  padding: 0 34px 0 34px;
 }
 
 .fabricate-manager-v2 .manager-v2-gathering-task-edit-view input[type="range"] {
