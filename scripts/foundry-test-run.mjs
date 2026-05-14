@@ -932,7 +932,7 @@ async function exerciseManagerV2RecipePointerTargets(page) {
  * @param {import('playwright').Page} page
  */
 async function exerciseManagerV2EnvironmentPointerTargets(page) {
-  await page.locator('.fabricate-manager-v2 .manager-v2-nav-button:has-text("Environments")').first().click();
+  await page.locator('.fabricate-manager-v2 .manager-v2-nav-button:has-text("Gathering")').first().click();
   await page.locator('.fabricate-manager-v2 .manager-v2-environment-row').first().waitFor({ state: 'visible', timeout: 5_000 });
 
   const search = page.locator('.fabricate-manager-v2 input[aria-label="Search environments"]').first();
@@ -2500,7 +2500,7 @@ async function main() {
         if (navLabels.at(0) !== 'System settings') {
           throw new Error(`Manager V2 selected nav should keep System settings first. Saw: ${navLabels.join(', ')}`);
         }
-        for (const expected of ['System settings', 'Components', 'Recipes', 'Environments', 'Essences', 'Rules', 'Graph']) {
+        for (const expected of ['System settings', 'Components', 'Recipes', 'Tags & Categories', 'Essences', 'Tools', 'Gathering', 'Rules', 'Graph']) {
           if (!navLabels.includes(expected)) {
             throw new Error(`Manager V2 selected nav missing ${expected}. Saw: ${navLabels.join(', ')}`);
           }
@@ -2816,7 +2816,7 @@ async function main() {
         if (await firstStateSaveButton.isEnabled()) await firstStateSaveButton.click({ trial: true });
         const firstStateCancelButton = page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Cancel")').first();
         if (await firstStateCancelButton.isEnabled()) await firstStateCancelButton.click({ trial: true });
-        await page.locator('.fabricate-manager-v2 .manager-v2-breadcrumbs button:has-text("Environments")').first().click({ trial: true });
+        await page.locator('.fabricate-manager-v2 .manager-v2-breadcrumbs button:has-text("Gathering")').first().click({ trial: true });
         await assertManagerV2LayoutStable(page, 'environment edit first state');
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-v2-environments-edit-first-state');
