@@ -447,7 +447,7 @@ test('manager-v2 gathering settings condition panels use a two-column responsive
 
   assert.ok(settingsBlock.includes('grid-template-columns: repeat(2, minmax(0, 1fr));'), 'settings conditions should sit side by side at normal widths');
   assert.ok(settingsBlock.includes('align-items: stretch;'), 'condition panels should stretch to equal height in the two-column layout');
-  assert.ok(settingsBlock.includes('padding: 0 12px 12px;'), 'settings panel should remove extra top padding while keeping side and bottom workspace spacing');
+  assert.ok(settingsBlock.includes('padding: 12px;'), 'settings panel should use uniform workspace padding on all sides');
   assert.ok(panelBlock.includes('align-content: start;'), 'condition panel content should pack to its natural height');
   assert.ok(panelBlock.includes('height: 100%;'), 'condition panel backgrounds should fill the stretched grid row');
   assert.ok(addBlock.includes('grid-template-columns: 36px minmax(0, 1fr) 48px;'), 'condition add controls should reserve icon picker, label input, and Add button columns');
