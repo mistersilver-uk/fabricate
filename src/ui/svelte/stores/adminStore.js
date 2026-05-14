@@ -2477,7 +2477,7 @@ export function createAdminStore(services) {
 
     const confirmed = await services.confirmDialog({
       title: `Delete ${system.name}?`,
-      content: `<p>Delete crafting system <strong>${system.name}</strong>? Recipes linked to it will be deleted.</p>`,
+      content: `<p>Delete crafting system <strong>${system.name}</strong>?</p><p>Linked recipes, gathering environments, gathering tools and tasks, and any in-progress or historical crafting, salvage, and gathering runs for this system will be removed.</p>`,
       yes: () => true,
       no: () => false
     });

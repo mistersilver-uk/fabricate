@@ -26,6 +26,7 @@ function makeSettings(initial = {}) {
   const store = new Map(Object.entries({
     lastGatheringActor: '',
     lastManagedCraftingSystem: '',
+    lastAlchemySystem: '',
     progressiveResultOrder: {},
     ...initial
   }));
@@ -80,6 +81,31 @@ test('leaves lastManagedCraftingSystem unchanged when it references a valid syst
 
   assert.equal(store.get('lastManagedCraftingSystem'), 'system-a');
   const setCall = calls.set.find(c => c.key === 'lastManagedCraftingSystem');
+  assert.equal(setCall, undefined, 'setSetting should NOT be called when value is valid');
+});
+
+test('resets lastAlchemySystem when it references a missing system', async () => {
+  const { store, calls, getSetting, setSetting } = makeSettings({
+    lastAlchemySystem: 'system-deleted'
+  });
+
+  await cleanupStalePreferences(new Set(['system-other']), new Set(), getSetting, setSetting);
+
+  assert.equal(store.get('lastAlchemySystem'), '');
+  const setCall = calls.set.find(c => c.key === 'lastAlchemySystem');
+  assert.ok(setCall, 'setSetting should be called for lastAlchemySystem');
+  assert.equal(setCall.value, '');
+});
+
+test('leaves lastAlchemySystem unchanged when it references a valid system', async () => {
+  const { store, calls, getSetting, setSetting } = makeSettings({
+    lastAlchemySystem: 'system-a'
+  });
+
+  await cleanupStalePreferences(new Set(['system-a']), new Set(), getSetting, setSetting);
+
+  assert.equal(store.get('lastAlchemySystem'), 'system-a');
+  const setCall = calls.set.find(c => c.key === 'lastAlchemySystem');
   assert.equal(setCall, undefined, 'setSetting should NOT be called when value is valid');
 });
 

@@ -29,6 +29,13 @@ export async function cleanupStalePreferences(
     console.log('Fabricate | Cleared stale lastManagedCraftingSystem:', lastSystem);
   }
 
+  // 1b. Validate lastAlchemySystem
+  const lastAlchemy = getSetting(SETTING_KEYS.LAST_ALCHEMY_SYSTEM);
+  if (lastAlchemy && !validSystemIds.has(lastAlchemy)) {
+    await setSetting(SETTING_KEYS.LAST_ALCHEMY_SYSTEM, '');
+    console.log('Fabricate | Cleared stale lastAlchemySystem:', lastAlchemy);
+  }
+
   // 2. Validate lastGatheringActor when the caller can resolve/select actors
   const lastGatheringActor = getSetting(SETTING_KEYS.LAST_GATHERING_ACTOR);
   if (

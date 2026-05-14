@@ -94,3 +94,58 @@ test('CraftingRunManager: getRun and history limit helpers work for active + his
   const limitedHistory = manager.getRunHistory(actor, 1);
   assert.equal(limitedHistory.length, 1);
 });
+
+test('CraftingRunManager.removeRunsForSystem purges active and history entries for the system', async () => {
+  setupGlobals();
+  const manager = new CraftingRunManager();
+  const actor = new FakeActor('Multi');
+  globalThis.game.actors = [actor];
+
+  const recipeA = {
+    id: 'recipe-a',
+    craftingSystemId: 'sys-doomed',
+    getExecutionSteps: () => [{ id: 'a-1', name: 'A' }]
+  };
+  const recipeB = {
+    id: 'recipe-b',
+    craftingSystemId: 'sys-keep',
+    getExecutionSteps: () => [{ id: 'b-1', name: 'B' }]
+  };
+
+  const doomedActive = await manager.createRun(actor, recipeA, [actor], 'user-1');
+  const keepActive = await manager.createRun(actor, recipeB, [actor], 'user-1');
+
+  const doomedHistorySource = await manager.createRun(actor, recipeA, [actor], 'user-1');
+  await manager.cancelRun(actor, doomedHistorySource.id);
+
+  const keepHistorySource = await manager.createRun(actor, recipeB, [actor], 'user-1');
+  await manager.cancelRun(actor, keepHistorySource.id);
+
+  await manager.removeRunsForSystem('sys-doomed');
+
+  const active = manager.getActiveRuns(actor);
+  assert.deepEqual(active.map(r => r.id), [keepActive.id]);
+  assert.equal(manager.getRun(actor, doomedActive.id), null);
+
+  const history = manager.getRunHistory(actor);
+  assert.equal(history.length, 1);
+  assert.equal(history[0].craftingSystemId, 'sys-keep');
+});
+
+test('CraftingRunManager.removeRunsForSystem is a no-op when no runs match', async () => {
+  setupGlobals();
+  const manager = new CraftingRunManager();
+  const actor = new FakeActor('Untouched');
+  globalThis.game.actors = [actor];
+
+  const recipe = {
+    id: 'recipe-only',
+    craftingSystemId: 'sys-stable',
+    getExecutionSteps: () => [{ id: 's', name: 'S' }]
+  };
+  const run = await manager.createRun(actor, recipe, [actor], 'user-1');
+
+  await manager.removeRunsForSystem('sys-other');
+
+  assert.deepEqual(manager.getActiveRuns(actor).map(r => r.id), [run.id]);
+});

@@ -781,6 +781,28 @@ export class GatheringRichStateService {
     return runtimeTask;
   }
 
+  /**
+   * Remove all per-system gathering library state for `systemId` from the
+   * persisted gathering config. Operates on the raw setting (no normalization)
+   * so unrelated systems are left untouched.
+   *
+   * @param {string} systemId
+   * @returns {Promise<boolean>} true when an entry was removed
+   */
+  async removeSystem(systemId) {
+    if (!systemId) return false;
+    if (typeof this.getSetting !== 'function' || typeof this.setSetting !== 'function') return false;
+    const target = String(systemId);
+    const raw = this.getSetting(this.settingKey);
+    const systems = raw?.systems;
+    if (!systems || typeof systems !== 'object' || !(target in systems)) return false;
+    const nextSystems = { ...systems };
+    delete nextSystems[target];
+    const next = { ...(raw || {}), systems: nextSystems };
+    await this.setSetting(this.settingKey, next);
+    return true;
+  }
+
   _config() {
     const raw = typeof this.getSetting === 'function' ? this.getSetting(this.settingKey) : {};
     return normalizeGatheringConfig(raw);
