@@ -23,3 +23,8 @@ PLAN.md
 content-packs/
 /.claude/settings.local.json
 tmp
+# Foundry LevelDB pack runtime files (rewritten on every pack open)
+packs/*/LOG
+packs/*/LOG.old
+packs/*/LOCK
+packs/*/*.log
