@@ -138,7 +138,7 @@ test('T-097: successful import creates system and recipes', async () => {
   assert.equal(summary.system.skipped, false, 'System should not be skipped');
   assert.equal(createdSystems.length, 1, 'One system should be created');
   assert.equal(summary.recipes.imported, 1, 'One recipe should be imported');
-  assert.deepEqual(createdRecipeOptions, [{ notify: false }], 'Batch import should suppress per-recipe create notifications');
+  assert.deepEqual(createdRecipeOptions, [{ notify: false, emitChange: false }], 'Batch import should suppress per-recipe create notifications and change hooks');
   assert.equal(summary.recipes.errors.length, 0, 'No recipe errors');
 });
 
@@ -382,7 +382,7 @@ test('batch import suppresses per-recipe update notifications when overwriting r
   const summary = await importer.importFromPackData(makePackData(), { overwriteExisting: true });
 
   assert.equal(summary.recipes.imported, 1);
-  assert.deepEqual(updatedRecipeOptions, [{ notify: false }]);
+  assert.deepEqual(updatedRecipeOptions, [{ notify: false, emitChange: false }]);
   assert.equal(
     summary.collisions.some(c => c.type === 'recipe' && c.resolution === 'overwritten'),
     true

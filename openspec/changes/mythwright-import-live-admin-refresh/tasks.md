@@ -1,0 +1,6 @@
+- [x] Add Mythwright import payload construction and route system/recipe seeding through `game.fabricate.importFromPack`.
+- [x] Add recipe mutation hook emission.
+- [x] Add Admin V2 external data-change subscription and teardown.
+- [x] Add focused tests for Mythwright import usage, recipe hooks, and admin store refresh.
+- [x] Run focused tests and `npm run build`.
+- [ ] `npm test` passes. Current run is blocked by an existing dirty `styles/fabricate.css` layout-contract change unrelated to this implementation.

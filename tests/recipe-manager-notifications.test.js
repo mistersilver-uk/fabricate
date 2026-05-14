@@ -102,6 +102,34 @@ describe('RecipeManager notification controls', () => {
     assert.equal(manager.getRecipe(recipe.id), null);
   });
 
+  it('emits recipe change hooks for direct and import mutations', async () => {
+    const previousHooks = globalThis.Hooks;
+    const hookPayloads = [];
+    globalThis.Hooks = {
+      callAll: (hookName, payload) => {
+        if (hookName === 'fabricate.recipesChanged') hookPayloads.push(payload);
+      }
+    };
+    const manager = makeManager();
+
+    try {
+      const recipe = await manager.createRecipe(makeRecipeData({ id: 'recipe-hook', name: 'Hooked Recipe' }), { notify: false });
+      await manager.updateRecipe(recipe.id, { name: 'Hooked Update' }, { notify: false });
+      await manager.deleteRecipe(recipe.id, { notify: false });
+      await manager.importRecipes([makeRecipeData({ id: 'recipe-import-hook', name: 'Hooked Import' })], true);
+
+      assert.deepEqual(
+        hookPayloads.map(payload => payload.action),
+        ['create', 'update', 'delete', 'import']
+      );
+      assert.equal(hookPayloads[0].recipeId, 'recipe-hook');
+      assert.equal(hookPayloads.at(-1).imported, 1);
+      assert.equal(hookPayloads.at(-1).total, 1);
+    } finally {
+      globalThis.Hooks = previousHooks;
+    }
+  });
+
   it('importRecipes emits one aggregate notification and returns counts', async () => {
     const manager = makeManager();
     manager.recipes.set('existing-recipe', new Recipe(makeRecipeData({ id: 'existing-recipe', name: 'Existing' })));

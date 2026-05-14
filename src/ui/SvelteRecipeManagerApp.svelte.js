@@ -113,6 +113,21 @@ export class SvelteRecipeManagerApp extends SvelteApplicationMixin(
           hooks?.off?.('fabricate.ready', wrapped);
         };
       },
+      onFabricateDataChanged: (callback) => {
+        if (typeof callback !== 'function') return () => {};
+        const hooks = globalThis.Hooks;
+        if (typeof hooks?.on !== 'function') return () => {};
+
+        const systemListener = (...args) => callback('systems', ...args);
+        const recipeListener = (...args) => callback('recipes', ...args);
+        hooks.on('fabricate.craftingSystemsChanged', systemListener);
+        hooks.on('fabricate.recipesChanged', recipeListener);
+
+        return () => {
+          hooks?.off?.('fabricate.craftingSystemsChanged', systemListener);
+          hooks?.off?.('fabricate.recipesChanged', recipeListener);
+        };
+      },
       setGatheringConditions: async (conditions) => game?.fabricate?.gathering?.setConditions?.(conditions),
       getScriptMacros: () =>
         Array.from(game.macros?.contents || [])

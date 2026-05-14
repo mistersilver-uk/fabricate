@@ -1532,7 +1532,10 @@ export function createAdminStore(services) {
   const toolsDraftExpandedToolId = writable('');
   let dirtyToolsDraftDiscardConfirmation = null;
   let unsubscribeFabricateReady = null;
+  let unsubscribeFabricateDataChanged = null;
   let readyRefreshScheduled = false;
+  let externalRefreshScheduled = false;
+  let destroyed = false;
 
   // --- Computed state ---
   const viewState = writable({
@@ -2082,6 +2085,26 @@ export function createAdminStore(services) {
       readyRefreshScheduled = false;
       unsubscribeFabricateReady = null;
       await refresh();
+    });
+  }
+
+  function _scheduleExternalRefresh() {
+    if (destroyed || externalRefreshScheduled) return;
+    externalRefreshScheduled = true;
+    const schedule = typeof queueMicrotask === 'function'
+      ? queueMicrotask
+      : (callback) => Promise.resolve().then(callback);
+    schedule(async () => {
+      externalRefreshScheduled = false;
+      if (destroyed) return;
+      await refresh();
+    });
+  }
+
+  function _subscribeExternalDataChanges() {
+    if (typeof services.onFabricateDataChanged !== 'function') return null;
+    return services.onFabricateDataChanged(() => {
+      _scheduleExternalRefresh();
     });
   }
 
@@ -4681,10 +4704,16 @@ export function createAdminStore(services) {
   }
 
   function destroy() {
+    destroyed = true;
     unsubscribeFabricateReady?.();
     unsubscribeFabricateReady = null;
+    unsubscribeFabricateDataChanged?.();
+    unsubscribeFabricateDataChanged = null;
     readyRefreshScheduled = false;
+    externalRefreshScheduled = false;
   }
+
+  unsubscribeFabricateDataChanged = _subscribeExternalDataChanges();
 
   // Trigger initial computation
   refresh();

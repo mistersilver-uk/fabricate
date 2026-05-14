@@ -1298,6 +1298,65 @@ const MythwrightDnd5eBootstrap = (() => {
     };
   }
 
+  function buildRecipePayloads({ srd = { resolved: [] }, componentMap = new Map() } = {}) {
+    const recipes = [];
+
+    for (const target of srd.resolved || []) {
+      recipes.push(buildRecipeForSrd(target, componentMap));
+    }
+    for (const definition of ELEMENTAL_VARIANTS) {
+      if (elementalQualityVariantDefinitions(definition).every(variant => componentMap.has(variant.id))) {
+        recipes.push(buildElementalRecipe(definition));
+      }
+    }
+    recipes.push(
+      buildRelicRecipe('relic-mythic-longsword', 'Mythwright Mythic Longsword', 'ember'),
+      buildRelicRecipe('relic-draconic-scale-mail', 'Draconic Scale Mail', 'dragon'),
+      buildRelicRecipe('relic-storm-bow', 'Storm-Forged Bow', 'storm'),
+      buildRelicRecipe('relic-radiant-shield', 'Radiant Shield', 'radiance'),
+      buildRelicRecipe('relic-shadow-dagger', 'Shadow Dagger', 'shadow'),
+      ...buildToolRepairRecipes()
+    );
+    return recipes;
+  }
+
+  function buildImportPayload({ systemPayload, recipes = [] } = {}) {
+    return {
+      fabricateVersion: globalThis.game?.modules?.get?.('fabricate')?.version || '0.0.0',
+      exportedAt: new Date().toISOString(),
+      system: clonePlain(systemPayload),
+      recipes: clonePlain(recipes)
+    };
+  }
+
+  async function importMythwrightPayload(payload, summary) {
+    const importFromPack = globalThis.game?.fabricate?.importFromPack;
+    if (typeof importFromPack !== 'function') {
+      throw new Error('Fabricate import API is not available.');
+    }
+
+    const importSummary = await importFromPack(payload, { overwriteExisting: true });
+    const overwrittenRecipes = (importSummary?.collisions || [])
+      .filter(collision => collision.type === 'recipe' && collision.resolution === 'overwritten')
+      .length;
+    const importedRecipes = Number(importSummary?.recipes?.imported) || 0;
+    const recipeErrors = Array.isArray(importSummary?.recipes?.errors)
+      ? importSummary.recipes.errors.length
+      : 0;
+
+    summary.system = (importSummary?.collisions || []).some(collision =>
+      collision.type === 'system' && collision.resolution === 'overwritten'
+    )
+      ? 'updated'
+      : (importSummary?.system?.created ? 'created' : 'skipped');
+    summary.recipes.updated = overwrittenRecipes;
+    summary.recipes.created = Math.max(0, importedRecipes - overwrittenRecipes);
+    summary.recipes.skipped = Number(importSummary?.recipes?.skipped) || 0;
+    summary.recipes.errors = recipeErrors;
+
+    return importSummary;
+  }
+
   function buildEnvironment(id, name, risk, tasks) {
     return {
       id,
@@ -1415,17 +1474,6 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
     return created;
   }
 
-  async function upsertRecipe(recipeManager, data, summary) {
-    const existing = recipeManager.getRecipe?.(data.id) || recipeManager.getRecipes?.({})?.find(recipe => recipe.id === data.id);
-    if (existing) {
-      await recipeManager.updateRecipe(data.id, data);
-      summary.recipes.updated++;
-      return;
-    }
-    await recipeManager.createRecipe(data);
-    summary.recipes.created++;
-  }
-
   async function upsertEnvironment(store, environment, summary) {
     const all = store.list ? store.list() : (store.getAll ? store.getAll() : []);
     const existing = collectionValues(all).find(entry => entry.id === environment.id);
@@ -1450,7 +1498,7 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
       items: { created: 0, updated: 0, deleted: 0 },
       srd: { resolved: 0, unresolved: [] },
       system: 'skipped',
-      recipes: { created: 0, updated: 0 },
+      recipes: { created: 0, updated: 0, skipped: 0, errors: 0 },
       environments: { created: 0, updated: 0 },
       gatheringConfig: { tools: 0, tasks: 0 },
       macro: null
@@ -1514,8 +1562,6 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
 
     const macro = await ensureMacro(summary);
     const gatheringTools = buildGatheringTools();
-    const systemManager = globalThis.game.fabricate.getCraftingSystemManager();
-    const recipeManager = globalThis.game.fabricate.getRecipeManager();
     const environmentStore = globalThis.game.fabricate.getGatheringEnvironmentStore?.();
 
     const srdQualityComponentIds = new Set(srd.resolved.flatMap(target =>
@@ -1571,31 +1617,10 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
       components
     });
 
-    if (systemManager.getSystem(SYSTEM_ID)) {
-      await systemManager.updateSystem(SYSTEM_ID, systemPayload);
-      summary.system = 'updated';
-    } else {
-      await systemManager.createSystem(systemPayload);
-      summary.system = 'created';
-    }
-
     const componentMap = new Map(components.map(component => [component.id, component]));
-    for (const target of srd.resolved) {
-      await upsertRecipe(recipeManager, buildRecipeForSrd(target, componentMap), summary);
-    }
-    for (const definition of ELEMENTAL_VARIANTS) {
-      if (elementalQualityVariantDefinitions(definition).every(variant => componentMap.has(variant.id))) {
-        await upsertRecipe(recipeManager, buildElementalRecipe(definition), summary);
-      }
-    }
-    await upsertRecipe(recipeManager, buildRelicRecipe('relic-mythic-longsword', 'Mythwright Mythic Longsword', 'ember'), summary);
-    await upsertRecipe(recipeManager, buildRelicRecipe('relic-draconic-scale-mail', 'Draconic Scale Mail', 'dragon'), summary);
-    await upsertRecipe(recipeManager, buildRelicRecipe('relic-storm-bow', 'Storm-Forged Bow', 'storm'), summary);
-    await upsertRecipe(recipeManager, buildRelicRecipe('relic-radiant-shield', 'Radiant Shield', 'radiance'), summary);
-    await upsertRecipe(recipeManager, buildRelicRecipe('relic-shadow-dagger', 'Shadow Dagger', 'shadow'), summary);
-    for (const recipe of buildToolRepairRecipes()) {
-      await upsertRecipe(recipeManager, recipe, summary);
-    }
+    const recipes = buildRecipePayloads({ srd, componentMap });
+    const importPayload = buildImportPayload({ systemPayload, recipes });
+    await importMythwrightPayload(importPayload, summary);
 
     if (environmentStore) {
       const taskById = new Map(gatheringTasks.map(task => [task.id, task]));
@@ -1655,6 +1680,9 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
     validateGatheringTaskDrops,
     buildToolRepairRecipes,
     seedGatheringConfig,
+    buildRecipePayloads,
+    buildImportPayload,
+    importMythwrightPayload,
     elementalQualityById,
     elementalVariantQualityId,
     elementalVariantQualityName,

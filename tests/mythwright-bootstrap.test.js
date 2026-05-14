@@ -378,6 +378,50 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     assert.deepEqual(payload.components, [{ id: 'raw-ore', name: 'Raw Ore' }]);
   });
 
+  it('builds an import payload and maps import API summary counts', async () => {
+    const helper = globalThis.MythwrightDnd5eBootstrap;
+    const previousGame = globalThis.game;
+    const calls = [];
+    globalThis.game = {
+      modules: new Map([['fabricate', { version: '9.8.7' }]]),
+      fabricate: {
+        importFromPack: async (payload, options) => {
+          calls.push({ payload, options });
+          return {
+            system: { created: false },
+            recipes: { imported: 3, skipped: 1, errors: [] },
+            collisions: [
+              { type: 'system', resolution: 'overwritten' },
+              { type: 'recipe', resolution: 'overwritten' }
+            ]
+          };
+        }
+      }
+    };
+
+    try {
+      const payload = helper.buildImportPayload({
+        systemPayload: { id: helper.SYSTEM_ID, name: 'Mythwright', components: [{ id: 'raw-ore' }] },
+        recipes: [{ id: 'recipe-a', name: 'Recipe A' }]
+      });
+      const summary = { system: 'skipped', recipes: { created: 0, updated: 0, skipped: 0, errors: 0 } };
+
+      await helper.importMythwrightPayload(payload, summary);
+
+      assert.equal(payload.fabricateVersion, '9.8.7');
+      assert.equal(calls.length, 1);
+      assert.deepEqual(calls[0].options, { overwriteExisting: true });
+      assert.equal(calls[0].payload.system.id, helper.SYSTEM_ID);
+      assert.equal(calls[0].payload.recipes.length, 1);
+      assert.equal(summary.system, 'updated');
+      assert.equal(summary.recipes.created, 2);
+      assert.equal(summary.recipes.updated, 1);
+      assert.equal(summary.recipes.skipped, 1);
+    } finally {
+      globalThis.game = previousGame;
+    }
+  });
+
   it('uses patterned player-facing recipe copy and plain gathering environment names', () => {
     const helper = globalThis.MythwrightDnd5eBootstrap;
     const club = helper.buildRecipeForSrd(

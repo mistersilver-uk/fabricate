@@ -310,6 +310,46 @@ describe('createAdminStore', () => {
       assert.equal(cleanupCalled, true);
     });
 
+    it('refreshes on external Fabricate data changes and unsubscribes on destroy', async () => {
+      let dataChangedCallback = null;
+      let cleanupCalled = false;
+      const services = createMockServices({
+        onFabricateDataChanged: (callback) => {
+          dataChangedCallback = callback;
+          return () => {
+            cleanupCalled = true;
+          };
+        }
+      });
+      const store = createAdminStore(services);
+      await store.refresh();
+
+      assert.equal(get(store.viewState).recipes.length, 1);
+      services._getRecipesMutable().push(makeRecipe({
+        id: 'r-external',
+        name: 'External Recipe',
+        craftingSystemId: 'sys1'
+      }));
+
+      dataChangedCallback?.('recipes');
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      assert.equal(get(store.viewState).recipes.length, 2);
+
+      store.destroy();
+      assert.equal(cleanupCalled, true);
+
+      services._getRecipesMutable().push(makeRecipe({
+        id: 'r-after-destroy',
+        name: 'After Destroy',
+        craftingSystemId: 'sys1'
+      }));
+      dataChangedCallback?.('recipes');
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      assert.equal(get(store.viewState).recipes.length, 2);
+    });
+
     it('leaves selection empty when no systems exist', async () => {
       const services = createMockServices({
         getSetting: () => ''

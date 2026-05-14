@@ -54,6 +54,18 @@ export class RecipeManager {
     await setSetting(SETTING_KEYS.RECIPES, recipesArray);
   }
 
+  _notifyRecipesChanged(action, details = {}) {
+    globalThis.Hooks?.callAll?.('fabricate.recipesChanged', {
+      action,
+      recipes: this.getRecipes(),
+      ...details
+    });
+  }
+
+  notifyRecipesChanged(details = {}) {
+    this._notifyRecipesChanged(details.action || 'external', details);
+  }
+
   /**
    * Create a new recipe
    * @param {Object} recipeData - Recipe configuration
@@ -76,6 +88,9 @@ export class RecipeManager {
 
     if (options.notify !== false) {
       ui.notifications.info(`Recipe "${recipe.name}" created`);
+    }
+    if (options.emitChange !== false) {
+      this._notifyRecipesChanged('create', { recipeId: recipe.id });
     }
     return recipe;
   }
@@ -113,6 +128,9 @@ export class RecipeManager {
     if (options.notify !== false) {
       ui.notifications.info(`Recipe "${updatedRecipe.name}" updated`);
     }
+    if (options.emitChange !== false) {
+      this._notifyRecipesChanged('update', { recipeId });
+    }
     return updatedRecipe;
   }
 
@@ -134,6 +152,9 @@ export class RecipeManager {
     await this._cleanupFlagsAfterRecipeMutation();
     if (options.notify !== false) {
       ui.notifications.info(`Recipe "${recipe.name}" deleted`);
+    }
+    if (options.emitChange !== false) {
+      this._notifyRecipesChanged('delete', { recipeId });
     }
   }
 
@@ -897,6 +918,7 @@ export class RecipeManager {
     await this.save();
     await this._cleanupFlagsAfterRecipeMutation();
     ui.notifications.info(`Imported ${imported} recipes (${skipped} skipped)`);
+    this._notifyRecipesChanged('import', { imported, skipped, total: recipesData.length });
     return { imported, skipped, total: recipesData.length };
   }
 

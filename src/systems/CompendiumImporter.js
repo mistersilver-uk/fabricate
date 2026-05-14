@@ -122,7 +122,7 @@ export class CompendiumImporter {
 
       try {
         if (existing && overwriteExisting) {
-          await this._recipeManager.updateRecipe(resolved.id, resolved, { notify: false });
+          await this._recipeManager.updateRecipe(resolved.id, resolved, { notify: false, emitChange: false });
           summary.collisions.push({
             type: 'recipe',
             id: resolved.id,
@@ -130,7 +130,7 @@ export class CompendiumImporter {
             resolution: 'overwritten'
           });
         } else {
-          await this._recipeManager.createRecipe(resolved, { notify: false });
+          await this._recipeManager.createRecipe(resolved, { notify: false, emitChange: false });
         }
         summary.recipes.imported++;
       } catch (err) {
@@ -141,6 +141,14 @@ export class CompendiumImporter {
         });
       }
     }
+
+    this._recipeManager.notifyRecipesChanged?.({
+      action: 'importFromPack',
+      imported: summary.recipes.imported,
+      skipped: summary.recipes.skipped,
+      errors: summary.recipes.errors.length,
+      systemId: system.id
+    });
 
     return summary;
   }
