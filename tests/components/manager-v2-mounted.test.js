@@ -2179,12 +2179,16 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(gatheringParent.getAttribute('aria-expanded'), 'true');
     assert.equal(gatheringParent.classList.contains('is-active'), false);
     assert.equal(target.querySelector('.manager-v2-nav-group').classList.contains('is-expanded'), true);
-    assert.equal(gatheringParent.querySelector('.manager-v2-nav-count'), null);
+    assert.equal(gatheringParent.querySelector('.manager-v2-nav-count').textContent.trim(), '5');
     assert.equal(gatheringToggle().getAttribute('aria-label'), 'Collapse gathering menu');
     const gatheringItems = Array.from(target.querySelectorAll('.manager-v2-nav-subitem'));
     assert.deepEqual(
-      gatheringItems.map(item => item.textContent.trim()),
+      gatheringItems.map(item => item.querySelector('.manager-v2-nav-label')?.textContent.trim()),
       ['Environments', 'Tasks', 'Hazards', 'Settings']
+    );
+    assert.deepEqual(
+      gatheringItems.map(item => item.querySelector('.manager-v2-nav-count')?.textContent.trim() ?? null),
+      ['2', '3', '0', null]
     );
     assert.equal(
       gatheringSubitem('Environments').getAttribute('aria-current'),
@@ -4111,8 +4115,12 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'environments');
     const gatheringItems = Array.from(target.querySelectorAll('.manager-v2-nav-subitem'));
     assert.deepEqual(
-      gatheringItems.map(item => item.textContent.trim()),
+      gatheringItems.map(item => item.querySelector('.manager-v2-nav-label')?.textContent.trim()),
       ['Environments', 'Tasks', 'Hazards', 'Settings']
+    );
+    assert.deepEqual(
+      gatheringItems.map(item => item.querySelector('.manager-v2-nav-count')?.textContent.trim() ?? null),
+      ['0', '3', '0', null]
     );
     assert.equal(gatheringSubitem('Environments').getAttribute('aria-current'), 'page');
     assert.ok(target.textContent.includes('Prepare gathering building blocks first'));

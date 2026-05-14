@@ -325,6 +325,7 @@ test('manager-v2 nav buttons clear host mouse focus and keep green keyboard focu
 
 test('manager-v2 gathering rail submenu controls clear host mouse focus and keep green keyboard focus', () => {
   const expandedGroupBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-group.is-expanded');
+  const parentBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-parent');
   const expandedParentBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-group.is-expanded .manager-v2-nav-parent');
   const expandedParentHoverBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-group.is-expanded .manager-v2-nav-parent:hover');
   const submenuBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-submenu');
@@ -332,6 +333,7 @@ test('manager-v2 gathering rail submenu controls clear host mouse focus and keep
   const expandedToggleBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-group.is-expanded .manager-v2-nav-toggle');
   const toggleFocusBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-toggle:focus');
   const toggleFocusVisibleBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-toggle:focus-visible');
+  const subitemBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-subitem');
   const subitemFocusBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-subitem:focus');
   const activeSubitemBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-subitem.is-active');
   const activeSubitemFocusBlock = blockFor('.fabricate-manager-v2 .manager-v2-nav-subitem.is-active:focus');
@@ -342,6 +344,7 @@ test('manager-v2 gathering rail submenu controls clear host mouse focus and keep
   assert.ok(expandedGroupBlock.includes('box-shadow: inset 0 0 0 1px var(--fab-mv2-border);'), 'expanded gathering nav should draw chrome without shifting contents');
   assert.equal(expandedGroupBlock.includes('padding:'), false, 'expanded gathering nav should not add layout padding that shifts the parent row');
   assert.equal(expandedGroupBlock.includes('border:'), false, 'expanded gathering nav should not add layout border that shifts the parent row');
+  assert.ok(parentBlock.includes('grid-template-columns: 24px minmax(0, 1fr) auto;'), 'gathering parent should keep count chips inside the row before the toggle');
   assert.ok(expandedParentBlock.includes('border-color: transparent;'), 'expanded gathering parent should not use selected border styling');
   assert.ok(expandedParentBlock.includes('background: transparent;'), 'expanded gathering parent should not use selected fill styling');
   assert.ok(expandedParentBlock.includes('box-shadow: none;'), 'expanded gathering parent should not use the selected left accent');
@@ -349,6 +352,7 @@ test('manager-v2 gathering rail submenu controls clear host mouse focus and keep
   assert.ok(toggleBlock.includes('top: 4px;') && toggleBlock.includes('right: 4px;'), 'gathering toggle should have stable collapsed geometry');
   assert.equal(expandedToggleBlock, '', 'expanded gathering toggle should not override collapsed geometry');
   assert.ok(submenuBlock.includes('padding-left: 12px;'), 'gathering submenu entries should be nested inside the group');
+  assert.ok(subitemBlock.includes('grid-template-columns: 20px minmax(0, 1fr) auto;'), 'gathering submenu entries should keep count chips inside their rows');
   assert.ok(activeSubitemBlock.includes('background: var(--fab-success-soft);'), 'only selected gathering submenu entries should use selected fill');
   assert.ok(activeSubitemBlock.includes('box-shadow: inset 3px 0 0 var(--fab-mv2-accent);'), 'selected gathering submenu entries should keep the active left accent');
   assert.ok(toggleFocusBlock.includes('outline: none;'), 'mouse focus on gathering toggle should not inherit the host outline');

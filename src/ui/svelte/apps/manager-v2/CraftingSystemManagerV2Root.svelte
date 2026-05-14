@@ -412,6 +412,13 @@
   });
   const selectedGatheringSystemConfig = $derived($viewState.gatheringConfig?.systems?.[selectedSystemId] || {});
   const gatheringTaskDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.tasks) ? selectedGatheringSystemConfig.tasks : []);
+  const gatheringHazardDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.hazards) ? selectedGatheringSystemConfig.hazards : []);
+  const gatheringNavCounts = $derived({
+    environments: environmentList.length,
+    tasks: gatheringTaskDefinitions.length,
+    encounters: gatheringHazardDefinitions.length,
+    total: environmentList.length + gatheringTaskDefinitions.length + gatheringHazardDefinitions.length
+  });
   const selectedGatheringSystemTools = $derived(Array.isArray(selectedGatheringSystemConfig.tools) ? selectedGatheringSystemConfig.tools : []);
   const selectedGatheringTask = $derived(
     gatheringTaskDefinitions.find(task => task.id === selectedGatheringTaskId)
@@ -2512,6 +2519,7 @@
               >
                 <i class="fas fa-seedling" aria-hidden="true"></i>
                 <span class="manager-v2-nav-label">{text('FABRICATE.Admin.ManagerV2.Nav.Environments', 'Gathering')}</span>
+                <span class="manager-v2-nav-count">{gatheringNavCounts.total}</span>
               </button>
               <button
                 type="button"
@@ -2537,6 +2545,9 @@
                     >
                       <i class={gatheringItem.icon} aria-hidden="true"></i>
                       <span class="manager-v2-nav-label">{text(gatheringItem.labelKey, gatheringItem.labelFallback)}</span>
+                      {#if gatheringNavCounts[gatheringItem.id] != null}
+                        <span class="manager-v2-nav-count">{gatheringNavCounts[gatheringItem.id]}</span>
+                      {/if}
                     </button>
                   {/each}
                 </div>

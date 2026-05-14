@@ -8509,7 +8509,7 @@
 }
 
 .fabricate-manager-v2 .manager-v2-nav-parent {
-  grid-template-columns: 24px minmax(0, 1fr);
+  grid-template-columns: 24px minmax(0, 1fr) auto;
   padding-right: 40px;
 }
 
@@ -8570,7 +8570,7 @@
   appearance: none;
   -webkit-appearance: none;
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr);
+  grid-template-columns: 20px minmax(0, 1fr) auto;
   align-items: center;
   gap: 7px;
   width: 100%;
