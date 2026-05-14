@@ -2066,7 +2066,10 @@ describe('createAdminStore', () => {
           { id: 'night', label: 'Night', icon: 'fas fa-moon' }
         ]
       });
-      assert.deepEqual(config.vocabularies.regions, ['north', 'south']);
+      assert.deepEqual(config.vocabularies.regions, [
+        { id: 'north', label: 'North' },
+        { id: 'south', label: 'South' }
+      ]);
       assert.equal(config.systems.sys1.tasks[0].name, 'Rain Herbs');
       assert.deepEqual(config.systems.sys1.tasks[0].dropRows[0], {
         id: 'drop-herb',
@@ -2591,7 +2594,7 @@ describe('createAdminStore', () => {
       await store.selectSystem('sys1');
 
       assert.deepEqual(get(store.viewState).gatheringConfig.systems.sys1.vocabularies.regions.values, [
-        { id: 'north', label: 'north' }
+        { id: 'north', label: 'North' }
       ]);
       assert.deepEqual(get(store.viewState).gatheringConfig.systems.sys1.vocabularies.biomes.values, [
         { id: 'forest', label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage', customColor: '' }
@@ -2613,6 +2616,64 @@ describe('createAdminStore', () => {
       });
       assert.deepEqual(services._store.gatheringConfig.systems.sys1.tasks[0].biomes, ['forest']);
       assert.deepEqual(services._store.gatheringConfig.systems.sys1.hazards[0].biomes, ['forest']);
+    });
+
+    it('normalises top-level vocabularies into objects with capitalised labels and per-biome colour tokens', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      services._store.gatheringConfig = {
+        vocabularies: {
+          regions: ['northreach'],
+          biomes: ['forest', 'mountain', 'swamp']
+        }
+      };
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const config = get(store.viewState).gatheringConfig;
+
+      assert.deepEqual(config.vocabularies.regions, [
+        { id: 'northreach', label: 'Northreach' }
+      ], 'bare string region ids render as capitalised labels');
+
+      assert.deepEqual(config.vocabularies.biomes, [
+        { id: 'forest', label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage', customColor: '' },
+        { id: 'mountain', label: 'Mountain', icon: 'fas fa-mountain', colorToken: 'mist', customColor: '' },
+        { id: 'swamp', label: 'Swamp', icon: 'fas fa-frog', colorToken: 'mauve', customColor: '' }
+      ], 'each default biome gets its own colour token, not a single flat fallback');
+    });
+
+    it('seeds default biomes/weather/timeOfDay at the top level when the persisted setting has none', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      services._store.gatheringConfig = {};
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const config = get(store.viewState).gatheringConfig;
+
+      assert.equal(config.vocabularies.regions.length, 0,
+        'regions stays empty by default (no canonical list)');
+
+      const biomeIds = config.vocabularies.biomes.map(b => b.id);
+      assert.deepEqual(biomeIds, [
+        'forest', 'grassland', 'mountain', 'cave', 'coastal',
+        'swamp', 'desert', 'urban', 'ruins', 'wasteland'
+      ]);
+      const distinctColorTokens = new Set(config.vocabularies.biomes.map(b => b.colorToken));
+      assert.ok(distinctColorTokens.size >= 6,
+        'default biomes use multiple distinct colour tokens, not a single fallback');
+
+      const weatherLabels = config.vocabularies.weather.map(w => w.label);
+      assert.ok(weatherLabels.every(label => /^[A-Z]/.test(label)),
+        'every weather label starts with an uppercase letter');
+      const weatherIds = config.vocabularies.weather.map(w => w.id);
+      assert.deepEqual(weatherIds, ['clear', 'cloudy', 'rain', 'storm', 'snow', 'fog', 'wind']);
+
+      const timeOfDayLabels = config.vocabularies.timeOfDay.map(t => t.label);
+      assert.deepEqual(timeOfDayLabels, ['Dawn', 'Day', 'Dusk', 'Night']);
     });
 
     it('deletes selected-system region and biome vocabulary values and prunes matching references only in that system', async () => {

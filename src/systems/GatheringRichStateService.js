@@ -1298,11 +1298,14 @@ function normalizeVocabularyOption(kind, value) {
   const isRecord = value && typeof value === 'object';
   const id = normalizeTag(isRecord ? (value.id ?? value.value ?? value.label) : value);
   if (!id) return null;
-  const rawLabel = isRecord ? String(value.label ?? '').trim() : String(value ?? '').trim();
+  const rawLabel = isRecord ? String(value.label ?? '').trim() : '';
   const defaultBiome = kind === 'biomes' ? DEFAULT_BIOME_METADATA[id] : null;
+  // Bare strings get a generated capitalised label; using the raw string as
+  // the label would render an unwanted lowercase chip. Records keep their
+  // explicit label when present.
   const label = isRecord
     ? (rawLabel || defaultBiome?.label || vocabularyLabelFromId(id))
-    : (kind === 'biomes' ? (defaultBiome?.label || vocabularyLabelFromId(id)) : (rawLabel || vocabularyLabelFromId(id)));
+    : (defaultBiome?.label || vocabularyLabelFromId(id));
   if (kind === 'biomes') {
     return {
       id,

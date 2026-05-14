@@ -357,11 +357,14 @@ function _normalizeGatheringVocabularyOption(kind, value) {
   const isRecord = value && typeof value === 'object';
   const id = _normalizeGatheringVocabularyId(isRecord ? (value.id ?? value.value ?? value.label) : value);
   if (!id) return null;
-  const rawLabel = isRecord ? String(value.label ?? '').trim() : String(value ?? '').trim();
+  const rawLabel = isRecord ? String(value.label ?? '').trim() : '';
   const defaultBiome = kind === 'biomes' ? DEFAULT_GATHERING_BIOME_METADATA[id] : null;
+  // Bare strings get a generated capitalised label — using the raw string as
+  // the label would render an unwanted lowercase chip (e.g. "northreach"
+  // instead of "Northreach"). Records keep their explicit label when present.
   const label = isRecord
     ? (rawLabel || defaultBiome?.label || _gatheringVocabularyLabelFromId(id))
-    : (kind === 'biomes' ? (defaultBiome?.label || _gatheringVocabularyLabelFromId(id)) : (rawLabel || _gatheringVocabularyLabelFromId(id)));
+    : (defaultBiome?.label || _gatheringVocabularyLabelFromId(id));
   if (kind === 'biomes') {
     return {
       id,
@@ -385,6 +388,12 @@ function _normalizeGatheringVocabularyOptions(kind, value) {
     options.push(option);
   }
   return options;
+}
+
+function _seedGatheringVocabularyOptions(kind, raw, defaults) {
+  const options = _normalizeGatheringVocabularyOptions(kind, raw);
+  if (options.length > 0) return options;
+  return _normalizeGatheringVocabularyOptions(kind, defaults);
 }
 
 function _normalizeGatheringSystemVocabularies(raw = {}, fallbackVocabularies = {}) {
@@ -666,12 +675,20 @@ function _normalizeGatheringRules(rules = {}) {
 }
 
 function _normalizeGatheringConfig(raw = {}, randomID = () => Math.random().toString(36).slice(2, 10)) {
+  // Top-level vocabularies are normalised into the same { id, label, icon, colorToken }
+  // shape that per-system vocabularies use, so the Svelte fallback path (which
+  // reads top-level when a system has no per-system override) renders capitalised
+  // labels and per-biome colour tokens instead of bare lowercase ids. The
+  // normalisers below accept either bare strings or already-normalised records,
+  // so persisted data of either shape (and re-normalisation on save) roundtrips
+  // safely. `danger` stays as a bare string list because no UI surface renders
+  // it directly today.
   const vocabularies = {
-    regions: _seedGatheringVocabulary(raw?.vocabularies?.regions, DEFAULT_GATHERING_VOCABULARIES.regions),
-    biomes: _seedGatheringVocabulary(raw?.vocabularies?.biomes, DEFAULT_GATHERING_VOCABULARIES.biomes),
+    regions: _normalizeGatheringVocabularyOptions('regions', raw?.vocabularies?.regions || []),
+    biomes: _seedGatheringVocabularyOptions('biomes', raw?.vocabularies?.biomes, DEFAULT_GATHERING_VOCABULARIES.biomes),
     danger: _seedGatheringVocabulary(raw?.vocabularies?.danger, DEFAULT_GATHERING_VOCABULARIES.danger),
-    weather: _seedGatheringVocabulary(raw?.vocabularies?.weather, DEFAULT_GATHERING_VOCABULARIES.weather),
-    timeOfDay: _seedGatheringVocabulary(raw?.vocabularies?.timeOfDay, DEFAULT_GATHERING_VOCABULARIES.timeOfDay)
+    weather: _seedGatheringConditionOptions('weather', raw?.vocabularies?.weather, DEFAULT_GATHERING_VOCABULARIES.weather),
+    timeOfDay: _seedGatheringConditionOptions('timeOfDay', raw?.vocabularies?.timeOfDay, DEFAULT_GATHERING_VOCABULARIES.timeOfDay)
   };
   const weather = _normalizeGatheringConditionId(raw?.conditions?.weather) || DEFAULT_GATHERING_CONDITIONS.weather;
   const timeOfDay = _normalizeGatheringConditionId(raw?.conditions?.timeOfDay) || DEFAULT_GATHERING_CONDITIONS.timeOfDay;

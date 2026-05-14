@@ -18,6 +18,7 @@ function makeSettings(initial = {}) {
   const store = new Map(Object.entries({
     recipes: [],
     craftingSystems: [],
+    gatheringConfig: {},
     migrationVersion: '0.0.0',
     ...initial
   }));
@@ -268,7 +269,7 @@ test('full run from 0.1.0 skips componentId migration', async () => {
   assert.ok(!setKeys.includes('recipes'));
 });
 
-test('migrationVersion setting is updated to 0.1.0 after successful run', async () => {
+test('migrationVersion setting is updated to the highest migration version after successful run', async () => {
   const { runner, settings } = makeRunner({
     initial: {
       migrationVersion: '0.0.0',
@@ -281,7 +282,7 @@ test('migrationVersion setting is updated to 0.1.0 after successful run', async 
 
   const versionCall = settings.calls.set.find(c => c.key === 'migrationVersion');
   assert.ok(versionCall, 'migrationVersion should be persisted');
-  assert.equal(versionCall.value, '0.1.0');
+  assert.equal(versionCall.value, '0.2.0');
 });
 
 // ---------------------------------------------------------------------------
@@ -319,4 +320,114 @@ test('unchanged data only triggers setSetting for migrationVersion', async () =>
   assert.ok(!setKeys.includes('recipes'), 'recipes should NOT be persisted when unchanged');
   assert.ok(!setKeys.includes('craftingSystems'), 'craftingSystems should NOT be persisted when unchanged');
   assert.ok(setKeys.includes('migrationVersion'), 'migrationVersion should always be updated after migrations run');
+});
+
+// ---------------------------------------------------------------------------
+// Group 6: Migration 0.2.0 — clear stale top-level gathering regions
+// ---------------------------------------------------------------------------
+
+test('0.2.0 clears stale top-level gatheringConfig.vocabularies.regions', async () => {
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '0.1.0',
+      gatheringConfig: {
+        conditions: { weather: 'rain', timeOfDay: 'dusk' },
+        vocabularies: {
+          regions: ['northreach'],
+          biomes: ['forest', 'mountain']
+        },
+        systems: { 'sys-a': { tools: [{ id: 't1' }] } }
+      }
+    }
+  });
+
+  await runner.run();
+
+  const saved = settings.store.get('gatheringConfig');
+  assert.deepEqual(saved.vocabularies.regions, [], 'regions cleared');
+  assert.deepEqual(saved.vocabularies.biomes, ['forest', 'mountain'], 'biomes preserved');
+  assert.deepEqual(saved.conditions, { weather: 'rain', timeOfDay: 'dusk' }, 'conditions preserved');
+  assert.deepEqual(saved.systems, { 'sys-a': { tools: [{ id: 't1' }] } }, 'systems preserved');
+
+  const versionCall = settings.calls.set.find(c => c.key === 'migrationVersion');
+  assert.equal(versionCall?.value, '0.2.0');
+});
+
+test('0.2.0 is a no-op when gatheringConfig.vocabularies.regions is already empty', async () => {
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '0.1.0',
+      gatheringConfig: {
+        vocabularies: { regions: [], biomes: ['forest'] },
+        systems: {}
+      }
+    }
+  });
+
+  await runner.run();
+
+  const setKeys = settings.calls.set.map(c => c.key);
+  assert.ok(!setKeys.includes('gatheringConfig'),
+    'gatheringConfig should NOT be persisted when regions already empty');
+  assert.ok(setKeys.includes('migrationVersion'),
+    'migrationVersion still advances to record the run');
+});
+
+test('0.2.0 is a no-op when gatheringConfig has no vocabularies key at all', async () => {
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '0.1.0',
+      gatheringConfig: { systems: { 'sys-a': {} } }
+    }
+  });
+
+  await runner.run();
+
+  const setKeys = settings.calls.set.map(c => c.key);
+  assert.ok(!setKeys.includes('gatheringConfig'),
+    'no rewrite when there is nothing to clear');
+});
+
+test('0.1.0 backward-compat: gatheringConfig is preserved across the spread-merge refactor', async () => {
+  const originalGathering = {
+    conditions: { weather: 'clear', timeOfDay: 'day' },
+    vocabularies: { regions: ['legacy-region'], biomes: ['forest'] },
+    systems: { 'legacy-sys': { tools: [{ id: 'legacy-tool' }] } }
+  };
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '0.0.0',
+      recipes: [{ catalysts: [{ systemItemId: 'forge' }] }],
+      craftingSystems: [{ managedItems: [{ id: 'comp-1' }] }],
+      gatheringConfig: JSON.parse(JSON.stringify(originalGathering))
+    }
+  });
+
+  await runner.run();
+
+  // 0.1.0 ran (componentId rename) and 0.2.0 ran (regions cleared). The
+  // gatheringConfig should retain its biomes, conditions, and systems —
+  // only regions should change.
+  const saved = settings.store.get('gatheringConfig');
+  assert.deepEqual(saved.vocabularies.regions, [], 'regions cleared by 0.2.0');
+  assert.deepEqual(saved.vocabularies.biomes, ['forest'], 'biomes preserved across both migrations');
+  assert.deepEqual(saved.conditions, originalGathering.conditions, 'conditions preserved');
+  assert.deepEqual(saved.systems, originalGathering.systems, 'systems preserved');
+
+  // 0.1.0's recipe / system migrations also took effect.
+  const recipes = settings.store.get('recipes');
+  const systems = settings.store.get('craftingSystems');
+  assert.equal(recipes[0].catalysts[0].componentId, 'forge');
+  assert.equal('systemItemId' in recipes[0].catalysts[0], false);
+  assert.ok(Array.isArray(systems[0].components));
+  assert.equal('managedItems' in systems[0], false);
+});
+
+test('null gatheringConfig setting is handled gracefully', async () => {
+  const settings = makeSettings({ migrationVersion: '0.1.0' });
+  const originalGet = settings.getSetting;
+  const patchedGet = (key) => (key === 'gatheringConfig' ? null : originalGet(key));
+  const runner = new MigrationRunner({ getSetting: patchedGet, setSetting: settings.setSetting });
+
+  await assert.doesNotReject(() => runner.run());
 });
