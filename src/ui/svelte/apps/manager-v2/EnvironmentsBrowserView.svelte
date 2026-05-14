@@ -133,21 +133,25 @@
 
   const environmentList = $derived(environments || []);
   const selectedGatheringSystemConfig = $derived(gatheringConfig?.systems?.[selectedSystemId] || {});
+  // Top-level vocabularies from the admin store are normalised into
+  // { id, label, icon, colorToken } records, so the fallback path used by
+  // systems with no per-system override renders capitalised labels and
+  // per-biome colour tokens.
   const weatherCondition = $derived(selectedGatheringSystemConfig.conditions?.weather || {
     enabled: true,
     current: gatheringConfig?.conditions?.weather || 'clear',
-    values: gatheringConfig?.vocabularies?.weather || ['clear', 'cloudy', 'rain', 'storm', 'snow', 'fog', 'wind']
+    values: gatheringConfig?.vocabularies?.weather || []
   });
   const timeOfDayCondition = $derived(selectedGatheringSystemConfig.conditions?.timeOfDay || {
     enabled: true,
     current: gatheringConfig?.conditions?.timeOfDay || 'day',
-    values: gatheringConfig?.vocabularies?.timeOfDay || ['dawn', 'day', 'dusk', 'night']
+    values: gatheringConfig?.vocabularies?.timeOfDay || []
   });
   const regionVocabulary = $derived(selectedGatheringSystemConfig.vocabularies?.regions || {
     values: gatheringConfig?.vocabularies?.regions || []
   });
   const biomeVocabulary = $derived(selectedGatheringSystemConfig.vocabularies?.biomes || {
-    values: gatheringConfig?.vocabularies?.biomes || ['forest', 'grassland', 'mountain', 'cave', 'coastal', 'swamp', 'desert', 'urban', 'ruins', 'wasteland']
+    values: gatheringConfig?.vocabularies?.biomes || []
   });
   const activeGatheringTabConfig = $derived(gatheringTabs.find(tab => tab.id === activeGatheringTab) || gatheringTabs[0]);
   const regionOptions = $derived(uniqueSorted(environmentList.map(environment => environment.region)));

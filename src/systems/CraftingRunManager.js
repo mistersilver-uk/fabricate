@@ -287,6 +287,31 @@ export class CraftingRunManager {
     }
   }
 
+  async removeRunsForSystem(systemId) {
+    if (!systemId) return;
+    const target = String(systemId);
+    for (const actor of game.actors || []) {
+      const container = this._getContainer(actor);
+      let dirty = false;
+
+      for (const [runId, run] of Object.entries(container.active || {})) {
+        if (run?.craftingSystemId !== target) continue;
+        delete container.active[runId];
+        dirty = true;
+      }
+
+      const nextHistory = (container.history || []).filter(run => run?.craftingSystemId !== target);
+      if (nextHistory.length !== (container.history || []).length) {
+        container.history = nextHistory;
+        dirty = true;
+      }
+
+      if (dirty) {
+        await this._persist(actor, container);
+      }
+    }
+  }
+
   async cleanupInvalidRuns(validRecipeIds = new Set(), validSystemIds = new Set()) {
     for (const actor of game.actors || []) {
       const container = this._getContainer(actor);

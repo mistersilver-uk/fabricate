@@ -11,11 +11,14 @@ import {
   processWorldTimeCallbacksSafely,
   withCurrentGatheringViewer
 } from '../src/gatheringBootstrapAdapters.js';
+import { createGatheringToolAvailability } from '../src/gatheringToolRuntime.js';
 import { GatheringGateAndCheckEvaluator } from '../src/systems/GatheringGateAndCheckEvaluator.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const mainPath = resolve(__dirname, '../src/main.js');
+const toolRuntimePath = resolve(__dirname, '../src/gatheringToolRuntime.js');
 const mainSource = readFileSync(mainPath, 'utf8');
+const toolRuntimeSource = readFileSync(toolRuntimePath, 'utf8');
 
 test('Fabricate exposes gathering runtime getters and API methods', () => {
   for (const expected of [
@@ -362,8 +365,8 @@ test('GatheringEngine is constructed with tool availability and breakage injecta
 test('tool availability injectable matches by componentId and skips broken-flagged items', () => {
   assert.match(
     mainSource,
-    /function createGatheringToolAvailability\(/,
-    'main.js should declare createGatheringToolAvailability'
+    /createGatheringToolAvailability/,
+    'main.js should wire createGatheringToolAvailability'
   );
   assert.match(
     mainSource,
@@ -371,13 +374,57 @@ test('tool availability injectable matches by componentId and skips broken-flagg
     'main.js should declare createGatheringToolBreakage'
   );
   assert.match(
-    mainSource,
+    toolRuntimeSource,
     /toolBroken/,
     'tool availability should consider the toolBroken flag'
   );
   assert.match(
-    mainSource,
+    toolRuntimeSource,
     /evaluateRequirement\?\.\(/,
     'tool availability should evaluate per-tool requirement'
   );
+});
+
+test('tool availability injectable blocks when actor lacks a required library tool', async () => {
+  const availability = createGatheringToolAvailability({
+    craftingSystemManager: {
+      catalystMatchesItem: (_recipe, tool, item) => tool.componentId === item.componentId
+    },
+    evaluator: { evaluateRequirement: async () => ({ allowed: true }) }
+  });
+
+  const result = await availability.check({
+    actor: { uuid: 'Actor.actor-1', items: [] },
+    system: { id: 'system-a' },
+    task: { id: 'task-a' },
+    tools: [{ componentId: 'tool-pick' }]
+  });
+
+  assert.equal(result.available, false);
+  assert.deepEqual(result.missing, [{ componentId: 'tool-pick' }]);
+});
+
+test('tool availability injectable treats actor tools flagged broken as missing', async () => {
+  const availability = createGatheringToolAvailability({
+    craftingSystemManager: {
+      catalystMatchesItem: (_recipe, tool, item) => tool.componentId === item.componentId
+    },
+    evaluator: { evaluateRequirement: async () => ({ allowed: true }) }
+  });
+  const brokenItem = {
+    uuid: 'Item.pick',
+    componentId: 'tool-pick',
+    flags: { fabricate: { toolBroken: true } },
+    getFlag: (namespace, key) => namespace === 'fabricate' && key === 'toolBroken' ? true : undefined
+  };
+
+  const result = await availability.check({
+    actor: { uuid: 'Actor.actor-1', items: [brokenItem] },
+    system: { id: 'system-a' },
+    task: { id: 'task-a' },
+    tools: [{ componentId: 'tool-pick' }]
+  });
+
+  assert.equal(result.available, false);
+  assert.deepEqual(result.missing, [{ componentId: 'tool-pick' }]);
 });

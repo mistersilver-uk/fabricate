@@ -357,11 +357,14 @@ function _normalizeGatheringVocabularyOption(kind, value) {
   const isRecord = value && typeof value === 'object';
   const id = _normalizeGatheringVocabularyId(isRecord ? (value.id ?? value.value ?? value.label) : value);
   if (!id) return null;
-  const rawLabel = isRecord ? String(value.label ?? '').trim() : String(value ?? '').trim();
+  const rawLabel = isRecord ? String(value.label ?? '').trim() : '';
   const defaultBiome = kind === 'biomes' ? DEFAULT_GATHERING_BIOME_METADATA[id] : null;
+  // Bare strings get a generated capitalised label — using the raw string as
+  // the label would render an unwanted lowercase chip (e.g. "northreach"
+  // instead of "Northreach"). Records keep their explicit label when present.
   const label = isRecord
     ? (rawLabel || defaultBiome?.label || _gatheringVocabularyLabelFromId(id))
-    : (kind === 'biomes' ? (defaultBiome?.label || _gatheringVocabularyLabelFromId(id)) : (rawLabel || _gatheringVocabularyLabelFromId(id)));
+    : (defaultBiome?.label || _gatheringVocabularyLabelFromId(id));
   if (kind === 'biomes') {
     return {
       id,
@@ -385,6 +388,12 @@ function _normalizeGatheringVocabularyOptions(kind, value) {
     options.push(option);
   }
   return options;
+}
+
+function _seedGatheringVocabularyOptions(kind, raw, defaults) {
+  const options = _normalizeGatheringVocabularyOptions(kind, raw);
+  if (options.length > 0) return options;
+  return _normalizeGatheringVocabularyOptions(kind, defaults);
 }
 
 function _normalizeGatheringSystemVocabularies(raw = {}, fallbackVocabularies = {}) {
@@ -666,12 +675,20 @@ function _normalizeGatheringRules(rules = {}) {
 }
 
 function _normalizeGatheringConfig(raw = {}, randomID = () => Math.random().toString(36).slice(2, 10)) {
+  // Top-level vocabularies are normalised into the same { id, label, icon, colorToken }
+  // shape that per-system vocabularies use, so the Svelte fallback path (which
+  // reads top-level when a system has no per-system override) renders capitalised
+  // labels and per-biome colour tokens instead of bare lowercase ids. The
+  // normalisers below accept either bare strings or already-normalised records,
+  // so persisted data of either shape (and re-normalisation on save) roundtrips
+  // safely. `danger` stays as a bare string list because no UI surface renders
+  // it directly today.
   const vocabularies = {
-    regions: _seedGatheringVocabulary(raw?.vocabularies?.regions, DEFAULT_GATHERING_VOCABULARIES.regions),
-    biomes: _seedGatheringVocabulary(raw?.vocabularies?.biomes, DEFAULT_GATHERING_VOCABULARIES.biomes),
+    regions: _normalizeGatheringVocabularyOptions('regions', raw?.vocabularies?.regions || []),
+    biomes: _seedGatheringVocabularyOptions('biomes', raw?.vocabularies?.biomes, DEFAULT_GATHERING_VOCABULARIES.biomes),
     danger: _seedGatheringVocabulary(raw?.vocabularies?.danger, DEFAULT_GATHERING_VOCABULARIES.danger),
-    weather: _seedGatheringVocabulary(raw?.vocabularies?.weather, DEFAULT_GATHERING_VOCABULARIES.weather),
-    timeOfDay: _seedGatheringVocabulary(raw?.vocabularies?.timeOfDay, DEFAULT_GATHERING_VOCABULARIES.timeOfDay)
+    weather: _seedGatheringConditionOptions('weather', raw?.vocabularies?.weather, DEFAULT_GATHERING_VOCABULARIES.weather),
+    timeOfDay: _seedGatheringConditionOptions('timeOfDay', raw?.vocabularies?.timeOfDay, DEFAULT_GATHERING_VOCABULARIES.timeOfDay)
   };
   const weather = _normalizeGatheringConditionId(raw?.conditions?.weather) || DEFAULT_GATHERING_CONDITIONS.weather;
   const timeOfDay = _normalizeGatheringConditionId(raw?.conditions?.timeOfDay) || DEFAULT_GATHERING_CONDITIONS.timeOfDay;
@@ -1532,7 +1549,10 @@ export function createAdminStore(services) {
   const toolsDraftExpandedToolId = writable('');
   let dirtyToolsDraftDiscardConfirmation = null;
   let unsubscribeFabricateReady = null;
+  let unsubscribeFabricateDataChanged = null;
   let readyRefreshScheduled = false;
+  let externalRefreshScheduled = false;
+  let destroyed = false;
 
   // --- Computed state ---
   const viewState = writable({
@@ -2085,6 +2105,26 @@ export function createAdminStore(services) {
     });
   }
 
+  function _scheduleExternalRefresh() {
+    if (destroyed || externalRefreshScheduled) return;
+    externalRefreshScheduled = true;
+    const schedule = typeof queueMicrotask === 'function'
+      ? queueMicrotask
+      : (callback) => Promise.resolve().then(callback);
+    schedule(async () => {
+      externalRefreshScheduled = false;
+      if (destroyed) return;
+      await refresh();
+    });
+  }
+
+  function _subscribeExternalDataChanges() {
+    if (typeof services.onFabricateDataChanged !== 'function') return null;
+    return services.onFabricateDataChanged(() => {
+      _scheduleExternalRefresh();
+    });
+  }
+
   function _newEnvironmentResultGroup(existingGroups = []) {
     const baseName = services.localize?.('FABRICATE.Admin.Environments.NewResultGroupName') || 'Results';
     const existingNames = new Set((Array.isArray(existingGroups) ? existingGroups : [])
@@ -2454,7 +2494,7 @@ export function createAdminStore(services) {
 
     const confirmed = await services.confirmDialog({
       title: `Delete ${system.name}?`,
-      content: `<p>Delete crafting system <strong>${system.name}</strong>? Recipes linked to it will be deleted.</p>`,
+      content: `<p>Delete crafting system <strong>${system.name}</strong>?</p><p>Linked recipes, gathering environments, gathering tools and tasks, and any in-progress or historical crafting, salvage, and gathering runs for this system will be removed.</p>`,
       yes: () => true,
       no: () => false
     });
@@ -3853,7 +3893,11 @@ export function createAdminStore(services) {
     return task;
   }
 
-  function validateGatheringLibraryTask(task) {
+  function _selectedGatheringSystem(systemId = get(selectedSystemId)) {
+    return services.getCraftingSystemManager?.()?.getSystem?.(systemId) || null;
+  }
+
+  function _validateGatheringLibraryTaskForSystem(task, systemId = get(selectedSystemId)) {
     const errors = [];
     if (!task || typeof task !== 'object') {
       errors.push('Task is required');
@@ -3864,7 +3908,12 @@ export function createAdminStore(services) {
       errors.push('Task name is required');
     }
     const label = `Task "${name || task.id || 'unnamed'}"`;
-    errors.push(...validateDropRows(task.dropRows, label));
+    const system = _selectedGatheringSystem(systemId);
+    errors.push(...validateDropRows(task.dropRows, label, {
+      system,
+      systemId,
+      validateDisabledRows: true
+    }));
     if (Array.isArray(task.dropRows)) {
       for (const row of task.dropRows) {
         if (row?.enabled === false && !row?.componentId && !row?.itemUuid) {
@@ -3873,6 +3922,10 @@ export function createAdminStore(services) {
       }
     }
     return { valid: errors.length === 0, errors };
+  }
+
+  function validateGatheringLibraryTask(task) {
+    return _validateGatheringLibraryTaskForSystem(task);
   }
 
   function _gatheringTaskIsAtDefaults(task) {
@@ -3924,6 +3977,14 @@ export function createAdminStore(services) {
     systemConfig.tasks = systemConfig.tasks.map(task => task.id === taskId
       ? _normalizeGatheringTask({ ...task, ...mergedUpdates }, _randomID)
       : task);
+    if (Array.isArray(updates.dropRows)) {
+      const nextTask = systemConfig.tasks.find(task => task.id === taskId);
+      const validation = _validateGatheringLibraryTaskForSystem(nextTask, systemId);
+      if (!validation.valid) {
+        services.notify?.error?.(validation.errors[0] || 'Gathering task validation failed.');
+        return false;
+      }
+    }
     await _saveGatheringConfig(config);
     await refresh();
     return true;
@@ -4660,10 +4721,16 @@ export function createAdminStore(services) {
   }
 
   function destroy() {
+    destroyed = true;
     unsubscribeFabricateReady?.();
     unsubscribeFabricateReady = null;
+    unsubscribeFabricateDataChanged?.();
+    unsubscribeFabricateDataChanged = null;
     readyRefreshScheduled = false;
+    externalRefreshScheduled = false;
   }
+
+  unsubscribeFabricateDataChanged = _subscribeExternalDataChanges();
 
   // Trigger initial computation
   refresh();

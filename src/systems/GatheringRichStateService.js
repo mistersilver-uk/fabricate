@@ -781,6 +781,28 @@ export class GatheringRichStateService {
     return runtimeTask;
   }
 
+  /**
+   * Remove all per-system gathering library state for `systemId` from the
+   * persisted gathering config. Operates on the raw setting (no normalization)
+   * so unrelated systems are left untouched.
+   *
+   * @param {string} systemId
+   * @returns {Promise<boolean>} true when an entry was removed
+   */
+  async removeSystem(systemId) {
+    if (!systemId) return false;
+    if (typeof this.getSetting !== 'function' || typeof this.setSetting !== 'function') return false;
+    const target = String(systemId);
+    const raw = this.getSetting(this.settingKey);
+    const systems = raw?.systems;
+    if (!systems || typeof systems !== 'object' || !(target in systems)) return false;
+    const nextSystems = { ...systems };
+    delete nextSystems[target];
+    const next = { ...(raw || {}), systems: nextSystems };
+    await this.setSetting(this.settingKey, next);
+    return true;
+  }
+
   _config() {
     const raw = typeof this.getSetting === 'function' ? this.getSetting(this.settingKey) : {};
     return normalizeGatheringConfig(raw);
@@ -1276,11 +1298,14 @@ function normalizeVocabularyOption(kind, value) {
   const isRecord = value && typeof value === 'object';
   const id = normalizeTag(isRecord ? (value.id ?? value.value ?? value.label) : value);
   if (!id) return null;
-  const rawLabel = isRecord ? String(value.label ?? '').trim() : String(value ?? '').trim();
+  const rawLabel = isRecord ? String(value.label ?? '').trim() : '';
   const defaultBiome = kind === 'biomes' ? DEFAULT_BIOME_METADATA[id] : null;
+  // Bare strings get a generated capitalised label; using the raw string as
+  // the label would render an unwanted lowercase chip. Records keep their
+  // explicit label when present.
   const label = isRecord
     ? (rawLabel || defaultBiome?.label || vocabularyLabelFromId(id))
-    : (kind === 'biomes' ? (defaultBiome?.label || vocabularyLabelFromId(id)) : (rawLabel || vocabularyLabelFromId(id)));
+    : (defaultBiome?.label || vocabularyLabelFromId(id));
   if (kind === 'biomes') {
     return {
       id,

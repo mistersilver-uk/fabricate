@@ -27,6 +27,7 @@ When `CraftingSystem.resolutionMode` changes:
 1. Delete all recipes in the system.
 2. Apply the same clean-up as mode change.
 3. Remove the system from persisted settings.
+4. Emit one summary notification that includes the deleted crafting system name and the number of related entities removed; do not emit one notification per deleted recipe.
 
 ### Delete Recipe
 
@@ -78,6 +79,7 @@ On recipe import:
    - conflicting recipes are rejected.
 2. If target system mode is `alchemy`, signature uniqueness collisions are treated as conflicts.
 3. The import operation must emit one aggregated conflict report at completion.
+4. The import operation must emit one terminal notification summary and must not emit per-recipe create or update notifications.
 
 ### Alchemy Uniqueness Revalidation
 

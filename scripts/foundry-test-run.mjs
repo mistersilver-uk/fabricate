@@ -2207,15 +2207,11 @@ async function main() {
 
         await game.settings.set('fabricate', 'gatheringConfig', {
           conditions: { weather: 'rain', timeOfDay: 'dusk' },
-          vocabularies: {
-            regions: ['northreach'],
-            biomes: ['forest', 'grassland', 'mountain', 'cave', 'coastal', 'swamp', 'desert', 'urban', 'ruins', 'wasteland'],
-            danger: ['safe', 'hazardous', 'dangerous', 'deadly'],
-            weather: ['clear', 'cloudy', 'rain', 'storm', 'snow', 'fog', 'wind'],
-            timeOfDay: ['dawn', 'day', 'dusk', 'night']
-          },
           systems: {
             [systemId]: {
+              vocabularies: {
+                regions: { values: ['northreach'] }
+              },
               tasks: [{
                 id: 'smoke-forage-library',
                 name: 'Smoke Reusable Forage',

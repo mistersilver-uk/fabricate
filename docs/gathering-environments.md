@@ -69,7 +69,7 @@ Legacy per-task item selection, per-environment hazard selection, and per-enviro
 
 ## Gathering Tools Library
 
-Manager V2 exposes a per-system **Tools** page under Gathering. Tools are reusable gathering tools that can later be required by gathering tasks. The page is a draft-and-save surface: edits are held in memory until the GM clicks **Save changes**, navigation away from a dirty draft prompts before discarding, and a concurrent-edit dialog appears if the live tool list changed while the GM was editing.
+Manager V2 exposes a per-system **Tools** page under Gathering. Tools are reusable gathering tools that Gathering Tasks can require by `toolIds`. The page is a draft-and-save surface: edits are held in memory until the GM clicks **Save changes**, navigation away from a dirty draft prompts before discarding, and a concurrent-edit dialog appears if the live tool list changed while the GM was editing.
 
 Each library tool record carries:
 
@@ -83,7 +83,7 @@ Each library tool record carries:
 
 Tool authoring rejects entries with no component, with `replaceWith` and the same replacement as primary component, with out-of-range breakage chance, or with empty dice formulas. The Save button is disabled until every tool is valid; hovering it reveals the first failing reason.
 
-Library tools persist under `gatheringConfig.systems[systemId].tools[]`. Legacy worlds without a `tools` array load as `[]`. Cross-system sharing is not supported in this slice. Task-side wiring (referring to a library tool from a gathering task) is the next change in the OpenSpec backlog.
+Library tools persist under `gatheringConfig.systems[systemId].tools[]`. Legacy worlds without a `tools` array load as `[]`. Cross-system sharing is not supported. If a task references a missing or disabled library tool, the runtime blocks the attempt with `TOOL_BLOCKED` before actor inventory checks.
 
 ## Gathering Task And Hazard Libraries
 
@@ -99,6 +99,7 @@ Gathering Task records support:
 | **Region, biomes, weather, time of day** | Optional match tags; empty means any |
 | **Drop rows** | Ordered d100 item/component rows with quantity, `dropRate` from 0 to 100, and optional per-drop time/weather modifiers. Authored order is the rank used by system Gathering Rules. |
 | **Stamina and modifiers** | Optional stamina cost and gathering roll modifier provider |
+| **Required tools** | Optional references to the selected system's Gathering Tools library. All referenced tools are required. |
 
 Reusable hazard records support:
 
@@ -116,6 +117,8 @@ Disabled Gathering Tasks and hazards never match for player gathering.
 Gathering Tasks use gathering-native d100 rows. Task-level weather and time-of-day availability gates decide whether the task can be attempted. For each enabled item row, Fabricate computes `finalDropRate = clamp(dropRate + matching drop-level time/weather modifiers, 0, 100)`, rolls `d100 + gatheringModifier`, and drops the row when the effective roll is at least `101 - finalDropRate`. Gathering modifiers affect the d100 roll, not the final drop chance. Matched enabled hazards roll independently with `d100 + hazardModifier` and their authored hazard drop-rate threshold.
 
 Drop-level modifiers do not make an unavailable task available. They only adjust individual row chance after the task already matches. Multiple rows can reference the same component with different quantities and chances; each row rolls independently before the selected system's Gathering Rules choose awarded rows.
+
+Saved, imported, or seeded drop rows must point at a real reward target. A `componentId` must exist in the selected crafting system's component library, and an `itemUuid` must resolve to a Foundry Item. Fabricate rejects stale component ids, unresolved item UUIDs, and rows with neither target before writing the gathering task.
 
 The selected crafting system's Gathering Rules choose reward and hazard rows after rolling. `highestRankedDrop` selects the first successful row by authored order, `allDrops` selects every successful row, and `limitedDrops` selects the first `N` successful rows by authored order. `successWithHazard` records selected hazards while the gathering still succeeds. `failureWithHazard` records selected hazards and makes the attempt fail, so no selected rewards are awarded. If no hazards are enabled or matched, the environment is mechanically safe even when danger tags are present.
 
@@ -239,11 +242,12 @@ Save validation rejects catalyst rows without a `componentId`. `maxUses` is null
 
 ## Tools
 
-Gathering tasks may declare one or more required tools, separate from catalysts. All listed tools must be present in the actor's inventory and pass their requirement before the attempt may start.
+Gathering tasks may declare one or more required tools by referencing the selected system's Gathering Tools library, separate from catalysts. All referenced tools must resolve to enabled library entries, and all resolved tools must be present in the actor's inventory and pass their requirement before the attempt may start.
 
 | Field | Description |
 |:------|:------------|
-| `componentId` | Required component from the current crafting system's managed item list |
+| `toolIds` | Required tool references stored on the task; each id points at `gatheringConfig.systems[systemId].tools[]` |
+| `componentId` | Required component from the current crafting system's managed item list on the library tool |
 | `requirement` | Optional Foundry expression (per provider) or macro UUID; must evaluate truthy for the actor to use the tool |
 | `breakage.mode` | One of `limitedUses`, `breakageChance`, or `diceExpression` |
 | `breakage.maxUses` | `limitedUses`: positive integer or blank (unlimited); tracked on the item via `flags.fabricate.toolUsage.timesUsed` |
@@ -253,6 +257,8 @@ Gathering tasks may declare one or more required tools, separate from catalysts.
 | `onBreak.replacementComponentId` | `replaceWith`: a different managed component spawned on the actor when the tool breaks |
 
 The system-level Gathering Rules setting **Tool breakage outcome** controls what happens when any tool breaks: `failureOnBreak` (default) overrides the attempt to `failed` and clears drops; `successDespiteBreak` preserves the success state. Either way, the on-break action always commits.
+
+Missing or disabled library references block with `TOOL_BLOCKED`, as do missing actor-owned tools, owned tools with `flags.fabricate.toolBroken === true`, and failed tool requirements.
 
 See the [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}) how-to for a worked example.
 

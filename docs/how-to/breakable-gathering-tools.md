@@ -13,7 +13,7 @@ How do I require an actor to wield a tool for a gathering task, have that tool w
 
 ## Short answer
 
-Author the tool once on the **Gathering → Tools** page. Pick one of three breakage mechanics (limited uses, breakage chance, or dice expression), pick what happens when it breaks (destroy, mark broken, or replace with another component), and set the system-level **Tool breakage outcome** policy in the gathering rules. Task-side wiring — having a specific gathering task require this tool — is a separate change still in progress.
+Author the tool once on the **Gathering → Tools** page. Pick one of three breakage mechanics (limited uses, breakage chance, or dice expression), pick what happens when it breaks (destroy, mark broken, or replace with another component), require that tool from the relevant Gathering Task, and set the system-level **Tool breakage outcome** policy in the gathering rules.
 
 ## Steps
 
@@ -32,11 +32,12 @@ Author the tool once on the **Gathering → Tools** page. Pick one of three brea
    - **Mark as broken** — the tool stays in inventory but receives the `flags.fabricate.toolBroken = true` flag. Broken tools fail the presence gate on future attempts, so a task is blocked until a GM clears the flag (Foundry item flag editor).
    - **Replace with...** — pick a second managed component (the "broken" variant). On break, the original is deleted and the replacement is created on the actor. The replacement is a normal component, so you can build a recipe that consumes it to produce the repaired tool.
 7. **Click *Save changes*.** The page tracks dirty state with an *Unsaved* chip; navigation away while dirty prompts before discarding.
-8. **Decide the system-level outcome.** In Manager V2 → System Settings → Gathering Rules, set **Tool breakage outcome** to either *Attempt fails on break* (the default — a broken tool fails the whole attempt and clears its drops) or *Attempt succeeds despite break* (drops are awarded; the breakage is reported alongside).
+8. **Require the tool from a task.** Open the selected system's Gathering Tasks, edit the task, and add the saved tool in the required-tools section. Fabricate stores this as `task.toolIds`.
+9. **Decide the system-level outcome.** In Manager V2 → System Settings → Gathering Rules, set **Tool breakage outcome** to either *Attempt fails on break* (the default — a broken tool fails the whole attempt and clears its drops) or *Attempt succeeds despite break* (drops are awarded; the breakage is reported alongside).
 
 ## What happens at the table
 
-- Before the attempt starts, Fabricate checks each configured tool: the actor must own a non-broken instance and the requirement (if any) must evaluate truthy. Missing tools or failed requirements block the start with a `TOOL_BLOCKED` reason.
+- Before the attempt starts, Fabricate resolves each configured `toolId`: missing or disabled library references block with `TOOL_BLOCKED`. Then Fabricate checks each resolved tool against the actor inventory: the actor must own a non-broken instance and the requirement (if any) must evaluate truthy. Missing actor tools or failed requirements also block with `TOOL_BLOCKED`.
 - During resolution, each tool's breakage mechanic runs. The `limitedUses` counter increments before the comparison, so `maxUses: 5` lets the tool survive its first five attempts and breaks on the sixth.
 - The breakage rolls happen *before* result creation. With the `failureOnBreak` policy the success state flips to `failed` when any tool breaks, and no drops are awarded — but the destruction / flag / replacement always commits.
 - The terminal response includes a `usedTools` array describing what each tool did this attempt, so chat/log integrations can describe the breakage.

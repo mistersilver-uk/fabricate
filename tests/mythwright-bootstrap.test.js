@@ -378,6 +378,50 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     assert.deepEqual(payload.components, [{ id: 'raw-ore', name: 'Raw Ore' }]);
   });
 
+  it('builds an import payload and maps import API summary counts', async () => {
+    const helper = globalThis.MythwrightDnd5eBootstrap;
+    const previousGame = globalThis.game;
+    const calls = [];
+    globalThis.game = {
+      modules: new Map([['fabricate', { version: '9.8.7' }]]),
+      fabricate: {
+        importFromPack: async (payload, options) => {
+          calls.push({ payload, options });
+          return {
+            system: { created: false },
+            recipes: { imported: 3, skipped: 1, errors: [] },
+            collisions: [
+              { type: 'system', resolution: 'overwritten' },
+              { type: 'recipe', resolution: 'overwritten' }
+            ]
+          };
+        }
+      }
+    };
+
+    try {
+      const payload = helper.buildImportPayload({
+        systemPayload: { id: helper.SYSTEM_ID, name: 'Mythwright', components: [{ id: 'raw-ore' }] },
+        recipes: [{ id: 'recipe-a', name: 'Recipe A' }]
+      });
+      const summary = { system: 'skipped', recipes: { created: 0, updated: 0, skipped: 0, errors: 0 } };
+
+      await helper.importMythwrightPayload(payload, summary);
+
+      assert.equal(payload.fabricateVersion, '9.8.7');
+      assert.equal(calls.length, 1);
+      assert.deepEqual(calls[0].options, { overwriteExisting: true });
+      assert.equal(calls[0].payload.system.id, helper.SYSTEM_ID);
+      assert.equal(calls[0].payload.recipes.length, 1);
+      assert.equal(summary.system, 'updated');
+      assert.equal(summary.recipes.created, 2);
+      assert.equal(summary.recipes.updated, 1);
+      assert.equal(summary.recipes.skipped, 1);
+    } finally {
+      globalThis.game = previousGame;
+    }
+  });
+
   it('uses patterned player-facing recipe copy and plain gathering environment names', () => {
     const helper = globalThis.MythwrightDnd5eBootstrap;
     const club = helper.buildRecipeForSrd(
@@ -599,5 +643,137 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
       'weapon-ember-masterwork-shortsword',
       'weapon-ember-mythic-shortsword'
     ]);
+  });
+
+  it('seeds deterministic Mythwright gathering tools with broken replacements', () => {
+    const helper = globalThis.MythwrightDnd5eBootstrap;
+    const tools = helper.buildGatheringTools();
+
+    assert.deepEqual(tools.map(tool => tool.id), [
+      'mythwright-tool-mining-pick',
+      'mythwright-tool-wood-axe',
+      'mythwright-tool-skinning-knife',
+      'mythwright-tool-delver-kit',
+      'mythwright-tool-planar-binding-rod',
+      'mythwright-tool-dragon-tongs'
+    ]);
+    assert.ok(tools.every(tool => tool.breakage.mode === 'breakageChance'));
+    assert.ok(tools.every(tool => tool.onBreak.mode === 'replaceWith'));
+    assert.equal(
+      tools.find(tool => tool.id === 'mythwright-tool-mining-pick').onBreak.replacementComponentId,
+      'broken-tool-mining-pick'
+    );
+    assert.ok(helper.APPROVED_MYTHWRIGHT_ICON_PATHS.includes('icons/tools/hand/pickaxe-steel-white.webp'));
+  });
+
+  it('builds repair recipes that consume broken tools and matching Mythwright materials', () => {
+    const helper = globalThis.MythwrightDnd5eBootstrap;
+    const recipes = helper.buildToolRepairRecipes();
+    const pick = recipes.find(recipe => recipe.id === 'mythwright-repair-mining-pick');
+    const components = pick.steps[0].ingredientSets[0].ingredientGroups.map(group => group.options[0].componentId);
+
+    assert.equal(pick.category, 'Tools');
+    assert.deepEqual(components, ['broken-tool-mining-pick', 'iron-ingot', 'hardwood']);
+    assert.equal(pick.steps[0].resultGroups[0].results[0].componentId, 'tool-mining-pick');
+  });
+
+  it('builds Mythwright gathering library tasks with toolIds and valid drop rows', () => {
+    const helper = globalThis.MythwrightDnd5eBootstrap;
+    const tasks = helper.buildGatheringTasks({
+      srdByName: new Map([
+        [helper.normalizeName('War Pick'), { type: 'weapon', name: 'War Pick', item: { uuid: 'Compendium.dnd5e.equipment24.Item.phbwepWarPick000' } }],
+        [helper.normalizeName('Longsword'), { type: 'weapon', name: 'Longsword', item: { uuid: 'Compendium.dnd5e.equipment24.Item.phbwepLongsword0' } }],
+        [helper.normalizeName('Leather Armor'), { type: 'armor', name: 'Leather Armor', item: { uuid: 'Compendium.dnd5e.equipment24.Item.phbarmLeatherArm' } }],
+        [helper.normalizeName('Shield'), { type: 'armor', name: 'Shield', item: { uuid: 'Compendium.dnd5e.equipment24.Item.phbarmShield0000' } }]
+      ])
+    });
+    const byId = new Map(tasks.map(task => [task.id, task]));
+    const rowNames = tasks.flatMap(task => task.dropRows.map(row => row.name));
+
+    assert.equal(byId.get('mine-ore').name, 'Extract Ore');
+    assert.deepEqual(byId.get('mine-ore').toolIds, ['mythwright-tool-mining-pick']);
+    assert.deepEqual(byId.get('battlefield-salvage').toolIds, [
+      'mythwright-tool-delver-kit',
+      'mythwright-tool-skinning-knife'
+    ]);
+    assert.ok(tasks.every(task => task.dropRows.length > 0));
+    assert.ok(tasks.every(task => task.dropRows.every(row => row.componentId || row.itemUuid)));
+    assert.equal(rowNames.some(name => /^(Found|Recovered|Buried|Preserved)\b/.test(name)), false);
+    assert.ok(rowNames.includes('Leather Armor'));
+    assert.deepEqual(byId.get('mine-ore').dropRows.find(row => row.name === 'War Pick'), {
+      id: 'mine-ore-war-pick',
+      name: 'War Pick',
+      quantity: 1,
+      dropRate: 8,
+      enabled: true,
+      componentId: 'weapon-war-pick'
+    });
+    assert.ok(byId.get('battlefield-salvage').dropRows.some(row => row.componentId === 'weapon-longsword'));
+    assert.equal(tasks.some(task => task.dropRows.some(row => row.itemUuid)), false);
+  });
+
+  it('omits and reports Mythwright optional SRD gathering rewards that cannot become components', () => {
+    const helper = globalThis.MythwrightDnd5eBootstrap;
+    const unresolvedDrops = [];
+    const tasks = helper.buildGatheringTasks({ srdByName: new Map(), unresolvedDrops });
+
+    assert.equal(tasks.some(task => task.dropRows.some(row => row.name === 'War Pick')), false);
+    assert.ok(unresolvedDrops.some(row => row.id === 'mine-ore-war-pick' && row.itemName === 'War Pick'));
+  });
+
+  it('builds Mythwright environments that compose gathering task-library records', () => {
+    const helper = globalThis.MythwrightDnd5eBootstrap;
+    const environment = helper.buildEnvironment('mythwright-wilds', 'Wilds', 'safe', [
+      { id: 'wild-hardwood' },
+      { id: 'wild-hide' }
+    ]);
+
+    assert.deepEqual(environment.tasks, []);
+    assert.deepEqual(environment.enabledTaskIds, ['wild-hardwood', 'wild-hide']);
+  });
+
+  it('seeds Mythwright gathering tools and tasks into gatheringConfig idempotently', async () => {
+    const helper = globalThis.MythwrightDnd5eBootstrap;
+    const originalGame = globalThis.game;
+    const writes = [];
+    let config = {
+      systems: {
+        'mythwright-dnd5e': {
+          tools: [{ id: 'existing-tool', componentId: 'old-tool' }],
+          tasks: [{ id: 'mine-ore', name: 'Old Mine Task' }],
+          rules: { rewardSelectionMode: 'allDrops' }
+        }
+      }
+    };
+    globalThis.game = {
+      ...originalGame,
+      settings: {
+        get: (_namespace, key) => key === 'gatheringConfig' ? config : undefined,
+        set: async (_namespace, key, value) => {
+          if (key === 'gatheringConfig') config = value;
+          writes.push({ key, value });
+          return value;
+        }
+      }
+    };
+
+    await helper.seedGatheringConfig({
+      tools: helper.buildGatheringTools(),
+      tasks: helper.buildGatheringTasks()
+    });
+
+    const systemConfig = config.systems['mythwright-dnd5e'];
+    assert.equal(writes.at(-1).key, 'gatheringConfig');
+    assert.ok(systemConfig.tools.some(tool => tool.id === 'existing-tool'));
+    assert.equal(
+      systemConfig.tools.find(tool => tool.id === 'mythwright-tool-mining-pick').componentId,
+      'tool-mining-pick'
+    );
+    assert.notEqual(
+      systemConfig.tasks.find(task => task.id === 'mine-ore').name,
+      'Old Mine Task'
+    );
+    assert.ok(systemConfig.tasks.find(task => task.id === 'mine-ore').toolIds.includes('mythwright-tool-mining-pick'));
+    globalThis.game = originalGame;
   });
 });

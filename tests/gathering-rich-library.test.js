@@ -342,7 +342,7 @@ test('d100 drop-row save validation accepts zero chance and rejects invalid drop
   const unresolvedDisabled = store.validate(environment({
     tasks: [{
       id: 'd100-unresolved-authoring-row',
-      name: 'Valid With Unresolved Authoring Row',
+      name: 'Invalid With Unresolved Authoring Row',
       enabled: true,
       resolutionMode: 'd100',
       dropRows: [
@@ -351,7 +351,11 @@ test('d100 drop-row save validation accepts zero chance and rejects invalid drop
       ]
     }]
   }));
-  assert.equal(unresolvedDisabled.valid, true);
+  assert.equal(unresolvedDisabled.valid, false);
+  assert.ok(
+    unresolvedDisabled.errors.some(error => error.includes('unresolved-row') && error.includes('requires componentId or itemUuid')),
+    `expected unresolved disabled row to be rejected: ${unresolvedDisabled.errors.join(' | ')}`
+  );
 
   for (const row of [
     { id: 'missing-rate', componentId: 'herb', quantity: 1 },

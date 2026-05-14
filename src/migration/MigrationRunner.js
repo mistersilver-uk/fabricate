@@ -8,6 +8,7 @@
  */
 
 import { migrateRecipes, migrateCraftingSystems } from './migrateComponentId.js';
+import { migrateGatheringConfig } from './migrateGatheringConfig.js';
 import { SETTING_KEYS } from '../config/settings.js';
 
 // ---------------------------------------------------------------------------
@@ -47,6 +48,15 @@ const MIGRATIONS = [
         systems: migrateCraftingSystems(data.systems)
       };
     }
+  },
+  {
+    version: '0.2.0',
+    label: 'Clear stale top-level gathering regions',
+    migrate(data) {
+      return {
+        gatheringConfig: migrateGatheringConfig(data.gatheringConfig)
+      };
+    }
   }
   // Future migrations added here in version order
 ];
@@ -83,18 +93,27 @@ export class MigrationRunner {
 
     const rawRecipes = this._getSetting(SETTING_KEYS.RECIPES) ?? [];
     const rawSystems = this._getSetting(SETTING_KEYS.CRAFTING_SYSTEMS) ?? [];
+    const rawGatheringConfig = this._getSetting(SETTING_KEYS.GATHERING_CONFIG) ?? {};
 
     const originalRecipesJson = JSON.stringify(rawRecipes);
     const originalSystemsJson = JSON.stringify(rawSystems);
+    const originalGatheringConfigJson = JSON.stringify(rawGatheringConfig);
 
-    let data = { recipes: rawRecipes, systems: rawSystems };
+    let data = {
+      recipes: rawRecipes,
+      systems: rawSystems,
+      gatheringConfig: rawGatheringConfig
+    };
     let highestVersion = lastRunVersion;
 
     for (const migration of pending) {
       try {
         const result = migration.migrate(data);
-        if (result !== undefined) {
-          data = result;
+        if (result && typeof result === 'object') {
+          // Spread-merge so a migration that returns only a subset of keys
+          // (e.g., the 0.1.0 migration returns { recipes, systems } and does
+          // not touch gatheringConfig) leaves the untouched keys intact.
+          data = { ...data, ...result };
         }
         highestVersion = migration.version;
       } catch (err) {
@@ -104,12 +123,16 @@ export class MigrationRunner {
 
     const recipesChanged = JSON.stringify(data.recipes) !== originalRecipesJson;
     const systemsChanged = JSON.stringify(data.systems) !== originalSystemsJson;
+    const gatheringConfigChanged = JSON.stringify(data.gatheringConfig) !== originalGatheringConfigJson;
 
     if (recipesChanged) {
       await this._setSetting(SETTING_KEYS.RECIPES, data.recipes);
     }
     if (systemsChanged) {
       await this._setSetting(SETTING_KEYS.CRAFTING_SYSTEMS, data.systems);
+    }
+    if (gatheringConfigChanged) {
+      await this._setSetting(SETTING_KEYS.GATHERING_CONFIG, data.gatheringConfig);
     }
 
     await this._setSetting(SETTING_KEYS.MIGRATION_VERSION, highestVersion);

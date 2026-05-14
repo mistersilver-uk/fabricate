@@ -43,6 +43,7 @@ const packData = JSON.parse(readFileSync(PACK_PATH, 'utf8'));
 
 const { Recipe } = await import('../src/models/Recipe.js');
 const { dnd5eCheckTemplate, genericCheckTemplate } = await import('../src/macros/check-templates.js');
+const { importStarterPack } = await import('../src/starter/importStarterPack.js');
 
 // ---------------------------------------------------------------------------
 // Group 1: JSON structure
@@ -270,4 +271,45 @@ test('import simulation: placeholder system ID is replaced in all recipes', asyn
   const withPlaceholder = createdRecipes.filter(r => r.craftingSystemId === '__SYSTEM_ID__');
   assert.equal(withPlaceholder.length, 0,
     'No recipe should retain the __SYSTEM_ID__ placeholder after import');
+});
+
+test('importStarterPack suppresses per-recipe notices and emits one summary', async () => {
+  const createdRecipeOptions = [];
+  const infoMessages = [];
+  const originalFetch = globalThis.fetch;
+  const originalGame = globalThis.game;
+  const originalInfo = globalThis.ui.notifications.info;
+
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => packData
+  });
+  globalThis.game = {
+    fabricate: {
+      getCraftingSystemManager: () => ({
+        createSystem: async (data) => ({ ...data, id: 'starter-system-id' })
+      }),
+      getRecipeManager: () => ({
+        createRecipe: async (data, options) => {
+          createdRecipeOptions.push(options);
+          return data;
+        }
+      })
+    }
+  };
+  globalThis.ui.notifications.info = message => infoMessages.push(message);
+
+  try {
+    const result = await importStarterPack();
+
+    assert.equal(result.recipes.length, packData.recipes.length);
+    assert.ok(createdRecipeOptions.every(options => options?.notify === false));
+    assert.deepEqual(infoMessages, [
+      `Imported starter pack "${packData.system.name}" with ${packData.recipes.length} recipes.`
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+    globalThis.game = originalGame;
+    globalThis.ui.notifications.info = originalInfo;
+  }
 });

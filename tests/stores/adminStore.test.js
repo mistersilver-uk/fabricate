@@ -310,6 +310,46 @@ describe('createAdminStore', () => {
       assert.equal(cleanupCalled, true);
     });
 
+    it('refreshes on external Fabricate data changes and unsubscribes on destroy', async () => {
+      let dataChangedCallback = null;
+      let cleanupCalled = false;
+      const services = createMockServices({
+        onFabricateDataChanged: (callback) => {
+          dataChangedCallback = callback;
+          return () => {
+            cleanupCalled = true;
+          };
+        }
+      });
+      const store = createAdminStore(services);
+      await store.refresh();
+
+      assert.equal(get(store.viewState).recipes.length, 1);
+      services._getRecipesMutable().push(makeRecipe({
+        id: 'r-external',
+        name: 'External Recipe',
+        craftingSystemId: 'sys1'
+      }));
+
+      dataChangedCallback?.('recipes');
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      assert.equal(get(store.viewState).recipes.length, 2);
+
+      store.destroy();
+      assert.equal(cleanupCalled, true);
+
+      services._getRecipesMutable().push(makeRecipe({
+        id: 'r-after-destroy',
+        name: 'After Destroy',
+        craftingSystemId: 'sys1'
+      }));
+      dataChangedCallback?.('recipes');
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      assert.equal(get(store.viewState).recipes.length, 2);
+    });
+
     it('leaves selection empty when no systems exist', async () => {
       const services = createMockServices({
         getSetting: () => ''
@@ -2026,7 +2066,10 @@ describe('createAdminStore', () => {
           { id: 'night', label: 'Night', icon: 'fas fa-moon' }
         ]
       });
-      assert.deepEqual(config.vocabularies.regions, ['north', 'south']);
+      assert.deepEqual(config.vocabularies.regions, [
+        { id: 'north', label: 'North' },
+        { id: 'south', label: 'South' }
+      ]);
       assert.equal(config.systems.sys1.tasks[0].name, 'Rain Herbs');
       assert.deepEqual(config.systems.sys1.tasks[0].dropRows[0], {
         id: 'drop-herb',
@@ -2248,6 +2291,7 @@ describe('createAdminStore', () => {
       const services = createMockServices();
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
+      sys.components = [{ id: 'herb', name: 'Herb', img: 'herb.webp' }];
       services._store.gatheringConfig = { systems: { sys1: { tasks: [] } } };
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -2326,6 +2370,41 @@ describe('createAdminStore', () => {
       assert.equal(resolved.valid, true);
       assert.deepEqual(resolved.errors, []);
 
+      const staleComponent = store.validateGatheringLibraryTask({
+        id: 't-stale',
+        name: 'Gather',
+        dropRows: [{ id: 'row-stale', componentId: 'missing-herb', itemUuid: '', quantity: 1, dropRate: 50, enabled: true }]
+      });
+      assert.equal(staleComponent.valid, false);
+      assert.ok(
+        staleComponent.errors.some(error => error.includes('missing-herb') && error.includes('unknown componentId')),
+        `expected stale component to be rejected: ${staleComponent.errors.join(' | ')}`
+      );
+
+      const originalFromUuidSync = globalThis.fromUuidSync;
+      globalThis.fromUuidSync = (uuid) => uuid === 'Item.valid-reward' ? { documentName: 'Item' } : null;
+      try {
+        const staleItem = store.validateGatheringLibraryTask({
+          id: 't-stale-item',
+          name: 'Gather',
+          dropRows: [{ id: 'row-item', componentId: '', itemUuid: 'Item.missing-reward', quantity: 1, dropRate: 50, enabled: true }]
+        });
+        assert.equal(staleItem.valid, false);
+        assert.ok(
+          staleItem.errors.some(error => error.includes('Item.missing-reward') && error.includes('does not resolve to an Item')),
+          `expected stale item UUID to be rejected: ${staleItem.errors.join(' | ')}`
+        );
+
+        const validItem = store.validateGatheringLibraryTask({
+          id: 't-valid-item',
+          name: 'Gather',
+          dropRows: [{ id: 'row-item', componentId: '', itemUuid: 'Item.valid-reward', quantity: 1, dropRate: 50, enabled: true }]
+        });
+        assert.equal(validItem.valid, true);
+      } finally {
+        globalThis.fromUuidSync = originalFromUuidSync;
+      }
+
       const enabledResolvedPlusDisabledUnresolved = store.validateGatheringLibraryTask({
         id: 't4',
         name: 'Gather',
@@ -2341,6 +2420,25 @@ describe('createAdminStore', () => {
         ),
         `expected disabled unresolved row to be rejected: ${enabledResolvedPlusDisabledUnresolved.errors.join(' | ')}`
       );
+    });
+
+    it('does not persist gathering library task drops with stale reward targets', async () => {
+      const errors = [];
+      const services = createMockServices({ notify: { info: () => {}, warn: () => {}, error: (message) => errors.push(message) } });
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      sys.components = [{ id: 'herb', name: 'Herb', img: 'herb.webp' }];
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const task = await store.addGatheringLibraryTask('sys1');
+
+      const saved = await store.updateGatheringLibraryTask('sys1', task.id, {
+        dropRows: [{ id: 'row-stale', componentId: 'missing-herb', quantity: 1, dropRate: 50 }]
+      });
+
+      assert.equal(saved, false);
+      assert.equal(services._store.gatheringConfig.systems.sys1.tasks[0].dropRows.length, 0);
+      assert.ok(errors.some(error => error.includes('missing-herb')));
     });
 
     it('returns null when duplicating a missing gathering task', async () => {
@@ -2496,7 +2594,7 @@ describe('createAdminStore', () => {
       await store.selectSystem('sys1');
 
       assert.deepEqual(get(store.viewState).gatheringConfig.systems.sys1.vocabularies.regions.values, [
-        { id: 'north', label: 'north' }
+        { id: 'north', label: 'North' }
       ]);
       assert.deepEqual(get(store.viewState).gatheringConfig.systems.sys1.vocabularies.biomes.values, [
         { id: 'forest', label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage', customColor: '' }
@@ -2518,6 +2616,64 @@ describe('createAdminStore', () => {
       });
       assert.deepEqual(services._store.gatheringConfig.systems.sys1.tasks[0].biomes, ['forest']);
       assert.deepEqual(services._store.gatheringConfig.systems.sys1.hazards[0].biomes, ['forest']);
+    });
+
+    it('normalises top-level vocabularies into objects with capitalised labels and per-biome colour tokens', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      services._store.gatheringConfig = {
+        vocabularies: {
+          regions: ['northreach'],
+          biomes: ['forest', 'mountain', 'swamp']
+        }
+      };
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const config = get(store.viewState).gatheringConfig;
+
+      assert.deepEqual(config.vocabularies.regions, [
+        { id: 'northreach', label: 'Northreach' }
+      ], 'bare string region ids render as capitalised labels');
+
+      assert.deepEqual(config.vocabularies.biomes, [
+        { id: 'forest', label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage', customColor: '' },
+        { id: 'mountain', label: 'Mountain', icon: 'fas fa-mountain', colorToken: 'mist', customColor: '' },
+        { id: 'swamp', label: 'Swamp', icon: 'fas fa-frog', colorToken: 'mauve', customColor: '' }
+      ], 'each default biome gets its own colour token, not a single flat fallback');
+    });
+
+    it('seeds default biomes/weather/timeOfDay at the top level when the persisted setting has none', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      services._store.gatheringConfig = {};
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const config = get(store.viewState).gatheringConfig;
+
+      assert.equal(config.vocabularies.regions.length, 0,
+        'regions stays empty by default (no canonical list)');
+
+      const biomeIds = config.vocabularies.biomes.map(b => b.id);
+      assert.deepEqual(biomeIds, [
+        'forest', 'grassland', 'mountain', 'cave', 'coastal',
+        'swamp', 'desert', 'urban', 'ruins', 'wasteland'
+      ]);
+      const distinctColorTokens = new Set(config.vocabularies.biomes.map(b => b.colorToken));
+      assert.ok(distinctColorTokens.size >= 6,
+        'default biomes use multiple distinct colour tokens, not a single fallback');
+
+      const weatherLabels = config.vocabularies.weather.map(w => w.label);
+      assert.ok(weatherLabels.every(label => /^[A-Z]/.test(label)),
+        'every weather label starts with an uppercase letter');
+      const weatherIds = config.vocabularies.weather.map(w => w.id);
+      assert.deepEqual(weatherIds, ['clear', 'cloudy', 'rain', 'storm', 'snow', 'fog', 'wind']);
+
+      const timeOfDayLabels = config.vocabularies.timeOfDay.map(t => t.label);
+      assert.deepEqual(timeOfDayLabels, ['Dawn', 'Day', 'Dusk', 'Night']);
     });
 
     it('deletes selected-system region and biome vocabulary values and prunes matching references only in that system', async () => {

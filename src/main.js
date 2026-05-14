@@ -30,6 +30,10 @@ import {
   processWorldTimeCallbacksSafely,
 } from './gatheringBootstrapAdapters.js';
 import {
+  createGatheringToolAvailability,
+  matchGatheringTools
+} from './gatheringToolRuntime.js';
+import {
   getCraftingAppClass,
   getGatheringAppClass,
   getCraftingSystemManagerV2AppClass,
@@ -177,58 +181,49 @@ function createGatheringCatalystUsage(craftingSystemManager) {
   };
 }
 
-function createGatheringToolAvailability({ craftingSystemManager, evaluator }) {
-  return {
-    async check({ actor, viewer, system, environment, task, tools = [] } = {}) {
-      const matched = matchGatheringTools({ actor, system, task, tools, craftingSystemManager });
-      const failedRequirements = [];
-      for (const { tool } of matched.items) {
-        if (!tool?.requirement) continue;
-        const result = await evaluator?.evaluateRequirement?.({
-          requirement: tool.requirement,
-          actor,
-          environment,
-          task
-        });
-        if (result && result.allowed !== true) {
-          failedRequirements.push({ tool, diagnostic: result.diagnostic, reasonCode: result.reasonCode });
-        }
-      }
-      return {
-        available: matched.missing.length === 0 && failedRequirements.length === 0,
-        missing: matched.missing,
-        failedRequirements,
-        items: matched.items.map(({ item }) => item)
-      };
-    }
-  };
-}
-
 function createGatheringToolBreakage({ craftingSystemManager, evaluateExpression, resultCreator }) {
+  const pendingPlans = new Map();
   return {
     async plan({ actor, system, task, tools = [] } = {}) {
       const matched = matchGatheringTools({ actor, system, task, tools, craftingSystemManager });
       const planned = [];
       for (const { tool, item } of matched.items) {
-        planned.push({ ref: gatheringRunItemRef(actor, item), componentId: tool.componentId });
+        const model = Tool.fromJSON(tool);
+        const breakageResult = await evaluateToolBreakagePlan(model, { actor, item, evaluateExpression });
+        const entry = {
+          componentId: model.componentId,
+          itemRef: gatheringRunItemRef(actor, item),
+          mode: breakageResult.mode,
+          broken: breakageResult.broken,
+          evidence: breakageResult.evidence
+        };
+        if (breakageResult.broken) {
+          entry.onBreak = plannedToolBreakageOutcome(model);
+        }
+        planned.push(entry);
       }
+      pendingPlans.set(gatheringToolPlanKey({ actor, task }), planned);
       return planned;
     },
 
     async apply({ actor, system, environment, task, tools = [] } = {}) {
       const matched = matchGatheringTools({ actor, system, task, tools, craftingSystemManager });
+      const planKey = gatheringToolPlanKey({ actor, task });
+      const plannedByItem = new Map((pendingPlans.get(planKey) || [])
+        .map(entry => [stringOrEmpty(entry?.itemRef?.itemUuid), entry]));
+      pendingPlans.delete(planKey);
       const evidence = [];
       for (const { tool: toolData, item } of matched.items) {
         const tool = Tool.fromJSON(toolData);
         await tool.applyUsage(item);
-        const breakageResult = await tool.evaluateBreakage({
-          actor,
-          item,
-          evaluateExpression
-        });
+        const itemRef = gatheringRunItemRef(actor, item);
+        const planned = plannedByItem.get(stringOrEmpty(itemRef.itemUuid));
+        const breakageResult = planned
+          ? { mode: planned.mode, broken: planned.broken, evidence: planned.evidence }
+          : await evaluateToolBreakagePlan(tool, { actor, item, evaluateExpression });
         const entry = {
           componentId: tool.componentId,
-          itemRef: gatheringRunItemRef(actor, item),
+          itemRef,
           mode: breakageResult.mode,
           broken: breakageResult.broken,
           evidence: breakageResult.evidence
@@ -267,30 +262,43 @@ function createGatheringToolBreakage({ craftingSystemManager, evaluateExpression
   };
 }
 
-function matchGatheringTools({ actor, system, task, tools = [], craftingSystemManager } = {}) {
-  const matchedItems = [];
-  const missing = [];
-  const syntheticRecipe = {
-    id: `gathering:${task?.id ?? 'task'}`,
-    craftingSystemId: system?.id ?? task?.craftingSystemId ?? null
-  };
-  const items = normalizeFoundryCollection(actor?.items);
-
-  for (const tool of tools) {
-    const item = items.find(candidate => {
-      const broken = candidate?.getFlag?.('fabricate', 'fabricate.toolBroken') === true
-        || globalThis.foundry?.utils?.getProperty?.(candidate, 'flags.fabricate.fabricate.toolBroken') === true;
-      if (broken) return false;
-      return craftingSystemManager?.catalystMatchesItem?.(syntheticRecipe, tool, candidate);
-    });
-    if (item) {
-      matchedItems.push({ tool, item });
-    } else {
-      missing.push(tool);
-    }
+async function evaluateToolBreakagePlan(tool, { actor, item, evaluateExpression } = {}) {
+  if (tool.breakage?.mode === 'limitedUses') {
+    const usage = readToolUsage(item);
+    const timesUsed = Number(usage?.timesUsed || 0) + 1;
+    const maxUses = tool.breakage.maxUses;
+    const broken = maxUses !== null && Number.isFinite(maxUses) && timesUsed >= maxUses;
+    return { broken, mode: 'limitedUses', evidence: { timesUsed, maxUses } };
   }
+  return tool.evaluateBreakage({ actor, item, evaluateExpression });
+}
 
-  return { items: matchedItems, missing };
+function plannedToolBreakageOutcome(tool) {
+  if (tool.onBreak?.mode === 'destroy') return { action: 'destroyed' };
+  if (tool.onBreak?.mode === 'flagBroken') return { action: 'flagged' };
+  if (tool.onBreak?.mode === 'replaceWith') {
+    return {
+      action: 'replaced',
+      replacementComponentId: tool.onBreak.replacementComponentId
+    };
+  }
+  return { action: 'none' };
+}
+
+function readToolUsage(item) {
+  return item?.getFlag?.('fabricate', 'toolUsage')
+    ?? item?.getFlag?.('fabricate', 'fabricate.toolUsage')
+    ?? globalThis.foundry?.utils?.getProperty?.(item, 'flags.fabricate.toolUsage')
+    ?? globalThis.foundry?.utils?.getProperty?.(item, 'flags.fabricate.fabricate.toolUsage')
+    ?? { timesUsed: 0 };
+}
+
+function gatheringToolPlanKey({ actor, task } = {}) {
+  return `${actor?.uuid ?? actor?.id ?? 'actor'}:${task?.id ?? 'task'}`;
+}
+
+function stringOrEmpty(value) {
+  return value === null || value === undefined ? '' : String(value);
 }
 
 function matchGatheringCatalysts({ actor, system, task, catalysts = [], craftingSystemManager } = {}) {
@@ -1223,6 +1231,12 @@ globalThis.fabricate = {
   importSystemFromFile: async (file, options) => {
     return game.fabricate.importSystemFromFile(file, options);
   }
+};
+
+export const __test = {
+  createGatheringToolAvailability,
+  createGatheringToolBreakage,
+  matchGatheringTools
 };
 
 export default fabricate;

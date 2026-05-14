@@ -1,4 +1,5 @@
 import { getSetting as defaultGetSetting, setSetting as defaultSetSetting, SETTING_KEYS } from '../config/settings.js';
+import { validateGatheringDropReferencesSync } from './GatheringDropReferenceValidator.js';
 
 const DEFAULT_TASK_IMG = 'icons/svg/item-bag.svg';
 const VALID_SELECTION_MODES = new Set(['targeted', 'blind']);
@@ -425,10 +426,11 @@ export class GatheringEnvironmentStore {
       errors.push(`Environment "${label}" selectionMode must be targeted or blind`);
     }
 
-    if (normalized.selectionMode === 'targeted' && normalized.tasks.length < 1) {
+    const hasTaskSource = normalized.tasks.length > 0 || normalized.enabledTaskIds.length > 0;
+    if (normalized.selectionMode === 'targeted' && !hasTaskSource) {
       errors.push(`Environment "${label}" targeted selection requires at least one task`);
     }
-    if (normalized.selectionMode === 'blind' && normalized.tasks.length < 1) {
+    if (normalized.selectionMode === 'blind' && !hasTaskSource) {
       errors.push(`Environment "${label}" blind selection requires at least one task`);
     }
     if (!VALID_RISK_LEVELS.has(original?.risk ?? normalized.risk)) {
@@ -500,7 +502,11 @@ export class GatheringEnvironmentStore {
     }
 
     if (task.resolutionMode === 'd100') {
-      errors.push(...validateDropRows(originalTask?.dropRows ?? originalTask?.itemDrops, `Task "${label}"`));
+      errors.push(...validateDropRows(originalTask?.dropRows ?? originalTask?.itemDrops, `Task "${label}"`, {
+        system: this._getSystem(environment?.craftingSystemId),
+        systemId: environment?.craftingSystemId,
+        validateDisabledRows: true
+      }));
     }
 
     if (task.resolutionMode === 'routed') {
@@ -835,10 +841,16 @@ function normalizeDropRow(data = {}, randomID) {
   };
 }
 
-export function validateDropRows(rows, label) {
+export function validateDropRows(rows, label, {
+  system = null,
+  systemId = '',
+  validateDisabledRows = false,
+  requireAtLeastOneEnabled = true,
+  resolveUuid
+} = {}) {
   const entries = Array.isArray(rows) ? rows.filter(row => row?.enabled !== false) : [];
   const errors = [];
-  if (entries.length < 1) {
+  if (requireAtLeastOneEnabled && entries.length < 1) {
     errors.push(`${label} requires at least one drop row`);
   }
   for (const row of entries) {
@@ -854,6 +866,15 @@ export function validateDropRows(rows, label) {
       errors.push(`${label} drop row "${row?.id || 'row'}" quantity must be positive`);
     }
   }
+  errors.push(...validateGatheringDropReferencesSync({
+    tasks: [{ name: label.replace(/^Task\s+"|"$/g, ''), dropRows: Array.isArray(rows) ? rows : [] }],
+    system,
+    systemId,
+    validateDisabledRows,
+    requireAtLeastOneEnabled: false,
+    validateBasics: false,
+    resolveUuid
+  }));
   return errors;
 }
 
