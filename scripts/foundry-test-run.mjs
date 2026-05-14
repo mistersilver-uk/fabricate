@@ -958,9 +958,6 @@ async function exerciseManagerV2EnvironmentPointerTargets(page) {
   if (await moveUp.isEnabled()) await moveUp.click({ trial: true });
   const moveDown = azureRow.locator('.manager-v2-icon-button').nth(4);
   if (await moveDown.isEnabled()) await moveDown.click({ trial: true });
-  await page.locator('.fabricate-manager-v2 .manager-v2-inspector-actions .manager-v2-button:has-text("Edit environment")').first().click({ trial: true });
-  await page.locator('.fabricate-manager-v2 .manager-v2-inspector-actions .manager-v2-button:has-text("Duplicate environment")').first().click({ trial: true });
-  await page.locator('.fabricate-manager-v2 .manager-v2-inspector-actions .manager-v2-button:has-text("Disable environment")').first().click({ trial: true });
   await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Create environment")').first().click({ trial: true });
 }
 
@@ -2750,7 +2747,7 @@ async function main() {
         await screenshot(page, 'manager-v2-environments-browse-stacked');
 
         await setManagerV2WindowSize(page, { width: 1280, height: 820 });
-        await page.locator('.fabricate-manager-v2 #manager-v2-gathering-tab-tasks').first().click();
+        await page.locator('.fabricate-manager-v2 #manager-v2-gathering-nav-tasks').first().click();
         await page.locator('.fabricate-manager-v2 .manager-v2-gathering-task-row:has-text("Smoke Reusable Forage")').first().waitFor({ state: 'visible', timeout: 10_000 });
         await page.locator('.fabricate-manager-v2 .manager-v2-gathering-task-row:has-text("Smoke Reusable Forage") [aria-label^="Edit"]').first().click();
         await page.locator('.fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
@@ -2771,7 +2768,7 @@ async function main() {
 
         await setManagerV2WindowSize(page, { width: 1280, height: 820 });
         await page.locator('.fabricate-manager-v2 [data-gathering-task-core-editor] .manager-v2-link-button').first().click();
-        await page.locator('.fabricate-manager-v2 #manager-v2-gathering-tab-environments').first().click();
+        await page.locator('.fabricate-manager-v2 #manager-v2-gathering-nav-environments').first().click();
         await page.locator('.fabricate-manager-v2 .manager-v2-environment-row:has-text("Azure Grove") .manager-v2-icon-button').nth(0).click();
         await page.locator('.fabricate-manager-v2[data-manager-v2-view="environment-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await page.locator('.fabricate-manager-v2 .manager-v2-environment-edit-view').first().waitFor({ state: 'visible', timeout: 10_000 });
