@@ -10804,7 +10804,7 @@
   align-items: stretch;
   overflow: auto;
   min-height: 0;
-  padding: 0 12px 12px;
+  padding: 12px;
 }
 
 .fabricate-manager-v2 .manager-v2-condition-panel {
