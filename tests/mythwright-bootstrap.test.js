@@ -689,13 +689,19 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     });
     const byId = new Map(tasks.map(task => [task.id, task]));
     const rowNames = tasks.flatMap(task => task.dropRows.map(row => row.name));
+    const safeIcons = new Set(helper.APPROVED_MYTHWRIGHT_ICON_PATHS);
 
     assert.equal(byId.get('mine-ore').name, 'Extract Ore');
+    assert.equal(byId.get('mine-ore').img, 'icons/commodities/stone/ore-pile-grey.webp');
+    assert.equal(byId.get('planar-essence').img, 'icons/svg/lightning.svg');
+    assert.equal(byId.get('dragon-scale').img, 'icons/commodities/leather/scales-brown.webp');
     assert.deepEqual(byId.get('mine-ore').toolIds, ['mythwright-tool-mining-pick']);
     assert.deepEqual(byId.get('battlefield-salvage').toolIds, [
       'mythwright-tool-delver-kit',
       'mythwright-tool-skinning-knife'
     ]);
+    assert.ok(tasks.every(task => task.img && task.img !== 'icons/svg/item-bag.svg'));
+    assert.ok(tasks.every(task => safeIcons.has(task.img)));
     assert.ok(tasks.every(task => task.dropRows.length > 0));
     assert.ok(tasks.every(task => task.dropRows.every(row => row.componentId || row.itemUuid)));
     assert.equal(rowNames.some(name => /^(Found|Recovered|Buried|Preserved)\b/.test(name)), false);
