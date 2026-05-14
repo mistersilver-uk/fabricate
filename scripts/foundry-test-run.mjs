@@ -825,7 +825,6 @@ async function exerciseManagerV2PointerTargets(page) {
   await page.locator('.fabricate-manager-v2 .manager-v2-breadcrumbs button:has-text("Crafting Systems")').first().click();
   await page.locator('.fabricate-manager-v2 .manager-v2-scope-return').first().click({ trial: true });
   await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Import")').first().click({ trial: true });
-  await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Open current admin")').first().click({ trial: true });
   await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Export")').first().click({ trial: true });
   await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Create")').first().click({ trial: true });
   const rowActionButtons = page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist") .manager-v2-icon-button');
