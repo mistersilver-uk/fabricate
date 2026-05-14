@@ -25,7 +25,7 @@
  *
  * Environment variables:
  *   FOUNDRY_ADMIN_KEY     — admin password (default: fabricate-test-admin)
- *   FOUNDRY_URL           — base URL (default: http://localhost:30000)
+ *   FOUNDRY_URL           — base URL (default: http://localhost:30100)
  */
 
 import { chromium } from 'playwright';
@@ -37,7 +37,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const RESULTS_DIR = join(ROOT, 'test-results');
 
-const FOUNDRY_URL = process.env.FOUNDRY_URL ?? 'http://localhost:30000';
+const FOUNDRY_URL = process.env.FOUNDRY_URL ?? 'http://localhost:30100';
 const ADMIN_KEY = process.env.FOUNDRY_ADMIN_KEY ?? 'fabricate-test-admin';
 const WORLD_ID = 'fabricate-smoke-ci';
 

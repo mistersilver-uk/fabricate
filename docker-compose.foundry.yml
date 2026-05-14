@@ -31,7 +31,7 @@ services:
     # docker compose up.
     user: "${FOUNDRY_HOST_UID:-1000}:${FOUNDRY_HOST_GID:-1000}"
     ports:
-      - "${FOUNDRY_HOST_PORT:-30000}:30000"
+      - "${FOUNDRY_HOST_PORT:-30100}:30000"
     environment:
       FOUNDRY_USERNAME: "${FOUNDRY_USERNAME}"
       FOUNDRY_PASSWORD: "${FOUNDRY_PASSWORD}"

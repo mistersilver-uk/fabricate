@@ -29,8 +29,8 @@ node scripts/foundry-test-run.mjs
 
 | Variable | Default | Description |
 |---|---|---|
-| `FOUNDRY_URL` | `http://localhost:30000` | Base URL of the Foundry instance |
-| `FOUNDRY_HOST_PORT` | `30000` | Host port used by the Docker harness; set this with `FOUNDRY_URL` when port 30000 is already occupied |
+| `FOUNDRY_URL` | `http://localhost:30100` | Base URL of the Foundry instance |
+| `FOUNDRY_HOST_PORT` | `30100` | Host port used by the Docker harness. The default is 30100 (not 30000) so the smoke test can coexist with a developer's local Foundry on 30000; override with a matching `FOUNDRY_URL` if 30100 is also occupied. |
 | `FOUNDRY_ADMIN_KEY` | `fabricate-test-admin` | Admin password for the setup/auth page |
 | `FOUNDRY_IMAGE` | `felddy/foundryvtt:13` | Docker image used by the compose harness. Defaults to Foundry V13 for the V13 smoke world. |
 | `FOUNDRY_RELEASE_URL` | unset | Optional explicit Foundry release URL. When unset, `test:foundry:up` uses a matching local cached zip if one exists. |

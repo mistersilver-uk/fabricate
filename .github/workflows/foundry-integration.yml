@@ -22,7 +22,7 @@ jobs:
       FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}
       FOUNDRY_TELEMETRY: "false"
       FOUNDRY_ADMIN_KEY: fabricate-test-admin
-      FOUNDRY_URL: http://localhost:30000
+      FOUNDRY_URL: http://localhost:30100
       # `rc` profile: real Foundry boot, fixture creation, one gathering
       # success, craft a Healing Potion, console-error health, minimal
       # screenshot budget. Full screenshot regeneration runs in `full`

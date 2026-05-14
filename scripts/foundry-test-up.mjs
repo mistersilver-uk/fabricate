@@ -120,10 +120,16 @@ function getContainerStatus() {
 }
 
 function getContainerHostPort() {
+  // NetworkSettings.Ports is the live binding (only populated when the
+  // container has run at least once). HostConfig.PortBindings is the
+  // *desired* binding from create-time — populated even for `created`
+  // and `exited` containers that have never bound the port. Reading both
+  // lets the port-mismatch branch in main() detect a cached container
+  // that was created with an old port default and needs recreating.
   const result = spawnSync('docker', [
     'inspect',
     '--format',
-    '{{json .NetworkSettings.Ports}}',
+    '{{json .NetworkSettings.Ports}}|{{json .HostConfig.PortBindings}}',
     CONTAINER_NAME
   ], {
     encoding: 'utf8',
@@ -133,8 +139,12 @@ function getContainerHostPort() {
   if (result.status !== 0) return null;
 
   try {
-    const ports = JSON.parse((result.stdout ?? '').trim() || '{}');
-    return ports?.['30000/tcp']?.[0]?.HostPort ?? null;
+    const [networkRaw, hostConfigRaw] = (result.stdout ?? '').trim().split('|');
+    const network = JSON.parse(networkRaw || '{}');
+    const live = network?.['30000/tcp']?.[0]?.HostPort;
+    if (live) return live;
+    const hostConfig = JSON.parse(hostConfigRaw || '{}');
+    return hostConfig?.['30000/tcp']?.[0]?.HostPort ?? null;
   } catch {
     return null;
   }
@@ -266,7 +276,7 @@ async function main() {
   }
 
   if (existingStatus) {
-    const desiredHostPort = process.env.FOUNDRY_HOST_PORT || '30000';
+    const desiredHostPort = process.env.FOUNDRY_HOST_PORT || '30100';
     const cachedHostPort = getContainerHostPort();
     if (cachedHostPort && cachedHostPort !== desiredHostPort) {
       process.stdout.write(
