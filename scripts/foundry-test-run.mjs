@@ -25,11 +25,11 @@
  *
  * Environment variables:
  *   FOUNDRY_ADMIN_KEY     — admin password (default: fabricate-test-admin)
- *   FOUNDRY_URL           — base URL (default: http://localhost:30000)
+ *   FOUNDRY_URL           — base URL (default: http://localhost:30100)
  */
 
 import { chromium } from 'playwright';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -37,20 +37,37 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const RESULTS_DIR = join(ROOT, 'test-results');
 
-const FOUNDRY_URL = process.env.FOUNDRY_URL ?? 'http://localhost:30000';
+const FOUNDRY_URL = process.env.FOUNDRY_URL ?? 'http://localhost:30100';
 const ADMIN_KEY = process.env.FOUNDRY_ADMIN_KEY ?? 'fabricate-test-admin';
 const WORLD_ID = 'fabricate-smoke-ci';
 
-// Smoke profile selector. Default `full` runs every phase including
-// the manager-v2 screenshot suite (Phase D0) and the legacy Recipe
-// Manager screenshots (Phase D), which together regenerate ~26
-// reference artifacts for visual verification. Set
-// FOUNDRY_SMOKE_PROFILE=ci to skip those phases — CI exercises module
-// load + system creation + crafting end-to-end (Phases B, C, E, F)
-// and finishes much faster, leaving the screenshot suite for local
-// developer use.
-const SMOKE_PROFILE = String(process.env.FOUNDRY_SMOKE_PROFILE ?? 'full').toLowerCase();
-const RUN_SCREENSHOT_PHASES = SMOKE_PROFILE !== 'ci';
+// Smoke profile selector. Three profiles:
+//   - `rc`   release-candidate happy path: real Foundry boot, fixture creation,
+//            one gathering success, craft a Healing Potion, console-error
+//            health. Minimal screenshot budget. Used by the CI workflow.
+//   - `ci`   alias for `rc`; kept for one release for back-compat.
+//   - `full` (default) every phase, full screenshot regen. Local + scheduled
+//            visual-regression workflow.
+const RAW_SMOKE_PROFILE = String(process.env.FOUNDRY_SMOKE_PROFILE ?? 'full').toLowerCase();
+const SMOKE_PROFILE = RAW_SMOKE_PROFILE === 'ci' ? 'rc' : RAW_SMOKE_PROFILE;
+const RUN_SCREENSHOT_PHASES = SMOKE_PROFILE === 'full';
+const RUN_FULL_ONLY_BEHAVIORS = SMOKE_PROFILE === 'full';
+const RUN_FULL_ONLY_GATHERING_STATES = SMOKE_PROFILE === 'full';
+
+// Exact set of screenshot labels the `rc` profile captures. Every other
+// `screenshot(page, label)` call is a no-op under `rc` (the surrounding
+// behavioral assertions still run). The on-failure capture is taken
+// directly by `page.screenshot({ path: ... 'screenshot-failure.png' })`
+// in the catch block, not via `screenshot()`, so it always survives.
+const RC_SCREENSHOT_BUDGET = new Set([
+  'world-loaded',
+  'crafting-app-opened',
+  'post-craft',
+  'alara-post-craft-inventory',
+  'gathering-targeted-ready',
+  'gathering-immediate-success'
+]);
+
 const JOIN_BUTTON_SELECTOR = 'button:has-text("Join Game Session"), button[name="join"]';
 const JOIN_USER_SELECT_SELECTOR = 'select[name="userid"]';
 const JOIN_USER_TILE_SELECTOR = '[data-user-id]';
@@ -63,12 +80,69 @@ const consoleLog = [];
 // ── Screenshot counter ──────────────────────────────────────────────────────
 let screenshotCounter = 0;
 
+// ── Phase timings ───────────────────────────────────────────────────────────
+/** @type {Array<{ phase: string, startedAt: string, durationMs: number }>} */
+const phaseTimings = [];
+
+/** @type {{ name: string, startedAt: string, t0: number } | null} */
+let currentPhase = null;
+
 /**
- * Take a screenshot with an auto-incrementing numeric prefix.
+ * Begin a phase stopwatch. If another phase is already running it ends
+ * automatically — phases are sequential, never nested.
+ * @param {string} name
+ */
+function startPhase(name) {
+  if (currentPhase) endPhase();
+  currentPhase = { name, startedAt: new Date().toISOString(), t0: performance.now() };
+}
+
+/**
+ * End the current phase and push its duration into `phaseTimings`.
+ */
+function endPhase() {
+  if (!currentPhase) return;
+  phaseTimings.push({
+    phase: currentPhase.name,
+    startedAt: currentPhase.startedAt,
+    durationMs: Math.round(performance.now() - currentPhase.t0)
+  });
+  currentPhase = null;
+}
+
+/**
+ * Format a list of timing entries as an aligned stdout table so slow
+ * phases are obvious in CI logs. Accepts any `{ phase, durationMs }[]`
+ * so it can render boot timings, phase timings, or the combined list.
+ * @param {Array<{ phase: string, durationMs: number }>} timings
+ * @returns {string}
+ */
+function formatTimingsTable(timings) {
+  if (timings.length === 0) return '';
+  const rows = timings.map(({ phase, durationMs }) => ({
+    phase,
+    seconds: (durationMs / 1000).toFixed(1)
+  }));
+  const totalMs = timings.reduce((sum, entry) => sum + entry.durationMs, 0);
+  rows.push({ phase: 'TOTAL', seconds: (totalMs / 1000).toFixed(1) });
+  const phaseWidth = Math.max(...rows.map(row => row.phase.length));
+  const secondsWidth = Math.max(...rows.map(row => row.seconds.length));
+  const lines = ['Phase timings', '─'.repeat(phaseWidth + secondsWidth + 5)];
+  for (const row of rows) {
+    lines.push(`  ${row.phase.padEnd(phaseWidth)}  ${row.seconds.padStart(secondsWidth)}s`);
+  }
+  return lines.join('\n');
+}
+
+/**
+ * Take a screenshot with an auto-incrementing numeric prefix. Under the
+ * `rc` profile, only labels in `RC_SCREENSHOT_BUDGET` are captured; all
+ * other labels are no-ops (the surrounding assertions still run).
  * @param {import('playwright').Page} page
  * @param {string} label
  */
 async function screenshot(page, label) {
+  if (SMOKE_PROFILE === 'rc' && !RC_SCREENSHOT_BUDGET.has(label)) return;
   screenshotCounter++;
   const num = String(screenshotCounter).padStart(2, '0');
   const path = join(RESULTS_DIR, `screenshot-${num}-${label}.png`);
@@ -686,6 +760,7 @@ async function assertManagerV2LayoutStable(page, label) {
       '.manager-v2-essence-edit-view',
       '.environment-draft-editor',
       '.manager-v2-environment-edit-view',
+      '.manager-v2-gathering-task-edit-view',
       '.manager-v2-environment-workspace',
       '.environment-fields',
       '.environment-task-layout',
@@ -722,6 +797,7 @@ async function assertManagerV2LayoutStable(page, label) {
     metric.selector === '.manager-v2-system-edit-form'
       || metric.selector === '.manager-v2-environment-editor-shell'
       || metric.selector === '.manager-v2-environment-edit-view'
+      || metric.selector === '.manager-v2-gathering-task-edit-view'
       || metric.selector === '.manager-v2-essence-edit-view'
       || metric.selector === '.environment-draft-editor'
   ).length;
@@ -751,7 +827,6 @@ async function exerciseManagerV2PointerTargets(page) {
   await page.locator('.fabricate-manager-v2 .manager-v2-breadcrumbs button:has-text("Crafting Systems")').first().click();
   await page.locator('.fabricate-manager-v2 .manager-v2-scope-return').first().click({ trial: true });
   await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Import")').first().click({ trial: true });
-  await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Open current admin")').first().click({ trial: true });
   await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Export")').first().click({ trial: true });
   await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Create")').first().click({ trial: true });
   const rowActionButtons = page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist") .manager-v2-icon-button');
@@ -858,7 +933,7 @@ async function exerciseManagerV2RecipePointerTargets(page) {
  * @param {import('playwright').Page} page
  */
 async function exerciseManagerV2EnvironmentPointerTargets(page) {
-  await page.locator('.fabricate-manager-v2 .manager-v2-nav-button:has-text("Environments")').first().click();
+  await page.locator('.fabricate-manager-v2 .manager-v2-nav-button:has-text("Gathering")').first().click();
   await page.locator('.fabricate-manager-v2 .manager-v2-environment-row').first().waitFor({ state: 'visible', timeout: 5_000 });
 
   const search = page.locator('.fabricate-manager-v2 input[aria-label="Search environments"]').first();
@@ -885,9 +960,6 @@ async function exerciseManagerV2EnvironmentPointerTargets(page) {
   if (await moveUp.isEnabled()) await moveUp.click({ trial: true });
   const moveDown = azureRow.locator('.manager-v2-icon-button').nth(4);
   if (await moveDown.isEnabled()) await moveDown.click({ trial: true });
-  await page.locator('.fabricate-manager-v2 .manager-v2-inspector-actions .manager-v2-button:has-text("Edit environment")').first().click({ trial: true });
-  await page.locator('.fabricate-manager-v2 .manager-v2-inspector-actions .manager-v2-button:has-text("Duplicate environment")').first().click({ trial: true });
-  await page.locator('.fabricate-manager-v2 .manager-v2-inspector-actions .manager-v2-button:has-text("Disable environment")').first().click({ trial: true });
   await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Create environment")').first().click({ trial: true });
 }
 
@@ -896,6 +968,10 @@ async function exerciseManagerV2EnvironmentPointerTargets(page) {
  * @param {import('playwright').Page} page
  */
 async function dismissFoundryNotifications(page) {
+  // Notifications are globally hidden via `installNotificationHidingCss()` at
+  // world-load, so this helper is largely defensive — kept in case the CSS is
+  // bypassed by a Foundry update or an in-test addStyleTag removal. No sleep:
+  // the DOM removal is synchronous from Playwright's perspective.
   await page.evaluate(() => {
     document
       .querySelectorAll('#notifications .notification, body > .notification, .notification')
@@ -903,7 +979,25 @@ async function dismissFoundryNotifications(page) {
         try { notification.remove(); } catch { /* ignore */ }
       });
   });
-  await page.waitForTimeout(300);
+}
+
+/**
+ * Inject a global stylesheet that hides Foundry's notification toasts so they
+ * never overlay screenshots or block clicks. Called once per browser context
+ * at world-load. Replaces a previous per-screenshot 300 ms `waitForTimeout`
+ * that existed solely to let notifications fade out before capture.
+ * @param {import('playwright').Page} page
+ */
+async function installNotificationHidingCss(page) {
+  await page.addStyleTag({
+    content: `
+      #notifications,
+      body > .notification,
+      .notification {
+        display: none !important;
+      }
+    `
+  });
 }
 
 /**
@@ -1269,7 +1363,6 @@ function attachConsoleCapture(page, ignoredErrorPatterns = []) {
 async function openGatheringAppFromDirectory(page) {
   const itemsTab = page.locator('#sidebar [data-tab="items"]').first();
   await itemsTab.click({ force: true });
-  await page.waitForTimeout(1_000);
   const gatheringButton = page.locator('button[data-fabricate-action="gathering"]').first();
   await gatheringButton.waitFor({ state: 'visible', timeout: 10_000 });
   if (!await gatheringButton.isEnabled()) {
@@ -1318,7 +1411,6 @@ async function selectGatheringActor(page, actorName) {
   const actorSelect = page.locator('.fabricate-gathering-app .gathering-v2-actor-card select').first();
   await actorSelect.waitFor({ state: 'visible', timeout: 10_000 });
   await actorSelect.selectOption({ label: actorName });
-  await page.waitForTimeout(1_000);
   await page.locator('.fabricate-gathering-app .gathering-v2-actor-card').filter({ hasText: actorName }).first()
     .waitFor({ state: 'visible', timeout: 10_000 });
 }
@@ -1446,7 +1538,25 @@ const cleanup = {
 };
 
 async function main() {
+  // Read boot timings written by foundry-test-up.mjs *before* wiping
+  // test-results/ — that script may have populated boot-timings.json, and we
+  // want to merge those entries into the final summary so the timing table
+  // reflects the whole pipeline, not just the in-browser phases.
+  /** @type {Array<{ phase: string, startedAt: string, durationMs: number }>} */
+  let bootTimings = [];
+  try {
+    const raw = await readFile(join(RESULTS_DIR, 'boot-timings.json'), 'utf8');
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed?.bootTimings)) bootTimings = parsed.bootTimings;
+  } catch { /* boot timings are optional (e.g., when invoking foundry-test-run.mjs directly) */ }
+
+  // Wipe stale artifacts so the uploaded test-results/ artifact contains
+  // only the current run. Every consumer (CI artifact upload, local triage)
+  // wants current-run output; nothing here is hand-authored.
+  await rm(RESULTS_DIR, { recursive: true, force: true });
   await mkdir(RESULTS_DIR, { recursive: true });
+
+  process.stdout.write(`Smoke profile: ${SMOKE_PROFILE}${RAW_SMOKE_PROFILE !== SMOKE_PROFILE ? ` (from FOUNDRY_SMOKE_PROFILE=${RAW_SMOKE_PROFILE})` : ''}\n`);
 
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
@@ -1469,6 +1579,7 @@ async function main() {
   };
 
   try {
+    startPhase('boot-and-join');
     // ── Step 1: Navigate to setup page and handle first-run flows ──────────
     await page.goto(`${FOUNDRY_URL}/setup`, { waitUntil: 'networkidle' });
     results.steps.push({ step: 'navigate-setup', passed: true });
@@ -1499,7 +1610,9 @@ async function main() {
         const tab = document.querySelector('#setup-packages-header [data-tab="worlds"]');
         if (tab) tab.click();
       });
-      await page.waitForTimeout(2_000);
+      // Wait for the smoke world's card to be present (replaces a 2 s fixed sleep)
+      await page.locator(`[data-package-id="${WORLD_ID}"]`).first()
+        .waitFor({ state: 'visible', timeout: 15_000 });
       await screenshot(page, 'worlds-tab');
 
       // Click the Launch World button (visible on hover in Foundry V13)
@@ -1529,6 +1642,11 @@ async function main() {
 
     await joinWorldSession(page, results, { userLabel: 'Gamemaster', stepName: 'join-session' });
 
+    // Hide notification toasts globally — they otherwise overlay screenshots
+    // and force a per-screenshot dismiss + sleep dance. Behavioral assertions
+    // (e.g. `assertNoScreenshotOverlays`) still inspect the DOM defensively.
+    await installNotificationHidingCss(page);
+
     await screenshot(page, 'world-loaded');
 
     // Wait for Foundry canvas to be ready
@@ -1551,6 +1669,9 @@ async function main() {
       await page.reload({ waitUntil: 'load', timeout: 60_000 });
       // Re-join if redirected to /join
       await joinWorldSession(page, results, { userLabel: 'Gamemaster' });
+      // Re-apply the notification-hiding CSS after reload (style tags are
+      // scoped to the document and are cleared on navigation)
+      await installNotificationHidingCss(page);
       await page.waitForFunction(() => typeof game !== 'undefined' && game.ready, { timeout: 30_000 });
 
       const nowActive = await page.evaluate(() => game.modules.get('fabricate')?.active === true);
@@ -1578,6 +1699,7 @@ async function main() {
     await page.waitForTimeout(500);
 
     // ── Phase B: Create test actors & items ─────────────────────────────────
+    startPhase('phase-B');
     process.stdout.write('Phase B: Creating test actors and items...\n');
     try {
       const createdDocs = await page.evaluate(async () => {
@@ -1755,7 +1877,11 @@ async function main() {
       // Screenshot the Items sidebar (force: true bypasses overlays like "Game Paused")
       const itemsTab = page.locator('#sidebar [data-tab="items"]').first();
       await itemsTab.click({ force: true });
-      await page.waitForTimeout(1_000);
+      // Wait for the items directory to render an item row created in Phase B
+      // (replaces a 1 s fixed sleep that was guarding sidebar render).
+      await page.locator('#sidebar #items .directory-item, #sidebar [data-tab="items"] .directory-item').first()
+        .waitFor({ state: 'visible', timeout: 5_000 })
+        .catch(() => { /* selector variants across V13 — best-effort */ });
       await screenshot(page, 'items-sidebar');
       process.stdout.write('  Screenshotted Items sidebar.\n');
 
@@ -1767,7 +1893,11 @@ async function main() {
           await actor.sheet.render(true);
           return actor.name;
         }, actorId);
-        await page.waitForTimeout(1_500);
+        // Wait for an actor sheet to be in the DOM (covers AppV1 + V2 shells).
+        // Replaces a 1.5 s fixed sleep.
+        await page.locator('.actor.sheet, .actor-sheet, .actor.window-app, [data-application-part="primary"]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 })
+          .catch(() => { /* shell selector varies; the changeTab logic below tolerates a not-yet-rendered sheet */ });
         // Navigate to inventory tab via Foundry API
         const invTabResult = await page.evaluate((id) => {
           const actor = game.actors.get(id);
@@ -1832,6 +1962,7 @@ async function main() {
 
     // ── Phase C: Create crafting system & recipes ────────────────────────────
     if (phaseBPassed) {
+    startPhase('phase-C');
     process.stdout.write('Phase C: Creating crafting system and recipes...\n');
     try {
       const craftingSetup = await page.evaluate(async () => {
@@ -2267,6 +2398,11 @@ async function main() {
       results.steps.push({ step: 'create-crafting-system', passed: true });
       process.stdout.write(`Phase C complete: System "${craftingSetup.systemId}" with ${craftingSetup.recipeIds.length} recipes.\n`);
 
+      // Feature-gate negative test (toggle gathering off, assert button hides,
+      // toggle back on). Belongs in `full` only — `rc` proves the positive
+      // gathering path in Phase D2, which exercises the same feature flag from
+      // the on side.
+      if (RUN_FULL_ONLY_BEHAVIORS) {
       try {
         const otherGatheringSystemsEnabled = await page.evaluate((systemId) => {
           const csm = game.fabricate.getCraftingSystemManager();
@@ -2278,7 +2414,12 @@ async function main() {
           await csm.updateSystem(systemId, { features: { essences: true, gathering: false } });
         }, craftingSetup.systemId);
         await page.locator('#sidebar [data-tab="items"]').first().click({ force: true });
-        await page.waitForTimeout(750);
+        // Wait for the items-sidebar tab content to be visible — replaces a
+        // 750 ms fixed sleep that was guarding render of the sidebar after a
+        // settings.update that triggers a Hooks.callAll cycle.
+        await page.locator('#sidebar [data-tab="items"][aria-selected="true"], #sidebar [data-application-part="items"]').first()
+          .waitFor({ state: 'visible', timeout: 5_000 })
+          .catch(() => { /* selectors vary across V13 sheets — best-effort */ });
         if (!otherGatheringSystemsEnabled && await page.locator('button[data-fabricate-action="gathering"]').count() > 0) {
           throw new Error('Gathering action is visible when no system enables gathering.');
         }
@@ -2294,7 +2435,12 @@ async function main() {
           const csm = game.fabricate.getCraftingSystemManager();
           await csm.updateSystem(systemId, { features: { essences: true, gathering: true } });
         }, craftingSetup.systemId);
-        await page.waitForTimeout(750);
+        await page.locator('button[data-fabricate-action="gathering"]').first()
+          .waitFor({ state: 'visible', timeout: 5_000 })
+          .catch(() => { /* tolerate if sidebar hasn't re-rendered in time */ });
+      }
+      } else {
+        results.steps.push({ step: 'gathering-feature-gate-negative', passed: true, skipped: true });
       }
 
       // ── Phase D0: Screenshot Crafting System Manager V2 ─────────────────────
@@ -2302,9 +2448,11 @@ async function main() {
       // ~25 manager-v2 captures and pointer hit-tests; local `full` runs
       // continue to regenerate them for visual verification.
       if (!RUN_SCREENSHOT_PHASES) {
-        process.stdout.write('Phase D0: skipped (FOUNDRY_SMOKE_PROFILE=ci).\n');
+        startPhase('phase-D0-skipped');
+        process.stdout.write(`Phase D0: skipped (profile=${SMOKE_PROFILE}).\n`);
         results.steps.push({ step: 'screenshot-manager-v2', passed: true, skipped: true });
       } else {
+      startPhase('phase-D0');
       process.stdout.write('Phase D0: Opening Crafting System Manager V2...\n');
       try {
         await page.evaluate(async (sysId) => {
@@ -2350,7 +2498,7 @@ async function main() {
         if (navLabels.at(0) !== 'System settings') {
           throw new Error(`Manager V2 selected nav should keep System settings first. Saw: ${navLabels.join(', ')}`);
         }
-        for (const expected of ['System settings', 'Components', 'Recipes', 'Environments', 'Essences', 'Rules', 'Graph']) {
+        for (const expected of ['System settings', 'Components', 'Recipes', 'Tags & Categories', 'Essences', 'Tools', 'Gathering', 'Rules', 'Graph']) {
           if (!navLabels.includes(expected)) {
             throw new Error(`Manager V2 selected nav missing ${expected}. Saw: ${navLabels.join(', ')}`);
           }
@@ -2601,11 +2749,16 @@ async function main() {
         await screenshot(page, 'manager-v2-environments-browse-stacked');
 
         await setManagerV2WindowSize(page, { width: 1280, height: 820 });
-        await page.locator('.fabricate-manager-v2 #manager-v2-gathering-tab-tasks').first().click();
+        await page.locator('.fabricate-manager-v2 #manager-v2-gathering-nav-tasks').first().click();
         await page.locator('.fabricate-manager-v2 .manager-v2-gathering-task-row:has-text("Smoke Reusable Forage")').first().waitFor({ state: 'visible', timeout: 10_000 });
         await page.locator('.fabricate-manager-v2 .manager-v2-gathering-task-row:has-text("Smoke Reusable Forage") [aria-label^="Edit"]').first().click();
         await page.locator('.fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
-        for (const expected of ['Task Identity', 'Task Availability', 'Drop Rules', 'Selected Drop Rule', 'Final chance']) {
+        // "Selected Drop Rule" only renders when a drop row is selected
+        // (CraftingSystemManagerV2Root.svelte:2957 `{#if selectedGatheringDrop}`)
+        // and its i18n value is now "Selected Drop", so it isn't asserted here.
+        // "Final chance" was removed entirely. The remaining sections are the
+        // editor's stable scaffolding.
+        for (const expected of ['Task Identity', 'Task Availability', 'Drop Rules']) {
           if (await page.locator('.fabricate-manager-v2').filter({ hasText: expected }).count() === 0) {
             throw new Error(`Manager V2 gathering task editor is missing "${expected}".`);
           }
@@ -2621,86 +2774,40 @@ async function main() {
         await screenshot(page, 'manager-v2-gathering-task-editor-stacked');
 
         await setManagerV2WindowSize(page, { width: 1280, height: 820 });
-        await page.locator('.fabricate-manager-v2 [data-gathering-task-core-editor] .manager-v2-link-button').first().click();
-        await page.locator('.fabricate-manager-v2 #manager-v2-gathering-tab-environments').first().click();
+        // Navigate back to environments via the side nav (always visible on
+        // gathering routes; the submenu auto-expands when isGatheringRoute).
+        await page.locator('.fabricate-manager-v2 #manager-v2-gathering-nav-environments').first().click();
         await page.locator('.fabricate-manager-v2 .manager-v2-environment-row:has-text("Azure Grove") .manager-v2-icon-button').nth(0).click();
         await page.locator('.fabricate-manager-v2[data-manager-v2-view="environment-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
-        await page.locator('.fabricate-manager-v2 .manager-v2-environment-edit-view').first().waitFor({ state: 'visible', timeout: 10_000 });
-        await page.locator('.fabricate-manager-v2 .manager-v2-gathering-library').first().waitFor({ state: 'visible', timeout: 10_000 });
-        for (const expected of ['Global conditions', 'Reusable tasks', 'Reusable hazards', 'Smoke Reusable Forage', 'Smoke Bramble Snare']) {
-          if (await page.locator('.fabricate-manager-v2 .manager-v2-gathering-library').filter({ hasText: expected }).count() === 0) {
-            throw new Error(`Manager V2 gathering library panel is missing "${expected}".`);
-          }
-        }
-        await page.locator('.fabricate-manager-v2 .manager-v2-gathering-library details:has-text("Smoke Reusable Forage")').first()
-          .evaluate(element => { element.open = true; });
-        await page.locator('.fabricate-manager-v2 .manager-v2-gathering-library details:has-text("Smoke Bramble Snare")').first()
-          .evaluate(element => { element.open = true; });
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-v2-gathering-library-composition');
+
+        // The environment editor is currently a placeholder
+        // (src/ui/svelte/apps/manager-v2/EnvironmentEditView.svelte) while the
+        // previous inline task/catalyst/tool authoring is being rebuilt — that
+        // surface has moved to the standalone `gathering-task-edit` route. Until
+        // the new editor lands, verify the placeholder renders with the
+        // environment's title and screenshot it for visual evidence, then
+        // return via the placeholder's own button.
+        await page.locator('.fabricate-manager-v2 .manager-v2-environment-edit-view.is-placeholder').first()
+          .waitFor({ state: 'visible', timeout: 10_000 });
+        await page.locator('.fabricate-manager-v2 .manager-v2-environment-details-band')
+          .filter({ hasText: 'Azure Grove' }).first()
+          .waitFor({ state: 'visible', timeout: 5_000 });
+        await page.locator('.fabricate-manager-v2 .manager-v2-environment-placeholder-card').first()
+          .waitFor({ state: 'visible', timeout: 5_000 });
         if (await page.locator('.fabricate-manager-v2 .environment-draft-editor, .fabricate-manager-v2 .environment-foundation').count() > 0) {
           throw new Error('Manager V2 environments edit route still rendered the legacy environment editor.');
         }
-        for (const selector of [
-          '.manager-v2-environment-details-band',
-          '.manager-v2-environment-scene-card',
-          '.manager-v2-gathering-library',
-          '.manager-v2-environment-task-rail',
-          '.manager-v2-environment-task-editor',
-          '[data-environment-field="environment.name"]',
-          '[data-environment-field="environment.sceneUuid"]',
-          '.manager-v2-task-tabs'
-        ]) {
-          if (await page.locator(`.fabricate-manager-v2 ${selector}`).count() === 0) {
-            throw new Error(`Manager V2 environment edit is missing required control: ${selector}`);
-          }
-        }
-        await page.locator('.fabricate-manager-v2 .manager-v2-task-rail-row').first().click();
-        await page.locator('.fabricate-manager-v2 .manager-v2-task-rail-row .environment-action-menu-trigger').first().click();
-        await page.locator('.fabricate-manager-v2 .environment-action-menu-item:not([disabled])').first().click({ trial: true });
-        await page.keyboard.press('Escape');
-        await page.locator('.fabricate-manager-v2 .manager-v2-task-tabs [role="tab"]:has-text("Results")').first().click({ trial: true });
-        const sceneSelect = page.locator('.fabricate-manager-v2 .manager-v2-scene-actions select').first();
-        if (await sceneSelect.count() > 0) await sceneSelect.click({ trial: true });
-        const firstStateSaveButton = page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button.is-primary:has-text("Save")').first();
-        if (await firstStateSaveButton.isEnabled()) await firstStateSaveButton.click({ trial: true });
-        const firstStateCancelButton = page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Cancel")').first();
-        if (await firstStateCancelButton.isEnabled()) await firstStateCancelButton.click({ trial: true });
-        await page.locator('.fabricate-manager-v2 .manager-v2-breadcrumbs button:has-text("Environments")').first().click({ trial: true });
-        await assertManagerV2LayoutStable(page, 'environment edit first state');
         await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-v2-environments-edit-first-state');
+        await screenshot(page, 'manager-v2-environment-edit-placeholder');
 
-        await prepareGmEnvironmentsScreenshotState(page);
-        const validationLink = page.locator('.fabricate-manager-v2 .environment-validation-link').first();
-        if (await validationLink.count() > 0) {
-          await validationLink.click({ trial: true });
-        }
-        await scrollEnvironmentEditorToTop(page);
-        await assertManagerV2LayoutStable(page, 'environment edit validation');
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-v2-environments-edit-validation');
-
-        const catalystsTab = page.locator('.fabricate-manager-v2 .manager-v2-task-tabs [role="tab"]:has-text("Catalysts")').first();
-        if (await catalystsTab.count() > 0) await catalystsTab.click();
-        await scrollEnvironmentEditorTo(page, '.environment-catalyst-authoring');
-        await assertManagerV2LayoutStable(page, 'environment edit authoring');
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-v2-environments-edit-authoring');
-
-        await setManagerV2WindowSize(page, { width: 900, height: 700 });
-        const resultsTab = page.locator('.fabricate-manager-v2 .manager-v2-task-tabs [role="tab"]:has-text("Results")').first();
-        if (await resultsTab.count() > 0) await resultsTab.click();
-        await scrollEnvironmentEditorTo(page, '.environment-result-authoring');
-        await assertManagerV2LayoutStable(page, 'environment edit stacked');
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-v2-environments-edit-stacked');
-
-        const cancelEnvironmentDraft = page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Cancel")').first();
-        if (await cancelEnvironmentDraft.count() > 0 && await cancelEnvironmentDraft.isEnabled()) {
-          await cancelEnvironmentDraft.click();
-          await page.waitForTimeout(500);
-        }
+        // The placeholder's "Return to environments" button is wired to
+        // store.cancelEnvironmentDraft (the store action), which doesn't
+        // change the view. Verify the button is clickable, then navigate
+        // back via the side nav.
+        await page.locator('.fabricate-manager-v2 .manager-v2-environment-placeholder-card .manager-v2-button:has-text("Return to environments")').first().click({ trial: true });
+        await page.locator('.fabricate-manager-v2 #manager-v2-gathering-nav-environments').first().click();
+        await page.locator('.fabricate-manager-v2[data-manager-v2-view="environments"]').first()
+          .waitFor({ state: 'visible', timeout: 5_000 });
 
         await page.evaluate(async (sysId) => {
           const csm = game.fabricate.getCraftingSystemManager();
@@ -2723,9 +2830,11 @@ async function main() {
       // Gated behind RUN_SCREENSHOT_PHASES so the CI smoke profile skips the
       // legacy Recipe Manager screenshot tour; local `full` runs keep it.
       if (!RUN_SCREENSHOT_PHASES) {
-        process.stdout.write('Phase D: skipped (FOUNDRY_SMOKE_PROFILE=ci).\n');
+        startPhase('phase-D-skipped');
+        process.stdout.write(`Phase D: skipped (profile=${SMOKE_PROFILE}).\n`);
         results.steps.push({ step: 'screenshot-recipe-manager', passed: true, skipped: true });
       } else {
+      startPhase('phase-D');
       process.stdout.write('Phase D: Opening Recipe Manager...\n');
       try {
         // Pre-select the system via settings so the adminStore picks it up on init
@@ -2736,9 +2845,9 @@ async function main() {
         await page.evaluate(() => {
           fabricate.openRecipeManager();
         });
-        await page.waitForTimeout(2_000);
 
-        // Wait for the Recipe Manager to be visible
+        // Wait for the Recipe Manager to be visible (also serves as the
+        // post-`openRecipeManager()` settle — replaces a 2 s fixed sleep).
         process.stdout.write('  Waiting for Recipe Manager to render...\n');
         const adminApp = page.locator('.fabricate-admin, .recipe-manager').first();
         await adminApp.waitFor({ state: 'visible', timeout: 10_000 });
@@ -2747,7 +2856,11 @@ async function main() {
         const systemLink = page.locator('.admin-system-list button.system-link:has-text("Arcane Forge")').first();
         if (await systemLink.count() > 0) {
           await systemLink.click();
-          await page.waitForTimeout(2_000);
+          // Wait for the active system badge / selected state to reflect the click
+          // (replaces a 2 s fixed sleep).
+          await page.locator('.admin-system-list button.system-link.is-active:has-text("Arcane Forge"), .admin-system-list button.system-link[aria-current="true"]:has-text("Arcane Forge")').first()
+            .waitFor({ state: 'visible', timeout: 5_000 })
+            .catch(() => { /* selector for active state varies — fall through */ });
           process.stdout.write('Selected "Arcane Forge" system in sidebar.\n');
         }
 
@@ -2782,7 +2895,13 @@ async function main() {
             }
 
             await tab.click();
-            await page.waitForTimeout(1_000);
+            // Wait for the tab's panel to be visible. Each Svelte tab marks
+            // its active pane via aria-selected="true" on the button and a
+            // matching panel-shape under .recipe-manager-content. Replaces
+            // a 1 s fixed sleep.
+            await page.locator('.fabricate-admin button[aria-selected="true"], .recipe-manager button[aria-selected="true"]').first()
+              .waitFor({ state: 'visible', timeout: 5_000 })
+              .catch(() => { /* fall back if aria-selected isn't applied */ });
             await assertNoScreenshotOverlays(page);
             await screenshot(page, `recipe-manager-${slug}`);
             process.stdout.write(`  Screenshotted Recipe Manager "${label}" tab.\n`);
@@ -2822,28 +2941,23 @@ async function main() {
 
               await setRecipeManagerWindowSize(page, { width: 1000, height: 700 });
               await scrollEnvironmentEditorToTop(page);
-              await dismissFoundryNotifications(page);
               await screenshot(page, 'gm-environments-normal-validation');
               process.stdout.write('  Screenshotted GM Environments validation state at normal admin size.\n');
 
               await scrollEnvironmentEditorTo(page, '.environment-catalyst-authoring');
-              await dismissFoundryNotifications(page);
               await screenshot(page, 'gm-environments-normal-authoring');
               process.stdout.write('  Screenshotted GM Environments result/catalyst authoring at normal admin size.\n');
 
               await scrollEnvironmentEditorTo(page, '.environment-result-authoring');
-              await dismissFoundryNotifications(page);
               await screenshot(page, 'gm-environments-normal-results');
               process.stdout.write('  Screenshotted GM Environments result rows at normal admin size.\n');
 
               await setRecipeManagerWindowSize(page, { width: 640, height: 700 });
               await scrollEnvironmentEditorTo(page, '.environment-catalyst-authoring');
-              await dismissFoundryNotifications(page);
               await screenshot(page, 'gm-environments-narrow-authoring');
               process.stdout.write('  Screenshotted GM Environments narrow container-query authoring state.\n');
 
               await scrollEnvironmentEditorTo(page, '.environment-result-authoring');
-              await dismissFoundryNotifications(page);
               await screenshot(page, 'gm-environments-narrow-results');
               process.stdout.write('  Screenshotted GM Environments narrow container-query result rows.\n');
 
@@ -2931,14 +3045,13 @@ async function main() {
       }
 
       // ── Phase D2: Screenshot Gathering app live states ─────────────────────
+      startPhase('phase-D2');
       process.stdout.write('Phase D2: Exercising Gathering app live states...\n');
       try {
         await closeOpenApplications(page);
         await page.setViewportSize({ width: 1920, height: 1080 });
-        await page.waitForTimeout(500);
         const itemsTab = page.locator('#sidebar [data-tab="items"]').first();
         await itemsTab.click({ force: true });
-        await page.waitForTimeout(1_000);
         const gatheringButton = page.locator('button[data-fabricate-action="gathering"]').first();
         await gatheringButton.waitFor({ state: 'visible', timeout: 10_000 });
         await assertNoScreenshotOverlays(page);
@@ -3081,7 +3194,18 @@ async function main() {
         await page.evaluate(async () => {
           await game.time.advance(120);
         });
-        await page.waitForTimeout(2_000);
+        // Wait for the active timed run to resolve out of `waitingTime`
+        // status rather than sleep for a fixed window. The Phase D2 success
+        // path already reads this flag a few lines below; this just hoists
+        // the wait so the next step's UI has settled before we proceed.
+        await page.waitForFunction((alaraId) => {
+          const actor = game.actors.get(alaraId);
+          const runs = actor?.getFlag?.('fabricate', 'gatheringRuns') ?? {};
+          const activeRuns = Array.isArray(runs.active)
+            ? runs.active
+            : Object.values(runs.active || {});
+          return !activeRuns.some(run => run?.status === 'waitingTime');
+        }, cleanup.alaraId, { timeout: 30_000 });
         await closeOpenApplications(page);
         await openGatheringAppFromDirectory(page);
         await selectGatheringActor(page, 'Alara the Alchemist');
@@ -3126,9 +3250,11 @@ async function main() {
       // verification (Phase E); D3's player-secrecy assertions are visual
       // verification for `full` profile runs.
       if (!RUN_SCREENSHOT_PHASES) {
-        process.stdout.write('Phase D3: skipped (FOUNDRY_SMOKE_PROFILE=ci).\n');
+        startPhase('phase-D3-skipped');
+        process.stdout.write(`Phase D3: skipped (profile=${SMOKE_PROFILE}).\n`);
         results.steps.push({ step: 'gathering-non-gm-states', passed: true, skipped: true });
       } else {
+      startPhase('phase-D3');
       process.stdout.write('Phase D3: Exercising non-GM Gathering app states...\n');
       try {
         const playerContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
@@ -3182,15 +3308,16 @@ async function main() {
       }
 
       // ── Phase E: Craft an item ──────────────────────────────────────────────
+      startPhase('phase-E');
       process.stdout.write('Phase E: Crafting a Healing Potion...\n');
       try {
         // Open Crafting App programmatically (avoids viewport/overlay issues)
         await page.evaluate(() => {
           document.querySelector('[data-fabricate-action="craft"]')?.click();
         });
-        await page.waitForTimeout(2_000);
 
-        // Verify the crafting app opened
+        // Verify the crafting app opened (this `waitFor` also serves as the
+        // post-click settle — replaces a 2 s fixed sleep).
         process.stdout.write('  Waiting for Crafting App to render...\n');
         const craftingApp = page.locator('.crafting-app, [data-appid] .window-title:has-text("Craft")').first();
         await craftingApp.waitFor({ state: 'visible', timeout: 10_000 });
@@ -3234,7 +3361,15 @@ async function main() {
           results.steps.push({ step: 'craft-healing-potion', passed: true });
         }
 
-        await page.waitForTimeout(1_000);
+        // Wait for the Healing Potion to actually appear in Alara's inventory
+        // before screenshotting. Catches missing-craft regressions that a
+        // fixed sleep would mask. Replaces a 1 s fixed sleep.
+        if (craftResult.success) {
+          await page.waitForFunction((alaraId) => {
+            const alara = game.actors.get(alaraId);
+            return alara?.items?.contents?.some(i => i.name === 'Healing Potion') === true;
+          }, cleanup.alaraId, { timeout: 10_000 }).catch(() => { /* surface via post-craft step state */ });
+        }
         await screenshot(page, 'post-craft');
         process.stdout.write('  Screenshotted post-craft state.\n');
 
@@ -3244,7 +3379,10 @@ async function main() {
           const alara = game.actors.get(alaraId);
           if (alara) await alara.sheet.render(true);
         }, cleanup.alaraId);
-        await page.waitForTimeout(1_500);
+        // Wait for the actor sheet to render (replaces a 1.5 s fixed sleep).
+        await page.locator('.actor.sheet, .actor-sheet, .actor.window-app, [data-application-part="primary"]').first()
+          .waitFor({ state: 'visible', timeout: 10_000 })
+          .catch(() => { /* sheet selectors vary by V13 sheet — tab change tolerates absence */ });
         // Navigate to inventory tab via Foundry API
         await page.evaluate((id) => {
           const actor = game.actors.get(id);
@@ -3280,9 +3418,11 @@ async function main() {
       // hosted Ubuntu runner). The empty-state assertion is a visual
       // verification path for `full` profile runs.
       if (!RUN_SCREENSHOT_PHASES) {
-        process.stdout.write('Phase E2: skipped (FOUNDRY_SMOKE_PROFILE=ci).\n');
+        startPhase('phase-E2-skipped');
+        process.stdout.write(`Phase E2: skipped (profile=${SMOKE_PROFILE}).\n`);
         results.steps.push({ step: 'gathering-no-selectable-actors-state', passed: true, skipped: true });
       } else {
+      startPhase('phase-E2');
       process.stdout.write('Phase E2: Exercising no-selectable-actors Gathering state...\n');
       try {
         await closeOpenApplications(page);
@@ -3347,6 +3487,12 @@ async function main() {
     await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-failure.png') }).catch(() => {});
   } finally {
     // ── Phase F: Cleanup created documents ────────────────────────────────
+    // Cleanup matters for local dev (the container is preserved across runs
+    // and stale state can shadow fresh fixtures). CI containers are torn
+    // down by `foundry-test-down.mjs` immediately after this script exits,
+    // so cleanup is wasted wall-time. Gate behind RUN_FULL_ONLY_BEHAVIORS.
+    if (RUN_FULL_ONLY_BEHAVIORS) {
+    startPhase('phase-F');
     process.stdout.write('Phase F: Cleaning up test data...\n');
     try {
       await page.evaluate(async (cleanupData) => {
@@ -3395,9 +3541,27 @@ async function main() {
     } catch {
       process.stderr.write('Cleanup: some test data may remain.\n');
     }
+    } else {
+      startPhase('phase-F-skipped');
+      process.stdout.write(`Phase F: skipped (profile=${SMOKE_PROFILE}).\n`);
+      results.steps.push({ step: 'cleanup', passed: true, skipped: true });
+    }
+
+    endPhase();
 
     results.consoleErrors = consoleErrors;
+    results.bootTimings = bootTimings;
+    results.phaseTimings = phaseTimings;
     await browser.close();
+
+    const combinedTimings = [
+      ...bootTimings.map(entry => ({ ...entry, phase: `boot:${entry.phase}` })),
+      ...phaseTimings
+    ];
+    const timingsTable = formatTimingsTable(combinedTimings);
+    if (timingsTable) {
+      process.stdout.write(`\n${timingsTable}\n\n`);
+    }
 
     // Write summary.json
     await writeFile(

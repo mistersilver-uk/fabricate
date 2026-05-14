@@ -12,8 +12,8 @@
  */
 
 import { execSync, spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { existsSync, mkdirSync } from 'node:fs';
+import { readFile, writeFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -24,6 +24,61 @@ const ENV_FILE = join(ROOT, '.env.foundry');
 const DEFAULT_FOUNDRY_IMAGE = 'felddy/foundryvtt:13';
 const CONTAINER_NAME = 'fabricate-foundry-test';
 const CACHE_DIR = join(ROOT, '.foundry-e2e', 'cache');
+const RESULTS_DIR = join(ROOT, 'test-results');
+
+/** @type {Array<{ phase: string, startedAt: string, durationMs: number }>} */
+const bootTimings = [];
+
+/**
+ * Time a labelled boot phase. Always records, even when `fn` throws.
+ * @template T
+ * @param {string} name
+ * @param {() => T | Promise<T>} fn
+ * @returns {Promise<T>}
+ */
+async function timed(name, fn) {
+  const startedAt = new Date().toISOString();
+  const t0 = performance.now();
+  try {
+    return await fn();
+  } finally {
+    bootTimings.push({
+      phase: name,
+      startedAt,
+      durationMs: Math.round(performance.now() - t0)
+    });
+  }
+}
+
+function formatBootTimingsTable() {
+  if (bootTimings.length === 0) return '';
+  const rows = bootTimings.map(({ phase, durationMs }) => ({
+    phase,
+    seconds: (durationMs / 1000).toFixed(1)
+  }));
+  const totalMs = bootTimings.reduce((sum, entry) => sum + entry.durationMs, 0);
+  rows.push({ phase: 'TOTAL', seconds: (totalMs / 1000).toFixed(1) });
+  const phaseWidth = Math.max(...rows.map(r => r.phase.length));
+  const secondsWidth = Math.max(...rows.map(r => r.seconds.length));
+  const lines = ['Boot timings', '─'.repeat(phaseWidth + secondsWidth + 5)];
+  for (const row of rows) {
+    lines.push(`  ${row.phase.padEnd(phaseWidth)}  ${row.seconds.padStart(secondsWidth)}s`);
+  }
+  return lines.join('\n');
+}
+
+async function writeBootTimings() {
+  if (bootTimings.length === 0) return;
+  try {
+    mkdirSync(RESULTS_DIR, { recursive: true });
+    await writeFile(
+      join(RESULTS_DIR, 'boot-timings.json'),
+      JSON.stringify({ bootTimings }, null, 2)
+    );
+  } catch {
+    /* non-fatal — the timing table still printed to stdout */
+  }
+}
 
 /** Parse a simple KEY=VALUE env file, ignoring comments and blanks. */
 async function loadEnvFile(filePath) {
@@ -65,10 +120,16 @@ function getContainerStatus() {
 }
 
 function getContainerHostPort() {
+  // NetworkSettings.Ports is the live binding (only populated when the
+  // container has run at least once). HostConfig.PortBindings is the
+  // *desired* binding from create-time — populated even for `created`
+  // and `exited` containers that have never bound the port. Reading both
+  // lets the port-mismatch branch in main() detect a cached container
+  // that was created with an old port default and needs recreating.
   const result = spawnSync('docker', [
     'inspect',
     '--format',
-    '{{json .NetworkSettings.Ports}}',
+    '{{json .NetworkSettings.Ports}}|{{json .HostConfig.PortBindings}}',
     CONTAINER_NAME
   ], {
     encoding: 'utf8',
@@ -78,8 +139,12 @@ function getContainerHostPort() {
   if (result.status !== 0) return null;
 
   try {
-    const ports = JSON.parse((result.stdout ?? '').trim() || '{}');
-    return ports?.['30000/tcp']?.[0]?.HostPort ?? null;
+    const [networkRaw, hostConfigRaw] = (result.stdout ?? '').trim().split('|');
+    const network = JSON.parse(networkRaw || '{}');
+    const live = network?.['30000/tcp']?.[0]?.HostPort;
+    if (live) return live;
+    const hostConfig = JSON.parse(hostConfigRaw || '{}');
+    return hostConfig?.['30000/tcp']?.[0]?.HostPort ?? null;
   } catch {
     return null;
   }
@@ -144,19 +209,23 @@ async function main() {
   }
 
   // Ensure game systems are downloaded
-  process.stdout.write('Fetching game systems...\n');
-  execSync(`"${process.execPath}" "${join(__dirname, 'foundry-fetch-systems.mjs')}"`, {
-    cwd: ROOT,
-    stdio: 'inherit',
-    env: process.env
+  await timed('fetch-systems', () => {
+    process.stdout.write('Fetching game systems...\n');
+    execSync(`"${process.execPath}" "${join(__dirname, 'foundry-fetch-systems.mjs')}"`, {
+      cwd: ROOT,
+      stdio: 'inherit',
+      env: process.env
+    });
   });
 
   // Assemble the data directory with symlinks
-  process.stdout.write('Setting up data directory...\n');
-  execSync(`"${process.execPath}" "${join(__dirname, 'foundry-setup-data.mjs')}"`, {
-    cwd: ROOT,
-    stdio: 'inherit',
-    env: process.env
+  await timed('setup-data', () => {
+    process.stdout.write('Setting up data directory...\n');
+    execSync(`"${process.execPath}" "${join(__dirname, 'foundry-setup-data.mjs')}"`, {
+      cwd: ROOT,
+      stdio: 'inherit',
+      env: process.env
+    });
   });
 
   // Set container user to match the host user so bind-mounted volumes are writable.
@@ -181,15 +250,17 @@ async function main() {
 
   // Prefer the local fixed-version image when available. Compose will still use
   // the configured FOUNDRY_IMAGE and pull it when this host does not have it.
-  const imageInspect = spawnSync('docker', ['image', 'inspect', process.env.FOUNDRY_IMAGE], {
-    stdio: 'ignore'
+  await timed('image-check', () => {
+    const imageInspect = spawnSync('docker', ['image', 'inspect', process.env.FOUNDRY_IMAGE], {
+      stdio: 'ignore'
+    });
+    if (imageInspect.status === 0) {
+      process.stdout.write(`Using local Docker image ${process.env.FOUNDRY_IMAGE}.\n`);
+    } else {
+      process.stdout.write(`Pulling Docker image ${process.env.FOUNDRY_IMAGE}...\n`);
+      compose('pull --quiet');
+    }
   });
-  if (imageInspect.status === 0) {
-    process.stdout.write(`Using local Docker image ${process.env.FOUNDRY_IMAGE}.\n`);
-  } else {
-    process.stdout.write(`Pulling Docker image ${process.env.FOUNDRY_IMAGE}...\n`);
-    compose('pull --quiet');
-  }
 
   configureCachedReleaseUrl();
 
@@ -205,7 +276,7 @@ async function main() {
   }
 
   if (existingStatus) {
-    const desiredHostPort = process.env.FOUNDRY_HOST_PORT || '30000';
+    const desiredHostPort = process.env.FOUNDRY_HOST_PORT || '30100';
     const cachedHostPort = getContainerHostPort();
     if (cachedHostPort && cachedHostPort !== desiredHostPort) {
       process.stdout.write(
@@ -217,48 +288,61 @@ async function main() {
   }
 
   const cachedStatus = existingStatus;
-  if (cachedStatus === 'running') {
-    process.stdout.write(`Reusing running Foundry container ${CONTAINER_NAME}.\n`);
-  } else if (cachedStatus) {
-    process.stdout.write(`Starting cached Foundry container ${CONTAINER_NAME} (${cachedStatus}).\n`);
-    compose('start');
-  } else {
-    process.stdout.write('Creating Foundry container...\n');
-    compose('up -d');
-  }
+  await timed('compose-up', () => {
+    if (cachedStatus === 'running') {
+      process.stdout.write(`Reusing running Foundry container ${CONTAINER_NAME}.\n`);
+    } else if (cachedStatus) {
+      process.stdout.write(`Starting cached Foundry container ${CONTAINER_NAME} (${cachedStatus}).\n`);
+      compose('start');
+    } else {
+      process.stdout.write('Creating Foundry container...\n');
+      compose('up -d');
+    }
+  });
 
   // Wait for health check (max 120 seconds)
-  process.stdout.write('Waiting for Foundry to become healthy...\n');
-  const deadline = Date.now() + 120_000;
-  while (Date.now() < deadline) {
-    const result = spawnSync('docker', [
-      'inspect',
-      '--format', '{{.State.Health.Status}}',
-      CONTAINER_NAME
-    ], { encoding: 'utf8' });
+  await timed('health-poll', async () => {
+    process.stdout.write('Waiting for Foundry to become healthy...\n');
+    const deadline = Date.now() + 120_000;
+    while (Date.now() < deadline) {
+      const result = spawnSync('docker', [
+        'inspect',
+        '--format', '{{.State.Health.Status}}',
+        CONTAINER_NAME
+      ], { encoding: 'utf8' });
 
-    const status = (result.stdout ?? '').trim();
-    if (status === 'healthy') {
-      process.stdout.write('Foundry is healthy and ready.\n');
-      return;
+      const status = (result.stdout ?? '').trim();
+      if (status === 'healthy') {
+        process.stdout.write('Foundry is healthy and ready.\n');
+        return;
+      }
+      if (status === 'unhealthy') {
+        process.stderr.write('Container reported unhealthy. Check logs:\n');
+        compose('logs --tail 50');
+        process.exit(1);
+      }
+
+      // Sleep 5 seconds
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      process.stdout.write(`  status: ${status || 'starting'}...\n`);
     }
-    if (status === 'unhealthy') {
-      process.stderr.write('Container reported unhealthy. Check logs:\n');
-      compose('logs --tail 50');
-      process.exit(1);
-    }
 
-    // Sleep 5 seconds
-    await new Promise(resolve => setTimeout(resolve, 5000));
-    process.stdout.write(`  status: ${status || 'starting'}...\n`);
-  }
-
-  process.stderr.write('Timeout waiting for Foundry to become healthy.\n');
-  compose('logs --tail 50');
-  process.exit(1);
+    process.stderr.write('Timeout waiting for Foundry to become healthy.\n');
+    compose('logs --tail 50');
+    process.exit(1);
+  });
 }
 
-main().catch(err => {
-  process.stderr.write(`foundry-test-up failed: ${err.message}\n`);
-  process.exit(1);
-});
+main()
+  .then(async () => {
+    const table = formatBootTimingsTable();
+    if (table) process.stdout.write(`\n${table}\n\n`);
+    await writeBootTimings();
+  })
+  .catch(async err => {
+    const table = formatBootTimingsTable();
+    if (table) process.stderr.write(`\n${table}\n\n`);
+    await writeBootTimings();
+    process.stderr.write(`foundry-test-up failed: ${err.message}\n`);
+    process.exit(1);
+  });

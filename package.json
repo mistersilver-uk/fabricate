@@ -12,6 +12,7 @@
     "test:foundry:run": "node scripts/foundry-test-run.mjs",
     "test:foundry:down": "node scripts/foundry-test-down.mjs",
     "test:foundry": "node scripts/foundry-test.mjs",
+    "test:foundry:rc": "node scripts/foundry-test.mjs --profile=rc",
     "test:foundry:ci": "node scripts/foundry-test.mjs --profile=ci",
     "release:build": "node scripts/release.js",
     "release:validate": "node scripts/release.js --validate-only",

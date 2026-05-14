@@ -52,7 +52,7 @@ Keep this skill aligned with the `fabricate_implementer` custom Codex agent.
 - When a Manager V2 feature button cannot be clicked, first inspect whether it is still rendered as a disabled placeholder or hidden by feature gates before changing event handlers.
 - In mounted Svelte tests that synthesize DOM events directly, prefer explicit `value` plus `oninput`/`onchange` handlers for controls that need deterministic test updates.
 - Use `npm run test:foundry` for UI changes only when the task depends on Foundry runtime integration, no dev server is available, or reproducible container-backed evidence is required.
-- If `npm run test:foundry` conflicts with a local Foundry on port `30000`, use matching alternate environment variables such as `FOUNDRY_HOST_PORT=30001 FOUNDRY_URL=http://localhost:30001`.
+- `npm run test:foundry` defaults to host port `30100` so it coexists with a developer's local Foundry on `30000`. If `30100` is also occupied, override with matching `FOUNDRY_HOST_PORT` and `FOUNDRY_URL` (e.g. `FOUNDRY_HOST_PORT=30101 FOUNDRY_URL=http://localhost:30101`).
 - Treat Docker startup conflicts, launch reconnects, and stale container-name failures as harness infrastructure unless the app loaded and failed a product assertion.
 - For card, overlay, menu, disabled-state, and icon-button interactions, add real browser pointer hit-tests when feasible. `elementFromPoint` checks catch CSS overlays and global Foundry styles that mounted tests can miss.
 - For compact rails, headers, fact cards, buttons, and fixed navigation areas, test long localized/content strings so wrapping, truncation, and stable geometry are explicit.

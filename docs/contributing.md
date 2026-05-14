@@ -121,27 +121,32 @@ After a run, results are written to `test-results/`:
 6. Asserts the Crafting App window is visible.
 7. Fails if any browser console errors were captured during the session.
 
-### Smoke profiles (`full` vs `ci`)
+### Smoke profiles (`rc` vs `full`)
 
-The smoke harness runs in one of two profiles selected by the `FOUNDRY_SMOKE_PROFILE` env var (or the `--profile=<value>` CLI flag on `node scripts/foundry-test.mjs`):
+The smoke harness runs in one of three profiles selected by the `FOUNDRY_SMOKE_PROFILE` env var (or the `--profile=<value>` CLI flag on `node scripts/foundry-test.mjs`):
 
 | Profile | When | Phases | Total |
 |---------|------|--------|-------|
-| `full` (default) | Local, screenshot regen | Phase B → Phase C → Phase D0 (manager-v2 screenshots) → Phase D (legacy Recipe Manager screenshots) → Phase D2/D3 (Gathering app behaviour + screenshots) → Phase E (craft) → Phase E2 (no-selectable-actors) → Phase F (cleanup) | ~10–15 min |
-| `ci` | Release-candidate CI | Phase B → Phase C → ~~Phase D0~~ ~~Phase D~~ → Phase D2 → ~~Phase D3~~ → Phase E → ~~Phase E2~~ → Phase F | ~6–8 min |
+| `rc` | Release-candidate CI | Phase B → Phase C → Phase D2 (one success path) → Phase E → console-error check | ~3–5 min |
+| `ci` | Alias for `rc` (deprecated; removed after one release) | same as `rc` | same |
+| `full` (default) | Local, screenshot regeneration | Phase B → Phase C → Phase D0 (manager-v2 screenshots) → Phase D (legacy Recipe Manager screenshots) → Phase D2/D3 (Gathering app behaviour + screenshots) → Phase E → Phase E2 (no-selectable-actors) → Phase F (cleanup) | ~10–15 min |
 
-The CI profile additionally skips Phase D3 and Phase E2 because each opens a fresh `browser.newContext()` and joins the world a second/third time as a player or observer user; cold-loading Foundry's UI repeatedly on a hosted Ubuntu runner reliably exceeds the 30s `waitForFunction(() => game.ready)` budget those phases use, while a warm dev machine clears it in 5–10s.
+The `rc` profile captures a pinned screenshot budget (`world-loaded`, `crafting-app-opened`, `post-craft`, `alara-post-craft-inventory`, `gathering-targeted-ready`, `gathering-immediate-success`, plus `screenshot-failure.png` on failure) — every other `screenshot(page, label)` call is a no-op under `rc`, but the surrounding behavioral assertions still run. Phase D3 / E2 stay in `full` only because each opens a fresh `browser.newContext()` and re-joins the world as a player or observer user; cold-loading Foundry's UI repeatedly on a hosted Ubuntu runner reliably exceeds the 30s `waitForFunction(() => game.ready)` budget those phases use.
 
-Run the CI-equivalent profile locally with:
+Phase F (cleanup) and the gathering feature-gate negative test also stay in `full` only — the RC container is torn down by `foundry-test-down.mjs` immediately after the run, so document cleanup is wasted wall-time, and the feature-gate positive path is already exercised end-to-end in Phase D2.
+
+Every run prints a phase-timing table to stdout at the end (and writes the timings into `summary.json` under `phaseTimings` and `bootTimings`) so slow phases jump out in CI logs.
+
+Run the RC profile locally with:
 
 ```sh
-npm run test:foundry:ci
+npm run test:foundry:rc
 # or
-FOUNDRY_SMOKE_PROFILE=ci npm run test:foundry      # POSIX
-$env:FOUNDRY_SMOKE_PROFILE='ci'; npm run test:foundry  # PowerShell
+FOUNDRY_SMOKE_PROFILE=rc npm run test:foundry      # POSIX
+$env:FOUNDRY_SMOKE_PROFILE='rc'; npm run test:foundry  # PowerShell
 ```
 
-The `ci` profile skips manager-v2 / Recipe Manager screenshot regeneration only — it still creates a system, recipes, and crafts a Healing Potion end-to-end. Use `full` whenever you need fresh visual references for design review.
+Use `full` whenever you need fresh visual references for design review.
 
 ## CI workflows
 

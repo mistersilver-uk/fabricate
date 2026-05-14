@@ -22,12 +22,12 @@ jobs:
       FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}
       FOUNDRY_TELEMETRY: "false"
       FOUNDRY_ADMIN_KEY: fabricate-test-admin
-      FOUNDRY_URL: http://localhost:30000
-      # Skip the manager-v2 + legacy Recipe Manager screenshot phases.
-      # CI verifies module load + system creation + crafting end-to-end;
-      # screenshot fidelity is for local visual verification (run
-      # `npm run test:foundry` without this env var to regenerate them).
-      FOUNDRY_SMOKE_PROFILE: ci
+      FOUNDRY_URL: http://localhost:30100
+      # `rc` profile: real Foundry boot, fixture creation, one gathering
+      # success, craft a Healing Potion, console-error health, minimal
+      # screenshot budget. Full screenshot regeneration runs in `full`
+      # (local + the scheduled visual-regression workflow).
+      FOUNDRY_SMOKE_PROFILE: rc
 
     steps:
       - uses: actions/checkout@v4
@@ -50,13 +50,44 @@ jobs:
         if: env.SKIP_SMOKE != 'true'
         run: npm ci
 
-      - name: Install Playwright Chromium
+      # Cache the Playwright Chromium download keyed on package-lock so the
+      # ~30 MB install only runs when playwright itself bumps. Saves
+      # ~20–40s per warm run.
+      - name: Cache Playwright Chromium
         if: env.SKIP_SMOKE != 'true'
+        id: cache-playwright
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright Chromium
+        if: env.SKIP_SMOKE != 'true' && steps.cache-playwright.outputs.cache-hit != 'true'
         run: npm run test:foundry:install
 
       - name: Build module
         if: env.SKIP_SMOKE != 'true'
         run: npm run build
+
+      # Cache the Foundry binary archive (used by foundry-test-up.mjs's
+      # `configureCachedReleaseUrl`) keyed on the felddy image tag pinned
+      # in docker-compose.foundry.yml. Saves ~30–90s per cold run by
+      # skipping the Foundry release download.
+      - name: Cache Foundry binary
+        if: env.SKIP_SMOKE != 'true'
+        uses: actions/cache@v4
+        with:
+          path: .foundry-e2e/cache
+          key: foundry-binary-${{ runner.os }}-${{ hashFiles('docker-compose.foundry.yml') }}
+
+      # Cache the dnd5e game system fetched by foundry-fetch-systems.mjs.
+      # Saves ~10–20s per warm run.
+      - name: Cache dnd5e system
+        if: env.SKIP_SMOKE != 'true'
+        uses: actions/cache@v4
+        with:
+          path: .foundry-e2e/systems
+          key: foundry-systems-${{ runner.os }}-${{ hashFiles('scripts/foundry-fetch-systems.mjs') }}
 
       - name: Run smoke test (up → run → down)
         if: env.SKIP_SMOKE != 'true'
