@@ -32,6 +32,13 @@ const MythwrightDnd5eBootstrap = (() => {
     rawOre: 'icons/commodities/stone/ore-pile-grey.webp',
     hardwood: 'icons/commodities/wood/lumber-stack-brown.webp',
     curedHide: 'icons/commodities/leather/leather-bolt-tan.webp',
+    gatheringMineOre: 'icons/commodities/stone/ore-pile-grey.webp',
+    gatheringWildHardwood: 'icons/commodities/wood/lumber-stack-brown.webp',
+    gatheringWildHide: 'icons/commodities/leather/leather-bolt-tan.webp',
+    gatheringRuinRelics: 'icons/commodities/treasure/token-runed-spiral-grey.webp',
+    gatheringBattlefieldSalvage: 'icons/equipment/chest/breastplate-layered-steel.webp',
+    gatheringPlanarEssence: 'icons/svg/lightning.svg',
+    gatheringDragonScale: 'icons/commodities/leather/scales-brown.webp',
     ironIngot: 'icons/commodities/metal/ingot-iron.webp',
     weaponCore: 'icons/commodities/metal/ingot-steel.webp',
     balancedHilt: 'icons/weapons/swords/sword-hilt-steel-green.webp',
@@ -1036,6 +1043,7 @@ const MythwrightDnd5eBootstrap = (() => {
       {
         id: 'mine-ore',
         name: 'Extract Ore',
+        img: MYTHWRIGHT_ICONS.gatheringMineOre,
         enabled: true,
         biomes: ['cave', 'mountain'],
         toolIds: ['mythwright-tool-mining-pick'],
@@ -1050,6 +1058,7 @@ const MythwrightDnd5eBootstrap = (() => {
       {
         id: 'wild-hardwood',
         name: 'Cut Hardwood',
+        img: MYTHWRIGHT_ICONS.gatheringWildHardwood,
         enabled: true,
         biomes: ['forest', 'grassland'],
         toolIds: ['mythwright-tool-wood-axe'],
@@ -1063,6 +1072,7 @@ const MythwrightDnd5eBootstrap = (() => {
       {
         id: 'wild-hide',
         name: 'Dress Hides and Trophies',
+        img: MYTHWRIGHT_ICONS.gatheringWildHide,
         enabled: true,
         biomes: ['forest', 'grassland'],
         toolIds: ['mythwright-tool-skinning-knife'],
@@ -1076,6 +1086,7 @@ const MythwrightDnd5eBootstrap = (() => {
       {
         id: 'ruin-relics',
         name: 'Excavate Ruin Relics',
+        img: MYTHWRIGHT_ICONS.gatheringRuinRelics,
         enabled: true,
         biomes: ['ruins', 'urban'],
         toolIds: ['mythwright-tool-delver-kit'],
@@ -1090,6 +1101,7 @@ const MythwrightDnd5eBootstrap = (() => {
       {
         id: 'battlefield-salvage',
         name: 'Salvage Battlefield Gear',
+        img: MYTHWRIGHT_ICONS.gatheringBattlefieldSalvage,
         enabled: true,
         biomes: ['wasteland', 'grassland'],
         toolIds: ['mythwright-tool-delver-kit', 'mythwright-tool-skinning-knife'],
@@ -1105,6 +1117,7 @@ const MythwrightDnd5eBootstrap = (() => {
       {
         id: 'planar-essence',
         name: 'Bind Planar Essence',
+        img: MYTHWRIGHT_ICONS.gatheringPlanarEssence,
         enabled: true,
         toolIds: ['mythwright-tool-planar-binding-rod'],
         itemSelectionMode: 'allDrops',
@@ -1119,6 +1132,7 @@ const MythwrightDnd5eBootstrap = (() => {
       {
         id: 'dragon-scale',
         name: 'Harvest Dragon Scale',
+        img: MYTHWRIGHT_ICONS.gatheringDragonScale,
         enabled: true,
         toolIds: ['mythwright-tool-dragon-tongs'],
         itemSelectionMode: 'allDrops',
