@@ -795,8 +795,8 @@ test('manager-v2 gathering task browser defines bounded toolbar and compact tabl
     toolsEditorPercentInputBlock.includes('padding: 0 10px 0 0;'),
     'tools breakage chance percent input should keep its specialized compact padding'
   );
-  assert.ok(editorBlock.includes('grid-template-rows: auto auto 340px minmax(410px, 1fr) auto;'), 'task edit route should reserve taller component browser and exact three-row drop-rule rows for drag/drop');
-  assert.ok(editorWithNoticeBlock.includes('grid-template-rows: auto auto 340px auto minmax(410px, 1fr) auto;'), 'task edit route should give the duplicate-drop warning a compact auto row before drop rules');
+  assert.ok(editorBlock.includes('grid-template-rows: auto auto 340px 340px 410px auto;'), 'task edit route should reserve fixed component browser and drop-rule rows for drag/drop');
+  assert.ok(editorWithNoticeBlock.includes('grid-template-rows: auto auto 340px 340px auto 410px auto;'), 'task edit route should give the duplicate-drop warning a compact auto row before drop rules');
   assert.ok(editorBlock.includes('overflow: auto;'), 'task editor should allow vertical scrolling without horizontal overflow');
   assert.ok(availabilityBlock.includes('grid-template-columns: repeat(2, minmax(160px, 1fr));'), 'task availability controls should form a stable two-column grid');
   assert.ok(componentBrowserBlock.includes('height: 340px;') && componentBrowserBlock.includes('max-height: 340px;') && componentBrowserBlock.includes('overflow: hidden;'), 'component browser should own a fixed bounded height that keeps the footer visible');
