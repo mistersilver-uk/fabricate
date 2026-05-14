@@ -72,16 +72,21 @@ The script exits with code 1 if validation fails and prints a list of missing fi
 
 ### Local Development (dev server with HMR)
 
-Symlink the **project root** into Foundry's module directory.
-Run these commands in the project root:
+Link the **project root** into Foundry's module directory:
 
 ```bash
-# Linux / macOS
-ln -s "$(pwd)" ~/.local/share/FoundryVTT/Data/modules/fabricate
-
-# Windows (run as Administrator in PowerShell)
-New-Item -ItemType SymbolicLink -Path "$env:LOCALAPPDATA\FoundryVTT\Data\modules\fabricate" -Target "$(pwd)"
+npm run setup:dev
 ```
+
+The script is idempotent — re-run it any time (for example after a Foundry update). It creates a directory junction on Windows (no admin or Developer Mode needed) and a symlink on Linux and macOS. Default Foundry Data paths:
+
+- Windows: `%LOCALAPPDATA%\FoundryVTT\Data`
+- macOS: `~/Library/Application Support/FoundryVTT/Data`
+- Linux: `~/.local/share/FoundryVTT/Data`
+
+If your Foundry install uses a custom Data location, set `FOUNDRY_DATA_PATH` before running the script. If an existing link points at the wrong place, re-run with `--force` to repoint it (the script refuses to clobber a real directory or file at the target path under any flag).
+
+**Troubleshooting:** If the Fabricate module is missing from Foundry's Setup screen after a Foundry major-version update, the symlink is probably fine — check `compatibility.verified` and `compatibility.maximum` in `module.json`. Foundry hides modules whose `maximum` is below the running major version.
 
 Start Foundry at `http://localhost:30000` with a world that has the module enabled, then:
 
