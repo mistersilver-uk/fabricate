@@ -637,9 +637,10 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     const helper = globalThis.MythwrightDnd5eBootstrap;
     const tasks = helper.buildGatheringTasks({
       srdByName: new Map([
-        [helper.normalizeName('Longsword'), { item: { uuid: 'Compendium.dnd5e.equipment24.Item.phbwepLongsword0' } }],
-        [helper.normalizeName('Leather Armor'), { item: { uuid: 'Compendium.dnd5e.equipment24.Item.phbarmLeatherArm' } }],
-        [helper.normalizeName('Shield'), { item: { uuid: 'Compendium.dnd5e.equipment24.Item.phbarmShield0000' } }]
+        [helper.normalizeName('War Pick'), { type: 'weapon', name: 'War Pick', item: { uuid: 'Compendium.dnd5e.equipment24.Item.phbwepWarPick000' } }],
+        [helper.normalizeName('Longsword'), { type: 'weapon', name: 'Longsword', item: { uuid: 'Compendium.dnd5e.equipment24.Item.phbwepLongsword0' } }],
+        [helper.normalizeName('Leather Armor'), { type: 'armor', name: 'Leather Armor', item: { uuid: 'Compendium.dnd5e.equipment24.Item.phbarmLeatherArm' } }],
+        [helper.normalizeName('Shield'), { type: 'armor', name: 'Shield', item: { uuid: 'Compendium.dnd5e.equipment24.Item.phbarmShield0000' } }]
       ])
     });
     const byId = new Map(tasks.map(task => [task.id, task]));
@@ -655,7 +656,25 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     assert.ok(tasks.every(task => task.dropRows.every(row => row.componentId || row.itemUuid)));
     assert.equal(rowNames.some(name => /^(Found|Recovered|Buried|Preserved)\b/.test(name)), false);
     assert.ok(rowNames.includes('Leather Armor'));
-    assert.ok(byId.get('battlefield-salvage').dropRows.some(row => row.itemUuid === 'Compendium.dnd5e.equipment24.Item.phbwepLongsword0'));
+    assert.deepEqual(byId.get('mine-ore').dropRows.find(row => row.name === 'War Pick'), {
+      id: 'mine-ore-war-pick',
+      name: 'War Pick',
+      quantity: 1,
+      dropRate: 8,
+      enabled: true,
+      componentId: 'weapon-war-pick'
+    });
+    assert.ok(byId.get('battlefield-salvage').dropRows.some(row => row.componentId === 'weapon-longsword'));
+    assert.equal(tasks.some(task => task.dropRows.some(row => row.itemUuid)), false);
+  });
+
+  it('omits and reports Mythwright optional SRD gathering rewards that cannot become components', () => {
+    const helper = globalThis.MythwrightDnd5eBootstrap;
+    const unresolvedDrops = [];
+    const tasks = helper.buildGatheringTasks({ srdByName: new Map(), unresolvedDrops });
+
+    assert.equal(tasks.some(task => task.dropRows.some(row => row.name === 'War Pick')), false);
+    assert.ok(unresolvedDrops.some(row => row.id === 'mine-ore-war-pick' && row.itemName === 'War Pick'));
   });
 
   it('builds Mythwright environments that compose gathering task-library records', () => {

@@ -619,6 +619,32 @@ Tool = {
 | `breakage.diceExpression.threshold`    | finite number                                      | non-finite                |
 | `onBreak.replaceWith.replacementComponentId` | non-empty, must differ from `componentId`    | empty, equal to `componentId` |
 
+## Gathering Drop Reference
+
+### Purpose
+
+Represent one reward row target on a d100 gathering task. The row shape remains a component reference or a direct Foundry Item UUID so existing task data can keep using either reward source.
+
+### Properties
+
+```js
+GatheringDropReference = {
+  componentId?: string,
+  itemUuid?: string,
+  quantity: number,
+  dropRate: number,
+}
+```
+
+### Requirements
+
+1. `quantity` must be positive.
+2. `dropRate` must be an integer from `0` to `100`.
+3. A persisted, imported, or seeded row must have exactly one resolvable reward target path:
+   - `componentId` resolves to a component in the owning crafting system.
+   - `itemUuid` resolves through Foundry UUID lookup to an Item document.
+4. Rows with neither target, stale component ids, or unresolved item UUIDs are invalid at import/save/seed boundaries.
+
 ## ResultGroup
 
 ### Purpose

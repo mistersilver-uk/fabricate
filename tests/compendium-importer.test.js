@@ -389,6 +389,104 @@ test('batch import suppresses per-recipe update notifications when overwriting r
   );
 });
 
+test('import rejects gathering task drops with unknown component ids before persisting the system', async () => {
+  globalThis.fromUuid = async (uuid) => uuid === 'Compendium.source.items.iron-ore' ? { documentName: 'Item' } : null;
+
+  const createdSystems = [];
+  const systemManager = makeMockSystemManager({ createdSystems });
+  const recipeManager = makeMockRecipeManager();
+  const importer = new CompendiumImporter(systemManager, recipeManager);
+  const packData = makePackData({
+    recipes: [],
+    system: {
+      ...makePackData({ recipes: [] }).system,
+      gatheringConfig: {
+        systems: {
+          'test-system': {
+            tasks: [{
+              id: 'task-ore',
+              name: 'Mine Ore',
+              dropRows: [{ id: 'drop-stale', name: 'Missing Reward', componentId: 'missing-component', quantity: 1, dropRate: 50 }]
+            }]
+          }
+        }
+      }
+    }
+  });
+
+  await assert.rejects(
+    () => importer.importFromPackData(packData),
+    /unknown componentId "missing-component"/
+  );
+  assert.equal(createdSystems.length, 0);
+});
+
+test('import rejects gathering task drops with unresolved item UUIDs', async () => {
+  globalThis.fromUuid = async (uuid) => uuid === 'Compendium.source.items.iron-ore' ? { documentName: 'Item' } : null;
+
+  const systemManager = makeMockSystemManager();
+  const recipeManager = makeMockRecipeManager();
+  const importer = new CompendiumImporter(systemManager, recipeManager);
+  const packData = makePackData({
+    recipes: [],
+    system: {
+      ...makePackData({ recipes: [] }).system,
+      gatheringConfig: {
+        systems: {
+          'test-system': {
+            tasks: [{
+              id: 'task-ore',
+              name: 'Mine Ore',
+              dropRows: [{ id: 'drop-item', name: 'Lost Reward', itemUuid: 'Item.missing', quantity: 1, dropRate: 50 }]
+            }]
+          }
+        }
+      }
+    }
+  });
+
+  await assert.rejects(
+    () => importer.importFromPackData(packData),
+    /itemUuid "Item\.missing" does not resolve to an Item/
+  );
+});
+
+test('import accepts gathering task drops with valid component or item UUID targets', async () => {
+  globalThis.fromUuid = async (uuid) => {
+    if (uuid === 'Compendium.source.items.iron-ore') return { documentName: 'Item' };
+    if (uuid === 'Item.reward') return { documentName: 'Item' };
+    return null;
+  };
+
+  const createdSystems = [];
+  const systemManager = makeMockSystemManager({ createdSystems });
+  const recipeManager = makeMockRecipeManager();
+  const importer = new CompendiumImporter(systemManager, recipeManager);
+  const packData = makePackData({
+    recipes: [],
+    system: {
+      ...makePackData({ recipes: [] }).system,
+      gatheringConfig: {
+        systems: {
+          'test-system': {
+            tasks: [{
+              id: 'task-ore',
+              name: 'Mine Ore',
+              dropRows: [
+                { id: 'drop-component', name: 'Ore', componentId: 'comp1', quantity: 1, dropRate: 50 },
+                { id: 'drop-item', name: 'Reward', itemUuid: 'Item.reward', quantity: 1, dropRate: 25 }
+              ]
+            }]
+          }
+        }
+      }
+    }
+  });
+
+  await importer.importFromPackData(packData);
+  assert.equal(createdSystems.length, 1);
+});
+
 test('T-097: invalid pack data (missing system) throws error', async () => {
   const systemManager = makeMockSystemManager();
   const recipeManager = makeMockRecipeManager();

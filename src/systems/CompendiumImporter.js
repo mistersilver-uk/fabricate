@@ -2,6 +2,8 @@
  * Orchestrates importing crafting systems and recipes from pack JSON data.
  * Handles UUID remapping with deterministic precedence and fallback item ID management.
  */
+import { validateGatheringDropReferences } from './GatheringDropReferenceValidator.js';
+
 export class CompendiumImporter {
   /**
    * @param {object} craftingSystemManager
@@ -76,6 +78,7 @@ export class CompendiumImporter {
 
     // --- Phase 3: Create or overwrite system ---
     const systemInput = { ...systemData, components: remappedComponents };
+    await this._validateGatheringConfig(systemInput);
 
     let system;
     if (existingSystem && overwriteExisting) {
@@ -140,6 +143,27 @@ export class CompendiumImporter {
     }
 
     return summary;
+  }
+
+  async _validateGatheringConfig(systemInput) {
+    const gatheringConfig = systemInput?.gatheringConfig;
+    if (!gatheringConfig || typeof gatheringConfig !== 'object') return;
+    const systems = gatheringConfig.systems && typeof gatheringConfig.systems === 'object'
+      ? gatheringConfig.systems
+      : {};
+    const errors = [];
+    for (const [systemId, systemConfig] of Object.entries(systems)) {
+      if (!Array.isArray(systemConfig?.tasks)) continue;
+      const validationErrors = await validateGatheringDropReferences({
+        tasks: systemConfig.tasks,
+        system: { components: systemInput.components || [] },
+        systemId
+      });
+      errors.push(...validationErrors);
+    }
+    if (errors.length > 0) {
+      throw new Error(`Invalid gatheringConfig: ${errors.join('; ')}`);
+    }
   }
 
   /**

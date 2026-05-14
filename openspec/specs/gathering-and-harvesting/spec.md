@@ -288,7 +288,7 @@ GatheringTaskDefinition = {
 4. Region matches when omitted or equal to the environment region.
 5. Biomes match when omitted or at least one task biome is present on the environment.
 6. Weather and time of day match against the current global gathering conditions.
-7. Enabled drop rows require a `dropRate` integer from 0 to 100, a positive quantity, and either a component reference or item UUID. Unresolved editor rows may omit component references while a GM is still authoring the row, but they remain disabled until assigned a component or item reference.
+7. Persisted, imported, or seeded drop rows require a `dropRate` integer from 0 to 100, a positive quantity, and a reward target that resolves at the data boundary. `componentId` targets must match a component in the owning crafting system. `itemUuid` targets must resolve through Foundry UUID lookup to an Item document. Unresolved editor rows may omit component references while a GM is still authoring the row, but they must not be saved or imported until assigned a valid component or item reference.
 8. Drop row condition modifier values are signed integer percentage-point adjustments. Matching time-of-day and weather modifiers are summed into final drop chance; gathering modifiers affect the d100 roll instead.
 9. `itemSelectionMode` is a legacy compatibility field. New Manager V2 authoring and d100 runtime behavior use system Gathering Rules once they are authored.
 10. Row order is authoritative for `highestRankedDrop` and `limitedDrops`.

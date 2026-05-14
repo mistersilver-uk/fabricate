@@ -2248,6 +2248,7 @@ describe('createAdminStore', () => {
       const services = createMockServices();
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
+      sys.components = [{ id: 'herb', name: 'Herb', img: 'herb.webp' }];
       services._store.gatheringConfig = { systems: { sys1: { tasks: [] } } };
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
@@ -2326,6 +2327,41 @@ describe('createAdminStore', () => {
       assert.equal(resolved.valid, true);
       assert.deepEqual(resolved.errors, []);
 
+      const staleComponent = store.validateGatheringLibraryTask({
+        id: 't-stale',
+        name: 'Gather',
+        dropRows: [{ id: 'row-stale', componentId: 'missing-herb', itemUuid: '', quantity: 1, dropRate: 50, enabled: true }]
+      });
+      assert.equal(staleComponent.valid, false);
+      assert.ok(
+        staleComponent.errors.some(error => error.includes('missing-herb') && error.includes('unknown componentId')),
+        `expected stale component to be rejected: ${staleComponent.errors.join(' | ')}`
+      );
+
+      const originalFromUuidSync = globalThis.fromUuidSync;
+      globalThis.fromUuidSync = (uuid) => uuid === 'Item.valid-reward' ? { documentName: 'Item' } : null;
+      try {
+        const staleItem = store.validateGatheringLibraryTask({
+          id: 't-stale-item',
+          name: 'Gather',
+          dropRows: [{ id: 'row-item', componentId: '', itemUuid: 'Item.missing-reward', quantity: 1, dropRate: 50, enabled: true }]
+        });
+        assert.equal(staleItem.valid, false);
+        assert.ok(
+          staleItem.errors.some(error => error.includes('Item.missing-reward') && error.includes('does not resolve to an Item')),
+          `expected stale item UUID to be rejected: ${staleItem.errors.join(' | ')}`
+        );
+
+        const validItem = store.validateGatheringLibraryTask({
+          id: 't-valid-item',
+          name: 'Gather',
+          dropRows: [{ id: 'row-item', componentId: '', itemUuid: 'Item.valid-reward', quantity: 1, dropRate: 50, enabled: true }]
+        });
+        assert.equal(validItem.valid, true);
+      } finally {
+        globalThis.fromUuidSync = originalFromUuidSync;
+      }
+
       const enabledResolvedPlusDisabledUnresolved = store.validateGatheringLibraryTask({
         id: 't4',
         name: 'Gather',
@@ -2341,6 +2377,25 @@ describe('createAdminStore', () => {
         ),
         `expected disabled unresolved row to be rejected: ${enabledResolvedPlusDisabledUnresolved.errors.join(' | ')}`
       );
+    });
+
+    it('does not persist gathering library task drops with stale reward targets', async () => {
+      const errors = [];
+      const services = createMockServices({ notify: { info: () => {}, warn: () => {}, error: (message) => errors.push(message) } });
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      sys.components = [{ id: 'herb', name: 'Herb', img: 'herb.webp' }];
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const task = await store.addGatheringLibraryTask('sys1');
+
+      const saved = await store.updateGatheringLibraryTask('sys1', task.id, {
+        dropRows: [{ id: 'row-stale', componentId: 'missing-herb', quantity: 1, dropRate: 50 }]
+      });
+
+      assert.equal(saved, false);
+      assert.equal(services._store.gatheringConfig.systems.sys1.tasks[0].dropRows.length, 0);
+      assert.ok(errors.some(error => error.includes('missing-herb')));
     });
 
     it('returns null when duplicating a missing gathering task', async () => {

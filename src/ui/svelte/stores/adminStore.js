@@ -3853,7 +3853,11 @@ export function createAdminStore(services) {
     return task;
   }
 
-  function validateGatheringLibraryTask(task) {
+  function _selectedGatheringSystem(systemId = get(selectedSystemId)) {
+    return services.getCraftingSystemManager?.()?.getSystem?.(systemId) || null;
+  }
+
+  function _validateGatheringLibraryTaskForSystem(task, systemId = get(selectedSystemId)) {
     const errors = [];
     if (!task || typeof task !== 'object') {
       errors.push('Task is required');
@@ -3864,7 +3868,12 @@ export function createAdminStore(services) {
       errors.push('Task name is required');
     }
     const label = `Task "${name || task.id || 'unnamed'}"`;
-    errors.push(...validateDropRows(task.dropRows, label));
+    const system = _selectedGatheringSystem(systemId);
+    errors.push(...validateDropRows(task.dropRows, label, {
+      system,
+      systemId,
+      validateDisabledRows: true
+    }));
     if (Array.isArray(task.dropRows)) {
       for (const row of task.dropRows) {
         if (row?.enabled === false && !row?.componentId && !row?.itemUuid) {
@@ -3873,6 +3882,10 @@ export function createAdminStore(services) {
       }
     }
     return { valid: errors.length === 0, errors };
+  }
+
+  function validateGatheringLibraryTask(task) {
+    return _validateGatheringLibraryTaskForSystem(task);
   }
 
   function _gatheringTaskIsAtDefaults(task) {
@@ -3924,6 +3937,14 @@ export function createAdminStore(services) {
     systemConfig.tasks = systemConfig.tasks.map(task => task.id === taskId
       ? _normalizeGatheringTask({ ...task, ...mergedUpdates }, _randomID)
       : task);
+    if (Array.isArray(updates.dropRows)) {
+      const nextTask = systemConfig.tasks.find(task => task.id === taskId);
+      const validation = _validateGatheringLibraryTaskForSystem(nextTask, systemId);
+      if (!validation.valid) {
+        services.notify?.error?.(validation.errors[0] || 'Gathering task validation failed.');
+        return false;
+      }
+    }
     await _saveGatheringConfig(config);
     await refresh();
     return true;

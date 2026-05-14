@@ -987,7 +987,17 @@ const MythwrightDnd5eBootstrap = (() => {
     return MYTHWRIGHT_GATHERING_TOOL_DEFINITIONS.map(buildRepairRecipeForTool);
   }
 
-  function gatheringDrop({ id, name, componentId = null, itemName = null, srdByName = new Map(), quantity = 1, dropRate = 50 }) {
+  function gatheringDrop({
+    id,
+    name,
+    componentId = null,
+    itemName = null,
+    srdByName = new Map(),
+    componentIds = null,
+    unresolvedDrops = null,
+    quantity = 1,
+    dropRate = 50
+  }) {
     const row = {
       id,
       name,
@@ -997,13 +1007,31 @@ const MythwrightDnd5eBootstrap = (() => {
     };
     if (componentId) row.componentId = componentId;
     const target = itemName ? srdByName.get(normalizeName(itemName)) : null;
-    if (!componentId && target?.item?.uuid) row.itemUuid = target.item.uuid;
-    if (!row.componentId && !row.itemUuid) return null;
+    if (!componentId && target) {
+      const targetComponentId = idFromName(target.type === 'weapon' ? 'weapon' : 'armor', target.name);
+      if (!componentIds || componentIds.has(targetComponentId)) {
+        row.componentId = targetComponentId;
+      }
+    }
+    if (!row.componentId && !row.itemUuid) {
+      if (itemName && Array.isArray(unresolvedDrops)) {
+        unresolvedDrops.push({ id, name, itemName });
+      }
+      return null;
+    }
     return row;
   }
 
-  function buildGatheringTasks({ srdByName = new Map() } = {}) {
-    const drop = options => gatheringDrop({ ...options, srdByName });
+  function srdComponentIdsFromMap(srdByName = new Map()) {
+    return new Set(Array.from(srdByName.values())
+      .filter(Boolean)
+      .map(target => idFromName(target.type === 'weapon' ? 'weapon' : 'armor', target.name))
+      .filter(Boolean));
+  }
+
+  function buildGatheringTasks({ srdByName = new Map(), componentIds = null, unresolvedDrops = null } = {}) {
+    const resolvedComponentIds = componentIds || srdComponentIdsFromMap(srdByName);
+    const drop = options => gatheringDrop({ ...options, srdByName, componentIds: resolvedComponentIds, unresolvedDrops });
     return [
       {
         id: 'mine-ore',
@@ -1294,10 +1322,43 @@ const MythwrightDnd5eBootstrap = (() => {
     return Array.from(byId.values());
   }
 
-  async function seedGatheringConfig({ tools = [], tasks = [] } = {}, summary = null) {
+  async function validateGatheringTaskDrops(tasks = [], components = []) {
+    if (!Array.isArray(components) || components.length === 0) return [];
+    const componentIds = new Set(components.map(component => String(component?.id || '')).filter(Boolean));
+    const errors = [];
+    for (const task of Array.isArray(tasks) ? tasks : []) {
+      const taskLabel = String(task?.name || task?.id || 'unnamed');
+      const rows = Array.isArray(task?.dropRows) ? task.dropRows : [];
+      for (const row of rows) {
+        const rowLabel = String(row?.name || row?.id || 'row');
+        const componentId = String(row?.componentId || '').trim();
+        const itemUuid = String(row?.itemUuid || '').trim();
+        if (componentId) {
+          if (!componentIds.has(componentId)) {
+            errors.push(`Task "${taskLabel}" drop row "${rowLabel}" references unknown componentId "${componentId}"`);
+          }
+          continue;
+        }
+        if (itemUuid) {
+          if (!await resolveCompendiumDocument(itemUuid)) {
+            errors.push(`Task "${taskLabel}" drop row "${rowLabel}" itemUuid "${itemUuid}" does not resolve to an Item`);
+          }
+          continue;
+        }
+        errors.push(`Task "${taskLabel}" drop row "${rowLabel}" requires componentId or itemUuid`);
+      }
+    }
+    return errors;
+  }
+
+  async function seedGatheringConfig({ tools = [], tasks = [], components = [], unresolvedDrops = [] } = {}, summary = null) {
     const settings = globalThis.game?.settings;
     if (typeof settings?.get !== 'function' || typeof settings?.set !== 'function') {
       return { updated: false, tools: 0, tasks: 0 };
+    }
+    const validationErrors = await validateGatheringTaskDrops(tasks, components);
+    if (validationErrors.length > 0) {
+      throw new Error(`Mythwright gatheringConfig validation failed: ${validationErrors.join('; ')}`);
     }
     const current = clonePlain(settings.get('fabricate', 'gatheringConfig') || {});
     current.systems = current.systems && typeof current.systems === 'object' ? current.systems : {};
@@ -1312,7 +1373,7 @@ const MythwrightDnd5eBootstrap = (() => {
     };
     current.systems[SYSTEM_ID] = systemConfig;
     await settings.set('fabricate', 'gatheringConfig', current);
-    if (summary) summary.gatheringConfig = { tools: tools.length, tasks: tasks.length };
+    if (summary) summary.gatheringConfig = { tools: tools.length, tasks: tasks.length, unresolvedDrops: clonePlain(unresolvedDrops) };
     return { updated: true, tools: tools.length, tasks: tasks.length };
   }
 
@@ -1453,11 +1514,9 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
 
     const macro = await ensureMacro(summary);
     const gatheringTools = buildGatheringTools();
-    const gatheringTasks = buildGatheringTasks({ srdByName });
     const systemManager = globalThis.game.fabricate.getCraftingSystemManager();
     const recipeManager = globalThis.game.fabricate.getRecipeManager();
     const environmentStore = globalThis.game.fabricate.getGatheringEnvironmentStore?.();
-    await seedGatheringConfig({ tools: gatheringTools, tasks: gatheringTasks }, summary);
 
     const srdQualityComponentIds = new Set(srd.resolved.flatMap(target =>
       MUNDANE_QUALITY
@@ -1491,6 +1550,20 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
         outcomeRouting: { pass: 'scrap', fail: 'scrap' }
       }
     }));
+
+    const unresolvedGatheringDrops = [];
+    const componentIds = new Set(components.map(component => component.id));
+    const gatheringTasks = buildGatheringTasks({
+      srdByName,
+      componentIds,
+      unresolvedDrops: unresolvedGatheringDrops
+    });
+    await seedGatheringConfig({
+      tools: gatheringTools,
+      tasks: gatheringTasks,
+      components,
+      unresolvedDrops: unresolvedGatheringDrops
+    }, summary);
 
     const systemPayload = buildSystemPayload({
       macroUuid: macro.uuid,
@@ -1578,6 +1651,8 @@ return { success: true, outcome: hasMythic ? 'mythic' : 'masterwork', value: tot
     buildElementalRecipe,
     buildGatheringTools,
     buildGatheringTasks,
+    srdComponentIdsFromMap,
+    validateGatheringTaskDrops,
     buildToolRepairRecipes,
     seedGatheringConfig,
     elementalQualityById,
