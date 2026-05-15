@@ -761,6 +761,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'setExpandedDraftTool',
       'toolsDraftDirtyToolIds',
       'toolsDraftSelectedToolId',
+      'toolsNavCount',
       'selectedToolDraftValidation'
     ]) {
       assert.ok(rootSource.includes(snippet), `root should reference ${snippet}`);
@@ -768,6 +769,10 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(
       /onclick=\{\(\) => setView\('tools'\)\}/.test(rootSource),
       'root should wire a top-level Tools nav button to setView(\'tools\')'
+    );
+    assert.ok(
+      rootSource.includes('<span class="manager-v2-nav-count">{toolsNavCount}</span>'),
+      'root should render a Tools nav count chip'
     );
     assert.ok(
       lang.FABRICATE.Admin.ManagerV2.Tools && typeof lang.FABRICATE.Admin.ManagerV2.Tools === 'object',

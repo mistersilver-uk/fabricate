@@ -972,6 +972,9 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
       .find(button => button.querySelector('.manager-v2-nav-label')?.textContent.trim() === 'System settings');
     assert.ok(systemSettingsNav, 'system settings nav button should render');
     assert.equal(systemSettingsNav.querySelector('.manager-v2-nav-count'), null, 'system settings nav should not show an Edit badge');
+    const toolsNav = Array.from(target.querySelectorAll('.manager-v2-nav-button'))
+      .find(button => button.querySelector('.manager-v2-nav-label')?.textContent.trim() === 'Tools');
+    assert.equal(toolsNav.querySelector('.manager-v2-nav-count')?.textContent.trim(), '0');
     assert.ok(target.textContent.includes('Alchemy'));
     assert.ok(target.textContent.includes('Potion and essence work'));
     assert.ok(target.textContent.includes('4'));
@@ -3504,6 +3507,15 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
           toolsDraftDirtyToolIds: ['tool-catalyst'],
           trackCancelToolsDraft: true,
           toolsDraftSelectedToolId: 'tool-catalyst',
+          gatheringLibraryTools: [{
+            id: 'tool-catalyst',
+            label: 'Artisan Catalyst',
+            enabled: true,
+            componentId: 'c1',
+            requirement: null,
+            breakage: { mode: 'limitedUses', maxUses: null },
+            onBreak: { mode: 'destroy' }
+          }],
           toolsDraft: [{
             id: 'tool-catalyst',
             label: 'Artisan Catalyst',
@@ -3526,6 +3538,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
+    assert.equal(navButton('Tools').querySelector('.manager-v2-nav-count')?.textContent.trim(), '1');
     assert.equal(target.querySelector('.manager-v2-header-actions'), null);
     assert.equal(target.querySelector('.manager-v2-header').textContent.includes('Back to Gathering'), false);
     assert.equal(target.querySelector('.manager-v2-header').textContent.includes('Unsaved'), false);
