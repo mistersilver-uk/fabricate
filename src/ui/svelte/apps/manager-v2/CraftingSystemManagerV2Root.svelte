@@ -412,7 +412,15 @@
   });
   const selectedGatheringSystemConfig = $derived($viewState.gatheringConfig?.systems?.[selectedSystemId] || {});
   const gatheringTaskDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.tasks) ? selectedGatheringSystemConfig.tasks : []);
+  const gatheringHazardDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.hazards) ? selectedGatheringSystemConfig.hazards : []);
   const selectedGatheringSystemTools = $derived(Array.isArray(selectedGatheringSystemConfig.tools) ? selectedGatheringSystemConfig.tools : []);
+  const toolsNavCount = $derived(selectedGatheringSystemTools.length);
+  const gatheringNavCounts = $derived({
+    environments: environmentList.length,
+    tasks: gatheringTaskDefinitions.length,
+    encounters: gatheringHazardDefinitions.length,
+    total: environmentList.length + gatheringTaskDefinitions.length + gatheringHazardDefinitions.length
+  });
   const selectedGatheringTask = $derived(
     gatheringTaskDefinitions.find(task => task.id === selectedGatheringTaskId)
       || gatheringTaskDefinitions[0]
@@ -2499,6 +2507,7 @@
           <button type="button" class={`manager-v2-nav-button ${currentView === 'tools' ? 'is-active' : ''}`} aria-current={currentView === 'tools' ? 'page' : undefined} onclick={() => setView('tools')}>
             <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
             <span class="manager-v2-nav-label">{text('FABRICATE.Admin.ManagerV2.Nav.Tools', 'Tools')}</span>
+            <span class="manager-v2-nav-count">{toolsNavCount}</span>
           </button>
           {#if canShowEnvironments}
             <div class={`manager-v2-nav-group ${gatheringMenuExpanded ? 'is-expanded' : ''}`}>
@@ -2512,6 +2521,7 @@
               >
                 <i class="fas fa-seedling" aria-hidden="true"></i>
                 <span class="manager-v2-nav-label">{text('FABRICATE.Admin.ManagerV2.Nav.Environments', 'Gathering')}</span>
+                <span class="manager-v2-nav-count">{gatheringNavCounts.total}</span>
               </button>
               <button
                 type="button"
@@ -2537,6 +2547,9 @@
                     >
                       <i class={gatheringItem.icon} aria-hidden="true"></i>
                       <span class="manager-v2-nav-label">{text(gatheringItem.labelKey, gatheringItem.labelFallback)}</span>
+                      {#if gatheringNavCounts[gatheringItem.id] != null}
+                        <span class="manager-v2-nav-count">{gatheringNavCounts[gatheringItem.id]}</span>
+                      {/if}
                     </button>
                   {/each}
                 </div>

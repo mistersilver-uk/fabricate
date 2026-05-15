@@ -264,6 +264,10 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(rootSource.includes('manager-v2-nav-submenu'), 'gathering sections should render in the left rail submenu');
     assert.ok(rootSource.includes('manager-v2-nav-toggle'), 'gathering rail should expose an expand/collapse control');
     assert.ok(rootSource.includes("manager-v2-nav-group ${gatheringMenuExpanded ? 'is-expanded' : ''}"), 'expanded gathering rail should style as one submenu group');
+    assert.ok(rootSource.includes('const gatheringHazardDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.hazards) ? selectedGatheringSystemConfig.hazards : [])'), 'root should derive reusable gathering hazard counts from selected gathering config');
+    assert.ok(rootSource.includes('total: environmentList.length + gatheringTaskDefinitions.length + gatheringHazardDefinitions.length'), 'gathering parent count should summarize environments, tasks, and hazards');
+    assert.ok(rootSource.includes('<span class="manager-v2-nav-count">{gatheringNavCounts.total}</span>'), 'gathering parent should render a summary count chip');
+    assert.ok(rootSource.includes('gatheringNavCounts[gatheringItem.id]'), 'gathering submenu items should render their count chips from gathered section counts');
     assert.equal(rootSource.includes("manager-v2-nav-parent ${isGatheringRoute ? 'is-active' : ''}"), false, 'gathering parent should not use the selected pill class');
     assert.ok(rootSource.includes('FABRICATE.Admin.ManagerV2.Nav.ExpandGathering'), 'gathering rail expand label should be localized');
     assert.ok(rootSource.includes('FABRICATE.Admin.ManagerV2.Nav.CollapseGathering'), 'gathering rail collapse label should be localized');
@@ -757,6 +761,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
       'setExpandedDraftTool',
       'toolsDraftDirtyToolIds',
       'toolsDraftSelectedToolId',
+      'toolsNavCount',
       'selectedToolDraftValidation'
     ]) {
       assert.ok(rootSource.includes(snippet), `root should reference ${snippet}`);
@@ -764,6 +769,10 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(
       /onclick=\{\(\) => setView\('tools'\)\}/.test(rootSource),
       'root should wire a top-level Tools nav button to setView(\'tools\')'
+    );
+    assert.ok(
+      rootSource.includes('<span class="manager-v2-nav-count">{toolsNavCount}</span>'),
+      'root should render a Tools nav count chip'
     );
     assert.ok(
       lang.FABRICATE.Admin.ManagerV2.Tools && typeof lang.FABRICATE.Admin.ManagerV2.Tools === 'object',
