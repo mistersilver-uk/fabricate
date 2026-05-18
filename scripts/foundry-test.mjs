@@ -24,14 +24,21 @@ const ROOT = join(__dirname, '..');
  * Run a node script and return its exit code.
  * @param {string} scriptPath
  * @param {string[]} [args]
+ * @param {number} [timeoutMs] Optional wall-clock budget; SIGTERM on overrun.
  * @returns {number}
  */
-function runScript(scriptPath, args = []) {
+function runScript(scriptPath, args = [], timeoutMs) {
   const result = spawnSync(process.execPath, [scriptPath, ...args], {
     cwd: ROOT,
     stdio: 'inherit',
-    env: process.env
+    env: process.env,
+    timeout: timeoutMs,
+    killSignal: 'SIGTERM'
   });
+  if (result.error?.code === 'ETIMEDOUT') {
+    process.stderr.write(`${scriptPath} timed out after ${timeoutMs}ms.\n`);
+    return 124;
+  }
   return result.status ?? 1;
 }
 
@@ -56,9 +63,13 @@ async function main() {
     process.exit(2);
   }
 
-  // Step 2: Run the smoke test (capture result, always proceed to down)
+  // Step 2: Run the smoke test (capture result, always proceed to down).
+  // The run phase gets its own wall-clock budget so the 20-minute GitHub
+  // Actions job timeout can never preempt Docker teardown + artifact upload.
+  // Override with FOUNDRY_RUN_TIMEOUT_MS; defaults to 15 minutes.
   process.stdout.write('=== foundry-test: RUN ===\n');
-  const runCode = runScript(run);
+  const runTimeoutMs = Number(process.env.FOUNDRY_RUN_TIMEOUT_MS ?? 15 * 60_000);
+  const runCode = runScript(run, [], runTimeoutMs);
 
   // Step 3: Tear down regardless of test result
   process.stdout.write('=== foundry-test: DOWN ===\n');

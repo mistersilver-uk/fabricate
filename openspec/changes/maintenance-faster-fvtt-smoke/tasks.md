@@ -21,7 +21,11 @@
 
 - [ ] Wrap Phase F cleanup block in `if (RUN_FULL_ONLY_BEHAVIORS) { ... }` else mark its steps `skipped: true`.
 - [ ] Wrap the gathering feature-gate negative test (`scripts/foundry-test-run.mjs:2274–2302`) in `if (RUN_FULL_ONLY_BEHAVIORS) { ... }` else mark `gathering-feature-gate-negative` as `skipped: true`.
-- [ ] Gate the D2 sub-paths beyond the single success (failure feedback, timed-active, narrow-active-history, timed-complete, blocked states) on `RUN_FULL_ONLY_GATHERING_STATES`.
+- [x] Gate the D2 sub-paths beyond the single success (failure feedback, timed-active, narrow-active-history, timed-complete, blocked states) on `RUN_FULL_ONLY_GATHERING_STATES`. *(Was the load-bearing miss: the flag was declared but never wired into Phase D2; the missing gating let RC over-run a hosted runner's 20-minute budget.)*
+
+## Teardown safety
+
+- [x] Give the run-phase `spawnSync` in `scripts/foundry-test.mjs` an internal wall-clock budget (`FOUNDRY_RUN_TIMEOUT_MS`, default 15 minutes) so the 20-minute GitHub Actions job timeout can never preempt Docker teardown + artifact upload. On overrun the orchestrator returns exit 124 from the run phase, still calls `down`, and then propagates the failure.
 
 ## CI caches
 

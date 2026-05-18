@@ -3068,6 +3068,7 @@ async function main() {
           .waitFor({ state: 'visible', timeout: 10_000 });
         await screenshot(page, 'gathering-targeted-ready');
 
+        if (RUN_FULL_ONLY_GATHERING_STATES) {
         await page.evaluate(async () => {
           if (!game.paused) {
             await game.togglePause(true, { broadcast: true });
@@ -3140,6 +3141,9 @@ async function main() {
         if (bromVialCountAfter !== bromVialCountBefore) {
           throw new Error('Blocked catalyst attempt changed the selected actor catalyst inventory.');
         }
+        } else {
+          process.stdout.write(`Phase D2: skipping blocked gathering sub-states (profile=${SMOKE_PROFILE}).\n`);
+        }
 
         await selectGatheringActor(page, 'Alara the Alchemist');
         await selectGatheringEnvironment(page, 'Verdant Meadow');
@@ -3155,6 +3159,7 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'gathering-immediate-success');
 
+        if (RUN_FULL_ONLY_GATHERING_STATES) {
         await dismissFoundryNotifications(page);
         const herbCountBeforeFailure = await page.evaluate((alaraId) => {
           const alara = game.actors.get(alaraId);
@@ -3233,6 +3238,9 @@ async function main() {
         await scrollGatheringAppToText(page, 'Recent History');
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'gathering-timed-complete');
+        } else {
+          process.stdout.write(`Phase D2: skipping failure + timed gathering sub-states (profile=${SMOKE_PROFILE}).\n`);
+        }
 
         results.steps.push({ step: 'gathering-gm-live-states', passed: true });
         process.stdout.write('Phase D2 complete: GM/player Gathering states screenshotted.\n');
