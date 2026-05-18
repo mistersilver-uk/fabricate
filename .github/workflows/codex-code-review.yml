@@ -121,7 +121,7 @@ jobs:
 
       - name: Checkout trusted review logic
         if: steps.trigger_policy.outputs.allowed == 'true' && steps.target.outputs.skip != 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ steps.target.outputs.base_sha }}
@@ -129,7 +129,7 @@ jobs:
 
       - name: Checkout reviewed pull request head
         if: steps.trigger_policy.outputs.allowed == 'true' && steps.target.outputs.skip != 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           path: pr
