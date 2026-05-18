@@ -12,7 +12,7 @@
     "test:foundry:up": "node scripts/foundry-test-up.mjs",
     "test:foundry:run": "node scripts/foundry-test-run.mjs",
     "test:foundry:down": "node scripts/foundry-test-down.mjs",
-    "test:foundry": "node scripts/foundry-test.mjs",
+    "test:foundry": "node scripts/foundry-test-router.mjs",
     "test:foundry:rc": "node scripts/foundry-test-rc.mjs",
     "test:foundry:ci": "node scripts/foundry-test-rc.mjs",
     "release:build": "node scripts/release.js",
