@@ -1483,7 +1483,11 @@ async function showGatheringLog(page) {
 async function startGatheringTaskByLabel(page, taskLabel) {
   const taskRow = page.locator('.gathering-task-row').filter({ hasText: taskLabel }).first();
   await taskRow.waitFor({ state: 'visible', timeout: 10_000 });
-  await taskRow.click();
+  // noWaitAfter: clicking an already-`is-selected` task row can trigger a
+  // same-document state change that Playwright treats as a pending navigation,
+  // hanging the click() for the full 30s navigation budget. See PR diagnosis
+  // for run 26031422155 / issue #149.
+  await taskRow.click({ noWaitAfter: true });
   const startButton = page.locator('.fabricate-gathering-app .gathering-start-button').first();
   await startButton.waitFor({ state: 'visible', timeout: 10_000 });
   await startButton.click();
@@ -3063,7 +3067,7 @@ async function main() {
         await selectGatheringEnvironment(page, 'Verdant Meadow');
         await page.locator('.gathering-task-row').filter({ hasText: 'Gather Meadow Herbs' }).first()
           .waitFor({ state: 'visible', timeout: 10_000 });
-        await page.locator('.gathering-task-row').filter({ hasText: 'Gather Meadow Herbs' }).first().click();
+        await page.locator('.gathering-task-row').filter({ hasText: 'Gather Meadow Herbs' }).first().click({ noWaitAfter: true });
         await page.locator('.fabricate-gathering-app .gathering-start-button').first()
           .waitFor({ state: 'visible', timeout: 10_000 });
         await screenshot(page, 'gathering-targeted-ready');
@@ -3100,7 +3104,7 @@ async function main() {
           await Promise.all(gatheringApps.map(app => app._gatheringStore.refresh()));
         });
         await selectGatheringEnvironment(page, 'Verdant Meadow');
-        await page.locator('.gathering-task-row').filter({ hasText: 'Gather Meadow Herbs' }).first().click();
+        await page.locator('.gathering-task-row').filter({ hasText: 'Gather Meadow Herbs' }).first().click({ noWaitAfter: true });
         await page.locator('.fabricate-gathering-app .gathering-start-button').first()
           .waitFor({ state: 'visible', timeout: 10_000 });
 
