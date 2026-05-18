@@ -251,7 +251,7 @@ jobs:
 
       - name: Upload screenshot artifacts
         if: always() && steps.validate.outputs.ui_changed == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: codex-ui-evidence-${{ matrix.issue.number }}-${{ github.run_number }}
           path: test-results/

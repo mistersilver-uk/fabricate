@@ -56,7 +56,7 @@ jobs:
       - name: Cache Playwright Chromium
         if: env.SKIP_SMOKE != 'true'
         id: cache-playwright
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -75,7 +75,7 @@ jobs:
       # skipping the Foundry release download.
       - name: Cache Foundry binary
         if: env.SKIP_SMOKE != 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .foundry-e2e/cache
           key: foundry-binary-${{ runner.os }}-${{ hashFiles('docker-compose.foundry.yml') }}
@@ -84,7 +84,7 @@ jobs:
       # Saves ~10–20s per warm run.
       - name: Cache dnd5e system
         if: env.SKIP_SMOKE != 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .foundry-e2e/systems
           key: foundry-systems-${{ runner.os }}-${{ hashFiles('scripts/foundry-fetch-systems.mjs') }}
@@ -95,7 +95,7 @@ jobs:
 
       - name: Upload test artifacts
         if: always() && env.SKIP_SMOKE != 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: foundry-smoke-results-${{ github.run_number }}
           path: test-results/
