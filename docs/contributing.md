@@ -43,7 +43,7 @@ Header lines must be 100 characters or fewer.
 
 ## Foundry integration tests
 
-Fabricate ships a Docker-based smoke test that starts a real Foundry VTT instance, loads the built module, and verifies the Crafting App opens without runtime errors.
+Fabricate ships a Docker-based smoke test that starts a real Foundry VTT instance, loads the built module, and verifies the Crafting and Gathering surfaces work without runtime errors.
 
 ### Prerequisites
 
@@ -75,19 +75,28 @@ Build the module so the Docker container has a `dist/` directory to mount:
 npm run build
 ```
 
-### Running the full smoke test
+### Running the smoke tests
 
-To run the complete pipeline (start container, run test, stop container) in one command:
+To run the default full pipeline (start container, run the visual/regression-heavy smoke test, stop container):
 
 ```bash
 npm run test:foundry
 ```
 
-To run each phase separately (useful for debugging):
+To run the release-candidate CI profile locally:
+
+```bash
+npm run test:foundry:rc
+# or
+FOUNDRY_SMOKE_PROFILE=rc npm run test:foundry      # POSIX
+$env:FOUNDRY_SMOKE_PROFILE='rc'; npm run test:foundry  # PowerShell
+```
+
+To run each phase separately (useful for debugging the full runner):
 
 ```bash
 npm run test:foundry:up    # Start the Foundry container and wait for it to be healthy
-npm run test:foundry:run   # Run the Playwright smoke test against the running container
+npm run test:foundry:run   # Run the full Playwright smoke test against the running container
 npm run test:foundry:down  # Stop and remove the container
 ```
 
@@ -103,48 +112,38 @@ After a run, results are written to `test-results/`:
 
 | File | Description |
 |------|-------------|
-| `summary.json` | Machine-readable pass/fail result and list of errors |
+| `summary.json` | Machine-readable pass/fail result, smoke profile, timings, and list of errors |
 | `console.log` | Full browser console output captured during the test |
-| `screenshot-01-setup.png` | Foundry setup page after navigation |
-| `screenshot-02-authenticated.png` | After admin authentication |
-| `screenshot-03-world-loaded.png` | After the smoke world launches |
-| `screenshot-04-crafting-app.png` | After opening the Crafting App |
+| `screenshot-*.png` | Screenshots captured by the selected profile |
 | `screenshot-failure.png` | Captured only when the test fails |
 
-### What the smoke test checks
+### What the RC smoke test checks
 
-1. Navigates to the Foundry setup page and authenticates as admin.
-2. Launches the `fabricate-smoke-ci` world (auto-wiped from the fixture under `.foundry-e2e/worlds/fabricate-smoke-ci/` on every `test:foundry:up`).
-3. Waits for `game.ready` in the browser.
-4. Verifies the Fabricate module is active (`game.modules.get('fabricate')?.active === true`).
-5. Opens the Items sidebar and clicks the **Craft Item** button injected by Fabricate.
-6. Asserts the Crafting App window is visible.
-7. Fails if any browser console errors were captured during the session.
+The release-candidate runner is intentionally focused so it completes within the 20-minute GitHub Actions job budget even on cold hosted runners:
+
+1. Starts the Foundry container and launches the `fabricate-smoke-ci` world.
+2. Waits for `game.ready` and `game.fabricate.ready`.
+3. Activates the Fabricate module if the copied fixture world does not already have it active.
+4. Creates a minimal crafting system, one actor, three world items, one recipe, and one Gathering environment.
+5. Opens the Gathering app and completes one successful **Gather Meadow Herbs** task.
+6. Opens the Crafting app and crafts one **Healing Potion**.
+7. Fails if any non-ignored browser console errors were captured during the session.
 
 ### Smoke profiles (`rc` vs `full`)
 
-The smoke harness runs in one of three profiles selected by the `FOUNDRY_SMOKE_PROFILE` env var (or the `--profile=<value>` CLI flag on `node scripts/foundry-test.mjs`):
+The public `npm run test:foundry` entrypoint routes by `FOUNDRY_SMOKE_PROFILE` (or `--profile=<value>`):
 
-| Profile | When | Phases | Total |
-|---------|------|--------|-------|
-| `rc` | Release-candidate CI | Phase B → Phase C → Phase D2 (one success path) → Phase E → console-error check | ~3–5 min |
-| `ci` | Alias for `rc` (deprecated; removed after one release) | same as `rc` | same |
-| `full` (default) | Local, screenshot regeneration | Phase B → Phase C → Phase D0 (manager-v2 screenshots) → Phase D (legacy Recipe Manager screenshots) → Phase D2/D3 (Gathering app behaviour + screenshots) → Phase E → Phase E2 (no-selectable-actors) → Phase F (cleanup) | ~10–15 min |
+| Profile | When | Runner | Coverage | Target |
+|---------|------|--------|----------|--------|
+| `rc` | Release-candidate CI | `scripts/foundry-test-rc.mjs` → `scripts/foundry-test-rc-run.mjs` | Minimal fixture setup, one Gathering success, one Healing Potion craft, console-error health | < 20 min including cold setup |
+| `ci` | Deprecated alias for `rc` | same as `rc` | same as `rc` | same |
+| `full` (default) | Local and visual-regression runs | `scripts/foundry-test.mjs` → `scripts/foundry-test-run.mjs` | Manager screenshots, legacy Recipe Manager screenshots, blocked/failure/timed Gathering states, non-GM redaction, no-selectable-actors state, cleanup | ~10–15 min locally |
 
-The `rc` profile captures a pinned screenshot budget (`world-loaded`, `crafting-app-opened`, `post-craft`, `alara-post-craft-inventory`, `gathering-targeted-ready`, `gathering-immediate-success`, plus `screenshot-failure.png` on failure) — every other `screenshot(page, label)` call is a no-op under `rc`, but the surrounding behavioral assertions still run. Phase D3 / E2 stay in `full` only because each opens a fresh `browser.newContext()` and re-joins the world as a player or observer user; cold-loading Foundry's UI repeatedly on a hosted Ubuntu runner reliably exceeds the 30s `waitForFunction(() => game.ready)` budget those phases use.
+The `rc` orchestrator gives the in-browser run its own timeout (`FOUNDRY_RUN_TIMEOUT_MS`, default 15 minutes). This leaves enough of the 20-minute Actions budget for Docker teardown and artifact upload instead of letting GitHub cancel the entire job with no useful failure summary.
 
-Phase F (cleanup) and the gathering feature-gate negative test also stay in `full` only — the RC container is torn down by `foundry-test-down.mjs` immediately after the run, so document cleanup is wasted wall-time, and the feature-gate positive path is already exercised end-to-end in Phase D2.
+The full runner remains the place for screenshot regeneration and visual/edge-state coverage. Do not add visual walkthrough states to the RC runner unless they are load-bearing release-candidate assertions.
 
-Every run prints a phase-timing table to stdout at the end (and writes the timings into `summary.json` under `phaseTimings` and `bootTimings`) so slow phases jump out in CI logs.
-
-Run the RC profile locally with:
-
-```sh
-npm run test:foundry:rc
-# or
-FOUNDRY_SMOKE_PROFILE=rc npm run test:foundry      # POSIX
-$env:FOUNDRY_SMOKE_PROFILE='rc'; npm run test:foundry  # PowerShell
-```
+Every run prints a phase-timing table to stdout at the end and writes timings into `summary.json` under `phaseTimings` and `bootTimings`, so slow phases jump out in CI logs.
 
 Use `full` whenever you need fresh visual references for design review.
 
