@@ -30,7 +30,7 @@ jobs:
       FOUNDRY_SMOKE_PROFILE: rc
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Check Foundry credentials
         run: |
@@ -41,7 +41,7 @@ jobs:
 
       - name: Setup Node.js
         if: env.SKIP_SMOKE != 'true'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
