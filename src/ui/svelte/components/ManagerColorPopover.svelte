@@ -41,7 +41,7 @@
 
   function swatchStyle(token = colorToken, hex = customColor) {
     const custom = validCustomHex(hex);
-    return `--manager-v2-color-swatch: ${custom || `var(--fab-tag-${normalizedToken(token)})`}`;
+    return `--manager-color-swatch: ${custom || `var(--fab-tag-${normalizedToken(token)})`}`;
   }
 
   function selectPreset(token) {
@@ -61,33 +61,33 @@
 
 <span
   bind:this={popoverRoot}
-  class="manager-v2-color-picker-popover"
-  data-manager-v2-color-picker-popover
+  class="manager-color-picker-popover"
+  data-manager-color-picker-popover
   style={popoverStyle}
   use:dismissOnOutsideClick={{ enabled: manageDismiss, onDismiss }}
   use:portal={portalTarget}
 >
-  <span class="manager-v2-color-preset-grid" aria-label={presetGridLabel}>
+  <span class="manager-color-preset-grid" aria-label={presetGridLabel}>
     {#each presets as preset (preset.token)}
       <button
         type="button"
-        class={`manager-v2-color-preset ${normalizedToken(colorToken) === preset.token ? 'is-selected' : ''}`}
+        class={`manager-color-preset ${normalizedToken(colorToken) === preset.token ? 'is-selected' : ''}`}
         aria-label={preset.label}
         title={preset.label}
-        data-manager-v2-color-token={preset.token}
+        data-manager-color-token={preset.token}
         style={swatchStyle(preset.token, '')}
         onclick={() => selectPreset(preset.token)}
       >
-        <span class="manager-v2-color-swatch" aria-hidden="true"></span>
+        <span class="manager-color-swatch" aria-hidden="true"></span>
       </button>
     {/each}
   </span>
-  <label class="manager-v2-color-custom">
+  <label class="manager-color-custom">
     <span>{customHexLabel}</span>
     <input
       value={customColor || ''}
       placeholder="hex"
-      data-manager-v2-custom-color
+      data-manager-custom-color
       oninput={(event) => updateCustomColor(event.currentTarget.value)}
     />
   </label>

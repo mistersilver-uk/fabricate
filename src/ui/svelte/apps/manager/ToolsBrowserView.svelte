@@ -1,10 +1,10 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Manager V2 — Gathering Tools library page body.
+  Manager — Gathering Tools library page body.
 
   Browses the reusable tools library for the selected crafting system, supports
   inline expansion to edit a tool, and emits row-level CRUD via callbacks. The
-  surrounding shell (CraftingSystemManagerV2Root.svelte) supplies the page
+  surrounding shell (CraftingSystemManagerRoot.svelte) supplies the page
   header chrome, the right-side inspector, and Save / dirty-state handling.
 -->
 <script>
@@ -54,28 +54,28 @@
     if (label) return label;
     const componentName = managedItem(tool?.componentId)?.name;
     if (componentName) return String(componentName);
-    return text('FABRICATE.Admin.ManagerV2.Tools.EmptyTitle', 'No tool name');
+    return text('FABRICATE.Admin.Manager.Tools.EmptyTitle', 'No tool name');
   }
 
   function toolSecondary(tool) {
     const rarity = managedItem(tool?.componentId)?.rarity;
-    const baseLabel = text('FABRICATE.Admin.ManagerV2.Tools.SecondaryLabel', 'Tool');
+    const baseLabel = text('FABRICATE.Admin.Manager.Tools.SecondaryLabel', 'Tool');
     if (rarity) return `${baseLabel} · ${rarity}`;
-    return `${baseLabel} · ${text('FABRICATE.Admin.ManagerV2.Tools.SecondaryRarityFallback', 'Common')}`;
+    return `${baseLabel} · ${text('FABRICATE.Admin.Manager.Tools.SecondaryRarityFallback', 'Common')}`;
   }
 
   function requirementChipClass(tool) {
-    return tool?.requirement ? 'manager-v2-chip is-active' : 'manager-v2-chip is-neutral';
+    return tool?.requirement ? 'manager-chip is-active' : 'manager-chip is-neutral';
   }
 
   function requirementChipLabel(tool) {
     return tool?.requirement
-      ? text('FABRICATE.Admin.ManagerV2.Tools.RequirementPresent', 'Requirement set')
-      : text('FABRICATE.Admin.ManagerV2.Tools.RequirementNone', 'No requirement');
+      ? text('FABRICATE.Admin.Manager.Tools.RequirementPresent', 'Requirement set')
+      : text('FABRICATE.Admin.Manager.Tools.RequirementNone', 'No requirement');
   }
 
   function breakageChipClass(tool) {
-    return tool?.breakage?.mode === 'limitedUses' ? 'manager-v2-chip is-neutral' : 'manager-v2-chip is-warning';
+    return tool?.breakage?.mode === 'limitedUses' ? 'manager-chip is-neutral' : 'manager-chip is-warning';
   }
 
   function breakageChipLabel(tool) {
@@ -83,33 +83,33 @@
     if (mode === 'limitedUses') {
       const maxUses = tool?.breakage?.maxUses;
       if (maxUses === null || maxUses === undefined) {
-        return text('FABRICATE.Admin.ManagerV2.Tools.BreakageSummaryUnlimited', 'Unlimited uses');
+        return text('FABRICATE.Admin.Manager.Tools.BreakageSummaryUnlimited', 'Unlimited uses');
       }
-      return formatCount('FABRICATE.Admin.ManagerV2.Tools.BreakageSummaryLimited', '{count} max uses', Number(maxUses));
+      return formatCount('FABRICATE.Admin.Manager.Tools.BreakageSummaryLimited', '{count} max uses', Number(maxUses));
     }
     if (mode === 'breakageChance') {
-      return text('FABRICATE.Admin.ManagerV2.Tools.BreakageSummaryChance', '{percent}% break chance')
+      return text('FABRICATE.Admin.Manager.Tools.BreakageSummaryChance', '{percent}% break chance')
         .replace('{percent}', String(tool?.breakage?.breakageChance ?? 0));
     }
     if (mode === 'diceExpression') {
-      return text('FABRICATE.Admin.ManagerV2.Tools.BreakageSummaryDice', 'Dice < {threshold}')
+      return text('FABRICATE.Admin.Manager.Tools.BreakageSummaryDice', 'Dice < {threshold}')
         .replace('{threshold}', String(tool?.breakage?.threshold ?? 0));
     }
-    return text('FABRICATE.Admin.ManagerV2.Tools.BreakageLimitedUses', 'Limited uses');
+    return text('FABRICATE.Admin.Manager.Tools.BreakageLimitedUses', 'Limited uses');
   }
 
   function onBreakChipClass(tool) {
     const mode = tool?.onBreak?.mode;
-    if (mode === 'destroy') return 'manager-v2-chip is-danger';
-    if (mode === 'flagBroken') return 'manager-v2-chip is-warning';
-    return 'manager-v2-chip is-positive';
+    if (mode === 'destroy') return 'manager-chip is-danger';
+    if (mode === 'flagBroken') return 'manager-chip is-warning';
+    return 'manager-chip is-positive';
   }
 
   function onBreakChipLabel(tool) {
     const mode = tool?.onBreak?.mode;
-    if (mode === 'destroy') return text('FABRICATE.Admin.ManagerV2.Tools.OnBreakDestroy', 'Destroy item');
-    if (mode === 'flagBroken') return text('FABRICATE.Admin.ManagerV2.Tools.OnBreakFlag', 'Mark as broken');
-    return text('FABRICATE.Admin.ManagerV2.Tools.OnBreakReplace', 'Replace with item');
+    if (mode === 'destroy') return text('FABRICATE.Admin.Manager.Tools.OnBreakDestroy', 'Destroy item');
+    if (mode === 'flagBroken') return text('FABRICATE.Admin.Manager.Tools.OnBreakFlag', 'Mark as broken');
+    return text('FABRICATE.Admin.Manager.Tools.OnBreakReplace', 'Replace with item');
   }
 
   function handleSelectRow(tool) {
@@ -261,63 +261,63 @@
   }
 </script>
 
-<main class="manager-v2-main manager-v2-tools-main" aria-label={text('FABRICATE.Admin.ManagerV2.Tools.Title', 'Tools')}>
-  <section class="manager-v2-section-header">
-    <div class="manager-v2-heading">
-      <p class="manager-v2-kicker">{text('FABRICATE.Admin.ManagerV2.Environment.GatheringTabs.Tools', 'Tools')}</p>
-      <h2 class="manager-v2-title">{text('FABRICATE.Admin.ManagerV2.Tools.Title', 'Tools')}</h2>
-      <p class="manager-v2-subtitle">{text('FABRICATE.Admin.ManagerV2.Tools.Subtitle', 'Manage reusable gathering tools and configure how they behave when required by tasks.')}</p>
+<main class="manager-main manager-tools-main" aria-label={text('FABRICATE.Admin.Manager.Tools.Title', 'Tools')}>
+  <section class="manager-section-header">
+    <div class="manager-heading">
+      <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Environment.GatheringTabs.Tools', 'Tools')}</p>
+      <h2 class="manager-title">{text('FABRICATE.Admin.Manager.Tools.Title', 'Tools')}</h2>
+      <p class="manager-subtitle">{text('FABRICATE.Admin.Manager.Tools.Subtitle', 'Manage reusable gathering tools and configure how they behave when required by tasks.')}</p>
     </div>
   </section>
 
   <div
-    class="manager-v2-gathering-panel manager-v2-gathering-panel-tools"
-    id="manager-v2-gathering-panel-tools"
+    class="manager-gathering-panel manager-gathering-panel-tools"
+    id="manager-gathering-panel-tools"
     role="tabpanel"
-    aria-labelledby="manager-v2-gathering-nav-tools"
+    aria-labelledby="manager-gathering-nav-tools"
   >
-  <section class="manager-v2-inspector-card manager-v2-tools-card" data-manager-v2-tools-browser>
-    <div class="manager-v2-tools-card-header">
+  <section class="manager-inspector-card manager-tools-card" data-manager-tools-browser>
+    <div class="manager-tools-card-header">
       <div>
-        <h3 class="manager-v2-card-title">{formatCount('FABRICATE.Admin.ManagerV2.Tools.RowCount', 'Tools ({count})', tools.length)}</h3>
-        <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Tools.RowCountHint', 'Define the behavior of tools when used in gathering tasks.')}</p>
+        <h3 class="manager-card-title">{formatCount('FABRICATE.Admin.Manager.Tools.RowCount', 'Tools ({count})', tools.length)}</h3>
+        <p class="manager-muted">{text('FABRICATE.Admin.Manager.Tools.RowCountHint', 'Define the behavior of tools when used in gathering tasks.')}</p>
       </div>
-      <button type="button" class="manager-v2-button is-primary" onclick={() => onAddTool?.()} data-manager-v2-tools-add>
+      <button type="button" class="manager-button is-primary" onclick={() => onAddTool?.()} data-manager-tools-add>
         <i class="fas fa-plus" aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.ManagerV2.Tools.Add', 'Add tool')}</span>
+        <span>{text('FABRICATE.Admin.Manager.Tools.Add', 'Add tool')}</span>
       </button>
     </div>
 
     {#if tools.length === 0}
-      <div class="manager-v2-empty is-compact manager-v2-tools-empty">
+      <div class="manager-empty is-compact manager-tools-empty">
         <div>
           <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.ManagerV2.Tools.EmptyTitle', 'No tools yet')}</h3>
-          <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Tools.EmptyHint', 'Add a reusable tool that gathering tasks can require.')}</p>
-          <button type="button" class="manager-v2-button is-primary" onclick={() => onAddTool?.()}>
+          <h3>{text('FABRICATE.Admin.Manager.Tools.EmptyTitle', 'No tools yet')}</h3>
+          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Tools.EmptyHint', 'Add a reusable tool that gathering tasks can require.')}</p>
+          <button type="button" class="manager-button is-primary" onclick={() => onAddTool?.()}>
             <i class="fas fa-plus" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.ManagerV2.Tools.Add', 'Add tool')}</span>
+            <span>{text('FABRICATE.Admin.Manager.Tools.Add', 'Add tool')}</span>
           </button>
         </div>
       </div>
     {:else}
-      <div class="manager-v2-tools-list" role="list">
+      <div class="manager-tools-list" role="list">
         {#each tools as tool (tool.id)}
           {@const isExpanded = expandedToolId === tool.id}
           {@const isSelected = selectedToolId === tool.id}
           {@const isDirty = dirtyToolIdSet.has(String(tool.id))}
-          <div class={`manager-v2-tools-row ${isSelected ? 'is-selected' : ''} ${isExpanded ? 'is-expanded' : ''}`}
+          <div class={`manager-tools-row ${isSelected ? 'is-selected' : ''} ${isExpanded ? 'is-expanded' : ''}`}
             role="listitem"
-            data-manager-v2-tool-id={tool.id}>
+            data-manager-tool-id={tool.id}>
             {#if isDirty}
-              <span class="manager-v2-tools-row-dirty-slot">
-                <span class="manager-v2-chip is-warning manager-v2-tools-dirty-chip" title={text('FABRICATE.Admin.ManagerV2.Tools.Dirty', 'Unsaved')}>
+              <span class="manager-tools-row-dirty-slot">
+                <span class="manager-chip is-warning manager-tools-dirty-chip" title={text('FABRICATE.Admin.Manager.Tools.Dirty', 'Unsaved')}>
                   <i class="fas fa-save" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.ManagerV2.Tools.Dirty', 'Unsaved')}</span>
+                  <span>{text('FABRICATE.Admin.Manager.Tools.Dirty', 'Unsaved')}</span>
                 </span>
               </span>
             {/if}
-            <div class="manager-v2-tools-row-body"
+            <div class="manager-tools-row-body"
               role="button"
               tabindex="0"
               aria-selected={isSelected}
@@ -325,18 +325,18 @@
               onclick={() => handleSelectRow(tool)}
               onkeydown={(event) => handleRowKey(event, tool)}>
               <div
-                class={`manager-v2-tools-identity ${tool.componentId ? 'is-component-drop-zone' : ''}`}
-                data-manager-v2-tool-component-drop-zone={tool.componentId ? tool.id : undefined}
-                title={tool.componentId ? text('FABRICATE.Admin.ManagerV2.Tools.DropToReplaceComponent', 'Drop a component here to replace this tool component') : undefined}
+                class={`manager-tools-identity ${tool.componentId ? 'is-component-drop-zone' : ''}`}
+                data-manager-tool-component-drop-zone={tool.componentId ? tool.id : undefined}
+                title={tool.componentId ? text('FABRICATE.Admin.Manager.Tools.DropToReplaceComponent', 'Drop a component here to replace this tool component') : undefined}
                 use:dragDrop={{ onDrop: (data) => handleComponentDrop(tool, data), activeClass: 'is-drop-active', disabled: !tool.componentId }}
               >
-                <img class="manager-v2-tools-thumb" src={toolImage(tool)} alt="" />
-                <div class="manager-v2-tools-identity-copy">
-                  <span class="manager-v2-tools-name">{toolPrimaryLabel(tool)}</span>
-                  <span class="manager-v2-tools-secondary">{toolSecondary(tool)}</span>
+                <img class="manager-tools-thumb" src={toolImage(tool)} alt="" />
+                <div class="manager-tools-identity-copy">
+                  <span class="manager-tools-name">{toolPrimaryLabel(tool)}</span>
+                  <span class="manager-tools-secondary">{toolSecondary(tool)}</span>
                 </div>
               </div>
-              <div class="manager-v2-tools-row-summary">
+              <div class="manager-tools-row-summary">
                 <span class={requirementChipClass(tool)}>
                   <i class="fas fa-shield-halved" aria-hidden="true"></i>
                   <span>{requirementChipLabel(tool)}</span>
@@ -350,11 +350,11 @@
                   <span>{onBreakChipLabel(tool)}</span>
                 </span>
               </div>
-              <div class="manager-v2-tools-row-actions">
+              <div class="manager-tools-row-actions">
                 <button type="button"
-                  class="manager-v2-icon-button"
-                  title={isExpanded ? text('FABRICATE.Admin.ManagerV2.Tools.CollapseRow', 'Collapse tool editor') : text('FABRICATE.Admin.ManagerV2.Tools.ExpandRow', 'Expand tool editor')}
-                  aria-label={isExpanded ? text('FABRICATE.Admin.ManagerV2.Tools.CollapseRow', 'Collapse tool editor') : text('FABRICATE.Admin.ManagerV2.Tools.ExpandRow', 'Expand tool editor')}
+                  class="manager-icon-button"
+                  title={isExpanded ? text('FABRICATE.Admin.Manager.Tools.CollapseRow', 'Collapse tool editor') : text('FABRICATE.Admin.Manager.Tools.ExpandRow', 'Expand tool editor')}
+                  aria-label={isExpanded ? text('FABRICATE.Admin.Manager.Tools.CollapseRow', 'Collapse tool editor') : text('FABRICATE.Admin.Manager.Tools.ExpandRow', 'Expand tool editor')}
                   onclick={(event) => { event.stopPropagation(); onToggleExpand?.(tool.id); }}>
                   <i class={isExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>
                 </button>
@@ -362,89 +362,89 @@
             </div>
 
             {#if isExpanded}
-              <div class="manager-v2-tools-row-editor" data-manager-v2-tool-editor>
-                <div class="manager-v2-tools-identity-row">
-                  <div class="manager-v2-field">
-                    <span>{text('FABRICATE.Admin.ManagerV2.Tools.ComponentLabel', 'Component')}</span>
-                    <div class="manager-v2-tool-component-row"
+              <div class="manager-tools-row-editor" data-manager-tool-editor>
+                <div class="manager-tools-identity-row">
+                  <div class="manager-field">
+                    <span>{text('FABRICATE.Admin.Manager.Tools.ComponentLabel', 'Component')}</span>
+                    <div class="manager-tool-component-row"
                       use:dragDrop={{ onDrop: (data) => handleComponentDrop(tool, data), activeClass: 'is-drop-active' }}>
                       {#if tool.componentId}
                         <button type="button"
-                          class="manager-v2-gathering-task-identity manager-v2-drop-component-button"
-                          title={text('FABRICATE.Admin.ManagerV2.Tools.ClearComponentHint', 'Right-click to clear component')}
+                          class="manager-gathering-task-identity manager-drop-component-button"
+                          title={text('FABRICATE.Admin.Manager.Tools.ClearComponentHint', 'Right-click to clear component')}
                           onmousedown={(event) => onToolComponentMouseDown(tool, event)}
                           oncontextmenu={(event) => onClearToolComponent(tool, event)}>
-                          <img class="manager-v2-gathering-task-thumb" src={toolImage(tool)} alt="" />
-                          <span class="manager-v2-system-copy">
-                            <span class="manager-v2-system-name">{managedItem(tool.componentId)?.name || text('FABRICATE.Admin.ManagerV2.Tools.OverviewComponentMissing', 'Not set')}</span>
+                          <img class="manager-gathering-task-thumb" src={toolImage(tool)} alt="" />
+                          <span class="manager-system-copy">
+                            <span class="manager-system-name">{managedItem(tool.componentId)?.name || text('FABRICATE.Admin.Manager.Tools.OverviewComponentMissing', 'Not set')}</span>
                           </span>
                         </button>
                       {:else}
-                        <div class="manager-v2-gathering-task-identity manager-v2-drop-empty-component is-empty">
-                          <span class="manager-v2-inline-drop-zone" aria-hidden="true">
+                        <div class="manager-gathering-task-identity manager-drop-empty-component is-empty">
+                          <span class="manager-inline-drop-zone" aria-hidden="true">
                             <i class="fas fa-file-import"></i>
                           </span>
-                          <span class="manager-v2-system-copy">
-                            <span class="manager-v2-system-name">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.NoComponent', 'No Component')}</span>
-                            <span class="manager-v2-system-description">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.CreateOrAssign', 'Create or assign')}</span>
+                          <span class="manager-system-copy">
+                            <span class="manager-system-name">{text('FABRICATE.Admin.Manager.Environment.Tasks.NoComponent', 'No Component')}</span>
+                            <span class="manager-system-description">{text('FABRICATE.Admin.Manager.Environment.Tasks.CreateOrAssign', 'Create or assign')}</span>
                           </span>
                         </div>
                       {/if}
                     </div>
                   </div>
 
-                  <label class="manager-v2-field">
-                    <span>{text('FABRICATE.Admin.ManagerV2.Tools.LabelField', 'Display label')}</span>
+                  <label class="manager-field">
+                    <span>{text('FABRICATE.Admin.Manager.Tools.LabelField', 'Display label')}</span>
                     <input type="text"
                       value={tool.label || ''}
                       placeholder={managedItem(tool.componentId)?.name || ''}
                       oninput={(event) => onUpdateTool?.(tool.id, { label: event.currentTarget.value })} />
-                    <span class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Tools.LabelHint', 'Optional. Falls back to the component name.')}</span>
+                    <span class="manager-muted">{text('FABRICATE.Admin.Manager.Tools.LabelHint', 'Optional. Falls back to the component name.')}</span>
                   </label>
                 </div>
 
-                <fieldset class="manager-v2-tools-section">
-                  <legend>{text('FABRICATE.Admin.ManagerV2.Tools.RequirementTitle', 'Requirement')}</legend>
+                <fieldset class="manager-tools-section">
+                  <legend>{text('FABRICATE.Admin.Manager.Tools.RequirementTitle', 'Requirement')}</legend>
                   {#if tool.requirement}
-                    <label class="manager-v2-field manager-v2-tools-requirement-expression">
-                      <span>{text('FABRICATE.Admin.ManagerV2.Tools.RequirementExpression', 'Expression')}</span>
+                    <label class="manager-field manager-tools-requirement-expression">
+                      <span>{text('FABRICATE.Admin.Manager.Tools.RequirementExpression', 'Expression')}</span>
                       <input type="text"
                         value={tool.requirement.formula || ''}
-                        placeholder={text('FABRICATE.Admin.ManagerV2.Tools.RequirementExpressionPlaceholder', '@tools.alchemist.value')}
+                        placeholder={text('FABRICATE.Admin.Manager.Tools.RequirementExpressionPlaceholder', '@tools.alchemist.value')}
                         oninput={(event) => updateRequirementExpression(tool, event.currentTarget.value)} />
                     </label>
-                    <div class="manager-v2-tools-requirement-help">
-                      <p>{text('FABRICATE.Admin.ManagerV2.Tools.RequirementInstructions', 'Enter an actor roll-data property. The tool is available when the value is greater than zero.')}</p>
+                    <div class="manager-tools-requirement-help">
+                      <p>{text('FABRICATE.Admin.Manager.Tools.RequirementInstructions', 'Enter an actor roll-data property. The tool is available when the value is greater than zero.')}</p>
                       <ul>
-                        <li>{text('FABRICATE.Admin.ManagerV2.Tools.RequirementExampleActorProperty', 'Example: @tools.alchemist.value')}</li>
+                        <li>{text('FABRICATE.Admin.Manager.Tools.RequirementExampleActorProperty', 'Example: @tools.alchemist.value')}</li>
                       </ul>
                     </div>
                     <button type="button"
-                      class="manager-v2-button"
+                      class="manager-button"
                       onclick={() => onUpdateTool?.(tool.id, { requirement: null })}>
                       <i class="fas fa-xmark" aria-hidden="true"></i>
-                      <span>{text('FABRICATE.Admin.ManagerV2.Tools.RequirementRemove', 'Remove requirement')}</span>
+                      <span>{text('FABRICATE.Admin.Manager.Tools.RequirementRemove', 'Remove requirement')}</span>
                     </button>
                   {:else}
-                    <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Tools.RequirementHint', 'Optional actor property that must be greater than zero for the actor to use this tool.')}</p>
+                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Tools.RequirementHint', 'Optional actor property that must be greater than zero for the actor to use this tool.')}</p>
                     <button type="button"
-                      class="manager-v2-button"
+                      class="manager-button"
                       onclick={() => onUpdateTool?.(tool.id, { requirement: defaultRequirement() })}>
                       <i class="fas fa-plus" aria-hidden="true"></i>
-                      <span>{text('FABRICATE.Admin.ManagerV2.Tools.RequirementAdd', 'Add requirement')}</span>
+                      <span>{text('FABRICATE.Admin.Manager.Tools.RequirementAdd', 'Add requirement')}</span>
                     </button>
                   {/if}
                 </fieldset>
 
-                <fieldset class="manager-v2-radio-group manager-v2-tools-section" role="radiogroup" aria-labelledby={`tool-${tool.id}-breakage-legend`}>
-                  <legend id={`tool-${tool.id}-breakage-legend`} class="manager-v2-radio-group-legend">{text('FABRICATE.Admin.ManagerV2.Tools.BreakageTitle', 'Breakage mechanic')}</legend>
-                  <div class="manager-v2-radio-options">
+                <fieldset class="manager-radio-group manager-tools-section" role="radiogroup" aria-labelledby={`tool-${tool.id}-breakage-legend`}>
+                  <legend id={`tool-${tool.id}-breakage-legend`} class="manager-radio-group-legend">{text('FABRICATE.Admin.Manager.Tools.BreakageTitle', 'Breakage mechanic')}</legend>
+                  <div class="manager-radio-options">
                     {#each [
-                      { value: 'limitedUses', icon: 'fas fa-hashtag', labelKey: 'FABRICATE.Admin.ManagerV2.Tools.BreakageLimitedUses', labelFallback: 'Limited uses' },
-                      { value: 'breakageChance', icon: 'fas fa-percent', labelKey: 'FABRICATE.Admin.ManagerV2.Tools.BreakageChance', labelFallback: 'Breakage chance' },
-                      { value: 'diceExpression', icon: 'fas fa-dice-d20', labelKey: 'FABRICATE.Admin.ManagerV2.Tools.BreakageDice', labelFallback: 'Dice expression' }
+                      { value: 'limitedUses', icon: 'fas fa-hashtag', labelKey: 'FABRICATE.Admin.Manager.Tools.BreakageLimitedUses', labelFallback: 'Limited uses' },
+                      { value: 'breakageChance', icon: 'fas fa-percent', labelKey: 'FABRICATE.Admin.Manager.Tools.BreakageChance', labelFallback: 'Breakage chance' },
+                      { value: 'diceExpression', icon: 'fas fa-dice-d20', labelKey: 'FABRICATE.Admin.Manager.Tools.BreakageDice', labelFallback: 'Dice expression' }
                     ] as option (option.value)}
-                      <label class={`manager-v2-radio-option ${tool.breakage?.mode === option.value ? 'is-selected' : ''}`}>
+                      <label class={`manager-radio-option ${tool.breakage?.mode === option.value ? 'is-selected' : ''}`}>
                         <input type="radio"
                           name={`tool-${tool.id}-breakage-mode`}
                           value={option.value}
@@ -456,13 +456,13 @@
                     {/each}
                   </div>
                   {#if tool.breakage?.mode === 'limitedUses'}
-                    <label class="manager-v2-field manager-v2-tools-inline-field">
-                      <span>{text('FABRICATE.Admin.ManagerV2.Tools.BreakageMaxUses', 'Maximum uses')}</span>
+                    <label class="manager-field manager-tools-inline-field">
+                      <span>{text('FABRICATE.Admin.Manager.Tools.BreakageMaxUses', 'Maximum uses')}</span>
                       <input type="number"
-                        class="manager-v2-tools-max-uses-input"
+                        class="manager-tools-max-uses-input"
                         min="1"
                         step="1"
-                        placeholder={text('FABRICATE.Admin.ManagerV2.Tools.BreakageMaxUsesHint', 'Blank = unlimited')}
+                        placeholder={text('FABRICATE.Admin.Manager.Tools.BreakageMaxUsesHint', 'Blank = unlimited')}
                         value={tool.breakage.maxUses ?? ''}
                         oninput={(event) => {
                           const raw = event.currentTarget.value;
@@ -471,46 +471,46 @@
                         }} />
                     </label>
                   {:else if tool.breakage?.mode === 'breakageChance'}
-                    <label class="manager-v2-field manager-v2-tools-inline-field">
-                      <span>{text('FABRICATE.Admin.ManagerV2.Tools.BreakageChance', 'Breakage chance')}</span>
-                      <span class="manager-v2-drop-rate-value">
-                        <span class="manager-v2-drop-rate-percent">
+                    <label class="manager-field manager-tools-inline-field">
+                      <span>{text('FABRICATE.Admin.Manager.Tools.BreakageChance', 'Breakage chance')}</span>
+                      <span class="manager-drop-rate-value">
+                        <span class="manager-drop-rate-percent">
                           <input type="text"
                             inputmode="numeric"
                             pattern="[0-9]*"
                             value={tool.breakage.breakageChance ?? 0}
-                            aria-label={text('FABRICATE.Admin.ManagerV2.Tools.BreakageChancePercent', 'Break chance (%)')}
+                            aria-label={text('FABRICATE.Admin.Manager.Tools.BreakageChancePercent', 'Break chance (%)')}
                             oninput={(event) => onBreakageChanceInput(tool, event)}
                             onblur={(event) => onBreakageChanceBlur(tool, event)}
                             onkeydown={(event) => onBreakageChanceKeydown(tool, event)} />
                           <span aria-hidden="true">%</span>
                         </span>
-                        <span class="manager-v2-drop-rate-control manager-v2-tool-breakage-chance-control"
+                        <span class="manager-drop-rate-control manager-tool-breakage-chance-control"
                           style={`--fab-drop-rate-value: ${tool.breakage.breakageChance ?? 0}%; --fab-tool-breakage-chance-color: ${breakageChanceColor(tool.breakage.breakageChance ?? 0)};`}>
-                          <span class="manager-v2-drop-rate-track" aria-hidden="true">
-                            <span class="manager-v2-drop-rate-fill"></span>
+                          <span class="manager-drop-rate-track" aria-hidden="true">
+                            <span class="manager-drop-rate-fill"></span>
                           </span>
                           <input type="range"
                             min="0"
                             max="100"
                             step="1"
                             value={tool.breakage.breakageChance ?? 0}
-                            aria-label={text('FABRICATE.Admin.ManagerV2.Tools.BreakageChance', 'Breakage chance')}
+                            aria-label={text('FABRICATE.Admin.Manager.Tools.BreakageChance', 'Breakage chance')}
                             oninput={(event) => onUpdateTool?.(tool.id, { breakage: { mode: 'breakageChance', breakageChance: Number(event.currentTarget.value) } })} />
                         </span>
                       </span>
                     </label>
                   {:else if tool.breakage?.mode === 'diceExpression'}
-                    <div class="manager-v2-tools-inline-fields">
-                      <label class="manager-v2-field manager-v2-tools-inline-field">
-                        <span>{text('FABRICATE.Admin.ManagerV2.Tools.BreakageFormula', 'Formula')}</span>
+                    <div class="manager-tools-inline-fields">
+                      <label class="manager-field manager-tools-inline-field">
+                        <span>{text('FABRICATE.Admin.Manager.Tools.BreakageFormula', 'Formula')}</span>
                         <input type="text"
                           value={tool.breakage.formula || ''}
                           placeholder="1d20 + @abilities.str.mod"
                           oninput={(event) => onUpdateTool?.(tool.id, { breakage: { mode: 'diceExpression', formula: event.currentTarget.value, threshold: tool.breakage.threshold ?? 0 } })} />
                       </label>
-                      <label class="manager-v2-field manager-v2-tools-inline-field">
-                        <span>{text('FABRICATE.Admin.ManagerV2.Tools.BreakageThreshold', 'Break below')}</span>
+                      <label class="manager-field manager-tools-inline-field">
+                        <span>{text('FABRICATE.Admin.Manager.Tools.BreakageThreshold', 'Break below')}</span>
                         <input type="number"
                           step="1"
                           value={tool.breakage.threshold ?? 0}
@@ -520,15 +520,15 @@
                   {/if}
                 </fieldset>
 
-                <fieldset class="manager-v2-radio-group manager-v2-tools-section" role="radiogroup" aria-labelledby={`tool-${tool.id}-on-break-legend`}>
-                  <legend id={`tool-${tool.id}-on-break-legend`} class="manager-v2-radio-group-legend">{text('FABRICATE.Admin.ManagerV2.Tools.OnBreakTitle', 'On-break action')}</legend>
-                  <div class="manager-v2-radio-options">
+                <fieldset class="manager-radio-group manager-tools-section" role="radiogroup" aria-labelledby={`tool-${tool.id}-on-break-legend`}>
+                  <legend id={`tool-${tool.id}-on-break-legend`} class="manager-radio-group-legend">{text('FABRICATE.Admin.Manager.Tools.OnBreakTitle', 'On-break action')}</legend>
+                  <div class="manager-radio-options">
                     {#each [
-                      { value: 'destroy', icon: 'fas fa-circle-xmark', labelKey: 'FABRICATE.Admin.ManagerV2.Tools.OnBreakDestroy', labelFallback: 'Destroy item' },
-                      { value: 'flagBroken', icon: 'fas fa-shield-halved', labelKey: 'FABRICATE.Admin.ManagerV2.Tools.OnBreakFlag', labelFallback: 'Mark as broken' },
-                      { value: 'replaceWith', icon: 'fas fa-right-left', labelKey: 'FABRICATE.Admin.ManagerV2.Tools.OnBreakReplace', labelFallback: 'Replace with item' }
+                      { value: 'destroy', icon: 'fas fa-circle-xmark', labelKey: 'FABRICATE.Admin.Manager.Tools.OnBreakDestroy', labelFallback: 'Destroy item' },
+                      { value: 'flagBroken', icon: 'fas fa-shield-halved', labelKey: 'FABRICATE.Admin.Manager.Tools.OnBreakFlag', labelFallback: 'Mark as broken' },
+                      { value: 'replaceWith', icon: 'fas fa-right-left', labelKey: 'FABRICATE.Admin.Manager.Tools.OnBreakReplace', labelFallback: 'Replace with item' }
                     ] as option (option.value)}
-                      <label class={`manager-v2-radio-option ${tool.onBreak?.mode === option.value ? 'is-selected' : ''}`}>
+                      <label class={`manager-radio-option ${tool.onBreak?.mode === option.value ? 'is-selected' : ''}`}>
                         <input type="radio"
                           name={`tool-${tool.id}-on-break-mode`}
                           value={option.value}
@@ -540,50 +540,50 @@
                     {/each}
                   </div>
                   {#if tool.onBreak?.mode === 'replaceWith'}
-                    <div class="manager-v2-field manager-v2-tools-replacement-field">
-                      <div class="manager-v2-tool-component-row"
-                        data-manager-v2-tool-replacement-drop-zone={tool.id}
+                    <div class="manager-field manager-tools-replacement-field">
+                      <div class="manager-tool-component-row"
+                        data-manager-tool-replacement-drop-zone={tool.id}
                         use:dragDrop={{ onDrop: (data) => handleReplacementDrop(tool, data), activeClass: 'is-drop-active' }}>
                         {#if tool.onBreak.replacementComponentId}
                           <button type="button"
-                            class="manager-v2-gathering-task-identity manager-v2-drop-component-button"
-                            title={text('FABRICATE.Admin.ManagerV2.Tools.ClearComponentHint', 'Right-click to clear component')}
+                            class="manager-gathering-task-identity manager-drop-component-button"
+                            title={text('FABRICATE.Admin.Manager.Tools.ClearComponentHint', 'Right-click to clear component')}
                             onmousedown={(event) => onReplacementComponentMouseDown(tool, event)}
                             oncontextmenu={(event) => onClearReplacementComponent(tool, event)}>
-                            <img class="manager-v2-gathering-task-thumb" src={managedItem(tool.onBreak.replacementComponentId)?.img || 'icons/svg/item-bag.svg'} alt="" />
-                            <span class="manager-v2-system-copy">
-                              <span class="manager-v2-system-name">{managedItem(tool.onBreak.replacementComponentId)?.name || text('FABRICATE.Admin.ManagerV2.Tools.OverviewComponentMissing', 'Not set')}</span>
+                            <img class="manager-gathering-task-thumb" src={managedItem(tool.onBreak.replacementComponentId)?.img || 'icons/svg/item-bag.svg'} alt="" />
+                            <span class="manager-system-copy">
+                              <span class="manager-system-name">{managedItem(tool.onBreak.replacementComponentId)?.name || text('FABRICATE.Admin.Manager.Tools.OverviewComponentMissing', 'Not set')}</span>
                             </span>
                           </button>
                         {:else}
-                          <div class="manager-v2-gathering-task-identity manager-v2-drop-empty-component is-empty">
-                            <span class="manager-v2-inline-drop-zone" aria-hidden="true">
+                          <div class="manager-gathering-task-identity manager-drop-empty-component is-empty">
+                            <span class="manager-inline-drop-zone" aria-hidden="true">
                               <i class="fas fa-file-import"></i>
                             </span>
-                            <span class="manager-v2-system-copy">
-                              <span class="manager-v2-system-name">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.NoComponent', 'No Component')}</span>
-                              <span class="manager-v2-system-description">{text('FABRICATE.Admin.ManagerV2.Environment.Tasks.CreateOrAssign', 'Create or assign')}</span>
+                            <span class="manager-system-copy">
+                              <span class="manager-system-name">{text('FABRICATE.Admin.Manager.Environment.Tasks.NoComponent', 'No Component')}</span>
+                              <span class="manager-system-description">{text('FABRICATE.Admin.Manager.Environment.Tasks.CreateOrAssign', 'Create or assign')}</span>
                             </span>
                           </div>
                         {/if}
                       </div>
                       {#if replacementSameAsComponent(tool)}
-                        <span class="manager-v2-chip is-danger" role="alert">
+                        <span class="manager-chip is-danger" role="alert">
                           <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-                          <span>{text('FABRICATE.Admin.ManagerV2.Tools.ReplacementSame', 'Replacement must differ from the tool component.')}</span>
+                          <span>{text('FABRICATE.Admin.Manager.Tools.ReplacementSame', 'Replacement must differ from the tool component.')}</span>
                         </span>
                       {/if}
                     </div>
                   {/if}
                 </fieldset>
 
-                <div class="manager-v2-tools-row-editor-actions">
+                <div class="manager-tools-row-editor-actions">
                   <button type="button"
-                    class="manager-v2-button is-danger"
+                    class="manager-button is-danger"
                     onclick={() => onDeleteTool?.(tool.id)}
-                    data-manager-v2-tool-delete>
+                    data-manager-tool-delete>
                     <i class="fas fa-trash" aria-hidden="true"></i>
-                    <span>{text('FABRICATE.Admin.ManagerV2.Tools.Delete', 'Delete tool')}</span>
+                    <span>{text('FABRICATE.Admin.Manager.Tools.Delete', 'Delete tool')}</span>
                   </button>
                 </div>
               </div>
@@ -591,12 +591,12 @@
           </div>
         {/each}
         <button type="button"
-          class="manager-v2-tools-empty-stub"
+          class="manager-tools-empty-stub"
           onclick={() => onAddTool?.()}
-          data-manager-v2-tools-add-stub
+          data-manager-tools-add-stub
           use:dragDrop={{ onDrop: handleAddToolDrop, activeClass: 'is-drop-active' }}>
           <i class="fas fa-plus" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.ManagerV2.Tools.Add', 'Add tool')}</span>
+          <span>{text('FABRICATE.Admin.Manager.Tools.Add', 'Add tool')}</span>
         </button>
       </div>
     {/if}

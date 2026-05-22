@@ -1,9 +1,9 @@
 import SvelteApplicationMixin from './svelte/SvelteApplicationMixin.svelte.js';
-import CraftingSystemManagerV2Root from './svelte/apps/manager-v2/CraftingSystemManagerV2Root.svelte';
+import CraftingSystemManagerRoot from './svelte/apps/manager/CraftingSystemManagerRoot.svelte';
 import { createAdminStore } from './svelte/stores/adminStore.js';
 import { getSetting, setSetting } from '../config/settings.js';
 import { confirmDialog, renderDialog } from './foundryCompat.js';
-import { getRecipeEditorAppClass, registerCraftingSystemManagerV2App } from './appFactory.js';
+import { getRecipeEditorAppClass, registerCraftingSystemManagerApp } from './appFactory.js';
 import { SvelteComponentEditorApp } from './SvelteComponentEditorApp.svelte.js';
 import { get } from 'svelte/store';
 import { resolveDropUuid, resolveDropData } from './svelte/util/dropUtils.js';
@@ -51,10 +51,10 @@ function collectFolderItems(folder, folders, visited = new Set()) {
   return [...directItems, ...nestedItems];
 }
 
-export class SvelteCraftingSystemManagerV2App extends SvelteApplicationMixin(
+export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
   foundry.applications.api.ApplicationV2
 ) {
-  static SVELTE_COMPONENT = CraftingSystemManagerV2Root;
+  static SVELTE_COMPONENT = CraftingSystemManagerRoot;
   static _pendingReadyOpen = false;
 
   _adminStore = null;
@@ -62,11 +62,11 @@ export class SvelteCraftingSystemManagerV2App extends SvelteApplicationMixin(
   _confirmDiscardDirtyEssenceDraft = null;
 
   static DEFAULT_OPTIONS = {
-    id: 'fabricate-crafting-system-manager-v2',
-    classes: ['fabricate', 'crafting-system-manager-v2'],
+    id: 'fabricate-crafting-system-manager',
+    classes: ['fabricate', 'crafting-system-manager'],
     tag: 'div',
     window: {
-      title: 'FABRICATE.Admin.ManagerV2.WindowTitle',
+      title: 'FABRICATE.Admin.Manager.WindowTitle',
       icon: 'fa-solid fa-layer-group',
       resizable: true
     },
@@ -516,14 +516,14 @@ export class SvelteCraftingSystemManagerV2App extends SvelteApplicationMixin(
           SvelteComponentEditorApp.show(itemId, systemId, this);
         },
         confirmDiscardEssenceDraft: () => confirmDialog({
-          title: localize('FABRICATE.Admin.ManagerV2.Essence.DiscardDirtyTitle'),
-          content: `<p>${localize('FABRICATE.Admin.ManagerV2.Essence.DiscardDirtyContent')}</p>`,
+          title: localize('FABRICATE.Admin.Manager.Essence.DiscardDirtyTitle'),
+          content: `<p>${localize('FABRICATE.Admin.Manager.Essence.DiscardDirtyContent')}</p>`,
           yes: {
-            label: localize('FABRICATE.Admin.ManagerV2.Essence.DiscardDirtyConfirm'),
+            label: localize('FABRICATE.Admin.Manager.Essence.DiscardDirtyConfirm'),
             callback: () => true
           },
           no: {
-            label: localize('FABRICATE.Admin.ManagerV2.Essence.DiscardDirtyCancel'),
+            label: localize('FABRICATE.Admin.Manager.Essence.DiscardDirtyCancel'),
             callback: () => false
           }
         }),
@@ -535,25 +535,25 @@ export class SvelteCraftingSystemManagerV2App extends SvelteApplicationMixin(
             resolve(value);
           };
           const dialog = renderDialog({
-            window: { title: localize('FABRICATE.Admin.ManagerV2.Tools.NavigationDirty.Title') },
-            content: `<p>${localize('FABRICATE.Admin.ManagerV2.Tools.NavigationDirty.Content')}</p>`,
+            window: { title: localize('FABRICATE.Admin.Manager.Tools.NavigationDirty.Title') },
+            content: `<p>${localize('FABRICATE.Admin.Manager.Tools.NavigationDirty.Content')}</p>`,
             buttons: [
               {
                 action: 'save',
-                label: localize('FABRICATE.Admin.ManagerV2.Tools.NavigationDirty.SaveAll'),
+                label: localize('FABRICATE.Admin.Manager.Tools.NavigationDirty.SaveAll'),
                 icon: 'fas fa-save',
                 default: true,
                 callback: () => settle('save')
               },
               {
                 action: 'discard',
-                label: localize('FABRICATE.Admin.ManagerV2.Tools.NavigationDirty.Discard'),
+                label: localize('FABRICATE.Admin.Manager.Tools.NavigationDirty.Discard'),
                 icon: 'fas fa-trash',
                 callback: () => settle('discard')
               },
               {
                 action: 'cancel',
-                label: localize('FABRICATE.Admin.ManagerV2.Tools.NavigationDirty.Cancel'),
+                label: localize('FABRICATE.Admin.Manager.Tools.NavigationDirty.Cancel'),
                 icon: 'fas fa-times',
                 callback: () => settle(false)
               }
@@ -589,31 +589,31 @@ export class SvelteCraftingSystemManagerV2App extends SvelteApplicationMixin(
 
   static show() {
     if (!game.user.isGM) {
-      ui.notifications.error(localize('FABRICATE.Admin.ManagerV2.GMOnly'));
+      ui.notifications.error(localize('FABRICATE.Admin.Manager.GMOnly'));
       return null;
     }
 
     if (!this._isFabricateReady()) {
-      ui.notifications.warn(localize('FABRICATE.Admin.ManagerV2.StartupPending'));
-      if (!SvelteCraftingSystemManagerV2App._pendingReadyOpen) {
-        SvelteCraftingSystemManagerV2App._pendingReadyOpen = true;
+      ui.notifications.warn(localize('FABRICATE.Admin.Manager.StartupPending'));
+      if (!SvelteCraftingSystemManagerApp._pendingReadyOpen) {
+        SvelteCraftingSystemManagerApp._pendingReadyOpen = true;
         const openWhenReady = () => {
-          SvelteCraftingSystemManagerV2App._pendingReadyOpen = false;
+          SvelteCraftingSystemManagerApp._pendingReadyOpen = false;
           if (!game.user.isGM) return;
-          const app = new SvelteCraftingSystemManagerV2App();
+          const app = new SvelteCraftingSystemManagerApp();
           app.render(true);
         };
         const hooks = globalThis.Hooks;
         if (typeof hooks?.once === 'function') {
           hooks.once('fabricate.ready', openWhenReady);
         } else {
-          SvelteCraftingSystemManagerV2App._pendingReadyOpen = false;
+          SvelteCraftingSystemManagerApp._pendingReadyOpen = false;
         }
       }
       return null;
     }
 
-    const app = new SvelteCraftingSystemManagerV2App();
+    const app = new SvelteCraftingSystemManagerApp();
     app.render(true);
     return app;
   }
@@ -626,4 +626,4 @@ export class SvelteCraftingSystemManagerV2App extends SvelteApplicationMixin(
   }
 }
 
-registerCraftingSystemManagerV2App(SvelteCraftingSystemManagerV2App);
+registerCraftingSystemManagerApp(SvelteCraftingSystemManagerApp);

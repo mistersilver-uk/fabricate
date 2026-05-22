@@ -272,7 +272,7 @@
         "Rules": "Rules",
         "Graph": "Graph"
       },
-      "ManagerV2": {
+      "Manager": {
         "WindowTitle": "Crafting Systems",
         "GMOnly": "Only GMs can manage crafting systems.",
         "StartupPending": "Fabricate is still loading. The crafting system manager will open when startup finishes.",
@@ -366,7 +366,7 @@
           "Quickstart": "Quickstart",
           "Docs": "Docs"
         },
-        "PlannedView": "{view} is planned for manager v2.",
+        "PlannedView": "{view} is planned for a future release.",
         "Soon": "Soon",
         "ResolutionRouted": "Routed",
         "ResolutionMappedLegacy": "Legacy routed",
@@ -374,7 +374,7 @@
         "SystemEdit": {
           "Kicker": "System Edit",
           "Title": "System settings",
-          "Subtitle": "Edit base settings for the selected crafting system without leaving manager v2.",
+          "Subtitle": "Edit base settings for the selected crafting system.",
           "Breadcrumb": "System settings",
           "Nav": "System settings",
           "Actions": "System edit actions",
@@ -393,7 +393,7 @@
           "AdvancedVisible": "Advanced visible",
           "Summary": "Edit summary",
           "EnabledFeatureCount": "Features enabled",
-          "DeepConfigHint": "Categories, tags, essences, checks, requirements, visibility, alchemy, and gathering configuration stay in later manager-v2 views or the current admin for this slice.",
+          "DeepConfigHint": "Categories, tags, essences, checks, requirements, visibility, alchemy, and gathering configuration stay in later manager views or the current admin for this slice.",
           "LegacyFallback": "Legacy fallback",
           "LegacyFallbackHint": "Open the current admin when you need deeper configuration that is not part of this v2 edit slice.",
           "FeatureHint": {
@@ -801,7 +801,7 @@
           "Subtitle": "Manage gathering environments for the selected crafting system.",
           "EditKicker": "Environment Edit",
           "EditTitle": "Edit environment",
-          "EditSubtitle": "Edit scene linkage, environment details, tasks, results, catalysts, visibility, timing, and validation in the v2 workspace.",
+          "EditSubtitle": "Edit scene linkage, environment details, tasks, results, catalysts, visibility, timing, and validation in the workspace.",
           "EditBreadcrumb": "Edit environment",
           "Actions": "Environment actions",
           "Create": "Create environment",

@@ -32,7 +32,7 @@
     ? managedItemOptions.find(item => item.id === sourceComponentId) || null
     : null);
   const selectedIconOption = $derived(getEssenceIconOption(normalizeEssenceIcon(icon)));
-  const selectedIconLabel = $derived(selectedIconOption?.label || text('FABRICATE.Admin.ManagerV2.Essence.CustomIcon', 'Custom icon'));
+  const selectedIconLabel = $derived(selectedIconOption?.label || text('FABRICATE.Admin.Manager.Essence.CustomIcon', 'Custom icon'));
   const sourceState = $derived(essenceSourceState());
   const dirty = $derived(isDirty());
   const validName = $derived(Boolean(name.trim()));
@@ -92,24 +92,24 @@
     const state = draftSourceState();
     if (state === 'linked') {
       return {
-        label: text('FABRICATE.Admin.ManagerV2.Essence.SourceLinked', 'Linked source'),
+        label: text('FABRICATE.Admin.Manager.Essence.SourceLinked', 'Linked source'),
         className: 'is-active'
       };
     }
     if (state === 'missing') {
       return {
-        label: text('FABRICATE.Admin.ManagerV2.Essence.SourceMissing', 'Source item missing'),
+        label: text('FABRICATE.Admin.Manager.Essence.SourceMissing', 'Source item missing'),
         className: 'is-warning'
       };
     }
     if (state === 'stale') {
       return {
-        label: text('FABRICATE.Admin.ManagerV2.Essence.SourceStale', 'Source unresolved'),
+        label: text('FABRICATE.Admin.Manager.Essence.SourceStale', 'Source unresolved'),
         className: 'is-warning'
       };
     }
     return {
-      label: text('FABRICATE.Admin.ManagerV2.Essence.SourceNone', 'No source'),
+      label: text('FABRICATE.Admin.Manager.Essence.SourceNone', 'No source'),
       className: 'is-disabled'
     };
   }
@@ -129,7 +129,7 @@
     const sourceStateId = draftSourceState();
     return {
       id: draftId || '',
-      name: name.trim() || text('FABRICATE.Admin.ManagerV2.Essence.CreateInspectorTitle', 'New essence draft'),
+      name: name.trim() || text('FABRICATE.Admin.Manager.Essence.CreateInspectorTitle', 'New essence draft'),
       description,
       icon: normalizedIcon,
       sourceComponentId: showSourceUi ? sourceComponentId || '' : '',
@@ -189,89 +189,89 @@
   }
 </script>
 
-<main class="manager-v2-main manager-v2-essence-edit-main" aria-label={isNew
-  ? text('FABRICATE.Admin.ManagerV2.Essence.CreateTitle', 'Create essence')
-  : text('FABRICATE.Admin.ManagerV2.Essence.EditTitle', 'Edit essence')}>
-  <form id="manager-v2-essence-edit-form" class="manager-v2-essence-edit-view" onsubmit={handleSave}>
-    <section class="manager-v2-edit-card manager-v2-essence-identity-card">
-      <div class="manager-v2-edit-card-heading">
-        <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Essence.Identity', 'Identity')}</h3>
+<main class="manager-main manager-essence-edit-main" aria-label={isNew
+  ? text('FABRICATE.Admin.Manager.Essence.CreateTitle', 'Create essence')
+  : text('FABRICATE.Admin.Manager.Essence.EditTitle', 'Edit essence')}>
+  <form id="manager-essence-edit-form" class="manager-essence-edit-view" onsubmit={handleSave}>
+    <section class="manager-edit-card manager-essence-identity-card">
+      <div class="manager-edit-card-heading">
+        <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Essence.Identity', 'Identity')}</h3>
       </div>
 
-      <div class="manager-v2-essence-edit-grid">
-        <div class="manager-v2-essence-icon-panel">
-          <span class="manager-v2-essence-field-label">{text('FABRICATE.Admin.ManagerV2.Essence.Icon', 'Icon')}</span>
-          <span class="manager-v2-essence-icon-preview" aria-hidden="true">
+      <div class="manager-essence-edit-grid">
+        <div class="manager-essence-icon-panel">
+          <span class="manager-essence-field-label">{text('FABRICATE.Admin.Manager.Essence.Icon', 'Icon')}</span>
+          <span class="manager-essence-icon-preview" aria-hidden="true">
             <i class={normalizeEssenceIcon(icon)}></i>
           </span>
-          <div class="manager-v2-essence-icon-actions">
+          <div class="manager-essence-icon-actions">
             <IconPicker
               value={icon}
               disabled={saving}
-              buttonTitle={text('FABRICATE.Admin.ManagerV2.Essence.ChangeIcon', 'Change icon')}
+              buttonTitle={text('FABRICATE.Admin.Manager.Essence.ChangeIcon', 'Change icon')}
               onChange={(iconClass) => { icon = iconClass; }}
             />
-            <button type="button" class="manager-v2-button" onclick={() => { icon = DEFAULT_ESSENCE_ICON; }} disabled={saving || normalizeEssenceIcon(icon) === DEFAULT_ESSENCE_ICON}>
+            <button type="button" class="manager-button" onclick={() => { icon = DEFAULT_ESSENCE_ICON; }} disabled={saving || normalizeEssenceIcon(icon) === DEFAULT_ESSENCE_ICON}>
               <i class="fas fa-undo" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.ManagerV2.Essence.ClearIcon', 'Clear icon')}</span>
+              <span>{text('FABRICATE.Admin.Manager.Essence.ClearIcon', 'Clear icon')}</span>
             </button>
           </div>
-          <span class="manager-v2-essence-icon-copy">
+          <span class="manager-essence-icon-copy">
             <strong>{selectedIconLabel}</strong>
             <small>{normalizeEssenceIcon(icon) === DEFAULT_ESSENCE_ICON
-              ? text('FABRICATE.Admin.ManagerV2.Essence.DefaultIconLabel', 'Default essence icon')
-              : text('FABRICATE.Admin.ManagerV2.Essence.IconLabel', 'Selected icon')}</small>
+              ? text('FABRICATE.Admin.Manager.Essence.DefaultIconLabel', 'Default essence icon')
+              : text('FABRICATE.Admin.Manager.Essence.IconLabel', 'Selected icon')}</small>
           </span>
         </div>
 
-        <div class="manager-v2-essence-core-fields">
-          <label class="manager-v2-field" for="manager-v2-essence-edit-name">
-            <span>{text('FABRICATE.Admin.ManagerV2.Essence.Name', 'Name')}</span>
-            <input id="manager-v2-essence-edit-name" type="text" value={name} oninput={(event) => name = event.currentTarget.value} placeholder={text('FABRICATE.Admin.ManagerV2.Essence.NamePlaceholder', 'Essence name')} disabled={saving} required />
+        <div class="manager-essence-core-fields">
+          <label class="manager-field" for="manager-essence-edit-name">
+            <span>{text('FABRICATE.Admin.Manager.Essence.Name', 'Name')}</span>
+            <input id="manager-essence-edit-name" type="text" value={name} oninput={(event) => name = event.currentTarget.value} placeholder={text('FABRICATE.Admin.Manager.Essence.NamePlaceholder', 'Essence name')} disabled={saving} required />
           </label>
 
-          <label class="manager-v2-field" for="manager-v2-essence-edit-description">
-            <span>{text('FABRICATE.Admin.ManagerV2.Essence.Description', 'Description')}</span>
-            <textarea id="manager-v2-essence-edit-description" rows="5" value={description} oninput={(event) => description = event.currentTarget.value} placeholder={text('FABRICATE.Admin.ManagerV2.Essence.DescriptionPlaceholder', 'Description')} disabled={saving}></textarea>
+          <label class="manager-field" for="manager-essence-edit-description">
+            <span>{text('FABRICATE.Admin.Manager.Essence.Description', 'Description')}</span>
+            <textarea id="manager-essence-edit-description" rows="5" value={description} oninput={(event) => description = event.currentTarget.value} placeholder={text('FABRICATE.Admin.Manager.Essence.DescriptionPlaceholder', 'Description')} disabled={saving}></textarea>
           </label>
         </div>
       </div>
 
       {#if showSourceUi}
-        <div class="manager-v2-essence-source-panel">
-          <div class="manager-v2-edit-card-heading">
-            <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Essence.Source', 'Source')}</h3>
-            <span class={`manager-v2-chip ${sourceState.className}`}>{sourceState.label}</span>
+        <div class="manager-essence-source-panel">
+          <div class="manager-edit-card-heading">
+            <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Essence.Source', 'Source')}</h3>
+            <span class={`manager-chip ${sourceState.className}`}>{sourceState.label}</span>
           </div>
-          <div class="manager-v2-essence-source-stack">
-            <div class="manager-v2-essence-source-summary">
+          <div class="manager-essence-source-stack">
+            <div class="manager-essence-source-summary">
               {#if selectedSource}
-                <img class="manager-v2-essence-source-thumb" src={selectedSource.img || 'icons/svg/item-bag.svg'} alt="" />
+                <img class="manager-essence-source-thumb" src={selectedSource.img || 'icons/svg/item-bag.svg'} alt="" />
               {:else}
-                <span class="manager-v2-essence-source-thumb is-empty" aria-hidden="true">
+                <span class="manager-essence-source-thumb is-empty" aria-hidden="true">
                   <i class="fas fa-link"></i>
                 </span>
               {/if}
-              <div class="manager-v2-essence-source-copy">
+              <div class="manager-essence-source-copy">
                 {#if selectedSource}
                   <strong>{selectedSource.name}</strong>
-                  <p class="manager-v2-muted">{selectedSource.sourceItemUuid || text('FABRICATE.Admin.ManagerV2.Essence.SourceNoUuid', 'This component has no source item UUID.')}</p>
+                  <p class="manager-muted">{selectedSource.sourceItemUuid || text('FABRICATE.Admin.Manager.Essence.SourceNoUuid', 'This component has no source item UUID.')}</p>
                 {:else if essence?.sourceName || essence?.sourceItemUuid || essence?.sourceComponentId}
                   <strong>{essence.sourceName || essence.sourceComponentId || essence.sourceItemUuid}</strong>
-                  <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Essence.SourceEvidenceHint', 'Stored source evidence remains readable until you clear or repair it.')}</p>
+                  <p class="manager-muted">{text('FABRICATE.Admin.Manager.Essence.SourceEvidenceHint', 'Stored source evidence remains readable until you clear or repair it.')}</p>
                 {:else}
-                  <strong>{text('FABRICATE.Admin.ManagerV2.Essence.SourceNone', 'No source')}</strong>
-                  <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Essence.SourceEditHint', 'Pick or drop a managed component to provide the effect-transfer source.')}</p>
+                  <strong>{text('FABRICATE.Admin.Manager.Essence.SourceNone', 'No source')}</strong>
+                  <p class="manager-muted">{text('FABRICATE.Admin.Manager.Essence.SourceEditHint', 'Pick or drop a managed component to provide the effect-transfer source.')}</p>
                 {/if}
               </div>
               {#if selectedSource || sourceComponentId || hasStoredSourceEvidence()}
-                <button type="button" class="manager-v2-icon-button" onclick={() => { sourceComponentId = ''; sourceTouched = true; }} aria-label={text('FABRICATE.Admin.Features.Essences.ClearSourceItem', 'Clear source item')} title={text('FABRICATE.Admin.Features.Essences.ClearSourceItem', 'Clear source item')}>
+                <button type="button" class="manager-icon-button" onclick={() => { sourceComponentId = ''; sourceTouched = true; }} aria-label={text('FABRICATE.Admin.Features.Essences.ClearSourceItem', 'Clear source item')} title={text('FABRICATE.Admin.Features.Essences.ClearSourceItem', 'Clear source item')}>
                   <i class="fas fa-times" aria-hidden="true"></i>
                 </button>
               {/if}
             </div>
 
-            <div class="manager-v2-essence-source-drop-zone">
+            <div class="manager-essence-source-drop-zone">
               <EssenceSourceSelector
                 value={null}
                 items={managedItemOptions}
@@ -285,7 +285,7 @@
       {/if}
 
       {#if saveFailed}
-        <p class="manager-v2-muted manager-v2-form-warning">{text('FABRICATE.Admin.ManagerV2.Essence.SaveFailed', 'Save failed. Check for duplicate or blank names and try again.')}</p>
+        <p class="manager-muted manager-form-warning">{text('FABRICATE.Admin.Manager.Essence.SaveFailed', 'Save failed. Check for duplicate or blank names and try again.')}</p>
       {/if}
     </section>
   </form>

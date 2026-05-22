@@ -2,7 +2,7 @@
 <script>
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
-  import ManagerV2ColorPopover from './ManagerV2ColorPopover.svelte';
+  import ManagerColorPopover from './ManagerColorPopover.svelte';
 
   let {
     colorToken = 'sage',
@@ -31,7 +31,7 @@
 
   function swatchStyle(token = colorToken, hex = customColor) {
     const custom = validCustomHex(hex);
-    return `--manager-v2-color-swatch: ${custom || `var(--fab-tag-${normalizedToken(token)})`}`;
+    return `--manager-color-swatch: ${custom || `var(--fab-tag-${normalizedToken(token)})`}`;
   }
 
   function closePicker() {
@@ -45,13 +45,13 @@
   function getPopoverHost() {
     if (!pickerRoot || typeof document === 'undefined') return null;
 
-    return pickerRoot.closest('.fabricate-manager-v2');
+    return pickerRoot.closest('.fabricate-manager');
   }
 
   function getPopoverHorizontalBounds(hostRect) {
     if (!pickerRoot) return {};
 
-    const mainPanel = pickerRoot.closest('.manager-v2-main');
+    const mainPanel = pickerRoot.closest('.manager-main');
     const mainPanelRect = mainPanel?.getBoundingClientRect?.();
     if (!mainPanelRect) return {};
 
@@ -136,7 +136,7 @@
 
 <span
   bind:this={pickerRoot}
-  class="manager-v2-color-picker"
+  class="manager-color-picker"
   use:dismissOnOutsideClick={{
     enabled: open,
     onDismiss: closePicker,
@@ -146,17 +146,17 @@
   <button
     type="button"
     bind:this={triggerButton}
-    class="manager-v2-color-picker-trigger"
+    class="manager-color-picker-trigger"
     aria-expanded={open}
     aria-label={buttonTitle}
     title={buttonTitle}
     style={swatchStyle()}
     onclick={togglePicker}
   >
-    <span class="manager-v2-color-swatch" aria-hidden="true"></span>
+    <span class="manager-color-swatch" aria-hidden="true"></span>
   </button>
   {#if open}
-    <ManagerV2ColorPopover
+    <ManagerColorPopover
       {colorToken}
       {customColor}
       {presetGridLabel}

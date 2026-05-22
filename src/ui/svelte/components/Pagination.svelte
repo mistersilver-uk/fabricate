@@ -33,46 +33,46 @@
 </script>
 
 {#if showPagination}
-  <section class="manager-v2-pagination" aria-label={text('FABRICATE.Admin.ManagerV2.Pagination.Label', 'Pagination')}>
-    <span class="manager-v2-pagination-summary" data-pagination-summary>
-      {text('FABRICATE.Admin.ManagerV2.Pagination.Range', 'Showing {first}–{last} of {total}')
+  <section class="manager-pagination" aria-label={text('FABRICATE.Admin.Manager.Pagination.Label', 'Pagination')}>
+    <span class="manager-pagination-summary" data-pagination-summary>
+      {text('FABRICATE.Admin.Manager.Pagination.Range', 'Showing {first}–{last} of {total}')
         .replace('{first}', firstShown)
         .replace('{last}', lastShown)
         .replace('{total}', totalCount)}
     </span>
-    <nav class="manager-v2-pagination-nav" aria-label={text('FABRICATE.Admin.ManagerV2.Pagination.Navigation', 'Page navigation')}>
+    <nav class="manager-pagination-nav" aria-label={text('FABRICATE.Admin.Manager.Pagination.Navigation', 'Page navigation')}>
       <button
         type="button"
-        class="manager-v2-icon-button"
+        class="manager-icon-button"
         data-pagination-prev
-        aria-label={text('FABRICATE.Admin.ManagerV2.Pagination.Previous', 'Previous page')}
+        aria-label={text('FABRICATE.Admin.Manager.Pagination.Previous', 'Previous page')}
         disabled={pageIndex === 0}
         onclick={() => goToPage(pageIndex - 1)}
       >
         <i class="fas fa-chevron-left" aria-hidden="true"></i>
       </button>
-      <span class="manager-v2-pagination-page" data-pagination-page>
-        {text('FABRICATE.Admin.ManagerV2.Pagination.PageOf', 'Page {page} of {total}')
+      <span class="manager-pagination-page" data-pagination-page>
+        {text('FABRICATE.Admin.Manager.Pagination.PageOf', 'Page {page} of {total}')
           .replace('{page}', pageIndex + 1)
           .replace('{total}', totalPages)}
       </span>
       <button
         type="button"
-        class="manager-v2-icon-button"
+        class="manager-icon-button"
         data-pagination-next
-        aria-label={text('FABRICATE.Admin.ManagerV2.Pagination.Next', 'Next page')}
+        aria-label={text('FABRICATE.Admin.Manager.Pagination.Next', 'Next page')}
         disabled={pageIndex >= totalPages - 1}
         onclick={() => goToPage(pageIndex + 1)}
       >
         <i class="fas fa-chevron-right" aria-hidden="true"></i>
       </button>
     </nav>
-    <label class="manager-v2-pagination-size">
-      <span>{text('FABRICATE.Admin.ManagerV2.Pagination.PerPage', 'Per page')}</span>
+    <label class="manager-pagination-size">
+      <span>{text('FABRICATE.Admin.Manager.Pagination.PerPage', 'Per page')}</span>
       <select
         value={pageSize}
         data-pagination-size
-        aria-label={text('FABRICATE.Admin.ManagerV2.Pagination.PerPageLabel', 'Rows per page')}
+        aria-label={text('FABRICATE.Admin.Manager.Pagination.PerPageLabel', 'Rows per page')}
         onchange={(event) => changePageSize(event.currentTarget.value)}
       >
         {#each pageSizeOptions as option (option)}

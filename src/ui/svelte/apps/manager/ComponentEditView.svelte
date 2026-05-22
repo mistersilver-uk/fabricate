@@ -140,7 +140,7 @@
   }
 
   function tabClass(id) {
-    return `manager-v2-component-edit-tab ${activeTab === id ? 'is-active' : ''}`;
+    return `manager-component-edit-tab ${activeTab === id ? 'is-active' : ''}`;
   }
 
   function selectTab(id) {
@@ -192,15 +192,15 @@
 </script>
 
 <main
-  class="manager-v2-main manager-v2-component-edit-main"
-  aria-label={text('FABRICATE.Admin.ManagerV2.Component.EditTitle', 'Edit component')}
+  class="manager-main manager-component-edit-main"
+  aria-label={text('FABRICATE.Admin.Manager.Component.EditTitle', 'Edit component')}
 >
   <form
-    id="manager-v2-component-edit-form"
-    class="manager-v2-component-edit-view"
+    id="manager-component-edit-form"
+    class="manager-component-edit-view"
     onsubmit={handleSave}
   >
-    <div class="manager-v2-component-edit-tabs" role="tablist" aria-label={text('FABRICATE.Admin.ManagerV2.Component.EditTabs', 'Edit component tabs')}>
+    <div class="manager-component-edit-tabs" role="tablist" aria-label={text('FABRICATE.Admin.Manager.Component.EditTabs', 'Edit component tabs')}>
       <button
         type="button"
         class={tabClass('details')}
@@ -209,7 +209,7 @@
         data-component-edit-tab="details"
         onclick={() => selectTab('details')}
       >
-        {text('FABRICATE.Admin.ManagerV2.Component.Tabs.Details', 'Details')}
+        {text('FABRICATE.Admin.Manager.Component.Tabs.Details', 'Details')}
       </button>
       {#if showTags || showEssences}
         <button
@@ -220,34 +220,34 @@
           data-component-edit-tab="tags-essences"
           onclick={() => selectTab('tags-essences')}
         >
-          {text('FABRICATE.Admin.ManagerV2.Component.Tabs.TagsEssences', 'Tags & Essences')}
+          {text('FABRICATE.Admin.Manager.Component.Tabs.TagsEssences', 'Tags & Essences')}
         </button>
       {/if}
     </div>
 
     {#if activeTab === 'details'}
-      <section class="manager-v2-edit-card manager-v2-component-identity" data-component-edit-section="identity">
-        <div class="manager-v2-edit-card-heading">
-          <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Component.Identity.Title', 'Identity')}</h3>
+      <section class="manager-edit-card manager-component-identity" data-component-edit-section="identity">
+        <div class="manager-edit-card-heading">
+          <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Component.Identity.Title', 'Identity')}</h3>
         </div>
 
-        <div class="manager-v2-component-identity-grid">
-          <div class="manager-v2-component-identity-image">
-            <span class="manager-v2-component-identity-label">{text('FABRICATE.Admin.ManagerV2.Component.Identity.ImageLabel', 'Image')}</span>
+        <div class="manager-component-identity-grid">
+          <div class="manager-component-identity-image">
+            <span class="manager-component-identity-label">{text('FABRICATE.Admin.Manager.Component.Identity.ImageLabel', 'Image')}</span>
             {#if component?.img}
-              <img class="manager-v2-component-preview" src={component.img} alt="" />
+              <img class="manager-component-preview" src={component.img} alt="" />
             {:else}
-              <span class="manager-v2-component-preview is-empty" aria-hidden="true">
+              <span class="manager-component-preview is-empty" aria-hidden="true">
                 <i class="fas fa-box-open"></i>
               </span>
             {/if}
           </div>
 
-          <div class="manager-v2-component-identity-fields">
-            <label class="manager-v2-field" for="manager-v2-component-edit-name">
-              <span>{text('FABRICATE.Admin.ManagerV2.Component.Identity.NameLabel', 'Name')}</span>
+          <div class="manager-component-identity-fields">
+            <label class="manager-field" for="manager-component-edit-name">
+              <span>{text('FABRICATE.Admin.Manager.Component.Identity.NameLabel', 'Name')}</span>
               <input
-                id="manager-v2-component-edit-name"
+                id="manager-component-edit-name"
                 type="text"
                 value={component?.name || ''}
                 readonly
@@ -255,10 +255,10 @@
               />
             </label>
 
-            <label class="manager-v2-field" for="manager-v2-component-edit-description">
-              <span>{text('FABRICATE.Admin.ManagerV2.Component.Identity.DescriptionLabel', 'Description')}</span>
+            <label class="manager-field" for="manager-component-edit-description">
+              <span>{text('FABRICATE.Admin.Manager.Component.Identity.DescriptionLabel', 'Description')}</span>
               <textarea
-                id="manager-v2-component-edit-description"
+                id="manager-component-edit-description"
                 rows="4"
                 value={component?.description || ''}
                 readonly
@@ -268,90 +268,90 @@
           </div>
         </div>
 
-        <p class="manager-v2-muted manager-v2-component-identity-hint">
-          {text('FABRICATE.Admin.ManagerV2.Component.Identity.SourceBackedHint', 'This component is backed by a Foundry item. Changes to its source item’s name, image, or description will be reflected here.')}
+        <p class="manager-muted manager-component-identity-hint">
+          {text('FABRICATE.Admin.Manager.Component.Identity.SourceBackedHint', 'This component is backed by a Foundry item. Changes to its source item’s name, image, or description will be reflected here.')}
         </p>
       </section>
 
       {#if showSourceUi}
-        <section class="manager-v2-edit-card manager-v2-component-source-card" data-component-edit-section="source">
-          <div class="manager-v2-edit-card-heading">
-            <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Component.SourceCard.Title', 'Linked Source Item')}</h3>
+        <section class="manager-edit-card manager-component-source-card" data-component-edit-section="source">
+          <div class="manager-edit-card-heading">
+            <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Component.SourceCard.Title', 'Linked Source Item')}</h3>
             {#if component?.sourceMissing}
-              <span class="manager-v2-chip is-warning">{text('FABRICATE.Admin.ManagerV2.Component.SourceOriginMissing', 'Missing')}</span>
+              <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Component.SourceOriginMissing', 'Missing')}</span>
             {:else if component?.hasSourceUuid}
-              <span class="manager-v2-chip is-active">{component.sourceOriginLabel || text('FABRICATE.Admin.ManagerV2.Component.SourceOriginLinked', 'Linked')}</span>
+              <span class="manager-chip is-active">{component.sourceOriginLabel || text('FABRICATE.Admin.Manager.Component.SourceOriginLinked', 'Linked')}</span>
             {:else}
-              <span class="manager-v2-chip is-disabled">{text('FABRICATE.Admin.ManagerV2.Component.SourceCard.NoneLabel', 'No source')}</span>
+              <span class="manager-chip is-disabled">{text('FABRICATE.Admin.Manager.Component.SourceCard.NoneLabel', 'No source')}</span>
             {/if}
           </div>
 
-          <div class="manager-v2-component-source-stack">
-            <div class="manager-v2-component-source-summary">
+          <div class="manager-component-source-stack">
+            <div class="manager-component-source-summary">
               {#if component?.img}
-                <img class="manager-v2-component-source-thumb" src={component.img} alt="" />
+                <img class="manager-component-source-thumb" src={component.img} alt="" />
               {:else}
-                <span class="manager-v2-component-source-thumb is-empty" aria-hidden="true">
+                <span class="manager-component-source-thumb is-empty" aria-hidden="true">
                   <i class="fas fa-link"></i>
                 </span>
               {/if}
-              <div class="manager-v2-component-source-copy">
+              <div class="manager-component-source-copy">
                 {#if component?.hasSourceUuid}
                   <strong>{component?.name || ''}</strong>
-                  <p class="manager-v2-muted manager-v2-component-source-uuid">{component.sourceUuidDisplay}</p>
+                  <p class="manager-muted manager-component-source-uuid">{component.sourceUuidDisplay}</p>
                 {:else}
-                  <strong>{text('FABRICATE.Admin.ManagerV2.Component.SourceCard.NoneLabel', 'No source')}</strong>
-                  <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Component.SourceCard.NoSourceHint', 'Drop or replace a Foundry item to link this component to a source.')}</p>
+                  <strong>{text('FABRICATE.Admin.Manager.Component.SourceCard.NoneLabel', 'No source')}</strong>
+                  <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.SourceCard.NoSourceHint', 'Drop or replace a Foundry item to link this component to a source.')}</p>
                 {/if}
               </div>
             </div>
 
             {#if component?.sourceMissing}
-              <p class="manager-v2-muted manager-v2-component-source-warning">
-                {text('FABRICATE.Admin.ManagerV2.Component.SourceMissingHint', 'The stored source no longer resolves. Replace the component source or verify the original compendium/world item still exists.')}
+              <p class="manager-muted manager-component-source-warning">
+                {text('FABRICATE.Admin.Manager.Component.SourceMissingHint', 'The stored source no longer resolves. Replace the component source or verify the original compendium/world item still exists.')}
               </p>
             {/if}
 
-            <div class="manager-v2-component-source-actions">
+            <div class="manager-component-source-actions">
               <button
                 type="button"
-                class="manager-v2-button"
+                class="manager-button"
                 data-component-edit-action="open-source"
                 onclick={handleOpenSource}
                 disabled={!component?.hasSourceUuid}
               >
                 <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.ManagerV2.Component.SourceCard.Open', 'Open Source Item')}</span>
+                <span>{text('FABRICATE.Admin.Manager.Component.SourceCard.Open', 'Open Source Item')}</span>
               </button>
               <button
                 type="button"
-                class="manager-v2-button"
+                class="manager-button"
                 data-component-edit-action="copy-source"
                 onclick={handleCopySource}
                 disabled={!component?.hasSourceUuid}
               >
                 <i class="fas fa-copy" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.ManagerV2.Component.CopySource', 'Copy source UUID')}</span>
+                <span>{text('FABRICATE.Admin.Manager.Component.CopySource', 'Copy source UUID')}</span>
               </button>
               <button
                 type="button"
-                class="manager-v2-button is-danger"
+                class="manager-button is-danger"
                 data-component-edit-action="unlink-source"
                 onclick={handleUnlink}
                 disabled={!component?.hasSourceUuid}
               >
                 <i class="fas fa-link-slash" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.ManagerV2.Component.SourceCard.Unlink', 'Unlink Source Item')}</span>
+                <span>{text('FABRICATE.Admin.Manager.Component.SourceCard.Unlink', 'Unlink Source Item')}</span>
               </button>
             </div>
 
             <div
-              class="manager-v2-component-source-drop-zone"
+              class="manager-component-source-drop-zone"
               data-component-edit-action="replace-source"
               use:dragDrop={{ onDrop: handleSourceDrop, activeClass: 'is-drop-active' }}
             >
               <i class="fas fa-arrows-rotate" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.ManagerV2.Component.SourceCard.ReplaceHint', 'Drop a Foundry item here to replace the linked source.')}</span>
+              <span>{text('FABRICATE.Admin.Manager.Component.SourceCard.ReplaceHint', 'Drop a Foundry item here to replace the linked source.')}</span>
             </div>
           </div>
         </section>
@@ -360,14 +360,14 @@
 
     {#if activeTab === 'tags-essences'}
       {#if showTags}
-        <section class="manager-v2-edit-card" data-component-edit-section="tags">
-          <div class="manager-v2-edit-card-heading">
-            <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Component.TagsEdit.Title', 'Tags')}</h3>
+        <section class="manager-edit-card" data-component-edit-section="tags">
+          <div class="manager-edit-card-heading">
+            <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Component.TagsEdit.Title', 'Tags')}</h3>
           </div>
           {#if tagDraft.length > 0}
-            <div class="manager-v2-component-tag-grid">
+            <div class="manager-component-tag-grid">
               {#each tagDraft as option (option.tag)}
-                <label class="manager-v2-component-tag-option">
+                <label class="manager-component-tag-option">
                   <input
                     type="checkbox"
                     checked={option.checked}
@@ -379,23 +379,23 @@
               {/each}
             </div>
           {:else}
-            <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Component.TagsEdit.NoTags', 'No tags are defined for this system yet.')}</p>
+            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.TagsEdit.NoTags', 'No tags are defined for this system yet.')}</p>
           {/if}
         </section>
       {/if}
 
       {#if showEssences}
-        <section class="manager-v2-edit-card" data-component-edit-section="essences">
-          <div class="manager-v2-edit-card-heading">
-            <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.Component.EssencesEdit.Title', 'Essences')}</h3>
+        <section class="manager-edit-card" data-component-edit-section="essences">
+          <div class="manager-edit-card-heading">
+            <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Component.EssencesEdit.Title', 'Essences')}</h3>
           </div>
           {#if essenceDraft.length > 0}
-            <div class="manager-v2-component-essence-grid">
+            <div class="manager-component-essence-grid">
               {#each essenceDraft as option (option.id)}
-                <article class="manager-v2-component-essence-card" data-component-edit-essence={option.id}>
+                <article class="manager-component-essence-card" data-component-edit-essence={option.id}>
                   <button
                     type="button"
-                    class="manager-v2-icon-button"
+                    class="manager-icon-button"
                     onclick={() => adjustEssence(option.id, -1)}
                     aria-label={text('FABRICATE.Admin.Items.Editor.DecrementEssence', 'Decrement {name}').replace('{name}', option.name)}
                     title={text('FABRICATE.Admin.Items.Editor.DecrementEssence', 'Decrement {name}').replace('{name}', option.name)}
@@ -405,7 +405,7 @@
                   </button>
 
                   <input
-                    class="manager-v2-component-essence-quantity"
+                    class="manager-component-essence-quantity"
                     type="number"
                     min="0"
                     step="1"
@@ -415,15 +415,15 @@
                     disabled={saving}
                   />
 
-                  <span class="manager-v2-component-essence-icon" aria-hidden="true">
+                  <span class="manager-component-essence-icon" aria-hidden="true">
                     <i class={option.icon || 'fas fa-mortar-pestle'}></i>
                   </span>
 
-                  <strong class="manager-v2-component-essence-name">{option.name}</strong>
+                  <strong class="manager-component-essence-name">{option.name}</strong>
 
                   <button
                     type="button"
-                    class="manager-v2-icon-button"
+                    class="manager-icon-button"
                     onclick={() => adjustEssence(option.id, 1)}
                     aria-label={text('FABRICATE.Admin.Items.Editor.IncrementEssence', 'Increment {name}').replace('{name}', option.name)}
                     title={text('FABRICATE.Admin.Items.Editor.IncrementEssence', 'Increment {name}').replace('{name}', option.name)}
@@ -435,20 +435,20 @@
               {/each}
             </div>
           {:else}
-            <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Component.EssencesEdit.NoEssences', 'No essences are defined for this system yet.')}</p>
+            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.EssencesEdit.NoEssences', 'No essences are defined for this system yet.')}</p>
           {/if}
         </section>
       {/if}
 
       {#if !showTags && !showEssences}
-        <section class="manager-v2-edit-card">
-          <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.Component.NoEditableFields', 'There are no editable tag or essence fields for this component in the selected system.')}</p>
+        <section class="manager-edit-card">
+          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.NoEditableFields', 'There are no editable tag or essence fields for this component in the selected system.')}</p>
         </section>
       {/if}
     {/if}
 
     {#if saveFailed}
-      <p class="manager-v2-muted manager-v2-form-warning">{text('FABRICATE.Admin.ManagerV2.Component.SaveFailed', 'Save failed. Try again or refresh the manager.')}</p>
+      <p class="manager-muted manager-form-warning">{text('FABRICATE.Admin.Manager.Component.SaveFailed', 'Save failed. Try again or refresh the manager.')}</p>
     {/if}
   </form>
 </main>

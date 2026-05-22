@@ -13,8 +13,8 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const sharedComponentNames = [
   'ImagePathPicker',
   'IconPicker',
-  'ManagerV2ColorPicker',
-  'ManagerV2ColorPopover',
+  'ManagerColorPicker',
+  'ManagerColorPopover',
   'EssenceSourceSelector',
   'Pagination',
   'ProviderExpressionInput'
@@ -31,21 +31,21 @@ function rewriteClientImports(code) {
     .replace(/(from\s+['"][^'"]+\.svelte)(['"])/g, '$1.js$2');
 }
 
-function compileManagerV2Root() {
-  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/CraftingSystemManagerV2Root.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/ComponentEditView.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/ComponentsBrowserView.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EnvironmentEditView.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EnvironmentsBrowserView.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EssenceBrowserView.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/EssenceEditView.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/GatheringTaskEditView.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/ToolsBrowserView.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/GatheringTasksBrowserView.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/RecipesBrowserView.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/SystemEditView.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/SystemsBrowserView.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager-v2/TagsCategoriesView.svelte');
+function compileManagerRoot() {
+  writeCompiledSvelte('src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentEditView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ComponentsBrowserView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/EnvironmentEditView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/EssenceBrowserView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/EssenceEditView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTaskEditView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ToolsBrowserView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/SystemEditView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/SystemsBrowserView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/TagsCategoriesView.svelte');
   for (const componentName of sharedComponentNames) {
     writeCompiledSvelte(`src/ui/svelte/components/${componentName}.svelte`);
   }
@@ -70,17 +70,17 @@ function compileManagerV2Root() {
 }
 
 function navButton(labelText) {
-  return Array.from(target.querySelectorAll('.manager-v2-nav-button'))
+  return Array.from(target.querySelectorAll('.manager-nav-button'))
     .find(button => button.textContent.includes(labelText));
 }
 
 function gatheringSubitem(labelText) {
-  return Array.from(target.querySelectorAll('.manager-v2-nav-subitem'))
+  return Array.from(target.querySelectorAll('.manager-nav-subitem'))
     .find(button => button.textContent.includes(labelText));
 }
 
 function gatheringToggle() {
-  return target.querySelector('.manager-v2-nav-toggle');
+  return target.querySelector('.manager-nav-toggle');
 }
 
 function writeCompiledSvelte(sourcePath) {
@@ -879,7 +879,7 @@ function createStore(calls = [], options = {}) {
   };
 }
 
-describe('CraftingSystemManagerV2 mounted behavior', () => {
+describe('CraftingSystemManager mounted behavior', () => {
   before(async () => {
     setupDOM();
     globalThis.Text = document.createTextNode('').constructor;
@@ -890,12 +890,12 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
         format: (key) => key
       }
     };
-    tempRoot = mkdtempSync(join(tmpdir(), 'fabricate-manager-v2-'));
+    tempRoot = mkdtempSync(join(tmpdir(), 'fabricate-manager-'));
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
-    compileManagerV2Root();
+    compileManagerRoot();
     Component = (await import(pathToFileURL(join(
       tempRoot,
-      'src/ui/svelte/apps/manager-v2/CraftingSystemManagerV2Root.svelte.js'
+      'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte.js'
     )))).default;
   });
 
@@ -926,35 +926,35 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     });
     flushSync();
 
-    assert.ok(target.querySelector('.fabricate-manager-v2'));
-    assert.ok(target.querySelector('.manager-v2-rail'));
-    assert.ok(target.querySelector('.manager-v2-main'));
-    assert.ok(target.querySelector('.manager-v2-inspector'));
-    assert.equal(target.querySelectorAll('.manager-v2-system-row').length, 2);
-    assert.equal(target.querySelectorAll('.manager-v2-table-head [role="columnheader"]').length, 4);
-    assert.equal(target.querySelectorAll('.manager-v2-count-cluster').length, 0);
-    assert.ok(target.querySelector('.manager-v2-breadcrumbs'));
-    assert.equal(target.querySelector('.manager-v2-header .manager-v2-heading > .manager-v2-kicker'), null);
+    assert.ok(target.querySelector('.fabricate-manager'));
+    assert.ok(target.querySelector('.manager-rail'));
+    assert.ok(target.querySelector('.manager-main'));
+    assert.ok(target.querySelector('.manager-inspector'));
+    assert.equal(target.querySelectorAll('.manager-system-row').length, 2);
+    assert.equal(target.querySelectorAll('.manager-table-head [role="columnheader"]').length, 4);
+    assert.equal(target.querySelectorAll('.manager-count-cluster').length, 0);
+    assert.ok(target.querySelector('.manager-breadcrumbs'));
+    assert.equal(target.querySelector('.manager-header .manager-heading > .manager-kicker'), null);
     assert.equal(target.textContent.includes('Systems View'), false);
-    assert.equal(target.querySelector('.manager-v2-section-header .manager-v2-action-group'), null);
+    assert.equal(target.querySelector('.manager-section-header .manager-action-group'), null);
     assert.equal(target.textContent.includes('Quick actions'), false);
     assert.deepEqual(
-      Array.from(target.querySelectorAll('.manager-v2-nav-label')).map(label => label.textContent.trim()),
+      Array.from(target.querySelectorAll('.manager-nav-label')).map(label => label.textContent.trim()),
       ['System settings', 'Recipes', 'Components', 'Tags & Categories', 'Essences', 'Tools', 'Gathering', 'Rules', 'Graph']
     );
     assert.equal(
-      Array.from(target.querySelectorAll('.manager-v2-header-actions .manager-v2-button'))
+      Array.from(target.querySelectorAll('.manager-header-actions .manager-button'))
         .some(button => button.textContent.includes('Open current admin')),
       false,
       'system library header should not expose the legacy admin launch button'
     );
-    const systemSettingsNav = Array.from(target.querySelectorAll('.manager-v2-nav-button'))
-      .find(button => button.querySelector('.manager-v2-nav-label')?.textContent.trim() === 'System settings');
+    const systemSettingsNav = Array.from(target.querySelectorAll('.manager-nav-button'))
+      .find(button => button.querySelector('.manager-nav-label')?.textContent.trim() === 'System settings');
     assert.ok(systemSettingsNav, 'system settings nav button should render');
-    assert.equal(systemSettingsNav.querySelector('.manager-v2-nav-count'), null, 'system settings nav should not show an Edit badge');
-    const toolsNav = Array.from(target.querySelectorAll('.manager-v2-nav-button'))
-      .find(button => button.querySelector('.manager-v2-nav-label')?.textContent.trim() === 'Tools');
-    assert.equal(toolsNav.querySelector('.manager-v2-nav-count')?.textContent.trim(), '0');
+    assert.equal(systemSettingsNav.querySelector('.manager-nav-count'), null, 'system settings nav should not show an Edit badge');
+    const toolsNav = Array.from(target.querySelectorAll('.manager-nav-button'))
+      .find(button => button.querySelector('.manager-nav-label')?.textContent.trim() === 'Tools');
+    assert.equal(toolsNav.querySelector('.manager-nav-count')?.textContent.trim(), '0');
     assert.ok(target.textContent.includes('Alchemy'));
     assert.ok(target.textContent.includes('Potion and essence work'));
     assert.ok(target.textContent.includes('4'));
@@ -962,12 +962,12 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
 
     const environmentFact = target.querySelector('[data-count-id="environments"]');
     assert.equal(environmentFact.textContent.trim().replace(/\s+/g, ' '), '2 Gathering environments');
-    assert.equal(environmentFact.querySelector('.manager-v2-fact-leading')?.textContent.trim(), '2 Gathering');
-    assert.equal(environmentFact.querySelector('.manager-v2-fact-label')?.textContent.trim(), 'environments');
+    assert.equal(environmentFact.querySelector('.manager-fact-leading')?.textContent.trim(), '2 Gathering');
+    assert.equal(environmentFact.querySelector('.manager-fact-label')?.textContent.trim(), 'environments');
 
-    const systemHeroRow = target.querySelector('.manager-v2-inspector .manager-v2-inspector-title-row.is-hero-large');
+    const systemHeroRow = target.querySelector('.manager-inspector .manager-inspector-title-row.is-hero-large');
     assert.ok(systemHeroRow, 'systems inspector should use the prominent hero title row');
-    assert.ok(systemHeroRow.querySelector('.manager-v2-inspector-icon.is-hero-large'), 'systems inspector hero should render the icon at hero-large size');
+    assert.ok(systemHeroRow.querySelector('.manager-inspector-icon.is-hero-large'), 'systems inspector hero should render the icon at hero-large size');
   });
 
   it('renders Systems Library current gathering condition shortcuts for enabled dimensions', () => {
@@ -1104,7 +1104,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     });
     flushSync();
 
-    const navLabels = Array.from(target.querySelectorAll('.manager-v2-nav-label')).map(label => label.textContent.trim());
+    const navLabels = Array.from(target.querySelectorAll('.manager-nav-label')).map(label => label.textContent.trim());
     assert.deepEqual(navLabels, []);
     assert.ok(target.textContent.includes('Crafting Systems'));
     assert.ok(target.textContent.includes('No crafting systems yet'));
@@ -1112,7 +1112,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Create a system for one crafting discipline or ruleset.'));
     assert.ok(target.textContent.includes('Quickstart'));
     assert.equal(target.textContent.includes('Select a system'), false);
-    assert.equal(target.querySelectorAll('.manager-v2-setup-card').length, 1);
+    assert.equal(target.querySelectorAll('.manager-setup-card').length, 1);
   });
 
   it('shows systems loading instead of the empty systems setup while startup is pending', () => {
@@ -1183,13 +1183,13 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     flushSync();
 
     assert.deepEqual(
-      Array.from(target.querySelectorAll('.manager-v2-nav-label')).map(label => label.textContent.trim()),
+      Array.from(target.querySelectorAll('.manager-nav-label')).map(label => label.textContent.trim()),
       ['System settings', 'Recipes', 'Components', 'Tags & Categories', 'Tools', 'Rules', 'Graph']
     );
 
     const environmentFact = target.querySelector('[data-count-id="environments"]');
     assert.equal(environmentFact.textContent.trim().replace(/\s+/g, ' '), 'Gathering environments Off');
-    assert.equal(environmentFact.querySelector('.manager-v2-fact-label')?.textContent.trim(), 'Gathering environments');
+    assert.equal(environmentFact.querySelector('.manager-fact-label')?.textContent.trim(), 'Gathering environments');
     assert.equal(environmentFact.querySelector('strong.is-disabled')?.textContent.trim(), 'Off');
   });
 
@@ -1209,33 +1209,33 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     navButton('Recipes').click();
     await tick();
     flushSync();
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'recipes');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes');
 
-    const systemCrumb = Array.from(target.querySelectorAll('.manager-v2-breadcrumbs button'))
+    const systemCrumb = Array.from(target.querySelectorAll('.manager-breadcrumbs button'))
       .find(button => button.textContent.trim() === 'Alchemy');
     systemCrumb.click();
     await Promise.resolve();
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'system-edit');
-    assert.ok(target.querySelector('.manager-v2-system-edit-form'));
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'system-edit');
+    assert.ok(target.querySelector('.manager-system-edit-form'));
 
-    const scopeCard = target.querySelector('.manager-v2-scope-card');
+    const scopeCard = target.querySelector('.manager-scope-card');
     assert.ok(scopeCard, 'selected system scope card should render');
-    assert.equal(scopeCard.querySelector('.manager-v2-scope-name')?.textContent.trim(), 'Alchemy');
-    assert.equal(scopeCard.querySelector('.manager-v2-scope-name')?.tagName, 'SPAN');
-    const returnButton = scopeCard.querySelector('.manager-v2-scope-return');
+    assert.equal(scopeCard.querySelector('.manager-scope-name')?.textContent.trim(), 'Alchemy');
+    assert.equal(scopeCard.querySelector('.manager-scope-name')?.tagName, 'SPAN');
+    const returnButton = scopeCard.querySelector('.manager-scope-return');
     assert.ok(returnButton, 'selected system scope should expose a return-to-library button');
     assert.equal(returnButton.getAttribute('aria-label'), 'Return to System Library');
     assert.equal(returnButton.getAttribute('title'), 'Return to System Library');
 
     const callsBeforeScopeNameClick = calls.length;
-    scopeCard.querySelector('.manager-v2-scope-name').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    scopeCard.querySelector('.manager-scope-name').dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await tick();
     flushSync();
     assert.equal(calls.length, callsBeforeScopeNameClick, 'clicking the selected system name should not route or clear selection');
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'system-edit');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'system-edit');
 
     const callsBeforeReturn = calls.length;
     returnButton.click();
@@ -1244,11 +1244,11 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     flushSync();
 
     assert.equal(calls.length, callsBeforeReturn, 'returning to system library should not call selectSystem');
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'systems');
-    assert.ok(target.querySelector('.manager-v2-scope-card'), 'selected system scope should remain visible');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'systems');
+    assert.ok(target.querySelector('.manager-scope-card'), 'selected system scope should remain visible');
     assert.equal(target.querySelector('[data-system-id="alchemy"]').getAttribute('aria-selected'), 'true');
     assert.deepEqual(
-      Array.from(target.querySelectorAll('.manager-v2-nav-label')).map(label => label.textContent.trim()),
+      Array.from(target.querySelectorAll('.manager-nav-label')).map(label => label.textContent.trim()),
       ['System settings', 'Recipes', 'Components', 'Tags & Categories', 'Essences', 'Tools', 'Gathering', 'Rules', 'Graph']
     );
     assert.ok(target.textContent.includes('System library'));
@@ -1275,31 +1275,31 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'recipes');
-    assert.equal(target.querySelectorAll('.manager-v2-recipe-row').length, 2);
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes');
+    assert.equal(target.querySelectorAll('.manager-recipe-row').length, 2);
     assert.ok(target.textContent.includes('Recipe library'));
     assert.ok(target.textContent.includes('Healing Draught'));
     assert.ok(target.textContent.includes('Restores a small amount of health.'));
     assert.ok(target.textContent.includes('Requirements'));
     assert.ok(target.textContent.includes('Player visibility'));
-    const enabledRecipeToggle = target.querySelector('[data-recipe-id="r1"] .manager-v2-status-toggle');
-    const disabledRecipeToggle = target.querySelector('[data-recipe-id="r2"] .manager-v2-status-toggle');
+    const enabledRecipeToggle = target.querySelector('[data-recipe-id="r1"] .manager-status-toggle');
+    const disabledRecipeToggle = target.querySelector('[data-recipe-id="r2"] .manager-status-toggle');
     assert.ok(enabledRecipeToggle, 'enabled recipe row should render the shared status toggle');
     assert.ok(disabledRecipeToggle, 'disabled recipe row should render the shared status toggle');
     assert.equal(enabledRecipeToggle.getAttribute('aria-pressed'), 'true');
     assert.equal(disabledRecipeToggle.getAttribute('aria-pressed'), 'false');
-    assert.equal(enabledRecipeToggle.querySelector('.manager-v2-status-toggle-label').textContent.trim(), 'On');
-    assert.equal(disabledRecipeToggle.querySelector('.manager-v2-status-toggle-label').textContent.trim(), 'Off');
-    assert.equal(target.querySelector('[data-recipe-id="r2"] .manager-v2-toggle input[type="checkbox"]'), null);
+    assert.equal(enabledRecipeToggle.querySelector('.manager-status-toggle-label').textContent.trim(), 'On');
+    assert.equal(disabledRecipeToggle.querySelector('.manager-status-toggle-label').textContent.trim(), 'Off');
+    assert.equal(target.querySelector('[data-recipe-id="r2"] .manager-toggle input[type="checkbox"]'), null);
 
-    target.querySelector('[data-recipe-id="r2"] .manager-v2-recipe-identity').click();
+    target.querySelector('[data-recipe-id="r2"] .manager-recipe-identity').click();
     await tick();
     flushSync();
     assert.ok(target.querySelector('[data-recipe-id="r2"]').classList.contains('is-selected'));
     assert.ok(target.textContent.includes('Locked Elixir'));
     assert.ok(target.textContent.includes('Restricted (none selected)'));
 
-    assert.equal(target.querySelector('.manager-v2-pagination'), null, 'pagination should hide while filtered row count is below the page size');
+    assert.equal(target.querySelector('.manager-pagination'), null, 'pagination should hide while filtered row count is below the page size');
 
     assert.equal(target.querySelector('[data-clear-filters="recipes"]'), null, 'Clear filters should hide while no filter is active');
     const recipeStatusFilterSelect = target.querySelector('[aria-label="Filter recipes by status"]');
@@ -1322,22 +1322,22 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.querySelector('[data-recipe-action="delete"]'), 'recipe inspector should expose a Delete action');
     assert.ok(target.querySelector('[data-recipe-fact="structure"]'), 'recipe inspector should expose a Structure fact');
     assert.ok(target.querySelector('[data-recipe-fact="result-groups"]'), 'recipe inspector should expose a Result groups fact');
-    const heroRow = target.querySelector('.manager-v2-inspector-title-row.is-hero-large');
+    const heroRow = target.querySelector('.manager-inspector-title-row.is-hero-large');
     assert.ok(heroRow, 'recipe inspector should use the prominent hero title row');
-    assert.ok(heroRow.querySelector('.manager-v2-recipe-preview'), 'recipe inspector hero should render the recipe preview image');
+    assert.ok(heroRow.querySelector('.manager-recipe-preview'), 'recipe inspector hero should render the recipe preview image');
 
-    const search = target.querySelector('.manager-v2-toolbar input[type="search"]');
+    const search = target.querySelector('.manager-toolbar input[type="search"]');
     search.value = 'elixir';
     search.dispatchEvent(new Event('input', { bubbles: true }));
 
-    target.querySelector('[data-recipe-id="r2"] .manager-v2-status-toggle').click();
+    target.querySelector('[data-recipe-id="r2"] .manager-status-toggle').click();
 
-    target.querySelector('[data-recipe-id="r2"] .manager-v2-icon-button').click();
-    target.querySelector('[data-recipe-id="r2"] .manager-v2-icon-button:nth-of-type(2)').click();
-    target.querySelector('[data-recipe-id="r2"] .manager-v2-icon-button:nth-of-type(3)').click();
-    target.querySelector('.manager-v2-header-actions .manager-v2-button:nth-child(1)').click();
-    target.querySelector('.manager-v2-header-actions .manager-v2-button:nth-child(2)').click();
-    target.querySelector('.manager-v2-header-actions .manager-v2-button:nth-child(3)').click();
+    target.querySelector('[data-recipe-id="r2"] .manager-icon-button').click();
+    target.querySelector('[data-recipe-id="r2"] .manager-icon-button:nth-of-type(2)').click();
+    target.querySelector('[data-recipe-id="r2"] .manager-icon-button:nth-of-type(3)').click();
+    target.querySelector('.manager-header-actions .manager-button:nth-child(1)').click();
+    target.querySelector('.manager-header-actions .manager-button:nth-child(2)').click();
+    target.querySelector('.manager-header-actions .manager-button:nth-child(3)').click();
 
     assert.deepEqual(edited, ['r2']);
     assert.deepEqual(calls.slice(-5), [
@@ -1376,21 +1376,21 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'components');
-    assert.equal(target.querySelectorAll('.manager-v2-component-row').length, 2);
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'components');
+    assert.equal(target.querySelectorAll('.manager-component-row').length, 2);
     assert.ok(target.textContent.includes('Component directory'));
     assert.ok(target.textContent.includes('Drop items to add components'));
     assert.ok(target.textContent.includes('Iron Ore'));
     assert.ok(target.textContent.includes('Compendium'));
     assert.ok(target.textContent.includes('Unknown'));
-    const compactEssenceChip = target.querySelector('[data-component-id="c1"] .manager-v2-essence-compact-chip');
+    const compactEssenceChip = target.querySelector('[data-component-id="c1"] .manager-essence-compact-chip');
     assert.equal(compactEssenceChip?.textContent.trim(), '2', 'essence row should show only compact quantity text');
     assert.equal(compactEssenceChip?.getAttribute('aria-label'), 'Earth 2', 'compact essence chip should expose the essence name and quantity accessibly');
     assert.equal(target.textContent.includes('Usage evidence'), false);
     assert.equal(target.textContent.includes('Evidence'), false);
     assert.equal(target.textContent.includes('Progressive difficulty'), false);
 
-    const search = target.querySelector('.manager-v2-toolbar input[type="search"]');
+    const search = target.querySelector('.manager-toolbar input[type="search"]');
     search.value = 'iron';
     search.dispatchEvent(new Event('input', { bubbles: true }));
 
@@ -1402,20 +1402,20 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     tagSearch.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
-    const containerSuggestion = Array.from(target.querySelectorAll('.manager-v2-tag-suggestion'))
+    const containerSuggestion = Array.from(target.querySelectorAll('.manager-tag-suggestion'))
       .find(button => button.textContent.includes('container'));
     assert.ok(containerSuggestion, 'tag search should show matching tags underneath');
     containerSuggestion.click();
     await tick();
     flushSync();
-    assert.equal(target.querySelectorAll('.manager-v2-component-row').length, 1);
+    assert.equal(target.querySelectorAll('.manager-component-row').length, 1);
     assert.ok(target.textContent.includes('Glass Vial'));
     const containerPill = target.querySelector('[data-component-tag-pill="container"]');
     assert.ok(containerPill, 'selected tag should render as a removable pill');
-    const componentToolbar = target.querySelector('.manager-v2-toolbar');
-    const primaryToolbarRow = target.querySelector('.manager-v2-toolbar-primary');
+    const componentToolbar = target.querySelector('.manager-toolbar');
+    const primaryToolbarRow = target.querySelector('.manager-toolbar-primary');
     const tagSearchControl = target.querySelector('[data-component-tag-search]');
-    const selectedTagRow = target.querySelector('.manager-v2-toolbar-pills');
+    const selectedTagRow = target.querySelector('.manager-toolbar-pills');
     assert.ok(primaryToolbarRow.contains(tagSearchControl), 'tag search control should stay in the primary toolbar row');
     assert.equal(selectedTagRow?.parentElement, componentToolbar, 'selected tag pills should render in a toolbar sibling row');
     assert.equal(tagSearchControl.contains(containerPill), false, 'selected tag pills should not live inside the tag search control');
@@ -1423,13 +1423,13 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     containerPill.querySelector('button').click();
     await tick();
     flushSync();
-    assert.equal(target.querySelectorAll('.manager-v2-component-row').length, 2);
+    assert.equal(target.querySelectorAll('.manager-component-row').length, 2);
 
     tagSearch.value = 'ore';
     tagSearch.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
-    Array.from(target.querySelectorAll('.manager-v2-tag-suggestion'))
+    Array.from(target.querySelectorAll('.manager-tag-suggestion'))
       .find(button => button.textContent.includes('ore'))
       .click();
     await tick();
@@ -1438,12 +1438,12 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     tagSearch.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
-    Array.from(target.querySelectorAll('.manager-v2-tag-suggestion'))
+    Array.from(target.querySelectorAll('.manager-tag-suggestion'))
       .find(button => button.textContent.includes('metal'))
       .click();
     await tick();
     flushSync();
-    assert.equal(target.querySelectorAll('.manager-v2-component-row').length, 1, 'multiple selected tags should require all tags');
+    assert.equal(target.querySelectorAll('.manager-component-row').length, 1, 'multiple selected tags should require all tags');
     assert.ok(target.textContent.includes('Iron Ore'));
 
     target.querySelector('[data-component-tag-pill="ore"]').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
@@ -1455,9 +1455,9 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(target.querySelector('[data-component-tag-pill="metal"]'), null, 'clear filters should remove selected tag pills');
-    assert.equal(target.querySelectorAll('.manager-v2-component-row').length, 2);
+    assert.equal(target.querySelectorAll('.manager-component-row').length, 2);
 
-    target.querySelector('[data-component-id="c1"] .manager-v2-component-identity').click();
+    target.querySelector('[data-component-id="c1"] .manager-component-identity').click();
     await tick();
     flushSync();
     assert.ok(target.querySelector('[data-component-id="c1"]').classList.contains('is-selected'));
@@ -1472,31 +1472,31 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(target.querySelector('[data-component-action="delete"]'), null, 'component inspector should not duplicate row delete action');
     assert.ok(target.querySelector('[data-component-section="source"]'), 'component inspector should expose a Source section');
     assert.equal(target.querySelector('[data-component-source-missing]'), null, 'resolved source should not show a missing-source warning');
-    const componentHeroRow = target.querySelector('.manager-v2-inspector-title-row.is-hero-large');
+    const componentHeroRow = target.querySelector('.manager-inspector-title-row.is-hero-large');
     assert.ok(componentHeroRow, 'component inspector should use the prominent hero title row');
-    assert.ok(componentHeroRow.querySelector('.manager-v2-component-preview'), 'component inspector hero should render the component preview image');
+    assert.ok(componentHeroRow.querySelector('.manager-component-preview'), 'component inspector hero should render the component preview image');
 
     const dropEvent = new Event('drop', { bubbles: true, cancelable: true });
     Object.defineProperty(dropEvent, 'dataTransfer', {
       value: { getData: () => JSON.stringify({ type: 'Item', uuid: 'Item.dropped' }) }
     });
-    target.querySelector('.manager-v2-component-drop-zone').dispatchEvent(dropEvent);
+    target.querySelector('.manager-component-drop-zone').dispatchEvent(dropEvent);
 
     target.querySelector('[data-component-id="c1"] [aria-label="Edit Iron Ore"]').click();
     flushSync();
     await tick();
     flushSync();
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'component-edit', 'row Edit action should route into the manager-v2 component-edit view');
-    Array.from(target.querySelectorAll('.manager-v2-breadcrumbs button')).find(button => button.textContent.trim() === 'Components').click();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'component-edit', 'row Edit action should route into the manager component-edit view');
+    Array.from(target.querySelectorAll('.manager-breadcrumbs button')).find(button => button.textContent.trim() === 'Components').click();
     flushSync();
     await tick();
     flushSync();
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'components', 'breadcrumb Components button should return to the components browser');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'components', 'breadcrumb Components button should return to the components browser');
     target.querySelector('[data-component-id="c1"] [aria-label="Delete Iron Ore"]').click();
 
     assert.deepEqual(dropped, [{ type: 'Item', uuid: 'Item.dropped' }]);
     assert.deepEqual(copied, ['Compendium.fabricate.items.iron-ore']);
-    assert.deepEqual(edited, [], 'manager-v2 row Edit should no longer call the legacy services.onEditComponent');
+    assert.deepEqual(edited, [], 'manager row Edit should no longer call the legacy services.onEditComponent');
     assert.ok(calls.some(call => call[0] === 'setItemSearch' && call[1] === 'iron'));
     assert.ok(calls.some(call => call[0] === 'deleteComponent' && call[1] === 'c1'));
   });
@@ -1520,7 +1520,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Progressive difficulty'));
     assert.ok(target.textContent.includes('Missing'));
 
-    target.querySelector('[data-component-id="c1"] .manager-v2-component-identity').click();
+    target.querySelector('[data-component-id="c1"] .manager-component-identity').click();
     await tick();
     flushSync();
 
@@ -1560,8 +1560,8 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    const root = target.querySelector('.fabricate-manager-v2');
-    assert.equal(root.dataset.managerV2View, 'component-edit', 'row Edit should land on the component-edit route');
+    const root = target.querySelector('.fabricate-manager');
+    assert.equal(root.dataset.managerView, 'component-edit', 'row Edit should land on the component-edit route');
     assert.ok(target.textContent.includes('Edit component'), 'header should show the Edit component title');
     assert.ok(target.querySelector('[data-component-edit-tab="details"].is-active'), 'Details tab should be active by default');
     assert.ok(target.querySelector('[data-component-edit-section="identity"]'), 'Identity card should render on the Details tab');
@@ -1592,7 +1592,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.querySelector('[data-component-edit-section="tags"]'), 'Tags section should render');
     assert.ok(target.querySelector('[data-component-edit-section="essences"]'), 'Essences section should render');
 
-    const mineralCheckbox = Array.from(target.querySelectorAll('.manager-v2-component-tag-option'))
+    const mineralCheckbox = Array.from(target.querySelectorAll('.manager-component-tag-option'))
       .find(label => label.textContent.includes('mineral'));
     assert.ok(mineralCheckbox, 'tag checkboxes should render for the system itemTags');
     const mineralInput = mineralCheckbox.querySelector('input[type="checkbox"]');
@@ -1604,7 +1604,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
 
     assert.ok(target.textContent.includes('Unsaved'), 'dirty indicator should appear after a tag change');
 
-    const saveButton = target.querySelector('button[form="manager-v2-component-edit-form"]');
+    const saveButton = target.querySelector('button[form="manager-component-edit-form"]');
     assert.ok(saveButton, 'header save submit should target the edit form');
     assert.equal(saveButton.disabled, false, 'save should be enabled when the draft is dirty');
     saveButton.click();
@@ -1618,7 +1618,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(updateCall, 'save should call store.updateComponent');
     assert.equal(updateCall[1], 'c1');
     assert.equal(Array.isArray(updateCall[2].tags) && updateCall[2].tags.includes('mineral'), true, 'tags update should include the newly checked tag');
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'components', 'successful save should return to the components browser');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'components', 'successful save should return to the components browser');
   });
 
   it('routes to tags and categories with add feedback, usage warnings, and store delegation', async () => {
@@ -1648,7 +1648,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'tags');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'tags');
     assert.ok(target.textContent.includes('Recipe categories'));
     assert.ok(target.textContent.includes('Item tags'));
     assert.ok(target.textContent.includes('General'));
@@ -1666,7 +1666,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     const examplesCard = target.querySelector('[data-tags-evidence="examples"]');
     assert.ok(examplesCard, 'tags inspector should render an Examples evidence card');
 
-    const categoryInput = target.querySelector('#manager-v2-category-add');
+    const categoryInput = target.querySelector('#manager-category-add');
     categoryInput.value = 'General';
     categoryInput.dispatchEvent(new Event('input', { bubbles: true }));
     target.querySelector('[aria-label="Recipe categories"] form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
@@ -1685,7 +1685,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(categoryInput.value, '');
     assert.equal(document.activeElement, categoryInput);
 
-    const tagInput = target.querySelector('#manager-v2-tag-add');
+    const tagInput = target.querySelector('#manager-tag-add');
     tagInput.value = 'SPICE';
     tagInput.dispatchEvent(new Event('input', { bubbles: true }));
     target.querySelector('[aria-label="Item tags"] form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
@@ -1709,7 +1709,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.deepEqual(confirmations[1]?.slice(0, 2), ['tag', 'ore']);
     assert.ok(!calls.some(call => call[0] === 'removeTag' && call[1] === 'ore'));
 
-    const search = target.querySelector('.manager-v2-toolbar input[type="search"]');
+    const search = target.querySelector('.manager-toolbar input[type="search"]');
     search.value = 'zzzz';
     search.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
@@ -1739,7 +1739,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    const categoryInput = target.querySelector('#manager-v2-category-add');
+    const categoryInput = target.querySelector('#manager-category-add');
     categoryInput.value = 'Elixirs';
     categoryInput.dispatchEvent(new Event('input', { bubbles: true }));
     target.querySelector('[aria-label="Recipe categories"] form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
@@ -1751,7 +1751,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(document.activeElement, categoryInput);
     assert.ok(target.textContent.includes('Category could not be added.'));
 
-    const tagInput = target.querySelector('#manager-v2-tag-add');
+    const tagInput = target.querySelector('#manager-tag-add');
     tagInput.value = 'SPICE';
     tagInput.dispatchEvent(new Event('input', { bubbles: true }));
     target.querySelector('[aria-label="Item tags"] form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
@@ -1791,33 +1791,33 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'essences');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essences');
     assert.ok(target.textContent.includes('Essence browser'));
-    assert.equal(target.querySelectorAll('.manager-v2-essence-row').length, 2);
+    assert.equal(target.querySelectorAll('.manager-essence-row').length, 2);
     assert.ok(target.textContent.includes('Earth'));
-    assert.equal(target.querySelector('.manager-v2-essence-action-band'), null);
+    assert.equal(target.querySelector('.manager-essence-action-band'), null);
     assert.equal(target.textContent.includes('Linked source'), false);
-    const linkedSourceImage = target.querySelector('[data-essence-id="earth"] .manager-v2-essence-source-cell-image');
+    const linkedSourceImage = target.querySelector('[data-essence-id="earth"] .manager-essence-source-cell-image');
     assert.ok(linkedSourceImage, 'linked essence Source column should render image evidence');
     assert.equal(linkedSourceImage.title, 'Iron Ore');
     assert.equal(linkedSourceImage.getAttribute('aria-label'), 'Iron Ore');
-    assert.ok(target.querySelector('[data-essence-id="water"] .manager-v2-essence-source-cell').textContent.includes('None'));
+    assert.ok(target.querySelector('[data-essence-id="water"] .manager-essence-source-cell').textContent.includes('None'));
     assert.ok(target.textContent.includes('Deletion blocked'));
-    assert.equal(target.querySelectorAll('.manager-v2-essence-usage-item').length, 1);
-    assert.equal(target.querySelector('.manager-v2-essence-usage-item').title, 'Iron Ore');
-    target.querySelector('.manager-v2-essence-usage-item').click();
+    assert.equal(target.querySelectorAll('.manager-essence-usage-item').length, 1);
+    assert.equal(target.querySelector('.manager-essence-usage-item').title, 'Iron Ore');
+    target.querySelector('.manager-essence-usage-item').click();
     flushSync();
     await tick();
     flushSync();
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'component-edit', 'essence usage thumbnail should route to the manager-v2 component-edit view');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'component-edit', 'essence usage thumbnail should route to the manager component-edit view');
     assert.deepEqual(editedComponents, [], 'essence usage thumbnail should no longer launch the legacy services.onEditComponent');
     navButton('Essences').click();
     flushSync();
     await tick();
     flushSync();
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'essences');
-    assert.equal(target.querySelectorAll('.manager-v2-essence-edit-row').length, 0);
-    assert.equal(target.querySelectorAll('#manager-v2-essence-create-name').length, 0);
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essences');
+    assert.equal(target.querySelectorAll('.manager-essence-edit-row').length, 0);
+    assert.equal(target.querySelectorAll('#manager-essence-create-name').length, 0);
 
     target.querySelector('[data-essence-id="water"]').click();
     await tick();
@@ -1828,10 +1828,10 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(target.querySelector('[data-essence-action="edit"]'), null, 'essence inspector should not duplicate row Edit actions');
     assert.equal(target.querySelector('[data-essence-action="delete"]'), null, 'essence inspector should not duplicate row Delete actions');
     assert.ok(target.querySelector('[data-essence-section="usage"]'), 'essence inspector should expose a Usage section');
-    assert.ok(target.querySelector('[data-essence-section="source"] .manager-v2-essence-source-drop-zone .essence-source-trigger'), 'unlinked selected essence should expose a source drop zone');
-    const essenceHeroRow = target.querySelector('.manager-v2-inspector-title-row.is-hero-large');
+    assert.ok(target.querySelector('[data-essence-section="source"] .manager-essence-source-drop-zone .essence-source-trigger'), 'unlinked selected essence should expose a source drop zone');
+    const essenceHeroRow = target.querySelector('.manager-inspector-title-row.is-hero-large');
     assert.ok(essenceHeroRow, 'essence inspector should use the prominent hero title row');
-    assert.ok(essenceHeroRow.querySelector('.manager-v2-inspector-icon.is-hero-large'), 'essence inspector hero should render the icon at hero-large size');
+    assert.ok(essenceHeroRow.querySelector('.manager-inspector-icon.is-hero-large'), 'essence inspector hero should render the icon at hero-large size');
 
     const inspectorDropEvent = new Event('drop', { bubbles: true, cancelable: true });
     Object.defineProperty(inspectorDropEvent, 'dataTransfer', {
@@ -1846,12 +1846,12 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     target.querySelector('[data-essence-id="earth"]').click();
     await tick();
     flushSync();
-    const inspectorSourceSummary = target.querySelector('[data-essence-section="source"] .manager-v2-essence-inspector-source-summary');
+    const inspectorSourceSummary = target.querySelector('[data-essence-section="source"] .manager-essence-inspector-source-summary');
     assert.ok(inspectorSourceSummary, 'linked selected essence should render a source summary card');
-    assert.equal(inspectorSourceSummary.querySelectorAll('.manager-v2-essence-source-thumb').length, 1, 'linked selected essence should show one source thumbnail');
-    assert.ok(inspectorSourceSummary.querySelector('.manager-v2-essence-source-copy').textContent.includes('Iron Ore'), 'linked selected essence should keep the source name readable');
-    assert.equal(inspectorSourceSummary.querySelector('.manager-v2-essence-source-copy').textContent.includes('c1'), false, 'linked selected essence should not print UUID evidence under the item name');
-    const inspectorSourceActions = target.querySelector('[data-essence-section="source"] .manager-v2-essence-inspector-source-actions');
+    assert.equal(inspectorSourceSummary.querySelectorAll('.manager-essence-source-thumb').length, 1, 'linked selected essence should show one source thumbnail');
+    assert.ok(inspectorSourceSummary.querySelector('.manager-essence-source-copy').textContent.includes('Iron Ore'), 'linked selected essence should keep the source name readable');
+    assert.equal(inspectorSourceSummary.querySelector('.manager-essence-source-copy').textContent.includes('c1'), false, 'linked selected essence should not print UUID evidence under the item name');
+    const inspectorSourceActions = target.querySelector('[data-essence-section="source"] .manager-essence-inspector-source-actions');
     assert.ok(inspectorSourceActions, 'linked selected essence should expose source actions below the item card');
     assert.equal(inspectorSourceSummary.contains(inspectorSourceActions), false, 'source actions should sit outside the linked item card');
     const copySourceAction = inspectorSourceActions.querySelector('[data-essence-action="copy-source"]');
@@ -1873,7 +1873,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     sourceFilter.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
-    assert.equal(target.querySelectorAll('.manager-v2-essence-row').length, 1);
+    assert.equal(target.querySelectorAll('.manager-essence-row').length, 1);
     assert.ok(target.textContent.includes('Water'));
 
     sourceFilter.value = 'all';
@@ -1884,40 +1884,40 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     target.querySelector('[data-essence-id="water"] [aria-label="Edit Water"]').click();
     await tick();
     flushSync();
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'essence-edit');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
     assert.ok(target.textContent.includes('Edit essence'));
     assert.ok(!target.textContent.includes('Essence editor'));
-    assert.ok(!target.querySelector('.manager-v2-essence-edit-view .manager-v2-action-group'), 'identity card should not duplicate route save/cancel actions');
+    assert.ok(!target.querySelector('.manager-essence-edit-view .manager-action-group'), 'identity card should not duplicate route save/cancel actions');
     assert.equal(target.textContent.includes('Basic information'), false);
     assert.equal(target.textContent.includes('Essence ID'), false);
-    assert.ok(!target.querySelector('.manager-v2-inspector [aria-label="Edit Water"]'), 'inspector should not show an edit action while already editing');
+    assert.ok(!target.querySelector('.manager-inspector [aria-label="Edit Water"]'), 'inspector should not show an edit action while already editing');
     assert.ok(target.querySelector('.essence-icon-picker-trigger'), 'edit route should use the shared icon picker trigger');
     assert.equal(target.querySelector('.essence-icon-picker-trigger').title, 'Change icon');
     assert.ok(target.textContent.includes('Clear icon'));
     assert.ok(target.querySelector('.essence-source-trigger'), 'effect-transfer systems should show source picker controls');
-    assert.ok(target.querySelector('.manager-v2-essence-source-summary'), 'edit route should show selected source summary inside the form');
-    assert.ok(target.querySelector('.manager-v2-essence-source-drop-zone .essence-source-trigger'), 'edit route should show a full-width source drop/pick target');
-    assert.equal(target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').disabled, true);
+    assert.ok(target.querySelector('.manager-essence-source-summary'), 'edit route should show selected source summary inside the form');
+    assert.ok(target.querySelector('.manager-essence-source-drop-zone .essence-source-trigger'), 'edit route should show a full-width source drop/pick target');
+    assert.equal(target.querySelector('.manager-header-actions .manager-button.is-primary').disabled, true);
 
-    const editName = target.querySelector('#manager-v2-essence-edit-name');
+    const editName = target.querySelector('#manager-essence-edit-name');
     editName.value = 'Rain';
     editName.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
-    assert.equal(target.querySelector('.manager-v2-inspector-name').textContent.trim(), 'Rain');
-    assert.equal(target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').disabled, false);
+    assert.equal(target.querySelector('.manager-inspector-name').textContent.trim(), 'Rain');
+    assert.equal(target.querySelector('.manager-header-actions .manager-button.is-primary').disabled, false);
     target.querySelector('.essence-source-trigger').click();
     await tick();
     flushSync();
     document.querySelector('.essence-source-picker-option[title="Glass Vial"]').click();
     await tick();
     flushSync();
-    assert.ok(target.querySelector('.manager-v2-essence-source-summary').textContent.includes('Glass Vial'));
-    target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').click();
+    assert.ok(target.querySelector('.manager-essence-source-summary').textContent.includes('Glass Vial'));
+    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
     await tick();
     flushSync();
     assert.ok(calls.some(call => call[0] === 'updateEssence' && call[1] === 'water' && call[2].name === 'Rain' && call[2].sourceComponentId === 'c2'));
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'essences');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essences');
 
     target.querySelector('[data-essence-id="water"] [aria-label="Delete Water"]').click();
     assert.ok(calls.some(call => call[0] === 'removeEssence' && call[1] === 'water'));
@@ -1925,25 +1925,25 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     flushSync();
     assert.equal(target.querySelector('[data-essence-id="earth"] [aria-label="Delete Earth"]').disabled, true);
 
-    target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').click();
+    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
     await tick();
     flushSync();
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'essence-edit');
-    assert.equal(target.querySelector('.manager-v2-inspector-name').textContent.trim(), 'New essence draft');
-    assert.equal(target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').disabled, true);
-    const createName = target.querySelector('#manager-v2-essence-edit-name');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
+    assert.equal(target.querySelector('.manager-inspector-name').textContent.trim(), 'New essence draft');
+    assert.equal(target.querySelector('.manager-header-actions .manager-button.is-primary').disabled, true);
+    const createName = target.querySelector('#manager-essence-edit-name');
     createName.value = 'Air';
     createName.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
-    assert.equal(target.querySelector('.manager-v2-inspector-name').textContent.trim(), 'Air');
-    target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').click();
+    assert.equal(target.querySelector('.manager-inspector-name').textContent.trim(), 'Air');
+    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
     await tick();
     flushSync();
     assert.ok(calls.some(call => call[0] === 'addEssence' && call[1] === 'Air'));
   });
 
-  it('hides manager-v2 essence source UI when effect transfer is disabled', async () => {
+  it('hides manager essence source UI when effect transfer is disabled', async () => {
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -1969,7 +1969,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     flushSync();
 
     assert.equal(target.querySelector('[aria-label="Filter essences by source state"]'), null);
-    assert.equal(target.querySelector('.manager-v2-essences-table').classList.contains('has-no-source'), true);
+    assert.equal(target.querySelector('.manager-essences-table').classList.contains('has-no-source'), true);
     assert.equal(target.textContent.includes('Linked source'), false);
     assert.equal(target.textContent.includes('Source evidence'), false);
 
@@ -1978,17 +1978,17 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     flushSync();
 
     assert.equal(target.querySelector('.essence-source-trigger'), null);
-    assert.equal(target.querySelector('.manager-v2-essence-source-summary'), null);
-    assert.equal(target.querySelector('.manager-v2-essence-source-drop-zone'), null);
+    assert.equal(target.querySelector('.manager-essence-source-summary'), null);
+    assert.equal(target.querySelector('.manager-essence-source-drop-zone'), null);
     assert.equal(target.textContent.includes('Source unresolved'), false);
     assert.equal(target.textContent.includes('source linkage'), false);
 
-    const editName = target.querySelector('#manager-v2-essence-edit-name');
+    const editName = target.querySelector('#manager-essence-edit-name');
     editName.value = 'Rain';
     editName.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
-    target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').click();
+    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
     await tick();
     flushSync();
 
@@ -2017,7 +2017,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    const editName = target.querySelector('#manager-v2-essence-edit-name');
+    const editName = target.querySelector('#manager-essence-edit-name');
     editName.value = 'Rain';
     editName.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
@@ -2028,8 +2028,8 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     flushSync();
 
     assert.ok(calls.some(call => call[0] === 'confirmDiscardDirtyEssenceDraft'));
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'essence-edit');
-    assert.equal(target.querySelector('#manager-v2-essence-edit-name').value, 'Rain');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
+    assert.equal(target.querySelector('#manager-essence-edit-name').value, 'Rain');
   });
 
   it('keeps essence edit drafts on failed and rejected saves', async () => {
@@ -2051,18 +2051,18 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     target.querySelector('[data-essence-id="water"] [aria-label="Edit Water"]').click();
     await tick();
     flushSync();
-    const failedName = target.querySelector('#manager-v2-essence-edit-name');
+    const failedName = target.querySelector('#manager-essence-edit-name');
     failedName.value = 'Rain';
     failedName.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
-    target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').click();
+    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
     await tick();
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'essence-edit');
-    assert.equal(target.querySelector('#manager-v2-essence-edit-name').value, 'Rain');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
+    assert.equal(target.querySelector('#manager-essence-edit-name').value, 'Rain');
     assert.ok(target.textContent.includes('Save failed.'));
 
     unmount(mounted);
@@ -2086,18 +2086,18 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     target.querySelector('[data-essence-id="water"] [aria-label="Edit Water"]').click();
     await tick();
     flushSync();
-    const rejectedName = target.querySelector('#manager-v2-essence-edit-name');
+    const rejectedName = target.querySelector('#manager-essence-edit-name');
     rejectedName.value = 'Storm';
     rejectedName.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
-    target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').click();
+    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
     await tick();
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'essence-edit');
-    assert.equal(target.querySelector('#manager-v2-essence-edit-name').value, 'Storm');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
+    assert.equal(target.querySelector('#manager-essence-edit-name').value, 'Storm');
     assert.ok(target.textContent.includes('Save failed.'));
 
     unmount(mounted);
@@ -2118,21 +2118,21 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     navButton('Essences').click();
     await tick();
     flushSync();
-    target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').click();
+    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
     await tick();
     flushSync();
-    const createName = target.querySelector('#manager-v2-essence-edit-name');
+    const createName = target.querySelector('#manager-essence-edit-name');
     createName.value = 'Air';
     createName.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
-    target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').click();
+    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
     await tick();
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'essence-edit');
-    assert.equal(target.querySelector('#manager-v2-essence-edit-name').value, 'Air');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
+    assert.equal(target.querySelector('#manager-essence-edit-name').value, 'Air');
     assert.ok(target.textContent.includes('Save failed.'));
   });
 
@@ -2153,48 +2153,48 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'environments');
-    assert.equal(target.querySelectorAll('.manager-v2-environment-row').length, 2);
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environments');
+    assert.equal(target.querySelectorAll('.manager-environment-row').length, 2);
     assert.ok(target.textContent.includes('Gathering environments'));
     assert.ok(target.textContent.includes('Moonlit Forest'));
     assert.ok(target.textContent.includes('Quiet Cavern'));
-    const gatheringParent = target.querySelector('#manager-v2-nav-gathering');
+    const gatheringParent = target.querySelector('#manager-nav-gathering');
     assert.equal(gatheringParent.getAttribute('aria-expanded'), 'true');
     assert.equal(gatheringParent.classList.contains('is-active'), false);
-    assert.equal(target.querySelector('.manager-v2-nav-group').classList.contains('is-expanded'), true);
-    assert.equal(gatheringParent.querySelector('.manager-v2-nav-count').textContent.trim(), '5');
+    assert.equal(target.querySelector('.manager-nav-group').classList.contains('is-expanded'), true);
+    assert.equal(gatheringParent.querySelector('.manager-nav-count').textContent.trim(), '5');
     assert.equal(gatheringToggle().getAttribute('aria-label'), 'Collapse gathering menu');
-    const gatheringItems = Array.from(target.querySelectorAll('.manager-v2-nav-subitem'));
+    const gatheringItems = Array.from(target.querySelectorAll('.manager-nav-subitem'));
     assert.deepEqual(
-      gatheringItems.map(item => item.querySelector('.manager-v2-nav-label')?.textContent.trim()),
+      gatheringItems.map(item => item.querySelector('.manager-nav-label')?.textContent.trim()),
       ['Environments', 'Tasks', 'Hazards', 'Settings']
     );
     assert.deepEqual(
-      gatheringItems.map(item => item.querySelector('.manager-v2-nav-count')?.textContent.trim() ?? null),
+      gatheringItems.map(item => item.querySelector('.manager-nav-count')?.textContent.trim() ?? null),
       ['2', '3', '0', null]
     );
     assert.equal(
       gatheringSubitem('Environments').getAttribute('aria-current'),
       'page'
     );
-    assert.equal(target.querySelectorAll('.manager-v2-gathering-tab').length, 0);
+    assert.equal(target.querySelectorAll('.manager-gathering-tab').length, 0);
 
     gatheringToggle().click();
     await tick();
     flushSync();
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'environments');
-    assert.equal(target.querySelectorAll('.manager-v2-nav-subitem').length, 4);
-    assert.equal(target.querySelector('#manager-v2-nav-gathering').getAttribute('aria-expanded'), 'true');
-    assert.equal(target.querySelector('.manager-v2-nav-group').classList.contains('is-expanded'), true);
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environments');
+    assert.equal(target.querySelectorAll('.manager-nav-subitem').length, 4);
+    assert.equal(target.querySelector('#manager-nav-gathering').getAttribute('aria-expanded'), 'true');
+    assert.equal(target.querySelector('.manager-nav-group').classList.contains('is-expanded'), true);
 
     gatheringSubitem('Tasks').click();
     await tick();
     flushSync();
 
     assert.equal(gatheringSubitem('Tasks').getAttribute('aria-current'), 'page');
-    assert.equal(target.querySelector('#manager-v2-nav-gathering').classList.contains('is-active'), false);
+    assert.equal(target.querySelector('#manager-nav-gathering').classList.contains('is-active'), false);
     assert.equal(gatheringSubitem('Tasks').classList.contains('is-active'), true);
-    target.querySelector('#manager-v2-nav-gathering').click();
+    target.querySelector('#manager-nav-gathering').click();
     await tick();
     flushSync();
     assert.equal(gatheringSubitem('Tasks').getAttribute('aria-current'), 'page');
@@ -2202,39 +2202,39 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     gatheringToggle().click();
     await tick();
     flushSync();
-    assert.equal(target.querySelectorAll('.manager-v2-nav-subitem').length, 4);
-    assert.equal(target.querySelector('#manager-v2-nav-gathering').getAttribute('aria-expanded'), 'true');
-    assert.equal(target.querySelectorAll('.manager-v2-gathering-task-row').length, 3);
+    assert.equal(target.querySelectorAll('.manager-nav-subitem').length, 4);
+    assert.equal(target.querySelector('#manager-nav-gathering').getAttribute('aria-expanded'), 'true');
+    assert.equal(target.querySelectorAll('.manager-gathering-task-row').length, 3);
     assert.ok(target.textContent.includes('Gather Moon Herbs'));
     assert.ok(target.textContent.includes('Prospect Crystal Veins'));
     assert.ok(target.textContent.includes('High Day, Clear Sky'));
     assert.ok(target.querySelector('[data-gathering-task-inspector]').textContent.includes('Selected gathering task'));
     assert.equal(
-      target.querySelector('.manager-v2-inspector').textContent.includes('Gathering task actions'),
+      target.querySelector('.manager-inspector').textContent.includes('Gathering task actions'),
       false,
       'selected gathering task inspector should not duplicate row actions'
     );
     assert.equal(
-      target.querySelector('.manager-v2-inspector [aria-label="Edit Gather Moon Herbs"]'),
+      target.querySelector('.manager-inspector [aria-label="Edit Gather Moon Herbs"]'),
       null,
       'selected gathering task inspector should not render edit action buttons'
     );
     assert.equal(
-      target.querySelector('.manager-v2-inspector [aria-label="Duplicate Gather Moon Herbs"]'),
+      target.querySelector('.manager-inspector [aria-label="Duplicate Gather Moon Herbs"]'),
       null,
       'selected gathering task inspector should not render duplicate action buttons'
     );
     assert.equal(
-      target.querySelector('.manager-v2-inspector [aria-label="Delete Gather Moon Herbs"]'),
+      target.querySelector('.manager-inspector [aria-label="Delete Gather Moon Herbs"]'),
       null,
       'selected gathering task inspector should not render delete action buttons'
     );
     assert.equal(
-      target.querySelector('[data-gathering-task-inspector] .manager-v2-action-group'),
+      target.querySelector('[data-gathering-task-inspector] .manager-action-group'),
       null,
       'selected gathering task identity card should not contain an action group'
     );
-    assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Nightshade With An Exceptionally Long Localized Component Name x2 (80%)'));
+    assert.ok(target.querySelector('.manager-inspector').textContent.includes('Nightshade With An Exceptionally Long Localized Component Name x2 (80%)'));
     assert.equal(target.querySelector('[data-gathering-task-fact="environments"] strong').textContent.trim(), '1');
 
     const taskSearch = target.querySelector('[data-gathering-tasks-browser] input[type="search"]');
@@ -2242,18 +2242,18 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     taskSearch.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
-    assert.equal(target.querySelectorAll('.manager-v2-gathering-task-row').length, 1);
+    assert.equal(target.querySelectorAll('.manager-gathering-task-row').length, 1);
     assert.ok(target.textContent.includes('Prospect Crystal Veins'));
 
     target.querySelector('[data-clear-filters="gathering-tasks"]').click();
     await tick();
     flushSync();
-    const taskSelects = target.querySelectorAll('[data-gathering-tasks-browser] .manager-v2-filter select');
+    const taskSelects = target.querySelectorAll('[data-gathering-tasks-browser] .manager-filter select');
     taskSelects[0].value = 'disabled';
     taskSelects[0].dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
     flushSync();
-    assert.equal(target.querySelectorAll('.manager-v2-gathering-task-row').length, 1);
+    assert.equal(target.querySelectorAll('.manager-gathering-task-row').length, 1);
     assert.ok(target.textContent.includes('South Coast Driftwood'));
 
     target.querySelector('[data-clear-filters="gathering-tasks"]').click();
@@ -2263,12 +2263,12 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     taskSelects[1].dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
     flushSync();
-    assert.equal(target.querySelectorAll('.manager-v2-gathering-task-row').length, 2);
+    assert.equal(target.querySelectorAll('.manager-gathering-task-row').length, 2);
     taskSelects[2].value = 'cavern';
     taskSelects[2].dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
     flushSync();
-    assert.equal(target.querySelectorAll('.manager-v2-gathering-task-row').length, 1);
+    assert.equal(target.querySelectorAll('.manager-gathering-task-row').length, 1);
     assert.ok(target.textContent.includes('Prospect Crystal Veins'));
     target.querySelector('[data-clear-filters="gathering-tasks"]').click();
     await tick();
@@ -2277,12 +2277,12 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     taskSelects[3].dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
     flushSync();
-    assert.equal(target.querySelectorAll('.manager-v2-gathering-task-row').length, 2);
+    assert.equal(target.querySelectorAll('.manager-gathering-task-row').length, 2);
 
     target.querySelector('[data-clear-filters="gathering-tasks"]').click();
     await tick();
     flushSync();
-    target.querySelector('[data-gathering-task-id="task-herbs"] .manager-v2-status-toggle').click();
+    target.querySelector('[data-gathering-task-id="task-herbs"] .manager-status-toggle').click();
     target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Duplicate Gather Moon Herbs"]').click();
     target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Delete Gather Moon Herbs"]').click();
     assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[1] === 'alchemy' && call[2] === 'task-herbs' && call[3].enabled === false));
@@ -2292,20 +2292,20 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]').click();
     await tick();
     flushSync();
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'gathering-task-edit');
-    target.querySelector('#manager-v2-nav-gathering').click();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'gathering-task-edit');
+    target.querySelector('#manager-nav-gathering').click();
     await tick();
     flushSync();
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'gathering-task-edit');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'gathering-task-edit');
     gatheringToggle().click();
     await tick();
     flushSync();
-    assert.equal(target.querySelectorAll('.manager-v2-nav-subitem').length, 4);
-    assert.equal(target.querySelector('#manager-v2-nav-gathering').getAttribute('aria-expanded'), 'true');
+    assert.equal(target.querySelectorAll('.manager-nav-subitem').length, 4);
+    assert.equal(target.querySelector('#manager-nav-gathering').getAttribute('aria-expanded'), 'true');
     assert.ok(target.querySelector('[data-gathering-task-editor]'));
     const coreEditor = target.querySelector('[data-gathering-task-core-editor]');
     assert.ok(coreEditor);
-    assert.equal(coreEditor.querySelector('.manager-v2-link-button'), null);
+    assert.equal(coreEditor.querySelector('.manager-link-button'), null);
     assert.equal(coreEditor.textContent.includes('Back to task library'), false);
     assert.ok(target.textContent.includes('Task Identity'));
     assert.equal(target.textContent.includes('Internal ID'), false);
@@ -2314,18 +2314,18 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.querySelector('[data-gathering-task-drop-inspector]'));
     const dropInspector = target.querySelector('[data-gathering-task-drop-inspector]');
     const dropInspectorChildren = Array.from(dropInspector.children);
-    assert.ok(dropInspectorChildren[0].classList.contains('manager-v2-drop-editor-header-card'));
+    assert.ok(dropInspectorChildren[0].classList.contains('manager-drop-editor-header-card'));
     assert.equal(dropInspectorChildren[0].classList.contains('is-sticky'), false);
-    assert.ok(dropInspectorChildren[1].classList.contains('manager-v2-drop-inspector-divider'));
-    assert.ok(dropInspectorChildren[2].classList.contains('manager-v2-drop-inspector-scroll'));
-    assert.ok(dropInspectorChildren[2].querySelector('.manager-v2-drop-editor-card'));
+    assert.ok(dropInspectorChildren[1].classList.contains('manager-drop-inspector-divider'));
+    assert.ok(dropInspectorChildren[2].classList.contains('manager-drop-inspector-scroll'));
+    assert.ok(dropInspectorChildren[2].querySelector('.manager-drop-editor-card'));
     assert.ok(dropInspectorChildren[2].querySelector('[data-gathering-drop-character-modifiers]'));
-    assert.equal(target.querySelector('.manager-v2-task-editor-tabs'), null);
+    assert.equal(target.querySelector('.manager-task-editor-tabs'), null);
     assert.equal(target.querySelector('[data-gathering-task-summary]'), null);
     assert.equal(target.querySelector('[data-gathering-task-matching-logic]'), null);
     assert.ok(target.textContent.includes('Drop chance'));
-    assert.equal(target.querySelector('.manager-v2-task-card-header .manager-v2-drop-count'), null);
-    assert.ok(target.querySelector('.manager-v2-task-drop-footer [data-gathering-task-drop-count]'));
+    assert.equal(target.querySelector('.manager-task-card-header .manager-drop-count'), null);
+    assert.ok(target.querySelector('.manager-task-drop-footer [data-gathering-task-drop-count]'));
     const dropColumnHeaders = Array.from(target.querySelectorAll('[data-gathering-task-drops-table] [role="columnheader"]')).map(node => node.textContent.trim());
     assert.ok(dropColumnHeaders.includes('Count'));
     assert.ok(dropColumnHeaders.includes('#'), 'highestRankedDrop mode should surface the rank column header');
@@ -2334,13 +2334,13 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     const populatedDropRow = target.querySelector('[data-gathering-task-drop-id="drop-nightshade"]');
     assert.equal(populatedDropRow.querySelector('[data-gathering-task-drop-row-number]'), null);
     const populatedComponentCell = populatedDropRow.querySelector('[data-gathering-task-drop-component-cell]');
-    const populatedComponentButton = populatedComponentCell.querySelector('.manager-v2-drop-component-button');
+    const populatedComponentButton = populatedComponentCell.querySelector('.manager-drop-component-button');
     assert.ok(populatedComponentButton);
-    const populatedComponentThumb = populatedComponentCell.querySelector('.manager-v2-gathering-task-thumb');
+    const populatedComponentThumb = populatedComponentCell.querySelector('.manager-gathering-task-thumb');
     assert.ok(populatedComponentThumb);
     assert.equal(populatedComponentButton.getAttribute('title'), 'Right-click to clear component');
     assert.ok(populatedComponentCell.textContent.includes('Nightshade With An Exceptionally Long Localized Component Name'));
-    assert.equal(populatedComponentCell.querySelector('.manager-v2-drop-component-button .manager-v2-system-description'), null);
+    assert.equal(populatedComponentCell.querySelector('.manager-drop-component-button .manager-system-description'), null);
     assert.equal(populatedComponentCell.textContent.includes('A dusky flowering herb used in careful doses.'), false);
     assert.equal(populatedComponentCell.textContent.includes('Unresolved drop'), false);
     assert.equal(populatedDropRow.textContent.includes('Drop component'), false);
@@ -2348,13 +2348,13 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(populatedDropRow.textContent.includes('Quantity'), false);
     assert.equal(populatedDropRow.textContent.includes('award'), false);
     const populatedChanceCell = populatedDropRow.querySelector('[data-gathering-task-drop-chance-cell]');
-    const dropRateInput = populatedChanceCell.querySelector('.manager-v2-drop-rate-percent input');
+    const dropRateInput = populatedChanceCell.querySelector('.manager-drop-rate-percent input');
     assert.equal(dropRateInput.getAttribute('type'), 'text');
     assert.equal(dropRateInput.getAttribute('inputmode'), 'numeric');
     assert.equal(dropRateInput.getAttribute('pattern'), '[0-9]*');
     assert.equal(dropRateInput.value, '80');
     const dropRateControl = populatedChanceCell.querySelector('input[type="range"]').parentElement;
-    assert.ok(dropRateControl.classList.contains('manager-v2-drop-rate-control'));
+    assert.ok(dropRateControl.classList.contains('manager-drop-rate-control'));
     assert.ok(dropRateControl.classList.contains('is-common'));
     assert.ok(dropRateControl.getAttribute('style').includes('--fab-drop-rate-value: 80%;'));
     assert.ok(dropRateControl.getAttribute('style').includes('--fab-drop-rate-color: var(--fab-drop-rate-common);'));
@@ -2363,7 +2363,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(dropRateInput.value, '7');
-    const updatedDropRateInput = populatedDropRow.querySelector('.manager-v2-drop-rate-percent input');
+    const updatedDropRateInput = populatedDropRow.querySelector('.manager-drop-rate-percent input');
     updatedDropRateInput.value = '150';
     updatedDropRateInput.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
@@ -2373,19 +2373,19 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(updatedDropRateInput.value, '7');
-    let stepDropRateInput = populatedDropRow.querySelector('.manager-v2-drop-rate-percent input');
+    let stepDropRateInput = populatedDropRow.querySelector('.manager-drop-rate-percent input');
     const dropRateArrowUpEvent = new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true });
     stepDropRateInput.dispatchEvent(dropRateArrowUpEvent);
     await tick();
     flushSync();
     assert.equal(dropRateArrowUpEvent.defaultPrevented, true);
     assert.equal(stepDropRateInput.value, '8');
-    stepDropRateInput = populatedDropRow.querySelector('.manager-v2-drop-rate-percent input');
+    stepDropRateInput = populatedDropRow.querySelector('.manager-drop-rate-percent input');
     stepDropRateInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
     await tick();
     flushSync();
     assert.equal(stepDropRateInput.value, '7');
-    stepDropRateInput = populatedDropRow.querySelector('.manager-v2-drop-rate-percent input');
+    stepDropRateInput = populatedDropRow.querySelector('.manager-drop-rate-percent input');
     stepDropRateInput.value = '100';
     stepDropRateInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }));
     await tick();
@@ -2396,7 +2396,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(stepDropRateInput.value, '0');
-    const quantityInput = populatedDropRow.querySelector('.manager-v2-drop-quantity-cell input');
+    const quantityInput = populatedDropRow.querySelector('.manager-drop-quantity-cell input');
     assert.equal(quantityInput.getAttribute('type'), 'text');
     assert.equal(quantityInput.getAttribute('inputmode'), 'numeric');
     assert.equal(quantityInput.getAttribute('pattern'), '[1-9][0-9]{0,2}');
@@ -2411,31 +2411,31 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(quantityInput.value, '3');
-    let stepQuantityInput = populatedDropRow.querySelector('.manager-v2-drop-quantity-cell input');
+    let stepQuantityInput = populatedDropRow.querySelector('.manager-drop-quantity-cell input');
     const quantityArrowUpEvent = new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true });
     stepQuantityInput.dispatchEvent(quantityArrowUpEvent);
     await tick();
     flushSync();
     assert.equal(quantityArrowUpEvent.defaultPrevented, true);
     assert.equal(stepQuantityInput.value, '4');
-    stepQuantityInput = populatedDropRow.querySelector('.manager-v2-drop-quantity-cell input');
+    stepQuantityInput = populatedDropRow.querySelector('.manager-drop-quantity-cell input');
     stepQuantityInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
     await tick();
     flushSync();
     assert.equal(stepQuantityInput.value, '3');
-    stepQuantityInput = populatedDropRow.querySelector('.manager-v2-drop-quantity-cell input');
+    stepQuantityInput = populatedDropRow.querySelector('.manager-drop-quantity-cell input');
     stepQuantityInput.value = '999';
     stepQuantityInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }));
     await tick();
     flushSync();
     assert.equal(stepQuantityInput.value, '999');
-    stepQuantityInput = populatedDropRow.querySelector('.manager-v2-drop-quantity-cell input');
+    stepQuantityInput = populatedDropRow.querySelector('.manager-drop-quantity-cell input');
     stepQuantityInput.value = '1';
     stepQuantityInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
     await tick();
     flushSync();
     assert.equal(stepQuantityInput.value, '1');
-    stepQuantityInput = populatedDropRow.querySelector('.manager-v2-drop-quantity-cell input');
+    stepQuantityInput = populatedDropRow.querySelector('.manager-drop-quantity-cell input');
     stepQuantityInput.value = '1000';
     stepQuantityInput.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
@@ -2445,7 +2445,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(stepQuantityInput.value, '1');
-    const modifierPills = populatedDropRow.querySelectorAll('.manager-v2-drop-modifier-pill');
+    const modifierPills = populatedDropRow.querySelectorAll('.manager-drop-modifier-pill');
     assert.equal(modifierPills.length, 3);
     assert.ok(Array.from(modifierPills).some(pill => pill.classList.contains('is-positive') && pill.textContent.includes('Deep Night') && pill.textContent.includes('+20%')));
     assert.ok(Array.from(modifierPills).some(pill => pill.classList.contains('is-negative') && pill.textContent.includes('Clear Sky') && pill.textContent.includes('-15%')));
@@ -2453,20 +2453,20 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(populatedDropRow.querySelector('[aria-label="Duplicate drop rule"]'), null);
     assert.equal(populatedDropRow.querySelector('[aria-label="Delete drop rule"]'), null);
     const selectedDropInspector = target.querySelector('[data-gathering-task-drop-inspector]');
-    const selectedDropActions = selectedDropInspector.querySelector('.manager-v2-drop-editor-actions');
+    const selectedDropActions = selectedDropInspector.querySelector('.manager-drop-editor-actions');
     assert.ok(selectedDropActions);
-    assert.ok(selectedDropActions.previousElementSibling?.classList.contains('manager-v2-inspector-title-row'));
+    assert.ok(selectedDropActions.previousElementSibling?.classList.contains('manager-inspector-title-row'));
     assert.ok(selectedDropActions.querySelector('[aria-label="Duplicate drop rule"]'));
     assert.ok(selectedDropActions.querySelector('[aria-label="Delete drop rule"]'));
     assert.equal(selectedDropInspector.textContent.includes('Drop component'), false);
     assert.equal(selectedDropInspector.textContent.includes('Select a component'), false);
     const inspectorRateEditor = selectedDropInspector.querySelector('[data-gathering-drop-inspector-rate]');
     assert.ok(inspectorRateEditor.textContent.includes('Drop chance'));
-    const inspectorRateInput = inspectorRateEditor.querySelector('.manager-v2-drop-rate-percent input');
+    const inspectorRateInput = inspectorRateEditor.querySelector('.manager-drop-rate-percent input');
     assert.equal(inspectorRateInput.getAttribute('type'), 'text');
     assert.equal(inspectorRateInput.getAttribute('inputmode'), 'numeric');
     assert.equal(inspectorRateInput.value, '0');
-    const inspectorRateControl = inspectorRateEditor.querySelector('.manager-v2-drop-rate-control');
+    const inspectorRateControl = inspectorRateEditor.querySelector('.manager-drop-rate-control');
     assert.ok(inspectorRateControl.classList.contains('is-none'));
     assert.ok(inspectorRateControl.getAttribute('style').includes('--fab-drop-rate-value: 0%;'));
     assert.ok(inspectorRateControl.getAttribute('style').includes('--fab-drop-rate-color: var(--fab-drop-rate-none);'));
@@ -2475,14 +2475,14 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(inspectorRateInput.value, '9');
-    let refreshedInspectorRateInput = selectedDropInspector.querySelector('[data-gathering-drop-inspector-rate] .manager-v2-drop-rate-percent input');
+    let refreshedInspectorRateInput = selectedDropInspector.querySelector('[data-gathering-drop-inspector-rate] .manager-drop-rate-percent input');
     const inspectorRateArrowUpEvent = new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true });
     refreshedInspectorRateInput.dispatchEvent(inspectorRateArrowUpEvent);
     await tick();
     flushSync();
     assert.equal(inspectorRateArrowUpEvent.defaultPrevented, true);
     assert.equal(refreshedInspectorRateInput.value, '10');
-    refreshedInspectorRateInput = selectedDropInspector.querySelector('[data-gathering-drop-inspector-rate] .manager-v2-drop-rate-percent input');
+    refreshedInspectorRateInput = selectedDropInspector.querySelector('[data-gathering-drop-inspector-rate] .manager-drop-rate-percent input');
     refreshedInspectorRateInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
     await tick();
     flushSync();
@@ -2518,19 +2518,19 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(refreshedInspectorCountInput.value, '5');
     assert.equal(populatedDropRow.querySelector('[aria-label="Select drop rule"]'), null);
     assert.equal(populatedDropRow.querySelector('[aria-label="Edit drop rule"]'), null);
-    const mediaColumn = coreEditor.querySelector('.manager-v2-task-media-column');
-    const taskImagePicker = coreEditor.querySelector('.manager-v2-task-image-picker');
-    const taskStatus = coreEditor.querySelector('.manager-v2-task-core-status');
-    const taskStatusToggle = taskStatus.querySelector('.manager-v2-status-toggle');
+    const mediaColumn = coreEditor.querySelector('.manager-task-media-column');
+    const taskImagePicker = coreEditor.querySelector('.manager-task-image-picker');
+    const taskStatus = coreEditor.querySelector('.manager-task-core-status');
+    const taskStatusToggle = taskStatus.querySelector('.manager-status-toggle');
     assert.equal(mediaColumn.firstElementChild, taskImagePicker);
     assert.equal(mediaColumn.children[1], taskStatus);
     assert.equal(taskStatusToggle.tagName, 'BUTTON');
     assert.equal(taskStatusToggle.querySelector('input'), null);
-    assert.equal(taskStatusToggle.querySelector('.manager-v2-status-toggle-label').textContent.trim(), 'Off');
+    assert.equal(taskStatusToggle.querySelector('.manager-status-toggle-label').textContent.trim(), 'Off');
     taskStatusToggle.click();
     await tick();
     flushSync();
-    assert.equal(taskStatusToggle.querySelector('.manager-v2-status-toggle-label').textContent.trim(), 'On');
+    assert.equal(taskStatusToggle.querySelector('.manager-status-toggle-label').textContent.trim(), 'On');
     const taskNameInput = target.querySelector('[data-gathering-task-field="name"]');
     assert.equal(
       Boolean(taskNameInput.compareDocumentPosition(taskImagePicker) & Node.DOCUMENT_POSITION_PRECEDING),
@@ -2553,7 +2553,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     const regionPillNorth = regionAvailability.querySelector('[data-gathering-task-availability-pill="regions"][data-condition-id="north"]');
     assert.ok(regionPillNorth);
     assert.ok(regionPillNorth.textContent.includes('Northlands'));
-    regionAvailability.querySelector('.manager-v2-availability-menu-button').click();
+    regionAvailability.querySelector('.manager-availability-menu-button').click();
     await tick();
     flushSync();
     assert.equal(regionAvailability.querySelector('[data-gathering-task-availability-option="regions"][data-condition-id="north"]'), null);
@@ -2565,7 +2565,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.ok(regionAvailability.querySelector('[data-gathering-task-availability-pill="regions"][data-condition-id="south"]'));
-    regionAvailability.querySelector('[data-gathering-task-availability-pill="regions"][data-condition-id="north"] .manager-v2-availability-remove').click();
+    regionAvailability.querySelector('[data-gathering-task-availability-pill="regions"][data-condition-id="north"] .manager-availability-remove').click();
     await tick();
     flushSync();
     assert.equal(regionAvailability.querySelector('[data-gathering-task-availability-pill="regions"][data-condition-id="north"]'), null);
@@ -2582,7 +2582,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(weatherPill.textContent.includes('Clear Sky'));
     assert.ok(weatherPill.querySelector('i.fas.fa-sun'));
 
-    biomeAvailability.querySelector('.manager-v2-availability-menu-button').click();
+    biomeAvailability.querySelector('.manager-availability-menu-button').click();
     await tick();
     flushSync();
     assert.equal(biomeAvailability.querySelector('[data-gathering-task-availability-option="biomes"][data-condition-id="forest"]'), null);
@@ -2596,17 +2596,17 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     flushSync();
     assert.ok(biomeAvailability.querySelector('[data-gathering-task-availability-pill="biomes"][data-condition-id="cavern"]'));
 
-    biomeAvailability.querySelector('[data-gathering-task-availability-pill="biomes"][data-condition-id="forest"] .manager-v2-availability-remove').click();
+    biomeAvailability.querySelector('[data-gathering-task-availability-pill="biomes"][data-condition-id="forest"] .manager-availability-remove').click();
     await tick();
     flushSync();
     assert.equal(biomeAvailability.querySelector('[data-gathering-task-availability-pill="biomes"][data-condition-id="forest"]'), null);
 
-    biomeAvailability.querySelector('[data-gathering-task-availability-pill="biomes"][data-condition-id="cavern"] .manager-v2-availability-remove').click();
+    biomeAvailability.querySelector('[data-gathering-task-availability-pill="biomes"][data-condition-id="cavern"] .manager-availability-remove').click();
     await tick();
     flushSync();
     assert.ok(biomeAvailability.textContent.includes('Any Biome'));
 
-    timeAvailability.querySelector('.manager-v2-availability-menu-button').click();
+    timeAvailability.querySelector('.manager-availability-menu-button').click();
     await tick();
     flushSync();
     assert.equal(timeAvailability.querySelector('[data-gathering-task-availability-option="timeOfDay"][data-condition-id="day"]'), null);
@@ -2620,12 +2620,12 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     flushSync();
     assert.ok(timeAvailability.querySelector('[data-gathering-task-availability-pill="timeOfDay"][data-condition-id="night"]'));
 
-    timeAvailability.querySelector('[data-gathering-task-availability-pill="timeOfDay"][data-condition-id="day"] .manager-v2-availability-remove').click();
+    timeAvailability.querySelector('[data-gathering-task-availability-pill="timeOfDay"][data-condition-id="day"] .manager-availability-remove').click();
     await tick();
     flushSync();
     assert.equal(timeAvailability.querySelector('[data-gathering-task-availability-pill="timeOfDay"][data-condition-id="day"]'), null);
 
-    weatherAvailability.querySelector('.manager-v2-availability-menu-button').click();
+    weatherAvailability.querySelector('.manager-availability-menu-button').click();
     await tick();
     flushSync();
     assert.equal(weatherAvailability.querySelector('[data-gathering-task-availability-option="weather"][data-condition-id="clear"]'), null);
@@ -2639,19 +2639,19 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     flushSync();
     assert.ok(weatherAvailability.querySelector('[data-gathering-task-availability-pill="weather"][data-condition-id="heavy-rain"]'));
 
-    weatherAvailability.querySelector('[data-gathering-task-availability-pill="weather"][data-condition-id="clear"] .manager-v2-availability-remove').click();
+    weatherAvailability.querySelector('[data-gathering-task-availability-pill="weather"][data-condition-id="clear"] .manager-availability-remove').click();
     await tick();
     flushSync();
     assert.equal(weatherAvailability.querySelector('[data-gathering-task-availability-pill="weather"][data-condition-id="clear"]'), null);
     for (const availability of [regionAvailability, biomeAvailability, timeAvailability, weatherAvailability]) {
-      availability.querySelector('.manager-v2-availability-menu-button').click();
+      availability.querySelector('.manager-availability-menu-button').click();
       await tick();
       flushSync();
-      assert.ok(availability.querySelector('.manager-v2-availability-menu'), 'picker menu should open on trigger click');
+      assert.ok(availability.querySelector('.manager-availability-menu'), 'picker menu should open on trigger click');
       document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
       await tick();
       flushSync();
-      assert.equal(availability.querySelector('.manager-v2-availability-menu'), null, 'picker menu should dismiss on outside mousedown');
+      assert.equal(availability.querySelector('.manager-availability-menu'), null, 'picker menu should dismiss on outside mousedown');
     }
     const inspectorSlider = target.querySelector('[data-gathering-task-drop-inspector] input[type="range"]');
     inspectorSlider.value = '35';
@@ -2664,12 +2664,12 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     chanceSlider.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
-    assert.equal(target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] .manager-v2-drop-rate-percent input').value, '25');
+    assert.equal(target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] .manager-drop-rate-percent input').value, '25');
     target.querySelector('[data-gathering-task-drop-inspector] [aria-label="Duplicate drop rule"]').click();
     await tick();
     flushSync();
     assert.ok(target.querySelector('[data-gathering-task-reward-rule-notice]'));
-    const clearableComponentThumb = target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] .manager-v2-gathering-task-thumb');
+    const clearableComponentThumb = target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] .manager-gathering-task-thumb');
     assert.ok(clearableComponentThumb);
     const clearComponentEvent = new MouseEvent('mousedown', { button: 2, bubbles: true, cancelable: true });
     clearableComponentThumb.dispatchEvent(clearComponentEvent);
@@ -2678,16 +2678,16 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(clearComponentEvent.defaultPrevented, true);
     const clearedDropRow = target.querySelector('[data-gathering-task-drop-id="drop-nightshade"]');
     assert.ok(clearedDropRow.textContent.includes('No Component'));
-    const saveButton = target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary');
+    const saveButton = target.querySelector('.manager-header-actions .manager-button.is-primary');
     assert.ok(saveButton, 'gathering task editor should expose a Save button');
     saveButton.click();
     await tick();
     flushSync();
     assert.ok(calls.some(call => call[0] === 'updateGatheringLibraryTask' && call[1] === 'alchemy' && call[2] === 'task-herbs' && call[3].name === 'Gather Sun Herbs' && call[3].enabled === true), 'Save should persist staged edits in a single call');
-    target.querySelector('.manager-v2-header-actions .manager-v2-button:not(.is-primary)').click();
+    target.querySelector('.manager-header-actions .manager-button:not(.is-primary)').click();
     await tick();
     flushSync();
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'environments');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environments');
     assert.equal(gatheringSubitem('Tasks').getAttribute('aria-current'), 'page');
 
     for (const [label, placeholder] of [
@@ -2699,15 +2699,15 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
 
       assert.equal(gatheringSubitem(label).getAttribute('aria-current'), 'page');
       assert.ok(target.textContent.includes(placeholder));
-      assert.equal(target.querySelector('.manager-v2-toolbar'), null);
-      assert.equal(target.querySelector('.manager-v2-environments-table'), null);
+      assert.equal(target.querySelector('.manager-toolbar'), null);
+      assert.equal(target.querySelector('.manager-environments-table'), null);
       assert.equal(
-        target.querySelector('.manager-v2-inspector [data-gathering-inspector-placeholder] h2').textContent.trim(),
+        target.querySelector('.manager-inspector [data-gathering-inspector-placeholder] h2').textContent.trim(),
         label === 'Hazards' ? 'Gathering hazards' : 'Gathering settings'
       );
-      assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes(placeholder));
+      assert.ok(target.querySelector('.manager-inspector').textContent.includes(placeholder));
       assert.equal(
-        target.querySelector('.manager-v2-inspector').textContent.includes('Selected environment'),
+        target.querySelector('.manager-inspector').textContent.includes('Selected environment'),
         false
       );
     }
@@ -2716,8 +2716,8 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(gatheringSubitem('Settings').getAttribute('aria-current'), 'page');
-    assert.equal(target.querySelector('.manager-v2-toolbar'), null);
-    assert.equal(target.querySelector('.manager-v2-environments-table'), null);
+    assert.equal(target.querySelector('.manager-toolbar'), null);
+    assert.equal(target.querySelector('.manager-environments-table'), null);
     assert.ok(target.textContent.includes('Set system-level drop resolution and hazard rules for gathering.'));
     assert.equal(target.querySelectorAll('[data-gathering-condition-panel]').length, 2);
     assert.equal(target.querySelectorAll('[data-gathering-vocabulary-panel]').length, 2);
@@ -2733,29 +2733,29 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('These values control current weather matching for gathering tasks and hazards.'));
     assert.ok(target.textContent.includes('Environments use one region. Labels can be renamed without changing ids.'));
     assert.ok(target.textContent.includes('Environments can use multiple biomes. Left-click the coloured icon to edit icon; right-click to edit colour.'));
-    assert.equal(target.querySelectorAll('.manager-v2-condition-add input').length, 4);
-    assert.equal(target.querySelectorAll('.manager-v2-condition-add .essence-icon-picker-trigger.icon-only').length, 3);
-    assert.equal(target.querySelectorAll('.manager-v2-color-picker-trigger').length, 1);
-    assert.equal(target.querySelectorAll('.manager-v2-condition-add .manager-v2-add-button').length, 4);
-    assert.equal(Array.from(target.querySelectorAll('.manager-v2-condition-add .manager-v2-add-button')).every(button => button.textContent.trim() === 'Add'), true);
+    assert.equal(target.querySelectorAll('.manager-condition-add input').length, 4);
+    assert.equal(target.querySelectorAll('.manager-condition-add .essence-icon-picker-trigger.icon-only').length, 3);
+    assert.equal(target.querySelectorAll('.manager-color-picker-trigger').length, 1);
+    assert.equal(target.querySelectorAll('.manager-condition-add .manager-add-button').length, 4);
+    assert.equal(Array.from(target.querySelectorAll('.manager-condition-add .manager-add-button')).every(button => button.textContent.trim() === 'Add'), true);
     assert.equal(target.textContent.includes('Add time of day'), false);
     assert.equal(target.textContent.includes('Add weather'), false);
     assert.equal(target.textContent.includes('Add region'), false);
     assert.equal(target.textContent.includes('Add biome'), false);
     assert.equal(target.querySelectorAll('[data-gathering-condition-value]').length, 5);
-    assert.equal(target.querySelectorAll('.manager-v2-vocabulary-pill').length, 4);
-    assert.equal(target.querySelectorAll('[data-gathering-vocabulary-panel="biomes"] .manager-v2-biome-combined-trigger').length, 2);
-    assert.equal(target.querySelectorAll('.manager-v2-condition-label-input').length, 9);
-    assert.equal(target.querySelectorAll('.manager-v2-vocabulary-pill .manager-v2-condition-label-input').length, 4);
+    assert.equal(target.querySelectorAll('.manager-vocabulary-pill').length, 4);
+    assert.equal(target.querySelectorAll('[data-gathering-vocabulary-panel="biomes"] .manager-biome-combined-trigger').length, 2);
+    assert.equal(target.querySelectorAll('.manager-condition-label-input').length, 9);
+    assert.equal(target.querySelectorAll('.manager-vocabulary-pill .manager-condition-label-input').length, 4);
     assert.deepEqual(
-      Array.from(target.querySelectorAll('[data-gathering-condition-panel="weather"] .manager-v2-condition-label-input')).map(input => input.value),
+      Array.from(target.querySelectorAll('[data-gathering-condition-panel="weather"] .manager-condition-label-input')).map(input => input.value),
       ['Clear Sky', 'Storm Rain']
     );
     assert.deepEqual(
-      Array.from(target.querySelectorAll('[data-gathering-condition-panel="timeOfDay"] .manager-v2-condition-label-input')).map(input => input.value),
+      Array.from(target.querySelectorAll('[data-gathering-condition-panel="timeOfDay"] .manager-condition-label-input')).map(input => input.value),
       ['First Light', 'High Day', 'Deep Night']
     );
-    const weatherLabelInput = target.querySelector('[data-gathering-condition-value="heavy-rain"] .manager-v2-condition-label-input');
+    const weatherLabelInput = target.querySelector('[data-gathering-condition-value="heavy-rain"] .manager-condition-label-input');
     weatherLabelInput.value = 'Heavy Rainfall';
     weatherLabelInput.dispatchEvent(new Event('blur'));
     await tick();
@@ -2765,7 +2765,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
       ['updateGatheringConditionValue', 'weather', 'heavy-rain', { label: 'Heavy Rainfall' }, 'alchemy']
     );
 
-    const timeLabelInput = target.querySelector('[data-gathering-condition-value="dawn"] .manager-v2-condition-label-input');
+    const timeLabelInput = target.querySelector('[data-gathering-condition-value="dawn"] .manager-condition-label-input');
     timeLabelInput.focus();
     timeLabelInput.value = 'Grey Dawn';
     timeLabelInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
@@ -2776,7 +2776,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
       ['updateGatheringConditionValue', 'timeOfDay', 'dawn', { label: 'Grey Dawn' }, 'alchemy']
     );
     assert.equal(target.querySelectorAll('[data-gathering-condition-value] .essence-icon-picker-trigger.icon-only').length, 5);
-    const regionLabelInput = target.querySelector('[data-gathering-vocabulary-panel="regions"] [data-gathering-vocabulary-value="north"] .manager-v2-condition-label-input');
+    const regionLabelInput = target.querySelector('[data-gathering-vocabulary-panel="regions"] [data-gathering-vocabulary-value="north"] .manager-condition-label-input');
     regionLabelInput.value = 'Northern Reach';
     regionLabelInput.dispatchEvent(new Event('blur'));
     await tick();
@@ -2785,7 +2785,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
       calls.find(call => call[0] === 'updateGatheringVocabularyValue'),
       ['updateGatheringVocabularyValue', 'regions', 'north', { label: 'Northern Reach' }, 'alchemy']
     );
-    const biomeIconTrigger = target.querySelector('[data-gathering-vocabulary-panel="biomes"] [data-gathering-vocabulary-value="forest"] .manager-v2-biome-combined-trigger');
+    const biomeIconTrigger = target.querySelector('[data-gathering-vocabulary-panel="biomes"] [data-gathering-vocabulary-value="forest"] .manager-biome-combined-trigger');
     biomeIconTrigger.click();
     await tick();
     flushSync();
@@ -2794,9 +2794,9 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(calls.filter(call => call[0] === 'updateGatheringVocabularyValue').at(-1)[1], 'biomes');
-    const biomeColorTrigger = target.querySelector('[data-gathering-vocabulary-panel="biomes"] [data-gathering-vocabulary-value="forest"] .manager-v2-biome-combined-trigger');
-    const managerShell = target.querySelector('.fabricate-manager-v2');
-    const managerMain = target.querySelector('.manager-v2-main');
+    const biomeColorTrigger = target.querySelector('[data-gathering-vocabulary-panel="biomes"] [data-gathering-vocabulary-value="forest"] .manager-biome-combined-trigger');
+    const managerShell = target.querySelector('.fabricate-manager');
+    const managerMain = target.querySelector('.manager-main');
     const originalShellRect = managerShell.getBoundingClientRect;
     const originalMainRect = managerMain.getBoundingClientRect;
     const originalBiomeTriggerRect = biomeColorTrigger.getBoundingClientRect;
@@ -2829,25 +2829,25 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     flushSync();
     await tick();
     flushSync();
-    const colorPopover = target.querySelector('[data-manager-v2-color-picker-popover]');
+    const colorPopover = target.querySelector('[data-manager-color-picker-popover]');
     assert.ok(colorPopover);
-    assert.equal(colorPopover.closest('.fabricate-manager-v2'), managerShell, 'biome color popover should stay inside the Manager V2 shell overlay layer');
+    assert.equal(colorPopover.closest('.fabricate-manager'), managerShell, 'biome color popover should stay inside the Manager shell overlay layer');
     assert.equal(colorPopover.closest('[data-gathering-vocabulary-panel="biomes"]'), null, 'biome color popover should be portaled out of the settings panel');
     assert.match(colorPopover.getAttribute('style'), /bottom:\s*\d+px;/, 'lower biome color popovers should flip above the trigger when space below is constrained');
     assert.match(colorPopover.getAttribute('style'), /left:\s*40px;/, 'biome color popover should left-align with the trigger while within the main panel bounds');
     assert.match(colorPopover.getAttribute('style'), /width:\s*220px;/, 'biome color popover should keep its fixed compact width');
-    target.querySelector('[data-manager-v2-color-token="mist"]').click();
+    target.querySelector('[data-manager-color-token="mist"]').click();
     await tick();
     flushSync();
     assert.deepEqual(
       calls.filter(call => call[0] === 'updateGatheringVocabularyValue').at(-1),
       ['updateGatheringVocabularyValue', 'biomes', 'forest', { colorToken: 'mist', customColor: '' }, 'alchemy']
     );
-    assert.ok(target.querySelector('[data-manager-v2-color-picker-popover]'));
+    assert.ok(target.querySelector('[data-manager-color-picker-popover]'));
     document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
     await tick();
     flushSync();
-    assert.equal(target.querySelector('[data-manager-v2-color-picker-popover]'), null);
+    assert.equal(target.querySelector('[data-manager-color-picker-popover]'), null);
     biomeColorTrigger.getBoundingClientRect = () => ({
       left: 760,
       top: 330,
@@ -2859,23 +2859,23 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     biomeColorTrigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true, cancelable: true }));
     await tick();
     flushSync();
-    const constrainedColorPopover = target.querySelector('[data-manager-v2-color-picker-popover]');
+    const constrainedColorPopover = target.querySelector('[data-manager-color-picker-popover]');
     assert.ok(constrainedColorPopover);
-    assert.match(constrainedColorPopover.getAttribute('style'), /left:\s*424px;/, 'biome color popover should clamp to the Manager V2 main panel right edge');
+    assert.match(constrainedColorPopover.getAttribute('style'), /left:\s*424px;/, 'biome color popover should clamp to the Manager main panel right edge');
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await tick();
     flushSync();
-    assert.equal(target.querySelector('[data-manager-v2-color-picker-popover]'), null);
+    assert.equal(target.querySelector('[data-manager-color-picker-popover]'), null);
     managerShell.getBoundingClientRect = originalShellRect;
     managerMain.getBoundingClientRect = originalMainRect;
     biomeColorTrigger.getBoundingClientRect = originalBiomeTriggerRect;
-    assert.equal(target.querySelector('.manager-v2-gathering-settings-summary'), null);
+    assert.equal(target.querySelector('.manager-gathering-settings-summary'), null);
     assert.equal(target.querySelector('[data-gathering-rule-fact]'), null);
-    assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Choose which successful drop rows are granted.'));
-    assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Choose which matching hazards are applied after a gathering roll.'));
-    assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Decide whether selected hazards still allow the gathering attempt to succeed.'));
-    const rewardsSelect = target.querySelector('#manager-v2-gathering-rule-rewards');
-    const hazardsSelect = target.querySelector('#manager-v2-gathering-rule-hazards');
+    assert.ok(target.querySelector('.manager-inspector').textContent.includes('Choose which successful drop rows are granted.'));
+    assert.ok(target.querySelector('.manager-inspector').textContent.includes('Choose which matching hazards are applied after a gathering roll.'));
+    assert.ok(target.querySelector('.manager-inspector').textContent.includes('Decide whether selected hazards still allow the gathering attempt to succeed.'));
+    const rewardsSelect = target.querySelector('#manager-gathering-rule-rewards');
+    const hazardsSelect = target.querySelector('#manager-gathering-rule-hazards');
     assert.deepEqual(
       Array.from(rewardsSelect.options).map(option => option.textContent.trim()),
       ['Highest ranked successful drop', 'All successful drops', 'Limit successful drops']
@@ -2887,12 +2887,12 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(hazardsSelect.textContent.includes('Highest ranked successful drop'), false);
     assert.equal(hazardsSelect.textContent.includes('All successful drops'), false);
     assert.ok(target.textContent.includes('Gathering succeeds'));
-    assert.ok(target.querySelector('.manager-v2-inspector [data-gathering-inspector-rules]'));
-    assert.equal(target.querySelector('.manager-v2-inspector [data-gathering-inspector-rules] h2').textContent.trim(), 'Rules');
-    assert.equal(target.querySelectorAll('.manager-v2-inspector [data-gathering-inspector-rules] select').length, 4);
-    assert.equal(target.querySelector('.manager-v2-inspector [data-gathering-rule-stepper]'), null);
+    assert.ok(target.querySelector('.manager-inspector [data-gathering-inspector-rules]'));
+    assert.equal(target.querySelector('.manager-inspector [data-gathering-inspector-rules] h2').textContent.trim(), 'Rules');
+    assert.equal(target.querySelectorAll('.manager-inspector [data-gathering-inspector-rules] select').length, 4);
+    assert.equal(target.querySelector('.manager-inspector [data-gathering-rule-stepper]'), null);
     assert.equal(
-      target.querySelector('.manager-v2-inspector').textContent.includes('Selected environment'),
+      target.querySelector('.manager-inspector').textContent.includes('Selected environment'),
       false
     );
 
@@ -2900,9 +2900,9 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(gatheringSubitem('Environments').getAttribute('aria-current'), 'page');
-    assert.equal(target.querySelectorAll('.manager-v2-environment-row').length, 2);
+    assert.equal(target.querySelectorAll('.manager-environment-row').length, 2);
 
-    const environmentTable = target.querySelector('.manager-v2-environments-table');
+    const environmentTable = target.querySelector('.manager-environments-table');
     assert.deepEqual(
       Array.from(environmentTable.querySelectorAll('[role="columnheader"]')).map(header => header.textContent.trim()),
       ['Environment', 'Selection mode', 'Tasks', 'Status', 'Actions']
@@ -2910,44 +2910,44 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(environmentTable.textContent.includes('Linked scene'), false);
     assert.equal(environmentTable.textContent.includes('Scene unresolved'), false);
     const forestRow = target.querySelector('[data-environment-id="env-forest"]');
-    assert.equal(forestRow.querySelector('.manager-v2-environment-task-count').textContent.trim(), '1');
+    assert.equal(forestRow.querySelector('.manager-environment-task-count').textContent.trim(), '1');
     assert.equal(forestRow.textContent.includes('results'), false);
     assert.equal(forestRow.textContent.includes('catalysts'), false);
-    assert.equal(forestRow.querySelector('.manager-v2-environment-task-count.manager-v2-chip'), null);
-    assert.ok(forestRow.querySelector('.manager-v2-status-toggle'));
-    assert.ok(forestRow.querySelector('.manager-v2-environment-action-grid'));
+    assert.equal(forestRow.querySelector('.manager-environment-task-count.manager-chip'), null);
+    assert.ok(forestRow.querySelector('.manager-status-toggle'));
+    assert.ok(forestRow.querySelector('.manager-environment-action-grid'));
     assert.ok(forestRow.querySelector('[aria-label="Edit Moonlit Forest"]'));
     assert.ok(forestRow.querySelector('[aria-label="Duplicate Moonlit Forest"]'));
     assert.ok(forestRow.querySelector('[aria-label="Delete Moonlit Forest"]'));
-    assert.ok(forestRow.querySelector('.manager-v2-environment-reorder-stack'));
-    assert.ok(target.querySelector('.manager-v2-inspector').textContent.includes('Selected environment'));
+    assert.ok(forestRow.querySelector('.manager-environment-reorder-stack'));
+    assert.ok(target.querySelector('.manager-inspector').textContent.includes('Selected environment'));
     assert.equal(
-      target.querySelector('.manager-v2-inspector').textContent.includes('Environment actions'),
+      target.querySelector('.manager-inspector').textContent.includes('Environment actions'),
       false,
       'selected environment inspector should not duplicate row quick actions'
     );
 
-    const search = target.querySelector('.manager-v2-toolbar input[type="search"]');
+    const search = target.querySelector('.manager-toolbar input[type="search"]');
     search.value = 'cavern';
     search.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
-    assert.equal(target.querySelectorAll('.manager-v2-environment-row').length, 1);
+    assert.equal(target.querySelectorAll('.manager-environment-row').length, 1);
     assert.ok(target.textContent.includes('Quiet Cavern'));
     assert.equal(
-      target.querySelector('[data-environment-id="env-cavern"] .manager-v2-environment-reorder-stack [aria-label="Move up"]').disabled,
+      target.querySelector('[data-environment-id="env-cavern"] .manager-environment-reorder-stack [aria-label="Move up"]').disabled,
       false,
       'filtered environment move-up should use full list order, not filtered row position'
     );
 
-    const cavernToggle = target.querySelector('[data-environment-id="env-cavern"] .manager-v2-status-toggle');
+    const cavernToggle = target.querySelector('[data-environment-id="env-cavern"] .manager-status-toggle');
     cavernToggle.click();
     await tick();
     flushSync();
     assert.ok(calls.some(call => call[0] === 'toggleEnvironmentEnabled' && call[1] === 'env-cavern' && call[2] === true));
     assert.equal(calls.some(call => call[0] === 'selectEnvironment' && call[1] === 'env-cavern'), false);
 
-    target.querySelector('[data-environment-id="env-cavern"] .manager-v2-environment-identity').click();
+    target.querySelector('[data-environment-id="env-cavern"] .manager-environment-identity').click();
     await tick();
     flushSync();
     assert.ok(target.querySelector('[data-environment-id="env-cavern"]').classList.contains('is-selected'));
@@ -2966,8 +2966,8 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'environment-edit');
-    assert.ok(target.querySelector('.manager-v2-environment-editor-shell .manager-v2-environment-edit-view'));
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environment-edit');
+    assert.ok(target.querySelector('.manager-environment-editor-shell .manager-environment-edit-view'));
     assert.ok(target.textContent.includes('Quiet Cavern'));
   });
 
@@ -2995,9 +2995,9 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]').click();
     await tick();
     flushSync();
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'gathering-task-edit');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'gathering-task-edit');
 
-    const headerDeleteButton = target.querySelector('.manager-v2-header-actions .manager-v2-button.is-danger');
+    const headerDeleteButton = target.querySelector('.manager-header-actions .manager-button.is-danger');
     assert.ok(headerDeleteButton, 'editor toolbar should expose a destructive delete button');
     assert.ok(headerDeleteButton.textContent.includes('Delete gathering task'));
     headerDeleteButton.click();
@@ -3008,7 +3008,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
       calls.some(call => call[0] === 'deleteGatheringLibraryTask' && call[1] === 'alchemy' && call[2] === 'task-herbs'),
       `expected deleteGatheringLibraryTask call for task-herbs, got ${JSON.stringify(calls)}`
     );
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'environments');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environments');
   });
 
   it('edits gathering task drop rules from unresolved row through inspector modifiers', async () => {
@@ -3039,7 +3039,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
 
     const knownDropIds = new Set(Array.from(target.querySelectorAll('[data-gathering-task-drop-id]'))
       .map(node => node.dataset.gatheringTaskDropId));
-    Array.from(target.querySelectorAll('.manager-v2-task-card-header .manager-v2-button'))
+    Array.from(target.querySelectorAll('.manager-task-card-header .manager-button'))
       .find(button => button.textContent.includes('Add drop rule'))
       .click();
     await tick();
@@ -3127,7 +3127,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     flushSync();
 
     const browser = target.querySelector('[data-gathering-task-component-browser]');
-    const dropsCard = target.querySelector('.manager-v2-task-drops-card');
+    const dropsCard = target.querySelector('.manager-task-drops-card');
     assert.ok(browser, 'component browser should render in the task editor');
     assert.equal(
       Boolean(browser.compareDocumentPosition(dropsCard) & Node.DOCUMENT_POSITION_FOLLOWING),
@@ -3184,7 +3184,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(target.querySelectorAll('[data-gathering-component-card]').length, 1, 'selected component tags should require all tags');
     assert.ok(browser.textContent.includes('Moon Fern'));
     const selectedTagPills = Array.from(target.querySelectorAll('[data-gathering-component-tag-pill]'));
-    assert.ok(selectedTagPills.every(pill => pill.classList.contains('manager-v2-selected-tag-pill')), 'selected component tags should render as removable pills');
+    assert.ok(selectedTagPills.every(pill => pill.classList.contains('manager-selected-tag-pill')), 'selected component tags should render as removable pills');
 
     for (const pill of Array.from(target.querySelectorAll('[data-gathering-component-tag-pill] button'))) {
       pill.click();
@@ -3292,10 +3292,10 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
 
     const fourModifierRow = target.querySelector('[data-gathering-task-drop-id="drop-four-modifiers"]');
     const fiveModifierRow = target.querySelector('[data-gathering-task-drop-id="drop-five-modifiers"]');
-    assert.equal(fourModifierRow.querySelectorAll('.manager-v2-drop-modifier-pill').length, 4);
+    assert.equal(fourModifierRow.querySelectorAll('.manager-drop-modifier-pill').length, 4);
     assert.equal(fourModifierRow.textContent.includes('See selected rule for modifiers'), false);
-    assert.equal(fiveModifierRow.querySelectorAll('.manager-v2-drop-modifier-pill').length, 0);
-    assert.ok(fiveModifierRow.querySelector('.manager-v2-drop-modifier-overflow'));
+    assert.equal(fiveModifierRow.querySelectorAll('.manager-drop-modifier-pill').length, 0);
+    assert.ok(fiveModifierRow.querySelector('.manager-drop-modifier-overflow'));
     assert.ok(fiveModifierRow.textContent.includes('See selected rule for modifiers'));
   });
 
@@ -3339,7 +3339,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
 
     function assertRenderedRarityRows(rows) {
       for (const [id, dropRate, tierClass, color] of rows) {
-        const control = target.querySelector(`[data-gathering-task-drop-id="${id}"] .manager-v2-drop-rate-control`);
+        const control = target.querySelector(`[data-gathering-task-drop-id="${id}"] .manager-drop-rate-control`);
         assert.ok(control.classList.contains(tierClass), `${id} should use ${tierClass}`);
         assert.ok(control.getAttribute('style').includes(`--fab-drop-rate-value: ${dropRate}%;`), `${id} should expose its slider fill value`);
         assert.ok(control.getAttribute('style').includes(`--fab-drop-rate-color: ${color};`), `${id} should expose ${color}`);
@@ -3347,7 +3347,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     }
 
     assertRenderedRarityRows(rarityRows.slice(0, 5));
-    target.querySelector('.manager-v2-task-drops-card [data-pagination-next]').click();
+    target.querySelector('.manager-task-drops-card [data-pagination-next]').click();
     await tick();
     flushSync();
     assertRenderedRarityRows(rarityRows.slice(5));
@@ -3382,7 +3382,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    const dropRulesCard = target.querySelector('.manager-v2-task-drops-card');
+    const dropRulesCard = target.querySelector('.manager-task-drops-card');
     assert.ok(target.querySelector('[data-gathering-task-drop-id="drop-page-1"]'));
     assert.equal(dropRulesCard.querySelectorAll('[data-gathering-task-drop-id]').length, 5, 'drop rules should default to five rows per page');
     assert.equal(dropRulesCard.querySelector('[data-pagination-page]').textContent.trim(), 'Page 1 of 3');
@@ -3518,32 +3518,32 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    assert.equal(navButton('Tools').querySelector('.manager-v2-nav-count')?.textContent.trim(), '1');
-    assert.equal(target.querySelector('.manager-v2-header-actions'), null);
-    assert.equal(target.querySelector('.manager-v2-header').textContent.includes('Back to Gathering'), false);
-    assert.equal(target.querySelector('.manager-v2-header').textContent.includes('Unsaved'), false);
-    assert.equal(target.querySelector('.manager-v2-header').textContent.includes('Delete tool'), false);
-    assert.equal(target.querySelector('.manager-v2-header').textContent.includes('Save changes'), false);
-    assert.equal(target.querySelector('.manager-v2-header').textContent.includes('Import'), false);
-    assert.equal(target.querySelector('.manager-v2-header').textContent.includes('Export'), false);
-    assert.equal(target.querySelector('.manager-v2-header').textContent.includes('Create'), false);
+    assert.equal(navButton('Tools').querySelector('.manager-nav-count')?.textContent.trim(), '1');
+    assert.equal(target.querySelector('.manager-header-actions'), null);
+    assert.equal(target.querySelector('.manager-header').textContent.includes('Back to Gathering'), false);
+    assert.equal(target.querySelector('.manager-header').textContent.includes('Unsaved'), false);
+    assert.equal(target.querySelector('.manager-header').textContent.includes('Delete tool'), false);
+    assert.equal(target.querySelector('.manager-header').textContent.includes('Save changes'), false);
+    assert.equal(target.querySelector('.manager-header').textContent.includes('Import'), false);
+    assert.equal(target.querySelector('.manager-header').textContent.includes('Export'), false);
+    assert.equal(target.querySelector('.manager-header').textContent.includes('Create'), false);
 
-    const toolInspector = target.querySelector('[data-manager-v2-tool-inspector]');
+    const toolInspector = target.querySelector('[data-manager-tool-inspector]');
     assert.ok(toolInspector.textContent.includes('Artisan Catalyst'));
-    assert.ok(toolInspector.querySelector('.manager-v2-tools-dirty-chip').textContent.includes('Unsaved'));
-    assert.ok(toolInspector.querySelector('.manager-v2-tools-dirty-chip .fa-save'), 'inspector dirty pip should include the save icon');
-    const inspectorActions = toolInspector.querySelector('.manager-v2-tool-inspector-actions');
+    assert.ok(toolInspector.querySelector('.manager-tools-dirty-chip').textContent.includes('Unsaved'));
+    assert.ok(toolInspector.querySelector('.manager-tools-dirty-chip .fa-save'), 'inspector dirty pip should include the save icon');
+    const inspectorActions = toolInspector.querySelector('.manager-tool-inspector-actions');
     assert.ok(inspectorActions, 'selected tool inspector header card should own tool actions');
-    assert.equal(inspectorActions.querySelectorAll('.manager-v2-button').length, 2);
-    assert.ok(inspectorActions.querySelector('.manager-v2-button.is-danger').textContent.includes('Delete tool'));
-    assert.ok(inspectorActions.querySelector('.manager-v2-button.is-primary').textContent.includes('Save changes'));
+    assert.equal(inspectorActions.querySelectorAll('.manager-button').length, 2);
+    assert.ok(inspectorActions.querySelector('.manager-button.is-danger').textContent.includes('Delete tool'));
+    assert.ok(inspectorActions.querySelector('.manager-button.is-primary').textContent.includes('Save changes'));
 
-    inspectorActions.querySelector('.manager-v2-button.is-primary').click();
+    inspectorActions.querySelector('.manager-button.is-primary').click();
     await tick();
     flushSync();
     assert.ok(calls.some(call => call[0] === 'saveToolDraft' && call[1] === 'tool-catalyst'));
 
-    inspectorActions.querySelector('.manager-v2-button.is-danger').click();
+    inspectorActions.querySelector('.manager-button.is-danger').click();
     await tick();
     flushSync();
     assert.ok(calls.some(call => call[0] === 'deleteToolFromDraft' && call[1] === 'tool-catalyst'));
@@ -3592,14 +3592,14 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    const dirtyRow = target.querySelector('[data-manager-v2-tool-id="tool-catalyst"]');
-    const cleanRow = target.querySelector('[data-manager-v2-tool-id="tool-mail"]');
-    assert.ok(dirtyRow.querySelector('.manager-v2-tools-row-dirty-slot .manager-v2-tools-dirty-chip').textContent.includes('Unsaved'));
-    assert.ok(dirtyRow.querySelector('.manager-v2-tools-row-dirty-slot .fa-save'), 'row dirty pip should include the save icon');
-    assert.equal(dirtyRow.querySelector('.manager-v2-tools-row-actions .manager-v2-tools-dirty-chip'), null);
-    assert.equal(cleanRow.querySelector('.manager-v2-tools-row-dirty-slot .manager-v2-tools-dirty-chip'), null);
+    const dirtyRow = target.querySelector('[data-manager-tool-id="tool-catalyst"]');
+    const cleanRow = target.querySelector('[data-manager-tool-id="tool-mail"]');
+    assert.ok(dirtyRow.querySelector('.manager-tools-row-dirty-slot .manager-tools-dirty-chip').textContent.includes('Unsaved'));
+    assert.ok(dirtyRow.querySelector('.manager-tools-row-dirty-slot .fa-save'), 'row dirty pip should include the save icon');
+    assert.equal(dirtyRow.querySelector('.manager-tools-row-actions .manager-tools-dirty-chip'), null);
+    assert.equal(cleanRow.querySelector('.manager-tools-row-dirty-slot .manager-tools-dirty-chip'), null);
     assert.equal(dirtyRow.querySelector('[aria-label="More actions"]'), null);
-    assert.equal(dirtyRow.querySelectorAll('.manager-v2-tools-row-actions .manager-v2-icon-button').length, 1);
+    assert.equal(dirtyRow.querySelectorAll('.manager-tools-row-actions .manager-icon-button').length, 1);
   });
 
   it('offers save-all navigation handling when leaving with unsaved tools', async () => {
@@ -3683,24 +3683,24 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    const row = target.querySelector('[data-manager-v2-tool-id="tool-catalyst"]');
+    const row = target.querySelector('[data-manager-tool-id="tool-catalyst"]');
     assert.ok(row);
-    assert.equal(row.querySelector('[data-manager-v2-tool-editor]'), null);
+    assert.equal(row.querySelector('[data-manager-tool-editor]'), null);
 
-    row.querySelector('.manager-v2-tools-row-body').click();
+    row.querySelector('.manager-tools-row-body').click();
     await tick();
     flushSync();
-    assert.ok(row.querySelector('[data-manager-v2-tool-editor]'), 'row click should expand the tool editor');
+    assert.ok(row.querySelector('[data-manager-tool-editor]'), 'row click should expand the tool editor');
 
-    row.querySelector('.manager-v2-tools-row-body').click();
+    row.querySelector('.manager-tools-row-body').click();
     await tick();
     flushSync();
-    assert.ok(row.querySelector('[data-manager-v2-tool-editor]'), 'row click should keep an already expanded tool open');
+    assert.ok(row.querySelector('[data-manager-tool-editor]'), 'row click should keep an already expanded tool open');
 
-    row.querySelector('.manager-v2-tools-row-actions .manager-v2-icon-button:last-child').click();
+    row.querySelector('.manager-tools-row-actions .manager-icon-button:last-child').click();
     await tick();
     flushSync();
-    assert.equal(row.querySelector('[data-manager-v2-tool-editor]'), null, 'chevron button should remain the explicit collapse control');
+    assert.equal(row.querySelector('[data-manager-tool-editor]'), null, 'chevron button should remain the explicit collapse control');
   });
 
   it('swaps a mapped gathering tool component from the row drop zone', async () => {
@@ -3757,18 +3757,18 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
       node.dispatchEvent(dropEvent);
     }
 
-    const dropZone = target.querySelector('[data-manager-v2-tool-component-drop-zone="tool-catalyst"]');
+    const dropZone = target.querySelector('[data-manager-tool-component-drop-zone="tool-catalyst"]');
     assert.ok(dropZone);
     assert.ok(dropZone.classList.contains('is-component-drop-zone'));
 
-    const payload = dragPayloadFrom(target.querySelector('[data-manager-v2-tools-component-card="c2"]'));
+    const payload = dragPayloadFrom(target.querySelector('[data-manager-tools-component-card="c2"]'));
     assert.deepEqual(JSON.parse(payload), { type: 'FabricateManagedComponent', componentId: 'c2' });
     dropPayloadOn(dropZone, payload);
     await tick();
     flushSync();
 
     assert.ok(calls.some(call => call[0] === 'updateToolInDraft' && call[1] === 'tool-catalyst' && call[2].componentId === 'c2'));
-    assert.ok(target.querySelector('[data-manager-v2-tool-id="tool-catalyst"]').textContent.includes('Glass Vial'), 'row drop should stage the replacement component on the tool');
+    assert.ok(target.querySelector('[data-manager-tool-id="tool-catalyst"]').textContent.includes('Glass Vial'), 'row drop should stage the replacement component on the tool');
   });
 
   it('creates a gathering tool from a managed component dropped on the add-tool stub', async () => {
@@ -3802,7 +3802,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    const addStub = target.querySelector('[data-manager-v2-tools-add-stub]');
+    const addStub = target.querySelector('[data-manager-tools-add-stub]');
     assert.ok(addStub);
     addStub.click();
     await tick();
@@ -3819,7 +3819,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
         effectAllowed: ''
       }
     });
-    target.querySelector('[data-manager-v2-tools-component-card="c2"]').dispatchEvent(dragStart);
+    target.querySelector('[data-manager-tools-component-card="c2"]').dispatchEvent(dragStart);
 
     const dropEvent = new Event('drop', { bubbles: true, cancelable: true });
     Object.defineProperty(dropEvent, 'dataTransfer', {
@@ -3874,7 +3874,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     Object.defineProperty(dropEvent, 'dataTransfer', {
       value: { getData: (type) => type === 'text/plain' ? JSON.stringify(itemPayload) : '' }
     });
-    target.querySelector('[data-manager-v2-tools-add-stub]').dispatchEvent(dropEvent);
+    target.querySelector('[data-manager-tools-add-stub]').dispatchEvent(dropEvent);
     await Promise.resolve();
     await tick();
     flushSync();
@@ -3915,16 +3915,16 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    const editor = target.querySelector('[data-manager-v2-tool-editor]');
+    const editor = target.querySelector('[data-manager-tool-editor]');
     assert.ok(editor);
-    assert.equal(editor.querySelector('.manager-v2-provider-expression-input'), null);
+    assert.equal(editor.querySelector('.manager-provider-expression-input'), null);
     assert.equal(editor.querySelector('select[id$="-provider"]'), null);
     assert.ok(editor.textContent.includes('Enter an actor roll-data property'));
     assert.ok(editor.textContent.includes('Example: @tools.alchemist.value'));
     assert.ok(!editor.textContent.includes('Example: @abilities.str.mod'));
     assert.ok(!editor.textContent.includes('Example: @skills.prc.total'));
 
-    const expressionInput = editor.querySelector('.manager-v2-tools-requirement-expression input');
+    const expressionInput = editor.querySelector('.manager-tools-requirement-expression input');
     assert.equal(expressionInput.value, '@tools.alchemist.value');
     expressionInput.value = '@tools.smith.value';
     expressionInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -3970,9 +3970,9 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    const control = target.querySelector('[data-manager-v2-tool-editor] .manager-v2-tool-breakage-chance-control');
+    const control = target.querySelector('[data-manager-tool-editor] .manager-tool-breakage-chance-control');
     assert.ok(control);
-    assert.ok(control.classList.contains('manager-v2-drop-rate-control'));
+    assert.ok(control.classList.contains('manager-drop-rate-control'));
     for (const tierClass of ['is-none', 'is-legendary', 'is-very-rare', 'is-rare', 'is-uncommon', 'is-common', 'is-guaranteed']) {
       assert.equal(control.classList.contains(tierClass), false, `breakage chance slider should not use ${tierClass}`);
     }
@@ -3992,7 +3992,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
       && call[2].breakage?.breakageChance === 75));
     assert.ok(control.getAttribute('style').includes('--fab-tool-breakage-chance-color: color-mix(in srgb, var(--fab-danger) 50%, var(--fab-warning) 50%);'));
 
-    const percentInput = target.querySelector('[data-manager-v2-tool-editor] .manager-v2-drop-rate-percent input[type="text"]');
+    const percentInput = target.querySelector('[data-manager-tool-editor] .manager-drop-rate-percent input[type="text"]');
     percentInput.value = '42';
     percentInput.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
@@ -4036,18 +4036,18 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    const replacementDropZone = target.querySelector('[data-manager-v2-tool-replacement-drop-zone="tool-catalyst"]');
+    const replacementDropZone = target.querySelector('[data-manager-tool-replacement-drop-zone="tool-catalyst"]');
     assert.ok(replacementDropZone);
     const replacementField = replacementDropZone.parentElement;
-    assert.ok(replacementField.classList.contains('manager-v2-tools-replacement-field'));
-    assert.equal(replacementField.classList.contains('manager-v2-tools-inline-field'), false);
+    assert.ok(replacementField.classList.contains('manager-tools-replacement-field'));
+    assert.equal(replacementField.classList.contains('manager-tools-inline-field'), false);
     assert.equal(replacementField.firstElementChild, replacementDropZone);
     assert.equal(
       Array.from(replacementField.children).some(child => child.tagName === 'SPAN' && child.textContent.trim() === 'Replacement component'),
       false
     );
     assert.equal(replacementDropZone.querySelector('select'), null, 'replacement component should use the primary drop-zone layout instead of a select');
-    assert.ok(replacementDropZone.querySelector('.manager-v2-drop-empty-component'));
+    assert.ok(replacementDropZone.querySelector('.manager-drop-empty-component'));
     assert.ok(replacementDropZone.textContent.includes('No Component'));
     assert.ok(replacementDropZone.textContent.includes('Create or assign'));
 
@@ -4061,7 +4061,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
         effectAllowed: ''
       }
     });
-    target.querySelector('[data-manager-v2-tools-component-card="c2"]').dispatchEvent(dragStart);
+    target.querySelector('[data-manager-tools-component-card="c2"]').dispatchEvent(dragStart);
 
     const dropEvent = new Event('drop', { bubbles: true, cancelable: true });
     Object.defineProperty(dropEvent, 'dataTransfer', {
@@ -4078,7 +4078,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(replacementDropZone.textContent.includes('Glass Vial'));
 
     const clearEvent = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
-    replacementDropZone.querySelector('.manager-v2-drop-component-button').dispatchEvent(clearEvent);
+    replacementDropZone.querySelector('.manager-drop-component-button').dispatchEvent(clearEvent);
     await tick();
     flushSync();
 
@@ -4105,14 +4105,14 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'environments');
-    const gatheringItems = Array.from(target.querySelectorAll('.manager-v2-nav-subitem'));
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environments');
+    const gatheringItems = Array.from(target.querySelectorAll('.manager-nav-subitem'));
     assert.deepEqual(
-      gatheringItems.map(item => item.querySelector('.manager-v2-nav-label')?.textContent.trim()),
+      gatheringItems.map(item => item.querySelector('.manager-nav-label')?.textContent.trim()),
       ['Environments', 'Tasks', 'Hazards', 'Settings']
     );
     assert.deepEqual(
-      gatheringItems.map(item => item.querySelector('.manager-v2-nav-count')?.textContent.trim() ?? null),
+      gatheringItems.map(item => item.querySelector('.manager-nav-count')?.textContent.trim() ?? null),
       ['0', '3', '0', null]
     );
     assert.equal(gatheringSubitem('Environments').getAttribute('aria-current'), 'page');
@@ -4127,7 +4127,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Gathering docs'));
     assert.equal(target.textContent.includes('Select an environment'), false);
 
-    Array.from(target.querySelectorAll('.manager-v2-table-scroll .manager-v2-button'))
+    Array.from(target.querySelectorAll('.manager-table-scroll .manager-button'))
       .find(button => button.textContent.includes('Review tasks'))
       .click();
     await tick();
@@ -4137,13 +4137,13 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(target.textContent.includes('Gather Moon Herbs'));
     assert.ok(target.querySelector('[data-gathering-tasks-browser]'));
     assert.ok(target.querySelector('[data-gathering-task-inspector]'));
-    assert.equal(target.querySelector('.manager-v2-inspector').textContent.includes('Plan gathering content'), false);
+    assert.equal(target.querySelector('.manager-inspector').textContent.includes('Plan gathering content'), false);
 
     gatheringSubitem('Environments').click();
     await tick();
     flushSync();
 
-    Array.from(target.querySelectorAll('.manager-v2-table-scroll .manager-v2-button'))
+    Array.from(target.querySelectorAll('.manager-table-scroll .manager-button'))
       .find(button => button.textContent.includes('Review hazards'))
       .click();
     await tick();
@@ -4156,11 +4156,11 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    target.querySelector('.manager-v2-table-scroll .manager-v2-button.is-primary').click();
+    target.querySelector('.manager-table-scroll .manager-button.is-primary').click();
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'environment-edit');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environment-edit');
     assert.ok(calls.some(call => call[0] === 'createEnvironmentDraft'));
   });
 
@@ -4186,7 +4186,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
 
     assert.ok(target.textContent.includes('No gathering tasks yet'));
     assert.ok(target.textContent.includes('Create gathering tasks before attaching them to environments.'));
-    target.querySelector('[data-gathering-tasks-browser] .manager-v2-button.is-primary').click();
+    target.querySelector('[data-gathering-tasks-browser] .manager-button.is-primary').click();
     await tick();
     flushSync();
 
@@ -4210,14 +4210,14 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'recipes');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes');
     assert.ok(target.textContent.includes('No recipes yet'));
     assert.ok(target.textContent.includes('Set up recipes'));
     assert.ok(target.textContent.includes('Choose the recipe structure supported by the selected system.'));
     assert.ok(target.textContent.includes('Recipe docs'));
     assert.equal(target.textContent.includes('Select a recipe'), false);
 
-    target.querySelector('.manager-v2-table-scroll .manager-v2-button.is-primary').click();
+    target.querySelector('.manager-table-scroll .manager-button.is-primary').click();
     assert.ok(calls.some(call => call[0] === 'createRecipe'));
   });
 
@@ -4238,20 +4238,20 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'recipes');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes');
     assert.ok(target.textContent.includes('No recipes yet'));
     assert.ok(target.textContent.includes('Add components before creating recipes'));
     assert.ok(target.textContent.includes('Open Components and drop world, compendium, pack, or folder items into this system.'));
     assert.ok(target.textContent.includes('Add components'));
     assert.equal(target.textContent.includes('Choose the recipe structure supported by the selected system.'), false);
 
-    Array.from(target.querySelectorAll('.manager-v2-setup-links .manager-v2-button'))
+    Array.from(target.querySelectorAll('.manager-setup-links .manager-button'))
       .find(button => button.textContent.includes('Add components'))
       .click();
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'components');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'components');
     assert.ok(target.textContent.includes('No components yet'));
   });
 
@@ -4272,12 +4272,12 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'components');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'components');
     assert.ok(target.textContent.includes('No components yet'));
     assert.ok(target.textContent.includes('Set up components'));
     assert.ok(target.textContent.includes('Drop world, compendium, pack, or folder items into the component browser.'));
     assert.ok(target.textContent.includes('Component docs'));
-    assert.ok(target.querySelector('.manager-v2-component-drop-zone'));
+    assert.ok(target.querySelector('.manager-component-drop-zone'));
     assert.equal(target.textContent.includes('Select a component'), false);
   });
 
@@ -4298,18 +4298,18 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'essences');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essences');
     assert.ok(target.textContent.includes('No essences yet'));
     assert.ok(target.textContent.includes('Set up essences'));
     assert.ok(target.textContent.includes('Create an essence with a clear name, icon, and description.'));
     assert.ok(target.textContent.includes('Essence docs'));
     assert.equal(target.textContent.includes('Select an essence'), false);
 
-    target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').click();
+    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'essence-edit');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
   });
 
   it('creates a new environment draft with draft-backed title and inspector context', async () => {
@@ -4328,13 +4328,13 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     navButton('Gathering').click();
     await tick();
     flushSync();
-    target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').click();
+    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'environment-edit');
-    assert.equal(target.querySelector('.manager-v2-environment-details-band .manager-v2-card-title').textContent.trim(), 'New Gathering Environment');
-    assert.equal(target.querySelector('.manager-v2-inspector'), null);
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environment-edit');
+    assert.equal(target.querySelector('.manager-environment-details-band .manager-card-title').textContent.trim(), 'New Gathering Environment');
+    assert.equal(target.querySelector('.manager-inspector'), null);
     assert.ok(calls.some(call => call[0] === 'createEnvironmentDraft'));
   });
 
@@ -4369,12 +4369,12 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     tagSearch.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
-    Array.from(target.querySelectorAll('.manager-v2-tag-suggestion'))
+    Array.from(target.querySelectorAll('.manager-tag-suggestion'))
       .find(button => button.textContent.includes('ore'))
       .click();
     await tick();
     flushSync();
-    assert.equal(target.querySelectorAll('.manager-v2-component-row').length, 1);
+    assert.equal(target.querySelectorAll('.manager-component-row').length, 1);
 
     store.selectSystem('smithing');
     await tick();
@@ -4382,7 +4382,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
 
     assert.equal(target.querySelector('[aria-label="Filter components by tag"]'), null);
     assert.equal(target.querySelector('[aria-label="Search component tags"]'), null);
-    assert.equal(target.querySelectorAll('.manager-v2-component-row').length, 1);
+    assert.equal(target.querySelectorAll('.manager-component-row').length, 1);
     assert.ok(target.textContent.includes('Coal'));
     assert.equal(target.textContent.includes('No components match these filters'), false);
   });
@@ -4408,7 +4408,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     search.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
-    assert.equal(target.querySelectorAll('.manager-v2-system-row').length, 1);
+    assert.equal(target.querySelectorAll('.manager-system-row').length, 1);
     assert.ok(target.textContent.includes('Smithing'));
 
     search.value = '';
@@ -4416,7 +4416,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    target.querySelector('[data-system-id="smithing"] .manager-v2-labeled-cell').click();
+    target.querySelector('[data-system-id="smithing"] .manager-labeled-cell').click();
     await tick();
     flushSync();
     target.querySelector('[data-system-id="smithing"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
@@ -4430,9 +4430,9 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     flushSync();
 
     assert.equal(onEditSystemCalled, false);
-    assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'system-edit');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'system-edit');
     assert.ok(target.textContent.includes('System settings'));
-    assert.ok(target.querySelector('.manager-v2-system-edit-form'));
+    assert.ok(target.querySelector('.manager-system-edit-form'));
     assert.deepEqual(calls.slice(-4), [
       ['selectSystem', 'smithing'],
       ['selectSystem', 'smithing'],
@@ -4461,15 +4461,15 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await tick();
     flushSync();
 
-    const name = target.querySelector('#manager-v2-system-name');
-    const description = target.querySelector('#manager-v2-system-description');
+    const name = target.querySelector('#manager-system-name');
+    const description = target.querySelector('#manager-system-description');
     name.value = 'Greater Alchemy';
     name.dispatchEvent(new Event('input', { bubbles: true }));
     description.value = 'Updated potion work';
     description.dispatchEvent(new Event('input', { bubbles: true }));
-    target.querySelector('.manager-v2-system-edit-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    target.querySelector('.manager-system-edit-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 
-    const resolution = target.querySelector('#manager-v2-system-resolution-mode');
+    const resolution = target.querySelector('#manager-system-resolution-mode');
     resolution.value = 'mapped';
     resolution.dispatchEvent(new Event('change', { bubbles: true }));
     await Promise.resolve();
@@ -4515,7 +4515,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(target.querySelector('[data-feature-key="craftingChecks"]'), null);
     assert.equal(target.querySelector('[data-feature-key="outcomeRouting"]'), null);
 
-    const resolution = target.querySelector('#manager-v2-system-resolution-mode');
+    const resolution = target.querySelector('#manager-system-resolution-mode');
     resolution.value = 'progressive';
     resolution.dispatchEvent(new Event('change', { bubbles: true }));
     await Promise.resolve();
@@ -4587,14 +4587,14 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(target.querySelectorAll('[data-gathering-task-required-tools-card]').length, 0, 'attached tools should be removed from the result grid');
 
     const lanternPill = Array.from(afterAddPills).find(node => node.getAttribute('data-gathering-task-required-tool-pill') === 'tool-pickaxe');
-    lanternPill.querySelector('.manager-v2-availability-remove').click();
+    lanternPill.querySelector('.manager-availability-remove').click();
     await tick();
     flushSync();
     const afterRemovePills = target.querySelectorAll('[data-gathering-task-required-tool-pill]');
     assert.equal(afterRemovePills.length, 1);
     assert.equal(afterRemovePills[0].getAttribute('data-gathering-task-required-tool-pill'), 'tool-lantern');
 
-    target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').click();
+    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
     await tick();
     flushSync();
     assert.ok(
@@ -4643,7 +4643,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.ok(section.querySelector('[data-gathering-task-required-tools-library-empty]'), 'library-empty placeholder should render when no tools exist');
     assert.equal(section.querySelector('[data-gathering-task-required-tools-search]'), null, 'search input should hide when library is empty');
 
-    stalePill.querySelector('.manager-v2-availability-remove').click();
+    stalePill.querySelector('.manager-availability-remove').click();
     await tick();
     flushSync();
 
@@ -4651,7 +4651,7 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(afterClearPills.length, 0, 'removing the stale chip should clear the dangling reference');
     assert.ok(target.querySelector('[data-gathering-task-required-tools]').textContent.includes('No tools required'));
 
-    target.querySelector('.manager-v2-header-actions .manager-v2-button.is-primary').click();
+    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
     await tick();
     flushSync();
     assert.ok(

@@ -19,11 +19,11 @@
     onMacroUuidChange = () => {},
     idPrefix = 'provider-expression',
     disabled = false,
-    providerLabelKey = 'FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.Provider',
+    providerLabelKey = 'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Provider',
     providerLabelFallback = 'Provider',
-    expressionLabelKey = 'FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.Expression',
+    expressionLabelKey = 'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Expression',
     expressionLabelFallback = 'Expression',
-    macroUuidLabelKey = 'FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.MacroUuid',
+    macroUuidLabelKey = 'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.MacroUuid',
     macroUuidLabelFallback = 'Macro UUID'
   } = $props();
 
@@ -38,8 +38,8 @@
   const isMacro = $derived(provider === 'macro');
 </script>
 
-<div class="manager-v2-provider-expression-input">
-  <label class="manager-v2-field" for={providerId}>
+<div class="manager-provider-expression-input">
+  <label class="manager-field" for={providerId}>
     <span>{text(providerLabelKey, providerLabelFallback)}</span>
     <select
       id={providerId}
@@ -47,12 +47,12 @@
       disabled={disabled}
       onchange={(event) => onProviderChange(event.currentTarget.value)}
     >
-      <option value="dnd5e">{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.ProviderDnd5e', 'D&D 5e')}</option>
-      <option value="pf2e">{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.ProviderPf2e', 'Pathfinder 2e')}</option>
-      <option value="macro">{text('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.ProviderMacro', 'Macro')}</option>
+      <option value="dnd5e">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.ProviderDnd5e', 'D&D 5e')}</option>
+      <option value="pf2e">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.ProviderPf2e', 'Pathfinder 2e')}</option>
+      <option value="macro">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.ProviderMacro', 'Macro')}</option>
     </select>
   </label>
-  <label class="manager-v2-field" for={expressionId} aria-hidden={isMacro ? 'true' : undefined} style={isMacro ? 'display:none;' : ''}>
+  <label class="manager-field" for={expressionId} aria-hidden={isMacro ? 'true' : undefined} style={isMacro ? 'display:none;' : ''}>
     <span>{text(expressionLabelKey, expressionLabelFallback)}</span>
     <input
       type="text"
@@ -63,7 +63,7 @@
       oninput={(event) => onExpressionChange(event.currentTarget.value)}
     />
   </label>
-  <label class="manager-v2-field" for={macroUuidId} aria-hidden={isMacro ? undefined : 'true'} style={isMacro ? '' : 'display:none;'}>
+  <label class="manager-field" for={macroUuidId} aria-hidden={isMacro ? undefined : 'true'} style={isMacro ? '' : 'display:none;'}>
     <span>{text(macroUuidLabelKey, macroUuidLabelFallback)}</span>
     <input
       type="text"

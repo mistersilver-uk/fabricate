@@ -19,7 +19,7 @@ test('Items Directory manager action launches the v2 manager registry entry', ()
   const buttonEnd = source.indexOf(');', buttonStart);
   const buttonSource = source.slice(buttonStart, buttonEnd);
 
-  assert.match(buttonSource, /getCraftingSystemManagerV2AppClass\(\)\.show\(\)/);
+  assert.match(buttonSource, /getCraftingSystemManagerAppClass\(\)\.show\(\)/);
   assert.doesNotMatch(buttonSource, /getRecipeManagerAppClass\(\)\.show\(\)/);
 });
 
@@ -31,5 +31,5 @@ test('openRecipeManager public API opens the crafting system manager', () => {
   const apiEnd = source.indexOf('},', apiStart);
   const apiSource = source.slice(apiStart, apiEnd);
 
-  assert.match(apiSource, /getCraftingSystemManagerV2AppClass\(\)\.show\(\)/);
+  assert.match(apiSource, /getCraftingSystemManagerAppClass\(\)\.show\(\)/);
 });
