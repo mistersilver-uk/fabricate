@@ -21,7 +21,6 @@ const gatheringTaskEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/G
 const gatheringTasksBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/GatheringTasksBrowserView.svelte');
 const toolsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager-v2/ToolsBrowserView.svelte');
 const appPath = resolve(repoRoot, 'src/ui/SvelteCraftingSystemManagerV2App.svelte.js');
-const recipeManagerAppPath = resolve(repoRoot, 'src/ui/SvelteRecipeManagerApp.svelte.js');
 const mainPath = resolve(repoRoot, 'src/main.js');
 const langPath = resolve(repoRoot, 'lang/en.json');
 
@@ -40,41 +39,44 @@ const gatheringTaskEditSource = readFileSync(gatheringTaskEditPath, 'utf8');
 const gatheringTasksBrowserSource = readFileSync(gatheringTasksBrowserPath, 'utf8');
 const toolsBrowserSource = readFileSync(toolsBrowserPath, 'utf8');
 const appSource = readFileSync(appPath, 'utf8');
-const recipeManagerAppSource = readFileSync(recipeManagerAppPath, 'utf8');
 const mainSource = readFileSync(mainPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
 const managerV2Source = [rootSource, essenceBrowserSource, essenceEditSource, tagsCategoriesSource, systemEditSource, systemsBrowserSource, recipesBrowserSource, componentsBrowserSource, componentEditSource, environmentEditSource, environmentsBrowserSource, gatheringTaskEditSource, gatheringTasksBrowserSource, toolsBrowserSource].join('\n');
 
 describe('CraftingSystemManagerV2 source contract', () => {
-  it('self-registers as a parallel manager app without replacing the legacy manager', () => {
+  it('self-registers as the sole crafting system manager app', () => {
     assert.ok(
-      appSource.includes("extends SvelteRecipeManagerApp"),
-      'v2 wrapper should reuse the current manager store/service plumbing'
+      appSource.includes('extends SvelteApplicationMixin('),
+      'manager app should be a standalone ApplicationV2 shell with no legacy base class'
+    );
+    assert.ok(
+      !appSource.includes('SvelteRecipeManagerApp'),
+      'manager app should not reference the removed legacy manager class'
     );
     assert.ok(
       appSource.includes('registerCraftingSystemManagerV2App(SvelteCraftingSystemManagerV2App)'),
-      'v2 wrapper should self-register with the v2 registry'
+      'manager app should self-register with the manager registry'
     );
     assert.ok(
-      appSource.includes('openCurrentAdmin'),
-      'v2 wrapper should expose an explicit legacy admin launch service during additive rollout'
+      !appSource.includes('openCurrentAdmin'),
+      'manager app should not expose a legacy admin launch service'
     );
-    assert.ok(appSource.includes('height: 940'), 'v2 wrapper should open tall enough for gathering task drag/drop');
+    assert.ok(appSource.includes('height: 940'), 'manager app should open tall enough for gathering task drag/drop');
     assert.ok(
-      mainSource.includes("import './ui/SvelteRecipeManagerApp.svelte.js';"),
-      'legacy manager side-effect import should remain'
+      !mainSource.includes("import './ui/SvelteRecipeManagerApp.svelte.js';"),
+      'legacy manager side-effect import should be removed'
     );
     assert.ok(
       mainSource.includes("import './ui/SvelteCraftingSystemManagerV2App.svelte.js';"),
-      'v2 manager side-effect import should be present for registry wiring'
+      'manager side-effect import should be present for registry wiring'
     );
   });
 
   it('guards manager-v2 startup against unready Fabricate services', () => {
-    assert.ok(recipeManagerAppSource.includes('isFabricateReady'), 'base manager app should expose readiness through services');
-    assert.ok(recipeManagerAppSource.includes('onFabricateReady'), 'base manager app should expose a ready callback service');
-    assert.ok(recipeManagerAppSource.includes("hooks.once('fabricate.ready'"), 'ready callback should listen at the Foundry edge');
+    assert.ok(appSource.includes('isFabricateReady'), 'manager app should expose readiness through services');
+    assert.ok(appSource.includes('onFabricateReady'), 'manager app should expose a ready callback service');
+    assert.ok(appSource.includes("hooks.once('fabricate.ready'"), 'ready callback should listen at the Foundry edge');
     assert.ok(appSource.includes('_pendingReadyOpen'), 'v2 app should prevent duplicate deferred opens');
     assert.ok(appSource.includes('StartupPending'), 'v2 app should notify when startup defers the window open');
     assert.ok(appSource.includes("hooks.once('fabricate.ready', openWhenReady)"), 'v2 app should defer direct opens until fabricate.ready');
@@ -158,7 +160,6 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Title, 'Crafting systems');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Nav.Components, 'Components');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Nav.Environments, 'Gathering');
-    assert.equal(lang.FABRICATE.Admin.ManagerV2.OpenCurrentAdmin, 'Open current admin');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.Breadcrumbs, 'Breadcrumbs');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.EditSystem, 'Edit system');
     assert.equal(lang.FABRICATE.Admin.ManagerV2.ReturnToSystemLibrary, 'Return to System Library');
@@ -207,7 +208,7 @@ describe('CraftingSystemManagerV2 source contract', () => {
     assert.ok(!managerV2Source.includes("storeKey: 'craftingChecks'"), 'system edit should not reintroduce the legacy crafting checks toggle');
     assert.ok(!managerV2Source.includes("storeKey: 'outcomeRouting'"), 'system edit should not reintroduce the legacy outcome routing toggle');
     assert.ok(!appSource.includes('onEditSystem'), 'v2 wrapper should not provide a row edit service for this action');
-    assert.ok(appSource.includes('openCurrentAdmin'), 'v2 wrapper should keep the explicit legacy fallback');
+    assert.ok(!appSource.includes('openCurrentAdmin'), 'v2 wrapper should not retain a legacy admin fallback service');
     assert.ok(!appSource.includes('LAST_MANAGED_CRAFTING_SYSTEM'), 'v2 row edit should not seed and launch the current admin');
   });
 

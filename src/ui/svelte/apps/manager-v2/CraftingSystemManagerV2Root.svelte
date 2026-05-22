@@ -1676,10 +1676,6 @@
     services?.onCopySourceUuid?.(uuid);
   }
 
-  function openCurrentAdmin() {
-    services?.openCurrentAdmin?.();
-  }
-
   function ingredientCount(recipe) {
     return recipe?.ingredientCount ?? recipe?.ingredients?.length ?? 0;
   }
@@ -2338,10 +2334,6 @@
           <span>{text('FABRICATE.Admin.ManagerV2.Recipe.Create', 'Create Recipe')}</span>
         </button>
       {:else if currentView === 'components'}
-        <button type="button" class="manager-v2-button" onclick={openCurrentAdmin}>
-          <i class="fas fa-book" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.ManagerV2.OpenCurrentAdmin', 'Open current admin')}</span>
-        </button>
       {:else if currentView === 'component-edit'}
         {#if componentEditDirty}
           <span class="manager-v2-chip is-warning">{text('FABRICATE.Admin.ManagerV2.Component.Dirty', 'Unsaved')}</span>
@@ -2355,10 +2347,6 @@
           <span>{componentEditSaveLabel()}</span>
         </button>
       {:else if currentView === 'tags'}
-        <button type="button" class="manager-v2-button" onclick={openCurrentAdmin}>
-          <i class="fas fa-book" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.ManagerV2.OpenCurrentAdmin', 'Open current admin')}</span>
-        </button>
       {:else if currentView === 'essences'}
         <button type="button" class="manager-v2-button is-primary" onclick={createEssenceDraft}>
           <i class="fas fa-plus" aria-hidden="true"></i>
@@ -2430,10 +2418,6 @@
         <button type="button" class="manager-v2-button" onclick={backToSystemsBrowser}>
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.ManagerV2.SystemEdit.BackToSystems', 'Back to systems')}</span>
-        </button>
-        <button type="button" class="manager-v2-button" onclick={openCurrentAdmin}>
-          <i class="fas fa-book" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.ManagerV2.OpenCurrentAdmin', 'Open current admin')}</span>
         </button>
       {:else}
         <button type="button" class="manager-v2-button" onclick={importSystem}>
@@ -3958,16 +3942,7 @@
               <span>{text('FABRICATE.Admin.ManagerV2.SystemEdit.EnabledFeatureCount', 'Features enabled')}</span>
             </div>
           </div>
-          <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.SystemEdit.DeepConfigHint', 'Categories, tags, essences, checks, requirements, visibility, alchemy, and gathering configuration stay in later manager-v2 views or the current admin for this slice.')}</p>
-        </section>
-
-        <section class="manager-v2-inspector-card">
-          <h3 class="manager-v2-card-title">{text('FABRICATE.Admin.ManagerV2.SystemEdit.LegacyFallback', 'Legacy fallback')}</h3>
-          <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.SystemEdit.LegacyFallbackHint', 'Open the current admin when you need deeper configuration that is not part of this v2 edit slice.')}</p>
-          <button type="button" class="manager-v2-button" onclick={openCurrentAdmin}>
-            <i class="fas fa-book" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.ManagerV2.OpenCurrentAdmin', 'Open current admin')}</span>
-          </button>
+          <p class="manager-v2-muted">{text('FABRICATE.Admin.ManagerV2.SystemEdit.DeepConfigHint', 'Categories, tags, essences, checks, requirements, visibility, alchemy, and gathering configuration stay in later manager-v2 views.')}</p>
         </section>
       {:else if selectedSystem}
         <section class="manager-v2-inspector-card">

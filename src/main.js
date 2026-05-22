@@ -37,7 +37,6 @@ import {
   getCraftingAppClass,
   getGatheringAppClass,
   getCraftingSystemManagerV2AppClass,
-  getRecipeManagerAppClass,
   getRecipeEditorAppClass
 } from './ui/appFactory.js';
 import { applyCurrentFabricateTheme } from './ui/theme.js';
@@ -53,7 +52,6 @@ import { registerItemSheetRecipeLearnControl } from './ui/ItemSheetRecipeLearnCo
 import * as CraftingSystemExporter from './systems/CraftingSystemExporter.js';
 import './ui/SvelteCraftingApp.svelte.js';
 import './ui/SvelteGatheringApp.svelte.js';
-import './ui/SvelteRecipeManagerApp.svelte.js';
 import './ui/SvelteCraftingSystemManagerV2App.svelte.js';
 import './ui/SvelteRecipeEditorApp.svelte.js';
 
@@ -952,7 +950,6 @@ Hooks.once('init', async () => {
     getCraftingAppClass,
     getGatheringAppClass,
     getCraftingSystemManagerV2AppClass,
-    getRecipeManagerAppClass,
     getRecipeEditorAppClass,
     CraftingSystemManager,
     CraftingRunManager,
@@ -1207,10 +1204,10 @@ globalThis.fabricate = {
   },
 
   /**
-   * Open GM recipe manager
+   * Open the GM crafting system manager
    */
   openRecipeManager: () => {
-    return getRecipeManagerAppClass().show();
+    return getCraftingSystemManagerV2AppClass().show();
   },
 
   /**

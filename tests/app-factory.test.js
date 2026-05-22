@@ -19,12 +19,10 @@ const {
   getCraftingAppClass,
   getGatheringAppClass,
   getCraftingSystemManagerV2AppClass,
-  getRecipeManagerAppClass,
   getRecipeEditorAppClass,
   registerSvelteCraftingApp,
   registerSvelteGatheringApp,
   registerCraftingSystemManagerV2App,
-  registerSvelteRecipeManagerApp,
   registerSvelteRecipeEditorApp
 } = await import('../src/ui/appFactory.js');
 
@@ -68,20 +66,6 @@ test('getCraftingSystemManagerV2AppClass returns registered v2 manager class', (
   registerCraftingSystemManagerV2App(MockCraftingSystemManagerV2App);
   assert.equal(getCraftingSystemManagerV2AppClass(), MockCraftingSystemManagerV2App);
   registerCraftingSystemManagerV2App(null);
-});
-
-// --- getRecipeManagerAppClass ---
-
-test('getRecipeManagerAppClass throws when no Svelte class registered', () => {
-  registerSvelteRecipeManagerApp(null);
-  assert.throws(() => getRecipeManagerAppClass(), /SvelteRecipeManagerApp not registered/);
-});
-
-test('getRecipeManagerAppClass returns registered Svelte class', () => {
-  class MockSvelteRecipeManagerApp {}
-  registerSvelteRecipeManagerApp(MockSvelteRecipeManagerApp);
-  assert.equal(getRecipeManagerAppClass(), MockSvelteRecipeManagerApp);
-  registerSvelteRecipeManagerApp(null);
 });
 
 // --- getRecipeEditorAppClass ---

@@ -4,7 +4,6 @@
 let _svelteCraftingApp = null;
 let _svelteGatheringApp = null;
 let _craftingSystemManagerV2App = null;
-let _svelteRecipeManagerApp = null;
 let _svelteRecipeEditorApp = null;
 
 export function registerSvelteCraftingApp(cls) {
@@ -17,10 +16,6 @@ export function registerSvelteGatheringApp(cls) {
 
 export function registerCraftingSystemManagerV2App(cls) {
   _craftingSystemManagerV2App = cls;
-}
-
-export function registerSvelteRecipeManagerApp(cls) {
-  _svelteRecipeManagerApp = cls;
 }
 
 export function registerSvelteRecipeEditorApp(cls) {
@@ -46,13 +41,6 @@ export function getCraftingSystemManagerV2AppClass() {
     throw new Error('Fabricate | CraftingSystemManagerV2App not registered. Ensure SvelteCraftingSystemManagerV2App.svelte.js is imported.');
   }
   return _craftingSystemManagerV2App;
-}
-
-export function getRecipeManagerAppClass() {
-  if (!_svelteRecipeManagerApp) {
-    throw new Error('Fabricate | SvelteRecipeManagerApp not registered. Ensure SvelteRecipeManagerApp.svelte.js is imported.');
-  }
-  return _svelteRecipeManagerApp;
 }
 
 export function getRecipeEditorAppClass() {

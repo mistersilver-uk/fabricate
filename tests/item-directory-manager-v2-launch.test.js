@@ -23,7 +23,7 @@ test('Items Directory manager action launches the v2 manager registry entry', ()
   assert.doesNotMatch(buttonSource, /getRecipeManagerAppClass\(\)\.show\(\)/);
 });
 
-test('legacy recipe manager launch path remains available through the public API', () => {
+test('openRecipeManager public API opens the crafting system manager', () => {
   const source = mainSource();
   const apiStart = source.indexOf('openRecipeManager: () => {');
   assert.notEqual(apiStart, -1, 'main.js should expose openRecipeManager');
@@ -31,5 +31,5 @@ test('legacy recipe manager launch path remains available through the public API
   const apiEnd = source.indexOf('},', apiStart);
   const apiSource = source.slice(apiStart, apiEnd);
 
-  assert.match(apiSource, /getRecipeManagerAppClass\(\)\.show\(\)/);
+  assert.match(apiSource, /getCraftingSystemManagerV2AppClass\(\)\.show\(\)/);
 });

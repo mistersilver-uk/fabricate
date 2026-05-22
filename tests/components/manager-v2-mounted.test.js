@@ -10,22 +10,6 @@ import { writable } from 'svelte/store';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-const environmentComponentNames = [
-  'EnvironmentActionMenu',
-  'CatalystList',
-  'ToolsList',
-  'EnvironmentFields',
-  'EnvironmentList',
-  'EnvironmentValidationFeedback',
-  'FailureOutcomeFields',
-  'ProgressiveFields',
-  'ResultGroups',
-  'ResultSelectionFields',
-  'TaskBaseFields',
-  'TaskList',
-  'TimeRequirementFields',
-  'VisibilityFields'
-];
 const sharedComponentNames = [
   'ImagePathPicker',
   'IconPicker',
@@ -62,10 +46,6 @@ function compileManagerV2Root() {
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/SystemEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/SystemsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager-v2/TagsCategoriesView.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/EnvironmentsTab.svelte');
-  for (const componentName of environmentComponentNames) {
-    writeCompiledSvelte(`src/ui/svelte/apps/environments/${componentName}.svelte`);
-  }
   for (const componentName of sharedComponentNames) {
     writeCompiledSvelte(`src/ui/svelte/components/${componentName}.svelte`);
   }
@@ -4407,10 +4387,9 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     assert.equal(target.textContent.includes('No components match these filters'), false);
   });
 
-  it('supports search, row selection, in-place system edit, legacy admin fallback, and row actions', async () => {
+  it('supports search, row selection, in-place system edit, and row actions', async () => {
     const calls = [];
     let onEditSystemCalled = false;
-    let legacyOpened = false;
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(Component, {
@@ -4418,7 +4397,6 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
       props: {
         store: createStore(calls),
         services: {
-          openCurrentAdmin: () => { legacyOpened = true; },
           onEditSystem: () => { onEditSystemCalled = true; }
         }
       }
@@ -4450,7 +4428,6 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
     await Promise.resolve();
     await tick();
     flushSync();
-    target.querySelector('.manager-v2-header-actions .manager-v2-button:nth-child(2)').click();
 
     assert.equal(onEditSystemCalled, false);
     assert.equal(target.querySelector('.fabricate-manager-v2').dataset.managerV2View, 'system-edit');
@@ -4462,7 +4439,6 @@ describe('CraftingSystemManagerV2 mounted behavior', () => {
       ['exportSystem', 'smithing'],
       ['selectSystem', 'smithing']
     ]);
-    assert.equal(legacyOpened, true);
   });
 
   it('writes system edit controls through existing admin-store callbacks', async () => {
