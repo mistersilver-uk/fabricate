@@ -33,7 +33,21 @@
       recipe-graph); delete the obsolete legacy-admin CSS regression tests.
 - [x] `npm test` and `npm run build` green.
 
+## Foundry smoke suite
+- [x] Rename V2 tokens in `scripts/foundry-test-run.mjs` to match the new API
+      / app id / CSS class names (`getCraftingSystemManagerAppClass`,
+      `fabricate-crafting-system-manager`, `.fabricate-manager`, `manager-*`).
+- [x] Delete Phase D ("Screenshot Recipe Manager" — the legacy admin
+      screenshot tour) and the helpers it owned
+      (`setRecipeManagerWindowSize`, `prepareGmEnvironmentsScreenshotState`,
+      `scrollEnvironmentEditorTo`, `scrollEnvironmentEditorToTop`,
+      `assertPointerTarget`, `exerciseGmEnvironmentCardPointerActions`,
+      `assertGmEnvironmentCardMediaContained`).
+- [x] Drop the "Open current admin" button click from the system-edit pointer
+      exercise; clean up the inert `.fabricate-admin` selectors in
+      `closeOpenApplications`.
+- [x] `npm run test:foundry` (full profile) green locally.
+
 ## Follow-ups
 - [ ] Excise the remaining inert `.fabricate-admin` legacy CSS interleaved in
       `styles/fabricate.css`.
-- [ ] Confirm the Foundry smoke suite (`npm run test:foundry:rc`) is green in CI.
