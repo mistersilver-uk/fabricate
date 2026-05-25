@@ -100,65 +100,65 @@ function themePage(theme, width, height, body) {
 
 function managerRows() {
   return Array.from({ length: 8 }, (_, index) => `
-    <article class="manager-v2-system-row" tabindex="0" data-boundary>
-      <div class="manager-v2-system-identity">
-        <span class="manager-v2-system-thumb is-empty">${index + 1}</span>
+    <article class="manager-system-row" tabindex="0" data-boundary>
+      <div class="manager-system-identity">
+        <span class="manager-system-thumb is-empty">${index + 1}</span>
         <div>
           <strong>Very Long Workshop ${index + 1} Name For Localized Layout Validation</strong>
           <p>Recipe, component, essence, and environment management</p>
         </div>
       </div>
-      <button type="button" class="manager-v2-status-toggle ${index % 2 ? 'is-off' : 'is-on'}" data-contrast-soft data-boundary>
-        <span class="manager-v2-status-toggle-track" aria-hidden="true"><span class="manager-v2-status-toggle-knob"></span></span>
-        <span class="manager-v2-status-toggle-label">${index % 2 ? 'Off' : 'On'}</span>
+      <button type="button" class="manager-status-toggle ${index % 2 ? 'is-off' : 'is-on'}" data-contrast-soft data-boundary>
+        <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
+        <span class="manager-status-toggle-label">${index % 2 ? 'Off' : 'On'}</span>
       </button>
-      <button type="button" class="manager-v2-button" data-boundary>Open</button>
+      <button type="button" class="manager-button" data-boundary>Open</button>
     </article>
   `).join('');
 }
 
 function managerFixture(theme, width, height) {
   return themePage(theme, width, height, `
-    <section class="fabricate fabricate-manager-v2 surface-root" data-fabricate-theme="${theme}" data-manager-v2-view="systems" data-surface-backdrop>
-      <header class="manager-v2-header" data-region data-boundary>
-        <div class="manager-v2-heading">
-          <h1 class="manager-v2-title preview-title" data-contrast-surface>Fabricate Theme Validation Surface With Long Localized Title</h1>
-          <p class="manager-v2-subtitle preview-copy">Checks buttons, tags, toggles, text, focus rings, and fixed app-width layout.</p>
+    <section class="fabricate fabricate-manager surface-root" data-fabricate-theme="${theme}" data-manager-view="systems" data-surface-backdrop>
+      <header class="manager-header" data-region data-boundary>
+        <div class="manager-heading">
+          <h1 class="manager-title preview-title" data-contrast-surface>Fabricate Theme Validation Surface With Long Localized Title</h1>
+          <p class="manager-subtitle preview-copy">Checks buttons, tags, toggles, text, focus rings, and fixed app-width layout.</p>
         </div>
-        <div class="manager-v2-header-actions">
-          <button id="focus-target" type="button" class="manager-v2-button is-primary" data-hit data-contrast-solid data-boundary>Create System</button>
+        <div class="manager-header-actions">
+          <button id="focus-target" type="button" class="manager-button is-primary" data-hit data-contrast-solid data-boundary>Create System</button>
         </div>
       </header>
-      <div class="manager-v2-body">
-        <nav class="manager-v2-rail" data-region data-boundary>
-          <button type="button" class="manager-v2-nav-button is-active" data-boundary>
+      <div class="manager-body">
+        <nav class="manager-rail" data-region data-boundary>
+          <button type="button" class="manager-nav-button is-active" data-boundary>
             <i aria-hidden="true">*</i>
-            <span class="manager-v2-nav-label">Crafting Systems With Extra Words</span>
-            <span class="manager-v2-nav-count">6</span>
+            <span class="manager-nav-label">Crafting Systems With Extra Words</span>
+            <span class="manager-nav-count">6</span>
           </button>
-          <button type="button" class="manager-v2-nav-button" data-boundary>
+          <button type="button" class="manager-nav-button" data-boundary>
             <i aria-hidden="true">*</i>
-            <span class="manager-v2-nav-label">Recipes</span>
-            <span class="manager-v2-nav-count">12</span>
+            <span class="manager-nav-label">Recipes</span>
+            <span class="manager-nav-count">12</span>
           </button>
-          <button type="button" class="manager-v2-nav-button" data-boundary>
+          <button type="button" class="manager-nav-button" data-boundary>
             <i aria-hidden="true">*</i>
-            <span class="manager-v2-nav-label">Components</span>
-            <span class="manager-v2-nav-count">40</span>
+            <span class="manager-nav-label">Components</span>
+            <span class="manager-nav-count">40</span>
           </button>
         </nav>
-        <section class="manager-v2-main" data-region data-boundary>
-          <div class="manager-v2-toolbar">
-            <input class="manager-v2-search" value="Alchemy and harvesting" aria-label="Search">
-            <span class="manager-v2-chip manager-v2-selected-tag-pill" data-contrast-soft data-boundary>Rare ingredient category <button type="button">x</button></span>
-            <span class="manager-v2-chip is-warning" data-contrast-soft data-boundary>Warning</span>
+        <section class="manager-main" data-region data-boundary>
+          <div class="manager-toolbar">
+            <input class="manager-search" value="Alchemy and harvesting" aria-label="Search">
+            <span class="manager-chip manager-selected-tag-pill" data-contrast-soft data-boundary>Rare ingredient category <button type="button">x</button></span>
+            <span class="manager-chip is-warning" data-contrast-soft data-boundary>Warning</span>
           </div>
-          <div class="manager-v2-systems-table">${managerRows()}</div>
+          <div class="manager-systems-table">${managerRows()}</div>
         </section>
-        <aside class="manager-v2-inspector" data-region data-boundary>
+        <aside class="manager-inspector" data-region data-boundary>
           <h2 data-contrast-surface>Palette</h2>
-          <p class="manager-v2-empty-copy preview-copy">Shared theme tokens drive every mounted Fabricate surface.</p>
-          <button type="button" class="manager-v2-button is-danger" data-hit data-contrast-solid data-boundary>Delete</button>
+          <p class="manager-empty-copy preview-copy">Shared theme tokens drive every mounted Fabricate surface.</p>
+          <button type="button" class="manager-button is-danger" data-hit data-contrast-solid data-boundary>Delete</button>
         </aside>
       </div>
     </section>`);
@@ -412,16 +412,16 @@ function liveUpdateFixture(origin) {
           ${css}
           :root { --font-primary: Arial, sans-serif; }
           body { margin: 0; background: var(--fab-bg-0); font-family: Arial, sans-serif; }
-          .fabricate-manager-v2 { width: 720px; height: 420px; }
+          .fabricate-manager { width: 720px; height: 420px; }
         </style>
       </head>
       <body>
-        <section id="mounted-surface" class="fabricate fabricate-manager-v2" data-fabricate-theme="fabricate" data-manager-v2-view="systems">
-          <header class="manager-v2-header"><h1 class="manager-v2-title">Mounted Fabricate Surface</h1><button class="manager-v2-button is-primary">Action</button></header>
-          <div class="manager-v2-body">
-            <nav class="manager-v2-rail"><button class="manager-v2-nav-button is-active">Systems</button></nav>
-            <main class="manager-v2-main"><div class="manager-v2-toolbar"><span class="manager-v2-chip manager-v2-selected-tag-pill">Live theme</span></div></main>
-            <aside class="manager-v2-inspector"><p>Inspector stays mounted.</p></aside>
+        <section id="mounted-surface" class="fabricate fabricate-manager" data-fabricate-theme="fabricate" data-manager-view="systems">
+          <header class="manager-header"><h1 class="manager-title">Mounted Fabricate Surface</h1><button class="manager-button is-primary">Action</button></header>
+          <div class="manager-body">
+            <nav class="manager-rail"><button class="manager-nav-button is-active">Systems</button></nav>
+            <main class="manager-main"><div class="manager-toolbar"><span class="manager-chip manager-selected-tag-pill">Live theme</span></div></main>
+            <aside class="manager-inspector"><p>Inspector stays mounted.</p></aside>
           </div>
         </section>
         <script type="module">

@@ -14,7 +14,7 @@ const productRoots = [
 const allowedExtensions = new Set(['.js', '.svelte', '.css']);
 const gradientPattern = /\b(?:linear|radial|conic)-gradient\s*\(/g;
 const allowedGradientSelectors = [
-  '.fabricate-manager-v2 .manager-v2-tool-breakage-chance-control'
+  '.fabricate-manager .manager-tool-breakage-chance-control'
 ];
 
 function collectProductFiles(rootPath) {

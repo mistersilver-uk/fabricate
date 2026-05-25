@@ -1812,14 +1812,14 @@ export function createAdminStore(services) {
         : liveTool !== null;
       if (hasConflict) {
         const overwrite = await services.confirmDialog?.({
-          title: services.localize?.('FABRICATE.Admin.ManagerV2.Tools.ConcurrentEdit.Title') || 'Tools were modified elsewhere',
-          content: services.localize?.('FABRICATE.Admin.ManagerV2.Tools.ConcurrentEdit.Content') || 'The library has been modified outside this editor. Overwrite with your changes?',
+          title: services.localize?.('FABRICATE.Admin.Manager.Tools.ConcurrentEdit.Title') || 'Tools were modified elsewhere',
+          content: services.localize?.('FABRICATE.Admin.Manager.Tools.ConcurrentEdit.Content') || 'The library has been modified outside this editor. Overwrite with your changes?',
           yes: {
-            label: services.localize?.('FABRICATE.Admin.ManagerV2.Tools.ConcurrentEdit.Confirm') || 'Overwrite',
+            label: services.localize?.('FABRICATE.Admin.Manager.Tools.ConcurrentEdit.Confirm') || 'Overwrite',
             callback: () => true
           },
           no: {
-            label: services.localize?.('FABRICATE.Admin.ManagerV2.Tools.ConcurrentEdit.Cancel') || 'Cancel',
+            label: services.localize?.('FABRICATE.Admin.Manager.Tools.ConcurrentEdit.Cancel') || 'Cancel',
             callback: () => false
           }
         });
@@ -1892,8 +1892,8 @@ export function createAdminStore(services) {
     if (dirtyToolsDraftDiscardConfirmation) return dirtyToolsDraftDiscardConfirmation;
     dirtyToolsDraftDiscardConfirmation = (async () => {
       const result = await services.confirmDialog?.({
-        title: services.localize?.('FABRICATE.Admin.ManagerV2.Tools.DiscardDirty.Title') || 'Discard unsaved tool changes?',
-        content: services.localize?.('FABRICATE.Admin.ManagerV2.Tools.DiscardDirty.Content') || 'The tools library has unsaved changes. Discard them and continue?',
+        title: services.localize?.('FABRICATE.Admin.Manager.Tools.DiscardDirty.Title') || 'Discard unsaved tool changes?',
+        content: services.localize?.('FABRICATE.Admin.Manager.Tools.DiscardDirty.Content') || 'The tools library has unsaved changes. Discard them and continue?',
         yes: () => true,
         no: () => false
       });
@@ -2383,7 +2383,7 @@ export function createAdminStore(services) {
     }
 
     // Phase 1: publish all synchronous selected-system context immediately so
-    // manager v2 can paint its selected rail, menu, and inspector before slower
+    // manager can paint its selected rail, menu, and inspector before slower
     // item/environment work finishes.
     viewState.update(prev => ({
       ...prev,
@@ -3884,7 +3884,7 @@ export function createAdminStore(services) {
     if (!systemConfig) return null;
     const task = _normalizeGatheringTask({
       id: _randomID(),
-      name: services.localize?.('FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask') || 'New Gathering Task',
+      name: services.localize?.('FABRICATE.Admin.Manager.Environment.NewLibraryTask') || 'New Gathering Task',
       dropRows: []
     }, _randomID);
     systemConfig.tasks = [...systemConfig.tasks, task];
@@ -3930,7 +3930,7 @@ export function createAdminStore(services) {
 
   function _gatheringTaskIsAtDefaults(task) {
     if (!task) return false;
-    const localizedDefault = services.localize?.('FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask');
+    const localizedDefault = services.localize?.('FABRICATE.Admin.Manager.Environment.NewLibraryTask');
     const isDefaultName = task.name === localizedDefault
       || task.name === 'New Gathering Task'
       || task.name === 'Gather';
@@ -3947,7 +3947,7 @@ export function createAdminStore(services) {
     const component = managedItemById?.get?.(String(firstRowWithComponent.componentId));
     const componentName = String(component?.name || '').trim();
     if (!componentName) return null;
-    const template = services.localize?.('FABRICATE.Admin.ManagerV2.Environment.Tasks.AutoNameTemplate')
+    const template = services.localize?.('FABRICATE.Admin.Manager.Environment.Tasks.AutoNameTemplate')
       || 'Gather {component}';
     return {
       name: template.replace('{component}', componentName),
@@ -4048,7 +4048,7 @@ export function createAdminStore(services) {
     if (!systemConfig || !taskId) return null;
     const task = systemConfig.tasks.find(task => task.id === taskId);
     if (!task) return null;
-    const copySuffix = services.localize?.('FABRICATE.Admin.ManagerV2.Environment.Tasks.CopySuffix') || 'Copy';
+    const copySuffix = services.localize?.('FABRICATE.Admin.Manager.Environment.Tasks.CopySuffix') || 'Copy';
     const duplicate = _normalizeGatheringTask({
       ..._clonePlain(task),
       id: _randomID(),
@@ -4068,7 +4068,7 @@ export function createAdminStore(services) {
     if (!systemConfig) return null;
     const hazard = _normalizeGatheringHazard({
       id: _randomID(),
-      name: services.localize?.('FABRICATE.Admin.ManagerV2.Environment.NewLibraryHazard') || 'Reusable hazard',
+      name: services.localize?.('FABRICATE.Admin.Manager.Environment.NewLibraryHazard') || 'Reusable hazard',
       dangerTags: ['hazardous'],
       dropRate: 25
     }, _randomID);
@@ -4119,7 +4119,7 @@ export function createAdminStore(services) {
     if ((systemConfig.characterModifiers || []).some(entry => entry.id === id)) return null;
     const entry = _normalizeGatheringCharacterModifier({
       id,
-      label: partial?.label || services.localize?.('FABRICATE.Admin.ManagerV2.Gathering.CharacterModifiers.NewLabel') || 'Character modifier',
+      label: partial?.label || services.localize?.('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.NewLabel') || 'Character modifier',
       icon: partial?.icon || 'fa-solid fa-user',
       provider: partial?.provider || 'dnd5e',
       expression: partial?.expression || '',

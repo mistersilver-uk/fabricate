@@ -1925,7 +1925,7 @@ describe('createAdminStore', () => {
   // -------------------------------------------------------------------------
 
   describe('viewState data contracts', () => {
-    it('viewState.systems entries include manager-v2 summary fields', async () => {
+    it('viewState.systems entries include manager summary fields', async () => {
       const services = createMockServices();
       const store = createAdminStore(services);
       await store.refresh();
@@ -2014,7 +2014,7 @@ describe('createAdminStore', () => {
           let id = 0;
           return () => `gid-${++id}`;
         })(),
-        localize: (key) => key === 'FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask' ? 'New Gathering Task' : key
+        localize: (key) => key === 'FABRICATE.Admin.Manager.Environment.NewLibraryTask' ? 'New Gathering Task' : key
       });
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
@@ -2089,8 +2089,8 @@ describe('createAdminStore', () => {
     it('auto-populates default task name and image when the first drop row receives a component', async () => {
       const services = createMockServices({
         localize: (key) => {
-          if (key === 'FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask') return 'New Gathering Task';
-          if (key === 'FABRICATE.Admin.ManagerV2.Environment.Tasks.AutoNameTemplate') return 'Gather {component}';
+          if (key === 'FABRICATE.Admin.Manager.Environment.NewLibraryTask') return 'New Gathering Task';
+          if (key === 'FABRICATE.Admin.Manager.Environment.Tasks.AutoNameTemplate') return 'Gather {component}';
           return key;
         }
       });
@@ -2114,8 +2114,8 @@ describe('createAdminStore', () => {
     it('does not auto-populate the task name and image when the task name has been customized', async () => {
       const services = createMockServices({
         localize: (key) => {
-          if (key === 'FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask') return 'New Gathering Task';
-          if (key === 'FABRICATE.Admin.ManagerV2.Environment.Tasks.AutoNameTemplate') return 'Gather {component}';
+          if (key === 'FABRICATE.Admin.Manager.Environment.NewLibraryTask') return 'New Gathering Task';
+          if (key === 'FABRICATE.Admin.Manager.Environment.Tasks.AutoNameTemplate') return 'Gather {component}';
           return key;
         }
       });
@@ -2140,8 +2140,8 @@ describe('createAdminStore', () => {
     it('does not auto-populate the task name and image when the task image has been customized', async () => {
       const services = createMockServices({
         localize: (key) => {
-          if (key === 'FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask') return 'New Gathering Task';
-          if (key === 'FABRICATE.Admin.ManagerV2.Environment.Tasks.AutoNameTemplate') return 'Gather {component}';
+          if (key === 'FABRICATE.Admin.Manager.Environment.NewLibraryTask') return 'New Gathering Task';
+          if (key === 'FABRICATE.Admin.Manager.Environment.Tasks.AutoNameTemplate') return 'Gather {component}';
           return key;
         }
       });
@@ -2166,8 +2166,8 @@ describe('createAdminStore', () => {
     it('does not auto-populate the task name and image when a second drop row receives a component', async () => {
       const services = createMockServices({
         localize: (key) => {
-          if (key === 'FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask') return 'New Gathering Task';
-          if (key === 'FABRICATE.Admin.ManagerV2.Environment.Tasks.AutoNameTemplate') return 'Gather {component}';
+          if (key === 'FABRICATE.Admin.Manager.Environment.NewLibraryTask') return 'New Gathering Task';
+          if (key === 'FABRICATE.Admin.Manager.Environment.Tasks.AutoNameTemplate') return 'Gather {component}';
           return key;
         }
       });
@@ -2201,8 +2201,8 @@ describe('createAdminStore', () => {
     it('does not auto-populate the task name and image when an empty drop row is added', async () => {
       const services = createMockServices({
         localize: (key) => {
-          if (key === 'FABRICATE.Admin.ManagerV2.Environment.NewLibraryTask') return 'New Gathering Task';
-          if (key === 'FABRICATE.Admin.ManagerV2.Environment.Tasks.AutoNameTemplate') return 'Gather {component}';
+          if (key === 'FABRICATE.Admin.Manager.Environment.NewLibraryTask') return 'New Gathering Task';
+          if (key === 'FABRICATE.Admin.Manager.Environment.Tasks.AutoNameTemplate') return 'Gather {component}';
           return key;
         }
       });
@@ -2229,7 +2229,7 @@ describe('createAdminStore', () => {
           let id = 0;
           return () => `copy-id-${++id}`;
         })(),
-        localize: (key) => key === 'FABRICATE.Admin.ManagerV2.Environment.Tasks.CopySuffix' ? 'Copy' : key
+        localize: (key) => key === 'FABRICATE.Admin.Manager.Environment.Tasks.CopySuffix' ? 'Copy' : key
       });
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
@@ -3560,7 +3560,7 @@ describe('createAdminStore', () => {
       assert.equal(unlinkedEssence.associatedItemName, null);
     });
 
-    it('viewState.essenceCards expose source state and component usage for manager v2', async () => {
+    it('viewState.essenceCards expose source state and component usage for manager', async () => {
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
       const sys = origManager.getSystem('sys1');

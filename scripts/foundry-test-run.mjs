@@ -642,35 +642,6 @@ async function joinWorldSession(page, results, options = {}) {
 }
 
 /**
- * Resize the rendered Recipe Manager application frame for responsive
- * screenshots without changing the browser viewport used by other phases.
- * @param {import('playwright').Page} page
- * @param {{ width: number, height: number }} size
- */
-async function setRecipeManagerWindowSize(page, { width, height }) {
-  await page.setViewportSize({
-    width: Math.max(1366, width + 80),
-    height: Math.max(768, height + 80)
-  });
-  await page.evaluate(({ width, height }) => {
-    const admin = document.querySelector('.fabricate-admin');
-    const app = admin?.closest('.application, .app') || document.querySelector('#fabricate-recipe-manager');
-    if (!app) return null;
-    Object.assign(app.style, {
-      width: `${width}px`,
-      height: `${height}px`,
-      left: '20px',
-      top: '20px'
-    });
-    return {
-      width: app.getBoundingClientRect().width,
-      height: app.getBoundingClientRect().height
-    };
-  }, { width, height });
-  await page.waitForTimeout(500);
-}
-
-/**
  * Race a promise against a deadline. Used to surface page.evaluate hangs as
  * thrown errors (with context) rather than silent waits that consume the
  * job timeout. Discovered cause for an earlier 13-minute Phase D0 hang
@@ -693,12 +664,12 @@ function withDeadline(promise, ms, label) {
 }
 
 /**
- * Resize the rendered Crafting System Manager V2 application frame for
+ * Resize the rendered Crafting System Manager application frame for
  * responsive screenshots and hit testing.
  * @param {import('playwright').Page} page
  * @param {{ width: number, height: number }} size
  */
-async function setManagerV2WindowSize(page, { width, height }) {
+async function setManagerWindowSize(page, { width, height }) {
   await withDeadline(
     page.setViewportSize({
       width: Math.max(1366, width + 80),
@@ -709,8 +680,8 @@ async function setManagerV2WindowSize(page, { width, height }) {
   );
   await withDeadline(
     page.evaluate(({ width, height }) => {
-      const manager = document.querySelector('.fabricate-manager-v2');
-      const app = manager?.closest('.application, .app') || document.querySelector('#fabricate-crafting-system-manager-v2');
+      const manager = document.querySelector('.fabricate-manager');
+      const app = manager?.closest('.application, .app') || document.querySelector('#fabricate-crafting-system-manager');
       if (!app) return null;
       Object.assign(app.style, {
         width: `${width}px`,
@@ -724,47 +695,47 @@ async function setManagerV2WindowSize(page, { width, height }) {
       };
     }, { width, height }),
     15_000,
-    `setManagerV2WindowSize evaluate ${width}x${height}`
+    `setManagerWindowSize evaluate ${width}x${height}`
   );
   await page.waitForTimeout(500);
 }
 
 /**
- * Assert manager-v2 table rows and summary regions do not horizontally overflow.
+ * Assert manager table rows and summary regions do not horizontally overflow.
  * @param {import('playwright').Page} page
  * @param {string} label
  */
-async function assertManagerV2LayoutStable(page, label) {
+async function assertManagerLayoutStable(page, label) {
   const metrics = await withDeadline(page.evaluate(() => {
     const selectors = [
-      '.fabricate-manager-v2',
-      '.manager-v2-main',
-      '.manager-v2-table-scroll',
-      '.manager-v2-system-row',
-      '.manager-v2-system-identity',
-      '.manager-v2-recipes-table',
-      '.manager-v2-recipe-row',
-      '.manager-v2-recipe-identity',
-      '.manager-v2-environments-table',
-      '.manager-v2-environment-row',
-      '.manager-v2-environment-identity',
-      '.manager-v2-environment-editor-shell',
-      '.manager-v2-component-row',
-      '.manager-v2-component-identity',
-      '.manager-v2-essence-row',
-      '.manager-v2-vocabulary-row',
-      '.manager-v2-inspector-card',
-      '.manager-v2-system-edit-form',
-      '.manager-v2-edit-card',
-      '.manager-v2-toggle-row',
-      '.manager-v2-essence-edit-view',
+      '.fabricate-manager',
+      '.manager-main',
+      '.manager-table-scroll',
+      '.manager-system-row',
+      '.manager-system-identity',
+      '.manager-recipes-table',
+      '.manager-recipe-row',
+      '.manager-recipe-identity',
+      '.manager-environments-table',
+      '.manager-environment-row',
+      '.manager-environment-identity',
+      '.manager-environment-editor-shell',
+      '.manager-component-row',
+      '.manager-component-identity',
+      '.manager-essence-row',
+      '.manager-vocabulary-row',
+      '.manager-inspector-card',
+      '.manager-system-edit-form',
+      '.manager-edit-card',
+      '.manager-toggle-row',
+      '.manager-essence-edit-view',
       '.environment-draft-editor',
-      '.manager-v2-environment-edit-view',
-      '.manager-v2-gathering-task-edit-view',
-      '.manager-v2-environment-workspace',
+      '.manager-environment-edit-view',
+      '.manager-gathering-task-edit-view',
+      '.manager-environment-workspace',
       '.environment-fields',
       '.environment-task-layout',
-      '.manager-v2-fact'
+      '.manager-fact'
     ];
     return selectors.flatMap(selector => Array.from(document.querySelectorAll(selector)).map((element, index) => {
       const rect = element.getBoundingClientRect();
@@ -778,130 +749,129 @@ async function assertManagerV2LayoutStable(page, label) {
         text: element.textContent?.replace(/\s+/g, ' ').trim().slice(0, 80) || ''
       };
     }));
-  }), 30_000, `assertManagerV2LayoutStable ${label}`);
+  }), 30_000, `assertManagerLayoutStable ${label}`);
 
   const overflowing = metrics.filter(metric => metric.scrollWidth > metric.clientWidth + 2);
   if (overflowing.length > 0) {
-    throw new Error(`Manager V2 horizontal overflow at ${label}: ${JSON.stringify(overflowing.slice(0, 5))}`);
+    throw new Error(`Manager horizontal overflow at ${label}: ${JSON.stringify(overflowing.slice(0, 5))}`);
   }
 
   const rowCount = metrics.filter(metric =>
-    metric.selector === '.manager-v2-system-row'
-      || metric.selector === '.manager-v2-recipe-row'
-      || metric.selector === '.manager-v2-environment-row'
-      || metric.selector === '.manager-v2-component-row'
-      || metric.selector === '.manager-v2-essence-row'
-      || metric.selector === '.manager-v2-vocabulary-row'
+    metric.selector === '.manager-system-row'
+      || metric.selector === '.manager-recipe-row'
+      || metric.selector === '.manager-environment-row'
+      || metric.selector === '.manager-component-row'
+      || metric.selector === '.manager-essence-row'
+      || metric.selector === '.manager-vocabulary-row'
   ).length;
   const editFormCount = metrics.filter(metric =>
-    metric.selector === '.manager-v2-system-edit-form'
-      || metric.selector === '.manager-v2-environment-editor-shell'
-      || metric.selector === '.manager-v2-environment-edit-view'
-      || metric.selector === '.manager-v2-gathering-task-edit-view'
-      || metric.selector === '.manager-v2-essence-edit-view'
+    metric.selector === '.manager-system-edit-form'
+      || metric.selector === '.manager-environment-editor-shell'
+      || metric.selector === '.manager-environment-edit-view'
+      || metric.selector === '.manager-gathering-task-edit-view'
+      || metric.selector === '.manager-essence-edit-view'
       || metric.selector === '.environment-draft-editor'
   ).length;
   if (rowCount === 0 && editFormCount === 0) {
-    throw new Error(`Manager V2 rendered no table rows at ${label}`);
+    throw new Error(`Manager rendered no table rows at ${label}`);
   }
 }
 
 /**
- * Exercise manager-v2 pointer targets without triggering destructive actions.
+ * Exercise manager pointer targets without triggering destructive actions.
  * @param {import('playwright').Page} page
  */
-async function exerciseManagerV2PointerTargets(page) {
-  const search = page.locator('.fabricate-manager-v2 input[type="search"]').first();
+async function exerciseManagerPointerTargets(page) {
+  const search = page.locator('.fabricate-manager input[type="search"]').first();
   await search.fill('forge');
   await page.waitForTimeout(250);
   await search.fill('');
   await page.waitForTimeout(250);
 
-  await page.locator('.fabricate-manager-v2 .manager-v2-filter select').first().selectOption('active');
+  await page.locator('.fabricate-manager .manager-filter select').first().selectOption('active');
   await page.waitForTimeout(250);
-  await page.locator('.fabricate-manager-v2 .manager-v2-filter select').first().selectOption('all');
+  await page.locator('.fabricate-manager .manager-filter select').first().selectOption('all');
 
-  await page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist") .manager-v2-system-identity').first().click();
-  await page.locator('.fabricate-manager-v2 .manager-v2-nav-button:has-text("Recipes")').first().click();
-  await page.locator('.fabricate-manager-v2 .manager-v2-breadcrumbs button:has-text("The Herbalist")').first().click({ trial: true });
-  await page.locator('.fabricate-manager-v2 .manager-v2-breadcrumbs button:has-text("Crafting Systems")').first().click();
-  await page.locator('.fabricate-manager-v2 .manager-v2-scope-return').first().click({ trial: true });
-  await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Import")').first().click({ trial: true });
-  await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Export")').first().click({ trial: true });
-  await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Create")').first().click({ trial: true });
-  const rowActionButtons = page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist") .manager-v2-icon-button');
+  await page.locator('.fabricate-manager .manager-system-row:has-text("The Herbalist") .manager-system-identity').first().click();
+  await page.locator('.fabricate-manager .manager-nav-button:has-text("Recipes")').first().click();
+  await page.locator('.fabricate-manager .manager-breadcrumbs button:has-text("The Herbalist")').first().click({ trial: true });
+  await page.locator('.fabricate-manager .manager-breadcrumbs button:has-text("Crafting Systems")').first().click();
+  await page.locator('.fabricate-manager .manager-scope-return').first().click({ trial: true });
+  await page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Import")').first().click({ trial: true });
+  await page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Export")').first().click({ trial: true });
+  await page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Create")').first().click({ trial: true });
+  const rowActionButtons = page.locator('.fabricate-manager .manager-system-row:has-text("The Herbalist") .manager-icon-button');
   for (let index = 0; index < await rowActionButtons.count(); index += 1) {
     await rowActionButtons.nth(index).click({ trial: true });
   }
 }
 
 /**
- * Select the smoke test crafting system in Manager V2.
+ * Select the smoke test crafting system in Manager.
  * @param {import('playwright').Page} page
  */
-async function selectSmokeSystemInManagerV2(page) {
-  const row = page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist")').first();
+async function selectSmokeSystemInManager(page) {
+  const row = page.locator('.fabricate-manager .manager-system-row:has-text("The Herbalist")').first();
   await row.waitFor({ state: 'visible', timeout: 10_000 });
   const alreadySelected = await row.evaluate(element => element.getAttribute('aria-selected') === 'true')
     .catch(() => false);
   if (alreadySelected) return;
-  await row.locator('.manager-v2-system-identity').click();
+  await row.locator('.manager-system-identity').click();
   await page.waitForTimeout(750);
 }
 
 /**
- * Exercise manager-v2 system edit controls without saving destructive changes.
+ * Exercise manager system edit controls without saving destructive changes.
  * @param {import('playwright').Page} page
  */
-async function exerciseManagerV2SystemEditPointerTargets(page) {
-  if (await page.locator('.fabricate-manager-v2 #manager-v2-system-name').count() === 0) {
-    let editButton = page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist") .manager-v2-icon-button').nth(0);
+async function exerciseManagerSystemEditPointerTargets(page) {
+  if (await page.locator('.fabricate-manager #manager-system-name').count() === 0) {
+    let editButton = page.locator('.fabricate-manager .manager-system-row:has-text("The Herbalist") .manager-icon-button').nth(0);
     if (await editButton.count() === 0) {
-      const systemsBreadcrumb = page.locator('.fabricate-manager-v2 .manager-v2-breadcrumbs button:has-text("Crafting Systems")').first();
+      const systemsBreadcrumb = page.locator('.fabricate-manager .manager-breadcrumbs button:has-text("Crafting Systems")').first();
       if (await systemsBreadcrumb.count() > 0) {
         await systemsBreadcrumb.click();
         await page.waitForTimeout(500);
       }
-      const search = page.locator('.fabricate-manager-v2 input[type="search"]').first();
+      const search = page.locator('.fabricate-manager input[type="search"]').first();
       if (await search.count() > 0) {
         await search.fill('');
         await page.waitForTimeout(250);
       }
-      await page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist")').first().waitFor({ state: 'visible', timeout: 5_000 });
-      editButton = page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist") .manager-v2-icon-button').nth(0);
+      await page.locator('.fabricate-manager .manager-system-row:has-text("The Herbalist")').first().waitFor({ state: 'visible', timeout: 5_000 });
+      editButton = page.locator('.fabricate-manager .manager-system-row:has-text("The Herbalist") .manager-icon-button').nth(0);
     }
     await editButton.click();
   }
-  await page.locator('.fabricate-manager-v2[data-manager-v2-view="system-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
-  await page.locator('.fabricate-manager-v2 #manager-v2-system-name').first().fill('The Herbalist');
-  await page.locator('.fabricate-manager-v2 #manager-v2-system-description').first().fill('A field alchemy system for gathering herbs and brewing reliable remedies.');
-  await page.locator('.fabricate-manager-v2 #manager-v2-system-resolution-mode').first().selectOption('mapped');
+  await page.locator('.fabricate-manager[data-manager-view="system-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+  await page.locator('.fabricate-manager #manager-system-name').first().fill('The Herbalist');
+  await page.locator('.fabricate-manager #manager-system-description').first().fill('A field alchemy system for gathering herbs and brewing reliable remedies.');
+  await page.locator('.fabricate-manager #manager-system-resolution-mode').first().selectOption('mapped');
   await page.locator('.dialog button:has-text("No")').first().click();
-  await page.locator('.fabricate-manager-v2 [data-edit-control="advanced-options"] input').first().click({ trial: true });
-  await page.locator('.fabricate-manager-v2 [data-feature-key="gathering"] input').first().click({ trial: true });
-  await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Open current admin")').first().click({ trial: true });
-  await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Back to systems")').first().click({ trial: true });
+  await page.locator('.fabricate-manager [data-edit-control="advanced-options"] input').first().click({ trial: true });
+  await page.locator('.fabricate-manager [data-feature-key="gathering"] input').first().click({ trial: true });
+  await page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Back to systems")').first().click({ trial: true });
 }
 
 /**
- * Exercise manager-v2 recipe browser pointer targets without mutating recipes.
+ * Exercise manager recipe browser pointer targets without mutating recipes.
  * @param {import('playwright').Page} page
  */
-async function exerciseManagerV2RecipePointerTargets(page) {
-  await page.locator('.fabricate-manager-v2 .manager-v2-nav-button:has-text("Recipes")').first().click();
-  await page.locator('.fabricate-manager-v2 .manager-v2-recipe-row').first().waitFor({ state: 'visible', timeout: 5_000 });
+async function exerciseManagerRecipePointerTargets(page) {
+  await page.locator('.fabricate-manager .manager-nav-button:has-text("Recipes")').first().click();
+  await page.locator('.fabricate-manager .manager-recipe-row').first().waitFor({ state: 'visible', timeout: 5_000 });
 
-  const search = page.locator('.fabricate-manager-v2 input[aria-label="Search recipes"]').first();
+  const search = page.locator('.fabricate-manager input[aria-label="Search recipes"]').first();
   await search.fill('Brew');
   await page.waitForTimeout(250);
   await search.fill('');
   await page.waitForTimeout(250);
 
-  await page.locator('.fabricate-manager-v2 select[aria-label="Filter recipes by status"]').first().selectOption('active');
+  await page.locator('.fabricate-manager select[aria-label="Filter recipes by status"]').first().selectOption('active');
   await page.waitForTimeout(250);
-  await page.locator('.fabricate-manager-v2 select[aria-label="Filter recipes by status"]').first().selectOption('all');
+  await page.locator('.fabricate-manager select[aria-label="Filter recipes by status"]').first().selectOption('all');
 
-  const categoryFilter = page.locator('.fabricate-manager-v2 select[aria-label="Filter recipes by category"]').first();
+  const categoryFilter = page.locator('.fabricate-manager select[aria-label="Filter recipes by category"]').first();
   if (await categoryFilter.count() > 0) {
     await categoryFilter.selectOption({ index: 1 });
     await page.waitForTimeout(250);
@@ -910,57 +880,57 @@ async function exerciseManagerV2RecipePointerTargets(page) {
   }
 
   await search.fill('');
-  await page.locator('.fabricate-manager-v2 select[aria-label="Filter recipes by status"]').first().selectOption('all');
+  await page.locator('.fabricate-manager select[aria-label="Filter recipes by status"]').first().selectOption('all');
   await page.waitForTimeout(250);
-  const recipeRow = page.locator('.fabricate-manager-v2 .manager-v2-recipe-row').first();
+  const recipeRow = page.locator('.fabricate-manager .manager-recipe-row').first();
   await recipeRow.waitFor({ state: 'visible', timeout: 5_000 });
-  await recipeRow.locator('.manager-v2-recipe-identity').click();
-  const toggleInput = recipeRow.locator('.manager-v2-toggle input').first();
+  await recipeRow.locator('.manager-recipe-identity').click();
+  const toggleInput = recipeRow.locator('.manager-toggle input').first();
   if (await toggleInput.count() > 0) await toggleInput.click({ trial: true });
-  const recipeActions = recipeRow.locator('.manager-v2-icon-button');
+  const recipeActions = recipeRow.locator('.manager-icon-button');
   for (let index = 0; index < await recipeActions.count(); index += 1) {
     await recipeActions.nth(index).click({ trial: true });
   }
 
-  await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Import")').first().click({ trial: true });
-  await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Export")').first().click({ trial: true });
-  await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Create Recipe")').first().click({ trial: true });
+  await page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Import")').first().click({ trial: true });
+  await page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Export")').first().click({ trial: true });
+  await page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Create Recipe")').first().click({ trial: true });
 }
 
 /**
- * Exercise manager-v2 environment browser pointer targets without mutating
+ * Exercise manager environment browser pointer targets without mutating
  * environments.
  * @param {import('playwright').Page} page
  */
-async function exerciseManagerV2EnvironmentPointerTargets(page) {
-  await page.locator('.fabricate-manager-v2 .manager-v2-nav-button:has-text("Gathering")').first().click();
-  await page.locator('.fabricate-manager-v2 .manager-v2-environment-row').first().waitFor({ state: 'visible', timeout: 5_000 });
+async function exerciseManagerEnvironmentPointerTargets(page) {
+  await page.locator('.fabricate-manager .manager-nav-button:has-text("Gathering")').first().click();
+  await page.locator('.fabricate-manager .manager-environment-row').first().waitFor({ state: 'visible', timeout: 5_000 });
 
-  const search = page.locator('.fabricate-manager-v2 input[aria-label="Search environments"]').first();
+  const search = page.locator('.fabricate-manager input[aria-label="Search environments"]').first();
   await search.fill('Azure');
   await page.waitForTimeout(250);
   await search.fill('');
   await page.waitForTimeout(250);
 
-  await page.locator('.fabricate-manager-v2 select[aria-label="Filter environments by status"]').first().selectOption('active');
+  await page.locator('.fabricate-manager select[aria-label="Filter environments by status"]').first().selectOption('active');
   await page.waitForTimeout(250);
-  await page.locator('.fabricate-manager-v2 select[aria-label="Filter environments by status"]').first().selectOption('all');
-  await page.locator('.fabricate-manager-v2 select[aria-label="Filter environments by selection mode"]').first().selectOption('targeted');
+  await page.locator('.fabricate-manager select[aria-label="Filter environments by status"]').first().selectOption('all');
+  await page.locator('.fabricate-manager select[aria-label="Filter environments by selection mode"]').first().selectOption('targeted');
   await page.waitForTimeout(250);
-  await page.locator('.fabricate-manager-v2 select[aria-label="Filter environments by selection mode"]').first().selectOption('all');
+  await page.locator('.fabricate-manager select[aria-label="Filter environments by selection mode"]').first().selectOption('all');
 
-  const azureRow = page.locator('.fabricate-manager-v2 .manager-v2-environment-row:has-text("Azure Grove")').first();
+  const azureRow = page.locator('.fabricate-manager .manager-environment-row:has-text("Azure Grove")').first();
   await azureRow.waitFor({ state: 'visible', timeout: 5_000 });
-  await azureRow.locator('.manager-v2-environment-identity').click();
-  await azureRow.locator('.manager-v2-status-toggle').click({ trial: true });
-  await azureRow.locator('.manager-v2-icon-button').nth(0).click({ trial: true });
-  await azureRow.locator('.manager-v2-icon-button').nth(1).click({ trial: true });
-  await azureRow.locator('.manager-v2-icon-button').nth(2).click({ trial: true });
-  const moveUp = azureRow.locator('.manager-v2-icon-button').nth(3);
+  await azureRow.locator('.manager-environment-identity').click();
+  await azureRow.locator('.manager-status-toggle').click({ trial: true });
+  await azureRow.locator('.manager-icon-button').nth(0).click({ trial: true });
+  await azureRow.locator('.manager-icon-button').nth(1).click({ trial: true });
+  await azureRow.locator('.manager-icon-button').nth(2).click({ trial: true });
+  const moveUp = azureRow.locator('.manager-icon-button').nth(3);
   if (await moveUp.isEnabled()) await moveUp.click({ trial: true });
-  const moveDown = azureRow.locator('.manager-v2-icon-button').nth(4);
+  const moveDown = azureRow.locator('.manager-icon-button').nth(4);
   if (await moveDown.isEnabled()) await moveDown.click({ trial: true });
-  await page.locator('.fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button:has-text("Create environment")').first().click({ trial: true });
+  await page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Create environment")').first().click({ trial: true });
 }
 
 /**
@@ -1013,7 +983,7 @@ async function closeOpenApplications(page) {
     '.application:not(#sidebar) .window-header .close',
     '.app.window-app .close',
     '#fabricate-recipe-manager button[data-action="close"]',
-    '#fabricate-crafting-system-manager-v2 button[data-action="close"]',
+    '#fabricate-crafting-system-manager button[data-action="close"]',
     '#fabricate-gathering button[data-action="close"]'
   ].join(', ');
 
@@ -1046,7 +1016,7 @@ async function closeOpenApplications(page) {
       for (const app of applicationV2s) {
         const element = app?.element ?? app?._element ?? null;
         if (!element || element.id === 'sidebar') continue;
-        if (element.querySelector?.('.fabricate-admin, .fabricate-gathering-app') || element.id?.startsWith?.('fabricate-')) {
+        if (element.querySelector?.('.fabricate-manager, .fabricate-gathering-app') || element.id?.startsWith?.('fabricate-')) {
           try {
             closedApplicationV2 = true;
             app.close({ force: true });
@@ -1072,260 +1042,9 @@ async function closeOpenApplications(page) {
     await page.waitForTimeout(500);
     await discardDirtyDraft();
 
-    const remaining = await page.locator('.fabricate-admin, .fabricate-gathering-app, button:has-text("Discard Changes")').count();
+    const remaining = await page.locator('.fabricate-manager, .fabricate-gathering-app, button:has-text("Discard Changes")').count();
     if (remaining === 0) break;
   }
-}
-
-/**
- * Put the Environments editor in a validation-rich draft state for screenshot
- * inspection while leaving persistence behavior untouched.
- * @param {import('playwright').Page} page
- */
-async function prepareGmEnvironmentsScreenshotState(page) {
-  await page.locator('.environment-draft-editor, .manager-v2-environment-edit-view').first().waitFor({ state: 'visible', timeout: 10_000 });
-
-  const catalystTab = page.locator('.manager-v2-task-tabs [role="tab"]:has-text("Catalysts")').first();
-  if (await catalystTab.count() > 0) {
-    await catalystTab.click();
-    await page.waitForTimeout(250);
-  }
-  const catalystComponent = page
-    .locator('.environment-catalyst-row select[data-environment-field*=".catalysts.0.componentId"]')
-    .first();
-  if (await catalystComponent.count() > 0) {
-    await catalystComponent.selectOption('');
-    await page.waitForTimeout(500);
-  }
-
-  const saveButton = page.locator('.environment-save-actions button[type="submit"], .fabricate-manager-v2 .manager-v2-header-actions .manager-v2-button.is-primary:has-text("Save")').first();
-  if (await saveButton.count() > 0) {
-    await saveButton.click();
-    await page.locator('.environment-validation-summary, .manager-v2-validation-group').first().waitFor({ state: 'visible', timeout: 5_000 });
-  }
-}
-
-/**
- * Scroll the Environments editor to a useful authoring inspection target.
- * @param {import('playwright').Page} page
- * @param {string} selector
- */
-async function scrollEnvironmentEditorTo(page, selector) {
-  await page.evaluate((selector) => {
-    const editor = document.querySelector('.manager-v2-environment-editor-shell') || document.querySelector('.environment-draft-editor');
-    const target = document.querySelector(selector);
-    if (!editor || !target) return;
-    const editorRect = editor.getBoundingClientRect();
-    const targetRect = target.getBoundingClientRect();
-    editor.scrollTop += targetRect.top - editorRect.top - 24;
-  }, selector);
-  await page.waitForTimeout(500);
-}
-
-/**
- * Reset the Environments editor scroll position for top-of-editor screenshots.
- * @param {import('playwright').Page} page
- */
-async function scrollEnvironmentEditorToTop(page) {
-  await page.evaluate(() => {
-    const editor = document.querySelector('.manager-v2-environment-editor-shell') || document.querySelector('.environment-draft-editor');
-    if (editor) editor.scrollTop = 0;
-  });
-  await page.waitForTimeout(500);
-}
-
-/**
- * Assert the browser's real pointer hit-test reaches the expected card control.
- * @param {import('playwright').Page} page
- * @param {import('playwright').Locator} locator
- * @param {string} targetSelector
- * @param {string} label
- */
-async function assertPointerTarget(page, locator, targetSelector, label) {
-  await locator.scrollIntoViewIfNeeded();
-  await locator.waitFor({ state: 'visible', timeout: 5_000 });
-  const box = await locator.boundingBox();
-  if (!box) throw new Error(`No pointer box found for ${label}`);
-
-  const hit = await page.evaluate(({ x, y, targetSelector }) => {
-    const element = document.elementFromPoint(x, y);
-    return {
-      hitClass: element?.className || '',
-      hitTag: element?.tagName || '',
-      matched: Boolean(element?.closest?.(targetSelector))
-    };
-  }, {
-    x: box.x + box.width / 2,
-    y: box.y + box.height / 2,
-    targetSelector
-  });
-
-  if (!hit.matched) {
-    throw new Error(
-      `Pointer hit-test for ${label} missed ${targetSelector}; ` +
-      `hit ${hit.hitTag || 'none'} ${String(hit.hitClass || '')}`
-    );
-  }
-}
-
-/**
- * Exercise real pointer targets for the GM Environments card grid before
- * opening the editor for screenshots.
- * @param {import('playwright').Page} page
- */
-async function exerciseGmEnvironmentCardPointerActions(page) {
-  const azureCard = page.locator('.environment-card').filter({ hasText: 'Azure Grove' }).first();
-  await azureCard.waitFor({ state: 'visible', timeout: 10_000 });
-
-  await assertPointerTarget(page, azureCard.locator('.environment-card-body-action'), '.environment-card-body-action', 'environment card body');
-  await assertPointerTarget(page, azureCard.locator('.environment-card-image-action'), '.environment-card-image-action', 'environment card image');
-  await assertPointerTarget(page, azureCard.locator('.environment-card-edit'), '.environment-card-edit', 'environment card edit button');
-  await assertPointerTarget(page, azureCard.locator('.environment-card-toggle'), '.environment-card-toggle', 'environment card toggle button');
-  await assertPointerTarget(page, azureCard.locator('.environment-card-delete'), '.environment-card-delete', 'environment card delete button');
-
-  const toggle = azureCard.locator('.environment-card-toggle');
-  await toggle.click();
-  await page.locator('.environment-card').filter({ hasText: 'Azure Grove' }).filter({ hasText: 'Disabled' })
-    .waitFor({ state: 'visible', timeout: 5_000 });
-  if (await page.locator('.environment-draft-editor').count() > 0) {
-    throw new Error('Environment toggle opened the editor instead of staying on the card grid');
-  }
-
-  await page.locator('.environment-card').filter({ hasText: 'Azure Grove' }).first()
-    .locator('.environment-card-toggle')
-    .click();
-  await page.locator('.environment-card').filter({ hasText: 'Azure Grove' }).filter({ hasText: 'Enabled' })
-    .waitFor({ state: 'visible', timeout: 5_000 });
-  if (await page.locator('.environment-draft-editor').count() > 0) {
-    throw new Error('Environment toggle re-enable opened the editor instead of staying on the card grid');
-  }
-
-  await azureCard.locator('.environment-action-menu-trigger').click();
-  const moveDown = page.locator('.environment-action-menu-item[data-environment-action="move-down"]').first();
-  await assertPointerTarget(page, moveDown, '.environment-action-menu-item[data-environment-action="move-down"]', 'environment card move down menu item');
-  await moveDown.click();
-  await page.waitForTimeout(500);
-  const firstAfterMoveDown = await page.locator('.environment-card .environment-name').first().textContent();
-  if (String(firstAfterMoveDown || '').trim() === 'Azure Grove') {
-    throw new Error('Environment move-down action did not reorder the first card');
-  }
-
-  const movedAzureCard = page.locator('.environment-card').filter({ hasText: 'Azure Grove' }).first();
-  await movedAzureCard.locator('.environment-action-menu-trigger').click();
-  const moveUp = page.locator('.environment-action-menu-item[data-environment-action="move-up"]').first();
-  await assertPointerTarget(page, moveUp, '.environment-action-menu-item[data-environment-action="move-up"]', 'environment card move up menu item');
-  await moveUp.click();
-  await page.waitForTimeout(500);
-  const firstAfterMoveUp = await page.locator('.environment-card .environment-name').first().textContent();
-  if (String(firstAfterMoveUp || '').trim() !== 'Azure Grove') {
-    throw new Error('Environment move-up action did not restore the first card');
-  }
-}
-
-/**
- * Assert a named GM Environments card uses linked scene imagery and does not
- * let the media frame overflow the card at the current admin window size.
- * @param {import('playwright').Page} page
- * @param {string} environmentName
- * @param {{ label: string, tolerance?: number }} options
- */
-async function assertGmEnvironmentCardMediaContained(page, environmentName, { label, tolerance = 1 }) {
-  const card = page.locator('.fabricate-admin .environment-card').filter({ hasText: environmentName }).first();
-  await card.waitFor({ state: 'visible', timeout: 10_000 });
-  await card.locator('.environment-card-media').waitFor({ state: 'visible', timeout: 5_000 });
-  await card.locator('.environment-card-image-frame').waitFor({ state: 'visible', timeout: 5_000 });
-  await card.locator('img.environment-card-image').waitFor({ state: 'visible', timeout: 5_000 });
-
-  await page.waitForFunction(({ cardSelector, environmentName }) => {
-    const cards = Array.from(document.querySelectorAll(cardSelector));
-    const card = cards.find(candidate => candidate.textContent?.includes(environmentName));
-    const image = card?.querySelector?.('img.environment-card-image');
-    return image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0;
-  }, { cardSelector: '.fabricate-admin .environment-card', environmentName }, { timeout: 10_000 });
-
-  const diagnostics = await card.evaluate((cardElement, { label, tolerance }) => {
-    const rectData = rect => ({
-      left: Number(rect.left.toFixed(2)),
-      right: Number(rect.right.toFixed(2)),
-      top: Number(rect.top.toFixed(2)),
-      bottom: Number(rect.bottom.toFixed(2)),
-      width: Number(rect.width.toFixed(2)),
-      height: Number(rect.height.toFixed(2))
-    });
-    const edgeOverflow = (inner, outer) => ({
-      left: Number((outer.left - inner.left).toFixed(2)),
-      right: Number((inner.right - outer.right).toFixed(2)),
-      top: Number((outer.top - inner.top).toFixed(2)),
-      bottom: Number((inner.bottom - outer.bottom).toFixed(2))
-    });
-    const within = (inner, outer) =>
-      inner.left >= outer.left - tolerance &&
-      inner.right <= outer.right + tolerance &&
-      inner.top >= outer.top - tolerance &&
-      inner.bottom <= outer.bottom + tolerance;
-
-    const media = cardElement.querySelector('.environment-card-media');
-    const frame = cardElement.querySelector('.environment-card-image-frame');
-    const image = cardElement.querySelector('img.environment-card-image');
-    const admin = cardElement.closest('.fabricate-admin');
-    const app = admin?.closest('.application, .app') || document.querySelector('#fabricate-recipe-manager');
-
-    if (!(media instanceof HTMLElement) || !(frame instanceof HTMLElement) || !(image instanceof HTMLImageElement)) {
-      return {
-        ok: false,
-        label,
-        reason: 'missing required environment card media elements',
-        hasMedia: media instanceof HTMLElement,
-        hasFrame: frame instanceof HTMLElement,
-        hasImage: image instanceof HTMLImageElement
-      };
-    }
-
-    const cardRect = cardElement.getBoundingClientRect();
-    const mediaRect = media.getBoundingClientRect();
-    const frameRect = frame.getBoundingClientRect();
-    const appRect = app?.getBoundingClientRect?.() ?? null;
-    const imageClasses = Array.from(image.classList);
-    const imageIsLoaded = image.complete && image.naturalWidth > 0;
-    const imageIsFallback = image.classList.contains('fallback') || image.currentSrc.includes('icons/svg/item-bag.svg');
-    const mediaWithinCard = within(mediaRect, cardRect);
-    const frameWithinCard = within(frameRect, cardRect);
-    const frameWithinMedia = within(frameRect, mediaRect);
-
-    return {
-      ok: imageIsLoaded && !imageIsFallback && mediaWithinCard && frameWithinCard && frameWithinMedia,
-      label,
-      tolerance,
-      imageIsLoaded,
-      imageIsFallback,
-      imageSrc: image.currentSrc || image.src || '',
-      imageNaturalSize: { width: image.naturalWidth, height: image.naturalHeight },
-      imageClasses,
-      mediaWithinCard,
-      frameWithinCard,
-      frameWithinMedia,
-      overflow: {
-        mediaVsCard: edgeOverflow(mediaRect, cardRect),
-        frameVsCard: edgeOverflow(frameRect, cardRect),
-        frameVsMedia: edgeOverflow(frameRect, mediaRect)
-      },
-      rects: {
-        app: appRect ? rectData(appRect) : null,
-        card: rectData(cardRect),
-        media: rectData(mediaRect),
-        frame: rectData(frameRect)
-      }
-    };
-  }, { label, tolerance });
-
-  if (!diagnostics.ok) {
-    throw new Error(
-      `Environment card media containment failed for "${environmentName}" at ${label}: ` +
-      JSON.stringify(diagnostics, null, 2)
-    );
-  }
-
-  process.stdout.write(`  Verified "${environmentName}" linked scene media containment at ${label}.\n`);
 }
 
 /**
@@ -2350,7 +2069,7 @@ async function main() {
               tasks: [{
                 id: 'smoke-forage-library',
                 name: 'Smoke Reusable Forage',
-                description: 'Reusable library task for Manager V2 gathering composition screenshots.',
+                description: 'Reusable library task for Manager gathering composition screenshots.',
                 img: 'icons/consumables/plants/leaf-herb-green.webp',
                 enabled: true,
                 region: 'northreach',
@@ -2369,7 +2088,7 @@ async function main() {
               hazards: [{
                 id: 'smoke-bramble-hazard',
                 name: 'Smoke Bramble Snare',
-                description: 'Reusable hazard for Manager V2 gathering composition screenshots.',
+                description: 'Reusable hazard for Manager gathering composition screenshots.',
                 img: 'icons/svg/hazard.svg',
                 enabled: true,
                 dangerTags: ['hazardous'],
@@ -2447,17 +2166,17 @@ async function main() {
         results.steps.push({ step: 'gathering-feature-gate-negative', passed: true, skipped: true });
       }
 
-      // ── Phase D0: Screenshot Crafting System Manager V2 ─────────────────────
+      // ── Phase D0: Screenshot Crafting System Manager ─────────────────────
       // Gated behind RUN_SCREENSHOT_PHASES so the CI smoke profile skips the
-      // ~25 manager-v2 captures and pointer hit-tests; local `full` runs
+      // ~25 manager captures and pointer hit-tests; local `full` runs
       // continue to regenerate them for visual verification.
       if (!RUN_SCREENSHOT_PHASES) {
         startPhase('phase-D0-skipped');
         process.stdout.write(`Phase D0: skipped (profile=${SMOKE_PROFILE}).\n`);
-        results.steps.push({ step: 'screenshot-manager-v2', passed: true, skipped: true });
+        results.steps.push({ step: 'screenshot-manager', passed: true, skipped: true });
       } else {
       startPhase('phase-D0');
-      process.stdout.write('Phase D0: Opening Crafting System Manager V2...\n');
+      process.stdout.write('Phase D0: Opening Crafting System Manager...\n');
       try {
         await page.evaluate(async (sysId) => {
           await game.settings.set('fabricate', 'lastManagedCraftingSystem', '');
@@ -2469,80 +2188,80 @@ async function main() {
         }, craftingSetup.systemId);
 
         await page.evaluate(() => {
-          game.fabricate.api.getCraftingSystemManagerV2AppClass().show();
+          game.fabricate.api.getCraftingSystemManagerAppClass().show();
         });
-        await page.locator('.fabricate-manager-v2').first().waitFor({ state: 'visible', timeout: 10_000 });
+        await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
 
-        await setManagerV2WindowSize(page, { width: 1280, height: 820 });
-        await selectSmokeSystemInManagerV2(page);
-        let navLabels = await page.locator('.fabricate-manager-v2 .manager-v2-nav-label').evaluateAll(labels =>
+        await setManagerWindowSize(page, { width: 1280, height: 820 });
+        await selectSmokeSystemInManager(page);
+        let navLabels = await page.locator('.fabricate-manager .manager-nav-label').evaluateAll(labels =>
           labels.map(label => label.textContent?.trim()).filter(Boolean)
         );
         if (navLabels.at(0) !== 'System settings') {
-          throw new Error(`Manager V2 default selection should keep System settings first. Saw: ${navLabels.join(', ')}`);
+          throw new Error(`Manager default selection should keep System settings first. Saw: ${navLabels.join(', ')}`);
         }
-        if (await page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist")[aria-selected="true"]').count() === 0) {
-          throw new Error('Manager V2 did not select the smoke test system.');
+        if (await page.locator('.fabricate-manager .manager-system-row:has-text("The Herbalist")[aria-selected="true"]').count() === 0) {
+          throw new Error('Manager did not select the smoke test system.');
         }
-        if (await page.locator('.fabricate-manager-v2 .manager-v2-breadcrumbs button:has-text("Crafting Systems")').count() === 0) {
-          throw new Error('Manager V2 root breadcrumb is missing.');
+        if (await page.locator('.fabricate-manager .manager-breadcrumbs button:has-text("Crafting Systems")').count() === 0) {
+          throw new Error('Manager root breadcrumb is missing.');
         }
-        await assertManagerV2LayoutStable(page, 'normal default selection');
+        await assertManagerLayoutStable(page, 'normal default selection');
         await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-v2-default-selection');
+        await screenshot(page, 'manager-default-selection');
 
-        await page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist") .manager-v2-system-identity').first().click();
+        await page.locator('.fabricate-manager .manager-system-row:has-text("The Herbalist") .manager-system-identity').first().click();
         await page.waitForTimeout(750);
-        navLabels = await page.locator('.fabricate-manager-v2 .manager-v2-nav-label').evaluateAll(labels =>
+        navLabels = await page.locator('.fabricate-manager .manager-nav-label').evaluateAll(labels =>
           labels.map(label => label.textContent?.trim()).filter(Boolean)
         );
         if (navLabels.includes('Systems')) {
-          throw new Error(`Manager V2 selected nav should not expose a Systems tab. Saw: ${navLabels.join(', ')}`);
+          throw new Error(`Manager selected nav should not expose a Systems tab. Saw: ${navLabels.join(', ')}`);
         }
         if (navLabels.at(0) !== 'System settings') {
-          throw new Error(`Manager V2 selected nav should keep System settings first. Saw: ${navLabels.join(', ')}`);
+          throw new Error(`Manager selected nav should keep System settings first. Saw: ${navLabels.join(', ')}`);
         }
         for (const expected of ['System settings', 'Components', 'Recipes', 'Tags & Categories', 'Essences', 'Tools', 'Gathering', 'Rules', 'Graph']) {
           if (!navLabels.includes(expected)) {
-            throw new Error(`Manager V2 selected nav missing ${expected}. Saw: ${navLabels.join(', ')}`);
+            throw new Error(`Manager selected nav missing ${expected}. Saw: ${navLabels.join(', ')}`);
           }
         }
-        if (await page.locator('.fabricate-manager-v2 .manager-v2-scope-card .manager-v2-scope-name:has-text("The Herbalist")').count() === 0) {
-          throw new Error('Manager V2 selected-system scope is missing static selected-system text.');
+        if (await page.locator('.fabricate-manager .manager-scope-card .manager-scope-name:has-text("The Herbalist")').count() === 0) {
+          throw new Error('Manager selected-system scope is missing static selected-system text.');
         }
-        if (await page.locator('.fabricate-manager-v2 .manager-v2-scope-return[aria-label="Return to System Library"]').count() === 0) {
-          throw new Error('Manager V2 selected-system scope is missing the return-to-library action.');
+        if (await page.locator('.fabricate-manager .manager-scope-return[aria-label="Return to System Library"]').count() === 0) {
+          throw new Error('Manager selected-system scope is missing the return-to-library action.');
         }
-        if (await page.locator('.fabricate-manager-v2 .manager-v2-section-header .manager-v2-button:has-text("Import")').count() > 0) {
-          throw new Error('Manager V2 duplicated Import in the System library header.');
+        if (await page.locator('.fabricate-manager .manager-section-header .manager-button:has-text("Import")').count() > 0) {
+          throw new Error('Manager duplicated Import in the System library header.');
         }
-        if (await page.locator('.fabricate-manager-v2 .manager-v2-section-header .manager-v2-button:has-text("Create")').count() > 0) {
-          throw new Error('Manager V2 duplicated Create in the System library header.');
+        if (await page.locator('.fabricate-manager .manager-section-header .manager-button:has-text("Create")').count() > 0) {
+          throw new Error('Manager duplicated Create in the System library header.');
         }
-        if (await page.locator('.fabricate-manager-v2 .manager-v2-card-title:has-text("Quick actions")').count() > 0) {
-          throw new Error('Manager V2 inspector still shows duplicate Quick actions.');
+        if (await page.locator('.fabricate-manager .manager-card-title:has-text("Quick actions")').count() > 0) {
+          throw new Error('Manager inspector still shows duplicate Quick actions.');
         }
-        await assertManagerV2LayoutStable(page, 'normal selected');
-        await exerciseManagerV2PointerTargets(page);
+        await assertManagerLayoutStable(page, 'normal selected');
+        await exerciseManagerPointerTargets(page);
         await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-v2-selected-normal');
+        await screenshot(page, 'manager-selected-normal');
 
-        await page.locator('.fabricate-manager-v2 .manager-v2-scope-return').first().click();
+        await page.locator('.fabricate-manager .manager-scope-return').first().click();
         await page.waitForTimeout(750);
-        navLabels = await page.locator('.fabricate-manager-v2 .manager-v2-nav-label').evaluateAll(labels =>
+        navLabels = await page.locator('.fabricate-manager .manager-nav-label').evaluateAll(labels =>
           labels.map(label => label.textContent?.trim()).filter(Boolean)
         );
         if (navLabels.at(0) !== 'System settings') {
-          throw new Error(`Manager V2 return to library should preserve selected-system nav. Saw nav: ${navLabels.join(', ')}`);
+          throw new Error(`Manager return to library should preserve selected-system nav. Saw nav: ${navLabels.join(', ')}`);
         }
-        if (await page.locator('.fabricate-manager-v2 .manager-v2-scope-card').count() === 0) {
-          throw new Error('Manager V2 return to library should leave the rail scope visible.');
+        if (await page.locator('.fabricate-manager .manager-scope-card').count() === 0) {
+          throw new Error('Manager return to library should leave the rail scope visible.');
         }
-        if (await page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist")').count() === 0) {
-          throw new Error('Manager V2 return to library did not return to the systems browser.');
+        if (await page.locator('.fabricate-manager .manager-system-row:has-text("The Herbalist")').count() === 0) {
+          throw new Error('Manager return to library did not return to the systems browser.');
         }
-        if (await page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist")[aria-selected="true"]').count() === 0) {
-          throw new Error('Manager V2 return to library should preserve the selected system row.');
+        if (await page.locator('.fabricate-manager .manager-system-row:has-text("The Herbalist")[aria-selected="true"]').count() === 0) {
+          throw new Error('Manager return to library should preserve the selected system row.');
         }
 
         await closeOpenApplications(page);
@@ -2551,13 +2270,13 @@ async function main() {
           await csm.updateSystem(sysId, { features: { essences: true, gathering: false } });
         }, craftingSetup.systemId);
         await page.evaluate(() => {
-          game.fabricate.api.getCraftingSystemManagerV2AppClass().show();
+          game.fabricate.api.getCraftingSystemManagerAppClass().show();
         });
-        await page.locator('.fabricate-manager-v2').first().waitFor({ state: 'visible', timeout: 10_000 });
-        await setManagerV2WindowSize(page, { width: 1280, height: 820 });
-        await page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist") .manager-v2-system-identity').first().click();
+        await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
+        await setManagerWindowSize(page, { width: 1280, height: 820 });
+        await page.locator('.fabricate-manager .manager-system-row:has-text("The Herbalist") .manager-system-identity').first().click();
         await page.waitForTimeout(750);
-        const gatheringOffFact = await page.locator('.fabricate-manager-v2 [data-count-id="environments"]').first().evaluate(element => {
+        const gatheringOffFact = await page.locator('.fabricate-manager [data-count-id="environments"]').first().evaluate(element => {
           const rect = element.getBoundingClientRect();
           const strong = element.querySelector('strong');
           const style = getComputedStyle(element);
@@ -2574,243 +2293,243 @@ async function main() {
         });
         if (gatheringOffFact.text === 'Gathering environments Off') {
           if (gatheringOffFact.strongText !== 'Off' || gatheringOffFact.strongTagName !== 'STRONG') {
-            throw new Error(`Manager V2 gathering-off fact does not preserve Off emphasis: ${JSON.stringify(gatheringOffFact)}`);
+            throw new Error(`Manager gathering-off fact does not preserve Off emphasis: ${JSON.stringify(gatheringOffFact)}`);
           }
           if (!String(gatheringOffFact.className).includes('is-off')) {
-            throw new Error(`Manager V2 gathering-off fact should use the full-grid special case: ${JSON.stringify(gatheringOffFact)}`);
+            throw new Error(`Manager gathering-off fact should use the full-grid special case: ${JSON.stringify(gatheringOffFact)}`);
           }
         } else if (!/^\d+ Gathering environments$/.test(gatheringOffFact.text || '')) {
-          throw new Error(`Manager V2 gathering fact text is wrong: ${JSON.stringify(gatheringOffFact)}`);
+          throw new Error(`Manager gathering fact text is wrong: ${JSON.stringify(gatheringOffFact)}`);
         }
         if (gatheringOffFact.scrollWidth > gatheringOffFact.clientWidth + 2) {
-          throw new Error(`Manager V2 gathering-off fact overflows: ${JSON.stringify(gatheringOffFact)}`);
+          throw new Error(`Manager gathering-off fact overflows: ${JSON.stringify(gatheringOffFact)}`);
         }
-        await assertManagerV2LayoutStable(page, 'normal selected gathering off');
+        await assertManagerLayoutStable(page, 'normal selected gathering off');
         await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-v2-selected-gathering-off');
+        await screenshot(page, 'manager-selected-gathering-off');
         await closeOpenApplications(page);
         await page.evaluate(async (sysId) => {
           const csm = game.fabricate.getCraftingSystemManager();
           await csm.updateSystem(sysId, { features: { essences: true, gathering: true } });
         }, craftingSetup.systemId);
         await page.evaluate(() => {
-          game.fabricate.api.getCraftingSystemManagerV2AppClass().show();
+          game.fabricate.api.getCraftingSystemManagerAppClass().show();
         });
-        await page.locator('.fabricate-manager-v2').first().waitFor({ state: 'visible', timeout: 10_000 });
-        await setManagerV2WindowSize(page, { width: 1280, height: 820 });
-        await page.locator('.fabricate-manager-v2 .manager-v2-system-row:has-text("The Herbalist") .manager-v2-system-identity').first().click();
+        await page.locator('.fabricate-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
+        await setManagerWindowSize(page, { width: 1280, height: 820 });
+        await page.locator('.fabricate-manager .manager-system-row:has-text("The Herbalist") .manager-system-identity').first().click();
         await page.waitForTimeout(750);
 
-        await setManagerV2WindowSize(page, { width: 1000, height: 700 });
-        await assertManagerV2LayoutStable(page, 'stacked selected');
+        await setManagerWindowSize(page, { width: 1000, height: 700 });
+        await assertManagerLayoutStable(page, 'stacked selected');
         await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-v2-selected-stacked');
+        await screenshot(page, 'manager-selected-stacked');
 
-        await setManagerV2WindowSize(page, { width: 1280, height: 820 });
-        await page.locator('.fabricate-manager-v2 .manager-v2-nav-button:has-text("Recipes")').first().click();
-        await page.locator('.fabricate-manager-v2 .manager-v2-breadcrumbs button:has-text("The Herbalist")').first().click();
-        await page.locator('.fabricate-manager-v2[data-manager-v2-view="system-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
-        await exerciseManagerV2SystemEditPointerTargets(page);
-        if (await page.locator('.fabricate-manager-v2[data-manager-v2-view="system-edit"]').count() === 0) {
-          throw new Error('Manager V2 system Edit did not stay inside the v2 edit route.');
+        await setManagerWindowSize(page, { width: 1280, height: 820 });
+        await page.locator('.fabricate-manager .manager-nav-button:has-text("Recipes")').first().click();
+        await page.locator('.fabricate-manager .manager-breadcrumbs button:has-text("The Herbalist")').first().click();
+        await page.locator('.fabricate-manager[data-manager-view="system-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await exerciseManagerSystemEditPointerTargets(page);
+        if (await page.locator('.fabricate-manager[data-manager-view="system-edit"]').count() === 0) {
+          throw new Error('Manager system Edit did not stay inside the v2 edit route.');
         }
         for (const selector of [
-          '#manager-v2-system-name',
-          '#manager-v2-system-description',
-          '#manager-v2-system-resolution-mode',
+          '#manager-system-name',
+          '#manager-system-description',
+          '#manager-system-resolution-mode',
           '[data-edit-control="advanced-options"]',
           '[data-feature-key="gathering"]'
         ]) {
-          if (await page.locator(`.fabricate-manager-v2 ${selector}`).count() === 0) {
-            throw new Error(`Manager V2 system edit is missing required control: ${selector}`);
+          if (await page.locator(`.fabricate-manager ${selector}`).count() === 0) {
+            throw new Error(`Manager system edit is missing required control: ${selector}`);
           }
         }
-        await assertManagerV2LayoutStable(page, 'system edit normal');
+        await assertManagerLayoutStable(page, 'system edit normal');
         await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-v2-system-edit-normal');
+        await screenshot(page, 'manager-system-edit-normal');
 
-        await setManagerV2WindowSize(page, { width: 900, height: 700 });
-        await assertManagerV2LayoutStable(page, 'system edit narrow');
+        await setManagerWindowSize(page, { width: 900, height: 700 });
+        await assertManagerLayoutStable(page, 'system edit narrow');
         await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-v2-system-edit-narrow');
+        await screenshot(page, 'manager-system-edit-narrow');
 
-        await setManagerV2WindowSize(page, { width: 1280, height: 820 });
-        await exerciseManagerV2RecipePointerTargets(page);
-        if (await page.locator('.fabricate-manager-v2 .manager-v2-recipe-row').count() < 2) {
-          throw new Error('Manager V2 recipes browser rendered fewer than two recipe rows.');
+        await setManagerWindowSize(page, { width: 1280, height: 820 });
+        await exerciseManagerRecipePointerTargets(page);
+        if (await page.locator('.fabricate-manager .manager-recipe-row').count() < 2) {
+          throw new Error('Manager recipes browser rendered fewer than two recipe rows.');
         }
-        if (await page.locator('.fabricate-manager-v2 .manager-v2-recipe-row.is-selected').count() === 0) {
-          throw new Error('Manager V2 recipes browser did not show selected recipe row state.');
+        if (await page.locator('.fabricate-manager .manager-recipe-row.is-selected').count() === 0) {
+          throw new Error('Manager recipes browser did not show selected recipe row state.');
         }
-        if (await page.locator('.fabricate-manager-v2 .manager-v2-inspector:has-text("Requirements")').count() === 0) {
-          throw new Error('Manager V2 recipes inspector did not show requirements preview.');
+        if (await page.locator('.fabricate-manager .manager-inspector:has-text("Requirements")').count() === 0) {
+          throw new Error('Manager recipes inspector did not show requirements preview.');
         }
-        await assertManagerV2LayoutStable(page, 'recipes normal');
+        await assertManagerLayoutStable(page, 'recipes normal');
         await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-v2-recipes-normal');
+        await screenshot(page, 'manager-recipes-normal');
 
-        await setManagerV2WindowSize(page, { width: 1000, height: 700 });
-        await page.locator('.fabricate-manager-v2 .manager-v2-recipe-row:has-text("Brew Healing Potion")').first().scrollIntoViewIfNeeded();
+        await setManagerWindowSize(page, { width: 1000, height: 700 });
+        await page.locator('.fabricate-manager .manager-recipe-row:has-text("Brew Healing Potion")').first().scrollIntoViewIfNeeded();
         await page.waitForTimeout(250);
-        await assertManagerV2LayoutStable(page, 'recipes stacked');
+        await assertManagerLayoutStable(page, 'recipes stacked');
         await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-v2-recipes-stacked');
+        await screenshot(page, 'manager-recipes-stacked');
 
-        await setManagerV2WindowSize(page, { width: 1280, height: 820 });
-        await page.locator('.fabricate-manager-v2 .manager-v2-nav-button:has-text("Components")').first().click();
-        await page.locator('.fabricate-manager-v2[data-manager-v2-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await setManagerWindowSize(page, { width: 1280, height: 820 });
+        await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
+        await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await page.waitForTimeout(500);
-        if (await page.locator('.fabricate-manager-v2 .manager-v2-component-drop-zone').count() === 0) {
-          throw new Error('Manager V2 components browser did not show the drop-to-add affordance.');
+        if (await page.locator('.fabricate-manager .manager-component-drop-zone').count() === 0) {
+          throw new Error('Manager components browser did not show the drop-to-add affordance.');
         }
-        await assertManagerV2LayoutStable(page, 'components normal');
+        await assertManagerLayoutStable(page, 'components normal');
         await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-v2-components-normal');
+        await screenshot(page, 'manager-components-normal');
         process.stdout.write('  D0: components normal screenshotted\n');
 
         // Components → stacked. Earlier CI runs hung silently between this
         // resize and the next screenshot for ~13 minutes. The withDeadline
         // wrappers above now surface a hang here as a thrown error rather
         // than an opaque job timeout.
-        await setManagerV2WindowSize(page, { width: 1000, height: 700 });
+        await setManagerWindowSize(page, { width: 1000, height: 700 });
         process.stdout.write('  D0: components stacked resize complete\n');
-        await assertManagerV2LayoutStable(page, 'components stacked');
+        await assertManagerLayoutStable(page, 'components stacked');
         process.stdout.write('  D0: components stacked layout asserted\n');
         await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-v2-components-stacked');
+        await screenshot(page, 'manager-components-stacked');
         process.stdout.write('  D0: components stacked screenshotted\n');
 
-        await setManagerV2WindowSize(page, { width: 1280, height: 820 });
-        await page.locator('.fabricate-manager-v2 .manager-v2-nav-button:has-text("Tags")').first().click();
-        await page.locator('.fabricate-manager-v2[data-manager-v2-view="tags"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await setManagerWindowSize(page, { width: 1280, height: 820 });
+        await page.locator('.fabricate-manager .manager-nav-button:has-text("Tags")').first().click();
+        await page.locator('.fabricate-manager[data-manager-view="tags"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await page.waitForTimeout(500);
-        if (await page.locator('.fabricate-manager-v2 [data-tags-evidence="how-it-works"]').count() === 0) {
-          throw new Error('Manager V2 tags inspector did not render the How-it-works evidence card.');
+        if (await page.locator('.fabricate-manager [data-tags-evidence="how-it-works"]').count() === 0) {
+          throw new Error('Manager tags inspector did not render the How-it-works evidence card.');
         }
-        await assertManagerV2LayoutStable(page, 'tags-categories normal');
+        await assertManagerLayoutStable(page, 'tags-categories normal');
         await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-v2-tags-categories-normal');
+        await screenshot(page, 'manager-tags-categories-normal');
 
-        await setManagerV2WindowSize(page, { width: 1000, height: 700 });
-        await assertManagerV2LayoutStable(page, 'tags-categories stacked');
+        await setManagerWindowSize(page, { width: 1000, height: 700 });
+        await assertManagerLayoutStable(page, 'tags-categories stacked');
         await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-v2-tags-categories-stacked');
+        await screenshot(page, 'manager-tags-categories-stacked');
 
-        await setManagerV2WindowSize(page, { width: 1280, height: 820 });
-        const essenceNav = page.locator('.fabricate-manager-v2 .manager-v2-nav-button:has-text("Essences")');
+        await setManagerWindowSize(page, { width: 1280, height: 820 });
+        const essenceNav = page.locator('.fabricate-manager .manager-nav-button:has-text("Essences")');
         if (await essenceNav.count() > 0 && !(await essenceNav.first().isDisabled())) {
           await essenceNav.first().click();
-          await page.locator('.fabricate-manager-v2[data-manager-v2-view="essences"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+          await page.locator('.fabricate-manager[data-manager-view="essences"]').first().waitFor({ state: 'visible', timeout: 5_000 });
           await page.waitForTimeout(500);
-          await assertManagerV2LayoutStable(page, 'essences normal');
+          await assertManagerLayoutStable(page, 'essences normal');
           await assertNoScreenshotOverlays(page);
-          await screenshot(page, 'manager-v2-essences-normal');
+          await screenshot(page, 'manager-essences-normal');
 
-          await setManagerV2WindowSize(page, { width: 1000, height: 700 });
-          await assertManagerV2LayoutStable(page, 'essences stacked');
+          await setManagerWindowSize(page, { width: 1000, height: 700 });
+          await assertManagerLayoutStable(page, 'essences stacked');
           await assertNoScreenshotOverlays(page);
-          await screenshot(page, 'manager-v2-essences-stacked');
+          await screenshot(page, 'manager-essences-stacked');
 
-          await setManagerV2WindowSize(page, { width: 1280, height: 820 });
-          const essenceRow = page.locator('.fabricate-manager-v2 .manager-v2-essence-row');
+          await setManagerWindowSize(page, { width: 1280, height: 820 });
+          const essenceRow = page.locator('.fabricate-manager .manager-essence-row');
           if (await essenceRow.count() > 0) {
-            const editButton = essenceRow.first().locator('.manager-v2-icon-button[title*="Edit" i]');
+            const editButton = essenceRow.first().locator('.manager-icon-button[title*="Edit" i]');
             if (await editButton.count() > 0) {
               await editButton.first().click();
-              await page.locator('.fabricate-manager-v2[data-manager-v2-view="essence-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+              await page.locator('.fabricate-manager[data-manager-view="essence-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
               await page.waitForTimeout(500);
-              await assertManagerV2LayoutStable(page, 'essence-edit first state');
+              await assertManagerLayoutStable(page, 'essence-edit first state');
               await assertNoScreenshotOverlays(page);
-              await screenshot(page, 'manager-v2-essence-edit-first-state');
-              await page.locator('.fabricate-manager-v2 .manager-v2-button:has-text("Cancel"), .fabricate-manager-v2 .manager-v2-button:has-text("Back")').first().click({ trial: false }).catch(() => {});
+              await screenshot(page, 'manager-essence-edit-first-state');
+              await page.locator('.fabricate-manager .manager-button:has-text("Cancel"), .fabricate-manager .manager-button:has-text("Back")').first().click({ trial: false }).catch(() => {});
               await page.waitForTimeout(250);
             }
           }
         }
 
-        await setManagerV2WindowSize(page, { width: 1280, height: 820 });
-        await page.locator('.fabricate-manager-v2 .manager-v2-nav-button:has-text("Recipes")').first().click();
+        await setManagerWindowSize(page, { width: 1280, height: 820 });
+        await page.locator('.fabricate-manager .manager-nav-button:has-text("Recipes")').first().click();
         await page.waitForTimeout(250);
-        await exerciseManagerV2EnvironmentPointerTargets(page);
-        if (await page.locator('.fabricate-manager-v2 .manager-v2-environment-row').count() < 1) {
-          throw new Error('Manager V2 environments browser rendered no environment rows.');
+        await exerciseManagerEnvironmentPointerTargets(page);
+        if (await page.locator('.fabricate-manager .manager-environment-row').count() < 1) {
+          throw new Error('Manager environments browser rendered no environment rows.');
         }
-        if (await page.locator('.fabricate-manager-v2 .manager-v2-environment-row.is-selected:has-text("Azure Grove")').count() === 0) {
-          throw new Error('Manager V2 environments browser did not show selected environment row state.');
+        if (await page.locator('.fabricate-manager .manager-environment-row.is-selected:has-text("Azure Grove")').count() === 0) {
+          throw new Error('Manager environments browser did not show selected environment row state.');
         }
-        if (await page.locator('.fabricate-manager-v2 .manager-v2-inspector:has-text("Linked scene")').count() === 0) {
-          throw new Error('Manager V2 environments inspector did not show linked scene evidence.');
+        if (await page.locator('.fabricate-manager .manager-inspector:has-text("Linked scene")').count() === 0) {
+          throw new Error('Manager environments inspector did not show linked scene evidence.');
         }
-        await assertManagerV2LayoutStable(page, 'environments normal');
+        await assertManagerLayoutStable(page, 'environments normal');
         await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-v2-environments-browse-normal');
+        await screenshot(page, 'manager-environments-browse-normal');
 
-        await setManagerV2WindowSize(page, { width: 1000, height: 700 });
-        await page.locator('.fabricate-manager-v2 .manager-v2-environment-row:has-text("Azure Grove")').first().scrollIntoViewIfNeeded();
+        await setManagerWindowSize(page, { width: 1000, height: 700 });
+        await page.locator('.fabricate-manager .manager-environment-row:has-text("Azure Grove")').first().scrollIntoViewIfNeeded();
         await page.waitForTimeout(250);
-        await assertManagerV2LayoutStable(page, 'environments stacked');
+        await assertManagerLayoutStable(page, 'environments stacked');
         await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-v2-environments-browse-stacked');
+        await screenshot(page, 'manager-environments-browse-stacked');
 
-        await setManagerV2WindowSize(page, { width: 1280, height: 820 });
-        await page.locator('.fabricate-manager-v2 #manager-v2-gathering-nav-tasks').first().click();
-        await page.locator('.fabricate-manager-v2 .manager-v2-gathering-task-row:has-text("Smoke Reusable Forage")').first().waitFor({ state: 'visible', timeout: 10_000 });
-        await page.locator('.fabricate-manager-v2 .manager-v2-gathering-task-row:has-text("Smoke Reusable Forage") [aria-label^="Edit"]').first().click();
-        await page.locator('.fabricate-manager-v2[data-manager-v2-view="gathering-task-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await setManagerWindowSize(page, { width: 1280, height: 820 });
+        await page.locator('.fabricate-manager #manager-gathering-nav-tasks').first().click();
+        await page.locator('.fabricate-manager .manager-gathering-task-row:has-text("Smoke Reusable Forage")').first().waitFor({ state: 'visible', timeout: 10_000 });
+        await page.locator('.fabricate-manager .manager-gathering-task-row:has-text("Smoke Reusable Forage") [aria-label^="Edit"]').first().click();
+        await page.locator('.fabricate-manager[data-manager-view="gathering-task-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         // "Selected Drop Rule" only renders when a drop row is selected
-        // (CraftingSystemManagerV2Root.svelte:2957 `{#if selectedGatheringDrop}`)
+        // (CraftingSystemManagerRoot.svelte:2957 `{#if selectedGatheringDrop}`)
         // and its i18n value is now "Selected Drop", so it isn't asserted here.
         // "Final chance" was removed entirely. The remaining sections are the
         // editor's stable scaffolding.
         for (const expected of ['Task Identity', 'Task Availability', 'Drop Rules']) {
-          if (await page.locator('.fabricate-manager-v2').filter({ hasText: expected }).count() === 0) {
-            throw new Error(`Manager V2 gathering task editor is missing "${expected}".`);
+          if (await page.locator('.fabricate-manager').filter({ hasText: expected }).count() === 0) {
+            throw new Error(`Manager gathering task editor is missing "${expected}".`);
           }
         }
-        await assertManagerV2LayoutStable(page, 'gathering task editor normal');
+        await assertManagerLayoutStable(page, 'gathering task editor normal');
         await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-v2-gathering-task-editor-normal');
+        await screenshot(page, 'manager-gathering-task-editor-normal');
 
-        await setManagerV2WindowSize(page, { width: 1000, height: 720 });
+        await setManagerWindowSize(page, { width: 1000, height: 720 });
         await page.waitForTimeout(250);
-        await assertManagerV2LayoutStable(page, 'gathering task editor stacked');
+        await assertManagerLayoutStable(page, 'gathering task editor stacked');
         await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-v2-gathering-task-editor-stacked');
+        await screenshot(page, 'manager-gathering-task-editor-stacked');
 
-        await setManagerV2WindowSize(page, { width: 1280, height: 820 });
+        await setManagerWindowSize(page, { width: 1280, height: 820 });
         // Navigate back to environments via the side nav (always visible on
         // gathering routes; the submenu auto-expands when isGatheringRoute).
-        await page.locator('.fabricate-manager-v2 #manager-v2-gathering-nav-environments').first().click();
-        await page.locator('.fabricate-manager-v2 .manager-v2-environment-row:has-text("Azure Grove") .manager-v2-icon-button').nth(0).click();
-        await page.locator('.fabricate-manager-v2[data-manager-v2-view="environment-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
+        await page.locator('.fabricate-manager #manager-gathering-nav-environments').first().click();
+        await page.locator('.fabricate-manager .manager-environment-row:has-text("Azure Grove") .manager-icon-button').nth(0).click();
+        await page.locator('.fabricate-manager[data-manager-view="environment-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
 
         // The environment editor is currently a placeholder
-        // (src/ui/svelte/apps/manager-v2/EnvironmentEditView.svelte) while the
+        // (src/ui/svelte/apps/manager/EnvironmentEditView.svelte) while the
         // previous inline task/catalyst/tool authoring is being rebuilt — that
         // surface has moved to the standalone `gathering-task-edit` route. Until
         // the new editor lands, verify the placeholder renders with the
         // environment's title and screenshot it for visual evidence, then
         // return via the placeholder's own button.
-        await page.locator('.fabricate-manager-v2 .manager-v2-environment-edit-view.is-placeholder').first()
+        await page.locator('.fabricate-manager .manager-environment-edit-view.is-placeholder').first()
           .waitFor({ state: 'visible', timeout: 10_000 });
-        await page.locator('.fabricate-manager-v2 .manager-v2-environment-details-band')
+        await page.locator('.fabricate-manager .manager-environment-details-band')
           .filter({ hasText: 'Azure Grove' }).first()
           .waitFor({ state: 'visible', timeout: 5_000 });
-        await page.locator('.fabricate-manager-v2 .manager-v2-environment-placeholder-card').first()
+        await page.locator('.fabricate-manager .manager-environment-placeholder-card').first()
           .waitFor({ state: 'visible', timeout: 5_000 });
-        if (await page.locator('.fabricate-manager-v2 .environment-draft-editor, .fabricate-manager-v2 .environment-foundation').count() > 0) {
-          throw new Error('Manager V2 environments edit route still rendered the legacy environment editor.');
+        if (await page.locator('.fabricate-manager .environment-draft-editor, .fabricate-manager .environment-foundation').count() > 0) {
+          throw new Error('Manager environments edit route still rendered the legacy environment editor.');
         }
         await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-v2-environment-edit-placeholder');
+        await screenshot(page, 'manager-environment-edit-placeholder');
 
         // The placeholder's "Return to environments" button is wired to
         // store.cancelEnvironmentDraft (the store action), which doesn't
         // change the view. Verify the button is clickable, then navigate
         // back via the side nav.
-        await page.locator('.fabricate-manager-v2 .manager-v2-environment-placeholder-card .manager-v2-button:has-text("Return to environments")').first().click({ trial: true });
-        await page.locator('.fabricate-manager-v2 #manager-v2-gathering-nav-environments').first().click();
-        await page.locator('.fabricate-manager-v2[data-manager-v2-view="environments"]').first()
+        await page.locator('.fabricate-manager .manager-environment-placeholder-card .manager-button:has-text("Return to environments")').first().click({ trial: true });
+        await page.locator('.fabricate-manager #manager-gathering-nav-environments').first().click();
+        await page.locator('.fabricate-manager[data-manager-view="environments"]').first()
           .waitFor({ state: 'visible', timeout: 5_000 });
 
         await page.evaluate(async (sysId) => {
@@ -2822,229 +2541,11 @@ async function main() {
           await game.settings.set('fabricate', 'lastManagedCraftingSystem', sysId);
         }, craftingSetup.systemId);
         await closeOpenApplications(page);
-        results.steps.push({ step: 'screenshot-manager-v2', passed: true });
-        process.stdout.write('Phase D0 complete: Crafting System Manager V2 screenshotted and hit-tested.\n');
+        results.steps.push({ step: 'screenshot-manager', passed: true });
+        process.stdout.write('Phase D0 complete: Crafting System Manager screenshotted and hit-tested.\n');
       } catch (err) {
-        results.steps.push({ step: 'screenshot-manager-v2', passed: false, error: err.message });
+        results.steps.push({ step: 'screenshot-manager', passed: false, error: err.message });
         throw err;
-      }
-      }
-
-      // ── Phase D: Screenshot Recipe Manager ──────────────────────────────────
-      // Gated behind RUN_SCREENSHOT_PHASES so the CI smoke profile skips the
-      // legacy Recipe Manager screenshot tour; local `full` runs keep it.
-      if (!RUN_SCREENSHOT_PHASES) {
-        startPhase('phase-D-skipped');
-        process.stdout.write(`Phase D: skipped (profile=${SMOKE_PROFILE}).\n`);
-        results.steps.push({ step: 'screenshot-recipe-manager', passed: true, skipped: true });
-      } else {
-      startPhase('phase-D');
-      process.stdout.write('Phase D: Opening Recipe Manager...\n');
-      try {
-        // Pre-select the system via settings so the adminStore picks it up on init
-        await page.evaluate(async (sysId) => {
-          await game.settings.set('fabricate', 'lastManagedCraftingSystem', sysId);
-        }, craftingSetup.systemId);
-
-        await page.evaluate(() => {
-          fabricate.openRecipeManager();
-        });
-
-        // Wait for the Recipe Manager to be visible (also serves as the
-        // post-`openRecipeManager()` settle — replaces a 2 s fixed sleep).
-        process.stdout.write('  Waiting for Recipe Manager to render...\n');
-        const adminApp = page.locator('.fabricate-admin, .recipe-manager').first();
-        await adminApp.waitFor({ state: 'visible', timeout: 10_000 });
-
-        // Click "Arcane Forge" in the sidebar to ensure selection + refresh
-        const systemLink = page.locator('.admin-system-list button.system-link:has-text("Arcane Forge")').first();
-        if (await systemLink.count() > 0) {
-          await systemLink.click();
-          // Wait for the active system badge / selected state to reflect the click
-          // (replaces a 2 s fixed sleep).
-          await page.locator('.admin-system-list button.system-link.is-active:has-text("Arcane Forge"), .admin-system-list button.system-link[aria-current="true"]:has-text("Arcane Forge")').first()
-            .waitFor({ state: 'visible', timeout: 5_000 })
-            .catch(() => { /* selector for active state varies — fall through */ });
-          process.stdout.write('Selected "Arcane Forge" system in sidebar.\n');
-        }
-
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'recipe-manager-default');
-        process.stdout.write('  Screenshotted Recipe Manager default view.\n');
-
-        // Click through tabs using button text (Svelte tabs have no data-tab attributes)
-        // Tab labels from lang/en.json: Systems, Components, Recipes, Rules, Graph
-        const adminTabs = [
-          { label: 'Environments', slug: 'environments' },
-          { label: 'Systems', slug: 'systems' },
-          { label: 'Components', slug: 'items' },
-          { label: 'Recipes', slug: 'recipes' },
-          { label: 'Rules', slug: 'rules' },
-          { label: 'Graph', slug: 'graph' }
-        ];
-        for (const { label, slug } of adminTabs) {
-          try {
-            const tab = page.locator(`.admin-tabs button:has-text("${label}")`).first();
-            if (await tab.count() === 0) {
-              if (slug === 'environments') {
-                const availableTabs = await page.locator('.admin-tabs button').evaluateAll(buttons =>
-                  buttons.map(button => button.textContent?.trim()).filter(Boolean)
-                );
-                throw new Error(
-                  `Environments tab was not available for screenshot validation. ` +
-                  `Available tabs: ${availableTabs.join(', ') || 'none'}.`
-                );
-              }
-              continue;
-            }
-
-            await tab.click();
-            // Wait for the tab's panel to be visible. Each Svelte tab marks
-            // its active pane via aria-selected="true" on the button and a
-            // matching panel-shape under .recipe-manager-content. Replaces
-            // a 1 s fixed sleep.
-            await page.locator('.fabricate-admin button[aria-selected="true"], .recipe-manager button[aria-selected="true"]').first()
-              .waitFor({ state: 'visible', timeout: 5_000 })
-              .catch(() => { /* fall back if aria-selected isn't applied */ });
-            await assertNoScreenshotOverlays(page);
-            await screenshot(page, `recipe-manager-${slug}`);
-            process.stdout.write(`  Screenshotted Recipe Manager "${label}" tab.\n`);
-
-            if (slug === 'environments') {
-              await page.locator('.environment-card').filter({ hasText: 'Azure Grove' }).first()
-                .waitFor({ state: 'visible', timeout: 10_000 });
-              const environmentListText = await page.locator('.environment-list').first().textContent();
-              for (const expectedEnvironmentName of [
-                'Azure Grove',
-                'Verdant Meadow',
-                'Sunken Ruins',
-                'Crystal Thicket',
-                'Timed Orchard',
-                'Withered Patch',
-                'Moonlit Blind Grove'
-              ]) {
-                if (!String(environmentListText || '').includes(expectedEnvironmentName)) {
-                  throw new Error(`GM Environments list did not show environment name: ${expectedEnvironmentName}`);
-                }
-              }
-
-              await setRecipeManagerWindowSize(page, { width: 1000, height: 700 });
-              await assertGmEnvironmentCardMediaContained(page, 'Azure Grove', { label: 'normal admin width' });
-
-              await setRecipeManagerWindowSize(page, { width: 640, height: 700 });
-              await assertGmEnvironmentCardMediaContained(page, 'Azure Grove', { label: 'narrow admin width' });
-
-              await setRecipeManagerWindowSize(page, { width: 1000, height: 700 });
-              await exerciseGmEnvironmentCardPointerActions(page);
-
-              await page.locator('.environment-card').filter({ hasText: 'Azure Grove' }).first()
-                .locator('.environment-card-edit')
-                .click();
-              await page.locator('.environment-draft-editor').first().waitFor({ state: 'visible', timeout: 10_000 });
-              await prepareGmEnvironmentsScreenshotState(page);
-
-              await setRecipeManagerWindowSize(page, { width: 1000, height: 700 });
-              await scrollEnvironmentEditorToTop(page);
-              await screenshot(page, 'gm-environments-normal-validation');
-              process.stdout.write('  Screenshotted GM Environments validation state at normal admin size.\n');
-
-              await scrollEnvironmentEditorTo(page, '.environment-catalyst-authoring');
-              await screenshot(page, 'gm-environments-normal-authoring');
-              process.stdout.write('  Screenshotted GM Environments result/catalyst authoring at normal admin size.\n');
-
-              await scrollEnvironmentEditorTo(page, '.environment-result-authoring');
-              await screenshot(page, 'gm-environments-normal-results');
-              process.stdout.write('  Screenshotted GM Environments result rows at normal admin size.\n');
-
-              await setRecipeManagerWindowSize(page, { width: 640, height: 700 });
-              await scrollEnvironmentEditorTo(page, '.environment-catalyst-authoring');
-              await screenshot(page, 'gm-environments-narrow-authoring');
-              process.stdout.write('  Screenshotted GM Environments narrow container-query authoring state.\n');
-
-              await scrollEnvironmentEditorTo(page, '.environment-result-authoring');
-              await screenshot(page, 'gm-environments-narrow-results');
-              process.stdout.write('  Screenshotted GM Environments narrow container-query result rows.\n');
-
-              const cancelDraft = page.locator('.environment-save-actions button:has-text("Cancel")').first();
-              if (await cancelDraft.count() > 0) {
-                await cancelDraft.evaluate(button => button.click());
-                await page.waitForTimeout(500);
-              }
-
-              await page.setViewportSize({ width: 1920, height: 1080 });
-            }
-
-            if (slug === 'systems') {
-                await page.evaluate(() => {
-                  document.querySelector('.essence-creation-toolbar')?.scrollIntoView({
-                    behavior: 'auto',
-                    block: 'center'
-                  });
-                });
-                await page.waitForTimeout(500);
-
-                const pickerTrigger = page.locator('.essence-creation-toolbar .essence-icon-picker-trigger').first();
-                await pickerTrigger.click();
-                await page.locator('.essence-icon-picker-popover').first().waitFor({ state: 'visible', timeout: 5_000 });
-                await page.waitForTimeout(300);
-                await assertNoScreenshotOverlays(page);
-                await screenshot(page, 'recipe-manager-systems-essence-picker');
-                process.stdout.write('  Screenshotted Systems tab essence picker.\n');
-
-                const pickerSearch = page.locator('.essence-icon-picker-search input').first();
-                await pickerSearch.fill('backward fast');
-                await page.waitForTimeout(300);
-                await assertNoScreenshotOverlays(page);
-                await screenshot(page, 'recipe-manager-systems-essence-picker-filtered');
-                process.stdout.write('  Screenshotted filtered essence picker state.\n');
-
-                await page.keyboard.press('Escape');
-                await page.waitForTimeout(300);
-
-                const editEssenceButton = page.locator(
-                  '.essence-definition-row .essence-definition-actions button:has(i.fa-pen)'
-                ).first();
-                if (await editEssenceButton.count() > 0) {
-                  await editEssenceButton.click();
-                  await page.waitForTimeout(300);
-
-                  const editPickerTrigger = page.locator(
-                    '.essence-definition-row .essence-icon-picker-trigger.icon-only'
-                  ).first();
-                  await editPickerTrigger.click();
-                  await page.locator('.essence-icon-picker-popover').first().waitFor({ state: 'visible', timeout: 5_000 });
-                  await page.waitForTimeout(300);
-                  await assertNoScreenshotOverlays(page);
-                  await screenshot(page, 'recipe-manager-systems-essence-edit-picker');
-                  process.stdout.write('  Screenshotted inline essence edit picker.\n');
-
-                  await page.keyboard.press('Escape');
-                  await page.waitForTimeout(300);
-
-                  const cancelEditButton = page.locator(
-                    '.essence-definition-row .essence-definition-actions button:has(i.fa-times)'
-                  ).first();
-                  if (await cancelEditButton.count() > 0) {
-                    await cancelEditButton.click();
-                    await page.waitForTimeout(300);
-                  }
-                }
-              }
-          } catch (err) {
-            if (slug === 'environments') throw err;
-            // Tab may not exist in this version
-          }
-        }
-
-        // Close all open application windows (try both V1 and V2 APIs)
-        await closeOpenApplications(page);
-
-        process.stdout.write('  Closing Recipe Manager windows...\n');
-        results.steps.push({ step: 'screenshot-recipe-manager', passed: true });
-        process.stdout.write('Phase D complete: Recipe Manager screenshotted.\n');
-      } catch (err) {
-        results.steps.push({ step: 'screenshot-recipe-manager', passed: false, error: err.message });
-        process.stderr.write(`Phase D failed: ${err.message}\n`);
       }
       }
 

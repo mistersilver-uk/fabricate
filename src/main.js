@@ -36,8 +36,7 @@ import {
 import {
   getCraftingAppClass,
   getGatheringAppClass,
-  getCraftingSystemManagerV2AppClass,
-  getRecipeManagerAppClass,
+  getCraftingSystemManagerAppClass,
   getRecipeEditorAppClass
 } from './ui/appFactory.js';
 import { applyCurrentFabricateTheme } from './ui/theme.js';
@@ -53,8 +52,7 @@ import { registerItemSheetRecipeLearnControl } from './ui/ItemSheetRecipeLearnCo
 import * as CraftingSystemExporter from './systems/CraftingSystemExporter.js';
 import './ui/SvelteCraftingApp.svelte.js';
 import './ui/SvelteGatheringApp.svelte.js';
-import './ui/SvelteRecipeManagerApp.svelte.js';
-import './ui/SvelteCraftingSystemManagerV2App.svelte.js';
+import './ui/SvelteCraftingSystemManagerApp.svelte.js';
 import './ui/SvelteRecipeEditorApp.svelte.js';
 
 let gatheringEngine = null;
@@ -951,8 +949,7 @@ Hooks.once('init', async () => {
     CraftingEngine,
     getCraftingAppClass,
     getGatheringAppClass,
-    getCraftingSystemManagerV2AppClass,
-    getRecipeManagerAppClass,
+    getCraftingSystemManagerAppClass,
     getRecipeEditorAppClass,
     CraftingSystemManager,
     CraftingRunManager,
@@ -1076,7 +1073,7 @@ function addModuleButtonsToItemsDirectory() {
         'Manage Crafting Systems',
         'fas fa-book',
         'manage',
-        () => getCraftingSystemManagerV2AppClass().show()
+        () => getCraftingSystemManagerAppClass().show()
       );
       actionsContainer.insertBefore(managerButton, actionsContainer.firstChild);
     }
@@ -1207,10 +1204,10 @@ globalThis.fabricate = {
   },
 
   /**
-   * Open GM recipe manager
+   * Open the GM crafting system manager
    */
   openRecipeManager: () => {
-    return getRecipeManagerAppClass().show();
+    return getCraftingSystemManagerAppClass().show();
   },
 
   /**

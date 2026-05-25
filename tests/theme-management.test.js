@@ -71,9 +71,9 @@ describe('Fabricate theme management', () => {
     document.body.innerHTML = `
       <section class="fabricate" data-appid="crafting"></section>
       <section class="fabricate" data-appid="manager">
-        <div class="fabricate-manager-v2"></div>
+        <div class="fabricate-manager"></div>
       </section>
-      <section class="fabricate-manager-v2" data-appid="surface-only"></section>
+      <section class="fabricate-manager" data-appid="surface-only"></section>
     `;
 
     registerFabricateSettings();

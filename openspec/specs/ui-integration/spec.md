@@ -62,9 +62,9 @@ Items with the same UUID or sourceUuid are de-duplicated on import.
 
 ## GM Crafting Admin
 
-### Manager V2 Shell
+### Manager Shell
 
-Manager V2 is an additive GM management shell that reuses existing admin data, persistence, validation, import/export, and destructive-confirmation behavior unless a later spec explicitly changes that boundary.
+Manager is the GM crafting-system management shell. It reuses existing admin data, persistence, validation, import/export, and destructive-confirmation behavior unless a later spec explicitly changes that boundary.
 
 Header hierarchy:
 
@@ -74,7 +74,7 @@ Header hierarchy:
 
 Selected-system navigation:
 
-- Manager V2 must distinguish unready/loading Fabricate services from a true empty systems library. While Fabricate is still initializing or the recipe/crafting system managers have not finished loading persisted data, Manager V2 shows a loading state and must not render `No crafting systems yet`.
+- Manager must distinguish unready/loading Fabricate services from a true empty systems library. While Fabricate is still initializing or the recipe/crafting system managers have not finished loading persisted data, Manager shows a loading state and must not render `No crafting systems yet`.
 - When at least one crafting system exists, manager v2 always has a selected crafting system. An empty or stale persisted selection resolves to the first available crafting system.
 - When no crafting systems exist, selected-system feature tabs are hidden and the systems browser is the active management surface.
 - When a crafting system is selected, `System settings` is the first left-nav item and stays in that position regardless of feature gates.
@@ -223,19 +223,19 @@ Capabilities:
 - Browse, create, edit, duplicate when supported, and delete essence definitions.
 - Set a FontAwesome icon for an essence (or fall-back to the default, `fas fa-mortar-pestle`)
 - Set optional source component identity by picker/drag-drop only when effect transfer is enabled. The source component may in turn expose a source item UUID.
-- In Manager V2, the Essences left-nav item is a real route, not a disabled placeholder, whenever the selected system has `features.essences === true`.
-- Manager V2 shows component usage evidence for essence definitions and shows source-link state only when `features.effectTransfer === true`.
-- Manager V2 does not allow inline editing on the browse essences page; the row Edit action opens a dedicated edit essence view.
-- Manager V2 essence icon editing uses a pop-over icon picker instead of requiring raw icon class entry.
-- Manager V2 hides source columns, source filters, source inspector sections, source warnings, and source edit controls unless `features.effectTransfer === true`.
-- Manager V2 prevents essence deletion while one or more managed components reference that essence with a positive quantity.
-- Manager V2 source-state language is `linked`, `missing`, `stale`, and `none`; stale source evidence must remain readable until the GM clears or repairs it.
+- In Manager, the Essences left-nav item is a real route, not a disabled placeholder, whenever the selected system has `features.essences === true`.
+- Manager shows component usage evidence for essence definitions and shows source-link state only when `features.effectTransfer === true`.
+- Manager does not allow inline editing on the browse essences page; the row Edit action opens a dedicated edit essence view.
+- Manager essence icon editing uses a pop-over icon picker instead of requiring raw icon class entry.
+- Manager hides source columns, source filters, source inspector sections, source warnings, and source edit controls unless `features.effectTransfer === true`.
+- Manager prevents essence deletion while one or more managed components reference that essence with a positive quantity.
+- Manager source-state language is `linked`, `missing`, `stale`, and `none`; stale source evidence must remain readable until the GM clears or repairs it.
 
 ### Recipes Tab
 
 List recipes for the selected crafting system.
 
-In Manager V2, recipe browse status uses the same compact interactive on/off toggle pattern as systems and environment browse rows. The Status column remains a Status column, and each row exposes a keyboard-reachable toggle with On/Off copy and enabled/disabled color treatment.
+In Manager, recipe browse status uses the same compact interactive on/off toggle pattern as systems and environment browse rows. The Status column remains a Status column, and each row exposes a keyboard-reachable toggle with On/Off copy and enabled/disabled color treatment.
 
 Columns:
 
@@ -272,10 +272,10 @@ Current GM editor behavior:
 - The Environments editor shows current global weather and time of day as context, not as environment browse filters.
 - Settings is the only primary GM UI surface for current global weather and current global time of day. Environment authoring may expose inherited condition evidence and future provider override evidence, but must not be the primary condition mutation surface.
 - The Environments editor exposes Gathering Task and hazard library rows for the selected crafting system, including per-environment enable/disable toggles.
-- When the Manager V2 Gathering `Environments` browser has no environments, its empty state keeps `Environments` selected, keeps `Create environment` available, and guides GMs to prepare Gathering Tasks plus encounter/hazard options before composing environments.
+- When the Manager Gathering `Environments` browser has no environments, its empty state keeps `Environments` selected, keeps `Create environment` available, and guides GMs to prepare Gathering Tasks plus encounter/hazard options before composing environments.
 - Gathering Task and hazard row overrides stay inside expandable rows so the default environment workspace remains scannable. Collapsed rows show default-vs-override chips, enabled state, matching evidence, dirty/validation markers, and an explicit expand/collapse control.
 - Expanded override panels contain per-environment override fields only; Gathering Task fields remain edited in their library surface.
-- Expanded override rows are keyboard reachable, preserve focus on save/error where practical, and stack without horizontal clipping in narrow Manager V2 widths.
+- Expanded override rows are keyboard reachable, preserve focus on save/error where practical, and stack without horizontal clipping in narrow Manager widths.
 - Gathering Task authoring includes identity, image, description, enabled state, task-level time/weather availability gates, search/pagination for ordered d100 drop rows, unresolved drop-zone rows, inline chance/quantity controls, modifier summaries, selected-drop inspector editing, and final chance preview. D100 row selection is controlled by selected-system Gathering Rules, not Gathering Task authoring.
 - Gathering Task authoring may also include node count, depletion timing, respawn policy, stamina cost, attempt limits, risk overrides, encounter hooks, natural expression providers, and macro providers where the selected economy/features use them.
 - Reusable hazard authoring includes name, image, description, enabled state, danger/match tags, d100 drop rate, and modifier provider evidence.
@@ -339,7 +339,7 @@ The environments editor must block save when:
 
 ### Gathering Hazard Library
 
-When `features.gathering === true`, Manager V2 must expose reusable hazard library authoring as a dedicated route or as a nested reusable library surface inside gathering tasks or gathering settings.
+When `features.gathering === true`, Manager must expose reusable hazard library authoring as a dedicated route or as a nested reusable library surface inside gathering tasks or gathering settings.
 
 Hazard library authoring must support:
 

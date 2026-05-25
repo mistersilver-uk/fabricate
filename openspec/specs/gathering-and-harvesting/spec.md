@@ -136,7 +136,7 @@ GatheringEnvironment = {
 12. `enabledTaskIds`, `disabledTaskIds`, `enabledHazardIds`, and `disabledHazardIds` store environment-level composition toggles for reusable library records without rewriting the library definitions.
 13. Environment metadata exposed to non-GM users must not leak hidden task identity, hidden result details, provider diagnostics, or GM-only notes.
 14. Legacy environments without rich metadata remain valid and load with neutral defaults.
-15. `hazardSelectionMode` and `hazardPolicy` are legacy compatibility fields. New Manager V2 authoring and d100 runtime behavior use system Gathering Rules once they are authored.
+15. `hazardSelectionMode` and `hazardPolicy` are legacy compatibility fields. New Manager authoring and d100 runtime behavior use system Gathering Rules once they are authored.
 
 ## System Gathering Rules
 
@@ -290,7 +290,7 @@ GatheringTaskDefinition = {
 6. Weather and time of day match against the current global gathering conditions.
 7. Persisted, imported, or seeded drop rows require a `dropRate` integer from 0 to 100, a positive quantity, and a reward target that resolves at the data boundary. `componentId` targets must match a component in the owning crafting system. `itemUuid` targets must resolve through Foundry UUID lookup to an Item document. Unresolved editor rows may omit component references while a GM is still authoring the row, but they must not be saved or imported until assigned a valid component or item reference.
 8. Drop row condition modifier values are signed integer percentage-point adjustments. Matching time-of-day and weather modifiers are summed into final drop chance; gathering modifiers affect the d100 roll instead.
-9. `itemSelectionMode` is a legacy compatibility field. New Manager V2 authoring and d100 runtime behavior use system Gathering Rules once they are authored.
+9. `itemSelectionMode` is a legacy compatibility field. New Manager authoring and d100 runtime behavior use system Gathering Rules once they are authored.
 10. Row order is authoritative for `highestRankedDrop` and `limitedDrops`.
 11. Drop rows may reference per-system character modifiers. Character modifiers adjust the threshold side of d100 resolution and do not replace task visibility, pass/fail gates, stamina gates, node gates, catalyst gates, or attempt limits.
 12. A Gathering Task may declare stamina cost, node availability, attempt limits, risk overrides, encounter hooks, and condition or roll modifier providers where the selected gathering economy uses them.
@@ -335,7 +335,7 @@ GatheringToolLibraryEntry = {
 1. Tools are stored under `gatheringConfig.systems[systemId].tools`.
 2. Library tools follow the existing `Tool` validation contract (`src/models/Tool.js`); persistence layer normalisation never rejects, but Save in the editor blocks until every tool passes `Tool.validate()`.
 3. Legacy gathering configs without a `tools` array on a system normalize to `tools: []` on load. No migration runner entry is required.
-4. The Manager V2 page authors tools through a draft (`toolsDraft`) parallel to the environment draft. Draft writes do not touch persistence until the GM saves; cancel/discard reverts to the live config.
+4. The Manager page authors tools through a draft (`toolsDraft`) parallel to the environment draft. Draft writes do not touch persistence until the GM saves; cancel/discard reverts to the live config.
 5. Save reads the live `systems[id].tools` immediately before writing and surfaces an overwrite-confirm dialog when the live array diverges from the draft baseline (concurrent-edit guard).
 6. The runtime `composeEnvironment` exposes a non-enumerable `__libraryTools` Map keyed by tool id on the composed environment, alongside `__libraryCharacterModifiers`. Gathering runtime consumers resolve task `toolIds` through this map before actor inventory checks, terminal breakage planning, terminal breakage application, and `usedTools` evidence.
 7. The library is per crafting system. Tools are not shared across crafting systems.
