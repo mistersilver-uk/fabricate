@@ -334,31 +334,30 @@
       <div class="manager-gathering-tasks-table" role="table" aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.TableShort', 'Gathering tasks')}>
         <div class="manager-table-head manager-gathering-task-table-head" role="row">
           <span role="columnheader">{text('FABRICATE.Admin.Manager.Environment.Tasks.Column.Task', 'Gathering task')}</span>
+          <span role="columnheader">{text('FABRICATE.Admin.Manager.Environment.Tasks.Tags', 'Tags')}</span>
           <span role="columnheader">{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
           <span role="columnheader">{text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}</span>
         </div>
         {#each paginatedTasks as task (task.id)}
           <div class={`manager-gathering-task-row ${selectedTaskId === task.id ? 'is-selected' : ''}`} role="row" aria-selected={selectedTaskId === task.id} data-gathering-task-id={task.id}>
-            <div class="manager-gathering-task-info-cell" role="cell">
-              <button type="button" class="manager-gathering-task-identity" onclick={() => onSelectTask(task.id)}>
-                <img class="manager-gathering-task-thumb" src={taskImage(task)} alt="" />
-                <span class="manager-system-copy">
-                  <span class="manager-system-name" title={taskName(task)}>{taskName(task)}</span>
-                  {#if task.description}
-                    <span class="manager-system-description" title={task.description}>{task.description}</span>
-                  {:else}
-                    <span class="manager-system-description">{text('FABRICATE.Admin.Manager.NoDescription', 'No description')}</span>
-                  {/if}
+            <button type="button" class="manager-gathering-task-identity" onclick={() => onSelectTask(task.id)} role="cell">
+              <img class="manager-gathering-task-thumb" src={taskImage(task)} alt="" />
+              <span class="manager-system-copy">
+                <span class="manager-system-name" title={taskName(task)}>{taskName(task)}</span>
+                {#if task.description}
+                  <span class="manager-system-description" title={task.description}>{task.description}</span>
+                {:else}
+                  <span class="manager-system-description">{text('FABRICATE.Admin.Manager.NoDescription', 'No description')}</span>
+                {/if}
+              </span>
+            </button>
+            <div class="manager-gathering-task-tags-cell" role="cell" data-gathering-task-tags>
+              {#each rowChips(task) as chip (chip.key)}
+                <span class={`manager-availability-pill is-${chip.kind}${chip.isAny ? ' is-any' : ''}`}>
+                  <i class={chip.icon} aria-hidden="true"></i>
+                  <span>{chip.label}</span>
                 </span>
-              </button>
-              <div class="manager-gathering-task-tags-row" data-gathering-task-tags>
-                {#each rowChips(task) as chip (chip.key)}
-                  <span class={`manager-availability-pill is-${chip.kind}${chip.isAny ? ' is-any' : ''}`}>
-                    <i class={chip.icon} aria-hidden="true"></i>
-                    <span>{chip.label}</span>
-                  </span>
-                {/each}
-              </div>
+              {/each}
             </div>
             <span role="cell" class="manager-labeled-cell manager-status-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.StatusFilter', 'Status')}>
               <button

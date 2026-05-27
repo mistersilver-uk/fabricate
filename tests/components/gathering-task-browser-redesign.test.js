@@ -15,14 +15,15 @@ const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 const css = readFileSync(cssPath, 'utf8');
 
 describe('GatheringTasksBrowserView card-style row', () => {
-  it('renders exactly three column headers (Task / Status / Actions) with chips inside the task column', () => {
+  it('renders four column headers (Task / Tags / Status / Actions)', () => {
     const headBlockStart = browserSource.indexOf('manager-table-head manager-gathering-task-table-head');
     assert.ok(headBlockStart >= 0, 'head block should be present');
     const headBlockEnd = browserSource.indexOf('</div>', headBlockStart);
     const headBlock = browserSource.slice(headBlockStart, headBlockEnd);
     const headerMatches = headBlock.match(/role="columnheader"/g) || [];
-    assert.equal(headerMatches.length, 3, 'expected three column headers');
-    for (const removed of ['Drops', 'Environments', 'Tags', 'Availability']) {
+    assert.equal(headerMatches.length, 4, 'expected four column headers');
+    assert.ok(headBlock.includes('FABRICATE.Admin.Manager.Environment.Tasks.Tags'), 'Tags column header should be present');
+    for (const removed of ['Drops', 'Environments', 'Availability']) {
       assert.equal(
         headBlock.includes(`FABRICATE.Admin.Manager.Environment.Tasks.${removed}`),
         false,
@@ -31,10 +32,11 @@ describe('GatheringTasksBrowserView card-style row', () => {
     }
   });
 
-  it('wraps the identity button and tags row in a single info cell so chips share the identity column width', () => {
-    assert.ok(browserSource.includes('manager-gathering-task-info-cell'), 'row should use an info-cell wrapper');
-    assert.ok(browserSource.includes('manager-gathering-task-tags-row'), 'tags live in a dedicated tags-row container');
-    assert.ok(browserSource.includes('data-gathering-task-tags'), 'tags row exposes a data attribute for tests');
+  it('renders the tags chip area as its own grid cell with a data attribute hook', () => {
+    assert.ok(browserSource.includes('manager-gathering-task-tags-cell'), 'tags live in a dedicated tags-cell container');
+    assert.ok(browserSource.includes('data-gathering-task-tags'), 'tags cell exposes a data attribute for tests');
+    assert.equal(browserSource.includes('manager-gathering-task-info-cell'), false, 'info-cell wrapper should be removed in this iteration');
+    assert.equal(browserSource.includes('manager-gathering-task-tags-row'), false, 'tags-row class should be replaced by tags-cell');
   });
 
   it('renders all tag dimensions in a single chip row via rowChips', () => {
@@ -70,19 +72,36 @@ describe('GatheringTasksBrowserView card-style row', () => {
     );
   });
 
-  it('uses a three-column grid for the task table', () => {
+  it('uses a four-column grid for the task table', () => {
     const gridMatch = css.match(/--fab-mv2-gathering-task-grid:\s*([^;]+);/);
     assert.ok(gridMatch, 'task grid CSS variable should be defined');
     const columns = gridMatch[1].split(/\s+(?![^()]*\))/).filter(Boolean);
-    assert.equal(columns.length, 3, 'expected three grid columns (info, status, actions)');
+    assert.equal(columns.length, 4, 'expected four grid columns (identity, tags, status, actions)');
   });
 
-  it('makes the tags row itself a wrapping flex container so chips flow horizontally', () => {
-    const block = css.match(/\.manager-gathering-task-tags-row\s*\{[^}]*\}/);
-    assert.ok(block, 'tags row rule should be defined');
-    assert.ok(/display:\s*flex/.test(block[0]), 'tags row must be a flex container so chips do not stack vertically');
-    assert.ok(/flex-wrap:\s*wrap/.test(block[0]), 'tags row must wrap so chips spill onto additional rows');
-    assert.ok(/align-content:\s*flex-start/.test(block[0]), 'tags row wrapped rows should pin to the top');
+  it('makes the tags cell a scrollable wrapping flex container', () => {
+    const block = css.match(/\.manager-gathering-task-tags-cell\s*\{[^}]*\}/);
+    assert.ok(block, 'tags cell rule should be defined');
+    assert.ok(/display:\s*flex/.test(block[0]), 'tags cell must be a flex container so chips do not stack vertically');
+    assert.ok(/flex-wrap:\s*wrap/.test(block[0]), 'tags cell must wrap so chips spill onto additional rows');
+    assert.ok(/align-content:\s*flex-start/.test(block[0]), 'wrapped rows pin to the top');
+    assert.ok(/overflow-y:\s*auto/.test(block[0]), 'tags cell must be scrollable so absurd tag counts do not expand the row');
+    assert.ok(/max-height:\s*\d+px/.test(block[0]), 'tags cell must have a max-height to cap row growth');
+  });
+
+  it('vertically centers status and action cells while keeping identity top-aligned', () => {
+    assert.ok(
+      /\.manager-status-cell[\s\S]{0,160}align-self:\s*center/.test(css),
+      'status cell should be vertically centered'
+    );
+    assert.ok(
+      /\.manager-action-group[\s\S]{0,160}align-self:\s*center/.test(css),
+      'action group should be vertically centered'
+    );
+    assert.ok(
+      /\.manager-gathering-task-identity\s*\{[^}]*align-self:\s*center/.test(css),
+      'identity column should be vertically centered in the row'
+    );
   });
 
   it('grows the gathering task thumbnail to 64px for the card layout', () => {

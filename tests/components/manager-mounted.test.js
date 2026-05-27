@@ -2211,13 +2211,12 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Prospect Crystal Veins'));
     const tasksHead = target.querySelector('.manager-gathering-task-table-head');
     const taskHeaders = Array.from(tasksHead.querySelectorAll('[role="columnheader"]')).map(node => node.textContent.trim());
-    assert.equal(taskHeaders.length, 3, 'task table should have three headers');
-    assert.deepEqual(taskHeaders, ['Gathering task', 'Status', 'Actions']);
+    assert.equal(taskHeaders.length, 4, 'task table should have four headers');
+    assert.deepEqual(taskHeaders, ['Gathering task', 'Tags', 'Status', 'Actions']);
     const firstTaskRow = target.querySelector('.manager-gathering-task-row');
-    const tagsRow = firstTaskRow.querySelector('[data-gathering-task-tags]');
-    assert.ok(tagsRow, 'tags chip row renders');
-    assert.ok(firstTaskRow.querySelector('.manager-gathering-task-info-cell'), 'info cell wraps identity + tags so they share full-width column');
-    const tagPills = Array.from(tagsRow.querySelectorAll('.manager-availability-pill'));
+    const tagsCell = firstTaskRow.querySelector('.manager-gathering-task-tags-cell[data-gathering-task-tags]');
+    assert.ok(tagsCell, 'tags chip cell renders as its own grid cell');
+    const tagPills = Array.from(tagsCell.querySelectorAll('.manager-availability-pill'));
     const tagKinds = new Set();
     for (const pill of tagPills) {
       for (const kind of ['region', 'biome', 'timeOfDay', 'weather']) {
