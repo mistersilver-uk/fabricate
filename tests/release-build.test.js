@@ -72,11 +72,11 @@ test('rewriteModuleJson normalizes legacy .db pack paths', () => {
     styles: [],
     languages: [],
     packs: [
-      { name: 'alchemists-supplies', path: 'packs/alchemists-supplies-v16.db', type: 'Item' }
+      { name: 'sample-pack', path: 'packs/sample-pack-v1.db', type: 'Item' }
     ]
   };
   const result = rewriteModuleJson(manifest);
-  assert.equal(result.packs[0].path, 'packs/alchemists-supplies-v16');
+  assert.equal(result.packs[0].path, 'packs/sample-pack-v1');
 });
 
 test('rewriteModuleJson leaves pack paths without .db suffix unchanged', () => {
@@ -98,12 +98,12 @@ test('rewriteModuleJson preserves non-path fields on packs', () => {
     styles: [],
     languages: [],
     packs: [
-      { name: 'alchemists-supplies', label: "Alchemist's Supplies", path: 'packs/alchemists-supplies-v16.db', type: 'Item', system: 'dnd5e' }
+      { name: 'sample-pack', label: 'Sample Pack', path: 'packs/sample-pack-v1.db', type: 'Item', system: 'dnd5e' }
     ]
   };
   const result = rewriteModuleJson(manifest);
-  assert.equal(result.packs[0].name, 'alchemists-supplies');
-  assert.equal(result.packs[0].label, "Alchemist's Supplies");
+  assert.equal(result.packs[0].name, 'sample-pack');
+  assert.equal(result.packs[0].label, 'Sample Pack');
   assert.equal(result.packs[0].type, 'Item');
   assert.equal(result.packs[0].system, 'dnd5e');
 });
@@ -198,13 +198,13 @@ test('getRequiredFiles returns all entries from full manifest', () => {
     esmodules: ['main.js'],
     styles: ['styles/fabricate.css'],
     languages: [{ path: 'lang/en.json' }],
-    packs: [{ path: 'packs/alchemists-supplies-v16' }]
+    packs: [{ path: 'packs/sample-pack-v1' }]
   };
   const files = getRequiredFiles(manifest);
   assert.ok(files.includes('main.js'));
   assert.ok(files.includes('styles/fabricate.css'));
   assert.ok(files.includes('lang/en.json'));
-  assert.ok(files.includes('packs/alchemists-supplies-v16'));
+  assert.ok(files.includes('packs/sample-pack-v1'));
   assert.ok(files.includes('module.json'));
 });
 
@@ -213,10 +213,10 @@ test('getRequiredFiles returns pack paths', () => {
     esmodules: [],
     styles: [],
     languages: [],
-    packs: [{ path: 'packs/alchemists-supplies-v16' }]
+    packs: [{ path: 'packs/sample-pack-v1' }]
   };
   const files = getRequiredFiles(manifest);
-  assert.ok(files.includes('packs/alchemists-supplies-v16'), 'should include pack path');
+  assert.ok(files.includes('packs/sample-pack-v1'), 'should include pack path');
 });
 
 test('getRequiredFiles handles multiple esmodules', () => {
@@ -257,10 +257,10 @@ test('validateDist returns success when all required files are present', async (
     esmodules: ['main.js'],
     styles: ['styles/fabricate.css'],
     languages: [{ path: 'lang/en.json' }],
-    packs: [{ path: 'packs/alchemists-supplies-v16' }]
+    packs: [{ path: 'packs/sample-pack-v1' }]
   };
   const distManifest = { ...manifest, id: 'fabricate', version: '0.1.0' };
-  const dir = await makeTempDist(['main.js', 'styles/fabricate.css', 'lang/en.json', 'packs/alchemists-supplies-v16/CURRENT'], distManifest);
+  const dir = await makeTempDist(['main.js', 'styles/fabricate.css', 'lang/en.json', 'packs/sample-pack-v1/CURRENT'], distManifest);
   try {
     const result = await validateDist(dir, manifest);
     assert.equal(result.valid, true);
@@ -275,14 +275,14 @@ test('validateDist returns failure when a pack path is missing', async () => {
     esmodules: ['main.js'],
     styles: [],
     languages: [],
-    packs: [{ path: 'packs/alchemists-supplies-v16' }]
+    packs: [{ path: 'packs/sample-pack-v1' }]
   };
   const distManifest = { ...manifest, id: 'fabricate', version: '0.1.0' };
   const dir = await makeTempDist(['main.js'], distManifest);
   try {
     const result = await validateDist(dir, manifest);
     assert.equal(result.valid, false);
-    assert.ok(result.missing.some(f => f.includes('alchemists-supplies-v16')), `Expected missing to include pack path, got: ${result.missing}`);
+    assert.ok(result.missing.some(f => f.includes('sample-pack-v1')), `Expected missing to include pack path, got: ${result.missing}`);
   } finally {
     await rm(dir, { recursive: true });
   }

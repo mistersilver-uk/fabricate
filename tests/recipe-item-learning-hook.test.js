@@ -11,7 +11,7 @@ const {
   notifyOwnedItemLearningResult
 } = await import('../src/systems/RecipeItemLearningHook.js');
 
-const ALARA_IMAGE = 'assets/img/Alara the Alchemist.webp';
+const ALARA_IMAGE = 'icons/svg/mystery-man.svg';
 
 function getPathValue(object, path) {
   return String(path).split('.').reduce((value, part) => {

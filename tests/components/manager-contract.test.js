@@ -788,7 +788,7 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.Tools.Save, 'Save changes');
     assert.equal(lang.FABRICATE.Admin.Manager.Tools.NavigationDirty.SaveAll, 'Save All');
     assert.equal(lang.FABRICATE.Admin.Manager.Tools.RequirementInstructions, 'Enter an actor roll-data property. The tool is available when the value is greater than zero.');
-    assert.equal(lang.FABRICATE.Admin.Manager.Tools.RequirementExampleActorProperty, 'Example: @tools.alchemist.value');
+    assert.equal(lang.FABRICATE.Admin.Manager.Tools.RequirementExampleActorProperty, 'Example: @tools.example.value');
     assert.ok(!toolsBrowserSource.includes('ProviderExpressionInput'), 'tools requirement editor should not expose provider selection');
     assert.ok(toolsBrowserSource.includes('manager-tools-requirement-expression'), 'tools requirement editor should expose a single expression input');
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.Tools, 'Tools');

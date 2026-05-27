@@ -45,7 +45,6 @@ import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS } from 
 import { MigrationRunner } from './migration/MigrationRunner.js';
 import { ItemPilesIntegration } from './integrations/ItemPilesIntegration.js';
 import { cleanupStalePreferences, isGatheringActorSelectableByUser } from './config/preferencesCleanup.js';
-import { importStarterPack } from './starter/importStarterPack.js';
 import { registerFragmentDiscoveryHook } from './systems/FragmentDiscoveryHook.js';
 import { registerRecipeItemLearningHook } from './systems/RecipeItemLearningHook.js';
 import { registerItemSheetRecipeLearnControl } from './ui/ItemSheetRecipeLearnControl.js';
@@ -962,7 +961,6 @@ Hooks.once('init', async () => {
     ResolutionModeService,
     SignatureValidator,
     ItemPilesIntegration,
-    importStarterPack,
     CompendiumImporter,
     CraftingSystemExporter
   };
@@ -1215,10 +1213,6 @@ globalThis.fabricate = {
    */
   listCraftingSystems: () => {
     return game.fabricate.getCraftingSystemManager().getSystems();
-  },
-
-  importStarterPack: async (packId) => {
-    return importStarterPack(packId);
   },
 
   exportSystem: (systemId) => {

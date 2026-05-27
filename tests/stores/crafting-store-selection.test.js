@@ -12,7 +12,7 @@ import { get } from 'svelte/store';
 
 const { createCraftingStore } = await import('../../src/ui/svelte/stores/craftingStore.js');
 
-const ALARA_IMAGE = 'assets/img/Alara the Alchemist.webp';
+const ALARA_IMAGE = 'icons/svg/mystery-man.svg';
 
 function makeRecipe(id, name, opts = {}) {
   return {

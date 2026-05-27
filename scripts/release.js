@@ -226,28 +226,6 @@ async function main() {
   await mkdir(join(distDir, 'lang'), { recursive: true });
   await cp(join(ROOT, 'lang', 'en.json'), join(distDir, 'lang', 'en.json'));
 
-  // Packs: copy LevelDB directory or .db file as appropriate.
-  // Skip LevelDB's LOCK file — it's a 0-byte OS-level mutex that LevelDB
-  // recreates on open. On Windows the OS often holds an exclusive handle
-  // on it (file watchers, prior runs) that blocks copy with EBUSY.
-  const packsSrc = join(ROOT, 'packs', 'alchemists-supplies-v16');
-  const packsDbSrc = join(ROOT, 'packs', 'alchemists-supplies-v16.db');
-  const packsDest = join(distDir, 'packs', 'alchemists-supplies-v16');
-  const srcStat = await stat(packsSrc).catch(() => null);
-  if (srcStat && srcStat.isDirectory()) {
-    await mkdir(join(distDir, 'packs'), { recursive: true });
-    await cp(packsSrc, packsDest, {
-      recursive: true,
-      filter: (src) => !/[\\/]LOCK$/.test(src)
-    });
-  } else if (await fileExists(packsDbSrc)) {
-    await mkdir(join(distDir, 'packs'), { recursive: true });
-    await cp(packsDbSrc, join(distDir, 'packs', 'alchemists-supplies-v16.db'));
-  }
-
-  await copyIfExists(join(ROOT, 'packs', 'starter-alchemists-supplies.json'),
-                     join(distDir, 'packs', 'starter-alchemists-supplies.json'));
-
   await copyIfExists(join(ROOT, 'LICENSE'), join(distDir, 'LICENSE'));
   await copyIfExists(join(ROOT, 'README.md'), join(distDir, 'README.md'));
 

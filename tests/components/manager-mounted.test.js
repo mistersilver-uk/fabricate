@@ -3913,7 +3913,7 @@ describe('CraftingSystemManager mounted behavior', () => {
             label: 'Artisan Catalyst',
             enabled: true,
             componentId: 'c1',
-            requirement: { provider: 'pf2e', formula: '@tools.alchemist.value', macroUuid: 'Macro.old' },
+            requirement: { provider: 'pf2e', formula: '@tools.example.value', macroUuid: 'Macro.old' },
             breakage: { mode: 'limitedUses', maxUses: null },
             onBreak: { mode: 'destroy' }
           }]
@@ -3935,12 +3935,12 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(editor.querySelector('.manager-provider-expression-input'), null);
     assert.equal(editor.querySelector('select[id$="-provider"]'), null);
     assert.ok(editor.textContent.includes('Enter an actor roll-data property'));
-    assert.ok(editor.textContent.includes('Example: @tools.alchemist.value'));
+    assert.ok(editor.textContent.includes('Example: @tools.example.value'));
     assert.ok(!editor.textContent.includes('Example: @abilities.str.mod'));
     assert.ok(!editor.textContent.includes('Example: @skills.prc.total'));
 
     const expressionInput = editor.querySelector('.manager-tools-requirement-expression input');
-    assert.equal(expressionInput.value, '@tools.alchemist.value');
+    assert.equal(expressionInput.value, '@tools.example.value');
     expressionInput.value = '@tools.smith.value';
     expressionInput.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();

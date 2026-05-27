@@ -78,9 +78,9 @@ You can combine search and category filtering at the same time.
 
 ---
 
-## Worked Example: Alchemist's Supplies
+## Worked Example: Connected and Disconnected Clusters
 
-The Alchemist's Supplies starter content includes several recipes that share components. Opening the Graph tab on that system shows:
+Consider a crafting system with four recipes that share some components and not others. Opening the Graph tab shows:
 
 - "Harvest Nightshade" → "Brew Sleeping Draught" (Nightshade Extract is produced by harvest and consumed by the brew recipe)
 - "Crush Sulphur" → "Mix Flash Powder" (Sulphur Powder connects these two)

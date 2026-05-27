@@ -120,7 +120,7 @@ export function prepareForImport(data, mode = 'keep') {
  * Generate a filename for the export.
  *
  * @param {string} systemName - Human-readable system name
- * @returns {string} Filename like "fabricate-alchemists-supplies-2026-03-12.json"
+ * @returns {string} Filename like "fabricate-example-system-2026-03-12.json"
  */
 export function makeExportFilename(systemName) {
   const slug = (systemName || 'system')
