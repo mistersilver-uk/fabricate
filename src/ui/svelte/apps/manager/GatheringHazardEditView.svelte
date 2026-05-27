@@ -2,7 +2,7 @@
 <script>
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import { localize } from '../../util/foundryBridge.js';
-  import ProviderExpressionInput from '../../components/ProviderExpressionInput.svelte';
+  import { dropRateTierClass, dropRateTierColor } from '../../util/dropRateTier.js';
 
   let {
     hazard = null,
@@ -23,15 +23,11 @@
   const dangerTags = $derived(Array.isArray(hazard?.dangerTags) ? hazard.dangerTags : []);
   const characterModifiers = $derived(Array.isArray(hazard?.characterModifiers) ? hazard.characterModifiers : []);
   const characterModifierLibraryList = $derived(Array.isArray(characterModifierLibrary) ? characterModifierLibrary : []);
-  const hazardModifier = $derived(hazard?.hazardModifier && typeof hazard.hazardModifier === 'object' ? hazard.hazardModifier : null);
-  const hazardModifierProvider = $derived(String(hazardModifier?.provider || 'dnd5e'));
-  const hazardModifierExpression = $derived(String(hazardModifier?.expression ?? ''));
-  const hazardModifierMacroUuid = $derived(String(hazardModifier?.macroUuid ?? ''));
-  const hasHazardModifier = $derived(hazardModifier !== null);
   const suggestedDangerTags = $derived(DEFAULT_DANGER_TAGS.filter(tag => !dangerTags.includes(tag)));
   const nameValid = $derived(Boolean((hazard?.name || '').trim()));
   const dropRateRaw = $derived(Number(hazard?.dropRate));
   const dropRateValid = $derived(Number.isFinite(dropRateRaw) && dropRateRaw >= 1 && dropRateRaw <= 100);
+  const dropRateValue = $derived(Math.max(1, Math.min(100, Math.floor(Number.isFinite(dropRateRaw) ? dropRateRaw : 1))));
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -169,20 +165,6 @@
     if (!Number.isFinite(raw)) return;
     const clamped = Math.min(100, Math.max(1, Math.floor(raw)));
     onUpdateHazard({ dropRate: clamped });
-  }
-
-  function setHazardModifier(patch) {
-    const base = hazardModifier || { provider: 'dnd5e', expression: '', macroUuid: '' };
-    onUpdateHazard({ hazardModifier: { ...base, ...patch } });
-  }
-
-  function clearHazardModifier() {
-    onUpdateHazard({ hazardModifier: null });
-  }
-
-  function enableHazardModifier() {
-    if (hazardModifier) return;
-    onUpdateHazard({ hazardModifier: { provider: 'dnd5e', expression: '', macroUuid: '' } });
   }
 
   function characterModifierLibraryEntry(modifierId) {
@@ -375,7 +357,7 @@
           <div class="manager-availability-pill-row" data-gathering-hazard-danger-pills>
             {#if dangerTags.length > 0}
               {#each dangerTags as tag (tag)}
-                <span class={`manager-availability-pill manager-danger-tag-pill is-${tag}`} data-danger-tag={tag}>
+                <span class={`manager-danger-tag-pill is-${tag}`} data-danger-tag={tag}>
                   <span>{dangerLabel(tag)}</span>
                   <button type="button" class="manager-availability-remove" aria-label={text('FABRICATE.Admin.Manager.Environment.Hazards.RemoveDangerTag', 'Remove {name}').replace('{name}', dangerLabel(tag))} onclick={() => removeDangerTag(tag)}>
                     <i class="fas fa-xmark" aria-hidden="true"></i>
@@ -405,7 +387,7 @@
               {#each suggestedDangerTags as tag (tag)}
                 <button
                   type="button"
-                  class={`manager-availability-pill manager-danger-tag-pill is-suggestion is-${tag}`}
+                  class={`manager-danger-tag-pill is-suggestion is-${tag}`}
                   data-danger-tag-suggestion={tag}
                   onclick={() => addDangerTag(tag)}
                 >
@@ -427,57 +409,41 @@
         </div>
       </div>
       <div class="manager-task-availability-row">
-        <label class="manager-field">
+        <label class="manager-field manager-drop-rate-editor">
           <span>{text('FABRICATE.Admin.Manager.Environment.Hazards.DropRatePercent', 'Drop rate (%)')}</span>
-          <input
-            type="number"
-            min="1"
-            max="100"
-            step="1"
-            value={hazard.dropRate ?? 1}
-            oninput={onDropRateInput}
-            data-gathering-hazard-field="dropRate"
-          />
+          <span class="manager-drop-rate-value">
+            <span class="manager-drop-rate-percent">
+              <input
+                type="text"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                value={dropRateValue}
+                oninput={onDropRateInput}
+                data-gathering-hazard-field="dropRate"
+                aria-label={text('FABRICATE.Admin.Manager.Environment.Hazards.DropRatePercent', 'Drop rate (%)')}
+              />
+              <span aria-hidden="true">%</span>
+            </span>
+            <span class={`manager-drop-rate-control ${dropRateTierClass(dropRateValue)}`} style={`--fab-drop-rate-value: ${dropRateValue}%; --fab-drop-rate-color: ${dropRateTierColor(dropRateValue)};`}>
+              <span class="manager-drop-rate-track" aria-hidden="true">
+                <span class="manager-drop-rate-fill"></span>
+              </span>
+              <input
+                type="range"
+                min="1"
+                max="100"
+                step="1"
+                value={dropRateValue}
+                oninput={onDropRateInput}
+                aria-label={text('FABRICATE.Admin.Manager.Environment.Hazards.DropRatePercent', 'Drop rate (%)')}
+              />
+            </span>
+          </span>
           {#if !dropRateValid}
             <span class="manager-field-error">{text('FABRICATE.Admin.Manager.Environment.Hazards.DropRateInvalid', 'Drop rate must be between 1 and 100.')}</span>
           {/if}
         </label>
       </div>
-    </section>
-
-    <section class="manager-task-availability-card" data-gathering-hazard-modifier>
-      <div class="manager-task-card-heading">
-        <div>
-          <h3>{text('FABRICATE.Admin.Manager.Environment.Hazards.HazardModifier', 'Hazard modifier')}</h3>
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Environment.Hazards.HazardModifierHint', 'Adjusts the d100 roll added before threshold comparison. Leave empty for no modifier.')}</p>
-        </div>
-        <div class="manager-action-group">
-          {#if hasHazardModifier}
-            <button type="button" class="manager-button" data-gathering-hazard-modifier-clear onclick={clearHazardModifier}>
-              <i class="fas fa-times" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Environment.Hazards.ClearHazardModifier', 'Remove modifier')}</span>
-            </button>
-          {:else}
-            <button type="button" class="manager-button is-primary" data-gathering-hazard-modifier-enable onclick={enableHazardModifier}>
-              <i class="fas fa-plus" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Environment.Hazards.EnableHazardModifier', 'Add hazard modifier')}</span>
-            </button>
-          {/if}
-        </div>
-      </div>
-      {#if hasHazardModifier}
-        <div class="manager-task-availability-row">
-          <ProviderExpressionInput
-            provider={hazardModifierProvider}
-            expression={hazardModifierExpression}
-            macroUuid={hazardModifierMacroUuid}
-            idPrefix="gathering-hazard-modifier"
-            onProviderChange={(value) => setHazardModifier({ provider: value })}
-            onExpressionChange={(value) => setHazardModifier({ expression: value })}
-            onMacroUuidChange={(value) => setHazardModifier({ macroUuid: value })}
-          />
-        </div>
-      {/if}
     </section>
 
     <section class="manager-task-availability-card" data-gathering-hazard-character-modifiers>

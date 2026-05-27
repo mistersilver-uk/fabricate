@@ -7,13 +7,17 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 const editorPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringHazardEditView.svelte');
+const rootPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
+const environmentsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte');
 const langPath = resolve(repoRoot, 'lang/en.json');
 
 const editorSource = readFileSync(editorPath, 'utf8');
+const rootSource = readFileSync(rootPath, 'utf8');
+const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
 describe('GatheringHazardEditView source contract', () => {
-  it('exposes hazard identity, availability, dangerTags, dropRate, and modifier sections', () => {
+  it('exposes hazard identity, availability, dangerTags, dropRate, and character-modifier sections', () => {
     assert.ok(editorSource.includes('data-gathering-hazard-editor'), 'editor should expose a data attribute hook');
     assert.ok(editorSource.includes('data-gathering-hazard-core-editor'), 'editor should expose an identity section');
     assert.ok(editorSource.includes("data-gathering-hazard-field=\"name\""), 'editor should bind the name field');
@@ -21,7 +25,6 @@ describe('GatheringHazardEditView source contract', () => {
     assert.ok(editorSource.includes('data-gathering-hazard-availability'), 'editor should expose an availability matching section');
     assert.ok(editorSource.includes('data-gathering-hazard-danger-tags'), 'editor should expose a danger tags section');
     assert.ok(editorSource.includes('data-gathering-hazard-drop-rate'), 'editor should expose a drop rate section');
-    assert.ok(editorSource.includes('data-gathering-hazard-modifier'), 'editor should expose a hazard modifier section');
     assert.ok(editorSource.includes('data-gathering-hazard-character-modifiers'), 'editor should expose a character modifiers section');
   });
 
@@ -41,10 +44,22 @@ describe('GatheringHazardEditView source contract', () => {
     assert.ok(editorSource.includes('manager-danger-tag-pill'), 'editor should render danger tags as pills');
   });
 
-  it('reuses ProviderExpressionInput for the hazard modifier', () => {
-    assert.ok(editorSource.includes("import ProviderExpressionInput from '../../components/ProviderExpressionInput.svelte';"), 'editor should import ProviderExpressionInput');
-    assert.ok(editorSource.includes('<ProviderExpressionInput'), 'editor should render ProviderExpressionInput for the hazard modifier');
-    assert.ok(editorSource.includes('hazardModifier'), 'editor should bind to hazard.hazardModifier');
+  it('renders the drop rate with the shared percentage slider widget', () => {
+    assert.ok(
+      editorSource.includes("import { dropRateTierClass, dropRateTierColor } from '../../util/dropRateTier.js';"),
+      'editor should import the drop-rate tier helpers'
+    );
+    assert.ok(editorSource.includes('manager-drop-rate-control'), 'editor should render the drop-rate slider control');
+    assert.ok(editorSource.includes('manager-drop-rate-percent'), 'editor should render the drop-rate percent input');
+    assert.ok(editorSource.includes('manager-drop-rate-fill'), 'editor should render the drop-rate fill bar');
+    assert.ok(editorSource.includes('type="range"'), 'editor should render a range input alongside the text input');
+  });
+
+  it('drops the redundant Hazard modifier UI', () => {
+    assert.equal(editorSource.includes('data-gathering-hazard-modifier'), false, 'hazard-modifier section should be removed');
+    assert.equal(editorSource.includes('ProviderExpressionInput'), false, 'ProviderExpressionInput import should be removed');
+    assert.equal(/function\s+setHazardModifier\s*\(/.test(editorSource), false, 'setHazardModifier helper should be removed');
+    assert.equal(/function\s+enableHazardModifier\s*\(/.test(editorSource), false, 'enableHazardModifier helper should be removed');
   });
 
   it('supports character modifier references with operator, min, max, and expressionOverride', () => {
@@ -56,13 +71,37 @@ describe('GatheringHazardEditView source contract', () => {
     assert.ok(editorSource.includes("operator: event.currentTarget.value === '-' ? '-' : '+'"), 'operator updates should clamp to + or -');
   });
 
+  it('mounts at the gathering-hazard-edit route and exposes a back-to-library affordance', () => {
+    assert.ok(
+      rootSource.includes("currentView === 'gathering-hazard-edit'"),
+      'manager root should branch on gathering-hazard-edit'
+    );
+    assert.ok(
+      rootSource.includes('<GatheringHazardEditView'),
+      'manager root should mount the hazard editor component'
+    );
+    assert.ok(
+      rootSource.includes('function backToGatheringHazardLibrary'),
+      'manager root should expose backToGatheringHazardLibrary'
+    );
+    assert.ok(
+      rootSource.includes("activeView = 'gathering-hazard-edit'"),
+      'editGatheringHazard should set the view to gathering-hazard-edit'
+    );
+    assert.equal(
+      environmentsBrowserSource.includes('GatheringHazardEditView'),
+      false,
+      'editor should no longer mount inline inside EnvironmentsBrowserView'
+    );
+  });
+
   it('localizes the hazard editor labels', () => {
     const hazardsNamespace = lang.FABRICATE.Admin.Manager.Environment.Hazards;
     assert.ok(hazardsNamespace, 'lang/en.json should declare the Hazards namespace');
     for (const key of [
       'HazardIdentity', 'HazardIdentityHint', 'HazardAvailability',
       'AvailabilityHint', 'DangerTagsHint', 'DropRateHint', 'DropRateInvalid',
-      'HazardModifier', 'HazardModifierHint', 'CharacterModifiers',
+      'CharacterModifiers',
       'CharacterModifiersHint', 'CharacterModifierOperator', 'CharacterModifierMin',
       'CharacterModifierMax', 'CharacterModifierOverride'
     ]) {

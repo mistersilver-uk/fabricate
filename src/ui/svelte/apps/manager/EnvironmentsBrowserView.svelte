@@ -8,7 +8,6 @@
   import ManagerColorPopover from '../../components/ManagerColorPopover.svelte';
   import GatheringTasksBrowserView from './GatheringTasksBrowserView.svelte';
   import GatheringHazardsBrowserView from './GatheringHazardsBrowserView.svelte';
-  import GatheringHazardEditView from './GatheringHazardEditView.svelte';
 
   let {
     environments = [],
@@ -26,14 +25,7 @@
     activeGatheringTab = 'environments',
     selectedTaskId = '',
     selectedHazardId = '',
-    selectedGatheringHazard = null,
-    characterModifierLibrary = [],
-    hazardWeatherOptions = [],
-    hazardTimeOfDayOptions = [],
-    hazardRegionOptions = [],
-    hazardBiomeOptions = [],
     managedItemOptions = [],
-    onPickImagePath = null,
     onSelectGatheringTab = () => {},
     onSelectGatheringTask = () => {},
     onCreateGatheringTask = () => {},
@@ -47,7 +39,6 @@
     onDuplicateGatheringHazard = () => {},
     onDeleteGatheringHazard = () => {},
     onToggleGatheringHazardEnabled = () => {},
-    onUpdateGatheringHazard = () => {},
     onSelectEnvironment = () => {},
     onEditEnvironment = () => {},
     onCreateEnvironment = () => {},
@@ -833,18 +824,6 @@
         onDeleteHazard={onDeleteGatheringHazard}
         onToggleHazardEnabled={onToggleGatheringHazardEnabled}
       />
-      {#if selectedGatheringHazard}
-        <GatheringHazardEditView
-          hazard={selectedGatheringHazard}
-          weatherOptions={hazardWeatherOptions}
-          timeOfDayOptions={hazardTimeOfDayOptions}
-          regionOptions={hazardRegionOptions}
-          biomeOptions={hazardBiomeOptions}
-          {characterModifierLibrary}
-          {onPickImagePath}
-          onUpdateHazard={onUpdateGatheringHazard}
-        />
-      {/if}
     </div>
   {:else if activeGatheringTab === 'settings'}
     <div

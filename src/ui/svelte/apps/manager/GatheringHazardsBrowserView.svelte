@@ -29,8 +29,9 @@
   let pageSize = $state(10);
 
   const hazardList = $derived(Array.isArray(hazards) ? hazards : []);
-  const environmentList = $derived(Array.isArray(environments) ? environments : []);
   const systemConfig = $derived(gatheringConfig?.systems?.[selectedSystemId] || {});
+  const weatherCondition = $derived(systemConfig.conditions?.weather || {});
+  const timeCondition = $derived(systemConfig.conditions?.timeOfDay || {});
   const normalizedSearchTerm = $derived(searchTerm.trim().toLowerCase());
   const regionOptions = $derived(uniqueSorted([
     ...hazardList.flatMap(hazard => Array.isArray(hazard.regions)
@@ -109,17 +110,123 @@
     return (Array.isArray(values) ? values : []).map(value => typeof value === 'object' ? value.id : value);
   }
 
-  function optionLabel(kind, id) {
-    const options = kind === 'biome'
+  function defaultIcon(kind) {
+    switch (kind) {
+      case 'biome': return 'fas fa-tree';
+      case 'weather': return 'fas fa-cloud-sun';
+      case 'timeOfDay': return 'fas fa-clock';
+      case 'region':
+      default: return 'fas fa-map-location-dot';
+    }
+  }
+
+  function vocabularyEntry(kind, id) {
+    const values = kind === 'biome'
       ? systemConfig.vocabularies?.biomes?.values
       : systemConfig.vocabularies?.regions?.values;
-    const option = (Array.isArray(options) ? options : []).find(value => String(value?.id || value) === String(id || ''));
-    return String(option?.label || option?.id || id || '').trim();
+    const option = (Array.isArray(values) ? values : []).find(value => String(value?.id || value) === String(id || ''));
+    const label = String(option?.label || option?.id || id || '').trim();
+    const icon = String(option?.icon || '').trim() || defaultIcon(kind);
+    return { id: String(id || ''), label, icon };
+  }
+
+  function conditionEntry(kind, id) {
+    const setting = kind === 'weather' ? weatherCondition : timeCondition;
+    const option = (Array.isArray(setting?.values) ? setting.values : [])
+      .find(value => String(value?.id || value) === String(id || ''));
+    const label = String(option?.label || option?.id || id || '').trim();
+    const icon = String(option?.icon || '').trim() || defaultIcon(kind);
+    return { id: String(id || ''), label, icon, kind };
+  }
+
+  function optionLabel(kind, id) {
+    return vocabularyEntry(kind, id).label;
   }
 
   function dangerLabel(tag) {
     const key = `FABRICATE.Admin.Manager.Environment.Hazards.DangerTag.${tag}`;
     return text(key, tag.charAt(0).toUpperCase() + tag.slice(1));
+  }
+
+  function anyChip(kind, labelKey, fallback, pillClass) {
+    return {
+      id: 'any',
+      key: `${kind}:any`,
+      kind,
+      label: text(labelKey, fallback),
+      icon: kind === 'danger' ? null : defaultIcon(kind),
+      pillClass,
+      isAny: true
+    };
+  }
+
+  function regionChips(hazard) {
+    const values = Array.isArray(hazard?.regions)
+      ? hazard.regions
+      : (hazard?.region ? [hazard.region] : []);
+    const entries = values
+      .map(id => vocabularyEntry('region', id))
+      .filter(entry => entry.label)
+      .map(entry => ({ ...entry, kind: 'region', key: `region:${entry.id}`, pillClass: 'manager-availability-pill is-region', isAny: false }));
+    if (entries.length === 0) return [anyChip('region', 'FABRICATE.Admin.Manager.Environment.Hazards.AnyRegion', 'Any region', 'manager-availability-pill is-region')];
+    return entries;
+  }
+
+  function biomeChips(hazard) {
+    const values = Array.isArray(hazard?.biomes) ? hazard.biomes : [];
+    const entries = values
+      .map(id => vocabularyEntry('biome', id))
+      .filter(entry => entry.label)
+      .map(entry => ({ ...entry, kind: 'biome', key: `biome:${entry.id}`, pillClass: 'manager-availability-pill is-biome', isAny: false }));
+    if (entries.length === 0) return [anyChip('biome', 'FABRICATE.Admin.Manager.Environment.Hazards.AnyBiome', 'Any biome', 'manager-availability-pill is-biome')];
+    return entries;
+  }
+
+  function timeChips(hazard) {
+    const values = Array.isArray(hazard?.timeOfDay) ? hazard.timeOfDay : [];
+    const entries = values
+      .map(id => conditionEntry('timeOfDay', id))
+      .filter(entry => entry.label)
+      .map(entry => ({ ...entry, key: `timeOfDay:${entry.id}`, pillClass: 'manager-availability-pill is-timeOfDay', isAny: false }));
+    if (entries.length === 0) return [anyChip('timeOfDay', 'FABRICATE.Admin.Manager.Environment.Tasks.AnyTime', 'Any time', 'manager-availability-pill is-timeOfDay')];
+    return entries;
+  }
+
+  function weatherChips(hazard) {
+    const values = Array.isArray(hazard?.weather) ? hazard.weather : [];
+    const entries = values
+      .map(id => conditionEntry('weather', id))
+      .filter(entry => entry.label)
+      .map(entry => ({ ...entry, key: `weather:${entry.id}`, pillClass: 'manager-availability-pill is-weather', isAny: false }));
+    if (entries.length === 0) return [anyChip('weather', 'FABRICATE.Admin.Manager.Environment.Tasks.AnyWeather', 'Any weather', 'manager-availability-pill is-weather')];
+    return entries;
+  }
+
+  function dangerChips(hazard) {
+    const values = Array.isArray(hazard?.dangerTags) ? hazard.dangerTags : [];
+    const entries = values
+      .filter(tag => typeof tag === 'string' && tag.trim())
+      .map(tag => ({
+        id: tag,
+        key: `danger:${tag}`,
+        kind: 'danger',
+        label: dangerLabel(tag),
+        icon: null,
+        pillClass: `manager-danger-tag-pill is-${tag}`,
+        isAny: false
+      }));
+    if (entries.length === 0) return [anyChip('danger', 'FABRICATE.Admin.Manager.Environment.Hazards.AnyDanger', 'Any danger', 'manager-danger-tag-pill')];
+    return entries;
+  }
+
+  function rowChips(hazard) {
+    return [
+      ...regionChips(hazard),
+      ...biomeChips(hazard),
+      ...timeChips(hazard),
+      ...weatherChips(hazard),
+      ...dangerChips(hazard)
+    ];
   }
 
   function hazardName(hazard) {
@@ -128,22 +235,6 @@
 
   function hazardImage(hazard) {
     return hazard?.img || 'icons/svg/hazard.svg';
-  }
-
-  function dropRateLabel(hazard) {
-    const rate = Number(hazard?.dropRate);
-    if (!Number.isFinite(rate)) return text('FABRICATE.Admin.Manager.Environment.Hazards.NoDropRate', '—');
-    return `${Math.max(1, Math.min(100, Math.floor(rate)))}%`;
-  }
-
-  function activeEnvironmentCount(hazard) {
-    if (!hazard?.id) return 0;
-    const hazardId = String(hazard.id);
-    return environmentList.filter(environment => {
-      if (String(environment?.craftingSystemId || '') !== String(selectedSystemId || '')) return false;
-      const enabledIds = Array.isArray(environment?.enabledHazardIds) ? environment.enabledHazardIds.map(String) : [];
-      return enabledIds.includes(hazardId);
-    }).length;
   }
 
   function clearFilters() {
@@ -242,11 +333,7 @@
       <div class="manager-gathering-hazards-table" role="table" aria-label={text('FABRICATE.Admin.Manager.Environment.Hazards.TableShort', 'Gathering hazards')}>
         <div class="manager-table-head manager-gathering-hazard-table-head" role="row">
           <span role="columnheader">{text('FABRICATE.Admin.Manager.Environment.Hazards.Column.Hazard', 'Hazard')}</span>
-          <span role="columnheader">{text('FABRICATE.Admin.Manager.Environment.Hazards.DangerTags', 'Danger')}</span>
-          <span role="columnheader">{text('FABRICATE.Admin.Manager.Environment.Region', 'Region')}</span>
-          <span role="columnheader">{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>
-          <span role="columnheader">{text('FABRICATE.Admin.Manager.Environment.Hazards.DropRate', 'Drop rate')}</span>
-          <span role="columnheader">{text('FABRICATE.Admin.Manager.Environment.Hazards.Environments', 'Environments')}</span>
+          <span role="columnheader">{text('FABRICATE.Admin.Manager.Environment.Tasks.Tags', 'Tags')}</span>
           <span role="columnheader">{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
           <span role="columnheader">{text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}</span>
         </div>
@@ -263,33 +350,14 @@
                 {/if}
               </span>
             </button>
-            <span role="cell" class="manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Environment.Hazards.DangerTags', 'Danger')}>
-              {#if Array.isArray(hazard.dangerTags) && hazard.dangerTags.length > 0}
-                <span class="manager-chip-row">
-                  {#each hazard.dangerTags as tag (tag)}
-                    <span class={`manager-danger-tag-pill is-${tag}`}>{dangerLabel(tag)}</span>
-                  {/each}
+            <div class="manager-gathering-hazard-tags-cell" role="cell" data-gathering-hazard-tags>
+              {#each rowChips(hazard) as chip (chip.key)}
+                <span class={`${chip.pillClass}${chip.isAny ? ' is-any' : ''}`}>
+                  {#if chip.icon}<i class={chip.icon} aria-hidden="true"></i>{/if}
+                  <span>{chip.label}</span>
                 </span>
-              {:else}
-                <span class="manager-chip">{text('FABRICATE.Admin.Manager.Environment.Hazards.AnyDanger', 'Any danger')}</span>
-              {/if}
-            </span>
-            <span role="cell" class="manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Environment.Region', 'Region')}>
-              {#if (Array.isArray(hazard.regions) ? hazard.regions : (hazard.region ? [hazard.region] : [])).length > 0}
-                <span class="manager-muted">{(Array.isArray(hazard.regions) ? hazard.regions : [hazard.region]).map(region => optionLabel('region', region) || region).join(', ')}</span>
-              {:else}
-                <span class="manager-chip">{text('FABRICATE.Admin.Manager.Environment.Hazards.AnyRegion', 'Any region')}</span>
-              {/if}
-            </span>
-            <span role="cell" class="manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}>
-              <span class="manager-muted">{(Array.isArray(hazard.biomes) && hazard.biomes.length > 0) ? hazard.biomes.map(biome => optionLabel('biome', biome) || biome).join(', ') : text('FABRICATE.Admin.Manager.Environment.Hazards.AnyBiome', 'Any biome')}</span>
-            </span>
-            <span role="cell" class="manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Environment.Hazards.DropRate', 'Drop rate')}>
-              <strong>{dropRateLabel(hazard)}</strong>
-            </span>
-            <span role="cell" class="manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Environment.Hazards.Environments', 'Environments')}>
-              <strong>{activeEnvironmentCount(hazard)}</strong>
-            </span>
+              {/each}
+            </div>
             <span role="cell" class="manager-labeled-cell manager-status-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.StatusFilter', 'Status')}>
               <button
                 type="button"

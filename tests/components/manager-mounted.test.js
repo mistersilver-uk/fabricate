@@ -2252,7 +2252,11 @@ describe('CraftingSystemManager mounted behavior', () => {
       null,
       'selected gathering task identity card should not contain an action group'
     );
-    assert.ok(target.querySelector('.manager-inspector').textContent.includes('Nightshade With An Exceptionally Long Localized Component Name x2 (80%)'));
+    const dropChips = target.querySelectorAll('[data-task-drops-summary] [data-task-drop-summary-chip]');
+    assert.ok(
+      Array.from(dropChips).some(chip => chip.textContent.includes('Nightshade With An Exceptionally Long Localized Component Name') && chip.textContent.includes('80%')),
+      'drops summary should show the nightshade drop name + chance'
+    );
     assert.equal(target.querySelector('[data-gathering-task-fact="environments"] strong').textContent.trim(), '1');
 
     const taskSearch = target.querySelector('[data-gathering-tasks-browser] input[type="search"]');
@@ -2714,9 +2718,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(gatheringSubitem('Hazards').getAttribute('aria-current'), 'page');
     assert.ok(target.querySelector('[data-gathering-hazards-browser]'), 'Hazards tab should mount the hazard library browser');
     assert.equal(target.querySelector('.manager-environments-table'), null);
-    assert.equal(
-      target.querySelector('.manager-inspector [data-gathering-inspector-placeholder] h2').textContent.trim(),
-      'Gathering hazards'
+    assert.ok(
+      target.querySelector('.manager-inspector').textContent.includes('Select a gathering hazard'),
+      'inspector should show the select-hazard empty state when no hazard is selected'
     );
     assert.equal(
       target.querySelector('.manager-inspector').textContent.includes('Selected environment'),
@@ -4161,7 +4165,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     assert.equal(gatheringSubitem('Hazards').getAttribute('aria-current'), 'page');
-    assert.ok(target.textContent.includes('Reusable hazard authoring is planned for a later slice.'));
+    assert.ok(target.querySelector('[data-gathering-hazards-browser]'), 'Review hazards button should land on the hazard library');
 
     gatheringSubitem('Environments').click();
     await tick();

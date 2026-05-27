@@ -10,11 +10,13 @@ const browserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringHazar
 const environmentsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte');
 const rootPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
 const langPath = resolve(repoRoot, 'lang/en.json');
+const cssPath = resolve(repoRoot, 'styles/fabricate.css');
 
 const browserSource = readFileSync(browserPath, 'utf8');
 const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
 const rootSource = readFileSync(rootPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
+const css = readFileSync(cssPath, 'utf8');
 
 describe('GatheringHazardsBrowserView source contract', () => {
   it('renders a hazard library tabpanel with the expected toolbar filters', () => {
@@ -38,11 +40,51 @@ describe('GatheringHazardsBrowserView source contract', () => {
     assert.ok(browserSource.includes('onToggleHazardEnabled'), 'browser should call onToggleHazardEnabled');
   });
 
-  it('counts referenced environments using enabledHazardIds', () => {
-    assert.ok(
-      browserSource.includes('enabledHazardIds'),
-      'environment usage count must read from environment.enabledHazardIds so deletion confirmation maths matches the store'
-    );
+  it('renders the card-style row with four column headers (Hazard / Tags / Status / Actions)', () => {
+    const headBlockStart = browserSource.indexOf('manager-table-head manager-gathering-hazard-table-head');
+    assert.ok(headBlockStart >= 0, 'head block should be present');
+    const headBlockEnd = browserSource.indexOf('</div>', headBlockStart);
+    const headBlock = browserSource.slice(headBlockStart, headBlockEnd);
+    const headerMatches = headBlock.match(/role="columnheader"/g) || [];
+    assert.equal(headerMatches.length, 4, 'expected four column headers');
+    for (const removed of ['DangerTags', 'DropRate', 'Environments']) {
+      assert.equal(
+        headBlock.includes(`FABRICATE.Admin.Manager.Environment.Hazards.${removed}`),
+        false,
+        `${removed} column header should not be present`
+      );
+    }
+  });
+
+  it('renders chips for region, biome, time, weather, and danger via rowChips', () => {
+    assert.ok(browserSource.includes('rowChips(hazard)'), 'tags cell renders rowChips(hazard)');
+    for (const helper of ['regionChips(', 'biomeChips(', 'timeChips(', 'weatherChips(', 'dangerChips(']) {
+      assert.ok(browserSource.includes(helper), `helper ${helper} should be present`);
+    }
+    assert.ok(browserSource.includes('data-gathering-hazard-tags'), 'tags cell exposes a data attribute');
+    assert.equal(/function\s+activeEnvironmentCount\s*\(/.test(browserSource), false, 'activeEnvironmentCount should be removed');
+    assert.equal(/function\s+dropRateLabel\s*\(/.test(browserSource), false, 'dropRateLabel should be removed');
+  });
+
+  it('uses a four-column grid for the hazard table and a scrollable tags cell', () => {
+    const gridMatch = css.match(/--fab-mv2-gathering-hazard-grid:\s*([^;]+);/);
+    assert.ok(gridMatch, 'hazard grid CSS variable should be defined');
+    const columns = gridMatch[1].split(/\s+(?![^()]*\))/).filter(Boolean);
+    assert.equal(columns.length, 4, 'expected four grid columns (identity, tags, status, actions)');
+
+    const tagsBlock = css.match(/\.manager-gathering-hazard-tags-cell\s*\{[^}]*\}/);
+    assert.ok(tagsBlock, 'tags cell rule should be defined');
+    assert.ok(/display:\s*flex/.test(tagsBlock[0]), 'tags cell must be a flex container');
+    assert.ok(/flex-wrap:\s*wrap/.test(tagsBlock[0]), 'tags cell must wrap');
+    assert.ok(/overflow-y:\s*auto/.test(tagsBlock[0]), 'tags cell must be scrollable');
+    assert.ok(/max-height:\s*\d+px/.test(tagsBlock[0]), 'tags cell must cap its height');
+  });
+
+  it('grows the hazard thumbnail to 64px for the card layout', () => {
+    const thumbBlock = css.match(/\.manager-gathering-hazards-table\s+\.manager-gathering-hazard-identity\s+\.manager-gathering-hazard-thumb\s*\{[^}]*\}/);
+    assert.ok(thumbBlock, 'card-layout thumb override should be defined');
+    assert.ok(/width:\s*64px/.test(thumbBlock[0]), 'thumb width should be 64px');
+    assert.ok(/height:\s*64px/.test(thumbBlock[0]), 'thumb height should be 64px');
   });
 
   it('replaces the encounters placeholder with the new hazard library tabpanel', () => {
