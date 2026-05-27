@@ -6055,7 +6055,7 @@
 }
 
 .fabricate-manager .manager-gathering-tasks-table {
-  --fab-mv2-gathering-task-grid: minmax(0, 1.58fr) minmax(78px, 0.42fr) minmax(0, 0.5fr) 58px minmax(0, 0.72fr) 74px 72px 92px;
+  --fab-mv2-gathering-task-grid: minmax(0, 1fr) 72px 92px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -6450,6 +6450,58 @@
   grid-template-columns: 120px minmax(0, 1fr);
   align-self: center;
   min-height: 68px;
+}
+
+.fabricate-manager .manager-gathering-tasks-table .manager-gathering-task-identity {
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 12px;
+  align-items: flex-start;
+  min-height: 64px;
+}
+
+.fabricate-manager .manager-gathering-tasks-table .manager-gathering-task-identity .manager-gathering-task-thumb {
+  width: 64px;
+  height: 64px;
+  align-self: flex-start;
+}
+
+.fabricate-manager .manager-gathering-tasks-table .manager-gathering-task-identity .manager-system-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-self: center;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-gathering-tasks-table .manager-gathering-task-row {
+  align-items: flex-start;
+  align-content: flex-start;
+}
+
+.fabricate-manager .manager-gathering-task-info-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-self: stretch;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-gathering-task-tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-content: flex-start;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-availability-pill.is-any {
+  opacity: 0.72;
+  font-style: italic;
+}
+
+.fabricate-manager .manager-availability-pill.is-any > i {
+  opacity: 1;
 }
 
 .fabricate-manager .manager-system-icon,
@@ -8571,6 +8623,206 @@
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
+.fabricate-manager .manager-gathering-panel-hazards {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.fabricate-manager .manager-gathering-encounters-shell {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 12px;
+  min-height: 0;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-gathering-hazards-table {
+  --fab-mv2-gathering-hazard-grid: minmax(0, 1.55fr) minmax(0, 0.85fr) minmax(78px, 0.42fr) minmax(0, 0.5fr) 78px 74px 72px 92px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-gathering-hazard-table-head,
+.fabricate-manager .manager-gathering-hazard-row {
+  display: grid;
+  grid-template-columns: var(--fab-mv2-gathering-hazard-grid);
+  gap: 8px;
+  align-items: center;
+  align-content: center;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-gathering-hazard-table-head > *,
+.fabricate-manager .manager-gathering-hazard-row > * {
+  min-width: 0;
+}
+
+.fabricate-manager .manager-gathering-hazard-row {
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 10px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-surface-2);
+}
+
+.fabricate-manager .manager-gathering-hazard-row:hover {
+  border-color: var(--fab-mv2-border-strong);
+}
+
+.fabricate-manager .manager-gathering-hazard-row.is-selected {
+  border-color: var(--fab-mv2-accent);
+  background: var(--fab-mv2-surface-1);
+}
+
+.fabricate-manager .manager-gathering-hazard-row .manager-status-cell {
+  justify-self: start;
+}
+
+.fabricate-manager .manager-gathering-hazard-identity {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-gathering-hazard-identity:focus {
+  outline: none;
+}
+
+.fabricate-manager .manager-gathering-hazard-identity:focus-visible {
+  outline: 2px solid var(--fab-mv2-accent);
+  outline-offset: 2px;
+}
+
+.fabricate-manager .manager-gathering-hazard-thumb {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--fab-overlay-dark-18);
+}
+
+.fabricate-manager .manager-danger-tag-pill {
+  border: 1px solid var(--fab-mv2-border);
+  background: var(--fab-mv2-surface-1);
+}
+
+.fabricate-manager .manager-danger-tag-pill.is-safe {
+  border-color: var(--fab-success-border);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-manager .manager-danger-tag-pill.is-hazardous {
+  border-color: var(--fab-warning-border);
+  background: var(--fab-warning-soft);
+}
+
+.fabricate-manager .manager-danger-tag-pill.is-dangerous {
+  border-color: var(--fab-danger-border, var(--fab-warning-border));
+  background: var(--fab-danger-soft, var(--fab-warning-soft));
+}
+
+.fabricate-manager .manager-danger-tag-pill.is-deadly {
+  border-color: var(--fab-critical-border, var(--fab-danger-border, var(--fab-warning-border)));
+  background: var(--fab-critical-soft, var(--fab-danger-soft, var(--fab-warning-soft)));
+}
+
+.fabricate-manager .manager-danger-tag-pill.is-suggestion {
+  opacity: 0.85;
+}
+
+.fabricate-manager .manager-danger-tag-input-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.fabricate-manager .manager-danger-tag-input-row input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-gathering-hazard-edit-view {
+  display: grid;
+  grid-template-rows: auto auto auto auto auto auto auto;
+  gap: 12px;
+  min-height: 0;
+  min-width: 0;
+  padding: 14px;
+  overflow: auto;
+}
+
+.fabricate-manager .manager-gathering-hazard-edit-view :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-surface-1);
+  box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
+  font: inherit;
+}
+
+.fabricate-manager .manager-gathering-hazard-edit-view :is(input:not([type="checkbox"]):not([type="radio"]), select) {
+  min-height: 32px;
+  padding: 5px 9px;
+}
+
+.fabricate-manager .manager-gathering-hazard-edit-view textarea {
+  min-height: 54px;
+  padding: 7px 9px;
+  resize: vertical;
+}
+
+.fabricate-manager .manager-gathering-hazard-character-modifiers-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fabricate-manager .manager-gathering-hazard-character-modifier-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) 90px 90px 90px minmax(0, 1.4fr) 40px;
+  align-items: end;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-mv2-surface-2);
+}
+
+.fabricate-manager .manager-gathering-hazard-character-modifier-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-gathering-hazard-character-modifier-override {
+  grid-column: span 1;
+}
+
+.fabricate-manager .manager-field-error {
+  display: block;
+  margin-top: 4px;
+  color: var(--fab-danger-border, var(--fab-warning-border));
+  font-size: 0.78rem;
+}
+
 .fabricate-manager .manager-gathering-panel-tools {
   grid-template-rows: auto;
   padding: 12px;
@@ -9059,6 +9311,90 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
+}
+
+.fabricate-manager .manager-task-drops-summary-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-mv2-surface-2);
+}
+
+.fabricate-manager .manager-task-drops-summary-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fabricate-manager .manager-task-drop-summary-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 4px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 999px;
+  background: var(--fab-mv2-surface-1);
+  color: var(--fab-mv2-text);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.fabricate-manager .manager-task-drop-summary-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: 0 0 28px;
+  background: var(--fab-overlay-dark-12);
+}
+
+.fabricate-manager .manager-task-drop-summary-label {
+  min-width: 0;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-task-drop-summary-percent {
+  font-variant-numeric: tabular-nums;
+  color: var(--fab-mv2-text-muted);
+}
+
+.fabricate-manager .manager-task-drops-summary-usage {
+  display: grid;
+  gap: 6px;
+}
+
+.fabricate-manager .manager-task-drops-summary-usage-label {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--fab-mv2-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fabricate-manager .manager-task-environment-usage-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 3px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 999px;
+  background: var(--fab-mv2-surface-1);
+  color: var(--fab-mv2-text);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-task-environment-usage-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: 0 0 22px;
+  background: var(--fab-overlay-dark-12);
 }
 
 .fabricate-manager .manager-task-overview-card {

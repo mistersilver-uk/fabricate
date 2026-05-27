@@ -4102,6 +4102,24 @@ export function createAdminStore(services) {
     return true;
   }
 
+  async function duplicateGatheringLibraryHazard(systemId = get(selectedSystemId), hazardId) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig || !hazardId) return null;
+    const hazard = systemConfig.hazards.find(hazard => hazard.id === hazardId);
+    if (!hazard) return null;
+    const copySuffix = services.localize?.('FABRICATE.Admin.Manager.Environment.Tasks.CopySuffix') || 'Copy';
+    const duplicate = _normalizeGatheringHazard({
+      ..._clonePlain(hazard),
+      id: _randomID(),
+      name: `${hazard.name || 'Hazard'} (${copySuffix})`
+    }, _randomID);
+    systemConfig.hazards = [...systemConfig.hazards, duplicate];
+    await _saveGatheringConfig(config);
+    await refresh();
+    return duplicate;
+  }
+
   /**
    * Append a new character modifier entry to the selected system's library.
    * Returns the normalized entry, or null when the system has no gathering
@@ -4839,6 +4857,7 @@ export function createAdminStore(services) {
     addGatheringLibraryHazard,
     updateGatheringLibraryHazard,
     deleteGatheringLibraryHazard,
+    duplicateGatheringLibraryHazard,
     addGatheringCharacterModifier,
     updateGatheringCharacterModifier,
     deleteGatheringCharacterModifier,

@@ -42,6 +42,8 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTaskEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ToolsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringHazardsBrowserView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringHazardEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemsBrowserView.svelte');
@@ -2207,7 +2209,24 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelectorAll('.manager-gathering-task-row').length, 3);
     assert.ok(target.textContent.includes('Gather Moon Herbs'));
     assert.ok(target.textContent.includes('Prospect Crystal Veins'));
-    assert.ok(target.textContent.includes('High Day, Clear Sky'));
+    const tasksHead = target.querySelector('.manager-gathering-task-table-head');
+    const taskHeaders = Array.from(tasksHead.querySelectorAll('[role="columnheader"]')).map(node => node.textContent.trim());
+    assert.equal(taskHeaders.length, 3, 'task table should have three headers');
+    assert.deepEqual(taskHeaders, ['Gathering task', 'Status', 'Actions']);
+    const firstTaskRow = target.querySelector('.manager-gathering-task-row');
+    const tagsRow = firstTaskRow.querySelector('[data-gathering-task-tags]');
+    assert.ok(tagsRow, 'tags chip row renders');
+    assert.ok(firstTaskRow.querySelector('.manager-gathering-task-info-cell'), 'info cell wraps identity + tags so they share full-width column');
+    const tagPills = Array.from(tagsRow.querySelectorAll('.manager-availability-pill'));
+    const tagKinds = new Set();
+    for (const pill of tagPills) {
+      for (const kind of ['region', 'biome', 'timeOfDay', 'weather']) {
+        if (pill.classList.contains(`is-${kind}`)) tagKinds.add(kind);
+      }
+    }
+    assert.equal(tagKinds.size, 4, 'tags row should contain chips from all four dimensions (region/biome/time/weather)');
+    const description = firstTaskRow.querySelector('.manager-gathering-task-identity .manager-system-description');
+    assert.ok(description && description.textContent.trim().length > 0, 'short description should render under the task name');
     assert.ok(target.querySelector('[data-gathering-task-inspector]').textContent.includes('Selected gathering task'));
     assert.equal(
       target.querySelector('.manager-inspector').textContent.includes('Gathering task actions'),
@@ -2690,27 +2709,20 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environments');
     assert.equal(gatheringSubitem('Tasks').getAttribute('aria-current'), 'page');
 
-    for (const [label, placeholder] of [
-      ['Hazards', 'Reusable hazard authoring is planned for a later slice.']
-    ]) {
-      gatheringSubitem(label).click();
-      await tick();
-      flushSync();
-
-      assert.equal(gatheringSubitem(label).getAttribute('aria-current'), 'page');
-      assert.ok(target.textContent.includes(placeholder));
-      assert.equal(target.querySelector('.manager-toolbar'), null);
-      assert.equal(target.querySelector('.manager-environments-table'), null);
-      assert.equal(
-        target.querySelector('.manager-inspector [data-gathering-inspector-placeholder] h2').textContent.trim(),
-        label === 'Hazards' ? 'Gathering hazards' : 'Gathering settings'
-      );
-      assert.ok(target.querySelector('.manager-inspector').textContent.includes(placeholder));
-      assert.equal(
-        target.querySelector('.manager-inspector').textContent.includes('Selected environment'),
-        false
-      );
-    }
+    gatheringSubitem('Hazards').click();
+    await tick();
+    flushSync();
+    assert.equal(gatheringSubitem('Hazards').getAttribute('aria-current'), 'page');
+    assert.ok(target.querySelector('[data-gathering-hazards-browser]'), 'Hazards tab should mount the hazard library browser');
+    assert.equal(target.querySelector('.manager-environments-table'), null);
+    assert.equal(
+      target.querySelector('.manager-inspector [data-gathering-inspector-placeholder] h2').textContent.trim(),
+      'Gathering hazards'
+    );
+    assert.equal(
+      target.querySelector('.manager-inspector').textContent.includes('Selected environment'),
+      false
+    );
 
     gatheringSubitem('Settings').click();
     await tick();

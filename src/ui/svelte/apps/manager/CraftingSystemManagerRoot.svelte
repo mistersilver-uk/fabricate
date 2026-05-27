@@ -38,6 +38,7 @@
   let activeGatheringTab = $state('environments');
   let gatheringMenuExpanded = $state(false);
   let selectedGatheringTaskId = $state('');
+  let selectedGatheringHazardId = $state('');
   let selectedGatheringDropId = $state('');
   let gatheringTaskDraft = $state(null);
   let gatheringTaskDraftBaseline = $state(null);
@@ -426,6 +427,9 @@
       || gatheringTaskDefinitions[0]
       || null
   );
+  const selectedGatheringHazard = $derived(
+    gatheringHazardDefinitions.find(hazard => hazard.id === selectedGatheringHazardId) || null
+  );
   const editingGatheringTask = $derived(gatheringTaskDraft || selectedGatheringTask);
   const selectedGatheringDrop = $derived(
     gatheringTaskDropRows(editingGatheringTask).find(row => row.id === selectedGatheringDropId)
@@ -478,6 +482,7 @@
     if (selectedSystemId === lastGatheringSystemId) return;
     activeGatheringTab = 'environments';
     selectedGatheringTaskId = '';
+    selectedGatheringHazardId = '';
     gatheringTaskDraft = null;
     gatheringTaskDraftBaseline = null;
     gatheringTaskSaving = false;
@@ -507,6 +512,16 @@
     }
     if (selectedGatheringTaskId && gatheringTaskDefinitions.some(task => task.id === selectedGatheringTaskId)) return;
     selectedGatheringTaskId = gatheringTaskDefinitions[0]?.id || '';
+  });
+
+  $effect(() => {
+    if (!canShowEnvironments) {
+      selectedGatheringHazardId = '';
+      return;
+    }
+    if (!selectedGatheringHazardId) return;
+    if (gatheringHazardDefinitions.some(hazard => hazard.id === selectedGatheringHazardId)) return;
+    selectedGatheringHazardId = '';
   });
 
   $effect(() => {
@@ -1433,6 +1448,63 @@
   function toggleGatheringTaskEnabled(systemId = selectedSystemId, taskId = selectedGatheringTask?.id, enabled = true) {
     if (!systemId || !taskId) return;
     store.updateGatheringLibraryTask?.(systemId, taskId, { enabled });
+  }
+
+  function selectGatheringHazard(hazardId = selectedGatheringHazard?.id) {
+    selectedGatheringHazardId = hazardId || '';
+  }
+
+  function createGatheringHazard(systemId = selectedSystemId) {
+    if (!systemId) return;
+    const created = store.addGatheringLibraryHazard?.(systemId);
+    if (isPromise(created)) {
+      created.then(hazard => {
+        if (hazard?.id) selectedGatheringHazardId = hazard.id;
+      });
+      return;
+    }
+    if (created?.id) selectedGatheringHazardId = created.id;
+  }
+
+  function editGatheringHazard(hazardId = selectedGatheringHazard?.id) {
+    if (!hazardId || !canShowEnvironments) return;
+    selectedGatheringHazardId = hazardId;
+    activeGatheringTab = 'encounters';
+    gatheringMenuExpanded = true;
+  }
+
+  function duplicateGatheringHazard(systemId = selectedSystemId, hazardId = selectedGatheringHazard?.id) {
+    if (!systemId || !hazardId) return;
+    const duplicated = store.duplicateGatheringLibraryHazard?.(systemId, hazardId);
+    if (isPromise(duplicated)) {
+      duplicated.then(hazard => {
+        if (hazard?.id) selectedGatheringHazardId = hazard.id;
+      });
+      return;
+    }
+    if (duplicated?.id) selectedGatheringHazardId = duplicated.id;
+  }
+
+  function deleteGatheringHazard(systemId = selectedSystemId, hazardId = selectedGatheringHazard?.id) {
+    if (!systemId || !hazardId) return;
+    const deleted = store.deleteGatheringLibraryHazard?.(systemId, hazardId);
+    if (isPromise(deleted)) {
+      deleted.then(value => {
+        if (value !== false && selectedGatheringHazardId === hazardId) selectedGatheringHazardId = '';
+      });
+      return;
+    }
+    if (deleted !== false && selectedGatheringHazardId === hazardId) selectedGatheringHazardId = '';
+  }
+
+  function toggleGatheringHazardEnabled(systemId = selectedSystemId, hazardId = selectedGatheringHazard?.id, enabled = true) {
+    if (!systemId || !hazardId) return;
+    store.updateGatheringLibraryHazard?.(systemId, hazardId, { enabled });
+  }
+
+  function updateSelectedGatheringHazard(updates = {}) {
+    if (!selectedSystemId || !selectedGatheringHazard?.id) return false;
+    return store.updateGatheringLibraryHazard?.(selectedSystemId, selectedGatheringHazard.id, updates);
   }
 
   function updateSelectedGatheringTask(updates = {}) {
@@ -2567,7 +2639,15 @@
         {shouldUseEnvironmentDraftForDisplay}
         {activeGatheringTab}
         selectedTaskId={selectedGatheringTask?.id || selectedGatheringTaskId}
+        selectedHazardId={selectedGatheringHazard?.id || selectedGatheringHazardId}
+        selectedGatheringHazard={selectedGatheringHazard}
+        characterModifierLibrary={selectedGatheringCharacterModifiers}
+        hazardWeatherOptions={gatheringConditionOptions('weather')}
+        hazardTimeOfDayOptions={gatheringConditionOptions('timeOfDay')}
+        hazardRegionOptions={gatheringVocabularyOptions('regions')}
+        hazardBiomeOptions={gatheringVocabularyOptions('biomes')}
         managedItemOptions={selectedSystem?.managedItemOptions || []}
+        onPickImagePath={services?.pickImagePath}
         onSelectGatheringTab={selectGatheringTab}
         onSelectGatheringTask={selectGatheringTask}
         onCreateGatheringTask={createGatheringTask}
@@ -2575,6 +2655,13 @@
         onDuplicateGatheringTask={duplicateGatheringTask}
         onDeleteGatheringTask={deleteGatheringTask}
         onToggleGatheringTaskEnabled={toggleGatheringTaskEnabled}
+        onSelectGatheringHazard={selectGatheringHazard}
+        onCreateGatheringHazard={createGatheringHazard}
+        onEditGatheringHazard={editGatheringHazard}
+        onDuplicateGatheringHazard={duplicateGatheringHazard}
+        onDeleteGatheringHazard={deleteGatheringHazard}
+        onToggleGatheringHazardEnabled={toggleGatheringHazardEnabled}
+        onUpdateGatheringHazard={updateSelectedGatheringHazard}
         onSelectEnvironment={(id) => selectEnvironment(id)}
         onEditEnvironment={(id) => editEnvironment(id)}
         onCreateEnvironment={createEnvironment}
@@ -2666,6 +2753,8 @@
         rewardRules={selectedGatheringRules}
         characterModifierLibrary={selectedGatheringCharacterModifiers}
         libraryTools={selectedGatheringSystemTools}
+        environments={environmentList}
+        {selectedSystemId}
         onPickImagePath={services?.pickImagePath}
         onUpdateTask={updateSelectedGatheringTask}
         onSelectDrop={(rowId) => { selectedGatheringDropId = rowId; }}

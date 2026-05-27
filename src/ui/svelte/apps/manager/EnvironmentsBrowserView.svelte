@@ -7,6 +7,8 @@
   import ManagerColorPicker from '../../components/ManagerColorPicker.svelte';
   import ManagerColorPopover from '../../components/ManagerColorPopover.svelte';
   import GatheringTasksBrowserView from './GatheringTasksBrowserView.svelte';
+  import GatheringHazardsBrowserView from './GatheringHazardsBrowserView.svelte';
+  import GatheringHazardEditView from './GatheringHazardEditView.svelte';
 
   let {
     environments = [],
@@ -23,7 +25,15 @@
     shouldUseEnvironmentDraftForDisplay = false,
     activeGatheringTab = 'environments',
     selectedTaskId = '',
+    selectedHazardId = '',
+    selectedGatheringHazard = null,
+    characterModifierLibrary = [],
+    hazardWeatherOptions = [],
+    hazardTimeOfDayOptions = [],
+    hazardRegionOptions = [],
+    hazardBiomeOptions = [],
     managedItemOptions = [],
+    onPickImagePath = null,
     onSelectGatheringTab = () => {},
     onSelectGatheringTask = () => {},
     onCreateGatheringTask = () => {},
@@ -31,6 +41,13 @@
     onDuplicateGatheringTask = () => {},
     onDeleteGatheringTask = () => {},
     onToggleGatheringTaskEnabled = () => {},
+    onSelectGatheringHazard = () => {},
+    onCreateGatheringHazard = () => {},
+    onEditGatheringHazard = () => {},
+    onDuplicateGatheringHazard = () => {},
+    onDeleteGatheringHazard = () => {},
+    onToggleGatheringHazardEnabled = () => {},
+    onUpdateGatheringHazard = () => {},
     onSelectEnvironment = () => {},
     onEditEnvironment = () => {},
     onCreateEnvironment = () => {},
@@ -93,10 +110,10 @@
       labelKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.Encounters',
       labelFallback: 'Hazards',
       icon: 'fas fa-exclamation-triangle',
-      titleKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersPlaceholderTitle',
+      titleKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersTitle',
       titleFallback: 'Gathering hazards',
-      hintKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersPlaceholderHint',
-      hintFallback: 'Reusable hazard authoring is planned for a later slice.'
+      hintKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersHint',
+      hintFallback: 'Browse reusable hazards before attaching them to environments.'
     },
     {
       id: 'settings',
@@ -800,6 +817,35 @@
       onDeleteTask={onDeleteGatheringTask}
       onToggleTaskEnabled={onToggleGatheringTaskEnabled}
     />
+  {:else if activeGatheringTab === 'encounters'}
+    <div class="manager-gathering-encounters-shell" data-gathering-encounters-shell>
+      <GatheringHazardsBrowserView
+        hazards={selectedGatheringSystemConfig.hazards || []}
+        environments={environmentList}
+        {selectedHazardId}
+        {selectedSystemId}
+        {gatheringConfig}
+        labelledBy="manager-gathering-nav-encounters"
+        onSelectHazard={onSelectGatheringHazard}
+        onCreateHazard={onCreateGatheringHazard}
+        onEditHazard={onEditGatheringHazard}
+        onDuplicateHazard={onDuplicateGatheringHazard}
+        onDeleteHazard={onDeleteGatheringHazard}
+        onToggleHazardEnabled={onToggleGatheringHazardEnabled}
+      />
+      {#if selectedGatheringHazard}
+        <GatheringHazardEditView
+          hazard={selectedGatheringHazard}
+          weatherOptions={hazardWeatherOptions}
+          timeOfDayOptions={hazardTimeOfDayOptions}
+          regionOptions={hazardRegionOptions}
+          biomeOptions={hazardBiomeOptions}
+          {characterModifierLibrary}
+          {onPickImagePath}
+          onUpdateHazard={onUpdateGatheringHazard}
+        />
+      {/if}
+    </div>
   {:else if activeGatheringTab === 'settings'}
     <div
       class="manager-gathering-panel manager-gathering-settings"

@@ -18,6 +18,8 @@
     rewardRules = null,
     characterModifierLibrary = [],
     libraryTools = [],
+    environments = [],
+    selectedSystemId = '',
     onPickImagePath = null,
     onUpdateTask = () => {},
     onSelectDrop = () => {},
@@ -102,6 +104,23 @@
   ));
   const toolShowingStart = $derived(filteredLibraryTools.length === 0 ? 0 : toolPageIndex * toolPageSize + 1);
   const toolShowingEnd = $derived(Math.min(filteredLibraryTools.length, (toolPageIndex + 1) * toolPageSize));
+
+  const dropSummaryRows = $derived(dropRows.map(row => ({
+    id: row.id,
+    label: componentLabel(row),
+    image: componentImage(row),
+    chancePercent: dropRateValue(row)
+  })));
+  const referencingEnvironments = $derived((Array.isArray(environments) ? environments : []).filter(environment => {
+    if (!task?.id) return false;
+    if (String(environment?.craftingSystemId || '') !== String(selectedSystemId || '')) return false;
+    const enabledIds = Array.isArray(environment?.enabledTaskIds) ? environment.enabledTaskIds.map(String) : [];
+    return enabledIds.includes(String(task.id));
+  }).map(environment => ({
+    id: environment.id,
+    name: String(environment?.name || environment?.id || '').trim(),
+    img: environment?.img || 'icons/svg/explosion.svg'
+  })));
 
   $effect(() => {
     if (task?.id === lastTaskId) return;
@@ -847,6 +866,48 @@
         <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.RewardRuleNotice', 'Multiple drop rows use this component. Current drop rules may award only one matching row.')}</span>
       </section>
     {/if}
+
+    <section class="manager-task-drops-summary-card" data-task-drops-summary>
+      <header class="manager-task-card-header">
+        <div class="manager-task-drop-header-copy">
+          <h3>{text('FABRICATE.Admin.Manager.Environment.Tasks.DropsSummary', 'Drops summary')}</h3>
+        </div>
+      </header>
+      {#if dropSummaryRows.length === 0}
+        <p class="manager-muted" data-task-drops-summary-empty>{text('FABRICATE.Admin.Manager.Environment.Tasks.NoDropsConfigured', 'No drops configured yet.')}</p>
+      {:else}
+        <div class="manager-task-drops-summary-list" data-task-drops-summary-list>
+          {#each dropSummaryRows as drop (drop.id)}
+            <span class="manager-task-drop-summary-chip" data-task-drop-summary-chip>
+              <img class="manager-task-drop-summary-thumb" src={drop.image} alt="" />
+              <span class="manager-task-drop-summary-label" title={drop.label}>{drop.label}</span>
+              <strong class="manager-task-drop-summary-percent">{drop.chancePercent}%</strong>
+            </span>
+          {/each}
+        </div>
+      {/if}
+      <footer class="manager-task-drops-summary-usage" data-task-environment-usage>
+        {#if referencingEnvironments.length === 0}
+          <p class="manager-muted" data-task-environment-usage-empty>{text('FABRICATE.Admin.Manager.Environment.Tasks.NotUsedInEnvironments', 'Not used in any environments yet.')}</p>
+        {:else}
+          <p class="manager-task-drops-summary-usage-label">
+            {#if referencingEnvironments.length === 1}
+              {text('FABRICATE.Admin.Manager.Environment.Tasks.UsedInOneEnvironment', 'Used in 1 environment')}
+            {:else}
+              {text('FABRICATE.Admin.Manager.Environment.Tasks.UsedInEnvironments', 'Used in {count} environments').replace('{count}', referencingEnvironments.length)}
+            {/if}
+          </p>
+          <span class="manager-availability-pill-row" data-task-environment-usage-chips>
+            {#each referencingEnvironments as environment (environment.id)}
+              <span class="manager-task-environment-usage-chip">
+                <img class="manager-task-environment-usage-thumb" src={environment.img} alt="" />
+                <span>{environment.name}</span>
+              </span>
+            {/each}
+          </span>
+        {/if}
+      </footer>
+    </section>
 
     <section class="manager-task-drops-card">
       <div class="manager-task-card-header">
