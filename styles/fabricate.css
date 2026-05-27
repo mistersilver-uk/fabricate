@@ -6493,7 +6493,12 @@
 
 .fabricate-manager .manager-availability-pill.is-any {
   opacity: 0.72;
+  padding-right: 12px;
   font-style: italic;
+}
+
+.fabricate-manager .manager-availability-pill.is-any > span {
+  padding-right: 2px;
 }
 
 .fabricate-manager .manager-availability-pill.is-any > i {
@@ -8758,7 +8763,12 @@
 
 .fabricate-manager .manager-danger-tag-pill.is-any {
   opacity: 0.72;
+  padding-right: 12px;
   font-style: italic;
+}
+
+.fabricate-manager .manager-danger-tag-pill.is-any > span {
+  padding-right: 2px;
 }
 
 .fabricate-manager .manager-danger-tag-pill {
@@ -8859,7 +8869,7 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-gathering-hazard-row {
+.fabricate-manager .manager-gathering-hazard-edit-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 12px;
@@ -8867,7 +8877,7 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-gathering-hazard-row > .manager-task-availability-card {
+.fabricate-manager .manager-gathering-hazard-edit-row > .manager-task-availability-card {
   min-width: 0;
 }
 

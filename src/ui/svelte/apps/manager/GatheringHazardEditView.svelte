@@ -292,7 +292,7 @@
       </div>
     </section>
 
-    <div class="manager-gathering-hazard-row" data-gathering-hazard-row="danger-drop-rate">
+    <div class="manager-gathering-hazard-edit-row" data-gathering-hazard-row="danger-drop-rate">
     <section class="manager-task-availability-card" data-gathering-hazard-danger-tags>
       <div class="manager-task-card-heading">
         <div>
