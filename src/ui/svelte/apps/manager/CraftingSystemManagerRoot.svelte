@@ -45,6 +45,10 @@
   let gatheringTaskDraftBaseline = $state(null);
   let gatheringTaskSaving = $state(false);
   let gatheringTaskSaveError = $state('');
+  let gatheringHazardDraft = $state(null);
+  let gatheringHazardDraftBaseline = $state(null);
+  let gatheringHazardSaving = $state(false);
+  let gatheringHazardSaveError = $state('');
   let toolsComponentSearchTerm = $state('');
   let toolsComponentPageIndex = $state(0);
   let toolsComponentPageSize = $state(6);
@@ -190,6 +194,23 @@
     }
   });
 
+  const hazardCharacterModifierSearchSuggestions = $derived.by(() => {
+    const term = characterModifierSearchTerm.trim().toLowerCase();
+    if (!term) return [];
+    const attached = new Set((editingGatheringHazard?.characterModifiers || []).map(ref => ref.modifierId).filter(Boolean));
+    return selectedGatheringCharacterModifiers.filter(entry => {
+      if (attached.has(entry.id)) return false;
+      const label = String(entry.label || '').toLowerCase();
+      const id = String(entry.id || '').toLowerCase();
+      return label.includes(term) || id.includes(term);
+    });
+  });
+  $effect(() => {
+    if (editingGatheringHazard?.id) {
+      characterModifierSearchTerm = '';
+    }
+  });
+
   let characterModifierSearchAnchor = $state(null);
   let characterModifierSearchOpenUp = $state(false);
 
@@ -259,6 +280,28 @@
       gatheringWeatherPickerSelection = weatherAvailable[0]?.id || '';
     }
   });
+
+  let gatheringHazardTimeOfDayPickerSelection = $state('');
+  let gatheringHazardWeatherPickerSelection = $state('');
+  $effect(() => {
+    const timeAvailable = gatheringConditionAvailableOptions(editingGatheringHazard, 'timeOfDay');
+    if (!timeAvailable.some(option => option.id === gatheringHazardTimeOfDayPickerSelection)) {
+      gatheringHazardTimeOfDayPickerSelection = timeAvailable[0]?.id || '';
+    }
+    const weatherAvailable = gatheringConditionAvailableOptions(editingGatheringHazard, 'weather');
+    if (!weatherAvailable.some(option => option.id === gatheringHazardWeatherPickerSelection)) {
+      gatheringHazardWeatherPickerSelection = weatherAvailable[0]?.id || '';
+    }
+  });
+
+  function gatheringHazardModifierPickerSelection(kind) {
+    return kind === 'weather' ? gatheringHazardWeatherPickerSelection : gatheringHazardTimeOfDayPickerSelection;
+  }
+
+  function setGatheringHazardModifierPickerSelection(kind, value) {
+    if (kind === 'weather') gatheringHazardWeatherPickerSelection = value;
+    else gatheringHazardTimeOfDayPickerSelection = value;
+  }
 
   function gatheringDropModifierPickerSelection(kind) {
     return kind === 'weather' ? gatheringWeatherPickerSelection : gatheringTimeOfDayPickerSelection;
@@ -447,6 +490,26 @@
       : { valid: true, errors: [] }
   );
 
+  const editingGatheringHazard = $derived(gatheringHazardDraft || selectedGatheringHazard);
+  const gatheringHazardDraftDirty = $derived(
+    !!(gatheringHazardDraft && gatheringHazardDraftBaseline
+      && JSON.stringify(gatheringHazardDraft) !== JSON.stringify(gatheringHazardDraftBaseline))
+  );
+  const gatheringHazardValidation = $derived(validateGatheringHazardDraft(gatheringHazardDraft));
+
+  function validateGatheringHazardDraft(draft) {
+    if (!draft) return { valid: true, errors: [] };
+    const errors = [];
+    if (!String(draft?.name || '').trim()) {
+      errors.push(text('FABRICATE.Admin.Manager.Environment.Hazards.NameRequired', 'Name is required.'));
+    }
+    const rate = Number(draft?.dropRate);
+    if (!Number.isFinite(rate) || rate < 1 || rate > 100) {
+      errors.push(text('FABRICATE.Admin.Manager.Environment.Hazards.DropRateInvalid', 'Drop rate must be between 1 and 100.'));
+    }
+    return { valid: errors.length === 0, errors };
+  }
+
   const libraryToolsList = $derived(Array.isArray($viewState.toolsDraft) ? $viewState.toolsDraft : []);
   const dirtyToolIds = $derived(Array.isArray($viewState.toolsDraftDirtyToolIds) ? $viewState.toolsDraftDirtyToolIds : []);
   const selectedLibraryTool = $derived(
@@ -488,6 +551,10 @@
     gatheringTaskDraftBaseline = null;
     gatheringTaskSaving = false;
     gatheringTaskSaveError = '';
+    gatheringHazardDraft = null;
+    gatheringHazardDraftBaseline = null;
+    gatheringHazardSaving = false;
+    gatheringHazardSaveError = '';
     gatheringMenuExpanded = isGatheringRoute;
     store?.cancelToolsDraft?.();
     lastGatheringSystemId = selectedSystemId;
@@ -865,6 +932,24 @@
     return true;
   }
 
+  function finishGatheringHazardRouteExit(confirmed) {
+    if (confirmed === false) return false;
+    clearGatheringHazardDraft();
+    return true;
+  }
+
+  function confirmGatheringHazardRouteExit(nextView) {
+    if (activeView !== 'gathering-hazard-edit') return true;
+    if (!gatheringHazardDraftDirty) return finishGatheringHazardRouteExit(true);
+    const message = text(
+      'FABRICATE.Admin.Manager.Environment.Hazards.DiscardChangesPrompt',
+      'The current hazard has unsaved changes. Discard them and continue?'
+    );
+    const confirmed = typeof globalThis.confirm === 'function' ? globalThis.confirm(message) : false;
+    if (isPromise(confirmed)) return confirmed.then(finishGatheringHazardRouteExit);
+    return finishGatheringHazardRouteExit(confirmed);
+  }
+
   function confirmComponentRouteExit(nextView) {
     if (activeView !== 'component-edit') return true;
     if (componentEditDirty !== true) return true;
@@ -945,9 +1030,18 @@
   function continueRouteExitAfterComponent(nextView) {
     const taskResult = confirmGatheringTaskRouteExit(nextView);
     if (isPromise(taskResult)) {
-      return taskResult.then(value => value === false ? false : confirmToolsRouteExit(nextView));
+      return taskResult.then(value => value === false ? false : continueRouteExitAfterTask(nextView));
     }
     if (taskResult === false) return false;
+    return continueRouteExitAfterTask(nextView);
+  }
+
+  function continueRouteExitAfterTask(nextView) {
+    const hazardResult = confirmGatheringHazardRouteExit(nextView);
+    if (isPromise(hazardResult)) {
+      return hazardResult.then(value => value === false ? false : confirmToolsRouteExit(nextView));
+    }
+    if (hazardResult === false) return false;
     return confirmToolsRouteExit(nextView);
   }
 
@@ -1473,9 +1567,21 @@
   function editGatheringHazard(hazardId = selectedGatheringHazard?.id) {
     if (!hazardId || !canShowEnvironments) return;
     selectedGatheringHazardId = hazardId;
+    const source = gatheringHazardDefinitions.find(hazard => hazard.id === hazardId) || null;
+    const snapshot = source ? JSON.parse(JSON.stringify(source)) : null;
+    gatheringHazardDraft = snapshot;
+    gatheringHazardDraftBaseline = snapshot ? JSON.parse(JSON.stringify(snapshot)) : null;
+    gatheringHazardSaveError = '';
     activeGatheringTab = 'encounters';
     gatheringMenuExpanded = true;
     activeView = 'gathering-hazard-edit';
+  }
+
+  function clearGatheringHazardDraft() {
+    gatheringHazardDraft = null;
+    gatheringHazardDraftBaseline = null;
+    gatheringHazardSaveError = '';
+    gatheringHazardSaving = false;
   }
 
   function backToGatheringHazardLibrary() {
@@ -1484,6 +1590,42 @@
       gatheringMenuExpanded = true;
       activeView = 'environments';
     });
+  }
+
+  async function saveGatheringHazardDraft() {
+    if (!gatheringHazardDraft || !selectedSystemId || !selectedGatheringHazardId) return;
+    const { valid, errors } = gatheringHazardValidation;
+    if (!valid) {
+      gatheringHazardSaveError = errors[0] || '';
+      return;
+    }
+    gatheringHazardSaving = true;
+    try {
+      const ok = await store.updateGatheringLibraryHazard?.(selectedSystemId, selectedGatheringHazardId, gatheringHazardDraft);
+      if (ok !== false) {
+        gatheringHazardDraftBaseline = JSON.parse(JSON.stringify(gatheringHazardDraft));
+        gatheringHazardSaveError = '';
+      }
+    } finally {
+      gatheringHazardSaving = false;
+    }
+  }
+
+  async function deleteGatheringHazardDraft() {
+    if (!selectedGatheringHazardId || !selectedSystemId) return;
+    const message = text(
+      'FABRICATE.Admin.Manager.Environment.Hazards.DeleteConfirm',
+      'Delete this hazard? This cannot be undone.'
+    );
+    const confirmed = typeof globalThis.confirm === 'function' ? globalThis.confirm(message) : true;
+    if (confirmed === false) return;
+    const deletedId = selectedGatheringHazardId;
+    await store.deleteGatheringLibraryHazard?.(selectedSystemId, deletedId);
+    if (selectedGatheringHazardId === deletedId) selectedGatheringHazardId = '';
+    clearGatheringHazardDraft();
+    activeGatheringTab = 'encounters';
+    gatheringMenuExpanded = true;
+    activeView = 'environments';
   }
 
   function duplicateGatheringHazard(systemId = selectedSystemId, hazardId = selectedGatheringHazard?.id) {
@@ -1516,6 +1658,10 @@
   }
 
   function updateSelectedGatheringHazard(updates = {}) {
+    if (gatheringHazardDraft) {
+      gatheringHazardDraft = { ...gatheringHazardDraft, ...updates };
+      return true;
+    }
     if (!selectedSystemId || !selectedGatheringHazard?.id) return false;
     return store.updateGatheringLibraryHazard?.(selectedSystemId, selectedGatheringHazard.id, updates);
   }
@@ -1681,6 +1827,74 @@
     };
     conditionModifiers[kind] = conditionModifiers[kind].filter(modifier => modifier.id !== modifierId);
     updateGatheringTaskDrop(rowId, { conditionModifiers });
+  }
+
+  function addGatheringHazardConditionModifier(kind, conditionId) {
+    if (!editingGatheringHazard?.id || !kind || !conditionId) return;
+    const conditionModifiers = {
+      timeOfDay: gatheringConditionModifierRows(editingGatheringHazard, 'timeOfDay'),
+      weather: gatheringConditionModifierRows(editingGatheringHazard, 'weather')
+    };
+    if (conditionModifiers[kind].some(modifier => modifier.conditionId === conditionId)) return;
+    conditionModifiers[kind] = [
+      ...conditionModifiers[kind],
+      { id: `${kind}-${gatheringDropRowId()}`, conditionId, operator: '+', value: 0 }
+    ];
+    updateSelectedGatheringHazard({ conditionModifiers });
+  }
+
+  function updateGatheringHazardConditionModifier(kind, modifierId, updates = {}) {
+    if (!editingGatheringHazard?.id || !kind || !modifierId) return;
+    const conditionModifiers = {
+      timeOfDay: gatheringConditionModifierRows(editingGatheringHazard, 'timeOfDay'),
+      weather: gatheringConditionModifierRows(editingGatheringHazard, 'weather')
+    };
+    conditionModifiers[kind] = conditionModifiers[kind].map(modifier => modifier.id === modifierId ? { ...modifier, ...updates } : modifier);
+    updateSelectedGatheringHazard({ conditionModifiers });
+  }
+
+  function deleteGatheringHazardConditionModifier(kind, modifierId) {
+    if (!editingGatheringHazard?.id || !kind || !modifierId) return;
+    const conditionModifiers = {
+      timeOfDay: gatheringConditionModifierRows(editingGatheringHazard, 'timeOfDay'),
+      weather: gatheringConditionModifierRows(editingGatheringHazard, 'weather')
+    };
+    conditionModifiers[kind] = conditionModifiers[kind].filter(modifier => modifier.id !== modifierId);
+    updateSelectedGatheringHazard({ conditionModifiers });
+  }
+
+  function pickCharacterModifierForHazard(modifierId) {
+    if (!editingGatheringHazard?.id || !modifierId) return;
+    const refs = Array.isArray(editingGatheringHazard.characterModifiers) ? editingGatheringHazard.characterModifiers : [];
+    if (refs.some(ref => ref.modifierId === modifierId)) return;
+    characterModifierSearchTerm = '';
+    const newRef = {
+      id: `char-mod-${modifierId}-${refs.length + 1}-${Math.random().toString(36).slice(2, 6)}`,
+      modifierId,
+      operator: '+',
+      min: null,
+      max: null,
+      expressionOverride: ''
+    };
+    updateSelectedGatheringHazard({ characterModifiers: [...refs, newRef] });
+  }
+
+  function onUpdateHazardCharacterModifier(refId, patch) {
+    if (!editingGatheringHazard?.id || !refId) return;
+    const refs = Array.isArray(editingGatheringHazard.characterModifiers) ? editingGatheringHazard.characterModifiers : [];
+    const next = refs.map(ref => ref.id === refId ? { ...ref, ...patch } : ref);
+    updateSelectedGatheringHazard({ characterModifiers: next });
+  }
+
+  function onDeleteHazardCharacterModifier(refId) {
+    if (!editingGatheringHazard?.id || !refId) return;
+    const refs = Array.isArray(editingGatheringHazard.characterModifiers) ? editingGatheringHazard.characterModifiers : [];
+    updateSelectedGatheringHazard({ characterModifiers: refs.filter(ref => ref.id !== refId) });
+  }
+
+  function setHazardCharacterModifierOverrideEnabled(ref, enabled, libraryEntry) {
+    const expressionOverride = enabled ? (libraryEntry?.expression || '') : '';
+    onUpdateHazardCharacterModifier(ref.id, { expressionOverride });
   }
 
   function moveEnvironment(environmentId = selectedEnvironment?.id, direction) {
@@ -2103,6 +2317,20 @@
     return true;
   }
 
+  const DANGER_LEVEL_ORDER = ['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme'];
+
+  function sortedDangerTags(tags) {
+    if (!Array.isArray(tags)) return [];
+    return [...tags].sort((a, b) => {
+      const ai = DANGER_LEVEL_ORDER.indexOf(a);
+      const bi = DANGER_LEVEL_ORDER.indexOf(b);
+      const aRank = ai === -1 ? DANGER_LEVEL_ORDER.length : ai;
+      const bRank = bi === -1 ? DANGER_LEVEL_ORDER.length : bi;
+      if (aRank !== bRank) return aRank - bRank;
+      return String(a).localeCompare(String(b));
+    });
+  }
+
   function gatheringTaskReferencingEnvironments(task) {
     if (!task?.id) return [];
     const taskId = String(task.id);
@@ -2470,6 +2698,11 @@
           <i class="fas fa-plus" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Create', 'Create gathering task')}</span>
         </button>
+      {:else if currentView === 'environments' && activeGatheringTab === 'encounters'}
+        <button type="button" class="manager-button is-primary" onclick={() => createGatheringHazard(selectedSystemId)} disabled={!canShowEnvironments}>
+          <i class="fas fa-plus" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Environment.Hazards.Create', 'Create gathering hazard')}</span>
+        </button>
       {:else if currentView === 'environments'}
         <button type="button" class="manager-button is-primary" onclick={createEnvironment} disabled={!canShowEnvironments}>
           <i class="fas fa-plus" aria-hidden="true"></i>
@@ -2520,15 +2753,28 @@
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Environment.Hazards.BackToLibrary', 'Back to hazard library')}</span>
         </button>
+        {#if gatheringHazardDraftDirty}
+          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Environment.Hazards.Dirty', 'Unsaved')}</span>
+        {/if}
         <button
           type="button"
           class="manager-button is-danger"
-          onclick={() => deleteGatheringHazard(selectedSystemId, selectedGatheringHazard?.id)}
-          disabled={!selectedGatheringHazard?.id}
+          onclick={deleteGatheringHazardDraft}
+          disabled={!selectedGatheringHazardId || gatheringHazardSaving}
           title={text('FABRICATE.Admin.Manager.Environment.Hazards.Delete', 'Delete hazard')}
         >
           <i class="fas fa-trash" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Environment.Hazards.Delete', 'Delete hazard')}</span>
+        </button>
+        <button
+          type="button"
+          class="manager-button is-primary"
+          onclick={saveGatheringHazardDraft}
+          disabled={!gatheringHazardDraftDirty || !gatheringHazardValidation.valid || gatheringHazardSaving}
+          title={gatheringHazardValidation.valid ? '' : gatheringHazardValidation.errors.join('\n')}
+        >
+          <i class={gatheringHazardSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Environment.Hazards.Save', 'Save hazard')}</span>
         </button>
       {:else if currentView === 'system-edit'}
         <button type="button" class="manager-button" onclick={backToSystemsBrowser}>
@@ -2804,12 +3050,11 @@
       />
     {:else if currentView === 'gathering-hazard-edit' && selectedSystem}
       <GatheringHazardEditView
-        hazard={selectedGatheringHazard}
+        hazard={editingGatheringHazard}
         weatherOptions={gatheringConditionOptions('weather')}
         timeOfDayOptions={gatheringConditionOptions('timeOfDay')}
         regionOptions={gatheringVocabularyOptions('regions')}
         biomeOptions={gatheringVocabularyOptions('biomes')}
-        characterModifierLibrary={selectedGatheringCharacterModifiers}
         onPickImagePath={services?.pickImagePath}
         onUpdateHazard={updateSelectedGatheringHazard}
       />
@@ -3105,14 +3350,14 @@
               {#if gatheringTaskReferencingEnvironments(selectedGatheringTask).length === 0}
                 <p class="manager-muted" data-task-environment-usage-empty>{text('FABRICATE.Admin.Manager.Environment.Tasks.NotUsedInEnvironments', 'Not used in any environments yet.')}</p>
               {:else}
-                <span class="manager-availability-pill-row" data-task-environment-usage-chips>
+                <div class="manager-task-environment-usage-grid" data-task-environment-usage-chips>
                   {#each gatheringTaskReferencingEnvironments(selectedGatheringTask) as environment (environment.id)}
-                    <span class="manager-task-environment-usage-chip">
+                    <article class="manager-task-environment-usage-card">
                       <img class="manager-task-environment-usage-thumb" src={environmentImage(environment)} alt="" />
-                      <span>{environmentName(environment)}</span>
-                    </span>
+                      <span class="manager-task-environment-usage-name" title={environmentName(environment)}>{environmentName(environment)}</span>
+                    </article>
                   {/each}
-                </span>
+                </div>
               {/if}
             </section>
             {/if}
@@ -3382,7 +3627,207 @@
             </div>
           {/if}
         {:else if (currentView === 'environments' && activeGatheringTab === 'encounters') || currentView === 'gathering-hazard-edit'}
-          {#if selectedGatheringHazard && currentView !== 'gathering-hazard-edit'}
+          {#if currentView === 'gathering-hazard-edit' && editingGatheringHazard}
+            <div class="manager-drop-inspector-stack" data-gathering-hazard-inspector-stack>
+              <div class="manager-drop-inspector-scroll">
+              {#each ['timeOfDay', 'weather'] as kind (kind)}
+                {@const isWeather = kind === 'weather'}
+                {@const cardTitle = isWeather
+                  ? text('FABRICATE.Admin.Manager.Environment.Tasks.WeatherModifiers', 'Weather modifiers')
+                  : text('FABRICATE.Admin.Manager.Environment.Tasks.TimeModifiers', 'Time modifiers')}
+                {@const cardHint = isWeather
+                  ? text('FABRICATE.Admin.Manager.Environment.Hazards.WeatherModifiersHint', "Adjust this hazard's chance based on the active weather condition.")
+                  : text('FABRICATE.Admin.Manager.Environment.Hazards.TimeModifiersHint', "Adjust this hazard's chance based on the active time of day.")}
+                {@const availableConditions = gatheringConditionAvailableOptions(editingGatheringHazard, kind)}
+                {@const pickerSelection = gatheringHazardModifierPickerSelection(kind)}
+                {@const attachedModifiers = gatheringConditionModifierRows(editingGatheringHazard, kind)}
+                <section class="manager-inspector-card manager-drop-editor-condition-modifier-card" data-gathering-hazard-condition-modifiers={kind}>
+                  <header class="manager-character-modifier-row-card-header">
+                    <div class="manager-character-modifier-row-card-heading">
+                      <h3 class="manager-card-title">{cardTitle}</h3>
+                      <p class="manager-muted">{cardHint}</p>
+                    </div>
+                  </header>
+                  <div class="manager-condition-modifier-add-row" data-gathering-hazard-condition-modifier-picker={kind}>
+                    <label class="manager-field manager-condition-modifier-picker">
+                      <span class="visually-hidden">{text('FABRICATE.Admin.Manager.Environment.Tasks.ConditionPickerLabel', 'Condition')}</span>
+                      <select
+                        value={pickerSelection}
+                        disabled={availableConditions.length === 0}
+                        data-tooltip={availableConditions.length === 0 ? text('FABRICATE.Admin.Manager.Environment.Tasks.AllConditionsAdded', 'All conditions already added.') : null}
+                        onchange={(event) => setGatheringHazardModifierPickerSelection(kind, event.currentTarget.value)}
+                      >
+                        {#each availableConditions as option (option.id)}
+                          <option value={option.id}>{option.label || option.id}</option>
+                        {/each}
+                      </select>
+                    </label>
+                    <button
+                      type="button"
+                      class="manager-icon-button"
+                      aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.AddConditionModifier', 'Add modifier')}
+                      title={text('FABRICATE.Admin.Manager.Environment.Tasks.AddConditionModifier', 'Add modifier')}
+                      disabled={availableConditions.length === 0 || !pickerSelection}
+                      data-tooltip={availableConditions.length === 0 ? text('FABRICATE.Admin.Manager.Environment.Tasks.AllConditionsAdded', 'All conditions already added.') : null}
+                      onclick={() => addGatheringHazardConditionModifier(kind, pickerSelection)}
+                    >
+                      <i class="fas fa-plus" aria-hidden="true"></i>
+                    </button>
+                  </div>
+                  <div class="manager-condition-modifier-row-list">
+                    {#each attachedModifiers as modifier (modifier.id)}
+                      {@const operatorClass = gatheringDropModifierOperatorClass(modifier.operator)}
+                      <article class="manager-condition-modifier-row-reference" data-gathering-hazard-modifier-id={modifier.id}>
+                        <header class="manager-character-modifier-row-reference-header">
+                          <span class="manager-character-modifier-icon">
+                            <i class={isWeather ? 'fas fa-cloud-sun' : 'fas fa-clock'} aria-hidden="true"></i>
+                          </span>
+                          <span class="manager-character-modifier-row-reference-label">{gatheringConditionLabel(kind, modifier.conditionId) || modifier.conditionId}</span>
+                          <label class={`manager-character-modifier-operator-select ${operatorClass}`}>
+                            <span class="visually-hidden">{text('FABRICATE.Admin.Manager.Environment.Tasks.Operator', 'Operator')}</span>
+                            <select value={modifier.operator || '+'} onchange={(event) => updateGatheringHazardConditionModifier(kind, modifier.id, { operator: event.currentTarget.value === '-' ? '-' : '+' })}>
+                              <option value="+">{text('FABRICATE.Admin.Manager.Environment.Tasks.OperatorPositive', 'Positive')}</option>
+                              <option value="-">{text('FABRICATE.Admin.Manager.Environment.Tasks.OperatorNegative', 'Negative')}</option>
+                            </select>
+                          </label>
+                          <button
+                            type="button"
+                            class="manager-icon-button is-danger manager-character-modifier-row-reference-delete"
+                            aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.DeleteModifier', 'Delete modifier')}
+                            onclick={() => deleteGatheringHazardConditionModifier(kind, modifier.id)}
+                          >
+                            <i class="fas fa-trash" aria-hidden="true"></i>
+                          </button>
+                        </header>
+                        <div class="manager-condition-modifier-row-body">
+                          <label class="manager-field">
+                            <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue', 'Modifier value')}</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={Math.abs(Math.trunc(Number(modifier.value || 0)))}
+                              aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue', 'Modifier value')}
+                              oninput={(event) => updateGatheringHazardConditionModifier(kind, modifier.id, { value: Math.abs(Math.trunc(Number(event.currentTarget.value || 0))) })}
+                            />
+                          </label>
+                        </div>
+                      </article>
+                    {/each}
+                  </div>
+                </section>
+              {/each}
+
+              <section class="manager-inspector-card manager-character-modifier-row-card" data-gathering-hazard-character-modifiers>
+                <header class="manager-character-modifier-row-card-header">
+                  <div class="manager-character-modifier-row-card-heading">
+                    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowSectionTitle', 'Character modifiers')}</h3>
+                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowSectionHint', 'Modifiers adjust the final chance based on the attempting character.')}</p>
+                  </div>
+                </header>
+                <div class="manager-character-modifier-add-search-row">
+                  <label bind:this={characterModifierSearchAnchor} class="manager-search is-compact manager-character-modifier-add-search" data-gathering-hazard-character-modifier-search>
+                    <i class="fas fa-search" aria-hidden="true"></i>
+                    <input
+                      type="search"
+                      value={characterModifierSearchTerm}
+                      oninput={(event) => { characterModifierSearchTerm = event.currentTarget.value; }}
+                      placeholder={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.AddSearchPlaceholder', 'Search character modifiers...')}
+                      aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.AddSearchLabel', 'Search character modifiers to add')}
+                      disabled={selectedGatheringCharacterModifiers.length === 0}
+                      data-tooltip={selectedGatheringCharacterModifiers.length === 0 ? text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.LibraryEmptyHint', 'Add a modifier to the system library first to reference it here.') : null}
+                    />
+                    {#if hazardCharacterModifierSearchSuggestions.length > 0}
+                      <div class="manager-tag-suggestions manager-character-modifier-add-suggestions" class:is-above={characterModifierSearchOpenUp} data-gathering-hazard-character-modifier-suggestions>
+                        {#each hazardCharacterModifierSearchSuggestions as option (option.id)}
+                          <button
+                            type="button"
+                            class="manager-tag-suggestion manager-character-modifier-add-suggestion"
+                            data-gathering-hazard-character-modifier-suggestion={option.id}
+                            onclick={() => pickCharacterModifierForHazard(option.id)}
+                          >
+                            <i class={option.icon || 'fa-solid fa-user'} aria-hidden="true"></i>
+                            <span>{option.label || option.id}</span>
+                          </button>
+                        {/each}
+                      </div>
+                    {/if}
+                  </label>
+                </div>
+                <div class="manager-character-modifier-row-list">
+                  {#each rowCharacterModifiers(editingGatheringHazard) as ref (ref.id)}
+                    {@const libraryEntry = characterModifierLibraryEntry(ref.modifierId)}
+                    {@const hasOverride = characterModifierIsCustomized(ref)}
+                    {@const operatorClass = characterModifierOperatorClass(ref.operator)}
+                    <article class="manager-character-modifier-row-reference" data-gathering-hazard-character-modifier-ref={ref.id}>
+                      <header class="manager-character-modifier-row-reference-header">
+                        <span class="manager-character-modifier-icon"><i class={characterModifierIconForRef(ref)} aria-hidden="true"></i></span>
+                        <span class="manager-character-modifier-row-reference-label">{characterModifierLabelForRef(ref)}</span>
+                        {#if !libraryEntry}
+                          <span class="manager-character-modifier-stale-warning" data-tooltip={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.UnknownModifier', 'Unknown modifier ({id})').replace('{id}', ref.modifierId)}>
+                            <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                          </span>
+                        {/if}
+                        <label class={`manager-character-modifier-operator-select ${operatorClass}`}>
+                          <span class="visually-hidden">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Operator', 'Operator')}</span>
+                          <select value={ref.operator || '+'} onchange={(event) => onUpdateHazardCharacterModifier(ref.id, { operator: event.currentTarget.value })}>
+                            <option value="+">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OperatorPositive', 'Positive')}</option>
+                            <option value="-">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OperatorNegative', 'Negative')}</option>
+                          </select>
+                        </label>
+                        <button type="button" class="manager-icon-button is-danger manager-character-modifier-row-reference-delete" aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.DeleteRowReference', 'Delete character modifier reference')} onclick={() => onDeleteHazardCharacterModifier(ref.id)}>
+                          <i class="fas fa-trash" aria-hidden="true"></i>
+                        </button>
+                      </header>
+                      <div class="manager-character-modifier-row-bounds">
+                        <label class="manager-field">
+                          <span>{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Min', 'Min')}</span>
+                          <input type="number" step="1" value={ref.min ?? ''} oninput={(event) => onUpdateHazardCharacterModifier(ref.id, { min: event.currentTarget.value === '' ? null : Number(event.currentTarget.value) })} />
+                        </label>
+                        <label class="manager-field">
+                          <span>{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Max', 'Max')}</span>
+                          <input type="number" step="1" value={ref.max ?? ''} oninput={(event) => onUpdateHazardCharacterModifier(ref.id, { max: event.currentTarget.value === '' ? null : Number(event.currentTarget.value) })} />
+                        </label>
+                      </div>
+                      <div class="manager-character-modifier-override-row">
+                        <button
+                          type="button"
+                          class={`manager-status-toggle ${hasOverride ? 'is-on' : 'is-off'}`}
+                          aria-pressed={hasOverride}
+                          aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggle', 'Override?')}
+                          onclick={() => setHazardCharacterModifierOverrideEnabled(ref, !hasOverride, libraryEntry)}
+                        >
+                          <span class="manager-status-toggle-track" aria-hidden="true">
+                            <span class="manager-status-toggle-knob"></span>
+                          </span>
+                          <span class="manager-status-toggle-label">
+                            {hasOverride
+                              ? text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggleOn', 'Overridden')
+                              : text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggle', 'Override?')}
+                          </span>
+                        </button>
+                      </div>
+                      {#if hasOverride}
+                        <p class="manager-muted manager-character-modifier-override-hint">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideHint', 'Overrides the library expression for this row.')}</p>
+                        <label class="manager-field" for={`hazard-${editingGatheringHazard.id}-character-modifier-${ref.id}-expression`}>
+                          <span>{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Expression', 'Expression')}</span>
+                          <input
+                            id={`hazard-${editingGatheringHazard.id}-character-modifier-${ref.id}-expression`}
+                            type="text"
+                            value={ref.expressionOverride || ''}
+                            oninput={(event) => onUpdateHazardCharacterModifier(ref.id, { expressionOverride: event.currentTarget.value })}
+                          />
+                        </label>
+                      {/if}
+                    </article>
+                  {:else}
+                    <p class="manager-muted manager-character-modifier-row-empty">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowEmpty', 'No character modifiers attached.')}</p>
+                  {/each}
+                </div>
+              </section>
+              </div>
+            </div>
+          {:else if selectedGatheringHazard && currentView !== 'gathering-hazard-edit'}
             <section class="manager-inspector-card" data-gathering-hazard-inspector>
               <div class="manager-inspector-title-row is-hero-large">
                 <img class="manager-recipe-preview" src={selectedGatheringHazard.img || 'icons/svg/hazard.svg'} alt="" />
@@ -3394,7 +3839,7 @@
                       {selectedGatheringHazard.enabled === false ? text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled') : text('FABRICATE.Admin.Manager.StatusActive', 'Active')}
                     </span>
                     {#if Array.isArray(selectedGatheringHazard.dangerTags) && selectedGatheringHazard.dangerTags.length > 0}
-                      <span class="manager-chip">{selectedGatheringHazard.dangerTags.join(', ')}</span>
+                      <span class="manager-chip">{sortedDangerTags(selectedGatheringHazard.dangerTags).join(', ')}</span>
                     {/if}
                   </div>
                 </div>

@@ -641,6 +641,7 @@ function _normalizeGatheringHazard(hazard = {}, randomID = () => Math.random().t
     timeOfDay: _normalizeGatheringConditionIdList(hazard.timeOfDay),
     dropRate: Number.isFinite(Number(hazard.dropRate)) ? Math.min(100, Math.max(1, Math.floor(Number(hazard.dropRate)))) : 1,
     hazardModifier: hazard.hazardModifier && typeof hazard.hazardModifier === 'object' ? _clonePlain(hazard.hazardModifier) : null,
+    conditionModifiers: _normalizeGatheringDropConditionModifiers(hazard.conditionModifiers),
     characterModifiers: _normalizeGatheringCharacterModifierReferences(hazard.characterModifiers, randomID)
   };
 }

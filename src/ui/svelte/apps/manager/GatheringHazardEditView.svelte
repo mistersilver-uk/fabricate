@@ -10,19 +10,23 @@
     timeOfDayOptions = [],
     regionOptions = [],
     biomeOptions = [],
-    characterModifierLibrary = [],
     onPickImagePath = null,
     onUpdateHazard = () => {}
   } = $props();
 
-  const DEFAULT_DANGER_TAGS = ['safe', 'hazardous', 'dangerous', 'deadly'];
+  const DEFAULT_DANGER_TAGS = ['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme'];
 
   let openAvailabilityMenu = $state('');
-  let dangerTagInput = $state('');
 
-  const dangerTags = $derived(Array.isArray(hazard?.dangerTags) ? hazard.dangerTags : []);
-  const characterModifiers = $derived(Array.isArray(hazard?.characterModifiers) ? hazard.characterModifiers : []);
-  const characterModifierLibraryList = $derived(Array.isArray(characterModifierLibrary) ? characterModifierLibrary : []);
+  const rawDangerTags = $derived(Array.isArray(hazard?.dangerTags) ? hazard.dangerTags : []);
+  const dangerTags = $derived([...rawDangerTags].sort((a, b) => {
+    const ai = DEFAULT_DANGER_TAGS.indexOf(a);
+    const bi = DEFAULT_DANGER_TAGS.indexOf(b);
+    const aRank = ai === -1 ? DEFAULT_DANGER_TAGS.length : ai;
+    const bRank = bi === -1 ? DEFAULT_DANGER_TAGS.length : bi;
+    if (aRank !== bRank) return aRank - bRank;
+    return String(a).localeCompare(String(b));
+  }));
   const suggestedDangerTags = $derived(DEFAULT_DANGER_TAGS.filter(tag => !dangerTags.includes(tag)));
   const nameValid = $derived(Boolean((hazard?.name || '').trim()));
   const dropRateRaw = $derived(Number(hazard?.dropRate));
@@ -146,18 +150,10 @@
     if (!normalized) return;
     if (dangerTags.includes(normalized)) return;
     onUpdateHazard({ dangerTags: [...dangerTags, normalized] });
-    dangerTagInput = '';
   }
 
   function removeDangerTag(tag) {
     onUpdateHazard({ dangerTags: dangerTags.filter(value => value !== tag) });
-  }
-
-  function onDangerTagInputKey(event) {
-    if (event.key === 'Enter' || event.key === ',') {
-      event.preventDefault();
-      addDangerTag(dangerTagInput);
-    }
   }
 
   function onDropRateInput(event) {
@@ -167,54 +163,6 @@
     onUpdateHazard({ dropRate: clamped });
   }
 
-  function characterModifierLibraryEntry(modifierId) {
-    return characterModifierLibraryList.find(entry => entry.id === modifierId) || null;
-  }
-
-  function characterModifierLabel(entry) {
-    const libraryEntry = characterModifierLibraryEntry(entry?.modifierId);
-    return libraryEntry?.label
-      || libraryEntry?.id
-      || entry?.modifierId
-      || text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.UnknownModifierShort', 'Unknown');
-  }
-
-  function unattachedCharacterModifiers() {
-    const attached = new Set(characterModifiers.map(entry => entry.modifierId));
-    return characterModifierLibraryList.filter(entry => !attached.has(entry.id));
-  }
-
-  function addCharacterModifier(modifierId) {
-    const normalizedId = String(modifierId || '').trim();
-    if (!normalizedId) return;
-    if (characterModifiers.some(entry => entry.modifierId === normalizedId)) return;
-    const newEntry = {
-      modifierId: normalizedId,
-      operator: '+',
-      min: null,
-      max: null,
-      expressionOverride: ''
-    };
-    onUpdateHazard({ characterModifiers: [...characterModifiers, newEntry] });
-  }
-
-  function removeCharacterModifier(entryId) {
-    onUpdateHazard({ characterModifiers: characterModifiers.filter(entry => entry.id !== entryId) });
-  }
-
-  function updateCharacterModifier(entryId, patch) {
-    onUpdateHazard({
-      characterModifiers: characterModifiers.map(entry => entry.id === entryId
-        ? { ...entry, ...patch }
-        : entry)
-    });
-  }
-
-  function numericOrNull(value) {
-    if (value === '' || value === null || value === undefined) return null;
-    const number = Number(value);
-    return Number.isFinite(number) ? number : null;
-  }
 </script>
 
 <main
@@ -344,6 +292,7 @@
       </div>
     </section>
 
+    <div class="manager-gathering-hazard-row" data-gathering-hazard-row="danger-drop-rate">
     <section class="manager-task-availability-card" data-gathering-hazard-danger-tags>
       <div class="manager-task-card-heading">
         <div>
@@ -367,20 +316,6 @@
             {:else}
               <span class="manager-muted manager-availability-any">{text('FABRICATE.Admin.Manager.Environment.Hazards.AnyDanger', 'Any danger profile')}</span>
             {/if}
-          </div>
-          <div class="manager-danger-tag-input-row">
-            <input
-              type="text"
-              value={dangerTagInput}
-              oninput={(event) => dangerTagInput = event.currentTarget.value}
-              onkeydown={onDangerTagInputKey}
-              placeholder={text('FABRICATE.Admin.Manager.Environment.Hazards.DangerTagPlaceholder', 'Add a custom danger tag…')}
-              aria-label={text('FABRICATE.Admin.Manager.Environment.Hazards.DangerTagPlaceholder', 'Add a custom danger tag…')}
-            />
-            <button type="button" class="manager-button" onclick={() => addDangerTag(dangerTagInput)} disabled={!dangerTagInput.trim()}>
-              <i class="fas fa-plus" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Environment.Hazards.AddDangerTag', 'Add tag')}</span>
-            </button>
           </div>
           {#if suggestedDangerTags.length > 0}
             <div class="manager-availability-pill-row" data-gathering-hazard-danger-suggestions>
@@ -445,84 +380,8 @@
         </label>
       </div>
     </section>
+    </div>
 
-    <section class="manager-task-availability-card" data-gathering-hazard-character-modifiers>
-      <div class="manager-task-card-heading">
-        <div>
-          <h3>{text('FABRICATE.Admin.Manager.Environment.Hazards.CharacterModifiers', 'Character modifiers')}</h3>
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Environment.Hazards.CharacterModifiersHint', 'Pick reusable actor-driven modifiers from the per-system library. These adjust the threshold, not the roll.')}</p>
-        </div>
-      </div>
-      {#if characterModifierLibraryList.length === 0}
-        <p class="manager-muted">{text('FABRICATE.Admin.Manager.Environment.Hazards.CharacterModifiersEmptyLibrary', 'No character modifiers exist in this system yet. Add them in the Character Modifiers library first.')}</p>
-      {:else}
-        <ul class="manager-gathering-hazard-character-modifiers-list" data-gathering-hazard-character-modifier-list>
-          {#each characterModifiers as entry (entry.id)}
-            <li class="manager-gathering-hazard-character-modifier-row" data-gathering-hazard-character-modifier={entry.id}>
-              <div class="manager-gathering-hazard-character-modifier-summary">
-                <strong>{characterModifierLabel(entry)}</strong>
-                <span class="manager-muted">{entry.modifierId}</span>
-              </div>
-              <label class="manager-field">
-                <span>{text('FABRICATE.Admin.Manager.Environment.Hazards.CharacterModifierOperator', 'Operator')}</span>
-                <select value={entry.operator} onchange={(event) => updateCharacterModifier(entry.id, { operator: event.currentTarget.value === '-' ? '-' : '+' })}>
-                  <option value="+">+</option>
-                  <option value="-">−</option>
-                </select>
-              </label>
-              <label class="manager-field">
-                <span>{text('FABRICATE.Admin.Manager.Environment.Hazards.CharacterModifierMin', 'Min')}</span>
-                <input
-                  type="number"
-                  value={entry.min ?? ''}
-                  oninput={(event) => updateCharacterModifier(entry.id, { min: numericOrNull(event.currentTarget.value) })}
-                />
-              </label>
-              <label class="manager-field">
-                <span>{text('FABRICATE.Admin.Manager.Environment.Hazards.CharacterModifierMax', 'Max')}</span>
-                <input
-                  type="number"
-                  value={entry.max ?? ''}
-                  oninput={(event) => updateCharacterModifier(entry.id, { max: numericOrNull(event.currentTarget.value) })}
-                />
-              </label>
-              <label class="manager-field manager-gathering-hazard-character-modifier-override">
-                <span>{text('FABRICATE.Admin.Manager.Environment.Hazards.CharacterModifierOverride', 'Expression override')}</span>
-                <input
-                  type="text"
-                  value={entry.expressionOverride || ''}
-                  oninput={(event) => updateCharacterModifier(entry.id, { expressionOverride: event.currentTarget.value })}
-                  placeholder={text('FABRICATE.Admin.Manager.Environment.Hazards.CharacterModifierOverridePlaceholder', 'Leave empty to use library expression')}
-                />
-              </label>
-              <button
-                type="button"
-                class="manager-icon-button is-danger"
-                aria-label={text('FABRICATE.Admin.Manager.Environment.Hazards.RemoveCharacterModifier', 'Remove {name}').replace('{name}', characterModifierLabel(entry))}
-                onclick={() => removeCharacterModifier(entry.id)}
-              >
-                <i class="fas fa-trash" aria-hidden="true"></i>
-              </button>
-            </li>
-          {/each}
-        </ul>
-        {#if unattachedCharacterModifiers().length > 0}
-          <div class="manager-availability-pill-row" data-gathering-hazard-character-modifier-suggestions>
-            {#each unattachedCharacterModifiers() as entry (entry.id)}
-              <button
-                type="button"
-                class="manager-availability-pill is-suggestion"
-                onclick={() => addCharacterModifier(entry.id)}
-                data-gathering-hazard-character-modifier-add={entry.id}
-              >
-                <i class={entry.icon || 'fa-solid fa-user'} aria-hidden="true"></i>
-                <span>{entry.label || entry.id}</span>
-              </button>
-            {/each}
-          </div>
-        {/if}
-      {/if}
-    </section>
   {:else}
     <div class="manager-empty">
       <div>

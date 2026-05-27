@@ -643,7 +643,7 @@
           "BaseCategory": "Base category",
           "CustomCategories": "Custom categories",
           "References": "References",
-          "GeneralHint": "Base category, not stored as a custom category.",
+          "GeneralHint": "Built-in fallback category.",
           "GeneralTitle": "General category",
           "GeneralInspectorHint": "General is the built-in category for recipes without a custom category and cannot be removed.",
           "Locked": "Locked",
@@ -991,9 +991,11 @@
             "DangerTag": {
               "Label": "Danger",
               "safe": "Safe",
+              "unsafe": "Unsafe",
               "hazardous": "Hazardous",
               "dangerous": "Dangerous",
-              "deadly": "Deadly"
+              "deadly": "Deadly",
+              "extreme": "Extreme"
             },
             "DropRate": "Drop rate",
             "DropRatePercent": "Drop rate (%)",
@@ -1024,6 +1026,10 @@
             "EditSubtitle": "Edit identity, availability, danger, and modifiers for the selected hazard.",
             "EditBreadcrumb": "Edit gathering hazard",
             "BackToLibrary": "Back to hazard library",
+            "Save": "Save hazard",
+            "Dirty": "Unsaved",
+            "DiscardChangesPrompt": "The current hazard has unsaved changes. Discard them and continue?",
+            "DeleteConfirm": "Delete this hazard? This cannot be undone.",
             "HazardIdentity": "Hazard Identity",
             "HazardIdentityHint": "Name the hazard, give it a description, choose an image, and toggle whether it is enabled.",
             "HazardAvailability": "Hazard Matching",

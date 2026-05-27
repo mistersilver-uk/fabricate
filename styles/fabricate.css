@@ -6808,11 +6808,17 @@
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-035);
+  overflow: visible;
 }
 
 .fabricate-manager .manager-vocabulary-row.is-locked {
   grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
   background: var(--fab-success-soft);
+}
+
+.fabricate-manager .manager-vocabulary-row.is-locked > .manager-chip {
+  align-self: center;
 }
 
 .fabricate-manager .manager-vocabulary-main {
@@ -8756,9 +8762,12 @@
 }
 
 .fabricate-manager .manager-danger-tag-pill {
+  appearance: none;
+  -webkit-appearance: none;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  box-sizing: border-box;
   min-height: 28px;
   max-width: 100%;
   padding: 3px 8px;
@@ -8766,8 +8775,10 @@
   border-radius: 5px;
   background: var(--fab-mv2-surface-1);
   color: var(--fab-mv2-text);
+  font-family: inherit;
   font-size: 0.76rem;
   font-weight: 700;
+  line-height: 1.2;
 }
 
 .fabricate-manager .manager-danger-tag-pill > span {
@@ -8782,23 +8793,44 @@
   background: var(--fab-success-soft);
 }
 
+.fabricate-manager .manager-danger-tag-pill.is-unsafe {
+  border-color: color-mix(in srgb, var(--fab-success-border) 55%, var(--fab-warning-border) 45%);
+  background: color-mix(in srgb, var(--fab-success-soft) 55%, var(--fab-warning-soft) 45%);
+}
+
 .fabricate-manager .manager-danger-tag-pill.is-hazardous {
   border-color: var(--fab-warning-border);
   background: var(--fab-warning-soft);
 }
 
 .fabricate-manager .manager-danger-tag-pill.is-dangerous {
-  border-color: var(--fab-danger-border, var(--fab-warning-border));
-  background: var(--fab-danger-soft, var(--fab-warning-soft));
+  border-color: color-mix(in srgb, var(--fab-warning-border) 50%, var(--fab-danger-border) 50%);
+  background: color-mix(in srgb, var(--fab-warning-soft) 50%, var(--fab-danger-soft) 50%);
 }
 
 .fabricate-manager .manager-danger-tag-pill.is-deadly {
-  border-color: var(--fab-critical-border, var(--fab-danger-border, var(--fab-warning-border)));
-  background: var(--fab-critical-soft, var(--fab-danger-soft, var(--fab-warning-soft)));
+  border-color: var(--fab-danger-border);
+  background: var(--fab-danger-soft);
+}
+
+.fabricate-manager .manager-danger-tag-pill.is-extreme {
+  border-color: var(--fab-danger);
+  background: color-mix(in srgb, var(--fab-danger-soft) 35%, var(--fab-danger) 65%);
+  color: var(--fab-danger-text);
 }
 
 .fabricate-manager .manager-danger-tag-pill.is-suggestion {
-  opacity: 0.85;
+  background: transparent;
+  border-style: dashed;
+  color: var(--fab-mv2-text-muted);
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-danger-tag-pill.is-suggestion:hover,
+.fabricate-manager .manager-danger-tag-pill.is-suggestion:focus-visible {
+  background: var(--fab-overlay-light-06);
+  border-style: solid;
+  color: var(--fab-mv2-text);
 }
 
 .fabricate-manager .manager-danger-tag-input-row {
@@ -8814,13 +8846,29 @@
 }
 
 .fabricate-manager .manager-gathering-hazard-edit-view {
-  display: grid;
-  grid-template-rows: auto auto auto auto auto auto auto;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
   min-height: 0;
   min-width: 0;
   padding: 14px;
   overflow: auto;
+}
+
+.fabricate-manager .manager-gathering-hazard-edit-view > * {
+  min-width: 0;
+}
+
+.fabricate-manager .manager-gathering-hazard-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-gathering-hazard-row > .manager-task-availability-card {
+  min-width: 0;
 }
 
 .fabricate-manager .manager-gathering-hazard-edit-view :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
@@ -9423,25 +9471,42 @@
   color: var(--fab-mv2-text-muted);
 }
 
-.fabricate-manager .manager-task-environment-usage-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 10px 3px 3px;
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 999px;
-  background: var(--fab-mv2-surface-1);
-  color: var(--fab-mv2-text);
+.fabricate-manager .manager-task-environment-usage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.fabricate-manager [data-task-environment-usage] > [data-task-environment-usage-empty] {
+  margin-top: 10px;
+}
+
+.fabricate-manager .manager-task-environment-usage-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   min-width: 0;
 }
 
 .fabricate-manager .manager-task-environment-usage-thumb {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  border-radius: 6px;
   object-fit: cover;
-  flex: 0 0 22px;
   background: var(--fab-overlay-dark-12);
+  border: 1px solid var(--fab-mv2-border);
+}
+
+.fabricate-manager .manager-task-environment-usage-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fab-mv2-text);
+  font-size: 0.82rem;
+  text-align: center;
 }
 
 .fabricate-manager .manager-task-overview-card {

@@ -17,7 +17,7 @@ const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
 describe('GatheringHazardEditView source contract', () => {
-  it('exposes hazard identity, availability, dangerTags, dropRate, and character-modifier sections', () => {
+  it('exposes hazard identity, availability, dangerTags, and dropRate sections', () => {
     assert.ok(editorSource.includes('data-gathering-hazard-editor'), 'editor should expose a data attribute hook');
     assert.ok(editorSource.includes('data-gathering-hazard-core-editor'), 'editor should expose an identity section');
     assert.ok(editorSource.includes("data-gathering-hazard-field=\"name\""), 'editor should bind the name field');
@@ -25,7 +25,11 @@ describe('GatheringHazardEditView source contract', () => {
     assert.ok(editorSource.includes('data-gathering-hazard-availability'), 'editor should expose an availability matching section');
     assert.ok(editorSource.includes('data-gathering-hazard-danger-tags'), 'editor should expose a danger tags section');
     assert.ok(editorSource.includes('data-gathering-hazard-drop-rate'), 'editor should expose a drop rate section');
-    assert.ok(editorSource.includes('data-gathering-hazard-character-modifiers'), 'editor should expose a character modifiers section');
+    assert.equal(
+      editorSource.includes('data-gathering-hazard-character-modifiers'),
+      false,
+      'character-modifier section should live in the right inspector, not the main editor'
+    );
   });
 
   it('clamps dropRate to 1..100 before dispatching the update', () => {
@@ -39,9 +43,15 @@ describe('GatheringHazardEditView source contract', () => {
     assert.ok(editorSource.includes('!nameValid'), 'editor should branch on name validity');
   });
 
-  it('seeds the default danger tag suggestions from the spec', () => {
-    assert.ok(editorSource.includes("['safe', 'hazardous', 'dangerous', 'deadly']"), 'editor should seed default danger tags from the spec');
+  it('locks danger tags to the six-step RAG scale and removes the custom input', () => {
+    assert.ok(
+      editorSource.includes("['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme']"),
+      'editor should seed the six fixed danger levels'
+    );
     assert.ok(editorSource.includes('manager-danger-tag-pill'), 'editor should render danger tags as pills');
+    assert.equal(editorSource.includes('manager-danger-tag-input-row'), false, 'custom danger tag input row should be removed');
+    assert.equal(editorSource.includes('dangerTagInput'), false, 'dangerTagInput state should be removed');
+    assert.equal(/function\s+onDangerTagInputKey\s*\(/.test(editorSource), false, 'onDangerTagInputKey helper should be removed');
   });
 
   it('renders the drop rate with the shared percentage slider widget', () => {
@@ -62,13 +72,29 @@ describe('GatheringHazardEditView source contract', () => {
     assert.equal(/function\s+enableHazardModifier\s*\(/.test(editorSource), false, 'enableHazardModifier helper should be removed');
   });
 
-  it('supports character modifier references with operator, min, max, and expressionOverride', () => {
-    assert.ok(editorSource.includes('characterModifiers'), 'editor should read hazard.characterModifiers');
-    assert.ok(editorSource.includes('CharacterModifierOperator'), 'editor should localize the operator field');
-    assert.ok(editorSource.includes('CharacterModifierMin'), 'editor should localize the min field');
-    assert.ok(editorSource.includes('CharacterModifierMax'), 'editor should localize the max field');
-    assert.ok(editorSource.includes('CharacterModifierOverride'), 'editor should localize the expression override field');
-    assert.ok(editorSource.includes("operator: event.currentTarget.value === '-' ? '-' : '+'"), 'operator updates should clamp to + or -');
+  it('renders the hazard modifier inspector (time, weather, character) from the manager root', () => {
+    assert.ok(rootSource.includes('data-gathering-hazard-condition-modifiers={kind}'), 'root should render hazard condition modifier cards');
+    assert.ok(rootSource.includes('data-gathering-hazard-character-modifiers'), 'root should render hazard character modifier card');
+    assert.ok(rootSource.includes('addGatheringHazardConditionModifier'), 'root should expose add condition modifier handler');
+    assert.ok(rootSource.includes('updateGatheringHazardConditionModifier'), 'root should expose update condition modifier handler');
+    assert.ok(rootSource.includes('deleteGatheringHazardConditionModifier'), 'root should expose delete condition modifier handler');
+    assert.ok(rootSource.includes('onUpdateHazardCharacterModifier'), 'root should expose update character modifier handler');
+    assert.ok(rootSource.includes('onDeleteHazardCharacterModifier'), 'root should expose delete character modifier handler');
+    assert.ok(rootSource.includes('pickCharacterModifierForHazard'), 'root should expose a picker for adding character modifiers');
+  });
+
+  it('stages hazard edits in a draft with Save + Dirty toolbar parity with tasks', () => {
+    assert.ok(rootSource.includes('let gatheringHazardDraft = $state(null)'), 'root should declare a hazard draft state');
+    assert.ok(rootSource.includes('let gatheringHazardDraftBaseline = $state(null)'), 'root should declare a hazard draft baseline');
+    assert.ok(rootSource.includes('const editingGatheringHazard = $derived'), 'root should expose an editingGatheringHazard derived');
+    assert.ok(rootSource.includes('const gatheringHazardDraftDirty = $derived'), 'root should expose a hazard dirty derived');
+    assert.ok(rootSource.includes('const gatheringHazardValidation = $derived'), 'root should expose a hazard validation derived');
+    assert.ok(rootSource.includes('function saveGatheringHazardDraft'), 'root should expose saveGatheringHazardDraft');
+    assert.ok(rootSource.includes('function deleteGatheringHazardDraft'), 'root should expose deleteGatheringHazardDraft');
+    assert.ok(rootSource.includes('function confirmGatheringHazardRouteExit'), 'route-exit chain should include hazard confirm');
+    assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Environment.Hazards.Save'), 'toolbar Save button uses the hazard Save lang key');
+    assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Environment.Hazards.Dirty'), 'toolbar Dirty chip uses the hazard Dirty lang key');
+    assert.ok(rootSource.includes('hazard={editingGatheringHazard}'), 'editor mount should bind the draft hazard');
   });
 
   it('mounts at the gathering-hazard-edit route and exposes a back-to-library affordance', () => {

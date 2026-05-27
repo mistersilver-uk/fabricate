@@ -21,8 +21,9 @@ describe('Selected gathering task — drops summary lives in the inspector', () 
     assert.ok(rootSource.includes('data-task-drop-summary-chip'), 'each drop chip should expose a data attribute');
     assert.ok(rootSource.includes('data-task-environment-usage'), 'environment usage block should expose a data attribute');
     assert.ok(rootSource.includes('manager-task-drop-summary-thumb'), 'drop chip should include a thumbnail image');
-    assert.ok(rootSource.includes('manager-task-environment-usage-chip'), 'environment usage should use chip styling');
-    assert.ok(rootSource.includes('manager-task-environment-usage-thumb'), 'environment chip should include a thumbnail image');
+    assert.ok(rootSource.includes('manager-task-environment-usage-card'), 'environment usage should render tiled cards');
+    assert.ok(rootSource.includes('manager-task-environment-usage-thumb'), 'environment tile should include a thumbnail image');
+    assert.ok(rootSource.includes('manager-task-environment-usage-grid'), 'environment tiles should sit in a grid container');
   });
 
   it('renders the environment usage as its own inspector card after the drops summary card', () => {

@@ -232,20 +232,20 @@
       <div class="manager-vocabulary-list">
         {#if generalCategory}
           <div class="manager-vocabulary-row is-locked" data-category-id="general">
-            <span class="manager-vocabulary-main">
+            <div class="manager-vocabulary-main">
               <strong>{generalCategory.name}</strong>
               <span class="manager-muted">{text('FABRICATE.Admin.Manager.TagsCategories.GeneralHint', 'Base category, not stored as a custom category.')}</span>
-            </span>
+            </div>
             <span class="manager-chip is-active">{usageLabel(generalCategory)}</span>
             <span class="manager-chip is-disabled">{text('FABRICATE.Admin.Manager.TagsCategories.Locked', 'Locked')}</span>
           </div>
         {/if}
         {#each filteredCategoryRows as row (row.id)}
           <div class="manager-vocabulary-row" data-category-id={row.id}>
-            <span class="manager-vocabulary-main">
+            <div class="manager-vocabulary-main">
               <strong>{row.name}</strong>
               <span class="manager-muted">{usageLabel(row)}</span>
-            </span>
+            </div>
             <span class={`manager-chip ${row.totalUsage > 0 ? 'is-warning' : ''}`}>{usageLabel(row)}</span>
             <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.TagsCategories.RemoveCategoryNamed', 'Remove category {name}').replace('{name}', row.name)} title={text('FABRICATE.Admin.Manager.TagsCategories.RemoveCategory', 'Remove category')} onclick={() => removeCategory(row)}>
               <i class="fas fa-trash" aria-hidden="true"></i>
@@ -287,10 +287,10 @@
       <div class="manager-vocabulary-list">
         {#each filteredTagRows as row (row.id)}
           <div class="manager-vocabulary-row" data-tag-id={row.id}>
-            <span class="manager-vocabulary-main">
+            <div class="manager-vocabulary-main">
               <strong>{row.name}</strong>
               <span class="manager-muted">{usageLabel(row)}</span>
-            </span>
+            </div>
             <span class={`manager-chip ${row.totalUsage > 0 ? 'is-warning' : ''}`}>{usageLabel(row)}</span>
             <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.TagsCategories.RemoveTagNamed', 'Remove tag {name}').replace('{name}', row.name)} title={text('FABRICATE.Admin.Manager.TagsCategories.RemoveTag', 'Remove tag')} onclick={() => removeTag(row)}>
               <i class="fas fa-trash" aria-hidden="true"></i>

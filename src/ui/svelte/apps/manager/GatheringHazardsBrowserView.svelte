@@ -28,6 +28,13 @@
   let pageIndex = $state(0);
   let pageSize = $state(10);
 
+  const DANGER_LEVEL_ORDER = ['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme'];
+
+  function dangerLevelRank(tag) {
+    const idx = DANGER_LEVEL_ORDER.indexOf(tag);
+    return idx === -1 ? DANGER_LEVEL_ORDER.length : idx;
+  }
+
   const hazardList = $derived(Array.isArray(hazards) ? hazards : []);
   const systemConfig = $derived(gatheringConfig?.systems?.[selectedSystemId] || {});
   const weatherCondition = $derived(systemConfig.conditions?.weather || {});
@@ -43,13 +50,19 @@
     ...hazardList.flatMap(hazard => Array.isArray(hazard.biomes) ? hazard.biomes : []),
     ...vocabularyIds(systemConfig.vocabularies?.biomes?.values)
   ]));
-  const dangerOptions = $derived(uniqueSorted([
-    'safe',
-    'hazardous',
-    'dangerous',
-    'deadly',
-    ...hazardList.flatMap(hazard => Array.isArray(hazard.dangerTags) ? hazard.dangerTags : [])
-  ]));
+  const dangerOptions = $derived((() => {
+    const seen = new Set();
+    const all = [
+      ...DANGER_LEVEL_ORDER,
+      ...hazardList.flatMap(hazard => Array.isArray(hazard.dangerTags) ? hazard.dangerTags : [])
+    ]
+      .map(value => String(value || '').trim())
+      .filter(value => value && !seen.has(value) && seen.add(value));
+    return all.sort((a, b) => {
+      const rankDelta = dangerLevelRank(a) - dangerLevelRank(b);
+      return rankDelta !== 0 ? rankDelta : a.localeCompare(b);
+    });
+  })());
   const filteredHazards = $derived(hazardList.filter(hazard => {
     const dangerTags = Array.isArray(hazard.dangerTags) ? hazard.dangerTags : [];
     const haystack = `${hazardName(hazard)} ${hazard.description || ''} ${dangerTags.join(' ')}`.toLowerCase();
@@ -206,6 +219,11 @@
     const values = Array.isArray(hazard?.dangerTags) ? hazard.dangerTags : [];
     const entries = values
       .filter(tag => typeof tag === 'string' && tag.trim())
+      .slice()
+      .sort((a, b) => {
+        const rankDelta = dangerLevelRank(a) - dangerLevelRank(b);
+        return rankDelta !== 0 ? rankDelta : String(a).localeCompare(String(b));
+      })
       .map(tag => ({
         id: tag,
         key: `danger:${tag}`,
