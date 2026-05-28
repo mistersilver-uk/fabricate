@@ -410,13 +410,13 @@
                       <span>{text('FABRICATE.Admin.Manager.Tools.RequirementExpression', 'Expression')}</span>
                       <input type="text"
                         value={tool.requirement.formula || ''}
-                        placeholder={text('FABRICATE.Admin.Manager.Tools.RequirementExpressionPlaceholder', '@tools.alchemist.value')}
+                        placeholder={text('FABRICATE.Admin.Manager.Tools.RequirementExpressionPlaceholder', '@tools.example.value')}
                         oninput={(event) => updateRequirementExpression(tool, event.currentTarget.value)} />
                     </label>
                     <div class="manager-tools-requirement-help">
                       <p>{text('FABRICATE.Admin.Manager.Tools.RequirementInstructions', 'Enter an actor roll-data property. The tool is available when the value is greater than zero.')}</p>
                       <ul>
-                        <li>{text('FABRICATE.Admin.Manager.Tools.RequirementExampleActorProperty', 'Example: @tools.alchemist.value')}</li>
+                        <li>{text('FABRICATE.Admin.Manager.Tools.RequirementExampleActorProperty', 'Example: @tools.example.value')}</li>
                       </ul>
                     </div>
                     <button type="button"

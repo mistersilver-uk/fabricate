@@ -66,6 +66,17 @@ export function renderDialog(options) {
   return dialog;
 }
 
+export async function viewScene(uuid) {
+  const id = String(uuid || '').trim();
+  if (!id || typeof globalThis.fromUuid !== 'function') return false;
+  const doc = await globalThis.fromUuid(id);
+  if (doc && typeof doc.view === 'function') {
+    await doc.view();
+    return true;
+  }
+  return false;
+}
+
 export function notifyInfo(msg) {
   globalThis.ui?.notifications?.info(msg);
 }

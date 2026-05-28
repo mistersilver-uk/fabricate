@@ -333,9 +333,9 @@ test('prepareForImport: handles missing recipes', () => {
 // ---------------------------------------------------------------------------
 
 test('makeExportFilename: generates slug from system name', () => {
-  const filename = makeExportFilename('Alchemist\'s Supplies');
+  const filename = makeExportFilename('Example System');
 
-  assert.ok(filename.startsWith('fabricate-alchemist-s-supplies-'));
+  assert.ok(filename.startsWith('fabricate-example-system-'));
   assert.ok(filename.endsWith('.json'));
 });
 

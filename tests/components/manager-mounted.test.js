@@ -42,6 +42,8 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTaskEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ToolsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringHazardsBrowserView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringHazardEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemsBrowserView.svelte');
@@ -50,7 +52,7 @@ function compileManagerRoot() {
     writeCompiledSvelte(`src/ui/svelte/components/${componentName}.svelte`);
   }
 
-  for (const utilPath of ['foundryBridge.js', 'essenceIcons.js', 'fontAwesomeFreeClassicIcons.js', 'iconPickerPopover.js', 'componentEditor.js', 'dropRateTier.js']) {
+  for (const utilPath of ['foundryBridge.js', 'essenceIcons.js', 'fontAwesomeFreeClassicIcons.js', 'iconPickerPopover.js', 'componentEditor.js', 'dropRateTier.js', 'dropUtils.js']) {
     const utilDestination = join(tempRoot, `src/ui/svelte/util/${utilPath}`);
     mkdirSync(dirname(utilDestination), { recursive: true });
     writeFileSync(
@@ -2207,7 +2209,23 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelectorAll('.manager-gathering-task-row').length, 3);
     assert.ok(target.textContent.includes('Gather Moon Herbs'));
     assert.ok(target.textContent.includes('Prospect Crystal Veins'));
-    assert.ok(target.textContent.includes('High Day, Clear Sky'));
+    const tasksHead = target.querySelector('.manager-gathering-task-table-head');
+    const taskHeaders = Array.from(tasksHead.querySelectorAll('[role="columnheader"]')).map(node => node.textContent.trim());
+    assert.equal(taskHeaders.length, 4, 'task table should have four headers');
+    assert.deepEqual(taskHeaders, ['Gathering task', 'Tags', 'Status', 'Actions']);
+    const firstTaskRow = target.querySelector('.manager-gathering-task-row');
+    const tagsCell = firstTaskRow.querySelector('.manager-gathering-task-tags-cell[data-gathering-task-tags]');
+    assert.ok(tagsCell, 'tags chip cell renders as its own grid cell');
+    const tagPills = Array.from(tagsCell.querySelectorAll('.manager-availability-pill'));
+    const tagKinds = new Set();
+    for (const pill of tagPills) {
+      for (const kind of ['region', 'biome', 'timeOfDay', 'weather']) {
+        if (pill.classList.contains(`is-${kind}`)) tagKinds.add(kind);
+      }
+    }
+    assert.equal(tagKinds.size, 4, 'tags row should contain chips from all four dimensions (region/biome/time/weather)');
+    const description = firstTaskRow.querySelector('.manager-gathering-task-identity .manager-system-description');
+    assert.ok(description && description.textContent.trim().length > 0, 'short description should render under the task name');
     assert.ok(target.querySelector('[data-gathering-task-inspector]').textContent.includes('Selected gathering task'));
     assert.equal(
       target.querySelector('.manager-inspector').textContent.includes('Gathering task actions'),
@@ -2234,7 +2252,11 @@ describe('CraftingSystemManager mounted behavior', () => {
       null,
       'selected gathering task identity card should not contain an action group'
     );
-    assert.ok(target.querySelector('.manager-inspector').textContent.includes('Nightshade With An Exceptionally Long Localized Component Name x2 (80%)'));
+    const dropChips = target.querySelectorAll('[data-task-drops-summary] [data-task-drop-summary-chip]');
+    assert.ok(
+      Array.from(dropChips).some(chip => chip.textContent.includes('Nightshade With An Exceptionally Long Localized Component Name') && chip.textContent.includes('80%')),
+      'drops summary should show the nightshade drop name + chance'
+    );
     assert.equal(target.querySelector('[data-gathering-task-fact="environments"] strong').textContent.trim(), '1');
 
     const taskSearch = target.querySelector('[data-gathering-tasks-browser] input[type="search"]');
@@ -2690,27 +2712,20 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environments');
     assert.equal(gatheringSubitem('Tasks').getAttribute('aria-current'), 'page');
 
-    for (const [label, placeholder] of [
-      ['Hazards', 'Reusable hazard authoring is planned for a later slice.']
-    ]) {
-      gatheringSubitem(label).click();
-      await tick();
-      flushSync();
-
-      assert.equal(gatheringSubitem(label).getAttribute('aria-current'), 'page');
-      assert.ok(target.textContent.includes(placeholder));
-      assert.equal(target.querySelector('.manager-toolbar'), null);
-      assert.equal(target.querySelector('.manager-environments-table'), null);
-      assert.equal(
-        target.querySelector('.manager-inspector [data-gathering-inspector-placeholder] h2').textContent.trim(),
-        label === 'Hazards' ? 'Gathering hazards' : 'Gathering settings'
-      );
-      assert.ok(target.querySelector('.manager-inspector').textContent.includes(placeholder));
-      assert.equal(
-        target.querySelector('.manager-inspector').textContent.includes('Selected environment'),
-        false
-      );
-    }
+    gatheringSubitem('Hazards').click();
+    await tick();
+    flushSync();
+    assert.equal(gatheringSubitem('Hazards').getAttribute('aria-current'), 'page');
+    assert.ok(target.querySelector('[data-gathering-hazards-browser]'), 'Hazards tab should mount the hazard library browser');
+    assert.equal(target.querySelector('.manager-environments-table'), null);
+    assert.ok(
+      target.querySelector('.manager-inspector').textContent.includes('Select a gathering hazard'),
+      'inspector should show the select-hazard empty state when no hazard is selected'
+    );
+    assert.equal(
+      target.querySelector('.manager-inspector').textContent.includes('Selected environment'),
+      false
+    );
 
     gatheringSubitem('Settings').click();
     await tick();
@@ -2889,7 +2904,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Gathering succeeds'));
     assert.ok(target.querySelector('.manager-inspector [data-gathering-inspector-rules]'));
     assert.equal(target.querySelector('.manager-inspector [data-gathering-inspector-rules] h2').textContent.trim(), 'Rules');
-    assert.equal(target.querySelectorAll('.manager-inspector [data-gathering-inspector-rules] select').length, 4);
+    assert.equal(target.querySelectorAll('.manager-inspector [data-gathering-inspector-rules] select').length, 5);
     assert.equal(target.querySelector('.manager-inspector [data-gathering-rule-stepper]'), null);
     assert.equal(
       target.querySelector('.manager-inspector').textContent.includes('Selected environment'),
@@ -3898,7 +3913,7 @@ describe('CraftingSystemManager mounted behavior', () => {
             label: 'Artisan Catalyst',
             enabled: true,
             componentId: 'c1',
-            requirement: { provider: 'pf2e', formula: '@tools.alchemist.value', macroUuid: 'Macro.old' },
+            requirement: { provider: 'pf2e', formula: '@tools.example.value', macroUuid: 'Macro.old' },
             breakage: { mode: 'limitedUses', maxUses: null },
             onBreak: { mode: 'destroy' }
           }]
@@ -3920,12 +3935,12 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(editor.querySelector('.manager-provider-expression-input'), null);
     assert.equal(editor.querySelector('select[id$="-provider"]'), null);
     assert.ok(editor.textContent.includes('Enter an actor roll-data property'));
-    assert.ok(editor.textContent.includes('Example: @tools.alchemist.value'));
+    assert.ok(editor.textContent.includes('Example: @tools.example.value'));
     assert.ok(!editor.textContent.includes('Example: @abilities.str.mod'));
     assert.ok(!editor.textContent.includes('Example: @skills.prc.total'));
 
     const expressionInput = editor.querySelector('.manager-tools-requirement-expression input');
-    assert.equal(expressionInput.value, '@tools.alchemist.value');
+    assert.equal(expressionInput.value, '@tools.example.value');
     expressionInput.value = '@tools.smith.value';
     expressionInput.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
@@ -4150,7 +4165,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     assert.equal(gatheringSubitem('Hazards').getAttribute('aria-current'), 'page');
-    assert.ok(target.textContent.includes('Reusable hazard authoring is planned for a later slice.'));
+    assert.ok(target.querySelector('[data-gathering-hazards-browser]'), 'Review hazards button should land on the hazard library');
 
     gatheringSubitem('Environments').click();
     await tick();

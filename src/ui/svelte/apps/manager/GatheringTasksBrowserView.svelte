@@ -30,7 +30,6 @@
   let pageSize = $state(10);
 
   const taskList = $derived(Array.isArray(tasks) ? tasks : []);
-  const environmentList = $derived(Array.isArray(environments) ? environments : []);
   const systemConfig = $derived(gatheringConfig?.systems?.[selectedSystemId] || {});
   const weatherCondition = $derived(systemConfig.conditions?.weather || {});
   const timeCondition = $derived(systemConfig.conditions?.timeOfDay || {});
@@ -46,7 +45,7 @@
     ...vocabularyIds(systemConfig.vocabularies?.biomes?.values)
   ]));
   const filteredTasks = $derived(taskList.filter(task => {
-    const haystack = `${taskName(task)} ${task.description || ''} ${dropSummary(task)} ${dropReferenceText(task)}`.toLowerCase();
+    const haystack = `${taskName(task)} ${task.description || ''} ${dropReferenceText(task)}`.toLowerCase();
     const matchesSearch = !normalizedSearchTerm || haystack.includes(normalizedSearchTerm);
     const matchesStatus = statusFilter === 'all'
       || (statusFilter === 'active' && task.enabled !== false)
@@ -107,19 +106,88 @@
     return (Array.isArray(values) ? values : []).map(value => typeof value === 'object' ? value.id : value);
   }
 
-  function optionLabel(kind, id) {
-    const options = kind === 'biome'
-      ? systemConfig.vocabularies?.biomes?.values
-      : systemConfig.vocabularies?.regions?.values;
-    const option = (Array.isArray(options) ? options : []).find(value => String(value?.id || value) === String(id || ''));
-    return String(option?.label || option?.id || id || '').trim();
+  function defaultIcon(kind) {
+    switch (kind) {
+      case 'biome': return 'fas fa-tree';
+      case 'weather': return 'fas fa-cloud-sun';
+      case 'timeOfDay': return 'fas fa-clock';
+      case 'region':
+      default: return 'fas fa-map-location-dot';
+    }
   }
 
-  function conditionLabel(kind, id) {
+  function vocabularyEntry(kind, id) {
+    const values = kind === 'biome'
+      ? systemConfig.vocabularies?.biomes?.values
+      : systemConfig.vocabularies?.regions?.values;
+    const option = (Array.isArray(values) ? values : []).find(value => String(value?.id || value) === String(id || ''));
+    const label = String(option?.label || option?.id || id || '').trim();
+    const icon = String(option?.icon || '').trim() || defaultIcon(kind);
+    const colorToken = typeof option === 'object' && option?.colorToken ? String(option.colorToken) : '';
+    const customColor = typeof option === 'object' && option?.customColor ? String(option.customColor) : '';
+    return { id: String(id || ''), label, icon, colorToken, customColor };
+  }
+
+  function biomeChipStyle(entry) {
+    const hex = /^#[0-9a-fA-F]{6}$/.test(entry?.customColor || '') ? entry.customColor : '';
+    const token = String(entry?.colorToken || 'sage').replace(/^--fab-tag-/, '');
+    return `--fab-chip-color: ${hex || `var(--fab-tag-${token})`}`;
+  }
+
+  function conditionEntry(kind, id) {
     const setting = kind === 'weather' ? weatherCondition : timeCondition;
     const option = (Array.isArray(setting?.values) ? setting.values : [])
       .find(value => String(value?.id || value) === String(id || ''));
-    return String(option?.label || option?.id || id || '').trim();
+    const label = String(option?.label || option?.id || id || '').trim();
+    const icon = String(option?.icon || '').trim() || defaultIcon(kind);
+    return { id: String(id || ''), label, icon, kind };
+  }
+
+  function optionLabel(kind, id) {
+    return vocabularyEntry(kind, id).label;
+  }
+
+  function regionChips(task) {
+    const values = Array.isArray(task?.regions)
+      ? task.regions
+      : (task?.region ? [task.region] : []);
+    return values
+      .map(id => vocabularyEntry('region', id))
+      .filter(entry => entry.label)
+      .map(entry => ({ ...entry, kind: 'region', key: `region:${entry.id}` }));
+  }
+
+  function biomeChips(task) {
+    const values = Array.isArray(task?.biomes) ? task.biomes : [];
+    return values
+      .map(id => vocabularyEntry('biome', id))
+      .filter(entry => entry.label)
+      .map(entry => ({ ...entry, kind: 'biome', key: `biome:${entry.id}`, style: biomeChipStyle(entry) }));
+  }
+
+  function timeChips(task) {
+    const values = Array.isArray(task?.timeOfDay) ? task.timeOfDay : [];
+    return values
+      .map(id => conditionEntry('timeOfDay', id))
+      .filter(entry => entry.label)
+      .map(entry => ({ ...entry, key: `timeOfDay:${entry.id}` }));
+  }
+
+  function weatherChips(task) {
+    const values = Array.isArray(task?.weather) ? task.weather : [];
+    return values
+      .map(id => conditionEntry('weather', id))
+      .filter(entry => entry.label)
+      .map(entry => ({ ...entry, key: `weather:${entry.id}` }));
+  }
+
+  function rowChips(task) {
+    return [
+      ...regionChips(task),
+      ...biomeChips(task),
+      ...timeChips(task),
+      ...weatherChips(task)
+    ];
   }
 
   function taskName(task) {
@@ -139,29 +207,11 @@
     return item?.name || id || '';
   }
 
-  function dropSummary(task) {
-    const count = dropRows(task).length;
-    if (count === 1) return text('FABRICATE.Admin.Manager.Environment.Tasks.OneDrop', '1 drop');
-    return text('FABRICATE.Admin.Manager.Environment.Tasks.DropCount', '{count} drops').replace('{count}', count);
-  }
-
   function dropReferenceText(task) {
     return dropRows(task)
       .map(row => row.name || itemLabel(row.componentId) || row.itemUuid)
       .filter(Boolean)
       .join(' ');
-  }
-
-  function availabilityLabels(task) {
-    const timeValues = Array.isArray(task?.timeOfDay) ? task.timeOfDay : [];
-    const weatherValues = Array.isArray(task?.weather) ? task.weather : [];
-    const times = timeValues.length > 0
-      ? timeValues.map(id => conditionLabel('timeOfDay', id)).filter(Boolean).join(', ')
-      : text('FABRICATE.Admin.Manager.Environment.Tasks.AnyTime', 'Any time');
-    const weather = weatherValues.length > 0
-      ? weatherValues.map(id => conditionLabel('weather', id)).filter(Boolean).join(', ')
-      : text('FABRICATE.Admin.Manager.Environment.Tasks.AnyWeather', 'Any weather');
-    return `${times}, ${weather}`;
   }
 
   function availabilityState(task) {
@@ -175,16 +225,6 @@
       || !hasTime
       || task.timeOfDay.includes(timeCondition?.current);
     return weatherMatches && timeMatches ? 'current' : 'mismatch';
-  }
-
-  function activeEnvironmentCount(task) {
-    if (!task?.id) return 0;
-    const taskId = String(task.id);
-    return environmentList.filter(environment => {
-      if (String(environment?.craftingSystemId || '') !== String(selectedSystemId || '')) return false;
-      const enabledIds = Array.isArray(environment?.enabledTaskIds) ? environment.enabledTaskIds.map(String) : [];
-      return enabledIds.includes(taskId);
-    }).length;
   }
 
   function clearFilters() {
@@ -283,11 +323,7 @@
       <div class="manager-gathering-tasks-table" role="table" aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.TableShort', 'Gathering tasks')}>
         <div class="manager-table-head manager-gathering-task-table-head" role="row">
           <span role="columnheader">{text('FABRICATE.Admin.Manager.Environment.Tasks.Column.Task', 'Gathering task')}</span>
-          <span role="columnheader">{text('FABRICATE.Admin.Manager.Environment.Region', 'Region')}</span>
-          <span role="columnheader">{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>
-          <span role="columnheader">{text('FABRICATE.Admin.Manager.Environment.Tasks.Drops', 'Drops')}</span>
-          <span role="columnheader">{text('FABRICATE.Admin.Manager.Environment.Tasks.Availability', 'Availability')}</span>
-          <span role="columnheader">{text('FABRICATE.Admin.Manager.Environment.Tasks.Environments', 'Environments')}</span>
+          <span role="columnheader">{text('FABRICATE.Admin.Manager.Environment.Tasks.Tags', 'Tags')}</span>
           <span role="columnheader">{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
           <span role="columnheader">{text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}</span>
         </div>
@@ -304,25 +340,14 @@
                 {/if}
               </span>
             </button>
-            <span role="cell" class="manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Environment.Region', 'Region')}>
-              {#if (Array.isArray(task.regions) ? task.regions : (task.region ? [task.region] : [])).length > 0}
-                <span class="manager-muted">{(Array.isArray(task.regions) ? task.regions : [task.region]).map(region => optionLabel('region', region) || region).join(', ')}</span>
-              {:else}
-                <span class="manager-chip">{text('FABRICATE.Admin.Manager.Environment.Tasks.AnyRegion', 'Any region')}</span>
-              {/if}
-            </span>
-            <span role="cell" class="manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}>
-              <span class="manager-muted">{(Array.isArray(task.biomes) && task.biomes.length > 0) ? task.biomes.map(biome => optionLabel('biome', biome) || biome).join(', ') : text('FABRICATE.Admin.Manager.Environment.Tasks.AnyBiome', 'Any biome')}</span>
-            </span>
-            <span role="cell" class="manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Environment.Tasks.Drops', 'Drops')}>
-              <strong>{dropSummary(task)}</strong>
-            </span>
-            <span role="cell" class="manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Environment.Tasks.Availability', 'Availability')}>
-              <span class="manager-muted">{availabilityLabels(task)}</span>
-            </span>
-            <span role="cell" class="manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Environment.Tasks.Environments', 'Environments')}>
-              <strong>{activeEnvironmentCount(task)}</strong>
-            </span>
+            <div class="manager-gathering-task-tags-cell" role="cell" data-gathering-task-tags>
+              {#each rowChips(task) as chip (chip.key)}
+                <span class={`manager-availability-pill is-${chip.kind}`} style={chip.style}>
+                  <i class={chip.icon} aria-hidden="true"></i>
+                  <span>{chip.label}</span>
+                </span>
+              {/each}
+            </div>
             <span role="cell" class="manager-labeled-cell manager-status-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.StatusFilter', 'Status')}>
               <button
                 type="button"

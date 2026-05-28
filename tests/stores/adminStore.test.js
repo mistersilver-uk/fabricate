@@ -2078,7 +2078,7 @@ describe('createAdminStore', () => {
         itemUuid: '',
         quantity: 2,
         dropRate: 80,
-        conditionModifiers: { timeOfDay: [], weather: [] },
+        conditionModifiers: { timeOfDay: [], weather: [], biome: [] },
         characterModifiers: [],
         enabled: true
       });
@@ -2318,7 +2318,8 @@ describe('createAdminStore', () => {
       assert.equal(saved.dropRows[0].dropRate, 0);
       assert.deepEqual(saved.dropRows[0].conditionModifiers, {
         timeOfDay: [{ id: 'night-penalty', conditionId: 'night', operator: '-', value: 5 }],
-        weather: [{ id: 'rain-bonus', conditionId: 'rain', operator: '+', value: 15 }]
+        weather: [{ id: 'rain-bonus', conditionId: 'rain', operator: '+', value: 15 }],
+        biome: []
       });
     });
 
@@ -2456,6 +2457,77 @@ describe('createAdminStore', () => {
       assert.equal(await store.duplicateGatheringLibraryTask('sys1', 'missing'), null);
       assert.equal(await store.duplicateGatheringLibraryTask('missing-system', 'task-herbs'), null);
       assert.equal(services._store.gatheringConfig.systems.sys1.tasks.length, 1);
+    });
+
+    it('duplicates gathering library hazards with a fresh id and Copy suffix', async () => {
+      const services = createMockServices({
+        randomID: (() => {
+          let id = 0;
+          return () => `hazard-copy-${++id}`;
+        })(),
+        localize: (key) => key === 'FABRICATE.Admin.Manager.Environment.Tasks.CopySuffix' ? 'Copy' : key
+      });
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      services._store.gatheringConfig = {
+        systems: {
+          sys1: {
+            hazards: [{
+              id: 'hazard-thorns',
+              name: 'Thornwall',
+              description: 'Vicious thicket.',
+              enabled: true,
+              dangerTags: ['hazardous'],
+              regions: ['north'],
+              biomes: ['forest'],
+              weather: ['rain'],
+              timeOfDay: ['night'],
+              dropRate: 35,
+              hazardModifier: { provider: 'macro', macroUuid: 'Macro.thorn' },
+              characterModifiers: []
+            }]
+          },
+          sys2: {
+            hazards: [{ id: 'hazard-other', name: 'Other Hazard', dropRate: 10 }]
+          }
+        }
+      };
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const duplicate = await store.duplicateGatheringLibraryHazard('sys1', 'hazard-thorns');
+
+      const sys1Hazards = services._store.gatheringConfig.systems.sys1.hazards;
+      assert.equal(duplicate.id, 'hazard-copy-1');
+      assert.equal(duplicate.name, 'Thornwall (Copy)');
+      assert.deepEqual(duplicate.regions, ['north']);
+      assert.deepEqual(duplicate.biomes, ['forest']);
+      assert.deepEqual(duplicate.weather, ['rain']);
+      assert.deepEqual(duplicate.timeOfDay, ['night']);
+      assert.deepEqual(duplicate.dangerTags, ['hazardous']);
+      assert.equal(duplicate.dropRate, 35);
+      assert.deepEqual(duplicate.hazardModifier, { provider: 'macro', macroUuid: 'Macro.thorn' });
+      assert.equal(sys1Hazards.length, 2);
+      assert.equal(sys1Hazards[0].id, 'hazard-thorns');
+      assert.equal(services._store.gatheringConfig.systems.sys2.hazards.length, 1);
+      assert.equal(get(store.viewState).gatheringConfig.systems.sys1.hazards.length, 2);
+    });
+
+    it('returns null when duplicating a missing gathering hazard', async () => {
+      const services = createMockServices();
+      services._store.gatheringConfig = {
+        systems: {
+          sys1: {
+            hazards: [{ id: 'hazard-thorns', name: 'Thornwall', dropRate: 25 }]
+          }
+        }
+      };
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      assert.equal(await store.duplicateGatheringLibraryHazard('sys1', 'missing'), null);
+      assert.equal(await store.duplicateGatheringLibraryHazard('missing-system', 'hazard-thorns'), null);
+      assert.equal(services._store.gatheringConfig.systems.sys1.hazards.length, 1);
     });
 
     it('manages selected-system gathering weather and time vocabulary without affecting other systems', async () => {
@@ -2768,7 +2840,8 @@ describe('createAdminStore', () => {
         hazardSelectionMode: 'limitedDrops',
         hazardLimit: 3,
         hazardPolicy: 'successWithHazard',
-        toolBreakagePolicy: 'failureOnBreak'
+        toolBreakagePolicy: 'failureOnBreak',
+        biomeModifierAggregation: 'strongestOfEach'
       });
 
       await store.updateGatheringRules('sys1', {
@@ -2785,7 +2858,8 @@ describe('createAdminStore', () => {
         hazardSelectionMode: 'highestRankedDrop',
         hazardLimit: 1,
         hazardPolicy: 'failureWithHazard',
-        toolBreakagePolicy: 'failureOnBreak'
+        toolBreakagePolicy: 'failureOnBreak',
+        biomeModifierAggregation: 'strongestOfEach'
       });
       assert.deepEqual(get(store.viewState).gatheringConfig.systems.sys1.rules, services._store.gatheringConfig.systems.sys1.rules);
     });

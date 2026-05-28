@@ -127,13 +127,15 @@ const FALLBACK_GATHERING_CONDITION_ICONS = Object.freeze({
 const GATHERING_DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops', 'limitedDrops']);
 const GATHERING_HAZARD_POLICIES = new Set(['successWithHazard', 'failureWithHazard']);
 const GATHERING_TOOL_BREAKAGE_POLICIES = new Set(['failureOnBreak', 'successDespiteBreak']);
+const GATHERING_BIOME_MODIFIER_AGGREGATIONS = new Set(['cumulative', 'strongestOfEach', 'dominant']);
 const DEFAULT_GATHERING_RULES = Object.freeze({
   rewardSelectionMode: 'highestRankedDrop',
   rewardLimit: 1,
   hazardSelectionMode: 'allDrops',
   hazardLimit: 1,
   hazardPolicy: 'successWithHazard',
-  toolBreakagePolicy: 'failureOnBreak'
+  toolBreakagePolicy: 'failureOnBreak',
+  biomeModifierAggregation: 'strongestOfEach'
 });
 
 // ---------------------------------------------------------------------------
@@ -512,14 +514,15 @@ function _normalizeGatheringCharacterModifierReference(ref, index, randomID = ()
 function _normalizeGatheringDropConditionModifiers(modifiers = {}) {
   return {
     timeOfDay: _normalizeGatheringDropConditionModifierList(modifiers?.timeOfDay),
-    weather: _normalizeGatheringDropConditionModifierList(modifiers?.weather)
+    weather: _normalizeGatheringDropConditionModifierList(modifiers?.weather),
+    biome: _normalizeGatheringDropConditionModifierList(modifiers?.biome, _normalizeGatheringTag)
   };
 }
 
-function _normalizeGatheringDropConditionModifierList(values = []) {
+function _normalizeGatheringDropConditionModifierList(values = [], normalizeId = _normalizeGatheringConditionId) {
   return (Array.isArray(values) ? values : [])
     .map((modifier, index) => {
-      const conditionId = _normalizeGatheringConditionId(modifier?.conditionId ?? modifier?.id);
+      const conditionId = normalizeId(modifier?.conditionId ?? modifier?.id);
       const rawValue = Number(modifier?.value);
       if (!conditionId || !Number.isFinite(rawValue)) return null;
       const truncated = Math.trunc(rawValue);
@@ -640,7 +643,9 @@ function _normalizeGatheringHazard(hazard = {}, randomID = () => Math.random().t
     weather: _normalizeGatheringConditionIdList(hazard.weather),
     timeOfDay: _normalizeGatheringConditionIdList(hazard.timeOfDay),
     dropRate: Number.isFinite(Number(hazard.dropRate)) ? Math.min(100, Math.max(1, Math.floor(Number(hazard.dropRate)))) : 1,
+    linkedSceneUuid: String(hazard.linkedSceneUuid || ''),
     hazardModifier: hazard.hazardModifier && typeof hazard.hazardModifier === 'object' ? _clonePlain(hazard.hazardModifier) : null,
+    conditionModifiers: _normalizeGatheringDropConditionModifiers(hazard.conditionModifiers),
     characterModifiers: _normalizeGatheringCharacterModifierReferences(hazard.characterModifiers, randomID)
   };
 }
@@ -664,13 +669,17 @@ function _normalizeGatheringRules(rules = {}) {
   const toolBreakagePolicy = GATHERING_TOOL_BREAKAGE_POLICIES.has(rules?.toolBreakagePolicy)
     ? rules.toolBreakagePolicy
     : DEFAULT_GATHERING_RULES.toolBreakagePolicy;
+  const biomeModifierAggregation = GATHERING_BIOME_MODIFIER_AGGREGATIONS.has(rules?.biomeModifierAggregation)
+    ? rules.biomeModifierAggregation
+    : DEFAULT_GATHERING_RULES.biomeModifierAggregation;
   return {
     rewardSelectionMode,
     rewardLimit: _normalizePositiveInteger(rules?.rewardLimit, DEFAULT_GATHERING_RULES.rewardLimit),
     hazardSelectionMode,
     hazardLimit: _normalizePositiveInteger(rules?.hazardLimit, DEFAULT_GATHERING_RULES.hazardLimit),
     hazardPolicy,
-    toolBreakagePolicy
+    toolBreakagePolicy,
+    biomeModifierAggregation
   };
 }
 
@@ -4102,6 +4111,24 @@ export function createAdminStore(services) {
     return true;
   }
 
+  async function duplicateGatheringLibraryHazard(systemId = get(selectedSystemId), hazardId) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    if (!systemConfig || !hazardId) return null;
+    const hazard = systemConfig.hazards.find(hazard => hazard.id === hazardId);
+    if (!hazard) return null;
+    const copySuffix = services.localize?.('FABRICATE.Admin.Manager.Environment.Tasks.CopySuffix') || 'Copy';
+    const duplicate = _normalizeGatheringHazard({
+      ..._clonePlain(hazard),
+      id: _randomID(),
+      name: `${hazard.name || 'Hazard'} (${copySuffix})`
+    }, _randomID);
+    systemConfig.hazards = [...systemConfig.hazards, duplicate];
+    await _saveGatheringConfig(config);
+    await refresh();
+    return duplicate;
+  }
+
   /**
    * Append a new character modifier entry to the selected system's library.
    * Returns the normalized entry, or null when the system has no gathering
@@ -4839,6 +4866,7 @@ export function createAdminStore(services) {
     addGatheringLibraryHazard,
     updateGatheringLibraryHazard,
     deleteGatheringLibraryHazard,
+    duplicateGatheringLibraryHazard,
     addGatheringCharacterModifier,
     updateGatheringCharacterModifier,
     deleteGatheringCharacterModifier,
