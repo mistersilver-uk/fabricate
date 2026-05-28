@@ -2,7 +2,10 @@ name: CI
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    # `edited` lets title/screenshot checks re-run when the PR title or body is
+    # fixed after opening. The expensive unit-tests job opts out of `edited`
+    # (see its `if:`), so description tweaks only re-run the cheap metadata jobs.
+    types: [opened, synchronize, reopened, edited]
   push:
     branches:
       - main
@@ -17,6 +20,10 @@ permissions:
 
 jobs:
   unit-tests:
+    # Skip on `edited` PR events: editing the title/body doesn't change the head
+    # commit, so the existing result for that SHA still stands. Runs on push and
+    # all other PR events (opened/synchronize/reopened).
+    if: github.event_name != 'pull_request' || github.event.action != 'edited'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -68,8 +75,13 @@ jobs:
 
       - name: Lint PR title
         env:
-          PR_TITLE: ${{ github.event.pull_request.title }}
-        run: echo "$PR_TITLE" | npx commitlint --verbose
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          # Read the live title (not the event payload) so a re-run or `edited`
+          # event always lints the current PR title.
+          PR_TITLE=$(gh pr view "$PR_NUMBER" --repo "${{ github.repository }}" --json title --jq .title)
+          echo "$PR_TITLE" | npx commitlint --verbose
 
   check-screenshots:
     if: github.event_name == 'pull_request'
@@ -80,8 +92,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_BODY: ${{ github.event.pull_request.body }}
         run: |
+          # Read the live body (not the event payload) so a re-run or `edited`
+          # event sees screenshots added after the PR was opened.
+          PR_BODY=$(gh pr view "$PR_NUMBER" --repo "${{ github.repository }}" --json body --jq .body)
+
           # Get changed files
           CHANGED_FILES=$(gh pr diff "$PR_NUMBER" \
             --repo "${{ github.repository }}" \
