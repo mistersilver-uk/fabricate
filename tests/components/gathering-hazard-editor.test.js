@@ -83,6 +83,45 @@ describe('GatheringHazardEditView source contract', () => {
     assert.ok(rootSource.includes('pickCharacterModifierForHazard'), 'root should expose a picker for adding character modifiers');
   });
 
+  it('renders condition modifiers as a single signed number input that colors its box by value', () => {
+    // The operator Positive/Negative <select> is gone; value is typed signed.
+    assert.ok(rootSource.includes('function gatheringModifierValueClass'), 'root should expose a signed value-class helper');
+    assert.ok(rootSource.includes('function signedToOperatorValue'), 'root should split a signed input back into { operator, value }');
+    assert.ok(
+      rootSource.includes('manager-condition-modifier-row-reference ${gatheringModifierValueClass(modifier)}'),
+      'condition modifier box should be colored by its signed value'
+    );
+    assert.ok(rootSource.includes('class="manager-condition-modifier-value"'), 'condition modifier should use the single signed-input wrapper');
+    assert.equal(rootSource.includes('manager-condition-modifier-row-body'), false, 'the old two-line value body should be removed');
+    assert.equal(rootSource.includes('gatheringDropModifierOperatorClass'), false, 'the operator-only class helper should be removed');
+  });
+
+  it('formats condition modifier values as signed percentages', () => {
+    assert.ok(rootSource.includes('function gatheringModifierDisplayValue'), 'root should expose a signed display formatter');
+    assert.ok(rootSource.includes('value={gatheringModifierDisplayValue(modifier)}'), 'condition modifier input should render the formatted signed value');
+    assert.ok(/<input\s+type="text"\s+inputmode="numeric"/.test(rootSource), 'condition modifier value should be a numeric text input so a leading + can render');
+    assert.ok(rootSource.includes('<span aria-hidden="true">%</span>'), 'condition modifier value should show a % adornment');
+  });
+
+  it('supports Arrow Up/Down stepping on condition modifier values', () => {
+    assert.ok(rootSource.includes('function onGatheringDropModifierKeydown'), 'root should expose a drop modifier keydown stepper');
+    assert.ok(rootSource.includes('function onGatheringHazardModifierKeydown'), 'root should expose a hazard modifier keydown stepper');
+    assert.ok(rootSource.includes('onkeydown={(event) => onGatheringDropModifierKeydown'), 'drop modifier input should wire the keydown stepper');
+    assert.ok(rootSource.includes('onkeydown={(event) => onGatheringHazardModifierKeydown'), 'hazard modifier input should wire the keydown stepper');
+    assert.ok(/onGatheringDropModifierKeydown[\s\S]*ArrowUp[\s\S]*ArrowDown/.test(rootSource), 'stepper should handle ArrowUp and ArrowDown');
+  });
+
+  it('exposes an optional linked-scene row with drag-drop, unlink, and right-click removal', () => {
+    assert.ok(editorSource.includes('data-gathering-hazard-scene'), 'editor should expose a linked-scene section');
+    assert.ok(editorSource.includes('use:dragDrop'), 'linked-scene drop zone should use the dragDrop action');
+    assert.ok(editorSource.includes('function handleSceneDrop'), 'editor should expose a scene drop handler');
+    assert.ok(editorSource.includes("type !== 'Scene'"), 'drop handler should only accept Scene documents');
+    assert.ok(editorSource.includes('onUpdateHazard({ linkedSceneUuid:'), 'linking/unlinking should patch linkedSceneUuid via onUpdateHazard');
+    assert.ok(editorSource.includes('oncontextmenu'), 'linked scene should support right-click removal');
+    assert.ok(editorSource.includes('fa-link-slash'), 'linked scene should expose an unlink button');
+    assert.ok(editorSource.includes('viewScene(linkedSceneUuid)'), 'clicking the scene name should navigate the GM to the scene');
+  });
+
   it('stages hazard edits in a draft with Save + Dirty toolbar parity with tasks', () => {
     assert.ok(rootSource.includes('let gatheringHazardDraft = $state(null)'), 'root should declare a hazard draft state');
     assert.ok(rootSource.includes('let gatheringHazardDraftBaseline = $state(null)'), 'root should declare a hazard draft baseline');

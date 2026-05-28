@@ -14,6 +14,8 @@ import { GatheringRunManager } from './systems/GatheringRunManager.js';
 import { GatheringGateAndCheckEvaluator } from './systems/GatheringGateAndCheckEvaluator.js';
 import { GatheringRichStateService } from './systems/GatheringRichStateService.js';
 import { GatheringEngine } from './systems/GatheringEngine.js';
+import { HAZARD_SCENE_SOCKET, createHazardSceneTrigger, routeHazardSceneSocketMessage } from './systems/hazardSceneCoordinator.js';
+import { renderDialog, viewScene } from './ui/svelte/util/foundryBridge.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { ResolutionModeService } from './systems/ResolutionModeService.js';
 import { SignatureValidator } from './systems/SignatureValidator.js';
@@ -421,6 +423,68 @@ function createGatheringFailureFeedback() {
   };
 }
 
+function fabricateEscapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[ch]));
+}
+
+function hazardScenePromptText(key, fallback, data) {
+  const i18n = game?.i18n;
+  if (!i18n) return fallback;
+  if (data) return i18n.format?.(key, data) ?? fallback;
+  const out = i18n.localize?.(key);
+  return out && out !== key ? out : fallback;
+}
+
+// GM-side prompt: choose which active players to pull to a dropped hazard's
+// linked scene. The GM also views the scene; selected players are pulled via
+// the module socket. Lives here (not the engine) because it is Foundry glue.
+async function showHazardScenePrompt({ sceneUuid, hazardName } = {}) {
+  const scene = typeof fromUuid === 'function' ? await fromUuid(sceneUuid) : null;
+  if (!scene) {
+    ui.notifications?.warn?.(hazardScenePromptText(
+      'FABRICATE.Admin.Manager.Environment.Hazards.HazardScenePrompt.Missing',
+      'The hazard\'s linked scene could not be found.'
+    ));
+    return;
+  }
+  const sceneName = scene.name || sceneUuid;
+  const players = Array.from(game.users?.contents || []).filter(user => user?.active && !user?.isGM);
+  const intro = hazardScenePromptText(
+    'FABRICATE.Admin.Manager.Environment.Hazards.HazardScenePrompt.Intro',
+    `${hazardName || 'A hazard'} dropped. Move players to ${sceneName}?`,
+    { hazard: hazardName || 'A hazard', scene: sceneName }
+  );
+  const rows = players.length === 0
+    ? `<p class="notes">${fabricateEscapeHtml(hazardScenePromptText('FABRICATE.Admin.Manager.Environment.Hazards.HazardScenePrompt.NoPlayers', 'No active players to move.'))}</p>`
+    : players.map(user => `<label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" class="fab-pull-player" value="${fabricateEscapeHtml(user.id)}" checked /> ${fabricateEscapeHtml(user.name)}</label>`).join('');
+  const content = `<div style="display:flex;flex-direction:column;gap:6px;"><p>${fabricateEscapeHtml(intro)}</p>${rows}</div>`;
+  renderDialog({
+    title: hazardScenePromptText('FABRICATE.Admin.Manager.Environment.Hazards.HazardScenePrompt.Title', 'Hazard struck'),
+    content,
+    default: 'move',
+    buttons: {
+      move: {
+        label: hazardScenePromptText('FABRICATE.Admin.Manager.Environment.Hazards.HazardScenePrompt.Move', 'Move players'),
+        callback: (html) => {
+          const root = html?.[0] ?? html;
+          const userIds = root
+            ? Array.from(root.querySelectorAll('.fab-pull-player:checked')).map(input => input.value)
+            : [];
+          void viewScene(sceneUuid);
+          if (userIds.length > 0) {
+            game.socket?.emit(HAZARD_SCENE_SOCKET, { action: 'pullToScene', sceneUuid, userIds });
+          }
+        }
+      },
+      cancel: {
+        label: hazardScenePromptText('FABRICATE.Admin.Manager.Environment.Hazards.HazardScenePrompt.Cancel', 'Cancel')
+      }
+    }
+  });
+}
+
 function normalizeGatheringRollTableOutcome(tableResult) {
   const disposition = tableResult?.meta?.disposition;
   if (disposition === 'success') {
@@ -610,6 +674,13 @@ class Fabricate {
         resultCreator: createGatheringResultCreator(this.craftingSystemManager)
       }),
       failureFeedback: createGatheringFailureFeedback(),
+      hazardSceneTrigger: createHazardSceneTrigger({
+        isGM: () => !!game.user?.isGM,
+        emitPrompt: ({ sceneUuid, hazardName }) => game.socket?.emit(HAZARD_SCENE_SOCKET, {
+          action: 'hazardScenePrompt', sceneUuid, hazardName, requestedBy: game.user?.id
+        }),
+        showPrompt: showHazardScenePrompt
+      }),
       getRunViewer: getGatheringRunViewer,
       localize: localizeGathering
     });
@@ -998,6 +1069,13 @@ Hooks.once('init', async () => {
 Hooks.once('ready', async () => {
   await fabricate.initialize();
   await processFabricateWorldTime();
+
+  game.socket?.on(HAZARD_SCENE_SOCKET, (payload) => routeHazardSceneSocketMessage(payload, {
+    currentUserId: () => game.user?.id,
+    isActiveGM: () => game.user === game.users?.activeGM,
+    showPrompt: showHazardScenePrompt,
+    viewSceneForSelf: (uuid) => viewScene(uuid)
+  }));
 
   addModuleButtonsToItemsDirectory();
   Hooks.on('fabricate.craftingSystemsChanged', () => addModuleButtonsToItemsDirectory());

@@ -1,7 +1,9 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
-  import { localize } from '../../util/foundryBridge.js';
+  import { dragDrop } from '../../actions/dragDrop.js';
+  import { localize, viewScene } from '../../util/foundryBridge.js';
+  import { resolveDropData } from '../../util/dropUtils.js';
   import { dropRateTierClass, dropRateTierColor } from '../../util/dropRateTier.js';
 
   let {
@@ -29,6 +31,40 @@
   }));
   const suggestedDangerTags = $derived(DEFAULT_DANGER_TAGS.filter(tag => !dangerTags.includes(tag)));
   const nameValid = $derived(Boolean((hazard?.name || '').trim()));
+  const linkedSceneUuid = $derived(String(hazard?.linkedSceneUuid || ''));
+  let linkedSceneName = $state('');
+  let linkedSceneThumb = $state('');
+  $effect(() => {
+    const uuid = linkedSceneUuid;
+    linkedSceneName = '';
+    linkedSceneThumb = '';
+    if (!uuid || typeof globalThis.fromUuid !== 'function') return;
+    let cancelled = false;
+    Promise.resolve(globalThis.fromUuid(uuid)).then(doc => {
+      if (cancelled || !doc) return;
+      linkedSceneName = String(doc.name || '');
+      linkedSceneThumb = String(doc.thumb || doc.background?.src || '');
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  });
+  const linkedSceneLabel = $derived(linkedSceneName || linkedSceneUuid);
+
+  function handleSceneDrop(data) {
+    const { uuid, type } = resolveDropData(data);
+    if (type !== 'Scene' || !uuid) return;
+    onUpdateHazard({ linkedSceneUuid: uuid });
+  }
+
+  function unlinkScene() {
+    onUpdateHazard({ linkedSceneUuid: '' });
+  }
+
+  function onLinkedSceneMouseDown(event) {
+    if (event.button !== 2) return;
+    event.preventDefault();
+    unlinkScene();
+  }
+
   const dropRateRaw = $derived(Number(hazard?.dropRate));
   const dropRateValid = $derived(Number.isFinite(dropRateRaw) && dropRateRaw >= 1 && dropRateRaw <= 100);
   const dropRateValue = $derived(Math.max(1, Math.min(100, Math.floor(Number.isFinite(dropRateRaw) ? dropRateRaw : 1))));
@@ -381,6 +417,54 @@
       </div>
     </section>
     </div>
+
+    <section class="manager-task-availability-card manager-gathering-hazard-scene" data-gathering-hazard-scene>
+      <div class="manager-task-card-heading">
+        <div>
+          <h3>{text('FABRICATE.Admin.Manager.Environment.Hazards.SceneLink', 'Linked scene')}</h3>
+          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Environment.Hazards.SceneLinkHint', 'Optionally link a scene to open when this hazard is triggered.')}</p>
+        </div>
+      </div>
+      {#if linkedSceneUuid}
+        <div
+          class="manager-gathering-hazard-scene-linked"
+          data-gathering-hazard-scene-linked
+          title={text('FABRICATE.Admin.Manager.Environment.Hazards.SceneRemoveTooltip', 'Right-click to remove the linked scene')}
+          oncontextmenu={(event) => { event.preventDefault(); unlinkScene(); }}
+          onmousedown={onLinkedSceneMouseDown}
+        >
+          {#if linkedSceneThumb}
+            <img class="manager-gathering-hazard-scene-thumb" src={linkedSceneThumb} alt="" />
+          {:else}
+            <span class="manager-gathering-hazard-scene-thumb is-placeholder" aria-hidden="true"><i class="fas fa-map"></i></span>
+          {/if}
+          <button
+            type="button"
+            class="manager-gathering-hazard-scene-name"
+            title={text('FABRICATE.Admin.Manager.Environment.Hazards.SceneOpen', 'Open scene')}
+            onclick={(event) => { event.stopPropagation(); viewScene(linkedSceneUuid); }}
+          >{linkedSceneLabel}</button>
+          <button
+            type="button"
+            class="manager-icon-button is-danger"
+            aria-label={text('FABRICATE.Admin.Manager.Environment.Hazards.SceneUnlink', 'Unlink scene')}
+            title={text('FABRICATE.Admin.Manager.Environment.Hazards.SceneUnlink', 'Unlink scene')}
+            onclick={unlinkScene}
+          >
+            <i class="fas fa-link-slash" aria-hidden="true"></i>
+          </button>
+        </div>
+      {:else}
+        <div
+          class="manager-gathering-hazard-scene-dropzone"
+          data-gathering-hazard-scene-dropzone
+          use:dragDrop={{ onDrop: handleSceneDrop, activeClass: 'is-drop-active' }}
+        >
+          <i class="fas fa-map-location-dot" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Environment.Hazards.SceneDropHint', 'Drag a scene here to link it.')}</span>
+        </div>
+      {/if}
+    </section>
 
   {:else}
     <div class="manager-empty">

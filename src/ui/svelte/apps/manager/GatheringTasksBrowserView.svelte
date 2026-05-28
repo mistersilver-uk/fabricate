@@ -123,7 +123,15 @@
     const option = (Array.isArray(values) ? values : []).find(value => String(value?.id || value) === String(id || ''));
     const label = String(option?.label || option?.id || id || '').trim();
     const icon = String(option?.icon || '').trim() || defaultIcon(kind);
-    return { id: String(id || ''), label, icon };
+    const colorToken = typeof option === 'object' && option?.colorToken ? String(option.colorToken) : '';
+    const customColor = typeof option === 'object' && option?.customColor ? String(option.customColor) : '';
+    return { id: String(id || ''), label, icon, colorToken, customColor };
+  }
+
+  function biomeChipStyle(entry) {
+    const hex = /^#[0-9a-fA-F]{6}$/.test(entry?.customColor || '') ? entry.customColor : '';
+    const token = String(entry?.colorToken || 'sage').replace(/^--fab-tag-/, '');
+    return `--fab-chip-color: ${hex || `var(--fab-tag-${token})`}`;
   }
 
   function conditionEntry(kind, id) {
@@ -139,57 +147,38 @@
     return vocabularyEntry(kind, id).label;
   }
 
-  function anyChip(kind, labelKey, fallback) {
-    return {
-      id: 'any',
-      key: `${kind}:any`,
-      kind,
-      label: text(labelKey, fallback),
-      icon: defaultIcon(kind),
-      isAny: true
-    };
-  }
-
   function regionChips(task) {
     const values = Array.isArray(task?.regions)
       ? task.regions
       : (task?.region ? [task.region] : []);
-    const entries = values
+    return values
       .map(id => vocabularyEntry('region', id))
       .filter(entry => entry.label)
-      .map(entry => ({ ...entry, kind: 'region', key: `region:${entry.id}`, isAny: false }));
-    if (entries.length === 0) return [anyChip('region', 'FABRICATE.Admin.Manager.Environment.Tasks.AnyRegion', 'Any region')];
-    return entries;
+      .map(entry => ({ ...entry, kind: 'region', key: `region:${entry.id}` }));
   }
 
   function biomeChips(task) {
     const values = Array.isArray(task?.biomes) ? task.biomes : [];
-    const entries = values
+    return values
       .map(id => vocabularyEntry('biome', id))
       .filter(entry => entry.label)
-      .map(entry => ({ ...entry, kind: 'biome', key: `biome:${entry.id}`, isAny: false }));
-    if (entries.length === 0) return [anyChip('biome', 'FABRICATE.Admin.Manager.Environment.Tasks.AnyBiome', 'Any biome')];
-    return entries;
+      .map(entry => ({ ...entry, kind: 'biome', key: `biome:${entry.id}`, style: biomeChipStyle(entry) }));
   }
 
   function timeChips(task) {
     const values = Array.isArray(task?.timeOfDay) ? task.timeOfDay : [];
-    const entries = values
+    return values
       .map(id => conditionEntry('timeOfDay', id))
       .filter(entry => entry.label)
-      .map(entry => ({ ...entry, key: `timeOfDay:${entry.id}`, isAny: false }));
-    if (entries.length === 0) return [anyChip('timeOfDay', 'FABRICATE.Admin.Manager.Environment.Tasks.AnyTime', 'Any time')];
-    return entries;
+      .map(entry => ({ ...entry, key: `timeOfDay:${entry.id}` }));
   }
 
   function weatherChips(task) {
     const values = Array.isArray(task?.weather) ? task.weather : [];
-    const entries = values
+    return values
       .map(id => conditionEntry('weather', id))
       .filter(entry => entry.label)
-      .map(entry => ({ ...entry, key: `weather:${entry.id}`, isAny: false }));
-    if (entries.length === 0) return [anyChip('weather', 'FABRICATE.Admin.Manager.Environment.Tasks.AnyWeather', 'Any weather')];
-    return entries;
+      .map(entry => ({ ...entry, key: `weather:${entry.id}` }));
   }
 
   function rowChips(task) {
@@ -353,7 +342,7 @@
             </button>
             <div class="manager-gathering-task-tags-cell" role="cell" data-gathering-task-tags>
               {#each rowChips(task) as chip (chip.key)}
-                <span class={`manager-availability-pill is-${chip.kind}${chip.isAny ? ' is-any' : ''}`}>
+                <span class={`manager-availability-pill is-${chip.kind}`} style={chip.style}>
                   <i class={chip.icon} aria-hidden="true"></i>
                   <span>{chip.label}</span>
                 </span>

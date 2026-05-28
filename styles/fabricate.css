@@ -5535,21 +5535,50 @@
   flex-wrap: nowrap;
 }
 
-.fabricate-manager .manager-condition-modifier-row-body {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.fabricate-manager .manager-condition-modifier-row-reference.is-positive {
+  border-color: var(--fab-success-border);
+  background: color-mix(in srgb, var(--fab-success-soft) 40%, var(--fab-mv2-surface-1));
 }
 
-.fabricate-manager .manager-condition-modifier-row-body .manager-field {
-  flex-direction: row;
+.fabricate-manager .manager-condition-modifier-row-reference.is-negative {
+  border-color: var(--fab-danger-border);
+  background: color-mix(in srgb, var(--fab-danger-soft) 40%, var(--fab-mv2-surface-1));
+}
+
+.fabricate-manager .manager-condition-modifier-row-reference.is-zero {
+  border-color: var(--fab-mv2-border);
+}
+
+.fabricate-manager .manager-condition-modifier-value {
+  position: relative;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
+  flex: 0 0 auto;
 }
 
-.fabricate-manager .manager-condition-modifier-row-body .manager-field input {
-  flex: 0 0 80px;
-  width: auto;
+.fabricate-manager .manager-condition-modifier-value input {
+  flex: 0 0 56px;
+  width: 56px;
+  height: 28px;
+  min-height: 28px;
+  padding: 3px 16px 3px 4px;
+  text-align: center;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-surface-1);
+  box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.fabricate-manager .manager-condition-modifier-value > span[aria-hidden="true"] {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--fab-mv2-text-muted, var(--fab-mv2-text));
 }
 
 .fabricate-manager .manager-condition-modifier-add-row {
@@ -6486,23 +6515,21 @@
   align-items: flex-start;
   align-self: flex-start;
   min-width: 0;
-  max-height: 96px;
+  height: 68px;
   overflow-y: auto;
   padding-right: 4px;
 }
 
-.fabricate-manager .manager-availability-pill.is-any {
-  opacity: 0.72;
-  padding-right: 12px;
-  font-style: italic;
-}
+.fabricate-manager .manager-availability-pill.is-region { --fab-chip-color: var(--fab-info); }
+.fabricate-manager .manager-availability-pill.is-weather { --fab-chip-color: var(--fab-warning); }
+.fabricate-manager .manager-availability-pill.is-timeOfDay { --fab-chip-color: var(--fab-purple); }
 
-.fabricate-manager .manager-availability-pill.is-any > span {
-  padding-right: 2px;
-}
-
-.fabricate-manager .manager-availability-pill.is-any > i {
-  opacity: 1;
+.fabricate-manager .manager-availability-pill.is-region,
+.fabricate-manager .manager-availability-pill.is-weather,
+.fabricate-manager .manager-availability-pill.is-timeOfDay,
+.fabricate-manager .manager-availability-pill.is-biome {
+  background: color-mix(in srgb, var(--fab-chip-color, var(--fab-warning)) 16%, var(--fab-mv2-surface-2));
+  border-color: color-mix(in srgb, var(--fab-chip-color, var(--fab-warning)) 50%, transparent);
 }
 
 .fabricate-manager .manager-system-icon,
@@ -8756,19 +8783,9 @@
   align-items: flex-start;
   align-self: flex-start;
   min-width: 0;
-  max-height: 96px;
+  height: 68px;
   overflow-y: auto;
   padding-right: 4px;
-}
-
-.fabricate-manager .manager-danger-tag-pill.is-any {
-  opacity: 0.72;
-  padding-right: 12px;
-  font-style: italic;
-}
-
-.fabricate-manager .manager-danger-tag-pill.is-any > span {
-  padding-right: 2px;
 }
 
 .fabricate-manager .manager-danger-tag-pill {
@@ -8879,6 +8896,80 @@
 
 .fabricate-manager .manager-gathering-hazard-edit-row > .manager-task-availability-card {
   min-width: 0;
+  align-content: start;
+}
+
+.fabricate-manager [data-gathering-hazard-drop-rate] .manager-task-availability-row,
+.fabricate-manager [data-gathering-hazard-danger-tags] .manager-task-availability-row {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.fabricate-manager .manager-gathering-hazard-scene-dropzone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1px dashed var(--fab-mv2-border);
+  border-radius: 8px;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.fabricate-manager .manager-gathering-hazard-scene-dropzone.is-drop-active {
+  border-color: var(--fab-mv2-accent);
+  background: var(--fab-success-soft);
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-gathering-hazard-scene-linked {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-mv2-surface-1);
+}
+
+.fabricate-manager .manager-gathering-hazard-scene-thumb {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  object-fit: cover;
+  color: var(--fab-mv2-text-muted);
+  background: var(--fab-overlay-light-06);
+}
+
+.fabricate-manager .manager-gathering-hazard-scene-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  color: var(--fab-mv2-accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-gathering-hazard-scene-name:hover {
+  text-decoration: underline;
 }
 
 .fabricate-manager .manager-gathering-hazard-edit-view :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {

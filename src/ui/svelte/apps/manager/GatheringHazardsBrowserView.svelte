@@ -140,7 +140,15 @@
     const option = (Array.isArray(values) ? values : []).find(value => String(value?.id || value) === String(id || ''));
     const label = String(option?.label || option?.id || id || '').trim();
     const icon = String(option?.icon || '').trim() || defaultIcon(kind);
-    return { id: String(id || ''), label, icon };
+    const colorToken = typeof option === 'object' && option?.colorToken ? String(option.colorToken) : '';
+    const customColor = typeof option === 'object' && option?.customColor ? String(option.customColor) : '';
+    return { id: String(id || ''), label, icon, colorToken, customColor };
+  }
+
+  function biomeChipStyle(entry) {
+    const hex = /^#[0-9a-fA-F]{6}$/.test(entry?.customColor || '') ? entry.customColor : '';
+    const token = String(entry?.colorToken || 'sage').replace(/^--fab-tag-/, '');
+    return `--fab-chip-color: ${hex || `var(--fab-tag-${token})`}`;
   }
 
   function conditionEntry(kind, id) {
@@ -161,63 +169,43 @@
     return text(key, tag.charAt(0).toUpperCase() + tag.slice(1));
   }
 
-  function anyChip(kind, labelKey, fallback, pillClass) {
-    return {
-      id: 'any',
-      key: `${kind}:any`,
-      kind,
-      label: text(labelKey, fallback),
-      icon: kind === 'danger' ? null : defaultIcon(kind),
-      pillClass,
-      isAny: true
-    };
-  }
-
   function regionChips(hazard) {
     const values = Array.isArray(hazard?.regions)
       ? hazard.regions
       : (hazard?.region ? [hazard.region] : []);
-    const entries = values
+    return values
       .map(id => vocabularyEntry('region', id))
       .filter(entry => entry.label)
-      .map(entry => ({ ...entry, kind: 'region', key: `region:${entry.id}`, pillClass: 'manager-availability-pill is-region', isAny: false }));
-    if (entries.length === 0) return [anyChip('region', 'FABRICATE.Admin.Manager.Environment.Hazards.AnyRegion', 'Any region', 'manager-availability-pill is-region')];
-    return entries;
+      .map(entry => ({ ...entry, kind: 'region', key: `region:${entry.id}`, pillClass: 'manager-availability-pill is-region' }));
   }
 
   function biomeChips(hazard) {
     const values = Array.isArray(hazard?.biomes) ? hazard.biomes : [];
-    const entries = values
+    return values
       .map(id => vocabularyEntry('biome', id))
       .filter(entry => entry.label)
-      .map(entry => ({ ...entry, kind: 'biome', key: `biome:${entry.id}`, pillClass: 'manager-availability-pill is-biome', isAny: false }));
-    if (entries.length === 0) return [anyChip('biome', 'FABRICATE.Admin.Manager.Environment.Hazards.AnyBiome', 'Any biome', 'manager-availability-pill is-biome')];
-    return entries;
+      .map(entry => ({ ...entry, kind: 'biome', key: `biome:${entry.id}`, pillClass: 'manager-availability-pill is-biome', style: biomeChipStyle(entry) }));
   }
 
   function timeChips(hazard) {
     const values = Array.isArray(hazard?.timeOfDay) ? hazard.timeOfDay : [];
-    const entries = values
+    return values
       .map(id => conditionEntry('timeOfDay', id))
       .filter(entry => entry.label)
-      .map(entry => ({ ...entry, key: `timeOfDay:${entry.id}`, pillClass: 'manager-availability-pill is-timeOfDay', isAny: false }));
-    if (entries.length === 0) return [anyChip('timeOfDay', 'FABRICATE.Admin.Manager.Environment.Tasks.AnyTime', 'Any time', 'manager-availability-pill is-timeOfDay')];
-    return entries;
+      .map(entry => ({ ...entry, key: `timeOfDay:${entry.id}`, pillClass: 'manager-availability-pill is-timeOfDay' }));
   }
 
   function weatherChips(hazard) {
     const values = Array.isArray(hazard?.weather) ? hazard.weather : [];
-    const entries = values
+    return values
       .map(id => conditionEntry('weather', id))
       .filter(entry => entry.label)
-      .map(entry => ({ ...entry, key: `weather:${entry.id}`, pillClass: 'manager-availability-pill is-weather', isAny: false }));
-    if (entries.length === 0) return [anyChip('weather', 'FABRICATE.Admin.Manager.Environment.Tasks.AnyWeather', 'Any weather', 'manager-availability-pill is-weather')];
-    return entries;
+      .map(entry => ({ ...entry, key: `weather:${entry.id}`, pillClass: 'manager-availability-pill is-weather' }));
   }
 
   function dangerChips(hazard) {
     const values = Array.isArray(hazard?.dangerTags) ? hazard.dangerTags : [];
-    const entries = values
+    return values
       .filter(tag => typeof tag === 'string' && tag.trim())
       .slice()
       .sort((a, b) => {
@@ -230,11 +218,8 @@
         kind: 'danger',
         label: dangerLabel(tag),
         icon: null,
-        pillClass: `manager-danger-tag-pill is-${tag}`,
-        isAny: false
+        pillClass: `manager-danger-tag-pill is-${tag}`
       }));
-    if (entries.length === 0) return [anyChip('danger', 'FABRICATE.Admin.Manager.Environment.Hazards.AnyDanger', 'Any danger', 'manager-danger-tag-pill')];
-    return entries;
   }
 
   function rowChips(hazard) {
@@ -370,7 +355,7 @@
             </button>
             <div class="manager-gathering-hazard-tags-cell" role="cell" data-gathering-hazard-tags>
               {#each rowChips(hazard) as chip (chip.key)}
-                <span class={`${chip.pillClass}${chip.isAny ? ' is-any' : ''}`}>
+                <span class={chip.pillClass} style={chip.style}>
                   {#if chip.icon}<i class={chip.icon} aria-hidden="true"></i>{/if}
                   <span>{chip.label}</span>
                 </span>

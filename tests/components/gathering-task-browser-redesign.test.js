@@ -47,7 +47,8 @@ describe('GatheringTasksBrowserView card-style row', () => {
     assert.ok(browserSource.includes('rowChips(task)'), 'rowChips concatenates all dimensions');
     assert.ok(browserSource.includes('data-gathering-task-tags'), 'tags chip row exposes a data attribute');
     assert.ok(/manager-availability-pill is-\$\{chip\.kind\}/.test(browserSource), 'chips render with per-kind variant class');
-    assert.ok(browserSource.includes("' is-any'"), 'rowChips placeholders carry an isAny flag rendered as is-any');
+    assert.equal(browserSource.includes("' is-any'"), false, 'unrestricted dimensions render no chip (no is-any placeholder)');
+    assert.equal(/function\s+anyChip\s*\(/.test(browserSource), false, 'anyChip helper should be removed');
   });
 
   it('removes the obsolete drops count, env count, and availability helpers', () => {
@@ -86,7 +87,7 @@ describe('GatheringTasksBrowserView card-style row', () => {
     assert.ok(/flex-wrap:\s*wrap/.test(block[0]), 'tags cell must wrap so chips spill onto additional rows');
     assert.ok(/align-content:\s*flex-start/.test(block[0]), 'wrapped rows pin to the top');
     assert.ok(/overflow-y:\s*auto/.test(block[0]), 'tags cell must be scrollable so absurd tag counts do not expand the row');
-    assert.ok(/max-height:\s*\d+px/.test(block[0]), 'tags cell must have a max-height to cap row growth');
+    assert.ok(/[^-]height:\s*\d+px/.test(block[0]), 'tags cell must use a fixed height so all rows match');
   });
 
   it('vertically centers status and action cells while keeping identity top-aligned', () => {

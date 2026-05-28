@@ -270,7 +270,12 @@
 
   let gatheringTimeOfDayPickerSelection = $state('');
   let gatheringWeatherPickerSelection = $state('');
+  let gatheringBiomePickerSelection = $state('');
   $effect(() => {
+    const biomeAvailable = gatheringConditionAvailableOptions(selectedGatheringDrop, 'biome');
+    if (!biomeAvailable.some(option => option.id === gatheringBiomePickerSelection)) {
+      gatheringBiomePickerSelection = biomeAvailable[0]?.id || '';
+    }
     const timeAvailable = gatheringConditionAvailableOptions(selectedGatheringDrop, 'timeOfDay');
     if (!timeAvailable.some(option => option.id === gatheringTimeOfDayPickerSelection)) {
       gatheringTimeOfDayPickerSelection = timeAvailable[0]?.id || '';
@@ -283,7 +288,12 @@
 
   let gatheringHazardTimeOfDayPickerSelection = $state('');
   let gatheringHazardWeatherPickerSelection = $state('');
+  let gatheringHazardBiomePickerSelection = $state('');
   $effect(() => {
+    const biomeAvailable = gatheringConditionAvailableOptions(editingGatheringHazard, 'biome');
+    if (!biomeAvailable.some(option => option.id === gatheringHazardBiomePickerSelection)) {
+      gatheringHazardBiomePickerSelection = biomeAvailable[0]?.id || '';
+    }
     const timeAvailable = gatheringConditionAvailableOptions(editingGatheringHazard, 'timeOfDay');
     if (!timeAvailable.some(option => option.id === gatheringHazardTimeOfDayPickerSelection)) {
       gatheringHazardTimeOfDayPickerSelection = timeAvailable[0]?.id || '';
@@ -295,25 +305,68 @@
   });
 
   function gatheringHazardModifierPickerSelection(kind) {
+    if (kind === 'biome') return gatheringHazardBiomePickerSelection;
     return kind === 'weather' ? gatheringHazardWeatherPickerSelection : gatheringHazardTimeOfDayPickerSelection;
   }
 
   function setGatheringHazardModifierPickerSelection(kind, value) {
-    if (kind === 'weather') gatheringHazardWeatherPickerSelection = value;
+    if (kind === 'biome') gatheringHazardBiomePickerSelection = value;
+    else if (kind === 'weather') gatheringHazardWeatherPickerSelection = value;
     else gatheringHazardTimeOfDayPickerSelection = value;
   }
 
   function gatheringDropModifierPickerSelection(kind) {
+    if (kind === 'biome') return gatheringBiomePickerSelection;
     return kind === 'weather' ? gatheringWeatherPickerSelection : gatheringTimeOfDayPickerSelection;
   }
 
   function setGatheringDropModifierPickerSelection(kind, value) {
-    if (kind === 'weather') gatheringWeatherPickerSelection = value;
+    if (kind === 'biome') gatheringBiomePickerSelection = value;
+    else if (kind === 'weather') gatheringWeatherPickerSelection = value;
     else gatheringTimeOfDayPickerSelection = value;
   }
 
-  function gatheringDropModifierOperatorClass(operator) {
-    return operator === '-' ? 'is-negative' : 'is-positive';
+  function gatheringModifierSignedValue(modifier) {
+    return (modifier?.operator === '-' ? -1 : 1) * Math.abs(Math.trunc(Number(modifier?.value || 0)));
+  }
+
+  function gatheringModifierValueClass(modifier) {
+    const signed = gatheringModifierSignedValue(modifier);
+    if (signed > 0) return 'is-positive';
+    if (signed < 0) return 'is-negative';
+    return 'is-zero';
+  }
+
+  function gatheringModifierDisplayValue(modifier) {
+    const value = Math.abs(Math.trunc(Number(modifier?.value || 0)));
+    if (modifier?.operator === '-') return value > 0 ? `-${value}` : '-';
+    return value > 0 ? `+${value}` : '0';
+  }
+
+  function signedToOperatorValue(raw) {
+    const text = String(raw ?? '');
+    const negative = text.trim().startsWith('-');
+    const digits = text.replace(/[^0-9]/g, '');
+    const value = digits === '' ? 0 : Math.abs(Math.trunc(Number(digits)));
+    return { operator: negative ? '-' : '+', value };
+  }
+
+  function onGatheringDropModifierKeydown(rowId, kind, modifier, event) {
+    event.stopPropagation();
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    event.preventDefault();
+    const next = signedToOperatorValue(String(gatheringModifierSignedValue(modifier) + (event.key === 'ArrowUp' ? 1 : -1)));
+    event.currentTarget.value = gatheringModifierDisplayValue(next);
+    updateGatheringDropModifier(rowId, kind, modifier.id, next);
+  }
+
+  function onGatheringHazardModifierKeydown(kind, modifier, event) {
+    event.stopPropagation();
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    event.preventDefault();
+    const next = signedToOperatorValue(String(gatheringModifierSignedValue(modifier) + (event.key === 'ArrowUp' ? 1 : -1)));
+    event.currentTarget.value = gatheringModifierDisplayValue(next);
+    updateGatheringHazardConditionModifier(kind, modifier.id, next);
   }
 
   async function setCharacterModifierOverrideEnabled(rowId, ref, enabled, libraryEntry) {
@@ -453,7 +506,8 @@
     hazardSelectionMode: 'allDrops',
     hazardLimit: 1,
     hazardPolicy: 'successWithHazard',
-    toolBreakagePolicy: 'failureOnBreak'
+    toolBreakagePolicy: 'failureOnBreak',
+    biomeModifierAggregation: 'strongestOfEach'
   });
   const selectedGatheringSystemConfig = $derived($viewState.gatheringConfig?.systems?.[selectedSystemId] || {});
   const gatheringTaskDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.tasks) ? selectedGatheringSystemConfig.tasks : []);
@@ -472,7 +526,9 @@
       || null
   );
   const selectedGatheringHazard = $derived(
-    gatheringHazardDefinitions.find(hazard => hazard.id === selectedGatheringHazardId) || null
+    gatheringHazardDefinitions.find(hazard => hazard.id === selectedGatheringHazardId)
+      || gatheringHazardDefinitions[0]
+      || null
   );
   const editingGatheringTask = $derived(gatheringTaskDraft || selectedGatheringTask);
   const selectedGatheringDrop = $derived(
@@ -588,9 +644,8 @@
       selectedGatheringHazardId = '';
       return;
     }
-    if (!selectedGatheringHazardId) return;
-    if (gatheringHazardDefinitions.some(hazard => hazard.id === selectedGatheringHazardId)) return;
-    selectedGatheringHazardId = '';
+    if (selectedGatheringHazardId && gatheringHazardDefinitions.some(hazard => hazard.id === selectedGatheringHazardId)) return;
+    selectedGatheringHazardId = gatheringHazardDefinitions[0]?.id || '';
   });
 
   $effect(() => {
@@ -1783,20 +1838,25 @@
   }
 
   function gatheringConditionAvailableOptions(row, kind) {
-    const options = gatheringConditionOptions(kind);
+    const options = kind === 'biome' ? gatheringVocabularyOptions('biomes') : gatheringConditionOptions(kind);
     if (!row) return options;
     const attached = new Set(gatheringConditionModifierRows(row, kind).map(modifier => modifier.conditionId));
     return options.filter(option => !attached.has(option.id));
+  }
+
+  function gatheringConditionModifierGroups(row) {
+    return {
+      timeOfDay: gatheringConditionModifierRows(row, 'timeOfDay'),
+      weather: gatheringConditionModifierRows(row, 'weather'),
+      biome: gatheringConditionModifierRows(row, 'biome')
+    };
   }
 
   function updateGatheringDropModifier(rowId, kind, modifierId, updates = {}) {
     if (!editingGatheringTask || !rowId || !kind || !modifierId) return;
     const row = gatheringTaskDropRows(editingGatheringTask).find(entry => entry.id === rowId);
     if (!row) return;
-    const conditionModifiers = {
-      timeOfDay: gatheringConditionModifierRows(row, 'timeOfDay'),
-      weather: gatheringConditionModifierRows(row, 'weather')
-    };
+    const conditionModifiers = gatheringConditionModifierGroups(row);
     conditionModifiers[kind] = conditionModifiers[kind].map(modifier => modifier.id === modifierId ? { ...modifier, ...updates } : modifier);
     updateGatheringTaskDrop(rowId, { conditionModifiers });
   }
@@ -1805,10 +1865,7 @@
     if (!editingGatheringTask || !rowId || !kind || !conditionId) return;
     const row = gatheringTaskDropRows(editingGatheringTask).find(entry => entry.id === rowId);
     if (!row) return;
-    const conditionModifiers = {
-      timeOfDay: gatheringConditionModifierRows(row, 'timeOfDay'),
-      weather: gatheringConditionModifierRows(row, 'weather')
-    };
+    const conditionModifiers = gatheringConditionModifierGroups(row);
     if (conditionModifiers[kind].some(modifier => modifier.conditionId === conditionId)) return;
     conditionModifiers[kind] = [
       ...conditionModifiers[kind],
@@ -1821,20 +1878,14 @@
     if (!editingGatheringTask || !rowId || !kind || !modifierId) return;
     const row = gatheringTaskDropRows(editingGatheringTask).find(entry => entry.id === rowId);
     if (!row) return;
-    const conditionModifiers = {
-      timeOfDay: gatheringConditionModifierRows(row, 'timeOfDay'),
-      weather: gatheringConditionModifierRows(row, 'weather')
-    };
+    const conditionModifiers = gatheringConditionModifierGroups(row);
     conditionModifiers[kind] = conditionModifiers[kind].filter(modifier => modifier.id !== modifierId);
     updateGatheringTaskDrop(rowId, { conditionModifiers });
   }
 
   function addGatheringHazardConditionModifier(kind, conditionId) {
     if (!editingGatheringHazard?.id || !kind || !conditionId) return;
-    const conditionModifiers = {
-      timeOfDay: gatheringConditionModifierRows(editingGatheringHazard, 'timeOfDay'),
-      weather: gatheringConditionModifierRows(editingGatheringHazard, 'weather')
-    };
+    const conditionModifiers = gatheringConditionModifierGroups(editingGatheringHazard);
     if (conditionModifiers[kind].some(modifier => modifier.conditionId === conditionId)) return;
     conditionModifiers[kind] = [
       ...conditionModifiers[kind],
@@ -1845,20 +1896,14 @@
 
   function updateGatheringHazardConditionModifier(kind, modifierId, updates = {}) {
     if (!editingGatheringHazard?.id || !kind || !modifierId) return;
-    const conditionModifiers = {
-      timeOfDay: gatheringConditionModifierRows(editingGatheringHazard, 'timeOfDay'),
-      weather: gatheringConditionModifierRows(editingGatheringHazard, 'weather')
-    };
+    const conditionModifiers = gatheringConditionModifierGroups(editingGatheringHazard);
     conditionModifiers[kind] = conditionModifiers[kind].map(modifier => modifier.id === modifierId ? { ...modifier, ...updates } : modifier);
     updateSelectedGatheringHazard({ conditionModifiers });
   }
 
   function deleteGatheringHazardConditionModifier(kind, modifierId) {
     if (!editingGatheringHazard?.id || !kind || !modifierId) return;
-    const conditionModifiers = {
-      timeOfDay: gatheringConditionModifierRows(editingGatheringHazard, 'timeOfDay'),
-      weather: gatheringConditionModifierRows(editingGatheringHazard, 'weather')
-    };
+    const conditionModifiers = gatheringConditionModifierGroups(editingGatheringHazard);
     conditionModifiers[kind] = conditionModifiers[kind].filter(modifier => modifier.id !== modifierId);
     updateSelectedGatheringHazard({ conditionModifiers });
   }
@@ -2195,10 +2240,39 @@
   }
 
   function gatheringConditionLabel(kind, id) {
+    if (kind === 'biome') return gatheringOptionLabel('biome', id) || String(id || '');
     const setting = selectedGatheringSystemConfig.conditions?.[kind] || {};
     const option = (Array.isArray(setting.values) ? setting.values : [])
       .find(value => String(value?.id || value) === String(id || ''));
     return String(option?.label || option?.id || id || '').trim();
+  }
+
+  function gatheringModifierKindIcon(kind, conditionId = '') {
+    if (kind === 'weather') return 'fas fa-cloud-sun';
+    if (kind === 'timeOfDay') return 'fas fa-clock';
+    const option = gatheringVocabularyOptions('biomes').find(value => String(value?.id || value) === String(conditionId || ''));
+    return String(option?.icon || '').trim() || 'fas fa-mountain-sun';
+  }
+
+  function gatheringModifierCardTitle(kind, scope = 'task') {
+    if (kind === 'biome') {
+      return scope === 'hazard'
+        ? text('FABRICATE.Admin.Manager.Environment.Hazards.BiomeModifiers', 'Biome modifiers')
+        : text('FABRICATE.Admin.Manager.Environment.Tasks.BiomeModifiers', 'Biome modifiers');
+    }
+    if (kind === 'weather') return text('FABRICATE.Admin.Manager.Environment.Tasks.WeatherModifiers', 'Weather modifiers');
+    return text('FABRICATE.Admin.Manager.Environment.Tasks.TimeModifiers', 'Time modifiers');
+  }
+
+  function gatheringModifierCardHint(kind, scope = 'task') {
+    if (scope === 'hazard') {
+      if (kind === 'biome') return text('FABRICATE.Admin.Manager.Environment.Hazards.BiomeModifiersHint', "Adjust this hazard's chance based on the gathering environment's biomes.");
+      if (kind === 'weather') return text('FABRICATE.Admin.Manager.Environment.Hazards.WeatherModifiersHint', "Adjust this hazard's chance based on the active weather condition.");
+      return text('FABRICATE.Admin.Manager.Environment.Hazards.TimeModifiersHint', "Adjust this hazard's chance based on the active time of day.");
+    }
+    if (kind === 'biome') return text('FABRICATE.Admin.Manager.Environment.Tasks.BiomeModifiersHint', "Adjust this drop's chance based on the gathering environment's biomes.");
+    if (kind === 'weather') return text('FABRICATE.Admin.Manager.Environment.Tasks.WeatherModifiersHint', "Adjust this drop's chance based on the active weather condition.");
+    return text('FABRICATE.Admin.Manager.Environment.Tasks.TimeModifiersHint', "Adjust this drop's chance based on the active time of day.");
   }
 
   function gatheringDropRateValue(row) {
@@ -3414,14 +3488,9 @@
               </div>
             </section>
 
-            {#each ['timeOfDay', 'weather'] as kind}
-              {@const isWeather = kind === 'weather'}
-              {@const cardTitle = isWeather
-                ? text('FABRICATE.Admin.Manager.Environment.Tasks.WeatherModifiers', 'Weather modifiers')
-                : text('FABRICATE.Admin.Manager.Environment.Tasks.TimeModifiers', 'Time modifiers')}
-              {@const cardHint = isWeather
-                ? text('FABRICATE.Admin.Manager.Environment.Tasks.WeatherModifiersHint', "Adjust this drop's chance based on the active weather condition.")
-                : text('FABRICATE.Admin.Manager.Environment.Tasks.TimeModifiersHint', "Adjust this drop's chance based on the active time of day.")}
+            {#each ['biome', 'timeOfDay', 'weather'] as kind (kind)}
+              {@const cardTitle = gatheringModifierCardTitle(kind, 'task')}
+              {@const cardHint = gatheringModifierCardHint(kind, 'task')}
               {@const availableConditions = gatheringConditionAvailableOptions(selectedGatheringDrop, kind)}
               {@const pickerSelection = gatheringDropModifierPickerSelection(kind)}
               {@const attachedModifiers = gatheringConditionModifierRows(selectedGatheringDrop, kind)}
@@ -3460,19 +3529,23 @@
                 </div>
                 <div class="manager-condition-modifier-row-list">
                   {#each attachedModifiers as modifier (modifier.id)}
-                    {@const operatorClass = gatheringDropModifierOperatorClass(modifier.operator)}
-                    <article class="manager-condition-modifier-row-reference" data-gathering-drop-modifier-id={modifier.id}>
+                    <article class={`manager-condition-modifier-row-reference ${gatheringModifierValueClass(modifier)}`} data-gathering-drop-modifier-id={modifier.id}>
                       <header class="manager-character-modifier-row-reference-header">
                         <span class="manager-character-modifier-icon">
-                          <i class={isWeather ? 'fas fa-cloud-sun' : 'fas fa-clock'} aria-hidden="true"></i>
+                          <i class={gatheringModifierKindIcon(kind, modifier.conditionId)} aria-hidden="true"></i>
                         </span>
                         <span class="manager-character-modifier-row-reference-label">{gatheringConditionLabel(kind, modifier.conditionId) || modifier.conditionId}</span>
-                        <label class={`manager-character-modifier-operator-select ${operatorClass}`}>
-                          <span class="visually-hidden">{text('FABRICATE.Admin.Manager.Environment.Tasks.Operator', 'Operator')}</span>
-                          <select value={modifier.operator || '+'} onchange={(event) => updateGatheringDropModifier(selectedGatheringDrop.id, kind, modifier.id, { operator: event.currentTarget.value === '-' ? '-' : '+' })}>
-                            <option value="+">{text('FABRICATE.Admin.Manager.Environment.Tasks.OperatorPositive', 'Positive')}</option>
-                            <option value="-">{text('FABRICATE.Admin.Manager.Environment.Tasks.OperatorNegative', 'Negative')}</option>
-                          </select>
+                        <label class="manager-condition-modifier-value">
+                          <span class="visually-hidden">{text('FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue', 'Modifier value')}</span>
+                          <input
+                            type="text"
+                            inputmode="numeric"
+                            value={gatheringModifierDisplayValue(modifier)}
+                            aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue', 'Modifier value')}
+                            oninput={(event) => updateGatheringDropModifier(selectedGatheringDrop.id, kind, modifier.id, signedToOperatorValue(event.currentTarget.value))}
+                            onkeydown={(event) => onGatheringDropModifierKeydown(selectedGatheringDrop.id, kind, modifier, event)}
+                          />
+                          <span aria-hidden="true">%</span>
                         </label>
                         <button
                           type="button"
@@ -3483,19 +3556,6 @@
                           <i class="fas fa-trash" aria-hidden="true"></i>
                         </button>
                       </header>
-                      <div class="manager-condition-modifier-row-body">
-                        <label class="manager-field">
-                          <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue', 'Modifier value')}</span>
-                          <input
-                            type="number"
-                            min="0"
-                            step="1"
-                            value={Math.abs(Math.trunc(Number(modifier.value || 0)))}
-                            aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue', 'Modifier value')}
-                            oninput={(event) => updateGatheringDropModifier(selectedGatheringDrop.id, kind, modifier.id, { value: Math.abs(Math.trunc(Number(event.currentTarget.value || 0))) })}
-                          />
-                        </label>
-                      </div>
                     </article>
                   {:else}
                     <p class="manager-muted manager-condition-modifier-row-empty">{text('FABRICATE.Admin.Manager.Environment.Tasks.NoConditionModifiers', 'No modifiers attached.')}</p>
@@ -3630,14 +3690,9 @@
           {#if currentView === 'gathering-hazard-edit' && editingGatheringHazard}
             <div class="manager-drop-inspector-stack" data-gathering-hazard-inspector-stack>
               <div class="manager-drop-inspector-scroll">
-              {#each ['timeOfDay', 'weather'] as kind (kind)}
-                {@const isWeather = kind === 'weather'}
-                {@const cardTitle = isWeather
-                  ? text('FABRICATE.Admin.Manager.Environment.Tasks.WeatherModifiers', 'Weather modifiers')
-                  : text('FABRICATE.Admin.Manager.Environment.Tasks.TimeModifiers', 'Time modifiers')}
-                {@const cardHint = isWeather
-                  ? text('FABRICATE.Admin.Manager.Environment.Hazards.WeatherModifiersHint', "Adjust this hazard's chance based on the active weather condition.")
-                  : text('FABRICATE.Admin.Manager.Environment.Hazards.TimeModifiersHint', "Adjust this hazard's chance based on the active time of day.")}
+              {#each ['biome', 'timeOfDay', 'weather'] as kind (kind)}
+                {@const cardTitle = gatheringModifierCardTitle(kind, 'hazard')}
+                {@const cardHint = gatheringModifierCardHint(kind, 'hazard')}
                 {@const availableConditions = gatheringConditionAvailableOptions(editingGatheringHazard, kind)}
                 {@const pickerSelection = gatheringHazardModifierPickerSelection(kind)}
                 {@const attachedModifiers = gatheringConditionModifierRows(editingGatheringHazard, kind)}
@@ -3676,19 +3731,23 @@
                   </div>
                   <div class="manager-condition-modifier-row-list">
                     {#each attachedModifiers as modifier (modifier.id)}
-                      {@const operatorClass = gatheringDropModifierOperatorClass(modifier.operator)}
-                      <article class="manager-condition-modifier-row-reference" data-gathering-hazard-modifier-id={modifier.id}>
+                      <article class={`manager-condition-modifier-row-reference ${gatheringModifierValueClass(modifier)}`} data-gathering-hazard-modifier-id={modifier.id}>
                         <header class="manager-character-modifier-row-reference-header">
                           <span class="manager-character-modifier-icon">
-                            <i class={isWeather ? 'fas fa-cloud-sun' : 'fas fa-clock'} aria-hidden="true"></i>
+                            <i class={gatheringModifierKindIcon(kind, modifier.conditionId)} aria-hidden="true"></i>
                           </span>
                           <span class="manager-character-modifier-row-reference-label">{gatheringConditionLabel(kind, modifier.conditionId) || modifier.conditionId}</span>
-                          <label class={`manager-character-modifier-operator-select ${operatorClass}`}>
-                            <span class="visually-hidden">{text('FABRICATE.Admin.Manager.Environment.Tasks.Operator', 'Operator')}</span>
-                            <select value={modifier.operator || '+'} onchange={(event) => updateGatheringHazardConditionModifier(kind, modifier.id, { operator: event.currentTarget.value === '-' ? '-' : '+' })}>
-                              <option value="+">{text('FABRICATE.Admin.Manager.Environment.Tasks.OperatorPositive', 'Positive')}</option>
-                              <option value="-">{text('FABRICATE.Admin.Manager.Environment.Tasks.OperatorNegative', 'Negative')}</option>
-                            </select>
+                          <label class="manager-condition-modifier-value">
+                            <span class="visually-hidden">{text('FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue', 'Modifier value')}</span>
+                            <input
+                              type="text"
+                              inputmode="numeric"
+                              value={gatheringModifierDisplayValue(modifier)}
+                              aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue', 'Modifier value')}
+                              oninput={(event) => updateGatheringHazardConditionModifier(kind, modifier.id, signedToOperatorValue(event.currentTarget.value))}
+                              onkeydown={(event) => onGatheringHazardModifierKeydown(kind, modifier, event)}
+                            />
+                            <span aria-hidden="true">%</span>
                           </label>
                           <button
                             type="button"
@@ -3699,19 +3758,6 @@
                             <i class="fas fa-trash" aria-hidden="true"></i>
                           </button>
                         </header>
-                        <div class="manager-condition-modifier-row-body">
-                          <label class="manager-field">
-                            <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue', 'Modifier value')}</span>
-                            <input
-                              type="number"
-                              min="0"
-                              step="1"
-                              value={Math.abs(Math.trunc(Number(modifier.value || 0)))}
-                              aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue', 'Modifier value')}
-                              oninput={(event) => updateGatheringHazardConditionModifier(kind, modifier.id, { value: Math.abs(Math.trunc(Number(event.currentTarget.value || 0))) })}
-                            />
-                          </label>
-                        </div>
                       </article>
                     {/each}
                   </div>
@@ -3981,6 +4027,21 @@
                   <select id="manager-gathering-rule-tool-breakage" value={selectedGatheringRules.toolBreakagePolicy ?? 'failureOnBreak'} onchange={(event) => updateSelectedGatheringRules({ toolBreakagePolicy: event.target.value })}>
                     <option value="failureOnBreak">{text('FABRICATE.Admin.Manager.Environment.Rules.ToolFailureOnBreak', 'Attempt fails on break')}</option>
                     <option value="successDespiteBreak">{text('FABRICATE.Admin.Manager.Environment.Rules.ToolSuccessDespiteBreak', 'Attempt succeeds despite break')}</option>
+                  </select>
+                </span>
+              </div>
+
+              <div class="manager-rule-row">
+                <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-mountain-sun"></i></span>
+                <label class="manager-rule-copy" for="manager-gathering-rule-biome-aggregation">
+                  <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.BiomeModifiers', 'Biome modifiers')}</strong>
+                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.BiomeModifiersDescription', "Decide how multiple matching biome modifiers combine into one drop-rate adjustment.")}</span>
+                </label>
+                <span class="manager-rule-field">
+                  <select id="manager-gathering-rule-biome-aggregation" value={selectedGatheringRules.biomeModifierAggregation ?? 'strongestOfEach'} onchange={(event) => updateSelectedGatheringRules({ biomeModifierAggregation: event.target.value })}>
+                    <option value="strongestOfEach">{text('FABRICATE.Admin.Manager.Environment.Rules.BiomeAggregationStrongestOfEach', 'Strongest of each')}</option>
+                    <option value="cumulative">{text('FABRICATE.Admin.Manager.Environment.Rules.BiomeAggregationCumulative', 'Cumulative')}</option>
+                    <option value="dominant">{text('FABRICATE.Admin.Manager.Environment.Rules.BiomeAggregationDominant', 'Dominant biome')}</option>
                   </select>
                 </span>
               </div>

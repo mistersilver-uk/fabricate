@@ -76,6 +76,7 @@ export class GatheringEngine {
     catalystUsage = null,
     toolBreakage = null,
     failureFeedback = null,
+    hazardSceneTrigger = null,
     getRunViewer = null,
     localize = defaultLocalize
   } = {}) {
@@ -96,6 +97,7 @@ export class GatheringEngine {
     this.catalystUsage = catalystUsage;
     this.toolBreakage = toolBreakage;
     this.failureFeedback = failureFeedback;
+    this.hazardSceneTrigger = hazardSceneTrigger;
     this.getRunViewer = getRunViewer;
     this.localize = localize;
   }
@@ -1535,6 +1537,7 @@ export class GatheringEngine {
     if (outcome.status === 'failed') {
       await this._applyFailureFeedback({ viewer, actor, system, environment, task, outcome, checkResult });
     }
+    await this.hazardSceneTrigger?.apply?.({ hazards: checkResult?.hazards, viewer, actor, system, environment, task });
   }
 
   async _resolveRoutedOutcome({ viewer, actor, system, environment, task }) {

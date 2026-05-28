@@ -49,6 +49,7 @@ const DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops', 'limitedD
 const LEGACY_DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops']);
 const HAZARD_POLICIES = new Set(['successWithHazard', 'failureWithHazard']);
 const TOOL_BREAKAGE_POLICIES = new Set(['failureOnBreak', 'successDespiteBreak']);
+const BIOME_MODIFIER_AGGREGATIONS = new Set(['cumulative', 'strongestOfEach', 'dominant']);
 const CHARACTER_MODIFIER_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
 const CHARACTER_MODIFIER_OPERATORS = new Set(['+', '-']);
 const ROLL_EXPRESSION_PATTERN = /\d\s*d\s*\d|[*/()]/i;
@@ -58,7 +59,8 @@ const DEFAULT_GATHERING_RULES = Object.freeze({
   hazardSelectionMode: 'allDrops',
   hazardLimit: 1,
   hazardPolicy: 'successWithHazard',
-  toolBreakagePolicy: 'failureOnBreak'
+  toolBreakagePolicy: 'failureOnBreak',
+  biomeModifierAggregation: 'strongestOfEach'
 });
 
 const BLOCKED_REASON_KEYS = Object.freeze({
@@ -341,6 +343,10 @@ export class GatheringRichStateService {
       };
     }
 
+    const rules = resolveRulesForAttempt(task, environment);
+    const biomes = Array.isArray(environment?.biomes) ? environment.biomes : [];
+    const biomeAggregation = rules.biomeModifierAggregation;
+
     const droppedItems = rowContributions
       .map((entry, index) => rollDropRow({
         row: entry.row,
@@ -348,10 +354,11 @@ export class GatheringRichStateService {
         roll: this.rollD100(),
         modifier: taskModifier,
         conditions,
+        biomes,
+        biomeAggregation,
         characterModifierContributions: entry.contributions
       }))
       .filter(result => result.dropped);
-    const rules = resolveRulesForAttempt(task, environment);
     const selectedItems = selectDrops(droppedItems, rules.rewardSelectionMode, rules.rewardLimit);
 
     const droppedHazards = hazardContributions
@@ -360,6 +367,9 @@ export class GatheringRichStateService {
         index,
         roll: this.rollD100(),
         modifier: numericModifier(entry.hazard?.hazardModifier, hazardModifier),
+        conditions,
+        biomes,
+        biomeAggregation,
         characterModifierContributions: entry.contributions
       }))
       .filter(result => result.dropped);
@@ -1062,7 +1072,9 @@ function normalizeHazard(hazard = {}) {
     weather: normalizeConditionIdList(hazard.weather),
     timeOfDay: normalizeConditionIdList(hazard.timeOfDay),
     dropRate: clampDropRate(hazard.dropRate),
+    linkedSceneUuid: stringOrFallback(hazard.linkedSceneUuid, ''),
     hazardModifier: normalizeModifierProvider(hazard.hazardModifier ?? hazard.modifier),
+    conditionModifiers: normalizeDropConditionModifiers(hazard.conditionModifiers),
     characterModifiers: normalizeHazardCharacterModifiers(hazard.characterModifiers)
   };
 }
@@ -1163,9 +1175,9 @@ function numericModifier(provider = null, fallback = 0) {
   return Number.isFinite(fallbackNumber) ? fallbackNumber : 0;
 }
 
-function rollDropRow({ row, index, roll, modifier, conditions = {}, characterModifierContributions = [] }) {
+function rollDropRow({ row, index, roll, modifier, conditions = {}, biomes = [], biomeAggregation = 'strongestOfEach', characterModifierContributions = [] }) {
   const effectiveRoll = Number(roll) + Number(modifier || 0);
-  const conditionModifier = matchingConditionModifier(row.conditionModifiers, conditions);
+  const conditionModifier = matchingConditionModifier(row.conditionModifiers, conditions, biomes, biomeAggregation);
   const characterModifierTotal = (Array.isArray(characterModifierContributions) ? characterModifierContributions : [])
     .reduce((sum, value) => sum + Number(value || 0), 0);
   const finalDropRate = Math.min(100, Math.max(0, Number(row.dropRate) + conditionModifier + characterModifierTotal));
@@ -1187,7 +1199,8 @@ function rollDropRow({ row, index, roll, modifier, conditions = {}, characterMod
 function normalizeDropConditionModifiers(modifiers = {}) {
   return {
     timeOfDay: normalizeDropConditionModifierList(modifiers?.timeOfDay),
-    weather: normalizeDropConditionModifierList(modifiers?.weather)
+    weather: normalizeDropConditionModifierList(modifiers?.weather),
+    biome: normalizeDropConditionModifierList(modifiers?.biome)
   };
 }
 
@@ -1212,14 +1225,38 @@ function normalizeDropConditionModifierList(values = []) {
     .filter(Boolean);
 }
 
-function matchingConditionModifier(modifiers = {}, conditions = {}) {
-  return ['timeOfDay', 'weather'].reduce((total, kind) => {
+function matchingConditionModifier(modifiers = {}, conditions = {}, biomes = [], biomeAggregation = 'strongestOfEach') {
+  const conditionTotal = ['timeOfDay', 'weather'].reduce((total, kind) => {
     const current = normalizeConditionId(conditions?.[kind]);
     if (!current) return total;
     return total + normalizeDropConditionModifierList(modifiers?.[kind])
       .filter(modifier => modifier.conditionId === current)
       .reduce((sum, modifier) => sum + (modifier.operator === '-' ? -modifier.value : modifier.value), 0);
   }, 0);
+  return conditionTotal + matchingBiomeModifier(modifiers?.biome, biomes, biomeAggregation);
+}
+
+function matchingBiomeModifier(biomeModifiers = [], biomes = [], aggregation = 'strongestOfEach') {
+  const activeBiomes = new Set((Array.isArray(biomes) ? biomes : []).map(normalizeTag).filter(Boolean));
+  if (activeBiomes.size === 0) return 0;
+  const values = normalizeDropConditionModifierList(biomeModifiers)
+    .filter(modifier => activeBiomes.has(normalizeTag(modifier.conditionId)))
+    .map(modifier => (modifier.operator === '-' ? -modifier.value : modifier.value));
+  return aggregateBiomeModifierValues(values, aggregation);
+}
+
+function aggregateBiomeModifierValues(values = [], aggregation = 'strongestOfEach') {
+  if (!Array.isArray(values) || values.length === 0) return 0;
+  if (aggregation === 'cumulative') return values.reduce((sum, value) => sum + value, 0);
+  if (aggregation === 'dominant') {
+    return values.reduce((best, value) => Math.abs(value) > Math.abs(best) ? value : best, 0);
+  }
+  // strongestOfEach: largest boost plus largest penalty.
+  const positives = values.filter(value => value > 0);
+  const negatives = values.filter(value => value < 0);
+  const maxPositive = positives.length > 0 ? Math.max(...positives) : 0;
+  const minNegative = negatives.length > 0 ? Math.min(...negatives) : 0;
+  return maxPositive + minNegative;
 }
 
 function normalizeGatheringRules(rules = {}) {
@@ -1237,7 +1274,10 @@ function normalizeGatheringRules(rules = {}) {
       : DEFAULT_GATHERING_RULES.hazardPolicy,
     toolBreakagePolicy: TOOL_BREAKAGE_POLICIES.has(rules?.toolBreakagePolicy)
       ? rules.toolBreakagePolicy
-      : DEFAULT_GATHERING_RULES.toolBreakagePolicy
+      : DEFAULT_GATHERING_RULES.toolBreakagePolicy,
+    biomeModifierAggregation: BIOME_MODIFIER_AGGREGATIONS.has(rules?.biomeModifierAggregation)
+      ? rules.biomeModifierAggregation
+      : DEFAULT_GATHERING_RULES.biomeModifierAggregation
   };
 }
 

@@ -77,7 +77,7 @@ describe('GatheringHazardsBrowserView source contract', () => {
     assert.ok(/display:\s*flex/.test(tagsBlock[0]), 'tags cell must be a flex container');
     assert.ok(/flex-wrap:\s*wrap/.test(tagsBlock[0]), 'tags cell must wrap');
     assert.ok(/overflow-y:\s*auto/.test(tagsBlock[0]), 'tags cell must be scrollable');
-    assert.ok(/max-height:\s*\d+px/.test(tagsBlock[0]), 'tags cell must cap its height');
+    assert.ok(/[^-]height:\s*\d+px/.test(tagsBlock[0]), 'tags cell must use a fixed height so all rows match');
   });
 
   it('grows the hazard thumbnail to 64px for the card layout', () => {

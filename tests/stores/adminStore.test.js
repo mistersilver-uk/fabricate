@@ -2078,7 +2078,7 @@ describe('createAdminStore', () => {
         itemUuid: '',
         quantity: 2,
         dropRate: 80,
-        conditionModifiers: { timeOfDay: [], weather: [] },
+        conditionModifiers: { timeOfDay: [], weather: [], biome: [] },
         characterModifiers: [],
         enabled: true
       });
@@ -2318,7 +2318,8 @@ describe('createAdminStore', () => {
       assert.equal(saved.dropRows[0].dropRate, 0);
       assert.deepEqual(saved.dropRows[0].conditionModifiers, {
         timeOfDay: [{ id: 'night-penalty', conditionId: 'night', operator: '-', value: 5 }],
-        weather: [{ id: 'rain-bonus', conditionId: 'rain', operator: '+', value: 15 }]
+        weather: [{ id: 'rain-bonus', conditionId: 'rain', operator: '+', value: 15 }],
+        biome: []
       });
     });
 
@@ -2839,7 +2840,8 @@ describe('createAdminStore', () => {
         hazardSelectionMode: 'limitedDrops',
         hazardLimit: 3,
         hazardPolicy: 'successWithHazard',
-        toolBreakagePolicy: 'failureOnBreak'
+        toolBreakagePolicy: 'failureOnBreak',
+        biomeModifierAggregation: 'strongestOfEach'
       });
 
       await store.updateGatheringRules('sys1', {
@@ -2856,7 +2858,8 @@ describe('createAdminStore', () => {
         hazardSelectionMode: 'highestRankedDrop',
         hazardLimit: 1,
         hazardPolicy: 'failureWithHazard',
-        toolBreakagePolicy: 'failureOnBreak'
+        toolBreakagePolicy: 'failureOnBreak',
+        biomeModifierAggregation: 'strongestOfEach'
       });
       assert.deepEqual(get(store.viewState).gatheringConfig.systems.sys1.rules, services._store.gatheringConfig.systems.sys1.rules);
     });

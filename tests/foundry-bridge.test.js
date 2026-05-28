@@ -8,8 +8,27 @@ import {
   notifyInfo,
   notifyWarn,
   notifyError,
-  getDragEventData
+  getDragEventData,
+  viewScene
 } from '../src/ui/svelte/util/foundryBridge.js';
+
+// --- viewScene ---
+
+test('viewScene resolves the uuid and calls scene.view()', async () => {
+  let viewed = 0;
+  globalThis.fromUuid = async (uuid) => uuid === 'Scene.a' ? { view: async () => { viewed++; } } : null;
+  const ok = await viewScene('Scene.a');
+  assert.equal(ok, true);
+  assert.equal(viewed, 1);
+  delete globalThis.fromUuid;
+});
+
+test('viewScene is a no-op for empty uuid or missing resolver', async () => {
+  assert.equal(await viewScene(''), false);
+  globalThis.fromUuid = async () => null;
+  assert.equal(await viewScene('Scene.missing'), false);
+  delete globalThis.fromUuid;
+});
 
 // --- localize ---
 
