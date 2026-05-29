@@ -64,8 +64,24 @@ Manager V2 stores d100 gathering rules per selected crafting system under `gathe
 | **Hazards** | `highestRankedDrop`, `allDrops`, or `limitedDrops` |
 | **Hazard limit** | Positive integer used when Hazards is `limitedDrops` |
 | **Hazard outcome** | `successWithHazard` or `failureWithHazard` |
+| **Blind candidate gate** | `attemptableOnly` (default) or `allMatching` — see Blind Mode |
+| **Blind reveal** | `never` (default), `onSuccess`, or `onAttempt` — reveal default for blind tasks |
+| **Reveal scope** | `actor`, `user`, `party`, or `global` — who learns a revealed task |
 
 Legacy per-task item selection, per-environment hazard selection, and per-environment hazard policy fields may still be read when an existing system has no `rules` object. Manager V2 no longer exposes those fields as authoring controls.
+
+## Blind Mode
+
+A `blind` environment hides its tasks from players and presents a single generic gather action. On each attempt the runtime resolves one concrete task for the actor:
+
+1. **Candidate pool** — start from the environment's visible, enabled tasks. The system **Blind candidate gate** then decides eligibility: `attemptableOnly` (default) drops tasks the character cannot currently attempt (missing tools/catalysts, depleted nodes, exhausted attempts, failed gates) so the generic gather never resolves to a task that would immediately fail; `allMatching` keeps every matching task. If the gated pool is empty, the player gets an opaque "nothing you can gather here" response.
+2. **Selection strategy** — the environment's Overview → **Blind behaviour** card chooses how the candidate is picked:
+   - **First available** — the first eligible task (default).
+   - **Weighted random** — a weighted draw using per-task **Weight** values set on the Tasks tab rows (default `1`; `0` excludes a task).
+   - **Roll table** / **Macro** — resolve a candidate via a linked Foundry RollTable or script Macro UUID; both fall back to First available when they produce no eligible candidate.
+3. **Reveal** — after the attempt resolves, the task may be revealed to the player so it can be recognised later. The **Blind reveal** policy (`never`/`onSuccess`/`onAttempt`) and **Reveal scope** default at the system level and can be overridden per environment on the Blind behaviour card. `never` keeps the task hidden; `onSuccess` reveals only after a successful gather; `onAttempt` reveals after success or failure.
+
+Per-task weights and the strategy/reveal controls only appear while the environment is in `blind` mode.
 
 ## Gathering Tools Library
 

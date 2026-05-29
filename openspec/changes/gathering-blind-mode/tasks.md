@@ -33,6 +33,6 @@
 - [x] `npm test` + `npm run build`.
 
 ## Specs / docs
-- [ ] Update `openspec/specs/gathering-and-harvesting/spec.md` with blind-mode selection, candidate gating, and reveal behavior.
-- [ ] Update `openspec/specs/data-models/spec.md` with the `blindSelection` / reveal / rules additions.
-- [ ] Update `docs/gathering-environments.md` with a Blind mode subsection.
+- [x] Update `openspec/specs/gathering-and-harvesting/spec.md`: added `blindSelection`/`reveal` to `GatheringEnvironment`, `blindCandidateGate`/`revealPolicy`/`revealScope` (and `biomeModifierAggregation`) to `GatheringRules`, and refreshed the Blind Environments / Blind Gathering Discovery behavior (candidate gating, selection strategies, empty-pool `BLIND_NO_CANDIDATE`, reveal-after-attempt).
+- [x] `openspec/specs/data-models/spec.md` — no change needed; it defers detailed gathering environment/rules shapes to `009-gathering-and-harvesting.md` (updated above).
+- [x] Update `docs/gathering-environments.md`: added the new Gathering Rules rows and a "Blind Mode" section (candidate gate, selection strategies + per-task weights, reveal policy/scope).
