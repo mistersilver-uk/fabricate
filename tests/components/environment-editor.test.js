@@ -22,6 +22,7 @@ const evidenceSource = read('MatchingEvidenceChips.svelte');
 const tasksTabSource = read('EnvironmentTasksTab.svelte');
 const overviewSource = read('EnvironmentOverviewTab.svelte');
 const summaryInspectorSource = read('EnvironmentSummaryInspector.svelte');
+const rightInspectorSource = read('EnvironmentRightInspector.svelte');
 const lang = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
 
 describe('environment editor localization', () => {
@@ -71,8 +72,9 @@ describe('environment composition editor structure', () => {
       assert.ok(shellSource.includes(snippet), `shell should reference ${snippet}`);
     }
     assert.ok(!shellSource.includes('EnvironmentEditorHeader'), 'header now lives in the shared chrome, not the editor body');
-    assert.ok(/\{#if activeTab === 'overview'\}\s*<EnvironmentRightInspector/.test(shellSource), 'right inspector only renders on the overview tab');
-    assert.ok(shellSource.includes("class:is-inspector-hidden={activeTab !== 'overview'}"), 'workspace collapses to one column when the inspector is hidden');
+    assert.ok(/\{#if activeTab !== 'validation'\}\s*<EnvironmentRightInspector/.test(shellSource), 'right inspector renders on every tab except validation');
+    assert.ok(shellSource.includes("class:is-inspector-hidden={activeTab === 'validation'}"), 'workspace collapses to one column on the validation tab');
+    assert.ok(/<EnvironmentRightInspector[\s\S]*?\{activeTab\}/.test(shellSource), 'shell passes the active tab to the inspector');
   });
 
   it('renders Tasks/Hazards as a column-headed table', () => {
@@ -110,6 +112,14 @@ describe('environment composition editor structure', () => {
     assert.ok(overviewSource.includes('data-overview-section="blind"'), 'overview renders a blind behaviour card');
     assert.ok(overviewSource.includes('data-environment-field="blindStrategy"'), 'overview exposes a blind selection strategy control');
     assert.ok(overviewSource.includes('data-environment-field="revealPolicy"'), 'overview exposes a per-environment reveal override');
+  });
+
+  it('the right inspector is tab-specific (summary on overview, record on tasks/hazards)', () => {
+    assert.ok(rightInspectorSource.includes("activeTab === 'overview'"), 'inspector branches on the overview tab');
+    assert.ok(rightInspectorSource.includes('EnvironmentSummaryInspector'), 'overview shows the environment summary');
+    assert.ok(rightInspectorSource.includes('RecordInspector'), 'tasks/hazards show the selected record');
+    assert.ok(rightInspectorSource.includes('selectedKind !== recordKind'), 'a record only shows for the active tab kind');
+    assert.ok(rightInspectorSource.includes('data-record-inspector-empty'), 'tasks/hazards show a select-a-record prompt when nothing is selected');
   });
 
   it('the linked scene card lives in the inspector under the summary', () => {

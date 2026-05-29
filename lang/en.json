@@ -1442,6 +1442,10 @@
           "Inspector": {
             "Label": "Environment inspector",
             "Summary": "Environment summary",
+            "SelectTaskPrompt": "Select a task",
+            "SelectTaskHint": "Choose a task to inspect and set environment-specific overrides.",
+            "SelectHazardPrompt": "Select a hazard",
+            "SelectHazardHint": "Choose a hazard to inspect and set environment-specific overrides.",
             "SelectedTask": "Selected task",
             "SelectedHazard": "Selected hazard",
             "OpenSourceTask": "Open source task",
