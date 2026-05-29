@@ -89,14 +89,16 @@
             class={`manager-environment-comp-row ${selectedId === entry.id ? 'is-selected' : ''} ${entry.runtimeState === 'unavailable' ? 'is-unavailable' : ''}`}
             data-record-id={entry.id}
             data-runtime-state={entry.runtimeState}
-            draggable="true"
-            ondragstart={() => { dragIndex = index; }}
-            ondragover={(event) => event.preventDefault()}
-            ondrop={(event) => { event.preventDefault(); handleDrop(index); }}
+            draggable={kind === 'hazard'}
+            ondragstart={kind === 'hazard' ? () => { dragIndex = index; } : undefined}
+            ondragover={kind === 'hazard' ? (event) => event.preventDefault() : undefined}
+            ondrop={kind === 'hazard' ? (event) => { event.preventDefault(); handleDrop(index); } : undefined}
           >
-            <span class="manager-environment-comp-handle" title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.DragReorder', 'Drag to reorder')}>
-              <i class="fas fa-grip-vertical" aria-hidden="true"></i>
-              <span class="manager-environment-comp-order">{index + 1}</span>
+            <span class="manager-environment-comp-handle" title={kind === 'hazard' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.DragReorder', 'Drag to reorder') : null}>
+              {#if kind === 'hazard'}
+                <i class="fas fa-grip-vertical" aria-hidden="true"></i>
+                <span class="manager-environment-comp-order">{index + 1}</span>
+              {/if}
             </span>
             <button type="button" class="manager-environment-comp-task" data-action="select" aria-pressed={selectedId === entry.id} onclick={() => onSelect(kind, entry.id)}>
               <img class="manager-environment-comp-thumb" src={recordImage(entry)} alt="" />
@@ -124,8 +126,10 @@
                 </button>
                 {#if openMenuId === entry.id}
                   <div class="manager-environment-comp-menu" role="menu">
-                    <button type="button" role="menuitem" disabled={index === 0} onclick={() => { onReorder(kind, index, index - 1); closeMenu(); }}><i class="fas fa-arrow-up" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoveUp', 'Move up')}</span></button>
-                    <button type="button" role="menuitem" disabled={index === included.length - 1} onclick={() => { onReorder(kind, index, index + 1); closeMenu(); }}><i class="fas fa-arrow-down" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoveDown', 'Move down')}</span></button>
+                    {#if kind === 'hazard'}
+                      <button type="button" role="menuitem" disabled={index === 0} onclick={() => { onReorder(kind, index, index - 1); closeMenu(); }}><i class="fas fa-arrow-up" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoveUp', 'Move up')}</span></button>
+                      <button type="button" role="menuitem" disabled={index === included.length - 1} onclick={() => { onReorder(kind, index, index + 1); closeMenu(); }}><i class="fas fa-arrow-down" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoveDown', 'Move down')}</span></button>
+                    {/if}
                     <button type="button" role="menuitem" onclick={() => { onOpenSource(kind, entry.id); closeMenu(); }}><i class="fas fa-up-right-from-square" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSource', 'Open source record')}</span></button>
                     <button type="button" role="menuitem" class="is-danger" data-action="exclude" onclick={() => { onExclude(kind, entry.id); closeMenu(); }}><i class="fas fa-ban" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Exclude', 'Exclude from environment')}</span></button>
                   </div>

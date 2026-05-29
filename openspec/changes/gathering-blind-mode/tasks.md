@@ -25,7 +25,7 @@
 
 ## Phase 4 — Editor UI
 - [ ] Tasks tab: per-task numeric **weight** input in the Override column, shown only when the environment is `blind`, writing `environment.blindSelection.weights[taskId]` via `onUpdateEnvironment`; add the environment strategy select + rollTable/macro pickers.
-- [ ] Remove task drag/reorder: drop the reorder handle + Move up/down menu actions and `onReorderRecord` wiring for `kind === 'task'` in `src/ui/svelte/apps/manager/environment/CompositionList.svelte`; keep hazards. Stop writing `taskOrder` from the editor.
+- [x] Remove task drag/reorder: gated the drag handle/grip, draggable, drop handlers, and Move up/down menu actions to `kind === 'hazard'` in `CompositionList.svelte` (tasks keep an empty handle cell). Hazard reorder + `onReorderRecord`/`reorderEnvironmentRecord` wiring retained.
 - [ ] Rules/Settings UI (`src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte`): controls for `blindCandidateGate`, `revealPolicy`, `revealScope`; per-environment reveal override.
 - [ ] `lang/en.json` keys for all new controls/labels.
 - [ ] Update `tests/components/environment-editor.test.js` (no task reorder; weight input present in blind) + `manager-layout`/`manager-contract` as needed.
