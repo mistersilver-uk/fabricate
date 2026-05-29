@@ -17,6 +17,7 @@ const VALID_ATTEMPT_LIMIT_SCOPES = new Set(['actor', 'user', 'task', 'environmen
 const VALID_RECHARGE_POLICIES = new Set(['none', 'manual', 'elapsedTime', 'probability', 'manualAndElapsedTime']);
 const VALID_BLIND_SELECTION_STRATEGIES = new Set(['firstAvailable', 'weightedRandom', 'rollTable', 'macro']);
 const VALID_REVEAL_SCOPES = new Set(['actor', 'user', 'party', 'global']);
+const VALID_REVEAL_POLICIES = new Set(['never', 'onSuccess', 'onAttempt']);
 const TIME_UNITS = ['minutes', 'hours', 'days', 'months', 'years'];
 
 export const GATHERING_FAILURE_KEYWORDS = Object.freeze([
@@ -280,6 +281,7 @@ export class GatheringEnvironmentStore {
     const selectionMode = VALID_SELECTION_MODES.has(data?.selectionMode) ? data.selectionMode : 'targeted';
     const compositionMode = VALID_COMPOSITION_MODES.has(data?.compositionMode) ? data.compositionMode : 'automatic';
     const blindSelection = normalizeBlindSelection(data?.blindSelection);
+    const reveal = normalizeEnvironmentReveal(data?.reveal);
     return {
       id: freshEnvironmentId || !data?.id ? this.randomID() : String(data.id),
       craftingSystemId: stringOrEmpty(data?.craftingSystemId),
@@ -308,6 +310,7 @@ export class GatheringEnvironmentStore {
       hazardSelectionMode: ['highestRankedDrop', 'allDrops'].includes(data?.hazardSelectionMode) ? data.hazardSelectionMode : 'allDrops',
       hazardPolicy: ['successWithHazard', 'failureWithHazard'].includes(data?.hazardPolicy) ? data.hazardPolicy : 'successWithHazard',
       ...(blindSelection ? { blindSelection } : {}),
+      ...(reveal ? { reveal } : {}),
       tasks: Array.isArray(data?.tasks) ? data.tasks.map(task => this._normalizeTask(task)) : []
     };
   }
@@ -1128,6 +1131,14 @@ function validateRevealConfig(reveal, label) {
     return [`${label}.scope must be actor, user, party, or global`];
   }
   return [];
+}
+
+function normalizeEnvironmentReveal(data = null) {
+  if (!data || typeof data !== 'object') return null;
+  return {
+    policy: VALID_REVEAL_POLICIES.has(data.policy) ? data.policy : 'never',
+    scope: VALID_REVEAL_SCOPES.has(data.scope) ? data.scope : 'actor'
+  };
 }
 
 function normalizeEncounterConfig(data = null) {

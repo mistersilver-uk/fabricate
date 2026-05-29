@@ -17,11 +17,11 @@
 - [x] `npm test` + `npm run build`.
 
 ## Phase 3 — Reveal policy
-- [ ] Add `revealPolicy` (`never`|`onSuccess`|`onAttempt`, default `never`) + `revealScope` (`VALID_REVEAL_SCOPES`, default `actor`) to `DEFAULT_GATHERING_RULES` + `normalizeGatheringRules`.
-- [ ] Add optional `environment.reveal = { policy, scope }` override (normalize/validate) + adminStore plumbing.
-- [ ] After attempt resolution in `GatheringEngine`, call `revealTask` per the effective policy/scope (`onSuccess` = success only, `onAttempt` = success or failure, `never` = no-op).
-- [ ] Tests across the runtime/resolution suites for each policy + scope.
-- [ ] `npm test` + `npm run build`.
+- [x] Add `revealPolicy` (`never`|`onSuccess`|`onAttempt`, default `never`) + `revealScope` (default `actor`) to `DEFAULT_GATHERING_RULES` + `normalizeGatheringRules`.
+- [x] Add optional `environment.reveal = { policy, scope }` override (`normalizeEnvironmentReveal`, attached only when present). adminStore plumbing deferred to Phase 4 (UI writer).
+- [x] After an attempt terminates (`GatheringEngine._terminalStart`, covering immediate + timed completion), call `revealTask` per the effective policy/scope (`onSuccess` = success only, `onAttempt` = success or failure, `never` = no-op; blind only; best-effort).
+- [x] Tests for each policy + scope, the env override beating the rule default, and targeted-mode no-op (`tests/gathering-engine-start-attempt.test.js`); store normalize coverage (`tests/gathering-rich-library.test.js`).
+- [x] `npm test` + `npm run build`.
 
 ## Phase 4 — Editor UI
 - [ ] Tasks tab: per-task numeric **weight** input in the Override column, shown only when the environment is `blind`, writing `environment.blindSelection.weights[taskId]` via `onUpdateEnvironment`; add the environment strategy select + rollTable/macro pickers.

@@ -1128,3 +1128,90 @@ test('blind rollTable/macro selection only offers attemptable candidates to the 
   assert.equal(result.taskId, 'gated-good');
   assert.deepEqual(received.candidates.map(candidate => candidate.id), ['gated-good']);
 });
+
+const ironTask = (overrides = {}) => task({
+  resultGroups: [{ id: 'group-iron', name: 'Iron', results: [{ id: 'result-iron', componentId: 'iron', quantity: 1 }] }],
+  ...overrides
+});
+
+test('blind reveal policy onAttempt reveals the resolved task on success', async () => {
+  const captured = [];
+  const engine = makeEngine({
+    environments: [environment({
+      selectionMode: 'blind',
+      rules: { revealPolicy: 'onAttempt', revealScope: 'party' },
+      tasks: [ironTask({ id: 'reveal-task' })]
+    })],
+    richState: { revealTask: async (_actor, payload) => { captured.push(payload); } },
+    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 1 }]
+  });
+
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a' });
+  assert.equal(result.state, 'succeeded');
+  // The blind response stays opaque, but the reveal records the real task id.
+  assert.equal(result.taskId, null);
+  assert.deepEqual(captured, [{ environmentId: 'env-a', taskId: 'reveal-task', scope: 'party' }]);
+});
+
+test('blind reveal policy onSuccess does not reveal a failed attempt', async () => {
+  const captured = [];
+  const engine = makeEngine({
+    environments: [environment({
+      selectionMode: 'blind',
+      rules: { revealPolicy: 'onSuccess' },
+      tasks: [ironTask({ id: 'reveal-task' })]
+    })],
+    richState: { revealTask: async (_actor, payload) => { captured.push(payload); } },
+    routedOutcome: { status: 'failed', resultGroups: [], checkResult: { outcome: 'fail' } }
+  });
+
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a' });
+  assert.equal(result.state, 'failed');
+  assert.deepEqual(captured, []);
+});
+
+test('blind reveal policy never (default) does not reveal', async () => {
+  const captured = [];
+  const engine = makeEngine({
+    environments: [environment({
+      selectionMode: 'blind',
+      tasks: [ironTask({ id: 'reveal-task' })]
+    })],
+    richState: { revealTask: async (_actor, payload) => { captured.push(payload); } },
+    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 1 }]
+  });
+
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a' });
+  assert.equal(result.state, 'succeeded');
+  assert.deepEqual(captured, []);
+});
+
+test('environment reveal override beats the system default; targeted mode never reveals', async () => {
+  const captured = [];
+  const blindEngine = makeEngine({
+    environments: [environment({
+      selectionMode: 'blind',
+      rules: { revealPolicy: 'never' },
+      reveal: { policy: 'onSuccess', scope: 'global' },
+      tasks: [ironTask({ id: 'reveal-task' })]
+    })],
+    richState: { revealTask: async (_actor, payload) => { captured.push(payload); } },
+    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 1 }]
+  });
+  const blindResult = await blindEngine.startAttempt({ viewer, actor, environmentId: 'env-a' });
+  assert.equal(blindResult.state, 'succeeded');
+  assert.deepEqual(captured, [{ environmentId: 'env-a', taskId: 'reveal-task', scope: 'global' }]);
+
+  const targetedCaptured = [];
+  const targetedEngine = makeEngine({
+    environments: [environment({
+      selectionMode: 'targeted',
+      rules: { revealPolicy: 'onAttempt' },
+      tasks: [ironTask({ id: 'targeted-task' })]
+    })],
+    richState: { revealTask: async (_actor, payload) => { targetedCaptured.push(payload); } },
+    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 1 }]
+  });
+  await targetedEngine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'targeted-task' });
+  assert.deepEqual(targetedCaptured, []);
+});

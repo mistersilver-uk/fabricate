@@ -467,7 +467,7 @@ export class GatheringEngine {
       checkResult
     });
 
-    return this._terminalStart({
+    return await this._terminalStart({
       viewer,
       actor,
       system,
@@ -1462,7 +1462,7 @@ export class GatheringEngine {
       checkResult
     });
 
-    return this._terminalStart({
+    return await this._terminalStart({
       viewer,
       actor,
       system,
@@ -1922,7 +1922,8 @@ export class GatheringEngine {
     });
   }
 
-  _terminalStart({ viewer, actor, system, environment, task, status, run, createdResults, usedCatalysts, usedTools = [], checkResult }) {
+  async _terminalStart({ viewer, actor, system, environment, task, status, run, createdResults, usedCatalysts, usedTools = [], checkResult }) {
+    await this._maybeRevealBlindTask({ actor, environment, task, status });
     const opaqueBlind = this._isOpaqueBlindTask({ environment, viewer });
     const publicRun = opaqueBlind
       ? redactBlindTerminalRun(run)
@@ -1950,6 +1951,39 @@ export class GatheringEngine {
     }
 
     return response;
+  }
+
+  /**
+   * Reveal the resolved task after a blind attempt terminates, per the effective
+   * reveal policy (`environment.reveal` overrides the system rules default).
+   * `onSuccess` reveals only on success; `onAttempt` reveals on success or
+   * failure; `never` is a no-op. Reveal is best-effort and never blocks the
+   * attempt result. Only applies to blind environments.
+   */
+  async _maybeRevealBlindTask({ actor, environment, task, status }) {
+    if (environment?.selectionMode !== 'blind') return;
+    if (typeof this.richState?.revealTask !== 'function') return;
+    const { policy, scope } = this._resolveRevealPolicy(environment);
+    if (policy === 'never') return;
+    if (policy === 'onSuccess' && status !== 'succeeded') return;
+    try {
+      await this.richState.revealTask(actor, {
+        environmentId: stringOrNull(environment.id),
+        taskId: stringOrNull(task?.id),
+        scope
+      });
+    } catch {
+      // Reveal is advisory; never fail the attempt because of it.
+    }
+  }
+
+  _resolveRevealPolicy(environment) {
+    const rules = environment?.rules || {};
+    const override = environment?.reveal || null;
+    return {
+      policy: override?.policy ?? rules.revealPolicy ?? 'never',
+      scope: override?.scope ?? rules.revealScope ?? 'actor'
+    };
   }
 
   async _clearMisconfiguredWaitingRun({ viewer, actor, run, environment, task, errors = null, outcome = null }) {

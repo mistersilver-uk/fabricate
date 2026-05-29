@@ -414,6 +414,19 @@ test('environment blindSelection normalizes strategy/weights and validates macro
   assert.ok(invalid.errors.some(error => error.includes('blindSelection')));
 });
 
+test('environment reveal override normalizes policy/scope and coerces invalid values', async () => {
+  const store = makeEnvironmentStore();
+
+  const saved = await store.create(environment({ reveal: { policy: 'onAttempt', scope: 'party' }, enabledTaskIds: ['lib-task'] }));
+  assert.deepEqual(saved.reveal, { policy: 'onAttempt', scope: 'party' });
+
+  const coerced = await store.create(environment({ id: 'env-reveal-bad', reveal: { policy: 'bogus', scope: 'nope' }, enabledTaskIds: ['lib-task'] }));
+  assert.deepEqual(coerced.reveal, { policy: 'never', scope: 'actor' });
+
+  const none = await store.create(environment({ id: 'env-reveal-none', enabledTaskIds: ['lib-task'] }));
+  assert.equal(none.reveal, undefined);
+});
+
 test('player listing exposes current conditions as context without weather/time filters', async () => {
   const { service } = makeRichState({
     config: {
