@@ -279,6 +279,7 @@ export class GatheringEnvironmentStore {
   _normalizeEnvironment(data = {}, { freshEnvironmentId = false } = {}) {
     const selectionMode = VALID_SELECTION_MODES.has(data?.selectionMode) ? data.selectionMode : 'targeted';
     const compositionMode = VALID_COMPOSITION_MODES.has(data?.compositionMode) ? data.compositionMode : 'automatic';
+    const blindSelection = normalizeBlindSelection(data?.blindSelection);
     return {
       id: freshEnvironmentId || !data?.id ? this.randomID() : String(data.id),
       craftingSystemId: stringOrEmpty(data?.craftingSystemId),
@@ -306,6 +307,7 @@ export class GatheringEnvironmentStore {
       hazardOrder: normalizeIdList(data?.hazardOrder),
       hazardSelectionMode: ['highestRankedDrop', 'allDrops'].includes(data?.hazardSelectionMode) ? data.hazardSelectionMode : 'allDrops',
       hazardPolicy: ['successWithHazard', 'failureWithHazard'].includes(data?.hazardPolicy) ? data.hazardPolicy : 'successWithHazard',
+      ...(blindSelection ? { blindSelection } : {}),
       tasks: Array.isArray(data?.tasks) ? data.tasks.map(task => this._normalizeTask(task)) : []
     };
   }
@@ -440,6 +442,8 @@ export class GatheringEnvironmentStore {
     if (original?.dangerLevel !== undefined && !DANGER_LEVELS.includes(original.dangerLevel)) {
       errors.push(`Environment "${label}" dangerLevel must be one of: ${DANGER_LEVELS.join(', ')}`);
     }
+
+    errors.push(...validateBlindSelection(normalized.blindSelection, `Environment "${label}" blindSelection`));
 
     const hasTaskSource = normalized.tasks.length > 0 || normalized.enabledTaskIds.length > 0;
     if (normalized.selectionMode === 'targeted' && !hasTaskSource) {

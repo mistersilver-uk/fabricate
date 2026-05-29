@@ -1,14 +1,14 @@
 # Tasks
 
 ## Phase 1 — Candidate gating + weighted selection (runtime core)
-- [ ] Add `blindCandidateGate` (`attemptableOnly`|`allMatching`, default `attemptableOnly`) to `DEFAULT_GATHERING_RULES` and `normalizeGatheringRules` in `src/systems/GatheringRichStateService.js` (+ a `BLIND_CANDIDATE_GATES` set).
-- [ ] Normalize/validate environment-level `blindSelection` in `src/systems/GatheringEnvironmentStore.js` (`_normalizeEnvironment` + `_validateEnvironment`), reusing `normalizeBlindSelection`; weights keyed by task id.
-- [ ] Plumb `blindCandidateGate` + `blindSelection` through `src/ui/svelte/stores/adminStore.js` (`_newEnvironmentDraft` default, `updateEnvironmentDraft` allow-list).
-- [ ] Inject a seedable RNG into `GatheringEngine` (mirror `rollD100`) for weighted selection.
-- [ ] Rework `GatheringEngine._findStartTask` blind branch: build the candidate pool, gate by `attemptable` when `attemptableOnly`, select via `firstAvailable`/`weightedRandom`; return null on empty pool.
-- [ ] Make the opaque `blindGather` listing report `attemptable: false` (with a reason, e.g. `BLIND_POOL_EMPTY`) when the gated pool is empty; add the `FABRICATE.Gathering.Blocked.*` localization key.
-- [ ] Tests: extend `tests/gathering-engine-start-attempt.test.js` / `tests/gathering-engine-listing.test.js` for gating, `weightedRandom` (seeded), and empty-pool behavior; add store normalize/validate coverage.
-- [ ] `npm test` + `npm run build`.
+- [x] Add `blindCandidateGate` (`attemptableOnly`|`allMatching`, default `attemptableOnly`) to `DEFAULT_GATHERING_RULES` and `normalizeGatheringRules` in `src/systems/GatheringRichStateService.js` (+ a `BLIND_CANDIDATE_GATES` set).
+- [x] Normalize/validate environment-level `blindSelection` in `src/systems/GatheringEnvironmentStore.js` (`_normalizeEnvironment` + `_validateEnvironment`), reusing `normalizeBlindSelection`; weights keyed by task id. Attached only when present (legacy shape unchanged).
+- [ ] Plumb `blindCandidateGate` + `blindSelection` through `src/ui/svelte/stores/adminStore.js` — deferred to Phase 4 (the editor UI is the writer; runtime reads the persisted/composed values).
+- [x] Inject a seedable RNG (`random`) into `GatheringEngine`.
+- [x] Rework `GatheringEngine` blind start selection (`_selectBlindStartTask` + `_pickBlindTask`/`_weightedPickTask`): build the candidate pool from visible+enabled tasks, gate by `attemptable` when `attemptableOnly`, select via `firstAvailable`/`weightedRandom`; return null on empty pool.
+- [x] Emit an opaque `BLIND_NO_CANDIDATE` blocked reason at start when the gated pool is empty; add the `FABRICATE.Gathering.Blocked.BlindNoCandidate` key. (Listing attemptability already reflects per-task blocked reasons.)
+- [x] Tests: extended `tests/gathering-engine-start-attempt.test.js` for gating, `weightedRandom` (seeded), empty-pool, and allMatching; updated blind-privacy tests to allMatching; added store normalize/validate coverage in `tests/gathering-rich-library.test.js`.
+- [x] `npm test` + `npm run build`.
 
 ## Phase 2 — rollTable + macro strategies
 - [ ] Implement `rollTable` selection (resolve `rollTableUuid`, map result → pool member) and `macro` selection (`macroUuid` via `src/utils/MacroExecutor.js`) in `_findStartTask`, both gated, falling back to `firstAvailable`.

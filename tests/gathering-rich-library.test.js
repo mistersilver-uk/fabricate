@@ -396,6 +396,24 @@ test('environment dangerLevel migrates from dangerTags, preserves explicit value
   assert.ok(invalid.errors.some(error => error.includes('dangerLevel')));
 });
 
+test('environment blindSelection normalizes strategy/weights and validates macro/rollTable requirements', async () => {
+  const store = makeEnvironmentStore();
+
+  const weighted = await store.create(environment({
+    blindSelection: { strategy: 'weightedRandom', weights: { t1: 3, t2: 1 } },
+    enabledTaskIds: ['lib-task']
+  }));
+  assert.equal(weighted.blindSelection.strategy, 'weightedRandom');
+  assert.deepEqual(weighted.blindSelection.weights, { t1: 3, t2: 1 });
+
+  const fallback = await store.create(environment({ id: 'env-bs-fallback', blindSelection: { strategy: 'nonsense' }, enabledTaskIds: ['lib-task'] }));
+  assert.equal(fallback.blindSelection.strategy, 'firstAvailable');
+
+  const invalid = store.validate(environment({ blindSelection: { strategy: 'macro' }, enabledTaskIds: ['lib-task'] }));
+  assert.equal(invalid.valid, false);
+  assert.ok(invalid.errors.some(error => error.includes('blindSelection')));
+});
+
 test('player listing exposes current conditions as context without weather/time filters', async () => {
   const { service } = makeRichState({
     config: {

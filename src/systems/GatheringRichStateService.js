@@ -52,6 +52,7 @@ const LEGACY_DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops']);
 const HAZARD_POLICIES = new Set(['successWithHazard', 'failureWithHazard']);
 const TOOL_BREAKAGE_POLICIES = new Set(['failureOnBreak', 'successDespiteBreak']);
 const BIOME_MODIFIER_AGGREGATIONS = new Set(['cumulative', 'strongestOfEach', 'dominant']);
+const BLIND_CANDIDATE_GATES = new Set(['attemptableOnly', 'allMatching']);
 const CHARACTER_MODIFIER_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
 const CHARACTER_MODIFIER_OPERATORS = new Set(['+', '-']);
 const ROLL_EXPRESSION_PATTERN = /\d\s*d\s*\d|[*/()]/i;
@@ -62,7 +63,8 @@ const DEFAULT_GATHERING_RULES = Object.freeze({
   hazardLimit: 1,
   hazardPolicy: 'successWithHazard',
   toolBreakagePolicy: 'failureOnBreak',
-  biomeModifierAggregation: 'strongestOfEach'
+  biomeModifierAggregation: 'strongestOfEach',
+  blindCandidateGate: 'attemptableOnly'
 });
 
 const BLOCKED_REASON_KEYS = Object.freeze({
@@ -1292,7 +1294,10 @@ function normalizeGatheringRules(rules = {}) {
       : DEFAULT_GATHERING_RULES.toolBreakagePolicy,
     biomeModifierAggregation: BIOME_MODIFIER_AGGREGATIONS.has(rules?.biomeModifierAggregation)
       ? rules.biomeModifierAggregation
-      : DEFAULT_GATHERING_RULES.biomeModifierAggregation
+      : DEFAULT_GATHERING_RULES.biomeModifierAggregation,
+    blindCandidateGate: BLIND_CANDIDATE_GATES.has(rules?.blindCandidateGate)
+      ? rules.blindCandidateGate
+      : DEFAULT_GATHERING_RULES.blindCandidateGate
   };
 }
 

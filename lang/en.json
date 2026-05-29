@@ -2494,7 +2494,8 @@
         "RunCreationFailed": "Gathering could not create an active run.",
         "NodeDepleted": "This resource is depleted.",
         "AttemptLimitExhausted": "No attempts remain for this gathering task.",
-        "StaminaBlocked": "The selected actor does not have enough gathering stamina."
+        "StaminaBlocked": "The selected actor does not have enough gathering stamina.",
+        "BlindNoCandidate": "There is nothing you can gather here right now."
       },
       "Risk": {
         "safe": "Safe",
