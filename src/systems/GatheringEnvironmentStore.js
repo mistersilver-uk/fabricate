@@ -3,6 +3,7 @@ import { validateGatheringDropReferencesSync } from './GatheringDropReferenceVal
 
 const DEFAULT_TASK_IMG = 'icons/svg/item-bag.svg';
 const VALID_SELECTION_MODES = new Set(['targeted', 'blind']);
+const VALID_COMPOSITION_MODES = new Set(['automatic', 'manual']);
 const VALID_RESOLUTION_MODES = new Set(['progressive', 'routed', 'd100']);
 const VALID_RESULT_SELECTION_PROVIDERS = new Set(['macroOutcome', 'rollTableOutcome']);
 const VALID_CHECK_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
@@ -276,6 +277,7 @@ export class GatheringEnvironmentStore {
 
   _normalizeEnvironment(data = {}, { freshEnvironmentId = false } = {}) {
     const selectionMode = VALID_SELECTION_MODES.has(data?.selectionMode) ? data.selectionMode : 'targeted';
+    const compositionMode = VALID_COMPOSITION_MODES.has(data?.compositionMode) ? data.compositionMode : 'automatic';
     return {
       id: freshEnvironmentId || !data?.id ? this.randomID() : String(data.id),
       craftingSystemId: stringOrEmpty(data?.craftingSystemId),
@@ -292,11 +294,14 @@ export class GatheringEnvironmentStore {
       chatMessages: normalizeChatMessages(data?.chatMessages),
       enabled: data?.enabled !== false,
       selectionMode,
+      compositionMode,
       sceneUuid: normalizeOptionalString(data?.sceneUuid),
       enabledTaskIds: normalizeIdList(data?.enabledTaskIds),
       disabledTaskIds: normalizeIdList(data?.disabledTaskIds),
       enabledHazardIds: normalizeIdList(data?.enabledHazardIds),
       disabledHazardIds: normalizeIdList(data?.disabledHazardIds),
+      taskOrder: normalizeIdList(data?.taskOrder),
+      hazardOrder: normalizeIdList(data?.hazardOrder),
       hazardSelectionMode: ['highestRankedDrop', 'allDrops'].includes(data?.hazardSelectionMode) ? data.hazardSelectionMode : 'allDrops',
       hazardPolicy: ['successWithHazard', 'failureWithHazard'].includes(data?.hazardPolicy) ? data.hazardPolicy : 'successWithHazard',
       tasks: Array.isArray(data?.tasks) ? data.tasks.map(task => this._normalizeTask(task)) : []
@@ -424,6 +429,10 @@ export class GatheringEnvironmentStore {
 
     if (!VALID_SELECTION_MODES.has(original?.selectionMode)) {
       errors.push(`Environment "${label}" selectionMode must be targeted or blind`);
+    }
+
+    if (original?.compositionMode !== undefined && !VALID_COMPOSITION_MODES.has(original.compositionMode)) {
+      errors.push(`Environment "${label}" compositionMode must be automatic or manual`);
     }
 
     const hasTaskSource = normalized.tasks.length > 0 || normalized.enabledTaskIds.length > 0;

@@ -1,3 +1,5 @@
+import { evaluateEnvironmentMatch } from './gatheringMatch.js';
+
 const FLAG_NAMESPACE = 'fabricate';
 const STATE_FLAG_KEY = 'gatheringState';
 const DEFAULT_CONDITIONS = Object.freeze({ weather: 'clear', timeOfDay: 'day' });
@@ -184,19 +186,24 @@ export class GatheringRichStateService {
           hazardLimit: environment.hazardLimit,
           hazardPolicy: environment.hazardPolicy
         });
+    const compositionMode = environment?.compositionMode === 'manual' ? 'manual' : 'automatic';
     const tasks = [
       ...normalizeList(environment.tasks),
-      ...normalizeList(libraries.tasks)
-        .filter(task => task?.enabled !== false)
-        .filter(task => this._recordMatchesEnvironment(task, environment, currentConditions, { includeDanger: false, conditionSettings: systemConditions }))
-        .filter(task => this._environmentAllowsLibraryRecord(environment, task.id, 'task'))
-        .map(task => this._libraryTaskToRuntimeTask(task))
+      ...sortRecordsByOrder(
+        normalizeList(libraries.tasks)
+          .filter(task => task?.enabled !== false)
+          .filter(task => this._recordMatchesEnvironment(task, environment, currentConditions, { includeDanger: false, conditionSettings: systemConditions }))
+          .filter(task => this._environmentIncludesLibraryRecord(environment, task.id, 'task', compositionMode)),
+        environment?.taskOrder
+      ).map(task => this._libraryTaskToRuntimeTask(task))
     ];
-    const hazards = normalizeList(libraries.hazards)
-      .filter(hazard => hazard?.enabled !== false)
-      .filter(hazard => this._recordMatchesEnvironment(hazard, environment, currentConditions, { includeDanger: true, conditionSettings: systemConditions }))
-      .filter(hazard => this._environmentAllowsLibraryRecord(environment, hazard.id, 'hazard'))
-      .map(hazard => normalizeHazard(hazard));
+    const hazards = sortRecordsByOrder(
+      normalizeList(libraries.hazards)
+        .filter(hazard => hazard?.enabled !== false)
+        .filter(hazard => this._recordMatchesEnvironment(hazard, environment, currentConditions, { includeDanger: true, conditionSettings: systemConditions }))
+        .filter(hazard => this._environmentIncludesLibraryRecord(environment, hazard.id, 'hazard', compositionMode)),
+      environment?.hazardOrder
+    ).map(hazard => normalizeHazard(hazard));
 
     const libraryCharacterModifiers = new Map();
     for (const entry of normalizeList(libraries.characterModifiers)) {
@@ -746,18 +753,7 @@ export class GatheringRichStateService {
   }
 
   _recordMatchesEnvironment(record, environment, conditions, { includeDanger, conditionSettings = null }) {
-    const envRegion = normalizeTag(environment?.region);
-    const envBiomes = normalizeTagList(environment?.biomes ?? environment?.biome);
-    const envDanger = normalizeTagList(environment?.dangerTags ?? environment?.risk);
-    const recordRegions = normalizeTagList(Array.isArray(record.regions)
-      ? record.regions
-      : record.region ? [record.region] : []);
-    if (recordRegions.length > 0 && !recordRegions.includes(envRegion)) return false;
-    if (normalizeTagList(record.biomes).length > 0 && !hasAny(normalizeTagList(record.biomes), envBiomes)) return false;
-    if (conditionSettings?.weather?.enabled !== false && normalizeConditionIdList(record.weather).length > 0 && !normalizeConditionIdList(record.weather).includes(normalizeConditionId(conditions.weather))) return false;
-    if (conditionSettings?.timeOfDay?.enabled !== false && normalizeConditionIdList(record.timeOfDay).length > 0 && !normalizeConditionIdList(record.timeOfDay).includes(normalizeConditionId(conditions.timeOfDay))) return false;
-    if (includeDanger && normalizeTagList(record.dangerTags).length > 0 && !hasAny(normalizeTagList(record.dangerTags), envDanger)) return false;
-    return true;
+    return evaluateEnvironmentMatch(record, environment, conditions, { includeDanger, conditionSettings }).matches;
   }
 
   _environmentAllowsLibraryRecord(environment, id, kind) {
@@ -766,6 +762,25 @@ export class GatheringRichStateService {
     const enabled = normalizeList(environment?.[enabledKey]).map(String);
     const disabled = normalizeList(environment?.[disabledKey]).map(String);
     if (disabled.includes(String(id))) return false;
+    return enabled.length === 0 || enabled.includes(String(id));
+  }
+
+  /**
+   * Whether a matching, library-enabled record is composed into the
+   * environment, honoring `compositionMode`:
+   * - `automatic`: include unless explicitly excluded (`disabled*Ids`). A
+   *   non-empty `enabled*Ids` is still honored as a legacy allow-list so
+   *   pre-existing environments keep their behavior (the new editor never
+   *   populates `enabled*Ids` while in automatic mode).
+   * - `manual`: include only when explicitly listed (`enabled*Ids`) and not excluded.
+   */
+  _environmentIncludesLibraryRecord(environment, id, kind, compositionMode = 'automatic') {
+    const enabledKey = kind === 'hazard' ? 'enabledHazardIds' : 'enabledTaskIds';
+    const disabledKey = kind === 'hazard' ? 'disabledHazardIds' : 'disabledTaskIds';
+    const enabled = normalizeList(environment?.[enabledKey]).map(String);
+    const disabled = normalizeList(environment?.[disabledKey]).map(String);
+    if (disabled.includes(String(id))) return false;
+    if (compositionMode === 'manual') return enabled.includes(String(id));
     return enabled.length === 0 || enabled.includes(String(id));
   }
 
@@ -1502,6 +1517,24 @@ async function writeState(actor, state) {
 
 function normalizeList(value) {
   return Array.isArray(value) ? value : [];
+}
+
+/**
+ * Stable-sort records by an explicit order of ids. Records absent from the
+ * order array keep their original (library) order after the listed ones.
+ */
+function sortRecordsByOrder(records, order) {
+  const list = normalizeList(records);
+  const orderIndex = new Map(normalizeList(order).map((id, index) => [String(id), index]));
+  if (orderIndex.size === 0) return list;
+  return list
+    .map((record, index) => ({ record, index }))
+    .sort((a, b) => {
+      const ai = orderIndex.has(String(a.record?.id)) ? orderIndex.get(String(a.record?.id)) : Number.MAX_SAFE_INTEGER;
+      const bi = orderIndex.has(String(b.record?.id)) ? orderIndex.get(String(b.record?.id)) : Number.MAX_SAFE_INTEGER;
+      return ai === bi ? a.index - b.index : ai - bi;
+    })
+    .map(entry => entry.record);
 }
 
 function nonNegativeNumber(value, fallback = 0) {

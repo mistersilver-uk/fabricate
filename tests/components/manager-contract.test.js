@@ -468,56 +468,52 @@ describe('CraftingSystemManager source contract', () => {
     );
     assert.ok(!rootSource.includes("import EnvironmentsTab from '../EnvironmentsTab.svelte';"), 'manager root should not import the full legacy environments tab');
     assert.ok(!rootSource.includes('forceEditorOpen'), 'manager edit route should not force-open the legacy environment editor');
+    // The v2 environment editor is a composition/wrapper editor: it composes
+    // reusable library tasks/hazards into one environment via include/exclude,
+    // ordering, and a shared automatic|manual composition mode. It does NOT
+    // author reusable source records (that lives in the standalone
+    // gathering-task-edit / gathering-hazard-edit routes), so it must wire the
+    // composition store actions rather than the inline task-authoring handlers.
     for (const snippet of [
       'store.updateEnvironmentDraft',
       'store.saveEnvironmentDraft',
-      'store.duplicateEnvironmentDraft',
       'store.deleteEnvironmentDraft',
-      'store.moveEnvironmentDraft',
-      'store.addEnvironmentTask',
-      'store.updateEnvironmentTask',
-      'store.addEnvironmentTaskResultGroup',
-      'store.addEnvironmentTaskCatalyst',
-      'store.updateEnvironmentTaskVisibility',
-      'store.updateEnvironmentTaskResultSelection',
-      'store.updateEnvironmentTaskProgressive',
-      'store.updateEnvironmentTaskCheck',
-      'store.updateEnvironmentTaskTimeRequirement',
-      'store.updateEnvironmentTaskFailureOutcome'
+      'store.setEnvironmentCompositionMode',
+      'store.includeEnvironmentRecord',
+      'store.excludeEnvironmentRecord',
+      'store.restoreEnvironmentRecord',
+      'store.reorderEnvironmentRecord',
+      'composition={$viewState.environmentComposition}'
     ]) {
       assert.ok(rootSource.includes(snippet), `environment edit route should wire ${snippet}`);
     }
-    assert.equal(lang.FABRICATE.Admin.Manager.Environment.TaskTabDetails, 'Task Details');
-    assert.equal(lang.FABRICATE.Admin.Manager.Environment.TaskTabCheck, 'Check');
-    assert.equal(lang.FABRICATE.Admin.Manager.Environment.TaskTabAdvanced, undefined);
-    assert.equal(lang.FABRICATE.Admin.Manager.Environment.AdvancedTab, undefined);
+    for (const snippet of [
+      'store.addEnvironmentTaskResultGroup',
+      'store.addEnvironmentTaskCatalyst',
+      'store.updateEnvironmentTaskVisibility',
+      'store.updateEnvironmentTaskCheck'
+    ]) {
+      assert.ok(!environmentEditSource.includes(snippet), `environment composition editor should not author tasks via ${snippet}`);
+    }
     assert.ok(!environmentEditSource.includes("id: 'advanced'"), 'environment editor should not define an advanced task tab');
     assert.ok(!environmentEditSource.includes('manager-environment-details-tabs'), 'environment editor should not render environment advanced tabs');
     assert.ok(!environmentEditSource.includes('manager-environment-evidence-column'), 'environment editor should no longer render the duplicated evidence column');
-    // NOTE: validation-band, library, scene-drop, status-toggle, and other
-    // editor-internal contracts were removed when EnvironmentEditView was
-    // placeholder'd out pending redesign. Reinstate per-surface contracts when
-    // the new editor lands.
   });
 
   it('wires Manager gathering libraries, global conditions, and environment composition controls', () => {
+    // Global conditions and vocabularies are authored from the gathering
+    // workspace browser (settings tab); library task/hazard authoring and rules
+    // live on their own routes, so those store actions are invoked by root-owned
+    // functions rather than passed into the environment composition editor.
     for (const snippet of [
       'gatheringConfig={$viewState.gatheringConfig}',
       'onUpdateGatheringConditions={store.updateGatheringConditions}',
-      'onUpdateGatheringVocabulary={store.updateGatheringVocabulary}',
       'onToggleGatheringConditionEnabled={store.toggleGatheringConditionEnabled}',
       'onAddGatheringConditionValue={store.addGatheringConditionValue}',
       'onDeleteGatheringConditionValue={store.deleteGatheringConditionValue}',
       'onAddGatheringVocabularyValue={store.addGatheringVocabularyValue}',
       'onUpdateGatheringVocabularyValue={store.updateGatheringVocabularyValue}',
-      'onDeleteGatheringVocabularyValue={store.deleteGatheringVocabularyValue}',
-      'onUpdateGatheringRules={store.updateGatheringRules}',
-      'onAddGatheringLibraryTask={store.addGatheringLibraryTask}',
-      'onUpdateGatheringLibraryTask={store.updateGatheringLibraryTask}',
-      'onDeleteGatheringLibraryTask={store.deleteGatheringLibraryTask}',
-      'onAddGatheringLibraryHazard={store.addGatheringLibraryHazard}',
-      'onUpdateGatheringLibraryHazard={store.updateGatheringLibraryHazard}',
-      'onDeleteGatheringLibraryHazard={store.deleteGatheringLibraryHazard}'
+      'onDeleteGatheringVocabularyValue={store.deleteGatheringVocabularyValue}'
     ]) {
       assert.ok(rootSource.includes(snippet), `root should wire ${snippet}`);
     }

@@ -41,6 +41,7 @@ import {
   seedCharacterModifierPresets
 } from '../../../config/gatheringCharacterModifierPresets.js';
 import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js';
+import { evaluateEnvironmentMatch } from '../../../systems/gatheringMatch.js';
 import { Tool } from '../../../models/Tool.js';
 
 // ---------------------------------------------------------------------------
@@ -1624,7 +1625,8 @@ export function createAdminStore(services) {
       environmentDraftIsNew: get(environmentDraftIsNew),
       environmentSaving: get(environmentSaving),
       environmentSaveError: get(environmentSaveError),
-      environmentValidationState: _clonePlain(get(environmentValidationState))
+      environmentValidationState: _clonePlain(get(environmentValidationState)),
+      environmentComposition: _clonePlain(_buildEnvironmentCompositionViewModel(get(environmentDraft)))
     };
   }
 
@@ -1963,22 +1965,7 @@ export function createAdminStore(services) {
   }
 
   function _gatheringLibraryRecordMatchesEnvironment(record, environment, conditions, includeDanger = false, conditionSettings = null) {
-    const environmentRegion = _normalizeGatheringTag(environment?.region);
-    const environmentBiomes = _normalizeGatheringTagList(environment?.biomes ?? environment?.biome);
-    const environmentDanger = _normalizeGatheringTagList(environment?.dangerTags ?? environment?.risk);
-    const recordBiomes = _normalizeGatheringTagList(record?.biomes);
-    const recordWeather = _normalizeGatheringConditionIdList(record?.weather);
-    const recordTimeOfDay = _normalizeGatheringConditionIdList(record?.timeOfDay);
-    const recordDanger = _normalizeGatheringTagList(record?.dangerTags);
-    const recordRegions = _normalizeGatheringTagList(Array.isArray(record?.regions)
-      ? record.regions
-      : record?.region ? [record.region] : []);
-    if (recordRegions.length > 0 && !recordRegions.includes(environmentRegion)) return false;
-    if (recordBiomes.length > 0 && !recordBiomes.some(tag => environmentBiomes.includes(tag))) return false;
-    if (conditionSettings?.weather?.enabled !== false && recordWeather.length > 0 && !recordWeather.includes(_normalizeGatheringConditionId(conditions?.weather))) return false;
-    if (conditionSettings?.timeOfDay?.enabled !== false && recordTimeOfDay.length > 0 && !recordTimeOfDay.includes(_normalizeGatheringConditionId(conditions?.timeOfDay))) return false;
-    if (includeDanger && recordDanger.length > 0 && !recordDanger.some(tag => environmentDanger.includes(tag))) return false;
-    return true;
+    return evaluateEnvironmentMatch(record, environment, conditions, { includeDanger, conditionSettings }).matches;
   }
 
   function _environmentAllowsGatheringLibraryRecord(environment, recordId, kind) {
@@ -1988,6 +1975,93 @@ export function createAdminStore(services) {
     const disabled = Array.isArray(environment?.[disabledKey]) ? environment[disabledKey].map(String) : [];
     if (disabled.includes(String(recordId))) return false;
     return enabled.length === 0 || enabled.includes(String(recordId));
+  }
+
+  /**
+   * Classify every library task/hazard for the given environment into a
+   * `CompositionState` + `RuntimeState` plus match evidence, honoring
+   * `compositionMode`. This is the single view-model the environment editor
+   * (Overview / Tasks / Hazards / Validation / inspector) renders from.
+   */
+  function _buildEnvironmentCompositionViewModel(environment) {
+    const empty = { compositionMode: 'automatic', conditions: { ...DEFAULT_GATHERING_CONDITIONS }, tasks: [], hazards: [], counts: _emptyCompositionCounts() };
+    if (!environment || typeof environment !== 'object') return empty;
+    const systemId = String(environment.craftingSystemId || get(selectedSystemId) || '');
+    if (!systemId) return empty;
+
+    const config = _currentGatheringConfig();
+    const system = config.systems?.[systemId] || {};
+    const conditionSettings = system.conditions || null;
+    const conditions = _gatheringCurrentConditions(conditionSettings);
+    const compositionMode = environment.compositionMode === 'manual' ? 'manual' : 'automatic';
+
+    const tasks = _classifyCompositionRecords({
+      records: Array.isArray(system.tasks) ? system.tasks : [],
+      environment, conditions, conditionSettings, compositionMode, kind: 'task', includeDanger: false,
+      order: environment.taskOrder
+    });
+    const hazards = _classifyCompositionRecords({
+      records: Array.isArray(system.hazards) ? system.hazards : [],
+      environment, conditions, conditionSettings, compositionMode, kind: 'hazard', includeDanger: true,
+      order: environment.hazardOrder
+    });
+
+    return { compositionMode, conditions, tasks, hazards, counts: _compositionCounts(tasks, hazards) };
+  }
+
+  function _classifyCompositionRecords({ records, environment, conditions, conditionSettings, compositionMode, kind, includeDanger, order }) {
+    const enabledKey = kind === 'hazard' ? 'enabledHazardIds' : 'enabledTaskIds';
+    const disabledKey = kind === 'hazard' ? 'disabledHazardIds' : 'disabledTaskIds';
+    const enabled = Array.isArray(environment?.[enabledKey]) ? environment[enabledKey].map(String) : [];
+    const disabled = Array.isArray(environment?.[disabledKey]) ? environment[disabledKey].map(String) : [];
+    const orderIndex = new Map((Array.isArray(order) ? order : []).map((id, index) => [String(id), index]));
+
+    const classified = (Array.isArray(records) ? records : []).map((record, index) => {
+      const id = String(record?.id || '');
+      const libraryEnabled = record?.enabled !== false;
+      const { matches, evidence } = evaluateEnvironmentMatch(record, environment, conditions, { includeDanger, conditionSettings });
+      const excluded = disabled.includes(id);
+      const explicitlyIncluded = enabled.includes(id);
+
+      let compositionState;
+      if (!libraryEnabled) compositionState = 'libraryDisabled';
+      else if (excluded) compositionState = 'excluded';
+      else if (!matches) compositionState = explicitlyIncluded ? 'includedButUnavailable' : 'notMatching';
+      else if (compositionMode === 'manual') compositionState = explicitlyIncluded ? 'explicitlyIncluded' : 'candidate';
+      else if (enabled.length === 0 || explicitlyIncluded) compositionState = 'includedByMatch';
+      else compositionState = 'candidate';
+
+      const runtimeState = (compositionState === 'includedByMatch' || compositionState === 'explicitlyIncluded') ? 'available' : 'unavailable';
+      const orderRank = orderIndex.has(id) ? orderIndex.get(id) : Number.MAX_SAFE_INTEGER;
+      return { id, record, kind, libraryEnabled, matches, evidence, excluded, explicitlyIncluded, compositionState, runtimeState, orderRank, _index: index };
+    });
+
+    return classified.sort((a, b) => (a.orderRank === b.orderRank ? a._index - b._index : a.orderRank - b.orderRank));
+  }
+
+  function _emptyCompositionCounts() {
+    return {
+      availableTasks: 0, excludedTasks: 0, candidateTasks: 0, unavailableTasks: 0,
+      availableHazards: 0, excludedHazards: 0, candidateHazards: 0, unavailableHazards: 0,
+      diagnosticTasks: 0, diagnosticHazards: 0
+    };
+  }
+
+  function _compositionCounts(tasks, hazards) {
+    const tally = records => {
+      const available = records.filter(r => r.runtimeState === 'available').length;
+      const excluded = records.filter(r => r.compositionState === 'excluded').length;
+      const candidate = records.filter(r => r.compositionState === 'candidate').length;
+      const unavailable = records.filter(r => r.compositionState === 'includedButUnavailable').length;
+      const diagnostic = records.filter(r => r.compositionState === 'notMatching' || r.compositionState === 'libraryDisabled').length;
+      return { available, excluded, candidate, unavailable, diagnostic };
+    };
+    const t = tally(tasks);
+    const h = tally(hazards);
+    return {
+      availableTasks: t.available, excludedTasks: t.excluded, candidateTasks: t.candidate, unavailableTasks: t.unavailable, diagnosticTasks: t.diagnostic,
+      availableHazards: h.available, excludedHazards: h.excluded, candidateHazards: h.candidate, unavailableHazards: h.unavailable, diagnosticHazards: h.diagnostic
+    };
   }
 
   function _gatheringLibraryRecordUsages(systemId, record, kind) {
@@ -2254,6 +2328,14 @@ export function createAdminStore(services) {
     try {
       const rawEnvironments = await environmentStore.listBySystem(selectedSystem.id);
       const environments = _clonePlain(Array.isArray(rawEnvironments) ? rawEnvironments : []);
+      const environmentTaskCounts = {};
+      for (const environment of environments) {
+        const counts = _buildEnvironmentCompositionViewModel(environment)?.counts || {};
+        environmentTaskCounts[String(environment.id)] = {
+          availableTaskCount: counts.availableTasks || 0,
+          availableHazardCount: counts.availableHazards || 0
+        };
+      }
       let environmentId = get(selectedEnvironmentId);
       const canKeepNewDraft = get(environmentDraftIsNew)
         && get(environmentDraftDirty)
@@ -2291,6 +2373,7 @@ export function createAdminStore(services) {
         environmentsLoading: false,
         environmentsError: null,
         environments,
+        environmentTaskCounts,
         ..._currentEnvironmentViewPatch()
       };
     } catch (err) {
@@ -2616,8 +2699,10 @@ export function createAdminStore(services) {
     const allowed = new Set([
       'name',
       'description',
+      'img',
       'enabled',
       'selectionMode',
+      'compositionMode',
       'sceneUuid',
       'region',
       'biomes',
@@ -2628,6 +2713,8 @@ export function createAdminStore(services) {
       'disabledTaskIds',
       'enabledHazardIds',
       'disabledHazardIds',
+      'taskOrder',
+      'hazardOrder',
       'tasks'
     ]);
     const next = _clonePlain(current);
@@ -2635,15 +2722,20 @@ export function createAdminStore(services) {
       if (!allowed.has(field)) continue;
       if (field === 'enabled') {
         next.enabled = value === true;
+      } else if (field === 'compositionMode') {
+        next.compositionMode = value === 'manual' ? 'manual' : 'automatic';
       } else if (field === 'sceneUuid') {
         const normalized = String(value ?? '').trim();
         next.sceneUuid = normalized || null;
+      } else if (field === 'img') {
+        const normalized = String(value ?? '').trim();
+        next.img = normalized || null;
       } else if (field === 'tasks') {
         next.tasks = Array.isArray(value) ? _clonePlain(value) : [];
         selectedEnvironmentTaskId.set(_resolveEnvironmentTaskSelection(next, get(selectedEnvironmentTaskId)));
       } else if (['biomes', 'dangerTags'].includes(field)) {
         next[field] = _normalizeGatheringTagList(value);
-      } else if (['enabledTaskIds', 'disabledTaskIds', 'enabledHazardIds', 'disabledHazardIds'].includes(field)) {
+      } else if (['enabledTaskIds', 'disabledTaskIds', 'enabledHazardIds', 'disabledHazardIds', 'taskOrder', 'hazardOrder'].includes(field)) {
         next[field] = Array.from(new Set((Array.isArray(value) ? value : [])
           .map(entry => String(entry || '').trim())
           .filter(Boolean)));
@@ -2685,6 +2777,74 @@ export function createAdminStore(services) {
     selectedEnvironmentTaskId.set(nextTaskId);
     _patchEnvironmentViewState();
     return true;
+  }
+
+  function _compositionFieldKeys(kind) {
+    return kind === 'hazard'
+      ? { enabledKey: 'enabledHazardIds', disabledKey: 'disabledHazardIds', orderKey: 'hazardOrder' }
+      : { enabledKey: 'enabledTaskIds', disabledKey: 'disabledTaskIds', orderKey: 'taskOrder' };
+  }
+
+  function _compositionIdArray(value) {
+    return Array.isArray(value) ? value.map(entry => String(entry || '').trim()).filter(Boolean) : [];
+  }
+
+  function setEnvironmentCompositionMode(mode) {
+    return updateEnvironmentDraft({ compositionMode: mode === 'manual' ? 'manual' : 'automatic' });
+  }
+
+  function includeEnvironmentRecord(kind, recordId) {
+    const current = get(environmentDraft);
+    if (!current) return false;
+    const id = String(recordId || '').trim();
+    if (!id) return false;
+    const { enabledKey, disabledKey, orderKey } = _compositionFieldKeys(kind);
+    const enabled = _compositionIdArray(current[enabledKey]);
+    const disabled = _compositionIdArray(current[disabledKey]).filter(entry => entry !== id);
+    const order = _compositionIdArray(current[orderKey]);
+    if (!enabled.includes(id)) enabled.push(id);
+    if (!order.includes(id)) order.push(id);
+    return updateEnvironmentDraft({ [enabledKey]: enabled, [disabledKey]: disabled, [orderKey]: order });
+  }
+
+  function excludeEnvironmentRecord(kind, recordId) {
+    const current = get(environmentDraft);
+    if (!current) return false;
+    const id = String(recordId || '').trim();
+    if (!id) return false;
+    const { enabledKey, disabledKey } = _compositionFieldKeys(kind);
+    const enabled = _compositionIdArray(current[enabledKey]).filter(entry => entry !== id);
+    const disabled = _compositionIdArray(current[disabledKey]);
+    if (!disabled.includes(id)) disabled.push(id);
+    return updateEnvironmentDraft({ [enabledKey]: enabled, [disabledKey]: disabled });
+  }
+
+  function restoreEnvironmentRecord(kind, recordId) {
+    const current = get(environmentDraft);
+    if (!current) return false;
+    const id = String(recordId || '').trim();
+    if (!id) return false;
+    const { disabledKey } = _compositionFieldKeys(kind);
+    const disabled = _compositionIdArray(current[disabledKey]).filter(entry => entry !== id);
+    return updateEnvironmentDraft({ [disabledKey]: disabled });
+  }
+
+  function reorderEnvironmentRecord(kind, fromIndex, toIndex) {
+    const current = get(environmentDraft);
+    if (!current) return false;
+    const viewModel = _buildEnvironmentCompositionViewModel(current);
+    const records = kind === 'hazard' ? viewModel.hazards : viewModel.tasks;
+    const ids = records
+      .filter(entry => entry.runtimeState === 'available' || entry.compositionState === 'includedButUnavailable')
+      .map(entry => entry.id);
+    const from = Number(fromIndex);
+    const to = Number(toIndex);
+    if (!Number.isInteger(from) || !Number.isInteger(to)) return false;
+    if (from < 0 || from >= ids.length || to < 0 || to >= ids.length || from === to) return false;
+    const [moved] = ids.splice(from, 1);
+    ids.splice(to, 0, moved);
+    const { orderKey } = _compositionFieldKeys(kind);
+    return updateEnvironmentDraft({ [orderKey]: ids });
   }
 
   function addEnvironmentTask() {
@@ -4782,6 +4942,11 @@ export function createAdminStore(services) {
     selectEnvironment,
     createEnvironmentDraft,
     updateEnvironmentDraft,
+    setEnvironmentCompositionMode,
+    includeEnvironmentRecord,
+    excludeEnvironmentRecord,
+    restoreEnvironmentRecord,
+    reorderEnvironmentRecord,
     selectEnvironmentTask,
     addEnvironmentTask,
     updateEnvironmentTask,

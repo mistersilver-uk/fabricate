@@ -1,0 +1,140 @@
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { evaluateEnvironmentReadiness } from '../../src/ui/svelte/apps/manager/environment/environmentReadiness.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const repoRoot = resolve(__dirname, '../..');
+const envDir = resolve(repoRoot, 'src/ui/svelte/apps/manager/environment');
+
+function read(name) {
+  return readFileSync(resolve(envDir, name), 'utf8');
+}
+
+const shellSource = readFileSync(resolve(repoRoot, 'src/ui/svelte/apps/manager/EnvironmentEditView.svelte'), 'utf8');
+const listSource = read('CompositionList.svelte');
+const inspectorSource = read('RecordInspector.svelte');
+const tabsSource = read('EnvironmentEditorTabs.svelte');
+const evidenceSource = read('MatchingEvidenceChips.svelte');
+const tasksTabSource = read('EnvironmentTasksTab.svelte');
+const overviewSource = read('EnvironmentOverviewTab.svelte');
+const summaryInspectorSource = read('EnvironmentSummaryInspector.svelte');
+
+describe('environment composition editor structure', () => {
+  it('shell composes tabs, workspace, and its own inspector (header lives in chrome)', () => {
+    for (const snippet of [
+      'EnvironmentEditorTabs',
+      'EnvironmentOverviewTab',
+      'EnvironmentTasksTab',
+      'EnvironmentHazardsTab',
+      'EnvironmentValidationTab',
+      'EnvironmentRightInspector',
+      'data-environment-editor',
+      'manager-environment-workspace'
+    ]) {
+      assert.ok(shellSource.includes(snippet), `shell should reference ${snippet}`);
+    }
+    assert.ok(!shellSource.includes('EnvironmentEditorHeader'), 'header now lives in the shared chrome, not the editor body');
+  });
+
+  it('renders Tasks/Hazards as a column-headed table with a composition-mode select', () => {
+    assert.ok(listSource.includes('manager-environment-comp-head'), 'composition list renders a column header row');
+    for (const col of ['ColTask', 'ColEvidence', 'ColOverride', 'ColRuntime']) {
+      assert.ok(listSource.includes(col), `composition table defines the ${col} column`);
+    }
+    assert.ok(listSource.includes('manager-environment-comp-row'), 'composition list renders table rows');
+    assert.ok(listSource.includes('dismissOnOutsideClick'), 'row overflow menu dismisses on outside click');
+    assert.ok(listSource.includes('manager-environment-comp-menu'), 'rows expose an overflow action menu');
+    assert.ok(tasksTabSource.includes('data-composition-mode-select'), 'tasks tab exposes a composition-mode select');
+  });
+
+  it('overview leads with a task-editor-style identity hero and drops the runtime summary', () => {
+    assert.ok(overviewSource.includes('manager-environment-overview-stack'), 'overview central panel is a vertical stack');
+    assert.ok(overviewSource.includes('manager-task-core-card'), 'identity card reuses the task/hazard hero card');
+    assert.ok(overviewSource.includes('manager-task-identity-fields'), 'identity card uses the shared identity fields layout');
+    assert.ok(overviewSource.includes('manager-environment-overview-duo'), 'player-facing and composition cards sit in a 2-up row');
+    assert.ok(!overviewSource.includes('runtime-summary'), 'runtime summary card is removed from the central panel');
+    assert.ok(overviewSource.includes("'icons/environment/'"), 'image picker defaults to the core environment icons directory');
+  });
+
+  it('the runtime preview inspector carries the full runtime counts', () => {
+    for (const fact of ['available-tasks', 'excluded-tasks', 'candidate-tasks', 'available-hazards', 'excluded-hazards', 'unavailable-included']) {
+      assert.ok(summaryInspectorSource.includes(`data-runtime-fact="${fact}"`), `runtime preview includes the ${fact} fact`);
+    }
+  });
+
+  it('matching evidence supports table chips and inspector check rows', () => {
+    assert.ok(evidenceSource.includes("variant === 'checks'"), 'evidence component branches on the checks variant');
+    assert.ok(evidenceSource.includes('manager-environment-evidence-summary'), 'chip variant renders a value summary line');
+    assert.ok(evidenceSource.includes('manager-environment-evidence-check'), 'checks variant renders check rows');
+    assert.ok(inspectorSource.includes('variant="checks"'), 'inspector requests the checks evidence variant');
+  });
+
+  it('keeps non-matching records out of the main flow and only in diagnostics', () => {
+    // The included/candidate/excluded sections must never surface notMatching or
+    // libraryDisabled records; those belong to the collapsed diagnostics view.
+    assert.ok(listSource.includes("entry.compositionState === 'includedByMatch'"), 'included section keys off includedByMatch');
+    assert.ok(listSource.includes("entry.compositionState === 'candidate'"), 'candidates section keys off candidate state');
+    assert.ok(/diagnostics = \$derived\(records\.filter\(entry =>\s*entry\.compositionState === 'notMatching' \|\| entry\.compositionState === 'libraryDisabled'\)\)/.test(listSource), 'diagnostics collects notMatching and libraryDisabled');
+    assert.ok(listSource.includes('DiagnosticsDisclosure'), 'non-matching records render inside the diagnostics disclosure');
+    // The include action only appears for matching candidates (manual mode).
+    assert.ok(listSource.includes("mode === 'manual'"), 'candidates section is gated to manual mode');
+    assert.ok(listSource.includes("data-action=\"include\""), 'candidate rows expose an include action');
+  });
+
+  it('inspector renders the four-layer evaluation and disabled environment overrides', () => {
+    for (const layer of ['LayerLibrary', 'LayerMatching', 'LayerComposition', 'LayerRuntime']) {
+      assert.ok(inspectorSource.includes(layer), `inspector should render the ${layer} row`);
+    }
+    assert.ok(inspectorSource.includes('MatchingEvidenceChips'), 'inspector should render match evidence');
+    assert.ok(inspectorSource.includes('is-disabled-overrides'), 'inspector should mark the override section as disabled in phase 1');
+    assert.ok(inspectorSource.includes('disabled'), 'override fields should be disabled');
+  });
+
+  it('tabs are a keyboard-navigable tablist', () => {
+    assert.ok(tabsSource.includes('role="tablist"'), 'tabs should be a tablist');
+    assert.ok(tabsSource.includes('role="tab"'), 'each tab should have the tab role');
+    assert.ok(tabsSource.includes("'ArrowRight'"), 'tabs should handle ArrowRight');
+    assert.ok(tabsSource.includes("'ArrowLeft'"), 'tabs should handle ArrowLeft');
+    assert.ok(tabsSource.includes('onkeydown='), 'tabs should wire a keydown handler');
+    assert.ok(tabsSource.includes('aria-selected'), 'tabs should expose aria-selected');
+  });
+});
+
+describe('evaluateEnvironmentReadiness', () => {
+  const environment = { enabled: true, name: 'Mines', biomes: ['cave'], dangerTags: ['hazardous'], sceneUuid: '' };
+
+  it('flags an active environment with no available tasks as critical', () => {
+    const { checks, issues } = evaluateEnvironmentReadiness(environment, { counts: { availableTasks: 0 }, tasks: [], hazards: [] });
+    assert.equal(checks.find(check => check.id === 'hasName').satisfied, true);
+    assert.equal(checks.find(check => check.id === 'hasBiome').satisfied, true);
+    assert.equal(checks.find(check => check.id === 'hasAvailableTask').satisfied, false);
+    assert.ok(issues.some(issue => issue.id === 'noAvailableTasks' && issue.severity === 'critical'));
+    assert.ok(issues.some(issue => issue.id === 'activeNoComposition' && issue.severity === 'critical'));
+    assert.ok(issues.some(issue => issue.id === 'noScene' && issue.severity === 'warning'));
+  });
+
+  it('raises a critical issue for an included-but-unavailable record', () => {
+    const composition = {
+      counts: { availableTasks: 1, unavailableTasks: 1 },
+      tasks: [{ id: 'stale', kind: 'task', compositionState: 'includedButUnavailable', record: { name: 'Stale Task' } }],
+      hazards: []
+    };
+    const { issues, checks } = evaluateEnvironmentReadiness(environment, composition);
+    const stale = issues.find(issue => issue.id === 'staleIncluded');
+    assert.ok(stale, 'should flag stale included record');
+    assert.equal(stale.recordId, 'stale');
+    assert.equal(stale.recordName, 'Stale Task');
+    assert.equal(checks.find(check => check.id === 'noStaleIncluded').satisfied, false);
+  });
+
+  it('reports informational issues for hidden and excluded records', () => {
+    const composition = { counts: { availableTasks: 1, diagnosticTasks: 2, excludedTasks: 1 }, tasks: [], hazards: [] };
+    const { issues } = evaluateEnvironmentReadiness(environment, composition);
+    assert.ok(issues.some(issue => issue.id === 'hiddenNonMatching' && issue.severity === 'info'));
+    assert.ok(issues.some(issue => issue.id === 'locallyExcluded' && issue.severity === 'info'));
+  });
+});

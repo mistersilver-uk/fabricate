@@ -1206,69 +1206,34 @@ test('manager environments browser and edit route define compact responsive geom
     'environment table scroll region should own internal overflow once bounded by the gathering panel'
   );
   assert.ok(
-    tableBlock.includes('--fab-mv2-environment-grid: minmax(0, 1.72fr) minmax(86px, 0.42fr) 46px 72px 72px;'),
-    'environments table should define five compact columns without reserving a reorder column'
+    tableBlock.includes('--fab-mv2-environment-grid: minmax(0, 1fr) 120px 56px 88px 116px;'),
+    'environments table should define one flexible identity column and fixed compact columns so headers and rows align'
   );
   assert.ok(
-    css.includes('.fabricate-manager .manager-environment-row {\n  position: relative;\n  min-height: 88px;\n}'),
-    'environment rows should anchor hover overlays while keeping height stable around larger thumbnails'
+    !css.includes('.fabricate-manager .manager-environment-row {\n  position: relative;\n  min-height: 88px;\n}'),
+    'environment rows should no longer carry the taller reorder-overlay height override'
   );
   assert.ok(
-    css.includes('.fabricate-manager .manager-environment-identity {\n  grid-template-columns: 120px minmax(0, 1fr);\n  align-self: center;\n  min-height: 68px;'),
-    'environment identity should reserve and vertically center the larger scene thumbnail column'
+    css.includes('.fabricate-manager .manager-environment-row,') && css.includes('min-height: 76px;'),
+    'environment rows should share the compact 76px row height with the task and hazard browsers'
   );
   assert.ok(
-    css.includes('.fabricate-manager .manager-environment-thumb {\n  display: block;\n  align-self: center;\n  width: 120px;\n  height: 68px;'),
-    'environment thumbnails should reserve a larger centered scene-like image area'
+    css.includes('.fabricate-manager .manager-environment-identity {\n  grid-template-columns: 64px minmax(0, 1fr);\n  gap: 12px;\n  align-self: center;\n  min-height: 64px;'),
+    'environment identity should reserve a square 64px thumbnail column like the task and hazard browsers'
+  );
+  assert.ok(
+    css.includes('.fabricate-manager .manager-environment-thumb {\n  display: block;\n  align-self: center;\n  width: 64px;\n  height: 64px;'),
+    'environment thumbnails should render as a square 64px image that suits both scene thumbnails and chosen images'
   );
   assert.ok(taskCountBlock.includes('font-weight: 800;'), 'environment task count should render as plain emphasized text');
-  assert.ok(actionsBlock.includes('grid-template-columns: 72px;'), 'environment row actions should only reserve edit duplicate delete controls');
-  assert.ok(actionsBlock.includes('justify-content: end;'), 'environment row actions should stay compact on the right at desktop widths');
-  assert.ok(actionsBlock.includes('justify-self: end;'), 'environment row actions should align to the right edge of their cell');
-  assert.ok(!actionsBlock.includes('grid-template-columns: 72px 34px;'), 'environment row actions should not reserve a reorder stack column');
-  assert.ok(actionGridBlock.includes('grid-template-columns: repeat(2, 34px);'), 'environment edit duplicate delete buttons should sit in a compact grid');
+  assert.ok(actionGridBlock.includes('display: flex;'), 'environment edit duplicate delete buttons should sit inline in a flex row');
   assert.ok(
-    css.includes('.fabricate-manager .manager-environment-action-grid .manager-icon-button.is-danger {\n  grid-column: 2;\n}'),
-    'environment delete quick action should sit in the right column below the duplicate action'
+    !css.includes('.fabricate-manager .manager-environment-action-grid .manager-icon-button.is-danger {\n  grid-column: 2;\n}'),
+    'environment delete quick action should no longer be forced into a second reorder-era grid column'
   );
   assert.ok(
-    mediumQuery.includes('.fabricate-manager .manager-action-group.manager-environment-actions.manager-labeled-cell')
-      && mediumQuery.includes('display: grid;')
-      && mediumQuery.includes('grid-template-columns: minmax(88px, 0.35fr) 72px;')
-      && mediumQuery.includes('justify-content: stretch;')
-      && mediumQuery.includes('.fabricate-manager .manager-environment-actions .manager-environment-action-grid')
-      && mediumQuery.includes('justify-self: end;')
-      && mediumQuery.includes('margin-left: auto;'),
-    'responsive environment row actions should stay right-aligned instead of inheriting the generic left-aligned action group layout'
-  );
-  assert.ok(
-    reorderStackBlock.includes('position: absolute;')
-      && reorderStackBlock.includes('inset: 0;')
-      && reorderStackBlock.includes('grid-template-rows: 18px 18px;')
-      && reorderStackBlock.includes('align-content: space-between;')
-      && reorderStackBlock.includes('pointer-events: none;'),
-    'environment move up/down hit areas should span hidden full-row top and bottom overlay bands'
-  );
-  assert.ok(
-    !css.includes('.manager-environment-row:hover .manager-environment-reorder-stack')
-      && !css.includes('.manager-environment-row:focus-within .manager-environment-reorder-stack'),
-    'environment reorder overlay should not become visible from whole-row hover or focus'
-  );
-  assert.ok(
-    css.includes('.fabricate-manager .manager-environment-reorder-stack .manager-icon-button {\n  width: 100%;\n  height: 18px;')
-      && css.includes('background: var(--fab-overlay-dark-32);')
-      && css.includes('opacity: 0;')
-      && css.includes('.fabricate-manager .manager-environment-reorder-stack .manager-icon-button:hover,\n.fabricate-manager .manager-environment-reorder-stack .manager-icon-button:focus-visible {\n  opacity: 1;'),
-    'environment reorder buttons should reveal only their own thin row-width overlay band on hover or keyboard focus'
-  );
-  assert.ok(
-    css.includes('.fabricate-manager .manager-environment-reorder-stack .manager-icon-button:disabled {\n  opacity: 0;\n  pointer-events: auto;')
-      && css.includes('.fabricate-manager .manager-environment-reorder-stack .manager-icon-button:disabled:hover,\n.fabricate-manager .manager-environment-reorder-stack .manager-icon-button:disabled:focus-visible {\n  opacity: 1;'),
-    'disabled environment reorder bands should stay hidden until their own hover or keyboard focus'
-  );
-  assert.ok(
-    css.includes('.fabricate-manager .manager-environment-reorder-stack .manager-icon-button:focus,\n.fabricate-manager .manager-environment-reorder-stack .manager-icon-button:focus-visible {\n  outline: none;\n  box-shadow: none;'),
-    'environment reorder buttons should not inherit host focus outlines after click'
+    !css.includes('manager-environment-reorder-stack'),
+    'environment reorder controls and their styles should be removed'
   );
   assert.ok(
     css.includes('.fabricate-manager .manager-environment-row .manager-status-cell'),

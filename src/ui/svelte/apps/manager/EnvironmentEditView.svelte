@@ -1,88 +1,127 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Placeholder for the environment editor.
+  Gathering environment composition editor shell.
 
-  The previous editor is being redesigned. This shell keeps the
-  `manager-environment-edit-view` root and the `manager-environment-details-band`
-  title hook so navigation through the `environment-edit` route and existing
-  parent layout remain intact, but no inline task / catalyst / tool authoring
-  is exposed here. Reusable authoring lives in the standalone gathering task
-  editor (route `gathering-task-edit`).
+  Keeps the `manager-environment-edit-view` root so the `environment-edit` route
+  and parent layout stay intact. The header (title, status pills, Back/Delete/Save)
+  lives in the shared manager chrome; this body renders the tab bar, the active
+  tab, and the editor-owned right inspector (the manager root skips the shared
+  inspector for this view). The editor composes reusable library tasks/hazards
+  into a single environment via include / exclude / ordering and a shared
+  automatic|manual composition mode; it never edits the reusable source records
+  (those live in the standalone gathering-task-edit / gathering-hazard-edit routes).
 -->
 <script>
-  import { localize } from '../../util/foundryBridge.js';
+  import EnvironmentEditorTabs from './environment/EnvironmentEditorTabs.svelte';
+  import EnvironmentOverviewTab from './environment/EnvironmentOverviewTab.svelte';
+  import EnvironmentTasksTab from './environment/EnvironmentTasksTab.svelte';
+  import EnvironmentHazardsTab from './environment/EnvironmentHazardsTab.svelte';
+  import EnvironmentValidationTab from './environment/EnvironmentValidationTab.svelte';
+  import EnvironmentRightInspector from './environment/EnvironmentRightInspector.svelte';
+  import { evaluateEnvironmentReadiness } from './environment/environmentReadiness.js';
 
   let {
     environmentDraft = null,
-    isNew = false,
-    onCancelEnvironment = () => {}
+    composition = { compositionMode: 'automatic', conditions: {}, tasks: [], hazards: [], counts: {} },
+    regionOptions = [],
+    biomeOptions = [],
+    dangerOptions = [],
+    onPickImagePath = null,
+    onUpdateEnvironment = () => {},
+    onSetCompositionMode = () => {},
+    onIncludeRecord = () => {},
+    onExcludeRecord = () => {},
+    onRestoreRecord = () => {},
+    onReorderRecord = () => {},
+    onOpenSourceTask = () => {},
+    onOpenSourceHazard = () => {}
   } = $props();
 
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
+  let activeTab = $state('overview');
+  let selectedKind = $state('');
+  let selectedId = $state('');
+
+  function selectRecord(kind, id) {
+    selectedKind = kind;
+    selectedId = id;
   }
 
-  function environmentName() {
-    const explicitName = typeof environmentDraft?.name === 'string' ? environmentDraft.name.trim() : '';
-    if (explicitName) return explicitName;
-    return text('FABRICATE.Admin.Environments.NewDraftTitle', 'New Gathering Environment');
-  }
+  const counts = $derived(composition?.counts || {});
+  const readiness = $derived(evaluateEnvironmentReadiness(environmentDraft || {}, composition || {}));
+  const criticalCount = $derived(readiness.issues.filter(issue => issue.severity === 'critical').length);
+  const badges = $derived({
+    tasks: counts.availableTasks || 0,
+    hazards: counts.availableHazards || 0,
+    validation: criticalCount || 0
+  });
 </script>
 
-<form class="manager-environment-edit-view is-placeholder" onsubmit={(event) => { event.preventDefault(); }}>
-  <section class="manager-environment-details-band" aria-label={text('FABRICATE.Admin.Manager.Environment.DetailsBand', 'Environment workspace')}>
-    <div class="manager-environment-details-band-row">
-      <h2 class="manager-card-title">{environmentName()}</h2>
-      {#if isNew}
-        <span class="manager-status-pill is-neutral">{text('FABRICATE.Admin.Environments.DraftStatus', 'Draft')}</span>
+<div class="manager-environment-edit-view" data-environment-editor>
+  <EnvironmentEditorTabs {activeTab} {badges} onSelect={(tab) => { activeTab = tab; }} />
+
+  <div class="manager-environment-workspace">
+    <div
+      class="manager-environment-tab-panel"
+      role="tabpanel"
+      id={`environment-panel-${activeTab}`}
+      aria-labelledby={`environment-tab-${activeTab}`}
+    >
+      {#if activeTab === 'overview'}
+        <EnvironmentOverviewTab
+          environment={environmentDraft}
+          {composition}
+          {regionOptions}
+          {biomeOptions}
+          {dangerOptions}
+          {onPickImagePath}
+          onUpdate={onUpdateEnvironment}
+          {onSetCompositionMode}
+        />
+      {:else if activeTab === 'tasks'}
+        <EnvironmentTasksTab
+          {composition}
+          {selectedKind}
+          {selectedId}
+          onSelectRecord={selectRecord}
+          {onIncludeRecord}
+          {onExcludeRecord}
+          {onRestoreRecord}
+          {onReorderRecord}
+          {onSetCompositionMode}
+          {onOpenSourceTask}
+        />
+      {:else if activeTab === 'hazards'}
+        <EnvironmentHazardsTab
+          {composition}
+          {selectedKind}
+          {selectedId}
+          onSelectRecord={selectRecord}
+          {onIncludeRecord}
+          {onExcludeRecord}
+          {onRestoreRecord}
+          {onReorderRecord}
+          {onSetCompositionMode}
+          {onOpenSourceHazard}
+        />
+      {:else if activeTab === 'validation'}
+        <EnvironmentValidationTab
+          environment={environmentDraft}
+          {composition}
+          onSelectRecord={selectRecord}
+        />
       {/if}
     </div>
-  </section>
 
-  <section class="manager-environment-placeholder-card" aria-label={text('FABRICATE.Admin.Manager.Environment.PlaceholderLabel', 'Environment editor placeholder')}>
-    <div class="manager-environment-placeholder-body">
-      <i class="fas fa-screwdriver-wrench manager-environment-placeholder-icon" aria-hidden="true"></i>
-      <h3>{text('FABRICATE.Admin.Manager.Environment.PlaceholderTitle', 'Environment editor under redesign')}</h3>
-      <p class="manager-muted">
-        {text('FABRICATE.Admin.Manager.Environment.PlaceholderBody', 'This screen is being rebuilt. Gathering tasks can be authored from the standalone task editor in the meantime.')}
-      </p>
-      <button type="button" class="manager-button" onclick={() => onCancelEnvironment?.()}>
-        <i class="fas fa-arrow-left" aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.Manager.Environment.PlaceholderReturn', 'Return to environments')}</span>
-      </button>
-    </div>
-  </section>
-</form>
-
-<style>
-  .manager-environment-edit-view.is-placeholder {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .manager-environment-placeholder-card {
-    border: 1px solid var(--fab-border);
-    border-radius: 0.5rem;
-    padding: 2rem;
-    background: var(--fab-card-bg);
-  }
-
-  .manager-environment-placeholder-body {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.75rem;
-    max-width: 48rem;
-  }
-
-  .manager-environment-placeholder-icon {
-    font-size: 1.5rem;
-    opacity: 0.7;
-  }
-
-  .manager-environment-placeholder-body h3 {
-    margin: 0;
-  }
-</style>
+    <EnvironmentRightInspector
+      environment={environmentDraft}
+      {composition}
+      {selectedKind}
+      {selectedId}
+      {onOpenSourceTask}
+      {onOpenSourceHazard}
+      {onIncludeRecord}
+      {onExcludeRecord}
+      {onRestoreRecord}
+    />
+  </div>
+</div>

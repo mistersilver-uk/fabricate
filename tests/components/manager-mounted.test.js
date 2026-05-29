@@ -48,6 +48,32 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/TagsCategoriesView.svelte');
+  for (const environmentComponent of [
+    'EnvironmentEditorTabs',
+    'EnvironmentOverviewTab',
+    'EnvironmentTasksTab',
+    'EnvironmentHazardsTab',
+    'EnvironmentValidationTab',
+    'EnvironmentRightInspector',
+    'EnvironmentSummaryInspector',
+    'RecordInspector',
+    'CompositionList',
+    'CompositionStatePill',
+    'RuntimeStatePill',
+    'MatchingEvidenceChips',
+    'DiagnosticsDisclosure',
+    'CompositionModeControl'
+  ]) {
+    writeCompiledSvelte(`src/ui/svelte/apps/manager/environment/${environmentComponent}.svelte`);
+  }
+  for (const environmentModule of ['environmentReadiness.js']) {
+    const moduleDestination = join(tempRoot, `src/ui/svelte/apps/manager/environment/${environmentModule}`);
+    mkdirSync(dirname(moduleDestination), { recursive: true });
+    writeFileSync(
+      moduleDestination,
+      readFileSync(resolve(repoRoot, `src/ui/svelte/apps/manager/environment/${environmentModule}`), 'utf8')
+    );
+  }
   for (const componentName of sharedComponentNames) {
     writeCompiledSvelte(`src/ui/svelte/components/${componentName}.svelte`);
   }
@@ -2934,7 +2960,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(forestRow.querySelector('[aria-label="Edit Moonlit Forest"]'));
     assert.ok(forestRow.querySelector('[aria-label="Duplicate Moonlit Forest"]'));
     assert.ok(forestRow.querySelector('[aria-label="Delete Moonlit Forest"]'));
-    assert.ok(forestRow.querySelector('.manager-environment-reorder-stack'));
+    assert.equal(forestRow.querySelector('.manager-environment-reorder-stack'), null, 'environment rows should no longer render reorder controls');
     assert.ok(target.querySelector('.manager-inspector').textContent.includes('Selected environment'));
     assert.equal(
       target.querySelector('.manager-inspector').textContent.includes('Environment actions'),
@@ -2949,11 +2975,6 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.equal(target.querySelectorAll('.manager-environment-row').length, 1);
     assert.ok(target.textContent.includes('Quiet Cavern'));
-    assert.equal(
-      target.querySelector('[data-environment-id="env-cavern"] .manager-environment-reorder-stack [aria-label="Move up"]').disabled,
-      false,
-      'filtered environment move-up should use full list order, not filtered row position'
-    );
 
     const cavernToggle = target.querySelector('[data-environment-id="env-cavern"] .manager-status-toggle');
     cavernToggle.click();
@@ -2968,10 +2989,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.querySelector('[data-environment-id="env-cavern"]').classList.contains('is-selected'));
     assert.ok(calls.some(call => call[0] === 'selectEnvironment' && call[1] === 'env-cavern'));
 
-    target.querySelector('[data-environment-id="env-cavern"] [aria-label="Move up"]').click();
     target.querySelector('[data-environment-id="env-cavern"] [aria-label="Duplicate Quiet Cavern"]').click();
     target.querySelector('[data-environment-id="env-cavern"] [aria-label="Delete Quiet Cavern"]').click();
-    assert.ok(calls.some(call => call[0] === 'moveEnvironmentDraft' && call[1] === 'env-cavern' && call[2] === 'up'));
     assert.ok(calls.some(call => call[0] === 'duplicateEnvironmentDraft' && call[1] === 'env-cavern'));
     assert.ok(calls.some(call => call[0] === 'deleteEnvironmentDraft' && call[1] === 'env-cavern'));
 
@@ -4348,8 +4367,17 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environment-edit');
-    assert.equal(target.querySelector('.manager-environment-details-band .manager-card-title').textContent.trim(), 'New Gathering Environment');
-    assert.equal(target.querySelector('.manager-inspector'), null);
+    // The mock-matching header puts the environment name in the shared chrome
+    // title and groups Back / Delete / Save there; pills render under the title.
+    assert.match(target.querySelector('.manager-title').textContent, /New Gathering Environment/);
+    assert.ok(target.querySelector('[data-environment-status-pills]'), 'chrome header should render environment status pills');
+    assert.ok(target.querySelector('[data-action="delete-environment"]'), 'chrome header should expose the delete action');
+    // The v2 composition editor owns its own contextual inspector inside the
+    // editor workspace (the manager root no longer renders the shared rail for
+    // this view), defaulting to the environment summary when nothing is selected.
+    assert.ok(target.querySelector('.manager-environment-edit-view[data-environment-editor]'), 'environment-edit should mount the composition editor');
+    assert.ok(target.querySelector('.manager-environment-inspector'), 'composition editor should render its own inspector rail');
+    assert.ok(target.querySelector('[data-environment-summary-inspector]'), 'inspector should default to the environment summary with no selection');
     assert.ok(calls.some(call => call[0] === 'createEnvironmentDraft'));
   });
 

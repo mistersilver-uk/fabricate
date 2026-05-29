@@ -6076,7 +6076,7 @@
 }
 
 .fabricate-manager .manager-environments-table {
-  --fab-mv2-environment-grid: minmax(0, 1.72fr) minmax(86px, 0.42fr) 46px 72px 72px;
+  --fab-mv2-environment-grid: minmax(0, 1fr) 120px 56px 88px 116px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -6205,6 +6205,18 @@
   justify-self: start;
 }
 
+/* Center the selection-mode, tasks, and status column contents in environment rows */
+.fabricate-manager .manager-environment-row .manager-labeled-cell:not(.manager-action-group) {
+  justify-self: stretch;
+  text-align: center;
+}
+
+.fabricate-manager .manager-environment-table-head > *:nth-child(2),
+.fabricate-manager .manager-environment-table-head > *:nth-child(3),
+.fabricate-manager .manager-environment-table-head > *:nth-child(4) {
+  text-align: center;
+}
+
 .fabricate-manager .manager-system-row .manager-action-group {
   width: 100%;
   cursor: default;
@@ -6326,11 +6338,6 @@
   border-radius: 8px;
   color: var(--fab-mv2-text);
   background: var(--fab-mv2-surface-2);
-}
-
-.fabricate-manager .manager-environment-row {
-  position: relative;
-  min-height: 88px;
 }
 
 .fabricate-manager .manager-recipe-row:hover,
@@ -6476,9 +6483,10 @@
 }
 
 .fabricate-manager .manager-environment-identity {
-  grid-template-columns: 120px minmax(0, 1fr);
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 12px;
   align-self: center;
-  min-height: 68px;
+  min-height: 64px;
 }
 
 .fabricate-manager .manager-gathering-tasks-table .manager-gathering-task-identity {
@@ -6586,8 +6594,8 @@
 .fabricate-manager .manager-environment-thumb {
   display: block;
   align-self: center;
-  width: 120px;
-  height: 68px;
+  width: 64px;
+  height: 64px;
 }
 
 .fabricate-manager .manager-environment-preview {
@@ -7331,80 +7339,19 @@
 }
 
 .fabricate-manager .manager-environment-actions {
-  display: grid;
-  grid-template-columns: 72px;
-  gap: 6px;
-  align-items: stretch;
-  justify-content: end;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   justify-self: end;
+  gap: 6px;
   width: 100%;
 }
 
 .fabricate-manager .manager-environment-action-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 34px);
-  grid-auto-rows: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   gap: 4px;
-}
-
-.fabricate-manager .manager-environment-action-grid .manager-icon-button.is-danger {
-  grid-column: 2;
-}
-
-.fabricate-manager .manager-environment-reorder-stack {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  display: grid;
-  grid-template-rows: 18px 18px;
-  align-content: space-between;
-  pointer-events: none;
-}
-
-.fabricate-manager .manager-environment-reorder-stack .manager-icon-button {
-  width: 100%;
-  height: 18px;
-  min-height: 18px;
-  border-right: 0;
-  border-left: 0;
-  border-radius: 0;
-  color: var(--fab-mv2-text);
-  background: var(--fab-overlay-dark-32);
-  flex: 0 0 auto;
-  opacity: 0;
-  pointer-events: auto;
-  transition: opacity 120ms ease;
-}
-
-.fabricate-manager .manager-environment-reorder-stack .manager-icon-button:hover,
-.fabricate-manager .manager-environment-reorder-stack .manager-icon-button:focus-visible {
-  opacity: 1;
-}
-
-.fabricate-manager .manager-environment-reorder-stack .manager-icon-button:focus,
-.fabricate-manager .manager-environment-reorder-stack .manager-icon-button:focus-visible {
-  outline: none;
-  box-shadow: none;
-}
-
-.fabricate-manager .manager-environment-reorder-stack .manager-icon-button:first-child {
-  border-top: 0;
-  border-radius: 8px 8px 0 0;
-}
-
-.fabricate-manager .manager-environment-reorder-stack .manager-icon-button:last-child {
-  border-bottom: 0;
-  border-radius: 0 0 8px 8px;
-}
-
-.fabricate-manager .manager-environment-reorder-stack .manager-icon-button:disabled {
-  opacity: 0;
-  pointer-events: auto;
-}
-
-.fabricate-manager .manager-environment-reorder-stack .manager-icon-button:disabled:hover,
-.fabricate-manager .manager-environment-reorder-stack .manager-icon-button:disabled:focus-visible {
-  opacity: 1;
 }
 
 .fabricate-manager .manager-toggle {
@@ -11783,21 +11730,6 @@
     min-width: 88px;
   }
 
-  .fabricate-manager .manager-action-group.manager-environment-actions.manager-labeled-cell {
-    display: grid;
-    grid-template-columns: minmax(88px, 0.35fr) 72px;
-    justify-content: stretch;
-  }
-
-  .fabricate-manager .manager-action-group.manager-environment-actions.manager-labeled-cell::before {
-    min-width: 0;
-  }
-
-  .fabricate-manager .manager-environment-actions .manager-environment-action-grid {
-    justify-self: end;
-    margin-left: auto;
-  }
-
   .fabricate-manager .manager-toggle-list {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -12597,4 +12529,752 @@
 
 .fabricate-manager .manager-tools-row-editor .manager-radio-option {
   padding: 6px 12px;
+}
+
+/* ---------------------------------------------------------------------------
+   Gathering environment composition editor
+   --------------------------------------------------------------------------- */
+
+.fabricate-manager .manager-environment-edit-view[data-environment-editor] {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 12px;
+}
+
+.fabricate-manager .manager-environment-details-band-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.fabricate-manager .manager-environment-status-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.fabricate-manager .manager-environment-short-description {
+  margin: 0;
+  max-width: 70ch;
+}
+
+.fabricate-manager .manager-environment-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  flex-wrap: wrap;
+  min-width: 0;
+  border-bottom: 1px solid var(--fab-mv2-border);
+}
+
+.fabricate-manager .manager-environment-tab-button {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 14px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  border-radius: 0;
+  color: var(--fab-mv2-text-muted);
+  background: none;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-environment-tab-button:hover {
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-environment-tab-button.is-active {
+  color: var(--fab-mv2-text);
+  border-bottom-color: var(--fab-mv2-accent);
+}
+
+.fabricate-manager .manager-environment-tab-badge {
+  margin-left: 2px;
+}
+
+.fabricate-manager .manager-environment-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.fabricate-manager .manager-environment-tab-panel {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+.fabricate-manager .manager-environment-workspace .manager-environment-inspector {
+  min-width: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-mv2-surface-2);
+}
+
+.fabricate-manager .manager-environment-tab-intro {
+  margin: 0 0 10px;
+}
+
+.fabricate-manager .manager-environment-overview-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fabricate-manager .manager-environment-overview-duo {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.fabricate-manager .manager-environment-card {
+  min-width: 0;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  background: var(--fab-overlay-light-04);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Segmented toggle (player-facing behaviour + composition mode) */
+.fabricate-manager .manager-environment-mode-control {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  min-width: 0;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-dark-16);
+}
+
+.fabricate-manager .manager-environment-mode-option {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  height: auto;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--fab-mv2-text-muted);
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-environment-mode-option:hover:not(.is-selected) {
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-environment-mode-option.is-selected {
+  color: var(--fab-mv2-text);
+  background: var(--fab-overlay-light-04);
+  box-shadow: inset 0 0 0 1px var(--fab-mv2-accent);
+}
+
+.fabricate-manager .manager-environment-mode-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fabricate-manager .manager-environment-mode-hint {
+  margin: 6px 0 0;
+  font-size: 0.85em;
+  white-space: normal;
+  line-height: 1.35;
+}
+
+
+.fabricate-manager .manager-environment-composition {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.fabricate-manager .manager-environment-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.fabricate-manager .manager-environment-section-head h4 {
+  margin: 0;
+  font-size: 0.95em;
+  color: var(--fab-mv2-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fabricate-manager .manager-environment-evidence {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.fabricate-manager .manager-environment-evidence-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.75em;
+  border: 1px solid var(--fab-mv2-border);
+  background: var(--fab-overlay-dark-16);
+}
+
+.fabricate-manager .manager-environment-evidence-chip.is-positive {
+  border-color: var(--fab-mv2-accent);
+}
+
+.fabricate-manager .manager-environment-evidence-chip.is-danger {
+  border-color: var(--fab-mv2-danger);
+  color: var(--fab-mv2-danger);
+}
+
+.fabricate-manager .manager-environment-evidence-label {
+  font-weight: 700;
+  opacity: 0.75;
+}
+
+.fabricate-manager .manager-environment-diagnostics {
+  border: 1px dashed var(--fab-mv2-border);
+  border-radius: 6px;
+}
+
+.fabricate-manager .manager-environment-diagnostics-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  background: none;
+  border: none;
+  color: var(--fab-mv2-text-muted);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-environment-diagnostics-title {
+  flex: 1;
+  text-align: left;
+}
+
+.fabricate-manager .manager-environment-diagnostics-body {
+  padding: 0 10px 10px;
+}
+
+.fabricate-manager .manager-environment-layer-list,
+.fabricate-manager .manager-environment-check-list,
+.fabricate-manager .manager-environment-issue-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fabricate-manager .manager-environment-layer,
+.fabricate-manager .manager-environment-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fabricate-manager .manager-environment-layer-label {
+  flex: 1;
+  font-weight: 700;
+}
+
+.fabricate-manager .manager-environment-layer.is-ok > i,
+.fabricate-manager .manager-environment-check.is-satisfied > i {
+  color: var(--fab-success, var(--fab-mv2-accent));
+}
+
+.fabricate-manager .manager-environment-layer.is-warn > i,
+.fabricate-manager .manager-environment-check.is-unsatisfied > i {
+  color: var(--fab-mv2-warning);
+}
+
+.fabricate-manager .manager-environment-issue {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-dark-16);
+}
+
+.fabricate-manager .manager-environment-issue-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-environment-inspector-actions,
+.fabricate-manager .manager-environment-inspector-facts {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fabricate-manager .manager-environment-scene-dropzone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1px dashed var(--fab-mv2-border);
+  border-radius: 6px;
+  color: var(--fab-mv2-text-muted);
+}
+
+.fabricate-manager .manager-environment-scene-dropzone.is-drop-active {
+  border-color: var(--fab-mv2-accent);
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-environment-scene-linked {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fabricate-manager .manager-environment-scene-name {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--fab-mv2-accent);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-environment-conditions-summary {
+  margin: 0;
+}
+
+.fabricate-manager .manager-environment-runtime-grid .manager-fact,
+.fabricate-manager .manager-environment-inspector-facts .manager-fact {
+  min-width: 0;
+}
+
+.fabricate-manager .manager-field.is-disabled {
+  opacity: 0.6;
+}
+
+/* Header status pills (chrome, for environment-edit) */
+.fabricate-manager .manager-environment-header-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+/* Tasks/Hazards composition tab header + callout */
+.fabricate-manager .manager-environment-comp-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.fabricate-manager .manager-environment-comp-header-copy {
+  min-width: 0;
+}
+
+.fabricate-manager .manager-environment-comp-header-copy p {
+  margin: 4px 0 0;
+}
+
+.fabricate-manager .manager-environment-comp-mode-select {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.78rem;
+  color: var(--fab-mv2-text-muted);
+}
+
+.fabricate-manager .manager-environment-comp-mode-select select {
+  min-height: 32px;
+  min-width: 150px;
+}
+
+.fabricate-manager .manager-environment-comp-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--fab-mv2-border);
+  border-left: 3px solid var(--fab-mv2-accent);
+  border-radius: 6px;
+  background: var(--fab-overlay-light-04);
+  color: var(--fab-mv2-text-muted);
+}
+
+.fabricate-manager .manager-environment-comp-callout i {
+  color: var(--fab-mv2-accent);
+  margin-top: 2px;
+}
+
+/* Composition table */
+.fabricate-manager .manager-environment-comp {
+  --fab-env-comp-grid: 30px minmax(150px, 1.6fr) minmax(150px, 1.5fr) 64px 126px 92px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.fabricate-manager .manager-environment-comp-band {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.fabricate-manager .manager-environment-comp-band h4 {
+  margin: 0;
+  font-size: 0.95em;
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-environment-comp-count {
+  font-size: 0.78rem;
+  color: var(--fab-mv2-text-muted);
+}
+
+.fabricate-manager .manager-environment-comp-head {
+  display: grid;
+  grid-template-columns: var(--fab-env-comp-grid);
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fab-mv2-text-muted);
+  border-bottom: 1px solid var(--fab-mv2-border);
+}
+
+.fabricate-manager .manager-environment-comp-rows {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fabricate-manager .manager-environment-comp-row {
+  display: grid;
+  grid-template-columns: var(--fab-env-comp-grid);
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-dark-16);
+}
+
+.fabricate-manager .manager-environment-comp-row.is-selected {
+  border-color: var(--fab-mv2-accent);
+  box-shadow: inset 0 0 0 1px var(--fab-mv2-accent);
+}
+
+.fabricate-manager .manager-environment-comp-row.is-unavailable {
+  border-color: var(--fab-mv2-warning);
+}
+
+.fabricate-manager .manager-environment-comp-row.is-excluded,
+.fabricate-manager .manager-environment-comp-row.is-diagnostic {
+  opacity: 0.85;
+}
+
+.fabricate-manager .manager-environment-comp-handle {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  color: var(--fab-mv2-text-muted);
+  cursor: grab;
+}
+
+.fabricate-manager .manager-environment-comp-order {
+  font-size: 0.72em;
+  font-weight: 700;
+}
+
+.fabricate-manager .manager-environment-comp-task {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+}
+
+.fabricate-manager .manager-environment-comp-thumb {
+  width: 38px;
+  height: 38px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+
+.fabricate-manager .manager-environment-comp-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-environment-comp-name {
+  font-weight: 700;
+  color: var(--fab-mv2-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-environment-comp-sub {
+  font-size: 0.8em;
+  color: var(--fab-mv2-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-environment-comp-override,
+.fabricate-manager .manager-environment-comp-runtime {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-environment-comp-none {
+  color: var(--fab-mv2-text-muted);
+}
+
+.fabricate-manager .manager-environment-comp-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.fabricate-manager .manager-environment-comp-empty {
+  margin: 6px 0 0;
+  padding: 6px 10px;
+}
+
+.fabricate-manager .manager-environment-comp-menu-wrap {
+  position: relative;
+}
+
+.fabricate-manager .manager-environment-comp-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 30;
+  min-width: 190px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-mv2-surface-2);
+  box-shadow: var(--fab-shadow-md);
+}
+
+.fabricate-manager .manager-environment-comp-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--fab-mv2-text);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.fabricate-manager .manager-environment-comp-menu button:hover:not(:disabled) {
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-environment-comp-menu button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.fabricate-manager .manager-environment-comp-menu button.is-danger {
+  color: var(--fab-mv2-danger);
+}
+
+/* Matching evidence — chips (table) + checks (inspector) */
+.fabricate-manager .manager-environment-evidence.is-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-environment-evidence-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.fabricate-manager .manager-environment-evidence-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  border: 1px solid var(--fab-mv2-border);
+  background: var(--fab-overlay-dark-16);
+  color: var(--fab-mv2-text-muted);
+}
+
+.fabricate-manager .manager-environment-evidence-chip.is-positive {
+  border-color: var(--fab-mv2-accent);
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-environment-evidence-chip.is-danger {
+  border-color: var(--fab-mv2-danger);
+  color: var(--fab-mv2-danger);
+}
+
+.fabricate-manager .manager-environment-evidence-count {
+  font-weight: 700;
+  opacity: 0.9;
+}
+
+.fabricate-manager .manager-environment-evidence-summary {
+  font-size: 0.78rem;
+  color: var(--fab-mv2-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-environment-evidence.is-checks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fabricate-manager .manager-environment-evidence-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.fabricate-manager .manager-environment-evidence-check.is-positive > i {
+  color: var(--fab-success, var(--fab-mv2-accent));
+}
+
+.fabricate-manager .manager-environment-evidence-check.is-danger > i {
+  color: var(--fab-mv2-danger);
+}
+
+.fabricate-manager .manager-environment-evidence-check.is-any > i {
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.5em;
+  margin-top: 6px;
+}
+
+.fabricate-manager .manager-environment-evidence-check-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-environment-evidence-check-label {
+  font-weight: 700;
+}
+
+.fabricate-manager .manager-environment-evidence-check-value {
+  font-size: 0.82rem;
+  color: var(--fab-mv2-text-muted);
+}
+
+/* Inspector source + override form */
+.fabricate-manager .manager-environment-source-label {
+  margin: 2px 0 4px;
+  font-weight: 700;
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-environment-override-toggle {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+@media (max-width: 960px) {
+  .fabricate-manager .manager-environment-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fabricate-manager .manager-environment-overview-duo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fabricate-manager .manager-environment-comp {
+    --fab-env-comp-grid: 24px minmax(120px, 1.5fr) minmax(110px, 1.3fr) 48px 110px 80px;
+  }
 }

@@ -885,7 +885,11 @@
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksTitle', 'Gathering Tasks');
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Title', 'Tools');
     if (currentView === 'environments') return text('FABRICATE.Admin.Manager.Environment.Title', 'Environments');
-    if (currentView === 'environment-edit') return text('FABRICATE.Admin.Manager.Environment.EditTitle', 'Edit environment');
+    if (currentView === 'environment-edit') {
+      const base = text('FABRICATE.Admin.Manager.Environment.EditTitle', 'Edit environment');
+      const environmentName = String(environmentDraftForDisplay?.name || '').trim();
+      return environmentName ? `${base}: ${environmentName}` : base;
+    }
     if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.Manager.Environment.Tasks.EditTitle', 'Edit gathering task');
     if (currentView === 'gathering-hazard-edit') return text('FABRICATE.Admin.Manager.Environment.Hazards.EditTitle', 'Edit gathering hazard');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.Title', 'System settings');
@@ -905,7 +909,10 @@
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksHint', 'Browse gathering tasks before attaching them to environments.');
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Subtitle', 'Manage reusable gathering tools and configure how they behave when required by tasks.');
     if (currentView === 'environments') return text('FABRICATE.Admin.Manager.Environment.Subtitle', 'Manage gathering environments for the selected crafting system.');
-    if (currentView === 'environment-edit') return text('FABRICATE.Admin.Manager.Environment.EditSubtitle', 'Edit scene linkage, environment details, tasks, results, catalysts, visibility, timing, and validation in the workspace.');
+    if (currentView === 'environment-edit') {
+      const environmentDescription = String(environmentDraftForDisplay?.description || '').trim();
+      return environmentDescription || text('FABRICATE.Admin.Manager.Environment.EditSubtitle', 'Compose reusable gathering tasks and hazards into this environment.');
+    }
     if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.Manager.Environment.Tasks.EditSubtitle', 'Edit availability, identity, and drop rules for the selected gathering task.');
     if (currentView === 'gathering-hazard-edit') return text('FABRICATE.Admin.Manager.Environment.Hazards.EditSubtitle', 'Edit identity, availability, danger, and modifiers for the selected hazard.');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.Subtitle', 'Edit base settings for the selected crafting system.');
@@ -2695,7 +2702,7 @@
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <button type="button" onclick={backToEnvironmentsBrowse}>{text('FABRICATE.Admin.Manager.Nav.Environments', 'Gathering')}</button>
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Environment.EditBreadcrumb', 'Edit environment')}</span>
+          <span>{viewTitle()}</span>
         {/if}
         {#if currentView === 'gathering-task-edit'}
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
@@ -2720,6 +2727,19 @@
       </nav>
       <h1 class="manager-title">{viewTitle()}</h1>
       <p class="manager-subtitle">{viewSubtitle()}</p>
+      {#if currentView === 'environment-edit' && environmentDraftForDisplay}
+        <div class="manager-environment-header-pills" data-environment-status-pills>
+          <span class={`manager-chip ${environmentDraftForDisplay.enabled === false ? 'is-neutral' : 'is-active'}`} data-status-pill="active">
+            {environmentDraftForDisplay.enabled === false ? text('FABRICATE.Admin.Manager.Environment.Overview.Draft', 'Draft') : text('FABRICATE.Admin.Manager.Environment.Overview.Active', 'Active')}
+          </span>
+          <span class="manager-chip is-info" data-status-pill="selection">
+            {environmentDraftForDisplay.selectionMode === 'blind' ? text('FABRICATE.Admin.Manager.Environment.Overview.Blind', 'Blind') : text('FABRICATE.Admin.Manager.Environment.Overview.Targeted', 'Targeted')}
+          </span>
+          <span class="manager-chip is-info" data-status-pill="composition">
+            {environmentDraftForDisplay.compositionMode === 'manual' ? text('FABRICATE.Admin.Manager.Environment.Composition.Manual', 'Manual') : text('FABRICATE.Admin.Manager.Environment.Composition.Automatic', 'Automatic')}
+          </span>
+        </div>
+      {/if}
     </div>
     {#if currentView !== 'tools'}
     <div class="manager-header-actions" aria-label={headerActionsLabel()}>
@@ -2787,8 +2807,12 @@
           <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Environment.Dirty', 'Unsaved')}</span>
         {/if}
         <button type="button" class="manager-button" onclick={cancelEnvironmentEdit} disabled={$viewState.environmentSaving}>
-          <i class="fas fa-times" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Environments.Cancel', 'Cancel')}</span>
+          <i class="fas fa-arrow-left" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Environment.BackToBrowse', 'Back to environments')}</span>
+        </button>
+        <button type="button" class="manager-button is-danger" data-action="delete-environment" onclick={() => store.deleteEnvironmentDraft?.()} disabled={$viewState.environmentDraftIsNew || $viewState.environmentSaving}>
+          <i class="fas fa-trash" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Environment.Delete', 'Delete environment')}</span>
         </button>
         <button type="button" class="manager-button is-primary" onclick={saveEnvironmentEdit} disabled={!$viewState.environmentDraftDirty || $viewState.environmentSaving}>
           <i class={$viewState.environmentSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
@@ -3000,6 +3024,7 @@
         {selectedSystemId}
         gatheringConfig={$viewState.gatheringConfig}
         sceneOptions={selectedSystem?.sceneOptions || []}
+        environmentTaskCounts={$viewState.environmentTaskCounts || {}}
         {shouldUseEnvironmentDraftForDisplay}
         {activeGatheringTab}
         selectedTaskId={selectedGatheringTask?.id || selectedGatheringTaskId}
@@ -3023,7 +3048,6 @@
         onCreateEnvironment={createEnvironment}
         onDuplicateEnvironment={(id) => duplicateEnvironment(id)}
         onDeleteEnvironment={(id) => deleteEnvironment(id)}
-        onMoveEnvironment={(id, direction) => moveEnvironment(id, direction)}
         onToggleEnvironmentEnabled={(id, enabled) => toggleEnvironmentEnabled(id, enabled)}
         onUpdateGatheringConditions={store.updateGatheringConditions}
         onToggleGatheringConditionEnabled={store.toggleGatheringConditionEnabled}
@@ -3038,61 +3062,21 @@
       <main class="manager-main manager-environment-edit-main" aria-label={text('FABRICATE.Admin.Manager.Environment.EditTitle', 'Edit environment')}>
         <section class="manager-environment-editor-shell">
           <EnvironmentEditView
-            environments={$viewState.environments}
             environmentDraft={$viewState.environmentDraft}
-            dirty={$viewState.environmentDraftDirty}
+            composition={$viewState.environmentComposition}
             isNew={$viewState.environmentDraftIsNew}
-            saving={$viewState.environmentSaving}
-            saveError={$viewState.environmentSaveError}
-            validationState={$viewState.environmentValidationState}
-            selectedTaskId={$viewState.selectedEnvironmentTaskId}
-            managedItemOptions={$viewState.selectedSystem?.managedItemOptions || []}
-            availableScriptMacros={$viewState.selectedSystem?.availableScriptMacros || []}
-            sceneOptions={$viewState.selectedSystem?.sceneOptions || []}
-            rollTableOptions={$viewState.selectedSystem?.rollTableOptions || []}
-            gatheringConfig={$viewState.gatheringConfig}
+            regionOptions={gatheringVocabularyOptions('regions')}
+            biomeOptions={gatheringVocabularyOptions('biomes')}
+            dangerOptions={[]}
             onPickImagePath={services?.pickImagePath}
             onUpdateEnvironment={store.updateEnvironmentDraft}
-            onUpdateGatheringConditions={store.updateGatheringConditions}
-            onUpdateGatheringVocabulary={store.updateGatheringVocabulary}
-            onUpdateGatheringRules={store.updateGatheringRules}
-            onAddGatheringLibraryTask={store.addGatheringLibraryTask}
-            onUpdateGatheringLibraryTask={store.updateGatheringLibraryTask}
-            onDeleteGatheringLibraryTask={store.deleteGatheringLibraryTask}
-            onAddGatheringLibraryHazard={store.addGatheringLibraryHazard}
-            onUpdateGatheringLibraryHazard={store.updateGatheringLibraryHazard}
-            onDeleteGatheringLibraryHazard={store.deleteGatheringLibraryHazard}
-            onAddGatheringHazardCharacterModifier={store.addGatheringHazardCharacterModifier}
-            onUpdateGatheringHazardCharacterModifier={store.updateGatheringHazardCharacterModifier}
-            onDeleteGatheringHazardCharacterModifier={store.deleteGatheringHazardCharacterModifier}
-            onCancelEnvironment={store.cancelEnvironmentDraft}
-            onSaveEnvironment={store.saveEnvironmentDraft}
-            onDuplicateEnvironment={store.duplicateEnvironmentDraft}
-            onDeleteEnvironment={store.deleteEnvironmentDraft}
-            onMoveEnvironment={store.moveEnvironmentDraft}
-            onAddTask={store.addEnvironmentTask}
-            onSelectTask={store.selectEnvironmentTask}
-            onUpdateTask={store.updateEnvironmentTask}
-            onDuplicateTask={store.duplicateEnvironmentTask}
-            onDeleteTask={store.deleteEnvironmentTask}
-            onMoveTask={store.moveEnvironmentTask}
-            onAddResultGroup={store.addEnvironmentTaskResultGroup}
-            onUpdateResultGroup={store.updateEnvironmentTaskResultGroup}
-            onDeleteResultGroup={store.deleteEnvironmentTaskResultGroup}
-            onMoveResultGroup={store.moveEnvironmentTaskResultGroup}
-            onAddResult={store.addEnvironmentTaskResult}
-            onUpdateResult={store.updateEnvironmentTaskResult}
-            onDeleteResult={store.deleteEnvironmentTaskResult}
-            onMoveResult={store.moveEnvironmentTaskResult}
-            onAddCatalyst={store.addEnvironmentTaskCatalyst}
-            onUpdateCatalyst={store.updateEnvironmentTaskCatalyst}
-            onDeleteCatalyst={store.deleteEnvironmentTaskCatalyst}
-            onUpdateVisibility={store.updateEnvironmentTaskVisibility}
-            onUpdateResultSelection={store.updateEnvironmentTaskResultSelection}
-            onUpdateProgressive={store.updateEnvironmentTaskProgressive}
-            onUpdateCheck={store.updateEnvironmentTaskCheck}
-            onUpdateTimeRequirement={store.updateEnvironmentTaskTimeRequirement}
-            onUpdateFailureOutcome={store.updateEnvironmentTaskFailureOutcome}
+            onSetCompositionMode={store.setEnvironmentCompositionMode}
+            onIncludeRecord={store.includeEnvironmentRecord}
+            onExcludeRecord={store.excludeEnvironmentRecord}
+            onRestoreRecord={store.restoreEnvironmentRecord}
+            onReorderRecord={store.reorderEnvironmentRecord}
+            onOpenSourceTask={(id) => editGatheringTask(id)}
+            onOpenSourceHazard={(id) => editGatheringHazard(id)}
           />
         </section>
       </main>
