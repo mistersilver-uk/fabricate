@@ -12620,6 +12620,12 @@
   min-width: 0;
   min-height: 0;
   overflow: auto;
+  /* Reserve scrollbar space and add a guaranteed visual buffer so the
+     vertical scrollbar never overlays the rightmost row content (the actions
+     column) when the panel scrolls. The padding works even when the host
+     renders an overlay-style scrollbar that ignores `scrollbar-gutter`. */
+  scrollbar-gutter: stable;
+  padding-right: 12px;
 }
 
 .fabricate-manager .manager-environment-workspace .manager-environment-inspector {
