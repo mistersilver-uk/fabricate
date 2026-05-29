@@ -2130,12 +2130,12 @@
 
   function environmentImage(environment) {
     const linkedScene = linkedSceneForEnvironment(environment);
-    return linkedScene?.background?.src || linkedScene?.img || linkedScene?.thumbnail || linkedScene?.thumb || 'icons/svg/item-bag.svg';
+    return linkedScene?.img || linkedScene?.thumbnail || linkedScene?.thumb || 'icons/svg/item-bag.svg';
   }
 
   function hasEnvironmentSceneImage(environment) {
     const linkedScene = linkedSceneForEnvironment(environment);
-    return Boolean(linkedScene?.background?.src || linkedScene?.img || linkedScene?.thumbnail || linkedScene?.thumb);
+    return Boolean(linkedScene?.img || linkedScene?.thumbnail || linkedScene?.thumb);
   }
 
   function linkedSceneForEnvironment(environment) {

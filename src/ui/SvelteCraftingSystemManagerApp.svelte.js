@@ -8,6 +8,7 @@ import { SvelteComponentEditorApp } from './SvelteComponentEditorApp.svelte.js';
 import { get } from 'svelte/store';
 import { resolveDropUuid, resolveDropData } from './svelte/util/dropUtils.js';
 import { localize } from './svelte/util/foundryBridge.js';
+import { normalizeSceneOption } from './svelte/util/sceneImages.js';
 import { validateImportData, prepareForImport } from '../systems/CraftingSystemExporter.js';
 import { CompendiumImporter } from '../systems/CompendiumImporter.js';
 
@@ -138,12 +139,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           .sort((a, b) => a.name.localeCompare(b.name)),
       getSceneOptions: () =>
         Array.from(game.scenes?.contents || [])
-          .map(scene => ({
-            uuid: scene.uuid,
-            name: scene.name,
-            img: scene.background?.src || scene.img || '',
-            thumbnail: scene.thumbnail || scene.thumb || ''
-          }))
+          .map(scene => normalizeSceneOption(scene))
           .filter(scene => scene.uuid && scene.name)
           .sort((a, b) => a.name.localeCompare(b.name)),
       getRollTableOptions: () =>
