@@ -27,7 +27,6 @@
   function optId(option) { return String(option?.id ?? option ?? '').trim(); }
   function optLabel(option) { return String(option?.label ?? option?.id ?? option ?? '').trim(); }
 
-  const conditions = $derived(composition?.conditions || {});
   const biomes = $derived(Array.isArray(environment?.biomes) ? environment.biomes : []);
   const dangerTags = $derived(Array.isArray(environment?.dangerTags) ? environment.dangerTags : []);
   const dangerChoices = $derived((dangerOptions && dangerOptions.length ? dangerOptions.map(optId) : DEFAULT_DANGER));
@@ -122,68 +121,68 @@
 
       <section class="manager-environment-card" data-overview-section="context">
         <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Overview.Context', 'Environment context')}</h3>
-        <label class="manager-field">
-          <span>{text('FABRICATE.Admin.Manager.Environment.Overview.Region', 'Region')}</span>
-          <select data-environment-field="region" value={environment.region || ''} onchange={(event) => onUpdate({ region: event.currentTarget.value })}>
-            <option value="">{text('FABRICATE.Admin.Manager.Environment.Overview.AnyRegion', 'Any region')}</option>
-            {#each regionOptions as option (optId(option))}
-              <option value={optId(option)}>{optLabel(option)}</option>
-            {/each}
-          </select>
-        </label>
-
-        <div class="manager-field">
-          <span>{text('FABRICATE.Admin.Manager.Environment.Overview.Biomes', 'Biomes')}</span>
-          <div class="manager-availability-pill-row" data-environment-field="biomes">
-            {#if biomes.length > 0}
-              {#each biomes as id (id)}
-                <span class="manager-availability-pill">
-                  <span>{biomeLabel(id)}</span>
-                  <button type="button" class="manager-availability-remove" aria-label={text('FABRICATE.Admin.Manager.Environment.Overview.RemoveBiome', 'Remove {name}').replace('{name}', biomeLabel(id))} onclick={() => removeBiome(id)}><i class="fas fa-xmark" aria-hidden="true"></i></button>
-                </span>
-              {/each}
-            {:else}
-              <span class="manager-muted">{text('FABRICATE.Admin.Manager.Environment.Overview.NoBiomes', 'No biomes selected')}</span>
-            {/if}
-          </div>
-          {#if availableBiomes.length > 0}
-            <select aria-label={text('FABRICATE.Admin.Manager.Environment.Overview.AddBiome', 'Add biome')} onchange={addBiome}>
-              <option value="">{text('FABRICATE.Admin.Manager.Environment.Overview.AddBiome', 'Add biome')}</option>
-              {#each availableBiomes as option (optId(option))}
+        <div class="manager-environment-context-grid">
+          <label class="manager-field manager-environment-context-field">
+            <span>{text('FABRICATE.Admin.Manager.Environment.Overview.Region', 'Region')}</span>
+            <p class="manager-muted manager-environment-context-hint">{text('FABRICATE.Admin.Manager.Environment.Overview.RegionHint', 'Where this environment is — records match its region or any region.')}</p>
+            <select data-environment-field="region" value={environment.region || ''} onchange={(event) => onUpdate({ region: event.currentTarget.value })}>
+              <option value="">{text('FABRICATE.Admin.Manager.Environment.Overview.AnyRegion', 'Any region')}</option>
+              {#each regionOptions as option (optId(option))}
                 <option value={optId(option)}>{optLabel(option)}</option>
               {/each}
             </select>
-          {/if}
-        </div>
+          </label>
 
-        <div class="manager-field">
-          <span>{text('FABRICATE.Admin.Manager.Environment.Overview.Danger', 'Danger level')}</span>
-          <div class="manager-availability-pill-row" data-environment-field="dangerTags">
-            {#if dangerTags.length > 0}
-              {#each dangerTags as id (id)}
-                <span class={`manager-danger-tag-pill is-${id}`}>
-                  <span>{dangerLabel(id)}</span>
-                  <button type="button" class="manager-availability-remove" aria-label={text('FABRICATE.Admin.Manager.Environment.Overview.RemoveDanger', 'Remove {name}').replace('{name}', dangerLabel(id))} onclick={() => removeDanger(id)}><i class="fas fa-xmark" aria-hidden="true"></i></button>
-                </span>
-              {/each}
-            {:else}
-              <span class="manager-muted">{text('FABRICATE.Admin.Manager.Environment.Overview.NoDanger', 'No danger tags')}</span>
+          <div class="manager-field manager-environment-context-field">
+            <span>{text('FABRICATE.Admin.Manager.Environment.Overview.Biomes', 'Biomes')}</span>
+            <p class="manager-muted manager-environment-context-hint">{text('FABRICATE.Admin.Manager.Environment.Overview.BiomesHint', 'Terrain here — records match if they share a biome.')}</p>
+            {#if availableBiomes.length > 0}
+              <select aria-label={text('FABRICATE.Admin.Manager.Environment.Overview.AddBiome', 'Add biome')} onchange={addBiome}>
+                <option value="">{text('FABRICATE.Admin.Manager.Environment.Overview.AddBiome', 'Add biome')}</option>
+                {#each availableBiomes as option (optId(option))}
+                  <option value={optId(option)}>{optLabel(option)}</option>
+                {/each}
+              </select>
             {/if}
+            <div class="manager-availability-pill-row" data-environment-field="biomes">
+              {#if biomes.length > 0}
+                {#each biomes as id (id)}
+                  <span class="manager-availability-pill">
+                    <span>{biomeLabel(id)}</span>
+                    <button type="button" class="manager-availability-remove" aria-label={text('FABRICATE.Admin.Manager.Environment.Overview.RemoveBiome', 'Remove {name}').replace('{name}', biomeLabel(id))} onclick={() => removeBiome(id)}><i class="fas fa-xmark" aria-hidden="true"></i></button>
+                  </span>
+                {/each}
+              {:else}
+                <span class="manager-muted">{text('FABRICATE.Admin.Manager.Environment.Overview.NoBiomes', 'No biomes selected')}</span>
+              {/if}
+            </div>
           </div>
-          {#if availableDanger.length > 0}
-            <select aria-label={text('FABRICATE.Admin.Manager.Environment.Overview.AddDanger', 'Add danger tag')} onchange={addDanger}>
-              <option value="">{text('FABRICATE.Admin.Manager.Environment.Overview.AddDanger', 'Add danger tag')}</option>
-              {#each availableDanger as id (id)}
-                <option value={id}>{dangerLabel(id)}</option>
-              {/each}
-            </select>
-          {/if}
-        </div>
 
-        <p class="manager-muted manager-environment-conditions-summary" data-environment-conditions>
-          {text('FABRICATE.Admin.Manager.Environment.Overview.ConditionsSummary', 'Current conditions')}:
-          <strong>{conditions.weather || '—'}</strong> · <strong>{conditions.timeOfDay || '—'}</strong>
-        </p>
+          <div class="manager-field manager-environment-context-field">
+            <span>{text('FABRICATE.Admin.Manager.Environment.Overview.Danger', 'Danger level')}</span>
+            <p class="manager-muted manager-environment-context-hint">{text('FABRICATE.Admin.Manager.Environment.Overview.DangerHint', 'Caps eligible hazards; those up to this level can appear.')}</p>
+            {#if availableDanger.length > 0}
+              <select aria-label={text('FABRICATE.Admin.Manager.Environment.Overview.AddDanger', 'Add danger tag')} onchange={addDanger}>
+                <option value="">{text('FABRICATE.Admin.Manager.Environment.Overview.AddDanger', 'Add danger tag')}</option>
+                {#each availableDanger as id (id)}
+                  <option value={id}>{dangerLabel(id)}</option>
+                {/each}
+              </select>
+            {/if}
+            <div class="manager-availability-pill-row" data-environment-field="dangerTags">
+              {#if dangerTags.length > 0}
+                {#each dangerTags as id (id)}
+                  <span class={`manager-danger-tag-pill is-${id}`}>
+                    <span>{dangerLabel(id)}</span>
+                    <button type="button" class="manager-availability-remove" aria-label={text('FABRICATE.Admin.Manager.Environment.Overview.RemoveDanger', 'Remove {name}').replace('{name}', dangerLabel(id))} onclick={() => removeDanger(id)}><i class="fas fa-xmark" aria-hidden="true"></i></button>
+                  </span>
+                {/each}
+              {:else}
+                <span class="manager-muted">{text('FABRICATE.Admin.Manager.Environment.Overview.NoDanger', 'No danger tags')}</span>
+              {/if}
+            </div>
+          </div>
+        </div>
       </section>
 
       <div class="manager-environment-overview-duo">

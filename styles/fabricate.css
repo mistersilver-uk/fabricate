@@ -12657,6 +12657,23 @@
   gap: 10px;
 }
 
+.fabricate-manager .manager-environment-context-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.fabricate-manager .manager-environment-context-hint {
+  margin: 0;
+  font-size: 0.8em;
+  line-height: 1.35;
+}
+
+.fabricate-manager .manager-environment-context-field .manager-availability-pill-row {
+  margin-top: 2px;
+}
+
 /* Segmented toggle (player-facing behaviour + composition mode) */
 .fabricate-manager .manager-environment-mode-control {
   display: flex;
@@ -12883,10 +12900,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.fabricate-manager .manager-environment-conditions-summary {
-  margin: 0;
 }
 
 .fabricate-manager .manager-environment-runtime-grid .manager-fact,
@@ -13273,7 +13286,8 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .fabricate-manager .manager-environment-overview-duo {
+  .fabricate-manager .manager-environment-overview-duo,
+  .fabricate-manager .manager-environment-context-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 
