@@ -117,6 +117,7 @@
       {composition}
       {selectedKind}
       {selectedId}
+      {onUpdateEnvironment}
       {onOpenSourceTask}
       {onOpenSourceHazard}
       {onIncludeRecord}

@@ -1,9 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
-  import { localize, viewScene } from '../../../util/foundryBridge.js';
-  import { dragDrop } from '../../../actions/dragDrop.js';
-  import { resolveDropData } from '../../../util/dropUtils.js';
-  import { sceneDocumentImage } from '../../../util/sceneImages.js';
+  import { localize } from '../../../util/foundryBridge.js';
   import CompositionModeControl from './CompositionModeControl.svelte';
 
   let {
@@ -31,7 +28,6 @@
   const biomes = $derived(Array.isArray(environment?.biomes) ? environment.biomes : []);
   const availableBiomes = $derived(biomeOptions.filter(option => !biomes.includes(optId(option))));
   const dangerLevel = $derived(DANGER_LEVELS.includes(environment?.dangerLevel) ? environment.dangerLevel : 'safe');
-  const sceneUuid = $derived(String(environment?.sceneUuid || ''));
   const selectionMode = $derived(environment?.selectionMode === 'blind' ? 'blind' : 'targeted');
 
   function addBiome(event) {
@@ -46,35 +42,6 @@
     if (typeof onPickImagePath !== 'function') return;
     const value = await onPickImagePath(environment?.img || DEFAULT_ENVIRONMENT_IMAGE_DIR);
     if (value) onUpdate({ img: value });
-  }
-
-  let sceneThumb = $state('');
-  let sceneName = $state('');
-  $effect(() => {
-    const uuid = sceneUuid;
-    sceneThumb = '';
-    sceneName = '';
-    if (!uuid || typeof globalThis.fromUuid !== 'function') return;
-    let cancelled = false;
-    Promise.resolve(globalThis.fromUuid(uuid)).then(doc => {
-      if (cancelled || !doc) return;
-      sceneName = String(doc.name || '');
-      sceneThumb = sceneDocumentImage(doc);
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  });
-  const sceneLabel = $derived(sceneName || sceneUuid);
-
-  function handleSceneDrop(data) {
-    const { uuid, type } = resolveDropData(data);
-    if (type !== 'Scene' || !uuid) return;
-    onUpdate({ sceneUuid: uuid });
-  }
-  function unlinkScene() { onUpdate({ sceneUuid: '' }); }
-  function onLinkedSceneMouseDown(event) {
-    if (event.button !== 2) return;
-    event.preventDefault();
-    unlinkScene();
   }
 
   function biomeLabel(id) {
@@ -118,11 +85,11 @@
                 onclick={() => onUpdate({ enabled: environment.enabled === false })}
               >
                 <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
-                <span class="manager-status-toggle-label">{environment.enabled === false ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Draft', 'Draft') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Active', 'Active')}</span>
+                <span class="manager-status-toggle-label">{environment.enabled === false ? text('FABRICATE.Admin.Manager.StatusOff', 'Off') : text('FABRICATE.Admin.Manager.StatusOn', 'On')}</span>
               </button>
               <p class="manager-muted">{environment.enabled === false
-                ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.DraftHint', 'Draft environments are hidden from players.')
-                : text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.ActiveHint', 'Active environments are available to players.')}</p>
+                ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.DraftHint', 'Hidden from players while off.')
+                : text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.ActiveHint', 'Available to players while on.')}</p>
             </div>
           </div>
           <div class="manager-task-identity-fields">
@@ -220,33 +187,6 @@
         <CompositionModeControl mode={environment.compositionMode || 'automatic'} onChange={onSetCompositionMode} />
       </section>
       </div>
-
-      <section class="manager-environment-card" data-overview-section="scene">
-        <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Scene', 'Linked scene')}</h3>
-        {#if sceneUuid}
-          <div
-            class="manager-environment-scene-linked"
-            data-overview-scene-linked
-            title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SceneReplaceTooltip', 'Drop a scene to replace it, or right-click to unlink.')}
-            use:dragDrop={{ onDrop: handleSceneDrop, activeClass: 'is-drop-active' }}
-            oncontextmenu={(event) => { event.preventDefault(); unlinkScene(); }}
-            onmousedown={onLinkedSceneMouseDown}
-          >
-            {#if sceneThumb}
-              <img class="manager-environment-scene-thumb" src={sceneThumb} alt="" />
-            {:else}
-              <span class="manager-environment-scene-thumb is-placeholder" aria-hidden="true"><i class="fas fa-map"></i></span>
-            {/if}
-            <button type="button" class="manager-environment-scene-name" onclick={(event) => { event.stopPropagation(); viewScene(sceneUuid); }} title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.OpenScene', 'Open scene')}>{sceneLabel}</button>
-            <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.UnlinkScene', 'Unlink scene')} title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.UnlinkScene', 'Unlink scene')} onclick={(event) => { event.stopPropagation(); unlinkScene(); }}><i class="fas fa-link-slash" aria-hidden="true"></i></button>
-          </div>
-        {:else}
-          <div class="manager-environment-scene-dropzone" use:dragDrop={{ onDrop: handleSceneDrop, activeClass: 'is-drop-active' }}>
-            <i class="fas fa-map-location-dot" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SceneDropHint', 'Drag a scene here to link it.')}</span>
-          </div>
-        {/if}
-      </section>
 
     </div>
   {/if}

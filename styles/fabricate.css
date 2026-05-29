@@ -12936,6 +12936,12 @@
   min-width: 0;
 }
 
+.fabricate-manager .manager-fact-grid-inline .manager-fact {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
 .fabricate-manager .manager-field.is-disabled {
   opacity: 0.6;
 }

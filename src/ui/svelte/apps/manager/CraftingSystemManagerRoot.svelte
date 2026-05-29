@@ -2730,7 +2730,7 @@
       {#if currentView === 'environment-edit' && environmentDraftForDisplay}
         <div class="manager-environment-header-pills" data-environment-status-pills>
           <span class={`manager-chip ${environmentDraftForDisplay.enabled === false ? 'is-neutral' : 'is-active'}`} data-status-pill="active">
-            {environmentDraftForDisplay.enabled === false ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Draft', 'Draft') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Active', 'Active')}
+            {environmentDraftForDisplay.enabled === false ? text('FABRICATE.Admin.Manager.StatusOff', 'Off') : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
           </span>
           <span class="manager-chip is-info" data-status-pill="selection">
             {environmentDraftForDisplay.selectionMode === 'blind' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Blind', 'Blind') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Targeted', 'Targeted')}

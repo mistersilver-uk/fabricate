@@ -378,6 +378,9 @@ test('manager inspector count labels wrap without truncation', () => {
   assert.ok(css.includes('grid-template-columns: repeat(2, minmax(0, 1fr));'), 'count facts should use a two-column inspector grid');
   assert.ok(factBlock.includes('display: block;'), 'count facts should render one phrase instead of wrapping separate flex children');
   assert.ok(!factBlock.includes('display: flex;'), 'count facts should not split values and labels into separate flex items');
+  const factInlineBlock = blockFor('.fabricate-manager .manager-fact-grid-inline .manager-fact');
+  assert.ok(factInlineBlock.includes('display: flex;'), 'inline fact grids lay value and label on one row');
+  assert.ok(factInlineBlock.includes('gap:'), 'inline facts keep a gap so value and label do not collide');
   assert.ok(factLineBlock.includes('display: inline;'), 'count facts should keep value and label in normal inline text flow');
   assert.ok(factLeadingBlock.includes('white-space: nowrap;'), 'count facts should keep the value and first label word together');
   assert.ok(!factBlock.includes('white-space: nowrap;'), 'count fact cards should not force single-line labels');

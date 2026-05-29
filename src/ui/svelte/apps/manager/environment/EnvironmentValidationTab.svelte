@@ -77,7 +77,7 @@
         {text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.TargetedPreview', 'Players will choose from {n} visible gathering tasks.').replace('{n}', String(counts.availableTasks || 0))}
       {/if}
     </p>
-    <div class="manager-fact-grid">
+    <div class="manager-fact-grid manager-fact-grid-inline">
       <div class="manager-fact"><strong>{counts.availableTasks || 0}</strong><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.AvailableTasks', 'Available tasks')}</span></div>
       <div class="manager-fact"><strong>{counts.availableHazards || 0}</strong><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.AvailableHazards', 'Available hazards')}</span></div>
       <div class="manager-fact"><strong>{counts.excludedHazards || 0}</strong><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.ExcludedHazards', 'Excluded hazards')}</span></div>

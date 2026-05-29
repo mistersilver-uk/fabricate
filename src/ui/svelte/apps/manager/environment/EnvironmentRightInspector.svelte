@@ -9,6 +9,7 @@
     composition = { tasks: [], hazards: [], counts: {} },
     selectedKind = '',
     selectedId = '',
+    onUpdateEnvironment = () => {},
     onOpenSourceTask = () => {},
     onOpenSourceHazard = () => {},
     onIncludeRecord = () => {},
@@ -44,6 +45,6 @@
       onRestore={onRestoreRecord}
     />
   {:else}
-    <EnvironmentSummaryInspector {environment} {composition} />
+    <EnvironmentSummaryInspector {environment} {composition} onUpdate={onUpdateEnvironment} />
   {/if}
 </aside>

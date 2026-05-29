@@ -90,6 +90,7 @@ describe('environment composition editor structure', () => {
     assert.ok(overviewSource.includes('manager-task-identity-fields'), 'identity card uses the shared identity fields layout');
     assert.ok(overviewSource.includes('manager-environment-overview-duo'), 'player-facing and composition cards sit in a 2-up row');
     assert.ok(!overviewSource.includes('runtime-summary'), 'runtime summary card is removed from the central panel');
+    assert.ok(!overviewSource.includes('data-overview-section="scene"'), 'linked scene card moved out of the overview central panel');
     assert.ok(overviewSource.includes("'icons/environment/'"), 'image picker defaults to the core environment icons directory');
   });
 
@@ -97,6 +98,11 @@ describe('environment composition editor structure', () => {
     for (const fact of ['available-tasks', 'excluded-tasks', 'candidate-tasks', 'available-hazards', 'excluded-hazards', 'unavailable-included']) {
       assert.ok(summaryInspectorSource.includes(`data-runtime-fact="${fact}"`), `runtime preview includes the ${fact} fact`);
     }
+  });
+
+  it('the linked scene card lives in the inspector under the summary', () => {
+    assert.ok(summaryInspectorSource.includes('data-environment-summary-scene'), 'inspector renders the relocated linked scene card');
+    assert.ok(summaryInspectorSource.includes('manager-environment-scene-dropzone'), 'inspector scene card keeps the drop-to-link zone');
   });
 
   it('matching evidence supports table chips and inspector check rows', () => {
