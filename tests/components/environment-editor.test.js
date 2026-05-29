@@ -75,7 +75,7 @@ describe('environment composition editor structure', () => {
     assert.ok(shellSource.includes("class:is-inspector-hidden={activeTab !== 'overview'}"), 'workspace collapses to one column when the inspector is hidden');
   });
 
-  it('renders Tasks/Hazards as a column-headed table with a composition-mode select', () => {
+  it('renders Tasks/Hazards as a column-headed table', () => {
     assert.ok(listSource.includes('manager-environment-comp-head'), 'composition list renders a column header row');
     for (const col of ['ColTask', 'ColEvidence', 'ColOverride', 'ColRuntime']) {
       assert.ok(listSource.includes(col), `composition table defines the ${col} column`);
@@ -83,7 +83,7 @@ describe('environment composition editor structure', () => {
     assert.ok(listSource.includes('manager-environment-comp-row'), 'composition list renders table rows');
     assert.ok(listSource.includes('dismissOnOutsideClick'), 'row overflow menu dismisses on outside click');
     assert.ok(listSource.includes('manager-environment-comp-menu'), 'rows expose an overflow action menu');
-    assert.ok(tasksTabSource.includes('data-composition-mode-select'), 'tasks tab exposes a composition-mode select');
+    assert.ok(!tasksTabSource.includes('data-composition-mode-select'), 'composition mode is set globally on the overview tab, not per-tab');
   });
 
   it('overview leads with a task-editor-style identity hero and drops the runtime summary', () => {

@@ -12960,36 +12960,6 @@
 }
 
 /* Tasks/Hazards composition tab header + callout */
-.fabricate-manager .manager-environment-comp-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-}
-
-.fabricate-manager .manager-environment-comp-header-copy {
-  min-width: 0;
-}
-
-.fabricate-manager .manager-environment-comp-header-copy p {
-  margin: 4px 0 0;
-}
-
-.fabricate-manager .manager-environment-comp-mode-select {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 0.78rem;
-  color: var(--fab-mv2-text-muted);
-}
-
-.fabricate-manager .manager-environment-comp-mode-select select {
-  min-height: 32px;
-  min-width: 150px;
-}
-
 .fabricate-manager .manager-environment-comp-callout {
   display: flex;
   align-items: flex-start;

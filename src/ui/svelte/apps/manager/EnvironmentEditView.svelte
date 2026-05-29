@@ -87,7 +87,6 @@
           {onExcludeRecord}
           {onRestoreRecord}
           {onReorderRecord}
-          {onSetCompositionMode}
           {onOpenSourceTask}
         />
       {:else if activeTab === 'hazards'}
@@ -100,7 +99,6 @@
           {onExcludeRecord}
           {onRestoreRecord}
           {onReorderRecord}
-          {onSetCompositionMode}
           {onOpenSourceHazard}
         />
       {:else if activeTab === 'validation'}

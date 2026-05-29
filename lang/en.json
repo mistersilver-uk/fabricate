@@ -1491,15 +1491,11 @@
           },
           "Tasks": {
             "Title": "Tasks",
-            "Composition": "Task composition",
-            "CompositionHint": "Determine which gathering tasks are available in this environment and how they behave at runtime.",
             "AutomaticIntro": "All matching enabled library tasks are available unless you exclude them here.",
             "ManualIntro": "Only tasks you explicitly include and that still match the environment are available to players."
           },
           "Hazards": {
             "Title": "Hazards",
-            "Composition": "Hazard composition",
-            "CompositionHint": "Hazards trigger as part of a gathering task attempt. They match the environment at the library level; here you compose which apply.",
             "AutomaticIntro": "All matching enabled library hazards apply unless you exclude them here.",
             "ManualIntro": "Only hazards you explicitly include and that still match the environment apply here.",
             "HazardChance": "Hazard chance",
