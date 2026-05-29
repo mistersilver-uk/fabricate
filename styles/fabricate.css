@@ -12612,6 +12612,10 @@
   min-height: 0;
 }
 
+.fabricate-manager .manager-environment-workspace.is-inspector-hidden {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .fabricate-manager .manager-environment-tab-panel {
   min-width: 0;
   min-height: 0;

@@ -71,6 +71,8 @@ describe('environment composition editor structure', () => {
       assert.ok(shellSource.includes(snippet), `shell should reference ${snippet}`);
     }
     assert.ok(!shellSource.includes('EnvironmentEditorHeader'), 'header now lives in the shared chrome, not the editor body');
+    assert.ok(/\{#if activeTab === 'overview'\}\s*<EnvironmentRightInspector/.test(shellSource), 'right inspector only renders on the overview tab');
+    assert.ok(shellSource.includes("class:is-inspector-hidden={activeTab !== 'overview'}"), 'workspace collapses to one column when the inspector is hidden');
   });
 
   it('renders Tasks/Hazards as a column-headed table with a composition-mode select', () => {

@@ -59,7 +59,7 @@
 <div class="manager-environment-edit-view" data-environment-editor>
   <EnvironmentEditorTabs {activeTab} {badges} onSelect={(tab) => { activeTab = tab; }} />
 
-  <div class="manager-environment-workspace">
+  <div class="manager-environment-workspace" class:is-inspector-hidden={activeTab !== 'overview'}>
     <div
       class="manager-environment-tab-panel"
       role="tabpanel"
@@ -112,17 +112,19 @@
       {/if}
     </div>
 
-    <EnvironmentRightInspector
-      environment={environmentDraft}
-      {composition}
-      {selectedKind}
-      {selectedId}
-      {onUpdateEnvironment}
-      {onOpenSourceTask}
-      {onOpenSourceHazard}
-      {onIncludeRecord}
-      {onExcludeRecord}
-      {onRestoreRecord}
-    />
+    {#if activeTab === 'overview'}
+      <EnvironmentRightInspector
+        environment={environmentDraft}
+        {composition}
+        {selectedKind}
+        {selectedId}
+        {onUpdateEnvironment}
+        {onOpenSourceTask}
+        {onOpenSourceHazard}
+        {onIncludeRecord}
+        {onExcludeRecord}
+        {onRestoreRecord}
+      />
+    {/if}
   </div>
 </div>
