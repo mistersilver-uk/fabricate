@@ -22,6 +22,39 @@ const evidenceSource = read('MatchingEvidenceChips.svelte');
 const tasksTabSource = read('EnvironmentTasksTab.svelte');
 const overviewSource = read('EnvironmentOverviewTab.svelte');
 const summaryInspectorSource = read('EnvironmentSummaryInspector.svelte');
+const lang = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
+
+describe('environment editor localization', () => {
+  it('defines the EnvironmentEditor namespace in en.json for the keys the editor uses', () => {
+    const editor = lang.FABRICATE.Admin.Manager.EnvironmentEditor;
+    assert.ok(editor, 'EnvironmentEditor namespace should exist');
+    const checks = [
+      ['Overview', 'RegionHint'],
+      ['Overview', 'BiomesHint'],
+      ['Overview', 'DangerHint'],
+      ['Composition', 'Automatic'],
+      ['Composition', 'IncludedByMatch'],
+      ['Inspector', 'LayerLibrary'],
+      ['Inspector', 'Overrides'],
+      ['Validation', 'Readiness'],
+      ['Evidence', 'Biome'],
+      ['Tabs', 'Tasks'],
+      ['Runtime', 'Available']
+    ];
+    for (const [group, key] of checks) {
+      assert.equal(typeof editor[group]?.[key], 'string', `EnvironmentEditor.${group}.${key} should be a localized string`);
+      assert.ok(editor[group][key].length > 0, `EnvironmentEditor.${group}.${key} should not be empty`);
+    }
+    assert.equal(editor.Validation.Severity.critical, 'Critical');
+    assert.equal(editor.Hazards.DangerTag.deadly, 'Deadly');
+  });
+
+  it('no editor component falls back on the legacy Environment.* editor key prefixes', () => {
+    for (const source of [shellSource, listSource, inspectorSource, tabsSource, evidenceSource, tasksTabSource, overviewSource, summaryInspectorSource]) {
+      assert.ok(!/FABRICATE\.Admin\.Manager\.Environment\.(Overview|Composition|Evidence|Diagnostics|Tabs|Runtime|Inspector|Validation)\b/.test(source), 'editor sources should use the EnvironmentEditor namespace');
+    }
+  });
+});
 
 describe('environment composition editor structure', () => {
   it('shell composes tabs, workspace, and its own inspector (header lives in chrome)', () => {

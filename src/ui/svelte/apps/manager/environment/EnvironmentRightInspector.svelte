@@ -33,7 +33,7 @@
   }
 </script>
 
-<aside class="manager-inspector manager-environment-inspector" aria-label={text('FABRICATE.Admin.Manager.Environment.Inspector.Label', 'Environment inspector')}>
+<aside class="manager-inspector manager-environment-inspector" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Label', 'Environment inspector')}>
   {#if selectedEntry}
     <RecordInspector
       kind={selectedKind}

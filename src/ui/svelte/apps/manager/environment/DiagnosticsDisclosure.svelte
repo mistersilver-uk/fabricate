@@ -11,7 +11,7 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  const heading = $derived(title || text('FABRICATE.Admin.Manager.Environment.Diagnostics.Title', 'Diagnostics'));
+  const heading = $derived(title || text('FABRICATE.Admin.Manager.EnvironmentEditor.Diagnostics.Title', 'Diagnostics'));
 </script>
 
 <section class="manager-environment-diagnostics" data-diagnostics-open={expanded}>

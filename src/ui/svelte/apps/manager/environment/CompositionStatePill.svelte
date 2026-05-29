@@ -20,7 +20,7 @@
   };
 
   const meta = $derived(META[state] || META.candidate);
-  const label = $derived(text(`FABRICATE.Admin.Manager.Environment.Composition.${meta.key}`, meta.fallback));
+  const label = $derived(text(`FABRICATE.Admin.Manager.EnvironmentEditor.Composition.${meta.key}`, meta.fallback));
 </script>
 
 <span class={`manager-chip ${meta.tone} manager-environment-composition-pill`} data-composition-state={state}>

@@ -27,7 +27,7 @@
   }
 </script>
 
-<div class="manager-environment-tabs" role="tablist" aria-label={text('FABRICATE.Admin.Manager.Environment.Tabs.Label', 'Environment editor sections')}>
+<div class="manager-environment-tabs" role="tablist" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Tabs.Label', 'Environment editor sections')}>
   {#each TABS as tab, index (tab.id)}
     <button
       type="button"
@@ -42,7 +42,7 @@
       onkeydown={(event) => onKeydown(event, index)}
     >
       <i class={tab.icon} aria-hidden="true"></i>
-      <span>{text(`FABRICATE.Admin.Manager.Environment.Tabs.${tab.key}`, tab.fallback)}</span>
+      <span>{text(`FABRICATE.Admin.Manager.EnvironmentEditor.Tabs.${tab.key}`, tab.fallback)}</span>
       {#if badges[tab.id]}
         <span class={`manager-chip ${tab.id === 'validation' ? 'is-danger' : 'is-neutral'} manager-environment-tab-badge`}>{badges[tab.id]}</span>
       {/if}

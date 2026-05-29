@@ -18,7 +18,7 @@
   const selected = $derived(OPTIONS.find(option => option.value === current) || OPTIONS[0]);
 </script>
 
-<div class="manager-environment-mode-control" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Environment.Composition.ModeLabel', 'Composition mode')}>
+<div class="manager-environment-mode-control" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ModeLabel', 'Composition mode')}>
   {#each OPTIONS as option (option.value)}
     <button
       type="button"
@@ -31,9 +31,9 @@
     >
       <span class="manager-environment-mode-head">
         <i class={option.icon} aria-hidden="true"></i>
-        <span>{text(`FABRICATE.Admin.Manager.Environment.Composition.${option.key}`, option.fallback)}</span>
+        <span>{text(`FABRICATE.Admin.Manager.EnvironmentEditor.Composition.${option.key}`, option.fallback)}</span>
       </span>
     </button>
   {/each}
 </div>
-<p class="manager-muted manager-environment-mode-hint">{text(`FABRICATE.Admin.Manager.Environment.Composition.${selected.descKey}`, selected.descFallback)}</p>
+<p class="manager-muted manager-environment-mode-hint">{text(`FABRICATE.Admin.Manager.EnvironmentEditor.Composition.${selected.descKey}`, selected.descFallback)}</p>

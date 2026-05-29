@@ -24,11 +24,11 @@
   }
 
   function fieldLabel(field) {
-    return text(`FABRICATE.Admin.Manager.Environment.Evidence.${field.label}`, field.label);
+    return text(`FABRICATE.Admin.Manager.EnvironmentEditor.Evidence.${field.label}`, field.label);
   }
 
   function anyLabel(field) {
-    return text(`FABRICATE.Admin.Manager.Environment.Evidence.${field.label}Any`, field.anyFallback);
+    return text(`FABRICATE.Admin.Manager.EnvironmentEditor.Evidence.${field.label}Any`, field.anyFallback);
   }
 
   function entryFor(field) {
@@ -72,7 +72,7 @@
 </script>
 
 {#if variant === 'checks'}
-  <ul class="manager-environment-evidence is-checks" aria-label={text('FABRICATE.Admin.Manager.Environment.Evidence.Title', 'Matching evidence')}>
+  <ul class="manager-environment-evidence is-checks" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Evidence.Title', 'Matching evidence')}>
     {#each shown as row (row.field.key)}
       <li class={`manager-environment-evidence-check ${row.tone}`} data-evidence-field={row.field.key} data-evidence-state={row.entry?.state || 'any'}>
         <i class={row.icon} aria-hidden="true"></i>
@@ -84,7 +84,7 @@
     {/each}
   </ul>
 {:else}
-  <div class="manager-environment-evidence is-chips" aria-label={text('FABRICATE.Admin.Manager.Environment.Evidence.Title', 'Matching evidence')}>
+  <div class="manager-environment-evidence is-chips" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Evidence.Title', 'Matching evidence')}>
     <div class="manager-environment-evidence-chips">
       {#each shown as row (row.field.key)}
         <span class={`manager-environment-evidence-chip ${row.tone}`} data-evidence-field={row.field.key} data-evidence-state={row.entry?.state || 'any'}>

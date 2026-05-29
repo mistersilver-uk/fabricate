@@ -11,8 +11,8 @@
 
   const isAvailable = $derived(state === 'available');
   const label = $derived(isAvailable
-    ? text('FABRICATE.Admin.Manager.Environment.Runtime.Available', 'Available')
-    : text('FABRICATE.Admin.Manager.Environment.Runtime.Unavailable', 'Unavailable'));
+    ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Runtime.Available', 'Available')
+    : text('FABRICATE.Admin.Manager.EnvironmentEditor.Runtime.Unavailable', 'Unavailable'));
 </script>
 
 <span

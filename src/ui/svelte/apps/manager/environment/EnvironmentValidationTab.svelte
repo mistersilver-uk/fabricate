@@ -46,18 +46,18 @@
 
   function checkLabel(id) {
     const meta = CHECK_LABELS[id] || [id, id];
-    return text(`FABRICATE.Admin.Manager.Environment.Validation.${meta[0]}`, meta[1]);
+    return text(`FABRICATE.Admin.Manager.EnvironmentEditor.Validation.${meta[0]}`, meta[1]);
   }
   function issueTitle(issue) {
     const meta = ISSUE_LABELS[issue.id] || [issue.id, issue.id];
-    const base = text(`FABRICATE.Admin.Manager.Environment.Validation.${meta[0]}`, meta[1]);
+    const base = text(`FABRICATE.Admin.Manager.EnvironmentEditor.Validation.${meta[0]}`, meta[1]);
     return issue.recordName ? `${base} (${issue.recordName})` : base;
   }
 </script>
 
-<section class="manager-environment-tab manager-environment-validation" data-environment-tab="validation" aria-label={text('FABRICATE.Admin.Manager.Environment.Validation.Title', 'Validation')}>
+<section class="manager-environment-tab manager-environment-validation" data-environment-tab="validation" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.Title', 'Validation')}>
   <section class="manager-environment-card" data-validation-section="readiness">
-    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Validation.Readiness', 'Environment readiness')}</h3>
+    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.Readiness', 'Environment readiness')}</h3>
     <ul class="manager-environment-check-list">
       {#each readiness.checks as check (check.id)}
         <li class={`manager-environment-check ${check.satisfied ? 'is-satisfied' : 'is-unsatisfied'}`} data-check={check.id} data-satisfied={check.satisfied}>
@@ -69,36 +69,36 @@
   </section>
 
   <section class="manager-environment-card" data-validation-section="runtime-preview">
-    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Validation.RuntimePreview', 'Runtime preview')}</h3>
+    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.RuntimePreview', 'Runtime preview')}</h3>
     <p class="manager-environment-runtime-preview" data-selection-mode={selectionMode}>
       {#if selectionMode === 'blind'}
-        {text('FABRICATE.Admin.Manager.Environment.Validation.BlindPreview', 'Players will see a generic Gather action. The system will select from {n} hidden available tasks unless tasks have been revealed.').replace('{n}', String(counts.availableTasks || 0))}
+        {text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.BlindPreview', 'Players will see a generic Gather action. The system will select from {n} hidden available tasks unless tasks have been revealed.').replace('{n}', String(counts.availableTasks || 0))}
       {:else}
-        {text('FABRICATE.Admin.Manager.Environment.Validation.TargetedPreview', 'Players will choose from {n} visible gathering tasks.').replace('{n}', String(counts.availableTasks || 0))}
+        {text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.TargetedPreview', 'Players will choose from {n} visible gathering tasks.').replace('{n}', String(counts.availableTasks || 0))}
       {/if}
     </p>
     <div class="manager-fact-grid">
-      <div class="manager-fact"><strong>{counts.availableTasks || 0}</strong><span>{text('FABRICATE.Admin.Manager.Environment.Validation.AvailableTasks', 'Available tasks')}</span></div>
-      <div class="manager-fact"><strong>{counts.availableHazards || 0}</strong><span>{text('FABRICATE.Admin.Manager.Environment.Validation.AvailableHazards', 'Available hazards')}</span></div>
-      <div class="manager-fact"><strong>{counts.excludedHazards || 0}</strong><span>{text('FABRICATE.Admin.Manager.Environment.Validation.ExcludedHazards', 'Excluded hazards')}</span></div>
+      <div class="manager-fact"><strong>{counts.availableTasks || 0}</strong><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.AvailableTasks', 'Available tasks')}</span></div>
+      <div class="manager-fact"><strong>{counts.availableHazards || 0}</strong><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.AvailableHazards', 'Available hazards')}</span></div>
+      <div class="manager-fact"><strong>{counts.excludedHazards || 0}</strong><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.ExcludedHazards', 'Excluded hazards')}</span></div>
     </div>
   </section>
 
   <section class="manager-environment-card" data-validation-section="issues">
-    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Validation.Issues', 'Issues')}</h3>
+    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.Issues', 'Issues')}</h3>
     {#if readiness.issues.length === 0}
-      <p class="manager-muted">{text('FABRICATE.Admin.Manager.Environment.Validation.NoIssues', 'No issues detected.')}</p>
+      <p class="manager-muted">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.NoIssues', 'No issues detected.')}</p>
     {:else}
       {#each ['critical', 'warning', 'info'] as severity (severity)}
         {#if issuesBy[severity].length > 0}
           <ul class="manager-environment-issue-list" data-issue-severity={severity}>
             {#each issuesBy[severity] as issue, index (issue.id + index)}
               <li class={`manager-environment-issue is-${severity}`} data-issue={issue.id}>
-                <span class={`manager-chip ${severity === 'critical' ? 'is-danger' : severity === 'warning' ? 'is-warning' : 'is-neutral'}`}>{text(`FABRICATE.Admin.Manager.Environment.Validation.Severity.${severity}`, severity)}</span>
+                <span class={`manager-chip ${severity === 'critical' ? 'is-danger' : severity === 'warning' ? 'is-warning' : 'is-neutral'}`}>{text(`FABRICATE.Admin.Manager.EnvironmentEditor.Validation.Severity.${severity}`, severity)}</span>
                 <span class="manager-environment-issue-title">{issueTitle(issue)}</span>
                 {#if issue.recordId}
                   <button type="button" class="manager-button manager-environment-issue-action" onclick={() => onSelectRecord(issue.recordKind, issue.recordId)}>
-                    {text('FABRICATE.Admin.Manager.Environment.Validation.ViewRecord', 'View record')}
+                    {text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.ViewRecord', 'View record')}
                   </button>
                 {/if}
               </li>
