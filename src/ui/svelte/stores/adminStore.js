@@ -2692,6 +2692,32 @@ export function createAdminStore(services) {
     return _clonePlain(get(environmentDraft));
   }
 
+  function _normalizeDraftBlindSelection(value) {
+    if (!value || typeof value !== 'object') return null;
+    const strategy = ['firstAvailable', 'weightedRandom', 'rollTable', 'macro'].includes(value.strategy)
+      ? value.strategy
+      : 'firstAvailable';
+    const weights = value.weights && typeof value.weights === 'object'
+      ? Object.fromEntries(Object.entries(value.weights)
+          .map(([key, weight]) => [String(key), Number(weight)])
+          .filter(([, weight]) => Number.isFinite(weight)))
+      : {};
+    return {
+      strategy,
+      macroUuid: value.macroUuid ? String(value.macroUuid) : null,
+      rollTableUuid: value.rollTableUuid ? String(value.rollTableUuid) : null,
+      weights
+    };
+  }
+
+  function _normalizeDraftReveal(value) {
+    if (!value || typeof value !== 'object') return null;
+    return {
+      policy: ['never', 'onSuccess', 'onAttempt'].includes(value.policy) ? value.policy : 'never',
+      scope: ['actor', 'user', 'party', 'global'].includes(value.scope) ? value.scope : 'actor'
+    };
+  }
+
   function updateEnvironmentDraft(updates = {}) {
     const current = get(environmentDraft);
     if (!current || typeof updates !== 'object' || updates === null) return false;
@@ -2716,6 +2742,8 @@ export function createAdminStore(services) {
       'disabledHazardIds',
       'taskOrder',
       'hazardOrder',
+      'blindSelection',
+      'reveal',
       'tasks'
     ]);
     const next = _clonePlain(current);
@@ -2740,6 +2768,10 @@ export function createAdminStore(services) {
         next[field] = Array.from(new Set((Array.isArray(value) ? value : [])
           .map(entry => String(entry || '').trim())
           .filter(Boolean)));
+      } else if (field === 'blindSelection') {
+        next.blindSelection = _normalizeDraftBlindSelection(value);
+      } else if (field === 'reveal') {
+        next.reveal = _normalizeDraftReveal(value);
       } else {
         next[field] = String(value ?? '');
       }

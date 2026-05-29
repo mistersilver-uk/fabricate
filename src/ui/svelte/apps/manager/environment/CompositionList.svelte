@@ -11,6 +11,9 @@
     kind = 'task',
     records = [],
     mode = 'automatic',
+    selectionMode = 'targeted',
+    weights = {},
+    onWeightChange = () => {},
     selectedId = '',
     onSelect = () => {},
     onInclude = () => {},
@@ -19,6 +22,12 @@
     onReorder = () => {},
     onOpenSource = () => {}
   } = $props();
+
+  const showBlindWeights = $derived(kind === 'task' && selectionMode === 'blind');
+  function weightFor(id) {
+    const raw = Number(weights?.[id]);
+    return Number.isFinite(raw) ? raw : 1;
+  }
 
   let dragIndex = $state(-1);
   let openMenuId = $state('');
@@ -109,7 +118,19 @@
             </button>
             <div class="manager-environment-comp-evidence"><MatchingEvidenceChips evidence={entry.evidence} /></div>
             <div class="manager-environment-comp-override">
-              {#if kind === 'hazard' && Number.isFinite(Number(entry.record?.dropRate))}
+              {#if showBlindWeights}
+                <label class="manager-environment-comp-weight">
+                  <span class="manager-environment-comp-weight-label">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Weight', 'Weight')}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    data-composition-weight={entry.id}
+                    value={weightFor(entry.id)}
+                    onchange={(event) => onWeightChange(entry.id, event.currentTarget.value)}
+                  />
+                </label>
+              {:else if kind === 'hazard' && Number.isFinite(Number(entry.record?.dropRate))}
                 <span class="manager-chip is-neutral">{Number(entry.record.dropRate)}%</span>
               {:else}
                 <span class="manager-environment-comp-none">—</span>

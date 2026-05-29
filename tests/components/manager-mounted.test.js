@@ -2930,7 +2930,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Gathering succeeds'));
     assert.ok(target.querySelector('.manager-inspector [data-gathering-inspector-rules]'));
     assert.equal(target.querySelector('.manager-inspector [data-gathering-inspector-rules] h2').textContent.trim(), 'Rules');
-    assert.equal(target.querySelectorAll('.manager-inspector [data-gathering-inspector-rules] select').length, 5);
+    assert.equal(target.querySelectorAll('.manager-inspector [data-gathering-inspector-rules] select').length, 8);
     assert.equal(target.querySelector('.manager-inspector [data-gathering-rule-stepper]'), null);
     assert.equal(
       target.querySelector('.manager-inspector').textContent.includes('Selected environment'),

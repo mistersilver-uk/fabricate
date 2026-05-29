@@ -79,10 +79,12 @@
         />
       {:else if activeTab === 'tasks'}
         <EnvironmentTasksTab
+          environment={environmentDraft}
           {composition}
           {selectedKind}
           {selectedId}
           onSelectRecord={selectRecord}
+          onUpdate={onUpdateEnvironment}
           {onIncludeRecord}
           {onExcludeRecord}
           {onRestoreRecord}

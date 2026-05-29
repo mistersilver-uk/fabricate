@@ -24,12 +24,13 @@
 - [x] `npm test` + `npm run build`.
 
 ## Phase 4 — Editor UI
-- [ ] Tasks tab: per-task numeric **weight** input in the Override column, shown only when the environment is `blind`, writing `environment.blindSelection.weights[taskId]` via `onUpdateEnvironment`; add the environment strategy select + rollTable/macro pickers.
+- [x] Tasks tab: per-task numeric **weight** input in the Override column, shown only when the environment is `blind`, writing `environment.blindSelection.weights[taskId]` via `onUpdate` (`CompositionList` + `EnvironmentTasksTab`); environment strategy select + rollTable/macro UUID pickers + per-environment reveal override on the Overview "Blind behaviour" card (blind-only).
+- [x] adminStore plumbing: `blindSelection`/`reveal` in the `updateEnvironmentDraft` allow-list with draft normalizers.
 - [x] Remove task drag/reorder: gated the drag handle/grip, draggable, drop handlers, and Move up/down menu actions to `kind === 'hazard'` in `CompositionList.svelte` (tasks keep an empty handle cell). Hazard reorder + `onReorderRecord`/`reorderEnvironmentRecord` wiring retained.
-- [ ] Rules/Settings UI (`src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte`): controls for `blindCandidateGate`, `revealPolicy`, `revealScope`; per-environment reveal override.
-- [ ] `lang/en.json` keys for all new controls/labels.
-- [ ] Update `tests/components/environment-editor.test.js` (no task reorder; weight input present in blind) + `manager-layout`/`manager-contract` as needed.
-- [ ] `npm test` + `npm run build`.
+- [x] Rules/Settings UI (`CraftingSystemManagerRoot.svelte`): selects for `blindCandidateGate`, `revealPolicy`, `revealScope`.
+- [x] `lang/en.json` keys for all new controls/labels.
+- [x] Updated `tests/components/environment-editor.test.js` (no task reorder; blind weight/strategy/reveal UI present) + `manager-mounted` rule-select count.
+- [x] `npm test` + `npm run build`.
 
 ## Specs / docs
 - [ ] Update `openspec/specs/gathering-and-harvesting/spec.md` with blind-mode selection, candidate gating, and reveal behavior.

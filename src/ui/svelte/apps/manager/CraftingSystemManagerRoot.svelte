@@ -4029,6 +4029,51 @@
                   </select>
                 </span>
               </div>
+
+              <div class="manager-rule-row">
+                <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-eye-slash"></i></span>
+                <label class="manager-rule-copy" for="manager-gathering-rule-blind-gate">
+                  <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.BlindCandidateGate', 'Blind candidate gate')}</strong>
+                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.BlindCandidateGateDescription', 'In blind mode, choose whether the generic gather only resolves to tasks the character can attempt, or to any matching task.')}</span>
+                </label>
+                <span class="manager-rule-field">
+                  <select id="manager-gathering-rule-blind-gate" value={selectedGatheringRules.blindCandidateGate ?? 'attemptableOnly'} onchange={(event) => updateSelectedGatheringRules({ blindCandidateGate: event.target.value })}>
+                    <option value="attemptableOnly">{text('FABRICATE.Admin.Manager.Environment.Rules.BlindGateAttemptableOnly', 'Only attemptable tasks')}</option>
+                    <option value="allMatching">{text('FABRICATE.Admin.Manager.Environment.Rules.BlindGateAllMatching', 'Any matching task')}</option>
+                  </select>
+                </span>
+              </div>
+
+              <div class="manager-rule-row">
+                <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-wand-sparkles"></i></span>
+                <label class="manager-rule-copy" for="manager-gathering-rule-reveal-policy">
+                  <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.RevealPolicy', 'Blind reveal')}</strong>
+                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.RevealPolicyDescription', 'Decide whether a blind task is revealed to the player after they attempt it.')}</span>
+                </label>
+                <span class="manager-rule-field">
+                  <select id="manager-gathering-rule-reveal-policy" value={selectedGatheringRules.revealPolicy ?? 'never'} onchange={(event) => updateSelectedGatheringRules({ revealPolicy: event.target.value })}>
+                    <option value="never">{text('FABRICATE.Admin.Manager.Environment.Rules.RevealNever', 'Never reveal')}</option>
+                    <option value="onSuccess">{text('FABRICATE.Admin.Manager.Environment.Rules.RevealOnSuccess', 'Reveal on success')}</option>
+                    <option value="onAttempt">{text('FABRICATE.Admin.Manager.Environment.Rules.RevealOnAttempt', 'Reveal on any attempt')}</option>
+                  </select>
+                </span>
+              </div>
+
+              <div class="manager-rule-row">
+                <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-users-viewfinder"></i></span>
+                <label class="manager-rule-copy" for="manager-gathering-rule-reveal-scope">
+                  <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.RevealScope', 'Reveal scope')}</strong>
+                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.RevealScopeDescription', 'Who learns the revealed task: just the actor, the controlling user, the party, or everyone.')}</span>
+                </label>
+                <span class="manager-rule-field">
+                  <select id="manager-gathering-rule-reveal-scope" value={selectedGatheringRules.revealScope ?? 'actor'} onchange={(event) => updateSelectedGatheringRules({ revealScope: event.target.value })}>
+                    <option value="actor">{text('FABRICATE.Admin.Manager.Environment.Rules.RevealScopeActor', 'Actor')}</option>
+                    <option value="user">{text('FABRICATE.Admin.Manager.Environment.Rules.RevealScopeUser', 'User')}</option>
+                    <option value="party">{text('FABRICATE.Admin.Manager.Environment.Rules.RevealScopeParty', 'Party')}</option>
+                    <option value="global">{text('FABRICATE.Admin.Manager.Environment.Rules.RevealScopeGlobal', 'Everyone')}</option>
+                  </select>
+                </span>
+              </div>
             </div>
           </section>
         {:else if currentView === 'environments' && activeGatheringInspectorTab}

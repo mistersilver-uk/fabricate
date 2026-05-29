@@ -4,10 +4,12 @@
   import CompositionList from './CompositionList.svelte';
 
   let {
+    environment = null,
     composition = { compositionMode: 'automatic', tasks: [] },
     selectedKind = '',
     selectedId = '',
     onSelectRecord = () => {},
+    onUpdate = () => {},
     onIncludeRecord = () => {},
     onExcludeRecord = () => {},
     onRestoreRecord = () => {},
@@ -23,6 +25,21 @@
   const mode = $derived(composition?.compositionMode === 'manual' ? 'manual' : 'automatic');
   const tasks = $derived(Array.isArray(composition?.tasks) ? composition.tasks : []);
   const activeSelectedId = $derived(selectedKind === 'task' ? selectedId : '');
+  const selectionMode = $derived(environment?.selectionMode === 'blind' ? 'blind' : 'targeted');
+  const blindWeights = $derived(environment?.blindSelection?.weights && typeof environment.blindSelection.weights === 'object'
+    ? environment.blindSelection.weights
+    : {});
+
+  function setBlindWeight(taskId, weight) {
+    const id = String(taskId || '').trim();
+    if (!id) return;
+    const current = environment?.blindSelection || {};
+    const weights = { ...(current.weights && typeof current.weights === 'object' ? current.weights : {}) };
+    const numeric = Number(weight);
+    if (!Number.isFinite(numeric) || numeric < 0) delete weights[id];
+    else weights[id] = numeric;
+    onUpdate({ blindSelection: { ...current, weights } });
+  }
 </script>
 
 <section class="manager-environment-tab" data-environment-tab="tasks" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Tasks.Title', 'Tasks')}>
@@ -37,6 +54,9 @@
     kind="task"
     records={tasks}
     {mode}
+    {selectionMode}
+    weights={blindWeights}
+    onWeightChange={setBlindWeight}
     selectedId={activeSelectedId}
     onSelect={onSelectRecord}
     onInclude={onIncludeRecord}

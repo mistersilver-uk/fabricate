@@ -103,6 +103,15 @@ describe('environment composition editor structure', () => {
     }
   });
 
+  it('exposes blind-mode configuration UI (weights, strategy, reveal override)', () => {
+    assert.ok(listSource.includes('data-composition-weight'), 'composition list renders a per-task blind weight input');
+    assert.ok(listSource.includes('showBlindWeights'), 'weight input is gated to blind task rows');
+    assert.ok(tasksTabSource.includes('onWeightChange'), 'tasks tab wires per-task blind weight changes');
+    assert.ok(overviewSource.includes('data-overview-section="blind"'), 'overview renders a blind behaviour card');
+    assert.ok(overviewSource.includes('data-environment-field="blindStrategy"'), 'overview exposes a blind selection strategy control');
+    assert.ok(overviewSource.includes('data-environment-field="revealPolicy"'), 'overview exposes a per-environment reveal override');
+  });
+
   it('the linked scene card lives in the inspector under the summary', () => {
     assert.ok(summaryInspectorSource.includes('data-environment-summary-scene'), 'inspector renders the relocated linked scene card');
     assert.ok(summaryInspectorSource.includes('manager-environment-scene-dropzone'), 'inspector scene card keeps the drop-to-link zone');
