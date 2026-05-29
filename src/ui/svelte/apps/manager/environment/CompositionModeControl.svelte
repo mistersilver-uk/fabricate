@@ -11,7 +11,7 @@
 
   const OPTIONS = [
     { value: 'automatic', icon: 'fas fa-wand-magic-sparkles', key: 'Automatic', fallback: 'Automatic', descKey: 'AutomaticHint', descFallback: 'All matching enabled records are available unless locally excluded.' },
-    { value: 'manual', icon: 'fas fa-hand-pointer', key: 'Manual', fallback: 'Manual', descKey: 'ManualHint', descFallback: 'Only explicitly included matching records are available.' }
+    { value: 'manual', icon: 'fas fa-hand-pointer', key: 'Manual', fallback: 'Manual', descKey: 'ManualHint', descFallback: 'Only explicitly included records are available; GMs can force add enabled non-matching records.' }
   ];
 
   const current = $derived(mode === 'manual' ? 'manual' : 'automatic');

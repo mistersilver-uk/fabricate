@@ -83,6 +83,19 @@ A `blind` environment hides its tasks from players and presents a single generic
 
 Per-task weights and the strategy/reveal controls only appear while the environment is in `blind` mode.
 
+## Composition
+
+Every environment has a **composition mode** (Overview → Composition mode card) that decides which reusable library tasks and hazards apply:
+
+- **Automatic** — every matching, library-enabled record is available unless you explicitly exclude it. Stale `enabled*Ids` / `forced*Ids` lists left over from a previous manual pass are ignored, so automatic always means "all matching available unless excluded".
+- **Manual** — only records you explicitly **include** apply. The Tasks and Hazards tabs show:
+  - **Included in this environment** — records you've added.
+  - **Matching candidates** — records that match this environment and can be included with one click.
+  - **Excluded from this environment** — records you've removed; Restore brings them back.
+  - **Non-matching** — paginated list of records that don't match this environment (plus library-disabled ones for reference). In manual mode each non-matching row has a **Force add** action that adds it to the environment regardless of matching; the row then appears in the Included section as **Force included** (available at runtime). Library-disabled rows show an "enable in library first" note and cannot be force-added. Excluding a force-included record clears the force.
+
+In automatic mode the Non-matching list is read-only — informational only — because automatic mode ignores the force list. Switching from manual to automatic does not silently make force-added non-matching records available.
+
 ## Gathering Tools Library
 
 Manager V2 exposes a per-system **Tools** page under Gathering. Tools are reusable gathering tools that Gathering Tasks can require by `toolIds`. The page is a draft-and-save surface: edits are held in memory until the GM clicks **Save changes**, navigation away from a dirty draft prompts before discarding, and a concurrent-edit dialog appears if the live tool list changed while the GM was editing.

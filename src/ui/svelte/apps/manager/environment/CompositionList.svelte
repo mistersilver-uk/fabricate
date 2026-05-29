@@ -5,7 +5,7 @@
   import RuntimeStatePill from './RuntimeStatePill.svelte';
   import CompositionStatePill from './CompositionStatePill.svelte';
   import MatchingEvidenceChips from './MatchingEvidenceChips.svelte';
-  import DiagnosticsDisclosure from './DiagnosticsDisclosure.svelte';
+  import Pagination from '../../../components/Pagination.svelte';
 
   let {
     kind = 'task',
@@ -17,11 +17,15 @@
     selectedId = '',
     onSelect = () => {},
     onInclude = () => {},
+    onForceInclude = () => {},
     onExclude = () => {},
     onRestore = () => {},
     onReorder = () => {},
     onOpenSource = () => {}
   } = $props();
+
+  let nonMatchingPageIndex = $state(0);
+  let nonMatchingPageSize = $state(10);
 
   const showBlindWeights = $derived(kind === 'task' && selectionMode === 'blind');
   function weightFor(id) {
@@ -49,11 +53,21 @@
   const included = $derived(records.filter(entry =>
     entry.compositionState === 'includedByMatch'
     || entry.compositionState === 'explicitlyIncluded'
+    || entry.compositionState === 'forceIncluded'
     || entry.compositionState === 'includedButUnavailable'));
   const candidates = $derived(records.filter(entry => entry.compositionState === 'candidate'));
   const excluded = $derived(records.filter(entry => entry.compositionState === 'excluded'));
-  const diagnostics = $derived(records.filter(entry =>
+  const nonMatching = $derived(records.filter(entry =>
     entry.compositionState === 'notMatching' || entry.compositionState === 'libraryDisabled'));
+  const paginatedNonMatching = $derived(nonMatching.slice(
+    nonMatchingPageIndex * nonMatchingPageSize,
+    (nonMatchingPageIndex + 1) * nonMatchingPageSize
+  ));
+  $effect(() => {
+    if (nonMatchingPageIndex > 0 && nonMatchingPageIndex * nonMatchingPageSize >= nonMatching.length) {
+      nonMatchingPageIndex = 0;
+    }
+  });
 
   const includedTitle = $derived(mode === 'manual'
     ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.IncludedInEnvironment', 'Included in this environment')
@@ -235,17 +249,18 @@
     {/if}
   </section>
 
-  <!-- Diagnostics -->
-  <DiagnosticsDisclosure
-    title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Diagnostics', 'Diagnostics')}
-    count={diagnostics.length}
-  >
-    {#if diagnostics.length === 0}
-      <p class="manager-muted">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoDiagnostics', 'No non-matching or disabled records.')}</p>
+  <!-- Non-matching (replaces the diagnostics disclosure; manual mode allows force-add). -->
+  <section class="manager-environment-comp-section" data-section="non-matching">
+    <header class="manager-environment-comp-band">
+      <h4>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NonMatching', 'Non-matching')}</h4>
+      <span class="manager-environment-comp-count">{nonMatching.length} {unit}</span>
+    </header>
+    {#if nonMatching.length === 0}
+      <p class="manager-muted manager-environment-comp-empty">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoNonMatching', 'No non-matching or disabled records.')}</p>
     {:else}
-      <ul class="manager-environment-comp-rows is-diagnostic">
-        {#each diagnostics as entry (entry.id)}
-          <li class="manager-environment-comp-row is-diagnostic" data-record-id={entry.id} data-section-row="diagnostic">
+      <ul class="manager-environment-comp-rows is-non-matching">
+        {#each paginatedNonMatching as entry (entry.id)}
+          <li class="manager-environment-comp-row is-non-matching" data-record-id={entry.id} data-section-row="non-matching" data-composition-state={entry.compositionState}>
             <span class="manager-environment-comp-handle"></span>
             <button type="button" class="manager-environment-comp-task" data-action="select" aria-pressed={selectedId === entry.id} onclick={() => onSelect(kind, entry.id)}>
               <img class="manager-environment-comp-thumb" src={recordImage(entry)} alt="" />
@@ -258,6 +273,14 @@
             <div class="manager-environment-comp-override"><span class="manager-environment-comp-none">—</span></div>
             <div class="manager-environment-comp-runtime"><CompositionStatePill state={entry.compositionState} /></div>
             <div class="manager-environment-comp-actions">
+              {#if mode === 'manual' && entry.compositionState === 'notMatching'}
+                <button type="button" class="manager-button is-warning manager-environment-force-include" data-action="force-include" onclick={() => onForceInclude(kind, entry.id)}>
+                  <i class="fas fa-plus" aria-hidden="true"></i>
+                  <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ForceAdd', 'Force add')}</span>
+                </button>
+              {:else if mode === 'manual' && entry.compositionState === 'libraryDisabled'}
+                <span class="manager-muted manager-environment-comp-disabled-note">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.LibraryDisabledNote', 'Enable in library first')}</span>
+              {/if}
               <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSource', 'Open source record')} onclick={() => onOpenSource(kind, entry.id)}>
                 <i class="fas fa-up-right-from-square" aria-hidden="true"></i>
               </button>
@@ -265,6 +288,13 @@
           </li>
         {/each}
       </ul>
+      <Pagination
+        totalCount={nonMatching.length}
+        pageSize={nonMatchingPageSize}
+        pageIndex={nonMatchingPageIndex}
+        onPageChange={(next) => nonMatchingPageIndex = next}
+        onPageSizeChange={(next) => { nonMatchingPageSize = next; nonMatchingPageIndex = 0; }}
+      />
     {/if}
-  </DiagnosticsDisclosure>
+  </section>
 </div>

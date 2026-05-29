@@ -11,6 +11,7 @@
     onSelectRecord = () => {},
     onUpdate = () => {},
     onIncludeRecord = () => {},
+    onForceIncludeRecord = () => {},
     onExcludeRecord = () => {},
     onRestoreRecord = () => {},
     onReorderRecord = () => {},
@@ -46,7 +47,7 @@
   <p class="manager-environment-comp-callout" data-composition-mode={mode}>
     <i class={mode === 'manual' ? 'fas fa-hand-pointer' : 'fas fa-wand-magic-sparkles'} aria-hidden="true"></i>
     <span>{mode === 'manual'
-      ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Tasks.ManualIntro', 'Only tasks you explicitly include and that still match the environment are available to players.')
+      ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Tasks.ManualIntro', 'Only tasks you explicitly include are available to players. You can also force add non-matching tasks from the Non-matching list.')
       : text('FABRICATE.Admin.Manager.EnvironmentEditor.Tasks.AutomaticIntro', 'All matching enabled library tasks are available unless you exclude them here.')}</span>
   </p>
 
@@ -60,6 +61,7 @@
     selectedId={activeSelectedId}
     onSelect={onSelectRecord}
     onInclude={onIncludeRecord}
+    onForceInclude={onForceIncludeRecord}
     onExclude={onExcludeRecord}
     onRestore={onRestoreRecord}
     onReorder={onReorderRecord}

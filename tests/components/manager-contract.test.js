@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -43,6 +43,38 @@ const mainSource = readFileSync(mainPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
 const managerSource = [rootSource, essenceBrowserSource, essenceEditSource, tagsCategoriesSource, systemEditSource, systemsBrowserSource, recipesBrowserSource, componentsBrowserSource, componentEditSource, environmentEditSource, environmentsBrowserSource, gatheringTaskEditSource, gatheringTasksBrowserSource, toolsBrowserSource].join('\n');
+
+function catalogValue(key) {
+  return key.split('.').reduce((node, part) => node?.[part], lang);
+}
+
+function decodeStaticString(quote, body) {
+  return Function(`return ${quote}${body}${quote};`)();
+}
+
+function staticTextCalls(source) {
+  const pattern = /text\(\s*(["'])(FABRICATE(?:\\.|(?!\1).)*)\1\s*,\s*(["'])((?:\\.|(?!\3).)*)\3\s*\)/gs;
+  return [...source.matchAll(pattern)].map(match => ({
+    key: match[2],
+    fallback: decodeStaticString(match[3], match[4])
+  }));
+}
+
+function isChangedManagerEnvironmentLocalizationKey(key) {
+  return key.startsWith('FABRICATE.Admin.Manager.Environment.')
+    || key.startsWith('FABRICATE.Admin.Manager.EnvironmentEditor.')
+    || key.startsWith('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.')
+    || key.startsWith('FABRICATE.Admin.Environments.')
+    || [
+      'FABRICATE.Admin.Manager.GlobalConditions',
+      'FABRICATE.Admin.Manager.CurrentTimeOfDay',
+      'FABRICATE.Admin.Manager.CurrentWeather'
+    ].includes(key);
+}
+
+function sourceName(filePath) {
+  return filePath.replace(`${repoRoot}\\`, '').replace(`${repoRoot}/`, '');
+}
 
 describe('CraftingSystemManager source contract', () => {
   it('self-registers as the sole crafting system manager app', () => {
@@ -188,6 +220,38 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.CreateBreadcrumb, 'Create essence');
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.SourceLinkedFilter, 'Linked');
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.SourceNoneShort, 'None');
+    assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersTitle, 'Gathering hazards');
+    assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersHint, 'Browse reusable hazards before attaching them to environments.');
+    assert.equal(rootSource.includes('EncountersPlaceholderTitle'), false);
+    assert.equal(rootSource.includes('EncountersPlaceholderHint'), false);
+  });
+
+  it('keeps changed manager and environment static localization fallbacks aligned with en.json', () => {
+    const environmentComponentDir = resolve(repoRoot, 'src/ui/svelte/apps/manager/environment');
+    const contractFiles = [
+      rootPath,
+      environmentEditPath,
+      environmentsBrowserPath,
+      ...readdirSync(environmentComponentDir)
+        .filter(name => name.endsWith('.svelte'))
+        .map(name => resolve(environmentComponentDir, name))
+    ];
+    const failures = [];
+
+    for (const filePath of contractFiles) {
+      const source = readFileSync(filePath, 'utf8');
+      for (const { key, fallback } of staticTextCalls(source)) {
+        if (!isChangedManagerEnvironmentLocalizationKey(key)) continue;
+        const value = catalogValue(key);
+        if (typeof value !== 'string') {
+          failures.push(`${sourceName(filePath)}: missing ${key}`);
+        } else if (value !== fallback) {
+          failures.push(`${sourceName(filePath)}: ${key} fallback "${fallback}" does not match en.json "${value}"`);
+        }
+      }
+    }
+
+    assert.deepEqual(failures, []);
   });
 
   it('routes system Edit to the in-place v2 edit view and existing store callbacks', () => {
@@ -480,6 +544,7 @@ describe('CraftingSystemManager source contract', () => {
       'store.deleteEnvironmentDraft',
       'store.setEnvironmentCompositionMode',
       'store.includeEnvironmentRecord',
+      'store.forceIncludeEnvironmentRecord',
       'store.excludeEnvironmentRecord',
       'store.restoreEnvironmentRecord',
       'store.reorderEnvironmentRecord',

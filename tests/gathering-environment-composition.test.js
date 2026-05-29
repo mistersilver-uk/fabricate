@@ -93,6 +93,38 @@ test('hazards compose by danger matching and respect the shared composition mode
   assert.deepEqual(composedManualEmpty.hazards.map(hazard => hazard.id), []);
 });
 
+test('manual mode force-adds a non-matching task into the composed environment', () => {
+  const service = makeService({ tasks: libraryTasks });
+  // tDesert does not match a cave environment, but the GM force-added it.
+  const composed = service.composeEnvironment(environment({
+    compositionMode: 'manual',
+    enabledTaskIds: ['t1'],
+    forcedTaskIds: ['tDesert']
+  }), system);
+  assert.deepEqual(composed.tasks.map(task => task.id).sort(), ['t1', 'tDesert']);
+});
+
+test('automatic mode ignores the forced allow-list', () => {
+  const service = makeService({ tasks: libraryTasks });
+  const composed = service.composeEnvironment(environment({
+    compositionMode: 'automatic',
+    forcedTaskIds: ['tDesert']
+  }), system);
+  // Auto-mode composition is "all matching available unless excluded"; forces are ignored.
+  assert.deepEqual(composed.tasks.map(task => task.id).sort(), ['t1', 't2', 't3']);
+});
+
+test('excluding a forced record drops it from the manual-mode composition', () => {
+  const service = makeService({ tasks: libraryTasks });
+  const composed = service.composeEnvironment(environment({
+    compositionMode: 'manual',
+    enabledTaskIds: ['t1'],
+    forcedTaskIds: ['tDesert'],
+    disabledTaskIds: ['tDesert']
+  }), system);
+  assert.deepEqual(composed.tasks.map(task => task.id), ['t1']);
+});
+
 test('the environment danger level acts as a ceiling for eligible hazards', () => {
   const service = makeService({
     hazards: [

@@ -61,7 +61,6 @@ function compileManagerRoot() {
     'CompositionStatePill',
     'RuntimeStatePill',
     'MatchingEvidenceChips',
-    'DiagnosticsDisclosure',
     'CompositionModeControl'
   ]) {
     writeCompiledSvelte(`src/ui/svelte/apps/manager/environment/${environmentComponent}.svelte`);
@@ -2770,10 +2769,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Weather conditions'));
     assert.ok(target.textContent.includes('Regions'));
     assert.ok(target.textContent.includes('Biomes'));
-    assert.ok(target.textContent.includes('These values control current time matching for gathering tasks and hazards.'));
-    assert.ok(target.textContent.includes('These values control current weather matching for gathering tasks and hazards.'));
-    assert.ok(target.textContent.includes('Environments use one region. Labels can be renamed without changing ids.'));
-    assert.ok(target.textContent.includes('Environments can use multiple biomes. Left-click the coloured icon to edit icon; right-click to edit colour.'));
+    assert.ok(target.textContent.includes('These values control current time matching for gathering tasks and hazards. Click the name of a time of day to edit it.'));
+    assert.ok(target.textContent.includes('These values control weather matching for gathering tasks and hazards. Click the name of a condition to edit it.'));
+    assert.ok(target.textContent.includes('Environments use one region. Click the name of a region to edit it.'));
+    assert.ok(target.textContent.includes('Environments can have multiple biomes. Left-click the icon to swap it out, right-click to change the colour.'));
     assert.equal(target.querySelectorAll('.manager-condition-add input').length, 4);
     assert.equal(target.querySelectorAll('.manager-condition-add .essence-icon-picker-trigger.icon-only').length, 3);
     assert.equal(target.querySelectorAll('.manager-color-picker-trigger').length, 1);
@@ -2912,9 +2911,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     biomeColorTrigger.getBoundingClientRect = originalBiomeTriggerRect;
     assert.equal(target.querySelector('.manager-gathering-settings-summary'), null);
     assert.equal(target.querySelector('[data-gathering-rule-fact]'), null);
-    assert.ok(target.querySelector('.manager-inspector').textContent.includes('Choose which successful drop rows are granted.'));
-    assert.ok(target.querySelector('.manager-inspector').textContent.includes('Choose which matching hazards are applied after a gathering roll.'));
-    assert.ok(target.querySelector('.manager-inspector').textContent.includes('Decide whether selected hazards still allow the gathering attempt to succeed.'));
+    assert.ok(target.querySelector('.manager-inspector').textContent.includes('Choose how rewards are granted.'));
+    assert.ok(target.querySelector('.manager-inspector').textContent.includes('Choose how matching hazards are applied after a gathering roll.'));
+    assert.ok(target.querySelector('.manager-inspector').textContent.includes('Decide whether rolling a hazard still allows the gathering attempt to succeed.'));
     const rewardsSelect = target.querySelector('#manager-gathering-rule-rewards');
     const hazardsSelect = target.querySelector('#manager-gathering-rule-hazards');
     assert.deepEqual(

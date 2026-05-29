@@ -311,14 +311,14 @@
 
   function conditionHint(kind) {
     return kind === 'timeOfDay'
-      ? text('FABRICATE.Admin.Manager.Environment.Conditions.TimeOfDayHint', 'These values control current time matching for gathering tasks and hazards.')
-      : text('FABRICATE.Admin.Manager.Environment.Conditions.WeatherHint', 'These values control current weather matching for gathering tasks and hazards.');
+      ? text('FABRICATE.Admin.Manager.Environment.Conditions.TimeOfDayHint', 'These values control current time matching for gathering tasks and hazards. Click the name of a time of day to edit it.')
+      : text('FABRICATE.Admin.Manager.Environment.Conditions.WeatherHint', 'These values control weather matching for gathering tasks and hazards. Click the name of a condition to edit it.');
   }
 
   function conditionInputPlaceholder(kind) {
     return kind === 'timeOfDay'
-      ? text('FABRICATE.Admin.Manager.Environment.Conditions.TimeOfDayPlaceholder', 'e.g. midnight')
-      : text('FABRICATE.Admin.Manager.Environment.Conditions.WeatherPlaceholder', 'e.g. ashfall');
+      ? text('FABRICATE.Admin.Manager.Environment.Conditions.TimeOfDayPlaceholder', 'e.g. Midnight')
+      : text('FABRICATE.Admin.Manager.Environment.Conditions.WeatherPlaceholder', 'e.g. Ashfall');
   }
 
   function conditionInputValue(kind) {
@@ -361,14 +361,14 @@
 
   function vocabularyHint(kind) {
     return kind === 'regions'
-      ? text('FABRICATE.Admin.Manager.Environment.Vocabularies.RegionsHint', 'Environments use one region. Labels can be renamed without changing ids.')
-      : text('FABRICATE.Admin.Manager.Environment.Vocabularies.BiomesHint', 'Environments can use multiple biomes. Left-click the coloured icon to edit icon; right-click to edit colour.');
+      ? text('FABRICATE.Admin.Manager.Environment.Vocabularies.RegionsHint', 'Environments use one region. Click the name of a region to edit it.')
+      : text('FABRICATE.Admin.Manager.Environment.Vocabularies.BiomesHint', 'Environments can have multiple biomes. Left-click the icon to swap it out, right-click to change the colour.');
   }
 
   function vocabularyPlaceholder(kind) {
     return kind === 'regions'
-      ? text('FABRICATE.Admin.Manager.Environment.Vocabularies.RegionPlaceholder', 'e.g. northlands')
-      : text('FABRICATE.Admin.Manager.Environment.Vocabularies.BiomePlaceholder', 'e.g. mushroom forest');
+      ? text('FABRICATE.Admin.Manager.Environment.Vocabularies.RegionPlaceholder', 'e.g. Northlands')
+      : text('FABRICATE.Admin.Manager.Environment.Vocabularies.BiomePlaceholder', 'e.g. Mushroom forest');
   }
 
   function vocabularyInputValue(kind) {

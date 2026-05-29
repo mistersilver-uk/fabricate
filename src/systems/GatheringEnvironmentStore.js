@@ -282,6 +282,8 @@ export class GatheringEnvironmentStore {
     const compositionMode = VALID_COMPOSITION_MODES.has(data?.compositionMode) ? data.compositionMode : 'automatic';
     const blindSelection = normalizeBlindSelection(data?.blindSelection);
     const reveal = normalizeEnvironmentReveal(data?.reveal);
+    const forcedTaskIds = normalizeIdList(data?.forcedTaskIds);
+    const forcedHazardIds = normalizeIdList(data?.forcedHazardIds);
     return {
       id: freshEnvironmentId || !data?.id ? this.randomID() : String(data.id),
       craftingSystemId: stringOrEmpty(data?.craftingSystemId),
@@ -311,6 +313,8 @@ export class GatheringEnvironmentStore {
       hazardPolicy: ['successWithHazard', 'failureWithHazard'].includes(data?.hazardPolicy) ? data.hazardPolicy : 'successWithHazard',
       ...(blindSelection ? { blindSelection } : {}),
       ...(reveal ? { reveal } : {}),
+      ...(forcedTaskIds.length > 0 ? { forcedTaskIds } : {}),
+      ...(forcedHazardIds.length > 0 ? { forcedHazardIds } : {}),
       tasks: Array.isArray(data?.tasks) ? data.tasks.map(task => this._normalizeTask(task)) : []
     };
   }

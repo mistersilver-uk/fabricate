@@ -8,6 +8,7 @@ Add to `_normalizeEnvironment()` and `_validateEnvironment()`:
 
 - `compositionMode: 'automatic' | 'manual'` — default `'automatic'`; validated against `VALID_COMPOSITION_MODES` (mirror `VALID_SELECTION_MODES`). Shared across tasks and hazards in Phase 1.
 - `taskOrder: string[]`, `hazardOrder: string[]` — ordered record IDs, normalized to deduped string arrays. They overlay drag order on the composed set; records absent from the array fall back to library order then name.
+- `forcedTaskIds: string[]`, `forcedHazardIds: string[]` — manual-mode GM force-add overrides, normalized to deduped string arrays. They are ignored in automatic mode and cleared for a record when that record is locally excluded.
 
 No per-record override fields are added in this change (see Phase 2 in the proposal).
 
@@ -16,7 +17,7 @@ No per-record override fields are added in this change (see Phase 2 in the propo
 `compositionMode` disambiguates today's ambiguous empty-list case (empty `enabledTaskIds` currently means "all matching" but cannot represent "manual, include none"):
 
 - **automatic** — include every matching, library-enabled record **except** IDs in `disabled*Ids`.
-- **manual** — include only IDs in `enabled*Ids` that still match and are library-enabled. A `manual`-included ID whose record no longer matches resolves to `includedButUnavailable` (not Available).
+- **manual** — include IDs in `enabled*Ids` that still match and are library-enabled, plus enabled IDs in `forced*Ids` even when they do not match. A normal manual-included ID whose record no longer matches resolves to `includedButUnavailable` (not Available); a forced non-matching ID resolves to `forceIncluded` and is Available until excluded or removed from the force list.
 
 ## Domain / Service
 
@@ -27,9 +28,9 @@ No per-record override fields are added in this change (see Phase 2 in the propo
 
 ## Store (`src/ui/svelte/stores/adminStore.js`)
 
-- `updateEnvironmentDraft` allowed-field set (`:2616`) gains `compositionMode`, `taskOrder`, `hazardOrder`. The two arrays normalize through the existing `enabled*Ids` branch (`:2646`); `compositionMode` validates to the allowed set.
-- New focused draft actions (thin wrappers over `updateEnvironmentDraft`, mirroring the existing environment task action style): `setEnvironmentCompositionMode(mode)`, `includeEnvironmentRecord(kind, id)`, `excludeEnvironmentRecord(kind, id)`, `restoreEnvironmentRecord(kind, id)`, `reorderEnvironmentRecord(kind, fromIndex, toIndex)`. `kind` is `'task' | 'hazard'`.
-- A derived **composition view-model** exposed on the environment view-state so all four tabs + inspector + validation read one source of truth. Built from the draft environment + library `tasks`/`hazards` (`gatheringConfig.systems[systemId]`) + current conditions (`_gatheringCurrentConditions`), it classifies each record into a `CompositionState` (`includedByMatch` | `explicitlyIncluded` | `excluded` | `candidate` | `includedButUnavailable` | `notMatching` | `libraryDisabled`) plus a `RuntimeState` (`available` | `unavailable`), and exposes `evidence` from `evaluateEnvironmentMatch` and runtime counts (available / excluded / candidate / unavailable tasks & hazards, validation issue count).
+- `updateEnvironmentDraft` allowed-field set (`:2616`) gains `compositionMode`, `taskOrder`, `hazardOrder`, `forcedTaskIds`, and `forcedHazardIds`. The arrays normalize through the existing `enabled*Ids` branch (`:2646`); `compositionMode` validates to the allowed set.
+- New focused draft actions (thin wrappers over `updateEnvironmentDraft`, mirroring the existing environment task action style): `setEnvironmentCompositionMode(mode)`, `includeEnvironmentRecord(kind, id)`, `forceIncludeEnvironmentRecord(kind, id)`, `excludeEnvironmentRecord(kind, id)`, `restoreEnvironmentRecord(kind, id)`, `reorderEnvironmentRecord(kind, fromIndex, toIndex)`. `kind` is `'task' | 'hazard'`.
+- A derived **composition view-model** exposed on the environment view-state so all four tabs + inspector + validation read one source of truth. Built from the draft environment + library `tasks`/`hazards` (`gatheringConfig.systems[systemId]`) + current conditions (`_gatheringCurrentConditions`), it classifies each record into a `CompositionState` (`includedByMatch` | `explicitlyIncluded` | `forceIncluded` | `excluded` | `candidate` | `includedButUnavailable` | `notMatching` | `libraryDisabled`) plus a `RuntimeState` (`available` | `unavailable`), and exposes `evidence` from `evaluateEnvironmentMatch` and runtime counts (available / excluded / candidate / unavailable tasks & hazards, validation issue count).
 
 ## UI
 
@@ -38,9 +39,9 @@ New directory `src/ui/svelte/apps/manager/environment/`. Svelte 5 runes only; co
 - Shell: `EnvironmentEditView.svelte` (replaces placeholder; keeps `manager-environment-edit-view` + `manager-environment-details-band` hooks), `EnvironmentEditorHeader.svelte`, `EnvironmentEditorTabs.svelte` (keyboard-navigable tablist).
 - Tabs: `EnvironmentOverviewTab.svelte`, `EnvironmentTasksTab.svelte`, `EnvironmentHazardsTab.svelte`, `EnvironmentValidationTab.svelte`.
 - Inspector: `EnvironmentRightInspector.svelte` → `EnvironmentSummaryInspector.svelte`, `TaskWrapperInspector.svelte`, `HazardWrapperInspector.svelte`. Override section disabled in Phase 1.
-- Shared: `RuntimeStatePill.svelte`, `CompositionStatePill.svelte`, `MatchingEvidenceChips.svelte`, `DiagnosticsDisclosure.svelte`, `CompositionModeControl.svelte`, `TaskCompositionList.svelte`, `HazardCompositionList.svelte`.
+- Shared: `RuntimeStatePill.svelte`, `CompositionStatePill.svelte`, `MatchingEvidenceChips.svelte`, `CompositionModeControl.svelte`, and a shared `CompositionList.svelte` used by task and hazard tabs.
 
-Behaviour rules in UI: non-matching records appear only in `DiagnosticsDisclosure` (collapsed) and cannot be included into the main flow (include action blocked for non-matching candidates); manual-included non-matching records render as `includedButUnavailable`. Drag-reorder reuses the existing `dragDrop` action with non-drag fallback buttons. Status pills always carry text, never colour alone.
+Behaviour rules in UI: non-matching and library-disabled records appear in a dedicated paginated Non-matching section, not among matching candidates. Manual mode can force-add enabled non-matching records; those rows render in the included section as `forceIncluded` with explicit force-included copy, while library-disabled rows remain non-addable until enabled in the reusable library. Drag-reorder remains hazard-only with non-drag fallback buttons. Status pills always carry text, never colour alone.
 
 ## Manager root wiring (`CraftingSystemManagerRoot.svelte`)
 
@@ -59,7 +60,7 @@ New `.manager-environment-*` selectors in `styles/fabricate.css` reusing existin
 - `tests/gathering-rich-state-service.*` (or a new `tests/gathering-environment-composition.test.js`) — `composeEnvironment` under `automatic` vs `manual` (empty-list disambiguation, manual non-matching include → unavailable, `taskOrder`/`hazardOrder` sort).
 - `tests/gathering-match.test.js` (new) — `evaluateEnvironmentMatch` evidence per field (region/biome/weather/time/danger; `any` vs `match` vs `mismatch`) and `matches` parity with prior `_recordMatchesEnvironment`.
 - `tests/stores/adminStore.test.js` — `updateEnvironmentDraft` accepts `compositionMode`/`taskOrder`/`hazardOrder`; the composition view-model classifies `CompositionState`/`RuntimeState` and counts correctly.
-- `tests/components/environment-editor.test.js` (new) — happy-dom mount: pills render text + state; tabs are keyboard-navigable; lists render Included/Candidate/Excluded/Diagnostics; non-matching records absent from the main flow.
+- `tests/components/environment-editor.test.js` (new) — source/contract checks: pills render text + state; tabs are keyboard-navigable; lists render Included/Candidate/Excluded/Non-matching; manual mode exposes force-add for enabled non-matching rows; localization keys/fallbacks stay aligned.
 - `tests/components/manager-mounted.test.js` — extend the compile/mount list with the new environment components.
 
 ## Risks

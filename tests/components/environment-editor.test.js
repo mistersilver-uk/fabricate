@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -14,16 +14,40 @@ function read(name) {
   return readFileSync(resolve(envDir, name), 'utf8');
 }
 
+function catalogValue(key) {
+  return key.split('.').reduce((node, part) => node?.[part], lang);
+}
+
+function decodeStaticString(quote, body) {
+  return Function(`return ${quote}${body}${quote};`)();
+}
+
+function staticTextCalls(source) {
+  const pattern = /text\(\s*(["'])(FABRICATE(?:\\.|(?!\1).)*)\1\s*,\s*(["'])((?:\\.|(?!\3).)*)\3\s*\)/gs;
+  return [...source.matchAll(pattern)].map(match => ({
+    key: match[2],
+    fallback: decodeStaticString(match[3], match[4])
+  }));
+}
+
 const shellSource = readFileSync(resolve(repoRoot, 'src/ui/svelte/apps/manager/EnvironmentEditView.svelte'), 'utf8');
 const listSource = read('CompositionList.svelte');
+const modeControlSource = read('CompositionModeControl.svelte');
 const inspectorSource = read('RecordInspector.svelte');
 const tabsSource = read('EnvironmentEditorTabs.svelte');
 const evidenceSource = read('MatchingEvidenceChips.svelte');
 const tasksTabSource = read('EnvironmentTasksTab.svelte');
+const validationSource = read('EnvironmentValidationTab.svelte');
 const overviewSource = read('EnvironmentOverviewTab.svelte');
 const summaryInspectorSource = read('EnvironmentSummaryInspector.svelte');
 const rightInspectorSource = read('EnvironmentRightInspector.svelte');
 const lang = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
+const editorLocalizationSources = [
+  ['EnvironmentEditView.svelte', shellSource],
+  ...readdirSync(envDir)
+    .filter(name => name.endsWith('.svelte'))
+    .map(name => [name, read(name)])
+];
 
 describe('environment editor localization', () => {
   it('defines the EnvironmentEditor namespace in en.json for the keys the editor uses', () => {
@@ -48,6 +72,53 @@ describe('environment editor localization', () => {
     }
     assert.equal(editor.Validation.Severity.critical, 'Critical');
     assert.equal(editor.Hazards.DangerTag.deadly, 'Deadly');
+  });
+
+  it('defines the new force-include and non-matching EnvironmentEditor copy', () => {
+    const editor = lang.FABRICATE.Admin.Manager.EnvironmentEditor;
+    const expected = [
+      ['Composition.NonMatching', 'Non-matching'],
+      ['Composition.NoNonMatching', 'No non-matching or disabled records.'],
+      ['Composition.ForceAdd', 'Force add'],
+      ['Composition.LibraryDisabledNote', 'Enable in library first'],
+      ['Composition.ForceIncluded', 'Force included'],
+      ['Composition.ManualHint', 'Only explicitly included records are available; GMs can force add enabled non-matching records.'],
+      ['Inspector.ExplainForceIncluded', 'Force-added by the GM despite not matching the environment context.'],
+      ['Tasks.ManualIntro', 'Only tasks you explicitly include are available to players. You can also force add non-matching tasks from the Non-matching list.'],
+      ['Hazards.ManualIntro', 'Only hazards you explicitly include apply here. You can also force add non-matching hazards from the Non-matching list.'],
+      ['Validation.CheckRegion', 'Has a region or is set to "any region"']
+    ];
+
+    for (const [path, value] of expected) {
+      assert.equal(path.split('.').reduce((node, part) => node?.[part], editor), value, `EnvironmentEditor.${path}`);
+    }
+  });
+
+  it('keeps static EnvironmentEditor localization fallbacks aligned with en.json', () => {
+    const failures = [];
+    for (const [fileName, source] of editorLocalizationSources) {
+      for (const { key, fallback } of staticTextCalls(source)) {
+        if (!key.startsWith('FABRICATE.Admin.Manager.EnvironmentEditor.')) continue;
+        const value = catalogValue(key);
+        if (typeof value !== 'string') {
+          failures.push(`${fileName}: missing ${key}`);
+        } else if (value !== fallback) {
+          failures.push(`${fileName}: ${key} fallback "${fallback}" does not match en.json "${value}"`);
+        }
+      }
+    }
+    assert.deepEqual(failures, []);
+  });
+
+  it('keeps dynamic EnvironmentEditor validation fallbacks aligned with en.json', () => {
+    assert.ok(
+      validationSource.includes('hasRegion: [\'CheckRegion\', \'Has a region or is set to "any region"\']'),
+      'CheckRegion dynamic fallback should match the English catalog'
+    );
+    assert.ok(
+      modeControlSource.includes("descFallback: 'Only explicitly included records are available; GMs can force add enabled non-matching records.'"),
+      'ManualHint dynamic fallback should match the English catalog'
+    );
   });
 
   it('no editor component falls back on the legacy Environment.* editor key prefixes', () => {
@@ -140,16 +211,21 @@ describe('environment composition editor structure', () => {
     assert.ok(inspectorSource.includes('variant="checks"'), 'inspector requests the checks evidence variant');
   });
 
-  it('keeps non-matching records out of the main flow and only in diagnostics', () => {
+  it('non-matching records render in a paginated section (force-addable in manual)', () => {
     // The included/candidate/excluded sections must never surface notMatching or
-    // libraryDisabled records; those belong to the collapsed diagnostics view.
+    // libraryDisabled records; those belong to the dedicated non-matching list.
     assert.ok(listSource.includes("entry.compositionState === 'includedByMatch'"), 'included section keys off includedByMatch');
+    assert.ok(listSource.includes("entry.compositionState === 'forceIncluded'"), 'included section also surfaces force-included records');
     assert.ok(listSource.includes("entry.compositionState === 'candidate'"), 'candidates section keys off candidate state');
-    assert.ok(/diagnostics = \$derived\(records\.filter\(entry =>\s*entry\.compositionState === 'notMatching' \|\| entry\.compositionState === 'libraryDisabled'\)\)/.test(listSource), 'diagnostics collects notMatching and libraryDisabled');
-    assert.ok(listSource.includes('DiagnosticsDisclosure'), 'non-matching records render inside the diagnostics disclosure');
+    assert.ok(/nonMatching = \$derived\(records\.filter\(entry =>\s*entry\.compositionState === 'notMatching' \|\| entry\.compositionState === 'libraryDisabled'\)\)/.test(listSource), 'non-matching list collects notMatching and libraryDisabled');
+    assert.ok(listSource.includes('<Pagination'), 'the non-matching list is paginated');
+    assert.ok(!listSource.includes('DiagnosticsDisclosure'), 'the diagnostics disclosure is replaced by the non-matching list');
     // The include action only appears for matching candidates (manual mode).
     assert.ok(listSource.includes("mode === 'manual'"), 'candidates section is gated to manual mode');
     assert.ok(listSource.includes("data-action=\"include\""), 'candidate rows expose an include action');
+    // Manual mode lets the GM force-add non-matching records; library-disabled rows are non-addable.
+    assert.ok(listSource.includes('data-action="force-include"'), 'manual mode exposes a force-add action on non-matching rows');
+    assert.ok(listSource.includes('LibraryDisabledNote'), 'library-disabled rows show an "enable in library first" note');
   });
 
   it('inspector renders the four-layer evaluation and disabled environment overrides', () => {

@@ -17,11 +17,11 @@ The runtime composition + matching engine already exists (`composeEnvironment`, 
 
 - Replace the `EnvironmentEditView` placeholder with an editor shell: header (breadcrumbs, title, description, status pills, Back/Delete/Save), a tabbed workspace (Overview / Tasks / Hazards / Validation), and an editor-owned right inspector rail.
 - Overview tab: edit identity, environment context (region/biomes/danger/conditions summary), player-facing behaviour (targeted/blind), composition mode, scene link, and a computed runtime summary.
-- Tasks and Hazards tabs: render automatic and manual composition with clear Included / Excluded / Candidates / Diagnostics separation, deterministic ordering, and per-record runtime/composition state + matching evidence.
+- Tasks and Hazards tabs: render automatic and manual composition with clear Included / Excluded / Candidates / Non-matching separation, deterministic ordering, and per-record runtime/composition state + matching evidence.
 - Right inspector: contextual states for no-selection (environment summary), selected task, and selected hazard, each showing the four-layer evaluation and matching evidence.
 - Validation tab: environment readiness checks, a player-facing runtime preview, and categorised issues.
-- Add a minimal schema extension that disambiguates composition: an explicit per-environment `compositionMode` (`automatic` | `manual`) and deterministic `taskOrder` / `hazardOrder`.
-- Enforce the behaviour rules: non-matching records are diagnostics-only and never become Available through local inclusion.
+- Add a minimal schema extension that disambiguates composition: an explicit per-environment `compositionMode` (`automatic` | `manual`), deterministic `taskOrder` / `hazardOrder`, and persisted `forcedTaskIds` / `forcedHazardIds` for manual force-inclusion.
+- Enforce the behaviour rules: non-matching records stay separated from matching candidates; in manual mode a GM can force-add a non-matching enabled record, which is surfaced as force-included rather than silently treated as a normal match.
 
 ## Out of Scope (deferred to Phase 2)
 

@@ -116,6 +116,8 @@ GatheringEnvironment = {
   disabledTaskIds?: string[],
   enabledHazardIds?: string[],
   disabledHazardIds?: string[],
+  forcedTaskIds?: string[],
+  forcedHazardIds?: string[],
   blindSelection?: {
     strategy: "firstAvailable" | "weightedRandom" | "rollTable" | "macro",
     macroUuid?: string | null,
@@ -141,6 +143,7 @@ GatheringEnvironment = {
 10. `risk` is optional player-facing risk evidence. Existing risk display values may map to `dangerTags`, but reusable hazard matching uses `dangerTags`.
 11. Weather and time of day are not environment fields. They are global gathering conditions used when matching Gathering Tasks and hazards.
 12. `enabledTaskIds`, `disabledTaskIds`, `enabledHazardIds`, and `disabledHazardIds` store environment-level composition toggles for reusable library records without rewriting the library definitions.
+12a. `forcedTaskIds` / `forcedHazardIds` are GM "force-add" overrides used in **manual** composition mode: a record listed there is composed into the environment even when it does not match the environment's region/biome/danger/conditions (composition state `forceIncluded`, runtime state `available`). Forces are honored only in manual mode — **automatic** mode ignores them, consistent with automatic ignoring the enabled allow-list, so a stale forced list never makes a non-matching record available in automatic mode. Excluding a forced record (`disabled*Ids`) clears the force.
 13. Environment metadata exposed to non-GM users must not leak hidden task identity, hidden result details, provider diagnostics, or GM-only notes.
 14. Legacy environments without rich metadata remain valid and load with neutral defaults.
 15. `hazardSelectionMode` and `hazardPolicy` are legacy compatibility fields. New Manager authoring and d100 runtime behavior use system Gathering Rules once they are authored.

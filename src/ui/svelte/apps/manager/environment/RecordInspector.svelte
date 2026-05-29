@@ -37,6 +37,8 @@
       case 'includedByMatch':
       case 'explicitlyIncluded':
         return text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ExplainAvailable', 'All matching rules are satisfied and no active hazards block this record.');
+      case 'forceIncluded':
+        return text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ExplainForceIncluded', 'Force-added by the GM despite not matching the environment context.');
       case 'includedButUnavailable':
         return text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ExplainStale', 'Included in this environment but no longer matches the environment context.');
       case 'excluded':

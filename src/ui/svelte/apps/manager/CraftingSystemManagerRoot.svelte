@@ -476,10 +476,10 @@
       icon: 'fas fa-exclamation-triangle',
       labelKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.Encounters',
       labelFallback: 'Hazards',
-      titleKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersPlaceholderTitle',
+      titleKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersTitle',
       titleFallback: 'Gathering hazards',
-      hintKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersPlaceholderHint',
-      hintFallback: 'Reusable hazard authoring is planned for a later slice.'
+      hintKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersHint',
+      hintFallback: 'Browse reusable hazards before attaching them to environments.'
     },
     {
       id: 'settings',
@@ -911,7 +911,7 @@
     if (currentView === 'environments') return text('FABRICATE.Admin.Manager.Environment.Subtitle', 'Manage gathering environments for the selected crafting system.');
     if (currentView === 'environment-edit') {
       const environmentDescription = String(environmentDraftForDisplay?.description || '').trim();
-      return environmentDescription || text('FABRICATE.Admin.Manager.Environment.EditSubtitle', 'Compose reusable gathering tasks and hazards into this environment.');
+      return environmentDescription || text('FABRICATE.Admin.Manager.Environment.EditSubtitle', 'Edit scene linkage, environment details, tasks, results, catalysts, visibility, timing, and validation in the workspace.');
     }
     if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.Manager.Environment.Tasks.EditSubtitle', 'Edit availability, identity, and drop rules for the selected gathering task.');
     if (currentView === 'gathering-hazard-edit') return text('FABRICATE.Admin.Manager.Environment.Hazards.EditSubtitle', 'Edit identity, availability, danger, and modifiers for the selected hazard.');
@@ -2816,7 +2816,7 @@
         </button>
         <button type="button" class="manager-button is-primary" onclick={saveEnvironmentEdit} disabled={!$viewState.environmentDraftDirty || $viewState.environmentSaving}>
           <i class={$viewState.environmentSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Environments.Save', 'Save Environment')}</span>
+          <span>{text('FABRICATE.Admin.Environments.Save', 'Save')}</span>
         </button>
       {:else if currentView === 'gathering-task-edit'}
         <button type="button" class="manager-button" onclick={backToGatheringTaskLibrary}>
@@ -3072,6 +3072,7 @@
             onUpdateEnvironment={store.updateEnvironmentDraft}
             onSetCompositionMode={store.setEnvironmentCompositionMode}
             onIncludeRecord={store.includeEnvironmentRecord}
+            onForceIncludeRecord={store.forceIncludeEnvironmentRecord}
             onExcludeRecord={store.excludeEnvironmentRecord}
             onRestoreRecord={store.restoreEnvironmentRecord}
             onReorderRecord={store.reorderEnvironmentRecord}
@@ -3424,7 +3425,7 @@
             {#if selectedGatheringDrop}
             <div class="manager-drop-inspector-stack" data-gathering-task-drop-inspector>
             <section class="manager-inspector-card manager-drop-editor-header-card">
-              <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Tasks.SelectedDrop', 'Selected Drop Rule')}</h3>
+              <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Tasks.SelectedDrop', 'Selected drop rule')}</h3>
               <div class="manager-inspector-title-row">
                 <img class="manager-recipe-preview" src={gatheringDropImage(selectedGatheringDrop)} alt="" />
                 <div class="manager-inspector-copy">
@@ -3947,7 +3948,7 @@
                 <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-gift"></i></span>
                 <label class="manager-rule-copy" for="manager-gathering-rule-rewards">
                   <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.Rewards', 'Rewards')}</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.RewardsDescription', 'Choose which successful drop rows are granted.')}</span>
+                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.RewardsDescription', 'Choose how rewards are granted.')}</span>
                 </label>
                 <span class="manager-rule-field">
                   <select id="manager-gathering-rule-rewards" value={selectedGatheringRules.rewardSelectionMode} onchange={(event) => updateSelectedGatheringRules({ rewardSelectionMode: event.target.value })}>
@@ -3969,7 +3970,7 @@
                 <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-triangle-exclamation"></i></span>
                 <label class="manager-rule-copy" for="manager-gathering-rule-hazards">
                   <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.Hazards', 'Hazards')}</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.HazardsDescription', 'Choose which matching hazards are applied after a gathering roll.')}</span>
+                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.HazardsDescription', 'Choose how matching hazards are applied after a gathering roll.')}</span>
                 </label>
                 <span class="manager-rule-field">
                   <select id="manager-gathering-rule-hazards" value={selectedGatheringRules.hazardSelectionMode} onchange={(event) => updateSelectedGatheringRules({ hazardSelectionMode: event.target.value })}>
@@ -3991,7 +3992,7 @@
                 <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-scale-balanced"></i></span>
                 <label class="manager-rule-copy" for="manager-gathering-rule-outcome">
                   <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.HazardOutcome', 'Hazard outcome')}</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.HazardOutcomeDescription', 'Decide whether selected hazards still allow the gathering attempt to succeed.')}</span>
+                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.HazardOutcomeDescription', 'Decide whether rolling a hazard still allows the gathering attempt to succeed.')}</span>
                 </label>
                 <span class="manager-rule-field">
                   <select id="manager-gathering-rule-outcome" value={selectedGatheringRules.hazardPolicy} onchange={(event) => updateSelectedGatheringRules({ hazardPolicy: event.target.value })}>
@@ -4414,7 +4415,7 @@
             <div>
               <i class="fas fa-boxes" aria-hidden="true"></i>
               <h3>{text('FABRICATE.Admin.Manager.Component.SelectComponent', 'Select a component')}</h3>
-              <p>{text('FABRICATE.Admin.Manager.Component.InspectorHint', 'The inspector shows component identity, source evidence, tags, essences, and existing actions for the selected row.')}</p>
+              <p>{text('FABRICATE.Admin.Manager.Component.InspectorHint', 'The inspector shows component identity, origin, tags, essences, and source copy context for the selected row.')}</p>
             </div>
           </div>
         {/if}

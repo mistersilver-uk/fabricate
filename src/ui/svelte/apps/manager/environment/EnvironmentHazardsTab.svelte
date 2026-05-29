@@ -9,6 +9,7 @@
     selectedId = '',
     onSelectRecord = () => {},
     onIncludeRecord = () => {},
+    onForceIncludeRecord = () => {},
     onExcludeRecord = () => {},
     onRestoreRecord = () => {},
     onReorderRecord = () => {},
@@ -29,7 +30,7 @@
   <p class="manager-environment-comp-callout" data-composition-mode={mode}>
     <i class={mode === 'manual' ? 'fas fa-hand-pointer' : 'fas fa-wand-magic-sparkles'} aria-hidden="true"></i>
     <span>{mode === 'manual'
-      ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Hazards.ManualIntro', 'Only hazards you explicitly include and that still match the environment apply here.')
+      ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Hazards.ManualIntro', 'Only hazards you explicitly include apply here. You can also force add non-matching hazards from the Non-matching list.')
       : text('FABRICATE.Admin.Manager.EnvironmentEditor.Hazards.AutomaticIntro', 'All matching enabled library hazards apply unless you exclude them here.')}</span>
   </p>
 
@@ -40,6 +41,7 @@
     selectedId={activeSelectedId}
     onSelect={onSelectRecord}
     onInclude={onIncludeRecord}
+    onForceInclude={onForceIncludeRecord}
     onExclude={onExcludeRecord}
     onRestore={onRestoreRecord}
     onReorder={onReorderRecord}

@@ -198,7 +198,8 @@ export class GatheringRichStateService {
       ...sortRecordsByOrder(
         normalizeList(libraries.tasks)
           .filter(task => task?.enabled !== false)
-          .filter(task => this._recordMatchesEnvironment(task, environment, currentConditions, { includeDanger: false, conditionSettings: systemConditions }))
+          .filter(task => this._recordMatchesEnvironment(task, environment, currentConditions, { includeDanger: false, conditionSettings: systemConditions })
+            || this._recordIsForced(environment, task.id, 'task', compositionMode))
           .filter(task => this._environmentIncludesLibraryRecord(environment, task.id, 'task', compositionMode)),
         environment?.taskOrder
       ).map(task => this._libraryTaskToRuntimeTask(task))
@@ -206,7 +207,8 @@ export class GatheringRichStateService {
     const hazards = sortRecordsByOrder(
       normalizeList(libraries.hazards)
         .filter(hazard => hazard?.enabled !== false)
-        .filter(hazard => this._recordMatchesEnvironment(hazard, environment, currentConditions, { includeDanger: true, conditionSettings: systemConditions }))
+        .filter(hazard => this._recordMatchesEnvironment(hazard, environment, currentConditions, { includeDanger: true, conditionSettings: systemConditions })
+          || this._recordIsForced(environment, hazard.id, 'hazard', compositionMode))
         .filter(hazard => this._environmentIncludesLibraryRecord(environment, hazard.id, 'hazard', compositionMode)),
       environment?.hazardOrder
     ).map(hazard => normalizeHazard(hazard));
@@ -772,13 +774,26 @@ export class GatheringRichStateService {
   }
 
   /**
+   * Whether a record is force-included into the environment. Forces are honored
+   * only in manual mode (automatic ignores them, like the enabled allow-list);
+   * a force-included record is composed even when it does not match the
+   * environment context.
+   */
+  _recordIsForced(environment, id, kind, compositionMode = 'automatic') {
+    if (compositionMode !== 'manual') return false;
+    const forcedKey = kind === 'hazard' ? 'forcedHazardIds' : 'forcedTaskIds';
+    return normalizeList(environment?.[forcedKey]).map(String).includes(String(id));
+  }
+
+  /**
    * Whether a matching, library-enabled record is composed into the
    * environment, honoring `compositionMode`:
    * - `automatic`: include every matching record unless explicitly excluded
    *   (`disabled*Ids`). Any `enabled*Ids` allow-list is ignored — automatic
    *   means "all matching available unless excluded", so a stale list left
    *   over from manual mode never suppresses matching records.
-   * - `manual`: include only when explicitly listed (`enabled*Ids`) and not excluded.
+   * - `manual`: include only when explicitly listed (`enabled*Ids`) or
+   *   force-added (`forced*Ids`) and not excluded.
    */
   _environmentIncludesLibraryRecord(environment, id, kind, compositionMode = 'automatic') {
     const enabledKey = kind === 'hazard' ? 'enabledHazardIds' : 'enabledTaskIds';
@@ -786,7 +801,10 @@ export class GatheringRichStateService {
     const enabled = normalizeList(environment?.[enabledKey]).map(String);
     const disabled = normalizeList(environment?.[disabledKey]).map(String);
     if (disabled.includes(String(id))) return false;
-    if (compositionMode === 'manual') return enabled.includes(String(id));
+    if (compositionMode === 'manual') {
+      const forced = normalizeList(environment?.[kind === 'hazard' ? 'forcedHazardIds' : 'forcedTaskIds']).map(String);
+      return enabled.includes(String(id)) || forced.includes(String(id));
+    }
     return true;
   }
 

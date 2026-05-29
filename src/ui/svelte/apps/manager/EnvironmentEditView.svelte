@@ -30,6 +30,7 @@
     onUpdateEnvironment = () => {},
     onSetCompositionMode = () => {},
     onIncludeRecord = () => {},
+    onForceIncludeRecord = () => {},
     onExcludeRecord = () => {},
     onRestoreRecord = () => {},
     onReorderRecord = () => {},
@@ -102,6 +103,7 @@
           onSelectRecord={selectRecord}
           onUpdate={onUpdateEnvironment}
           {onIncludeRecord}
+          {onForceIncludeRecord}
           {onExcludeRecord}
           {onRestoreRecord}
           {onReorderRecord}
@@ -114,6 +116,7 @@
           {selectedId}
           onSelectRecord={selectRecord}
           {onIncludeRecord}
+          {onForceIncludeRecord}
           {onExcludeRecord}
           {onRestoreRecord}
           {onReorderRecord}

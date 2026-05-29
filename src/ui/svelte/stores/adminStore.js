@@ -2012,8 +2012,10 @@ export function createAdminStore(services) {
   function _classifyCompositionRecords({ records, environment, conditions, conditionSettings, compositionMode, kind, includeDanger, order }) {
     const enabledKey = kind === 'hazard' ? 'enabledHazardIds' : 'enabledTaskIds';
     const disabledKey = kind === 'hazard' ? 'disabledHazardIds' : 'disabledTaskIds';
+    const forcedKey = kind === 'hazard' ? 'forcedHazardIds' : 'forcedTaskIds';
     const enabled = Array.isArray(environment?.[enabledKey]) ? environment[enabledKey].map(String) : [];
     const disabled = Array.isArray(environment?.[disabledKey]) ? environment[disabledKey].map(String) : [];
+    const forced = Array.isArray(environment?.[forcedKey]) ? environment[forcedKey].map(String) : [];
     const orderIndex = new Map((Array.isArray(order) ? order : []).map((id, index) => [String(id), index]));
 
     const classified = (Array.isArray(records) ? records : []).map((record, index) => {
@@ -2022,15 +2024,17 @@ export function createAdminStore(services) {
       const { matches, evidence } = evaluateEnvironmentMatch(record, environment, conditions, { includeDanger, conditionSettings });
       const excluded = disabled.includes(id);
       const explicitlyIncluded = enabled.includes(id);
+      // Forces are honored only in manual mode (automatic ignores them, like the enabled allow-list).
+      const forceIncluded = compositionMode === 'manual' && forced.includes(id);
 
       let compositionState;
       if (!libraryEnabled) compositionState = 'libraryDisabled';
       else if (excluded) compositionState = 'excluded';
-      else if (!matches) compositionState = explicitlyIncluded ? 'includedButUnavailable' : 'notMatching';
+      else if (!matches) compositionState = forceIncluded ? 'forceIncluded' : (explicitlyIncluded ? 'includedButUnavailable' : 'notMatching');
       else if (compositionMode === 'manual') compositionState = explicitlyIncluded ? 'explicitlyIncluded' : 'candidate';
       else compositionState = 'includedByMatch';
 
-      const runtimeState = (compositionState === 'includedByMatch' || compositionState === 'explicitlyIncluded') ? 'available' : 'unavailable';
+      const runtimeState = (compositionState === 'includedByMatch' || compositionState === 'explicitlyIncluded' || compositionState === 'forceIncluded') ? 'available' : 'unavailable';
       const orderRank = orderIndex.has(id) ? orderIndex.get(id) : Number.MAX_SAFE_INTEGER;
       return { id, record, kind, libraryEnabled, matches, evidence, excluded, explicitlyIncluded, compositionState, runtimeState, orderRank, _index: index };
     });
@@ -2740,6 +2744,8 @@ export function createAdminStore(services) {
       'disabledTaskIds',
       'enabledHazardIds',
       'disabledHazardIds',
+      'forcedTaskIds',
+      'forcedHazardIds',
       'taskOrder',
       'hazardOrder',
       'blindSelection',
@@ -2764,7 +2770,7 @@ export function createAdminStore(services) {
         selectedEnvironmentTaskId.set(_resolveEnvironmentTaskSelection(next, get(selectedEnvironmentTaskId)));
       } else if (['biomes', 'dangerTags'].includes(field)) {
         next[field] = _normalizeGatheringTagList(value);
-      } else if (['enabledTaskIds', 'disabledTaskIds', 'enabledHazardIds', 'disabledHazardIds', 'taskOrder', 'hazardOrder'].includes(field)) {
+      } else if (['enabledTaskIds', 'disabledTaskIds', 'enabledHazardIds', 'disabledHazardIds', 'forcedTaskIds', 'forcedHazardIds', 'taskOrder', 'hazardOrder'].includes(field)) {
         next[field] = Array.from(new Set((Array.isArray(value) ? value : [])
           .map(entry => String(entry || '').trim())
           .filter(Boolean)));
@@ -2814,8 +2820,8 @@ export function createAdminStore(services) {
 
   function _compositionFieldKeys(kind) {
     return kind === 'hazard'
-      ? { enabledKey: 'enabledHazardIds', disabledKey: 'disabledHazardIds', orderKey: 'hazardOrder' }
-      : { enabledKey: 'enabledTaskIds', disabledKey: 'disabledTaskIds', orderKey: 'taskOrder' };
+      ? { enabledKey: 'enabledHazardIds', disabledKey: 'disabledHazardIds', orderKey: 'hazardOrder', forcedKey: 'forcedHazardIds' }
+      : { enabledKey: 'enabledTaskIds', disabledKey: 'disabledTaskIds', orderKey: 'taskOrder', forcedKey: 'forcedTaskIds' };
   }
 
   function _compositionIdArray(value) {
@@ -2840,16 +2846,31 @@ export function createAdminStore(services) {
     return updateEnvironmentDraft({ [enabledKey]: enabled, [disabledKey]: disabled, [orderKey]: order });
   }
 
+  function forceIncludeEnvironmentRecord(kind, recordId) {
+    const current = get(environmentDraft);
+    if (!current) return false;
+    const id = String(recordId || '').trim();
+    if (!id) return false;
+    const { disabledKey, orderKey, forcedKey } = _compositionFieldKeys(kind);
+    const disabled = _compositionIdArray(current[disabledKey]).filter(entry => entry !== id);
+    const order = _compositionIdArray(current[orderKey]);
+    const forced = _compositionIdArray(current[forcedKey]);
+    if (!forced.includes(id)) forced.push(id);
+    if (!order.includes(id)) order.push(id);
+    return updateEnvironmentDraft({ [forcedKey]: forced, [disabledKey]: disabled, [orderKey]: order });
+  }
+
   function excludeEnvironmentRecord(kind, recordId) {
     const current = get(environmentDraft);
     if (!current) return false;
     const id = String(recordId || '').trim();
     if (!id) return false;
-    const { enabledKey, disabledKey } = _compositionFieldKeys(kind);
+    const { enabledKey, disabledKey, forcedKey } = _compositionFieldKeys(kind);
     const enabled = _compositionIdArray(current[enabledKey]).filter(entry => entry !== id);
+    const forced = _compositionIdArray(current[forcedKey]).filter(entry => entry !== id);
     const disabled = _compositionIdArray(current[disabledKey]);
     if (!disabled.includes(id)) disabled.push(id);
-    return updateEnvironmentDraft({ [enabledKey]: enabled, [disabledKey]: disabled });
+    return updateEnvironmentDraft({ [enabledKey]: enabled, [disabledKey]: disabled, [forcedKey]: forced });
   }
 
   function restoreEnvironmentRecord(kind, recordId) {
@@ -4977,6 +4998,7 @@ export function createAdminStore(services) {
     updateEnvironmentDraft,
     setEnvironmentCompositionMode,
     includeEnvironmentRecord,
+    forceIncludeEnvironmentRecord,
     excludeEnvironmentRecord,
     restoreEnvironmentRecord,
     reorderEnvironmentRecord,
