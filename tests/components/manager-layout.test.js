@@ -1243,7 +1243,14 @@ test('manager environments browser and edit route define compact responsive geom
     css.includes('.fabricate-manager[data-manager-view="environment-edit"] .manager-main'),
     'environment edit route should reserve scrollable editor space'
   );
-  assert.ok(editorShellBlock.includes('overflow: auto;'), 'environment editor shell should own scroll containment at normal widths');
+  assert.ok(
+    editorShellBlock.includes('overflow: hidden;') && editorShellBlock.includes('grid-template-rows: minmax(0, 1fr);'),
+    'environment editor shell should bound the editor height (not scroll) so the tab bar stays fixed'
+  );
+  assert.ok(
+    blockFor('.fabricate-manager .manager-environment-tab-panel').includes('overflow: auto;'),
+    'the environment editor tab panel should own internal scroll while the tab bar stays pinned'
+  );
   assert.ok(
     css.includes('.fabricate-manager[data-manager-view="environment-edit"] .manager-body') && css.includes('grid-template-columns: 220px minmax(0, 1fr);'),
     'environment edit route should replace the browse inspector with a two-region rail/editor grid'

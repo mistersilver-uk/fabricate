@@ -7448,7 +7448,9 @@
 .fabricate-manager .manager-environment-editor-shell {
   min-width: 0;
   min-height: 0;
-  overflow: auto;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  overflow: hidden;
   padding: 12px;
 }
 
@@ -12537,8 +12539,9 @@
 
 .fabricate-manager .manager-environment-edit-view[data-environment-editor] {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 12px;
+  min-height: 0;
 }
 
 .fabricate-manager .manager-environment-details-band-row {

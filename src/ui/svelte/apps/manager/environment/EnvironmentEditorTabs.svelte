@@ -11,7 +11,7 @@
 
   const TABS = [
     { id: 'overview', icon: 'fas fa-circle-info', key: 'Overview', fallback: 'Overview' },
-    { id: 'tasks', icon: 'fas fa-hand-holding', key: 'Tasks', fallback: 'Tasks' },
+    { id: 'tasks', icon: 'fas fa-clipboard-list', key: 'Tasks', fallback: 'Tasks' },
     { id: 'hazards', icon: 'fas fa-triangle-exclamation', key: 'Hazards', fallback: 'Hazards' },
     { id: 'validation', icon: 'fas fa-clipboard-check', key: 'Validation', fallback: 'Validation' }
   ];
