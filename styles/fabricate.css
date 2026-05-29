@@ -13222,6 +13222,11 @@
   color: var(--fab-mv2-danger);
 }
 
+.fabricate-manager .manager-environment-evidence-chip.is-warning {
+  border-color: var(--fab-warning);
+  color: var(--fab-warning-text, var(--fab-warning));
+}
+
 .fabricate-manager .manager-environment-evidence-count {
   font-weight: 700;
   opacity: 0.9;
@@ -13256,6 +13261,10 @@
 
 .fabricate-manager .manager-environment-evidence-check.is-danger > i {
   color: var(--fab-mv2-danger);
+}
+
+.fabricate-manager .manager-environment-evidence-check.is-warning > i {
+  color: var(--fab-warning);
 }
 
 .fabricate-manager .manager-environment-evidence-check.is-any > i {

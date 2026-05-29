@@ -45,9 +45,12 @@
     return values.length ? values.join(', ') : anyLabel(field);
   }
 
-  function tone(entry) {
+  function tone(field, entry) {
     if (!entry || entry.state === 'any') return 'is-any';
-    return entry.state === 'match' ? 'is-positive' : 'is-danger';
+    if (entry.state === 'match') return 'is-positive';
+    // Weather and time are runtime gates (transient), not exclusion criteria,
+    // so paint their mismatches as a warning instead of a hard danger.
+    return (field.key === 'weather' || field.key === 'time') ? 'is-warning' : 'is-danger';
   }
 
   function icon(entry) {
@@ -65,7 +68,7 @@
     return entry && entry.applicable !== false && entry.state !== 'any';
   }).map(field => {
     const entry = entryFor(field);
-    return { field, entry, count: count(entry), value: valueText(field, entry), tone: tone(entry), icon: icon(entry) };
+    return { field, entry, count: count(entry), value: valueText(field, entry), tone: tone(field, entry), icon: icon(entry) };
   }));
 
   const summary = $derived(shown.map(row => row.value).join(' · '));
