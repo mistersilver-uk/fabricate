@@ -80,9 +80,19 @@ test('a hazard is ranked by its highest danger tag against the ceiling', () => {
   assert.deepEqual(mixed.evidence.danger.envValues, ['dangerous']);
 });
 
-test('weather constraint that does not include the current condition is a mismatch', () => {
+test('weather/time mismatches keep matches true but flip conditionsMet to false', () => {
   const record = { weather: ['storm'] };
-  const { matches, evidence } = evaluateEnvironmentMatch(record, environment, conditions, { includeDanger: false });
-  assert.equal(matches, false);
+  const { matches, conditionsMet, evidence } = evaluateEnvironmentMatch(record, environment, conditions, { includeDanger: false });
+  // Weather is a runtime gate, not a match criterion.
+  assert.equal(matches, true);
+  assert.equal(conditionsMet, false);
   assert.equal(evidence.weather.state, 'mismatch');
+});
+
+test('region/biome/danger mismatch still drives matches false', () => {
+  const record = { biomes: ['desert'] };
+  const { matches, conditionsMet } = evaluateEnvironmentMatch(record, environment, conditions, { includeDanger: false });
+  assert.equal(matches, false);
+  // Conditions can still be met even when matching fails.
+  assert.equal(conditionsMet, true);
 });

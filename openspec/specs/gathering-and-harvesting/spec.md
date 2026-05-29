@@ -141,7 +141,7 @@ GatheringEnvironment = {
 8. Disabled environments are never attemptable by non-GM users and are hidden from normal player gathering flows.
 9. `region` is single-select; `biomes` and `dangerTags` are multi-select tag lists.
 10. `risk` is optional player-facing risk evidence. Existing risk display values may map to `dangerTags`, but reusable hazard matching uses `dangerTags`.
-11. Weather and time of day are not environment fields. They are global gathering conditions used when matching Gathering Tasks and hazards.
+11. Weather and time of day are not environment fields. They are global gathering conditions used as **runtime gates** — a Gathering Task or hazard whose required `weather` / `timeOfDay` values are not satisfied by the current conditions stays in the environment's composition (it still matches by region/biome/danger) but is **inactive** at runtime: tasks become `visible: true` / `attemptable: false` with a `CONDITIONS_BLOCKED` reason, and hazards are skipped during d100 hazard selection. Matching itself is decided by region / biome / danger only.
 12. `enabledTaskIds`, `disabledTaskIds`, `enabledHazardIds`, and `disabledHazardIds` store environment-level composition toggles for reusable library records without rewriting the library definitions.
 12a. `forcedTaskIds` / `forcedHazardIds` are GM "force-add" overrides used in **manual** composition mode: a record listed there is composed into the environment even when it does not match the environment's region/biome/danger/conditions (composition state `forceIncluded`, runtime state `available`). Forces are honored only in manual mode — **automatic** mode ignores them, consistent with automatic ignoring the enabled allow-list, so a stale forced list never makes a non-matching record available in automatic mode. Excluding a forced record (`disabled*Ids`) clears the force.
 13. Environment metadata exposed to non-GM users must not leak hidden task identity, hidden result details, provider diagnostics, or GM-only notes.
@@ -243,8 +243,8 @@ ConditionOption = {
 15. `game.fabricate.gathering.setWeather(weatherTag)`, `setTimeOfDay(timeOfDayTag)`, and `setConditions({ weather, timeOfDay })` require a GM user, validate tags against the configured vocabularies, persist the setting, dispatch `fabricate.gathering.conditionsUpdated`, and refresh gathering listings.
 16. Player-facing callers may read conditions but may not mutate them.
 17. Condition values are authored or selected by the GM unless an approved integration provider supplies them.
-18. Environments may use weather/time as matching dimensions for Gathering Tasks and hazards, but player environment browse filters must not expose weather/time as environment filters.
-19. Disabled per-system weather or time-of-day dimensions are ignored during Gathering Task and hazard matching.
+18. Weather and time-of-day are runtime gates only; they never affect whether a Gathering Task or hazard matches an environment, and player environment browse filters must not expose weather/time as environment filters.
+19. Disabled per-system weather or time-of-day dimensions are ignored at runtime (records with constraints on a disabled dimension are not condition-blocked by it).
 20. Condition state may modify task availability, result yield, check difficulty, stamina cost, risk, or encounter chance through declarative or provider-driven configuration.
 21. Fabricate core must not hardcode game-system-specific weather, time, skill, or stamina formulas.
 22. A gathering attempt should snapshot relevant condition state when the attempt starts so active runs and history can explain what conditions affected the attempt.

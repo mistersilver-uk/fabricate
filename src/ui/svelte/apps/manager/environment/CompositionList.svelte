@@ -50,6 +50,21 @@
       || text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoDescription', 'No description');
   }
 
+  function runtimePillState(entry) {
+    return entry?.runtimeState === 'unavailable' && entry?.conditionsMet === false
+      ? 'conditionsBlocked'
+      : entry?.runtimeState;
+  }
+  function conditionsHint(entry) {
+    const required = [
+      ...(entry?.evidence?.weather?.recordValues || []),
+      ...(entry?.evidence?.time?.recordValues || [])
+    ];
+    return required.length > 0
+      ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ConditionsBlockedHint', 'Available when: {values}').replace('{values}', required.join(', '))
+      : '';
+  }
+
   const included = $derived(records.filter(entry =>
     entry.compositionState === 'includedByMatch'
     || entry.compositionState === 'explicitlyIncluded'
@@ -109,7 +124,7 @@
       <ul class="manager-environment-comp-rows">
         {#each included as entry, index (entry.id)}
           <li
-            class={`manager-environment-comp-row ${selectedId === entry.id ? 'is-selected' : ''} ${entry.runtimeState === 'unavailable' ? 'is-unavailable' : ''}`}
+            class={`manager-environment-comp-row ${selectedId === entry.id ? 'is-selected' : ''} ${entry.runtimeState === 'unavailable' ? 'is-unavailable' : ''} ${entry.conditionsMet === false ? 'is-conditions-blocked' : ''}`}
             data-record-id={entry.id}
             data-runtime-state={entry.runtimeState}
             draggable={kind === 'hazard'}
@@ -150,7 +165,12 @@
                 <span class="manager-environment-comp-none">—</span>
               {/if}
             </div>
-            <div class="manager-environment-comp-runtime"><RuntimeStatePill state={entry.runtimeState} /></div>
+            <div class="manager-environment-comp-runtime">
+              <RuntimeStatePill state={runtimePillState(entry)} />
+              {#if entry.conditionsMet === false}
+                <span class="manager-muted manager-environment-comp-conditions-hint">{conditionsHint(entry)}</span>
+              {/if}
+            </div>
             <div class="manager-environment-comp-actions">
               <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSource', 'Open source record')} onclick={() => onOpenSource(kind, entry.id)}>
                 <i class="fas fa-pen-to-square" aria-hidden="true"></i>

@@ -1349,7 +1349,8 @@
           },
           "Runtime": {
             "Available": "Available",
-            "Unavailable": "Unavailable"
+            "Unavailable": "Unavailable",
+            "ConditionsBlocked": "Conditions blocked"
           },
           "Evidence": {
             "Title": "Matching evidence",
@@ -1405,6 +1406,7 @@
             "ForceAdd": "Force add",
             "LibraryDisabledNote": "Enable in library first",
             "ForceIncluded": "Force included",
+            "ConditionsBlockedHint": "Available when: {values}",
             "Weight": "Weight"
           },
           "Overview": {
@@ -1503,6 +1505,7 @@
             "MatchEvidence": "Matching evidence",
             "ExplainAvailable": "All matching rules are satisfied and no active hazards block this record.",
             "ExplainForceIncluded": "Force-added by the GM despite not matching the environment context.",
+            "ExplainConditionsBlocked": "Blocked by current weather or time-of-day; the record matches the environment but is inactive until conditions allow.",
             "ExplainStale": "Included in this environment but no longer matches the environment context.",
             "ExplainExcluded": "Locally excluded from this environment.",
             "ExplainCandidate": "Matches this environment but has not been included yet.",
@@ -2569,7 +2572,8 @@
         "NodeDepleted": "This resource is depleted.",
         "AttemptLimitExhausted": "No attempts remain for this gathering task.",
         "StaminaBlocked": "The selected actor does not have enough gathering stamina.",
-        "BlindNoCandidate": "There is nothing you can gather here right now."
+        "BlindNoCandidate": "There is nothing you can gather here right now.",
+        "ConditionsBlocked": "Current weather or time-of-day does not allow this task."
       },
       "Risk": {
         "safe": "Safe",

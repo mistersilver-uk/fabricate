@@ -2021,7 +2021,7 @@ export function createAdminStore(services) {
     const classified = (Array.isArray(records) ? records : []).map((record, index) => {
       const id = String(record?.id || '');
       const libraryEnabled = record?.enabled !== false;
-      const { matches, evidence } = evaluateEnvironmentMatch(record, environment, conditions, { includeDanger, conditionSettings });
+      const { matches, conditionsMet, evidence } = evaluateEnvironmentMatch(record, environment, conditions, { includeDanger, conditionSettings });
       const excluded = disabled.includes(id);
       const explicitlyIncluded = enabled.includes(id);
       // Forces are honored only in manual mode (automatic ignores them, like the enabled allow-list).
@@ -2034,9 +2034,14 @@ export function createAdminStore(services) {
       else if (compositionMode === 'manual') compositionState = explicitlyIncluded ? 'explicitlyIncluded' : 'candidate';
       else compositionState = 'includedByMatch';
 
-      const runtimeState = (compositionState === 'includedByMatch' || compositionState === 'explicitlyIncluded' || compositionState === 'forceIncluded') ? 'available' : 'unavailable';
+      // A record is runtime-available only when its composition state would compose it AND
+      // the current weather/time satisfy the record's required conditions.
+      const composed = compositionState === 'includedByMatch'
+        || compositionState === 'explicitlyIncluded'
+        || compositionState === 'forceIncluded';
+      const runtimeState = (composed && conditionsMet) ? 'available' : 'unavailable';
       const orderRank = orderIndex.has(id) ? orderIndex.get(id) : Number.MAX_SAFE_INTEGER;
-      return { id, record, kind, libraryEnabled, matches, evidence, excluded, explicitlyIncluded, compositionState, runtimeState, orderRank, _index: index };
+      return { id, record, kind, libraryEnabled, matches, conditionsMet, evidence, excluded, explicitlyIncluded, compositionState, runtimeState, orderRank, _index: index };
     });
 
     return classified.sort((a, b) => (a.orderRank === b.orderRank ? a._index - b._index : a.orderRank - b.orderRank));

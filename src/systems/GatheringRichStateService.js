@@ -321,6 +321,12 @@ export class GatheringRichStateService {
     const hazardSnapshots = [];
     const hazardContributions = [];
     for (const hazard of enabledHazards) {
+      // Weather/time are runtime gates: a hazard that does not currently meet its
+      // required weather/timeOfDay never triggers, even if it matched the
+      // environment (region/biome/danger) at composition time.
+      if (evaluateEnvironmentMatch(hazard, environment, conditions, { includeDanger: true }).conditionsMet === false) {
+        continue;
+      }
       const contributions = [];
       const hazardEvidence = [];
       for (const reference of normalizeList(hazard.characterModifiers)) {

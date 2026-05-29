@@ -76,13 +76,19 @@ export function resolveEnvironmentDangerLevel(environment = {}) {
  * Evaluate whether a record matches an environment and produce per-dimension
  * evidence for display.
  *
+ * Matching is decided by region, biome, and (for hazards) danger only —
+ * weather and time-of-day are runtime gates, not match criteria. A record with
+ * the right region/biome/danger but the wrong current weather/time still
+ * matches the environment; `conditionsMet` is `false` in that case so callers
+ * can mark it inactive at runtime without dropping it from composition.
+ *
  * @param {object} record Library task or hazard.
  * @param {object} environment Environment (raw or composed).
  * @param {{ weather?: string, timeOfDay?: string }} [conditions] Current conditions.
  * @param {object} [options]
  * @param {boolean} [options.includeDanger] Apply danger-tag matching (hazards only).
  * @param {object} [options.conditionSettings] Per-system condition enablement.
- * @returns {{ matches: boolean, evidence: MatchEvidence }}
+ * @returns {{ matches: boolean, conditionsMet: boolean, evidence: MatchEvidence }}
  */
 export function evaluateEnvironmentMatch(record = {}, environment = {}, conditions = {}, options = {}) {
   const { includeDanger = false, conditionSettings = null } = options;
@@ -107,8 +113,10 @@ export function evaluateEnvironmentMatch(record = {}, environment = {}, conditio
     : { state: 'any', recordValues: recordDanger, envValues: envDangerLevel ? [envDangerLevel] : [], applicable: false };
 
   const evidence = { region, biome, weather, time, danger };
-  const matches = Object.values(evidence).every(field => field.state !== 'mismatch');
-  return { matches, evidence };
+  // Matching ignores weather/time — those become runtime gates surfaced via conditionsMet.
+  const matches = region.state !== 'mismatch' && biome.state !== 'mismatch' && danger.state !== 'mismatch';
+  const conditionsMet = weather.state !== 'mismatch' && time.state !== 'mismatch';
+  return { matches, conditionsMet, evidence };
 }
 
 function evaluateTagField(recordValues, envValues) {

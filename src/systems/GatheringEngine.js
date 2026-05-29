@@ -1,3 +1,5 @@
+import { evaluateEnvironmentMatch } from './gatheringMatch.js';
+
 const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
   NO_SELECTABLE_ACTORS: 'FABRICATE.Gathering.Blocked.NoSelectableActors',
   INVALID_REMEMBERED_ACTOR: 'FABRICATE.Gathering.Blocked.InvalidRememberedActor',
@@ -22,7 +24,8 @@ const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
   NODE_DEPLETED: 'FABRICATE.Gathering.Blocked.NodeDepleted',
   ATTEMPT_LIMIT_EXHAUSTED: 'FABRICATE.Gathering.Blocked.AttemptLimitExhausted',
   STAMINA_BLOCKED: 'FABRICATE.Gathering.Blocked.StaminaBlocked',
-  BLIND_NO_CANDIDATE: 'FABRICATE.Gathering.Blocked.BlindNoCandidate'
+  BLIND_NO_CANDIDATE: 'FABRICATE.Gathering.Blocked.BlindNoCandidate',
+  CONDITIONS_BLOCKED: 'FABRICATE.Gathering.Blocked.ConditionsBlocked'
 });
 
 const BLIND_TASK_LABEL_KEY = 'FABRICATE.Gathering.BlindTaskLabel';
@@ -949,6 +952,22 @@ export class GatheringEngine {
             : this._toolBlockedData({ task, resolvedTools: taskTools, toolResult })
         }));
       }
+    }
+
+    // Weather/time-of-day are runtime gates: a task may match the environment
+    // (region/biome/danger) but be inactive when current conditions don't
+    // satisfy its required `weather` / `timeOfDay` values.
+    const conditionsResult = evaluateEnvironmentMatch(task, environment, environment?.conditions || {}, { includeDanger: false });
+    if (conditionsResult.conditionsMet === false) {
+      blockedReasons.push(this._blockedReason('CONDITIONS_BLOCKED', {
+        data: this._isOpaqueBlindTask({ environment, viewer })
+          ? null
+          : {
+              taskId: task.id,
+              requiredWeather: conditionsResult.evidence?.weather?.recordValues ?? [],
+              requiredTimeOfDay: conditionsResult.evidence?.time?.recordValues ?? []
+            }
+      }));
     }
 
     const richAttempt = await this._evaluateRichAttempt({ actor, viewer, system, environment, task });

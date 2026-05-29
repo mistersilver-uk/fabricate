@@ -96,6 +96,8 @@ Every environment has a **composition mode** (Overview → Composition mode card
 
 In automatic mode the Non-matching list is read-only — informational only — because automatic mode ignores the force list. Switching from manual to automatic does not silently make force-added non-matching records available.
 
+**Weather and time-of-day are runtime gates, not matching criteria.** A task or hazard whose required `weather` / `timeOfDay` values are not currently satisfied still matches the environment (region/biome/danger) and stays in the **Included** section, but it carries a **Conditions blocked** pill and a hint listing the required values ("Available when: storm, dawn"). At runtime the gathering app shows the task as visible but not attemptable with a `Conditions blocked` reason, and a blocked hazard is skipped during the d100 hazard selection. Flipping the current gathering conditions to one of the required values flips the row back to Available.
+
 ## Gathering Tools Library
 
 Manager V2 exposes a per-system **Tools** page under Gathering. Tools are reusable gathering tools that Gathering Tasks can require by `toolIds`. The page is a draft-and-save surface: edits are held in memory until the GM clicks **Save changes**, navigation away from a dirty draft prompts before discarding, and a concurrent-edit dialog appears if the live tool list changed while the GM was editing.

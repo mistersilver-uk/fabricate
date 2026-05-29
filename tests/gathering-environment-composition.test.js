@@ -40,6 +40,20 @@ const libraryTasks = [
   { id: 'tDesert', name: 'Dig Sand', biomes: ['desert'], dropRows: [{ id: 'd4', componentId: 'sand', quantity: 1, dropRate: 100 }] }
 ];
 
+test('weather/time-of-day mismatch does not stop a task from being composed (runtime gate, not match)', () => {
+  // The weather-only task matches by biome but requires stormy weather; the
+  // environment currently has clear weather. Composition still includes it —
+  // the runtime engine surfaces the conditions gate via CONDITIONS_BLOCKED.
+  const service = makeService({
+    tasks: [{ id: 'storm-pick', name: 'Storm Pick', biomes: ['cave'], weather: ['storm'], dropRows: [{ id: 'd', componentId: 'ore', quantity: 1, dropRate: 100 }] }]
+  });
+  const composed = service.composeEnvironment(environment({
+    compositionMode: 'automatic',
+    conditions: { weather: 'clear', timeOfDay: 'day' }
+  }), system);
+  assert.deepEqual(composed.tasks.map(task => task.id), ['storm-pick']);
+});
+
 test('automatic mode includes every matching enabled task and hides non-matching ones', () => {
   const service = makeService({ tasks: libraryTasks });
   const composed = service.composeEnvironment(environment({ compositionMode: 'automatic' }), system);

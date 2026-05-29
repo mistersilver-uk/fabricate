@@ -33,6 +33,12 @@
     : text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.SourceTask', 'Reusable gathering task'));
 
   const explanation = $derived((() => {
+    if (entry?.conditionsMet === false
+      && (entry?.compositionState === 'includedByMatch'
+        || entry?.compositionState === 'explicitlyIncluded'
+        || entry?.compositionState === 'forceIncluded')) {
+      return text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ExplainConditionsBlocked', 'Blocked by current weather or time-of-day; the record matches the environment but is inactive until conditions allow.');
+    }
     switch (entry?.compositionState) {
       case 'includedByMatch':
       case 'explicitlyIncluded':
