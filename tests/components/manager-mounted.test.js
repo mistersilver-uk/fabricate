@@ -52,7 +52,7 @@ function compileManagerRoot() {
     writeCompiledSvelte(`src/ui/svelte/components/${componentName}.svelte`);
   }
 
-  for (const utilPath of ['foundryBridge.js', 'essenceIcons.js', 'fontAwesomeFreeClassicIcons.js', 'iconPickerPopover.js', 'componentEditor.js', 'dropRateTier.js', 'dropUtils.js']) {
+  for (const utilPath of ['foundryBridge.js', 'essenceIcons.js', 'fontAwesomeFreeClassicIcons.js', 'iconPickerPopover.js', 'componentEditor.js', 'dropRateTier.js', 'dropUtils.js', 'sceneImages.js']) {
     const utilDestination = join(tempRoot, `src/ui/svelte/util/${utilPath}`);
     mkdirSync(dirname(utilDestination), { recursive: true });
     writeFileSync(

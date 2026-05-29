@@ -5,6 +5,7 @@
   import { localize, viewScene } from '../../util/foundryBridge.js';
   import { resolveDropData } from '../../util/dropUtils.js';
   import { dropRateTierClass, dropRateTierColor } from '../../util/dropRateTier.js';
+  import { sceneDocumentImage } from '../../util/sceneImages.js';
 
   let {
     hazard = null,
@@ -43,7 +44,7 @@
     Promise.resolve(globalThis.fromUuid(uuid)).then(doc => {
       if (cancelled || !doc) return;
       linkedSceneName = String(doc.name || '');
-      linkedSceneThumb = String(doc.thumb || doc.background?.src || '');
+      linkedSceneThumb = sceneDocumentImage(doc);
     }).catch(() => {});
     return () => { cancelled = true; };
   });
