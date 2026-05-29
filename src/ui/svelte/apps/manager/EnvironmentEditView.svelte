@@ -46,6 +46,22 @@
     selectedId = id;
   }
 
+  // On the Tasks/Hazards tabs, auto-select the first active (available) record of
+  // that kind so the inspector is populated. A valid manual selection of the same
+  // kind is never overridden; a stale cross-tab selection is replaced. When no
+  // record is available, selection is left so the inspector shows its empty state.
+  $effect(() => {
+    if (activeTab !== 'tasks' && activeTab !== 'hazards') return;
+    const kind = activeTab === 'hazards' ? 'hazard' : 'task';
+    const records = Array.isArray(activeTab === 'hazards' ? composition?.hazards : composition?.tasks)
+      ? (activeTab === 'hazards' ? composition.hazards : composition.tasks)
+      : [];
+    const hasValidSelection = selectedKind === kind && records.some(entry => entry.id === selectedId);
+    if (hasValidSelection) return;
+    const firstActive = records.find(entry => entry.runtimeState === 'available');
+    if (firstActive) selectRecord(kind, firstActive.id);
+  });
+
   const counts = $derived(composition?.counts || {});
   const readiness = $derived(evaluateEnvironmentReadiness(environmentDraft || {}, composition || {}));
   const criticalCount = $derived(readiness.issues.filter(issue => issue.severity === 'critical').length);

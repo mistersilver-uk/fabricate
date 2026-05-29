@@ -119,7 +119,13 @@ describe('environment composition editor structure', () => {
     assert.ok(rightInspectorSource.includes('EnvironmentSummaryInspector'), 'overview shows the environment summary');
     assert.ok(rightInspectorSource.includes('RecordInspector'), 'tasks/hazards show the selected record');
     assert.ok(rightInspectorSource.includes('selectedKind !== recordKind'), 'a record only shows for the active tab kind');
-    assert.ok(rightInspectorSource.includes('data-record-inspector-empty'), 'tasks/hazards show a select-a-record prompt when nothing is selected');
+    assert.ok(rightInspectorSource.includes('data-record-inspector-empty'), 'tasks/hazards show a no-active-records message when none are available');
+    assert.ok(rightInspectorSource.includes('NoActiveTasks') && rightInspectorSource.includes('NoActiveHazards'), 'empty state reads as "No active tasks/hazards"');
+  });
+
+  it('the shell auto-selects the first active record on the tasks/hazards tabs', () => {
+    assert.ok(shellSource.includes("runtimeState === 'available'"), 'auto-select targets active (available) records');
+    assert.ok(/\$effect\(\(\) => \{[\s\S]*?selectRecord\(kind, firstActive\.id\)/.test(shellSource), 'an effect auto-selects the first active record of the active tab kind');
   });
 
   it('the linked scene card lives in the inspector under the summary', () => {

@@ -55,11 +55,11 @@
   {:else}
     <section class="manager-inspector-card" data-record-inspector-empty={recordKind}>
       <p class="manager-kicker">{recordKind === 'hazard'
-        ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.SelectHazardPrompt', 'Select a hazard')
-        : text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.SelectTaskPrompt', 'Select a task')}</p>
+        ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoActiveHazards', 'No active hazards')
+        : text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoActiveTasks', 'No active tasks')}</p>
       <p class="manager-muted">{recordKind === 'hazard'
-        ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.SelectHazardHint', 'Choose a hazard to inspect and set environment-specific overrides.')
-        : text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.SelectTaskHint', 'Choose a task to inspect and set environment-specific overrides.')}</p>
+        ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoActiveHazardsHint', 'Add or include hazards in this environment so they appear here.')
+        : text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoActiveTasksHint', 'Add or include tasks in this environment so they appear here.')}</p>
     </section>
   {/if}
 </aside>
