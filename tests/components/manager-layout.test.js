@@ -1271,6 +1271,15 @@ test('manager environments browser and edit route define compact responsive geom
     workspaceBlock.includes('grid-template-columns: minmax(220px, 0.45fr) minmax(420px, 1fr);'),
     'environment editor workspace should expose only task rail and selected task editor at normal widths'
   );
+  const compBlock = blockFor('.fabricate-manager .manager-environment-comp');
+  assert.ok(
+    compBlock.includes('--fab-env-comp-grid: 30px minmax(0,'),
+    'composition grid flexible columns must shrink so rows fit the inspector-narrowed tasks/hazards panel'
+  );
+  assert.ok(
+    !compBlock.includes('minmax(150px'),
+    'composition grid should not hard-floor flexible columns and overflow the panel'
+  );
   assert.ok(
     !css.includes('manager-environment-evidence-column'),
     'environment editor CSS should no longer reference the removed evidence column'

@@ -12980,7 +12980,7 @@
 
 /* Composition table */
 .fabricate-manager .manager-environment-comp {
-  --fab-env-comp-grid: 30px minmax(150px, 1.6fr) minmax(150px, 1.5fr) 64px 126px 92px;
+  --fab-env-comp-grid: 30px minmax(0, 1.6fr) minmax(0, 1.5fr) 64px 126px 92px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -13109,6 +13109,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.fabricate-manager .manager-environment-comp-evidence {
+  min-width: 0;
 }
 
 .fabricate-manager .manager-environment-comp-override,
@@ -13301,6 +13305,6 @@
   }
 
   .fabricate-manager .manager-environment-comp {
-    --fab-env-comp-grid: 24px minmax(120px, 1.5fr) minmax(110px, 1.3fr) 48px 110px 80px;
+    --fab-env-comp-grid: 24px minmax(0, 1.5fr) minmax(0, 1.3fr) 48px 110px 80px;
   }
 }
