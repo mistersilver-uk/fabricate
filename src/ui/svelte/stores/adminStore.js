@@ -2028,8 +2028,7 @@ export function createAdminStore(services) {
       else if (excluded) compositionState = 'excluded';
       else if (!matches) compositionState = explicitlyIncluded ? 'includedButUnavailable' : 'notMatching';
       else if (compositionMode === 'manual') compositionState = explicitlyIncluded ? 'explicitlyIncluded' : 'candidate';
-      else if (enabled.length === 0 || explicitlyIncluded) compositionState = 'includedByMatch';
-      else compositionState = 'candidate';
+      else compositionState = 'includedByMatch';
 
       const runtimeState = (compositionState === 'includedByMatch' || compositionState === 'explicitlyIncluded') ? 'available' : 'unavailable';
       const orderRank = orderIndex.has(id) ? orderIndex.get(id) : Number.MAX_SAFE_INTEGER;

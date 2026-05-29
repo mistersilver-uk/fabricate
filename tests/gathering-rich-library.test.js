@@ -321,7 +321,9 @@ test('environment task and hazard toggles preserve mixed-case library IDs', asyn
   });
   const composed = service.composeEnvironment(saved, system);
 
-  assert.deepEqual(composed.tasks.map(task => task.id), ['inline-task', 'Task-Mixed']);
+  // Automatic mode ignores the enabled allow-list, so every matching library task
+  // composes; the disabled list still excludes Hazard-Mixed (mixed-case preserved).
+  assert.deepEqual(composed.tasks.map(task => task.id), ['inline-task', 'Task-Mixed', 'task-other']);
   assert.deepEqual(composed.hazards.map(hazard => hazard.id), ['hazard-other']);
 });
 

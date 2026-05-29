@@ -768,10 +768,10 @@ export class GatheringRichStateService {
   /**
    * Whether a matching, library-enabled record is composed into the
    * environment, honoring `compositionMode`:
-   * - `automatic`: include unless explicitly excluded (`disabled*Ids`). A
-   *   non-empty `enabled*Ids` is still honored as a legacy allow-list so
-   *   pre-existing environments keep their behavior (the new editor never
-   *   populates `enabled*Ids` while in automatic mode).
+   * - `automatic`: include every matching record unless explicitly excluded
+   *   (`disabled*Ids`). Any `enabled*Ids` allow-list is ignored — automatic
+   *   means "all matching available unless excluded", so a stale list left
+   *   over from manual mode never suppresses matching records.
    * - `manual`: include only when explicitly listed (`enabled*Ids`) and not excluded.
    */
   _environmentIncludesLibraryRecord(environment, id, kind, compositionMode = 'automatic') {
@@ -781,7 +781,7 @@ export class GatheringRichStateService {
     const disabled = normalizeList(environment?.[disabledKey]).map(String);
     if (disabled.includes(String(id))) return false;
     if (compositionMode === 'manual') return enabled.includes(String(id));
-    return enabled.length === 0 || enabled.includes(String(id));
+    return true;
   }
 
   _libraryTaskToRuntimeTask(task) {

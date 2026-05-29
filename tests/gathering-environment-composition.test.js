@@ -64,10 +64,10 @@ test('manual mode never makes a non-matching explicitly-included task available'
   assert.deepEqual(composed.tasks.map(task => task.id), ['t1']);
 });
 
-test('automatic mode honors a legacy non-empty enabled allow-list', () => {
+test('automatic mode ignores a stale enabled allow-list and includes all matching records', () => {
   const service = makeService({ tasks: libraryTasks });
   const composed = service.composeEnvironment(environment({ compositionMode: 'automatic', enabledTaskIds: ['t2'] }), system);
-  assert.deepEqual(composed.tasks.map(task => task.id), ['t2']);
+  assert.deepEqual(composed.tasks.map(task => task.id).sort(), ['t1', 't2', 't3']);
 });
 
 test('taskOrder applies a deterministic order, with unlisted records following in library order', () => {
