@@ -48,6 +48,31 @@ function recordRegionList(record) {
 }
 
 /**
+ * Canonical danger-level severity scale (ascending). An environment carries a
+ * single danger level; a hazard is eligible when its highest danger tag ranks
+ * at or below the environment's level ("hazards up to and including").
+ */
+export const DANGER_LEVELS = ['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme'];
+
+export function dangerRank(level) {
+  return DANGER_LEVELS.indexOf(normalizeTag(level));
+}
+
+/**
+ * Resolve an environment's single danger level, migrating legacy shapes:
+ * explicit `dangerLevel` → highest of `dangerTags` → `risk` → 'safe'.
+ */
+export function resolveEnvironmentDangerLevel(environment = {}) {
+  const explicit = normalizeTag(environment?.dangerLevel);
+  if (DANGER_LEVELS.includes(explicit)) return explicit;
+  const tags = normalizeTagList(environment?.dangerTags).filter(tag => DANGER_LEVELS.includes(tag));
+  if (tags.length > 0) return tags.reduce((best, tag) => (dangerRank(tag) > dangerRank(best) ? tag : best), tags[0]);
+  const risk = normalizeTag(environment?.risk);
+  if (DANGER_LEVELS.includes(risk)) return risk;
+  return 'safe';
+}
+
+/**
  * Evaluate whether a record matches an environment and produce per-dimension
  * evidence for display.
  *
@@ -64,7 +89,7 @@ export function evaluateEnvironmentMatch(record = {}, environment = {}, conditio
 
   const envRegion = normalizeTag(environment?.region);
   const envBiomes = normalizeTagList(environment?.biomes ?? environment?.biome);
-  const envDanger = normalizeTagList(environment?.dangerTags ?? environment?.risk);
+  const envDangerLevel = resolveEnvironmentDangerLevel(environment);
 
   const region = evaluateTagField(recordRegionList(record), envRegion ? [envRegion] : [], { requireAll: false });
   const biome = evaluateTagField(normalizeTagList(record?.biomes), envBiomes, { requireAll: false });
@@ -76,9 +101,10 @@ export function evaluateEnvironmentMatch(record = {}, environment = {}, conditio
 
   const weather = evaluateConditionField(normalizeConditionIdList(record?.weather), currentWeather, weatherEnabled);
   const time = evaluateConditionField(normalizeConditionIdList(record?.timeOfDay), currentTime, timeEnabled);
+  const recordDanger = normalizeTagList(record?.dangerTags).filter(tag => DANGER_LEVELS.includes(tag));
   const danger = includeDanger
-    ? evaluateTagField(normalizeTagList(record?.dangerTags), envDanger, { requireAll: false })
-    : { state: 'any', recordValues: normalizeTagList(record?.dangerTags), envValues: envDanger, applicable: false };
+    ? evaluateDangerField(recordDanger, envDangerLevel)
+    : { state: 'any', recordValues: recordDanger, envValues: envDangerLevel ? [envDangerLevel] : [], applicable: false };
 
   const evidence = { region, biome, weather, time, danger };
   const matches = Object.values(evidence).every(field => field.state !== 'mismatch');
@@ -91,6 +117,16 @@ function evaluateTagField(recordValues, envValues) {
   }
   const state = hasAny(recordValues, envValues) ? 'match' : 'mismatch';
   return { state, recordValues, envValues, applicable: true };
+}
+
+function evaluateDangerField(recordTags, envLevel) {
+  const envValues = envLevel ? [envLevel] : [];
+  if (recordTags.length === 0) {
+    return { state: 'any', recordValues: recordTags, envValues, applicable: true };
+  }
+  const hazardRank = recordTags.reduce((max, tag) => Math.max(max, dangerRank(tag)), -1);
+  const state = hazardRank <= dangerRank(envLevel) ? 'match' : 'mismatch';
+  return { state, recordValues: recordTags, envValues, applicable: true };
 }
 
 function evaluateConditionField(recordValues, currentValue, enabled) {

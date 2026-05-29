@@ -27,7 +27,7 @@ function environment(overrides = {}) {
     selectionMode: 'targeted',
     region: '',
     biomes: ['cave'],
-    dangerTags: ['hazardous'],
+    dangerLevel: 'hazardous',
     tasks: [],
     ...overrides
   };
@@ -91,4 +91,19 @@ test('hazards compose by danger matching and respect the shared composition mode
 
   const composedManualEmpty = service.composeEnvironment(environment({ compositionMode: 'manual' }), system);
   assert.deepEqual(composedManualEmpty.hazards.map(hazard => hazard.id), []);
+});
+
+test('the environment danger level acts as a ceiling for eligible hazards', () => {
+  const service = makeService({
+    hazards: [
+      { id: 'h1', name: 'Cave-in', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 50 },
+      { id: 'h2', name: 'Gas Pocket', biomes: ['cave'], dangerTags: ['deadly'], dropRate: 50 }
+    ]
+  });
+
+  const deadly = service.composeEnvironment(environment({ compositionMode: 'automatic', dangerLevel: 'deadly' }), system);
+  assert.deepEqual(deadly.hazards.map(hazard => hazard.id).sort(), ['h1', 'h2']);
+
+  const safe = service.composeEnvironment(environment({ compositionMode: 'automatic', dangerLevel: 'safe' }), system);
+  assert.deepEqual(safe.hazards.map(hazard => hazard.id), []);
 });

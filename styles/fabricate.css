@@ -12657,11 +12657,18 @@
   gap: 10px;
 }
 
-.fabricate-manager .manager-environment-context-grid {
+.fabricate-manager .manager-environment-context-split {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   align-items: start;
+}
+
+.fabricate-manager .manager-environment-context-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
 }
 
 .fabricate-manager .manager-environment-context-hint {
@@ -12887,6 +12894,28 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 12px;
+  border: 1px dashed var(--fab-mv2-border);
+  border-radius: 6px;
+}
+
+.fabricate-manager .manager-environment-scene-linked.is-drop-active {
+  border-color: var(--fab-mv2-accent);
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-environment-scene-thumb {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  object-fit: cover;
+  color: var(--fab-mv2-text-muted);
+  background: var(--fab-overlay-light-06);
 }
 
 .fabricate-manager .manager-environment-scene-name {
@@ -13287,7 +13316,7 @@
   }
 
   .fabricate-manager .manager-environment-overview-duo,
-  .fabricate-manager .manager-environment-context-grid {
+  .fabricate-manager .manager-environment-context-split {
     grid-template-columns: minmax(0, 1fr);
   }
 

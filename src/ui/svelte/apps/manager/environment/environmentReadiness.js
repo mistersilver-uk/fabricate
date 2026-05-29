@@ -31,7 +31,9 @@ export function evaluateEnvironmentReadiness(environment = {}, composition = {})
   const hasDescription = Boolean(trimmed(environment?.description));
   const hasRegion = true; // empty region is a valid "any region" state
   const hasBiome = tagList(environment?.biomes ?? environment?.biome).length > 0;
-  const hasDanger = tagList(environment?.dangerTags ?? environment?.risk).length > 0 || Boolean(trimmed(environment?.risk));
+  const hasDanger = Boolean(trimmed(environment?.dangerLevel))
+    || tagList(environment?.dangerTags ?? environment?.risk).length > 0
+    || Boolean(trimmed(environment?.risk));
   const hasCompositionMode = environment?.compositionMode === 'manual' || environment?.compositionMode === 'automatic' || environment?.compositionMode === undefined;
   const hasAvailableTask = Number(counts.availableTasks || 0) > 0;
   const staleIncluded = Number(counts.unavailableTasks || 0) + Number(counts.unavailableHazards || 0);

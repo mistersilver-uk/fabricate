@@ -377,6 +377,23 @@ test('d100 drop-row save validation accepts zero chance and rejects invalid drop
   }
 });
 
+test('environment dangerLevel migrates from dangerTags, preserves explicit values, and validates', async () => {
+  const store = makeEnvironmentStore();
+
+  const migrated = await store.create(environment({ dangerTags: ['safe', 'deadly'], enabledTaskIds: ['lib-task'] }));
+  assert.equal(migrated.dangerLevel, 'deadly');
+
+  const explicit = await store.create(environment({ id: 'env-explicit', dangerLevel: 'dangerous', dangerTags: [], enabledTaskIds: ['lib-task'] }));
+  assert.equal(explicit.dangerLevel, 'dangerous');
+
+  const defaulted = await store.create(environment({ id: 'env-default', dangerTags: [], risk: undefined, enabledTaskIds: ['lib-task'] }));
+  assert.equal(defaulted.dangerLevel, 'safe');
+
+  const invalid = store.validate(environment({ dangerLevel: 'cataclysmic', enabledTaskIds: ['lib-task'] }));
+  assert.equal(invalid.valid, false);
+  assert.ok(invalid.errors.some(error => error.includes('dangerLevel')));
+});
+
 test('player listing exposes current conditions as context without weather/time filters', async () => {
   const { service } = makeRichState({
     config: {

@@ -3,6 +3,7 @@
   import { localize, viewScene } from '../../../util/foundryBridge.js';
   import { dragDrop } from '../../../actions/dragDrop.js';
   import { resolveDropData } from '../../../util/dropUtils.js';
+  import { sceneDocumentImage } from '../../../util/sceneImages.js';
   import CompositionModeControl from './CompositionModeControl.svelte';
 
   let {
@@ -16,7 +17,7 @@
     onSetCompositionMode = () => {}
   } = $props();
 
-  const DEFAULT_DANGER = ['safe', 'hazardous', 'dangerous', 'deadly'];
+  const DANGER_LEVELS = ['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme'];
   const DEFAULT_ENVIRONMENT_IMAGE_DIR = 'icons/environment/';
 
   function text(key, fallback) {
@@ -28,10 +29,8 @@
   function optLabel(option) { return String(option?.label ?? option?.id ?? option ?? '').trim(); }
 
   const biomes = $derived(Array.isArray(environment?.biomes) ? environment.biomes : []);
-  const dangerTags = $derived(Array.isArray(environment?.dangerTags) ? environment.dangerTags : []);
-  const dangerChoices = $derived((dangerOptions && dangerOptions.length ? dangerOptions.map(optId) : DEFAULT_DANGER));
   const availableBiomes = $derived(biomeOptions.filter(option => !biomes.includes(optId(option))));
-  const availableDanger = $derived(dangerChoices.filter(tag => !dangerTags.includes(tag)));
+  const dangerLevel = $derived(DANGER_LEVELS.includes(environment?.dangerLevel) ? environment.dangerLevel : 'safe');
   const sceneUuid = $derived(String(environment?.sceneUuid || ''));
   const selectionMode = $derived(environment?.selectionMode === 'blind' ? 'blind' : 'targeted');
 
@@ -43,19 +42,28 @@
   }
   function removeBiome(id) { onUpdate({ biomes: biomes.filter(value => value !== id) }); }
 
-  function addDanger(event) {
-    const id = String(event.currentTarget.value || '').trim();
-    if (!id) return;
-    if (!dangerTags.includes(id)) onUpdate({ dangerTags: [...dangerTags, id] });
-    event.currentTarget.value = '';
-  }
-  function removeDanger(id) { onUpdate({ dangerTags: dangerTags.filter(value => value !== id) }); }
-
   async function chooseImage() {
     if (typeof onPickImagePath !== 'function') return;
     const value = await onPickImagePath(environment?.img || DEFAULT_ENVIRONMENT_IMAGE_DIR);
     if (value) onUpdate({ img: value });
   }
+
+  let sceneThumb = $state('');
+  let sceneName = $state('');
+  $effect(() => {
+    const uuid = sceneUuid;
+    sceneThumb = '';
+    sceneName = '';
+    if (!uuid || typeof globalThis.fromUuid !== 'function') return;
+    let cancelled = false;
+    Promise.resolve(globalThis.fromUuid(uuid)).then(doc => {
+      if (cancelled || !doc) return;
+      sceneName = String(doc.name || '');
+      sceneThumb = sceneDocumentImage(doc);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  });
+  const sceneLabel = $derived(sceneName || sceneUuid);
 
   function handleSceneDrop(data) {
     const { uuid, type } = resolveDropData(data);
@@ -63,9 +71,20 @@
     onUpdate({ sceneUuid: uuid });
   }
   function unlinkScene() { onUpdate({ sceneUuid: '' }); }
+  function onLinkedSceneMouseDown(event) {
+    if (event.button !== 2) return;
+    event.preventDefault();
+    unlinkScene();
+  }
 
   function biomeLabel(id) {
     return optLabel(biomeOptions.find(option => optId(option) === id)) || id;
+  }
+  function biomeColorStyle(id) {
+    const option = biomeOptions.find(entry => optId(entry) === id);
+    const hex = /^#[0-9a-fA-F]{6}$/.test(option?.customColor || '') ? option.customColor : '';
+    const token = String(option?.colorToken || 'sage').replace(/^--fab-tag-/, '');
+    return `--fab-chip-color: ${hex || `var(--fab-tag-${token})`}`;
   }
   function dangerLabel(id) {
     return text(`FABRICATE.Admin.Manager.EnvironmentEditor.Hazards.DangerTag.${id}`, id.charAt(0).toUpperCase() + id.slice(1));
@@ -121,21 +140,33 @@
 
       <section class="manager-environment-card" data-overview-section="context">
         <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Context', 'Environment context')}</h3>
-        <div class="manager-environment-context-grid">
-          <label class="manager-field manager-environment-context-field">
-            <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Region', 'Region')}</span>
-            <p class="manager-muted manager-environment-context-hint">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RegionHint', 'Where this environment is — records match its region or any region.')}</p>
-            <select data-environment-field="region" value={environment.region || ''} onchange={(event) => onUpdate({ region: event.currentTarget.value })}>
-              <option value="">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AnyRegion', 'Any region')}</option>
-              {#each regionOptions as option (optId(option))}
-                <option value={optId(option)}>{optLabel(option)}</option>
-              {/each}
-            </select>
-          </label>
+        <div class="manager-environment-context-split">
+          <div class="manager-environment-context-col">
+            <label class="manager-field manager-environment-context-field">
+              <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Region', 'Region')}</span>
+              <p class="manager-muted manager-environment-context-hint">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RegionHint', 'Where this environment is. Records match its region, or any region.')}</p>
+              <select data-environment-field="region" value={environment.region || ''} onchange={(event) => onUpdate({ region: event.currentTarget.value })}>
+                <option value="">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AnyRegion', 'Any region')}</option>
+                {#each regionOptions as option (optId(option))}
+                  <option value={optId(option)}>{optLabel(option)}</option>
+                {/each}
+              </select>
+            </label>
 
-          <div class="manager-field manager-environment-context-field">
+            <label class="manager-field manager-environment-context-field">
+              <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Danger', 'Danger level')}</span>
+              <p class="manager-muted manager-environment-context-hint">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.DangerHint', 'A ceiling — hazards up to and including this level can appear.')}</p>
+              <select data-environment-field="dangerLevel" value={dangerLevel} onchange={(event) => onUpdate({ dangerLevel: event.currentTarget.value })}>
+                {#each DANGER_LEVELS as level (level)}
+                  <option value={level}>{dangerLabel(level)}</option>
+                {/each}
+              </select>
+            </label>
+          </div>
+
+          <div class="manager-field manager-environment-context-field manager-environment-context-biomes">
             <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Biomes', 'Biomes')}</span>
-            <p class="manager-muted manager-environment-context-hint">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.BiomesHint', 'Terrain here — records match if they share a biome.')}</p>
+            <p class="manager-muted manager-environment-context-hint">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.BiomesHint', 'The terrain here. Records match if they share a biome.')}</p>
             {#if availableBiomes.length > 0}
               <select aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AddBiome', 'Add biome')} onchange={addBiome}>
                 <option value="">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AddBiome', 'Add biome')}</option>
@@ -147,38 +178,13 @@
             <div class="manager-availability-pill-row" data-environment-field="biomes">
               {#if biomes.length > 0}
                 {#each biomes as id (id)}
-                  <span class="manager-availability-pill">
+                  <span class="manager-availability-pill is-biome" style={biomeColorStyle(id)}>
                     <span>{biomeLabel(id)}</span>
                     <button type="button" class="manager-availability-remove" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RemoveBiome', 'Remove {name}').replace('{name}', biomeLabel(id))} onclick={() => removeBiome(id)}><i class="fas fa-xmark" aria-hidden="true"></i></button>
                   </span>
                 {/each}
               {:else}
                 <span class="manager-muted">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.NoBiomes', 'No biomes selected')}</span>
-              {/if}
-            </div>
-          </div>
-
-          <div class="manager-field manager-environment-context-field">
-            <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Danger', 'Danger level')}</span>
-            <p class="manager-muted manager-environment-context-hint">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.DangerHint', 'Caps eligible hazards; those up to this level can appear.')}</p>
-            {#if availableDanger.length > 0}
-              <select aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AddDanger', 'Add danger tag')} onchange={addDanger}>
-                <option value="">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AddDanger', 'Add danger tag')}</option>
-                {#each availableDanger as id (id)}
-                  <option value={id}>{dangerLabel(id)}</option>
-                {/each}
-              </select>
-            {/if}
-            <div class="manager-availability-pill-row" data-environment-field="dangerTags">
-              {#if dangerTags.length > 0}
-                {#each dangerTags as id (id)}
-                  <span class={`manager-danger-tag-pill is-${id}`}>
-                    <span>{dangerLabel(id)}</span>
-                    <button type="button" class="manager-availability-remove" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RemoveDanger', 'Remove {name}').replace('{name}', dangerLabel(id))} onclick={() => removeDanger(id)}><i class="fas fa-xmark" aria-hidden="true"></i></button>
-                  </span>
-                {/each}
-              {:else}
-                <span class="manager-muted">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.NoDanger', 'No danger tags')}</span>
               {/if}
             </div>
           </div>
@@ -211,7 +217,6 @@
 
       <section class="manager-environment-card" data-overview-section="composition">
         <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.CompositionMode', 'Composition mode')}</h3>
-        <p class="manager-muted">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.CompositionModeHint', 'Shared by tasks and hazards.')}</p>
         <CompositionModeControl mode={environment.compositionMode || 'automatic'} onChange={onSetCompositionMode} />
       </section>
       </div>
@@ -219,9 +224,21 @@
       <section class="manager-environment-card" data-overview-section="scene">
         <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Scene', 'Linked scene')}</h3>
         {#if sceneUuid}
-          <div class="manager-environment-scene-linked">
-            <button type="button" class="manager-environment-scene-name" onclick={() => viewScene(sceneUuid)} title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.OpenScene', 'Open scene')}>{sceneUuid}</button>
-            <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.UnlinkScene', 'Unlink scene')} onclick={unlinkScene}><i class="fas fa-link-slash" aria-hidden="true"></i></button>
+          <div
+            class="manager-environment-scene-linked"
+            data-overview-scene-linked
+            title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SceneReplaceTooltip', 'Drop a scene to replace it, or right-click to unlink.')}
+            use:dragDrop={{ onDrop: handleSceneDrop, activeClass: 'is-drop-active' }}
+            oncontextmenu={(event) => { event.preventDefault(); unlinkScene(); }}
+            onmousedown={onLinkedSceneMouseDown}
+          >
+            {#if sceneThumb}
+              <img class="manager-environment-scene-thumb" src={sceneThumb} alt="" />
+            {:else}
+              <span class="manager-environment-scene-thumb is-placeholder" aria-hidden="true"><i class="fas fa-map"></i></span>
+            {/if}
+            <button type="button" class="manager-environment-scene-name" onclick={(event) => { event.stopPropagation(); viewScene(sceneUuid); }} title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.OpenScene', 'Open scene')}>{sceneLabel}</button>
+            <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.UnlinkScene', 'Unlink scene')} title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.UnlinkScene', 'Unlink scene')} onclick={(event) => { event.stopPropagation(); unlinkScene(); }}><i class="fas fa-link-slash" aria-hidden="true"></i></button>
           </div>
         {:else}
           <div class="manager-environment-scene-dropzone" use:dragDrop={{ onDrop: handleSceneDrop, activeClass: 'is-drop-active' }}>

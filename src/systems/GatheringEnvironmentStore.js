@@ -1,5 +1,6 @@
 import { getSetting as defaultGetSetting, setSetting as defaultSetSetting, SETTING_KEYS } from '../config/settings.js';
 import { validateGatheringDropReferencesSync } from './GatheringDropReferenceValidator.js';
+import { DANGER_LEVELS, resolveEnvironmentDangerLevel } from './gatheringMatch.js';
 
 const DEFAULT_TASK_IMG = 'icons/svg/item-bag.svg';
 const VALID_SELECTION_MODES = new Set(['targeted', 'blind']);
@@ -288,6 +289,7 @@ export class GatheringEnvironmentStore {
       biome: stringOrEmpty(data?.biome),
       biomes: normalizeStringList(data?.biomes ?? data?.biome),
       dangerTags: normalizeStringList(data?.dangerTags ?? data?.risk),
+      dangerLevel: resolveEnvironmentDangerLevel(data),
       risk: VALID_RISK_LEVELS.has(data?.risk) ? data.risk : 'safe',
       economyMode: VALID_ECONOMY_MODES.has(data?.economyMode) ? data.economyMode : 'time',
       conditions: normalizeConditions(data?.conditions),
@@ -433,6 +435,10 @@ export class GatheringEnvironmentStore {
 
     if (original?.compositionMode !== undefined && !VALID_COMPOSITION_MODES.has(original.compositionMode)) {
       errors.push(`Environment "${label}" compositionMode must be automatic or manual`);
+    }
+
+    if (original?.dangerLevel !== undefined && !DANGER_LEVELS.includes(original.dangerLevel)) {
+      errors.push(`Environment "${label}" dangerLevel must be one of: ${DANGER_LEVELS.join(', ')}`);
     }
 
     const hasTaskSource = normalized.tasks.length > 0 || normalized.enabledTaskIds.length > 0;

@@ -2253,6 +2253,7 @@ export function createAdminStore(services) {
       description: '',
       enabled: false,
       selectionMode: 'targeted',
+      dangerLevel: 'safe',
       sceneUuid: null,
       tasks: [_newEnvironmentPlaceholderTask()]
     };
@@ -2707,6 +2708,7 @@ export function createAdminStore(services) {
       'region',
       'biomes',
       'dangerTags',
+      'dangerLevel',
       'hazardSelectionMode',
       'hazardPolicy',
       'enabledTaskIds',

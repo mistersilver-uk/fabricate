@@ -60,6 +60,26 @@ test('danger is only applied when includeDanger is set (hazards)', () => {
   assert.equal(hazardView.evidence.danger.state, 'mismatch');
 });
 
+test('danger is a severity ceiling: hazards at or below the environment level match', () => {
+  const env = { dangerLevel: 'dangerous' };
+  const below = evaluateEnvironmentMatch({ dangerTags: ['hazardous'] }, env, conditions, { includeDanger: true });
+  assert.equal(below.evidence.danger.state, 'match');
+  const equal = evaluateEnvironmentMatch({ dangerTags: ['dangerous'] }, env, conditions, { includeDanger: true });
+  assert.equal(equal.evidence.danger.state, 'match');
+  const above = evaluateEnvironmentMatch({ dangerTags: ['deadly'] }, env, conditions, { includeDanger: true });
+  assert.equal(above.evidence.danger.state, 'mismatch');
+  assert.equal(above.matches, false);
+  const none = evaluateEnvironmentMatch({ dangerTags: [] }, env, conditions, { includeDanger: true });
+  assert.equal(none.evidence.danger.state, 'any');
+});
+
+test('a hazard is ranked by its highest danger tag against the ceiling', () => {
+  const env = { dangerLevel: 'dangerous' };
+  const mixed = evaluateEnvironmentMatch({ dangerTags: ['safe', 'deadly'] }, env, conditions, { includeDanger: true });
+  assert.equal(mixed.evidence.danger.state, 'mismatch');
+  assert.deepEqual(mixed.evidence.danger.envValues, ['dangerous']);
+});
+
 test('weather constraint that does not include the current condition is a mismatch', () => {
   const record = { weather: ['storm'] };
   const { matches, evidence } = evaluateEnvironmentMatch(record, environment, conditions, { includeDanger: false });
