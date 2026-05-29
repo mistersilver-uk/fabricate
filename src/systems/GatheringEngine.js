@@ -80,6 +80,7 @@ export class GatheringEngine {
     hazardSceneTrigger = null,
     getRunViewer = null,
     random = Math.random,
+    blindSelectionResolver = null,
     localize = defaultLocalize
   } = {}) {
     this.environmentStore = environmentStore;
@@ -102,6 +103,7 @@ export class GatheringEngine {
     this.hazardSceneTrigger = hazardSceneTrigger;
     this.getRunViewer = getRunViewer;
     this.random = typeof random === 'function' ? random : Math.random;
+    this.blindSelectionResolver = typeof blindSelectionResolver === 'function' ? blindSelectionResolver : null;
     this.localize = localize;
   }
 
@@ -1215,14 +1217,45 @@ export class GatheringEngine {
     }
 
     if (pool.length === 0) return null;
-    return this._pickBlindTask(pool, environment?.blindSelection);
+    return this._pickBlindTask(pool, environment?.blindSelection, { environment, actor, viewer });
   }
 
-  _pickBlindTask(pool, blindSelection) {
-    if (blindSelection?.strategy === 'weightedRandom') {
+  async _pickBlindTask(pool, blindSelection, context = {}) {
+    const strategy = blindSelection?.strategy;
+    if (strategy === 'weightedRandom') {
       return this._weightedPickTask(pool, blindSelection?.weights) ?? pool[0] ?? null;
     }
+    if ((strategy === 'rollTable' || strategy === 'macro') && this.blindSelectionResolver) {
+      const resolved = await this._resolveBlindSelection(pool, blindSelection, context);
+      if (resolved) return resolved;
+    }
+    // firstAvailable (and the fallback when a rollTable/macro yields no pool match).
     return pool[0] ?? null;
+  }
+
+  async _resolveBlindSelection(pool, blindSelection, context) {
+    try {
+      const resolved = await this.blindSelectionResolver({
+        strategy: blindSelection.strategy,
+        blindSelection,
+        candidates: pool.map(task => ({ id: stringOrNull(task.id), name: stringOrEmpty(task.name) })),
+        environment: context.environment ?? null,
+        actor: context.actor ?? null,
+        viewer: context.viewer ?? null
+      });
+      return this._matchResolvedBlindTask(pool, resolved);
+    } catch {
+      return null;
+    }
+  }
+
+  _matchResolvedBlindTask(pool, resolved) {
+    if (!resolved) return null;
+    const id = typeof resolved === 'string'
+      ? stringOrNull(resolved)
+      : stringOrNull(resolved.taskId ?? resolved.id);
+    if (!id) return null;
+    return pool.find(task => stringOrNull(task.id) === id) ?? null;
   }
 
   _weightedPickTask(pool, weights) {

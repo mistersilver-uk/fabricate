@@ -11,9 +11,10 @@
 - [x] `npm test` + `npm run build`.
 
 ## Phase 2 — rollTable + macro strategies
-- [ ] Implement `rollTable` selection (resolve `rollTableUuid`, map result → pool member) and `macro` selection (`macroUuid` via `src/utils/MacroExecutor.js`) in `_findStartTask`, both gated, falling back to `firstAvailable`.
-- [ ] Tests for both strategies (mocked table/macro).
-- [ ] `npm test` + `npm run build`.
+- [x] Engine delegates `rollTable`/`macro` to an injected `blindSelectionResolver` over the gated pool, validates the returned id against the pool, and falls back to `firstAvailable` (`GatheringEngine._pickBlindTask`/`_resolveBlindSelection`/`_matchResolvedBlindTask`).
+- [x] Wire `resolveGatheringBlindSelection` in `src/main.js` (macro via `runGatheringMacro`/`MacroExecutor`, rollTable via `fromUuid` + `table.draw`, matching result to candidate id/name; best-effort → null on failure).
+- [x] Tests for macro + rollTable selection, fallback on no-match, and gated-candidates-only (`tests/gathering-engine-start-attempt.test.js`).
+- [x] `npm test` + `npm run build`.
 
 ## Phase 3 — Reveal policy
 - [ ] Add `revealPolicy` (`never`|`onSuccess`|`onAttempt`, default `never`) + `revealScope` (`VALID_REVEAL_SCOPES`, default `actor`) to `DEFAULT_GATHERING_RULES` + `normalizeGatheringRules`.

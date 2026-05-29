@@ -31,6 +31,7 @@ function makeEngine({
   usedCatalysts = [],
   richState = null,
   random = Math.random,
+  blindSelectionResolver = null,
   calls = {}
 } = {}) {
   calls.steps = [];
@@ -153,6 +154,7 @@ function makeEngine({
       }
     },
     random,
+    blindSelectionResolver,
     localize: (key, data) => data ? `${key}:${JSON.stringify(data)}` : key
   });
 }
@@ -1053,4 +1055,76 @@ test('blind allMatching gate selects the first matching task even when blocked',
   const result = await engine.startAttempt({ viewer: gmViewer, actor, environmentId: 'env-a' });
   assert.equal(result.taskId, 'blocked-task');
   assert.deepEqual(codes(result), ['CATALYST_BLOCKED']);
+});
+
+test('blind macro selection delegates to the resolver and starts the returned task', async () => {
+  const a = task({ id: 'macro-a', name: 'A' });
+  const b = task({ id: 'macro-b', name: 'B' });
+  let received = null;
+  const engine = makeEngine({
+    environments: [environment({
+      selectionMode: 'blind',
+      blindSelection: { strategy: 'macro', macroUuid: 'Macro.pick' },
+      tasks: [a, b]
+    })],
+    blindSelectionResolver: async (payload) => { received = payload; return 'macro-b'; }
+  });
+
+  const result = await engine.startAttempt({ viewer: gmViewer, actor, environmentId: 'env-a' });
+  assert.equal(result.taskId, 'macro-b');
+  assert.equal(received.strategy, 'macro');
+  assert.deepEqual(received.candidates.map(candidate => candidate.id).sort(), ['macro-a', 'macro-b']);
+});
+
+test('blind rollTable selection picks the resolver-returned task', async () => {
+  const a = task({ id: 'rt-a', name: 'A' });
+  const b = task({ id: 'rt-b', name: 'B' });
+  const engine = makeEngine({
+    environments: [environment({
+      selectionMode: 'blind',
+      blindSelection: { strategy: 'rollTable', rollTableUuid: 'RollTable.x' },
+      tasks: [a, b]
+    })],
+    blindSelectionResolver: async () => ({ taskId: 'rt-b' })
+  });
+
+  const result = await engine.startAttempt({ viewer: gmViewer, actor, environmentId: 'env-a' });
+  assert.equal(result.taskId, 'rt-b');
+});
+
+test('blind rollTable/macro selection falls back to firstAvailable when the resolver yields no pool match', async () => {
+  const a = task({ id: 'fallback-a', name: 'A' });
+  const b = task({ id: 'fallback-b', name: 'B' });
+  const engine = makeEngine({
+    environments: [environment({
+      selectionMode: 'blind',
+      blindSelection: { strategy: 'macro', macroUuid: 'Macro.bad' },
+      tasks: [a, b]
+    })],
+    blindSelectionResolver: async () => 'not-in-pool'
+  });
+
+  const result = await engine.startAttempt({ viewer: gmViewer, actor, environmentId: 'env-a' });
+  assert.equal(result.taskId, 'fallback-a');
+});
+
+test('blind rollTable/macro selection only offers attemptable candidates to the resolver', async () => {
+  const blocked = task({ id: 'gated-blocked', name: 'Blocked', catalysts: [{ componentId: 'rare-herb' }] });
+  const good = task({ id: 'gated-good', name: 'Good' });
+  let received = null;
+  const engine = makeEngine({
+    environments: [environment({
+      selectionMode: 'blind',
+      blindSelection: { strategy: 'macro', macroUuid: 'Macro.pick' },
+      tasks: [blocked, good]
+    })],
+    catalystAvailability: (payload) => payload.task.id === 'gated-blocked'
+      ? { available: false, missing: [{ componentId: 'rare-herb' }] }
+      : { available: true, missing: [] },
+    blindSelectionResolver: async (payload) => { received = payload; return 'gated-good'; }
+  });
+
+  const result = await engine.startAttempt({ viewer: gmViewer, actor, environmentId: 'env-a' });
+  assert.equal(result.taskId, 'gated-good');
+  assert.deepEqual(received.candidates.map(candidate => candidate.id), ['gated-good']);
 });
