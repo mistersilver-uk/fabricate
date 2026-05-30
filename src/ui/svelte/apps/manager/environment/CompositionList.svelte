@@ -219,6 +219,19 @@
                   <i class="fas fa-pen-to-square" aria-hidden="true"></i>
                 </button>
               {/if}
+              {#if kind === 'task' && mode === 'manual'}
+                <button
+                  type="button"
+                  class="manager-icon-button is-danger manager-environment-comp-quick-action"
+                  data-quick-action="exclude"
+                  data-action="exclude"
+                  aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickExclude', 'Exclude')}
+                  title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickExclude', 'Exclude')}
+                  onclick={() => onExclude(kind, entry.id)}
+                >
+                  <i class="fas fa-ban" aria-hidden="true"></i>
+                </button>
+              {/if}
               <div class="manager-environment-comp-menu-wrap" use:dismissOnOutsideClick={{ enabled: openMenuId === entry.id, onDismiss: closeMenu }}>
                 <button type="button" class="manager-icon-button" aria-haspopup="menu" aria-expanded={openMenuId === entry.id} aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoreActions', 'More actions')} onclick={() => toggleMenu(entry.id)}>
                   <i class="fas fa-ellipsis-vertical" aria-hidden="true"></i>
@@ -273,6 +286,31 @@
               <div class="manager-environment-comp-override"><OverrideIndicator active={entry.hasDropRateAdjustment === true} /></div>
               <div class="manager-environment-comp-runtime"><CompositionStatePill state={entry.compositionState} /></div>
               <div class="manager-environment-comp-actions">
+                {#if availableRowAction(entry) === 'include'}
+                  <button
+                    type="button"
+                    class="manager-icon-button is-primary manager-environment-comp-quick-action"
+                    data-quick-action="include"
+                    data-action="include"
+                    aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickAdd', 'Add')}
+                    title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickAdd', 'Add')}
+                    onclick={() => onInclude(kind, entry.id)}
+                  >
+                    <i class="fas fa-plus" aria-hidden="true"></i>
+                  </button>
+                {:else if availableRowAction(entry) === 'force-include'}
+                  <button
+                    type="button"
+                    class="manager-icon-button is-warning-action manager-environment-comp-quick-action"
+                    data-quick-action="force-include"
+                    data-action="force-include"
+                    aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ForceAdd', 'Force add')}
+                    title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ForceAdd', 'Force add')}
+                    onclick={() => onForceInclude(kind, entry.id)}
+                  >
+                    <i class="fas fa-circle-plus" aria-hidden="true"></i>
+                  </button>
+                {/if}
                 <div class="manager-environment-comp-menu-wrap" use:dismissOnOutsideClick={{ enabled: openMenuId === entry.id, onDismiss: closeMenu }}>
                   <button type="button" class="manager-icon-button" aria-haspopup="menu" aria-expanded={openMenuId === entry.id} aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoreActions', 'More actions')} onclick={() => toggleMenu(entry.id)}>
                     <i class="fas fa-ellipsis-vertical" aria-hidden="true"></i>

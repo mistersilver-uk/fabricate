@@ -8526,7 +8526,8 @@
   font-weight: 700;
 }
 
-.fabricate-manager .manager-button.is-primary {
+.fabricate-manager .manager-button.is-primary,
+.fabricate-manager .manager-icon-button.is-primary {
   border-color: var(--fab-success-border);
   color: var(--fab-on-success);
   background: var(--fab-success);
@@ -8551,7 +8552,8 @@
   background: var(--fab-overlay-light-10);
 }
 
-.fabricate-manager .manager-button.is-primary:not(:disabled):hover {
+.fabricate-manager .manager-button.is-primary:not(:disabled):hover,
+.fabricate-manager .manager-icon-button.is-primary:not(:disabled):hover {
   border-color: var(--fab-success-border);
   color: var(--fab-on-success);
   background: var(--fab-success-strong);
@@ -12993,11 +12995,11 @@
 }
 
 .fabricate-manager .manager-environment-comp[data-composition-kind="task"] {
-  --fab-env-comp-grid: minmax(0, 1fr) 72px 132px 44px;
+  --fab-env-comp-grid: minmax(0, 1fr) 72px 132px 72px;
 }
 
 .fabricate-manager .manager-environment-comp[data-composition-kind="task"][data-composition-selection="blind"] {
-  --fab-env-comp-grid: minmax(0, 1fr) 112px 72px 132px 44px;
+  --fab-env-comp-grid: minmax(0, 1fr) 112px 72px 132px 72px;
 }
 
 .fabricate-manager .manager-environment-comp[data-composition-kind="hazard"] {
@@ -13209,6 +13211,10 @@
   align-items: center;
   justify-content: flex-end;
   gap: 4px;
+}
+
+.fabricate-manager .manager-environment-comp-quick-action {
+  flex: 0 0 34px;
 }
 
 .fabricate-manager .manager-environment-comp-empty {
@@ -13482,11 +13488,11 @@
   }
 
   .fabricate-manager .manager-environment-comp[data-composition-kind="task"] {
-    --fab-env-comp-grid: minmax(0, 1fr) 64px 110px 40px;
+    --fab-env-comp-grid: minmax(0, 1fr) 64px 110px 72px;
   }
 
   .fabricate-manager .manager-environment-comp[data-composition-kind="task"][data-composition-selection="blind"] {
-    --fab-env-comp-grid: minmax(0, 1fr) 100px 64px 110px 40px;
+    --fab-env-comp-grid: minmax(0, 1fr) 100px 64px 110px 72px;
   }
 
   .fabricate-manager .manager-environment-comp[data-composition-kind="hazard"] {

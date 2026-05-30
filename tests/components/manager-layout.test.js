@@ -1193,6 +1193,7 @@ test('manager environments browser and edit route define compact responsive geom
   const compMenuLabelBlock = blockFor('.fabricate-manager .manager-environment-comp-menu button > span');
   const compMenuNoteBlock = blockFor('.fabricate-manager .manager-environment-comp-menu-note');
   const compMenuNoteBeforeBlock = blockFor('.fabricate-manager .manager-environment-comp-menu-note::before');
+  const compQuickActionBlock = blockFor('.fabricate-manager .manager-environment-comp-quick-action');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
 
   assert.ok(
@@ -1285,17 +1286,26 @@ test('manager environments browser and edit route define compact responsive geom
   );
   assert.ok(
     css.includes('.manager-environment-comp[data-composition-kind="task"]')
-      && css.includes('--fab-env-comp-grid: minmax(0, 1fr) 72px 132px 44px;'),
-    'task rows use a compact overflow-menu action column'
+      && css.includes('--fab-env-comp-grid: minmax(0, 1fr) 72px 132px 72px;'),
+    'task rows reserve space for a quick action icon beside the overflow-menu action'
   );
   assert.ok(
     css.includes('.manager-environment-comp[data-composition-kind="task"][data-composition-selection="blind"]')
-      && css.includes('--fab-env-comp-grid: minmax(0, 1fr) 112px 72px 132px 44px;'),
+      && css.includes('--fab-env-comp-grid: minmax(0, 1fr) 112px 72px 132px 72px;'),
     'blind-mode tasks add a compact Weight column for the input and calculated percentage'
+  );
+  assert.ok(
+    mediumQuery.includes('.fabricate-manager .manager-environment-comp[data-composition-kind="task"]')
+      && mediumQuery.includes('--fab-env-comp-grid: minmax(0, 1fr) 64px 110px 72px;'),
+    'medium task rows keep enough action-column width for quick action plus menu buttons'
   );
   assert.ok(
     weightInputBlock.includes('width: 42px;') && weightInputBlock.includes('padding: 2px 4px;'),
     'blind task weight input should be visually sized for three characters'
+  );
+  assert.ok(
+    compQuickActionBlock.includes('flex: 0 0 34px;'),
+    'composition quick actions should keep the same fixed geometry as manager icon buttons'
   );
   assert.ok(
     compMenuBlock.includes('right: 0;') && compMenuBlock.includes('top: calc(100% + 4px);'),
@@ -1631,6 +1641,8 @@ test('design-system colour tokens are declared in the theme layer as the agreed 
 
 test('manager icon buttons normalize host button defaults and keep pointer targets stable', () => {
   const block = blockFor('.fabricate-manager .manager-button,\n.fabricate-manager .manager-icon-button');
+  const primaryBlock = blockFor('.fabricate-manager .manager-button.is-primary,\n.fabricate-manager .manager-icon-button.is-primary');
+  const primaryHoverBlock = blockFor('.fabricate-manager .manager-button.is-primary:not(:disabled):hover,\n.fabricate-manager .manager-icon-button.is-primary:not(:disabled):hover');
   const iconBlocks = Array.from(css.matchAll(/\.fabricate-manager \.manager-icon-button\s*\{[\s\S]*?\}/g));
   const iconBlock = iconBlocks.at(-1)?.[0] || '';
 
@@ -1641,6 +1653,8 @@ test('manager icon buttons normalize host button defaults and keep pointer targe
   assert.ok(block.includes('min-width: 0;'), 'manager buttons should clear host min-width defaults');
   assert.ok(iconBlock.includes('width: 34px;'), 'icon buttons should have a stable width of at least 32px');
   assert.ok(iconBlock.includes('height: 34px;'), 'icon buttons should have a stable height of at least 32px');
+  assert.ok(primaryBlock.includes('background: var(--fab-success);'), 'primary icon buttons should use the same green success styling as primary text buttons');
+  assert.ok(primaryHoverBlock.includes('background: var(--fab-success-strong);'), 'primary icon buttons should keep the primary hover state');
   assert.ok(css.includes('.fabricate-manager .manager-button:disabled'), 'disabled manager buttons should have explicit disabled styling');
   assert.ok(css.includes('.fabricate-manager .manager-button:not(:disabled):hover'), 'manager hover styles should not target disabled buttons');
 });

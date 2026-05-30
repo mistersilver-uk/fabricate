@@ -100,6 +100,10 @@ function rowIds(sectionName) {
     .map(row => row.getAttribute('data-record-id'));
 }
 
+function quickAction(recordId, action) {
+  return target.querySelector(`[data-record-id="${recordId}"] .manager-environment-comp-quick-action[data-action="${action}"]`);
+}
+
 async function openRowMenu(recordId) {
   target.querySelector(`[data-record-id="${recordId}"] .manager-icon-button[aria-haspopup="menu"]`).click();
   await tick();
@@ -152,6 +156,7 @@ describe('CompositionList mounted layout', () => {
     await renderComposition({
       onInclude: (kind, id) => calls.push(['include', kind, id]),
       onForceInclude: (kind, id) => calls.push(['forceInclude', kind, id]),
+      onExclude: (kind, id) => calls.push(['exclude', kind, id]),
       onOpenSource: (kind, id) => calls.push(['openSource', kind, id])
     });
 
@@ -166,6 +171,46 @@ describe('CompositionList mounted layout', () => {
     ]);
     assert.equal(target.querySelector('[data-section="excluded"]'), null);
     assert.equal(target.querySelector('[data-section="non-matching"]'), null);
+
+    const excludeQuick = quickAction('included', 'exclude');
+    assert.ok(excludeQuick, 'included manual task rows render a quick exclude action');
+    assert.equal(excludeQuick.getAttribute('title'), 'Exclude');
+    assert.equal(excludeQuick.getAttribute('aria-label'), 'Exclude');
+    assert.ok(excludeQuick.querySelector('.fa-ban'), 'quick exclude uses the ban icon');
+    excludeQuick.click();
+    assert.deepEqual(calls.at(-1), ['exclude', 'task', 'included']);
+
+    const includeQuick = quickAction('candidate', 'include');
+    assert.ok(includeQuick, 'matching available task rows render a quick add action');
+    assert.equal(includeQuick.getAttribute('title'), 'Add');
+    assert.equal(includeQuick.getAttribute('aria-label'), 'Add');
+    assert.ok(includeQuick.querySelector('.fa-plus'), 'quick add uses the plus icon');
+    includeQuick.click();
+    assert.deepEqual(calls.at(-1), ['include', 'task', 'candidate']);
+
+    const restoreAsIncludeQuick = quickAction('excluded-matching', 'include');
+    assert.ok(restoreAsIncludeQuick, 'matching excluded rows in Available to add render a quick add action');
+    restoreAsIncludeQuick.click();
+    assert.deepEqual(calls.at(-1), ['include', 'task', 'excluded-matching']);
+
+    const forceIncludeQuick = quickAction('nonmatching', 'force-include');
+    assert.ok(forceIncludeQuick, 'non-matching available task rows render a quick force-add action');
+    assert.equal(forceIncludeQuick.getAttribute('title'), 'Force add');
+    assert.equal(forceIncludeQuick.getAttribute('aria-label'), 'Force add');
+    assert.ok(forceIncludeQuick.querySelector('.fa-circle-plus'), 'quick force add uses the circle-plus icon');
+    forceIncludeQuick.click();
+    assert.deepEqual(calls.at(-1), ['forceInclude', 'task', 'nonmatching']);
+
+    const excludedNonmatchingQuick = quickAction('excluded-nonmatching', 'force-include');
+    assert.ok(excludedNonmatchingQuick, 'non-matching excluded rows in Available to add render a quick force-add action');
+    excludedNonmatchingQuick.click();
+    assert.deepEqual(calls.at(-1), ['forceInclude', 'task', 'excluded-nonmatching']);
+
+    assert.equal(
+      target.querySelector('[data-record-id="disabled"] .manager-environment-comp-quick-action'),
+      null,
+      'library-disabled rows do not render a quick composition action'
+    );
 
     let menu = await openRowMenu('candidate');
     menu.querySelector('[data-action="include"]').click();
@@ -194,6 +239,7 @@ describe('CompositionList mounted layout', () => {
     assert.equal(target.querySelector('[data-section="available-to-add"]'), null);
     assert.deepEqual(rowIds('excluded'), ['excluded-nonmatching', 'excluded-matching']);
     assert.deepEqual(rowIds('non-matching'), ['disabled', 'nonmatching']);
+    assert.equal(target.querySelector('.manager-environment-comp-quick-action'), null);
   });
 
   it('hazard manual mode retains Matching candidates, Excluded, and Non-matching sections', async () => {
@@ -204,6 +250,7 @@ describe('CompositionList mounted layout', () => {
     assert.deepEqual(rowIds('candidates'), ['candidate']);
     assert.deepEqual(rowIds('excluded'), ['excluded-nonmatching', 'excluded-matching']);
     assert.deepEqual(rowIds('non-matching'), ['disabled', 'nonmatching']);
+    assert.equal(target.querySelector('.manager-environment-comp-quick-action'), null);
   });
 
   it('hazard automatic mode retains Excluded and standalone Non-matching sections', async () => {

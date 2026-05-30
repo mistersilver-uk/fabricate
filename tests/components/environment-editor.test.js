@@ -210,6 +210,10 @@ describe('environment composition editor structure', () => {
     assert.ok(listSource.includes('data-action="force-include" onclick={() => { onForceInclude'), 'task force-add action is available from a menu item');
     assert.ok(listSource.includes('data-action="restore" onclick={() => { onRestore'), 'task restore action is available from a menu item');
     assert.ok(listSource.includes('data-action="exclude" onclick={() => { onExclude'), 'task exclude action remains available from a menu item');
+    assert.ok(listSource.includes('manager-environment-comp-quick-action'), 'manual task rows expose icon-only quick action buttons beside the menu');
+    assert.ok(listSource.includes("data-quick-action=\"exclude\""), 'included manual task rows expose a quick exclude action');
+    assert.ok(listSource.includes("data-quick-action=\"include\""), 'available matching task rows expose a quick add action');
+    assert.ok(listSource.includes("data-quick-action=\"force-include\""), 'available non-matching task rows expose a quick force-add action');
     assert.ok(listSource.includes("{#if kind === 'hazard'}"), 'hazard rows keep their distinct action/reorder branch');
     assert.ok(listSource.includes("draggable={kind === 'hazard'}"), 'hazard drag reordering remains hazard-only');
   });
