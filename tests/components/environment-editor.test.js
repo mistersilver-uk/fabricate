@@ -86,6 +86,7 @@ describe('environment editor localization', () => {
       ['Composition.OverrideOff', 'Off'],
       ['Composition.OverrideOnTitle', 'Drop rate adjustment on'],
       ['Composition.OverrideOffTitle', 'Drop rate adjustment off'],
+      ['Composition.WeightPercentage', 'Selection share'],
       ['Composition.ManualHint', 'Only explicitly included records are available; GMs can force add enabled non-matching records.'],
       ['Inspector.ExplainForceIncluded', 'Force-added by the GM despite not matching the environment context.'],
       ['Inspector.OverridesHint', 'Drop-rate adjustments apply only in this environment and do not modify the reusable source record.'],
@@ -191,11 +192,24 @@ describe('environment composition editor structure', () => {
 
   it('exposes blind-mode configuration UI (weights, strategy, reveal override)', () => {
     assert.ok(listSource.includes('data-composition-weight'), 'composition list renders a per-task blind weight input');
+    assert.ok(listSource.includes('data-composition-weight-percent'), 'composition list renders a calculated blind weight percentage');
+    assert.ok(listSource.includes('formatWeightPercentage'), 'composition list calculates included-task selection shares');
+    assert.ok(listSource.includes('includedWeightTotal'), 'weight percentages are based on included task weights');
     assert.ok(listSource.includes('showBlindWeights'), 'weight input is gated to blind task rows');
     assert.ok(tasksTabSource.includes('onWeightChange'), 'tasks tab wires per-task blind weight changes');
     assert.ok(overviewSource.includes('data-overview-section="blind"'), 'overview renders a blind behaviour card');
     assert.ok(overviewSource.includes('data-environment-field="blindStrategy"'), 'overview exposes a blind selection strategy control');
     assert.ok(overviewSource.includes('data-environment-field="revealPolicy"'), 'overview exposes a per-environment reveal override');
+  });
+
+  it('collapses task row actions into the overflow menu while preserving hazard row controls', () => {
+    assert.ok(listSource.includes("{#if kind === 'task'}"), 'composition list branches task rows for compact action menus');
+    assert.ok(listSource.includes('data-action="include" onclick={() => { onInclude'), 'task include action is available from a menu item');
+    assert.ok(listSource.includes('data-action="force-include" onclick={() => { onForceInclude'), 'task force-add action is available from a menu item');
+    assert.ok(listSource.includes('data-action="restore" onclick={() => { onRestore'), 'task restore action is available from a menu item');
+    assert.ok(listSource.includes('data-action="exclude" onclick={() => { onExclude'), 'task exclude action remains available from a menu item');
+    assert.ok(listSource.includes("{#if kind === 'hazard'}"), 'hazard rows keep their distinct action/reorder branch');
+    assert.ok(listSource.includes("draggable={kind === 'hazard'}"), 'hazard drag reordering remains hazard-only');
   });
 
   it('the right inspector is tab-specific (summary on overview, record on tasks/hazards)', () => {

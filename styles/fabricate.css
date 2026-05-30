@@ -12992,8 +12992,12 @@
   gap: 16px;
 }
 
+.fabricate-manager .manager-environment-comp[data-composition-kind="task"] {
+  --fab-env-comp-grid: minmax(0, 1fr) 72px 132px 44px;
+}
+
 .fabricate-manager .manager-environment-comp[data-composition-kind="task"][data-composition-selection="blind"] {
-  --fab-env-comp-grid: minmax(0, 1fr) 72px 92px 132px 92px;
+  --fab-env-comp-grid: minmax(0, 1fr) 112px 72px 132px 44px;
 }
 
 .fabricate-manager .manager-environment-comp[data-composition-kind="hazard"] {
@@ -13157,13 +13161,12 @@
 .fabricate-manager .manager-environment-comp-weight {
   display: flex;
   align-items: center;
+  gap: 6px;
   min-width: 0;
 }
 
 .fabricate-manager .manager-environment-comp-weight-field {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  flex: 0 0 auto;
   margin: 0;
 }
 
@@ -13173,14 +13176,24 @@
 }
 
 .fabricate-manager .manager-environment-comp-weight-field input {
-  width: 56px;
+  width: 42px;
   height: 28px;
-  padding: 2px 6px;
+  padding: 2px 4px;
   border: 1px solid var(--fab-mv2-border);
   border-radius: 4px;
   background: var(--fab-mv2-surface-1);
   color: var(--fab-mv2-text);
   font: inherit;
+}
+
+.fabricate-manager .manager-environment-comp-weight-percent {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .fabricate-manager .manager-environment-override-indicator {
@@ -13249,6 +13262,16 @@
 
 .fabricate-manager .manager-environment-comp-menu button.is-danger {
   color: var(--fab-mv2-danger);
+}
+
+.fabricate-manager .manager-environment-comp-menu-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.88em;
 }
 
 /* Matching evidence — chips (table) + checks (inspector) */
@@ -13426,8 +13449,12 @@
     --fab-env-comp-grid: minmax(0, 1fr) 80px 110px 80px;
   }
 
+  .fabricate-manager .manager-environment-comp[data-composition-kind="task"] {
+    --fab-env-comp-grid: minmax(0, 1fr) 64px 110px 40px;
+  }
+
   .fabricate-manager .manager-environment-comp[data-composition-kind="task"][data-composition-selection="blind"] {
-    --fab-env-comp-grid: minmax(0, 1fr) 60px 80px 110px 80px;
+    --fab-env-comp-grid: minmax(0, 1fr) 100px 64px 110px 40px;
   }
 
   .fabricate-manager .manager-environment-comp[data-composition-kind="hazard"] {

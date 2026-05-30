@@ -1410,7 +1410,8 @@
             "OverrideOff": "Off",
             "OverrideOnTitle": "Drop rate adjustment on",
             "OverrideOffTitle": "Drop rate adjustment off",
-            "Weight": "Weight"
+            "Weight": "Weight",
+            "WeightPercentage": "Selection share"
           },
           "Overview": {
             "Title": "Overview",
@@ -1578,12 +1579,12 @@
           "Tasks": {
             "Title": "Tasks",
             "AutomaticIntro": "All matching enabled library tasks are available unless you exclude them here.",
-            "ManualIntro": "Only tasks you explicitly include are available to players. You can also force add tasks from the non-matching list."
+            "ManualIntro": "Only tasks you explicitly include are available to players. You can also force add non-matching tasks from the Non-matching list."
           },
           "Hazards": {
             "Title": "Hazards",
             "AutomaticIntro": "All matching enabled library hazards apply unless you exclude them here.",
-            "ManualIntro": "Only hazards you explicitly include apply here. You can also force add hazards from the non-matching list.",
+            "ManualIntro": "Only hazards you explicitly include apply here. You can also force add non-matching hazards from the Non-matching list.",
             "HazardChance": "Hazard chance",
             "DangerTag": {
               "safe": "Safe",

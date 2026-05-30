@@ -31,7 +31,7 @@
   const showHandle = $derived(kind === 'hazard');
   function weightFor(id) {
     const raw = Number(weights?.[id]);
-    return Number.isFinite(raw) ? raw : 1;
+    return Number.isFinite(raw) && raw >= 0 ? raw : 1;
   }
 
   let dragIndex = $state(-1);
@@ -62,6 +62,7 @@
     || entry.compositionState === 'explicitlyIncluded'
     || entry.compositionState === 'forceIncluded'
     || entry.compositionState === 'includedButUnavailable'));
+  const includedWeightTotal = $derived(included.reduce((total, entry) => total + weightFor(entry.id), 0));
   const candidates = $derived(records.filter(entry => entry.compositionState === 'candidate'));
   const excluded = $derived(records.filter(entry => entry.compositionState === 'excluded'));
   const nonMatching = $derived(records.filter(entry =>
@@ -90,6 +91,12 @@
   function handleDrop(targetIndex) {
     if (dragIndex >= 0 && dragIndex !== targetIndex) onReorder(kind, dragIndex, targetIndex);
     dragIndex = -1;
+  }
+
+  function formatWeightPercentage(id) {
+    if (includedWeightTotal <= 0) return '0%';
+    const rounded = Math.round((weightFor(id) / includedWeightTotal) * 1000) / 10;
+    return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)}%`;
   }
 
   function activateOnKey(event, id) {
@@ -155,7 +162,7 @@
             {#if showBlindWeights}
               <div class="manager-environment-comp-weight">
                 <label class="manager-environment-comp-weight-field">
-                  <span class="manager-environment-comp-weight-label">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Weight', 'Weight')}</span>
+                  <span class="sr-only">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Weight', 'Weight')}</span>
                   <input
                     type="number"
                     min="0"
@@ -165,6 +172,12 @@
                     onchange={(event) => onWeightChange(entry.id, event.currentTarget.value)}
                   />
                 </label>
+                <span
+                  class="manager-environment-comp-weight-percent"
+                  data-composition-weight-percent={entry.id}
+                  title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.WeightPercentage', 'Selection share')}
+                  aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.WeightPercentage', 'Selection share')}
+                >{formatWeightPercentage(entry.id)}</span>
               </div>
             {/if}
             <div class="manager-environment-comp-override">
@@ -174,9 +187,11 @@
               <RuntimeStatePill state={runtimePillState(entry)} />
             </div>
             <div class="manager-environment-comp-actions">
-              <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSource', 'Open source record')} onclick={() => onOpenSource(kind, entry.id)}>
-                <i class="fas fa-pen-to-square" aria-hidden="true"></i>
-              </button>
+              {#if kind === 'hazard'}
+                <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSource', 'Open source record')} onclick={() => onOpenSource(kind, entry.id)}>
+                  <i class="fas fa-pen-to-square" aria-hidden="true"></i>
+                </button>
+              {/if}
               <div class="manager-environment-comp-menu-wrap" use:dismissOnOutsideClick={{ enabled: openMenuId === entry.id, onDismiss: closeMenu }}>
                 <button type="button" class="manager-icon-button" aria-haspopup="menu" aria-expanded={openMenuId === entry.id} aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoreActions', 'More actions')} onclick={() => toggleMenu(entry.id)}>
                   <i class="fas fa-ellipsis-vertical" aria-hidden="true"></i>
@@ -232,10 +247,24 @@
               <div class="manager-environment-comp-override"><OverrideIndicator active={entry.hasDropRateAdjustment === true} /></div>
               <div class="manager-environment-comp-runtime"><CompositionStatePill state={entry.compositionState} /></div>
               <div class="manager-environment-comp-actions">
-                <button type="button" class="manager-button is-primary manager-environment-include" data-action="include" onclick={() => onInclude(kind, entry.id)}>
-                  <i class="fas fa-plus" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Include', 'Include')}</span>
-                </button>
+                {#if kind === 'task'}
+                  <div class="manager-environment-comp-menu-wrap" use:dismissOnOutsideClick={{ enabled: openMenuId === entry.id, onDismiss: closeMenu }}>
+                    <button type="button" class="manager-icon-button" aria-haspopup="menu" aria-expanded={openMenuId === entry.id} aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoreActions', 'More actions')} onclick={() => toggleMenu(entry.id)}>
+                      <i class="fas fa-ellipsis-vertical" aria-hidden="true"></i>
+                    </button>
+                    {#if openMenuId === entry.id}
+                      <div class="manager-environment-comp-menu" role="menu">
+                        <button type="button" role="menuitem" onclick={() => { onOpenSource(kind, entry.id); closeMenu(); }}><i class="fas fa-up-right-from-square" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSource', 'Open source record')}</span></button>
+                        <button type="button" role="menuitem" data-action="include" onclick={() => { onInclude(kind, entry.id); closeMenu(); }}><i class="fas fa-plus" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Include', 'Include')}</span></button>
+                      </div>
+                    {/if}
+                  </div>
+                {:else}
+                  <button type="button" class="manager-button is-primary manager-environment-include" data-action="include" onclick={() => onInclude(kind, entry.id)}>
+                    <i class="fas fa-plus" aria-hidden="true"></i>
+                    <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Include', 'Include')}</span>
+                  </button>
+                {/if}
               </div>
             </li>
           {/each}
@@ -276,10 +305,24 @@
             <div class="manager-environment-comp-override"><OverrideIndicator active={entry.hasDropRateAdjustment === true} /></div>
             <div class="manager-environment-comp-runtime"><CompositionStatePill state="excluded" /></div>
             <div class="manager-environment-comp-actions">
-              <button type="button" class="manager-button manager-environment-restore" data-action="restore" onclick={() => onRestore(kind, entry.id)}>
-                <i class="fas fa-rotate-left" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Restore', 'Restore')}</span>
-              </button>
+              {#if kind === 'task'}
+                <div class="manager-environment-comp-menu-wrap" use:dismissOnOutsideClick={{ enabled: openMenuId === entry.id, onDismiss: closeMenu }}>
+                  <button type="button" class="manager-icon-button" aria-haspopup="menu" aria-expanded={openMenuId === entry.id} aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoreActions', 'More actions')} onclick={() => toggleMenu(entry.id)}>
+                    <i class="fas fa-ellipsis-vertical" aria-hidden="true"></i>
+                  </button>
+                  {#if openMenuId === entry.id}
+                    <div class="manager-environment-comp-menu" role="menu">
+                      <button type="button" role="menuitem" onclick={() => { onOpenSource(kind, entry.id); closeMenu(); }}><i class="fas fa-up-right-from-square" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSource', 'Open source record')}</span></button>
+                      <button type="button" role="menuitem" data-action="restore" onclick={() => { onRestore(kind, entry.id); closeMenu(); }}><i class="fas fa-rotate-left" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Restore', 'Restore')}</span></button>
+                    </div>
+                  {/if}
+                </div>
+              {:else}
+                <button type="button" class="manager-button manager-environment-restore" data-action="restore" onclick={() => onRestore(kind, entry.id)}>
+                  <i class="fas fa-rotate-left" aria-hidden="true"></i>
+                  <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Restore', 'Restore')}</span>
+                </button>
+              {/if}
             </div>
           </li>
         {/each}
@@ -319,17 +362,35 @@
             <div class="manager-environment-comp-override"><OverrideIndicator active={entry.hasDropRateAdjustment === true} /></div>
             <div class="manager-environment-comp-runtime"><CompositionStatePill state={entry.compositionState} /></div>
             <div class="manager-environment-comp-actions">
-              {#if mode === 'manual' && entry.compositionState === 'notMatching'}
-                <button type="button" class="manager-button is-warning manager-environment-force-include" data-action="force-include" onclick={() => onForceInclude(kind, entry.id)}>
-                  <i class="fas fa-plus" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ForceAdd', 'Force add')}</span>
+              {#if kind === 'task'}
+                <div class="manager-environment-comp-menu-wrap" use:dismissOnOutsideClick={{ enabled: openMenuId === entry.id, onDismiss: closeMenu }}>
+                  <button type="button" class="manager-icon-button" aria-haspopup="menu" aria-expanded={openMenuId === entry.id} aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoreActions', 'More actions')} onclick={() => toggleMenu(entry.id)}>
+                    <i class="fas fa-ellipsis-vertical" aria-hidden="true"></i>
+                  </button>
+                  {#if openMenuId === entry.id}
+                    <div class="manager-environment-comp-menu" role="menu">
+                      {#if mode === 'manual' && entry.compositionState === 'notMatching'}
+                        <button type="button" role="menuitem" data-action="force-include" onclick={() => { onForceInclude(kind, entry.id); closeMenu(); }}><i class="fas fa-plus" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ForceAdd', 'Force add')}</span></button>
+                      {:else if mode === 'manual' && entry.compositionState === 'libraryDisabled'}
+                        <button type="button" role="menuitem" class="manager-environment-comp-menu-note" disabled>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.LibraryDisabledNote', 'Enable in library first')}</button>
+                      {/if}
+                      <button type="button" role="menuitem" onclick={() => { onOpenSource(kind, entry.id); closeMenu(); }}><i class="fas fa-up-right-from-square" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSource', 'Open source record')}</span></button>
+                    </div>
+                  {/if}
+                </div>
+              {:else}
+                {#if mode === 'manual' && entry.compositionState === 'notMatching'}
+                  <button type="button" class="manager-button is-warning manager-environment-force-include" data-action="force-include" onclick={() => onForceInclude(kind, entry.id)}>
+                    <i class="fas fa-plus" aria-hidden="true"></i>
+                    <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ForceAdd', 'Force add')}</span>
+                  </button>
+                {:else if mode === 'manual' && entry.compositionState === 'libraryDisabled'}
+                  <span class="manager-muted manager-environment-comp-disabled-note">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.LibraryDisabledNote', 'Enable in library first')}</span>
+                {/if}
+                <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSource', 'Open source record')} onclick={() => onOpenSource(kind, entry.id)}>
+                  <i class="fas fa-up-right-from-square" aria-hidden="true"></i>
                 </button>
-              {:else if mode === 'manual' && entry.compositionState === 'libraryDisabled'}
-                <span class="manager-muted manager-environment-comp-disabled-note">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.LibraryDisabledNote', 'Enable in library first')}</span>
               {/if}
-              <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSource', 'Open source record')} onclick={() => onOpenSource(kind, entry.id)}>
-                <i class="fas fa-up-right-from-square" aria-hidden="true"></i>
-              </button>
             </div>
           </li>
         {/each}

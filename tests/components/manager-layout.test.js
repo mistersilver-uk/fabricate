@@ -1186,6 +1186,7 @@ test('manager environments browser and edit route define compact responsive geom
   const editorViewBlock = blockFor('.fabricate-manager .manager-environment-edit-view');
   const detailsGridBlock = blockFor('.fabricate-manager .manager-environment-details-grid');
   const workspaceBlock = blockFor('.fabricate-manager .manager-environment-workspace');
+  const weightInputBlock = blockFor('.fabricate-manager .manager-environment-comp-weight-field input');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
 
   assert.ok(
@@ -1274,12 +1275,21 @@ test('manager environments browser and edit route define compact responsive geom
   const compBlock = blockFor('.fabricate-manager .manager-environment-comp');
   assert.ok(
     compBlock.includes('--fab-env-comp-grid: minmax(0, 1fr) 92px 132px 92px;'),
-    'composition grid defaults to the four-column tasks (targeted) layout: task / override / runtime / actions'
+    'composition grid keeps the shared fallback layout for non-task rows'
+  );
+  assert.ok(
+    css.includes('.manager-environment-comp[data-composition-kind="task"]')
+      && css.includes('--fab-env-comp-grid: minmax(0, 1fr) 72px 132px 44px;'),
+    'task rows use a compact overflow-menu action column'
   );
   assert.ok(
     css.includes('.manager-environment-comp[data-composition-kind="task"][data-composition-selection="blind"]')
-      && css.includes('--fab-env-comp-grid: minmax(0, 1fr) 72px 92px 132px 92px;'),
-    'blind-mode tasks add a Weight column ahead of override/runtime'
+      && css.includes('--fab-env-comp-grid: minmax(0, 1fr) 112px 72px 132px 44px;'),
+    'blind-mode tasks add a compact Weight column for the input and calculated percentage'
+  );
+  assert.ok(
+    weightInputBlock.includes('width: 42px;') && weightInputBlock.includes('padding: 2px 4px;'),
+    'blind task weight input should be visually sized for three characters'
   );
   assert.ok(
     css.includes('.manager-environment-comp[data-composition-kind="hazard"]')

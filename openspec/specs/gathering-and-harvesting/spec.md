@@ -150,7 +150,7 @@ GatheringEnvironment = {
 13. Environment metadata exposed to non-GM users must not leak hidden task identity, hidden result details, provider diagnostics, or GM-only notes.
 14. Legacy environments without rich metadata remain valid and load with neutral defaults.
 15. `hazardSelectionMode` and `hazardPolicy` are legacy compatibility fields. New Manager authoring and d100 runtime behavior use system Gathering Rules once they are authored.
-16. `blindSelection` (optional) configures how a blind environment resolves its generic gather to a concrete task. `strategy` defaults to `firstAvailable`; `weightedRandom` uses `weights[taskId]` (default `1`, non-positive excludes); `rollTable`/`macro` resolve via `rollTableUuid`/`macroUuid` and fall back to `firstAvailable` when they yield no eligible candidate. `weights` are keyed by task id and only meaningful for `weightedRandom`.
+16. `blindSelection` (optional) configures how a blind environment resolves its generic gather to a concrete task. `strategy` defaults to `firstAvailable`; `weightedRandom` uses `weights[taskId]` (default `1`, non-positive excludes); `rollTable`/`macro` resolve via `rollTableUuid`/`macroUuid` and fall back to `firstAvailable` when they yield no eligible candidate. `weights` are keyed by task id and only meaningful for `weightedRandom`. GM authoring UI for blind environments shows each included task's calculated selection share as `weight / sum(included task weights) * 100`; the displayed percentage is informational and does not change the persisted weight shape.
 17. `reveal` (optional) overrides the system reveal default for this environment. When absent, the system Gathering Rules `revealPolicy`/`revealScope` apply.
 
 ## System Gathering Rules
