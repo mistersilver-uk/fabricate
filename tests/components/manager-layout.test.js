@@ -1187,6 +1187,12 @@ test('manager environments browser and edit route define compact responsive geom
   const detailsGridBlock = blockFor('.fabricate-manager .manager-environment-details-grid');
   const workspaceBlock = blockFor('.fabricate-manager .manager-environment-workspace');
   const weightInputBlock = blockFor('.fabricate-manager .manager-environment-comp-weight-field input');
+  const compMenuBlock = blockFor('.fabricate-manager .manager-environment-comp-menu');
+  const compMenuButtonBlock = blockFor('.fabricate-manager .manager-environment-comp-menu button');
+  const compMenuIconBlock = blockFor('.fabricate-manager .manager-environment-comp-menu button > i');
+  const compMenuLabelBlock = blockFor('.fabricate-manager .manager-environment-comp-menu button > span');
+  const compMenuNoteBlock = blockFor('.fabricate-manager .manager-environment-comp-menu-note');
+  const compMenuNoteBeforeBlock = blockFor('.fabricate-manager .manager-environment-comp-menu-note::before');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
 
   assert.ok(
@@ -1292,6 +1298,62 @@ test('manager environments browser and edit route define compact responsive geom
     'blind task weight input should be visually sized for three characters'
   );
   assert.ok(
+    compMenuBlock.includes('right: 0;') && compMenuBlock.includes('top: calc(100% + 4px);'),
+    'composition overflow menus should stay anchored to the row action button'
+  );
+  assert.ok(
+    compMenuBlock.includes('width: max-content;')
+      && compMenuBlock.includes('max-width: min(260px, calc(100vw - 32px));')
+      && compMenuBlock.includes('min-width: 176px;'),
+    'composition overflow menus should size to single-line labels with compact minimum and bounded maximum widths'
+  );
+  assert.ok(
+    compMenuButtonBlock.includes('display: grid;') && compMenuButtonBlock.includes('grid-template-columns: 18px minmax(0, 1fr);'),
+    'composition overflow menu items should reserve a fixed icon column before a truncating label column'
+  );
+  assert.ok(
+    compMenuButtonBlock.includes('min-width: 0;'),
+    'composition overflow menu rows should be allowed to shrink inside the flex menu container'
+  );
+  assert.ok(
+    compMenuButtonBlock.includes('justify-content: start;')
+      && compMenuButtonBlock.includes('justify-items: start;')
+      && compMenuButtonBlock.includes('text-align: left;'),
+    'composition overflow menu item content should be left-aligned'
+  );
+  assert.ok(
+    compMenuButtonBlock.includes('white-space: nowrap;'),
+    'composition overflow menu labels should remain on one line'
+  );
+  assert.ok(
+    compMenuButtonBlock.includes('font-size: 0.82rem;') && compMenuButtonBlock.includes('font-weight: 500;'),
+    'composition overflow menu items should use compact lighter text'
+  );
+  assert.ok(
+    compMenuIconBlock.includes('justify-self: center;'),
+    'composition overflow menu icons should stack in the center of the fixed icon column'
+  );
+  assert.ok(
+    compMenuLabelBlock.includes('display: block;')
+      && compMenuLabelBlock.includes('min-width: 0;')
+      && compMenuLabelBlock.includes('max-width: 100%;')
+      && compMenuLabelBlock.includes('overflow: hidden;')
+      && compMenuLabelBlock.includes('text-overflow: ellipsis;'),
+    'composition overflow menu labels should truncate inside the bounded menu width'
+  );
+  assert.ok(
+    compMenuNoteBlock.includes('grid-template-columns: 18px minmax(0, 1fr);')
+      && compMenuNoteBlock.includes('min-width: 0;')
+      && compMenuNoteBlock.includes('white-space: nowrap;')
+      && compMenuNoteBlock.includes('font-size: 0.82rem;')
+      && compMenuNoteBlock.includes('font-weight: 500;'),
+    'disabled composition menu notes should share the compact row geometry'
+  );
+  assert.ok(
+    compMenuNoteBeforeBlock.includes('content: "";') && compMenuNoteBeforeBlock.includes('width: 18px;'),
+    'disabled composition menu notes should reserve the same icon column even without an icon'
+  );
+  assert.ok(
     css.includes('.manager-environment-comp[data-composition-kind="hazard"]')
       && css.includes('--fab-env-comp-grid: 30px minmax(0, 1fr) 92px 132px 92px;'),
     'hazards keep a leading 30px handle column ahead of the task/override/runtime cells'
@@ -1335,6 +1397,145 @@ test('manager environments browser and edit route define compact responsive geom
     mediumQuery.includes('.fabricate-manager .manager-environment-workspace') && mediumQuery.includes('grid-template-columns: minmax(0, 1fr);'),
     'stacked environment editor should put details, task rail, editor, and evidence in one column'
   );
+});
+
+test('manager environment composition overflow menu renders bounded single-line rows', async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 360, height: 260 }, deviceScaleFactor: 1 });
+
+  try {
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            ${css}
+            body {
+              margin: 0;
+              padding: 16px;
+              font-family: Arial, sans-serif;
+            }
+            .harness {
+              position: relative;
+              width: 320px;
+              height: 180px;
+            }
+            .harness .manager-environment-comp-menu-wrap {
+              width: 34px;
+              margin-left: 260px;
+            }
+            .harness .manager-icon-button {
+              width: 34px;
+              height: 34px;
+            }
+            .fa-solid::before,
+            .fas::before {
+              content: "■";
+              display: inline-block;
+              width: 10px;
+              font-size: 10px;
+            }
+          </style>
+        </head>
+        <body>
+          <main class="fabricate-manager">
+            <div class="harness">
+              <div class="manager-environment-comp-menu-wrap">
+                <button type="button" class="manager-icon-button" aria-label="Open task actions">
+                  <i class="fas fa-ellipsis-vertical" aria-hidden="true"></i>
+                </button>
+                <div class="manager-environment-comp-menu" role="menu">
+                  <button type="button" role="menuitem">
+                    <i class="fas fa-up-right-from-square" aria-hidden="true"></i>
+                    <span>OpenSourceRecordWithAnIntentionallyExtendedLocalizedMenuLabelThatMustTruncateInsideTheBoundedMenuWidth</span>
+                  </button>
+                  <button type="button" role="menuitem" class="is-danger">
+                    <i class="fas fa-ban" aria-hidden="true"></i>
+                    <span>Exclude from environment</span>
+                  </button>
+                  <button type="button" role="menuitem" class="manager-environment-comp-menu-note" disabled>
+                    <span>EnableInLibraryFirstWithAnIntentionallyExtendedLocalizedNoteThatMustTruncateInsideTheBoundedMenuWidth</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </main>
+        </body>
+      </html>
+    `);
+
+    const report = await page.evaluate(() => {
+      const rectFor = element => {
+        const rect = element.getBoundingClientRect();
+        return {
+          left: rect.left,
+          top: rect.top,
+          right: rect.right,
+          bottom: rect.bottom,
+          width: rect.width,
+          height: rect.height
+        };
+      };
+      const rowFor = element => {
+        const icon = element.querySelector('i');
+        const label = element.querySelector('span');
+        const rowStyle = getComputedStyle(element);
+        const labelStyle = getComputedStyle(label);
+        return {
+          row: rectFor(element),
+          icon: icon ? rectFor(icon) : null,
+          label: rectFor(label),
+          rowStyle: {
+            display: rowStyle.display,
+            gridTemplateColumns: rowStyle.gridTemplateColumns,
+            justifyContent: rowStyle.justifyContent,
+            justifyItems: rowStyle.justifyItems,
+            textAlign: rowStyle.textAlign,
+            whiteSpace: rowStyle.whiteSpace,
+            fontSize: rowStyle.fontSize,
+            fontWeight: rowStyle.fontWeight
+          },
+          labelStyle: {
+            overflow: labelStyle.overflow,
+            textOverflow: labelStyle.textOverflow,
+            whiteSpace: labelStyle.whiteSpace
+          },
+          labelClientWidth: label.clientWidth,
+          labelScrollWidth: label.scrollWidth
+        };
+      };
+
+      return {
+        viewportWidth: window.innerWidth,
+        wrap: rectFor(document.querySelector('.manager-environment-comp-menu-wrap')),
+        menu: rectFor(document.querySelector('.manager-environment-comp-menu')),
+        rows: Array.from(document.querySelectorAll('.manager-environment-comp-menu button')).map(rowFor)
+      };
+    });
+
+    const [firstRow, dangerRow, noteRow] = report.rows;
+    const iconCenters = [firstRow, dangerRow].map(row => row.icon.left + (row.icon.width / 2));
+    const labelLefts = report.rows.map(row => row.label.left);
+
+    assert.ok(report.menu.width <= 261, 'composition menu should render within the bounded maximum width');
+    assert.ok(report.menu.right <= report.viewportWidth - 16, 'composition menu should avoid viewport horizontal overflow');
+    assert.ok(Math.abs(report.menu.right - report.wrap.right) <= 1, 'composition menu should remain right-aligned to the action button');
+    assert.ok(report.rows.every(row => row.rowStyle.display === 'grid'), 'composition menu rows should render as grid rows');
+    assert.ok(report.rows.every(row => row.rowStyle.gridTemplateColumns.startsWith('18px ')), 'composition menu rows should render the fixed icon column');
+    assert.ok(report.rows.every(row => row.rowStyle.whiteSpace === 'nowrap'), 'composition menu rows should render as single-line actions');
+    assert.ok(report.rows.every(row => row.rowStyle.justifyContent === 'start' && row.rowStyle.justifyItems === 'start'), 'composition menu row content should be left-aligned');
+    assert.ok(report.rows.every(row => row.rowStyle.fontSize === '13.12px' && row.rowStyle.fontWeight === '500'), 'composition menu rows should render compact medium-weight text');
+    assert.ok(Math.abs(iconCenters[0] - iconCenters[1]) <= 1, 'composition menu icons should stack in one vertical column');
+    assert.ok(Math.max(...labelLefts) - Math.min(...labelLefts) <= 1, 'composition menu labels and disabled notes should align in one text column');
+    assert.equal(firstRow.labelStyle.overflow, 'hidden', 'long menu labels should hide overflow');
+    assert.equal(firstRow.labelStyle.textOverflow, 'ellipsis', 'long menu labels should use an ellipsis');
+    assert.ok(firstRow.labelScrollWidth > firstRow.labelClientWidth, 'long menu labels should truncate within the bounded label column');
+    assert.ok(noteRow.labelScrollWidth > noteRow.labelClientWidth, 'disabled note labels should truncate within the same bounded label column');
+  } finally {
+    await page.close();
+    await browser.close();
+  }
 });
 
 test('manager system edit view defines scoped stable form and toggle layout', () => {

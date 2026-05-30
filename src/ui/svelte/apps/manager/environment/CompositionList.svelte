@@ -284,7 +284,7 @@
                       {:else if availableRowAction(entry) === 'force-include'}
                         <button type="button" role="menuitem" data-action="force-include" onclick={() => { onForceInclude(kind, entry.id); closeMenu(); }}><i class="fas fa-plus" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ForceAdd', 'Force add')}</span></button>
                       {:else if availableRowAction(entry) === 'library-disabled'}
-                        <button type="button" role="menuitem" class="manager-environment-comp-menu-note" disabled>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.LibraryDisabledNote', 'Enable in library first')}</button>
+                        <button type="button" role="menuitem" class="manager-environment-comp-menu-note" disabled><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.LibraryDisabledNote', 'Enable in library first')}</span></button>
                       {/if}
                       <button type="button" role="menuitem" onclick={() => { onOpenSource(kind, entry.id); closeMenu(); }}><i class="fas fa-up-right-from-square" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSource', 'Open source record')}</span></button>
                     </div>
@@ -457,7 +457,7 @@
                         {#if mode === 'manual' && entry.compositionState === 'notMatching'}
                           <button type="button" role="menuitem" data-action="force-include" onclick={() => { onForceInclude(kind, entry.id); closeMenu(); }}><i class="fas fa-plus" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ForceAdd', 'Force add')}</span></button>
                         {:else if mode === 'manual' && entry.compositionState === 'libraryDisabled'}
-                          <button type="button" role="menuitem" class="manager-environment-comp-menu-note" disabled>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.LibraryDisabledNote', 'Enable in library first')}</button>
+                          <button type="button" role="menuitem" class="manager-environment-comp-menu-note" disabled><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.LibraryDisabledNote', 'Enable in library first')}</span></button>
                         {/if}
                         <button type="button" role="menuitem" onclick={() => { onOpenSource(kind, entry.id); closeMenu(); }}><i class="fas fa-up-right-from-square" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSource', 'Open source record')}</span></button>
                       </div>
