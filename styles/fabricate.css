@@ -13084,16 +13084,17 @@
 .fabricate-manager .manager-environment-comp-task {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 10px;
-  width: 100%;
   min-width: 0;
-  justify-self: stretch;
   text-align: left;
-  background: none;
-  border: none;
-  padding: 0;
   cursor: pointer;
   color: inherit;
+}
+
+.fabricate-manager .manager-environment-comp-task:focus-visible {
+  outline: 2px solid var(--fab-mv2-accent);
+  outline-offset: 2px;
 }
 
 .fabricate-manager .manager-environment-comp-thumb {
@@ -13107,6 +13108,7 @@
 .fabricate-manager .manager-environment-comp-copy {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   gap: 2px;
   min-width: 0;
 }

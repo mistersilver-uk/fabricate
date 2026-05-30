@@ -100,6 +100,13 @@
     if (dragIndex >= 0 && dragIndex !== targetIndex) onReorder(kind, dragIndex, targetIndex);
     dragIndex = -1;
   }
+
+  function activateOnKey(event, id) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onSelect(kind, id);
+    }
+  }
 </script>
 
 <div class="manager-environment-comp" data-composition-kind={kind} data-composition-mode={mode} data-composition-selection={selectionMode}>
@@ -139,13 +146,21 @@
                 <span class="manager-environment-comp-order">{index + 1}</span>
               </span>
             {/if}
-            <button type="button" class="manager-environment-comp-task" data-action="select" aria-pressed={selectedId === entry.id} onclick={() => onSelect(kind, entry.id)}>
+            <div
+              role="button"
+              tabindex="0"
+              class="manager-environment-comp-task"
+              data-action="select"
+              aria-pressed={selectedId === entry.id}
+              onclick={() => onSelect(kind, entry.id)}
+              onkeydown={(event) => activateOnKey(event, entry.id)}
+            >
               <img class="manager-environment-comp-thumb" src={recordImage(entry)} alt="" />
               <span class="manager-environment-comp-copy">
                 <span class="manager-environment-comp-name">{recordName(entry)}</span>
                 <span class="manager-environment-comp-sub">{recordDescription(entry)}</span>
               </span>
-            </button>
+            </div>
             {#if showBlindWeights}
               <div class="manager-environment-comp-weight">
                 <label class="manager-environment-comp-weight-field">
@@ -210,13 +225,21 @@
           {#each candidates as entry (entry.id)}
             <li class={`manager-environment-comp-row ${selectedId === entry.id ? 'is-selected' : ''}`} data-record-id={entry.id} data-section-row="candidate">
               {#if showHandle}<span class="manager-environment-comp-handle"></span>{/if}
-              <button type="button" class="manager-environment-comp-task" data-action="select" aria-pressed={selectedId === entry.id} onclick={() => onSelect(kind, entry.id)}>
+              <div
+                role="button"
+                tabindex="0"
+                class="manager-environment-comp-task"
+                data-action="select"
+                aria-pressed={selectedId === entry.id}
+                onclick={() => onSelect(kind, entry.id)}
+                onkeydown={(event) => activateOnKey(event, entry.id)}
+              >
                 <img class="manager-environment-comp-thumb" src={recordImage(entry)} alt="" />
                 <span class="manager-environment-comp-copy">
                   <span class="manager-environment-comp-name">{recordName(entry)}</span>
                   <span class="manager-environment-comp-sub">{recordDescription(entry)}</span>
                 </span>
-              </button>
+              </div>
               {#if showBlindWeights}<div class="manager-environment-comp-weight"><span class="manager-environment-comp-none">—</span></div>{/if}
               <div class="manager-environment-comp-override"><OverrideIndicator compositionState={entry.compositionState} {mode} /></div>
               <div class="manager-environment-comp-runtime"><CompositionStatePill state={entry.compositionState} /></div>
@@ -246,13 +269,21 @@
         {#each excluded as entry (entry.id)}
           <li class={`manager-environment-comp-row is-excluded ${selectedId === entry.id ? 'is-selected' : ''}`} data-record-id={entry.id} data-section-row="excluded">
             {#if showHandle}<span class="manager-environment-comp-handle"></span>{/if}
-            <button type="button" class="manager-environment-comp-task" data-action="select" aria-pressed={selectedId === entry.id} onclick={() => onSelect(kind, entry.id)}>
+            <div
+              role="button"
+              tabindex="0"
+              class="manager-environment-comp-task"
+              data-action="select"
+              aria-pressed={selectedId === entry.id}
+              onclick={() => onSelect(kind, entry.id)}
+              onkeydown={(event) => activateOnKey(event, entry.id)}
+            >
               <img class="manager-environment-comp-thumb" src={recordImage(entry)} alt="" />
               <span class="manager-environment-comp-copy">
                 <span class="manager-environment-comp-name">{recordName(entry)}</span>
                 <span class="manager-environment-comp-sub">{recordDescription(entry)}</span>
               </span>
-            </button>
+            </div>
             {#if showBlindWeights}<div class="manager-environment-comp-weight"><span class="manager-environment-comp-none">—</span></div>{/if}
             <div class="manager-environment-comp-override"><OverrideIndicator compositionState={entry.compositionState} {mode} /></div>
             <div class="manager-environment-comp-runtime"><CompositionStatePill state="excluded" /></div>
@@ -281,13 +312,21 @@
         {#each paginatedNonMatching as entry (entry.id)}
           <li class="manager-environment-comp-row is-non-matching" data-record-id={entry.id} data-section-row="non-matching" data-composition-state={entry.compositionState}>
             {#if showHandle}<span class="manager-environment-comp-handle"></span>{/if}
-            <button type="button" class="manager-environment-comp-task" data-action="select" aria-pressed={selectedId === entry.id} onclick={() => onSelect(kind, entry.id)}>
+            <div
+              role="button"
+              tabindex="0"
+              class="manager-environment-comp-task"
+              data-action="select"
+              aria-pressed={selectedId === entry.id}
+              onclick={() => onSelect(kind, entry.id)}
+              onkeydown={(event) => activateOnKey(event, entry.id)}
+            >
               <img class="manager-environment-comp-thumb" src={recordImage(entry)} alt="" />
               <span class="manager-environment-comp-copy">
                 <span class="manager-environment-comp-name">{recordName(entry)}</span>
                 <span class="manager-environment-comp-sub">{recordDescription(entry)}</span>
               </span>
-            </button>
+            </div>
             {#if showBlindWeights}<div class="manager-environment-comp-weight"><span class="manager-environment-comp-none">—</span></div>{/if}
             <div class="manager-environment-comp-override"><OverrideIndicator compositionState={entry.compositionState} {mode} /></div>
             <div class="manager-environment-comp-runtime"><CompositionStatePill state={entry.compositionState} /></div>
