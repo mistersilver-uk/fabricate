@@ -1373,7 +1373,7 @@
             "ManualHint": "Only explicitly included records are available; GMs can force add enabled non-matching records.",
             "IncludedByMatch": "Included by match",
             "Included": "Included",
-            "Candidate": "Matching candidate",
+            "Candidate": "Not included",
             "Excluded": "Excluded",
             "IncludedButUnavailable": "Included but unavailable",
             "NotMatching": "Not matching",

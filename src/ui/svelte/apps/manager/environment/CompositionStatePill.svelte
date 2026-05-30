@@ -13,7 +13,7 @@
     includedByMatch: { tone: 'is-active', icon: 'fas fa-link', key: 'IncludedByMatch', fallback: 'Included by match' },
     explicitlyIncluded: { tone: 'is-active', icon: 'fas fa-check', key: 'Included', fallback: 'Included' },
     forceIncluded: { tone: 'is-warning', icon: 'fas fa-bolt', key: 'ForceIncluded', fallback: 'Force included' },
-    candidate: { tone: 'is-neutral', icon: 'fas fa-plus', key: 'Candidate', fallback: 'Matching candidate' },
+    candidate: { tone: 'is-neutral', icon: 'fas fa-circle-question', key: 'Candidate', fallback: 'Matching candidate' },
     excluded: { tone: 'is-danger', icon: 'fas fa-ban', key: 'Excluded', fallback: 'Excluded' },
     includedButUnavailable: { tone: 'is-warning', icon: 'fas fa-triangle-exclamation', key: 'IncludedButUnavailable', fallback: 'Included but unavailable' },
     notMatching: { tone: 'is-disabled', icon: 'fas fa-circle-minus', key: 'NotMatching', fallback: 'Not matching' },
