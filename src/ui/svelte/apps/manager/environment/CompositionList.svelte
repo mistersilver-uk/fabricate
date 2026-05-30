@@ -296,7 +296,7 @@
                     title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickAdd', 'Add')}
                     onclick={() => onInclude(kind, entry.id)}
                   >
-                    <i class="fas fa-plus" aria-hidden="true"></i>
+                    <i class="fas fa-circle-plus" aria-hidden="true"></i>
                   </button>
                 {:else if availableRowAction(entry) === 'force-include'}
                   <button

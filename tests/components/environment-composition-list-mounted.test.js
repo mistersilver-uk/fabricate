@@ -184,7 +184,7 @@ describe('CompositionList mounted layout', () => {
     assert.ok(includeQuick, 'matching available task rows render a quick add action');
     assert.equal(includeQuick.getAttribute('title'), 'Add');
     assert.equal(includeQuick.getAttribute('aria-label'), 'Add');
-    assert.ok(includeQuick.querySelector('.fa-plus'), 'quick add uses the plus icon');
+    assert.ok(includeQuick.querySelector('.fa-circle-plus'), 'quick add uses the circle-plus icon');
     includeQuick.click();
     assert.deepEqual(calls.at(-1), ['include', 'task', 'candidate']);
 

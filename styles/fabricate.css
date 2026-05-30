@@ -8526,11 +8526,15 @@
   font-weight: 700;
 }
 
-.fabricate-manager .manager-button.is-primary,
-.fabricate-manager .manager-icon-button.is-primary {
+.fabricate-manager .manager-button.is-primary {
   border-color: var(--fab-success-border);
   color: var(--fab-on-success);
   background: var(--fab-success);
+}
+
+.fabricate-manager .manager-icon-button.is-primary {
+  border-color: var(--fab-success-border);
+  color: var(--fab-success-text);
 }
 
 .fabricate-manager .manager-button.is-danger,
@@ -8552,11 +8556,16 @@
   background: var(--fab-overlay-light-10);
 }
 
-.fabricate-manager .manager-button.is-primary:not(:disabled):hover,
-.fabricate-manager .manager-icon-button.is-primary:not(:disabled):hover {
+.fabricate-manager .manager-button.is-primary:not(:disabled):hover {
   border-color: var(--fab-success-border);
   color: var(--fab-on-success);
   background: var(--fab-success-strong);
+}
+
+.fabricate-manager .manager-icon-button.is-primary:not(:disabled):hover {
+  border-color: var(--fab-success-border);
+  color: var(--fab-success-text);
+  background: var(--fab-success-soft);
 }
 
 .fabricate-manager .manager-button.is-danger:not(:disabled):hover,

@@ -1641,8 +1641,8 @@ test('design-system colour tokens are declared in the theme layer as the agreed 
 
 test('manager icon buttons normalize host button defaults and keep pointer targets stable', () => {
   const block = blockFor('.fabricate-manager .manager-button,\n.fabricate-manager .manager-icon-button');
-  const primaryBlock = blockFor('.fabricate-manager .manager-button.is-primary,\n.fabricate-manager .manager-icon-button.is-primary');
-  const primaryHoverBlock = blockFor('.fabricate-manager .manager-button.is-primary:not(:disabled):hover,\n.fabricate-manager .manager-icon-button.is-primary:not(:disabled):hover');
+  const primaryIconBlock = blockFor('.fabricate-manager .manager-icon-button.is-primary');
+  const primaryIconHoverBlock = blockFor('.fabricate-manager .manager-icon-button.is-primary:not(:disabled):hover');
   const iconBlocks = Array.from(css.matchAll(/\.fabricate-manager \.manager-icon-button\s*\{[\s\S]*?\}/g));
   const iconBlock = iconBlocks.at(-1)?.[0] || '';
 
@@ -1653,8 +1653,9 @@ test('manager icon buttons normalize host button defaults and keep pointer targe
   assert.ok(block.includes('min-width: 0;'), 'manager buttons should clear host min-width defaults');
   assert.ok(iconBlock.includes('width: 34px;'), 'icon buttons should have a stable width of at least 32px');
   assert.ok(iconBlock.includes('height: 34px;'), 'icon buttons should have a stable height of at least 32px');
-  assert.ok(primaryBlock.includes('background: var(--fab-success);'), 'primary icon buttons should use the same green success styling as primary text buttons');
-  assert.ok(primaryHoverBlock.includes('background: var(--fab-success-strong);'), 'primary icon buttons should keep the primary hover state');
+  assert.ok(primaryIconBlock.includes('color: var(--fab-success-text);'), 'primary icon buttons should use a light green outline treatment');
+  assert.equal(primaryIconBlock.includes('background: var(--fab-success);'), false, 'primary icon buttons should not use the heavy solid primary background');
+  assert.ok(primaryIconHoverBlock.includes('background: var(--fab-success-soft);'), 'primary icon buttons should keep a soft green hover state');
   assert.ok(css.includes('.fabricate-manager .manager-button:disabled'), 'disabled manager buttons should have explicit disabled styling');
   assert.ok(css.includes('.fabricate-manager .manager-button:not(:disabled):hover'), 'manager hover styles should not target disabled buttons');
 });
