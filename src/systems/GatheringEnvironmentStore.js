@@ -309,6 +309,8 @@ export class GatheringEnvironmentStore {
       disabledHazardIds: normalizeIdList(data?.disabledHazardIds),
       taskOrder: normalizeIdList(data?.taskOrder),
       hazardOrder: normalizeIdList(data?.hazardOrder),
+      taskDropRateAdjustments: normalizeTaskDropRateAdjustments(data?.taskDropRateAdjustments),
+      hazardDropRateAdjustments: normalizeDropRateAdjustmentMap(data?.hazardDropRateAdjustments),
       hazardSelectionMode: ['highestRankedDrop', 'allDrops'].includes(data?.hazardSelectionMode) ? data.hazardSelectionMode : 'allDrops',
       hazardPolicy: ['successWithHazard', 'failureWithHazard'].includes(data?.hazardPolicy) ? data.hazardPolicy : 'successWithHazard',
       ...(blindSelection ? { blindSelection } : {}),
@@ -449,6 +451,9 @@ export class GatheringEnvironmentStore {
     if (original?.dangerLevel !== undefined && !DANGER_LEVELS.includes(original.dangerLevel)) {
       errors.push(`Environment "${label}" dangerLevel must be one of: ${DANGER_LEVELS.join(', ')}`);
     }
+
+    errors.push(...validateTaskDropRateAdjustments(original?.taskDropRateAdjustments, `Environment "${label}" taskDropRateAdjustments`));
+    errors.push(...validateDropRateAdjustmentMap(original?.hazardDropRateAdjustments, `Environment "${label}" hazardDropRateAdjustments`));
 
     errors.push(...validateBlindSelection(normalized.blindSelection, `Environment "${label}" blindSelection`));
 
@@ -1195,6 +1200,54 @@ function normalizeStringList(value) {
 function normalizeIdList(value) {
   const values = Array.isArray(value) ? value : (value ? [value] : []);
   return Array.from(new Set(values.map(entry => stringOrEmpty(entry)).filter(Boolean)));
+}
+
+function normalizeDropRateAdjustmentValue(value) {
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < -100 || number > 100 || number === 0) return null;
+  return number;
+}
+
+function normalizeDropRateAdjustmentMap(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value)
+    .map(([id, adjustment]) => [stringOrEmpty(id), normalizeDropRateAdjustmentValue(adjustment)])
+    .filter(([id, adjustment]) => id && adjustment !== null));
+}
+
+function normalizeTaskDropRateAdjustments(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value)
+    .map(([taskId, rowAdjustments]) => [stringOrEmpty(taskId), normalizeDropRateAdjustmentMap(rowAdjustments)])
+    .filter(([taskId, rowAdjustments]) => taskId && Object.keys(rowAdjustments).length > 0));
+}
+
+function validateDropRateAdjustmentMap(value, label) {
+  if (value === undefined || value === null) return [];
+  if (typeof value !== 'object' || Array.isArray(value)) return [`${label} must be an object`];
+  const errors = [];
+  for (const [id, adjustment] of Object.entries(value)) {
+    const key = stringOrEmpty(id);
+    const number = Number(adjustment);
+    if (!key) {
+      errors.push(`${label} keys must be non-empty ids`);
+      continue;
+    }
+    if (!Number.isInteger(number) || number < -100 || number > 100) {
+      errors.push(`${label}.${key} must be an integer from -100 to 100`);
+    }
+  }
+  return errors;
+}
+
+function validateTaskDropRateAdjustments(value, label) {
+  if (value === undefined || value === null) return [];
+  if (typeof value !== 'object' || Array.isArray(value)) return [`${label} must be an object`];
+  return Object.entries(value).flatMap(([taskId, rowAdjustments]) => {
+    const key = stringOrEmpty(taskId);
+    if (!key) return [`${label} keys must be non-empty task ids`];
+    return validateDropRateAdjustmentMap(rowAdjustments, `${label}.${key}`);
+  });
 }
 
 function trimmedOrDefault(value, fallback) {

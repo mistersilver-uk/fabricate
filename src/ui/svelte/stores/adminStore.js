@@ -2041,10 +2041,59 @@ export function createAdminStore(services) {
         || compositionState === 'forceIncluded';
       const runtimeState = (composed && conditionsMet) ? 'available' : 'unavailable';
       const orderRank = orderIndex.has(id) ? orderIndex.get(id) : Number.MAX_SAFE_INTEGER;
-      return { id, record, kind, libraryEnabled, matches, conditionsMet, evidence, excluded, explicitlyIncluded, compositionState, runtimeState, orderRank, _index: index };
+      const dropRateAdjustment = _dropRateAdjustmentSummary({ kind, record, environment });
+      return { id, record, kind, libraryEnabled, matches, conditionsMet, evidence, excluded, explicitlyIncluded, compositionState, runtimeState, orderRank, _index: index, ...dropRateAdjustment };
     });
 
     return classified.sort((a, b) => (a.orderRank === b.orderRank ? a._index - b._index : a.orderRank - b.orderRank));
+  }
+
+  function _effectiveDropRate(baseDropRate, adjustment) {
+    const base = Number.isFinite(Number(baseDropRate)) ? Math.floor(Number(baseDropRate)) : 0;
+    const delta = Number.isFinite(Number(adjustment)) ? Math.floor(Number(adjustment)) : 0;
+    return Math.min(100, Math.max(0, base + delta));
+  }
+
+  function _dropRateAdjustmentSummary({ kind, record, environment }) {
+    const id = String(record?.id || '');
+    if (!id) return { hasDropRateAdjustment: false, dropRateAdjustment: 0, dropRateAdjustmentRows: [] };
+    if (kind === 'hazard') {
+      const adjustments = _normalizeDraftDropRateAdjustmentMap(environment?.hazardDropRateAdjustments);
+      const adjustment = adjustments[id] || 0;
+      const baseDropRate = Number.isFinite(Number(record?.dropRate)) ? Math.floor(Number(record.dropRate)) : 1;
+      return {
+        hasDropRateAdjustment: adjustment !== 0,
+        dropRateAdjustment: adjustment,
+        baseDropRate,
+        effectiveDropRate: _effectiveDropRate(baseDropRate, adjustment),
+        dropRateAdjustmentRows: []
+      };
+    }
+
+    const taskAdjustments = _normalizeDraftTaskDropRateAdjustments(environment?.taskDropRateAdjustments);
+    const rowAdjustments = taskAdjustments[id] || {};
+    const rows = (Array.isArray(record?.dropRows ?? record?.itemDrops) ? (record.dropRows ?? record.itemDrops) : [])
+      .map(row => {
+        const rowId = String(row?.id || '');
+        const adjustment = rowAdjustments[rowId] || 0;
+        const baseDropRate = Number.isFinite(Number(row?.dropRate)) ? Math.floor(Number(row.dropRate)) : 1;
+        return {
+          id: rowId,
+          name: String(row?.name || ''),
+          componentId: String(row?.componentId || row?.systemItemId || ''),
+          itemUuid: String(row?.itemUuid || ''),
+          quantity: Number.isFinite(Number(row?.quantity)) && Number(row.quantity) > 0 ? Number(row.quantity) : 1,
+          baseDropRate,
+          adjustment,
+          effectiveDropRate: _effectiveDropRate(baseDropRate, adjustment),
+          hasDropRateAdjustment: adjustment !== 0
+        };
+      });
+    return {
+      hasDropRateAdjustment: rows.some(row => row.hasDropRateAdjustment),
+      dropRateAdjustment: rows.reduce((sum, row) => sum + row.adjustment, 0),
+      dropRateAdjustmentRows: rows
+    };
   }
 
   function _emptyCompositionCounts() {
@@ -2727,6 +2776,26 @@ export function createAdminStore(services) {
     };
   }
 
+  function _normalizeDraftDropRateAdjustmentValue(value) {
+    const number = Number(value);
+    if (!Number.isInteger(number) || number < -100 || number > 100 || number === 0) return null;
+    return number;
+  }
+
+  function _normalizeDraftDropRateAdjustmentMap(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    return Object.fromEntries(Object.entries(value)
+      .map(([id, adjustment]) => [String(id || '').trim(), _normalizeDraftDropRateAdjustmentValue(adjustment)])
+      .filter(([id, adjustment]) => id && adjustment !== null));
+  }
+
+  function _normalizeDraftTaskDropRateAdjustments(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    return Object.fromEntries(Object.entries(value)
+      .map(([taskId, rowAdjustments]) => [String(taskId || '').trim(), _normalizeDraftDropRateAdjustmentMap(rowAdjustments)])
+      .filter(([taskId, rowAdjustments]) => taskId && Object.keys(rowAdjustments).length > 0));
+  }
+
   function updateEnvironmentDraft(updates = {}) {
     const current = get(environmentDraft);
     if (!current || typeof updates !== 'object' || updates === null) return false;
@@ -2753,6 +2822,8 @@ export function createAdminStore(services) {
       'forcedHazardIds',
       'taskOrder',
       'hazardOrder',
+      'taskDropRateAdjustments',
+      'hazardDropRateAdjustments',
       'blindSelection',
       'reveal',
       'tasks'
@@ -2779,6 +2850,10 @@ export function createAdminStore(services) {
         next[field] = Array.from(new Set((Array.isArray(value) ? value : [])
           .map(entry => String(entry || '').trim())
           .filter(Boolean)));
+      } else if (field === 'hazardDropRateAdjustments') {
+        next.hazardDropRateAdjustments = _normalizeDraftDropRateAdjustmentMap(value);
+      } else if (field === 'taskDropRateAdjustments') {
+        next.taskDropRateAdjustments = _normalizeDraftTaskDropRateAdjustments(value);
       } else if (field === 'blindSelection') {
         next.blindSelection = _normalizeDraftBlindSelection(value);
       } else if (field === 'reveal') {

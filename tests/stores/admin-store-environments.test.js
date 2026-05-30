@@ -186,12 +186,13 @@ function validateEnvironmentForFakeCreate(environment) {
 function createServices({
   systems = [makeSystem()],
   environments = [],
+  gatheringConfig = {},
   updateError = null,
   confirmResult = true,
   sceneOptions = [],
   rollTableOptions = []
 } = {}) {
-  const settings = { lastManagedCraftingSystem: '' };
+  const settings = { lastManagedCraftingSystem: '', gatheringConfig };
   const listCalls = [];
   const confirmCalls = [];
   const calls = {
@@ -829,6 +830,50 @@ describe('adminStore gathering environments tab state', () => {
     await store.selectEnvironment('environment-b');
     assert.equal(get(store.viewState).environmentDraftDirty, false);
     assert.equal(get(store.viewState).environmentDraft.id, 'environment-b');
+  });
+
+  it('summarizes task and hazard drop-rate adjustments in environment composition view state', async () => {
+    const services = createServices({
+      systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
+      environments: [makeEnvironment({
+        id: 'environment-a',
+        tasks: [],
+        taskDropRateAdjustments: { 'task-library': { 'drop-ore': 25 } },
+        hazardDropRateAdjustments: { 'hazard-cave-in': -10 }
+      })],
+      gatheringConfig: {
+        systems: {
+          'system-a': {
+            tasks: [
+              { id: 'task-library', name: 'Mine Ore', dropRows: [{ id: 'drop-ore', componentId: 'ore', quantity: 1, dropRate: 40 }] }
+            ],
+            hazards: [
+              { id: 'hazard-cave-in', name: 'Cave-in', dropRate: 30 }
+            ]
+          }
+        }
+      }
+    });
+    const store = createAdminStore(services);
+
+    await store.selectSystem('system-a');
+    let composition = get(store.viewState).environmentComposition;
+    assert.equal(composition.tasks[0].hasDropRateAdjustment, true);
+    assert.equal(composition.tasks[0].dropRateAdjustmentRows[0].adjustment, 25);
+    assert.equal(composition.tasks[0].dropRateAdjustmentRows[0].effectiveDropRate, 65);
+    assert.equal(composition.hazards[0].hasDropRateAdjustment, true);
+    assert.equal(composition.hazards[0].dropRateAdjustment, -10);
+    assert.equal(composition.hazards[0].effectiveDropRate, 20);
+
+    store.updateEnvironmentDraft({
+      taskDropRateAdjustments: { 'task-library': { 'drop-ore': 0 } },
+      hazardDropRateAdjustments: { 'hazard-cave-in': 0 }
+    });
+    composition = get(store.viewState).environmentComposition;
+    assert.equal(composition.tasks[0].hasDropRateAdjustment, false);
+    assert.equal(composition.hazards[0].hasDropRateAdjustment, false);
+    assert.deepEqual(get(store.viewState).environmentDraft.taskDropRateAdjustments, {});
+    assert.deepEqual(get(store.viewState).environmentDraft.hazardDropRateAdjustments, {});
   });
 
   it('create, duplicate, delete, and reorder use the environment store and refresh selection safely', async () => {

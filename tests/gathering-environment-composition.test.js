@@ -18,6 +18,17 @@ function makeService(systemConfig = {}) {
   return service;
 }
 
+function makeRollingService(systemConfig = {}, rollD100 = () => 1) {
+  const config = { systems: { 'system-a': systemConfig } };
+  const settings = new Map([[SETTING_KEYS.GATHERING_CONFIG, config]]);
+  return new GatheringRichStateService({
+    getSetting: key => settings.get(key),
+    setSetting: async (key, value) => { settings.set(key, value); return value; },
+    settingKey: SETTING_KEYS.GATHERING_CONFIG,
+    rollD100
+  });
+}
+
 function environment(overrides = {}) {
   return {
     id: 'env-a',
@@ -152,4 +163,53 @@ test('the environment danger level acts as a ceiling for eligible hazards', () =
 
   const safe = service.composeEnvironment(environment({ compositionMode: 'automatic', dangerLevel: 'safe' }), system);
   assert.deepEqual(safe.hazards.map(hazard => hazard.id), []);
+});
+
+test('environment drop-rate adjustments apply to composed task rows and hazards without mutating library records', () => {
+  const sourceTask = { id: 'tAdjust', name: 'Pick Ore', biomes: ['cave'], dropRows: [{ id: 'dAdjust', componentId: 'ore', quantity: 1, dropRate: 40 }] };
+  const sourceHazard = { id: 'hAdjust', name: 'Cave-in', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 40 };
+  const service = makeService({ tasks: [sourceTask], hazards: [sourceHazard] });
+
+  const composed = service.composeEnvironment(environment({
+    compositionMode: 'automatic',
+    taskDropRateAdjustments: { tAdjust: { dAdjust: 20 } },
+    hazardDropRateAdjustments: { hAdjust: -15 }
+  }), system);
+
+  assert.equal(composed.tasks[0].dropRows[0].dropRate, 60);
+  assert.equal(composed.tasks[0].dropRows[0].baseDropRate, 40);
+  assert.equal(composed.tasks[0].dropRows[0].environmentDropRateAdjustment, 20);
+  assert.equal(composed.hazards[0].dropRate, 25);
+  assert.equal(composed.hazards[0].baseDropRate, 40);
+  assert.equal(composed.hazards[0].environmentDropRateAdjustment, -15);
+  assert.equal(sourceTask.dropRows[0].dropRate, 40);
+  assert.equal(sourceHazard.dropRate, 40);
+});
+
+test('environment drop-rate adjustments affect d100 task and hazard roll thresholds', async () => {
+  const service = makeRollingService({
+    tasks: [{ id: 'tRoll', name: 'Pick Ore', biomes: ['cave'], dropRows: [{ id: 'dRoll', componentId: 'ore', quantity: 1, dropRate: 40 }] }],
+    hazards: [{ id: 'hRoll', name: 'Cave-in', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 40 }]
+  }, () => 50);
+
+  const unadjusted = service.composeEnvironment(environment({ compositionMode: 'automatic' }), system);
+  const unadjustedResult = await service.resolveD100Attempt({
+    task: unadjusted.tasks[0],
+    environment: unadjusted
+  });
+  assert.deepEqual(unadjustedResult.items, []);
+  assert.deepEqual(unadjustedResult.hazards, []);
+
+  const adjusted = service.composeEnvironment(environment({
+    compositionMode: 'automatic',
+    taskDropRateAdjustments: { tRoll: { dRoll: 20 } },
+    hazardDropRateAdjustments: { hRoll: 20 }
+  }), system);
+  const adjustedResult = await service.resolveD100Attempt({
+    task: adjusted.tasks[0],
+    environment: adjusted
+  });
+
+  assert.deepEqual(adjustedResult.items.map(item => item.id), ['dRoll']);
+  assert.deepEqual(adjustedResult.hazards.map(hazard => hazard.id), ['hRoll']);
 });

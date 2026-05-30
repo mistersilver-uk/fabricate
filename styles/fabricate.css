@@ -13368,6 +13368,50 @@
   gap: 8px;
 }
 
+.fabricate-manager .manager-environment-drop-adjustment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fabricate-manager .manager-environment-drop-adjustment-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px auto;
+  align-items: end;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  background: var(--fab-overlay-dark-16);
+}
+
+.fabricate-manager .manager-environment-drop-adjustment-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fabricate-manager .manager-environment-drop-adjustment-copy strong,
+.fabricate-manager .manager-environment-drop-adjustment-copy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-environment-drop-adjustment-copy span {
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.82rem;
+}
+
+.fabricate-manager .manager-environment-drop-adjustment-input {
+  gap: 4px;
+}
+
+.fabricate-manager .manager-environment-drop-adjustment-input input {
+  width: 92px;
+}
+
 @media (max-width: 960px) {
   .fabricate-manager .manager-environment-workspace {
     grid-template-columns: minmax(0, 1fr);

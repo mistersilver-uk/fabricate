@@ -46,8 +46,10 @@
   {:else if recordEntry}
     <RecordInspector
       kind={recordKind}
+      {environment}
       entry={recordEntry}
       onOpenSource={openSource}
+      onUpdateEnvironment={onUpdateEnvironment}
       onInclude={onIncludeRecord}
       onExclude={onExcludeRecord}
       onRestore={onRestoreRecord}

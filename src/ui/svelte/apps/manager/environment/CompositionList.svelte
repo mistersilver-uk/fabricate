@@ -168,7 +168,7 @@
               </div>
             {/if}
             <div class="manager-environment-comp-override">
-              <OverrideIndicator compositionState={entry.compositionState} {mode} />
+              <OverrideIndicator active={entry.hasDropRateAdjustment === true} />
             </div>
             <div class="manager-environment-comp-runtime">
               <RuntimeStatePill state={runtimePillState(entry)} />
@@ -229,7 +229,7 @@
                 </span>
               </div>
               {#if showBlindWeights}<div class="manager-environment-comp-weight"><span class="manager-environment-comp-none">—</span></div>{/if}
-              <div class="manager-environment-comp-override"><OverrideIndicator compositionState={entry.compositionState} {mode} /></div>
+              <div class="manager-environment-comp-override"><OverrideIndicator active={entry.hasDropRateAdjustment === true} /></div>
               <div class="manager-environment-comp-runtime"><CompositionStatePill state={entry.compositionState} /></div>
               <div class="manager-environment-comp-actions">
                 <button type="button" class="manager-button is-primary manager-environment-include" data-action="include" onclick={() => onInclude(kind, entry.id)}>
@@ -273,7 +273,7 @@
               </span>
             </div>
             {#if showBlindWeights}<div class="manager-environment-comp-weight"><span class="manager-environment-comp-none">—</span></div>{/if}
-            <div class="manager-environment-comp-override"><OverrideIndicator compositionState={entry.compositionState} {mode} /></div>
+            <div class="manager-environment-comp-override"><OverrideIndicator active={entry.hasDropRateAdjustment === true} /></div>
             <div class="manager-environment-comp-runtime"><CompositionStatePill state="excluded" /></div>
             <div class="manager-environment-comp-actions">
               <button type="button" class="manager-button manager-environment-restore" data-action="restore" onclick={() => onRestore(kind, entry.id)}>
@@ -316,7 +316,7 @@
               </span>
             </div>
             {#if showBlindWeights}<div class="manager-environment-comp-weight"><span class="manager-environment-comp-none">—</span></div>{/if}
-            <div class="manager-environment-comp-override"><OverrideIndicator compositionState={entry.compositionState} {mode} /></div>
+            <div class="manager-environment-comp-override"><OverrideIndicator active={entry.hasDropRateAdjustment === true} /></div>
             <div class="manager-environment-comp-runtime"><CompositionStatePill state={entry.compositionState} /></div>
             <div class="manager-environment-comp-actions">
               {#if mode === 'manual' && entry.compositionState === 'notMatching'}

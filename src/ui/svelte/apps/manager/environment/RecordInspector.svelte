@@ -1,15 +1,16 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import { dropRateTierClass, dropRateTierColor } from '../../../util/dropRateTier.js';
   import CompositionStatePill from './CompositionStatePill.svelte';
   import RuntimeStatePill from './RuntimeStatePill.svelte';
   import MatchingEvidenceChips from './MatchingEvidenceChips.svelte';
 
   let {
     kind = 'task',
+    environment = null,
     entry = null,
     onOpenSource = () => {},
+    onUpdateEnvironment = () => {},
     onExclude = () => {},
     onRestore = () => {},
     onInclude = () => {}
@@ -67,7 +68,8 @@
     { id: 'runtime', label: text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.LayerRuntime', 'Runtime'), ok: entry?.runtimeState === 'available', value: '' }
   ]);
 
-  const dropChancePreview = 100;
+  const adjustmentRows = $derived(Array.isArray(entry?.dropRateAdjustmentRows) ? entry.dropRateAdjustmentRows : []);
+  const hazardAdjustment = $derived(Number.isFinite(Number(entry?.dropRateAdjustment)) ? Number(entry.dropRateAdjustment) : 0);
 
   const waitingForValues = $derived(entry?.conditionsMet === false
     ? [
@@ -75,6 +77,40 @@
         ...(entry?.evidence?.time?.recordValues || [])
       ]
     : []);
+
+  function clampAdjustment(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return 0;
+    return Math.max(-100, Math.min(100, Math.trunc(number)));
+  }
+
+  function setHazardAdjustment(value) {
+    const adjustment = clampAdjustment(value);
+    const id = String(entry?.id || '').trim();
+    if (!id) return;
+    const next = { ...(environment?.hazardDropRateAdjustments && typeof environment.hazardDropRateAdjustments === 'object' ? environment.hazardDropRateAdjustments : {}) };
+    if (adjustment === 0) delete next[id];
+    else next[id] = adjustment;
+    onUpdateEnvironment({ hazardDropRateAdjustments: next });
+  }
+
+  function setTaskDropAdjustment(rowId, value) {
+    const adjustment = clampAdjustment(value);
+    const taskId = String(entry?.id || '').trim();
+    const dropRowId = String(rowId || '').trim();
+    if (!taskId || !dropRowId) return;
+    const taskAdjustments = { ...(environment?.taskDropRateAdjustments && typeof environment.taskDropRateAdjustments === 'object' ? environment.taskDropRateAdjustments : {}) };
+    const rowAdjustments = { ...(taskAdjustments[taskId] && typeof taskAdjustments[taskId] === 'object' ? taskAdjustments[taskId] : {}) };
+    if (adjustment === 0) delete rowAdjustments[dropRowId];
+    else rowAdjustments[dropRowId] = adjustment;
+    if (Object.keys(rowAdjustments).length === 0) delete taskAdjustments[taskId];
+    else taskAdjustments[taskId] = rowAdjustments;
+    onUpdateEnvironment({ taskDropRateAdjustments: taskAdjustments });
+  }
+
+  function rowLabel(row) {
+    return String(row?.name || row?.componentId || row?.itemUuid || row?.id || text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.DropRow', 'Drop row'));
+  }
 </script>
 
 {#if entry}
@@ -164,51 +200,46 @@
     </section>
   {/if}
 
-  <section class="manager-inspector-card is-disabled-overrides" data-record-inspector-section="overrides">
+  <section class="manager-inspector-card" data-record-inspector-section="overrides">
     <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Overrides', 'Environment overrides')}</h3>
-    <p class="manager-muted">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.OverridesHint', 'Environment-local overrides do not modify the reusable source record. Per-field overrides are coming soon.')}</p>
+    <p class="manager-muted">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.OverridesHint', 'Drop-rate adjustments apply only in this environment and do not modify the reusable source record.')}</p>
 
-    <label class="manager-field is-disabled">
-      <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.PlayerLabel', 'Player-facing label')}</span>
-      <input type="text" disabled placeholder={record?.name || ''} aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.PlayerLabel', 'Player-facing label')} />
-    </label>
-
-    <label class="manager-field is-disabled manager-drop-rate-editor">
-      <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.DropChance', 'Drop chance adjustment')}</span>
-      <span class="manager-drop-rate-value">
-        <span class="manager-drop-rate-percent">
-          <input type="text" inputmode="numeric" value={dropChancePreview} disabled aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.DropChance', 'Drop chance adjustment')} />
-          <span aria-hidden="true">%</span>
-        </span>
-        <span class={`manager-drop-rate-control ${dropRateTierClass(dropChancePreview)}`} style={`--fab-drop-rate-value: ${dropChancePreview}%; --fab-drop-rate-color: ${dropRateTierColor(dropChancePreview)};`}>
-          <span class="manager-drop-rate-track" aria-hidden="true"><span class="manager-drop-rate-fill"></span></span>
-          <input type="range" min="1" max="100" step="1" value={dropChancePreview} disabled aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.DropChance', 'Drop chance adjustment')} />
-        </span>
-      </span>
-    </label>
-
-    <label class="manager-field is-disabled">
-      <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.EconomyImpact', 'Economy impact')}</span>
-      <select disabled aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.EconomyImpact', 'Economy impact')}>
-        <option>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.EconomyNormal', 'Normal')}</option>
-      </select>
-    </label>
-
-    <div class="manager-field is-disabled">
-      <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.AttemptsPerNode', 'Attempts per node')}</span>
-      <div class="manager-rule-stepper" aria-disabled="true">
-        <button type="button" class="manager-icon-button" disabled aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Decrease', 'Decrease')}><i class="fas fa-minus" aria-hidden="true"></i></button>
-        <input type="number" value="1" disabled aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.AttemptsPerNode', 'Attempts per node')} />
-        <button type="button" class="manager-icon-button" disabled aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Increase', 'Increase')}><i class="fas fa-plus" aria-hidden="true"></i></button>
+    {#if kind === 'hazard'}
+      <div class="manager-environment-drop-adjustment-row" data-drop-rate-adjustment={entry.id}>
+        <div class="manager-environment-drop-adjustment-copy">
+          <strong>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.HazardChance', 'Hazard chance')}</strong>
+          <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.BaseAndEffectiveRate', 'Base {base}% · Effective {effective}%').replace('{base}', entry.baseDropRate ?? record?.dropRate ?? 0).replace('{effective}', entry.effectiveDropRate ?? record?.dropRate ?? 0)}</span>
+        </div>
+        <label class="manager-field manager-environment-drop-adjustment-input">
+          <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.DropRateAdjustment', 'Drop-rate adjustment')}</span>
+          <input type="number" min="-100" max="100" step="1" value={hazardAdjustment} aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.DropRateAdjustment', 'Drop-rate adjustment')} onchange={(event) => setHazardAdjustment(event.currentTarget.value)} />
+        </label>
+        <button type="button" class="manager-button" disabled={hazardAdjustment === 0} onclick={() => setHazardAdjustment(0)}>
+          <i class="fas fa-rotate-left" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ClearAdjustment', 'Clear')}</span>
+        </button>
       </div>
-    </div>
-
-    <div class="manager-field is-disabled manager-environment-override-toggle">
-      <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.OverrideRuntime', 'Override runtime state')}</span>
-      <button type="button" class="manager-status-toggle is-off" disabled aria-pressed="false" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.OverrideRuntime', 'Override runtime state')}>
-        <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
-        <span class="manager-status-toggle-label">{text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span>
-      </button>
-    </div>
+    {:else if adjustmentRows.length > 0}
+      <div class="manager-environment-drop-adjustment-list">
+        {#each adjustmentRows as row (row.id)}
+          <div class="manager-environment-drop-adjustment-row" data-drop-rate-adjustment={row.id}>
+            <div class="manager-environment-drop-adjustment-copy">
+              <strong>{rowLabel(row)}</strong>
+              <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.BaseAndEffectiveRate', 'Base {base}% · Effective {effective}%').replace('{base}', row.baseDropRate).replace('{effective}', row.effectiveDropRate)}</span>
+            </div>
+            <label class="manager-field manager-environment-drop-adjustment-input">
+              <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.DropRateAdjustment', 'Drop-rate adjustment')}</span>
+              <input type="number" min="-100" max="100" step="1" value={row.adjustment} aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.DropRateAdjustment', 'Drop-rate adjustment')} onchange={(event) => setTaskDropAdjustment(row.id, event.currentTarget.value)} />
+            </label>
+            <button type="button" class="manager-button" disabled={row.adjustment === 0} onclick={() => setTaskDropAdjustment(row.id, 0)}>
+              <i class="fas fa-rotate-left" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ClearAdjustment', 'Clear')}</span>
+            </button>
+          </div>
+        {/each}
+      </div>
+    {:else}
+      <p class="manager-muted">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoDropRows', 'This task has no drop rows to adjust.')}</p>
+    {/if}
   </section>
 {/if}

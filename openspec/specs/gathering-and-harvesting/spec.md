@@ -118,6 +118,8 @@ GatheringEnvironment = {
   disabledHazardIds?: string[],
   forcedTaskIds?: string[],
   forcedHazardIds?: string[],
+  taskDropRateAdjustments?: Record<string, Record<string, number>>, // taskId -> dropRowId -> signed percentage-point delta
+  hazardDropRateAdjustments?: Record<string, number>, // hazardId -> signed percentage-point delta
   blindSelection?: {
     strategy: "firstAvailable" | "weightedRandom" | "rollTable" | "macro",
     macroUuid?: string | null,
@@ -144,6 +146,7 @@ GatheringEnvironment = {
 11. Weather and time of day are not environment fields. They are global gathering conditions used as **runtime gates** — a Gathering Task or hazard whose required `weather` / `timeOfDay` values are not satisfied by the current conditions stays in the environment's composition (it still matches by region/biome/danger) but is **inactive** at runtime: tasks become `visible: true` / `attemptable: false` with a `CONDITIONS_BLOCKED` reason, and hazards are skipped during d100 hazard selection. Matching itself is decided by region / biome / danger only.
 12. `enabledTaskIds`, `disabledTaskIds`, `enabledHazardIds`, and `disabledHazardIds` store environment-level composition toggles for reusable library records without rewriting the library definitions.
 12a. `forcedTaskIds` / `forcedHazardIds` are GM "force-add" overrides used in **manual** composition mode: a record listed there is composed into the environment even when it does not match the environment's region/biome/danger/conditions (composition state `forceIncluded`, runtime state `available`). Forces are honored only in manual mode — **automatic** mode ignores them, consistent with automatic ignoring the enabled allow-list, so a stale forced list never makes a non-matching record available in automatic mode. Excluding a forced record (`disabled*Ids`) clears the force.
+12b. `taskDropRateAdjustments` and `hazardDropRateAdjustments` store environment-local signed percentage-point deltas for reusable library task drop rows and hazards. Task adjustments are keyed first by task id and then by drop-row id. Hazard adjustments are keyed by hazard id. Values must be integers from `-100` to `100`; zero values are omitted. Adjustments affect only this environment and must not rewrite reusable library records.
 13. Environment metadata exposed to non-GM users must not leak hidden task identity, hidden result details, provider diagnostics, or GM-only notes.
 14. Legacy environments without rich metadata remain valid and load with neutral defaults.
 15. `hazardSelectionMode` and `hazardPolicy` are legacy compatibility fields. New Manager authoring and d100 runtime behavior use system Gathering Rules once they are authored.
@@ -517,8 +520,8 @@ Resolve gathering-native Gathering Task drops and matched hazards through ordere
 ### Runtime Requirements
 
 1. Before any player attempt starts, Fabricate rejects gathering if Foundry is paused.
-2. For every enabled item row in the selected Gathering Task, resolve row character modifier references, calculate `finalDropRate = clamp(dropRate + matchingConditionModifiers + resolvedCharacterModifiers, 0, 100)`, roll `d100`, add the gathering modifier, and drop the row when `effectiveRoll >= 101 - finalDropRate`.
-3. For every enabled matched hazard in the environment, resolve hazard character modifier references, calculate `finalHazardRate = clamp(dropRate + resolvedCharacterModifiers, 0, 100)`, roll `d100`, add the hazard modifier, and drop the hazard when `effectiveRoll >= 101 - finalHazardRate`.
+2. For every enabled item row in the selected Gathering Task, resolve row character modifier references, calculate `finalDropRate = clamp(dropRate + environmentDropRateAdjustment + matchingConditionModifiers + resolvedCharacterModifiers, 0, 100)`, roll `d100`, add the gathering modifier, and drop the row when `effectiveRoll >= 101 - finalDropRate`.
+3. For every enabled matched hazard in the environment, resolve hazard character modifier references, calculate `finalHazardRate = clamp(dropRate + environmentDropRateAdjustment + resolvedCharacterModifiers, 0, 100)`, roll `d100`, add the hazard modifier, and drop the hazard when `effectiveRoll >= 101 - finalHazardRate`.
 4. System Gathering Rules select rewards after item rows roll once rules are authored.
 5. Reward `highestRankedDrop` awards the first dropped item row in authored row order.
 6. Reward `allDrops` awards every dropped item row.

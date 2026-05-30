@@ -194,7 +194,7 @@ export class GatheringRichStateService {
         });
     const compositionMode = environment?.compositionMode === 'manual' ? 'manual' : 'automatic';
     const tasks = [
-      ...normalizeList(environment.tasks),
+      ...normalizeList(environment.tasks).map(task => this._environmentTaskToRuntimeTask(task, environment)),
       ...sortRecordsByOrder(
         normalizeList(libraries.tasks)
           .filter(task => task?.enabled !== false)
@@ -202,7 +202,7 @@ export class GatheringRichStateService {
             || this._recordIsForced(environment, task.id, 'task', compositionMode))
           .filter(task => this._environmentIncludesLibraryRecord(environment, task.id, 'task', compositionMode)),
         environment?.taskOrder
-      ).map(task => this._libraryTaskToRuntimeTask(task))
+      ).map(task => this._libraryTaskToRuntimeTask(task, environment))
     ];
     const hazards = sortRecordsByOrder(
       normalizeList(libraries.hazards)
@@ -211,7 +211,7 @@ export class GatheringRichStateService {
           || this._recordIsForced(environment, hazard.id, 'hazard', compositionMode))
         .filter(hazard => this._environmentIncludesLibraryRecord(environment, hazard.id, 'hazard', compositionMode)),
       environment?.hazardOrder
-    ).map(hazard => normalizeHazard(hazard));
+    ).map(hazard => applyHazardDropRateAdjustment(normalizeHazard(hazard), environment));
 
     const libraryCharacterModifiers = new Map();
     for (const entry of normalizeList(libraries.characterModifiers)) {
@@ -814,8 +814,18 @@ export class GatheringRichStateService {
     return true;
   }
 
-  _libraryTaskToRuntimeTask(task) {
+  _environmentTaskToRuntimeTask(task, environment) {
+    if (!task || typeof task !== 'object') return task;
+    const normalized = cloneJson(task);
+    const rowAdjustments = taskDropRateAdjustmentMap(environment, normalized.id);
+    normalized.dropRows = normalizeList(normalized.dropRows ?? normalized.itemDrops)
+      .map(row => applyDropRateAdjustment(row, rowAdjustments[String(row?.id || '')]));
+    return normalized;
+  }
+
+  _libraryTaskToRuntimeTask(task, environment = null) {
     const normalized = normalizeLibraryTask(task);
+    const rowAdjustments = taskDropRateAdjustmentMap(environment, normalized.id);
     const runtimeTask = {
       id: normalized.id,
       name: normalized.name,
@@ -824,7 +834,7 @@ export class GatheringRichStateService {
       enabled: normalized.enabled,
       resolutionMode: 'd100',
       itemSelectionMode: normalized.itemSelectionMode,
-      dropRows: normalized.dropRows,
+      dropRows: normalized.dropRows.map(row => applyDropRateAdjustment(row, rowAdjustments[row.id])),
       staminaCost: normalized.staminaCost,
       gatheringModifier: normalized.gatheringModifier,
       resultGroups: [{ id: `${normalized.id}-d100`, name: normalized.name, results: [] }],
@@ -1122,6 +1132,42 @@ function normalizeHazard(hazard = {}) {
     conditionModifiers: normalizeDropConditionModifiers(hazard.conditionModifiers),
     characterModifiers: normalizeHazardCharacterModifiers(hazard.characterModifiers)
   };
+}
+
+function normalizeDropRateAdjustmentValue(value) {
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < -100 || number > 100 || number === 0) return 0;
+  return number;
+}
+
+function dropRateAdjustmentMap(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value)
+    .map(([id, adjustment]) => [String(id || '').trim(), normalizeDropRateAdjustmentValue(adjustment)])
+    .filter(([id, adjustment]) => id && adjustment !== 0));
+}
+
+function taskDropRateAdjustmentMap(environment, taskId) {
+  const taskMaps = environment?.taskDropRateAdjustments;
+  if (!taskMaps || typeof taskMaps !== 'object' || Array.isArray(taskMaps)) return {};
+  return dropRateAdjustmentMap(taskMaps[String(taskId || '')]);
+}
+
+function applyDropRateAdjustment(row, adjustment = 0) {
+  const normalizedAdjustment = normalizeDropRateAdjustmentValue(adjustment);
+  const baseDropRate = clampDropRate(row?.dropRate);
+  return {
+    ...cloneJson(row),
+    dropRate: clampDropRate(baseDropRate + normalizedAdjustment),
+    baseDropRate,
+    environmentDropRateAdjustment: normalizedAdjustment
+  };
+}
+
+function applyHazardDropRateAdjustment(hazard, environment) {
+  const adjustments = dropRateAdjustmentMap(environment?.hazardDropRateAdjustments);
+  const adjustment = adjustments[String(hazard?.id || '')] || 0;
+  return applyDropRateAdjustment(hazard, adjustment);
 }
 
 /**

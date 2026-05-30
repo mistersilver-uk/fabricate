@@ -307,6 +307,45 @@ test('targeted environments may compose gathering task-library records by enable
   assert.deepEqual(created.enabledTaskIds, ['task-library-a', 'task-library-b']);
 });
 
+test('drop-rate adjustments normalize to non-zero integer deltas and validate raw ranges', async () => {
+  const { store } = makeMemoryStore();
+  store.load();
+
+  const created = await store.create(environment({
+    id: 'env-adjustments',
+    enabledTaskIds: ['task-library-a'],
+    taskDropRateAdjustments: {
+      ' task-library-a ': {
+        ' drop-a ': 15,
+        'drop-zero': 0
+      },
+      'task-empty': {
+        'drop-empty': 0
+      }
+    },
+    hazardDropRateAdjustments: {
+      ' hazard-a ': -20,
+      'hazard-zero': 0
+    }
+  }));
+
+  assert.deepEqual(created.taskDropRateAdjustments, {
+    'task-library-a': { 'drop-a': 15 }
+  });
+  assert.deepEqual(created.hazardDropRateAdjustments, {
+    'hazard-a': -20
+  });
+
+  const invalid = store.validate(environment({
+    id: 'env-invalid-adjustments',
+    taskDropRateAdjustments: { 'task-library-a': { 'drop-a': 101 } },
+    hazardDropRateAdjustments: { 'hazard-a': -101 }
+  }));
+  assert.equal(invalid.valid, false);
+  assert.match(invalid.errors.join('\n'), /taskDropRateAdjustments\.task-library-a\.drop-a must be an integer from -100 to 100/);
+  assert.match(invalid.errors.join('\n'), /hazardDropRateAdjustments\.hazard-a must be an integer from -100 to 100/);
+});
+
 test('rich gathering metadata and task economy fields normalize and validate additively', async () => {
   const { store } = makeMemoryStore();
   store.load();

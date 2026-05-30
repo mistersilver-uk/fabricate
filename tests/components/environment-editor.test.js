@@ -82,8 +82,15 @@ describe('environment editor localization', () => {
       ['Composition.ForceAdd', 'Force add'],
       ['Composition.LibraryDisabledNote', 'Enable in library first'],
       ['Composition.ForceIncluded', 'Force included'],
+      ['Composition.OverrideOn', 'On'],
+      ['Composition.OverrideOff', 'Off'],
+      ['Composition.OverrideOnTitle', 'Drop rate adjustment on'],
+      ['Composition.OverrideOffTitle', 'Drop rate adjustment off'],
       ['Composition.ManualHint', 'Only explicitly included records are available; GMs can force add enabled non-matching records.'],
       ['Inspector.ExplainForceIncluded', 'Force-added by the GM despite not matching the environment context.'],
+      ['Inspector.OverridesHint', 'Drop-rate adjustments apply only in this environment and do not modify the reusable source record.'],
+      ['Inspector.DropRateAdjustment', 'Drop-rate adjustment'],
+      ['Inspector.ClearAdjustment', 'Clear'],
       ['Tasks.ManualIntro', 'Only tasks you explicitly include are available to players. You can also force add non-matching tasks from the Non-matching list.'],
       ['Hazards.ManualIntro', 'Only hazards you explicitly include apply here. You can also force add non-matching hazards from the Non-matching list.'],
       ['Validation.CheckRegion', 'Has a region or is set to "any region"']
@@ -157,6 +164,8 @@ describe('environment composition editor structure', () => {
     assert.ok(!listSource.includes('ColEvidence'), 'composition table no longer renders an evidence column');
     assert.ok(!listSource.includes('MatchingEvidenceChips'), 'composition rows no longer embed evidence chips inline');
     assert.ok(listSource.includes('OverrideIndicator'), 'rows surface override state via the OverrideIndicator chip');
+    assert.ok(listSource.includes('active={entry.hasDropRateAdjustment === true}'), 'override chips are driven by drop-rate adjustment state');
+    assert.ok(!listSource.includes('compositionState={entry.compositionState}'), 'override chips are not driven by composition state');
     assert.ok(listSource.includes('manager-environment-comp-row'), 'composition list renders table rows');
     assert.ok(listSource.includes('dismissOnOutsideClick'), 'row overflow menu dismisses on outside click');
     assert.ok(listSource.includes('manager-environment-comp-menu'), 'rows expose an overflow action menu');
@@ -232,13 +241,16 @@ describe('environment composition editor structure', () => {
     assert.ok(listSource.includes('LibraryDisabledNote'), 'library-disabled rows show an "enable in library first" note');
   });
 
-  it('inspector renders the four-layer evaluation and disabled environment overrides', () => {
+  it('inspector renders the four-layer evaluation and active drop-rate adjustment overrides', () => {
     for (const layer of ['LayerLibrary', 'LayerMatching', 'LayerComposition', 'LayerRuntime']) {
       assert.ok(inspectorSource.includes(layer), `inspector should render the ${layer} row`);
     }
     assert.ok(inspectorSource.includes('MatchingEvidenceChips'), 'inspector should render match evidence');
-    assert.ok(inspectorSource.includes('is-disabled-overrides'), 'inspector should mark the override section as disabled in phase 1');
-    assert.ok(inspectorSource.includes('disabled'), 'override fields should be disabled');
+    assert.ok(inspectorSource.includes('data-record-inspector-section="overrides"'), 'inspector should render the override section');
+    assert.ok(inspectorSource.includes('DropRateAdjustment'), 'override section should edit drop-rate adjustments');
+    assert.ok(inspectorSource.includes('setHazardAdjustment'), 'hazard adjustment edits should update the environment draft');
+    assert.ok(inspectorSource.includes('setTaskDropAdjustment'), 'task drop-row adjustment edits should update the environment draft');
+    assert.ok(!inspectorSource.includes('is-disabled-overrides'), 'override section should no longer be phase-1 disabled');
   });
 
   it('tabs are a keyboard-navigable tablist', () => {
