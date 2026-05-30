@@ -61,6 +61,7 @@ function compileManagerRoot() {
     'CompositionStatePill',
     'RuntimeStatePill',
     'MatchingEvidenceChips',
+    'OverrideIndicator',
     'CompositionModeControl'
   ]) {
     writeCompiledSvelte(`src/ui/svelte/apps/manager/environment/${environmentComponent}.svelte`);

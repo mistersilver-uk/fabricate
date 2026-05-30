@@ -1385,7 +1385,7 @@
             "HazardsUnit": "hazards",
             "TasksUnit": "tasks",
             "ColTask": "Task",
-            "ColEvidence": "Matching evidence",
+            "ColWeight": "Weight",
             "ColOverride": "Override",
             "ColRuntime": "Runtime state",
             "NoIncluded": "No records are available in this environment yet.",
@@ -1406,7 +1406,8 @@
             "ForceAdd": "Force add",
             "LibraryDisabledNote": "Enable in library first",
             "ForceIncluded": "Force included",
-            "ConditionsBlockedHint": "Available when: {values}",
+            "ConditionsBlockedHint": "Waiting for: {values}",
+            "OverrideOn": "Override on",
             "Weight": "Weight"
           },
           "Overview": {

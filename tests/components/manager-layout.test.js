@@ -1273,8 +1273,18 @@ test('manager environments browser and edit route define compact responsive geom
   );
   const compBlock = blockFor('.fabricate-manager .manager-environment-comp');
   assert.ok(
-    compBlock.includes('--fab-env-comp-grid: 30px minmax(0,'),
-    'composition grid flexible columns must shrink so rows fit the inspector-narrowed tasks/hazards panel'
+    compBlock.includes('--fab-env-comp-grid: minmax(0, 1fr) 92px 132px 92px;'),
+    'composition grid defaults to the four-column tasks (targeted) layout: task / override / runtime / actions'
+  );
+  assert.ok(
+    css.includes('.manager-environment-comp[data-composition-kind="task"][data-composition-selection="blind"]')
+      && css.includes('--fab-env-comp-grid: minmax(0, 1fr) 72px 92px 132px 92px;'),
+    'blind-mode tasks add a Weight column ahead of override/runtime'
+  );
+  assert.ok(
+    css.includes('.manager-environment-comp[data-composition-kind="hazard"]')
+      && css.includes('--fab-env-comp-grid: 30px minmax(0, 1fr) 92px 132px 92px;'),
+    'hazards keep a leading 30px handle column ahead of the task/override/runtime cells'
   );
   assert.ok(
     !compBlock.includes('minmax(150px'),
@@ -1283,6 +1293,10 @@ test('manager environments browser and edit route define compact responsive geom
   assert.ok(
     !css.includes('manager-environment-evidence-column'),
     'environment editor CSS should no longer reference the removed evidence column'
+  );
+  assert.ok(
+    !css.includes('.manager-environment-comp-evidence'),
+    'environment editor CSS should no longer reference the removed inline-row evidence cell'
   );
   assert.ok(
     css.includes('.fabricate-manager .manager-environment-validation-band'),

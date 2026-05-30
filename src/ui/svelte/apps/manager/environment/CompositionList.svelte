@@ -4,7 +4,7 @@
   import { dismissOnOutsideClick } from '../../../actions/dismissOnOutsideClick.js';
   import RuntimeStatePill from './RuntimeStatePill.svelte';
   import CompositionStatePill from './CompositionStatePill.svelte';
-  import MatchingEvidenceChips from './MatchingEvidenceChips.svelte';
+  import OverrideIndicator from './OverrideIndicator.svelte';
   import Pagination from '../../../components/Pagination.svelte';
 
   let {
@@ -28,6 +28,7 @@
   let nonMatchingPageSize = $state(10);
 
   const showBlindWeights = $derived(kind === 'task' && selectionMode === 'blind');
+  const showHandle = $derived(kind === 'hazard');
   function weightFor(id) {
     const raw = Number(weights?.[id]);
     return Number.isFinite(raw) ? raw : 1;
@@ -61,7 +62,7 @@
       ...(entry?.evidence?.time?.recordValues || [])
     ];
     return required.length > 0
-      ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ConditionsBlockedHint', 'Available when: {values}').replace('{values}', required.join(', '))
+      ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ConditionsBlockedHint', 'Waiting for: {values}').replace('{values}', required.join(', '))
       : '';
   }
 
@@ -101,7 +102,7 @@
   }
 </script>
 
-<div class="manager-environment-comp" data-composition-kind={kind} data-composition-mode={mode}>
+<div class="manager-environment-comp" data-composition-kind={kind} data-composition-mode={mode} data-composition-selection={selectionMode}>
   <!-- Included -->
   <section class="manager-environment-comp-section" data-section="included">
     <header class="manager-environment-comp-band">
@@ -110,9 +111,9 @@
     </header>
 
     <div class="manager-environment-comp-head" aria-hidden="true">
-      <span></span>
+      {#if showHandle}<span></span>{/if}
       <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColTask', 'Task')}</span>
-      <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColEvidence', 'Matching evidence')}</span>
+      {#if showBlindWeights}<span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColWeight', 'Weight')}</span>{/if}
       <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColOverride', 'Override')}</span>
       <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColRuntime', 'Runtime state')}</span>
       <span></span>
@@ -132,12 +133,12 @@
             ondragover={kind === 'hazard' ? (event) => event.preventDefault() : undefined}
             ondrop={kind === 'hazard' ? (event) => { event.preventDefault(); handleDrop(index); } : undefined}
           >
-            <span class="manager-environment-comp-handle" title={kind === 'hazard' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.DragReorder', 'Drag to reorder') : null}>
-              {#if kind === 'hazard'}
+            {#if showHandle}
+              <span class="manager-environment-comp-handle" title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.DragReorder', 'Drag to reorder')}>
                 <i class="fas fa-grip-vertical" aria-hidden="true"></i>
                 <span class="manager-environment-comp-order">{index + 1}</span>
-              {/if}
-            </span>
+              </span>
+            {/if}
             <button type="button" class="manager-environment-comp-task" data-action="select" aria-pressed={selectedId === entry.id} onclick={() => onSelect(kind, entry.id)}>
               <img class="manager-environment-comp-thumb" src={recordImage(entry)} alt="" />
               <span class="manager-environment-comp-copy">
@@ -145,10 +146,9 @@
                 <span class="manager-environment-comp-sub">{recordDescription(entry)}</span>
               </span>
             </button>
-            <div class="manager-environment-comp-evidence"><MatchingEvidenceChips evidence={entry.evidence} /></div>
-            <div class="manager-environment-comp-override">
-              {#if showBlindWeights}
-                <label class="manager-environment-comp-weight">
+            {#if showBlindWeights}
+              <div class="manager-environment-comp-weight">
+                <label class="manager-environment-comp-weight-field">
                   <span class="manager-environment-comp-weight-label">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Weight', 'Weight')}</span>
                   <input
                     type="number"
@@ -159,11 +159,10 @@
                     onchange={(event) => onWeightChange(entry.id, event.currentTarget.value)}
                   />
                 </label>
-              {:else if kind === 'hazard' && Number.isFinite(Number(entry.record?.dropRate))}
-                <span class="manager-chip is-neutral">{Number(entry.record.dropRate)}%</span>
-              {:else}
-                <span class="manager-environment-comp-none">—</span>
-              {/if}
+              </div>
+            {/if}
+            <div class="manager-environment-comp-override">
+              <OverrideIndicator compositionState={entry.compositionState} {mode} />
             </div>
             <div class="manager-environment-comp-runtime">
               <RuntimeStatePill state={runtimePillState(entry)} />
@@ -210,7 +209,7 @@
         <ul class="manager-environment-comp-rows">
           {#each candidates as entry (entry.id)}
             <li class={`manager-environment-comp-row ${selectedId === entry.id ? 'is-selected' : ''}`} data-record-id={entry.id} data-section-row="candidate">
-              <span class="manager-environment-comp-handle"></span>
+              {#if showHandle}<span class="manager-environment-comp-handle"></span>{/if}
               <button type="button" class="manager-environment-comp-task" data-action="select" aria-pressed={selectedId === entry.id} onclick={() => onSelect(kind, entry.id)}>
                 <img class="manager-environment-comp-thumb" src={recordImage(entry)} alt="" />
                 <span class="manager-environment-comp-copy">
@@ -218,8 +217,8 @@
                   <span class="manager-environment-comp-sub">{recordDescription(entry)}</span>
                 </span>
               </button>
-              <div class="manager-environment-comp-evidence"><MatchingEvidenceChips evidence={entry.evidence} /></div>
-              <div class="manager-environment-comp-override"><span class="manager-environment-comp-none">—</span></div>
+              {#if showBlindWeights}<div class="manager-environment-comp-weight"><span class="manager-environment-comp-none">—</span></div>{/if}
+              <div class="manager-environment-comp-override"><OverrideIndicator compositionState={entry.compositionState} {mode} /></div>
               <div class="manager-environment-comp-runtime"><CompositionStatePill state={entry.compositionState} /></div>
               <div class="manager-environment-comp-actions">
                 <button type="button" class="manager-button is-primary manager-environment-include" data-action="include" onclick={() => onInclude(kind, entry.id)}>
@@ -246,7 +245,7 @@
       <ul class="manager-environment-comp-rows">
         {#each excluded as entry (entry.id)}
           <li class={`manager-environment-comp-row is-excluded ${selectedId === entry.id ? 'is-selected' : ''}`} data-record-id={entry.id} data-section-row="excluded">
-            <span class="manager-environment-comp-handle"></span>
+            {#if showHandle}<span class="manager-environment-comp-handle"></span>{/if}
             <button type="button" class="manager-environment-comp-task" data-action="select" aria-pressed={selectedId === entry.id} onclick={() => onSelect(kind, entry.id)}>
               <img class="manager-environment-comp-thumb" src={recordImage(entry)} alt="" />
               <span class="manager-environment-comp-copy">
@@ -254,8 +253,8 @@
                 <span class="manager-environment-comp-sub">{recordDescription(entry)}</span>
               </span>
             </button>
-            <div class="manager-environment-comp-evidence"><MatchingEvidenceChips evidence={entry.evidence} /></div>
-            <div class="manager-environment-comp-override"><span class="manager-environment-comp-none">—</span></div>
+            {#if showBlindWeights}<div class="manager-environment-comp-weight"><span class="manager-environment-comp-none">—</span></div>{/if}
+            <div class="manager-environment-comp-override"><OverrideIndicator compositionState={entry.compositionState} {mode} /></div>
             <div class="manager-environment-comp-runtime"><CompositionStatePill state="excluded" /></div>
             <div class="manager-environment-comp-actions">
               <button type="button" class="manager-button manager-environment-restore" data-action="restore" onclick={() => onRestore(kind, entry.id)}>
@@ -281,7 +280,7 @@
       <ul class="manager-environment-comp-rows is-non-matching">
         {#each paginatedNonMatching as entry (entry.id)}
           <li class="manager-environment-comp-row is-non-matching" data-record-id={entry.id} data-section-row="non-matching" data-composition-state={entry.compositionState}>
-            <span class="manager-environment-comp-handle"></span>
+            {#if showHandle}<span class="manager-environment-comp-handle"></span>{/if}
             <button type="button" class="manager-environment-comp-task" data-action="select" aria-pressed={selectedId === entry.id} onclick={() => onSelect(kind, entry.id)}>
               <img class="manager-environment-comp-thumb" src={recordImage(entry)} alt="" />
               <span class="manager-environment-comp-copy">
@@ -289,8 +288,8 @@
                 <span class="manager-environment-comp-sub">{recordDescription(entry)}</span>
               </span>
             </button>
-            <div class="manager-environment-comp-evidence"><MatchingEvidenceChips evidence={entry.evidence} /></div>
-            <div class="manager-environment-comp-override"><span class="manager-environment-comp-none">—</span></div>
+            {#if showBlindWeights}<div class="manager-environment-comp-weight"><span class="manager-environment-comp-none">—</span></div>{/if}
+            <div class="manager-environment-comp-override"><OverrideIndicator compositionState={entry.compositionState} {mode} /></div>
             <div class="manager-environment-comp-runtime"><CompositionStatePill state={entry.compositionState} /></div>
             <div class="manager-environment-comp-actions">
               {#if mode === 'manual' && entry.compositionState === 'notMatching'}

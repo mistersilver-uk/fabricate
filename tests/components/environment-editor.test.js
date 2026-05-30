@@ -150,9 +150,13 @@ describe('environment composition editor structure', () => {
 
   it('renders Tasks/Hazards as a column-headed table', () => {
     assert.ok(listSource.includes('manager-environment-comp-head'), 'composition list renders a column header row');
-    for (const col of ['ColTask', 'ColEvidence', 'ColOverride', 'ColRuntime']) {
+    for (const col of ['ColTask', 'ColOverride', 'ColRuntime']) {
       assert.ok(listSource.includes(col), `composition table defines the ${col} column`);
     }
+    assert.ok(listSource.includes('ColWeight'), 'composition table defines the blind-mode ColWeight column');
+    assert.ok(!listSource.includes('ColEvidence'), 'composition table no longer renders an evidence column');
+    assert.ok(!listSource.includes('MatchingEvidenceChips'), 'composition rows no longer embed evidence chips inline');
+    assert.ok(listSource.includes('OverrideIndicator'), 'rows surface override state via the OverrideIndicator chip');
     assert.ok(listSource.includes('manager-environment-comp-row'), 'composition list renders table rows');
     assert.ok(listSource.includes('dismissOnOutsideClick'), 'row overflow menu dismisses on outside click');
     assert.ok(listSource.includes('manager-environment-comp-menu'), 'rows expose an overflow action menu');
