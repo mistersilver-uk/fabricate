@@ -88,7 +88,7 @@ Per-task weights and the strategy/reveal controls only appear while the environm
 Every environment has a **composition mode** (Overview → Composition mode card) that decides which reusable library tasks and hazards apply:
 
 - **Automatic** — every matching, library-enabled record is available unless you explicitly exclude it. Stale `enabled*Ids` / `forced*Ids` lists left over from a previous manual pass are ignored, so automatic always means "all matching available unless excluded".
-- **Manual** — only records you explicitly **include** apply. The Tasks and Hazards tabs show:
+- **Manual** — only records you explicitly **include** apply. On the Tasks tab, manual mode shows **Included in this environment** and **Available to add** only. Available to add lists matching tasks first, then non-matching and library-disabled tasks; matching rows use **Include**, non-matching enabled rows use **Force add**, and library-disabled rows show an "enable in library first" note. The Hazards tab keeps the fuller manual layout:
   - **Included in this environment** — records you've added.
   - **Matching candidates** — records that match this environment and can be included with one click.
   - **Excluded from this environment** — records you've removed; Restore brings them back.

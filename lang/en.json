@@ -1397,6 +1397,8 @@
             "Exclude": "Exclude from environment",
             "MatchingCandidates": "Matching candidates",
             "NoCandidates": "No further matching records to include.",
+            "AvailableToAdd": "Available to add",
+            "NoAvailableToAdd": "No matching or non-matching records to add.",
             "Include": "Include",
             "ExcludedFromEnvironment": "Excluded from this environment",
             "NoExcluded": "Nothing is excluded.",
@@ -1579,7 +1581,7 @@
           "Tasks": {
             "Title": "Tasks",
             "AutomaticIntro": "All matching enabled library tasks are available unless you exclude them here.",
-            "ManualIntro": "Only tasks you explicitly include are available to players. You can also force add non-matching tasks from the Non-matching list."
+            "ManualIntro": "Only tasks you explicitly include are available to players. You can add matching tasks or force add non-matching tasks from Available to add."
           },
           "Hazards": {
             "Title": "Hazards",

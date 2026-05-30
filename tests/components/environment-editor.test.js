@@ -79,6 +79,8 @@ describe('environment editor localization', () => {
     const expected = [
       ['Composition.NonMatching', 'Non-matching'],
       ['Composition.NoNonMatching', 'No non-matching or disabled records.'],
+      ['Composition.AvailableToAdd', 'Available to add'],
+      ['Composition.NoAvailableToAdd', 'No matching or non-matching records to add.'],
       ['Composition.ForceAdd', 'Force add'],
       ['Composition.LibraryDisabledNote', 'Enable in library first'],
       ['Composition.ForceIncluded', 'Force included'],
@@ -92,7 +94,7 @@ describe('environment editor localization', () => {
       ['Inspector.OverridesHint', 'Drop-rate adjustments apply only in this environment and do not modify the reusable source record.'],
       ['Inspector.DropRateAdjustment', 'Drop-rate adjustment'],
       ['Inspector.ClearAdjustment', 'Clear'],
-      ['Tasks.ManualIntro', 'Only tasks you explicitly include are available to players. You can also force add non-matching tasks from the Non-matching list.'],
+      ['Tasks.ManualIntro', 'Only tasks you explicitly include are available to players. You can add matching tasks or force add non-matching tasks from Available to add.'],
       ['Hazards.ManualIntro', 'Only hazards you explicitly include apply here. You can also force add non-matching hazards from the Non-matching list.'],
       ['Validation.CheckRegion', 'Has a region or is set to "any region"']
     ];
@@ -238,21 +240,33 @@ describe('environment composition editor structure', () => {
     assert.ok(inspectorSource.includes('variant="checks"'), 'inspector requests the checks evidence variant');
   });
 
-  it('non-matching records render in a paginated section (force-addable in manual)', () => {
-    // The included/candidate/excluded sections must never surface notMatching or
-    // libraryDisabled records; those belong to the dedicated non-matching list.
+  it('manual task mode renders one Available-to-add group instead of Excluded and Non-matching sections', () => {
+    // The included section must never surface addable/non-matching records; those
+    // belong to the task-only Available-to-add list in manual mode.
     assert.ok(listSource.includes("entry.compositionState === 'includedByMatch'"), 'included section keys off includedByMatch');
     assert.ok(listSource.includes("entry.compositionState === 'forceIncluded'"), 'included section also surfaces force-included records');
-    assert.ok(listSource.includes("entry.compositionState === 'candidate'"), 'candidates section keys off candidate state');
+    assert.ok(listSource.includes("availableToAddMatching"), 'manual task mode has a matching available-to-add group');
+    assert.ok(listSource.includes("availableToAddNonMatching"), 'manual task mode has a non-matching available-to-add group');
+    assert.ok(listSource.includes("availableToAddLibraryDisabled"), 'manual task mode has a library-disabled available-to-add group');
+    assert.ok(listSource.includes('const availableToAdd = $derived([...availableToAddMatching, ...availableToAddNonMatching, ...availableToAddLibraryDisabled])'), 'available-to-add orders matching records before non-matching and library-disabled records');
+    assert.ok(listSource.includes('data-section="available-to-add"'), 'manual task mode renders an Available to add section');
+    assert.ok(listSource.includes('Composition.AvailableToAdd'), 'Available to add section uses localized copy');
+    assert.ok(listSource.includes('Composition.NoAvailableToAdd'), 'Available to add empty state uses localized copy');
+    assert.ok(listSource.includes("entry.compositionState === 'excluded' && entry.matches === true && entry.libraryEnabled === true"), 'matching excluded task records stay discoverable in Available to add');
+    assert.ok(listSource.includes("entry?.compositionState === 'excluded' && entry?.matches !== true"), 'non-matching excluded task records can be force-added again');
+    assert.ok(listSource.includes("entry?.compositionState === 'excluded' && entry?.libraryEnabled !== true"), 'library-disabled excluded task records remain non-addable');
+    assert.ok(listSource.includes("{#if kind === 'task' && mode === 'manual'}"), 'Available to add is gated to manual task mode');
+    assert.ok(listSource.includes("{#if !(kind === 'task' && mode === 'manual')}"), 'Excluded and standalone Non-matching sections do not render in manual task mode');
+    assert.ok(listSource.includes("{#if kind !== 'task' && mode === 'manual'}"), 'hazard manual mode keeps the existing Matching candidates section');
+    assert.ok(listSource.includes("data-section=\"excluded\""), 'automatic task mode and hazards retain the Excluded section');
+    assert.ok(listSource.includes("data-section=\"non-matching\""), 'automatic task mode and hazards retain the standalone Non-matching section');
     assert.ok(/nonMatching = \$derived\(records\.filter\(entry =>\s*entry\.compositionState === 'notMatching' \|\| entry\.compositionState === 'libraryDisabled'\)\)/.test(listSource), 'non-matching list collects notMatching and libraryDisabled');
-    assert.ok(listSource.includes('<Pagination'), 'the non-matching list is paginated');
+    assert.ok(listSource.includes('<Pagination'), 'the standalone non-matching list is still paginated where it remains visible');
     assert.ok(!listSource.includes('DiagnosticsDisclosure'), 'the diagnostics disclosure is replaced by the non-matching list');
-    // The include action only appears for matching candidates (manual mode).
-    assert.ok(listSource.includes("mode === 'manual'"), 'candidates section is gated to manual mode');
-    assert.ok(listSource.includes("data-action=\"include\""), 'candidate rows expose an include action');
-    // Manual mode lets the GM force-add non-matching records; library-disabled rows are non-addable.
+    assert.ok(listSource.includes('data-action="include"'), 'matching available-to-add rows expose an include action');
     assert.ok(listSource.includes('data-action="force-include"'), 'manual mode exposes a force-add action on non-matching rows');
     assert.ok(listSource.includes('LibraryDisabledNote'), 'library-disabled rows show an "enable in library first" note');
+    assert.ok(listSource.includes('OpenSource'), 'available-to-add rows keep open-source in the overflow menu');
   });
 
   it('inspector renders the four-layer evaluation and active drop-rate adjustment overrides', () => {
