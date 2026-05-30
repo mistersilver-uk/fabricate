@@ -13136,15 +13136,22 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-environment-comp-runtime {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
+.fabricate-manager .manager-environment-runtime-pill[data-runtime-state="conditionsBlocked"] {
+  background: var(--fab-warning);
+  border-color: var(--fab-warning);
+  color: var(--fab-bg-0);
+  font-weight: 700;
 }
 
-.fabricate-manager .manager-environment-comp-conditions-hint {
-  font-size: 0.72rem;
-  line-height: 1.2;
+.fabricate-manager .manager-environment-waiting-for {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.fabricate-manager .manager-environment-waiting-for .manager-kicker {
+  margin: 0;
 }
 
 .fabricate-manager .manager-environment-comp-weight {

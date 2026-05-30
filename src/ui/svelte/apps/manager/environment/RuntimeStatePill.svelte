@@ -15,12 +15,12 @@
   const icon = $derived(isAvailable
     ? 'fas fa-circle-check'
     : isConditionsBlocked
-      ? 'fas fa-cloud-sun'
+      ? 'fas fa-hourglass-half'
       : 'fas fa-circle-exclamation');
   const label = $derived(isAvailable
     ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Runtime.Available', 'Available')
     : isConditionsBlocked
-      ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Runtime.ConditionsBlocked', 'Conditions blocked')
+      ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Runtime.ConditionsBlocked', 'Waiting')
       : text('FABRICATE.Admin.Manager.EnvironmentEditor.Runtime.Unavailable', 'Unavailable'));
 </script>
 

@@ -1350,7 +1350,7 @@
           "Runtime": {
             "Available": "Available",
             "Unavailable": "Unavailable",
-            "ConditionsBlocked": "Conditions blocked"
+            "ConditionsBlocked": "Waiting"
           },
           "Evidence": {
             "Title": "Matching evidence",
@@ -1406,7 +1406,6 @@
             "ForceAdd": "Force add",
             "LibraryDisabledNote": "Enable in library first",
             "ForceIncluded": "Force included",
-            "ConditionsBlockedHint": "Waiting for: {values}",
             "OverrideOn": "Override on",
             "Weight": "Weight"
           },
@@ -1504,6 +1503,7 @@
             "Matches": "Matches",
             "NoMatch": "Does not match",
             "MatchEvidence": "Matching evidence",
+            "WaitingFor": "Waiting for",
             "ExplainAvailable": "All matching rules are satisfied and no active hazards block this record.",
             "ExplainForceIncluded": "Force-added by the GM despite not matching the environment context.",
             "ExplainConditionsBlocked": "Blocked by current weather or time-of-day; the record matches the environment but is inactive until conditions allow.",

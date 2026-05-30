@@ -56,15 +56,6 @@
       ? 'conditionsBlocked'
       : entry?.runtimeState;
   }
-  function conditionsHint(entry) {
-    const required = [
-      ...(entry?.evidence?.weather?.recordValues || []),
-      ...(entry?.evidence?.time?.recordValues || [])
-    ];
-    return required.length > 0
-      ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ConditionsBlockedHint', 'Waiting for: {values}').replace('{values}', required.join(', '))
-      : '';
-  }
 
   const included = $derived(records.filter(entry =>
     entry.compositionState === 'includedByMatch'
@@ -181,9 +172,6 @@
             </div>
             <div class="manager-environment-comp-runtime">
               <RuntimeStatePill state={runtimePillState(entry)} />
-              {#if entry.conditionsMet === false}
-                <span class="manager-muted manager-environment-comp-conditions-hint">{conditionsHint(entry)}</span>
-              {/if}
             </div>
             <div class="manager-environment-comp-actions">
               <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSource', 'Open source record')} onclick={() => onOpenSource(kind, entry.id)}>

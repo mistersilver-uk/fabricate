@@ -68,6 +68,13 @@
   ]);
 
   const dropChancePreview = 100;
+
+  const waitingForValues = $derived(entry?.conditionsMet === false
+    ? [
+        ...(entry?.evidence?.weather?.recordValues || []),
+        ...(entry?.evidence?.time?.recordValues || [])
+      ]
+    : []);
 </script>
 
 {#if entry}
@@ -114,6 +121,16 @@
     <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.RuntimeState', 'Runtime state')}</h3>
     <div class="manager-chip-row"><RuntimeStatePill state={entry.runtimeState} /></div>
     {#if explanation}<p class="manager-muted">{explanation}</p>{/if}
+    {#if waitingForValues.length > 0}
+      <div class="manager-environment-waiting-for" data-record-inspector-waiting-for>
+        <p class="manager-kicker">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.WaitingFor', 'Waiting for')}</p>
+        <div class="manager-chip-row">
+          {#each waitingForValues as value (value)}
+            <span class="manager-chip is-warning">{value}</span>
+          {/each}
+        </div>
+      </div>
+    {/if}
     <ul class="manager-environment-layer-list">
       {#each layers as layer (layer.id)}
         <li class={`manager-environment-layer ${layer.ok ? 'is-ok' : 'is-warn'}`} data-layer={layer.id}>
