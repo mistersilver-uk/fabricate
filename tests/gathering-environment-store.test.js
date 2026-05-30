@@ -370,7 +370,6 @@ test('rich gathering metadata and task economy fields normalize and validate add
       staminaCost: 3,
       riskOverride: 'unsafe',
       attemptLimit: { scope: 'actor', max: 2, windowSeconds: 86400 },
-      blindSelection: { strategy: 'firstAvailable' },
       reveal: { enabled: true, scope: 'actor', triggers: ['success'] }
     })]
   });

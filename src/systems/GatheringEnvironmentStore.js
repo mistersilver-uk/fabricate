@@ -15,9 +15,7 @@ const VALID_DEPLETION_TIMINGS = new Set(['onStart', 'onSuccess']);
 const VALID_RESPAWN_POLICIES = new Set(['none', 'manual', 'elapsedTime', 'probability', 'manualAndElapsedTime']);
 const VALID_ATTEMPT_LIMIT_SCOPES = new Set(['actor', 'user', 'task', 'environment', 'global']);
 const VALID_RECHARGE_POLICIES = new Set(['none', 'manual', 'elapsedTime', 'probability', 'manualAndElapsedTime']);
-const VALID_BLIND_SELECTION_STRATEGIES = new Set(['firstAvailable', 'weightedRandom', 'rollTable', 'macro']);
 const VALID_REVEAL_SCOPES = new Set(['actor', 'user', 'party', 'global']);
-const VALID_REVEAL_POLICIES = new Set(['never', 'onSuccess', 'onAttempt']);
 const TIME_UNITS = ['minutes', 'hours', 'days', 'months', 'years'];
 
 export const GATHERING_FAILURE_KEYWORDS = Object.freeze([
@@ -281,7 +279,6 @@ export class GatheringEnvironmentStore {
     const selectionMode = VALID_SELECTION_MODES.has(data?.selectionMode) ? data.selectionMode : 'targeted';
     const compositionMode = VALID_COMPOSITION_MODES.has(data?.compositionMode) ? data.compositionMode : 'automatic';
     const blindSelection = normalizeBlindSelection(data?.blindSelection);
-    const reveal = normalizeEnvironmentReveal(data?.reveal);
     const forcedTaskIds = normalizeIdList(data?.forcedTaskIds);
     const forcedHazardIds = normalizeIdList(data?.forcedHazardIds);
     return {
@@ -314,7 +311,6 @@ export class GatheringEnvironmentStore {
       hazardSelectionMode: ['highestRankedDrop', 'allDrops'].includes(data?.hazardSelectionMode) ? data.hazardSelectionMode : 'allDrops',
       hazardPolicy: ['successWithHazard', 'failureWithHazard'].includes(data?.hazardPolicy) ? data.hazardPolicy : 'successWithHazard',
       ...(blindSelection ? { blindSelection } : {}),
-      ...(reveal ? { reveal } : {}),
       ...(forcedTaskIds.length > 0 ? { forcedTaskIds } : {}),
       ...(forcedHazardIds.length > 0 ? { forcedHazardIds } : {}),
       tasks: Array.isArray(data?.tasks) ? data.tasks.map(task => this._normalizeTask(task)) : []
@@ -346,7 +342,6 @@ export class GatheringEnvironmentStore {
 
     const nodes = normalizeNodeConfig(data?.nodes);
     const attemptLimit = normalizeAttemptLimit(data?.attemptLimit);
-    const blindSelection = normalizeBlindSelection(data?.blindSelection);
     const reveal = normalizeRevealConfig(data?.reveal);
     const encounters = normalizeEncounterConfig(data?.encounters);
     const chatMessages = normalizeChatMessages(data?.chatMessages);
@@ -354,7 +349,6 @@ export class GatheringEnvironmentStore {
     if (attemptLimit) task.attemptLimit = attemptLimit;
     if (Number.isFinite(Number(data?.staminaCost)) && Number(data.staminaCost) > 0) task.staminaCost = Number(data.staminaCost);
     if (VALID_RISK_LEVELS.has(data?.riskOverride)) task.riskOverride = data.riskOverride;
-    if (blindSelection) task.blindSelection = blindSelection;
     if (reveal) task.reveal = reveal;
     if (encounters) task.encounters = encounters;
     if (chatMessages) task.chatMessages = chatMessages;
@@ -455,8 +449,6 @@ export class GatheringEnvironmentStore {
     errors.push(...validateTaskDropRateAdjustments(original?.taskDropRateAdjustments, `Environment "${label}" taskDropRateAdjustments`));
     errors.push(...validateDropRateAdjustmentMap(original?.hazardDropRateAdjustments, `Environment "${label}" hazardDropRateAdjustments`));
 
-    errors.push(...validateBlindSelection(normalized.blindSelection, `Environment "${label}" blindSelection`));
-
     const hasTaskSource = normalized.tasks.length > 0 || normalized.enabledTaskIds.length > 0;
     if (normalized.selectionMode === 'targeted' && !hasTaskSource) {
       errors.push(`Environment "${label}" targeted selection requires at least one task`);
@@ -525,7 +517,6 @@ export class GatheringEnvironmentStore {
     if (task.riskOverride && !VALID_RISK_LEVELS.has(task.riskOverride)) {
       errors.push(`Task "${label}" riskOverride must be safe, hazardous, unsafe, or extreme`);
     }
-    errors.push(...validateBlindSelection(task.blindSelection, `Task "${label}" blindSelection`));
     errors.push(...validateRevealConfig(task.reveal, `Task "${label}" reveal`));
 
     if (task.enabled !== true) {
@@ -1102,27 +1093,9 @@ function validateAttemptLimit(limit, label) {
 
 function normalizeBlindSelection(data = null) {
   if (!data || typeof data !== 'object') return null;
-  return {
-    strategy: VALID_BLIND_SELECTION_STRATEGIES.has(data.strategy) ? data.strategy : 'firstAvailable',
-    macroUuid: normalizeOptionalString(data.macroUuid),
-    rollTableUuid: normalizeOptionalString(data.rollTableUuid),
-    weights: data.weights && typeof data.weights === 'object' ? cloneJson(data.weights) : {}
-  };
-}
-
-function validateBlindSelection(selection, label) {
-  if (!selection) return [];
-  const errors = [];
-  if (!VALID_BLIND_SELECTION_STRATEGIES.has(selection.strategy)) {
-    errors.push(`${label}.strategy is invalid`);
-  }
-  if (selection.strategy === 'macro' && !selection.macroUuid) {
-    errors.push(`${label}.macroUuid is required for macro selection`);
-  }
-  if (selection.strategy === 'rollTable' && !selection.rollTableUuid) {
-    errors.push(`${label}.rollTableUuid is required for roll table selection`);
-  }
-  return errors;
+  const weights = data.weights && typeof data.weights === 'object' ? cloneJson(data.weights) : {};
+  if (Object.keys(weights).length === 0) return null;
+  return { weights };
 }
 
 function normalizeRevealConfig(data = null) {
@@ -1140,14 +1113,6 @@ function validateRevealConfig(reveal, label) {
     return [`${label}.scope must be actor, user, party, or global`];
   }
   return [];
-}
-
-function normalizeEnvironmentReveal(data = null) {
-  if (!data || typeof data !== 'object') return null;
-  return {
-    policy: VALID_REVEAL_POLICIES.has(data.policy) ? data.policy : 'never',
-    scope: VALID_REVEAL_SCOPES.has(data.scope) ? data.scope : 'actor'
-  };
 }
 
 function normalizeEncounterConfig(data = null) {

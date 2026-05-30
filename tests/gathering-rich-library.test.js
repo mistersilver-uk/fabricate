@@ -396,35 +396,35 @@ test('environment dangerLevel migrates from dangerTags, preserves explicit value
   assert.ok(invalid.errors.some(error => error.includes('dangerLevel')));
 });
 
-test('environment blindSelection normalizes strategy/weights and validates macro/rollTable requirements', async () => {
+test('environment blindSelection keeps weights and drops legacy strategy/uuid fields', async () => {
   const store = makeEnvironmentStore();
 
   const weighted = await store.create(environment({
-    blindSelection: { strategy: 'weightedRandom', weights: { t1: 3, t2: 1 } },
+    blindSelection: { weights: { t1: 3, t2: 1 } },
     enabledTaskIds: ['lib-task']
   }));
-  assert.equal(weighted.blindSelection.strategy, 'weightedRandom');
-  assert.deepEqual(weighted.blindSelection.weights, { t1: 3, t2: 1 });
+  assert.deepEqual(weighted.blindSelection, { weights: { t1: 3, t2: 1 } });
 
-  const fallback = await store.create(environment({ id: 'env-bs-fallback', blindSelection: { strategy: 'nonsense' }, enabledTaskIds: ['lib-task'] }));
-  assert.equal(fallback.blindSelection.strategy, 'firstAvailable');
+  const migrated = await store.create(environment({
+    id: 'env-bs-legacy',
+    blindSelection: { strategy: 'rollTable', rollTableUuid: 'RollTable.x', macroUuid: 'Macro.y', weights: { keep: 2 } },
+    enabledTaskIds: ['lib-task']
+  }));
+  assert.deepEqual(migrated.blindSelection, { weights: { keep: 2 } });
+  assert.equal(migrated.blindSelection.strategy, undefined);
 
-  const invalid = store.validate(environment({ blindSelection: { strategy: 'macro' }, enabledTaskIds: ['lib-task'] }));
-  assert.equal(invalid.valid, false);
-  assert.ok(invalid.errors.some(error => error.includes('blindSelection')));
+  const empty = await store.create(environment({ id: 'env-bs-empty', blindSelection: { strategy: 'macro' }, enabledTaskIds: ['lib-task'] }));
+  assert.equal(empty.blindSelection, undefined);
 });
 
-test('environment reveal override normalizes policy/scope and coerces invalid values', async () => {
+test('environment reveal override is discarded — system-level reveal governs', async () => {
   const store = makeEnvironmentStore();
 
-  const saved = await store.create(environment({ reveal: { policy: 'onAttempt', scope: 'party' }, enabledTaskIds: ['lib-task'] }));
-  assert.deepEqual(saved.reveal, { policy: 'onAttempt', scope: 'party' });
+  const withOverride = await store.create(environment({ reveal: { policy: 'onAttempt', scope: 'party' }, enabledTaskIds: ['lib-task'] }));
+  assert.equal(withOverride.reveal, undefined);
 
-  const coerced = await store.create(environment({ id: 'env-reveal-bad', reveal: { policy: 'bogus', scope: 'nope' }, enabledTaskIds: ['lib-task'] }));
-  assert.deepEqual(coerced.reveal, { policy: 'never', scope: 'actor' });
-
-  const none = await store.create(environment({ id: 'env-reveal-none', enabledTaskIds: ['lib-task'] }));
-  assert.equal(none.reveal, undefined);
+  const garbage = await store.create(environment({ id: 'env-reveal-bad', reveal: { policy: 'bogus', scope: 'nope' }, enabledTaskIds: ['lib-task'] }));
+  assert.equal(garbage.reveal, undefined);
 });
 
 test('player listing exposes current conditions as context without weather/time filters', async () => {

@@ -2752,28 +2752,13 @@ export function createAdminStore(services) {
 
   function _normalizeDraftBlindSelection(value) {
     if (!value || typeof value !== 'object') return null;
-    const strategy = ['firstAvailable', 'weightedRandom', 'rollTable', 'macro'].includes(value.strategy)
-      ? value.strategy
-      : 'firstAvailable';
     const weights = value.weights && typeof value.weights === 'object'
       ? Object.fromEntries(Object.entries(value.weights)
           .map(([key, weight]) => [String(key), Number(weight)])
           .filter(([, weight]) => Number.isFinite(weight)))
       : {};
-    return {
-      strategy,
-      macroUuid: value.macroUuid ? String(value.macroUuid) : null,
-      rollTableUuid: value.rollTableUuid ? String(value.rollTableUuid) : null,
-      weights
-    };
-  }
-
-  function _normalizeDraftReveal(value) {
-    if (!value || typeof value !== 'object') return null;
-    return {
-      policy: ['never', 'onSuccess', 'onAttempt'].includes(value.policy) ? value.policy : 'never',
-      scope: ['actor', 'user', 'party', 'global'].includes(value.scope) ? value.scope : 'actor'
-    };
+    if (Object.keys(weights).length === 0) return null;
+    return { weights };
   }
 
   function _normalizeDraftDropRateAdjustmentValue(value) {
@@ -2825,7 +2810,6 @@ export function createAdminStore(services) {
       'taskDropRateAdjustments',
       'hazardDropRateAdjustments',
       'blindSelection',
-      'reveal',
       'tasks'
     ]);
     const next = _clonePlain(current);
@@ -2856,8 +2840,6 @@ export function createAdminStore(services) {
         next.taskDropRateAdjustments = _normalizeDraftTaskDropRateAdjustments(value);
       } else if (field === 'blindSelection') {
         next.blindSelection = _normalizeDraftBlindSelection(value);
-      } else if (field === 'reveal') {
-        next.reveal = _normalizeDraftReveal(value);
       } else {
         next[field] = String(value ?? '');
       }

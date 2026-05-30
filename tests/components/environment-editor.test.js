@@ -192,16 +192,16 @@ describe('environment composition editor structure', () => {
     }
   });
 
-  it('exposes blind-mode configuration UI (weights, strategy, reveal override)', () => {
+  it('exposes blind-mode per-task weight UI but no per-environment strategy or reveal controls', () => {
     assert.ok(listSource.includes('data-composition-weight'), 'composition list renders a per-task blind weight input');
     assert.ok(listSource.includes('data-composition-weight-percent'), 'composition list renders a calculated blind weight percentage');
     assert.ok(listSource.includes('formatWeightPercentage'), 'composition list calculates included-task selection shares');
     assert.ok(listSource.includes('includedWeightTotal'), 'weight percentages are based on included task weights');
     assert.ok(listSource.includes('showBlindWeights'), 'weight input is gated to blind task rows');
     assert.ok(tasksTabSource.includes('onWeightChange'), 'tasks tab wires per-task blind weight changes');
-    assert.ok(overviewSource.includes('data-overview-section="blind"'), 'overview renders a blind behaviour card');
-    assert.ok(overviewSource.includes('data-environment-field="blindStrategy"'), 'overview exposes a blind selection strategy control');
-    assert.ok(overviewSource.includes('data-environment-field="revealPolicy"'), 'overview exposes a per-environment reveal override');
+    assert.ok(!overviewSource.includes('data-overview-section="blind"'), 'overview no longer renders a per-environment blind behaviour card');
+    assert.ok(!overviewSource.includes('data-environment-field="blindStrategy"'), 'overview no longer offers a strategy picker');
+    assert.ok(!overviewSource.includes('data-environment-field="revealPolicy"'), 'overview no longer offers a per-environment reveal override');
   });
 
   it('collapses task row actions into the overflow menu while preserving hazard row controls', () => {

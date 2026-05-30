@@ -30,28 +30,6 @@
   const dangerLevel = $derived(DANGER_LEVELS.includes(environment?.dangerLevel) ? environment.dangerLevel : 'safe');
   const selectionMode = $derived(environment?.selectionMode === 'blind' ? 'blind' : 'targeted');
 
-  const BLIND_STRATEGIES = ['firstAvailable', 'weightedRandom', 'rollTable', 'macro'];
-  const blindSelection = $derived(environment?.blindSelection || {});
-  const blindStrategy = $derived(BLIND_STRATEGIES.includes(blindSelection.strategy) ? blindSelection.strategy : 'firstAvailable');
-  const revealOverride = $derived(environment?.reveal || null);
-  const revealPolicy = $derived(revealOverride?.policy ?? 'inherit');
-  const revealScope = $derived(revealOverride?.scope ?? 'actor');
-
-  function setBlindStrategy(strategy) {
-    onUpdate({ blindSelection: { ...blindSelection, strategy } });
-  }
-  function setBlindUuid(field, value) {
-    const normalized = String(value || '').trim();
-    onUpdate({ blindSelection: { ...blindSelection, [field]: normalized || null } });
-  }
-  function setRevealPolicy(value) {
-    if (value === 'inherit') { onUpdate({ reveal: null }); return; }
-    onUpdate({ reveal: { policy: value, scope: revealScope } });
-  }
-  function setRevealScope(value) {
-    onUpdate({ reveal: { policy: revealOverride?.policy ?? 'never', scope: value } });
-  }
-
   function addBiome(event) {
     const id = String(event.currentTarget.value || '').trim();
     if (!id) return;
@@ -209,63 +187,6 @@
         <CompositionModeControl mode={environment.compositionMode || 'automatic'} onChange={onSetCompositionMode} />
       </section>
       </div>
-
-      {#if selectionMode === 'blind'}
-        <section class="manager-environment-card" data-overview-section="blind">
-          <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.BlindBehaviour', 'Blind behaviour')}</h3>
-          <div class="manager-environment-context-split">
-            <div class="manager-environment-context-col">
-              <label class="manager-field manager-environment-context-field">
-                <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.BlindStrategy', 'Selection strategy')}</span>
-                <p class="manager-muted manager-environment-context-hint">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.BlindStrategyHint', 'How the generic gather picks a task. Set per-task weights on the Tasks tab.')}</p>
-                <select data-environment-field="blindStrategy" value={blindStrategy} onchange={(event) => setBlindStrategy(event.currentTarget.value)}>
-                  <option value="firstAvailable">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.BlindStrategyFirst', 'First available')}</option>
-                  <option value="weightedRandom">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.BlindStrategyWeighted', 'Weighted random')}</option>
-                  <option value="rollTable">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.BlindStrategyRollTable', 'Roll table')}</option>
-                  <option value="macro">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.BlindStrategyMacro', 'Macro')}</option>
-                </select>
-              </label>
-
-              {#if blindStrategy === 'rollTable'}
-                <label class="manager-field manager-environment-context-field">
-                  <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.BlindRollTableUuid', 'Roll table UUID')}</span>
-                  <input data-environment-field="blindRollTableUuid" value={blindSelection.rollTableUuid || ''} oninput={(event) => setBlindUuid('rollTableUuid', event.currentTarget.value)} />
-                </label>
-              {:else if blindStrategy === 'macro'}
-                <label class="manager-field manager-environment-context-field">
-                  <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.BlindMacroUuid', 'Macro UUID')}</span>
-                  <input data-environment-field="blindMacroUuid" value={blindSelection.macroUuid || ''} oninput={(event) => setBlindUuid('macroUuid', event.currentTarget.value)} />
-                </label>
-              {/if}
-            </div>
-
-            <div class="manager-environment-context-col">
-              <label class="manager-field manager-environment-context-field">
-                <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RevealPolicy', 'Reveal after attempt')}</span>
-                <p class="manager-muted manager-environment-context-hint">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RevealPolicyHint', 'Override the system reveal default for this environment.')}</p>
-                <select data-environment-field="revealPolicy" value={revealPolicy} onchange={(event) => setRevealPolicy(event.currentTarget.value)}>
-                  <option value="inherit">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RevealInherit', 'Use system default')}</option>
-                  <option value="never">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RevealNever', 'Never reveal')}</option>
-                  <option value="onSuccess">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RevealOnSuccess', 'Reveal on success')}</option>
-                  <option value="onAttempt">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RevealOnAttempt', 'Reveal on any attempt')}</option>
-                </select>
-              </label>
-
-              {#if revealPolicy !== 'inherit'}
-                <label class="manager-field manager-environment-context-field">
-                  <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RevealScope', 'Reveal scope')}</span>
-                  <select data-environment-field="revealScope" value={revealScope} onchange={(event) => setRevealScope(event.currentTarget.value)}>
-                    <option value="actor">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RevealScopeActor', 'Actor')}</option>
-                    <option value="user">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RevealScopeUser', 'User')}</option>
-                    <option value="party">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RevealScopeParty', 'Party')}</option>
-                    <option value="global">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RevealScopeGlobal', 'Everyone')}</option>
-                  </select>
-                </label>
-              {/if}
-            </div>
-          </div>
-        </section>
-      {/if}
 
     </div>
   {/if}

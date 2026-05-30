@@ -105,52 +105,6 @@ async function runGatheringMacro(macroUuid, context = {}) {
 }
 
 /**
- * Resolve a blind gather task via the `rollTable` or `macro` selection strategy.
- * Returns a candidate task id (string) or null; the engine validates the id
- * against the gated candidate pool and falls back to `firstAvailable` on null.
- * Best-effort: any failure resolves to null so blind gathering never hard-fails
- * on a misconfigured table/macro.
- */
-async function resolveGatheringBlindSelection({ strategy, blindSelection, candidates = [], environment, actor, viewer }) {
-  const ids = new Set(candidates.map(candidate => String(candidate.id)));
-  const namesToId = new Map(candidates.map(candidate => [String(candidate.name || '').trim().toLowerCase(), String(candidate.id)]));
-  const matchToId = (value) => {
-    const raw = typeof value === 'string' ? value : (value?.taskId ?? value?.id ?? value?.text ?? value?.name ?? '');
-    const key = String(raw ?? '').trim();
-    if (!key) return null;
-    if (ids.has(key)) return key;
-    return namesToId.get(key.toLowerCase()) ?? null;
-  };
-
-  try {
-    if (strategy === 'macro') {
-      const result = await runGatheringMacro(blindSelection?.macroUuid, {
-        kind: 'gatheringBlindSelection',
-        candidates,
-        environment,
-        actor,
-        viewer
-      });
-      return matchToId(result);
-    }
-    if (strategy === 'rollTable') {
-      const uuid = blindSelection?.rollTableUuid;
-      const table = uuid && typeof fromUuid === 'function' ? await fromUuid(uuid) : null;
-      if (!table || typeof table.draw !== 'function') return null;
-      const draw = await table.draw({ displayChat: false });
-      for (const entry of (Array.isArray(draw?.results) ? draw.results : [])) {
-        const matched = matchToId(entry?.documentId) || matchToId(entry?.text) || matchToId(entry?.name);
-        if (matched) return matched;
-      }
-      return null;
-    }
-  } catch (err) {
-    console.warn(`Fabricate | blind selection (${strategy}) failed`, err);
-  }
-  return null;
-}
-
-/**
  * Enforce scene-linked gathering access.
  *
  * Scene links are attemptability gates rather than listing filters: failures
@@ -728,7 +682,6 @@ class Fabricate {
         showPrompt: showHazardScenePrompt
       }),
       getRunViewer: getGatheringRunViewer,
-      blindSelectionResolver: resolveGatheringBlindSelection,
       localize: localizeGathering
     });
     const validRecipes = new Set(this.recipeManager.getRecipes({}).map(r => r.id));

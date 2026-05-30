@@ -121,12 +121,8 @@ GatheringEnvironment = {
   taskDropRateAdjustments?: Record<string, Record<string, number>>, // taskId -> dropRowId -> signed percentage-point delta
   hazardDropRateAdjustments?: Record<string, number>, // hazardId -> signed percentage-point delta
   blindSelection?: {
-    strategy: "firstAvailable" | "weightedRandom" | "rollTable" | "macro",
-    macroUuid?: string | null,
-    rollTableUuid?: string | null,
-    weights?: Record<string, number>, // keyed by task id
+    weights: Record<string, number>, // keyed by task id
   },
-  reveal?: { policy: "never" | "onSuccess" | "onAttempt", scope: "actor" | "user" | "party" | "global" },
   tasks: GatheringTask[], // Environment Task records in the persisted schema
 }
 ```
@@ -151,8 +147,8 @@ GatheringEnvironment = {
 13. Environment metadata exposed to non-GM users must not leak hidden task identity, hidden result details, provider diagnostics, or GM-only notes.
 14. Legacy environments without rich metadata remain valid and load with neutral defaults.
 15. `hazardSelectionMode` and `hazardPolicy` are legacy compatibility fields. New Manager authoring and d100 runtime behavior use system Gathering Rules once they are authored.
-16. `blindSelection` (optional) configures how a blind environment resolves its generic gather to a concrete task. `strategy` defaults to `firstAvailable`; `weightedRandom` uses `weights[taskId]` (default `1`, non-positive excludes); `rollTable`/`macro` resolve via `rollTableUuid`/`macroUuid` and fall back to `firstAvailable` when they yield no eligible candidate. `weights` are keyed by task id and only meaningful for `weightedRandom`. GM authoring UI for blind environments shows each included task's calculated selection share as `weight / sum(included task weights) * 100`; the displayed percentage is informational and does not change the persisted weight shape.
-17. `reveal` (optional) overrides the system reveal default for this environment. When absent, the system Gathering Rules `revealPolicy`/`revealScope` apply.
+16. `blindSelection` (optional) stores the per-task `weights` map used when a blind environment resolves its generic gather. Selection is always a weighted random draw over the gated candidate pool: `weights[taskId]` defaults to `1`, and a non-positive weight excludes the task. There are no other strategies and no per-environment configuration of the selection algorithm. GM authoring UI for blind environments shows each included task's calculated selection share as `weight / sum(included task weights) * 100`; the displayed percentage is informational and does not change the persisted weight shape.
+17. Reveal behaviour is set at the system level only — the system Gathering Rules `revealPolicy` / `revealScope` apply to every environment. Environments do not override them.
 
 ## System Gathering Rules
 
@@ -848,7 +844,7 @@ In `blind` mode:
 - the player does not choose between unrevealed hidden targets
 - non-GM player listings present a generic gather action or equivalent environment-level action unless progressive discovery has revealed one or more tasks to the selected actor
 - on start, the engine builds a candidate pool from the environment's visible, enabled tasks, then applies the system `blindCandidateGate`: under `attemptableOnly` (default) tasks the character cannot currently attempt are excluded so the generic gather never resolves to a task that would immediately fail; under `allMatching` the full matching set remains eligible
-- the candidate is selected from that pool by the environment's `blindSelection.strategy`: `firstAvailable` (pool order), `weightedRandom` (per-task `weights`, default `1`, non-positive excludes), `rollTable`, or `macro`; `rollTable`/`macro` resolve to a candidate id and fall back to `firstAvailable` when they yield no pool match
+- the candidate is selected from that pool by a weighted random draw over the environment's `blindSelection.weights` (per-task value, default `1`, non-positive excludes); this is the only selection algorithm
 - if the gated pool is empty, the attempt is blocked with an opaque "nothing you can gather here" reason (`BLIND_NO_CANDIDATE`) and no task identity is leaked
 - revealed blind tasks may become visible as named task rows for the configured reveal scope, while unrevealed tasks remain hidden
 - blind task active runs, history, chat messages, and duplicate/attempt-limit blockers use generic labels until the task is revealed for that viewer or the viewer is a GM
@@ -858,7 +854,7 @@ Blind gathering simulates gathering from a place without player certainty about 
 ### Blind Gathering Discovery
 
 1. A blind environment may enable progressive task reveal.
-2. Reveal is governed by a `revealPolicy` (`never` default | `onSuccess` | `onAttempt`) and `revealScope` (`actor` | `user` | `party` | `global`), set as a system Gathering Rules default and overridable per environment via `environment.reveal`.
+2. Reveal is governed by a `revealPolicy` (`never` default | `onSuccess` | `onAttempt`) and `revealScope` (`actor` | `user` | `party` | `global`), set on the system Gathering Rules. Environments do not override these.
 3. After a blind attempt terminates (immediate or timed completion), the engine reveals the resolved task when the effective policy is `onSuccess` (success only) or `onAttempt` (success or failure); `never` is a no-op. Reveal is best-effort and never blocks the attempt result. Targeted environments never auto-reveal.
 4. Reveal scope determines who learns the task: just the actor, the controlling user, the party/source group, or everyone. Additional triggers (specific result, encounter outcome, GM manual reveal, API call, or macro/provider decision) may also drive reveal.
 5. Revealed task history preserves enough evidence to keep the task visible for the configured reveal scope unless the GM clears or resets discovery.

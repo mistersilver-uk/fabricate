@@ -83,7 +83,6 @@ export class GatheringEngine {
     hazardSceneTrigger = null,
     getRunViewer = null,
     random = Math.random,
-    blindSelectionResolver = null,
     localize = defaultLocalize
   } = {}) {
     this.environmentStore = environmentStore;
@@ -106,7 +105,6 @@ export class GatheringEngine {
     this.hazardSceneTrigger = hazardSceneTrigger;
     this.getRunViewer = getRunViewer;
     this.random = typeof random === 'function' ? random : Math.random;
-    this.blindSelectionResolver = typeof blindSelectionResolver === 'function' ? blindSelectionResolver : null;
     this.localize = localize;
   }
 
@@ -1216,10 +1214,9 @@ export class GatheringEngine {
   /**
    * Resolve which task a blind gather attempt starts. Builds the candidate pool
    * from visible+enabled tasks, gates by attemptability when the system's
-   * `blindCandidateGate` is `attemptableOnly` (default), then selects via the
-   * environment's `blindSelection.strategy` (`firstAvailable` over pool order or
-   * `weightedRandom` using per-task weights). Returns null when the pool is empty.
-   * `rollTable`/`macro` strategies fall back to `firstAvailable` until implemented.
+   * `blindCandidateGate` is `attemptableOnly` (default), then draws via weighted
+   * random over `blindSelection.weights` (default weight `1`, non-positive
+   * excludes). Returns null when the pool is empty.
    */
   async _selectBlindStartTask({ environment, system, actor, viewer }) {
     const visibleTasks = await this._visibleTaskListings({ environment, system, viewer, actor });
@@ -1236,45 +1233,11 @@ export class GatheringEngine {
     }
 
     if (pool.length === 0) return null;
-    return this._pickBlindTask(pool, environment?.blindSelection, { environment, actor, viewer });
+    return this._pickBlindTask(pool, environment?.blindSelection);
   }
 
-  async _pickBlindTask(pool, blindSelection, context = {}) {
-    const strategy = blindSelection?.strategy;
-    if (strategy === 'weightedRandom') {
-      return this._weightedPickTask(pool, blindSelection?.weights) ?? pool[0] ?? null;
-    }
-    if ((strategy === 'rollTable' || strategy === 'macro') && this.blindSelectionResolver) {
-      const resolved = await this._resolveBlindSelection(pool, blindSelection, context);
-      if (resolved) return resolved;
-    }
-    // firstAvailable (and the fallback when a rollTable/macro yields no pool match).
-    return pool[0] ?? null;
-  }
-
-  async _resolveBlindSelection(pool, blindSelection, context) {
-    try {
-      const resolved = await this.blindSelectionResolver({
-        strategy: blindSelection.strategy,
-        blindSelection,
-        candidates: pool.map(task => ({ id: stringOrNull(task.id), name: stringOrEmpty(task.name) })),
-        environment: context.environment ?? null,
-        actor: context.actor ?? null,
-        viewer: context.viewer ?? null
-      });
-      return this._matchResolvedBlindTask(pool, resolved);
-    } catch {
-      return null;
-    }
-  }
-
-  _matchResolvedBlindTask(pool, resolved) {
-    if (!resolved) return null;
-    const id = typeof resolved === 'string'
-      ? stringOrNull(resolved)
-      : stringOrNull(resolved.taskId ?? resolved.id);
-    if (!id) return null;
-    return pool.find(task => stringOrNull(task.id) === id) ?? null;
+  _pickBlindTask(pool, blindSelection) {
+    return this._weightedPickTask(pool, blindSelection?.weights) ?? pool[0] ?? null;
   }
 
   _weightedPickTask(pool, weights) {
@@ -1973,11 +1936,11 @@ export class GatheringEngine {
   }
 
   /**
-   * Reveal the resolved task after a blind attempt terminates, per the effective
-   * reveal policy (`environment.reveal` overrides the system rules default).
-   * `onSuccess` reveals only on success; `onAttempt` reveals on success or
-   * failure; `never` is a no-op. Reveal is best-effort and never blocks the
-   * attempt result. Only applies to blind environments.
+   * Reveal the resolved task after a blind attempt terminates, per the
+   * system-level reveal policy. `onSuccess` reveals only on success;
+   * `onAttempt` reveals on success or failure; `never` is a no-op. Reveal is
+   * best-effort and never blocks the attempt result. Only applies to blind
+   * environments.
    */
   async _maybeRevealBlindTask({ actor, environment, task, status }) {
     if (environment?.selectionMode !== 'blind') return;
@@ -1998,10 +1961,9 @@ export class GatheringEngine {
 
   _resolveRevealPolicy(environment) {
     const rules = environment?.rules || {};
-    const override = environment?.reveal || null;
     return {
-      policy: override?.policy ?? rules.revealPolicy ?? 'never',
-      scope: override?.scope ?? rules.revealScope ?? 'actor'
+      policy: rules.revealPolicy ?? 'never',
+      scope: rules.revealScope ?? 'actor'
     };
   }
 
