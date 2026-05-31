@@ -22,6 +22,7 @@ const sharedComponentNames = [
 
 let tempRoot;
 let Component;
+let EnvironmentEditViewComponent;
 let mounted;
 let target;
 
@@ -924,6 +925,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     Component = (await import(pathToFileURL(join(
       tempRoot,
       'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte.js'
+    )))).default;
+    EnvironmentEditViewComponent = (await import(pathToFileURL(join(
+      tempRoot,
+      'src/ui/svelte/apps/manager/EnvironmentEditView.svelte.js'
     )))).default;
   });
 
@@ -4379,6 +4384,68 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.querySelector('.manager-environment-inspector'), 'composition editor should render its own inspector rail');
     assert.ok(target.querySelector('[data-environment-summary-inspector]'), 'inspector should default to the environment summary with no selection');
     assert.ok(calls.some(call => call[0] === 'createEnvironmentDraft'));
+  });
+
+  it('omits source and action controls from mounted task and hazard record inspectors', async () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(EnvironmentEditViewComponent, {
+      target,
+      props: {
+        environmentDraft: {
+          id: 'env-forest',
+          craftingSystemId: 'alchemy',
+          name: 'Moonlit Forest',
+          enabled: true,
+          selectionMode: 'targeted',
+          compositionMode: 'automatic'
+        },
+        composition: {
+          compositionMode: 'automatic',
+          conditions: {},
+          counts: { availableTasks: 1, availableHazards: 1 },
+          tasks: [{
+            id: 'task-forage',
+            record: { name: 'Forage Herbs', img: 'icons/svg/item-bag.svg' },
+            compositionState: 'includedByMatch',
+            runtimeState: 'available',
+            libraryEnabled: true,
+            matches: true,
+            conditionsMet: true,
+            evidence: {},
+            dropRateAdjustmentRows: []
+          }],
+          hazards: [{
+            id: 'hazard-thorns',
+            record: { name: 'Thorn Snare', img: 'icons/svg/hazard.svg', dropRate: 10 },
+            compositionState: 'includedByMatch',
+            runtimeState: 'available',
+            libraryEnabled: true,
+            matches: true,
+            conditionsMet: true,
+            evidence: {},
+            dropRateAdjustment: 0
+          }]
+        }
+      }
+    });
+    flushSync();
+
+    target.querySelector('[data-environment-tab-button="tasks"]').click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-record-inspector="task"]'), 'tasks tab should render the selected task inspector');
+    assert.equal(target.querySelector('[data-record-inspector-section="source"]'), null, 'task inspector should not render a Source card');
+    assert.equal(target.querySelector('.manager-environment-inspector-actions'), null, 'task inspector should not render the selected-record action strip');
+    assert.equal(target.querySelector('.manager-environment-open-source'), null, 'task inspector should not render an open-source CTA');
+
+    target.querySelector('[data-environment-tab-button="hazards"]').click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-record-inspector="hazard"]'), 'hazards tab should render the selected hazard inspector');
+    assert.equal(target.querySelector('[data-record-inspector-section="source"]'), null, 'hazard inspector should not render a Source card');
+    assert.equal(target.querySelector('.manager-environment-inspector-actions'), null, 'hazard inspector should not render the selected-record action strip');
+    assert.equal(target.querySelector('.manager-environment-open-source'), null, 'hazard inspector should not render an open-source CTA');
   });
 
   // NOTE: previously covered tests for environment-edit input wiring and validation

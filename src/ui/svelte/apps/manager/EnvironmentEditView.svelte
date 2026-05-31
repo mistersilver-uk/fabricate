@@ -141,11 +141,6 @@
         {selectedKind}
         {selectedId}
         {onUpdateEnvironment}
-        {onOpenSourceTask}
-        {onOpenSourceHazard}
-        {onIncludeRecord}
-        {onExcludeRecord}
-        {onRestoreRecord}
       />
     {/if}
   </div>

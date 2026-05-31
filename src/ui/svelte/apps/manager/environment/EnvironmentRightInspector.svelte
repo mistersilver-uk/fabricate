@@ -10,12 +10,7 @@
     composition = { tasks: [], hazards: [], counts: {} },
     selectedKind = '',
     selectedId = '',
-    onUpdateEnvironment = () => {},
-    onOpenSourceTask = () => {},
-    onOpenSourceHazard = () => {},
-    onIncludeRecord = () => {},
-    onExcludeRecord = () => {},
-    onRestoreRecord = () => {}
+    onUpdateEnvironment = () => {}
   } = $props();
 
   function text(key, fallback) {
@@ -34,10 +29,6 @@
     return (Array.isArray(list) ? list : []).find(entry => entry.id === selectedId) || null;
   })());
 
-  function openSource(kind, id) {
-    if (kind === 'hazard') onOpenSourceHazard(id);
-    else onOpenSourceTask(id);
-  }
 </script>
 
 <aside class="manager-inspector manager-environment-inspector" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Label', 'Environment inspector')}>
@@ -48,11 +39,7 @@
       kind={recordKind}
       {environment}
       entry={recordEntry}
-      onOpenSource={openSource}
       onUpdateEnvironment={onUpdateEnvironment}
-      onInclude={onIncludeRecord}
-      onExclude={onExcludeRecord}
-      onRestore={onRestoreRecord}
     />
   {:else}
     <section class="manager-inspector-card" data-record-inspector-empty={recordKind}>

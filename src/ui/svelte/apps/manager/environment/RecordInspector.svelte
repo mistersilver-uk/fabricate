@@ -9,11 +9,7 @@
     kind = 'task',
     environment = null,
     entry = null,
-    onOpenSource = () => {},
-    onUpdateEnvironment = () => {},
-    onExclude = () => {},
-    onRestore = () => {},
-    onInclude = () => {}
+    onUpdateEnvironment = () => {}
   } = $props();
 
   function text(key, fallback) {
@@ -25,16 +21,6 @@
   const record = $derived(entry?.record || null);
   const name = $derived(record?.name || entry?.id || text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Unnamed', 'Unnamed'));
   const isStale = $derived(entry?.compositionState === 'includedButUnavailable');
-  const isExcluded = $derived(entry?.compositionState === 'excluded');
-  const isCandidate = $derived(entry?.compositionState === 'candidate');
-  const isAvailable = $derived(entry?.runtimeState === 'available');
-  const excludeLabel = $derived(environment?.compositionMode === 'manual'
-    ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Remove', 'Remove from environment')
-    : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Exclude', 'Exclude from environment'));
-
-  const sourceLabel = $derived(kind === 'hazard'
-    ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.SourceHazard', 'Reusable gathering hazard')
-    : text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.SourceTask', 'Reusable gathering task'));
 
   const explanation = $derived((() => {
     if (entry?.conditionsMet === false
@@ -129,31 +115,6 @@
         </div>
       </div>
     </div>
-    <div class="manager-environment-inspector-actions">
-      <button type="button" class="manager-button manager-environment-open-source" data-action="open-source" onclick={() => onOpenSource(kind, entry.id)}>
-        <i class="fas fa-up-right-from-square" aria-hidden="true"></i>
-        <span>{kind === 'hazard' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.OpenSourceHazard', 'Open source hazard') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.OpenSourceTask', 'Open source task')}</span>
-      </button>
-      {#if isCandidate}
-        <button type="button" class="manager-button is-primary" data-action="include" onclick={() => onInclude(kind, entry.id)}>
-          <i class="fas fa-plus" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Include', 'Include')}</span>
-        </button>
-      {:else if isExcluded}
-        <button type="button" class="manager-button" data-action="restore" onclick={() => onRestore(kind, entry.id)}>
-          <i class="fas fa-rotate-left" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Restore', 'Restore')}</span>
-        </button>
-      {:else if isAvailable || isStale}
-        <button type="button" class="manager-button is-danger" data-action="exclude" onclick={() => onExclude(kind, entry.id)}>
-          <i class="fas fa-ban" aria-hidden="true"></i><span>{excludeLabel}</span>
-        </button>
-      {/if}
-    </div>
-  </section>
-
-  <section class="manager-inspector-card" data-record-inspector-section="source">
-    <p class="manager-kicker">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Source', 'Source')}</p>
-    <p class="manager-environment-source-label">{sourceLabel}</p>
-    <p class="manager-muted">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.SourceHint', 'Composing this record does not modify the reusable source.')}</p>
   </section>
 
   <section class="manager-inspector-card {isStale ? 'is-warning' : ''}" data-record-inspector-section="runtime-state">

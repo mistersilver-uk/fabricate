@@ -248,11 +248,19 @@ describe('environment composition editor structure', () => {
     assert.ok(rightInspectorSource.includes('NoActiveTasks') && rightInspectorSource.includes('NoActiveHazards'), 'empty state reads as "No active tasks/hazards"');
   });
 
-  it('selected manual record inspector uses remove copy while automatic actions keep exclude copy', () => {
-    assert.ok(inspectorSource.includes("environment?.compositionMode === 'manual'"), 'inspector detects manual removal context');
-    assert.ok(inspectorSource.includes('Composition.Remove'), 'manual inspector action uses remove copy');
-    assert.ok(inspectorSource.includes('Composition.Exclude'), 'automatic inspector actions keep exclude copy');
-    assert.ok(inspectorSource.includes('<span>{excludeLabel}</span>'), 'inspector action label is selected from the mode-aware label');
+  it('selected record inspector omits source and composition action controls', () => {
+    assert.ok(!inspectorSource.includes('manager-environment-inspector-actions'), 'selected record inspector should not render an action strip below the record name');
+    assert.ok(!inspectorSource.includes('manager-environment-open-source'), 'selected record inspector should not render an open-source CTA');
+    assert.ok(!inspectorSource.includes('data-record-inspector-section="source"'), 'selected record inspector should not render a Source card');
+    assert.ok(!inspectorSource.includes('data-action="open-source"'), 'selected record inspector should not render source action buttons');
+    assert.ok(!inspectorSource.includes('onInclude'), 'selected record inspector should not accept include callbacks');
+    assert.ok(!inspectorSource.includes('onExclude'), 'selected record inspector should not accept exclude callbacks');
+    assert.ok(!inspectorSource.includes('onRestore'), 'selected record inspector should not accept restore callbacks');
+    assert.ok(!rightInspectorSource.includes('onOpenSourceTask'), 'right inspector should not accept source task callbacks');
+    assert.ok(!rightInspectorSource.includes('onOpenSourceHazard'), 'right inspector should not accept source hazard callbacks');
+    assert.ok(!rightInspectorSource.includes('onIncludeRecord'), 'right inspector should not accept include callbacks');
+    assert.ok(!rightInspectorSource.includes('onExcludeRecord'), 'right inspector should not accept exclude callbacks');
+    assert.ok(!rightInspectorSource.includes('onRestoreRecord'), 'right inspector should not accept restore callbacks');
   });
 
   it('the shell auto-selects the first active record on the tasks/hazards tabs', () => {

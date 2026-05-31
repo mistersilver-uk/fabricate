@@ -12889,7 +12889,6 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-environment-inspector-actions,
 .fabricate-manager .manager-environment-inspector-facts {
   display: flex;
   gap: 8px;
@@ -13427,13 +13426,7 @@
   color: var(--fab-mv2-text-muted);
 }
 
-/* Inspector source + override form */
-.fabricate-manager .manager-environment-source-label {
-  margin: 2px 0 4px;
-  font-weight: 700;
-  color: var(--fab-mv2-text);
-}
-
+/* Inspector override form */
 .fabricate-manager .manager-environment-override-toggle {
   flex-direction: row;
   align-items: center;
