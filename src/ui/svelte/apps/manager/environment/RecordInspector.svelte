@@ -21,6 +21,9 @@
   const record = $derived(entry?.record || null);
   const name = $derived(record?.name || entry?.id || text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Unnamed', 'Unnamed'));
   const isStale = $derived(entry?.compositionState === 'includedButUnavailable');
+  const environmentMatchTitle = $derived(kind === 'hazard'
+    ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.HazardEnvironmentMatching', 'Hazard Environment Matching')
+    : text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.TaskEnvironmentMatching', 'Task Environment Matching'));
 
   const explanation = $derived((() => {
     if (entry?.conditionsMet === false
@@ -149,7 +152,7 @@
   </section>
 
   <section class="manager-inspector-card" data-record-inspector-section="evidence">
-    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.MatchEvidence', 'Matching evidence')}</h3>
+    <h3 class="manager-card-title">{environmentMatchTitle}</h3>
     <MatchingEvidenceChips evidence={entry.evidence} variant="checks" />
   </section>
 

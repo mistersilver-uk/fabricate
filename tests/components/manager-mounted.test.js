@@ -4450,6 +4450,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('[data-record-inspector-section="source"]'), null, 'task inspector should not render a Source card');
     assert.equal(target.querySelector('.manager-environment-inspector-actions'), null, 'task inspector should not render the selected-record action strip');
     assert.equal(target.querySelector('.manager-environment-open-source'), null, 'task inspector should not render an open-source CTA');
+    assert.equal(target.querySelector('[data-record-inspector-section="evidence"] .manager-card-title').textContent.trim(), 'Task Environment Matching');
     const taskEvidenceRows = Array.from(target.querySelectorAll('.manager-environment-evidence-table [data-evidence-field]'));
     assert.deepEqual(taskEvidenceRows.map(row => row.dataset.evidenceField), ['biome', 'region', 'weather', 'time', 'danger'], 'task evidence table should render all five dimensions');
     assert.equal(target.querySelector('[data-evidence-field="biome"] [data-evidence-value-state="match"]').textContent.trim(), 'Forest');
@@ -4464,6 +4465,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('[data-record-inspector-section="source"]'), null, 'hazard inspector should not render a Source card');
     assert.equal(target.querySelector('.manager-environment-inspector-actions'), null, 'hazard inspector should not render the selected-record action strip');
     assert.equal(target.querySelector('.manager-environment-open-source'), null, 'hazard inspector should not render an open-source CTA');
+    assert.equal(target.querySelector('[data-record-inspector-section="evidence"] .manager-card-title').textContent.trim(), 'Hazard Environment Matching');
     const hazardEvidenceRows = Array.from(target.querySelectorAll('.manager-environment-evidence-table [data-evidence-field]'));
     assert.deepEqual(hazardEvidenceRows.map(row => row.dataset.evidenceField), ['biome', 'region', 'weather', 'time', 'danger'], 'hazard evidence table should render all five dimensions');
     assert.equal(target.querySelector('[data-evidence-field="danger"] [data-evidence-value-state="mismatch"]').textContent.trim(), 'Deadly');

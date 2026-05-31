@@ -1494,6 +1494,8 @@
             "Matches": "Matches",
             "NoMatch": "Does not match",
             "MatchEvidence": "Matching evidence",
+            "TaskEnvironmentMatching": "Task Environment Matching",
+            "HazardEnvironmentMatching": "Hazard Environment Matching",
             "WaitingFor": "Waiting for",
             "ExplainAvailable": "All matching rules are satisfied and no active hazards block this record.",
             "ExplainForceIncluded": "Force-added by the GM despite not matching the environment context.",
