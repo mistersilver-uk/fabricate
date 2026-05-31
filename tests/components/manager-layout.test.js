@@ -1506,6 +1506,7 @@ test('manager environment inspector evidence table wraps compact pills without h
       const rowStyle = getComputedStyle(document.querySelector('.manager-environment-evidence-row'));
       const tableStyle = getComputedStyle(table);
       const dimensionStyle = getComputedStyle(document.querySelector('.manager-environment-evidence-dimension'));
+      const valueCellStyle = getComputedStyle(document.querySelector('.manager-environment-evidence-values'));
       const valueListStyle = getComputedStyle(document.querySelector('.manager-environment-evidence-value-list'));
       const pillStyle = getComputedStyle(longPill);
       const valueCells = Array.from(document.querySelectorAll('.manager-environment-evidence-values')).map(rectFor);
@@ -1520,6 +1521,7 @@ test('manager environment inspector evidence table wraps compact pills without h
         firstValueCell: valueCells[0],
         valueLefts: valueCells.map(cell => Math.round(cell.left)),
         rowBorderBottom: rowStyle.borderBottomWidth,
+        rowBackgroundColor: rowStyle.backgroundColor,
         tableStyle: {
           display: tableStyle.display,
           tableLayout: tableStyle.tableLayout,
@@ -1527,7 +1529,11 @@ test('manager environment inspector evidence table wraps compact pills without h
         },
         dimensionStyle: {
           width: dimensionStyle.width,
-          fontWeight: dimensionStyle.fontWeight
+          fontWeight: dimensionStyle.fontWeight,
+          backgroundColor: dimensionStyle.backgroundColor
+        },
+        valueCellStyle: {
+          backgroundColor: valueCellStyle.backgroundColor
         },
         valueListStyle: {
           display: valueListStyle.display,
@@ -1545,6 +1551,9 @@ test('manager environment inspector evidence table wraps compact pills without h
     assert.equal(report.tableStyle.display, 'table', 'inspector evidence should keep table layout despite shared evidence flex styles');
     assert.equal(report.tableStyle.tableLayout, 'fixed', 'inspector evidence table should keep fixed columns');
     assert.equal(report.tableStyle.backgroundColor, 'rgba(0, 0, 0, 0)', 'inspector evidence table should not draw a dark inset panel');
+    assert.equal(report.rowBackgroundColor, 'rgba(0, 0, 0, 0)', 'inspector evidence rows should not draw alternating backgrounds');
+    assert.equal(report.dimensionStyle.backgroundColor, 'rgba(0, 0, 0, 0)', 'inspector evidence label cells should not draw row fill');
+    assert.equal(report.valueCellStyle.backgroundColor, 'rgba(0, 0, 0, 0)', 'inspector evidence value cells should not draw row fill');
     assert.equal(report.rowBorderBottom, '1px', 'inspector evidence rows should use horizontal separators');
     assert.ok(report.dimensionStyle.width.startsWith('82'), 'inspector evidence labels should keep a fixed left column');
     assert.ok(Number(report.dimensionStyle.fontWeight) >= 650, 'inspector evidence labels should render as strong labels');

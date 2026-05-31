@@ -13390,10 +13390,18 @@
 
 .fabricate-manager .manager-environment-evidence-row {
   border-bottom: 1px solid var(--fab-mv2-border);
+  background: transparent;
 }
 
 .fabricate-manager .manager-environment-evidence-row:last-child {
   border-bottom: none;
+}
+
+.fabricate-manager .manager-environment-evidence-row:nth-child(odd),
+.fabricate-manager .manager-environment-evidence-row:nth-child(even),
+.fabricate-manager .manager-environment-evidence-row > th,
+.fabricate-manager .manager-environment-evidence-row > td {
+  background: transparent;
 }
 
 .fabricate-manager .manager-environment-evidence-dimension,
