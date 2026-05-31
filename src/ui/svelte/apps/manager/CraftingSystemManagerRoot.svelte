@@ -3435,13 +3435,13 @@
                 </div>
               </div>
               <div class="manager-drop-editor-actions">
-                <button type="button" class="manager-button" aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.DuplicateDrop', 'Duplicate drop rule')} onclick={() => duplicateGatheringTaskDrop(selectedGatheringDrop.id)}>
+                <button type="button" class="manager-button" aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.DuplicateDrop', 'Duplicate')} onclick={() => duplicateGatheringTaskDrop(selectedGatheringDrop.id)}>
                   <i class="fas fa-copy" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.DuplicateDrop', 'Duplicate drop rule')}</span>
+                  <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.DuplicateDrop', 'Duplicate')}</span>
                 </button>
-                <button type="button" class="manager-button is-danger" aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.DeleteDrop', 'Delete drop rule')} onclick={() => deleteGatheringTaskDrop(selectedGatheringDrop.id)}>
+                <button type="button" class="manager-button is-danger" aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.DeleteDrop', 'Delete')} onclick={() => deleteGatheringTaskDrop(selectedGatheringDrop.id)}>
                   <i class="fas fa-trash" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.DeleteDrop', 'Delete drop rule')}</span>
+                  <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.DeleteDrop', 'Delete')}</span>
                 </button>
               </div>
             </section>

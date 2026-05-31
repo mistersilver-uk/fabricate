@@ -1410,6 +1410,160 @@ test('manager environments browser and edit route define compact responsive geom
   );
 });
 
+test('manager environment inspector evidence table wraps compact pills without horizontal overflow', async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 360, height: 360 }, deviceScaleFactor: 1 });
+
+  try {
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            ${css}
+            body {
+              margin: 0;
+              padding: 16px;
+              font-family: Arial, sans-serif;
+            }
+            .harness {
+              width: 260px;
+            }
+          </style>
+        </head>
+        <body>
+          <main class="fabricate-manager">
+            <section class="manager-inspector-card harness">
+              <h3 class="manager-card-title">Matching evidence</h3>
+              <table class="manager-environment-evidence is-checks manager-environment-evidence-table" aria-label="Matching evidence">
+                <tbody>
+                  <tr class="manager-environment-evidence-row is-positive" data-evidence-field="biome" data-evidence-state="match">
+                    <th class="manager-environment-evidence-dimension" scope="row">Biome</th>
+                    <td class="manager-environment-evidence-values">
+                      <div class="manager-environment-evidence-value-list">
+                        <span class="manager-environment-evidence-value-pill is-positive" data-evidence-value-state="match">Forest</span>
+                        <span class="manager-environment-evidence-value-pill is-danger" data-evidence-value-state="mismatch">VeryLongUnbrokenBiomeNameThatMustWrapInsideTheInspectorColumn</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr class="manager-environment-evidence-row is-positive" data-evidence-field="region" data-evidence-state="match">
+                    <th class="manager-environment-evidence-dimension" scope="row">Region</th>
+                    <td class="manager-environment-evidence-values">
+                      <div class="manager-environment-evidence-value-list">
+                        <span class="manager-environment-evidence-value-pill is-positive" data-evidence-value-state="match">North</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr class="manager-environment-evidence-row is-warning" data-evidence-field="weather" data-evidence-state="mismatch">
+                    <th class="manager-environment-evidence-dimension" scope="row">Weather</th>
+                    <td class="manager-environment-evidence-values">
+                      <div class="manager-environment-evidence-value-list">
+                        <span class="manager-environment-evidence-value-pill is-warning" data-evidence-value-state="mismatch">Storm</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr class="manager-environment-evidence-row is-warning" data-evidence-field="time" data-evidence-state="mismatch">
+                    <th class="manager-environment-evidence-dimension" scope="row">Time</th>
+                    <td class="manager-environment-evidence-values">
+                      <div class="manager-environment-evidence-value-list">
+                        <span class="manager-environment-evidence-value-pill is-warning" data-evidence-value-state="mismatch">Night</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr class="manager-environment-evidence-row is-any" data-evidence-field="danger" data-evidence-state="any">
+                    <th class="manager-environment-evidence-dimension" scope="row">Danger</th>
+                    <td class="manager-environment-evidence-values">
+                      <div class="manager-environment-evidence-value-list">
+                        <span class="manager-environment-evidence-value-pill is-any" data-evidence-value-state="any">Any danger</span>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </section>
+          </main>
+        </body>
+      </html>
+    `);
+
+    const report = await page.evaluate(() => {
+      const rectFor = element => {
+        const rect = element.getBoundingClientRect();
+        return {
+          left: rect.left,
+          top: rect.top,
+          right: rect.right,
+          bottom: rect.bottom,
+          width: rect.width,
+          height: rect.height
+        };
+      };
+      const table = document.querySelector('.manager-environment-evidence-table');
+      const card = document.querySelector('.manager-inspector-card');
+      const longPill = Array.from(document.querySelectorAll('.manager-environment-evidence-value-pill'))
+        .find(pill => pill.textContent.includes('VeryLongUnbroken'));
+      const rowStyle = getComputedStyle(document.querySelector('.manager-environment-evidence-row'));
+      const tableStyle = getComputedStyle(table);
+      const dimensionStyle = getComputedStyle(document.querySelector('.manager-environment-evidence-dimension'));
+      const valueListStyle = getComputedStyle(document.querySelector('.manager-environment-evidence-value-list'));
+      const pillStyle = getComputedStyle(longPill);
+      const valueCells = Array.from(document.querySelectorAll('.manager-environment-evidence-values')).map(rectFor);
+
+      return {
+        viewportWidth: window.innerWidth,
+        documentWidth: document.documentElement.scrollWidth,
+        rowFields: Array.from(document.querySelectorAll('.manager-environment-evidence-row')).map(row => row.dataset.evidenceField),
+        table: rectFor(table),
+        card: rectFor(card),
+        longPill: rectFor(longPill),
+        firstValueCell: valueCells[0],
+        valueLefts: valueCells.map(cell => Math.round(cell.left)),
+        rowBorderBottom: rowStyle.borderBottomWidth,
+        tableStyle: {
+          display: tableStyle.display,
+          tableLayout: tableStyle.tableLayout,
+          backgroundColor: tableStyle.backgroundColor
+        },
+        dimensionStyle: {
+          width: dimensionStyle.width,
+          fontWeight: dimensionStyle.fontWeight
+        },
+        valueListStyle: {
+          display: valueListStyle.display,
+          flexWrap: valueListStyle.flexWrap
+        },
+        pillStyle: {
+          borderRadius: pillStyle.borderRadius,
+          overflowWrap: pillStyle.overflowWrap,
+          backgroundColor: pillStyle.backgroundColor
+        }
+      };
+    });
+
+    assert.deepEqual(report.rowFields, ['biome', 'region', 'weather', 'time', 'danger'], 'inspector evidence table should render all five rows');
+    assert.equal(report.tableStyle.display, 'table', 'inspector evidence should keep table layout despite shared evidence flex styles');
+    assert.equal(report.tableStyle.tableLayout, 'fixed', 'inspector evidence table should keep fixed columns');
+    assert.equal(report.tableStyle.backgroundColor, 'rgba(0, 0, 0, 0)', 'inspector evidence table should not draw a dark inset panel');
+    assert.equal(report.rowBorderBottom, '1px', 'inspector evidence rows should use horizontal separators');
+    assert.ok(report.dimensionStyle.width.startsWith('82'), 'inspector evidence labels should keep a fixed left column');
+    assert.ok(Number(report.dimensionStyle.fontWeight) >= 650, 'inspector evidence labels should render as strong labels');
+    assert.equal(report.valueListStyle.display, 'flex', 'inspector values should align as inline pill rows');
+    assert.equal(report.valueListStyle.flexWrap, 'wrap', 'inspector value pills should wrap inside the right column');
+    assert.equal(new Set(report.valueLefts).size, 1, 'inspector value columns should align across rows');
+    assert.ok(report.table.right <= report.card.right + 1, 'evidence table should stay inside the inspector card');
+    assert.ok(report.documentWidth <= report.viewportWidth, 'evidence table should not create page-level horizontal overflow');
+    assert.ok(report.longPill.width <= report.firstValueCell.width + 1, 'long value pills should stay inside the right column');
+    assert.ok(report.longPill.height > 20, 'long value pills should wrap to multiple compact lines instead of clipping');
+    assert.equal(report.pillStyle.borderRadius, '4px', 'value pills should use compact chip corners');
+    assert.equal(report.pillStyle.overflowWrap, 'anywhere', 'value pills should be able to break long localized values');
+    assert.notEqual(report.pillStyle.backgroundColor, 'rgba(0, 0, 0, 0)', 'status pills should retain subtle state backgrounds');
+  } finally {
+    await page.close();
+    await browser.close();
+  }
+});
+
 test('manager environment composition overflow menu renders bounded single-line rows', async () => {
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 360, height: 260 }, deviceScaleFactor: 1 });

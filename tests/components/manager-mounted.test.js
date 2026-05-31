@@ -2503,14 +2503,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(Array.from(modifierPills).some(pill => pill.classList.contains('is-positive') && pill.textContent.includes('Deep Night') && pill.textContent.includes('+20%')));
     assert.ok(Array.from(modifierPills).some(pill => pill.classList.contains('is-negative') && pill.textContent.includes('Clear Sky') && pill.textContent.includes('-15%')));
     assert.ok(Array.from(modifierPills).some(pill => pill.classList.contains('is-neutral') && pill.textContent.includes('High Day') && pill.textContent.includes('+0%')));
-    assert.equal(populatedDropRow.querySelector('[aria-label="Duplicate drop rule"]'), null);
-    assert.equal(populatedDropRow.querySelector('[aria-label="Delete drop rule"]'), null);
+    assert.equal(populatedDropRow.querySelector('[aria-label="Duplicate"]'), null);
+    assert.equal(populatedDropRow.querySelector('[aria-label="Delete"]'), null);
     const selectedDropInspector = target.querySelector('[data-gathering-task-drop-inspector]');
     const selectedDropActions = selectedDropInspector.querySelector('.manager-drop-editor-actions');
     assert.ok(selectedDropActions);
     assert.ok(selectedDropActions.previousElementSibling?.classList.contains('manager-inspector-title-row'));
-    assert.ok(selectedDropActions.querySelector('[aria-label="Duplicate drop rule"]'));
-    assert.ok(selectedDropActions.querySelector('[aria-label="Delete drop rule"]'));
+    assert.ok(selectedDropActions.querySelector('[aria-label="Duplicate"]'));
+    assert.ok(selectedDropActions.querySelector('[aria-label="Delete"]'));
     assert.equal(selectedDropInspector.textContent.includes('Drop component'), false);
     assert.equal(selectedDropInspector.textContent.includes('Select a component'), false);
     const inspectorRateEditor = selectedDropInspector.querySelector('[data-gathering-drop-inspector-rate]');
@@ -2718,7 +2718,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] .manager-drop-rate-percent input').value, '25');
-    target.querySelector('[data-gathering-task-drop-inspector] [aria-label="Duplicate drop rule"]').click();
+    target.querySelector('[data-gathering-task-drop-inspector] [aria-label="Duplicate"]').click();
     await tick();
     flushSync();
     assert.ok(target.querySelector('[data-gathering-task-reward-rule-notice]'));
@@ -3105,8 +3105,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('[data-gathering-task-drop-inspector]').textContent.includes('Drop component'), false);
     assert.equal(target.querySelector('[data-gathering-task-drop-inspector] [data-gathering-drop-inspector-rate] input[type="text"]').value, '25');
     assert.equal(target.querySelector('[data-gathering-task-drop-inspector] [data-gathering-drop-inspector-count] input').value, '1');
-    assert.equal(target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] [aria-label="Duplicate drop rule"]'), null);
-    assert.equal(target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] [aria-label="Delete drop rule"]'), null);
+    assert.equal(target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] [aria-label="Duplicate"]'), null);
+    assert.equal(target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] [aria-label="Delete"]'), null);
 
     const inspectorSlider = target.querySelector('[data-gathering-task-drop-inspector] input[type="range"]');
     inspectorSlider.value = '100';
@@ -3114,7 +3114,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    target.querySelector('[data-gathering-task-drop-inspector] [aria-label="Duplicate drop rule"]').click();
+    target.querySelector('[data-gathering-task-drop-inspector] [aria-label="Duplicate"]').click();
     await tick();
     flushSync();
     const unresolvedDropsAtRate100 = Array.from(target.querySelectorAll('[data-gathering-task-drop-id]'))
@@ -3123,7 +3123,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     target.querySelector(`[data-gathering-task-drop-id="${addedRow.id}"]`).click();
     await tick();
     flushSync();
-    target.querySelector('[data-gathering-task-drop-inspector] [aria-label="Delete drop rule"]').click();
+    target.querySelector('[data-gathering-task-drop-inspector] [aria-label="Delete"]').click();
     await tick();
     flushSync();
     assert.equal(target.querySelector(`[data-gathering-task-drop-id="${addedRow.id}"]`), null, 'delete should stage removal of the row');

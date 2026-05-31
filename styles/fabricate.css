@@ -13378,36 +13378,45 @@
 }
 
 .fabricate-manager .manager-environment-evidence-table {
+  display: table;
   width: 100%;
+  margin: 0;
   border-collapse: collapse;
   table-layout: fixed;
+  border-top: 1px solid var(--fab-mv2-border);
+  border-bottom: 1px solid var(--fab-mv2-border);
+  background: transparent;
 }
 
 .fabricate-manager .manager-environment-evidence-row {
-  border-top: 1px solid var(--fab-mv2-border);
+  border-bottom: 1px solid var(--fab-mv2-border);
 }
 
-.fabricate-manager .manager-environment-evidence-row:first-child {
-  border-top: none;
+.fabricate-manager .manager-environment-evidence-row:last-child {
+  border-bottom: none;
 }
 
 .fabricate-manager .manager-environment-evidence-dimension,
 .fabricate-manager .manager-environment-evidence-values {
-  padding: 7px 0;
-  vertical-align: top;
+  padding: 6px 0;
+  vertical-align: middle;
+  line-height: 1.25;
 }
 
 .fabricate-manager .manager-environment-evidence-dimension {
-  width: 74px;
+  width: 82px;
+  padding-right: 10px;
   font-weight: 700;
   color: var(--fab-mv2-text);
+  font-size: 0.75rem;
   text-align: left;
 }
 
 .fabricate-manager .manager-environment-evidence-value-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  justify-content: flex-start;
+  gap: 3px 4px;
   min-width: 0;
 }
 
@@ -13416,30 +13425,33 @@
   align-items: center;
   max-width: 100%;
   min-width: 0;
-  padding: 2px 7px;
+  padding: 1px 6px;
   border: 1px solid var(--fab-mv2-border);
-  border-radius: 999px;
-  background: var(--fab-overlay-dark-16);
+  border-radius: 4px;
+  background: transparent;
   color: var(--fab-mv2-text-muted);
-  font-size: 0.78rem;
-  line-height: 1.35;
+  font-size: 0.74rem;
+  font-weight: 650;
+  line-height: 1.3;
   overflow-wrap: anywhere;
 }
 
 .fabricate-manager .manager-environment-evidence-value-pill.is-positive {
-  border-color: var(--fab-mv2-accent);
-  color: var(--fab-mv2-text);
-  background: var(--fab-overlay-light-04);
+  border-color: var(--fab-success-border);
+  color: var(--fab-success-text);
+  background: var(--fab-success-soft);
 }
 
 .fabricate-manager .manager-environment-evidence-value-pill.is-danger {
-  border-color: var(--fab-mv2-danger);
-  color: var(--fab-mv2-danger);
+  border-color: var(--fab-danger-border);
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
 }
 
 .fabricate-manager .manager-environment-evidence-value-pill.is-warning {
-  border-color: var(--fab-warning);
+  border-color: var(--fab-warning-border);
   color: var(--fab-warning-text, var(--fab-warning));
+  background: var(--fab-warning-soft);
 }
 
 /* Inspector override form */
