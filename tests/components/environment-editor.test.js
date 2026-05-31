@@ -89,6 +89,7 @@ describe('environment editor localization', () => {
       ['Composition.OverrideOnTitle', 'Drop rate adjustment on'],
       ['Composition.OverrideOffTitle', 'Drop rate adjustment off'],
       ['Composition.WeightPercentage', 'Selection share'],
+      ['Composition.ColHazard', 'Hazard'],
       ['Composition.QuickRemove', 'Remove'],
       ['Composition.Remove', 'Remove from environment'],
       ['Composition.ManualHint', 'Only explicitly included records are available; GMs can force add enabled non-matching records.'],
@@ -97,7 +98,7 @@ describe('environment editor localization', () => {
       ['Inspector.DropRateAdjustment', 'Drop-rate adjustment'],
       ['Inspector.ClearAdjustment', 'Clear'],
       ['Tasks.ManualIntro', 'Only tasks you explicitly include are available to players. You can add matching tasks or force add non-matching tasks from Available to add.'],
-      ['Hazards.ManualIntro', 'Only hazards you explicitly include apply here. You can also force add non-matching hazards from the Non-matching list.'],
+      ['Hazards.ManualIntro', 'Only hazards you explicitly include apply here. You can add matching hazards or force add non-matching hazards from Available to add.'],
       ['Validation.CheckRegion', 'Has a region or is set to "any region"']
     ];
 
@@ -162,7 +163,7 @@ describe('environment composition editor structure', () => {
 
   it('renders Tasks/Hazards as a column-headed table', () => {
     assert.ok(listSource.includes('manager-environment-comp-head'), 'composition list renders a column header row');
-    for (const col of ['ColTask', 'ColOverride', 'ColRuntime']) {
+    for (const col of ['ColTask', 'ColHazard', 'ColOverride', 'ColRuntime']) {
       assert.ok(listSource.includes(col), `composition table defines the ${col} column`);
     }
     assert.ok(listSource.includes('ColWeight'), 'composition table defines the blind-mode ColWeight column');
@@ -231,10 +232,10 @@ describe('environment composition editor structure', () => {
     assert.ok(rightInspectorSource.includes('NoActiveTasks') && rightInspectorSource.includes('NoActiveHazards'), 'empty state reads as "No active tasks/hazards"');
   });
 
-  it('selected manual task inspector uses remove copy while automatic and hazard actions keep exclude copy', () => {
-    assert.ok(inspectorSource.includes("kind === 'task' && environment?.compositionMode === 'manual'"), 'inspector detects manual task removal context');
-    assert.ok(inspectorSource.includes('Composition.Remove'), 'manual task inspector action uses remove copy');
-    assert.ok(inspectorSource.includes('Composition.Exclude'), 'non-manual task and hazard inspector actions keep exclude copy');
+  it('selected manual record inspector uses remove copy while automatic actions keep exclude copy', () => {
+    assert.ok(inspectorSource.includes("environment?.compositionMode === 'manual'"), 'inspector detects manual removal context');
+    assert.ok(inspectorSource.includes('Composition.Remove'), 'manual inspector action uses remove copy');
+    assert.ok(inspectorSource.includes('Composition.Exclude'), 'automatic inspector actions keep exclude copy');
     assert.ok(inspectorSource.includes('<span>{excludeLabel}</span>'), 'inspector action label is selected from the mode-aware label');
   });
 
@@ -255,24 +256,24 @@ describe('environment composition editor structure', () => {
     assert.ok(inspectorSource.includes('variant="checks"'), 'inspector requests the checks evidence variant');
   });
 
-  it('manual task mode renders one Available-to-add group instead of Excluded and Non-matching sections', () => {
+  it('manual mode renders one Available-to-add group instead of Excluded and Non-matching sections', () => {
     // The included section must never surface addable/non-matching records; those
-    // belong to the task-only Available-to-add list in manual mode.
+    // belong to the Available-to-add list in manual mode.
     assert.ok(listSource.includes("entry.compositionState === 'includedByMatch'"), 'included section keys off includedByMatch');
     assert.ok(listSource.includes("entry.compositionState === 'forceIncluded'"), 'included section also surfaces force-included records');
-    assert.ok(listSource.includes("availableToAddMatching"), 'manual task mode has a matching available-to-add group');
-    assert.ok(listSource.includes("availableToAddNonMatching"), 'manual task mode has a non-matching available-to-add group');
-    assert.ok(listSource.includes("availableToAddLibraryDisabled"), 'manual task mode has a library-disabled available-to-add group');
+    assert.ok(listSource.includes("availableToAddMatching"), 'manual mode has a matching available-to-add group');
+    assert.ok(listSource.includes("availableToAddNonMatching"), 'manual mode has a non-matching available-to-add group');
+    assert.ok(listSource.includes("availableToAddLibraryDisabled"), 'manual mode has a library-disabled available-to-add group');
     assert.ok(listSource.includes('const availableToAdd = $derived([...availableToAddMatching, ...availableToAddNonMatching, ...availableToAddLibraryDisabled])'), 'available-to-add orders matching records before non-matching and library-disabled records');
-    assert.ok(listSource.includes('data-section="available-to-add"'), 'manual task mode renders an Available to add section');
+    assert.ok(listSource.includes('data-section="available-to-add"'), 'manual mode renders an Available to add section');
     assert.ok(listSource.includes('Composition.AvailableToAdd'), 'Available to add section uses localized copy');
     assert.ok(listSource.includes('Composition.NoAvailableToAdd'), 'Available to add empty state uses localized copy');
-    assert.ok(!listSource.includes("entry.compositionState === 'excluded' && entry.matches === true && entry.libraryEnabled === true"), 'manual task Available to add no longer treats excluded task records as restorable');
-    assert.ok(!listSource.includes("entry?.compositionState === 'excluded' && entry?.matches !== true"), 'manual task Available to add no longer force-adds excluded task records');
-    assert.ok(!listSource.includes("entry?.compositionState === 'excluded' && entry?.libraryEnabled !== true"), 'manual task Available to add no longer classifies excluded task records');
-    assert.ok(listSource.includes("{#if kind === 'task' && mode === 'manual'}"), 'Available to add is gated to manual task mode');
-    assert.ok(listSource.includes("{#if !(kind === 'task' && mode === 'manual')}"), 'Excluded and standalone Non-matching sections do not render in manual task mode');
-    assert.ok(listSource.includes("{#if kind !== 'task' && mode === 'manual'}"), 'hazard manual mode keeps the existing Matching candidates section');
+    assert.ok(!listSource.includes("entry.compositionState === 'excluded' && entry.matches === true && entry.libraryEnabled === true"), 'manual Available to add no longer treats excluded records as restorable');
+    assert.ok(!listSource.includes("entry?.compositionState === 'excluded' && entry?.matches !== true"), 'manual Available to add no longer force-adds excluded records');
+    assert.ok(!listSource.includes("entry?.compositionState === 'excluded' && entry?.libraryEnabled !== true"), 'manual Available to add no longer classifies excluded records');
+    assert.ok(listSource.includes("{#if mode === 'manual'}"), 'Available to add is gated to manual mode');
+    assert.ok(listSource.includes("{#if mode !== 'manual'}"), 'Excluded and standalone Non-matching sections do not render in manual mode');
+    assert.ok(!listSource.includes("{#if kind !== 'task' && mode === 'manual'}"), 'hazard manual mode no longer keeps a separate Matching candidates section');
     assert.ok(listSource.includes("data-section=\"excluded\""), 'automatic task mode and hazards retain the Excluded section');
     assert.ok(listSource.includes("data-section=\"non-matching\""), 'automatic task mode and hazards retain the standalone Non-matching section');
     assert.ok(/nonMatching = \$derived\(records\.filter\(entry =>\s*entry\.compositionState === 'notMatching' \|\| entry\.compositionState === 'libraryDisabled'\)\)/.test(listSource), 'non-matching list collects notMatching and libraryDisabled');

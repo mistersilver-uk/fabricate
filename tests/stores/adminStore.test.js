@@ -3033,7 +3033,51 @@ describe('createAdminStore', () => {
       assert.equal(removedForced.runtimeState, 'unavailable');
     });
 
-    it('manual hazard exclusion still uses local excluded state', async () => {
+    it('manual hazard removal clears include and force state without local exclusion', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      services._store.gatheringConfig = {
+        systems: {
+          sys1: {
+            tasks: [],
+            hazards: [
+              { id: 'h-cave', name: 'Cave Hazard', biomes: ['cave'], dropRate: 25 },
+              { id: 'h-desert', name: 'Desert Hazard', biomes: ['desert'], dropRate: 25 }
+            ]
+          }
+        }
+      };
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.createEnvironmentDraft();
+      store.updateEnvironmentDraft({ biomes: ['cave'], compositionMode: 'manual' });
+
+      store.includeEnvironmentRecord('hazard', 'h-cave');
+      store.excludeEnvironmentRecord('hazard', 'h-cave');
+
+      const draft = get(store.viewState).environmentDraft;
+      assert.ok(!draft.enabledHazardIds.includes('h-cave'));
+      assert.ok(!draft.disabledHazardIds.includes('h-cave'));
+      let composition = get(store.viewState).environmentComposition;
+      assert.equal(composition.hazards.find(entry => entry.id === 'h-cave').compositionState, 'candidate');
+      assert.equal(composition.counts.excludedHazards, 0);
+
+      store.updateEnvironmentDraft({ disabledHazardIds: ['h-cave'] });
+      composition = get(store.viewState).environmentComposition;
+      assert.equal(composition.hazards.find(entry => entry.id === 'h-cave').compositionState, 'candidate');
+      assert.equal(composition.counts.excludedHazards, 0);
+
+      store.forceIncludeEnvironmentRecord('hazard', 'h-desert');
+      store.excludeEnvironmentRecord('hazard', 'h-desert');
+      const forcedDraft = get(store.viewState).environmentDraft;
+      assert.ok(!forcedDraft.forcedHazardIds.includes('h-desert'));
+      assert.ok(!forcedDraft.disabledHazardIds.includes('h-desert'));
+      composition = get(store.viewState).environmentComposition;
+      assert.equal(composition.hazards.find(entry => entry.id === 'h-desert').compositionState, 'notMatching');
+    });
+
+    it('automatic hazard exclusion writes local excluded state', async () => {
       const services = createMockServices();
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
@@ -3048,9 +3092,8 @@ describe('createAdminStore', () => {
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       await store.createEnvironmentDraft();
-      store.updateEnvironmentDraft({ biomes: ['cave'], compositionMode: 'manual' });
+      store.updateEnvironmentDraft({ biomes: ['cave'], compositionMode: 'automatic' });
 
-      store.includeEnvironmentRecord('hazard', 'h-cave');
       store.excludeEnvironmentRecord('hazard', 'h-cave');
 
       const draft = get(store.viewState).environmentDraft;

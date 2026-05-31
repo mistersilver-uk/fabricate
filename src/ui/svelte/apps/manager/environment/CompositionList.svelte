@@ -63,7 +63,6 @@
     || entry.compositionState === 'forceIncluded'
     || entry.compositionState === 'includedButUnavailable'));
   const includedWeightTotal = $derived(included.reduce((total, entry) => total + weightFor(entry.id), 0));
-  const candidates = $derived(records.filter(entry => entry.compositionState === 'candidate'));
   const excluded = $derived(records.filter(entry => entry.compositionState === 'excluded'));
   const nonMatching = $derived(records.filter(entry =>
     entry.compositionState === 'notMatching' || entry.compositionState === 'libraryDisabled'));
@@ -91,6 +90,9 @@
   const unit = $derived(kind === 'hazard'
     ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.HazardsUnit', 'hazards')
     : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.TasksUnit', 'tasks'));
+  const recordColumnLabel = $derived(kind === 'hazard'
+    ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColHazard', 'Hazard')
+    : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColTask', 'Task'));
 
   function toggleMenu(id) { openMenuId = openMenuId === id ? '' : id; }
   function closeMenu() { openMenuId = ''; }
@@ -135,7 +137,7 @@
 
     <div class="manager-environment-comp-head" aria-hidden="true">
       {#if showHandle}<span></span>{/if}
-      <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColTask', 'Task')}</span>
+      <span>{recordColumnLabel}</span>
       {#if showBlindWeights}<span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColWeight', 'Weight')}</span>{/if}
       <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColOverride', 'Override')}</span>
       <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColRuntime', 'Runtime state')}</span>
@@ -205,12 +207,7 @@
               <RuntimeStatePill state={runtimePillState(entry)} />
             </div>
             <div class="manager-environment-comp-actions">
-              {#if kind === 'hazard'}
-                <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSource', 'Open source record')} onclick={() => onOpenSource(kind, entry.id)}>
-                  <i class="fas fa-pen-to-square" aria-hidden="true"></i>
-                </button>
-              {/if}
-              {#if kind === 'task' && mode === 'manual'}
+              {#if mode === 'manual'}
                 <button
                   type="button"
                   class="manager-icon-button is-danger manager-environment-comp-quick-action"
@@ -234,7 +231,7 @@
                       <button type="button" role="menuitem" disabled={index === included.length - 1} onclick={() => { onReorder(kind, index, index + 1); closeMenu(); }}><i class="fas fa-arrow-down" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoveDown', 'Move down')}</span></button>
                     {/if}
                     <button type="button" role="menuitem" onclick={() => { onOpenSource(kind, entry.id); closeMenu(); }}><i class="fas fa-up-right-from-square" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSource', 'Open source record')}</span></button>
-                    <button type="button" role="menuitem" class="is-danger" data-action="exclude" onclick={() => { onExclude(kind, entry.id); closeMenu(); }}><i class="fas fa-ban" aria-hidden="true"></i><span>{kind === 'task' && mode === 'manual' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Remove', 'Remove from environment') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Exclude', 'Exclude from environment')}</span></button>
+                    <button type="button" role="menuitem" class="is-danger" data-action="exclude" onclick={() => { onExclude(kind, entry.id); closeMenu(); }}><i class="fas fa-ban" aria-hidden="true"></i><span>{mode === 'manual' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Remove', 'Remove from environment') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Exclude', 'Exclude from environment')}</span></button>
                   </div>
                 {/if}
               </div>
@@ -245,8 +242,8 @@
     {/if}
   </section>
 
-  <!-- Available to add (manual task mode only) -->
-  {#if kind === 'task' && mode === 'manual'}
+  <!-- Available to add (manual mode only) -->
+  {#if mode === 'manual'}
     <section class="manager-environment-comp-section" data-section="available-to-add">
       <header class="manager-environment-comp-band">
         <h4>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.AvailableToAdd', 'Available to add')}</h4>
@@ -258,6 +255,7 @@
         <ul class="manager-environment-comp-rows is-available-to-add">
           {#each availableToAdd as entry (entry.id)}
             <li class={`manager-environment-comp-row ${availableRowBucket(entry) === 'candidate' ? '' : 'is-non-matching'} ${selectedId === entry.id ? 'is-selected' : ''}`} data-record-id={entry.id} data-section-row={availableRowBucket(entry)} data-composition-state={entry.compositionState}>
+              {#if showHandle}<span class="manager-environment-comp-handle"></span>{/if}
               <div
                 role="button"
                 tabindex="0"
@@ -327,66 +325,7 @@
     </section>
   {/if}
 
-  <!-- Matching candidates (manual hazard mode only) -->
-  {#if kind !== 'task' && mode === 'manual'}
-    <section class="manager-environment-comp-section" data-section="candidates">
-      <header class="manager-environment-comp-band">
-        <h4>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MatchingCandidates', 'Matching candidates')}</h4>
-        <span class="manager-environment-comp-count">{candidates.length} {unit}</span>
-      </header>
-      {#if candidates.length === 0}
-        <p class="manager-muted manager-environment-comp-empty">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoCandidates', 'No further matching records to include.')}</p>
-      {:else}
-        <ul class="manager-environment-comp-rows">
-          {#each candidates as entry (entry.id)}
-            <li class={`manager-environment-comp-row ${selectedId === entry.id ? 'is-selected' : ''}`} data-record-id={entry.id} data-section-row="candidate">
-              {#if showHandle}<span class="manager-environment-comp-handle"></span>{/if}
-              <div
-                role="button"
-                tabindex="0"
-                class="manager-environment-comp-task"
-                data-action="select"
-                aria-pressed={selectedId === entry.id}
-                onclick={() => onSelect(kind, entry.id)}
-                onkeydown={(event) => activateOnKey(event, entry.id)}
-              >
-                <img class="manager-environment-comp-thumb" src={recordImage(entry)} alt="" />
-                <span class="manager-environment-comp-copy">
-                  <span class="manager-environment-comp-name">{recordName(entry)}</span>
-                  <span class="manager-environment-comp-sub">{recordDescription(entry)}</span>
-                </span>
-              </div>
-              {#if showBlindWeights}<div class="manager-environment-comp-weight"><span class="manager-environment-comp-none">—</span></div>{/if}
-              <div class="manager-environment-comp-override"><OverrideIndicator active={entry.hasDropRateAdjustment === true} /></div>
-              <div class="manager-environment-comp-runtime"><CompositionStatePill state={entry.compositionState} /></div>
-              <div class="manager-environment-comp-actions">
-                {#if kind === 'task'}
-                  <div class="manager-environment-comp-menu-wrap" use:dismissOnOutsideClick={{ enabled: openMenuId === entry.id, onDismiss: closeMenu }}>
-                    <button type="button" class="manager-icon-button" aria-haspopup="menu" aria-expanded={openMenuId === entry.id} aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoreActions', 'More actions')} onclick={() => toggleMenu(entry.id)}>
-                      <i class="fas fa-ellipsis-vertical" aria-hidden="true"></i>
-                    </button>
-                    {#if openMenuId === entry.id}
-                      <div class="manager-environment-comp-menu" role="menu">
-                        <button type="button" role="menuitem" onclick={() => { onOpenSource(kind, entry.id); closeMenu(); }}><i class="fas fa-up-right-from-square" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSource', 'Open source record')}</span></button>
-                        <button type="button" role="menuitem" data-action="include" onclick={() => { onInclude(kind, entry.id); closeMenu(); }}><i class="fas fa-plus" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Include', 'Include')}</span></button>
-                      </div>
-                    {/if}
-                  </div>
-                {:else}
-                  <button type="button" class="manager-button is-primary manager-environment-include" data-action="include" onclick={() => onInclude(kind, entry.id)}>
-                    <i class="fas fa-plus" aria-hidden="true"></i>
-                    <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Include', 'Include')}</span>
-                  </button>
-                {/if}
-              </div>
-            </li>
-          {/each}
-        </ul>
-      {/if}
-    </section>
-  {/if}
-
-  {#if !(kind === 'task' && mode === 'manual')}
+  {#if mode !== 'manual'}
     <!-- Excluded -->
     <section class="manager-environment-comp-section" data-section="excluded">
       <header class="manager-environment-comp-band">

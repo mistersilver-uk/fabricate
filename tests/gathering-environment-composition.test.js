@@ -150,7 +150,7 @@ test('manual task disabledTaskIds do not veto force-added tasks', () => {
   assert.deepEqual(composed.tasks.map(task => task.id).sort(), ['t1', 'tDesert']);
 });
 
-test('manual hazard disabledHazardIds still veto force-added hazards', () => {
+test('manual hazard disabledHazardIds do not veto enabled or force-added hazards', () => {
   const service = makeService({
     hazards: [
       { id: 'hCave', name: 'Cave-in', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 50 },
@@ -161,7 +161,21 @@ test('manual hazard disabledHazardIds still veto force-added hazards', () => {
     compositionMode: 'manual',
     enabledHazardIds: ['hCave'],
     forcedHazardIds: ['hDesert'],
-    disabledHazardIds: ['hDesert']
+    disabledHazardIds: ['hCave', 'hDesert']
+  }), system);
+  assert.deepEqual(composed.hazards.map(hazard => hazard.id).sort(), ['hCave', 'hDesert']);
+});
+
+test('automatic mode excludes hazards listed in disabledHazardIds', () => {
+  const service = makeService({
+    hazards: [
+      { id: 'hCave', name: 'Cave-in', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 50 },
+      { id: 'hGas', name: 'Gas Pocket', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 50 }
+    ]
+  });
+  const composed = service.composeEnvironment(environment({
+    compositionMode: 'automatic',
+    disabledHazardIds: ['hGas']
   }), system);
   assert.deepEqual(composed.hazards.map(hazard => hazard.id), ['hCave']);
 });

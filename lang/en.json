@@ -1385,6 +1385,7 @@
             "HazardsUnit": "hazards",
             "TasksUnit": "tasks",
             "ColTask": "Task",
+            "ColHazard": "Hazard",
             "ColWeight": "Weight",
             "ColOverride": "Override",
             "ColRuntime": "Runtime state",
@@ -1570,7 +1571,7 @@
           "Hazards": {
             "Title": "Hazards",
             "AutomaticIntro": "All matching enabled library hazards apply unless you exclude them here.",
-            "ManualIntro": "Only hazards you explicitly include apply here. You can also force add non-matching hazards from the Non-matching list.",
+            "ManualIntro": "Only hazards you explicitly include apply here. You can add matching hazards or force add non-matching hazards from Available to add.",
             "HazardChance": "Hazard chance",
             "DangerTag": {
               "safe": "Safe",

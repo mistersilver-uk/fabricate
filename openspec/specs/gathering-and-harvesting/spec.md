@@ -105,6 +105,7 @@ GatheringEnvironment = {
   img?: string,
   enabled: boolean,
   selectionMode: "targeted" | "blind",
+  compositionMode?: "automatic" | "manual",
   sceneUuid?: string | null,
   region?: string,
   biomes?: string[],
@@ -118,6 +119,8 @@ GatheringEnvironment = {
   disabledHazardIds?: string[],
   forcedTaskIds?: string[],
   forcedHazardIds?: string[],
+  taskOrder?: string[],
+  hazardOrder?: string[],
   taskDropRateAdjustments?: Record<string, Record<string, number>>, // taskId -> dropRowId -> signed percentage-point delta
   hazardDropRateAdjustments?: Record<string, number>, // hazardId -> signed percentage-point delta
   blindSelection?: {
@@ -141,9 +144,11 @@ GatheringEnvironment = {
 10. `risk` is optional player-facing risk evidence. Existing risk display values may map to `dangerTags`, but reusable hazard matching uses `dangerTags`.
 11. Weather and time of day are not environment fields. They are global gathering conditions used as **runtime gates** — a Gathering Task or hazard whose required `weather` / `timeOfDay` values are not satisfied by the current conditions stays in the environment's composition (it still matches by region/biome/danger) but is **inactive** at runtime: tasks become `visible: true` / `attemptable: false` with a `CONDITIONS_BLOCKED` reason, and hazards are skipped during d100 hazard selection. Matching itself is decided by region / biome / danger only.
 12. `enabledTaskIds`, `disabledTaskIds`, `enabledHazardIds`, and `disabledHazardIds` store environment-level composition toggles for reusable library records without rewriting the library definitions.
-12a. `forcedTaskIds` / `forcedHazardIds` are GM "force-add" overrides used in **manual** composition mode: a record listed there is composed into the environment even when it does not match the environment's region/biome/danger/conditions (composition state `forceIncluded`, runtime state `available`). Forces are honored only in manual mode — **automatic** mode ignores them, consistent with automatic ignoring the enabled allow-list, so a stale forced list never makes a non-matching record available in automatic mode. Excluding a forced hazard (`disabledHazardIds`) clears the force. Removing a forced task in manual mode clears it from `forcedTaskIds` without adding it to `disabledTaskIds`.
-12a.i. GM authoring UI for manual task composition shows only two record groups: **Included in this environment** and **Available to add**. Available to add includes matching addable task rows first, then enabled non-matching task rows, then library-disabled task rows; it does not show a separate Excluded or Non-matching task section. Removing an included manual task returns it to Available to add with its normal candidate/not-matching/library-disabled state instead of showing it as Excluded. Automatic task composition and hazard composition retain their Excluded and Non-matching sections.
-12b. `taskDropRateAdjustments` and `hazardDropRateAdjustments` store environment-local signed percentage-point deltas for reusable library task drop rows and hazards. Task adjustments are keyed first by task id and then by drop-row id. Hazard adjustments are keyed by hazard id. Values must be integers from `-100` to `100`; zero values are omitted. Adjustments affect only this environment and must not rewrite reusable library records.
+12a. `compositionMode` controls reusable task/hazard composition. In **automatic** mode, every matching, library-enabled record is composed unless listed in `disabledTaskIds` / `disabledHazardIds`; stale `enabled*Ids` and `forced*Ids` are ignored. In **manual** mode, only records in `enabled*Ids` that still match, plus records in `forced*Ids`, are composed; stale `disabledTaskIds` and `disabledHazardIds` are ignored.
+12b. `forcedTaskIds` / `forcedHazardIds` are GM "force-add" overrides used in **manual** composition mode: a record listed there is composed into the environment even when it does not match the environment's region/biome/danger/conditions (composition state `forceIncluded`, runtime state `available`). Forces are honored only in manual mode, so a stale forced list never makes a non-matching record available in automatic mode. Removing a forced task or hazard in manual mode clears it from `forced*Ids` without adding it to `disabled*Ids`.
+12c. `taskOrder` and `hazardOrder` provide deterministic ordering for composed reusable records. Records absent from the order list retain library order after ordered records.
+12d. GM authoring UI for manual task and hazard composition shows only two record groups: **Included in this environment** and **Available to add**. Available to add includes matching addable rows first, then enabled non-matching rows, then library-disabled rows; it does not show a separate Excluded or Non-matching section. Removing an included manual record returns it to Available to add with its normal candidate/not-matching/library-disabled state instead of showing it as Excluded. Automatic composition retains its Excluded and Non-matching sections.
+12e. `taskDropRateAdjustments` and `hazardDropRateAdjustments` store environment-local signed percentage-point deltas for reusable library task drop rows and hazards. Task adjustments are keyed first by task id and then by drop-row id. Hazard adjustments are keyed by hazard id. Values must be integers from `-100` to `100`; zero values are omitted. Adjustments affect only this environment and must not rewrite reusable library records.
 13. Environment metadata exposed to non-GM users must not leak hidden task identity, hidden result details, provider diagnostics, or GM-only notes.
 14. Legacy environments without rich metadata remain valid and load with neutral defaults.
 15. `hazardSelectionMode` and `hazardPolicy` are legacy compatibility fields. New Manager authoring and d100 runtime behavior use system Gathering Rules once they are authored.

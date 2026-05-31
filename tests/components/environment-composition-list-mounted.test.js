@@ -234,15 +234,59 @@ describe('CompositionList mounted layout', () => {
     assert.equal(target.querySelector('.manager-environment-comp-quick-action'), null);
   });
 
-  it('hazard manual mode retains Matching candidates, Excluded, and Non-matching sections', async () => {
-    await renderComposition({ kind: 'hazard', mode: 'manual' });
+  it('hazard manual mode renders Included plus Available to add with task-style quick actions', async () => {
+    const calls = [];
+    await renderComposition({
+      kind: 'hazard',
+      mode: 'manual',
+      onInclude: (kind, id) => calls.push(['include', kind, id]),
+      onForceInclude: (kind, id) => calls.push(['forceInclude', kind, id]),
+      onExclude: (kind, id) => calls.push(['exclude', kind, id]),
+      onOpenSource: (kind, id) => calls.push(['openSource', kind, id])
+    });
 
-    assert.deepEqual(sectionNames(), ['included', 'candidates', 'excluded', 'non-matching']);
-    assert.equal(target.querySelector('[data-section="available-to-add"]'), null);
-    assert.deepEqual(rowIds('candidates'), ['candidate']);
-    assert.deepEqual(rowIds('excluded'), ['excluded-nonmatching', 'excluded-matching']);
-    assert.deepEqual(rowIds('non-matching'), ['disabled', 'nonmatching']);
-    assert.equal(target.querySelector('.manager-environment-comp-quick-action'), null);
+    assert.deepEqual(sectionNames(), ['included', 'available-to-add']);
+    assert.deepEqual(rowIds('included'), ['included']);
+    assert.deepEqual(rowIds('available-to-add'), [
+      'candidate',
+      'nonmatching',
+      'disabled'
+    ]);
+    assert.equal(target.querySelector('[data-section="candidates"]'), null);
+    assert.equal(target.querySelector('[data-section="excluded"]'), null);
+    assert.equal(target.querySelector('[data-section="non-matching"]'), null);
+
+    const removeQuick = quickAction('included', 'exclude');
+    assert.ok(removeQuick, 'included manual hazard rows render a quick remove action');
+    assert.equal(removeQuick.getAttribute('title'), 'Remove');
+    removeQuick.click();
+    assert.deepEqual(calls.at(-1), ['exclude', 'hazard', 'included']);
+    assert.equal(
+      target.querySelector('[data-record-id="included"] .manager-icon-button[aria-label="Open source record"]'),
+      null,
+      'included manual hazard rows do not render a standalone edit-source action'
+    );
+
+    const includeQuick = quickAction('candidate', 'include');
+    assert.ok(includeQuick, 'matching available hazard rows render a quick add action');
+    includeQuick.click();
+    assert.deepEqual(calls.at(-1), ['include', 'hazard', 'candidate']);
+
+    const forceIncludeQuick = quickAction('nonmatching', 'force-include');
+    assert.ok(forceIncludeQuick, 'non-matching available hazard rows render a quick force-add action');
+    forceIncludeQuick.click();
+    assert.deepEqual(calls.at(-1), ['forceInclude', 'hazard', 'nonmatching']);
+
+    assert.equal(
+      target.querySelector('[data-record-id="disabled"] .manager-environment-comp-quick-action'),
+      null,
+      'library-disabled hazard rows do not render a quick composition action'
+    );
+
+    const menu = await openRowMenu('disabled');
+    assert.ok(menu.textContent.includes('Enable in library first'));
+    menu.querySelectorAll('button').item(1).click();
+    assert.deepEqual(calls.at(-1), ['openSource', 'hazard', 'disabled']);
   });
 
   it('hazard automatic mode retains Excluded and standalone Non-matching sections', async () => {

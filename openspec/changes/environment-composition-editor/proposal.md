@@ -17,11 +17,11 @@ The runtime composition + matching engine already exists (`composeEnvironment`, 
 
 - Replace the `EnvironmentEditView` placeholder with an editor shell: header (breadcrumbs, title, description, status pills, Back/Delete/Save), a tabbed workspace (Overview / Tasks / Hazards / Validation), and an editor-owned right inspector rail.
 - Overview tab: edit identity, environment context (region/biomes/danger/conditions summary), player-facing behaviour (targeted/blind), composition mode, scene link, and a computed runtime summary.
-- Tasks and Hazards tabs: render automatic composition with Included / Excluded / Non-matching sections, render manual hazard composition with Included / Matching candidates / Excluded / Non-matching sections, and render manual task composition with only Included plus a single Available to add group ordered as matching addable tasks before non-matching and library-disabled tasks.
+- Tasks and Hazards tabs: render automatic composition with Included / Excluded / Non-matching sections, and render manual composition with only Included plus a single Available to add group ordered as matching addable rows before non-matching and library-disabled rows.
 - Right inspector: contextual states for no-selection (environment summary), selected task, and selected hazard, each showing the four-layer evaluation and matching evidence.
 - Validation tab: environment readiness checks, a player-facing runtime preview, and categorised issues.
 - Add a minimal schema extension that disambiguates composition: an explicit per-environment `compositionMode` (`automatic` | `manual`), deterministic `taskOrder` / `hazardOrder`, and persisted `forcedTaskIds` / `forcedHazardIds` for manual force-inclusion.
-- Enforce the behaviour rules: non-matching records stay separated from matching candidates except in the manual task layout's Available to add group; in manual mode a GM can force-add a non-matching enabled record, which is surfaced as force-included rather than silently treated as a normal match.
+- Enforce the behaviour rules: non-matching records stay separated from matching candidates except in manual mode's Available to add group; in manual mode a GM can force-add a non-matching enabled record, which is surfaced as force-included rather than silently treated as a normal match.
 
 ## Out of Scope (deferred to Phase 2)
 

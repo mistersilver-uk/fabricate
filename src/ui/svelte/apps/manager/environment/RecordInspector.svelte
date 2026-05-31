@@ -28,7 +28,7 @@
   const isExcluded = $derived(entry?.compositionState === 'excluded');
   const isCandidate = $derived(entry?.compositionState === 'candidate');
   const isAvailable = $derived(entry?.runtimeState === 'available');
-  const excludeLabel = $derived(kind === 'task' && environment?.compositionMode === 'manual'
+  const excludeLabel = $derived(environment?.compositionMode === 'manual'
     ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Remove', 'Remove from environment')
     : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Exclude', 'Exclude from environment'));
 
