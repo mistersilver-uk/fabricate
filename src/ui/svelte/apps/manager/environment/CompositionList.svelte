@@ -68,14 +68,11 @@
   const nonMatching = $derived(records.filter(entry =>
     entry.compositionState === 'notMatching' || entry.compositionState === 'libraryDisabled'));
   const availableToAddMatching = $derived(records.filter(entry =>
-    entry.compositionState === 'candidate'
-    || (entry.compositionState === 'excluded' && entry.matches === true && entry.libraryEnabled === true)));
+    entry.compositionState === 'candidate'));
   const availableToAddNonMatching = $derived(records.filter(entry =>
-    entry.compositionState === 'notMatching'
-    || (entry.compositionState === 'excluded' && entry.matches !== true && entry.libraryEnabled === true)));
+    entry.compositionState === 'notMatching'));
   const availableToAddLibraryDisabled = $derived(records.filter(entry =>
-    entry.compositionState === 'libraryDisabled'
-    || (entry.compositionState === 'excluded' && entry.libraryEnabled !== true)));
+    entry.compositionState === 'libraryDisabled'));
   const availableToAdd = $derived([...availableToAddMatching, ...availableToAddNonMatching, ...availableToAddLibraryDisabled]);
   const paginatedNonMatching = $derived(nonMatching.slice(
     nonMatchingPageIndex * nonMatchingPageSize,
@@ -117,19 +114,13 @@
   }
 
   function availableRowBucket(entry) {
-    return entry?.compositionState === 'candidate'
-      || (entry?.compositionState === 'excluded' && entry?.matches === true && entry?.libraryEnabled === true)
-      ? 'candidate'
-      : 'non-matching';
+    return entry?.compositionState === 'candidate' ? 'candidate' : 'non-matching';
   }
 
   function availableRowAction(entry) {
     if (entry?.compositionState === 'candidate') return 'include';
     if (entry?.compositionState === 'notMatching') return 'force-include';
     if (entry?.compositionState === 'libraryDisabled') return 'library-disabled';
-    if (entry?.compositionState === 'excluded' && entry?.libraryEnabled !== true) return 'library-disabled';
-    if (entry?.compositionState === 'excluded' && entry?.matches !== true) return 'force-include';
-    if (entry?.compositionState === 'excluded') return 'include';
     return '';
   }
 </script>
@@ -225,8 +216,8 @@
                   class="manager-icon-button is-danger manager-environment-comp-quick-action"
                   data-quick-action="exclude"
                   data-action="exclude"
-                  aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickExclude', 'Exclude')}
-                  title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickExclude', 'Exclude')}
+                  aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickRemove', 'Remove')}
+                  title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickRemove', 'Remove')}
                   onclick={() => onExclude(kind, entry.id)}
                 >
                   <i class="fas fa-ban" aria-hidden="true"></i>
@@ -243,7 +234,7 @@
                       <button type="button" role="menuitem" disabled={index === included.length - 1} onclick={() => { onReorder(kind, index, index + 1); closeMenu(); }}><i class="fas fa-arrow-down" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoveDown', 'Move down')}</span></button>
                     {/if}
                     <button type="button" role="menuitem" onclick={() => { onOpenSource(kind, entry.id); closeMenu(); }}><i class="fas fa-up-right-from-square" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSource', 'Open source record')}</span></button>
-                    <button type="button" role="menuitem" class="is-danger" data-action="exclude" onclick={() => { onExclude(kind, entry.id); closeMenu(); }}><i class="fas fa-ban" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Exclude', 'Exclude from environment')}</span></button>
+                    <button type="button" role="menuitem" class="is-danger" data-action="exclude" onclick={() => { onExclude(kind, entry.id); closeMenu(); }}><i class="fas fa-ban" aria-hidden="true"></i><span>{kind === 'task' && mode === 'manual' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Remove', 'Remove from environment') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Exclude', 'Exclude from environment')}</span></button>
                   </div>
                 {/if}
               </div>

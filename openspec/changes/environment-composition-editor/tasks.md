@@ -18,7 +18,7 @@
 - [x] Create tabs: `EnvironmentOverviewTab.svelte`, `EnvironmentTasksTab.svelte`, `EnvironmentHazardsTab.svelte`, `EnvironmentValidationTab.svelte`.
 - [x] Create inspector: `EnvironmentRightInspector.svelte`, `EnvironmentSummaryInspector.svelte`, and a kind-adaptive `RecordInspector.svelte` (replaces the suggested separate Task/Hazard wrapper inspectors; override section disabled in Phase 1).
 - [x] Create shared building blocks: `RuntimeStatePill.svelte`, `CompositionStatePill.svelte`, `MatchingEvidenceChips.svelte`, `CompositionModeControl.svelte`, and a single `CompositionList.svelte` engine (used by both task and hazard tabs in place of separate Task/Hazard list components, with a paginated Non-matching section replacing `DiagnosticsDisclosure`).
-- [x] Refine manual task composition layout so it renders Included plus Available to add only; Available to add orders matching addable/restorable tasks before non-matching/library-disabled tasks while automatic task mode and hazard layouts keep Excluded and standalone Non-matching.
+- [x] Refine manual task composition layout so it renders Included plus Available to add only; Available to add orders matching addable tasks before non-matching/library-disabled tasks while automatic task mode and hazard layouts keep Excluded and standalone Non-matching.
 - [x] Wire props/actions into the `<EnvironmentEditView>` mount in `CraftingSystemManagerRoot.svelte`; drop unused inline-task handlers.
 
 ## Localization & CSS

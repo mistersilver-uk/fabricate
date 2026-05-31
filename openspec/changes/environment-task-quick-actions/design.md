@@ -4,12 +4,12 @@
 
 `CompositionList.svelte` remains the source of task and hazard composition row rendering. Manual task rows get a second icon button immediately before the existing 3-dot menu when there is a direct composition action:
 
-- Included manual task rows render Exclude using `fas fa-ban`, `data-action="exclude"`, `onExclude(kind, entry.id)`, danger styling, and localized `aria-label`/`title` text of `Exclude`.
+- Included manual task rows render Remove using `fas fa-ban`, `data-action="exclude"`, `onExclude(kind, entry.id)`, danger styling, and localized `aria-label`/`title` text of `Remove`.
 - Available manual task rows whose `availableRowAction(entry)` is `include` render Add using `fas fa-plus`, `data-action="include"`, `onInclude(kind, entry.id)`, success styling, and localized `aria-label`/`title` text of `Add`.
 - Available manual task rows whose `availableRowAction(entry)` is `force-include` render Force add using `fas fa-circle-plus`, `data-action="force-include"`, `onForceInclude(kind, entry.id)`, warning styling, and localized `aria-label`/`title` text of `Force add`.
 - Available manual task rows whose `availableRowAction(entry)` is `library-disabled` render no quick action.
 
-The overflow menu stays in place and keeps the same actions so keyboard/menu workflows and secondary Open source actions remain available.
+The overflow menu stays in place so keyboard/menu workflows and secondary Open source actions remain available. Its included manual task action uses Remove from environment copy while calling the same shared handler.
 
 ## Styling
 

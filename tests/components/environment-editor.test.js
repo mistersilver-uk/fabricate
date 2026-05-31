@@ -89,6 +89,8 @@ describe('environment editor localization', () => {
       ['Composition.OverrideOnTitle', 'Drop rate adjustment on'],
       ['Composition.OverrideOffTitle', 'Drop rate adjustment off'],
       ['Composition.WeightPercentage', 'Selection share'],
+      ['Composition.QuickRemove', 'Remove'],
+      ['Composition.Remove', 'Remove from environment'],
       ['Composition.ManualHint', 'Only explicitly included records are available; GMs can force add enabled non-matching records.'],
       ['Inspector.ExplainForceIncluded', 'Force-added by the GM despite not matching the environment context.'],
       ['Inspector.OverridesHint', 'Drop-rate adjustments apply only in this environment and do not modify the reusable source record.'],
@@ -209,9 +211,11 @@ describe('environment composition editor structure', () => {
     assert.ok(listSource.includes('data-action="include" onclick={() => { onInclude'), 'task include action is available from a menu item');
     assert.ok(listSource.includes('data-action="force-include" onclick={() => { onForceInclude'), 'task force-add action is available from a menu item');
     assert.ok(listSource.includes('data-action="restore" onclick={() => { onRestore'), 'task restore action is available from a menu item');
-    assert.ok(listSource.includes('data-action="exclude" onclick={() => { onExclude'), 'task exclude action remains available from a menu item');
+    assert.ok(listSource.includes('data-action="exclude" onclick={() => { onExclude'), 'task remove/exclude action remains available from a menu item');
     assert.ok(listSource.includes('manager-environment-comp-quick-action'), 'manual task rows expose icon-only quick action buttons beside the menu');
-    assert.ok(listSource.includes("data-quick-action=\"exclude\""), 'included manual task rows expose a quick exclude action');
+    assert.ok(listSource.includes("data-quick-action=\"exclude\""), 'included manual task rows expose a quick remove action through the shared exclude handler');
+    assert.ok(listSource.includes('Composition.QuickRemove'), 'manual included task quick action uses Remove copy');
+    assert.ok(listSource.includes('Composition.Remove'), 'manual included task menu action uses Remove from environment copy');
     assert.ok(listSource.includes("data-quick-action=\"include\""), 'available matching task rows expose a quick add action');
     assert.ok(listSource.includes("data-quick-action=\"force-include\""), 'available non-matching task rows expose a quick force-add action');
     assert.ok(listSource.includes("{#if kind === 'hazard'}"), 'hazard rows keep their distinct action/reorder branch');
@@ -225,6 +229,13 @@ describe('environment composition editor structure', () => {
     assert.ok(rightInspectorSource.includes('selectedKind !== recordKind'), 'a record only shows for the active tab kind');
     assert.ok(rightInspectorSource.includes('data-record-inspector-empty'), 'tasks/hazards show a no-active-records message when none are available');
     assert.ok(rightInspectorSource.includes('NoActiveTasks') && rightInspectorSource.includes('NoActiveHazards'), 'empty state reads as "No active tasks/hazards"');
+  });
+
+  it('selected manual task inspector uses remove copy while automatic and hazard actions keep exclude copy', () => {
+    assert.ok(inspectorSource.includes("kind === 'task' && environment?.compositionMode === 'manual'"), 'inspector detects manual task removal context');
+    assert.ok(inspectorSource.includes('Composition.Remove'), 'manual task inspector action uses remove copy');
+    assert.ok(inspectorSource.includes('Composition.Exclude'), 'non-manual task and hazard inspector actions keep exclude copy');
+    assert.ok(inspectorSource.includes('<span>{excludeLabel}</span>'), 'inspector action label is selected from the mode-aware label');
   });
 
   it('the shell auto-selects the first active record on the tasks/hazards tabs', () => {
@@ -256,9 +267,9 @@ describe('environment composition editor structure', () => {
     assert.ok(listSource.includes('data-section="available-to-add"'), 'manual task mode renders an Available to add section');
     assert.ok(listSource.includes('Composition.AvailableToAdd'), 'Available to add section uses localized copy');
     assert.ok(listSource.includes('Composition.NoAvailableToAdd'), 'Available to add empty state uses localized copy');
-    assert.ok(listSource.includes("entry.compositionState === 'excluded' && entry.matches === true && entry.libraryEnabled === true"), 'matching excluded task records stay discoverable in Available to add');
-    assert.ok(listSource.includes("entry?.compositionState === 'excluded' && entry?.matches !== true"), 'non-matching excluded task records can be force-added again');
-    assert.ok(listSource.includes("entry?.compositionState === 'excluded' && entry?.libraryEnabled !== true"), 'library-disabled excluded task records remain non-addable');
+    assert.ok(!listSource.includes("entry.compositionState === 'excluded' && entry.matches === true && entry.libraryEnabled === true"), 'manual task Available to add no longer treats excluded task records as restorable');
+    assert.ok(!listSource.includes("entry?.compositionState === 'excluded' && entry?.matches !== true"), 'manual task Available to add no longer force-adds excluded task records');
+    assert.ok(!listSource.includes("entry?.compositionState === 'excluded' && entry?.libraryEnabled !== true"), 'manual task Available to add no longer classifies excluded task records');
     assert.ok(listSource.includes("{#if kind === 'task' && mode === 'manual'}"), 'Available to add is gated to manual task mode');
     assert.ok(listSource.includes("{#if !(kind === 'task' && mode === 'manual')}"), 'Excluded and standalone Non-matching sections do not render in manual task mode');
     assert.ok(listSource.includes("{#if kind !== 'task' && mode === 'manual'}"), 'hazard manual mode keeps the existing Matching candidates section');

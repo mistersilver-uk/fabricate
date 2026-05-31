@@ -806,7 +806,7 @@ export class GatheringRichStateService {
     const disabledKey = kind === 'hazard' ? 'disabledHazardIds' : 'disabledTaskIds';
     const enabled = normalizeList(environment?.[enabledKey]).map(String);
     const disabled = normalizeList(environment?.[disabledKey]).map(String);
-    if (disabled.includes(String(id))) return false;
+    if (!(kind === 'task' && compositionMode === 'manual') && disabled.includes(String(id))) return false;
     if (compositionMode === 'manual') {
       const forced = normalizeList(environment?.[kind === 'hazard' ? 'forcedHazardIds' : 'forcedTaskIds']).map(String);
       return enabled.includes(String(id)) || forced.includes(String(id));

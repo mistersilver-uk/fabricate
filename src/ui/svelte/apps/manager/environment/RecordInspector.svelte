@@ -28,6 +28,9 @@
   const isExcluded = $derived(entry?.compositionState === 'excluded');
   const isCandidate = $derived(entry?.compositionState === 'candidate');
   const isAvailable = $derived(entry?.runtimeState === 'available');
+  const excludeLabel = $derived(kind === 'task' && environment?.compositionMode === 'manual'
+    ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Remove', 'Remove from environment')
+    : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Exclude', 'Exclude from environment'));
 
   const sourceLabel = $derived(kind === 'hazard'
     ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.SourceHazard', 'Reusable gathering hazard')
@@ -141,7 +144,7 @@
         </button>
       {:else if isAvailable || isStale}
         <button type="button" class="manager-button is-danger" data-action="exclude" onclick={() => onExclude(kind, entry.id)}>
-          <i class="fas fa-ban" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Exclude', 'Exclude from environment')}</span>
+          <i class="fas fa-ban" aria-hidden="true"></i><span>{excludeLabel}</span>
         </button>
       {/if}
     </div>

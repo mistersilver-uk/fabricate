@@ -139,7 +139,7 @@ test('automatic mode ignores the forced allow-list', () => {
   assert.deepEqual(composed.tasks.map(task => task.id).sort(), ['t1', 't2', 't3']);
 });
 
-test('excluding a forced record drops it from the manual-mode composition', () => {
+test('manual task disabledTaskIds do not veto force-added tasks', () => {
   const service = makeService({ tasks: libraryTasks });
   const composed = service.composeEnvironment(environment({
     compositionMode: 'manual',
@@ -147,7 +147,23 @@ test('excluding a forced record drops it from the manual-mode composition', () =
     forcedTaskIds: ['tDesert'],
     disabledTaskIds: ['tDesert']
   }), system);
-  assert.deepEqual(composed.tasks.map(task => task.id), ['t1']);
+  assert.deepEqual(composed.tasks.map(task => task.id).sort(), ['t1', 'tDesert']);
+});
+
+test('manual hazard disabledHazardIds still veto force-added hazards', () => {
+  const service = makeService({
+    hazards: [
+      { id: 'hCave', name: 'Cave-in', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 50 },
+      { id: 'hDesert', name: 'Sandstorm', biomes: ['desert'], dangerTags: ['hazardous'], dropRate: 50 }
+    ]
+  });
+  const composed = service.composeEnvironment(environment({
+    compositionMode: 'manual',
+    enabledHazardIds: ['hCave'],
+    forcedHazardIds: ['hDesert'],
+    disabledHazardIds: ['hDesert']
+  }), system);
+  assert.deepEqual(composed.hazards.map(hazard => hazard.id), ['hCave']);
 });
 
 test('the environment danger level acts as a ceiling for eligible hazards', () => {

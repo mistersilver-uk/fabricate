@@ -2022,7 +2022,7 @@ export function createAdminStore(services) {
       const id = String(record?.id || '');
       const libraryEnabled = record?.enabled !== false;
       const { matches, conditionsMet, evidence } = evaluateEnvironmentMatch(record, environment, conditions, { includeDanger, conditionSettings });
-      const excluded = disabled.includes(id);
+      const excluded = !(kind === 'task' && compositionMode === 'manual') && disabled.includes(id);
       const explicitlyIncluded = enabled.includes(id);
       // Forces are honored only in manual mode (automatic ignores them, like the enabled allow-list).
       const forceIncluded = compositionMode === 'manual' && forced.includes(id);
@@ -2930,8 +2930,8 @@ export function createAdminStore(services) {
     const { enabledKey, disabledKey, forcedKey } = _compositionFieldKeys(kind);
     const enabled = _compositionIdArray(current[enabledKey]).filter(entry => entry !== id);
     const forced = _compositionIdArray(current[forcedKey]).filter(entry => entry !== id);
-    const disabled = _compositionIdArray(current[disabledKey]);
-    if (!disabled.includes(id)) disabled.push(id);
+    const disabled = _compositionIdArray(current[disabledKey]).filter(entry => entry !== id);
+    if (!(kind === 'task' && current.compositionMode === 'manual')) disabled.push(id);
     return updateEnvironmentDraft({ [enabledKey]: enabled, [disabledKey]: disabled, [forcedKey]: forced });
   }
 
