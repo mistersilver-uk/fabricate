@@ -5,6 +5,7 @@
 
   let {
     composition = { compositionMode: 'automatic', hazards: [] },
+    hazardSelectionMode = 'allDrops',
     selectedKind = '',
     selectedId = '',
     onSelectRecord = () => {},
@@ -38,6 +39,7 @@
     kind="hazard"
     records={hazards}
     {mode}
+    {hazardSelectionMode}
     selectedId={activeSelectedId}
     onSelect={onSelectRecord}
     onInclude={onIncludeRecord}

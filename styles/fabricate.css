@@ -12998,6 +12998,7 @@
 /* Composition table */
 .fabricate-manager .manager-environment-comp {
   --fab-env-comp-grid: minmax(0, 1fr) 92px 132px 92px;
+  --fab-env-comp-grid-ranked: 30px minmax(0, 1fr) 92px 132px 92px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -13009,10 +13010,6 @@
 
 .fabricate-manager .manager-environment-comp[data-composition-kind="task"][data-composition-selection="blind"] {
   --fab-env-comp-grid: minmax(0, 1fr) 112px 72px 132px 72px;
-}
-
-.fabricate-manager .manager-environment-comp[data-composition-kind="hazard"] {
-  --fab-env-comp-grid: 30px minmax(0, 1fr) 92px 132px 92px;
 }
 
 .fabricate-manager .manager-environment-comp-band {
@@ -13068,6 +13065,11 @@
   background: var(--fab-overlay-dark-16);
 }
 
+.fabricate-manager .manager-environment-comp-head.has-rank-controls,
+.fabricate-manager .manager-environment-comp-row.has-rank-controls {
+  grid-template-columns: var(--fab-env-comp-grid-ranked);
+}
+
 .fabricate-manager .manager-environment-comp-row.is-selected {
   border-color: var(--fab-mv2-accent);
   box-shadow: inset 0 0 0 1px var(--fab-mv2-accent);
@@ -13089,6 +13091,7 @@
   gap: 2px;
   color: var(--fab-mv2-text-muted);
   cursor: grab;
+  transform: translateY(3px);
 }
 
 .fabricate-manager .manager-environment-comp-order {
@@ -13494,6 +13497,7 @@
 
   .fabricate-manager .manager-environment-comp {
     --fab-env-comp-grid: minmax(0, 1fr) 80px 110px 80px;
+    --fab-env-comp-grid-ranked: 24px minmax(0, 1fr) 80px 110px 80px;
   }
 
   .fabricate-manager .manager-environment-comp[data-composition-kind="task"] {
@@ -13504,7 +13508,4 @@
     --fab-env-comp-grid: minmax(0, 1fr) 100px 64px 110px 72px;
   }
 
-  .fabricate-manager .manager-environment-comp[data-composition-kind="hazard"] {
-    --fab-env-comp-grid: 24px minmax(0, 1fr) 80px 110px 80px;
-  }
 }

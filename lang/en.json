@@ -1432,7 +1432,7 @@
             "Description": "Description",
             "Context": "Environment context",
             "Region": "Region",
-            "RegionHint": "Where this environment is. Records match its region, or any region.",
+            "RegionHint": "Where this environment is (optional). Records match a region if specified.",
             "AnyRegion": "Any region",
             "Biomes": "Biomes",
             "BiomesHint": "The terrain here. Records match if they share a biome.",

@@ -12,6 +12,7 @@
     records = [],
     mode = 'automatic',
     selectionMode = 'targeted',
+    hazardSelectionMode = 'allDrops',
     weights = {},
     onWeightChange = () => {},
     selectedId = '',
@@ -28,7 +29,7 @@
   let nonMatchingPageSize = $state(10);
 
   const showBlindWeights = $derived(kind === 'task' && selectionMode === 'blind');
-  const showHandle = $derived(kind === 'hazard');
+  const showHazardRankControls = $derived(kind === 'hazard' && hazardSelectionMode === 'highestRankedDrop');
   function weightFor(id) {
     const raw = Number(weights?.[id]);
     return Number.isFinite(raw) && raw >= 0 ? raw : 1;
@@ -135,8 +136,8 @@
       <span class="manager-environment-comp-count">{included.length} {unit}</span>
     </header>
 
-    <div class="manager-environment-comp-head" aria-hidden="true">
-      {#if showHandle}<span></span>{/if}
+    <div class="manager-environment-comp-head" class:has-rank-controls={showHazardRankControls} aria-hidden="true">
+      {#if showHazardRankControls}<span></span>{/if}
       <span>{recordColumnLabel}</span>
       {#if showBlindWeights}<span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColWeight', 'Weight')}</span>{/if}
       <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColOverride', 'Override')}</span>
@@ -150,15 +151,15 @@
       <ul class="manager-environment-comp-rows">
         {#each included as entry, index (entry.id)}
           <li
-            class={`manager-environment-comp-row ${selectedId === entry.id ? 'is-selected' : ''} ${entry.runtimeState === 'unavailable' ? 'is-unavailable' : ''} ${entry.conditionsMet === false ? 'is-conditions-blocked' : ''}`}
+            class={`manager-environment-comp-row ${showHazardRankControls ? 'has-rank-controls' : ''} ${selectedId === entry.id ? 'is-selected' : ''} ${entry.runtimeState === 'unavailable' ? 'is-unavailable' : ''} ${entry.conditionsMet === false ? 'is-conditions-blocked' : ''}`}
             data-record-id={entry.id}
             data-runtime-state={entry.runtimeState}
-            draggable={kind === 'hazard'}
-            ondragstart={kind === 'hazard' ? () => { dragIndex = index; } : undefined}
-            ondragover={kind === 'hazard' ? (event) => event.preventDefault() : undefined}
-            ondrop={kind === 'hazard' ? (event) => { event.preventDefault(); handleDrop(index); } : undefined}
+            draggable={showHazardRankControls ? true : undefined}
+            ondragstart={showHazardRankControls ? () => { dragIndex = index; } : undefined}
+            ondragover={showHazardRankControls ? (event) => event.preventDefault() : undefined}
+            ondrop={showHazardRankControls ? (event) => { event.preventDefault(); handleDrop(index); } : undefined}
           >
-            {#if showHandle}
+            {#if showHazardRankControls}
               <span class="manager-environment-comp-handle" title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.DragReorder', 'Drag to reorder')}>
                 <i class="fas fa-grip-vertical" aria-hidden="true"></i>
                 <span class="manager-environment-comp-order">{index + 1}</span>
@@ -226,7 +227,7 @@
                 </button>
                 {#if openMenuId === entry.id}
                   <div class="manager-environment-comp-menu" role="menu">
-                    {#if kind === 'hazard'}
+                    {#if showHazardRankControls}
                       <button type="button" role="menuitem" disabled={index === 0} onclick={() => { onReorder(kind, index, index - 1); closeMenu(); }}><i class="fas fa-arrow-up" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoveUp', 'Move up')}</span></button>
                       <button type="button" role="menuitem" disabled={index === included.length - 1} onclick={() => { onReorder(kind, index, index + 1); closeMenu(); }}><i class="fas fa-arrow-down" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoveDown', 'Move down')}</span></button>
                     {/if}
@@ -255,7 +256,6 @@
         <ul class="manager-environment-comp-rows is-available-to-add">
           {#each availableToAdd as entry (entry.id)}
             <li class={`manager-environment-comp-row ${availableRowBucket(entry) === 'candidate' ? '' : 'is-non-matching'} ${selectedId === entry.id ? 'is-selected' : ''}`} data-record-id={entry.id} data-section-row={availableRowBucket(entry)} data-composition-state={entry.compositionState}>
-              {#if showHandle}<span class="manager-environment-comp-handle"></span>{/if}
               <div
                 role="button"
                 tabindex="0"
@@ -338,7 +338,6 @@
         <ul class="manager-environment-comp-rows">
           {#each excluded as entry (entry.id)}
             <li class={`manager-environment-comp-row is-excluded ${selectedId === entry.id ? 'is-selected' : ''}`} data-record-id={entry.id} data-section-row="excluded">
-              {#if showHandle}<span class="manager-environment-comp-handle"></span>{/if}
               <div
                 role="button"
                 tabindex="0"
@@ -395,7 +394,6 @@
         <ul class="manager-environment-comp-rows is-non-matching">
           {#each paginatedNonMatching as entry (entry.id)}
             <li class="manager-environment-comp-row is-non-matching" data-record-id={entry.id} data-section-row="non-matching" data-composition-state={entry.compositionState}>
-              {#if showHandle}<span class="manager-environment-comp-handle"></span>{/if}
               <div
                 role="button"
                 tabindex="0"

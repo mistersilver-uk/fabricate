@@ -3064,6 +3064,7 @@
           <EnvironmentEditView
             environmentDraft={$viewState.environmentDraft}
             composition={$viewState.environmentComposition}
+            hazardSelectionMode={selectedGatheringRules.hazardSelectionMode}
             isNew={$viewState.environmentDraftIsNew}
             regionOptions={gatheringVocabularyOptions('regions')}
             biomeOptions={gatheringVocabularyOptions('biomes')}

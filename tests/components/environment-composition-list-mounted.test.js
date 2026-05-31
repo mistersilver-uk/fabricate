@@ -255,6 +255,8 @@ describe('CompositionList mounted layout', () => {
     assert.equal(target.querySelector('[data-section="candidates"]'), null);
     assert.equal(target.querySelector('[data-section="excluded"]'), null);
     assert.equal(target.querySelector('[data-section="non-matching"]'), null);
+    assert.equal(target.querySelector('.manager-environment-comp-handle'), null, 'all-drops hazard mode does not render rank handles');
+    assert.equal(target.querySelector('[data-record-id="included"]').getAttribute('draggable'), null, 'all-drops hazard rows are not draggable');
 
     const removeQuick = quickAction('included', 'exclude');
     assert.ok(removeQuick, 'included manual hazard rows render a quick remove action');
@@ -289,6 +291,58 @@ describe('CompositionList mounted layout', () => {
     assert.deepEqual(calls.at(-1), ['openSource', 'hazard', 'disabled']);
   });
 
+  it('hazard highest-ranked mode renders rank handles only on included rows', async () => {
+    const calls = [];
+    await renderComposition({
+      kind: 'hazard',
+      hazardSelectionMode: 'highestRankedDrop',
+      records: [
+        record('first', 'First', 'explicitlyIncluded', { runtimeState: 'available' }),
+        record('second', 'Second', 'explicitlyIncluded', { runtimeState: 'available' }),
+        record('candidate', 'Candidate', 'candidate', { matches: true }),
+        record('nonmatching', 'Nonmatching', 'notMatching', { matches: false }),
+        record('disabled', 'Disabled', 'libraryDisabled', { libraryEnabled: false, matches: true })
+      ],
+      onReorder: (kind, from, to) => calls.push(['reorder', kind, from, to])
+    });
+
+    const includedRow = target.querySelector('[data-section="included"] [data-record-id="first"]');
+    assert.ok(includedRow.classList.contains('has-rank-controls'), 'included ranked hazard rows opt into the handle grid');
+    assert.equal(includedRow.getAttribute('draggable'), 'true', 'included ranked hazard rows are draggable');
+    assert.ok(includedRow.querySelector('.manager-environment-comp-handle .fa-grip-vertical'), 'included ranked hazard rows render the grip handle');
+    assert.ok(includedRow.querySelector('.manager-environment-comp-order').textContent.includes('1'), 'included ranked hazard rows render the rank number');
+
+    assert.equal(
+      target.querySelector('[data-section="available-to-add"] .manager-environment-comp-handle'),
+      null,
+      'available-to-add hazards do not reserve a blank handle placeholder'
+    );
+    assert.equal(
+      target.querySelector('[data-section="available-to-add"] .manager-environment-comp-row.has-rank-controls'),
+      null,
+      'available-to-add hazards keep the non-handle grid'
+    );
+
+    const menu = await openRowMenu('first');
+    assert.ok(menu.textContent.includes('Move up'), 'ranked hazard menus include move up');
+    assert.ok(menu.textContent.includes('Move down'), 'ranked hazard menus include move down');
+    menu.querySelectorAll('button').item(1).click();
+    assert.deepEqual(calls.at(-1), ['reorder', 'hazard', 0, 1]);
+  });
+
+  it('hazard all-drops mode hides rank controls and move actions', async () => {
+    await renderComposition({ kind: 'hazard', hazardSelectionMode: 'allDrops' });
+
+    assert.equal(target.querySelector('.manager-environment-comp-head.has-rank-controls'), null);
+    assert.equal(target.querySelector('.manager-environment-comp-row.has-rank-controls'), null);
+    assert.equal(target.querySelector('.manager-environment-comp-handle'), null);
+    assert.equal(target.querySelector('[draggable="true"]'), null);
+
+    const menu = await openRowMenu('included');
+    assert.equal(menu.textContent.includes('Move up'), false);
+    assert.equal(menu.textContent.includes('Move down'), false);
+  });
+
   it('hazard automatic mode retains Excluded and standalone Non-matching sections', async () => {
     await renderComposition({ kind: 'hazard', mode: 'automatic' });
 
@@ -297,5 +351,7 @@ describe('CompositionList mounted layout', () => {
     assert.equal(target.querySelector('[data-section="candidates"]'), null);
     assert.deepEqual(rowIds('excluded'), ['excluded-nonmatching', 'excluded-matching']);
     assert.deepEqual(rowIds('non-matching'), ['disabled', 'nonmatching']);
+    assert.equal(target.querySelector('[data-section="excluded"] .manager-environment-comp-handle'), null);
+    assert.equal(target.querySelector('[data-section="non-matching"] .manager-environment-comp-handle'), null);
   });
 });

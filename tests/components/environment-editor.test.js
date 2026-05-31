@@ -31,12 +31,14 @@ function staticTextCalls(source) {
 }
 
 const shellSource = readFileSync(resolve(repoRoot, 'src/ui/svelte/apps/manager/EnvironmentEditView.svelte'), 'utf8');
+const managerRootSource = readFileSync(resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte'), 'utf8');
 const listSource = read('CompositionList.svelte');
 const modeControlSource = read('CompositionModeControl.svelte');
 const inspectorSource = read('RecordInspector.svelte');
 const tabsSource = read('EnvironmentEditorTabs.svelte');
 const evidenceSource = read('MatchingEvidenceChips.svelte');
 const tasksTabSource = read('EnvironmentTasksTab.svelte');
+const hazardsTabSource = read('EnvironmentHazardsTab.svelte');
 const validationSource = read('EnvironmentValidationTab.svelte');
 const overviewSource = read('EnvironmentOverviewTab.svelte');
 const summaryInspectorSource = read('EnvironmentSummaryInspector.svelte');
@@ -175,8 +177,21 @@ describe('environment composition editor structure', () => {
     assert.ok(listSource.includes('manager-environment-comp-row'), 'composition list renders table rows');
     assert.ok(listSource.includes('dismissOnOutsideClick'), 'row overflow menu dismisses on outside click');
     assert.ok(listSource.includes('manager-environment-comp-menu'), 'rows expose an overflow action menu');
-    assert.ok(listSource.includes("draggable={kind === 'hazard'}"), 'reorder (drag) is hazard-only; tasks are not reorderable');
+    assert.ok(listSource.includes("const showHazardRankControls = $derived(kind === 'hazard' && hazardSelectionMode === 'highestRankedDrop')"), 'hazard rank controls are gated by the highest-ranked system rule');
+    assert.ok(listSource.includes('draggable={showHazardRankControls ? true : undefined}'), 'reorder drag is enabled only when hazard rank controls are active');
     assert.ok(!tasksTabSource.includes('data-composition-mode-select'), 'composition mode is set globally on the overview tab, not per-tab');
+  });
+
+  it('threads the system hazard selection rule into the hazards composition list', () => {
+    assert.ok(
+      managerRootSource.includes('hazardSelectionMode={selectedGatheringRules.hazardSelectionMode}'),
+      'manager root passes selectedGatheringRules.hazardSelectionMode into the environment editor'
+    );
+    assert.ok(shellSource.includes("hazardSelectionMode = 'allDrops'"), 'environment editor defaults the hazard rule defensively');
+    assert.ok(shellSource.includes('{hazardSelectionMode}'), 'environment editor forwards the hazard rule to the hazards tab');
+    assert.ok(hazardsTabSource.includes("hazardSelectionMode = 'allDrops'"), 'hazards tab defaults the hazard rule defensively');
+    assert.ok(hazardsTabSource.includes('{hazardSelectionMode}'), 'hazards tab forwards the hazard rule to CompositionList');
+    assert.ok(listSource.includes("hazardSelectionMode = 'allDrops'"), 'composition list defaults to the non-ranked all-drops mode');
   });
 
   it('overview leads with a task-editor-style identity hero and drops the runtime summary', () => {
@@ -219,8 +234,9 @@ describe('environment composition editor structure', () => {
     assert.ok(listSource.includes('Composition.Remove'), 'manual included task menu action uses Remove from environment copy');
     assert.ok(listSource.includes("data-quick-action=\"include\""), 'available matching task rows expose a quick add action');
     assert.ok(listSource.includes("data-quick-action=\"force-include\""), 'available non-matching task rows expose a quick force-add action');
-    assert.ok(listSource.includes("{#if kind === 'hazard'}"), 'hazard rows keep their distinct action/reorder branch');
-    assert.ok(listSource.includes("draggable={kind === 'hazard'}"), 'hazard drag reordering remains hazard-only');
+    assert.ok(listSource.includes("{#if showHazardRankControls}"), 'ranked hazard rows keep their distinct action/reorder branch');
+    assert.ok(listSource.includes('showHazardRankControls'), 'hazard drag reordering is tied to ranked hazard controls');
+    assert.ok(!listSource.includes('{#if showHazardRankControls}<span class="manager-environment-comp-handle"></span>{/if}'), 'non-ranked hazard sections do not render blank handle placeholders');
   });
 
   it('the right inspector is tab-specific (summary on overview, record on tasks/hazards)', () => {

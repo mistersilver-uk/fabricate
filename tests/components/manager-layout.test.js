@@ -1364,9 +1364,10 @@ test('manager environments browser and edit route define compact responsive geom
     'disabled composition menu notes should reserve the same icon column even without an icon'
   );
   assert.ok(
-    css.includes('.manager-environment-comp[data-composition-kind="hazard"]')
-      && css.includes('--fab-env-comp-grid: 30px minmax(0, 1fr) 92px 132px 92px;'),
-    'hazards keep a leading 30px handle column ahead of the task/override/runtime cells'
+    compBlock.includes('--fab-env-comp-grid-ranked: 30px minmax(0, 1fr) 92px 132px 92px;')
+      && css.includes('.fabricate-manager .manager-environment-comp-head.has-rank-controls')
+      && css.includes('.fabricate-manager .manager-environment-comp-row.has-rank-controls'),
+    'ranked hazards opt into a leading 30px handle column ahead of the task/override/runtime cells'
   );
   assert.ok(
     !compBlock.includes('minmax(150px'),

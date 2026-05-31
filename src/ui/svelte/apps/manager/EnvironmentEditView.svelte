@@ -23,6 +23,7 @@
   let {
     environmentDraft = null,
     composition = { compositionMode: 'automatic', conditions: {}, tasks: [], hazards: [], counts: {} },
+    hazardSelectionMode = 'allDrops',
     regionOptions = [],
     biomeOptions = [],
     dangerOptions = [],
@@ -112,6 +113,7 @@
       {:else if activeTab === 'hazards'}
         <EnvironmentHazardsTab
           {composition}
+          {hazardSelectionMode}
           {selectedKind}
           {selectedId}
           onSelectRecord={selectRecord}
