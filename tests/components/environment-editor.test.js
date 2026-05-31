@@ -273,10 +273,14 @@ describe('environment composition editor structure', () => {
     assert.ok(summaryInspectorSource.includes('manager-environment-scene-dropzone'), 'inspector scene card keeps the drop-to-link zone');
   });
 
-  it('matching evidence supports table chips and inspector check rows', () => {
+  it('matching evidence supports compact chips and the inspector evidence table', () => {
     assert.ok(evidenceSource.includes("variant === 'checks'"), 'evidence component branches on the checks variant');
     assert.ok(evidenceSource.includes('manager-environment-evidence-summary'), 'chip variant renders a value summary line');
-    assert.ok(evidenceSource.includes('manager-environment-evidence-check'), 'checks variant renders check rows');
+    assert.ok(evidenceSource.includes('manager-environment-evidence-table'), 'checks variant renders a table in the inspector');
+    assert.ok(evidenceSource.includes('manager-environment-evidence-dimension'), 'inspector table renders the evidence dimension column');
+    assert.ok(evidenceSource.includes('manager-environment-evidence-value-pill'), 'inspector table renders value pills');
+    assert.ok(evidenceSource.includes('data-evidence-value-state={pill.state}'), 'inspector value pills expose matching state');
+    assert.ok(evidenceSource.includes("if (variant === 'checks') return true"), 'inspector table renders all evidence dimensions');
     assert.ok(inspectorSource.includes('variant="checks"'), 'inspector requests the checks evidence variant');
   });
 

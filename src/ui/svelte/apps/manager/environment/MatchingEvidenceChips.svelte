@@ -2,7 +2,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
 
-  // variant: 'chips' (compact table cell) | 'checks' (inspector rows)
+  // variant: 'chips' (compact table cell) | 'checks' (inspector table)
   let { evidence = null, variant = 'chips' } = $props();
 
   function text(key, fallback) {
@@ -17,6 +17,7 @@
     { key: 'time', label: 'Time', anyFallback: 'Any time' },
     { key: 'danger', label: 'Danger', anyFallback: 'Any danger' }
   ];
+  const DANGER_LEVELS = ['safe', 'hazardous', 'dangerous', 'deadly'];
 
   function cap(value) {
     const str = String(value || '').trim();
@@ -53,9 +54,47 @@
     return (field.key === 'weather' || field.key === 'time') ? 'is-warning' : 'is-danger';
   }
 
-  function icon(entry) {
-    if (!entry || entry.state === 'any') return 'fas fa-circle';
-    return entry.state === 'match' ? 'fas fa-circle-check' : 'fas fa-circle-xmark';
+  function normalized(value) {
+    return String(value || '').trim().toLowerCase();
+  }
+
+  function dangerRank(value) {
+    return DANGER_LEVELS.indexOf(normalized(value));
+  }
+
+  function valueMatches(field, value, entry) {
+    if (!entry || entry.state === 'any') return true;
+    const envValues = Array.isArray(entry.envValues) ? entry.envValues.map(normalized) : [];
+    const candidate = normalized(value);
+    if (field.key === 'danger') {
+      const envRank = Math.max(...envValues.map(dangerRank), -1);
+      const candidateRank = dangerRank(candidate);
+      return candidateRank >= 0 && envRank >= 0 && candidateRank <= envRank;
+    }
+    return envValues.includes(candidate);
+  }
+
+  function mismatchTone(field) {
+    return (field.key === 'weather' || field.key === 'time') ? 'is-warning' : 'is-danger';
+  }
+
+  function valuePills(field, entry) {
+    if (!entry || entry.state === 'any') {
+      return [{ id: `${field.key}-any`, value: anyLabel(field), state: 'any', tone: 'is-any' }];
+    }
+    const values = (entry.recordValues || []).map(cap).filter(Boolean);
+    if (values.length === 0) {
+      return [{ id: `${field.key}-any`, value: anyLabel(field), state: 'any', tone: 'is-any' }];
+    }
+    return values.map(value => {
+      const matches = valueMatches(field, value, entry);
+      return {
+        id: `${field.key}-${normalized(value)}`,
+        value,
+        state: matches ? 'match' : 'mismatch',
+        tone: matches ? 'is-positive' : mismatchTone(field)
+      };
+    });
   }
 
   // Which dimensions to surface. Chips: the two primary axes (biome, region)
@@ -63,29 +102,34 @@
   // applicable dimension so the inspector explains the full evaluation.
   const shown = $derived(FIELDS.filter(field => {
     const entry = entryFor(field);
-    if (variant === 'checks') return entry ? entry.applicable !== false : true;
+    if (variant === 'checks') return true;
     if (field.key === 'biome' || field.key === 'region') return true;
     return entry && entry.applicable !== false && entry.state !== 'any';
   }).map(field => {
     const entry = entryFor(field);
-    return { field, entry, count: count(entry), value: valueText(field, entry), tone: tone(field, entry), icon: icon(entry) };
+    return { field, entry, count: count(entry), value: valueText(field, entry), tone: tone(field, entry), pills: valuePills(field, entry) };
   }));
 
   const summary = $derived(shown.map(row => row.value).join(' · '));
 </script>
 
 {#if variant === 'checks'}
-  <ul class="manager-environment-evidence is-checks" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Evidence.Title', 'Matching evidence')}>
-    {#each shown as row (row.field.key)}
-      <li class={`manager-environment-evidence-check ${row.tone}`} data-evidence-field={row.field.key} data-evidence-state={row.entry?.state || 'any'}>
-        <i class={row.icon} aria-hidden="true"></i>
-        <span class="manager-environment-evidence-check-copy">
-          <span class="manager-environment-evidence-check-label">{fieldLabel(row.field)}{row.count ? ` (${row.count})` : ''}</span>
-          <span class="manager-environment-evidence-check-value">{row.value}</span>
-        </span>
-      </li>
-    {/each}
-  </ul>
+  <table class="manager-environment-evidence is-checks manager-environment-evidence-table" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Evidence.Title', 'Matching evidence')}>
+    <tbody>
+      {#each shown as row (row.field.key)}
+        <tr class={`manager-environment-evidence-row ${row.tone}`} data-evidence-field={row.field.key} data-evidence-state={row.entry?.state || 'any'}>
+          <th class="manager-environment-evidence-dimension" scope="row">{fieldLabel(row.field)}</th>
+          <td class="manager-environment-evidence-values">
+            <div class="manager-environment-evidence-value-list">
+              {#each row.pills as pill (pill.id)}
+                <span class={`manager-environment-evidence-value-pill ${pill.tone}`} data-evidence-value-state={pill.state}>{pill.value}</span>
+              {/each}
+            </div>
+          </td>
+        </tr>
+      {/each}
+    </tbody>
+  </table>
 {:else}
   <div class="manager-environment-evidence is-chips" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Evidence.Title', 'Matching evidence')}>
     <div class="manager-environment-evidence-chips">

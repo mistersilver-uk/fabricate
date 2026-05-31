@@ -13323,7 +13323,7 @@
   width: 18px;
 }
 
-/* Matching evidence — chips (table) + checks (inspector) */
+/* Matching evidence — chips (compact) + table (inspector) */
 .fabricate-manager .manager-environment-evidence.is-chips {
   display: flex;
   flex-direction: column;
@@ -13377,53 +13377,69 @@
   white-space: nowrap;
 }
 
-.fabricate-manager .manager-environment-evidence.is-checks {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.fabricate-manager .manager-environment-evidence-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.fabricate-manager .manager-environment-evidence-row {
+  border-top: 1px solid var(--fab-mv2-border);
+}
+
+.fabricate-manager .manager-environment-evidence-row:first-child {
+  border-top: none;
+}
+
+.fabricate-manager .manager-environment-evidence-dimension,
+.fabricate-manager .manager-environment-evidence-values {
+  padding: 7px 0;
+  vertical-align: top;
+}
+
+.fabricate-manager .manager-environment-evidence-dimension {
+  width: 74px;
+  font-weight: 700;
+  color: var(--fab-mv2-text);
+  text-align: left;
+}
+
+.fabricate-manager .manager-environment-evidence-value-list {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.fabricate-manager .manager-environment-evidence-check {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.fabricate-manager .manager-environment-evidence-check.is-positive > i {
-  color: var(--fab-success, var(--fab-mv2-accent));
-}
-
-.fabricate-manager .manager-environment-evidence-check.is-danger > i {
-  color: var(--fab-mv2-danger);
-}
-
-.fabricate-manager .manager-environment-evidence-check.is-warning > i {
-  color: var(--fab-warning);
-}
-
-.fabricate-manager .manager-environment-evidence-check.is-any > i {
-  color: var(--fab-mv2-text-muted);
-  font-size: 0.5em;
-  margin-top: 6px;
-}
-
-.fabricate-manager .manager-environment-evidence-check-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
+  flex-wrap: wrap;
+  gap: 4px;
   min-width: 0;
 }
 
-.fabricate-manager .manager-environment-evidence-check-label {
-  font-weight: 700;
+.fabricate-manager .manager-environment-evidence-value-pill {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-width: 0;
+  padding: 2px 7px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 999px;
+  background: var(--fab-overlay-dark-16);
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
-.fabricate-manager .manager-environment-evidence-check-value {
-  font-size: 0.82rem;
-  color: var(--fab-mv2-text-muted);
+.fabricate-manager .manager-environment-evidence-value-pill.is-positive {
+  border-color: var(--fab-mv2-accent);
+  color: var(--fab-mv2-text);
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-environment-evidence-value-pill.is-danger {
+  border-color: var(--fab-mv2-danger);
+  color: var(--fab-mv2-danger);
+}
+
+.fabricate-manager .manager-environment-evidence-value-pill.is-warning {
+  border-color: var(--fab-warning);
+  color: var(--fab-warning-text, var(--fab-warning));
 }
 
 /* Inspector override form */

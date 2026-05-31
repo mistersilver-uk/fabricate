@@ -4412,7 +4412,13 @@ describe('CraftingSystemManager mounted behavior', () => {
             libraryEnabled: true,
             matches: true,
             conditionsMet: true,
-            evidence: {},
+            evidence: {
+              biome: { state: 'match', recordValues: ['forest', 'desert'], envValues: ['forest'], applicable: true },
+              region: { state: 'mismatch', recordValues: ['south'], envValues: ['north'], applicable: true },
+              weather: { state: 'mismatch', recordValues: ['storm'], envValues: ['clear'], applicable: true },
+              time: { state: 'any', recordValues: [], envValues: ['day'], applicable: true },
+              danger: { state: 'any', recordValues: ['deadly'], envValues: ['dangerous'], applicable: false }
+            },
             dropRateAdjustmentRows: []
           }],
           hazards: [{
@@ -4423,7 +4429,13 @@ describe('CraftingSystemManager mounted behavior', () => {
             libraryEnabled: true,
             matches: true,
             conditionsMet: true,
-            evidence: {},
+            evidence: {
+              biome: { state: 'match', recordValues: ['forest'], envValues: ['forest'], applicable: true },
+              region: { state: 'match', recordValues: ['north'], envValues: ['north'], applicable: true },
+              weather: { state: 'match', recordValues: ['clear'], envValues: ['clear'], applicable: true },
+              time: { state: 'mismatch', recordValues: ['night'], envValues: ['day'], applicable: true },
+              danger: { state: 'mismatch', recordValues: ['deadly'], envValues: ['dangerous'], applicable: true }
+            },
             dropRateAdjustment: 0
           }]
         }
@@ -4438,6 +4450,12 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('[data-record-inspector-section="source"]'), null, 'task inspector should not render a Source card');
     assert.equal(target.querySelector('.manager-environment-inspector-actions'), null, 'task inspector should not render the selected-record action strip');
     assert.equal(target.querySelector('.manager-environment-open-source'), null, 'task inspector should not render an open-source CTA');
+    const taskEvidenceRows = Array.from(target.querySelectorAll('.manager-environment-evidence-table [data-evidence-field]'));
+    assert.deepEqual(taskEvidenceRows.map(row => row.dataset.evidenceField), ['biome', 'region', 'weather', 'time', 'danger'], 'task evidence table should render all five dimensions');
+    assert.equal(target.querySelector('[data-evidence-field="biome"] [data-evidence-value-state="match"]').textContent.trim(), 'Forest');
+    assert.equal(target.querySelector('[data-evidence-field="biome"] [data-evidence-value-state="mismatch"]').textContent.trim(), 'Desert');
+    assert.equal(target.querySelector('[data-evidence-field="weather"] .manager-environment-evidence-value-pill').classList.contains('is-warning'), true, 'weather mismatch should use warning tone');
+    assert.ok(target.querySelector('[data-evidence-field="danger"]').textContent.includes('Any danger'), 'task evidence table should keep the danger row as unconstrained');
 
     target.querySelector('[data-environment-tab-button="hazards"]').click();
     await tick();
@@ -4446,6 +4464,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('[data-record-inspector-section="source"]'), null, 'hazard inspector should not render a Source card');
     assert.equal(target.querySelector('.manager-environment-inspector-actions'), null, 'hazard inspector should not render the selected-record action strip');
     assert.equal(target.querySelector('.manager-environment-open-source'), null, 'hazard inspector should not render an open-source CTA');
+    const hazardEvidenceRows = Array.from(target.querySelectorAll('.manager-environment-evidence-table [data-evidence-field]'));
+    assert.deepEqual(hazardEvidenceRows.map(row => row.dataset.evidenceField), ['biome', 'region', 'weather', 'time', 'danger'], 'hazard evidence table should render all five dimensions');
+    assert.equal(target.querySelector('[data-evidence-field="danger"] [data-evidence-value-state="mismatch"]').textContent.trim(), 'Deadly');
+    assert.equal(target.querySelector('[data-evidence-field="danger"] .manager-environment-evidence-value-pill').classList.contains('is-danger'), true, 'danger mismatch should use danger tone');
   });
 
   // NOTE: previously covered tests for environment-edit input wiring and validation
