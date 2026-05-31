@@ -299,6 +299,8 @@ describe('CompositionList mounted layout', () => {
       records: [
         record('first', 'First', 'explicitlyIncluded', { runtimeState: 'available' }),
         record('second', 'Second', 'explicitlyIncluded', { runtimeState: 'available' }),
+        record('blocked', 'Blocked', 'explicitlyIncluded', { runtimeState: 'unavailable', conditionsMet: false }),
+        record('forced', 'Forced', 'forceIncluded', { runtimeState: 'unavailable' }),
         record('candidate', 'Candidate', 'candidate', { matches: true }),
         record('nonmatching', 'Nonmatching', 'notMatching', { matches: false }),
         record('disabled', 'Disabled', 'libraryDisabled', { libraryEnabled: false, matches: true })
@@ -311,6 +313,14 @@ describe('CompositionList mounted layout', () => {
     assert.equal(includedRow.getAttribute('draggable'), 'true', 'included ranked hazard rows are draggable');
     assert.ok(includedRow.querySelector('.manager-environment-comp-handle .fa-grip-vertical'), 'included ranked hazard rows render the grip handle');
     assert.ok(includedRow.querySelector('.manager-environment-comp-order').textContent.includes('1'), 'included ranked hazard rows render the rank number');
+    const forcedRow = target.querySelector('[data-section="included"] [data-record-id="forced"]');
+    assert.ok(forcedRow.classList.contains('has-rank-controls'), 'force-included hazard rows also opt into rank controls');
+    assert.equal(forcedRow.getAttribute('draggable'), 'true', 'force-included ranked hazard rows are draggable');
+    assert.ok(forcedRow.querySelector('.manager-environment-comp-order').textContent.includes('4'), 'force-included rows receive their visible rank');
+    const blockedRow = target.querySelector('[data-section="included"] [data-record-id="blocked"]');
+    assert.ok(blockedRow.classList.contains('has-rank-controls'), 'condition-blocked included hazard rows opt into rank controls');
+    assert.equal(blockedRow.getAttribute('draggable'), 'true', 'condition-blocked included hazard rows are draggable');
+    assert.ok(blockedRow.querySelector('.manager-environment-comp-order').textContent.includes('3'), 'condition-blocked included rows receive their visible rank');
 
     assert.equal(
       target.querySelector('[data-section="available-to-add"] .manager-environment-comp-handle'),
@@ -331,7 +341,14 @@ describe('CompositionList mounted layout', () => {
   });
 
   it('hazard all-drops mode hides rank controls and move actions', async () => {
-    await renderComposition({ kind: 'hazard', hazardSelectionMode: 'allDrops' });
+    await renderComposition({
+      kind: 'hazard',
+      hazardSelectionMode: 'allDrops',
+      records: [
+        record('included', 'Included', 'explicitlyIncluded', { runtimeState: 'available' }),
+        record('forced', 'Forced', 'forceIncluded', { runtimeState: 'unavailable' })
+      ]
+    });
 
     assert.equal(target.querySelector('.manager-environment-comp-head.has-rank-controls'), null);
     assert.equal(target.querySelector('.manager-environment-comp-row.has-rank-controls'), null);
@@ -341,6 +358,23 @@ describe('CompositionList mounted layout', () => {
     const menu = await openRowMenu('included');
     assert.equal(menu.textContent.includes('Move up'), false);
     assert.equal(menu.textContent.includes('Move down'), false);
+  });
+
+  it('hazard limited-drops mode hides rank controls for force-included rows', async () => {
+    await renderComposition({
+      kind: 'hazard',
+      hazardSelectionMode: 'limitedDrops',
+      records: [
+        record('included', 'Included', 'explicitlyIncluded', { runtimeState: 'available' }),
+        record('blocked', 'Blocked', 'explicitlyIncluded', { runtimeState: 'unavailable', conditionsMet: false }),
+        record('forced', 'Forced', 'forceIncluded', { runtimeState: 'unavailable' })
+      ]
+    });
+
+    assert.deepEqual(rowIds('included'), ['included', 'blocked', 'forced']);
+    assert.equal(target.querySelector('.manager-environment-comp-handle'), null);
+    assert.equal(target.querySelector('[data-record-id="forced"]').getAttribute('draggable'), null);
+    assert.equal(target.querySelector('[data-record-id="blocked"]').getAttribute('draggable'), null);
   });
 
   it('hazard automatic mode retains Excluded and standalone Non-matching sections', async () => {

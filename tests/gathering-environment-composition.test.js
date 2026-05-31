@@ -166,6 +166,24 @@ test('manual hazard disabledHazardIds do not veto enabled or force-added hazards
   assert.deepEqual(composed.hazards.map(hazard => hazard.id).sort(), ['hCave', 'hDesert']);
 });
 
+test('hazardOrder sorts matching and force-added hazards together', () => {
+  const service = makeService({
+    hazards: [
+      { id: 'hCave', name: 'Cave-in', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 50 },
+      { id: 'hStorm', name: 'Storm Surge', biomes: ['cave'], dangerTags: ['hazardous'], weather: ['storm'], dropRate: 50 },
+      { id: 'hGas', name: 'Gas Pocket', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 50 },
+      { id: 'hDesert', name: 'Sandstorm', biomes: ['desert'], dangerTags: ['hazardous'], dropRate: 50 }
+    ]
+  });
+  const composed = service.composeEnvironment(environment({
+    compositionMode: 'manual',
+    enabledHazardIds: ['hCave', 'hStorm', 'hGas'],
+    forcedHazardIds: ['hDesert'],
+    hazardOrder: ['hDesert', 'hStorm', 'hGas', 'hCave']
+  }), system);
+  assert.deepEqual(composed.hazards.map(hazard => hazard.id), ['hDesert', 'hStorm', 'hGas', 'hCave']);
+});
+
 test('automatic mode excludes hazards listed in disabledHazardIds', () => {
   const service = makeService({
     hazards: [

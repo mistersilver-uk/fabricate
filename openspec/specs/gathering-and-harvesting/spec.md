@@ -145,8 +145,9 @@ GatheringEnvironment = {
 11. Weather and time of day are not environment fields. They are global gathering conditions used as **runtime gates** — a Gathering Task or hazard whose required `weather` / `timeOfDay` values are not satisfied by the current conditions stays in the environment's composition (it still matches by region/biome/danger) but is **inactive** at runtime: tasks become `visible: true` / `attemptable: false` with a `CONDITIONS_BLOCKED` reason, and hazards are skipped during d100 hazard selection. Matching itself is decided by region / biome / danger only.
 12. `enabledTaskIds`, `disabledTaskIds`, `enabledHazardIds`, and `disabledHazardIds` store environment-level composition toggles for reusable library records without rewriting the library definitions.
 12a. `compositionMode` controls reusable task/hazard composition. In **automatic** mode, every matching, library-enabled record is composed unless listed in `disabledTaskIds` / `disabledHazardIds`; stale `enabled*Ids` and `forced*Ids` are ignored. In **manual** mode, only records in `enabled*Ids` that still match, plus records in `forced*Ids`, are composed; stale `disabledTaskIds` and `disabledHazardIds` are ignored.
-12b. `forcedTaskIds` / `forcedHazardIds` are GM "force-add" overrides used in **manual** composition mode: a record listed there is composed into the environment even when it does not match the environment's region/biome/danger/conditions (composition state `forceIncluded`, runtime state `available`). Forces are honored only in manual mode, so a stale forced list never makes a non-matching record available in automatic mode. Removing a forced task or hazard in manual mode clears it from `forced*Ids` without adding it to `disabled*Ids`.
-12c. `taskOrder` and `hazardOrder` provide deterministic ordering for composed reusable records. Records absent from the order list retain library order after ordered records.
+12b. `forcedTaskIds` / `forcedHazardIds` are GM "force-add" overrides used in **manual** composition mode: a record listed there is composed into the environment even when it does not match the environment's region/biome/danger context (composition state `forceIncluded`). A forced record remains force-included until removed even if later environment edits make it match normally. Weather and time-of-day remain runtime gates for force-included records, so a force-included record can still be condition-blocked and inactive at runtime. Forces are honored only in manual mode, so a stale forced list never makes a non-matching record available in automatic mode. Removing a forced task or hazard in manual mode clears it from `forced*Ids` without adding it to `disabled*Ids`.
+12c. `taskOrder` and `hazardOrder` provide deterministic ordering for composed reusable records. `hazardOrder` applies to every composed/included hazard, including manual `forcedHazardIds`. Records absent from the order list retain library order after ordered records.
+12c.1. GM authoring UI exposes hazard reorder controls only when the selected system's hazard selection mode is `highestRankedDrop`. In that mode, every included hazard can occupy any rank, including matching, explicitly included, force-included, and currently condition-blocked included hazards. Other hazard selection modes do not expose reorder handles or move actions.
 12d. GM authoring UI for manual task and hazard composition shows only two record groups: **Included in this environment** and **Available to add**. Available to add includes matching addable rows first, then enabled non-matching rows, then library-disabled rows; it does not show a separate Excluded or Non-matching section. Removing an included manual record returns it to Available to add with its normal candidate/not-matching/library-disabled state instead of showing it as Excluded. Automatic composition retains its Excluded and Non-matching sections.
 12e. `taskDropRateAdjustments` and `hazardDropRateAdjustments` store environment-local signed percentage-point deltas for reusable library task drop rows and hazards. Task adjustments are keyed first by task id and then by drop-row id. Hazard adjustments are keyed by hazard id. Values must be integers from `-100` to `100`; zero values are omitted. Adjustments affect only this environment and must not rewrite reusable library records.
 13. Environment metadata exposed to non-GM users must not leak hidden task identity, hidden result details, provider diagnostics, or GM-only notes.
@@ -517,21 +518,21 @@ GatheringTask = {
 
 ### Purpose
 
-Resolve gathering-native Gathering Task drops and matched hazards through ordered d100 rows.
+Resolve gathering-native Gathering Task drops and composed hazards through ordered d100 rows.
 
 ### Runtime Requirements
 
 1. Before any player attempt starts, Fabricate rejects gathering if Foundry is paused.
 2. For every enabled item row in the selected Gathering Task, resolve row character modifier references, calculate `finalDropRate = clamp(dropRate + environmentDropRateAdjustment + matchingConditionModifiers + resolvedCharacterModifiers, 0, 100)`, roll `d100`, add the gathering modifier, and drop the row when `effectiveRoll >= 101 - finalDropRate`.
-3. For every enabled matched hazard in the environment, resolve hazard character modifier references, calculate `finalHazardRate = clamp(dropRate + environmentDropRateAdjustment + resolvedCharacterModifiers, 0, 100)`, roll `d100`, add the hazard modifier, and drop the hazard when `effectiveRoll >= 101 - finalHazardRate`.
+3. For every enabled composed hazard in the environment whose runtime condition gates are satisfied, resolve hazard character modifier references, calculate `finalHazardRate = clamp(dropRate + environmentDropRateAdjustment + resolvedCharacterModifiers, 0, 100)`, roll `d100`, add the hazard modifier, and drop the hazard when `effectiveRoll >= 101 - finalHazardRate`.
 4. System Gathering Rules select rewards after item rows roll once rules are authored.
 5. Reward `highestRankedDrop` awards the first dropped item row in authored row order.
 6. Reward `allDrops` awards every dropped item row.
 7. Reward `limitedDrops` awards the first `rewardLimit` dropped item rows in authored row order.
 8. System Gathering Rules select hazards after hazards roll once rules are authored.
-9. Hazard `highestRankedDrop` keeps the first dropped hazard in matched hazard order.
+9. Hazard `highestRankedDrop` keeps the first dropped hazard in composed hazard order after applying `hazardOrder`; condition-blocked hazards are skipped before hazard rolling and selection.
 10. Hazard `allDrops` keeps every dropped hazard.
-11. Hazard `limitedDrops` keeps the first `hazardLimit` dropped hazards in matched hazard order.
+11. Hazard `limitedDrops` keeps the first `hazardLimit` dropped hazards in composed hazard order after applying `hazardOrder`; condition-blocked hazards are skipped before hazard rolling and selection.
 12. Hazard policy `successWithHazard` reports a successful gathering outcome with hazard evidence when hazards drop.
 13. Hazard policy `failureWithHazard` reports a failed gathering outcome with hazard evidence when hazards drop and must not award selected reward rows.
 14. Legacy `task.itemSelectionMode`, `environment.hazardSelectionMode`, and `environment.hazardPolicy` fields may be read only when a system has no authored `rules` object; authored system rules override them.

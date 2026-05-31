@@ -3077,6 +3077,106 @@ describe('createAdminStore', () => {
       assert.equal(composition.hazards.find(entry => entry.id === 'h-desert').compositionState, 'notMatching');
     });
 
+    it('reorders all included hazards including condition-blocked force-added hazards', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      services._store.gatheringConfig = {
+        systems: {
+          sys1: {
+            tasks: [],
+            hazards: [
+              { id: 'h-cave', name: 'Cave Hazard', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 25 },
+              { id: 'h-gas', name: 'Gas Pocket', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 25 },
+              { id: 'h-storm', name: 'Storm Hazard', biomes: ['cave'], dangerTags: ['hazardous'], weather: ['storm'], dropRate: 25 },
+              { id: 'h-desert', name: 'Desert Storm', biomes: ['desert'], dangerTags: ['hazardous'], weather: ['storm'], dropRate: 25 }
+            ]
+          }
+        }
+      };
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.createEnvironmentDraft();
+      store.updateEnvironmentDraft({ biomes: ['cave'], dangerLevel: 'hazardous', compositionMode: 'manual' });
+
+      store.includeEnvironmentRecord('hazard', 'h-cave');
+      store.includeEnvironmentRecord('hazard', 'h-gas');
+      store.includeEnvironmentRecord('hazard', 'h-storm');
+      store.forceIncludeEnvironmentRecord('hazard', 'h-desert');
+
+      let composition = get(store.viewState).environmentComposition;
+      assert.deepEqual(
+        composition.hazards
+          .filter(entry => ['explicitlyIncluded', 'forceIncluded'].includes(entry.compositionState))
+          .map(entry => entry.id),
+        ['h-cave', 'h-gas', 'h-storm', 'h-desert']
+      );
+      const conditionBlocked = composition.hazards.find(entry => entry.id === 'h-storm');
+      assert.equal(conditionBlocked.compositionState, 'explicitlyIncluded');
+      assert.equal(conditionBlocked.runtimeState, 'unavailable');
+      const forced = composition.hazards.find(entry => entry.id === 'h-desert');
+      assert.equal(forced.compositionState, 'forceIncluded');
+      assert.equal(forced.runtimeState, 'unavailable');
+
+      assert.equal(store.reorderEnvironmentRecord('hazard', 2, 0), true);
+
+      let draft = get(store.viewState).environmentDraft;
+      assert.deepEqual(draft.hazardOrder, ['h-storm', 'h-cave', 'h-gas', 'h-desert']);
+      composition = get(store.viewState).environmentComposition;
+      assert.deepEqual(
+        composition.hazards
+          .filter(entry => ['explicitlyIncluded', 'forceIncluded'].includes(entry.compositionState))
+          .map(entry => entry.id),
+        ['h-storm', 'h-cave', 'h-gas', 'h-desert']
+      );
+
+      assert.equal(store.reorderEnvironmentRecord('hazard', 3, 1), true);
+      draft = get(store.viewState).environmentDraft;
+      assert.deepEqual(draft.hazardOrder, ['h-storm', 'h-desert', 'h-cave', 'h-gas']);
+    });
+
+    it('keeps force-added hazards included after environment edits make them match', async () => {
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.features = { gathering: true };
+      services._store.gatheringConfig = {
+        systems: {
+          sys1: {
+            tasks: [],
+            hazards: [
+              { id: 'h-cave', name: 'Cave Hazard', biomes: ['cave'], dangerTags: ['hazardous'], dropRate: 25 },
+              { id: 'h-desert', name: 'Desert Storm', biomes: ['desert'], dangerTags: ['hazardous'], dropRate: 25 }
+            ]
+          }
+        }
+      };
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.createEnvironmentDraft();
+      store.updateEnvironmentDraft({ biomes: ['cave'], dangerLevel: 'hazardous', compositionMode: 'manual' });
+
+      store.includeEnvironmentRecord('hazard', 'h-cave');
+      store.forceIncludeEnvironmentRecord('hazard', 'h-desert');
+      store.updateEnvironmentDraft({ biomes: ['desert'] });
+
+      let composition = get(store.viewState).environmentComposition;
+      const forced = composition.hazards.find(entry => entry.id === 'h-desert');
+      assert.equal(forced.matches, true);
+      assert.equal(forced.compositionState, 'forceIncluded');
+      assert.equal(forced.runtimeState, 'available');
+
+      assert.equal(store.reorderEnvironmentRecord('hazard', 0, 1), true);
+      const draft = get(store.viewState).environmentDraft;
+      assert.deepEqual(draft.hazardOrder, ['h-desert', 'h-cave']);
+      composition = get(store.viewState).environmentComposition;
+      assert.deepEqual(
+        composition.hazards
+          .filter(entry => ['includedByMatch', 'explicitlyIncluded', 'forceIncluded', 'includedButUnavailable'].includes(entry.compositionState))
+          .map(entry => entry.id),
+        ['h-desert', 'h-cave']
+      );
+    });
+
     it('automatic hazard exclusion writes local excluded state', async () => {
       const services = createMockServices();
       const sys = services.getCraftingSystemManager().getSystem('sys1');

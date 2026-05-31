@@ -129,6 +129,12 @@ const GATHERING_DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops',
 const GATHERING_HAZARD_POLICIES = new Set(['successWithHazard', 'failureWithHazard']);
 const GATHERING_TOOL_BREAKAGE_POLICIES = new Set(['failureOnBreak', 'successDespiteBreak']);
 const GATHERING_BIOME_MODIFIER_AGGREGATIONS = new Set(['cumulative', 'strongestOfEach', 'dominant']);
+const ENVIRONMENT_INCLUDED_COMPOSITION_STATES = new Set([
+  'includedByMatch',
+  'explicitlyIncluded',
+  'forceIncluded',
+  'includedButUnavailable'
+]);
 const DEFAULT_GATHERING_RULES = Object.freeze({
   rewardSelectionMode: 'highestRankedDrop',
   rewardLimit: 1,
@@ -2030,7 +2036,8 @@ export function createAdminStore(services) {
       let compositionState;
       if (!libraryEnabled) compositionState = 'libraryDisabled';
       else if (excluded) compositionState = 'excluded';
-      else if (!matches) compositionState = forceIncluded ? 'forceIncluded' : (explicitlyIncluded ? 'includedButUnavailable' : 'notMatching');
+      else if (forceIncluded) compositionState = 'forceIncluded';
+      else if (!matches) compositionState = explicitlyIncluded ? 'includedButUnavailable' : 'notMatching';
       else if (compositionMode === 'manual') compositionState = explicitlyIncluded ? 'explicitlyIncluded' : 'candidate';
       else compositionState = 'includedByMatch';
 
@@ -2951,7 +2958,9 @@ export function createAdminStore(services) {
     const viewModel = _buildEnvironmentCompositionViewModel(current);
     const records = kind === 'hazard' ? viewModel.hazards : viewModel.tasks;
     const ids = records
-      .filter(entry => entry.runtimeState === 'available' || entry.compositionState === 'includedButUnavailable')
+      .filter(entry => kind === 'hazard'
+        ? ENVIRONMENT_INCLUDED_COMPOSITION_STATES.has(entry.compositionState)
+        : entry.runtimeState === 'available' || entry.compositionState === 'includedButUnavailable')
       .map(entry => entry.id);
     const from = Number(fromIndex);
     const to = Number(toIndex);
