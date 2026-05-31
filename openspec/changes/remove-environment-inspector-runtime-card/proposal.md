@@ -12,13 +12,14 @@ In scope:
 - Keep the selected-record header composition and runtime pills.
 - Keep row-level runtime state in task/hazard composition lists.
 - Keep task/hazard matching evidence and all five evidence rows.
+- Keep hazard environment override controls, including the hazard chance drop-rate adjustment.
 - Remove localization keys used only by the deleted card.
 - Update source and mounted component tests.
 
 Out of scope:
 
 - Runtime-state semantics, composition semantics, matching logic, and player gathering behavior.
-- Hazard runtime details, environment override controls, and matching evidence layout.
+- Environment override behavior, persistence semantics, and matching evidence layout.
 
 ## Resolved Agent Roster
 
@@ -33,4 +34,5 @@ Out of scope:
 - `npm test`
 - `npm run build`
 - `git diff --check`
+- Local Playwright screenshot fixture: `test-results/hazard-inspector-runtime-card-removed.png` proves no hazard-runtime card, retained header pills, all five evidence rows, and visible hazard override controls at a 360px viewport.
 - `npx commitlint --from HEAD~1 --to HEAD` after commit

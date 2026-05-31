@@ -82,17 +82,6 @@
     <MatchingEvidenceChips evidence={entry.evidence} variant="checks" />
   </section>
 
-  {#if kind === 'hazard'}
-    <section class="manager-inspector-card" data-record-inspector-section="hazard-runtime">
-      <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.HazardRuntime', 'Hazard runtime')}</h3>
-      <div class="manager-environment-inspector-facts">
-        <div class="manager-fact"><strong>{Number.isFinite(Number(record?.dropRate)) ? `${Number(record.dropRate)}%` : '—'}</strong><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.HazardChance', 'Hazard chance')}</span></div>
-        <div class="manager-fact"><strong>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ScopeEnvironment', 'Environment-wide')}</strong><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Scope', 'Scope')}</span></div>
-      </div>
-      <p class="manager-muted">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.HazardExplanation', 'Final hazard chance = base chance + matching hazard modifiers + environment and actor-specific modifiers.')}</p>
-    </section>
-  {/if}
-
   <section class="manager-inspector-card" data-record-inspector-section="overrides">
     <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Overrides', 'Environment overrides')}</h3>
     <p class="manager-muted">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.OverridesHint', 'Drop-rate adjustments apply only in this environment and do not modify the reusable source record.')}</p>

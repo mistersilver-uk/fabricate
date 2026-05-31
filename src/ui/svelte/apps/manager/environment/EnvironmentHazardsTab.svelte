@@ -31,7 +31,7 @@
   <p class="manager-environment-comp-callout" data-composition-mode={mode}>
     <i class={mode === 'manual' ? 'fas fa-hand-pointer' : 'fas fa-wand-magic-sparkles'} aria-hidden="true"></i>
     <span>{mode === 'manual'
-      ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Hazards.ManualIntro', 'Only hazards you explicitly include apply here. You can add matching hazards or force add non-matching hazards from Available to add.')
+      ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Hazards.ManualIntro', 'Only hazards you explicitly include apply here. You can add matching hazards or force add non-matching hazards.')
       : text('FABRICATE.Admin.Manager.EnvironmentEditor.Hazards.AutomaticIntro', 'All matching enabled library hazards apply unless you exclude them here.')}</span>
   </p>
 

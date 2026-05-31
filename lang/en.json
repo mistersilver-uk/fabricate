@@ -1492,11 +1492,7 @@
             "StaleTask": "This task is included in this environment but is unavailable because it no longer matches the environment context.",
             "RemoveWrapper": "Remove from environment",
             "OpenSource": "Open source",
-            "HazardRuntime": "Hazard runtime",
             "HazardChance": "Hazard chance",
-            "ScopeEnvironment": "Environment-wide",
-            "Scope": "Scope",
-            "HazardExplanation": "Final hazard chance = base chance + matching hazard modifiers + environment and actor-specific modifiers.",
             "Overrides": "Environment overrides",
             "OverridesHint": "Drop-rate adjustments apply only in this environment and do not modify the reusable source record.",
             "PlayerLabel": "Player-facing label",
@@ -1550,12 +1546,12 @@
           "Tasks": {
             "Title": "Tasks",
             "AutomaticIntro": "All matching enabled library tasks are available unless you exclude them here.",
-            "ManualIntro": "Only tasks you explicitly include are available to players. You can add matching tasks or force add non-matching tasks from Available to add."
+            "ManualIntro": "Only tasks you explicitly include are available to players. You can add matching tasks or force add non-matching tasks."
           },
           "Hazards": {
             "Title": "Hazards",
             "AutomaticIntro": "All matching enabled library hazards apply unless you exclude them here.",
-            "ManualIntro": "Only hazards you explicitly include apply here. You can add matching hazards or force add non-matching hazards from Available to add.",
+            "ManualIntro": "Only hazards you explicitly include apply here. You can add matching hazards or force add non-matching hazards.",
             "HazardChance": "Hazard chance",
             "DangerTag": {
               "safe": "Safe",

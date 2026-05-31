@@ -13478,13 +13478,18 @@
 
 .fabricate-manager .manager-environment-drop-adjustment-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 92px auto;
+  grid-template-columns: minmax(112px, 1fr) 92px;
   align-items: end;
   gap: 8px;
   padding: 8px;
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   background: var(--fab-overlay-dark-16);
+}
+
+.fabricate-manager .manager-environment-drop-adjustment-row > .manager-button {
+  grid-column: 1 / -1;
+  justify-self: end;
 }
 
 .fabricate-manager .manager-environment-drop-adjustment-copy {

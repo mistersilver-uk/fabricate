@@ -98,8 +98,8 @@ describe('environment editor localization', () => {
       ['Inspector.OverridesHint', 'Drop-rate adjustments apply only in this environment and do not modify the reusable source record.'],
       ['Inspector.DropRateAdjustment', 'Drop-rate adjustment'],
       ['Inspector.ClearAdjustment', 'Clear'],
-      ['Tasks.ManualIntro', 'Only tasks you explicitly include are available to players. You can add matching tasks or force add non-matching tasks from Available to add.'],
-      ['Hazards.ManualIntro', 'Only hazards you explicitly include apply here. You can add matching hazards or force add non-matching hazards from Available to add.'],
+      ['Tasks.ManualIntro', 'Only tasks you explicitly include are available to players. You can add matching tasks or force add non-matching tasks.'],
+      ['Hazards.ManualIntro', 'Only hazards you explicitly include apply here. You can add matching hazards or force add non-matching hazards.'],
       ['Validation.CheckRegion', 'Has a region or is set to "any region"']
     ];
 
@@ -262,10 +262,11 @@ describe('environment composition editor structure', () => {
     assert.ok(!rightInspectorSource.includes('onRestoreRecord'), 'right inspector should not accept restore callbacks');
   });
 
-  it('selected record inspector omits the standalone runtime-state card', () => {
+  it('selected record inspector omits the standalone runtime-state and hazard-runtime cards', () => {
     assert.ok(inspectorSource.includes('CompositionStatePill'), 'selected record header should keep the composition pill');
     assert.ok(inspectorSource.includes('RuntimeStatePill'), 'selected record header should keep the runtime pill');
     assert.ok(!inspectorSource.includes('data-record-inspector-section="runtime-state"'), 'selected record inspector should not render a Runtime state card');
+    assert.ok(!inspectorSource.includes('data-record-inspector-section="hazard-runtime"'), 'selected record inspector should not render a Hazard runtime card');
     assert.ok(!inspectorSource.includes('data-record-inspector-waiting-for'), 'selected record inspector should not render waiting-for details');
     assert.ok(!inspectorSource.includes('manager-environment-layer-list'), 'selected record inspector should not render layer rows');
     for (const deleted of [
@@ -286,11 +287,20 @@ describe('environment composition editor structure', () => {
       'Inspector.ExplainExcluded',
       'Inspector.ExplainCandidate',
       'Inspector.ExplainNotMatching',
-      'Inspector.ExplainLibraryDisabled'
+      'Inspector.ExplainLibraryDisabled',
+      'Inspector.HazardRuntime',
+      'Inspector.ScopeEnvironment',
+      'Inspector.Scope',
+      'Inspector.HazardExplanation'
     ]) {
       assert.equal(catalogValue(`FABRICATE.Admin.Manager.EnvironmentEditor.${deleted}`), undefined, `EnvironmentEditor.${deleted} should be removed`);
       assert.ok(!inspectorSource.includes(deleted), `inspector should not reference ${deleted}`);
     }
+    assert.equal(
+      catalogValue('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.HazardChance'),
+      'Hazard chance',
+      'EnvironmentEditor.Inspector.HazardChance should remain for hazard override controls'
+    );
   });
 
   it('the shell auto-selects the first active record on the tasks/hazards tabs', () => {
@@ -349,6 +359,7 @@ describe('environment composition editor structure', () => {
     assert.ok(inspectorSource.includes('variant="checks"'), 'inspector should render the detailed evidence table');
     assert.ok(inspectorSource.includes('data-record-inspector-section="overrides"'), 'inspector should render the override section');
     assert.ok(inspectorSource.includes('DropRateAdjustment'), 'override section should edit drop-rate adjustments');
+    assert.ok(inspectorSource.includes('Inspector.HazardChance'), 'hazard overrides should keep HazardChance copy');
     assert.ok(inspectorSource.includes('setHazardAdjustment'), 'hazard adjustment edits should update the environment draft');
     assert.ok(inspectorSource.includes('setTaskDropAdjustment'), 'task drop-row adjustment edits should update the environment draft');
     assert.ok(!inspectorSource.includes('is-disabled-overrides'), 'override section should no longer be phase-1 disabled');

@@ -4477,6 +4477,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(hazardInspector.querySelector('[data-runtime-state]')?.dataset.runtimeState, 'available', 'hazard inspector header should keep the runtime pill');
     assert.equal(target.querySelector('[data-record-inspector-section="source"]'), null, 'hazard inspector should not render a Source card');
     assert.equal(target.querySelector('[data-record-inspector-section="runtime-state"]'), null, 'hazard inspector should not render a Runtime state card');
+    assert.equal(target.querySelector('[data-record-inspector-section="hazard-runtime"]'), null, 'hazard inspector should not render a Hazard runtime card');
     assert.equal(target.querySelector('.manager-environment-inspector-actions'), null, 'hazard inspector should not render the selected-record action strip');
     assert.equal(target.querySelector('.manager-environment-open-source'), null, 'hazard inspector should not render an open-source CTA');
     assert.equal(target.querySelector('[data-record-inspector-section="evidence"] .manager-card-title').textContent.trim(), 'Hazard Environment Matching');
@@ -4484,6 +4485,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.deepEqual(hazardEvidenceRows.map(row => row.dataset.evidenceField), ['biome', 'region', 'weather', 'time', 'danger'], 'hazard evidence table should render all five dimensions');
     assert.equal(target.querySelector('[data-evidence-field="danger"] [data-evidence-value-state="mismatch"]').textContent.trim(), 'Deadly');
     assert.equal(target.querySelector('[data-evidence-field="danger"] .manager-environment-evidence-value-pill').classList.contains('is-danger'), true, 'danger mismatch should use danger tone');
+    const hazardOverrides = target.querySelector('[data-record-inspector-section="overrides"]');
+    assert.ok(hazardOverrides, 'hazard inspector should keep the overrides card');
+    assert.ok(hazardOverrides.textContent.includes('Environment overrides'), 'hazard overrides card should keep its title');
+    assert.ok(hazardOverrides.textContent.includes('Hazard chance'), 'hazard overrides should keep the hazard chance row');
+    assert.ok(hazardOverrides.querySelector('[data-drop-rate-adjustment="hazard-thorns"] input[type="number"]'), 'hazard overrides should keep the drop-rate adjustment input');
   });
 
   // NOTE: previously covered tests for environment-edit input wiring and validation
