@@ -61,7 +61,7 @@ describe('environment editor localization', () => {
       ['Overview', 'DangerHint'],
       ['Composition', 'Automatic'],
       ['Composition', 'IncludedByMatch'],
-      ['Inspector', 'LayerLibrary'],
+      ['Inspector', 'TaskEnvironmentMatching'],
       ['Inspector', 'Overrides'],
       ['Validation', 'Readiness'],
       ['Evidence', 'Biome'],
@@ -95,7 +95,6 @@ describe('environment editor localization', () => {
       ['Composition.QuickRemove', 'Remove'],
       ['Composition.Remove', 'Remove from environment'],
       ['Composition.ManualHint', 'Only explicitly included records are available; GMs can force add enabled non-matching records.'],
-      ['Inspector.ExplainForceIncluded', 'Force-added by the GM despite not matching the environment context.'],
       ['Inspector.OverridesHint', 'Drop-rate adjustments apply only in this environment and do not modify the reusable source record.'],
       ['Inspector.DropRateAdjustment', 'Drop-rate adjustment'],
       ['Inspector.ClearAdjustment', 'Clear'],
@@ -263,6 +262,37 @@ describe('environment composition editor structure', () => {
     assert.ok(!rightInspectorSource.includes('onRestoreRecord'), 'right inspector should not accept restore callbacks');
   });
 
+  it('selected record inspector omits the standalone runtime-state card', () => {
+    assert.ok(inspectorSource.includes('CompositionStatePill'), 'selected record header should keep the composition pill');
+    assert.ok(inspectorSource.includes('RuntimeStatePill'), 'selected record header should keep the runtime pill');
+    assert.ok(!inspectorSource.includes('data-record-inspector-section="runtime-state"'), 'selected record inspector should not render a Runtime state card');
+    assert.ok(!inspectorSource.includes('data-record-inspector-waiting-for'), 'selected record inspector should not render waiting-for details');
+    assert.ok(!inspectorSource.includes('manager-environment-layer-list'), 'selected record inspector should not render layer rows');
+    for (const deleted of [
+      'Inspector.RuntimeState',
+      'Inspector.LayerLibrary',
+      'Inspector.LayerMatching',
+      'Inspector.LayerComposition',
+      'Inspector.LayerRuntime',
+      'Inspector.Enabled',
+      'Inspector.Disabled',
+      'Inspector.Matches',
+      'Inspector.NoMatch',
+      'Inspector.WaitingFor',
+      'Inspector.ExplainAvailable',
+      'Inspector.ExplainForceIncluded',
+      'Inspector.ExplainConditionsBlocked',
+      'Inspector.ExplainStale',
+      'Inspector.ExplainExcluded',
+      'Inspector.ExplainCandidate',
+      'Inspector.ExplainNotMatching',
+      'Inspector.ExplainLibraryDisabled'
+    ]) {
+      assert.equal(catalogValue(`FABRICATE.Admin.Manager.EnvironmentEditor.${deleted}`), undefined, `EnvironmentEditor.${deleted} should be removed`);
+      assert.ok(!inspectorSource.includes(deleted), `inspector should not reference ${deleted}`);
+    }
+  });
+
   it('the shell auto-selects the first active record on the tasks/hazards tabs', () => {
     assert.ok(shellSource.includes("runtimeState === 'available'"), 'auto-select targets active (available) records');
     assert.ok(/\$effect\(\(\) => \{[\s\S]*?selectRecord\(kind, firstActive\.id\)/.test(shellSource), 'an effect auto-selects the first active record of the active tab kind');
@@ -313,11 +343,10 @@ describe('environment composition editor structure', () => {
     assert.ok(listSource.includes('OpenSource'), 'available-to-add rows keep open-source in the overflow menu');
   });
 
-  it('inspector renders the four-layer evaluation and active drop-rate adjustment overrides', () => {
-    for (const layer of ['LayerLibrary', 'LayerMatching', 'LayerComposition', 'LayerRuntime']) {
-      assert.ok(inspectorSource.includes(layer), `inspector should render the ${layer} row`);
-    }
+  it('inspector renders matching evidence and active drop-rate adjustment overrides', () => {
     assert.ok(inspectorSource.includes('MatchingEvidenceChips'), 'inspector should render match evidence');
+    assert.ok(inspectorSource.includes('data-record-inspector-section="evidence"'), 'inspector should render the evidence section');
+    assert.ok(inspectorSource.includes('variant="checks"'), 'inspector should render the detailed evidence table');
     assert.ok(inspectorSource.includes('data-record-inspector-section="overrides"'), 'inspector should render the override section');
     assert.ok(inspectorSource.includes('DropRateAdjustment'), 'override section should edit drop-rate adjustments');
     assert.ok(inspectorSource.includes('setHazardAdjustment'), 'hazard adjustment edits should update the environment draft');

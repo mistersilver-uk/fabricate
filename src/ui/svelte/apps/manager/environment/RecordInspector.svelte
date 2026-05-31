@@ -20,55 +20,12 @@
   const defaultImg = $derived(kind === 'hazard' ? 'icons/svg/hazard.svg' : 'icons/svg/item-bag.svg');
   const record = $derived(entry?.record || null);
   const name = $derived(record?.name || entry?.id || text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Unnamed', 'Unnamed'));
-  const isStale = $derived(entry?.compositionState === 'includedButUnavailable');
   const environmentMatchTitle = $derived(kind === 'hazard'
     ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.HazardEnvironmentMatching', 'Hazard Environment Matching')
     : text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.TaskEnvironmentMatching', 'Task Environment Matching'));
 
-  const explanation = $derived((() => {
-    if (entry?.conditionsMet === false
-      && (entry?.compositionState === 'includedByMatch'
-        || entry?.compositionState === 'explicitlyIncluded'
-        || entry?.compositionState === 'forceIncluded')) {
-      return text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ExplainConditionsBlocked', 'Blocked by current weather or time-of-day; the record matches the environment but is inactive until conditions allow.');
-    }
-    switch (entry?.compositionState) {
-      case 'includedByMatch':
-      case 'explicitlyIncluded':
-        return text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ExplainAvailable', 'All matching rules are satisfied and no active hazards block this record.');
-      case 'forceIncluded':
-        return text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ExplainForceIncluded', 'Force-added by the GM despite not matching the environment context.');
-      case 'includedButUnavailable':
-        return text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ExplainStale', 'Included in this environment but no longer matches the environment context.');
-      case 'excluded':
-        return text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ExplainExcluded', 'Locally excluded from this environment.');
-      case 'candidate':
-        return text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ExplainCandidate', 'Matches this environment but has not been included yet.');
-      case 'notMatching':
-        return text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ExplainNotMatching', 'Does not match the environment context.');
-      case 'libraryDisabled':
-        return text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ExplainLibraryDisabled', 'Disabled in the reusable library.');
-      default:
-        return '';
-    }
-  })());
-
-  const layers = $derived([
-    { id: 'library', label: text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.LayerLibrary', 'Library'), ok: entry?.libraryEnabled === true, value: entry?.libraryEnabled ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Enabled', 'Enabled') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Disabled', 'Disabled') },
-    { id: 'matching', label: text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.LayerMatching', 'Matching'), ok: entry?.matches === true, value: entry?.matches ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Matches', 'Matches') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoMatch', 'Does not match') },
-    { id: 'composition', label: text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.LayerComposition', 'Composition'), ok: entry?.compositionState === 'includedByMatch' || entry?.compositionState === 'explicitlyIncluded', value: '' },
-    { id: 'runtime', label: text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.LayerRuntime', 'Runtime'), ok: entry?.runtimeState === 'available', value: '' }
-  ]);
-
   const adjustmentRows = $derived(Array.isArray(entry?.dropRateAdjustmentRows) ? entry.dropRateAdjustmentRows : []);
   const hazardAdjustment = $derived(Number.isFinite(Number(entry?.dropRateAdjustment)) ? Number(entry.dropRateAdjustment) : 0);
-
-  const waitingForValues = $derived(entry?.conditionsMet === false
-    ? [
-        ...(entry?.evidence?.weather?.recordValues || []),
-        ...(entry?.evidence?.time?.recordValues || [])
-      ]
-    : []);
 
   function clampAdjustment(value) {
     const number = Number(value);
@@ -118,37 +75,6 @@
         </div>
       </div>
     </div>
-  </section>
-
-  <section class="manager-inspector-card {isStale ? 'is-warning' : ''}" data-record-inspector-section="runtime-state">
-    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.RuntimeState', 'Runtime state')}</h3>
-    <div class="manager-chip-row"><RuntimeStatePill state={entry.runtimeState} /></div>
-    {#if explanation}<p class="manager-muted">{explanation}</p>{/if}
-    {#if waitingForValues.length > 0}
-      <div class="manager-environment-waiting-for" data-record-inspector-waiting-for>
-        <p class="manager-kicker">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.WaitingFor', 'Waiting for')}</p>
-        <div class="manager-chip-row">
-          {#each waitingForValues as value (value)}
-            <span class="manager-chip is-warning">{value}</span>
-          {/each}
-        </div>
-      </div>
-    {/if}
-    <ul class="manager-environment-layer-list">
-      {#each layers as layer (layer.id)}
-        <li class={`manager-environment-layer ${layer.ok ? 'is-ok' : 'is-warn'}`} data-layer={layer.id}>
-          <i class={layer.ok ? 'fas fa-circle-check' : 'fas fa-circle-exclamation'} aria-hidden="true"></i>
-          <span class="manager-environment-layer-label">{layer.label}</span>
-          {#if layer.id === 'composition'}
-            <CompositionStatePill state={entry.compositionState} />
-          {:else if layer.id === 'runtime'}
-            <RuntimeStatePill state={entry.runtimeState} />
-          {:else}
-            <span class="manager-environment-layer-value">{layer.value}</span>
-          {/if}
-        </li>
-      {/each}
-    </ul>
   </section>
 
   <section class="manager-inspector-card" data-record-inspector-section="evidence">
