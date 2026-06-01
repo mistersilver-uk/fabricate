@@ -7,7 +7,7 @@ The gathering environment editor (`src/ui/svelte/apps/manager/EnvironmentEditVie
 This change rebuilds the editor as a **composition / wrapper editor** for a single environment (e.g. "Mines"). It does not author reusable tasks or hazards — those keep their standalone library editors (`gathering-task-edit` / `gathering-hazard-edit`). Instead it makes the gathering domain's four-layer model legible to GMs:
 
 - **Library** — a reusable task/hazard is globally `enabled` / `disabled`.
-- **Matching** — a record matches an environment by region / biome / weather / time / danger.
+- **Matching** — a record matches an environment by region / biome / danger. Weather and time of day are runtime gates, not composition match criteria.
 - **Composition** — the environment locally **includes** / **excludes** a matching record.
 - **Runtime** — the computed result is **Available** / **Unavailable**.
 
@@ -16,7 +16,7 @@ The runtime composition + matching engine already exists (`composeEnvironment`, 
 ## Goals
 
 - Replace the `EnvironmentEditView` placeholder with an editor shell: header (breadcrumbs, title, description, status pills, Back/Delete/Save), a tabbed workspace (Overview / Tasks / Hazards / Validation), and an editor-owned right inspector rail.
-- Overview tab: edit identity, environment context (region/biomes/danger/conditions summary), player-facing behaviour (targeted/blind), composition mode, scene link, and a computed runtime summary.
+- Overview tab: edit identity, environment context (region/biomes/danger level plus conditions summary), player-facing behaviour (targeted/blind), composition mode, scene link, and a computed runtime summary.
 - Tasks and Hazards tabs: render automatic composition with Included / Excluded / Non-matching sections, and render manual composition with only Included plus a single Available to add group ordered as matching addable rows before non-matching and library-disabled rows.
 - Right inspector: contextual states for no-selection (environment summary), selected task, and selected hazard, each showing the four-layer evaluation and matching evidence.
 - Validation tab: environment readiness checks, a player-facing runtime preview, and categorised issues.

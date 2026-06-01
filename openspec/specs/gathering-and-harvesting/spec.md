@@ -34,7 +34,7 @@ This spec governs:
 - scene, pause, visibility, and permission gating
 - gathering time requirements and active-run behavior
 - optional resource-node availability, respawn, attempt limits, risk, encounters, and stamina
-- global gathering conditions and condition-sensitive matching
+- global gathering conditions and condition-sensitive runtime gates
 - routed and progressive gathering-task resolution
 - gathering-native d100 drop-row resolution
 - failure outcomes and special failure feedback
@@ -109,8 +109,9 @@ GatheringEnvironment = {
   sceneUuid?: string | null,
   region?: string,
   biomes?: string[],
-  dangerTags?: string[],
-  risk?: string,
+  dangerLevel?: string,
+  dangerTags?: string[], // legacy compatibility-read fallback for dangerLevel
+  risk?: string, // legacy compatibility-read fallback for dangerLevel / player-facing risk evidence
   hazardSelectionMode?: "highestRankedDrop" | "allDrops", // legacy compatibility-read only
   hazardPolicy?: "successWithHazard" | "failureWithHazard", // legacy compatibility-read only
   enabledTaskIds?: string[],
@@ -124,6 +125,7 @@ GatheringEnvironment = {
   taskDropRateAdjustments?: Record<string, Record<string, number>>, // taskId -> dropRowId -> signed percentage-point delta
   taskDropRateAdjustmentsEnabled?: Record<string, boolean>, // taskId -> false disables applying stored drop-row deltas; absent/true means enabled
   hazardDropRateAdjustments?: Record<string, number>, // hazardId -> signed percentage-point delta
+  hazardDropRateAdjustmentsEnabled?: Record<string, boolean>, // hazardId -> false disables applying stored hazard delta; absent/true means enabled
   blindSelection?: {
     weights: Record<string, number>, // keyed by task id
   },
@@ -141,8 +143,9 @@ GatheringEnvironment = {
 6. If `sceneUuid` is present, it references the scene where player self-service gathering is allowed.
 7. Scene linkage is optional. If `sceneUuid` is absent, the environment is not scene-gated by default and may still be player-visible when other guards pass.
 8. Disabled environments are never attemptable by non-GM users and are hidden from normal player gathering flows.
-9. `region` is single-select; `biomes` and `dangerTags` are multi-select tag lists.
-10. `risk` is optional player-facing risk evidence. Existing risk display values may map to `dangerTags`, but reusable hazard matching uses `dangerTags`.
+9. `region` and `dangerLevel` are single-select tag values; `biomes` is a multi-select tag list.
+10. `dangerLevel` is the canonical environment danger ceiling used for reusable hazard matching. Legacy `dangerTags` and `risk` values remain compatibility-read fallback inputs when `dangerLevel` is absent; canonical writes should use `dangerLevel`.
+10a. `risk` may remain as optional player-facing risk evidence for older data, but new matching behavior must not depend on `risk` when `dangerLevel` is present.
 11. Weather and time of day are not environment fields. They are global gathering conditions used as **runtime gates** — a Gathering Task or hazard whose required `weather` / `timeOfDay` values are not satisfied by the current conditions stays in the environment's composition (it still matches by region/biome/danger) but is **inactive** at runtime: tasks become `visible: true` / `attemptable: false` with a `CONDITIONS_BLOCKED` reason, and hazards are skipped during d100 hazard selection. Matching itself is decided by region / biome / danger only.
 12. `enabledTaskIds`, `disabledTaskIds`, `enabledHazardIds`, and `disabledHazardIds` store environment-level composition toggles for reusable library records without rewriting the library definitions.
 12a. `compositionMode` controls reusable task/hazard composition. In **automatic** mode, every matching, library-enabled record is composed unless listed in `disabledTaskIds` / `disabledHazardIds`; stale `enabled*Ids` and `forced*Ids` are ignored. In **manual** mode, only records in `enabled*Ids` that still match, plus records in `forced*Ids`, are composed; stale `disabledTaskIds` and `disabledHazardIds` are ignored.
@@ -152,6 +155,7 @@ GatheringEnvironment = {
 12d. GM authoring UI for manual task and hazard composition shows only two record groups: **Included in this environment** and **Available to add**. Available to add includes matching addable rows first, then enabled non-matching rows, then library-disabled rows; it does not show a separate Excluded or Non-matching section. Removing an included manual record returns it to Available to add with its normal candidate/not-matching/library-disabled state instead of showing it as Excluded. Automatic composition retains its Excluded and Non-matching sections.
 12e. `taskDropRateAdjustments` and `hazardDropRateAdjustments` store environment-local signed percentage-point deltas for reusable library task drop rows and hazards. Task adjustments are keyed first by task id and then by drop-row id. Hazard adjustments are keyed by hazard id. Values must be integers from `-100` to `100`; zero values are omitted. Adjustments affect only this environment and must not rewrite reusable library records.
 12f. `taskDropRateAdjustmentsEnabled` stores task-level apply switches for environment-local task drop-row adjustments. Missing task ids and `true` values mean enabled; `false` preserves configured per-drop deltas but prevents them from applying to composed runtime drop rates.
+12g. `hazardDropRateAdjustmentsEnabled` stores hazard-level apply switches for environment-local hazard adjustments when the runtime keeps the hazard adjustment toggle. Missing hazard ids and `true` values mean enabled; `false` preserves the configured hazard delta but prevents it from applying to composed runtime hazard rates.
 13. Environment metadata exposed to non-GM users must not leak hidden task identity, hidden result details, provider diagnostics, or GM-only notes.
 14. Legacy environments without rich metadata remain valid and load with neutral defaults.
 15. `hazardSelectionMode` and `hazardPolicy` are legacy compatibility fields. New Manager authoring and d100 runtime behavior use system Gathering Rules once they are authored.
@@ -192,13 +196,13 @@ GatheringRules = {
 7. These rules are authoritative for d100 reward selection, hazard selection, hazard outcome, and tool breakage outcome once authored.
 8. Existing worlds without a system `rules` object may read legacy task/environment selection fields for backwards-compatible d100 behavior.
 9. `blindCandidateGate` controls the blind candidate pool: `attemptableOnly` (default) excludes tasks the character cannot currently attempt (unmet tool/catalyst/resource/visibility gates) so the generic gather never resolves to a doomed task; `allMatching` keeps every matching task in the pool. Unknown values normalize to `attemptableOnly`.
-10. `revealPolicy`/`revealScope` are the system defaults for revealing a blind task after an attempt terminates; an environment's `reveal` override takes precedence. Unknown values normalize to `never`/`actor`.
+10. `revealPolicy`/`revealScope` control revealing a blind task after an attempt terminates for every environment in the system. Environments do not override them. Unknown values normalize to `never`/`actor`.
 
 ## Global Gathering Conditions
 
 ### Purpose
 
-Represent the current weather/time-of-day state used by gathering listing, matching, and attempts.
+Represent the current weather/time-of-day state used by gathering listing context and runtime attempt gates.
 
 ### Properties
 
@@ -236,11 +240,11 @@ ConditionOption = {
 
 1. Default weather is `"clear"` and default time of day is `"day"`.
 2. Default regions are empty. Default biomes are `forest`, `grassland`, `mountain`, `cave`, `coastal`, `swamp`, `desert`, `urban`, `ruins`, and `wasteland`.
-3. Default danger tags are `safe`, `hazardous`, `dangerous`, and `deadly`.
+3. Default danger levels are `safe`, `unsafe`, `hazardous`, `dangerous`, `deadly`, and `extreme`.
 4. Default weather tags are `clear`, `cloudy`, `rain`, `storm`, `snow`, `fog`, and `wind`.
 5. Default time-of-day tags are `dawn`, `day`, `dusk`, and `night`.
 6. GM-customized vocabularies are preserved. Defaults are seeded only when a custom list is absent or empty.
-7. Each `gatheringConfig.systems[systemId].conditions` entry owns selected-system weather and time-of-day matching settings with `enabled`, `current`, and `values` fields. `current` stores a condition option id.
+7. Each `gatheringConfig.systems[systemId].conditions` entry owns selected-system weather and time-of-day condition settings with `enabled`, `current`, and `values` fields. `current` stores a condition option id.
 8. Condition option values store stable normalized ids, GM-facing labels, and Font Awesome icon classes.
 9. Missing per-system weather settings default to enabled, current `clear`, and values `clear`, `cloudy`, `rain`, `storm`, `snow`, `fog`, and `wind` as option records.
 10. Missing per-system time-of-day settings default to enabled, current `day`, and values `dawn`, `day`, `dusk`, and `night` as option records.
@@ -313,7 +317,7 @@ GatheringTaskDefinition = {
 3. Empty match tags mean "matches any" for that dimension.
 4. Region matches when omitted or equal to the environment region.
 5. Biomes match when omitted or at least one task biome is present on the environment.
-6. Weather and time of day match against the current global gathering conditions.
+6. Weather and time of day are runtime availability gates, not environment composition match criteria. A task whose required `weather` or `timeOfDay` values are not satisfied by the current enabled condition dimensions remains composed by region/biome/danger, but is not attemptable until the condition gate passes.
 7. Persisted, imported, or seeded drop rows require a `dropRate` integer from 0 to 100, a positive quantity, and a reward target that resolves at the data boundary. `componentId` targets must match a component in the owning crafting system. `itemUuid` targets must resolve through Foundry UUID lookup to an Item document. Unresolved editor rows may omit component references while a GM is still authoring the row, but they must not be saved or imported until assigned a valid component or item reference.
 8. Drop row condition modifier values are signed integer percentage-point adjustments. Matching time-of-day and weather modifiers are summed into final drop chance; gathering modifiers affect the d100 roll instead.
 9. `itemSelectionMode` is a legacy compatibility field. New Manager authoring and d100 runtime behavior use system Gathering Rules once they are authored.
@@ -445,8 +449,10 @@ GatheringHazardDefinition = {
 1. Definitions are scoped to one crafting system.
 2. Disabled definitions never match for player gathering.
 3. Empty match tags mean "matches any" for that dimension.
-4. Danger matches when omitted or at least one hazard danger tag is present on the environment.
-5. Region, biome, weather, and time-of-day matching use the same rules as Gathering Tasks.
+4. Danger matches when omitted or when the hazard's danger tags are within the environment's canonical `dangerLevel` ceiling.
+5. Region and biome matching use the same rules as Gathering Tasks.
+5a. Hazard `dangerTags` match against the environment's canonical `dangerLevel` ceiling, with environment `dangerTags` / `risk` used only as legacy fallback when `dangerLevel` is absent.
+5b. Weather and time-of-day are runtime hazard gates, not environment composition match criteria. A composed hazard whose required `weather` or `timeOfDay` values are not satisfied by the current enabled condition dimensions is skipped during d100 hazard selection.
 6. `dropRate` must be an integer from 1 to 100.
 7. Hazards may reference per-system character modifiers. `hazardModifier` adjusts the d100 roll; `characterModifiers` adjust the threshold. The two surfaces are evaluated independently.
 8. Hazard output must respect blind task and GM-only redaction rules.
@@ -1122,7 +1128,7 @@ There is no multi-step gathering state in this phase.
    - do not consume, degrade, or destroy catalysts,
    - do not create result items.
 
-Immediate terminal outcome resolution is current `startAttempt` behavior for non-timed tasks. Timed backend completion/resolution, timed result creation, timed catalyst side effects, timed terminal history writes, timed cancellation for missing references, and misconfiguration cleanup are current module-private `GatheringEngine.processWorldTime(worldTime)` behavior. Module bootstrap constructs and loads the gathering runtime internally after systems load, wires environment-store cleanup callbacks to `GatheringRunManager`, exposes the store/run/evaluator getters plus narrow viewer-enforcing `listGatheringForActor(options)` and `startGatheringAttempt(options)` methods, and dispatches ready/updateWorldTime processing to `processWorldTime(worldTime)` with error isolation. The raw engine instance is not public. The current GM admin `Environments` editor is gated by the selected system's `features.gathering`, lists cloned environment records from the store, exposes a cloned selected draft, edits name, description, enabled state, selection mode, and scene UUID, tracks selected-draft dirty state, provides visible save/cancel actions, and falls back to a valid active tab when the environment tab is no longer visible. Creating an environment persists a disabled draft shell with one disabled placeholder task for validation compatibility; that shell is not a configured player-visible gathering path until configured and enabled by the GM. Duplicate, delete, and reorder use environment-store methods, and delete requires confirmation before the store cleans referenced gathering runs. Store-owned task/result/catalyst/visibility/result-selection/progressive/check/time/failure callbacks are wired from the root into the tab, and the tab delegates those mutations to the admin store. The selected draft supports task-list CRUD (add, select, duplicate, delete, and reorder), base task field edits for `name`, `description`, `img`, `enabled`, and `resolutionMode`, selected-task result-group authoring, selected-task catalyst authoring, selected-task visibility-gate authoring, routed result-selection provider authoring, progressive check/award-mode authoring, selected-task time-requirement authoring, and selected-task failure-outcome authoring. Result-group authoring includes group add/rename/delete/reorder plus component-based result add/edit/delete/reorder for `componentId` and `quantity`. Catalyst authoring includes catalyst add/delete plus editing `componentId`, `degradesOnUse`, `destroyWhenExhausted`, and nullable `maxUses`; the environment-store validation boundary rejects blank catalyst components and rejects non-positive or fractional `maxUses` when degradation is enabled. Visibility authoring supports enable/clear plus `macro`, `dnd5e`, and `pf2e` provider fields, with incomplete provider input kept local until required fields are available for a valid draft mutation. Routed result-selection authoring supports `macroOutcome.macroUuid` from available script macro options and `rollTableOutcome.rollTableUuid` as UUID text input. Progressive authoring supports `progressive.awardMode` values `equal`, `partial`, and `exceed`, plus `macro`, `dnd5e`, and `pf2e` checks with optional thresholds for dnd5e/pf2e. Time-requirement authoring supports immediate tasks by clearing `timeRequirement` and timed tasks by editing minutes, hours, days, months, and years. Failure-outcome authoring supports clearing to default failure feedback plus text and macro custom outcomes, with provider switching clearing stale provider fields. Task/result/catalyst/visibility/result-selection/progressive/check/time/failure edits preserve nested task configuration outside the edited collection and continue to save through the environment-store validation boundary. New draft placeholder result groups receive immediate IDs so they can be edited before save/reload. Managed item options are prepared by the admin store/root and passed into the environments tab; the tab does not perform Foundry lookups. Progressive difficulty is displayed from selected managed component difficulty and is not persisted inline on result rows because canonical store validation uses managed component difficulty. Dirty environment draft confirmation, save-blocking validation/accessibility presentation, the player-facing gathering app, the Items Directory `Gathering` action, dedicated gathering app registration, scene-linked runtime integration coverage, hook-driven timed completion coverage, and harvesting boundary regression coverage are implemented. Live Foundry validation remains conditional for future runtime-specific or screenshot-required work.
+Immediate terminal outcome resolution is current `startAttempt` behavior for non-timed tasks. Timed backend completion/resolution, timed result creation, timed catalyst side effects, timed terminal history writes, timed cancellation for missing references, and misconfiguration cleanup are current module-private `GatheringEngine.processWorldTime(worldTime)` behavior. Module bootstrap constructs and loads the gathering runtime internally after systems load, wires environment-store cleanup callbacks to `GatheringRunManager`, exposes the store/run/evaluator getters plus narrow viewer-enforcing `listGatheringForActor(options)` and `startGatheringAttempt(options)` methods, and dispatches ready/updateWorldTime processing to `processWorldTime(worldTime)` with error isolation. The raw engine instance is not public. The current GM admin `Environments` editor is gated by the selected system's `features.gathering`, lists cloned environment records from the store, exposes a cloned selected draft, edits name, description, enabled state, selection mode, and scene UUID, tracks selected-draft dirty state, provides visible save/cancel actions, and falls back to a valid active tab when the environment tab is no longer visible. Creating an environment persists a disabled draft shell; automatic composition can use matching library-backed Gathering Tasks without creating or requiring an inline placeholder Environment Task. Legacy inline task drafts may still use disabled placeholders for validation compatibility, and those shells are not configured player-visible gathering paths until configured and enabled by the GM. Duplicate, delete, and reorder use environment-store methods, and delete requires confirmation before the store cleans referenced gathering runs. Store-owned task/result/catalyst/visibility/result-selection/progressive/check/time/failure callbacks are wired from the root into the tab, and the tab delegates those mutations to the admin store. The selected draft supports task-list CRUD (add, select, duplicate, delete, and reorder), base task field edits for `name`, `description`, `img`, `enabled`, and `resolutionMode`, selected-task result-group authoring, selected-task catalyst authoring, selected-task visibility-gate authoring, routed result-selection provider authoring, progressive check/award-mode authoring, selected-task time-requirement authoring, and selected-task failure-outcome authoring. Result-group authoring includes group add/rename/delete/reorder plus component-based result add/edit/delete/reorder for `componentId` and `quantity`. Catalyst authoring includes catalyst add/delete plus editing `componentId`, `degradesOnUse`, `destroyWhenExhausted`, and nullable `maxUses`; the environment-store validation boundary rejects blank catalyst components and rejects non-positive or fractional `maxUses` when degradation is enabled. Visibility authoring supports enable/clear plus `macro`, `dnd5e`, and `pf2e` provider fields, with incomplete provider input kept local until required fields are available for a valid draft mutation. Routed result-selection authoring supports `macroOutcome.macroUuid` from available script macro options and `rollTableOutcome.rollTableUuid` as UUID text input. Progressive authoring supports `progressive.awardMode` values `equal`, `partial`, and `exceed`, plus `macro`, `dnd5e`, and `pf2e` checks with optional thresholds for dnd5e/pf2e. Time-requirement authoring supports immediate tasks by clearing `timeRequirement` and timed tasks by editing minutes, hours, days, months, and years. Failure-outcome authoring supports clearing to default failure feedback plus text and macro custom outcomes, with provider switching clearing stale provider fields. Task/result/catalyst/visibility/result-selection/progressive/check/time/failure edits preserve nested task configuration outside the edited collection and continue to save through the environment-store validation boundary. New draft placeholder result groups receive immediate IDs so they can be edited before save/reload. Managed item options are prepared by the admin store/root and passed into the environments tab; the tab does not perform Foundry lookups. Progressive difficulty is displayed from selected managed component difficulty and is not persisted inline on result rows because canonical store validation uses managed component difficulty. Dirty environment draft confirmation, save-blocking validation/accessibility presentation, the player-facing gathering app, the Items Directory `Gathering` action, dedicated gathering app registration, scene-linked runtime integration coverage, hook-driven timed completion coverage, and harvesting boundary regression coverage are implemented. Live Foundry validation remains conditional for future runtime-specific or screenshot-required work.
 
 ### Completion Flow
 
@@ -1310,10 +1316,10 @@ If a linked scene is deleted:
 ## Testing Requirements
 
 - Unit tests for environment validation:
-  - `targeted` requires at least one task
+  - `targeted` requires an explicit task source unless automatic library composition can provide matching Gathering Tasks
   - `blind` allows multiple tasks and validates blind-selection/redaction configuration
 - Unit tests for default tag seeding and preservation of GM-customized tags
-- Unit tests for task/hazard matching by region, biome, danger, global weather, and global time of day
+- Unit tests for task/hazard composition matching by region, biome, and danger, plus runtime condition gating by global weather and global time of day
 - Unit tests proving weather/time do not appear as player environment browse filters
 - API tests for `getConditions`, `setWeather`, `setTimeOfDay`, `setConditions`, permission checks, validation, persistence, and hook dispatch
 - Unit tests for visibility-gate evaluation using `dnd5e`, `pf2e`, and macro providers

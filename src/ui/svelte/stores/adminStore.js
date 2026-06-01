@@ -84,7 +84,7 @@ const DEFAULT_GATHERING_CONDITIONS = Object.freeze({ weather: 'clear', timeOfDay
 const DEFAULT_GATHERING_VOCABULARIES = Object.freeze({
   regions: [],
   biomes: ['forest', 'grassland', 'mountain', 'cave', 'coastal', 'swamp', 'desert', 'urban', 'ruins', 'wasteland'],
-  danger: ['safe', 'hazardous', 'dangerous', 'deadly'],
+  danger: ['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme'],
   weather: ['clear', 'cloudy', 'rain', 'storm', 'snow', 'fog', 'wind'],
   timeOfDay: ['dawn', 'day', 'dusk', 'night']
 });

@@ -2,7 +2,7 @@
 
 ## Data Model (minimal extension)
 
-Environments are persisted in world setting `fabricate.gatheringEnvironments` and normalized/validated by `GatheringEnvironmentStore` (`src/systems/GatheringEnvironmentStore.js`). They already carry `enabledTaskIds` / `disabledTaskIds` / `enabledHazardIds` / `disabledHazardIds`, `selectionMode` (`targeted` | `blind`), `region`, `biomes`, `dangerTags`/`risk`, `conditions`, `sceneUuid`, `enabled`, and inline `tasks[]`.
+Environments are persisted in world setting `fabricate.gatheringEnvironments` and normalized/validated by `GatheringEnvironmentStore` (`src/systems/GatheringEnvironmentStore.js`). They already carry `enabledTaskIds` / `disabledTaskIds` / `enabledHazardIds` / `disabledHazardIds`, `selectionMode` (`targeted` | `blind`), `region`, `biomes`, canonical `dangerLevel` with legacy `dangerTags`/`risk` fallback, condition context, `sceneUuid`, `enabled`, and optional inline `tasks[]`.
 
 Add to `_normalizeEnvironment()` and `_validateEnvironment()`:
 
@@ -19,11 +19,13 @@ No per-record override fields are added in this change (see Phase 2 in the propo
 - **automatic** — include every matching, library-enabled record **except** IDs in `disabled*Ids`.
 - **manual** — include IDs in `enabled*Ids` that still match and are library-enabled, plus enabled IDs in `forced*Ids` even when they do not match. A normal manual-included ID whose record no longer matches resolves to `includedButUnavailable` (not Available); a forced non-matching ID resolves to `forceIncluded` and is Available until removed from the force list. Manual removal clears `enabled*Ids` / `forced*Ids` and does not add `disabled*Ids`; stale manual `disabled*Ids` are ignored.
 
+Automatic composition can use matching reusable library tasks as the environment's gatherable records and does not require a legacy inline placeholder Environment Task. Inline placeholder tasks remain a legacy draft-authoring fallback only.
+
 ## Domain / Service
 
 `src/systems/GatheringRichStateService.js`:
 
-- Extract the boolean-only `_recordMatchesEnvironment` (`:748`) into a shared pure helper. New module `src/systems/gatheringMatch.js` exports `evaluateEnvironmentMatch(record, environment, conditions, { includeDanger, conditionSettings })` → `{ matches: boolean, evidence: { region, biome, weather, time, danger } }`, where each evidence field is `{ state: 'match' | 'any' | 'mismatch', recordValues: string[], envValues: string[] }`. `_recordMatchesEnvironment` becomes a thin wrapper returning `evidence.matches`. This removes the current duplication between the service and the adminStore mirror (`_environmentMatchesGatheringRecord` ~`:1955`, `_environmentAllowsGatheringLibraryRecord` `:1984`), which both delegate to the new helper.
+- Extract the boolean-only `_recordMatchesEnvironment` (`:748`) into a shared pure helper. New module `src/systems/gatheringMatch.js` exports `evaluateEnvironmentMatch(record, environment, conditions, { includeDanger, conditionSettings })` → `{ matches: boolean, evidence: { region, biome, danger, weather, time } }`, where region/biome/danger evidence determines composition matching and weather/time evidence reports runtime condition gates. `_recordMatchesEnvironment` becomes a thin wrapper returning `evidence.matches`. This removes the current duplication between the service and the adminStore mirror (`_environmentMatchesGatheringRecord` ~`:1955`, `_environmentAllowsGatheringLibraryRecord` `:1984`), which both delegate to the new helper.
 - `composeEnvironment()` (`:170-199`) honors `compositionMode` per the semantics above and applies `taskOrder` / `hazardOrder` as a stable sort over the included set. `_environmentAllowsLibraryRecord` (`:763`) is gated through the mode.
 
 ## Store (`src/ui/svelte/stores/adminStore.js`)
@@ -58,7 +60,7 @@ New `.manager-environment-*` selectors in `styles/fabricate.css` reusing existin
 ## Tests
 
 - `tests/gathering-rich-state-service.*` (or a new `tests/gathering-environment-composition.test.js`) — `composeEnvironment` under `automatic` vs `manual` (empty-list disambiguation, manual non-matching include → unavailable, `taskOrder`/`hazardOrder` sort).
-- `tests/gathering-match.test.js` (new) — `evaluateEnvironmentMatch` evidence per field (region/biome/weather/time/danger; `any` vs `match` vs `mismatch`) and `matches` parity with prior `_recordMatchesEnvironment`.
+- `tests/gathering-match.test.js` (new) — `evaluateEnvironmentMatch` evidence per field (region/biome/danger for composition; weather/time for runtime condition gates) and `matches` parity with prior `_recordMatchesEnvironment`.
 - `tests/stores/adminStore.test.js` — `updateEnvironmentDraft` accepts `compositionMode`/`taskOrder`/`hazardOrder`; the composition view-model classifies `CompositionState`/`RuntimeState` and counts correctly.
 - `tests/components/environment-editor.test.js` (new) — source/contract checks: pills render text + state; tabs are keyboard-navigable; automatic task mode and automatic hazard mode retain Included/Excluded/Non-matching sections; manual task and hazard mode render Included plus Available to add without Excluded or separate Non-matching; Available to add orders matching rows before non-matching/library-disabled rows and preserves include, force-add, library-disabled, and open-source actions; localization keys/fallbacks stay aligned.
 - `tests/components/manager-mounted.test.js` — extend the compile/mount list with the new environment components.
