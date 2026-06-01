@@ -2112,11 +2112,14 @@
   }
 
   function environmentImage(environment) {
+    const ownImg = String(environment?.img || '').trim();
+    if (ownImg) return ownImg;
     const linkedScene = linkedSceneForEnvironment(environment);
     return linkedScene?.img || linkedScene?.thumbnail || linkedScene?.thumb || 'icons/svg/item-bag.svg';
   }
 
-  function hasEnvironmentSceneImage(environment) {
+  function hasEnvironmentImage(environment) {
+    if (String(environment?.img || '').trim()) return true;
     const linkedScene = linkedSceneForEnvironment(environment);
     return Boolean(linkedScene?.img || linkedScene?.thumbnail || linkedScene?.thumb);
   }
@@ -2163,20 +2166,39 @@
     };
   }
 
-  function environmentTaskCount(environment) {
-    return Array.isArray(environment?.tasks) ? environment.tasks.length : 0;
+  function environmentComposedIds(environment, kind) {
+    const enabledKey = kind === 'hazard' ? 'enabledHazardIds' : 'enabledTaskIds';
+    const forcedKey = kind === 'hazard' ? 'forcedHazardIds' : 'forcedTaskIds';
+    const disabledKey = kind === 'hazard' ? 'disabledHazardIds' : 'disabledTaskIds';
+    const enabled = Array.isArray(environment?.[enabledKey]) ? environment[enabledKey] : [];
+    const forced = Array.isArray(environment?.[forcedKey]) ? environment[forcedKey] : [];
+    const disabled = new Set(Array.isArray(environment?.[disabledKey]) ? environment[disabledKey] : []);
+    return Array.from(new Set([...enabled, ...forced])).filter(id => !disabled.has(id));
   }
 
-  function environmentResultCount(environment) {
-    return (Array.isArray(environment?.tasks) ? environment.tasks : []).reduce((total, task) => {
-      return total + (Array.isArray(task?.resultGroups) ? task.resultGroups : [])
-        .reduce((groupTotal, group) => groupTotal + (Array.isArray(group?.results) ? group.results.length : 0), 0);
-    }, 0);
+  function environmentComposedTaskCount(environment) {
+    const stored = $viewState.environmentTaskCounts?.[String(environment?.id || '')]?.availableTaskCount;
+    return Number.isFinite(stored) ? stored : environmentComposedIds(environment, 'task').length;
   }
 
-  function environmentCatalystCount(environment) {
-    return (Array.isArray(environment?.tasks) ? environment.tasks : [])
-      .reduce((total, task) => total + (Array.isArray(task?.catalysts) ? task.catalysts.length : 0), 0);
+  function environmentComposedHazardCount(environment) {
+    const stored = $viewState.environmentTaskCounts?.[String(environment?.id || '')]?.availableHazardCount;
+    return Number.isFinite(stored) ? stored : environmentComposedIds(environment, 'hazard').length;
+  }
+
+  function environmentRequiredToolCount(environment) {
+    const taskIds = new Set(environmentComposedIds(environment, 'task'));
+    if (taskIds.size === 0) return 0;
+    const toolIds = new Set();
+    for (const task of gatheringTaskDefinitions) {
+      if (!taskIds.has(task?.id)) continue;
+      const refs = Array.isArray(task?.toolIds) ? task.toolIds : [];
+      for (const ref of refs) {
+        const str = String(ref || '').trim();
+        if (str) toolIds.add(str);
+      }
+    }
+    return toolIds.size;
   }
 
   function gatheringTaskName(task) {
@@ -2429,17 +2451,17 @@
       {
         id: 'tasks',
         label: text('FABRICATE.Admin.Environments.Tasks', 'Tasks'),
-        value: environmentTaskCount(environment)
+        value: environmentComposedTaskCount(environment)
       },
       {
-        id: 'results',
-        label: text('FABRICATE.Admin.Environments.Results', 'Results'),
-        value: environmentResultCount(environment)
+        id: 'hazards',
+        label: text('FABRICATE.Admin.Environments.Hazards', 'Hazards'),
+        value: environmentComposedHazardCount(environment)
       },
       {
-        id: 'catalysts',
-        label: text('FABRICATE.Admin.Environments.Catalysts', 'Catalysts'),
-        value: environmentCatalystCount(environment)
+        id: 'required-tools',
+        label: text('FABRICATE.Admin.Environments.RequiredTools', 'Required tools'),
+        value: environmentRequiredToolCount(environment)
       },
       {
         id: 'mode',
@@ -4073,7 +4095,7 @@
           </section>
         {:else if selectedEnvironment}
           <section class="manager-inspector-card">
-            <img class={`manager-environment-preview ${hasEnvironmentSceneImage(selectedEnvironment) ? '' : 'is-fallback'}`} src={environmentImage(selectedEnvironment)} alt="" />
+            <img class={`manager-environment-preview ${hasEnvironmentImage(selectedEnvironment) ? '' : 'is-fallback'}`} src={environmentImage(selectedEnvironment)} alt="" />
             <div class="manager-inspector-copy">
               <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Environment.Selected', 'Selected environment')}</p>
               <h2 class="manager-inspector-name" title={environmentName(selectedEnvironment)}>{environmentName(selectedEnvironment)}</h2>
