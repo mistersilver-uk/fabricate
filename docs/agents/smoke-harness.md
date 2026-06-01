@@ -1,0 +1,52 @@
+# Foundry Smoke Harness
+
+The smoke harness boots a real Foundry VTT instance in Docker and walks the manager UI + gathering app end-to-end with Playwright. It catches regressions that the JS-level unit suite can't — actual layout, DOM events, real Foundry APIs.
+
+## Entrypoints
+
+- `npm run test:foundry` — full pipeline: `up` → `run` → `down`. ~7–8 minutes including docker boot.
+- `npm run test:foundry:up` — start Foundry container, leave it running. Useful when iterating on the harness itself.
+- `npm run test:foundry:run` — Playwright steps against an already-running Foundry.
+- `npm run test:foundry:down` — stop the cached container, preserve the image.
+- `npm run test:foundry:ci` — faster CI profile (subset of phases) used in PR CI.
+- `npm run test:foundry:rc` — release-candidate profile.
+
+Scripts live in `scripts/foundry-test-*.mjs`. The main harness is `scripts/foundry-test-run.mjs` (~2700 lines).
+
+## Phases
+
+The run walks several phases in order. If an earlier phase fails, later phases are skipped:
+
+- **boot-and-join** — health-poll the container, log in as Gamemaster.
+- **Phase B** — create test actors and items, screenshot sheets.
+- **Phase C** — create a crafting system + sample recipes.
+- **Phase D0** — open the Crafting System Manager, exercise its surfaces, screenshot (the `screenshot-manager` step). **This is where most drift shows up** when manager markup changes.
+- **Phase D2** — gathering app GM/player live states.
+- **Phase D3** — non-GM gathering app states.
+- **Phase E / E2** — crafting flow + no-selectable-actors edge case.
+- **Phase F** — cleanup.
+
+Phase-by-phase timing and pass/fail land in `test-results/summary.json` after each run.
+
+## Artifacts
+
+After any run (success or failure):
+
+- `test-results/summary.json` — structured `{ passed, steps[], errors[], consoleErrors[], phaseTimings[] }`. Truth.
+- `test-results/console.log` — browser console transcript for the whole run.
+- `test-results/screenshot-*.png` — per-step screenshots; `screenshot-failure.png` captures the last DOM state if a step throws.
+
+When debugging a smoke failure, read `summary.json` first: the failing step's `error` field plus the surrounding successful steps usually point straight at the broken selector.
+
+## Known drift pattern: Phase D0 selectors
+
+`exerciseManagerEnvironmentPointerTargets` (~line 905 in `foundry-test-run.mjs`) and the env-edit checks (~line 2490) pin many selectors by class, child index (`.nth(N)`), and visible button text. When the manager UI evolves, these go stale silently — the harness only fails when the next smoke run hits the broken locator.
+
+Hit list seen historically:
+
+- `.manager-environment-row .manager-icon-button .nth(3)` / `.nth(4)` — expected move-up / move-down buttons that were dropped when reordering moved to drag-and-drop.
+- `.manager-environment-edit-view.is-placeholder` and `.manager-environment-placeholder-card` — gone since the real composition editor replaced the placeholder.
+- "Return to environments" button text — renamed to "Back to environments" and rewired through `confirmRouteExit`.
+- `.manager-environment-details-band` — CSS rule survived in `styles/fabricate.css`, but the Svelte usage was removed; the harness kept waiting on it.
+
+**Workflow rule:** Whenever editing manager UI markup (env browser row, env-edit view, CompositionList, header actions, etc.), grep `scripts/foundry-test-run.mjs` for the changed classes / text BEFORE declaring the change done. Prefer running `npm run test:foundry` locally at least once on UI-touching PRs. If the harness asserts on something the new markup no longer has, update the harness in the same PR.
