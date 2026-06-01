@@ -2088,7 +2088,8 @@ export function createAdminStore(services) {
       const appliedAdjustment = dropRateAdjustmentsEnabled ? adjustment : 0;
       const baseDropRate = Number.isFinite(Number(record?.dropRate)) ? Math.floor(Number(record.dropRate)) : 1;
       return {
-        hasDropRateAdjustment: adjustment !== 0,
+        hasDropRateAdjustment: dropRateAdjustmentsEnabled && adjustment !== 0,
+        hasStoredDropRateAdjustment: adjustment !== 0,
         dropRateAdjustment: adjustment,
         dropRateAdjustmentsEnabled,
         baseDropRate,

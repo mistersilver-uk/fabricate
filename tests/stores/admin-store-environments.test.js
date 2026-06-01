@@ -909,7 +909,8 @@ describe('adminStore gathering environments tab state', () => {
     });
     composition = get(store.viewState).environmentComposition;
     assert.equal(composition.hazards[0].dropRateAdjustmentsEnabled, false);
-    assert.equal(composition.hazards[0].hasDropRateAdjustment, true);
+    assert.equal(composition.hazards[0].hasDropRateAdjustment, false);
+    assert.equal(composition.hazards[0].hasStoredDropRateAdjustment, true);
     assert.equal(composition.hazards[0].dropRateAdjustment, -10);
     assert.equal(composition.hazards[0].effectiveDropRate, 30);
     assert.deepEqual(get(store.viewState).environmentDraft.hazardDropRateAdjustmentsEnabled, { 'hazard-cave-in': false });
@@ -919,6 +920,8 @@ describe('adminStore gathering environments tab state', () => {
     });
     composition = get(store.viewState).environmentComposition;
     assert.equal(composition.hazards[0].dropRateAdjustmentsEnabled, true);
+    assert.equal(composition.hazards[0].hasDropRateAdjustment, true);
+    assert.equal(composition.hazards[0].hasStoredDropRateAdjustment, true);
     assert.equal(composition.hazards[0].effectiveDropRate, 20);
     assert.deepEqual(get(store.viewState).environmentDraft.hazardDropRateAdjustmentsEnabled, {});
   });
