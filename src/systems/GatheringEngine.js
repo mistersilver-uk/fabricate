@@ -1,3 +1,5 @@
+import { evaluateEnvironmentMatch } from './gatheringMatch.js';
+
 const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
   NO_SELECTABLE_ACTORS: 'FABRICATE.Gathering.Blocked.NoSelectableActors',
   INVALID_REMEMBERED_ACTOR: 'FABRICATE.Gathering.Blocked.InvalidRememberedActor',
@@ -21,7 +23,9 @@ const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
   ,
   NODE_DEPLETED: 'FABRICATE.Gathering.Blocked.NodeDepleted',
   ATTEMPT_LIMIT_EXHAUSTED: 'FABRICATE.Gathering.Blocked.AttemptLimitExhausted',
-  STAMINA_BLOCKED: 'FABRICATE.Gathering.Blocked.StaminaBlocked'
+  STAMINA_BLOCKED: 'FABRICATE.Gathering.Blocked.StaminaBlocked',
+  BLIND_NO_CANDIDATE: 'FABRICATE.Gathering.Blocked.BlindNoCandidate',
+  CONDITIONS_BLOCKED: 'FABRICATE.Gathering.Blocked.ConditionsBlocked'
 });
 
 const BLIND_TASK_LABEL_KEY = 'FABRICATE.Gathering.BlindTaskLabel';
@@ -78,6 +82,7 @@ export class GatheringEngine {
     failureFeedback = null,
     hazardSceneTrigger = null,
     getRunViewer = null,
+    random = Math.random,
     localize = defaultLocalize
   } = {}) {
     this.environmentStore = environmentStore;
@@ -99,6 +104,7 @@ export class GatheringEngine {
     this.failureFeedback = failureFeedback;
     this.hazardSceneTrigger = hazardSceneTrigger;
     this.getRunViewer = getRunViewer;
+    this.random = typeof random === 'function' ? random : Math.random;
     this.localize = localize;
   }
 
@@ -462,7 +468,7 @@ export class GatheringEngine {
       checkResult
     });
 
-    return this._terminalStart({
+    return await this._terminalStart({
       viewer,
       actor,
       system,
@@ -946,6 +952,22 @@ export class GatheringEngine {
       }
     }
 
+    // Weather/time-of-day are runtime gates: a task may match the environment
+    // (region/biome/danger) but be inactive when current conditions don't
+    // satisfy its required `weather` / `timeOfDay` values.
+    const conditionsResult = evaluateEnvironmentMatch(task, environment, environment?.conditions || {}, { includeDanger: false });
+    if (conditionsResult.conditionsMet === false) {
+      blockedReasons.push(this._blockedReason('CONDITIONS_BLOCKED', {
+        data: this._isOpaqueBlindTask({ environment, viewer })
+          ? null
+          : {
+              taskId: task.id,
+              requiredWeather: conditionsResult.evidence?.weather?.recordValues ?? [],
+              requiredTimeOfDay: conditionsResult.evidence?.time?.recordValues ?? []
+            }
+      }));
+    }
+
     const richAttempt = await this._evaluateRichAttempt({ actor, viewer, system, environment, task });
     blockedReasons.push(...richAttempt.blockedReasons);
 
@@ -1144,17 +1166,22 @@ export class GatheringEngine {
       };
     }
 
-    const task = this._findStartTask({ environment, taskId });
+    const blindAuto = environment?.selectionMode === 'blind' && !stringOrNull(taskId);
+    const task = blindAuto
+      ? await this._selectBlindStartTask({ environment, system, actor: selected.actor, viewer })
+      : this._findStartTask({ environment, taskId });
     if (!task) {
       return {
         actor: selected.actor,
         environment,
-        blockedReason: this._blockedReason('MISSING_REFERENCE', {
-          data: {
-            environmentId: environment.id,
-            taskId: stringOrNull(taskId)
-          }
-        })
+        blockedReason: blindAuto
+          ? this._blockedReason('BLIND_NO_CANDIDATE')
+          : this._blockedReason('MISSING_REFERENCE', {
+              data: {
+                environmentId: environment.id,
+                taskId: stringOrNull(taskId)
+              }
+            })
       };
     }
 
@@ -1179,12 +1206,58 @@ export class GatheringEngine {
 
   _findStartTask({ environment, taskId }) {
     const tasks = normalizeList(environment?.tasks);
-    if (environment?.selectionMode === 'blind' && !taskId) {
-      return tasks[0] ?? null;
-    }
     const id = stringOrNull(taskId);
     if (!id) return null;
     return tasks.find(task => task?.id === id) ?? null;
+  }
+
+  /**
+   * Resolve which task a blind gather attempt starts. Builds the candidate pool
+   * from visible+enabled tasks, gates by attemptability when the system's
+   * `blindCandidateGate` is `attemptableOnly` (default), then draws via weighted
+   * random over `blindSelection.weights` (default weight `1`, non-positive
+   * excludes). Returns null when the pool is empty.
+   */
+  async _selectBlindStartTask({ environment, system, actor, viewer }) {
+    const visibleTasks = await this._visibleTaskListings({ environment, system, viewer, actor });
+    let pool = visibleTasks.map(entry => entry.task);
+
+    const gate = environment?.rules?.blindCandidateGate === 'allMatching' ? 'allMatching' : 'attemptableOnly';
+    if (gate === 'attemptableOnly') {
+      const attemptable = [];
+      for (const task of pool) {
+        const reasons = await this._taskBlockedReasons({ environment, system, task, actor, viewer });
+        if (reasons.length === 0) attemptable.push(task);
+      }
+      pool = attemptable;
+    }
+
+    if (pool.length === 0) return null;
+    return this._pickBlindTask(pool, environment?.blindSelection);
+  }
+
+  _pickBlindTask(pool, blindSelection) {
+    return this._weightedPickTask(pool, blindSelection?.weights) ?? pool[0] ?? null;
+  }
+
+  _weightedPickTask(pool, weights) {
+    const map = weights && typeof weights === 'object' ? weights : {};
+    const weighted = pool
+      .map(task => {
+        const raw = Number(map[task.id]);
+        const hasEntry = Object.prototype.hasOwnProperty.call(map, task.id);
+        const weight = Number.isFinite(raw) ? raw : (hasEntry ? 0 : 1);
+        return { task, weight: weight > 0 ? weight : 0 };
+      })
+      .filter(entry => entry.weight > 0);
+    if (weighted.length === 0) return null;
+    const total = weighted.reduce((sum, entry) => sum + entry.weight, 0);
+    let roll = this.random() * total;
+    for (const entry of weighted) {
+      roll -= entry.weight;
+      if (roll < 0) return entry.task;
+    }
+    return weighted[weighted.length - 1].task;
   }
 
   _validateStartTask(task) {
@@ -1371,7 +1444,7 @@ export class GatheringEngine {
       checkResult
     });
 
-    return this._terminalStart({
+    return await this._terminalStart({
       viewer,
       actor,
       system,
@@ -1831,7 +1904,8 @@ export class GatheringEngine {
     });
   }
 
-  _terminalStart({ viewer, actor, system, environment, task, status, run, createdResults, usedCatalysts, usedTools = [], checkResult }) {
+  async _terminalStart({ viewer, actor, system, environment, task, status, run, createdResults, usedCatalysts, usedTools = [], checkResult }) {
+    await this._maybeRevealBlindTask({ actor, environment, task, status });
     const opaqueBlind = this._isOpaqueBlindTask({ environment, viewer });
     const publicRun = opaqueBlind
       ? redactBlindTerminalRun(run)
@@ -1859,6 +1933,38 @@ export class GatheringEngine {
     }
 
     return response;
+  }
+
+  /**
+   * Reveal the resolved task after a blind attempt terminates, per the
+   * system-level reveal policy. `onSuccess` reveals only on success;
+   * `onAttempt` reveals on success or failure; `never` is a no-op. Reveal is
+   * best-effort and never blocks the attempt result. Only applies to blind
+   * environments.
+   */
+  async _maybeRevealBlindTask({ actor, environment, task, status }) {
+    if (environment?.selectionMode !== 'blind') return;
+    if (typeof this.richState?.revealTask !== 'function') return;
+    const { policy, scope } = this._resolveRevealPolicy(environment);
+    if (policy === 'never') return;
+    if (policy === 'onSuccess' && status !== 'succeeded') return;
+    try {
+      await this.richState.revealTask(actor, {
+        environmentId: stringOrNull(environment.id),
+        taskId: stringOrNull(task?.id),
+        scope
+      });
+    } catch {
+      // Reveal is advisory; never fail the attempt because of it.
+    }
+  }
+
+  _resolveRevealPolicy(environment) {
+    const rules = environment?.rules || {};
+    return {
+      policy: rules.revealPolicy ?? 'never',
+      scope: rules.revealScope ?? 'actor'
+    };
   }
 
   async _clearMisconfiguredWaitingRun({ viewer, actor, run, environment, task, errors = null, outcome = null }) {

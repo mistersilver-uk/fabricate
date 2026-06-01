@@ -1,8 +1,10 @@
 import { getSetting as defaultGetSetting, setSetting as defaultSetSetting, SETTING_KEYS } from '../config/settings.js';
 import { validateGatheringDropReferencesSync } from './GatheringDropReferenceValidator.js';
+import { DANGER_LEVELS, evaluateEnvironmentMatch, resolveEnvironmentDangerLevel } from './gatheringMatch.js';
 
 const DEFAULT_TASK_IMG = 'icons/svg/item-bag.svg';
 const VALID_SELECTION_MODES = new Set(['targeted', 'blind']);
+const VALID_COMPOSITION_MODES = new Set(['automatic', 'manual']);
 const VALID_RESOLUTION_MODES = new Set(['progressive', 'routed', 'd100']);
 const VALID_RESULT_SELECTION_PROVIDERS = new Set(['macroOutcome', 'rollTableOutcome']);
 const VALID_CHECK_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
@@ -13,7 +15,6 @@ const VALID_DEPLETION_TIMINGS = new Set(['onStart', 'onSuccess']);
 const VALID_RESPAWN_POLICIES = new Set(['none', 'manual', 'elapsedTime', 'probability', 'manualAndElapsedTime']);
 const VALID_ATTEMPT_LIMIT_SCOPES = new Set(['actor', 'user', 'task', 'environment', 'global']);
 const VALID_RECHARGE_POLICIES = new Set(['none', 'manual', 'elapsedTime', 'probability', 'manualAndElapsedTime']);
-const VALID_BLIND_SELECTION_STRATEGIES = new Set(['firstAvailable', 'weightedRandom', 'rollTable', 'macro']);
 const VALID_REVEAL_SCOPES = new Set(['actor', 'user', 'party', 'global']);
 const TIME_UNITS = ['minutes', 'hours', 'days', 'months', 'years'];
 
@@ -276,6 +277,10 @@ export class GatheringEnvironmentStore {
 
   _normalizeEnvironment(data = {}, { freshEnvironmentId = false } = {}) {
     const selectionMode = VALID_SELECTION_MODES.has(data?.selectionMode) ? data.selectionMode : 'targeted';
+    const compositionMode = VALID_COMPOSITION_MODES.has(data?.compositionMode) ? data.compositionMode : 'automatic';
+    const blindSelection = normalizeBlindSelection(data?.blindSelection);
+    const forcedTaskIds = normalizeIdList(data?.forcedTaskIds);
+    const forcedHazardIds = normalizeIdList(data?.forcedHazardIds);
     return {
       id: freshEnvironmentId || !data?.id ? this.randomID() : String(data.id),
       craftingSystemId: stringOrEmpty(data?.craftingSystemId),
@@ -286,19 +291,30 @@ export class GatheringEnvironmentStore {
       biome: stringOrEmpty(data?.biome),
       biomes: normalizeStringList(data?.biomes ?? data?.biome),
       dangerTags: normalizeStringList(data?.dangerTags ?? data?.risk),
+      dangerLevel: resolveEnvironmentDangerLevel(data),
       risk: VALID_RISK_LEVELS.has(data?.risk) ? data.risk : 'safe',
       economyMode: VALID_ECONOMY_MODES.has(data?.economyMode) ? data.economyMode : 'time',
       conditions: normalizeConditions(data?.conditions),
       chatMessages: normalizeChatMessages(data?.chatMessages),
       enabled: data?.enabled !== false,
       selectionMode,
+      compositionMode,
       sceneUuid: normalizeOptionalString(data?.sceneUuid),
       enabledTaskIds: normalizeIdList(data?.enabledTaskIds),
       disabledTaskIds: normalizeIdList(data?.disabledTaskIds),
       enabledHazardIds: normalizeIdList(data?.enabledHazardIds),
       disabledHazardIds: normalizeIdList(data?.disabledHazardIds),
+      taskOrder: normalizeIdList(data?.taskOrder),
+      hazardOrder: normalizeIdList(data?.hazardOrder),
+      taskDropRateAdjustments: normalizeTaskDropRateAdjustments(data?.taskDropRateAdjustments),
+      taskDropRateAdjustmentsEnabled: normalizeTaskDropRateAdjustmentsEnabled(data?.taskDropRateAdjustmentsEnabled),
+      hazardDropRateAdjustments: normalizeDropRateAdjustmentMap(data?.hazardDropRateAdjustments),
+      hazardDropRateAdjustmentsEnabled: normalizeHazardDropRateAdjustmentsEnabled(data?.hazardDropRateAdjustmentsEnabled),
       hazardSelectionMode: ['highestRankedDrop', 'allDrops'].includes(data?.hazardSelectionMode) ? data.hazardSelectionMode : 'allDrops',
       hazardPolicy: ['successWithHazard', 'failureWithHazard'].includes(data?.hazardPolicy) ? data.hazardPolicy : 'successWithHazard',
+      ...(blindSelection ? { blindSelection } : {}),
+      ...(forcedTaskIds.length > 0 ? { forcedTaskIds } : {}),
+      ...(forcedHazardIds.length > 0 ? { forcedHazardIds } : {}),
       tasks: Array.isArray(data?.tasks) ? data.tasks.map(task => this._normalizeTask(task)) : []
     };
   }
@@ -328,7 +344,6 @@ export class GatheringEnvironmentStore {
 
     const nodes = normalizeNodeConfig(data?.nodes);
     const attemptLimit = normalizeAttemptLimit(data?.attemptLimit);
-    const blindSelection = normalizeBlindSelection(data?.blindSelection);
     const reveal = normalizeRevealConfig(data?.reveal);
     const encounters = normalizeEncounterConfig(data?.encounters);
     const chatMessages = normalizeChatMessages(data?.chatMessages);
@@ -336,7 +351,6 @@ export class GatheringEnvironmentStore {
     if (attemptLimit) task.attemptLimit = attemptLimit;
     if (Number.isFinite(Number(data?.staminaCost)) && Number(data.staminaCost) > 0) task.staminaCost = Number(data.staminaCost);
     if (VALID_RISK_LEVELS.has(data?.riskOverride)) task.riskOverride = data.riskOverride;
-    if (blindSelection) task.blindSelection = blindSelection;
     if (reveal) task.reveal = reveal;
     if (encounters) task.encounters = encounters;
     if (chatMessages) task.chatMessages = chatMessages;
@@ -426,7 +440,20 @@ export class GatheringEnvironmentStore {
       errors.push(`Environment "${label}" selectionMode must be targeted or blind`);
     }
 
-    const hasTaskSource = normalized.tasks.length > 0 || normalized.enabledTaskIds.length > 0;
+    if (original?.compositionMode !== undefined && !VALID_COMPOSITION_MODES.has(original.compositionMode)) {
+      errors.push(`Environment "${label}" compositionMode must be automatic or manual`);
+    }
+
+    if (original?.dangerLevel !== undefined && !DANGER_LEVELS.includes(original.dangerLevel)) {
+      errors.push(`Environment "${label}" dangerLevel must be one of: ${DANGER_LEVELS.join(', ')}`);
+    }
+
+    errors.push(...validateTaskDropRateAdjustments(original?.taskDropRateAdjustments, `Environment "${label}" taskDropRateAdjustments`));
+    errors.push(...validateTaskDropRateAdjustmentsEnabled(original?.taskDropRateAdjustmentsEnabled, `Environment "${label}" taskDropRateAdjustmentsEnabled`));
+    errors.push(...validateDropRateAdjustmentMap(original?.hazardDropRateAdjustments, `Environment "${label}" hazardDropRateAdjustments`));
+    errors.push(...validateHazardDropRateAdjustmentsEnabled(original?.hazardDropRateAdjustmentsEnabled, `Environment "${label}" hazardDropRateAdjustmentsEnabled`));
+
+    const hasTaskSource = this._environmentHasTaskSource(normalized);
     if (normalized.selectionMode === 'targeted' && !hasTaskSource) {
       errors.push(`Environment "${label}" targeted selection requires at least one task`);
     }
@@ -494,7 +521,6 @@ export class GatheringEnvironmentStore {
     if (task.riskOverride && !VALID_RISK_LEVELS.has(task.riskOverride)) {
       errors.push(`Task "${label}" riskOverride must be safe, hazardous, unsafe, or extreme`);
     }
-    errors.push(...validateBlindSelection(task.blindSelection, `Task "${label}" blindSelection`));
     errors.push(...validateRevealConfig(task.reveal, `Task "${label}" reveal`));
 
     if (task.enabled !== true) {
@@ -624,6 +650,27 @@ export class GatheringEnvironmentStore {
     if (this.systemManager?.getSystem) return this.systemManager.getSystem(systemId);
     const systems = this._getSystems();
     return systems.find(system => system?.id === systemId) || null;
+  }
+
+  _environmentHasTaskSource(environment) {
+    if (environment.tasks.length > 0) return true;
+    if (environment.enabledTaskIds.length > 0) return true;
+    if (environment.compositionMode === 'manual' && normalizeIdList(environment.forcedTaskIds).length > 0) return true;
+    if (environment.compositionMode !== 'automatic') return false;
+    return this._hasMatchingLibraryTask(environment);
+  }
+
+  _hasMatchingLibraryTask(environment) {
+    return this._getGatheringLibraryTasks(environment.craftingSystemId)
+      .some(task => task?.enabled !== false
+        && evaluateEnvironmentMatch(task, environment, {}, { includeDanger: false }).matches);
+  }
+
+  _getGatheringLibraryTasks(systemId) {
+    if (!systemId) return [];
+    const config = this.getSetting?.(SETTING_KEYS.GATHERING_CONFIG);
+    const tasks = config?.systems?.[systemId]?.tasks;
+    return Array.isArray(tasks) ? tasks : [];
   }
 
   _getSystems() {
@@ -1071,27 +1118,9 @@ function validateAttemptLimit(limit, label) {
 
 function normalizeBlindSelection(data = null) {
   if (!data || typeof data !== 'object') return null;
-  return {
-    strategy: VALID_BLIND_SELECTION_STRATEGIES.has(data.strategy) ? data.strategy : 'firstAvailable',
-    macroUuid: normalizeOptionalString(data.macroUuid),
-    rollTableUuid: normalizeOptionalString(data.rollTableUuid),
-    weights: data.weights && typeof data.weights === 'object' ? cloneJson(data.weights) : {}
-  };
-}
-
-function validateBlindSelection(selection, label) {
-  if (!selection) return [];
-  const errors = [];
-  if (!VALID_BLIND_SELECTION_STRATEGIES.has(selection.strategy)) {
-    errors.push(`${label}.strategy is invalid`);
-  }
-  if (selection.strategy === 'macro' && !selection.macroUuid) {
-    errors.push(`${label}.macroUuid is required for macro selection`);
-  }
-  if (selection.strategy === 'rollTable' && !selection.rollTableUuid) {
-    errors.push(`${label}.rollTableUuid is required for roll table selection`);
-  }
-  return errors;
+  const weights = data.weights && typeof data.weights === 'object' ? cloneJson(data.weights) : {};
+  if (Object.keys(weights).length === 0) return null;
+  return { weights };
 }
 
 function normalizeRevealConfig(data = null) {
@@ -1161,6 +1190,102 @@ function normalizeStringList(value) {
 function normalizeIdList(value) {
   const values = Array.isArray(value) ? value : (value ? [value] : []);
   return Array.from(new Set(values.map(entry => stringOrEmpty(entry)).filter(Boolean)));
+}
+
+function normalizeDropRateAdjustmentValue(value) {
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < -100 || number > 100 || number === 0) return null;
+  return number;
+}
+
+function normalizeDropRateAdjustmentMap(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value)
+    .map(([id, adjustment]) => [stringOrEmpty(id), normalizeDropRateAdjustmentValue(adjustment)])
+    .filter(([id, adjustment]) => id && adjustment !== null));
+}
+
+function normalizeTaskDropRateAdjustments(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value)
+    .map(([taskId, rowAdjustments]) => [stringOrEmpty(taskId), normalizeDropRateAdjustmentMap(rowAdjustments)])
+    .filter(([taskId, rowAdjustments]) => taskId && Object.keys(rowAdjustments).length > 0));
+}
+
+function normalizeTaskDropRateAdjustmentsEnabled(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value)
+    .map(([taskId, enabled]) => [stringOrEmpty(taskId), enabled])
+    .filter(([taskId, enabled]) => taskId && enabled === false));
+}
+
+function normalizeHazardDropRateAdjustmentsEnabled(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value)
+    .map(([hazardId, enabled]) => [stringOrEmpty(hazardId), enabled])
+    .filter(([hazardId, enabled]) => hazardId && enabled === false));
+}
+
+function validateDropRateAdjustmentMap(value, label) {
+  if (value === undefined || value === null) return [];
+  if (typeof value !== 'object' || Array.isArray(value)) return [`${label} must be an object`];
+  const errors = [];
+  for (const [id, adjustment] of Object.entries(value)) {
+    const key = stringOrEmpty(id);
+    const number = Number(adjustment);
+    if (!key) {
+      errors.push(`${label} keys must be non-empty ids`);
+      continue;
+    }
+    if (!Number.isInteger(number) || number < -100 || number > 100) {
+      errors.push(`${label}.${key} must be an integer from -100 to 100`);
+    }
+  }
+  return errors;
+}
+
+function validateTaskDropRateAdjustments(value, label) {
+  if (value === undefined || value === null) return [];
+  if (typeof value !== 'object' || Array.isArray(value)) return [`${label} must be an object`];
+  return Object.entries(value).flatMap(([taskId, rowAdjustments]) => {
+    const key = stringOrEmpty(taskId);
+    if (!key) return [`${label} keys must be non-empty task ids`];
+    return validateDropRateAdjustmentMap(rowAdjustments, `${label}.${key}`);
+  });
+}
+
+function validateTaskDropRateAdjustmentsEnabled(value, label) {
+  if (value === undefined || value === null) return [];
+  if (typeof value !== 'object' || Array.isArray(value)) return [`${label} must be an object`];
+  const errors = [];
+  for (const [taskId, enabled] of Object.entries(value)) {
+    const key = stringOrEmpty(taskId);
+    if (!key) {
+      errors.push(`${label} keys must be non-empty task ids`);
+      continue;
+    }
+    if (typeof enabled !== 'boolean') {
+      errors.push(`${label}.${key} must be a boolean`);
+    }
+  }
+  return errors;
+}
+
+function validateHazardDropRateAdjustmentsEnabled(value, label) {
+  if (value === undefined || value === null) return [];
+  if (typeof value !== 'object' || Array.isArray(value)) return [`${label} must be an object`];
+  const errors = [];
+  for (const [hazardId, enabled] of Object.entries(value)) {
+    const key = stringOrEmpty(hazardId);
+    if (!key) {
+      errors.push(`${label} keys must be non-empty hazard ids`);
+      continue;
+    }
+    if (typeof enabled !== 'boolean') {
+      errors.push(`${label}.${key} must be a boolean`);
+    }
+  }
+  return errors;
 }
 
 function trimmedOrDefault(value, fallback) {

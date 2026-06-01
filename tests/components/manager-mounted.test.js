@@ -22,6 +22,7 @@ const sharedComponentNames = [
 
 let tempRoot;
 let Component;
+let EnvironmentEditViewComponent;
 let mounted;
 let target;
 
@@ -48,6 +49,32 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/TagsCategoriesView.svelte');
+  for (const environmentComponent of [
+    'EnvironmentEditorTabs',
+    'EnvironmentOverviewTab',
+    'EnvironmentTasksTab',
+    'EnvironmentHazardsTab',
+    'EnvironmentValidationTab',
+    'EnvironmentRightInspector',
+    'EnvironmentSummaryInspector',
+    'RecordInspector',
+    'CompositionList',
+    'CompositionStatePill',
+    'RuntimeStatePill',
+    'MatchingEvidenceChips',
+    'OverrideIndicator',
+    'CompositionModeControl'
+  ]) {
+    writeCompiledSvelte(`src/ui/svelte/apps/manager/environment/${environmentComponent}.svelte`);
+  }
+  for (const environmentModule of ['environmentReadiness.js']) {
+    const moduleDestination = join(tempRoot, `src/ui/svelte/apps/manager/environment/${environmentModule}`);
+    mkdirSync(dirname(moduleDestination), { recursive: true });
+    writeFileSync(
+      moduleDestination,
+      readFileSync(resolve(repoRoot, `src/ui/svelte/apps/manager/environment/${environmentModule}`), 'utf8')
+    );
+  }
   for (const componentName of sharedComponentNames) {
     writeCompiledSvelte(`src/ui/svelte/components/${componentName}.svelte`);
   }
@@ -712,6 +739,18 @@ function createStore(calls = [], options = {}) {
       calls.push(['confirmDiscardDirtyEssenceDraft']);
       return options.confirmDiscardEssenceResult ?? true;
     },
+    confirmDiscardDirtyComponentDraft: () => {
+      calls.push(['confirmDiscardDirtyComponentDraft']);
+      return options.confirmDiscardComponentResult ?? true;
+    },
+    confirmDiscardDirtyGatheringTaskDraft: () => {
+      calls.push(['confirmDiscardDirtyGatheringTaskDraft']);
+      return options.confirmDiscardGatheringTaskResult ?? true;
+    },
+    confirmDiscardDirtyGatheringHazardDraft: () => {
+      calls.push(['confirmDiscardDirtyGatheringHazardDraft']);
+      return options.confirmDiscardGatheringHazardResult ?? true;
+    },
     selectEnvironment: (id) => {
       calls.push(['selectEnvironment', id]);
       viewState.update(state => ({
@@ -898,6 +937,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     Component = (await import(pathToFileURL(join(
       tempRoot,
       'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte.js'
+    )))).default;
+    EnvironmentEditViewComponent = (await import(pathToFileURL(join(
+      tempRoot,
+      'src/ui/svelte/apps/manager/EnvironmentEditView.svelte.js'
     )))).default;
   });
 
@@ -2472,14 +2515,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(Array.from(modifierPills).some(pill => pill.classList.contains('is-positive') && pill.textContent.includes('Deep Night') && pill.textContent.includes('+20%')));
     assert.ok(Array.from(modifierPills).some(pill => pill.classList.contains('is-negative') && pill.textContent.includes('Clear Sky') && pill.textContent.includes('-15%')));
     assert.ok(Array.from(modifierPills).some(pill => pill.classList.contains('is-neutral') && pill.textContent.includes('High Day') && pill.textContent.includes('+0%')));
-    assert.equal(populatedDropRow.querySelector('[aria-label="Duplicate drop rule"]'), null);
-    assert.equal(populatedDropRow.querySelector('[aria-label="Delete drop rule"]'), null);
+    assert.equal(populatedDropRow.querySelector('[aria-label="Duplicate"]'), null);
+    assert.equal(populatedDropRow.querySelector('[aria-label="Delete"]'), null);
     const selectedDropInspector = target.querySelector('[data-gathering-task-drop-inspector]');
     const selectedDropActions = selectedDropInspector.querySelector('.manager-drop-editor-actions');
     assert.ok(selectedDropActions);
     assert.ok(selectedDropActions.previousElementSibling?.classList.contains('manager-inspector-title-row'));
-    assert.ok(selectedDropActions.querySelector('[aria-label="Duplicate drop rule"]'));
-    assert.ok(selectedDropActions.querySelector('[aria-label="Delete drop rule"]'));
+    assert.ok(selectedDropActions.querySelector('[aria-label="Duplicate"]'));
+    assert.ok(selectedDropActions.querySelector('[aria-label="Delete"]'));
     assert.equal(selectedDropInspector.textContent.includes('Drop component'), false);
     assert.equal(selectedDropInspector.textContent.includes('Select a component'), false);
     const inspectorRateEditor = selectedDropInspector.querySelector('[data-gathering-drop-inspector-rate]');
@@ -2687,7 +2730,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] .manager-drop-rate-percent input').value, '25');
-    target.querySelector('[data-gathering-task-drop-inspector] [aria-label="Duplicate drop rule"]').click();
+    target.querySelector('[data-gathering-task-drop-inspector] [aria-label="Duplicate"]').click();
     await tick();
     flushSync();
     assert.ok(target.querySelector('[data-gathering-task-reward-rule-notice]'));
@@ -2744,10 +2787,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Weather conditions'));
     assert.ok(target.textContent.includes('Regions'));
     assert.ok(target.textContent.includes('Biomes'));
-    assert.ok(target.textContent.includes('These values control current time matching for gathering tasks and hazards.'));
-    assert.ok(target.textContent.includes('These values control current weather matching for gathering tasks and hazards.'));
-    assert.ok(target.textContent.includes('Environments use one region. Labels can be renamed without changing ids.'));
-    assert.ok(target.textContent.includes('Environments can use multiple biomes. Left-click the coloured icon to edit icon; right-click to edit colour.'));
+    assert.ok(target.textContent.includes('These values control current time matching for gathering tasks and hazards. Click the name of a time of day to edit it.'));
+    assert.ok(target.textContent.includes('These values control weather matching for gathering tasks and hazards. Click the name of a condition to edit it.'));
+    assert.ok(target.textContent.includes('Environments use one region. Click the name of a region to edit it.'));
+    assert.ok(target.textContent.includes('Environments can have multiple biomes. Left-click the icon to swap it out, right-click to change the colour.'));
     assert.equal(target.querySelectorAll('.manager-condition-add input').length, 4);
     assert.equal(target.querySelectorAll('.manager-condition-add .essence-icon-picker-trigger.icon-only').length, 3);
     assert.equal(target.querySelectorAll('.manager-color-picker-trigger').length, 1);
@@ -2886,9 +2929,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     biomeColorTrigger.getBoundingClientRect = originalBiomeTriggerRect;
     assert.equal(target.querySelector('.manager-gathering-settings-summary'), null);
     assert.equal(target.querySelector('[data-gathering-rule-fact]'), null);
-    assert.ok(target.querySelector('.manager-inspector').textContent.includes('Choose which successful drop rows are granted.'));
-    assert.ok(target.querySelector('.manager-inspector').textContent.includes('Choose which matching hazards are applied after a gathering roll.'));
-    assert.ok(target.querySelector('.manager-inspector').textContent.includes('Decide whether selected hazards still allow the gathering attempt to succeed.'));
+    assert.ok(target.querySelector('.manager-inspector').textContent.includes('Choose how rewards are granted.'));
+    assert.ok(target.querySelector('.manager-inspector').textContent.includes('Choose how matching hazards are applied after a gathering roll.'));
+    assert.ok(target.querySelector('.manager-inspector').textContent.includes('Decide whether rolling a hazard still allows the gathering attempt to succeed.'));
     const rewardsSelect = target.querySelector('#manager-gathering-rule-rewards');
     const hazardsSelect = target.querySelector('#manager-gathering-rule-hazards');
     assert.deepEqual(
@@ -2904,7 +2947,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Gathering succeeds'));
     assert.ok(target.querySelector('.manager-inspector [data-gathering-inspector-rules]'));
     assert.equal(target.querySelector('.manager-inspector [data-gathering-inspector-rules] h2').textContent.trim(), 'Rules');
-    assert.equal(target.querySelectorAll('.manager-inspector [data-gathering-inspector-rules] select').length, 5);
+    assert.equal(target.querySelectorAll('.manager-inspector [data-gathering-inspector-rules] select').length, 8);
     assert.equal(target.querySelector('.manager-inspector [data-gathering-rule-stepper]'), null);
     assert.equal(
       target.querySelector('.manager-inspector').textContent.includes('Selected environment'),
@@ -2934,7 +2977,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(forestRow.querySelector('[aria-label="Edit Moonlit Forest"]'));
     assert.ok(forestRow.querySelector('[aria-label="Duplicate Moonlit Forest"]'));
     assert.ok(forestRow.querySelector('[aria-label="Delete Moonlit Forest"]'));
-    assert.ok(forestRow.querySelector('.manager-environment-reorder-stack'));
+    assert.equal(forestRow.querySelector('.manager-environment-reorder-stack'), null, 'environment rows should no longer render reorder controls');
     assert.ok(target.querySelector('.manager-inspector').textContent.includes('Selected environment'));
     assert.equal(
       target.querySelector('.manager-inspector').textContent.includes('Environment actions'),
@@ -2949,11 +2992,6 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.equal(target.querySelectorAll('.manager-environment-row').length, 1);
     assert.ok(target.textContent.includes('Quiet Cavern'));
-    assert.equal(
-      target.querySelector('[data-environment-id="env-cavern"] .manager-environment-reorder-stack [aria-label="Move up"]').disabled,
-      false,
-      'filtered environment move-up should use full list order, not filtered row position'
-    );
 
     const cavernToggle = target.querySelector('[data-environment-id="env-cavern"] .manager-status-toggle');
     cavernToggle.click();
@@ -2968,10 +3006,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.querySelector('[data-environment-id="env-cavern"]').classList.contains('is-selected'));
     assert.ok(calls.some(call => call[0] === 'selectEnvironment' && call[1] === 'env-cavern'));
 
-    target.querySelector('[data-environment-id="env-cavern"] [aria-label="Move up"]').click();
     target.querySelector('[data-environment-id="env-cavern"] [aria-label="Duplicate Quiet Cavern"]').click();
     target.querySelector('[data-environment-id="env-cavern"] [aria-label="Delete Quiet Cavern"]').click();
-    assert.ok(calls.some(call => call[0] === 'moveEnvironmentDraft' && call[1] === 'env-cavern' && call[2] === 'up'));
     assert.ok(calls.some(call => call[0] === 'duplicateEnvironmentDraft' && call[1] === 'env-cavern'));
     assert.ok(calls.some(call => call[0] === 'deleteEnvironmentDraft' && call[1] === 'env-cavern'));
 
@@ -3081,8 +3117,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('[data-gathering-task-drop-inspector]').textContent.includes('Drop component'), false);
     assert.equal(target.querySelector('[data-gathering-task-drop-inspector] [data-gathering-drop-inspector-rate] input[type="text"]').value, '25');
     assert.equal(target.querySelector('[data-gathering-task-drop-inspector] [data-gathering-drop-inspector-count] input').value, '1');
-    assert.equal(target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] [aria-label="Duplicate drop rule"]'), null);
-    assert.equal(target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] [aria-label="Delete drop rule"]'), null);
+    assert.equal(target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] [aria-label="Duplicate"]'), null);
+    assert.equal(target.querySelector('[data-gathering-task-drop-id="drop-nightshade"] [aria-label="Delete"]'), null);
 
     const inspectorSlider = target.querySelector('[data-gathering-task-drop-inspector] input[type="range"]');
     inspectorSlider.value = '100';
@@ -3090,7 +3126,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    target.querySelector('[data-gathering-task-drop-inspector] [aria-label="Duplicate drop rule"]').click();
+    target.querySelector('[data-gathering-task-drop-inspector] [aria-label="Duplicate"]').click();
     await tick();
     flushSync();
     const unresolvedDropsAtRate100 = Array.from(target.querySelectorAll('[data-gathering-task-drop-id]'))
@@ -3099,7 +3135,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     target.querySelector(`[data-gathering-task-drop-id="${addedRow.id}"]`).click();
     await tick();
     flushSync();
-    target.querySelector('[data-gathering-task-drop-inspector] [aria-label="Delete drop rule"]').click();
+    target.querySelector('[data-gathering-task-drop-inspector] [aria-label="Delete"]').click();
     await tick();
     flushSync();
     assert.equal(target.querySelector(`[data-gathering-task-drop-id="${addedRow.id}"]`), null, 'delete should stage removal of the row');
@@ -4348,16 +4384,394 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environment-edit');
-    assert.equal(target.querySelector('.manager-environment-details-band .manager-card-title').textContent.trim(), 'New Gathering Environment');
-    assert.equal(target.querySelector('.manager-inspector'), null);
+    // The mock-matching header puts the environment name in the shared chrome
+    // title and groups Back / Delete / Save there; pills render under the title.
+    assert.match(target.querySelector('.manager-title').textContent, /New Gathering Environment/);
+    assert.ok(target.querySelector('[data-environment-status-pills]'), 'chrome header should render environment status pills');
+    assert.ok(target.querySelector('[data-action="delete-environment"]'), 'chrome header should expose the delete action');
+    // The v2 composition editor owns its own contextual inspector inside the
+    // editor workspace (the manager root no longer renders the shared rail for
+    // this view), defaulting to the environment summary when nothing is selected.
+    assert.ok(target.querySelector('.manager-environment-edit-view[data-environment-editor]'), 'environment-edit should mount the composition editor');
+    assert.ok(target.querySelector('.manager-environment-inspector'), 'composition editor should render its own inspector rail');
+    assert.ok(target.querySelector('[data-environment-summary-inspector]'), 'inspector should default to the environment summary with no selection');
     assert.ok(calls.some(call => call[0] === 'createEnvironmentDraft'));
   });
 
-  // NOTE: previously covered tests for environment-edit input wiring and validation
-  // tab routing were removed when the environment editor was placeholder'd out for
-  // redesign. The store-level dirty-draft, cancel, and validation behaviours remain
-  // covered by tests/stores/adminStore.test.js. Reinstate mounted coverage when the
-  // new editor lands.
+  it('protects dirty environment edit drafts when leaving via the back button', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { confirmDiscardResult: false }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environment-edit');
+
+    const backButton = Array.from(target.querySelectorAll('.manager-header-actions .manager-button'))
+      .find(button => button.textContent.includes('Back to environments'));
+    assert.ok(backButton, 'env-edit header should render a Back to environments button');
+    backButton.click();
+    await tick();
+    flushSync();
+
+    assert.ok(calls.some(call => call[0] === 'confirmDiscardDirtyEnvironmentDraft'), 'clicking Back with a dirty draft should ask the store to confirm discard');
+    assert.equal(calls.filter(call => call[0] === 'cancelEnvironmentDraft').length, 0, 'declining the confirm should not run cancelEnvironmentDraft');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environment-edit', 'declining the confirm should keep the editor open');
+  });
+
+  it('omits source and action controls from mounted task and hazard record inspectors', async () => {
+    const updateCalls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(EnvironmentEditViewComponent, {
+      target,
+      props: {
+        environmentDraft: {
+          id: 'env-forest',
+          craftingSystemId: 'alchemy',
+          name: 'Moonlit Forest',
+          enabled: true,
+          selectionMode: 'targeted',
+          compositionMode: 'automatic',
+          taskDropRateAdjustments: { 'task-forage': { 'drop-herb': 15, 'drop-root': -10 } },
+          taskDropRateAdjustmentsEnabled: {}
+        },
+        composition: {
+          compositionMode: 'automatic',
+          conditions: {},
+          counts: { availableTasks: 1, availableHazards: 1 },
+          tasks: [{
+            id: 'task-forage',
+            record: { name: 'Forage Herbs', img: 'icons/svg/item-bag.svg' },
+            compositionState: 'includedByMatch',
+            runtimeState: 'available',
+            libraryEnabled: true,
+            matches: true,
+            conditionsMet: true,
+            evidence: {
+              biome: { state: 'match', recordValues: ['forest', 'desert'], envValues: ['forest'], applicable: true },
+              region: { state: 'mismatch', recordValues: ['south'], envValues: ['north'], applicable: true },
+              weather: { state: 'mismatch', recordValues: ['storm'], envValues: ['clear'], applicable: true },
+              time: { state: 'any', recordValues: [], envValues: ['day'], applicable: true },
+              danger: { state: 'any', recordValues: ['deadly'], envValues: ['dangerous'], applicable: false }
+            },
+            dropRateAdjustmentsEnabled: true,
+            dropRateAdjustmentRows: [{
+              id: 'drop-herb',
+              name: 'Moon Herb',
+              img: 'icons/consumables/plants/leaf-green.webp',
+              componentId: 'c1',
+              quantity: 1,
+              baseDropRate: 40,
+              adjustment: 15,
+              effectiveDropRate: 55,
+              hasDropRateAdjustment: true
+            }, {
+              id: 'drop-root',
+              name: 'Moon Root',
+              img: 'icons/consumables/plants/root-brown.webp',
+              componentId: 'c2',
+              quantity: 1,
+              baseDropRate: 30,
+              adjustment: -10,
+              effectiveDropRate: 20,
+              hasDropRateAdjustment: true
+            }]
+          }],
+          hazards: [{
+            id: 'hazard-thorns',
+            record: { name: 'Thorn Snare', img: 'icons/svg/hazard.svg', dropRate: 10 },
+            compositionState: 'includedByMatch',
+            runtimeState: 'available',
+            libraryEnabled: true,
+            matches: true,
+            conditionsMet: true,
+            evidence: {
+              biome: { state: 'match', recordValues: ['forest'], envValues: ['forest'], applicable: true },
+              region: { state: 'match', recordValues: ['north'], envValues: ['north'], applicable: true },
+              weather: { state: 'match', recordValues: ['clear'], envValues: ['clear'], applicable: true },
+              time: { state: 'mismatch', recordValues: ['night'], envValues: ['day'], applicable: true },
+              danger: { state: 'mismatch', recordValues: ['deadly'], envValues: ['dangerous'], applicable: true }
+            },
+            dropRateAdjustment: 0
+          }]
+        },
+        onUpdateEnvironment: (updates) => updateCalls.push(updates)
+      }
+    });
+    flushSync();
+
+    target.querySelector('[data-environment-tab-button="tasks"]').click();
+    await tick();
+    flushSync();
+    const taskInspector = target.querySelector('[data-record-inspector="task"]');
+    assert.ok(taskInspector, 'tasks tab should render the selected task inspector');
+    assert.ok(taskInspector.querySelector('.manager-inspector-title-row'), 'task inspector should render the selected-record header');
+    assert.ok(taskInspector.textContent.includes('Selected task'), 'task inspector header should identify the selected task');
+    assert.ok(taskInspector.textContent.includes('Forage Herbs'), 'task inspector header should include the selected task name');
+    assert.equal(taskInspector.querySelector('[data-composition-state]')?.dataset.compositionState, 'includedByMatch', 'task inspector header should keep the composition pill');
+    assert.equal(taskInspector.querySelector('[data-runtime-state]')?.dataset.runtimeState, 'available', 'task inspector header should keep the runtime pill');
+    assert.equal(target.querySelector('[data-record-inspector-section="source"]'), null, 'task inspector should not render a Source card');
+    assert.equal(target.querySelector('[data-record-inspector-section="runtime-state"]'), null, 'task inspector should not render a Runtime state card');
+    assert.equal(target.querySelector('.manager-environment-inspector-actions'), null, 'task inspector should not render the selected-record action strip');
+    assert.equal(target.querySelector('.manager-environment-open-source'), null, 'task inspector should not render an open-source CTA');
+    assert.equal(target.querySelector('[data-record-inspector-section="evidence"] .manager-card-title').textContent.trim(), 'Task Environment Matching');
+    const taskEvidenceRows = Array.from(target.querySelectorAll('.manager-environment-evidence-table [data-evidence-field]'));
+    assert.deepEqual(taskEvidenceRows.map(row => row.dataset.evidenceField), ['biome', 'region', 'weather', 'time', 'danger'], 'task evidence table should render all five dimensions');
+    assert.equal(target.querySelector('[data-evidence-field="biome"] [data-evidence-value-state="match"]').textContent.trim(), 'Forest');
+    assert.equal(target.querySelector('[data-evidence-field="biome"] [data-evidence-value-state="mismatch"]').textContent.trim(), 'Desert');
+    assert.equal(target.querySelector('[data-evidence-field="weather"] .manager-environment-evidence-value-pill').classList.contains('is-warning'), true, 'weather mismatch should use warning tone');
+    assert.ok(target.querySelector('[data-evidence-field="danger"]').textContent.includes('Any danger'), 'task evidence table should keep the danger row as unconstrained');
+    const taskOverrides = target.querySelector('[data-record-inspector-section="overrides"]');
+    assert.ok(taskOverrides, 'task inspector should keep the overrides card');
+    assert.ok(taskOverrides.querySelector('[data-task-drop-rate-adjustments-toggle]'), 'task overrides should render the apply toggle');
+    assert.ok(taskOverrides.textContent.includes('Base chance modifiers'), 'task overrides should render the base chance modifier section');
+    assert.ok(taskOverrides.textContent.includes('Base 40%'), 'task overrides should keep the base chance context');
+    assert.ok(taskOverrides.textContent.includes('Effective 55%'), 'task overrides should keep the effective chance context');
+    const taskAdjustmentRow = taskOverrides.querySelector('[data-drop-rate-adjustment="drop-herb"]');
+    assert.ok(taskAdjustmentRow, 'task drop override should render a row for the selected drop');
+    assert.equal(taskAdjustmentRow.classList.contains('is-positive'), true, 'positive modifiers should color the whole task drop override row');
+    assert.equal(taskOverrides.querySelector('[data-drop-rate-adjustment="drop-root"]')?.classList.contains('is-negative'), true, 'negative modifiers should color the whole task drop override row');
+    assert.equal(taskAdjustmentRow.querySelector('.manager-environment-drop-adjustment-thumb')?.getAttribute('src'), 'icons/consumables/plants/leaf-green.webp', 'task drop override should render the drop image');
+    assert.equal(taskAdjustmentRow.querySelector('.manager-environment-drop-adjustment-drop strong')?.textContent.trim(), 'Moon Herb', 'task drop override should render the drop name');
+    assert.equal(taskAdjustmentRow.querySelector('[data-drop-rate-adjustment-base]')?.textContent.trim(), 'Base 40%', 'base rate should be its own one-row item');
+    const taskEffectiveRate = taskAdjustmentRow.querySelector('[data-drop-rate-adjustment-effective]');
+    assert.equal(taskEffectiveRate?.textContent.trim(), 'Effective 55%', 'effective rate should be its own one-row item');
+    const taskClearButton = taskAdjustmentRow.querySelector('.manager-environment-drop-adjustment-clear');
+    assert.ok(taskClearButton, 'task drop override should render an icon-only clear button');
+    assert.equal(taskClearButton.getAttribute('aria-label'), 'Clear');
+    assert.equal(taskClearButton.getAttribute('title'), 'Clear');
+    assert.equal(taskClearButton.textContent.trim(), '', 'clear button should not render visible text');
+    assert.equal(taskClearButton.parentElement?.classList.contains('manager-environment-drop-adjustment-controls'), true, 'clear button should stay inside the task drop control row');
+    assert.equal(taskEffectiveRate?.nextElementSibling, taskClearButton, 'clear button should sit immediately after the effective rate block');
+    const taskAdjustmentInput = taskOverrides.querySelector('[data-drop-rate-adjustment="drop-herb"] [data-drop-rate-adjustment-input]');
+    assert.ok(taskAdjustmentInput, 'task drop override should render a custom percent input');
+    assert.equal(taskAdjustmentInput.getAttribute('type'), 'text');
+    assert.equal(taskAdjustmentInput.value, '+15');
+    assert.equal(taskAdjustmentInput.getAttribute('aria-label'), 'Drop-rate adjustment (-100% to +100%)');
+    const percentShell = taskAdjustmentRow.querySelector('[data-drop-rate-adjustment-percent]');
+    assert.ok(percentShell, 'task drop override should render the percent suffix shell');
+    assert.equal(percentShell.classList.contains('is-positive'), false, 'positive modifiers should not color the percent input shell');
+    assert.equal(taskOverrides.querySelector('[data-drop-rate-adjustment="drop-root"] [data-drop-rate-adjustment-percent]')?.classList.contains('is-negative'), false, 'negative modifiers should not color the percent input shell');
+    assert.equal(taskOverrides.querySelector('[data-drop-rate-adjustment="drop-herb"] input[type="number"]'), null, 'task drop override should not use the plain number input');
+    taskAdjustmentInput.value = '-';
+    taskAdjustmentInput.dispatchEvent(new Event('input', { bubbles: true }));
+    assert.equal(updateCalls.length, 0, 'typing a lone negative sign should remain an intermediate edit state');
+    taskAdjustmentInput.value = '-5';
+    taskAdjustmentInput.dispatchEvent(new Event('input', { bubbles: true }));
+    assert.deepEqual(updateCalls.at(-1), { taskDropRateAdjustments: { 'task-forage': { 'drop-herb': -5, 'drop-root': -10 } } }, 'task percent input should update the stored drop adjustment');
+    taskOverrides.querySelector('[data-task-drop-rate-adjustments-toggle]').click();
+    assert.deepEqual(updateCalls.at(-1), { taskDropRateAdjustmentsEnabled: { 'task-forage': false } }, 'turning the toggle off should preserve stored values and only disable application');
+
+    target.querySelector('[data-environment-tab-button="hazards"]').click();
+    await tick();
+    flushSync();
+    const hazardInspector = target.querySelector('[data-record-inspector="hazard"]');
+    assert.ok(hazardInspector, 'hazards tab should render the selected hazard inspector');
+    assert.ok(hazardInspector.querySelector('.manager-inspector-title-row'), 'hazard inspector should render the selected-record header');
+    assert.ok(hazardInspector.textContent.includes('Selected hazard'), 'hazard inspector header should identify the selected hazard');
+    assert.ok(hazardInspector.textContent.includes('Thorn Snare'), 'hazard inspector header should include the selected hazard name');
+    assert.equal(hazardInspector.querySelector('[data-composition-state]')?.dataset.compositionState, 'includedByMatch', 'hazard inspector header should keep the composition pill');
+    assert.equal(hazardInspector.querySelector('[data-runtime-state]')?.dataset.runtimeState, 'available', 'hazard inspector header should keep the runtime pill');
+    assert.equal(target.querySelector('[data-record-inspector-section="source"]'), null, 'hazard inspector should not render a Source card');
+    assert.equal(target.querySelector('[data-record-inspector-section="runtime-state"]'), null, 'hazard inspector should not render a Runtime state card');
+    assert.equal(target.querySelector('[data-record-inspector-section="hazard-runtime"]'), null, 'hazard inspector should not render a Hazard runtime card');
+    assert.equal(target.querySelector('.manager-environment-inspector-actions'), null, 'hazard inspector should not render the selected-record action strip');
+    assert.equal(target.querySelector('.manager-environment-open-source'), null, 'hazard inspector should not render an open-source CTA');
+    assert.equal(target.querySelector('[data-record-inspector-section="evidence"] .manager-card-title').textContent.trim(), 'Hazard Environment Matching');
+    const hazardEvidenceRows = Array.from(target.querySelectorAll('.manager-environment-evidence-table [data-evidence-field]'));
+    assert.deepEqual(hazardEvidenceRows.map(row => row.dataset.evidenceField), ['biome', 'region', 'weather', 'time', 'danger'], 'hazard evidence table should render all five dimensions');
+    assert.equal(target.querySelector('[data-evidence-field="danger"] [data-evidence-value-state="mismatch"]').textContent.trim(), 'Deadly');
+    assert.equal(target.querySelector('[data-evidence-field="danger"] .manager-environment-evidence-value-pill').classList.contains('is-danger'), true, 'danger mismatch should use danger tone');
+    const hazardOverrides = target.querySelector('[data-record-inspector-section="overrides"]');
+    assert.ok(hazardOverrides, 'hazard inspector should keep the overrides card');
+    assert.ok(hazardOverrides.textContent.includes('Environment overrides'), 'hazard overrides card should keep its title');
+    assert.ok(hazardOverrides.textContent.includes('Base chance modifier'), 'hazard overrides should render the singular base-chance-modifier heading');
+    assert.ok(hazardOverrides.querySelector('[data-hazard-drop-rate-adjustments-toggle]'), 'hazard overrides should render the apply toggle');
+    const hazardAdjustmentRow = hazardOverrides.querySelector('[data-drop-rate-adjustment="hazard-thorns"]');
+    assert.ok(hazardAdjustmentRow, 'hazard override should render a single row card for the selected hazard');
+    assert.equal(hazardAdjustmentRow.classList.contains('is-task-drop'), true, 'hazard override row should reuse the task-drop card layout');
+    assert.equal(hazardAdjustmentRow.querySelector('.manager-environment-drop-adjustment-thumb')?.getAttribute('src'), 'icons/svg/hazard.svg', 'hazard override should render the hazard image');
+    assert.equal(hazardAdjustmentRow.querySelector('.manager-environment-drop-adjustment-drop strong')?.textContent.trim(), 'Thorn Snare', 'hazard override should render the hazard name');
+    assert.equal(hazardAdjustmentRow.querySelector('[data-drop-rate-adjustment-base]')?.textContent.trim(), 'Base 10%', 'hazard base rate should be its own one-row item');
+    assert.equal(hazardAdjustmentRow.querySelector('[data-drop-rate-adjustment-effective]')?.textContent.trim(), 'Effective 10%', 'hazard effective rate should be its own one-row item');
+    const hazardAdjustmentInput = hazardAdjustmentRow.querySelector('[data-drop-rate-adjustment-input]');
+    assert.ok(hazardAdjustmentInput, 'hazard override should render the custom percent input');
+    assert.equal(hazardAdjustmentInput.getAttribute('type'), 'text', 'hazard override input should use the text percentage input formatting');
+    assert.equal(hazardAdjustmentRow.querySelector('input[type="number"]'), null, 'hazard override should no longer use the plain number input');
+    assert.ok(hazardAdjustmentRow.querySelector('.manager-environment-drop-adjustment-clear'), 'hazard override should render the icon-only clear button');
+    hazardAdjustmentInput.value = '-5';
+    hazardAdjustmentInput.dispatchEvent(new Event('input', { bubbles: true }));
+    assert.deepEqual(updateCalls.at(-1), { hazardDropRateAdjustments: { 'hazard-thorns': -5 } }, 'hazard percent input should update the stored hazard adjustment');
+    hazardOverrides.querySelector('[data-hazard-drop-rate-adjustments-toggle]').click();
+    assert.deepEqual(updateCalls.at(-1), { hazardDropRateAdjustmentsEnabled: { 'hazard-thorns': false } }, 'turning the hazard toggle off should preserve stored values and only disable application');
+  });
+
+  it('routes validation issue actions to the matching composition tab and selected record', async () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(EnvironmentEditViewComponent, {
+      target,
+      props: {
+        environmentDraft: {
+          id: 'env-forest',
+          craftingSystemId: 'alchemy',
+          name: 'Moonlit Forest',
+          description: 'Old trees and moonlit herbs.',
+          enabled: true,
+          selectionMode: 'targeted',
+          compositionMode: 'automatic',
+          biomes: ['forest'],
+          dangerLevel: 'dangerous',
+          sceneUuid: 'Scene.forest'
+        },
+        composition: {
+          compositionMode: 'automatic',
+          counts: { availableTasks: 1, unavailableHazards: 1, availableHazards: 0 },
+          tasks: [{
+            id: 'task-moon-herbs',
+            kind: 'task',
+            record: { name: 'Gather Moon Herbs', description: '', img: 'icons/svg/item-bag.svg' },
+            compositionState: 'includedByMatch',
+            runtimeState: 'available',
+            evidence: {}
+          }],
+          hazards: [{
+            id: 'hazard-thorns',
+            kind: 'hazard',
+            record: { name: 'Thorn Snare', description: 'Tangled thorns.', img: 'icons/svg/hazard.svg', dropRate: 10 },
+            compositionState: 'includedButUnavailable',
+            runtimeState: 'unavailable',
+            evidence: {}
+          }]
+        }
+      }
+    });
+    flushSync();
+
+    target.querySelector('[data-environment-tab-button="validation"]').click();
+    await tick();
+    flushSync();
+
+    Array.from(target.querySelectorAll('.manager-environment-issue-action'))
+      .find(button => button.textContent.includes('View hazard'))
+      .click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('[data-environment-tab-button="hazards"]').getAttribute('aria-selected'), 'true');
+    assert.ok(target.querySelector('[data-environment-tab="hazards"] [data-record-id="hazard-thorns"]').classList.contains('is-selected'));
+    assert.ok(target.querySelector('[data-record-inspector="hazard"]').textContent.includes('Thorn Snare'));
+
+    target.querySelector('[data-environment-tab-button="validation"]').click();
+    await tick();
+    flushSync();
+
+    Array.from(target.querySelectorAll('.manager-environment-issue-action'))
+      .find(button => button.textContent.includes('View task'))
+      .click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('[data-environment-tab-button="tasks"]').getAttribute('aria-selected'), 'true');
+    assert.ok(target.querySelector('[data-environment-tab="tasks"] [data-record-id="task-moon-herbs"]').classList.contains('is-selected'));
+    assert.ok(target.querySelector('[data-record-inspector="task"]').textContent.includes('Gather Moon Herbs'));
+  });
+
+  it('uses configured danger choices while preserving stale current danger values', async () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(EnvironmentEditViewComponent, {
+      target,
+      props: {
+        environmentDraft: {
+          id: 'env-forest',
+          craftingSystemId: 'alchemy',
+          name: 'Moonlit Forest',
+          description: 'Old trees and moonlit herbs.',
+          enabled: true,
+          selectionMode: 'targeted',
+          compositionMode: 'automatic',
+          biomes: ['forest'],
+          dangerLevel: 'extreme'
+        },
+        composition: { compositionMode: 'automatic', counts: {}, tasks: [], hazards: [] },
+        dangerOptions: [
+          { id: 'safe', label: 'Camp safe' },
+          { id: 'hazardous', label: 'Rough going' }
+        ]
+      }
+    });
+    flushSync();
+
+    const dangerSelect = target.querySelector('[data-environment-field="dangerLevel"]');
+    assert.equal(dangerSelect.value, 'extreme');
+    assert.deepEqual(Array.from(dangerSelect.options).map(option => option.value), ['extreme', 'safe', 'hazardous']);
+    assert.deepEqual(Array.from(dangerSelect.options).map(option => option.textContent.trim()), ['Extreme', 'Camp safe', 'Rough going']);
+  });
+
+  it('scores inspector danger evidence against the six-level canonical scale', async () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(EnvironmentEditViewComponent, {
+      target,
+      props: {
+        environmentDraft: {
+          id: 'env-forest',
+          craftingSystemId: 'alchemy',
+          name: 'Moonlit Forest',
+          description: 'Old trees and moonlit herbs.',
+          enabled: true,
+          selectionMode: 'targeted',
+          compositionMode: 'automatic',
+          biomes: ['forest'],
+          dangerLevel: 'dangerous'
+        },
+        composition: {
+          compositionMode: 'automatic',
+          counts: { availableTasks: 1 },
+          tasks: [{
+            id: 'task-danger',
+            kind: 'task',
+            record: { name: 'Read the Trail', description: 'Judge the safest route.', img: 'icons/svg/item-bag.svg' },
+            compositionState: 'includedByMatch',
+            runtimeState: 'available',
+            evidence: {
+              biome: { state: 'any', recordValues: [], envValues: ['forest'], applicable: true },
+              region: { state: 'any', recordValues: [], envValues: [], applicable: true },
+              weather: { state: 'any', recordValues: [], envValues: [], applicable: true },
+              time: { state: 'any', recordValues: [], envValues: [], applicable: true },
+              danger: { state: 'match', recordValues: ['unsafe', 'extreme'], envValues: ['dangerous'], applicable: true }
+            }
+          }],
+          hazards: []
+        }
+      }
+    });
+    flushSync();
+
+    target.querySelector('[data-environment-tab-button="tasks"]').click();
+    await tick();
+    flushSync();
+
+    const dangerPills = Array.from(target.querySelectorAll('[data-evidence-field="danger"] [data-evidence-value-state]'));
+    assert.deepEqual(dangerPills.map(pill => pill.textContent.trim()), ['Unsafe', 'Extreme']);
+    assert.deepEqual(dangerPills.map(pill => pill.dataset.evidenceValueState), ['match', 'mismatch']);
+    assert.equal(dangerPills[0].classList.contains('is-positive'), true, 'unsafe should rank below dangerous');
+    assert.equal(dangerPills[1].classList.contains('is-danger'), true, 'extreme should rank above dangerous');
+  });
 
   it('clears hidden component facet filters when the selected system changes', async () => {
     const store = createStore();

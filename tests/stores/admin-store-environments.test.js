@@ -186,12 +186,13 @@ function validateEnvironmentForFakeCreate(environment) {
 function createServices({
   systems = [makeSystem()],
   environments = [],
+  gatheringConfig = {},
   updateError = null,
   confirmResult = true,
   sceneOptions = [],
   rollTableOptions = []
 } = {}) {
-  const settings = { lastManagedCraftingSystem: '' };
+  const settings = { lastManagedCraftingSystem: '', gatheringConfig };
   const listCalls = [];
   const confirmCalls = [];
   const calls = {
@@ -829,6 +830,100 @@ describe('adminStore gathering environments tab state', () => {
     await store.selectEnvironment('environment-b');
     assert.equal(get(store.viewState).environmentDraftDirty, false);
     assert.equal(get(store.viewState).environmentDraft.id, 'environment-b');
+  });
+
+  it('summarizes task and hazard drop-rate adjustments in environment composition view state', async () => {
+    const services = createServices({
+      systems: [makeSystem({
+        id: 'system-a',
+        features: { gathering: true },
+        components: [{ id: 'ore', name: 'Iron Ore', img: 'ore.png' }]
+      })],
+      environments: [makeEnvironment({
+        id: 'environment-a',
+        tasks: [],
+        taskDropRateAdjustments: { 'task-library': { 'drop-ore': 25 } },
+        hazardDropRateAdjustments: { 'hazard-cave-in': -10 }
+      })],
+      gatheringConfig: {
+        systems: {
+          'system-a': {
+            tasks: [
+              { id: 'task-library', name: 'Mine Ore', dropRows: [{ id: 'drop-ore', componentId: 'ore', quantity: 1, dropRate: 40 }] }
+            ],
+            hazards: [
+              { id: 'hazard-cave-in', name: 'Cave-in', dropRate: 30 }
+            ]
+          }
+        }
+      }
+    });
+    const store = createAdminStore(services);
+
+    await store.selectSystem('system-a');
+    let composition = get(store.viewState).environmentComposition;
+    assert.equal(composition.tasks[0].hasDropRateAdjustment, true);
+    assert.equal(composition.tasks[0].dropRateAdjustmentsEnabled, true);
+    assert.equal(composition.tasks[0].dropRateAdjustmentRows[0].name, 'Iron Ore');
+    assert.equal(composition.tasks[0].dropRateAdjustmentRows[0].img, 'ore.png');
+    assert.equal(composition.tasks[0].dropRateAdjustmentRows[0].adjustment, 25);
+    assert.equal(composition.tasks[0].dropRateAdjustmentRows[0].effectiveDropRate, 65);
+    assert.equal(composition.hazards[0].hasDropRateAdjustment, true);
+    assert.equal(composition.hazards[0].dropRateAdjustment, -10);
+    assert.equal(composition.hazards[0].effectiveDropRate, 20);
+
+    store.updateEnvironmentDraft({
+      taskDropRateAdjustments: { 'task-library': { 'drop-ore': 0 } },
+      hazardDropRateAdjustments: { 'hazard-cave-in': 0 }
+    });
+    composition = get(store.viewState).environmentComposition;
+    assert.equal(composition.tasks[0].hasDropRateAdjustment, false);
+    assert.equal(composition.hazards[0].hasDropRateAdjustment, false);
+    assert.deepEqual(get(store.viewState).environmentDraft.taskDropRateAdjustments, {});
+    assert.deepEqual(get(store.viewState).environmentDraft.hazardDropRateAdjustments, {});
+
+    store.updateEnvironmentDraft({
+      taskDropRateAdjustments: { 'task-library': { 'drop-ore': 25 } },
+      taskDropRateAdjustmentsEnabled: { 'task-library': false }
+    });
+    composition = get(store.viewState).environmentComposition;
+    assert.equal(composition.tasks[0].dropRateAdjustmentsEnabled, false);
+    assert.equal(composition.tasks[0].hasDropRateAdjustment, false);
+    assert.equal(composition.tasks[0].hasStoredDropRateAdjustment, true);
+    assert.equal(composition.tasks[0].dropRateAdjustmentRows[0].adjustment, 25);
+    assert.equal(composition.tasks[0].dropRateAdjustmentRows[0].effectiveDropRate, 40);
+    assert.deepEqual(get(store.viewState).environmentDraft.taskDropRateAdjustmentsEnabled, { 'task-library': false });
+
+    store.updateEnvironmentDraft({
+      taskDropRateAdjustmentsEnabled: { 'task-library': true }
+    });
+    composition = get(store.viewState).environmentComposition;
+    assert.equal(composition.tasks[0].dropRateAdjustmentsEnabled, true);
+    assert.equal(composition.tasks[0].hasDropRateAdjustment, true);
+    assert.equal(composition.tasks[0].dropRateAdjustmentRows[0].effectiveDropRate, 65);
+    assert.deepEqual(get(store.viewState).environmentDraft.taskDropRateAdjustmentsEnabled, {});
+
+    store.updateEnvironmentDraft({
+      hazardDropRateAdjustments: { 'hazard-cave-in': -10 },
+      hazardDropRateAdjustmentsEnabled: { 'hazard-cave-in': false }
+    });
+    composition = get(store.viewState).environmentComposition;
+    assert.equal(composition.hazards[0].dropRateAdjustmentsEnabled, false);
+    assert.equal(composition.hazards[0].hasDropRateAdjustment, false);
+    assert.equal(composition.hazards[0].hasStoredDropRateAdjustment, true);
+    assert.equal(composition.hazards[0].dropRateAdjustment, -10);
+    assert.equal(composition.hazards[0].effectiveDropRate, 30);
+    assert.deepEqual(get(store.viewState).environmentDraft.hazardDropRateAdjustmentsEnabled, { 'hazard-cave-in': false });
+
+    store.updateEnvironmentDraft({
+      hazardDropRateAdjustmentsEnabled: { 'hazard-cave-in': true }
+    });
+    composition = get(store.viewState).environmentComposition;
+    assert.equal(composition.hazards[0].dropRateAdjustmentsEnabled, true);
+    assert.equal(composition.hazards[0].hasDropRateAdjustment, true);
+    assert.equal(composition.hazards[0].hasStoredDropRateAdjustment, true);
+    assert.equal(composition.hazards[0].effectiveDropRate, 20);
+    assert.deepEqual(get(store.viewState).environmentDraft.hazardDropRateAdjustmentsEnabled, {});
   });
 
   it('create, duplicate, delete, and reorder use the environment store and refresh selection safely', async () => {

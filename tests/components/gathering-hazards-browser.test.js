@@ -62,6 +62,8 @@ describe('GatheringHazardsBrowserView source contract', () => {
       assert.ok(browserSource.includes(helper), `helper ${helper} should be present`);
     }
     assert.ok(browserSource.includes('data-gathering-hazard-tags'), 'tags cell exposes a data attribute');
+    assert.ok(browserSource.includes("icon: 'fa-solid fa-triangle-exclamation'"), 'danger chips should render a triangle warning icon');
+    assert.ok(browserSource.includes('{#if chip.icon}<i class={chip.icon} aria-hidden="true"></i>{/if}'), 'row chip icons should be decorative');
     assert.equal(/function\s+activeEnvironmentCount\s*\(/.test(browserSource), false, 'activeEnvironmentCount should be removed');
     assert.equal(/function\s+dropRateLabel\s*\(/.test(browserSource), false, 'dropRateLabel should be removed');
   });
@@ -80,7 +82,7 @@ describe('GatheringHazardsBrowserView source contract', () => {
     assert.ok(/[^-]height:\s*\d+px/.test(tagsBlock[0]), 'tags cell must use a fixed height so all rows match');
   });
 
-  it('grows the hazard thumbnail to 64px for the card layout', () => {
+  it('sizes the hazard thumbnail to 64px to match the environments browser rows', () => {
     const thumbBlock = css.match(/\.manager-gathering-hazards-table\s+\.manager-gathering-hazard-identity\s+\.manager-gathering-hazard-thumb\s*\{[^}]*\}/);
     assert.ok(thumbBlock, 'card-layout thumb override should be defined');
     assert.ok(/width:\s*64px/.test(thumbBlock[0]), 'thumb width should be 64px');

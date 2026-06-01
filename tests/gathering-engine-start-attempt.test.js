@@ -30,6 +30,7 @@ function makeEngine({
   createdResults = [],
   usedCatalysts = [],
   richState = null,
+  random = Math.random,
   calls = {}
 } = {}) {
   calls.steps = [];
@@ -151,6 +152,7 @@ function makeEngine({
         return usedCatalysts;
       }
     },
+    random,
     localize: (key, data) => data ? `${key}:${JSON.stringify(data)}` : key
   });
 }
@@ -767,7 +769,9 @@ test('non-GM blind hidden start response does not expose task identity or visibi
   const serialized = JSON.stringify(result);
 
   assert.equal(result.accepted, false);
-  assert.deepEqual(codes(result), ['TASK_HIDDEN']);
+  // The sole task is concealed by its visibility gate, so it is never a blind
+  // candidate; the player gets an opaque "nothing to gather" response.
+  assert.deepEqual(codes(result), ['BLIND_NO_CANDIDATE']);
   assert.equal(result.taskId, null);
   assert.equal(serialized.includes('secret-mooncap-task'), false);
   assert.equal(serialized.includes('Secret Mooncap Patch'), false);
@@ -847,6 +851,7 @@ test('non-GM blind misconfigured start response does not expose task identity, c
   const engine = makeEngine({
     environments: [environment({
       selectionMode: 'blind',
+      rules: { blindCandidateGate: 'allMatching' },
       tasks: [blindTask]
     })],
     visibility: new Map([[
@@ -886,6 +891,7 @@ test('non-GM blind blocked start response does not expose task identity in dupli
   const engine = makeEngine({
     environments: [environment({
       selectionMode: 'blind',
+      rules: { blindCandidateGate: 'allMatching' },
       tasks: [blindTask]
     })],
     activeRuns: new Map([[blindTask.id, { id: 'run-active', taskId: blindTask.id }]]),
@@ -916,6 +922,7 @@ test('non-GM blind catalyst-blocked start response does not expose missing catal
   const engine = makeEngine({
     environments: [environment({
       selectionMode: 'blind',
+      rules: { blindCandidateGate: 'allMatching' },
       tasks: [blindTask]
     })],
     catalystAvailability: { available: false, missing: [{ componentId: 'silver-sickle', taskId: blindTask.id }] },
@@ -943,6 +950,7 @@ test('GM blind blocked start response may expose task identity for inspection', 
   const engine = makeEngine({
     environments: [environment({
       selectionMode: 'blind',
+      rules: { blindCandidateGate: 'allMatching' },
       tasks: [blindTask]
     })],
     activeRuns: new Map([[blindTask.id, { id: 'run-active', taskId: blindTask.id }]])
@@ -953,4 +961,170 @@ test('GM blind blocked start response may expose task identity for inspection', 
   assert.equal(result.accepted, false);
   assert.equal(result.taskId, 'secret-mooncap-task');
   assert.deepEqual(result.blockedReasons[0].data, { taskId: 'secret-mooncap-task' });
+});
+
+test('blind attemptableOnly gate skips a blocked task and starts an attemptable one', async () => {
+  const calls = {};
+  const blocked = task({ id: 'blocked-task', name: 'Blocked', catalysts: [{ componentId: 'rare-herb' }] });
+  const good = task({ id: 'good-task', name: 'Good' });
+  const engine = makeEngine({
+    environments: [environment({ selectionMode: 'blind', tasks: [blocked, good] })],
+    catalystAvailability: (payload) => payload.task.id === 'blocked-task'
+      ? { available: false, missing: [{ componentId: 'rare-herb' }] }
+      : { available: true, missing: [] },
+    calls
+  });
+
+  // GM viewer so the resolved task identity is exposed for the assertion.
+  const result = await engine.startAttempt({ viewer: gmViewer, actor, environmentId: 'env-a' });
+
+  assert.equal(result.taskId, 'good-task');
+  assert.notDeepEqual(codes(result), ['BLIND_NO_CANDIDATE']);
+});
+
+test('blind attemptableOnly gate yields no candidate when the sole task is blocked', async () => {
+  const calls = {};
+  const blocked = task({ id: 'blocked-task', name: 'Blocked', catalysts: [{ componentId: 'rare-herb' }] });
+  const engine = makeEngine({
+    environments: [environment({ selectionMode: 'blind', tasks: [blocked] })],
+    catalystAvailability: { available: false, missing: [{ componentId: 'rare-herb' }] },
+    calls
+  });
+
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a' });
+
+  assert.equal(result.accepted, false);
+  assert.deepEqual(codes(result), ['BLIND_NO_CANDIDATE']);
+  assert.equal(result.taskId, null);
+  assert.deepEqual(result.blockedReasons[0].data, null);
+  assertNoRunMutation(calls);
+});
+
+test('blind selection honors per-task weights with a seeded RNG', async () => {
+  const x = task({ id: 'task-x', name: 'X' });
+  const y = task({ id: 'task-y', name: 'Y' });
+  const makeBlindEnv = () => environment({
+    selectionMode: 'blind',
+    blindSelection: { weights: { 'task-x': 3, 'task-y': 1 } },
+    tasks: [x, y]
+  });
+
+  const low = makeEngine({ environments: [makeBlindEnv()], random: () => 0 });
+  const lowResult = await low.startAttempt({ viewer: gmViewer, actor, environmentId: 'env-a' });
+  assert.equal(lowResult.taskId, 'task-x');
+
+  const high = makeEngine({ environments: [makeBlindEnv()], random: () => 0.95 });
+  const highResult = await high.startAttempt({ viewer: gmViewer, actor, environmentId: 'env-a' });
+  assert.equal(highResult.taskId, 'task-y');
+});
+
+test('blind selection excludes a task weighted to zero', async () => {
+  const x = task({ id: 'task-x', name: 'X' });
+  const y = task({ id: 'task-y', name: 'Y' });
+  const engine = makeEngine({
+    environments: [environment({
+      selectionMode: 'blind',
+      blindSelection: { weights: { 'task-x': 0, 'task-y': 1 } },
+      tasks: [x, y]
+    })],
+    random: () => 0
+  });
+
+  const result = await engine.startAttempt({ viewer: gmViewer, actor, environmentId: 'env-a' });
+  assert.equal(result.taskId, 'task-y');
+});
+
+test('blind allMatching gate keeps blocked tasks in the pool so they can still be selected', async () => {
+  const blocked = task({ id: 'blocked-task', name: 'Blocked', catalysts: [{ componentId: 'rare-herb' }] });
+  const good = task({ id: 'good-task', name: 'Good' });
+  const engine = makeEngine({
+    environments: [environment({
+      selectionMode: 'blind',
+      rules: { blindCandidateGate: 'allMatching' },
+      tasks: [blocked, good]
+    })],
+    catalystAvailability: (payload) => payload.task.id === 'blocked-task'
+      ? { available: false, missing: [{ componentId: 'rare-herb' }] }
+      : { available: true, missing: [] },
+    // Seed the weighted pick to land on the first pool entry (both tasks weight 1 by default).
+    random: () => 0
+  });
+
+  // allMatching ignores attemptability: the blocked task remains a draw candidate
+  // and the attempt is blocked rather than skipping to a usable task.
+  const result = await engine.startAttempt({ viewer: gmViewer, actor, environmentId: 'env-a' });
+  assert.equal(result.taskId, 'blocked-task');
+  assert.deepEqual(codes(result), ['CATALYST_BLOCKED']);
+});
+
+const ironTask = (overrides = {}) => task({
+  resultGroups: [{ id: 'group-iron', name: 'Iron', results: [{ id: 'result-iron', componentId: 'iron', quantity: 1 }] }],
+  ...overrides
+});
+
+test('blind reveal policy onAttempt reveals the resolved task on success', async () => {
+  const captured = [];
+  const engine = makeEngine({
+    environments: [environment({
+      selectionMode: 'blind',
+      rules: { revealPolicy: 'onAttempt', revealScope: 'party' },
+      tasks: [ironTask({ id: 'reveal-task' })]
+    })],
+    richState: { revealTask: async (_actor, payload) => { captured.push(payload); } },
+    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 1 }]
+  });
+
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a' });
+  assert.equal(result.state, 'succeeded');
+  // The blind response stays opaque, but the reveal records the real task id.
+  assert.equal(result.taskId, null);
+  assert.deepEqual(captured, [{ environmentId: 'env-a', taskId: 'reveal-task', scope: 'party' }]);
+});
+
+test('blind reveal policy onSuccess does not reveal a failed attempt', async () => {
+  const captured = [];
+  const engine = makeEngine({
+    environments: [environment({
+      selectionMode: 'blind',
+      rules: { revealPolicy: 'onSuccess' },
+      tasks: [ironTask({ id: 'reveal-task' })]
+    })],
+    richState: { revealTask: async (_actor, payload) => { captured.push(payload); } },
+    routedOutcome: { status: 'failed', resultGroups: [], checkResult: { outcome: 'fail' } }
+  });
+
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a' });
+  assert.equal(result.state, 'failed');
+  assert.deepEqual(captured, []);
+});
+
+test('blind reveal policy never (default) does not reveal', async () => {
+  const captured = [];
+  const engine = makeEngine({
+    environments: [environment({
+      selectionMode: 'blind',
+      tasks: [ironTask({ id: 'reveal-task' })]
+    })],
+    richState: { revealTask: async (_actor, payload) => { captured.push(payload); } },
+    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 1 }]
+  });
+
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a' });
+  assert.equal(result.state, 'succeeded');
+  assert.deepEqual(captured, []);
+});
+
+test('targeted mode never auto-reveals even when the system policy would reveal', async () => {
+  const targetedCaptured = [];
+  const targetedEngine = makeEngine({
+    environments: [environment({
+      selectionMode: 'targeted',
+      rules: { revealPolicy: 'onAttempt' },
+      tasks: [ironTask({ id: 'targeted-task' })]
+    })],
+    richState: { revealTask: async (_actor, payload) => { targetedCaptured.push(payload); } },
+    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 1 }]
+  });
+  await targetedEngine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'targeted-task' });
+  assert.deepEqual(targetedCaptured, []);
 });

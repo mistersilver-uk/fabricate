@@ -217,7 +217,7 @@
         key: `danger:${tag}`,
         kind: 'danger',
         label: dangerLabel(tag),
-        icon: null,
+        icon: 'fa-solid fa-triangle-exclamation',
         pillClass: `manager-danger-tag-pill is-${tag}`
       }));
   }

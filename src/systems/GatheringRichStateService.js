@@ -1,10 +1,12 @@
+import { evaluateEnvironmentMatch } from './gatheringMatch.js';
+
 const FLAG_NAMESPACE = 'fabricate';
 const STATE_FLAG_KEY = 'gatheringState';
 const DEFAULT_CONDITIONS = Object.freeze({ weather: 'clear', timeOfDay: 'day' });
 const DEFAULT_VOCABULARIES = Object.freeze({
   regions: [],
   biomes: ['forest', 'grassland', 'mountain', 'cave', 'coastal', 'swamp', 'desert', 'urban', 'ruins', 'wasteland'],
-  danger: ['safe', 'hazardous', 'dangerous', 'deadly'],
+  danger: ['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme'],
   weather: ['clear', 'cloudy', 'rain', 'storm', 'snow', 'fog', 'wind'],
   timeOfDay: ['dawn', 'day', 'dusk', 'night']
 });
@@ -50,6 +52,9 @@ const LEGACY_DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops']);
 const HAZARD_POLICIES = new Set(['successWithHazard', 'failureWithHazard']);
 const TOOL_BREAKAGE_POLICIES = new Set(['failureOnBreak', 'successDespiteBreak']);
 const BIOME_MODIFIER_AGGREGATIONS = new Set(['cumulative', 'strongestOfEach', 'dominant']);
+const BLIND_CANDIDATE_GATES = new Set(['attemptableOnly', 'allMatching']);
+const REVEAL_POLICIES = new Set(['never', 'onSuccess', 'onAttempt']);
+const REVEAL_SCOPES = new Set(['actor', 'user', 'party', 'global']);
 const CHARACTER_MODIFIER_PROVIDERS = new Set(['dnd5e', 'pf2e', 'macro']);
 const CHARACTER_MODIFIER_OPERATORS = new Set(['+', '-']);
 const ROLL_EXPRESSION_PATTERN = /\d\s*d\s*\d|[*/()]/i;
@@ -60,7 +65,10 @@ const DEFAULT_GATHERING_RULES = Object.freeze({
   hazardLimit: 1,
   hazardPolicy: 'successWithHazard',
   toolBreakagePolicy: 'failureOnBreak',
-  biomeModifierAggregation: 'strongestOfEach'
+  biomeModifierAggregation: 'strongestOfEach',
+  blindCandidateGate: 'attemptableOnly',
+  revealPolicy: 'never',
+  revealScope: 'actor'
 });
 
 const BLOCKED_REASON_KEYS = Object.freeze({
@@ -184,19 +192,26 @@ export class GatheringRichStateService {
           hazardLimit: environment.hazardLimit,
           hazardPolicy: environment.hazardPolicy
         });
+    const compositionMode = environment?.compositionMode === 'manual' ? 'manual' : 'automatic';
     const tasks = [
-      ...normalizeList(environment.tasks),
-      ...normalizeList(libraries.tasks)
-        .filter(task => task?.enabled !== false)
-        .filter(task => this._recordMatchesEnvironment(task, environment, currentConditions, { includeDanger: false, conditionSettings: systemConditions }))
-        .filter(task => this._environmentAllowsLibraryRecord(environment, task.id, 'task'))
-        .map(task => this._libraryTaskToRuntimeTask(task))
+      ...normalizeList(environment.tasks).map(task => this._environmentTaskToRuntimeTask(task, environment)),
+      ...sortRecordsByOrder(
+        normalizeList(libraries.tasks)
+          .filter(task => task?.enabled !== false)
+          .filter(task => this._recordMatchesEnvironment(task, environment, currentConditions, { includeDanger: false, conditionSettings: systemConditions })
+            || this._recordIsForced(environment, task.id, 'task', compositionMode))
+          .filter(task => this._environmentIncludesLibraryRecord(environment, task.id, 'task', compositionMode)),
+        environment?.taskOrder
+      ).map(task => this._libraryTaskToRuntimeTask(task, environment))
     ];
-    const hazards = normalizeList(libraries.hazards)
-      .filter(hazard => hazard?.enabled !== false)
-      .filter(hazard => this._recordMatchesEnvironment(hazard, environment, currentConditions, { includeDanger: true, conditionSettings: systemConditions }))
-      .filter(hazard => this._environmentAllowsLibraryRecord(environment, hazard.id, 'hazard'))
-      .map(hazard => normalizeHazard(hazard));
+    const hazards = sortRecordsByOrder(
+      normalizeList(libraries.hazards)
+        .filter(hazard => hazard?.enabled !== false)
+        .filter(hazard => this._recordMatchesEnvironment(hazard, environment, currentConditions, { includeDanger: true, conditionSettings: systemConditions })
+          || this._recordIsForced(environment, hazard.id, 'hazard', compositionMode))
+        .filter(hazard => this._environmentIncludesLibraryRecord(environment, hazard.id, 'hazard', compositionMode)),
+      environment?.hazardOrder
+    ).map(hazard => applyHazardDropRateAdjustment(normalizeHazard(hazard), environment));
 
     const libraryCharacterModifiers = new Map();
     for (const entry of normalizeList(libraries.characterModifiers)) {
@@ -306,6 +321,12 @@ export class GatheringRichStateService {
     const hazardSnapshots = [];
     const hazardContributions = [];
     for (const hazard of enabledHazards) {
+      // Weather/time are runtime gates: a hazard that does not currently meet its
+      // required weather/timeOfDay never triggers, even if it matched the
+      // environment (region/biome/danger) at composition time.
+      if (evaluateEnvironmentMatch(hazard, environment, conditions, { includeDanger: true }).conditionsMet === false) {
+        continue;
+      }
       const contributions = [];
       const hazardEvidence = [];
       for (const reference of normalizeList(hazard.characterModifiers)) {
@@ -746,18 +767,7 @@ export class GatheringRichStateService {
   }
 
   _recordMatchesEnvironment(record, environment, conditions, { includeDanger, conditionSettings = null }) {
-    const envRegion = normalizeTag(environment?.region);
-    const envBiomes = normalizeTagList(environment?.biomes ?? environment?.biome);
-    const envDanger = normalizeTagList(environment?.dangerTags ?? environment?.risk);
-    const recordRegions = normalizeTagList(Array.isArray(record.regions)
-      ? record.regions
-      : record.region ? [record.region] : []);
-    if (recordRegions.length > 0 && !recordRegions.includes(envRegion)) return false;
-    if (normalizeTagList(record.biomes).length > 0 && !hasAny(normalizeTagList(record.biomes), envBiomes)) return false;
-    if (conditionSettings?.weather?.enabled !== false && normalizeConditionIdList(record.weather).length > 0 && !normalizeConditionIdList(record.weather).includes(normalizeConditionId(conditions.weather))) return false;
-    if (conditionSettings?.timeOfDay?.enabled !== false && normalizeConditionIdList(record.timeOfDay).length > 0 && !normalizeConditionIdList(record.timeOfDay).includes(normalizeConditionId(conditions.timeOfDay))) return false;
-    if (includeDanger && normalizeTagList(record.dangerTags).length > 0 && !hasAny(normalizeTagList(record.dangerTags), envDanger)) return false;
-    return true;
+    return evaluateEnvironmentMatch(record, environment, conditions, { includeDanger, conditionSettings }).matches;
   }
 
   _environmentAllowsLibraryRecord(environment, id, kind) {
@@ -769,8 +779,53 @@ export class GatheringRichStateService {
     return enabled.length === 0 || enabled.includes(String(id));
   }
 
-  _libraryTaskToRuntimeTask(task) {
+  /**
+   * Whether a record is force-included into the environment. Forces are honored
+   * only in manual mode (automatic ignores them, like the enabled allow-list);
+   * a force-included record is composed even when it does not match the
+   * environment context.
+   */
+  _recordIsForced(environment, id, kind, compositionMode = 'automatic') {
+    if (compositionMode !== 'manual') return false;
+    const forcedKey = kind === 'hazard' ? 'forcedHazardIds' : 'forcedTaskIds';
+    return normalizeList(environment?.[forcedKey]).map(String).includes(String(id));
+  }
+
+  /**
+   * Whether a matching, library-enabled record is composed into the
+   * environment, honoring `compositionMode`:
+   * - `automatic`: include every matching record unless explicitly excluded
+   *   (`disabled*Ids`). Any `enabled*Ids` allow-list is ignored — automatic
+   *   means "all matching available unless excluded", so a stale list left
+   *   over from manual mode never suppresses matching records.
+   * - `manual`: include only when explicitly listed (`enabled*Ids`) or
+   *   force-added (`forced*Ids`); stale disabled lists are ignored.
+   */
+  _environmentIncludesLibraryRecord(environment, id, kind, compositionMode = 'automatic') {
+    const enabledKey = kind === 'hazard' ? 'enabledHazardIds' : 'enabledTaskIds';
+    const disabledKey = kind === 'hazard' ? 'disabledHazardIds' : 'disabledTaskIds';
+    const enabled = normalizeList(environment?.[enabledKey]).map(String);
+    const disabled = normalizeList(environment?.[disabledKey]).map(String);
+    if (compositionMode !== 'manual' && disabled.includes(String(id))) return false;
+    if (compositionMode === 'manual') {
+      const forced = normalizeList(environment?.[kind === 'hazard' ? 'forcedHazardIds' : 'forcedTaskIds']).map(String);
+      return enabled.includes(String(id)) || forced.includes(String(id));
+    }
+    return true;
+  }
+
+  _environmentTaskToRuntimeTask(task, environment) {
+    if (!task || typeof task !== 'object') return task;
+    const normalized = cloneJson(task);
+    const rowAdjustments = taskDropRateAdjustmentMap(environment, normalized.id);
+    normalized.dropRows = normalizeList(normalized.dropRows ?? normalized.itemDrops)
+      .map(row => applyDropRateAdjustment(row, rowAdjustments[String(row?.id || '')]));
+    return normalized;
+  }
+
+  _libraryTaskToRuntimeTask(task, environment = null) {
     const normalized = normalizeLibraryTask(task);
+    const rowAdjustments = taskDropRateAdjustmentMap(environment, normalized.id);
     const runtimeTask = {
       id: normalized.id,
       name: normalized.name,
@@ -779,7 +834,7 @@ export class GatheringRichStateService {
       enabled: normalized.enabled,
       resolutionMode: 'd100',
       itemSelectionMode: normalized.itemSelectionMode,
-      dropRows: normalized.dropRows,
+      dropRows: normalized.dropRows.map(row => applyDropRateAdjustment(row, rowAdjustments[row.id])),
       staminaCost: normalized.staminaCost,
       gatheringModifier: normalized.gatheringModifier,
       resultGroups: [{ id: `${normalized.id}-d100`, name: normalized.name, results: [] }],
@@ -1079,6 +1134,50 @@ function normalizeHazard(hazard = {}) {
   };
 }
 
+function normalizeDropRateAdjustmentValue(value) {
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < -100 || number > 100 || number === 0) return 0;
+  return number;
+}
+
+function dropRateAdjustmentMap(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value)
+    .map(([id, adjustment]) => [String(id || '').trim(), normalizeDropRateAdjustmentValue(adjustment)])
+    .filter(([id, adjustment]) => id && adjustment !== 0));
+}
+
+function taskDropRateAdjustmentMap(environment, taskId) {
+  const id = String(taskId || '');
+  const enabledMap = environment?.taskDropRateAdjustmentsEnabled;
+  if (enabledMap && typeof enabledMap === 'object' && !Array.isArray(enabledMap) && enabledMap[id] === false) return {};
+  const taskMaps = environment?.taskDropRateAdjustments;
+  if (!taskMaps || typeof taskMaps !== 'object' || Array.isArray(taskMaps)) return {};
+  return dropRateAdjustmentMap(taskMaps[id]);
+}
+
+function applyDropRateAdjustment(row, adjustment = 0) {
+  const normalizedAdjustment = normalizeDropRateAdjustmentValue(adjustment);
+  const baseDropRate = clampDropRate(row?.dropRate);
+  return {
+    ...cloneJson(row),
+    dropRate: clampDropRate(baseDropRate + normalizedAdjustment),
+    baseDropRate,
+    environmentDropRateAdjustment: normalizedAdjustment
+  };
+}
+
+function applyHazardDropRateAdjustment(hazard, environment) {
+  const id = String(hazard?.id || '');
+  const enabledMap = environment?.hazardDropRateAdjustmentsEnabled;
+  if (enabledMap && typeof enabledMap === 'object' && !Array.isArray(enabledMap) && enabledMap[id] === false) {
+    return applyDropRateAdjustment(hazard, 0);
+  }
+  const adjustments = dropRateAdjustmentMap(environment?.hazardDropRateAdjustments);
+  const adjustment = adjustments[id] || 0;
+  return applyDropRateAdjustment(hazard, adjustment);
+}
+
 /**
  * Normalize a per-system character modifier library entry. Returns null when
  * the entry lacks a resolvable id or has neither an expression nor a
@@ -1277,7 +1376,16 @@ function normalizeGatheringRules(rules = {}) {
       : DEFAULT_GATHERING_RULES.toolBreakagePolicy,
     biomeModifierAggregation: BIOME_MODIFIER_AGGREGATIONS.has(rules?.biomeModifierAggregation)
       ? rules.biomeModifierAggregation
-      : DEFAULT_GATHERING_RULES.biomeModifierAggregation
+      : DEFAULT_GATHERING_RULES.biomeModifierAggregation,
+    blindCandidateGate: BLIND_CANDIDATE_GATES.has(rules?.blindCandidateGate)
+      ? rules.blindCandidateGate
+      : DEFAULT_GATHERING_RULES.blindCandidateGate,
+    revealPolicy: REVEAL_POLICIES.has(rules?.revealPolicy)
+      ? rules.revealPolicy
+      : DEFAULT_GATHERING_RULES.revealPolicy,
+    revealScope: REVEAL_SCOPES.has(rules?.revealScope)
+      ? rules.revealScope
+      : DEFAULT_GATHERING_RULES.revealScope
   };
 }
 
@@ -1502,6 +1610,24 @@ async function writeState(actor, state) {
 
 function normalizeList(value) {
   return Array.isArray(value) ? value : [];
+}
+
+/**
+ * Stable-sort records by an explicit order of ids. Records absent from the
+ * order array keep their original (library) order after the listed ones.
+ */
+function sortRecordsByOrder(records, order) {
+  const list = normalizeList(records);
+  const orderIndex = new Map(normalizeList(order).map((id, index) => [String(id), index]));
+  if (orderIndex.size === 0) return list;
+  return list
+    .map((record, index) => ({ record, index }))
+    .sort((a, b) => {
+      const ai = orderIndex.has(String(a.record?.id)) ? orderIndex.get(String(a.record?.id)) : Number.MAX_SAFE_INTEGER;
+      const bi = orderIndex.has(String(b.record?.id)) ? orderIndex.get(String(b.record?.id)) : Number.MAX_SAFE_INTEGER;
+      return ai === bi ? a.index - b.index : ai - bi;
+    })
+    .map(entry => entry.record);
 }
 
 function nonNegativeNumber(value, fallback = 0) {

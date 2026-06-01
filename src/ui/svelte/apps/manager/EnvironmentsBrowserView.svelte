@@ -21,6 +21,7 @@
     selectedSystemId = '',
     gatheringConfig = null,
     sceneOptions = [],
+    environmentTaskCounts = {},
     shouldUseEnvironmentDraftForDisplay = false,
     activeGatheringTab = 'environments',
     selectedTaskId = '',
@@ -44,7 +45,6 @@
     onCreateEnvironment = () => {},
     onDuplicateEnvironment = () => {},
     onDeleteEnvironment = () => {},
-    onMoveEnvironment = () => {},
     onToggleEnvironmentEnabled = () => {},
     onUpdateGatheringConditions = () => {},
     onToggleGatheringConditionEnabled = () => {},
@@ -163,7 +163,8 @@
   });
   const activeGatheringTabConfig = $derived(gatheringTabs.find(tab => tab.id === activeGatheringTab) || gatheringTabs[0]);
   const regionOptions = $derived(uniqueSorted(environmentList.map(environment => environment.region)));
-  const biomeOptions = $derived(uniqueSorted(environmentList.map(environment => environment.biome)));
+  const biomeOptions = $derived(uniqueSorted(environmentList.flatMap(environment =>
+    Array.isArray(environment.biomes) ? environment.biomes : (environment.biome ? [environment.biome] : []))));
   const normalizedSearchTerm = $derived(searchTerm.trim().toLowerCase());
   const filteredEnvironments = $derived(environmentList.filter(environment => {
     const matchesSearch = !normalizedSearchTerm
@@ -177,7 +178,10 @@
       || environment.selectionMode === selectionFilter;
     const matchesRisk = riskFilter === 'all' || (environment.risk || 'safe') === riskFilter;
     const matchesRegion = regionFilter === 'all' || (environment.region || '') === regionFilter;
-    const matchesBiome = biomeFilter === 'all' || (environment.biome || '') === biomeFilter;
+    const matchesBiome = biomeFilter === 'all'
+      || (Array.isArray(environment.biomes)
+        ? environment.biomes.includes(biomeFilter)
+        : (environment.biome || '') === biomeFilter);
     return matchesSearch && matchesStatus && matchesSelection && matchesRisk && matchesRegion && matchesBiome;
   }));
   const filtersActive = $derived(
@@ -210,6 +214,11 @@
       .sort((a, b) => a.localeCompare(b));
   }
 
+  function prettifyTag(value) {
+    const str = String(value || '').trim();
+    return str ? str.charAt(0).toUpperCase() + str.slice(1) : str;
+  }
+
   function linkedSceneForEnvironment(environment) {
     const sceneUuid = environment?.sceneUuid || '';
     if (!sceneUuid) return null;
@@ -226,14 +235,19 @@
     return text('FABRICATE.Admin.Environments.NewDraftTitle', 'New Gathering Environment');
   }
 
-  function environmentImage(environment) {
+  function environmentSceneImage(environment) {
     const linkedScene = linkedSceneForEnvironment(environment);
-    return linkedScene?.img || linkedScene?.thumbnail || linkedScene?.thumb || 'icons/svg/item-bag.svg';
+    return linkedScene?.img || linkedScene?.thumbnail || linkedScene?.thumb || '';
   }
 
-  function hasEnvironmentSceneImage(environment) {
-    const linkedScene = linkedSceneForEnvironment(environment);
-    return Boolean(linkedScene?.img || linkedScene?.thumbnail || linkedScene?.thumb);
+  function environmentImage(environment) {
+    const explicitImage = typeof environment?.img === 'string' ? environment.img.trim() : '';
+    return explicitImage || environmentSceneImage(environment) || 'icons/svg/item-bag.svg';
+  }
+
+  function hasEnvironmentImage(environment) {
+    const explicitImage = typeof environment?.img === 'string' ? environment.img.trim() : '';
+    return Boolean(explicitImage || environmentSceneImage(environment));
   }
 
   function environmentSelectionModeLabel(environment) {
@@ -243,6 +257,8 @@
   }
 
   function environmentTaskCount(environment) {
+    const counts = environmentTaskCounts?.[environment?.id];
+    if (counts && Number.isFinite(Number(counts.availableTaskCount))) return Number(counts.availableTaskCount);
     return Array.isArray(environment?.tasks) ? environment.tasks.length : 0;
   }
 
@@ -260,19 +276,6 @@
       return environmentDraft;
     }
     return environment;
-  }
-
-  function environmentListIndex(environmentId) {
-    return environmentList.findIndex(environment => environment.id === environmentId);
-  }
-
-  function canMoveEnvironmentUp(environmentId) {
-    return environmentListIndex(environmentId) > 0;
-  }
-
-  function canMoveEnvironmentDown(environmentId) {
-    const index = environmentListIndex(environmentId);
-    return index >= 0 && index < environmentList.length - 1;
   }
 
   function clearFilters() {
@@ -308,14 +311,14 @@
 
   function conditionHint(kind) {
     return kind === 'timeOfDay'
-      ? text('FABRICATE.Admin.Manager.Environment.Conditions.TimeOfDayHint', 'These values control current time matching for gathering tasks and hazards.')
-      : text('FABRICATE.Admin.Manager.Environment.Conditions.WeatherHint', 'These values control current weather matching for gathering tasks and hazards.');
+      ? text('FABRICATE.Admin.Manager.Environment.Conditions.TimeOfDayHint', 'These values control current time matching for gathering tasks and hazards. Click the name of a time of day to edit it.')
+      : text('FABRICATE.Admin.Manager.Environment.Conditions.WeatherHint', 'These values control weather matching for gathering tasks and hazards. Click the name of a condition to edit it.');
   }
 
   function conditionInputPlaceholder(kind) {
     return kind === 'timeOfDay'
-      ? text('FABRICATE.Admin.Manager.Environment.Conditions.TimeOfDayPlaceholder', 'e.g. midnight')
-      : text('FABRICATE.Admin.Manager.Environment.Conditions.WeatherPlaceholder', 'e.g. ashfall');
+      ? text('FABRICATE.Admin.Manager.Environment.Conditions.TimeOfDayPlaceholder', 'e.g. Midnight')
+      : text('FABRICATE.Admin.Manager.Environment.Conditions.WeatherPlaceholder', 'e.g. Ashfall');
   }
 
   function conditionInputValue(kind) {
@@ -358,14 +361,14 @@
 
   function vocabularyHint(kind) {
     return kind === 'regions'
-      ? text('FABRICATE.Admin.Manager.Environment.Vocabularies.RegionsHint', 'Environments use one region. Labels can be renamed without changing ids.')
-      : text('FABRICATE.Admin.Manager.Environment.Vocabularies.BiomesHint', 'Environments can use multiple biomes. Left-click the coloured icon to edit icon; right-click to edit colour.');
+      ? text('FABRICATE.Admin.Manager.Environment.Vocabularies.RegionsHint', 'Environments use one region. Click the name of a region to edit it.')
+      : text('FABRICATE.Admin.Manager.Environment.Vocabularies.BiomesHint', 'Environments can have multiple biomes. Left-click the icon to swap it out, right-click to change the colour.');
   }
 
   function vocabularyPlaceholder(kind) {
     return kind === 'regions'
-      ? text('FABRICATE.Admin.Manager.Environment.Vocabularies.RegionPlaceholder', 'e.g. northlands')
-      : text('FABRICATE.Admin.Manager.Environment.Vocabularies.BiomePlaceholder', 'e.g. mushroom forest');
+      ? text('FABRICATE.Admin.Manager.Environment.Vocabularies.RegionPlaceholder', 'e.g. Northlands')
+      : text('FABRICATE.Admin.Manager.Environment.Vocabularies.BiomePlaceholder', 'e.g. Mushroom forest');
   }
 
   function vocabularyInputValue(kind) {
@@ -634,7 +637,7 @@
           <select value={regionFilter} onchange={(event) => regionFilter = event.currentTarget.value} aria-label={text('FABRICATE.Admin.Manager.Environment.RegionFilterLabel', 'Filter environments by region')}>
             <option value="all">{text('FABRICATE.Admin.Manager.Environment.RegionAll', 'All regions')}</option>
             {#each regionOptions as region (region)}
-              <option value={region}>{region}</option>
+              <option value={region}>{prettifyTag(region)}</option>
             {/each}
           </select>
         </label>
@@ -643,7 +646,7 @@
           <select value={biomeFilter} onchange={(event) => biomeFilter = event.currentTarget.value} aria-label={text('FABRICATE.Admin.Manager.Environment.BiomeFilterLabel', 'Filter environments by biome')}>
             <option value="all">{text('FABRICATE.Admin.Manager.Environment.BiomeAll', 'All biomes')}</option>
             {#each biomeOptions as biome (biome)}
-              <option value={biome}>{biome}</option>
+              <option value={biome}>{prettifyTag(biome)}</option>
             {/each}
           </select>
         </label>
@@ -716,7 +719,7 @@
               {@const displayEnvironment = environmentDisplay(environment)}
               <div class={`manager-environment-row ${selectedEnvironmentId === environment.id ? 'is-selected' : ''}`} role="row" aria-selected={selectedEnvironmentId === environment.id} data-environment-id={environment.id}>
                 <button type="button" class="manager-environment-identity" onclick={() => onSelectEnvironment(environment.id)} role="cell">
-                  <img class={`manager-environment-thumb ${hasEnvironmentSceneImage(displayEnvironment) ? '' : 'is-fallback'}`} src={environmentImage(displayEnvironment)} alt="" />
+                  <img class={`manager-environment-thumb ${hasEnvironmentImage(displayEnvironment) ? '' : 'is-fallback'}`} src={environmentImage(displayEnvironment)} alt="" />
                   <span class="manager-system-copy">
                     <span class="manager-system-name" title={environmentName(displayEnvironment)}>{environmentName(displayEnvironment)}</span>
                     {#if displayEnvironment.description}
@@ -738,7 +741,7 @@
                   <span class="manager-chip">{environmentSelectionModeLabel(displayEnvironment)}</span>
                 </span>
                 <span role="cell" class="manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Environments.Tasks', 'Tasks')}>
-                  <strong class="manager-environment-task-count">{environmentTaskCount(displayEnvironment)}</strong>
+                  <strong class="manager-environment-task-count">{environmentTaskCount(environment)}</strong>
                 </span>
                 <span role="cell" class="manager-labeled-cell manager-status-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.StatusFilter', 'Status')}>
                   <button
@@ -767,14 +770,6 @@
                     </button>
                     <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.Environment.DeleteNamed', 'Delete {name}').replace('{name}', environmentName(displayEnvironment))} title={text('FABRICATE.Admin.Manager.Environment.Delete', 'Delete environment')} onclick={() => onDeleteEnvironment(environment.id)}>
                       <i class="fas fa-trash" aria-hidden="true"></i>
-                    </button>
-                  </span>
-                  <span class="manager-environment-reorder-stack">
-                    <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Environments.MoveUp', 'Move up')} title={text('FABRICATE.Admin.Environments.MoveUp', 'Move up')} disabled={!canMoveEnvironmentUp(environment.id)} onclick={() => onMoveEnvironment(environment.id, 'up')}>
-                      <i class="fas fa-arrow-up" aria-hidden="true"></i>
-                    </button>
-                    <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Environments.MoveDown', 'Move down')} title={text('FABRICATE.Admin.Environments.MoveDown', 'Move down')} disabled={!canMoveEnvironmentDown(environment.id)} onclick={() => onMoveEnvironment(environment.id, 'down')}>
-                      <i class="fas fa-arrow-down" aria-hidden="true"></i>
                     </button>
                   </span>
                 </span>

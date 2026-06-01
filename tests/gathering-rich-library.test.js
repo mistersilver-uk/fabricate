@@ -321,7 +321,9 @@ test('environment task and hazard toggles preserve mixed-case library IDs', asyn
   });
   const composed = service.composeEnvironment(saved, system);
 
-  assert.deepEqual(composed.tasks.map(task => task.id), ['inline-task', 'Task-Mixed']);
+  // Automatic mode ignores the enabled allow-list, so every matching library task
+  // composes; the disabled list still excludes Hazard-Mixed (mixed-case preserved).
+  assert.deepEqual(composed.tasks.map(task => task.id), ['inline-task', 'Task-Mixed', 'task-other']);
   assert.deepEqual(composed.hazards.map(hazard => hazard.id), ['hazard-other']);
 });
 
@@ -375,6 +377,54 @@ test('d100 drop-row save validation accepts zero chance and rejects invalid drop
     }));
     assert.equal(result.valid, false, `expected invalid row ${row.id}`);
   }
+});
+
+test('environment dangerLevel migrates from dangerTags, preserves explicit values, and validates', async () => {
+  const store = makeEnvironmentStore();
+
+  const migrated = await store.create(environment({ dangerTags: ['safe', 'deadly'], enabledTaskIds: ['lib-task'] }));
+  assert.equal(migrated.dangerLevel, 'deadly');
+
+  const explicit = await store.create(environment({ id: 'env-explicit', dangerLevel: 'dangerous', dangerTags: [], enabledTaskIds: ['lib-task'] }));
+  assert.equal(explicit.dangerLevel, 'dangerous');
+
+  const defaulted = await store.create(environment({ id: 'env-default', dangerTags: [], risk: undefined, enabledTaskIds: ['lib-task'] }));
+  assert.equal(defaulted.dangerLevel, 'safe');
+
+  const invalid = store.validate(environment({ dangerLevel: 'cataclysmic', enabledTaskIds: ['lib-task'] }));
+  assert.equal(invalid.valid, false);
+  assert.ok(invalid.errors.some(error => error.includes('dangerLevel')));
+});
+
+test('environment blindSelection keeps weights and drops legacy strategy/uuid fields', async () => {
+  const store = makeEnvironmentStore();
+
+  const weighted = await store.create(environment({
+    blindSelection: { weights: { t1: 3, t2: 1 } },
+    enabledTaskIds: ['lib-task']
+  }));
+  assert.deepEqual(weighted.blindSelection, { weights: { t1: 3, t2: 1 } });
+
+  const migrated = await store.create(environment({
+    id: 'env-bs-legacy',
+    blindSelection: { strategy: 'rollTable', rollTableUuid: 'RollTable.x', macroUuid: 'Macro.y', weights: { keep: 2 } },
+    enabledTaskIds: ['lib-task']
+  }));
+  assert.deepEqual(migrated.blindSelection, { weights: { keep: 2 } });
+  assert.equal(migrated.blindSelection.strategy, undefined);
+
+  const empty = await store.create(environment({ id: 'env-bs-empty', blindSelection: { strategy: 'macro' }, enabledTaskIds: ['lib-task'] }));
+  assert.equal(empty.blindSelection, undefined);
+});
+
+test('environment reveal override is discarded — system-level reveal governs', async () => {
+  const store = makeEnvironmentStore();
+
+  const withOverride = await store.create(environment({ reveal: { policy: 'onAttempt', scope: 'party' }, enabledTaskIds: ['lib-task'] }));
+  assert.equal(withOverride.reveal, undefined);
+
+  const garbage = await store.create(environment({ id: 'env-reveal-bad', reveal: { policy: 'bogus', scope: 'nope' }, enabledTaskIds: ['lib-task'] }));
+  assert.equal(garbage.reveal, undefined);
 });
 
 test('player listing exposes current conditions as context without weather/time filters', async () => {

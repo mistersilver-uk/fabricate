@@ -378,6 +378,9 @@ test('manager inspector count labels wrap without truncation', () => {
   assert.ok(css.includes('grid-template-columns: repeat(2, minmax(0, 1fr));'), 'count facts should use a two-column inspector grid');
   assert.ok(factBlock.includes('display: block;'), 'count facts should render one phrase instead of wrapping separate flex children');
   assert.ok(!factBlock.includes('display: flex;'), 'count facts should not split values and labels into separate flex items');
+  const factInlineBlock = blockFor('.fabricate-manager .manager-fact-grid-inline .manager-fact');
+  assert.ok(factInlineBlock.includes('display: flex;'), 'inline fact grids lay value and label on one row');
+  assert.ok(factInlineBlock.includes('gap:'), 'inline facts keep a gap so value and label do not collide');
   assert.ok(factLineBlock.includes('display: inline;'), 'count facts should keep value and label in normal inline text flow');
   assert.ok(factLeadingBlock.includes('white-space: nowrap;'), 'count facts should keep the value and first label word together');
   assert.ok(!factBlock.includes('white-space: nowrap;'), 'count fact cards should not force single-line labels');
@@ -1183,7 +1186,16 @@ test('manager environments browser and edit route define compact responsive geom
   const editorViewBlock = blockFor('.fabricate-manager .manager-environment-edit-view');
   const detailsGridBlock = blockFor('.fabricate-manager .manager-environment-details-grid');
   const workspaceBlock = blockFor('.fabricate-manager .manager-environment-workspace');
+  const weightInputBlock = blockFor('.fabricate-manager .manager-environment-comp-weight-field input');
+  const compMenuBlock = blockFor('.fabricate-manager .manager-environment-comp-menu');
+  const compMenuButtonBlock = blockFor('.fabricate-manager .manager-environment-comp-menu button');
+  const compMenuIconBlock = blockFor('.fabricate-manager .manager-environment-comp-menu button > i');
+  const compMenuLabelBlock = blockFor('.fabricate-manager .manager-environment-comp-menu button > span');
+  const compMenuNoteBlock = blockFor('.fabricate-manager .manager-environment-comp-menu-note');
+  const compMenuNoteBeforeBlock = blockFor('.fabricate-manager .manager-environment-comp-menu-note::before');
+  const compQuickActionBlock = blockFor('.fabricate-manager .manager-environment-comp-quick-action');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
+  const environmentCompContainerQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 960px)'));
 
   assert.ok(
     toolbarBlock.includes('max-height: 100px;') && toolbarBlock.includes('overflow-y: auto;'),
@@ -1206,69 +1218,34 @@ test('manager environments browser and edit route define compact responsive geom
     'environment table scroll region should own internal overflow once bounded by the gathering panel'
   );
   assert.ok(
-    tableBlock.includes('--fab-mv2-environment-grid: minmax(0, 1.72fr) minmax(86px, 0.42fr) 46px 72px 72px;'),
-    'environments table should define five compact columns without reserving a reorder column'
+    tableBlock.includes('--fab-mv2-environment-grid: minmax(0, 1fr) 120px 56px 88px 116px;'),
+    'environments table should define one flexible identity column and fixed compact columns so headers and rows align'
   );
   assert.ok(
-    css.includes('.fabricate-manager .manager-environment-row {\n  position: relative;\n  min-height: 88px;\n}'),
-    'environment rows should anchor hover overlays while keeping height stable around larger thumbnails'
+    !css.includes('.fabricate-manager .manager-environment-row {\n  position: relative;\n  min-height: 88px;\n}'),
+    'environment rows should no longer carry the taller reorder-overlay height override'
   );
   assert.ok(
-    css.includes('.fabricate-manager .manager-environment-identity {\n  grid-template-columns: 120px minmax(0, 1fr);\n  align-self: center;\n  min-height: 68px;'),
-    'environment identity should reserve and vertically center the larger scene thumbnail column'
+    css.includes('.fabricate-manager .manager-environment-row,') && css.includes('min-height: 76px;'),
+    'environment rows should share the compact 76px row height with the task and hazard browsers'
   );
   assert.ok(
-    css.includes('.fabricate-manager .manager-environment-thumb {\n  display: block;\n  align-self: center;\n  width: 120px;\n  height: 68px;'),
-    'environment thumbnails should reserve a larger centered scene-like image area'
+    css.includes('.fabricate-manager .manager-environment-identity {\n  grid-template-columns: 64px minmax(0, 1fr);\n  gap: 12px;\n  align-self: center;\n  min-height: 64px;'),
+    'environment identity should reserve a square 64px thumbnail column like the task and hazard browsers'
+  );
+  assert.ok(
+    css.includes('.fabricate-manager .manager-environment-thumb {\n  display: block;\n  align-self: center;\n  width: 64px;\n  height: 64px;'),
+    'environment thumbnails should render as a square 64px image that suits both scene thumbnails and chosen images'
   );
   assert.ok(taskCountBlock.includes('font-weight: 800;'), 'environment task count should render as plain emphasized text');
-  assert.ok(actionsBlock.includes('grid-template-columns: 72px;'), 'environment row actions should only reserve edit duplicate delete controls');
-  assert.ok(actionsBlock.includes('justify-content: end;'), 'environment row actions should stay compact on the right at desktop widths');
-  assert.ok(actionsBlock.includes('justify-self: end;'), 'environment row actions should align to the right edge of their cell');
-  assert.ok(!actionsBlock.includes('grid-template-columns: 72px 34px;'), 'environment row actions should not reserve a reorder stack column');
-  assert.ok(actionGridBlock.includes('grid-template-columns: repeat(2, 34px);'), 'environment edit duplicate delete buttons should sit in a compact grid');
+  assert.ok(actionGridBlock.includes('display: flex;'), 'environment edit duplicate delete buttons should sit inline in a flex row');
   assert.ok(
-    css.includes('.fabricate-manager .manager-environment-action-grid .manager-icon-button.is-danger {\n  grid-column: 2;\n}'),
-    'environment delete quick action should sit in the right column below the duplicate action'
+    !css.includes('.fabricate-manager .manager-environment-action-grid .manager-icon-button.is-danger {\n  grid-column: 2;\n}'),
+    'environment delete quick action should no longer be forced into a second reorder-era grid column'
   );
   assert.ok(
-    mediumQuery.includes('.fabricate-manager .manager-action-group.manager-environment-actions.manager-labeled-cell')
-      && mediumQuery.includes('display: grid;')
-      && mediumQuery.includes('grid-template-columns: minmax(88px, 0.35fr) 72px;')
-      && mediumQuery.includes('justify-content: stretch;')
-      && mediumQuery.includes('.fabricate-manager .manager-environment-actions .manager-environment-action-grid')
-      && mediumQuery.includes('justify-self: end;')
-      && mediumQuery.includes('margin-left: auto;'),
-    'responsive environment row actions should stay right-aligned instead of inheriting the generic left-aligned action group layout'
-  );
-  assert.ok(
-    reorderStackBlock.includes('position: absolute;')
-      && reorderStackBlock.includes('inset: 0;')
-      && reorderStackBlock.includes('grid-template-rows: 18px 18px;')
-      && reorderStackBlock.includes('align-content: space-between;')
-      && reorderStackBlock.includes('pointer-events: none;'),
-    'environment move up/down hit areas should span hidden full-row top and bottom overlay bands'
-  );
-  assert.ok(
-    !css.includes('.manager-environment-row:hover .manager-environment-reorder-stack')
-      && !css.includes('.manager-environment-row:focus-within .manager-environment-reorder-stack'),
-    'environment reorder overlay should not become visible from whole-row hover or focus'
-  );
-  assert.ok(
-    css.includes('.fabricate-manager .manager-environment-reorder-stack .manager-icon-button {\n  width: 100%;\n  height: 18px;')
-      && css.includes('background: var(--fab-overlay-dark-32);')
-      && css.includes('opacity: 0;')
-      && css.includes('.fabricate-manager .manager-environment-reorder-stack .manager-icon-button:hover,\n.fabricate-manager .manager-environment-reorder-stack .manager-icon-button:focus-visible {\n  opacity: 1;'),
-    'environment reorder buttons should reveal only their own thin row-width overlay band on hover or keyboard focus'
-  );
-  assert.ok(
-    css.includes('.fabricate-manager .manager-environment-reorder-stack .manager-icon-button:disabled {\n  opacity: 0;\n  pointer-events: auto;')
-      && css.includes('.fabricate-manager .manager-environment-reorder-stack .manager-icon-button:disabled:hover,\n.fabricate-manager .manager-environment-reorder-stack .manager-icon-button:disabled:focus-visible {\n  opacity: 1;'),
-    'disabled environment reorder bands should stay hidden until their own hover or keyboard focus'
-  );
-  assert.ok(
-    css.includes('.fabricate-manager .manager-environment-reorder-stack .manager-icon-button:focus,\n.fabricate-manager .manager-environment-reorder-stack .manager-icon-button:focus-visible {\n  outline: none;\n  box-shadow: none;'),
-    'environment reorder buttons should not inherit host focus outlines after click'
+    !css.includes('manager-environment-reorder-stack'),
+    'environment reorder controls and their styles should be removed'
   );
   assert.ok(
     css.includes('.fabricate-manager .manager-environment-row .manager-status-cell'),
@@ -1278,7 +1255,14 @@ test('manager environments browser and edit route define compact responsive geom
     css.includes('.fabricate-manager[data-manager-view="environment-edit"] .manager-main'),
     'environment edit route should reserve scrollable editor space'
   );
-  assert.ok(editorShellBlock.includes('overflow: auto;'), 'environment editor shell should own scroll containment at normal widths');
+  assert.ok(
+    editorShellBlock.includes('overflow: hidden;') && editorShellBlock.includes('grid-template-rows: minmax(0, 1fr);'),
+    'environment editor shell should bound the editor height (not scroll) so the tab bar stays fixed'
+  );
+  assert.ok(
+    blockFor('.fabricate-manager .manager-environment-tab-panel').includes('overflow: auto;'),
+    'the environment editor tab panel should own internal scroll while the tab bar stays pinned'
+  );
   assert.ok(
     css.includes('.fabricate-manager[data-manager-view="environment-edit"] .manager-body') && css.includes('grid-template-columns: 220px minmax(0, 1fr);'),
     'environment edit route should replace the browse inspector with a two-region rail/editor grid'
@@ -1296,9 +1280,107 @@ test('manager environments browser and edit route define compact responsive geom
     workspaceBlock.includes('grid-template-columns: minmax(220px, 0.45fr) minmax(420px, 1fr);'),
     'environment editor workspace should expose only task rail and selected task editor at normal widths'
   );
+  const compBlock = blockFor('.fabricate-manager .manager-environment-comp');
+  assert.ok(
+    compBlock.includes('--fab-env-comp-grid: minmax(0, 1fr) 92px 132px 92px;'),
+    'composition grid keeps the shared fallback layout for non-task rows'
+  );
+  assert.ok(
+    css.includes('.manager-environment-comp[data-composition-kind="task"]')
+      && css.includes('--fab-env-comp-grid: minmax(0, 1fr) 72px 132px 72px;'),
+    'task rows reserve space for a quick action icon beside the overflow-menu action'
+  );
+  assert.ok(
+    css.includes('.manager-environment-comp[data-composition-kind="task"][data-composition-selection="blind"]')
+      && css.includes('--fab-env-comp-grid: minmax(0, 1fr) 112px 72px 132px 72px;'),
+    'blind-mode tasks add a compact Weight column for the input and calculated percentage'
+  );
+  assert.ok(
+    environmentCompContainerQuery.includes('.fabricate-manager .manager-environment-comp[data-composition-kind="task"]')
+      && environmentCompContainerQuery.includes('--fab-env-comp-grid: minmax(0, 1fr) 64px 110px 72px;'),
+    'narrow task rows key off manager container width and keep enough action-column width for quick action plus menu buttons'
+  );
+  assert.ok(
+    weightInputBlock.includes('width: 42px;') && weightInputBlock.includes('padding: 2px 4px;'),
+    'blind task weight input should be visually sized for three characters'
+  );
+  assert.ok(
+    compQuickActionBlock.includes('flex: 0 0 34px;'),
+    'composition quick actions should keep the same fixed geometry as manager icon buttons'
+  );
+  assert.ok(
+    compMenuBlock.includes('right: 0;') && compMenuBlock.includes('top: calc(100% + 4px);'),
+    'composition overflow menus should stay anchored to the row action button'
+  );
+  assert.ok(
+    compMenuBlock.includes('width: max-content;')
+      && compMenuBlock.includes('max-width: min(260px, calc(100vw - 32px));')
+      && compMenuBlock.includes('min-width: 176px;'),
+    'composition overflow menus should size to single-line labels with compact minimum and bounded maximum widths'
+  );
+  assert.ok(
+    compMenuButtonBlock.includes('display: grid;') && compMenuButtonBlock.includes('grid-template-columns: 18px minmax(0, 1fr);'),
+    'composition overflow menu items should reserve a fixed icon column before a truncating label column'
+  );
+  assert.ok(
+    compMenuButtonBlock.includes('min-width: 0;'),
+    'composition overflow menu rows should be allowed to shrink inside the flex menu container'
+  );
+  assert.ok(
+    compMenuButtonBlock.includes('justify-content: start;')
+      && compMenuButtonBlock.includes('justify-items: start;')
+      && compMenuButtonBlock.includes('text-align: left;'),
+    'composition overflow menu item content should be left-aligned'
+  );
+  assert.ok(
+    compMenuButtonBlock.includes('white-space: nowrap;'),
+    'composition overflow menu labels should remain on one line'
+  );
+  assert.ok(
+    compMenuButtonBlock.includes('font-size: 0.82rem;') && compMenuButtonBlock.includes('font-weight: 500;'),
+    'composition overflow menu items should use compact lighter text'
+  );
+  assert.ok(
+    compMenuIconBlock.includes('justify-self: center;'),
+    'composition overflow menu icons should stack in the center of the fixed icon column'
+  );
+  assert.ok(
+    compMenuLabelBlock.includes('display: block;')
+      && compMenuLabelBlock.includes('min-width: 0;')
+      && compMenuLabelBlock.includes('max-width: 100%;')
+      && compMenuLabelBlock.includes('overflow: hidden;')
+      && compMenuLabelBlock.includes('text-overflow: ellipsis;'),
+    'composition overflow menu labels should truncate inside the bounded menu width'
+  );
+  assert.ok(
+    compMenuNoteBlock.includes('grid-template-columns: 18px minmax(0, 1fr);')
+      && compMenuNoteBlock.includes('min-width: 0;')
+      && compMenuNoteBlock.includes('white-space: nowrap;')
+      && compMenuNoteBlock.includes('font-size: 0.82rem;')
+      && compMenuNoteBlock.includes('font-weight: 500;'),
+    'disabled composition menu notes should share the compact row geometry'
+  );
+  assert.ok(
+    compMenuNoteBeforeBlock.includes('content: "";') && compMenuNoteBeforeBlock.includes('width: 18px;'),
+    'disabled composition menu notes should reserve the same icon column even without an icon'
+  );
+  assert.ok(
+    compBlock.includes('--fab-env-comp-grid-ranked: 30px minmax(0, 1fr) 92px 132px 92px;')
+      && css.includes('.fabricate-manager .manager-environment-comp-head.has-rank-controls')
+      && css.includes('.fabricate-manager .manager-environment-comp-row.has-rank-controls'),
+    'ranked hazards opt into a leading 30px handle column ahead of the task/override/runtime cells'
+  );
+  assert.ok(
+    !compBlock.includes('minmax(150px'),
+    'composition grid should not hard-floor flexible columns and overflow the panel'
+  );
   assert.ok(
     !css.includes('manager-environment-evidence-column'),
     'environment editor CSS should no longer reference the removed evidence column'
+  );
+  assert.ok(
+    !css.includes('.manager-environment-comp-evidence'),
+    'environment editor CSS should no longer reference the removed inline-row evidence cell'
   );
   assert.ok(
     css.includes('.fabricate-manager .manager-environment-validation-band'),
@@ -1327,6 +1409,308 @@ test('manager environments browser and edit route define compact responsive geom
     mediumQuery.includes('.fabricate-manager .manager-environment-workspace') && mediumQuery.includes('grid-template-columns: minmax(0, 1fr);'),
     'stacked environment editor should put details, task rail, editor, and evidence in one column'
   );
+});
+
+test('manager environment inspector evidence table wraps compact pills without horizontal overflow', async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 360, height: 360 }, deviceScaleFactor: 1 });
+
+  try {
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            ${css}
+            body {
+              margin: 0;
+              padding: 16px;
+              font-family: Arial, sans-serif;
+            }
+            .harness {
+              width: 260px;
+            }
+          </style>
+        </head>
+        <body>
+          <main class="fabricate-manager">
+            <section class="manager-inspector-card harness">
+              <h3 class="manager-card-title">Matching evidence</h3>
+              <table class="manager-environment-evidence is-checks manager-environment-evidence-table" aria-label="Matching evidence">
+                <tbody>
+                  <tr class="manager-environment-evidence-row is-positive" data-evidence-field="biome" data-evidence-state="match">
+                    <th class="manager-environment-evidence-dimension" scope="row">Biome</th>
+                    <td class="manager-environment-evidence-values">
+                      <div class="manager-environment-evidence-value-list">
+                        <span class="manager-environment-evidence-value-pill is-positive" data-evidence-value-state="match">Forest</span>
+                        <span class="manager-environment-evidence-value-pill is-danger" data-evidence-value-state="mismatch">VeryLongUnbrokenBiomeNameThatMustWrapInsideTheInspectorColumn</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr class="manager-environment-evidence-row is-positive" data-evidence-field="region" data-evidence-state="match">
+                    <th class="manager-environment-evidence-dimension" scope="row">Region</th>
+                    <td class="manager-environment-evidence-values">
+                      <div class="manager-environment-evidence-value-list">
+                        <span class="manager-environment-evidence-value-pill is-positive" data-evidence-value-state="match">North</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr class="manager-environment-evidence-row is-warning" data-evidence-field="weather" data-evidence-state="mismatch">
+                    <th class="manager-environment-evidence-dimension" scope="row">Weather</th>
+                    <td class="manager-environment-evidence-values">
+                      <div class="manager-environment-evidence-value-list">
+                        <span class="manager-environment-evidence-value-pill is-warning" data-evidence-value-state="mismatch">Storm</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr class="manager-environment-evidence-row is-warning" data-evidence-field="time" data-evidence-state="mismatch">
+                    <th class="manager-environment-evidence-dimension" scope="row">Time</th>
+                    <td class="manager-environment-evidence-values">
+                      <div class="manager-environment-evidence-value-list">
+                        <span class="manager-environment-evidence-value-pill is-warning" data-evidence-value-state="mismatch">Night</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr class="manager-environment-evidence-row is-any" data-evidence-field="danger" data-evidence-state="any">
+                    <th class="manager-environment-evidence-dimension" scope="row">Danger</th>
+                    <td class="manager-environment-evidence-values">
+                      <div class="manager-environment-evidence-value-list">
+                        <span class="manager-environment-evidence-value-pill is-any" data-evidence-value-state="any">Any danger</span>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </section>
+          </main>
+        </body>
+      </html>
+    `);
+
+    const report = await page.evaluate(() => {
+      const rectFor = element => {
+        const rect = element.getBoundingClientRect();
+        return {
+          left: rect.left,
+          top: rect.top,
+          right: rect.right,
+          bottom: rect.bottom,
+          width: rect.width,
+          height: rect.height
+        };
+      };
+      const table = document.querySelector('.manager-environment-evidence-table');
+      const card = document.querySelector('.manager-inspector-card');
+      const longPill = Array.from(document.querySelectorAll('.manager-environment-evidence-value-pill'))
+        .find(pill => pill.textContent.includes('VeryLongUnbroken'));
+      const rowStyle = getComputedStyle(document.querySelector('.manager-environment-evidence-row'));
+      const tableStyle = getComputedStyle(table);
+      const dimensionStyle = getComputedStyle(document.querySelector('.manager-environment-evidence-dimension'));
+      const valueCellStyle = getComputedStyle(document.querySelector('.manager-environment-evidence-values'));
+      const valueListStyle = getComputedStyle(document.querySelector('.manager-environment-evidence-value-list'));
+      const pillStyle = getComputedStyle(longPill);
+      const valueCells = Array.from(document.querySelectorAll('.manager-environment-evidence-values')).map(rectFor);
+
+      return {
+        viewportWidth: window.innerWidth,
+        documentWidth: document.documentElement.scrollWidth,
+        rowFields: Array.from(document.querySelectorAll('.manager-environment-evidence-row')).map(row => row.dataset.evidenceField),
+        table: rectFor(table),
+        card: rectFor(card),
+        longPill: rectFor(longPill),
+        firstValueCell: valueCells[0],
+        valueLefts: valueCells.map(cell => Math.round(cell.left)),
+        rowBorderBottom: rowStyle.borderBottomWidth,
+        rowBackgroundColor: rowStyle.backgroundColor,
+        tableStyle: {
+          display: tableStyle.display,
+          tableLayout: tableStyle.tableLayout,
+          backgroundColor: tableStyle.backgroundColor
+        },
+        dimensionStyle: {
+          width: dimensionStyle.width,
+          fontWeight: dimensionStyle.fontWeight,
+          backgroundColor: dimensionStyle.backgroundColor
+        },
+        valueCellStyle: {
+          backgroundColor: valueCellStyle.backgroundColor
+        },
+        valueListStyle: {
+          display: valueListStyle.display,
+          flexWrap: valueListStyle.flexWrap
+        },
+        pillStyle: {
+          borderRadius: pillStyle.borderRadius,
+          overflowWrap: pillStyle.overflowWrap,
+          backgroundColor: pillStyle.backgroundColor
+        }
+      };
+    });
+
+    assert.deepEqual(report.rowFields, ['biome', 'region', 'weather', 'time', 'danger'], 'inspector evidence table should render all five rows');
+    assert.equal(report.tableStyle.display, 'table', 'inspector evidence should keep table layout despite shared evidence flex styles');
+    assert.equal(report.tableStyle.tableLayout, 'fixed', 'inspector evidence table should keep fixed columns');
+    assert.equal(report.tableStyle.backgroundColor, 'rgba(0, 0, 0, 0)', 'inspector evidence table should not draw a dark inset panel');
+    assert.equal(report.rowBackgroundColor, 'rgba(0, 0, 0, 0)', 'inspector evidence rows should not draw alternating backgrounds');
+    assert.equal(report.dimensionStyle.backgroundColor, 'rgba(0, 0, 0, 0)', 'inspector evidence label cells should not draw row fill');
+    assert.equal(report.valueCellStyle.backgroundColor, 'rgba(0, 0, 0, 0)', 'inspector evidence value cells should not draw row fill');
+    assert.equal(report.rowBorderBottom, '1px', 'inspector evidence rows should use horizontal separators');
+    assert.ok(report.dimensionStyle.width.startsWith('82'), 'inspector evidence labels should keep a fixed left column');
+    assert.ok(Number(report.dimensionStyle.fontWeight) >= 650, 'inspector evidence labels should render as strong labels');
+    assert.equal(report.valueListStyle.display, 'flex', 'inspector values should align as inline pill rows');
+    assert.equal(report.valueListStyle.flexWrap, 'wrap', 'inspector value pills should wrap inside the right column');
+    assert.equal(new Set(report.valueLefts).size, 1, 'inspector value columns should align across rows');
+    assert.ok(report.table.right <= report.card.right + 1, 'evidence table should stay inside the inspector card');
+    assert.ok(report.documentWidth <= report.viewportWidth, 'evidence table should not create page-level horizontal overflow');
+    assert.ok(report.longPill.width <= report.firstValueCell.width + 1, 'long value pills should stay inside the right column');
+    assert.ok(report.longPill.height > 20, 'long value pills should wrap to multiple compact lines instead of clipping');
+    assert.equal(report.pillStyle.borderRadius, '4px', 'value pills should use compact chip corners');
+    assert.equal(report.pillStyle.overflowWrap, 'anywhere', 'value pills should be able to break long localized values');
+    assert.notEqual(report.pillStyle.backgroundColor, 'rgba(0, 0, 0, 0)', 'status pills should retain subtle state backgrounds');
+  } finally {
+    await page.close();
+    await browser.close();
+  }
+});
+
+test('manager environment composition overflow menu renders bounded single-line rows', async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 360, height: 260 }, deviceScaleFactor: 1 });
+
+  try {
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            ${css}
+            body {
+              margin: 0;
+              padding: 16px;
+              font-family: Arial, sans-serif;
+            }
+            .harness {
+              position: relative;
+              width: 320px;
+              height: 180px;
+            }
+            .harness .manager-environment-comp-menu-wrap {
+              width: 34px;
+              margin-left: 260px;
+            }
+            .harness .manager-icon-button {
+              width: 34px;
+              height: 34px;
+            }
+            .fa-solid::before,
+            .fas::before {
+              content: "■";
+              display: inline-block;
+              width: 10px;
+              font-size: 10px;
+            }
+          </style>
+        </head>
+        <body>
+          <main class="fabricate-manager">
+            <div class="harness">
+              <div class="manager-environment-comp-menu-wrap">
+                <button type="button" class="manager-icon-button" aria-label="Open task actions">
+                  <i class="fas fa-ellipsis-vertical" aria-hidden="true"></i>
+                </button>
+                <div class="manager-environment-comp-menu" role="menu">
+                  <button type="button" role="menuitem">
+                    <i class="fas fa-up-right-from-square" aria-hidden="true"></i>
+                    <span>OpenSourceRecordWithAnIntentionallyExtendedLocalizedMenuLabelThatMustTruncateInsideTheBoundedMenuWidth</span>
+                  </button>
+                  <button type="button" role="menuitem" class="is-danger">
+                    <i class="fas fa-ban" aria-hidden="true"></i>
+                    <span>Exclude from environment</span>
+                  </button>
+                  <button type="button" role="menuitem" class="manager-environment-comp-menu-note" disabled>
+                    <span>EnableInLibraryFirstWithAnIntentionallyExtendedLocalizedNoteThatMustTruncateInsideTheBoundedMenuWidth</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </main>
+        </body>
+      </html>
+    `);
+
+    const report = await page.evaluate(() => {
+      const rectFor = element => {
+        const rect = element.getBoundingClientRect();
+        return {
+          left: rect.left,
+          top: rect.top,
+          right: rect.right,
+          bottom: rect.bottom,
+          width: rect.width,
+          height: rect.height
+        };
+      };
+      const rowFor = element => {
+        const icon = element.querySelector('i');
+        const label = element.querySelector('span');
+        const rowStyle = getComputedStyle(element);
+        const labelStyle = getComputedStyle(label);
+        return {
+          row: rectFor(element),
+          icon: icon ? rectFor(icon) : null,
+          label: rectFor(label),
+          rowStyle: {
+            display: rowStyle.display,
+            gridTemplateColumns: rowStyle.gridTemplateColumns,
+            justifyContent: rowStyle.justifyContent,
+            justifyItems: rowStyle.justifyItems,
+            textAlign: rowStyle.textAlign,
+            whiteSpace: rowStyle.whiteSpace,
+            fontSize: rowStyle.fontSize,
+            fontWeight: rowStyle.fontWeight
+          },
+          labelStyle: {
+            overflow: labelStyle.overflow,
+            textOverflow: labelStyle.textOverflow,
+            whiteSpace: labelStyle.whiteSpace
+          },
+          labelClientWidth: label.clientWidth,
+          labelScrollWidth: label.scrollWidth
+        };
+      };
+
+      return {
+        viewportWidth: window.innerWidth,
+        wrap: rectFor(document.querySelector('.manager-environment-comp-menu-wrap')),
+        menu: rectFor(document.querySelector('.manager-environment-comp-menu')),
+        rows: Array.from(document.querySelectorAll('.manager-environment-comp-menu button')).map(rowFor)
+      };
+    });
+
+    const [firstRow, dangerRow, noteRow] = report.rows;
+    const iconCenters = [firstRow, dangerRow].map(row => row.icon.left + (row.icon.width / 2));
+    const labelLefts = report.rows.map(row => row.label.left);
+
+    assert.ok(report.menu.width <= 261, 'composition menu should render within the bounded maximum width');
+    assert.ok(report.menu.right <= report.viewportWidth - 16, 'composition menu should avoid viewport horizontal overflow');
+    assert.ok(Math.abs(report.menu.right - report.wrap.right) <= 1, 'composition menu should remain right-aligned to the action button');
+    assert.ok(report.rows.every(row => row.rowStyle.display === 'grid'), 'composition menu rows should render as grid rows');
+    assert.ok(report.rows.every(row => row.rowStyle.gridTemplateColumns.startsWith('18px ')), 'composition menu rows should render the fixed icon column');
+    assert.ok(report.rows.every(row => row.rowStyle.whiteSpace === 'nowrap'), 'composition menu rows should render as single-line actions');
+    assert.ok(report.rows.every(row => row.rowStyle.justifyContent === 'start' && row.rowStyle.justifyItems === 'start'), 'composition menu row content should be left-aligned');
+    assert.ok(report.rows.every(row => row.rowStyle.fontSize === '13.12px' && row.rowStyle.fontWeight === '500'), 'composition menu rows should render compact medium-weight text');
+    assert.ok(Math.abs(iconCenters[0] - iconCenters[1]) <= 1, 'composition menu icons should stack in one vertical column');
+    assert.ok(Math.max(...labelLefts) - Math.min(...labelLefts) <= 1, 'composition menu labels and disabled notes should align in one text column');
+    assert.equal(firstRow.labelStyle.overflow, 'hidden', 'long menu labels should hide overflow');
+    assert.equal(firstRow.labelStyle.textOverflow, 'ellipsis', 'long menu labels should use an ellipsis');
+    assert.ok(firstRow.labelScrollWidth > firstRow.labelClientWidth, 'long menu labels should truncate within the bounded label column');
+    assert.ok(noteRow.labelScrollWidth > noteRow.labelClientWidth, 'disabled note labels should truncate within the same bounded label column');
+  } finally {
+    await page.close();
+    await browser.close();
+  }
 });
 
 test('manager system edit view defines scoped stable form and toggle layout', () => {
@@ -1422,6 +1806,8 @@ test('design-system colour tokens are declared in the theme layer as the agreed 
 
 test('manager icon buttons normalize host button defaults and keep pointer targets stable', () => {
   const block = blockFor('.fabricate-manager .manager-button,\n.fabricate-manager .manager-icon-button');
+  const primaryIconBlock = blockFor('.fabricate-manager .manager-icon-button.is-primary');
+  const primaryIconHoverBlock = blockFor('.fabricate-manager .manager-icon-button.is-primary:not(:disabled):hover');
   const iconBlocks = Array.from(css.matchAll(/\.fabricate-manager \.manager-icon-button\s*\{[\s\S]*?\}/g));
   const iconBlock = iconBlocks.at(-1)?.[0] || '';
 
@@ -1432,6 +1818,9 @@ test('manager icon buttons normalize host button defaults and keep pointer targe
   assert.ok(block.includes('min-width: 0;'), 'manager buttons should clear host min-width defaults');
   assert.ok(iconBlock.includes('width: 34px;'), 'icon buttons should have a stable width of at least 32px');
   assert.ok(iconBlock.includes('height: 34px;'), 'icon buttons should have a stable height of at least 32px');
+  assert.ok(primaryIconBlock.includes('color: var(--fab-success-text);'), 'primary icon buttons should use a light green outline treatment');
+  assert.equal(primaryIconBlock.includes('background: var(--fab-success);'), false, 'primary icon buttons should not use the heavy solid primary background');
+  assert.ok(primaryIconHoverBlock.includes('background: var(--fab-success-soft);'), 'primary icon buttons should keep a soft green hover state');
   assert.ok(css.includes('.fabricate-manager .manager-button:disabled'), 'disabled manager buttons should have explicit disabled styling');
   assert.ok(css.includes('.fabricate-manager .manager-button:not(:disabled):hover'), 'manager hover styles should not target disabled buttons');
 });

@@ -41,6 +41,7 @@ import {
   seedCharacterModifierPresets
 } from '../../../config/gatheringCharacterModifierPresets.js';
 import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js';
+import { evaluateEnvironmentMatch } from '../../../systems/gatheringMatch.js';
 import { Tool } from '../../../models/Tool.js';
 
 // ---------------------------------------------------------------------------
@@ -83,7 +84,7 @@ const DEFAULT_GATHERING_CONDITIONS = Object.freeze({ weather: 'clear', timeOfDay
 const DEFAULT_GATHERING_VOCABULARIES = Object.freeze({
   regions: [],
   biomes: ['forest', 'grassland', 'mountain', 'cave', 'coastal', 'swamp', 'desert', 'urban', 'ruins', 'wasteland'],
-  danger: ['safe', 'hazardous', 'dangerous', 'deadly'],
+  danger: ['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme'],
   weather: ['clear', 'cloudy', 'rain', 'storm', 'snow', 'fog', 'wind'],
   timeOfDay: ['dawn', 'day', 'dusk', 'night']
 });
@@ -128,6 +129,15 @@ const GATHERING_DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops',
 const GATHERING_HAZARD_POLICIES = new Set(['successWithHazard', 'failureWithHazard']);
 const GATHERING_TOOL_BREAKAGE_POLICIES = new Set(['failureOnBreak', 'successDespiteBreak']);
 const GATHERING_BIOME_MODIFIER_AGGREGATIONS = new Set(['cumulative', 'strongestOfEach', 'dominant']);
+const GATHERING_BLIND_CANDIDATE_GATES = new Set(['attemptableOnly', 'allMatching']);
+const GATHERING_REVEAL_POLICIES = new Set(['never', 'onSuccess', 'onAttempt']);
+const GATHERING_REVEAL_SCOPES = new Set(['actor', 'user', 'party', 'global']);
+const ENVIRONMENT_INCLUDED_COMPOSITION_STATES = new Set([
+  'includedByMatch',
+  'explicitlyIncluded',
+  'forceIncluded',
+  'includedButUnavailable'
+]);
 const DEFAULT_GATHERING_RULES = Object.freeze({
   rewardSelectionMode: 'highestRankedDrop',
   rewardLimit: 1,
@@ -135,7 +145,10 @@ const DEFAULT_GATHERING_RULES = Object.freeze({
   hazardLimit: 1,
   hazardPolicy: 'successWithHazard',
   toolBreakagePolicy: 'failureOnBreak',
-  biomeModifierAggregation: 'strongestOfEach'
+  biomeModifierAggregation: 'strongestOfEach',
+  blindCandidateGate: 'attemptableOnly',
+  revealPolicy: 'never',
+  revealScope: 'actor'
 });
 
 // ---------------------------------------------------------------------------
@@ -672,6 +685,15 @@ function _normalizeGatheringRules(rules = {}) {
   const biomeModifierAggregation = GATHERING_BIOME_MODIFIER_AGGREGATIONS.has(rules?.biomeModifierAggregation)
     ? rules.biomeModifierAggregation
     : DEFAULT_GATHERING_RULES.biomeModifierAggregation;
+  const blindCandidateGate = GATHERING_BLIND_CANDIDATE_GATES.has(rules?.blindCandidateGate)
+    ? rules.blindCandidateGate
+    : DEFAULT_GATHERING_RULES.blindCandidateGate;
+  const revealPolicy = GATHERING_REVEAL_POLICIES.has(rules?.revealPolicy)
+    ? rules.revealPolicy
+    : DEFAULT_GATHERING_RULES.revealPolicy;
+  const revealScope = GATHERING_REVEAL_SCOPES.has(rules?.revealScope)
+    ? rules.revealScope
+    : DEFAULT_GATHERING_RULES.revealScope;
   return {
     rewardSelectionMode,
     rewardLimit: _normalizePositiveInteger(rules?.rewardLimit, DEFAULT_GATHERING_RULES.rewardLimit),
@@ -679,7 +701,10 @@ function _normalizeGatheringRules(rules = {}) {
     hazardLimit: _normalizePositiveInteger(rules?.hazardLimit, DEFAULT_GATHERING_RULES.hazardLimit),
     hazardPolicy,
     toolBreakagePolicy,
-    biomeModifierAggregation
+    biomeModifierAggregation,
+    blindCandidateGate,
+    revealPolicy,
+    revealScope
   };
 }
 
@@ -1624,7 +1649,8 @@ export function createAdminStore(services) {
       environmentDraftIsNew: get(environmentDraftIsNew),
       environmentSaving: get(environmentSaving),
       environmentSaveError: get(environmentSaveError),
-      environmentValidationState: _clonePlain(get(environmentValidationState))
+      environmentValidationState: _clonePlain(get(environmentValidationState)),
+      environmentComposition: _clonePlain(_buildEnvironmentCompositionViewModel(get(environmentDraft)))
     };
   }
 
@@ -1915,6 +1941,51 @@ export function createAdminStore(services) {
     }
   }
 
+  async function _confirmDiscardDirtyDraft(contentKey, contentFallback) {
+    const localizeFn = services.localize;
+    const result = await services.confirmDialog?.({
+      title: localizeFn?.('FABRICATE.Admin.Manager.DiscardDirtyTitle') || 'Discard unsaved changes?',
+      content: `<p>${localizeFn?.(contentKey) || contentFallback}</p>`,
+      yes: {
+        label: localizeFn?.('FABRICATE.Admin.Manager.DiscardDirtyConfirm') || 'Discard Changes',
+        callback: () => true
+      },
+      no: {
+        label: localizeFn?.('FABRICATE.Admin.Manager.DiscardDirtyCancel') || 'Keep Editing',
+        callback: () => false
+      }
+    });
+    return result === true;
+  }
+
+  function confirmDiscardDirtyComponentDraft() {
+    return _confirmDiscardDirtyDraft(
+      'FABRICATE.Admin.Manager.Component.DiscardDirtyContent',
+      'The current component has unsaved changes. Discard them and continue?'
+    );
+  }
+
+  function confirmDiscardDirtyEssenceDraft() {
+    return _confirmDiscardDirtyDraft(
+      'FABRICATE.Admin.Manager.Essence.DiscardDirtyContent',
+      'The current essence has unsaved changes. Discard them and continue?'
+    );
+  }
+
+  function confirmDiscardDirtyGatheringTaskDraft() {
+    return _confirmDiscardDirtyDraft(
+      'FABRICATE.Admin.Manager.Environment.Tasks.DiscardChangesPrompt',
+      'The current gathering task has unsaved changes. Discard them and continue?'
+    );
+  }
+
+  function confirmDiscardDirtyGatheringHazardDraft() {
+    return _confirmDiscardDirtyDraft(
+      'FABRICATE.Admin.Manager.Environment.Hazards.DiscardChangesPrompt',
+      'The current hazard has unsaved changes. Discard them and continue?'
+    );
+  }
+
   function _getEnvironmentStore() {
     return services.getGatheringEnvironmentStore?.() || null;
   }
@@ -1963,22 +2034,7 @@ export function createAdminStore(services) {
   }
 
   function _gatheringLibraryRecordMatchesEnvironment(record, environment, conditions, includeDanger = false, conditionSettings = null) {
-    const environmentRegion = _normalizeGatheringTag(environment?.region);
-    const environmentBiomes = _normalizeGatheringTagList(environment?.biomes ?? environment?.biome);
-    const environmentDanger = _normalizeGatheringTagList(environment?.dangerTags ?? environment?.risk);
-    const recordBiomes = _normalizeGatheringTagList(record?.biomes);
-    const recordWeather = _normalizeGatheringConditionIdList(record?.weather);
-    const recordTimeOfDay = _normalizeGatheringConditionIdList(record?.timeOfDay);
-    const recordDanger = _normalizeGatheringTagList(record?.dangerTags);
-    const recordRegions = _normalizeGatheringTagList(Array.isArray(record?.regions)
-      ? record.regions
-      : record?.region ? [record.region] : []);
-    if (recordRegions.length > 0 && !recordRegions.includes(environmentRegion)) return false;
-    if (recordBiomes.length > 0 && !recordBiomes.some(tag => environmentBiomes.includes(tag))) return false;
-    if (conditionSettings?.weather?.enabled !== false && recordWeather.length > 0 && !recordWeather.includes(_normalizeGatheringConditionId(conditions?.weather))) return false;
-    if (conditionSettings?.timeOfDay?.enabled !== false && recordTimeOfDay.length > 0 && !recordTimeOfDay.includes(_normalizeGatheringConditionId(conditions?.timeOfDay))) return false;
-    if (includeDanger && recordDanger.length > 0 && !recordDanger.some(tag => environmentDanger.includes(tag))) return false;
-    return true;
+    return evaluateEnvironmentMatch(record, environment, conditions, { includeDanger, conditionSettings }).matches;
   }
 
   function _environmentAllowsGatheringLibraryRecord(environment, recordId, kind) {
@@ -1988,6 +2044,181 @@ export function createAdminStore(services) {
     const disabled = Array.isArray(environment?.[disabledKey]) ? environment[disabledKey].map(String) : [];
     if (disabled.includes(String(recordId))) return false;
     return enabled.length === 0 || enabled.includes(String(recordId));
+  }
+
+  /**
+   * Classify every library task/hazard for the given environment into a
+   * `CompositionState` + `RuntimeState` plus match evidence, honoring
+   * `compositionMode`. This is the single view-model the environment editor
+   * (Overview / Tasks / Hazards / Validation / inspector) renders from.
+   */
+  function _buildEnvironmentCompositionViewModel(environment) {
+    const empty = { compositionMode: 'automatic', conditions: { ...DEFAULT_GATHERING_CONDITIONS }, tasks: [], hazards: [], counts: _emptyCompositionCounts() };
+    if (!environment || typeof environment !== 'object') return empty;
+    const systemId = String(environment.craftingSystemId || get(selectedSystemId) || '');
+    if (!systemId) return empty;
+
+    const config = _currentGatheringConfig();
+    const system = config.systems?.[systemId] || {};
+    const craftingSystem = services.getCraftingSystemManager?.()?.getSystem?.(systemId) || null;
+    const managedItemById = new Map(_buildManagedItemOptions(_getManagedItems(craftingSystem)).map(item => [String(item.id || ''), item]));
+    const conditionSettings = system.conditions || null;
+    const conditions = _gatheringCurrentConditions(conditionSettings);
+    const compositionMode = environment.compositionMode === 'manual' ? 'manual' : 'automatic';
+
+    const tasks = _classifyCompositionRecords({
+      records: Array.isArray(system.tasks) ? system.tasks : [],
+      environment, conditions, conditionSettings, compositionMode, kind: 'task', includeDanger: false,
+      order: environment.taskOrder,
+      managedItemById
+    });
+    const hazards = _classifyCompositionRecords({
+      records: Array.isArray(system.hazards) ? system.hazards : [],
+      environment, conditions, conditionSettings, compositionMode, kind: 'hazard', includeDanger: true,
+      order: environment.hazardOrder
+    });
+
+    return { compositionMode, conditions, tasks, hazards, counts: _compositionCounts(tasks, hazards) };
+  }
+
+  function _classifyCompositionRecords({ records, environment, conditions, conditionSettings, compositionMode, kind, includeDanger, order, managedItemById = new Map() }) {
+    const enabledKey = kind === 'hazard' ? 'enabledHazardIds' : 'enabledTaskIds';
+    const disabledKey = kind === 'hazard' ? 'disabledHazardIds' : 'disabledTaskIds';
+    const forcedKey = kind === 'hazard' ? 'forcedHazardIds' : 'forcedTaskIds';
+    const enabled = Array.isArray(environment?.[enabledKey]) ? environment[enabledKey].map(String) : [];
+    const disabled = Array.isArray(environment?.[disabledKey]) ? environment[disabledKey].map(String) : [];
+    const forced = Array.isArray(environment?.[forcedKey]) ? environment[forcedKey].map(String) : [];
+    const orderIndex = new Map((Array.isArray(order) ? order : []).map((id, index) => [String(id), index]));
+
+    const classified = (Array.isArray(records) ? records : []).map((record, index) => {
+      const id = String(record?.id || '');
+      const libraryEnabled = record?.enabled !== false;
+      const { matches, conditionsMet, evidence } = evaluateEnvironmentMatch(record, environment, conditions, { includeDanger, conditionSettings });
+      const excluded = compositionMode !== 'manual' && disabled.includes(id);
+      const explicitlyIncluded = enabled.includes(id);
+      // Forces are honored only in manual mode (automatic ignores them, like the enabled allow-list).
+      const forceIncluded = compositionMode === 'manual' && forced.includes(id);
+
+      let compositionState;
+      if (!libraryEnabled) compositionState = 'libraryDisabled';
+      else if (excluded) compositionState = 'excluded';
+      else if (forceIncluded) compositionState = 'forceIncluded';
+      else if (!matches) compositionState = explicitlyIncluded ? 'includedButUnavailable' : 'notMatching';
+      else if (compositionMode === 'manual') compositionState = explicitlyIncluded ? 'explicitlyIncluded' : 'candidate';
+      else compositionState = 'includedByMatch';
+
+      // A record is runtime-available only when its composition state would compose it AND
+      // the current weather/time satisfy the record's required conditions.
+      const composed = compositionState === 'includedByMatch'
+        || compositionState === 'explicitlyIncluded'
+        || compositionState === 'forceIncluded';
+      const runtimeState = (composed && conditionsMet) ? 'available' : 'unavailable';
+      const orderRank = orderIndex.has(id) ? orderIndex.get(id) : Number.MAX_SAFE_INTEGER;
+      const dropRateAdjustment = _dropRateAdjustmentSummary({ kind, record, environment, managedItemById });
+      return { id, record, kind, libraryEnabled, matches, conditionsMet, evidence, excluded, explicitlyIncluded, compositionState, runtimeState, orderRank, _index: index, ...dropRateAdjustment };
+    });
+
+    return classified.sort((a, b) => (a.orderRank === b.orderRank ? a._index - b._index : a.orderRank - b.orderRank));
+  }
+
+  function _effectiveDropRate(baseDropRate, adjustment) {
+    const base = Number.isFinite(Number(baseDropRate)) ? Math.floor(Number(baseDropRate)) : 0;
+    const delta = Number.isFinite(Number(adjustment)) ? Math.floor(Number(adjustment)) : 0;
+    return Math.min(100, Math.max(0, base + delta));
+  }
+
+  function _dropRowDisplay(row, managedItemById = new Map()) {
+    const componentId = String(row?.componentId || row?.systemItemId || '');
+    const item = componentId ? managedItemById.get(componentId) : null;
+    const itemUuid = String(row?.itemUuid || '');
+    const unresolvedKey = 'FABRICATE.Admin.Manager.Environment.Tasks.UnresolvedDrop';
+    const unresolved = services.localize?.(unresolvedKey);
+    const fallbackName = unresolved && unresolved !== unresolvedKey ? unresolved : 'Unresolved drop';
+    return {
+      name: String(row?.name || item?.name || itemUuid || fallbackName),
+      img: String(row?.img || item?.img || 'icons/svg/item-bag.svg')
+    };
+  }
+
+  function _dropRateAdjustmentSummary({ kind, record, environment, managedItemById = new Map() }) {
+    const id = String(record?.id || '');
+    if (!id) return { hasDropRateAdjustment: false, dropRateAdjustment: 0, dropRateAdjustmentsEnabled: true, dropRateAdjustmentRows: [] };
+    if (kind === 'hazard') {
+      const adjustments = _normalizeDraftDropRateAdjustmentMap(environment?.hazardDropRateAdjustments);
+      const adjustment = adjustments[id] || 0;
+      const hazardEnabledMap = _normalizeDraftHazardDropRateAdjustmentsEnabled(environment?.hazardDropRateAdjustmentsEnabled);
+      const dropRateAdjustmentsEnabled = hazardEnabledMap[id] !== false;
+      const appliedAdjustment = dropRateAdjustmentsEnabled ? adjustment : 0;
+      const baseDropRate = Number.isFinite(Number(record?.dropRate)) ? Math.floor(Number(record.dropRate)) : 1;
+      return {
+        hasDropRateAdjustment: dropRateAdjustmentsEnabled && adjustment !== 0,
+        hasStoredDropRateAdjustment: adjustment !== 0,
+        dropRateAdjustment: adjustment,
+        dropRateAdjustmentsEnabled,
+        baseDropRate,
+        effectiveDropRate: _effectiveDropRate(baseDropRate, appliedAdjustment),
+        dropRateAdjustmentRows: []
+      };
+    }
+
+    const taskAdjustments = _normalizeDraftTaskDropRateAdjustments(environment?.taskDropRateAdjustments);
+    const taskAdjustmentEnabledMap = _normalizeDraftTaskDropRateAdjustmentsEnabled(environment?.taskDropRateAdjustmentsEnabled);
+    const dropRateAdjustmentsEnabled = taskAdjustmentEnabledMap[id] !== false;
+    const rowAdjustments = taskAdjustments[id] || {};
+    const rows = (Array.isArray(record?.dropRows ?? record?.itemDrops) ? (record.dropRows ?? record.itemDrops) : [])
+      .map(row => {
+        const rowId = String(row?.id || '');
+        const adjustment = rowAdjustments[rowId] || 0;
+        const appliedAdjustment = dropRateAdjustmentsEnabled ? adjustment : 0;
+        const baseDropRate = Number.isFinite(Number(row?.dropRate)) ? Math.floor(Number(row.dropRate)) : 1;
+        const display = _dropRowDisplay(row, managedItemById);
+        return {
+          id: rowId,
+          name: display.name,
+          img: display.img,
+          componentId: String(row?.componentId || row?.systemItemId || ''),
+          itemUuid: String(row?.itemUuid || ''),
+          quantity: Number.isFinite(Number(row?.quantity)) && Number(row.quantity) > 0 ? Number(row.quantity) : 1,
+          baseDropRate,
+          adjustment,
+          effectiveDropRate: _effectiveDropRate(baseDropRate, appliedAdjustment),
+          hasDropRateAdjustment: dropRateAdjustmentsEnabled && adjustment !== 0,
+          hasStoredDropRateAdjustment: adjustment !== 0
+        };
+      });
+    const hasStoredDropRateAdjustment = rows.some(row => row.hasStoredDropRateAdjustment);
+    return {
+      hasDropRateAdjustment: dropRateAdjustmentsEnabled && hasStoredDropRateAdjustment,
+      hasStoredDropRateAdjustment,
+      dropRateAdjustmentsEnabled,
+      dropRateAdjustment: dropRateAdjustmentsEnabled ? rows.reduce((sum, row) => sum + row.adjustment, 0) : 0,
+      dropRateAdjustmentRows: rows
+    };
+  }
+
+  function _emptyCompositionCounts() {
+    return {
+      availableTasks: 0, excludedTasks: 0, candidateTasks: 0, unavailableTasks: 0,
+      availableHazards: 0, excludedHazards: 0, candidateHazards: 0, unavailableHazards: 0,
+      diagnosticTasks: 0, diagnosticHazards: 0
+    };
+  }
+
+  function _compositionCounts(tasks, hazards) {
+    const tally = records => {
+      const available = records.filter(r => r.runtimeState === 'available').length;
+      const excluded = records.filter(r => r.compositionState === 'excluded').length;
+      const candidate = records.filter(r => r.compositionState === 'candidate').length;
+      const unavailable = records.filter(r => r.compositionState === 'includedButUnavailable').length;
+      const diagnostic = records.filter(r => r.compositionState === 'notMatching' || r.compositionState === 'libraryDisabled').length;
+      return { available, excluded, candidate, unavailable, diagnostic };
+    };
+    const t = tally(tasks);
+    const h = tally(hazards);
+    return {
+      availableTasks: t.available, excludedTasks: t.excluded, candidateTasks: t.candidate, unavailableTasks: t.unavailable, diagnosticTasks: t.diagnostic,
+      availableHazards: h.available, excludedHazards: h.excluded, candidateHazards: h.candidate, unavailableHazards: h.unavailable, diagnosticHazards: h.diagnostic
+    };
   }
 
   function _gatheringLibraryRecordUsages(systemId, record, kind) {
@@ -2179,6 +2410,7 @@ export function createAdminStore(services) {
       description: '',
       enabled: false,
       selectionMode: 'targeted',
+      dangerLevel: 'safe',
       sceneUuid: null,
       tasks: [_newEnvironmentPlaceholderTask()]
     };
@@ -2254,6 +2486,14 @@ export function createAdminStore(services) {
     try {
       const rawEnvironments = await environmentStore.listBySystem(selectedSystem.id);
       const environments = _clonePlain(Array.isArray(rawEnvironments) ? rawEnvironments : []);
+      const environmentTaskCounts = {};
+      for (const environment of environments) {
+        const counts = _buildEnvironmentCompositionViewModel(environment)?.counts || {};
+        environmentTaskCounts[String(environment.id)] = {
+          availableTaskCount: counts.availableTasks || 0,
+          availableHazardCount: counts.availableHazards || 0
+        };
+      }
       let environmentId = get(selectedEnvironmentId);
       const canKeepNewDraft = get(environmentDraftIsNew)
         && get(environmentDraftDirty)
@@ -2291,6 +2531,7 @@ export function createAdminStore(services) {
         environmentsLoading: false,
         environmentsError: null,
         environments,
+        environmentTaskCounts,
         ..._currentEnvironmentViewPatch()
       };
     } catch (err) {
@@ -2609,6 +2850,51 @@ export function createAdminStore(services) {
     return _clonePlain(get(environmentDraft));
   }
 
+  function _normalizeDraftBlindSelection(value) {
+    if (!value || typeof value !== 'object') return null;
+    const weights = value.weights && typeof value.weights === 'object'
+      ? Object.fromEntries(Object.entries(value.weights)
+          .map(([key, weight]) => [String(key), Number(weight)])
+          .filter(([, weight]) => Number.isFinite(weight)))
+      : {};
+    if (Object.keys(weights).length === 0) return null;
+    return { weights };
+  }
+
+  function _normalizeDraftDropRateAdjustmentValue(value) {
+    const number = Number(value);
+    if (!Number.isInteger(number) || number < -100 || number > 100 || number === 0) return null;
+    return number;
+  }
+
+  function _normalizeDraftDropRateAdjustmentMap(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    return Object.fromEntries(Object.entries(value)
+      .map(([id, adjustment]) => [String(id || '').trim(), _normalizeDraftDropRateAdjustmentValue(adjustment)])
+      .filter(([id, adjustment]) => id && adjustment !== null));
+  }
+
+  function _normalizeDraftTaskDropRateAdjustments(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    return Object.fromEntries(Object.entries(value)
+      .map(([taskId, rowAdjustments]) => [String(taskId || '').trim(), _normalizeDraftDropRateAdjustmentMap(rowAdjustments)])
+      .filter(([taskId, rowAdjustments]) => taskId && Object.keys(rowAdjustments).length > 0));
+  }
+
+  function _normalizeDraftTaskDropRateAdjustmentsEnabled(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    return Object.fromEntries(Object.entries(value)
+      .map(([taskId, enabled]) => [String(taskId || '').trim(), enabled])
+      .filter(([taskId, enabled]) => taskId && enabled === false));
+  }
+
+  function _normalizeDraftHazardDropRateAdjustmentsEnabled(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    return Object.fromEntries(Object.entries(value)
+      .map(([hazardId, enabled]) => [String(hazardId || '').trim(), enabled])
+      .filter(([hazardId, enabled]) => hazardId && enabled === false));
+  }
+
   function updateEnvironmentDraft(updates = {}) {
     const current = get(environmentDraft);
     if (!current || typeof updates !== 'object' || updates === null) return false;
@@ -2616,18 +2902,30 @@ export function createAdminStore(services) {
     const allowed = new Set([
       'name',
       'description',
+      'img',
       'enabled',
       'selectionMode',
+      'compositionMode',
       'sceneUuid',
       'region',
       'biomes',
       'dangerTags',
+      'dangerLevel',
       'hazardSelectionMode',
       'hazardPolicy',
       'enabledTaskIds',
       'disabledTaskIds',
       'enabledHazardIds',
       'disabledHazardIds',
+      'forcedTaskIds',
+      'forcedHazardIds',
+      'taskOrder',
+      'hazardOrder',
+      'taskDropRateAdjustments',
+      'taskDropRateAdjustmentsEnabled',
+      'hazardDropRateAdjustments',
+      'hazardDropRateAdjustmentsEnabled',
+      'blindSelection',
       'tasks'
     ]);
     const next = _clonePlain(current);
@@ -2635,18 +2933,33 @@ export function createAdminStore(services) {
       if (!allowed.has(field)) continue;
       if (field === 'enabled') {
         next.enabled = value === true;
+      } else if (field === 'compositionMode') {
+        next.compositionMode = value === 'manual' ? 'manual' : 'automatic';
       } else if (field === 'sceneUuid') {
         const normalized = String(value ?? '').trim();
         next.sceneUuid = normalized || null;
+      } else if (field === 'img') {
+        const normalized = String(value ?? '').trim();
+        next.img = normalized || null;
       } else if (field === 'tasks') {
         next.tasks = Array.isArray(value) ? _clonePlain(value) : [];
         selectedEnvironmentTaskId.set(_resolveEnvironmentTaskSelection(next, get(selectedEnvironmentTaskId)));
       } else if (['biomes', 'dangerTags'].includes(field)) {
         next[field] = _normalizeGatheringTagList(value);
-      } else if (['enabledTaskIds', 'disabledTaskIds', 'enabledHazardIds', 'disabledHazardIds'].includes(field)) {
+      } else if (['enabledTaskIds', 'disabledTaskIds', 'enabledHazardIds', 'disabledHazardIds', 'forcedTaskIds', 'forcedHazardIds', 'taskOrder', 'hazardOrder'].includes(field)) {
         next[field] = Array.from(new Set((Array.isArray(value) ? value : [])
           .map(entry => String(entry || '').trim())
           .filter(Boolean)));
+      } else if (field === 'hazardDropRateAdjustments') {
+        next.hazardDropRateAdjustments = _normalizeDraftDropRateAdjustmentMap(value);
+      } else if (field === 'hazardDropRateAdjustmentsEnabled') {
+        next.hazardDropRateAdjustmentsEnabled = _normalizeDraftHazardDropRateAdjustmentsEnabled(value);
+      } else if (field === 'taskDropRateAdjustments') {
+        next.taskDropRateAdjustments = _normalizeDraftTaskDropRateAdjustments(value);
+      } else if (field === 'taskDropRateAdjustmentsEnabled') {
+        next.taskDropRateAdjustmentsEnabled = _normalizeDraftTaskDropRateAdjustmentsEnabled(value);
+      } else if (field === 'blindSelection') {
+        next.blindSelection = _normalizeDraftBlindSelection(value);
       } else {
         next[field] = String(value ?? '');
       }
@@ -2685,6 +2998,91 @@ export function createAdminStore(services) {
     selectedEnvironmentTaskId.set(nextTaskId);
     _patchEnvironmentViewState();
     return true;
+  }
+
+  function _compositionFieldKeys(kind) {
+    return kind === 'hazard'
+      ? { enabledKey: 'enabledHazardIds', disabledKey: 'disabledHazardIds', orderKey: 'hazardOrder', forcedKey: 'forcedHazardIds' }
+      : { enabledKey: 'enabledTaskIds', disabledKey: 'disabledTaskIds', orderKey: 'taskOrder', forcedKey: 'forcedTaskIds' };
+  }
+
+  function _compositionIdArray(value) {
+    return Array.isArray(value) ? value.map(entry => String(entry || '').trim()).filter(Boolean) : [];
+  }
+
+  function setEnvironmentCompositionMode(mode) {
+    return updateEnvironmentDraft({ compositionMode: mode === 'manual' ? 'manual' : 'automatic' });
+  }
+
+  function includeEnvironmentRecord(kind, recordId) {
+    const current = get(environmentDraft);
+    if (!current) return false;
+    const id = String(recordId || '').trim();
+    if (!id) return false;
+    const { enabledKey, disabledKey, orderKey } = _compositionFieldKeys(kind);
+    const enabled = _compositionIdArray(current[enabledKey]);
+    const disabled = _compositionIdArray(current[disabledKey]).filter(entry => entry !== id);
+    const order = _compositionIdArray(current[orderKey]);
+    if (!enabled.includes(id)) enabled.push(id);
+    if (!order.includes(id)) order.push(id);
+    return updateEnvironmentDraft({ [enabledKey]: enabled, [disabledKey]: disabled, [orderKey]: order });
+  }
+
+  function forceIncludeEnvironmentRecord(kind, recordId) {
+    const current = get(environmentDraft);
+    if (!current) return false;
+    const id = String(recordId || '').trim();
+    if (!id) return false;
+    const { disabledKey, orderKey, forcedKey } = _compositionFieldKeys(kind);
+    const disabled = _compositionIdArray(current[disabledKey]).filter(entry => entry !== id);
+    const order = _compositionIdArray(current[orderKey]);
+    const forced = _compositionIdArray(current[forcedKey]);
+    if (!forced.includes(id)) forced.push(id);
+    if (!order.includes(id)) order.push(id);
+    return updateEnvironmentDraft({ [forcedKey]: forced, [disabledKey]: disabled, [orderKey]: order });
+  }
+
+  function excludeEnvironmentRecord(kind, recordId) {
+    const current = get(environmentDraft);
+    if (!current) return false;
+    const id = String(recordId || '').trim();
+    if (!id) return false;
+    const { enabledKey, disabledKey, forcedKey } = _compositionFieldKeys(kind);
+    const enabled = _compositionIdArray(current[enabledKey]).filter(entry => entry !== id);
+    const forced = _compositionIdArray(current[forcedKey]).filter(entry => entry !== id);
+    const disabled = _compositionIdArray(current[disabledKey]).filter(entry => entry !== id);
+    if (current.compositionMode !== 'manual') disabled.push(id);
+    return updateEnvironmentDraft({ [enabledKey]: enabled, [disabledKey]: disabled, [forcedKey]: forced });
+  }
+
+  function restoreEnvironmentRecord(kind, recordId) {
+    const current = get(environmentDraft);
+    if (!current) return false;
+    const id = String(recordId || '').trim();
+    if (!id) return false;
+    const { disabledKey } = _compositionFieldKeys(kind);
+    const disabled = _compositionIdArray(current[disabledKey]).filter(entry => entry !== id);
+    return updateEnvironmentDraft({ [disabledKey]: disabled });
+  }
+
+  function reorderEnvironmentRecord(kind, fromIndex, toIndex) {
+    const current = get(environmentDraft);
+    if (!current) return false;
+    const viewModel = _buildEnvironmentCompositionViewModel(current);
+    const records = kind === 'hazard' ? viewModel.hazards : viewModel.tasks;
+    const ids = records
+      .filter(entry => kind === 'hazard'
+        ? ENVIRONMENT_INCLUDED_COMPOSITION_STATES.has(entry.compositionState)
+        : entry.runtimeState === 'available' || entry.compositionState === 'includedButUnavailable')
+      .map(entry => entry.id);
+    const from = Number(fromIndex);
+    const to = Number(toIndex);
+    if (!Number.isInteger(from) || !Number.isInteger(to)) return false;
+    if (from < 0 || from >= ids.length || to < 0 || to >= ids.length || from === to) return false;
+    const [moved] = ids.splice(from, 1);
+    ids.splice(to, 0, moved);
+    const { orderKey } = _compositionFieldKeys(kind);
+    return updateEnvironmentDraft({ [orderKey]: ids });
   }
 
   function addEnvironmentTask() {
@@ -4782,6 +5180,12 @@ export function createAdminStore(services) {
     selectEnvironment,
     createEnvironmentDraft,
     updateEnvironmentDraft,
+    setEnvironmentCompositionMode,
+    includeEnvironmentRecord,
+    forceIncludeEnvironmentRecord,
+    excludeEnvironmentRecord,
+    restoreEnvironmentRecord,
+    reorderEnvironmentRecord,
     selectEnvironmentTask,
     addEnvironmentTask,
     updateEnvironmentTask,
@@ -4809,6 +5213,10 @@ export function createAdminStore(services) {
     updateEnvironmentTaskTimeRequirement,
     updateEnvironmentTaskFailureOutcome,
     confirmDiscardDirtyEnvironmentDraft,
+    confirmDiscardDirtyComponentDraft,
+    confirmDiscardDirtyEssenceDraft,
+    confirmDiscardDirtyGatheringTaskDraft,
+    confirmDiscardDirtyGatheringHazardDraft,
     cancelEnvironmentDraft,
     saveEnvironmentDraft,
     duplicateEnvironmentDraft,

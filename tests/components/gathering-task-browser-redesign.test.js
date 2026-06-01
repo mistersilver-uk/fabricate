@@ -105,7 +105,7 @@ describe('GatheringTasksBrowserView card-style row', () => {
     );
   });
 
-  it('grows the gathering task thumbnail to 64px for the card layout', () => {
+  it('sizes the gathering task thumbnail to 64px to match the environments browser rows', () => {
     const sizeBlock = css.match(/\.manager-gathering-tasks-table\s+\.manager-gathering-task-identity\s+\.manager-gathering-task-thumb\s*\{[^}]*\}/);
     assert.ok(sizeBlock, 'card-layout thumb override should be defined');
     assert.ok(/width:\s*64px/.test(sizeBlock[0]), 'thumb width should be 64px');

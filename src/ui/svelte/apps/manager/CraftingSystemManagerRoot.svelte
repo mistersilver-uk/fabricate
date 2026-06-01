@@ -476,10 +476,10 @@
       icon: 'fas fa-exclamation-triangle',
       labelKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.Encounters',
       labelFallback: 'Hazards',
-      titleKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersPlaceholderTitle',
+      titleKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersTitle',
       titleFallback: 'Gathering hazards',
-      hintKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersPlaceholderHint',
-      hintFallback: 'Reusable hazard authoring is planned for a later slice.'
+      hintKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersHint',
+      hintFallback: 'Browse reusable hazards before attaching them to environments.'
     },
     {
       id: 'settings',
@@ -885,7 +885,11 @@
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksTitle', 'Gathering Tasks');
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Title', 'Tools');
     if (currentView === 'environments') return text('FABRICATE.Admin.Manager.Environment.Title', 'Environments');
-    if (currentView === 'environment-edit') return text('FABRICATE.Admin.Manager.Environment.EditTitle', 'Edit environment');
+    if (currentView === 'environment-edit') {
+      const base = text('FABRICATE.Admin.Manager.Environment.EditTitle', 'Edit environment');
+      const environmentName = String(environmentDraftForDisplay?.name || '').trim();
+      return environmentName ? `${base}: ${environmentName}` : base;
+    }
     if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.Manager.Environment.Tasks.EditTitle', 'Edit gathering task');
     if (currentView === 'gathering-hazard-edit') return text('FABRICATE.Admin.Manager.Environment.Hazards.EditTitle', 'Edit gathering hazard');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.Title', 'System settings');
@@ -905,7 +909,10 @@
     if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksHint', 'Browse gathering tasks before attaching them to environments.');
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Subtitle', 'Manage reusable gathering tools and configure how they behave when required by tasks.');
     if (currentView === 'environments') return text('FABRICATE.Admin.Manager.Environment.Subtitle', 'Manage gathering environments for the selected crafting system.');
-    if (currentView === 'environment-edit') return text('FABRICATE.Admin.Manager.Environment.EditSubtitle', 'Edit scene linkage, environment details, tasks, results, catalysts, visibility, timing, and validation in the workspace.');
+    if (currentView === 'environment-edit') {
+      const environmentDescription = String(environmentDraftForDisplay?.description || '').trim();
+      return environmentDescription || text('FABRICATE.Admin.Manager.Environment.EditSubtitle', 'Edit scene linkage, environment details, tasks, results, catalysts, visibility, timing, and validation in the workspace.');
+    }
     if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.Manager.Environment.Tasks.EditSubtitle', 'Edit availability, identity, and drop rules for the selected gathering task.');
     if (currentView === 'gathering-hazard-edit') return text('FABRICATE.Admin.Manager.Environment.Hazards.EditSubtitle', 'Edit identity, availability, danger, and modifiers for the selected hazard.');
     if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.Subtitle', 'Edit base settings for the selected crafting system.');
@@ -996,11 +1003,7 @@
   function confirmGatheringHazardRouteExit(nextView) {
     if (activeView !== 'gathering-hazard-edit') return true;
     if (!gatheringHazardDraftDirty) return finishGatheringHazardRouteExit(true);
-    const message = text(
-      'FABRICATE.Admin.Manager.Environment.Hazards.DiscardChangesPrompt',
-      'The current hazard has unsaved changes. Discard them and continue?'
-    );
-    const confirmed = typeof globalThis.confirm === 'function' ? globalThis.confirm(message) : false;
+    const confirmed = store.confirmDiscardDirtyGatheringHazardDraft?.() ?? false;
     if (isPromise(confirmed)) return confirmed.then(finishGatheringHazardRouteExit);
     return finishGatheringHazardRouteExit(confirmed);
   }
@@ -1008,12 +1011,7 @@
   function confirmComponentRouteExit(nextView) {
     if (activeView !== 'component-edit') return true;
     if (componentEditDirty !== true) return true;
-    const message = text(
-      'FABRICATE.Admin.Manager.Component.DiscardDirtyContent',
-      'The current component has unsaved changes. Discard them and continue?'
-    );
-    const confirmed = services?.confirmDiscardComponentDraft?.()
-      ?? (typeof globalThis.confirm === 'function' ? globalThis.confirm(message) : false);
+    const confirmed = store.confirmDiscardDirtyComponentDraft?.() ?? false;
     if (isPromise(confirmed)) return confirmed.then(finishComponentRouteExit);
     return finishComponentRouteExit(confirmed);
   }
@@ -1029,11 +1027,7 @@
   function confirmEssenceRouteExit(nextView) {
     if (activeView !== 'essence-edit') return true;
     if (essenceEditDirty !== true) return true;
-    const confirmed = store.confirmDiscardDirtyEssenceDraft?.()
-      ?? services?.confirmDiscardEssenceDraft?.()
-      ?? (typeof globalThis.confirm === 'function'
-        ? globalThis.confirm(text('FABRICATE.Admin.Manager.Essence.DiscardDirtyContent', 'The current essence has unsaved changes. Discard them and continue?'))
-        : false);
+    const confirmed = store.confirmDiscardDirtyEssenceDraft?.() ?? false;
     if (isPromise(confirmed)) return confirmed.then(finishEssenceRouteExit);
     return finishEssenceRouteExit(confirmed);
   }
@@ -1041,11 +1035,7 @@
   function confirmGatheringTaskRouteExit(nextView) {
     if (activeView !== 'gathering-task-edit') return true;
     if (!gatheringTaskDraftDirty) return finishGatheringTaskRouteExit(true);
-    const message = text(
-      'FABRICATE.Admin.Manager.Environment.Tasks.DiscardChangesPrompt',
-      'The current gathering task has unsaved changes. Discard them and continue?'
-    );
-    const confirmed = typeof globalThis.confirm === 'function' ? globalThis.confirm(message) : false;
+    const confirmed = store.confirmDiscardDirtyGatheringTaskDraft?.() ?? false;
     if (isPromise(confirmed)) return confirmed.then(finishGatheringTaskRouteExit);
     return finishGatheringTaskRouteExit(confirmed);
   }
@@ -1176,13 +1166,6 @@
   function backToEssencesBrowse() {
     afterTruthyResult(confirmRouteExit('essences'), () => {
       activeView = canShowEssences ? 'essences' : 'systems';
-    });
-  }
-
-  function cancelEnvironmentEdit() {
-    const cancelled = store.cancelEnvironmentDraft?.();
-    afterTruthyResult(cancelled, () => {
-      activeView = canShowEnvironments ? 'environments' : 'systems';
     });
   }
 
@@ -2129,11 +2112,14 @@
   }
 
   function environmentImage(environment) {
+    const ownImg = String(environment?.img || '').trim();
+    if (ownImg) return ownImg;
     const linkedScene = linkedSceneForEnvironment(environment);
     return linkedScene?.img || linkedScene?.thumbnail || linkedScene?.thumb || 'icons/svg/item-bag.svg';
   }
 
-  function hasEnvironmentSceneImage(environment) {
+  function hasEnvironmentImage(environment) {
+    if (String(environment?.img || '').trim()) return true;
     const linkedScene = linkedSceneForEnvironment(environment);
     return Boolean(linkedScene?.img || linkedScene?.thumbnail || linkedScene?.thumb);
   }
@@ -2180,20 +2166,39 @@
     };
   }
 
-  function environmentTaskCount(environment) {
-    return Array.isArray(environment?.tasks) ? environment.tasks.length : 0;
+  function environmentComposedIds(environment, kind) {
+    const enabledKey = kind === 'hazard' ? 'enabledHazardIds' : 'enabledTaskIds';
+    const forcedKey = kind === 'hazard' ? 'forcedHazardIds' : 'forcedTaskIds';
+    const disabledKey = kind === 'hazard' ? 'disabledHazardIds' : 'disabledTaskIds';
+    const enabled = Array.isArray(environment?.[enabledKey]) ? environment[enabledKey] : [];
+    const forced = Array.isArray(environment?.[forcedKey]) ? environment[forcedKey] : [];
+    const disabled = new Set(Array.isArray(environment?.[disabledKey]) ? environment[disabledKey] : []);
+    return Array.from(new Set([...enabled, ...forced])).filter(id => !disabled.has(id));
   }
 
-  function environmentResultCount(environment) {
-    return (Array.isArray(environment?.tasks) ? environment.tasks : []).reduce((total, task) => {
-      return total + (Array.isArray(task?.resultGroups) ? task.resultGroups : [])
-        .reduce((groupTotal, group) => groupTotal + (Array.isArray(group?.results) ? group.results.length : 0), 0);
-    }, 0);
+  function environmentComposedTaskCount(environment) {
+    const stored = $viewState.environmentTaskCounts?.[String(environment?.id || '')]?.availableTaskCount;
+    return Number.isFinite(stored) ? stored : environmentComposedIds(environment, 'task').length;
   }
 
-  function environmentCatalystCount(environment) {
-    return (Array.isArray(environment?.tasks) ? environment.tasks : [])
-      .reduce((total, task) => total + (Array.isArray(task?.catalysts) ? task.catalysts.length : 0), 0);
+  function environmentComposedHazardCount(environment) {
+    const stored = $viewState.environmentTaskCounts?.[String(environment?.id || '')]?.availableHazardCount;
+    return Number.isFinite(stored) ? stored : environmentComposedIds(environment, 'hazard').length;
+  }
+
+  function environmentRequiredToolCount(environment) {
+    const taskIds = new Set(environmentComposedIds(environment, 'task'));
+    if (taskIds.size === 0) return 0;
+    const toolIds = new Set();
+    for (const task of gatheringTaskDefinitions) {
+      if (!taskIds.has(task?.id)) continue;
+      const refs = Array.isArray(task?.toolIds) ? task.toolIds : [];
+      for (const ref of refs) {
+        const str = String(ref || '').trim();
+        if (str) toolIds.add(str);
+      }
+    }
+    return toolIds.size;
   }
 
   function gatheringTaskName(task) {
@@ -2446,17 +2451,17 @@
       {
         id: 'tasks',
         label: text('FABRICATE.Admin.Environments.Tasks', 'Tasks'),
-        value: environmentTaskCount(environment)
+        value: environmentComposedTaskCount(environment)
       },
       {
-        id: 'results',
-        label: text('FABRICATE.Admin.Environments.Results', 'Results'),
-        value: environmentResultCount(environment)
+        id: 'hazards',
+        label: text('FABRICATE.Admin.Environments.Hazards', 'Hazards'),
+        value: environmentComposedHazardCount(environment)
       },
       {
-        id: 'catalysts',
-        label: text('FABRICATE.Admin.Environments.Catalysts', 'Catalysts'),
-        value: environmentCatalystCount(environment)
+        id: 'required-tools',
+        label: text('FABRICATE.Admin.Environments.RequiredTools', 'Required tools'),
+        value: environmentRequiredToolCount(environment)
       },
       {
         id: 'mode',
@@ -2695,7 +2700,7 @@
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <button type="button" onclick={backToEnvironmentsBrowse}>{text('FABRICATE.Admin.Manager.Nav.Environments', 'Gathering')}</button>
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Environment.EditBreadcrumb', 'Edit environment')}</span>
+          <span>{viewTitle()}</span>
         {/if}
         {#if currentView === 'gathering-task-edit'}
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
@@ -2720,6 +2725,19 @@
       </nav>
       <h1 class="manager-title">{viewTitle()}</h1>
       <p class="manager-subtitle">{viewSubtitle()}</p>
+      {#if currentView === 'environment-edit' && environmentDraftForDisplay}
+        <div class="manager-environment-header-pills" data-environment-status-pills>
+          <span class={`manager-chip ${environmentDraftForDisplay.enabled === false ? 'is-neutral' : 'is-active'}`} data-status-pill="active">
+            {environmentDraftForDisplay.enabled === false ? text('FABRICATE.Admin.Manager.StatusOff', 'Off') : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
+          </span>
+          <span class="manager-chip is-info" data-status-pill="selection">
+            {environmentDraftForDisplay.selectionMode === 'blind' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Blind', 'Blind') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Targeted', 'Targeted')}
+          </span>
+          <span class="manager-chip is-info" data-status-pill="composition">
+            {environmentDraftForDisplay.compositionMode === 'manual' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Manual', 'Manual') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Automatic', 'Automatic')}
+          </span>
+        </div>
+      {/if}
     </div>
     {#if currentView !== 'tools'}
     <div class="manager-header-actions" aria-label={headerActionsLabel()}>
@@ -2786,22 +2804,26 @@
         {#if $viewState.environmentDraftDirty}
           <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Environment.Dirty', 'Unsaved')}</span>
         {/if}
-        <button type="button" class="manager-button" onclick={cancelEnvironmentEdit} disabled={$viewState.environmentSaving}>
-          <i class="fas fa-times" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Environments.Cancel', 'Cancel')}</span>
+        <button type="button" class="manager-button" onclick={backToEnvironmentsBrowse} disabled={$viewState.environmentSaving}>
+          <i class="fas fa-arrow-left" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Environment.BackToBrowse', 'Back to environments')}</span>
+        </button>
+        <button type="button" class="manager-button is-danger" data-action="delete-environment" onclick={() => store.deleteEnvironmentDraft?.()} disabled={$viewState.environmentDraftIsNew || $viewState.environmentSaving}>
+          <i class="fas fa-trash" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Environment.Delete', 'Delete environment')}</span>
         </button>
         <button type="button" class="manager-button is-primary" onclick={saveEnvironmentEdit} disabled={!$viewState.environmentDraftDirty || $viewState.environmentSaving}>
           <i class={$viewState.environmentSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Environments.Save', 'Save Environment')}</span>
+          <span>{text('FABRICATE.Admin.Environments.Save', 'Save')}</span>
         </button>
       {:else if currentView === 'gathering-task-edit'}
+        {#if gatheringTaskDraftDirty}
+          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Environment.Tasks.Dirty', 'Unsaved')}</span>
+        {/if}
         <button type="button" class="manager-button" onclick={backToGatheringTaskLibrary}>
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.BackToLibrary', 'Back to task library')}</span>
         </button>
-        {#if gatheringTaskDraftDirty}
-          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Environment.Tasks.Dirty', 'Unsaved')}</span>
-        {/if}
         <button
           type="button"
           class="manager-button is-danger"
@@ -2823,13 +2845,13 @@
           <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Save', 'Save task')}</span>
         </button>
       {:else if currentView === 'gathering-hazard-edit'}
+        {#if gatheringHazardDraftDirty}
+          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Environment.Hazards.Dirty', 'Unsaved')}</span>
+        {/if}
         <button type="button" class="manager-button" onclick={backToGatheringHazardLibrary}>
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Environment.Hazards.BackToLibrary', 'Back to hazard library')}</span>
         </button>
-        {#if gatheringHazardDraftDirty}
-          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Environment.Hazards.Dirty', 'Unsaved')}</span>
-        {/if}
         <button
           type="button"
           class="manager-button is-danger"
@@ -3000,6 +3022,7 @@
         {selectedSystemId}
         gatheringConfig={$viewState.gatheringConfig}
         sceneOptions={selectedSystem?.sceneOptions || []}
+        environmentTaskCounts={$viewState.environmentTaskCounts || {}}
         {shouldUseEnvironmentDraftForDisplay}
         {activeGatheringTab}
         selectedTaskId={selectedGatheringTask?.id || selectedGatheringTaskId}
@@ -3023,7 +3046,6 @@
         onCreateEnvironment={createEnvironment}
         onDuplicateEnvironment={(id) => duplicateEnvironment(id)}
         onDeleteEnvironment={(id) => deleteEnvironment(id)}
-        onMoveEnvironment={(id, direction) => moveEnvironment(id, direction)}
         onToggleEnvironmentEnabled={(id, enabled) => toggleEnvironmentEnabled(id, enabled)}
         onUpdateGatheringConditions={store.updateGatheringConditions}
         onToggleGatheringConditionEnabled={store.toggleGatheringConditionEnabled}
@@ -3038,61 +3060,23 @@
       <main class="manager-main manager-environment-edit-main" aria-label={text('FABRICATE.Admin.Manager.Environment.EditTitle', 'Edit environment')}>
         <section class="manager-environment-editor-shell">
           <EnvironmentEditView
-            environments={$viewState.environments}
             environmentDraft={$viewState.environmentDraft}
-            dirty={$viewState.environmentDraftDirty}
+            composition={$viewState.environmentComposition}
+            hazardSelectionMode={selectedGatheringRules.hazardSelectionMode}
             isNew={$viewState.environmentDraftIsNew}
-            saving={$viewState.environmentSaving}
-            saveError={$viewState.environmentSaveError}
-            validationState={$viewState.environmentValidationState}
-            selectedTaskId={$viewState.selectedEnvironmentTaskId}
-            managedItemOptions={$viewState.selectedSystem?.managedItemOptions || []}
-            availableScriptMacros={$viewState.selectedSystem?.availableScriptMacros || []}
-            sceneOptions={$viewState.selectedSystem?.sceneOptions || []}
-            rollTableOptions={$viewState.selectedSystem?.rollTableOptions || []}
-            gatheringConfig={$viewState.gatheringConfig}
+            regionOptions={gatheringVocabularyOptions('regions')}
+            biomeOptions={gatheringVocabularyOptions('biomes')}
+            dangerOptions={gatheringVocabularyOptions('danger')}
             onPickImagePath={services?.pickImagePath}
             onUpdateEnvironment={store.updateEnvironmentDraft}
-            onUpdateGatheringConditions={store.updateGatheringConditions}
-            onUpdateGatheringVocabulary={store.updateGatheringVocabulary}
-            onUpdateGatheringRules={store.updateGatheringRules}
-            onAddGatheringLibraryTask={store.addGatheringLibraryTask}
-            onUpdateGatheringLibraryTask={store.updateGatheringLibraryTask}
-            onDeleteGatheringLibraryTask={store.deleteGatheringLibraryTask}
-            onAddGatheringLibraryHazard={store.addGatheringLibraryHazard}
-            onUpdateGatheringLibraryHazard={store.updateGatheringLibraryHazard}
-            onDeleteGatheringLibraryHazard={store.deleteGatheringLibraryHazard}
-            onAddGatheringHazardCharacterModifier={store.addGatheringHazardCharacterModifier}
-            onUpdateGatheringHazardCharacterModifier={store.updateGatheringHazardCharacterModifier}
-            onDeleteGatheringHazardCharacterModifier={store.deleteGatheringHazardCharacterModifier}
-            onCancelEnvironment={store.cancelEnvironmentDraft}
-            onSaveEnvironment={store.saveEnvironmentDraft}
-            onDuplicateEnvironment={store.duplicateEnvironmentDraft}
-            onDeleteEnvironment={store.deleteEnvironmentDraft}
-            onMoveEnvironment={store.moveEnvironmentDraft}
-            onAddTask={store.addEnvironmentTask}
-            onSelectTask={store.selectEnvironmentTask}
-            onUpdateTask={store.updateEnvironmentTask}
-            onDuplicateTask={store.duplicateEnvironmentTask}
-            onDeleteTask={store.deleteEnvironmentTask}
-            onMoveTask={store.moveEnvironmentTask}
-            onAddResultGroup={store.addEnvironmentTaskResultGroup}
-            onUpdateResultGroup={store.updateEnvironmentTaskResultGroup}
-            onDeleteResultGroup={store.deleteEnvironmentTaskResultGroup}
-            onMoveResultGroup={store.moveEnvironmentTaskResultGroup}
-            onAddResult={store.addEnvironmentTaskResult}
-            onUpdateResult={store.updateEnvironmentTaskResult}
-            onDeleteResult={store.deleteEnvironmentTaskResult}
-            onMoveResult={store.moveEnvironmentTaskResult}
-            onAddCatalyst={store.addEnvironmentTaskCatalyst}
-            onUpdateCatalyst={store.updateEnvironmentTaskCatalyst}
-            onDeleteCatalyst={store.deleteEnvironmentTaskCatalyst}
-            onUpdateVisibility={store.updateEnvironmentTaskVisibility}
-            onUpdateResultSelection={store.updateEnvironmentTaskResultSelection}
-            onUpdateProgressive={store.updateEnvironmentTaskProgressive}
-            onUpdateCheck={store.updateEnvironmentTaskCheck}
-            onUpdateTimeRequirement={store.updateEnvironmentTaskTimeRequirement}
-            onUpdateFailureOutcome={store.updateEnvironmentTaskFailureOutcome}
+            onSetCompositionMode={store.setEnvironmentCompositionMode}
+            onIncludeRecord={store.includeEnvironmentRecord}
+            onForceIncludeRecord={store.forceIncludeEnvironmentRecord}
+            onExcludeRecord={store.excludeEnvironmentRecord}
+            onRestoreRecord={store.restoreEnvironmentRecord}
+            onReorderRecord={store.reorderEnvironmentRecord}
+            onOpenSourceTask={(id) => editGatheringTask(id)}
+            onOpenSourceHazard={(id) => editGatheringHazard(id)}
           />
         </section>
       </main>
@@ -3440,7 +3424,7 @@
             {#if selectedGatheringDrop}
             <div class="manager-drop-inspector-stack" data-gathering-task-drop-inspector>
             <section class="manager-inspector-card manager-drop-editor-header-card">
-              <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Tasks.SelectedDrop', 'Selected Drop Rule')}</h3>
+              <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Tasks.SelectedDrop', 'Selected drop rule')}</h3>
               <div class="manager-inspector-title-row">
                 <img class="manager-recipe-preview" src={gatheringDropImage(selectedGatheringDrop)} alt="" />
                 <div class="manager-inspector-copy">
@@ -3449,13 +3433,13 @@
                 </div>
               </div>
               <div class="manager-drop-editor-actions">
-                <button type="button" class="manager-button" aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.DuplicateDrop', 'Duplicate drop rule')} onclick={() => duplicateGatheringTaskDrop(selectedGatheringDrop.id)}>
+                <button type="button" class="manager-button" aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.DuplicateDrop', 'Duplicate')} onclick={() => duplicateGatheringTaskDrop(selectedGatheringDrop.id)}>
                   <i class="fas fa-copy" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.DuplicateDrop', 'Duplicate drop rule')}</span>
+                  <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.DuplicateDrop', 'Duplicate')}</span>
                 </button>
-                <button type="button" class="manager-button is-danger" aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.DeleteDrop', 'Delete drop rule')} onclick={() => deleteGatheringTaskDrop(selectedGatheringDrop.id)}>
+                <button type="button" class="manager-button is-danger" aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.DeleteDrop', 'Delete')} onclick={() => deleteGatheringTaskDrop(selectedGatheringDrop.id)}>
                   <i class="fas fa-trash" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.DeleteDrop', 'Delete drop rule')}</span>
+                  <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.DeleteDrop', 'Delete')}</span>
                 </button>
               </div>
             </section>
@@ -3963,7 +3947,7 @@
                 <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-gift"></i></span>
                 <label class="manager-rule-copy" for="manager-gathering-rule-rewards">
                   <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.Rewards', 'Rewards')}</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.RewardsDescription', 'Choose which successful drop rows are granted.')}</span>
+                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.RewardsDescription', 'Choose how rewards are granted.')}</span>
                 </label>
                 <span class="manager-rule-field">
                   <select id="manager-gathering-rule-rewards" value={selectedGatheringRules.rewardSelectionMode} onchange={(event) => updateSelectedGatheringRules({ rewardSelectionMode: event.target.value })}>
@@ -3985,7 +3969,7 @@
                 <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-triangle-exclamation"></i></span>
                 <label class="manager-rule-copy" for="manager-gathering-rule-hazards">
                   <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.Hazards', 'Hazards')}</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.HazardsDescription', 'Choose which matching hazards are applied after a gathering roll.')}</span>
+                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.HazardsDescription', 'Choose how matching hazards are applied after a gathering roll.')}</span>
                 </label>
                 <span class="manager-rule-field">
                   <select id="manager-gathering-rule-hazards" value={selectedGatheringRules.hazardSelectionMode} onchange={(event) => updateSelectedGatheringRules({ hazardSelectionMode: event.target.value })}>
@@ -4007,7 +3991,7 @@
                 <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-scale-balanced"></i></span>
                 <label class="manager-rule-copy" for="manager-gathering-rule-outcome">
                   <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.HazardOutcome', 'Hazard outcome')}</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.HazardOutcomeDescription', 'Decide whether selected hazards still allow the gathering attempt to succeed.')}</span>
+                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.HazardOutcomeDescription', 'Decide whether rolling a hazard still allows the gathering attempt to succeed.')}</span>
                 </label>
                 <span class="manager-rule-field">
                   <select id="manager-gathering-rule-outcome" value={selectedGatheringRules.hazardPolicy} onchange={(event) => updateSelectedGatheringRules({ hazardPolicy: event.target.value })}>
@@ -4045,6 +4029,51 @@
                   </select>
                 </span>
               </div>
+
+              <div class="manager-rule-row">
+                <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-eye-slash"></i></span>
+                <label class="manager-rule-copy" for="manager-gathering-rule-blind-gate">
+                  <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.BlindCandidateGate', 'Blind candidate gate')}</strong>
+                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.BlindCandidateGateDescription', 'In blind mode, choose whether the generic gather only resolves to tasks the character can attempt, or to any matching task.')}</span>
+                </label>
+                <span class="manager-rule-field">
+                  <select id="manager-gathering-rule-blind-gate" value={selectedGatheringRules.blindCandidateGate ?? 'attemptableOnly'} onchange={(event) => updateSelectedGatheringRules({ blindCandidateGate: event.target.value })}>
+                    <option value="attemptableOnly">{text('FABRICATE.Admin.Manager.Environment.Rules.BlindGateAttemptableOnly', 'Only attemptable tasks')}</option>
+                    <option value="allMatching">{text('FABRICATE.Admin.Manager.Environment.Rules.BlindGateAllMatching', 'Any matching task')}</option>
+                  </select>
+                </span>
+              </div>
+
+              <div class="manager-rule-row">
+                <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-wand-sparkles"></i></span>
+                <label class="manager-rule-copy" for="manager-gathering-rule-reveal-policy">
+                  <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.RevealPolicy', 'Blind reveal')}</strong>
+                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.RevealPolicyDescription', 'Decide whether a blind task is revealed to the player after they attempt it.')}</span>
+                </label>
+                <span class="manager-rule-field">
+                  <select id="manager-gathering-rule-reveal-policy" value={selectedGatheringRules.revealPolicy ?? 'never'} onchange={(event) => updateSelectedGatheringRules({ revealPolicy: event.target.value })}>
+                    <option value="never">{text('FABRICATE.Admin.Manager.Environment.Rules.RevealNever', 'Never reveal')}</option>
+                    <option value="onSuccess">{text('FABRICATE.Admin.Manager.Environment.Rules.RevealOnSuccess', 'Reveal on success')}</option>
+                    <option value="onAttempt">{text('FABRICATE.Admin.Manager.Environment.Rules.RevealOnAttempt', 'Reveal on any attempt')}</option>
+                  </select>
+                </span>
+              </div>
+
+              <div class="manager-rule-row">
+                <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-users-viewfinder"></i></span>
+                <label class="manager-rule-copy" for="manager-gathering-rule-reveal-scope">
+                  <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.RevealScope', 'Reveal scope')}</strong>
+                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.RevealScopeDescription', 'Who learns the revealed task: just the actor, the controlling user, the party, or everyone.')}</span>
+                </label>
+                <span class="manager-rule-field">
+                  <select id="manager-gathering-rule-reveal-scope" value={selectedGatheringRules.revealScope ?? 'actor'} onchange={(event) => updateSelectedGatheringRules({ revealScope: event.target.value })}>
+                    <option value="actor">{text('FABRICATE.Admin.Manager.Environment.Rules.RevealScopeActor', 'Actor')}</option>
+                    <option value="user">{text('FABRICATE.Admin.Manager.Environment.Rules.RevealScopeUser', 'User')}</option>
+                    <option value="party">{text('FABRICATE.Admin.Manager.Environment.Rules.RevealScopeParty', 'Party')}</option>
+                    <option value="global">{text('FABRICATE.Admin.Manager.Environment.Rules.RevealScopeGlobal', 'Everyone')}</option>
+                  </select>
+                </span>
+              </div>
             </div>
           </section>
         {:else if currentView === 'environments' && activeGatheringInspectorTab}
@@ -4066,7 +4095,7 @@
           </section>
         {:else if selectedEnvironment}
           <section class="manager-inspector-card">
-            <img class={`manager-environment-preview ${hasEnvironmentSceneImage(selectedEnvironment) ? '' : 'is-fallback'}`} src={environmentImage(selectedEnvironment)} alt="" />
+            <img class={`manager-environment-preview ${hasEnvironmentImage(selectedEnvironment) ? '' : 'is-fallback'}`} src={environmentImage(selectedEnvironment)} alt="" />
             <div class="manager-inspector-copy">
               <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Environment.Selected', 'Selected environment')}</p>
               <h2 class="manager-inspector-name" title={environmentName(selectedEnvironment)}>{environmentName(selectedEnvironment)}</h2>
@@ -4385,7 +4414,7 @@
             <div>
               <i class="fas fa-boxes" aria-hidden="true"></i>
               <h3>{text('FABRICATE.Admin.Manager.Component.SelectComponent', 'Select a component')}</h3>
-              <p>{text('FABRICATE.Admin.Manager.Component.InspectorHint', 'The inspector shows component identity, source evidence, tags, essences, and existing actions for the selected row.')}</p>
+              <p>{text('FABRICATE.Admin.Manager.Component.InspectorHint', 'The inspector shows component identity, origin, tags, essences, and source copy context for the selected row.')}</p>
             </div>
           </div>
         {/if}
