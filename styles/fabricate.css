@@ -6340,9 +6340,9 @@
   background: var(--fab-mv2-surface-2);
 }
 
-/* Match the gathering task browser rows to the shorter environment editor rows. */
+/* Let the gathering task browser rows fill the action group's two-row height. */
 .fabricate-manager .manager-gathering-task-row {
-  min-height: 54px;
+  min-height: 76px;
   padding: 8px 10px;
 }
 
@@ -6496,27 +6496,24 @@
 }
 
 .fabricate-manager .manager-gathering-tasks-table .manager-gathering-task-identity {
-  grid-template-columns: 38px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 12px;
   align-items: center;
   align-self: center;
-  min-height: 38px;
+  min-height: 76px;
 }
 
 .fabricate-manager .manager-gathering-tasks-table .manager-gathering-task-identity .manager-gathering-task-thumb {
-  width: 38px;
-  height: 38px;
-}
-
-.fabricate-manager .manager-gathering-tasks-table .manager-gathering-task-identity .manager-system-name {
-  -webkit-line-clamp: 1;
+  width: 76px;
+  height: 76px;
+  object-fit: cover;
 }
 
 .fabricate-manager .manager-gathering-tasks-table .manager-gathering-task-identity .manager-system-description {
-  margin-top: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .fabricate-manager .manager-gathering-tasks-table .manager-gathering-task-identity .manager-system-copy {
@@ -6540,7 +6537,8 @@
   align-items: flex-start;
   align-self: flex-start;
   min-width: 0;
-  height: 38px;
+  /* Fill the row height set by the action group (two rows of 34px buttons + 8px gap). */
+  height: 76px;
   overflow-y: auto;
   padding-right: 4px;
 }
@@ -8671,7 +8669,7 @@
 
 .fabricate-manager .manager-gathering-hazard-row {
   width: 100%;
-  min-height: 54px;
+  min-height: 76px;
   padding: 8px 10px;
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
@@ -8725,17 +8723,18 @@
 
 .fabricate-manager .manager-gathering-hazards-table .manager-gathering-hazard-identity {
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 12px;
   align-items: center;
   align-self: center;
-  min-height: 38px;
+  min-height: 76px;
 }
 
 .fabricate-manager .manager-gathering-hazards-table .manager-gathering-hazard-identity .manager-gathering-hazard-thumb {
-  width: 38px;
-  height: 38px;
-  flex: 0 0 38px;
+  width: 76px;
+  height: 76px;
+  flex: 0 0 76px;
+  object-fit: cover;
   align-self: center;
 }
 
@@ -8747,15 +8746,11 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-gathering-hazards-table .manager-gathering-hazard-identity .manager-system-name {
-  -webkit-line-clamp: 1;
-}
-
 .fabricate-manager .manager-gathering-hazards-table .manager-gathering-hazard-identity .manager-system-description {
-  margin-top: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .fabricate-manager .manager-gathering-hazards-table .manager-gathering-hazard-row .manager-status-cell,
@@ -8771,7 +8766,8 @@
   align-items: flex-start;
   align-self: flex-start;
   min-width: 0;
-  height: 38px;
+  /* Fill the row height set by the action group (two rows of 34px buttons + 8px gap). */
+  height: 76px;
   overflow-y: auto;
   padding-right: 4px;
 }
