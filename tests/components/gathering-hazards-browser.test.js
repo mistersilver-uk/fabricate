@@ -62,6 +62,8 @@ describe('GatheringHazardsBrowserView source contract', () => {
       assert.ok(browserSource.includes(helper), `helper ${helper} should be present`);
     }
     assert.ok(browserSource.includes('data-gathering-hazard-tags'), 'tags cell exposes a data attribute');
+    assert.ok(browserSource.includes("icon: 'fa-solid fa-triangle-exclamation'"), 'danger chips should render a triangle warning icon');
+    assert.ok(browserSource.includes('{#if chip.icon}<i class={chip.icon} aria-hidden="true"></i>{/if}'), 'row chip icons should be decorative');
     assert.equal(/function\s+activeEnvironmentCount\s*\(/.test(browserSource), false, 'activeEnvironmentCount should be removed');
     assert.equal(/function\s+dropRateLabel\s*\(/.test(browserSource), false, 'dropRateLabel should be removed');
   });

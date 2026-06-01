@@ -49,6 +49,14 @@ describe('GatheringHazardEditView source contract', () => {
       'editor should seed the six fixed danger levels'
     );
     assert.ok(editorSource.includes('manager-danger-tag-pill'), 'editor should render danger tags as pills');
+    assert.ok(
+      /data-danger-tag=\{tag\}[\s\S]*<i class="fa-solid fa-triangle-exclamation" aria-hidden="true"><\/i>/.test(editorSource),
+      'selected danger tag pills should render a decorative triangle warning icon'
+    );
+    assert.ok(
+      /data-danger-tag-suggestion=\{tag\}[\s\S]*<i class="fa-solid fa-triangle-exclamation" aria-hidden="true"><\/i>/.test(editorSource),
+      'danger tag suggestion pills should render a decorative triangle warning icon'
+    );
     assert.equal(editorSource.includes('manager-danger-tag-input-row'), false, 'custom danger tag input row should be removed');
     assert.equal(editorSource.includes('dangerTagInput'), false, 'dangerTagInput state should be removed');
     assert.equal(/function\s+onDangerTagInputKey\s*\(/.test(editorSource), false, 'onDangerTagInputKey helper should be removed');

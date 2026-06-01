@@ -344,6 +344,7 @@
             {#if dangerTags.length > 0}
               {#each dangerTags as tag (tag)}
                 <span class={`manager-danger-tag-pill is-${tag}`} data-danger-tag={tag}>
+                  <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
                   <span>{dangerLabel(tag)}</span>
                   <button type="button" class="manager-availability-remove" aria-label={text('FABRICATE.Admin.Manager.Environment.Hazards.RemoveDangerTag', 'Remove {name}').replace('{name}', dangerLabel(tag))} onclick={() => removeDangerTag(tag)}>
                     <i class="fas fa-xmark" aria-hidden="true"></i>
@@ -363,6 +364,7 @@
                   data-danger-tag-suggestion={tag}
                   onclick={() => addDangerTag(tag)}
                 >
+                  <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
                   <i class="fas fa-plus" aria-hidden="true"></i>
                   <span>{dangerLabel(tag)}</span>
                 </button>
