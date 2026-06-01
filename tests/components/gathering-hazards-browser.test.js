@@ -80,11 +80,11 @@ describe('GatheringHazardsBrowserView source contract', () => {
     assert.ok(/[^-]height:\s*\d+px/.test(tagsBlock[0]), 'tags cell must use a fixed height so all rows match');
   });
 
-  it('sizes the hazard thumbnail to 76px so it fills the row height', () => {
+  it('sizes the hazard thumbnail to 64px to match the environments browser rows', () => {
     const thumbBlock = css.match(/\.manager-gathering-hazards-table\s+\.manager-gathering-hazard-identity\s+\.manager-gathering-hazard-thumb\s*\{[^}]*\}/);
     assert.ok(thumbBlock, 'card-layout thumb override should be defined');
-    assert.ok(/width:\s*76px/.test(thumbBlock[0]), 'thumb width should be 76px');
-    assert.ok(/height:\s*76px/.test(thumbBlock[0]), 'thumb height should be 76px');
+    assert.ok(/width:\s*64px/.test(thumbBlock[0]), 'thumb width should be 64px');
+    assert.ok(/height:\s*64px/.test(thumbBlock[0]), 'thumb height should be 64px');
   });
 
   it('replaces the encounters placeholder with the new hazard library tabpanel', () => {

@@ -6084,7 +6084,7 @@
 }
 
 .fabricate-manager .manager-gathering-tasks-table {
-  --fab-mv2-gathering-task-grid: minmax(220px, 0.8fr) minmax(260px, 1.6fr) 72px 92px;
+  --fab-mv2-gathering-task-grid: minmax(180px, 0.8fr) minmax(260px, 1.6fr) 72px 116px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -6340,12 +6340,6 @@
   background: var(--fab-mv2-surface-2);
 }
 
-/* Let the gathering task browser rows fill the action group's two-row height. */
-.fabricate-manager .manager-gathering-task-row {
-  min-height: 76px;
-  padding: 8px 10px;
-}
-
 .fabricate-manager .manager-recipe-row:hover,
 .fabricate-manager .manager-component-row:hover,
 .fabricate-manager .manager-environment-row:hover,
@@ -6496,16 +6490,16 @@
 }
 
 .fabricate-manager .manager-gathering-tasks-table .manager-gathering-task-identity {
-  grid-template-columns: 76px minmax(0, 1fr);
+  grid-template-columns: 64px minmax(0, 1fr);
   gap: 12px;
   align-items: center;
   align-self: center;
-  min-height: 76px;
+  min-height: 64px;
 }
 
 .fabricate-manager .manager-gathering-tasks-table .manager-gathering-task-identity .manager-gathering-task-thumb {
-  width: 76px;
-  height: 76px;
+  width: 64px;
+  height: 64px;
   object-fit: cover;
 }
 
@@ -6529,6 +6523,13 @@
   align-self: center;
 }
 
+/* Keep the action buttons on a single row (like the environments browser) so the row
+   height is driven by the 64px thumbnail, not a wrapped second button row. */
+.fabricate-manager .manager-gathering-tasks-table .manager-gathering-task-row .manager-action-group {
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+
 .fabricate-manager .manager-gathering-task-tags-cell {
   display: flex;
   flex-wrap: wrap;
@@ -6537,8 +6538,8 @@
   align-items: flex-start;
   align-self: flex-start;
   min-width: 0;
-  /* Fill the row height set by the action group (two rows of 34px buttons + 8px gap). */
-  height: 76px;
+  /* Fill the row height set by the 64px thumbnail; excess tags scroll. */
+  height: 64px;
   overflow-y: auto;
   padding-right: 4px;
 }
@@ -8645,7 +8646,7 @@
 }
 
 .fabricate-manager .manager-gathering-hazards-table {
-  --fab-mv2-gathering-hazard-grid: minmax(220px, 0.8fr) minmax(260px, 1.6fr) 72px 92px;
+  --fab-mv2-gathering-hazard-grid: minmax(180px, 0.8fr) minmax(260px, 1.6fr) 72px 116px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -8670,7 +8671,7 @@
 .fabricate-manager .manager-gathering-hazard-row {
   width: 100%;
   min-height: 76px;
-  padding: 8px 10px;
+  padding: 9px 10px;
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   color: var(--fab-mv2-text);
@@ -8723,17 +8724,17 @@
 
 .fabricate-manager .manager-gathering-hazards-table .manager-gathering-hazard-identity {
   display: grid;
-  grid-template-columns: 76px minmax(0, 1fr);
+  grid-template-columns: 64px minmax(0, 1fr);
   gap: 12px;
   align-items: center;
   align-self: center;
-  min-height: 76px;
+  min-height: 64px;
 }
 
 .fabricate-manager .manager-gathering-hazards-table .manager-gathering-hazard-identity .manager-gathering-hazard-thumb {
-  width: 76px;
-  height: 76px;
-  flex: 0 0 76px;
+  width: 64px;
+  height: 64px;
+  flex: 0 0 64px;
   object-fit: cover;
   align-self: center;
 }
@@ -8758,6 +8759,13 @@
   align-self: center;
 }
 
+/* Keep the action buttons on a single row (like the environments browser) so the row
+   height is driven by the 64px thumbnail, not a wrapped second button row. */
+.fabricate-manager .manager-gathering-hazards-table .manager-gathering-hazard-row .manager-action-group {
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+
 .fabricate-manager .manager-gathering-hazard-tags-cell {
   display: flex;
   flex-wrap: wrap;
@@ -8766,8 +8774,8 @@
   align-items: flex-start;
   align-self: flex-start;
   min-width: 0;
-  /* Fill the row height set by the action group (two rows of 34px buttons + 8px gap). */
-  height: 76px;
+  /* Fill the row height set by the 64px thumbnail; excess tags scroll. */
+  height: 64px;
   overflow-y: auto;
   padding-right: 4px;
 }
