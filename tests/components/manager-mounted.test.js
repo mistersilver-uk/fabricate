@@ -4400,7 +4400,7 @@ describe('CraftingSystemManager mounted behavior', () => {
           enabled: true,
           selectionMode: 'targeted',
           compositionMode: 'automatic',
-          taskDropRateAdjustments: { 'task-forage': { 'drop-herb': 15 } },
+          taskDropRateAdjustments: { 'task-forage': { 'drop-herb': 15, 'drop-root': -10 } },
           taskDropRateAdjustmentsEnabled: {}
         },
         composition: {
@@ -4426,11 +4426,22 @@ describe('CraftingSystemManager mounted behavior', () => {
             dropRateAdjustmentRows: [{
               id: 'drop-herb',
               name: 'Moon Herb',
+              img: 'icons/consumables/plants/leaf-green.webp',
               componentId: 'c1',
               quantity: 1,
               baseDropRate: 40,
               adjustment: 15,
               effectiveDropRate: 55,
+              hasDropRateAdjustment: true
+            }, {
+              id: 'drop-root',
+              name: 'Moon Root',
+              img: 'icons/consumables/plants/root-brown.webp',
+              componentId: 'c2',
+              quantity: 1,
+              baseDropRate: 30,
+              adjustment: -10,
+              effectiveDropRate: 20,
               hasDropRateAdjustment: true
             }]
           }],
@@ -4484,19 +4495,33 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(taskOverrides.textContent.includes('Base chance modifiers'), 'task overrides should render the base chance modifier section');
     assert.ok(taskOverrides.textContent.includes('Base 40%'), 'task overrides should keep the base chance context');
     assert.ok(taskOverrides.textContent.includes('Effective 55%'), 'task overrides should keep the effective chance context');
+    const taskAdjustmentRow = taskOverrides.querySelector('[data-drop-rate-adjustment="drop-herb"]');
+    assert.ok(taskAdjustmentRow, 'task drop override should render a row for the selected drop');
+    assert.equal(taskAdjustmentRow.querySelector('.manager-environment-drop-adjustment-thumb')?.getAttribute('src'), 'icons/consumables/plants/leaf-green.webp', 'task drop override should render the drop image');
+    assert.equal(taskAdjustmentRow.querySelector('.manager-environment-drop-adjustment-drop strong')?.textContent.trim(), 'Moon Herb', 'task drop override should render the drop name');
+    assert.equal(taskAdjustmentRow.querySelector('[data-drop-rate-adjustment-base]')?.textContent.trim(), 'Base 40%', 'base rate should be its own one-row item');
+    assert.equal(taskAdjustmentRow.querySelector('[data-drop-rate-adjustment-effective]')?.textContent.trim(), 'Effective 55%', 'effective rate should be its own one-row item');
+    const taskClearButton = taskAdjustmentRow.querySelector('.manager-environment-drop-adjustment-clear');
+    assert.ok(taskClearButton, 'task drop override should render an icon-only clear button');
+    assert.equal(taskClearButton.getAttribute('aria-label'), 'Clear');
+    assert.equal(taskClearButton.getAttribute('title'), 'Clear');
+    assert.equal(taskClearButton.textContent.trim(), '', 'clear button should not render visible text');
     const taskAdjustmentInput = taskOverrides.querySelector('[data-drop-rate-adjustment="drop-herb"] [data-drop-rate-adjustment-input]');
     assert.ok(taskAdjustmentInput, 'task drop override should render a custom percent input');
     assert.equal(taskAdjustmentInput.getAttribute('type'), 'text');
     assert.equal(taskAdjustmentInput.value, '+15');
     assert.equal(taskAdjustmentInput.getAttribute('aria-label'), 'Drop-rate adjustment (-100% to +100%)');
-    assert.ok(taskOverrides.querySelector('[data-drop-rate-adjustment="drop-herb"] [data-drop-rate-adjustment-percent]'), 'task drop override should render the percent suffix shell');
+    const percentShell = taskAdjustmentRow.querySelector('[data-drop-rate-adjustment-percent]');
+    assert.ok(percentShell, 'task drop override should render the percent suffix shell');
+    assert.equal(percentShell.classList.contains('is-positive'), true, 'positive modifiers should color the percent input shell as positive');
+    assert.equal(taskOverrides.querySelector('[data-drop-rate-adjustment="drop-root"] [data-drop-rate-adjustment-percent]')?.classList.contains('is-negative'), true, 'negative modifiers should color the percent input shell as negative');
     assert.equal(taskOverrides.querySelector('[data-drop-rate-adjustment="drop-herb"] input[type="number"]'), null, 'task drop override should not use the plain number input');
     taskAdjustmentInput.value = '-';
     taskAdjustmentInput.dispatchEvent(new Event('input', { bubbles: true }));
     assert.equal(updateCalls.length, 0, 'typing a lone negative sign should remain an intermediate edit state');
     taskAdjustmentInput.value = '-5';
     taskAdjustmentInput.dispatchEvent(new Event('input', { bubbles: true }));
-    assert.deepEqual(updateCalls.at(-1), { taskDropRateAdjustments: { 'task-forage': { 'drop-herb': -5 } } }, 'task percent input should update the stored drop adjustment');
+    assert.deepEqual(updateCalls.at(-1), { taskDropRateAdjustments: { 'task-forage': { 'drop-herb': -5, 'drop-root': -10 } } }, 'task percent input should update the stored drop adjustment');
     taskOverrides.querySelector('[data-task-drop-rate-adjustments-toggle]').click();
     assert.deepEqual(updateCalls.at(-1), { taskDropRateAdjustmentsEnabled: { 'task-forage': false } }, 'turning the toggle off should preserve stored values and only disable application');
 

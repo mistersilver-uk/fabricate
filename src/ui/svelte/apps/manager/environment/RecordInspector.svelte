@@ -103,6 +103,10 @@
   function rowLabel(row) {
     return String(row?.name || row?.componentId || row?.itemUuid || row?.id || text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.DropRow', 'Drop row'));
   }
+
+  function rowImage(row) {
+    return String(row?.img || 'icons/svg/item-bag.svg');
+  }
 </script>
 
 {#if entry}
@@ -164,34 +168,50 @@
       <h4 class="manager-environment-drop-adjustment-heading">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.BaseChanceModifiers', 'Base chance modifiers')}</h4>
       <div class="manager-environment-drop-adjustment-list">
         {#each adjustmentRows as row (row.id)}
-          <div class={`manager-environment-drop-adjustment-row ${taskDropRateAdjustmentsEnabled ? '' : 'is-disabled'} ${adjustmentValueClass(row.adjustment)}`} data-drop-rate-adjustment={row.id}>
-            <div class="manager-environment-drop-adjustment-copy">
-              <strong>{rowLabel(row)}</strong>
-              <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.BaseAndEffectiveRate', 'Base {base}% · Effective {effective}%').replace('{base}', row.baseDropRate).replace('{effective}', row.effectiveDropRate)}</span>
+          <div class={`manager-environment-drop-adjustment-row is-task-drop ${taskDropRateAdjustmentsEnabled ? '' : 'is-disabled'} ${adjustmentValueClass(row.adjustment)}`} data-drop-rate-adjustment={row.id}>
+            <div class="manager-environment-drop-adjustment-drop">
+              <img class="manager-environment-drop-adjustment-thumb" src={rowImage(row)} alt="" />
+              <strong title={rowLabel(row)}>{rowLabel(row)}</strong>
             </div>
-            <label class="manager-field manager-environment-drop-adjustment-input">
-              <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.DropRateAdjustment', 'Drop-rate adjustment')}</span>
-              <span class="manager-condition-modifier-value" data-drop-rate-adjustment-percent>
-                <input
-                  type="text"
-                  inputmode="numeric"
-                  pattern="[+-]?[0-9]*"
-                  value={adjustmentDisplayValue(row.adjustment)}
-                  aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.DropRateAdjustmentRange', 'Drop-rate adjustment (-100% to +100%)')}
-                  title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.DropRateAdjustmentRange', 'Drop-rate adjustment (-100% to +100%)')}
-                  disabled={!taskDropRateAdjustmentsEnabled}
-                  data-drop-rate-adjustment-input
-                  oninput={(event) => onTaskAdjustmentInput(row.id, event)}
-                  onblur={(event) => onTaskAdjustmentBlur(row.id, event)}
-                  onkeydown={(event) => onTaskAdjustmentKeydown(row.id, row.adjustment, event)}
-                />
-                <span aria-hidden="true">%</span>
+            <div class="manager-environment-drop-adjustment-controls">
+              <span class="manager-environment-drop-adjustment-rate" data-drop-rate-adjustment-base>
+                <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.BaseRate', 'Base')}</span>
+                <strong>{row.baseDropRate}%</strong>
               </span>
-            </label>
-            <button type="button" class="manager-button" disabled={!taskDropRateAdjustmentsEnabled || row.adjustment === 0} onclick={() => setTaskDropAdjustment(row.id, 0)}>
-              <i class="fas fa-rotate-left" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ClearAdjustment', 'Clear')}</span>
-            </button>
+              <label class="manager-environment-drop-adjustment-input">
+                <span class="visually-hidden">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.DropRateAdjustment', 'Drop-rate adjustment')}</span>
+                <span class={`manager-condition-modifier-value ${adjustmentValueClass(row.adjustment)}`} data-drop-rate-adjustment-percent>
+                  <input
+                    type="text"
+                    inputmode="numeric"
+                    pattern="[+-]?[0-9]*"
+                    value={adjustmentDisplayValue(row.adjustment)}
+                    aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.DropRateAdjustmentRange', 'Drop-rate adjustment (-100% to +100%)')}
+                    title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.DropRateAdjustmentRange', 'Drop-rate adjustment (-100% to +100%)')}
+                    disabled={!taskDropRateAdjustmentsEnabled}
+                    data-drop-rate-adjustment-input
+                    oninput={(event) => onTaskAdjustmentInput(row.id, event)}
+                    onblur={(event) => onTaskAdjustmentBlur(row.id, event)}
+                    onkeydown={(event) => onTaskAdjustmentKeydown(row.id, row.adjustment, event)}
+                  />
+                  <span aria-hidden="true">%</span>
+                </span>
+              </label>
+              <span class="manager-environment-drop-adjustment-rate" data-drop-rate-adjustment-effective>
+                <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.EffectiveRate', 'Effective')}</span>
+                <strong>{row.effectiveDropRate}%</strong>
+              </span>
+              <button
+                type="button"
+                class="manager-icon-button manager-environment-drop-adjustment-clear"
+                aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ClearAdjustment', 'Clear')}
+                title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ClearAdjustment', 'Clear')}
+                disabled={!taskDropRateAdjustmentsEnabled || row.adjustment === 0}
+                onclick={() => setTaskDropAdjustment(row.id, 0)}
+              >
+                <i class="fas fa-rotate-left" aria-hidden="true"></i>
+              </button>
+            </div>
           </div>
         {/each}
       </div>

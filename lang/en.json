@@ -1502,6 +1502,8 @@
             "ApplyDropRateAdjustmentsOn": "Drop modifiers on",
             "ApplyDropRateAdjustmentsOff": "Drop modifiers off",
             "BaseChanceModifiers": "Base chance modifiers",
+            "BaseRate": "Base",
+            "EffectiveRate": "Effective",
             "BaseAndEffectiveRate": "Base {base}% · Effective {effective}%",
             "ClearAdjustment": "Clear",
             "DropRow": "Drop row",

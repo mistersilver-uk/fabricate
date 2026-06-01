@@ -101,6 +101,8 @@ describe('environment editor localization', () => {
       ['Inspector.ApplyDropRateAdjustmentsOn', 'Drop modifiers on'],
       ['Inspector.ApplyDropRateAdjustmentsOff', 'Drop modifiers off'],
       ['Inspector.BaseChanceModifiers', 'Base chance modifiers'],
+      ['Inspector.BaseRate', 'Base'],
+      ['Inspector.EffectiveRate', 'Effective'],
       ['Inspector.ClearAdjustment', 'Clear'],
       ['Tasks.ManualIntro', 'Only tasks you explicitly include are available to players. You can add matching tasks or force add non-matching tasks.'],
       ['Hazards.ManualIntro', 'Only hazards you explicitly include apply here. You can add matching hazards or force add non-matching hazards.'],
@@ -367,6 +369,13 @@ describe('environment composition editor structure', () => {
     assert.ok(inspectorSource.includes('taskDropRateAdjustmentsEnabled'), 'task overrides should preserve a separate enabled state');
     assert.ok(inspectorSource.includes('data-drop-rate-adjustment-percent'), 'task override rows should use the custom percent input shell');
     assert.ok(inspectorSource.includes('type="text"'), 'task override rows should use text percentage input formatting');
+    assert.ok(inspectorSource.includes('manager-environment-drop-adjustment-drop'), 'task override rows should render drop image/name above controls');
+    assert.ok(inspectorSource.includes('manager-environment-drop-adjustment-controls'), 'task override rows should group base/input/effective/clear controls on one row');
+    assert.ok(inspectorSource.includes('data-drop-rate-adjustment-base'), 'task override rows should expose base chance as its own control-row item');
+    assert.ok(inspectorSource.includes('data-drop-rate-adjustment-effective'), 'task override rows should expose effective chance as its own control-row item');
+    assert.ok(inspectorSource.includes('manager-environment-drop-adjustment-clear'), 'task override clear action should be an icon-only button');
+    assert.ok(inspectorSource.includes('aria-label={text(\'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ClearAdjustment\', \'Clear\')}'), 'icon-only clear action should keep accessible copy');
+    assert.ok(inspectorSource.includes('class={`manager-condition-modifier-value ${adjustmentValueClass(row.adjustment)}`}'), 'task override input shell should carry positive/negative/zero state classes');
     assert.ok(inspectorSource.includes('onTaskAdjustmentInput'), 'task override text input should preserve transient signed editing states');
     assert.ok(inspectorSource.includes('DropRateAdjustmentRange'), 'task override text input should expose its bounded range in accessible copy');
     assert.ok(!inspectorSource.includes('value={row.adjustment} aria-label={text(\'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.DropRateAdjustment\', \'Drop-rate adjustment\')} onchange={(event) => setTaskDropAdjustment(row.id, event.currentTarget.value)}'), 'task override rows should no longer use the plain numeric adjustment input');

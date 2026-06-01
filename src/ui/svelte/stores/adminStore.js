@@ -1997,6 +1997,8 @@ export function createAdminStore(services) {
 
     const config = _currentGatheringConfig();
     const system = config.systems?.[systemId] || {};
+    const craftingSystem = services.getCraftingSystemManager?.()?.getSystem?.(systemId) || null;
+    const managedItemById = new Map(_buildManagedItemOptions(_getManagedItems(craftingSystem)).map(item => [String(item.id || ''), item]));
     const conditionSettings = system.conditions || null;
     const conditions = _gatheringCurrentConditions(conditionSettings);
     const compositionMode = environment.compositionMode === 'manual' ? 'manual' : 'automatic';
@@ -2004,7 +2006,8 @@ export function createAdminStore(services) {
     const tasks = _classifyCompositionRecords({
       records: Array.isArray(system.tasks) ? system.tasks : [],
       environment, conditions, conditionSettings, compositionMode, kind: 'task', includeDanger: false,
-      order: environment.taskOrder
+      order: environment.taskOrder,
+      managedItemById
     });
     const hazards = _classifyCompositionRecords({
       records: Array.isArray(system.hazards) ? system.hazards : [],
@@ -2015,7 +2018,7 @@ export function createAdminStore(services) {
     return { compositionMode, conditions, tasks, hazards, counts: _compositionCounts(tasks, hazards) };
   }
 
-  function _classifyCompositionRecords({ records, environment, conditions, conditionSettings, compositionMode, kind, includeDanger, order }) {
+  function _classifyCompositionRecords({ records, environment, conditions, conditionSettings, compositionMode, kind, includeDanger, order, managedItemById = new Map() }) {
     const enabledKey = kind === 'hazard' ? 'enabledHazardIds' : 'enabledTaskIds';
     const disabledKey = kind === 'hazard' ? 'disabledHazardIds' : 'disabledTaskIds';
     const forcedKey = kind === 'hazard' ? 'forcedHazardIds' : 'forcedTaskIds';
@@ -2048,7 +2051,7 @@ export function createAdminStore(services) {
         || compositionState === 'forceIncluded';
       const runtimeState = (composed && conditionsMet) ? 'available' : 'unavailable';
       const orderRank = orderIndex.has(id) ? orderIndex.get(id) : Number.MAX_SAFE_INTEGER;
-      const dropRateAdjustment = _dropRateAdjustmentSummary({ kind, record, environment });
+      const dropRateAdjustment = _dropRateAdjustmentSummary({ kind, record, environment, managedItemById });
       return { id, record, kind, libraryEnabled, matches, conditionsMet, evidence, excluded, explicitlyIncluded, compositionState, runtimeState, orderRank, _index: index, ...dropRateAdjustment };
     });
 
@@ -2061,7 +2064,20 @@ export function createAdminStore(services) {
     return Math.min(100, Math.max(0, base + delta));
   }
 
-  function _dropRateAdjustmentSummary({ kind, record, environment }) {
+  function _dropRowDisplay(row, managedItemById = new Map()) {
+    const componentId = String(row?.componentId || row?.systemItemId || '');
+    const item = componentId ? managedItemById.get(componentId) : null;
+    const itemUuid = String(row?.itemUuid || '');
+    const unresolvedKey = 'FABRICATE.Admin.Manager.Environment.Tasks.UnresolvedDrop';
+    const unresolved = services.localize?.(unresolvedKey);
+    const fallbackName = unresolved && unresolved !== unresolvedKey ? unresolved : 'Unresolved drop';
+    return {
+      name: String(row?.name || item?.name || itemUuid || fallbackName),
+      img: String(row?.img || item?.img || 'icons/svg/item-bag.svg')
+    };
+  }
+
+  function _dropRateAdjustmentSummary({ kind, record, environment, managedItemById = new Map() }) {
     const id = String(record?.id || '');
     if (!id) return { hasDropRateAdjustment: false, dropRateAdjustment: 0, dropRateAdjustmentsEnabled: true, dropRateAdjustmentRows: [] };
     if (kind === 'hazard') {
@@ -2088,9 +2104,11 @@ export function createAdminStore(services) {
         const adjustment = rowAdjustments[rowId] || 0;
         const appliedAdjustment = dropRateAdjustmentsEnabled ? adjustment : 0;
         const baseDropRate = Number.isFinite(Number(row?.dropRate)) ? Math.floor(Number(row.dropRate)) : 1;
+        const display = _dropRowDisplay(row, managedItemById);
         return {
           id: rowId,
-          name: String(row?.name || ''),
+          name: display.name,
+          img: display.img,
           componentId: String(row?.componentId || row?.systemItemId || ''),
           itemUuid: String(row?.itemUuid || ''),
           quantity: Number.isFinite(Number(row?.quantity)) && Number(row.quantity) > 0 ? Number(row.quantity) : 1,

@@ -35,7 +35,7 @@ The Environment Editor composition `Override` column becomes a drop-rate adjustm
 - `On`: at least one effective non-zero adjustment exists for that task or hazard.
 - `Off`: no effective adjustment exists.
 
-The inspector replaces the disabled "coming soon" override card with active drop-rate adjustment controls. Hazards expose one adjustment. Tasks expose one task-level apply toggle followed by one signed custom percentage control per drop row. The task row indicator turns `On` only when at least one stored drop-row adjustment is enabled and non-zero.
+The inspector replaces the disabled "coming soon" override card with active drop-rate adjustment controls. Hazards expose one adjustment. Tasks expose one task-level apply toggle followed by one compact row per drop: drop image/name, base rate, signed custom percentage control, effective rate, and an icon-only clear action. The task row indicator turns `On` only when at least one stored drop-row adjustment is enabled and non-zero.
 
 ## Compatibility
 Existing environments without adjustment fields normalize to no adjustments. Stale adjustment entries for missing records or missing task drop rows are ignored by runtime and UI.

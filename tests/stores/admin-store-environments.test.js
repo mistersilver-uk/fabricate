@@ -834,7 +834,11 @@ describe('adminStore gathering environments tab state', () => {
 
   it('summarizes task and hazard drop-rate adjustments in environment composition view state', async () => {
     const services = createServices({
-      systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
+      systems: [makeSystem({
+        id: 'system-a',
+        features: { gathering: true },
+        components: [{ id: 'ore', name: 'Iron Ore', img: 'ore.png' }]
+      })],
       environments: [makeEnvironment({
         id: 'environment-a',
         tasks: [],
@@ -860,6 +864,8 @@ describe('adminStore gathering environments tab state', () => {
     let composition = get(store.viewState).environmentComposition;
     assert.equal(composition.tasks[0].hasDropRateAdjustment, true);
     assert.equal(composition.tasks[0].dropRateAdjustmentsEnabled, true);
+    assert.equal(composition.tasks[0].dropRateAdjustmentRows[0].name, 'Iron Ore');
+    assert.equal(composition.tasks[0].dropRateAdjustmentRows[0].img, 'ore.png');
     assert.equal(composition.tasks[0].dropRateAdjustmentRows[0].adjustment, 25);
     assert.equal(composition.tasks[0].dropRateAdjustmentRows[0].effectiveDropRate, 65);
     assert.equal(composition.hazards[0].hasDropRateAdjustment, true);
