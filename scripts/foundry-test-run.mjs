@@ -926,10 +926,8 @@ async function exerciseManagerEnvironmentPointerTargets(page) {
   await azureRow.locator('.manager-icon-button').nth(0).click({ trial: true });
   await azureRow.locator('.manager-icon-button').nth(1).click({ trial: true });
   await azureRow.locator('.manager-icon-button').nth(2).click({ trial: true });
-  const moveUp = azureRow.locator('.manager-icon-button').nth(3);
-  if (await moveUp.isEnabled()) await moveUp.click({ trial: true });
-  const moveDown = azureRow.locator('.manager-icon-button').nth(4);
-  if (await moveDown.isEnabled()) await moveDown.click({ trial: true });
+  // Reordering happens via composition-list drag-and-drop; row no longer has
+  // standalone move-up / move-down icon buttons.
   await page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Create environment")').first().click({ trial: true });
 }
 
@@ -2503,19 +2501,14 @@ async function main() {
         await page.locator('.fabricate-manager .manager-environment-row:has-text("Azure Grove") .manager-icon-button').nth(0).click();
         await page.locator('.fabricate-manager[data-manager-view="environment-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
 
-        // The environment editor is currently a placeholder
-        // (src/ui/svelte/apps/manager/EnvironmentEditView.svelte) while the
-        // previous inline task/catalyst/tool authoring is being rebuilt — that
-        // surface has moved to the standalone `gathering-task-edit` route. Until
-        // the new editor lands, verify the placeholder renders with the
-        // environment's title and screenshot it for visual evidence, then
-        // return via the placeholder's own button.
-        await page.locator('.fabricate-manager .manager-environment-edit-view.is-placeholder').first()
+        // The environment editor mounts the composition editor (tabs + inspector
+        // rail). Verify it renders the selected environment and screenshot it,
+        // then trial-click the Back button to confirm it's wired before
+        // navigating away via the side nav.
+        await page.locator('.fabricate-manager .manager-environment-edit-view[data-environment-editor]').first()
           .waitFor({ state: 'visible', timeout: 10_000 });
-        await page.locator('.fabricate-manager .manager-environment-details-band')
+        await page.locator('.fabricate-manager .manager-title')
           .filter({ hasText: 'Azure Grove' }).first()
-          .waitFor({ state: 'visible', timeout: 5_000 });
-        await page.locator('.fabricate-manager .manager-environment-placeholder-card').first()
           .waitFor({ state: 'visible', timeout: 5_000 });
         if (await page.locator('.fabricate-manager .environment-draft-editor, .fabricate-manager .environment-foundation').count() > 0) {
           throw new Error('Manager environments edit route still rendered the legacy environment editor.');
@@ -2523,11 +2516,10 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-environment-edit-placeholder');
 
-        // The placeholder's "Return to environments" button is wired to
-        // store.cancelEnvironmentDraft (the store action), which doesn't
-        // change the view. Verify the button is clickable, then navigate
-        // back via the side nav.
-        await page.locator('.fabricate-manager .manager-environment-placeholder-card .manager-button:has-text("Return to environments")').first().click({ trial: true });
+        // The "Back to environments" button runs through the unsaved-changes
+        // route-exit guard. Verify it's clickable, then navigate back via the
+        // side nav.
+        await page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Back to environments")').first().click({ trial: true });
         await page.locator('.fabricate-manager #manager-gathering-nav-environments').first().click();
         await page.locator('.fabricate-manager[data-manager-view="environments"]').first()
           .waitFor({ state: 'visible', timeout: 5_000 });
