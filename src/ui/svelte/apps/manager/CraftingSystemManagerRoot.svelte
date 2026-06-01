@@ -1003,11 +1003,7 @@
   function confirmGatheringHazardRouteExit(nextView) {
     if (activeView !== 'gathering-hazard-edit') return true;
     if (!gatheringHazardDraftDirty) return finishGatheringHazardRouteExit(true);
-    const message = text(
-      'FABRICATE.Admin.Manager.Environment.Hazards.DiscardChangesPrompt',
-      'The current hazard has unsaved changes. Discard them and continue?'
-    );
-    const confirmed = typeof globalThis.confirm === 'function' ? globalThis.confirm(message) : false;
+    const confirmed = store.confirmDiscardDirtyGatheringHazardDraft?.() ?? false;
     if (isPromise(confirmed)) return confirmed.then(finishGatheringHazardRouteExit);
     return finishGatheringHazardRouteExit(confirmed);
   }
@@ -1015,12 +1011,7 @@
   function confirmComponentRouteExit(nextView) {
     if (activeView !== 'component-edit') return true;
     if (componentEditDirty !== true) return true;
-    const message = text(
-      'FABRICATE.Admin.Manager.Component.DiscardDirtyContent',
-      'The current component has unsaved changes. Discard them and continue?'
-    );
-    const confirmed = services?.confirmDiscardComponentDraft?.()
-      ?? (typeof globalThis.confirm === 'function' ? globalThis.confirm(message) : false);
+    const confirmed = store.confirmDiscardDirtyComponentDraft?.() ?? false;
     if (isPromise(confirmed)) return confirmed.then(finishComponentRouteExit);
     return finishComponentRouteExit(confirmed);
   }
@@ -1036,11 +1027,7 @@
   function confirmEssenceRouteExit(nextView) {
     if (activeView !== 'essence-edit') return true;
     if (essenceEditDirty !== true) return true;
-    const confirmed = store.confirmDiscardDirtyEssenceDraft?.()
-      ?? services?.confirmDiscardEssenceDraft?.()
-      ?? (typeof globalThis.confirm === 'function'
-        ? globalThis.confirm(text('FABRICATE.Admin.Manager.Essence.DiscardDirtyContent', 'The current essence has unsaved changes. Discard them and continue?'))
-        : false);
+    const confirmed = store.confirmDiscardDirtyEssenceDraft?.() ?? false;
     if (isPromise(confirmed)) return confirmed.then(finishEssenceRouteExit);
     return finishEssenceRouteExit(confirmed);
   }
@@ -1048,11 +1035,7 @@
   function confirmGatheringTaskRouteExit(nextView) {
     if (activeView !== 'gathering-task-edit') return true;
     if (!gatheringTaskDraftDirty) return finishGatheringTaskRouteExit(true);
-    const message = text(
-      'FABRICATE.Admin.Manager.Environment.Tasks.DiscardChangesPrompt',
-      'The current gathering task has unsaved changes. Discard them and continue?'
-    );
-    const confirmed = typeof globalThis.confirm === 'function' ? globalThis.confirm(message) : false;
+    const confirmed = store.confirmDiscardDirtyGatheringTaskDraft?.() ?? false;
     if (isPromise(confirmed)) return confirmed.then(finishGatheringTaskRouteExit);
     return finishGatheringTaskRouteExit(confirmed);
   }
@@ -1183,13 +1166,6 @@
   function backToEssencesBrowse() {
     afterTruthyResult(confirmRouteExit('essences'), () => {
       activeView = canShowEssences ? 'essences' : 'systems';
-    });
-  }
-
-  function cancelEnvironmentEdit() {
-    const cancelled = store.cancelEnvironmentDraft?.();
-    afterTruthyResult(cancelled, () => {
-      activeView = canShowEnvironments ? 'environments' : 'systems';
     });
   }
 
@@ -2806,7 +2782,7 @@
         {#if $viewState.environmentDraftDirty}
           <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Environment.Dirty', 'Unsaved')}</span>
         {/if}
-        <button type="button" class="manager-button" onclick={cancelEnvironmentEdit} disabled={$viewState.environmentSaving}>
+        <button type="button" class="manager-button" onclick={backToEnvironmentsBrowse} disabled={$viewState.environmentSaving}>
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Environment.BackToBrowse', 'Back to environments')}</span>
         </button>
@@ -2819,13 +2795,13 @@
           <span>{text('FABRICATE.Admin.Environments.Save', 'Save')}</span>
         </button>
       {:else if currentView === 'gathering-task-edit'}
+        {#if gatheringTaskDraftDirty}
+          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Environment.Tasks.Dirty', 'Unsaved')}</span>
+        {/if}
         <button type="button" class="manager-button" onclick={backToGatheringTaskLibrary}>
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.BackToLibrary', 'Back to task library')}</span>
         </button>
-        {#if gatheringTaskDraftDirty}
-          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Environment.Tasks.Dirty', 'Unsaved')}</span>
-        {/if}
         <button
           type="button"
           class="manager-button is-danger"
@@ -2847,13 +2823,13 @@
           <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Save', 'Save task')}</span>
         </button>
       {:else if currentView === 'gathering-hazard-edit'}
+        {#if gatheringHazardDraftDirty}
+          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Environment.Hazards.Dirty', 'Unsaved')}</span>
+        {/if}
         <button type="button" class="manager-button" onclick={backToGatheringHazardLibrary}>
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Environment.Hazards.BackToLibrary', 'Back to hazard library')}</span>
         </button>
-        {#if gatheringHazardDraftDirty}
-          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Environment.Hazards.Dirty', 'Unsaved')}</span>
-        {/if}
         <button
           type="button"
           class="manager-button is-danger"

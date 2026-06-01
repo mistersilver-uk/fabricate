@@ -1923,6 +1923,51 @@ export function createAdminStore(services) {
     }
   }
 
+  async function _confirmDiscardDirtyDraft(contentKey, contentFallback) {
+    const localizeFn = services.localize;
+    const result = await services.confirmDialog?.({
+      title: localizeFn?.('FABRICATE.Admin.Manager.DiscardDirtyTitle') || 'Discard unsaved changes?',
+      content: `<p>${localizeFn?.(contentKey) || contentFallback}</p>`,
+      yes: {
+        label: localizeFn?.('FABRICATE.Admin.Manager.DiscardDirtyConfirm') || 'Discard Changes',
+        callback: () => true
+      },
+      no: {
+        label: localizeFn?.('FABRICATE.Admin.Manager.DiscardDirtyCancel') || 'Keep Editing',
+        callback: () => false
+      }
+    });
+    return result === true;
+  }
+
+  function confirmDiscardDirtyComponentDraft() {
+    return _confirmDiscardDirtyDraft(
+      'FABRICATE.Admin.Manager.Component.DiscardDirtyContent',
+      'The current component has unsaved changes. Discard them and continue?'
+    );
+  }
+
+  function confirmDiscardDirtyEssenceDraft() {
+    return _confirmDiscardDirtyDraft(
+      'FABRICATE.Admin.Manager.Essence.DiscardDirtyContent',
+      'The current essence has unsaved changes. Discard them and continue?'
+    );
+  }
+
+  function confirmDiscardDirtyGatheringTaskDraft() {
+    return _confirmDiscardDirtyDraft(
+      'FABRICATE.Admin.Manager.Environment.Tasks.DiscardChangesPrompt',
+      'The current gathering task has unsaved changes. Discard them and continue?'
+    );
+  }
+
+  function confirmDiscardDirtyGatheringHazardDraft() {
+    return _confirmDiscardDirtyDraft(
+      'FABRICATE.Admin.Manager.Environment.Hazards.DiscardChangesPrompt',
+      'The current hazard has unsaved changes. Discard them and continue?'
+    );
+  }
+
   function _getEnvironmentStore() {
     return services.getGatheringEnvironmentStore?.() || null;
   }
@@ -5150,6 +5195,10 @@ export function createAdminStore(services) {
     updateEnvironmentTaskTimeRequirement,
     updateEnvironmentTaskFailureOutcome,
     confirmDiscardDirtyEnvironmentDraft,
+    confirmDiscardDirtyComponentDraft,
+    confirmDiscardDirtyEssenceDraft,
+    confirmDiscardDirtyGatheringTaskDraft,
+    confirmDiscardDirtyGatheringHazardDraft,
     cancelEnvironmentDraft,
     saveEnvironmentDraft,
     duplicateEnvironmentDraft,

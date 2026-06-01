@@ -739,6 +739,18 @@ function createStore(calls = [], options = {}) {
       calls.push(['confirmDiscardDirtyEssenceDraft']);
       return options.confirmDiscardEssenceResult ?? true;
     },
+    confirmDiscardDirtyComponentDraft: () => {
+      calls.push(['confirmDiscardDirtyComponentDraft']);
+      return options.confirmDiscardComponentResult ?? true;
+    },
+    confirmDiscardDirtyGatheringTaskDraft: () => {
+      calls.push(['confirmDiscardDirtyGatheringTaskDraft']);
+      return options.confirmDiscardGatheringTaskResult ?? true;
+    },
+    confirmDiscardDirtyGatheringHazardDraft: () => {
+      calls.push(['confirmDiscardDirtyGatheringHazardDraft']);
+      return options.confirmDiscardGatheringHazardResult ?? true;
+    },
     selectEnvironment: (id) => {
       calls.push(['selectEnvironment', id]);
       viewState.update(state => ({
@@ -4384,6 +4396,39 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.querySelector('.manager-environment-inspector'), 'composition editor should render its own inspector rail');
     assert.ok(target.querySelector('[data-environment-summary-inspector]'), 'inspector should default to the environment summary with no selection');
     assert.ok(calls.some(call => call[0] === 'createEnvironmentDraft'));
+  });
+
+  it('protects dirty environment edit drafts when leaving via the back button', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { confirmDiscardResult: false }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environment-edit');
+
+    const backButton = Array.from(target.querySelectorAll('.manager-header-actions .manager-button'))
+      .find(button => button.textContent.includes('Back to environments'));
+    assert.ok(backButton, 'env-edit header should render a Back to environments button');
+    backButton.click();
+    await tick();
+    flushSync();
+
+    assert.ok(calls.some(call => call[0] === 'confirmDiscardDirtyEnvironmentDraft'), 'clicking Back with a dirty draft should ask the store to confirm discard');
+    assert.equal(calls.filter(call => call[0] === 'cancelEnvironmentDraft').length, 0, 'declining the confirm should not run cancelEnvironmentDraft');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environment-edit', 'declining the confirm should keep the editor open');
   });
 
   it('omits source and action controls from mounted task and hazard record inspectors', async () => {
