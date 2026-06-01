@@ -12842,7 +12842,6 @@
 }
 
 .fabricate-manager .manager-environment-layer-list,
-.fabricate-manager .manager-environment-check-list,
 .fabricate-manager .manager-environment-issue-list {
   list-style: none;
   margin: 0;
@@ -12850,6 +12849,21 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.fabricate-manager .manager-environment-validation {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fabricate-manager .manager-environment-check-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px 16px;
 }
 
 .fabricate-manager .manager-environment-layer,

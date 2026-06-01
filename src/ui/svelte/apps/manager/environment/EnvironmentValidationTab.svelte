@@ -15,8 +15,6 @@
   }
 
   const readiness = $derived(evaluateEnvironmentReadiness(environment || {}, composition || {}));
-  const counts = $derived(composition?.counts || {});
-  const selectionMode = $derived(environment?.selectionMode || 'targeted');
   const issuesBy = $derived({
     critical: readiness.issues.filter(issue => issue.severity === 'critical'),
     warning: readiness.issues.filter(issue => issue.severity === 'warning'),
@@ -66,22 +64,6 @@
         </li>
       {/each}
     </ul>
-  </section>
-
-  <section class="manager-environment-card" data-validation-section="runtime-preview">
-    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.RuntimePreview', 'Runtime preview')}</h3>
-    <p class="manager-environment-runtime-preview" data-selection-mode={selectionMode}>
-      {#if selectionMode === 'blind'}
-        {text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.BlindPreview', 'Players will see a generic Gather action. The system will select from {n} hidden available tasks unless tasks have been revealed.').replace('{n}', String(counts.availableTasks || 0))}
-      {:else}
-        {text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.TargetedPreview', 'Players will choose from {n} visible gathering tasks.').replace('{n}', String(counts.availableTasks || 0))}
-      {/if}
-    </p>
-    <div class="manager-fact-grid manager-fact-grid-inline">
-      <div class="manager-fact"><strong>{counts.availableTasks || 0}</strong><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.AvailableTasks', 'Available tasks')}</span></div>
-      <div class="manager-fact"><strong>{counts.availableHazards || 0}</strong><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.AvailableHazards', 'Available hazards')}</span></div>
-      <div class="manager-fact"><strong>{counts.excludedHazards || 0}</strong><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.ExcludedHazards', 'Excluded hazards')}</span></div>
-    </div>
   </section>
 
   <section class="manager-environment-card" data-validation-section="issues">
