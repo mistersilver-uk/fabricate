@@ -432,10 +432,17 @@ describe('evaluateEnvironmentReadiness', () => {
     assert.equal(checks.find(check => check.id === 'noStaleIncluded').satisfied, false);
   });
 
-  it('reports informational issues for hidden and excluded records', () => {
-    const composition = { counts: { availableTasks: 1, diagnosticTasks: 2, excludedTasks: 1 }, tasks: [], hazards: [] };
+  it('reports informational issues for locally excluded records', () => {
+    const composition = {
+      counts: { availableTasks: 1, diagnosticTasks: 2, excludedTasks: 1 },
+      tasks: [
+        { id: 'hidden-a', kind: 'task', compositionState: 'notMatching', record: { name: 'Forage Moonberries' } },
+        { id: 'hidden-b', kind: 'task', compositionState: 'libraryDisabled', record: { name: 'Forage Brambles' } }
+      ],
+      hazards: []
+    };
     const { issues } = evaluateEnvironmentReadiness(environment, composition);
-    assert.ok(issues.some(issue => issue.id === 'hiddenNonMatching' && issue.severity === 'info'));
+    assert.ok(!issues.some(issue => issue.id === 'hiddenNonMatching'), 'hidden non-matching records are surfaced in the Tasks/Hazards tabs, not as validation issues');
     assert.ok(issues.some(issue => issue.id === 'locallyExcluded' && issue.severity === 'info'));
   });
 });

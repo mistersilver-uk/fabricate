@@ -77,10 +77,6 @@ export function evaluateEnvironmentReadiness(environment = {}, composition = {})
     }
   }
 
-  const diagnostics = Number(counts.diagnosticTasks || 0) + Number(counts.diagnosticHazards || 0);
-  if (diagnostics > 0) {
-    issues.push({ id: 'hiddenNonMatching', severity: 'info' });
-  }
   const excluded = Number(counts.excludedTasks || 0) + Number(counts.excludedHazards || 0);
   if (excluded > 0) {
     issues.push({ id: 'locallyExcluded', severity: 'info' });

@@ -38,7 +38,6 @@
     noScene: ['IssueNoScene', 'No scene is linked.'],
     noHazardsAtDanger: ['IssueNoHazardsAtDanger', 'Danger is set but no hazards are available.'],
     taskNoDescription: ['IssueTaskNoDescription', 'Available task has no player-facing description.'],
-    hiddenNonMatching: ['IssueHiddenNonMatching', 'Some tasks or hazards are hidden because they do not match.'],
     locallyExcluded: ['IssueLocallyExcluded', 'Some tasks or hazards are excluded locally.']
   };
 

@@ -1542,7 +1542,6 @@
             "IssueNoScene": "No scene is linked.",
             "IssueNoHazardsAtDanger": "Danger is set but no hazards are available.",
             "IssueTaskNoDescription": "Available task has no player-facing description.",
-            "IssueHiddenNonMatching": "Some tasks or hazards are hidden because they do not match.",
             "IssueLocallyExcluded": "Some tasks or hazards are excluded locally.",
             "ViewTask": "View task",
             "ViewHazard": "View hazard",
