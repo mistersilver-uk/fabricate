@@ -4619,11 +4619,159 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.deepEqual(updateCalls.at(-1), { hazardDropRateAdjustmentsEnabled: { 'hazard-thorns': false } }, 'turning the hazard toggle off should preserve stored values and only disable application');
   });
 
-  // NOTE: previously covered tests for environment-edit input wiring and validation
-  // tab routing were removed when the environment editor was placeholder'd out for
-  // redesign. The store-level dirty-draft, cancel, and validation behaviours remain
-  // covered by tests/stores/adminStore.test.js. Reinstate mounted coverage when the
-  // new editor lands.
+  it('routes validation issue actions to the matching composition tab and selected record', async () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(EnvironmentEditViewComponent, {
+      target,
+      props: {
+        environmentDraft: {
+          id: 'env-forest',
+          craftingSystemId: 'alchemy',
+          name: 'Moonlit Forest',
+          description: 'Old trees and moonlit herbs.',
+          enabled: true,
+          selectionMode: 'targeted',
+          compositionMode: 'automatic',
+          biomes: ['forest'],
+          dangerLevel: 'dangerous',
+          sceneUuid: 'Scene.forest'
+        },
+        composition: {
+          compositionMode: 'automatic',
+          counts: { availableTasks: 1, unavailableHazards: 1, availableHazards: 0 },
+          tasks: [{
+            id: 'task-moon-herbs',
+            kind: 'task',
+            record: { name: 'Gather Moon Herbs', description: '', img: 'icons/svg/item-bag.svg' },
+            compositionState: 'includedByMatch',
+            runtimeState: 'available',
+            evidence: {}
+          }],
+          hazards: [{
+            id: 'hazard-thorns',
+            kind: 'hazard',
+            record: { name: 'Thorn Snare', description: 'Tangled thorns.', img: 'icons/svg/hazard.svg', dropRate: 10 },
+            compositionState: 'includedButUnavailable',
+            runtimeState: 'unavailable',
+            evidence: {}
+          }]
+        }
+      }
+    });
+    flushSync();
+
+    target.querySelector('[data-environment-tab-button="validation"]').click();
+    await tick();
+    flushSync();
+
+    Array.from(target.querySelectorAll('.manager-environment-issue-action'))
+      .find(button => button.textContent.includes('View hazard'))
+      .click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('[data-environment-tab-button="hazards"]').getAttribute('aria-selected'), 'true');
+    assert.ok(target.querySelector('[data-environment-tab="hazards"] [data-record-id="hazard-thorns"]').classList.contains('is-selected'));
+    assert.ok(target.querySelector('[data-record-inspector="hazard"]').textContent.includes('Thorn Snare'));
+
+    target.querySelector('[data-environment-tab-button="validation"]').click();
+    await tick();
+    flushSync();
+
+    Array.from(target.querySelectorAll('.manager-environment-issue-action'))
+      .find(button => button.textContent.includes('View task'))
+      .click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('[data-environment-tab-button="tasks"]').getAttribute('aria-selected'), 'true');
+    assert.ok(target.querySelector('[data-environment-tab="tasks"] [data-record-id="task-moon-herbs"]').classList.contains('is-selected'));
+    assert.ok(target.querySelector('[data-record-inspector="task"]').textContent.includes('Gather Moon Herbs'));
+  });
+
+  it('uses configured danger choices while preserving stale current danger values', async () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(EnvironmentEditViewComponent, {
+      target,
+      props: {
+        environmentDraft: {
+          id: 'env-forest',
+          craftingSystemId: 'alchemy',
+          name: 'Moonlit Forest',
+          description: 'Old trees and moonlit herbs.',
+          enabled: true,
+          selectionMode: 'targeted',
+          compositionMode: 'automatic',
+          biomes: ['forest'],
+          dangerLevel: 'extreme'
+        },
+        composition: { compositionMode: 'automatic', counts: {}, tasks: [], hazards: [] },
+        dangerOptions: [
+          { id: 'safe', label: 'Camp safe' },
+          { id: 'hazardous', label: 'Rough going' }
+        ]
+      }
+    });
+    flushSync();
+
+    const dangerSelect = target.querySelector('[data-environment-field="dangerLevel"]');
+    assert.equal(dangerSelect.value, 'extreme');
+    assert.deepEqual(Array.from(dangerSelect.options).map(option => option.value), ['extreme', 'safe', 'hazardous']);
+    assert.deepEqual(Array.from(dangerSelect.options).map(option => option.textContent.trim()), ['Extreme', 'Camp safe', 'Rough going']);
+  });
+
+  it('scores inspector danger evidence against the six-level canonical scale', async () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(EnvironmentEditViewComponent, {
+      target,
+      props: {
+        environmentDraft: {
+          id: 'env-forest',
+          craftingSystemId: 'alchemy',
+          name: 'Moonlit Forest',
+          description: 'Old trees and moonlit herbs.',
+          enabled: true,
+          selectionMode: 'targeted',
+          compositionMode: 'automatic',
+          biomes: ['forest'],
+          dangerLevel: 'dangerous'
+        },
+        composition: {
+          compositionMode: 'automatic',
+          counts: { availableTasks: 1 },
+          tasks: [{
+            id: 'task-danger',
+            kind: 'task',
+            record: { name: 'Read the Trail', description: 'Judge the safest route.', img: 'icons/svg/item-bag.svg' },
+            compositionState: 'includedByMatch',
+            runtimeState: 'available',
+            evidence: {
+              biome: { state: 'any', recordValues: [], envValues: ['forest'], applicable: true },
+              region: { state: 'any', recordValues: [], envValues: [], applicable: true },
+              weather: { state: 'any', recordValues: [], envValues: [], applicable: true },
+              time: { state: 'any', recordValues: [], envValues: [], applicable: true },
+              danger: { state: 'match', recordValues: ['unsafe', 'extreme'], envValues: ['dangerous'], applicable: true }
+            }
+          }],
+          hazards: []
+        }
+      }
+    });
+    flushSync();
+
+    target.querySelector('[data-environment-tab-button="tasks"]').click();
+    await tick();
+    flushSync();
+
+    const dangerPills = Array.from(target.querySelectorAll('[data-evidence-field="danger"] [data-evidence-value-state]'));
+    assert.deepEqual(dangerPills.map(pill => pill.textContent.trim()), ['Unsafe', 'Extreme']);
+    assert.deepEqual(dangerPills.map(pill => pill.dataset.evidenceValueState), ['match', 'mismatch']);
+    assert.equal(dangerPills[0].classList.contains('is-positive'), true, 'unsafe should rank below dangerous');
+    assert.equal(dangerPills[1].classList.contains('is-danger'), true, 'extreme should rank above dangerous');
+  });
 
   it('clears hidden component facet filters when the selected system changes', async () => {
     const store = createStore();

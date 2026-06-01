@@ -1195,6 +1195,7 @@ test('manager environments browser and edit route define compact responsive geom
   const compMenuNoteBeforeBlock = blockFor('.fabricate-manager .manager-environment-comp-menu-note::before');
   const compQuickActionBlock = blockFor('.fabricate-manager .manager-environment-comp-quick-action');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
+  const environmentCompContainerQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 960px)'));
 
   assert.ok(
     toolbarBlock.includes('max-height: 100px;') && toolbarBlock.includes('overflow-y: auto;'),
@@ -1295,9 +1296,9 @@ test('manager environments browser and edit route define compact responsive geom
     'blind-mode tasks add a compact Weight column for the input and calculated percentage'
   );
   assert.ok(
-    mediumQuery.includes('.fabricate-manager .manager-environment-comp[data-composition-kind="task"]')
-      && mediumQuery.includes('--fab-env-comp-grid: minmax(0, 1fr) 64px 110px 72px;'),
-    'medium task rows keep enough action-column width for quick action plus menu buttons'
+    environmentCompContainerQuery.includes('.fabricate-manager .manager-environment-comp[data-composition-kind="task"]')
+      && environmentCompContainerQuery.includes('--fab-env-comp-grid: minmax(0, 1fr) 64px 110px 72px;'),
+    'narrow task rows key off manager container width and keep enough action-column width for quick action plus menu buttons'
   );
   assert.ok(
     weightInputBlock.includes('width: 42px;') && weightInputBlock.includes('padding: 2px 4px;'),

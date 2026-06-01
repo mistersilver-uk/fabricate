@@ -13676,7 +13676,7 @@
   justify-self: start;
 }
 
-@media (max-width: 960px) {
+@container fabricate-manager (max-width: 960px) {
   .fabricate-manager .manager-environment-workspace {
     grid-template-columns: minmax(0, 1fr);
   }

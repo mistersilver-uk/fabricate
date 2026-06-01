@@ -17,7 +17,7 @@
     { key: 'time', label: 'Time', anyFallback: 'Any time' },
     { key: 'danger', label: 'Danger', anyFallback: 'Any danger' }
   ];
-  const DANGER_LEVELS = ['safe', 'hazardous', 'dangerous', 'deadly'];
+  const DANGER_LEVELS = ['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme'];
 
   function cap(value) {
     const str = String(value || '').trim();

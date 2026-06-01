@@ -170,6 +170,9 @@ describe('environment composition editor structure', () => {
     assert.ok(/\{#if activeTab !== 'validation'\}\s*<EnvironmentRightInspector/.test(shellSource), 'right inspector renders on every tab except validation');
     assert.ok(shellSource.includes("class:is-inspector-hidden={activeTab === 'validation'}"), 'workspace collapses to one column on the validation tab');
     assert.ok(/<EnvironmentRightInspector[\s\S]*?\{activeTab\}/.test(shellSource), 'shell passes the active tab to the inspector');
+    assert.ok(shellSource.includes('function selectValidationRecord'), 'validation issue actions route through a tab-switching selector');
+    assert.ok(shellSource.includes("activeTab = kind === 'hazard' ? 'hazards' : 'tasks'"), 'validation issue actions switch to the relevant Tasks/Hazards tab');
+    assert.ok(shellSource.includes('onSelectRecord={selectValidationRecord}'), 'validation tab uses the tab-switching selector');
   });
 
   it('renders Tasks/Hazards as a column-headed table', () => {
@@ -331,7 +334,14 @@ describe('environment composition editor structure', () => {
     assert.ok(evidenceSource.includes('manager-environment-evidence-value-pill'), 'inspector table renders value pills');
     assert.ok(evidenceSource.includes('data-evidence-value-state={pill.state}'), 'inspector value pills expose matching state');
     assert.ok(evidenceSource.includes("if (variant === 'checks') return true"), 'inspector table renders all evidence dimensions');
+    assert.ok(evidenceSource.includes("['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme']"), 'danger evidence uses the canonical six-level scale');
     assert.ok(inspectorSource.includes('variant="checks"'), 'inspector requests the checks evidence variant');
+  });
+
+  it('overview danger selector uses configured danger options and preserves stale values', () => {
+    assert.ok(overviewSource.includes('dangerLevelOptions'), 'overview derives danger options from configured values');
+    assert.ok(overviewSource.includes('renderedDangerOptions'), 'overview inserts the current stale danger value into the rendered options');
+    assert.ok(overviewSource.includes('{#each renderedDangerOptions as option (option.id)}'), 'danger select renders the derived option list');
   });
 
   it('manual mode renders one Available-to-add group instead of Excluded and Non-matching sections', () => {

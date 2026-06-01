@@ -24,10 +24,27 @@
 
   function optId(option) { return String(option?.id ?? option ?? '').trim(); }
   function optLabel(option) { return String(option?.label ?? option?.id ?? option ?? '').trim(); }
+  function defaultDangerLabel(id) {
+    return text(`FABRICATE.Admin.Manager.EnvironmentEditor.Hazards.DangerTag.${id}`, id.charAt(0).toUpperCase() + id.slice(1));
+  }
+  function dangerOption(option) {
+    const id = optId(option);
+    const label = option && typeof option === 'object' && optLabel(option)
+      ? optLabel(option)
+      : defaultDangerLabel(id);
+    return { id, label };
+  }
 
   const biomes = $derived(Array.isArray(environment?.biomes) ? environment.biomes : []);
   const availableBiomes = $derived(biomeOptions.filter(option => !biomes.includes(optId(option))));
-  const dangerLevel = $derived(DANGER_LEVELS.includes(environment?.dangerLevel) ? environment.dangerLevel : 'safe');
+  const dangerLevelOptions = $derived((Array.isArray(dangerOptions) && dangerOptions.length > 0
+    ? dangerOptions
+    : DANGER_LEVELS
+  ).map(dangerOption).filter(option => option.id));
+  const dangerLevel = $derived(String(environment?.dangerLevel || '').trim() || 'safe');
+  const renderedDangerOptions = $derived(dangerLevelOptions.some(option => option.id === dangerLevel)
+    ? dangerLevelOptions
+    : [{ id: dangerLevel, label: defaultDangerLabel(dangerLevel) }, ...dangerLevelOptions]);
   const selectionMode = $derived(environment?.selectionMode === 'blind' ? 'blind' : 'targeted');
 
   function addBiome(event) {
@@ -54,7 +71,8 @@
     return `--fab-chip-color: ${hex || `var(--fab-tag-${token})`}`;
   }
   function dangerLabel(id) {
-    return text(`FABRICATE.Admin.Manager.EnvironmentEditor.Hazards.DangerTag.${id}`, id.charAt(0).toUpperCase() + id.slice(1));
+    const option = renderedDangerOptions.find(option => option.id === id);
+    return option?.label || defaultDangerLabel(id);
   }
 </script>
 
@@ -124,8 +142,8 @@
               <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Danger', 'Danger level')}</span>
               <p class="manager-muted manager-environment-context-hint">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.DangerHint', 'A ceiling — hazards up to and including this level can appear.')}</p>
               <select data-environment-field="dangerLevel" value={dangerLevel} onchange={(event) => onUpdate({ dangerLevel: event.currentTarget.value })}>
-                {#each DANGER_LEVELS as level (level)}
-                  <option value={level}>{dangerLabel(level)}</option>
+                {#each renderedDangerOptions as option (option.id)}
+                  <option value={option.id}>{dangerLabel(option.id)}</option>
                 {/each}
               </select>
             </label>

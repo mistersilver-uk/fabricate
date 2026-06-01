@@ -48,6 +48,11 @@
     selectedId = id;
   }
 
+  function selectValidationRecord(kind, id) {
+    selectRecord(kind, id);
+    activeTab = kind === 'hazard' ? 'hazards' : 'tasks';
+  }
+
   // On the Tasks/Hazards tabs, auto-select the first active (available) record of
   // that kind so the inspector is populated. A valid manual selection of the same
   // kind is never overridden; a stale cross-tab selection is replaced. When no
@@ -128,7 +133,7 @@
         <EnvironmentValidationTab
           environment={environmentDraft}
           {composition}
-          onSelectRecord={selectRecord}
+          onSelectRecord={selectValidationRecord}
         />
       {/if}
     </div>

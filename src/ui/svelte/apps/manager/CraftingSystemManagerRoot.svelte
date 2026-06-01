@@ -3066,7 +3066,7 @@
             isNew={$viewState.environmentDraftIsNew}
             regionOptions={gatheringVocabularyOptions('regions')}
             biomeOptions={gatheringVocabularyOptions('biomes')}
-            dangerOptions={[]}
+            dangerOptions={gatheringVocabularyOptions('danger')}
             onPickImagePath={services?.pickImagePath}
             onUpdateEnvironment={store.updateEnvironmentDraft}
             onSetCompositionMode={store.setEnvironmentCompositionMode}
