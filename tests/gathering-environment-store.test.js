@@ -323,6 +323,10 @@ test('drop-rate adjustments normalize to non-zero integer deltas and validate ra
         'drop-empty': 0
       }
     },
+    taskDropRateAdjustmentsEnabled: {
+      ' task-library-a ': false,
+      'task-library-default': true
+    },
     hazardDropRateAdjustments: {
       ' hazard-a ': -20,
       'hazard-zero': 0
@@ -332,6 +336,9 @@ test('drop-rate adjustments normalize to non-zero integer deltas and validate ra
   assert.deepEqual(created.taskDropRateAdjustments, {
     'task-library-a': { 'drop-a': 15 }
   });
+  assert.deepEqual(created.taskDropRateAdjustmentsEnabled, {
+    'task-library-a': false
+  });
   assert.deepEqual(created.hazardDropRateAdjustments, {
     'hazard-a': -20
   });
@@ -339,10 +346,12 @@ test('drop-rate adjustments normalize to non-zero integer deltas and validate ra
   const invalid = store.validate(environment({
     id: 'env-invalid-adjustments',
     taskDropRateAdjustments: { 'task-library-a': { 'drop-a': 101 } },
+    taskDropRateAdjustmentsEnabled: { 'task-library-a': 'false' },
     hazardDropRateAdjustments: { 'hazard-a': -101 }
   }));
   assert.equal(invalid.valid, false);
   assert.match(invalid.errors.join('\n'), /taskDropRateAdjustments\.task-library-a\.drop-a must be an integer from -100 to 100/);
+  assert.match(invalid.errors.join('\n'), /taskDropRateAdjustmentsEnabled\.task-library-a must be a boolean/);
   assert.match(invalid.errors.join('\n'), /hazardDropRateAdjustments\.hazard-a must be an integer from -100 to 100/);
 });
 

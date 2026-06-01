@@ -4387,6 +4387,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   });
 
   it('omits source and action controls from mounted task and hazard record inspectors', async () => {
+    const updateCalls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(EnvironmentEditViewComponent, {
@@ -4398,7 +4399,9 @@ describe('CraftingSystemManager mounted behavior', () => {
           name: 'Moonlit Forest',
           enabled: true,
           selectionMode: 'targeted',
-          compositionMode: 'automatic'
+          compositionMode: 'automatic',
+          taskDropRateAdjustments: { 'task-forage': { 'drop-herb': 15 } },
+          taskDropRateAdjustmentsEnabled: {}
         },
         composition: {
           compositionMode: 'automatic',
@@ -4419,7 +4422,17 @@ describe('CraftingSystemManager mounted behavior', () => {
               time: { state: 'any', recordValues: [], envValues: ['day'], applicable: true },
               danger: { state: 'any', recordValues: ['deadly'], envValues: ['dangerous'], applicable: false }
             },
-            dropRateAdjustmentRows: []
+            dropRateAdjustmentsEnabled: true,
+            dropRateAdjustmentRows: [{
+              id: 'drop-herb',
+              name: 'Moon Herb',
+              componentId: 'c1',
+              quantity: 1,
+              baseDropRate: 40,
+              adjustment: 15,
+              effectiveDropRate: 55,
+              hasDropRateAdjustment: true
+            }]
           }],
           hazards: [{
             id: 'hazard-thorns',
@@ -4438,7 +4451,8 @@ describe('CraftingSystemManager mounted behavior', () => {
             },
             dropRateAdjustment: 0
           }]
-        }
+        },
+        onUpdateEnvironment: (updates) => updateCalls.push(updates)
       }
     });
     flushSync();
@@ -4464,6 +4478,27 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('[data-evidence-field="biome"] [data-evidence-value-state="mismatch"]').textContent.trim(), 'Desert');
     assert.equal(target.querySelector('[data-evidence-field="weather"] .manager-environment-evidence-value-pill').classList.contains('is-warning'), true, 'weather mismatch should use warning tone');
     assert.ok(target.querySelector('[data-evidence-field="danger"]').textContent.includes('Any danger'), 'task evidence table should keep the danger row as unconstrained');
+    const taskOverrides = target.querySelector('[data-record-inspector-section="overrides"]');
+    assert.ok(taskOverrides, 'task inspector should keep the overrides card');
+    assert.ok(taskOverrides.querySelector('[data-task-drop-rate-adjustments-toggle]'), 'task overrides should render the apply toggle');
+    assert.ok(taskOverrides.textContent.includes('Base chance modifiers'), 'task overrides should render the base chance modifier section');
+    assert.ok(taskOverrides.textContent.includes('Base 40%'), 'task overrides should keep the base chance context');
+    assert.ok(taskOverrides.textContent.includes('Effective 55%'), 'task overrides should keep the effective chance context');
+    const taskAdjustmentInput = taskOverrides.querySelector('[data-drop-rate-adjustment="drop-herb"] [data-drop-rate-adjustment-input]');
+    assert.ok(taskAdjustmentInput, 'task drop override should render a custom percent input');
+    assert.equal(taskAdjustmentInput.getAttribute('type'), 'text');
+    assert.equal(taskAdjustmentInput.value, '+15');
+    assert.equal(taskAdjustmentInput.getAttribute('aria-label'), 'Drop-rate adjustment (-100% to +100%)');
+    assert.ok(taskOverrides.querySelector('[data-drop-rate-adjustment="drop-herb"] [data-drop-rate-adjustment-percent]'), 'task drop override should render the percent suffix shell');
+    assert.equal(taskOverrides.querySelector('[data-drop-rate-adjustment="drop-herb"] input[type="number"]'), null, 'task drop override should not use the plain number input');
+    taskAdjustmentInput.value = '-';
+    taskAdjustmentInput.dispatchEvent(new Event('input', { bubbles: true }));
+    assert.equal(updateCalls.length, 0, 'typing a lone negative sign should remain an intermediate edit state');
+    taskAdjustmentInput.value = '-5';
+    taskAdjustmentInput.dispatchEvent(new Event('input', { bubbles: true }));
+    assert.deepEqual(updateCalls.at(-1), { taskDropRateAdjustments: { 'task-forage': { 'drop-herb': -5 } } }, 'task percent input should update the stored drop adjustment');
+    taskOverrides.querySelector('[data-task-drop-rate-adjustments-toggle]').click();
+    assert.deepEqual(updateCalls.at(-1), { taskDropRateAdjustmentsEnabled: { 'task-forage': false } }, 'turning the toggle off should preserve stored values and only disable application');
 
     target.querySelector('[data-environment-tab-button="hazards"]').click();
     await tick();

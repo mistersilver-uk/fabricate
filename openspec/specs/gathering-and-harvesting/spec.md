@@ -122,6 +122,7 @@ GatheringEnvironment = {
   taskOrder?: string[],
   hazardOrder?: string[],
   taskDropRateAdjustments?: Record<string, Record<string, number>>, // taskId -> dropRowId -> signed percentage-point delta
+  taskDropRateAdjustmentsEnabled?: Record<string, boolean>, // taskId -> false disables applying stored drop-row deltas; absent/true means enabled
   hazardDropRateAdjustments?: Record<string, number>, // hazardId -> signed percentage-point delta
   blindSelection?: {
     weights: Record<string, number>, // keyed by task id
@@ -150,6 +151,7 @@ GatheringEnvironment = {
 12c.1. GM authoring UI exposes hazard reorder controls only when the selected system's hazard selection mode is `highestRankedDrop`. In that mode, every included hazard can occupy any rank, including matching, explicitly included, force-included, and currently condition-blocked included hazards. Other hazard selection modes do not expose reorder handles or move actions.
 12d. GM authoring UI for manual task and hazard composition shows only two record groups: **Included in this environment** and **Available to add**. Available to add includes matching addable rows first, then enabled non-matching rows, then library-disabled rows; it does not show a separate Excluded or Non-matching section. Removing an included manual record returns it to Available to add with its normal candidate/not-matching/library-disabled state instead of showing it as Excluded. Automatic composition retains its Excluded and Non-matching sections.
 12e. `taskDropRateAdjustments` and `hazardDropRateAdjustments` store environment-local signed percentage-point deltas for reusable library task drop rows and hazards. Task adjustments are keyed first by task id and then by drop-row id. Hazard adjustments are keyed by hazard id. Values must be integers from `-100` to `100`; zero values are omitted. Adjustments affect only this environment and must not rewrite reusable library records.
+12f. `taskDropRateAdjustmentsEnabled` stores task-level apply switches for environment-local task drop-row adjustments. Missing task ids and `true` values mean enabled; `false` preserves configured per-drop deltas but prevents them from applying to composed runtime drop rates.
 13. Environment metadata exposed to non-GM users must not leak hidden task identity, hidden result details, provider diagnostics, or GM-only notes.
 14. Legacy environments without rich metadata remain valid and load with neutral defaults.
 15. `hazardSelectionMode` and `hazardPolicy` are legacy compatibility fields. New Manager authoring and d100 runtime behavior use system Gathering Rules once they are authored.
@@ -523,7 +525,7 @@ Resolve gathering-native Gathering Task drops and composed hazards through order
 ### Runtime Requirements
 
 1. Before any player attempt starts, Fabricate rejects gathering if Foundry is paused.
-2. For every enabled item row in the selected Gathering Task, resolve row character modifier references, calculate `finalDropRate = clamp(dropRate + environmentDropRateAdjustment + matchingConditionModifiers + resolvedCharacterModifiers, 0, 100)`, roll `d100`, add the gathering modifier, and drop the row when `effectiveRoll >= 101 - finalDropRate`.
+2. For every enabled item row in the selected Gathering Task, resolve row character modifier references, calculate `finalDropRate = clamp(dropRate + environmentDropRateAdjustment + matchingConditionModifiers + resolvedCharacterModifiers, 0, 100)`, roll `d100`, add the gathering modifier, and drop the row when `effectiveRoll >= 101 - finalDropRate`. `environmentDropRateAdjustment` is zero when the selected environment disables task drop-rate adjustments for that task.
 3. For every enabled composed hazard in the environment whose runtime condition gates are satisfied, resolve hazard character modifier references, calculate `finalHazardRate = clamp(dropRate + environmentDropRateAdjustment + resolvedCharacterModifiers, 0, 100)`, roll `d100`, add the hazard modifier, and drop the hazard when `effectiveRoll >= 101 - finalHazardRate`.
 4. System Gathering Rules select rewards after item rows roll once rules are authored.
 5. Reward `highestRankedDrop` awards the first dropped item row in authored row order.

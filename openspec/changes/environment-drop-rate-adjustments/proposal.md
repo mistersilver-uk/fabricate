@@ -8,6 +8,7 @@ The current "Override on" pill is driven by composition state, so manual inclusi
 
 ## Scope
 - Add environment-local drop-rate adjustment fields for library task drop rows and hazards.
+- Add a task-level apply toggle for library task drop-row adjustments so GMs can preserve configured values while disabling their runtime effect.
 - Apply adjustments at runtime without modifying reusable library records.
 - Update the Environment Editor list and inspector to show `On` / `Off` for drop-rate adjustments.
 - Keep existing composition state labels and actions unchanged.

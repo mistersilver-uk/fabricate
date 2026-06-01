@@ -1148,9 +1148,12 @@ function dropRateAdjustmentMap(value) {
 }
 
 function taskDropRateAdjustmentMap(environment, taskId) {
+  const id = String(taskId || '');
+  const enabledMap = environment?.taskDropRateAdjustmentsEnabled;
+  if (enabledMap && typeof enabledMap === 'object' && !Array.isArray(enabledMap) && enabledMap[id] === false) return {};
   const taskMaps = environment?.taskDropRateAdjustments;
   if (!taskMaps || typeof taskMaps !== 'object' || Array.isArray(taskMaps)) return {};
-  return dropRateAdjustmentMap(taskMaps[String(taskId || '')]);
+  return dropRateAdjustmentMap(taskMaps[id]);
 }
 
 function applyDropRateAdjustment(row, adjustment = 0) {

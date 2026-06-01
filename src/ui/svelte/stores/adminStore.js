@@ -2063,7 +2063,7 @@ export function createAdminStore(services) {
 
   function _dropRateAdjustmentSummary({ kind, record, environment }) {
     const id = String(record?.id || '');
-    if (!id) return { hasDropRateAdjustment: false, dropRateAdjustment: 0, dropRateAdjustmentRows: [] };
+    if (!id) return { hasDropRateAdjustment: false, dropRateAdjustment: 0, dropRateAdjustmentsEnabled: true, dropRateAdjustmentRows: [] };
     if (kind === 'hazard') {
       const adjustments = _normalizeDraftDropRateAdjustmentMap(environment?.hazardDropRateAdjustments);
       const adjustment = adjustments[id] || 0;
@@ -2071,6 +2071,7 @@ export function createAdminStore(services) {
       return {
         hasDropRateAdjustment: adjustment !== 0,
         dropRateAdjustment: adjustment,
+        dropRateAdjustmentsEnabled: true,
         baseDropRate,
         effectiveDropRate: _effectiveDropRate(baseDropRate, adjustment),
         dropRateAdjustmentRows: []
@@ -2078,11 +2079,14 @@ export function createAdminStore(services) {
     }
 
     const taskAdjustments = _normalizeDraftTaskDropRateAdjustments(environment?.taskDropRateAdjustments);
+    const taskAdjustmentEnabledMap = _normalizeDraftTaskDropRateAdjustmentsEnabled(environment?.taskDropRateAdjustmentsEnabled);
+    const dropRateAdjustmentsEnabled = taskAdjustmentEnabledMap[id] !== false;
     const rowAdjustments = taskAdjustments[id] || {};
     const rows = (Array.isArray(record?.dropRows ?? record?.itemDrops) ? (record.dropRows ?? record.itemDrops) : [])
       .map(row => {
         const rowId = String(row?.id || '');
         const adjustment = rowAdjustments[rowId] || 0;
+        const appliedAdjustment = dropRateAdjustmentsEnabled ? adjustment : 0;
         const baseDropRate = Number.isFinite(Number(row?.dropRate)) ? Math.floor(Number(row.dropRate)) : 1;
         return {
           id: rowId,
@@ -2092,13 +2096,17 @@ export function createAdminStore(services) {
           quantity: Number.isFinite(Number(row?.quantity)) && Number(row.quantity) > 0 ? Number(row.quantity) : 1,
           baseDropRate,
           adjustment,
-          effectiveDropRate: _effectiveDropRate(baseDropRate, adjustment),
-          hasDropRateAdjustment: adjustment !== 0
+          effectiveDropRate: _effectiveDropRate(baseDropRate, appliedAdjustment),
+          hasDropRateAdjustment: dropRateAdjustmentsEnabled && adjustment !== 0,
+          hasStoredDropRateAdjustment: adjustment !== 0
         };
       });
+    const hasStoredDropRateAdjustment = rows.some(row => row.hasStoredDropRateAdjustment);
     return {
-      hasDropRateAdjustment: rows.some(row => row.hasDropRateAdjustment),
-      dropRateAdjustment: rows.reduce((sum, row) => sum + row.adjustment, 0),
+      hasDropRateAdjustment: dropRateAdjustmentsEnabled && hasStoredDropRateAdjustment,
+      hasStoredDropRateAdjustment,
+      dropRateAdjustmentsEnabled,
+      dropRateAdjustment: dropRateAdjustmentsEnabled ? rows.reduce((sum, row) => sum + row.adjustment, 0) : 0,
       dropRateAdjustmentRows: rows
     };
   }
@@ -2788,6 +2796,13 @@ export function createAdminStore(services) {
       .filter(([taskId, rowAdjustments]) => taskId && Object.keys(rowAdjustments).length > 0));
   }
 
+  function _normalizeDraftTaskDropRateAdjustmentsEnabled(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    return Object.fromEntries(Object.entries(value)
+      .map(([taskId, enabled]) => [String(taskId || '').trim(), enabled])
+      .filter(([taskId, enabled]) => taskId && enabled === false));
+  }
+
   function updateEnvironmentDraft(updates = {}) {
     const current = get(environmentDraft);
     if (!current || typeof updates !== 'object' || updates === null) return false;
@@ -2815,6 +2830,7 @@ export function createAdminStore(services) {
       'taskOrder',
       'hazardOrder',
       'taskDropRateAdjustments',
+      'taskDropRateAdjustmentsEnabled',
       'hazardDropRateAdjustments',
       'blindSelection',
       'tasks'
@@ -2845,6 +2861,8 @@ export function createAdminStore(services) {
         next.hazardDropRateAdjustments = _normalizeDraftDropRateAdjustmentMap(value);
       } else if (field === 'taskDropRateAdjustments') {
         next.taskDropRateAdjustments = _normalizeDraftTaskDropRateAdjustments(value);
+      } else if (field === 'taskDropRateAdjustmentsEnabled') {
+        next.taskDropRateAdjustmentsEnabled = _normalizeDraftTaskDropRateAdjustmentsEnabled(value);
       } else if (field === 'blindSelection') {
         next.blindSelection = _normalizeDraftBlindSelection(value);
       } else {

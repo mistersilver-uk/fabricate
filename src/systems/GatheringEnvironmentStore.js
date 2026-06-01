@@ -307,6 +307,7 @@ export class GatheringEnvironmentStore {
       taskOrder: normalizeIdList(data?.taskOrder),
       hazardOrder: normalizeIdList(data?.hazardOrder),
       taskDropRateAdjustments: normalizeTaskDropRateAdjustments(data?.taskDropRateAdjustments),
+      taskDropRateAdjustmentsEnabled: normalizeTaskDropRateAdjustmentsEnabled(data?.taskDropRateAdjustmentsEnabled),
       hazardDropRateAdjustments: normalizeDropRateAdjustmentMap(data?.hazardDropRateAdjustments),
       hazardSelectionMode: ['highestRankedDrop', 'allDrops'].includes(data?.hazardSelectionMode) ? data.hazardSelectionMode : 'allDrops',
       hazardPolicy: ['successWithHazard', 'failureWithHazard'].includes(data?.hazardPolicy) ? data.hazardPolicy : 'successWithHazard',
@@ -447,6 +448,7 @@ export class GatheringEnvironmentStore {
     }
 
     errors.push(...validateTaskDropRateAdjustments(original?.taskDropRateAdjustments, `Environment "${label}" taskDropRateAdjustments`));
+    errors.push(...validateTaskDropRateAdjustmentsEnabled(original?.taskDropRateAdjustmentsEnabled, `Environment "${label}" taskDropRateAdjustmentsEnabled`));
     errors.push(...validateDropRateAdjustmentMap(original?.hazardDropRateAdjustments, `Environment "${label}" hazardDropRateAdjustments`));
 
     const hasTaskSource = normalized.tasks.length > 0 || normalized.enabledTaskIds.length > 0;
@@ -1187,6 +1189,13 @@ function normalizeTaskDropRateAdjustments(value) {
     .filter(([taskId, rowAdjustments]) => taskId && Object.keys(rowAdjustments).length > 0));
 }
 
+function normalizeTaskDropRateAdjustmentsEnabled(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value)
+    .map(([taskId, enabled]) => [stringOrEmpty(taskId), enabled])
+    .filter(([taskId, enabled]) => taskId && enabled === false));
+}
+
 function validateDropRateAdjustmentMap(value, label) {
   if (value === undefined || value === null) return [];
   if (typeof value !== 'object' || Array.isArray(value)) return [`${label} must be an object`];
@@ -1213,6 +1222,23 @@ function validateTaskDropRateAdjustments(value, label) {
     if (!key) return [`${label} keys must be non-empty task ids`];
     return validateDropRateAdjustmentMap(rowAdjustments, `${label}.${key}`);
   });
+}
+
+function validateTaskDropRateAdjustmentsEnabled(value, label) {
+  if (value === undefined || value === null) return [];
+  if (typeof value !== 'object' || Array.isArray(value)) return [`${label} must be an object`];
+  const errors = [];
+  for (const [taskId, enabled] of Object.entries(value)) {
+    const key = stringOrEmpty(taskId);
+    if (!key) {
+      errors.push(`${label} keys must be non-empty task ids`);
+      continue;
+    }
+    if (typeof enabled !== 'boolean') {
+      errors.push(`${label}.${key} must be a boolean`);
+    }
+  }
+  return errors;
 }
 
 function trimmedOrDefault(value, fallback) {

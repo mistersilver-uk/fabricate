@@ -859,6 +859,7 @@ describe('adminStore gathering environments tab state', () => {
     await store.selectSystem('system-a');
     let composition = get(store.viewState).environmentComposition;
     assert.equal(composition.tasks[0].hasDropRateAdjustment, true);
+    assert.equal(composition.tasks[0].dropRateAdjustmentsEnabled, true);
     assert.equal(composition.tasks[0].dropRateAdjustmentRows[0].adjustment, 25);
     assert.equal(composition.tasks[0].dropRateAdjustmentRows[0].effectiveDropRate, 65);
     assert.equal(composition.hazards[0].hasDropRateAdjustment, true);
@@ -874,6 +875,27 @@ describe('adminStore gathering environments tab state', () => {
     assert.equal(composition.hazards[0].hasDropRateAdjustment, false);
     assert.deepEqual(get(store.viewState).environmentDraft.taskDropRateAdjustments, {});
     assert.deepEqual(get(store.viewState).environmentDraft.hazardDropRateAdjustments, {});
+
+    store.updateEnvironmentDraft({
+      taskDropRateAdjustments: { 'task-library': { 'drop-ore': 25 } },
+      taskDropRateAdjustmentsEnabled: { 'task-library': false }
+    });
+    composition = get(store.viewState).environmentComposition;
+    assert.equal(composition.tasks[0].dropRateAdjustmentsEnabled, false);
+    assert.equal(composition.tasks[0].hasDropRateAdjustment, false);
+    assert.equal(composition.tasks[0].hasStoredDropRateAdjustment, true);
+    assert.equal(composition.tasks[0].dropRateAdjustmentRows[0].adjustment, 25);
+    assert.equal(composition.tasks[0].dropRateAdjustmentRows[0].effectiveDropRate, 40);
+    assert.deepEqual(get(store.viewState).environmentDraft.taskDropRateAdjustmentsEnabled, { 'task-library': false });
+
+    store.updateEnvironmentDraft({
+      taskDropRateAdjustmentsEnabled: { 'task-library': true }
+    });
+    composition = get(store.viewState).environmentComposition;
+    assert.equal(composition.tasks[0].dropRateAdjustmentsEnabled, true);
+    assert.equal(composition.tasks[0].hasDropRateAdjustment, true);
+    assert.equal(composition.tasks[0].dropRateAdjustmentRows[0].effectiveDropRate, 65);
+    assert.deepEqual(get(store.viewState).environmentDraft.taskDropRateAdjustmentsEnabled, {});
   });
 
   it('create, duplicate, delete, and reorder use the environment store and refresh selection safely', async () => {

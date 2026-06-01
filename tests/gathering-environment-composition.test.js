@@ -234,6 +234,22 @@ test('environment drop-rate adjustments apply to composed task rows and hazards 
   assert.equal(sourceHazard.dropRate, 40);
 });
 
+test('disabled task drop-rate adjustments remain stored but do not apply to composed task rows', () => {
+  const sourceTask = { id: 'tDisabledAdjust', name: 'Pick Ore', biomes: ['cave'], dropRows: [{ id: 'dDisabledAdjust', componentId: 'ore', quantity: 1, dropRate: 40 }] };
+  const service = makeService({ tasks: [sourceTask] });
+
+  const composed = service.composeEnvironment(environment({
+    compositionMode: 'automatic',
+    taskDropRateAdjustments: { tDisabledAdjust: { dDisabledAdjust: 20 } },
+    taskDropRateAdjustmentsEnabled: { tDisabledAdjust: false }
+  }), system);
+
+  assert.equal(composed.tasks[0].dropRows[0].dropRate, 40);
+  assert.equal(composed.tasks[0].dropRows[0].baseDropRate, 40);
+  assert.equal(composed.tasks[0].dropRows[0].environmentDropRateAdjustment, 0);
+  assert.equal(sourceTask.dropRows[0].dropRate, 40);
+});
+
 test('environment drop-rate adjustments affect d100 task and hazard roll thresholds', async () => {
   const service = makeRollingService({
     tasks: [{ id: 'tRoll', name: 'Pick Ore', biomes: ['cave'], dropRows: [{ id: 'dRoll', componentId: 'ore', quantity: 1, dropRate: 40 }] }],
