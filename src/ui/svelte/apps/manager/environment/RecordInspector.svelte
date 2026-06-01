@@ -168,7 +168,7 @@
     <div class="manager-environment-overrides-header">
       <div class="manager-environment-overrides-copy">
         <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Overrides', 'Environment overrides')}</h3>
-        <p class="manager-muted">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.OverridesHint', 'Drop-rate adjustments apply only in this environment and do not modify the reusable source record.')}</p>
+        <p class="manager-muted">{kind === 'hazard' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.OverridesHintHazard', 'Drop-rate adjustments apply only in this environment and do not modify the reusable source hazard.') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.OverridesHintTask', 'Drop-rate adjustments apply only in this environment and do not modify the reusable source task.')}</p>
       </div>
       {#if showOverridesToggle}
         <button

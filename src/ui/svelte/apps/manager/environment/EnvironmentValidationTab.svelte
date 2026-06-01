@@ -29,17 +29,17 @@
     hasDanger: ['CheckDanger', 'Has a danger level'],
     hasCompositionMode: ['CheckCompositionMode', 'Has a composition mode'],
     hasAvailableTask: ['CheckAvailableTask', 'Has at least one available task'],
-    noStaleIncluded: ['CheckNoStale', 'Has no stale included records']
+    noStaleIncluded: ['CheckNoStale', 'Has no stale included tasks or hazards']
   };
   const ISSUE_LABELS = {
     noAvailableTasks: ['IssueNoAvailableTasks', 'No tasks are available to players.'],
     activeNoComposition: ['IssueActiveNoComposition', 'Environment is active but has no valid task composition.'],
-    staleIncluded: ['IssueStaleIncluded', 'Included record no longer matches the environment.'],
+    staleIncluded: ['IssueStaleIncluded', 'Included task or hazard no longer matches the environment.'],
     noScene: ['IssueNoScene', 'No scene is linked.'],
     noHazardsAtDanger: ['IssueNoHazardsAtDanger', 'Danger is set but no hazards are available.'],
     taskNoDescription: ['IssueTaskNoDescription', 'Available task has no player-facing description.'],
-    hiddenNonMatching: ['IssueHiddenNonMatching', 'Some records are hidden because they do not match.'],
-    locallyExcluded: ['IssueLocallyExcluded', 'Some records are excluded locally.']
+    hiddenNonMatching: ['IssueHiddenNonMatching', 'Some tasks or hazards are hidden because they do not match.'],
+    locallyExcluded: ['IssueLocallyExcluded', 'Some tasks or hazards are excluded locally.']
   };
 
   function checkLabel(id) {
@@ -80,7 +80,7 @@
                 <span class="manager-environment-issue-title">{issueTitle(issue)}</span>
                 {#if issue.recordId}
                   <button type="button" class="manager-button manager-environment-issue-action" onclick={() => onSelectRecord(issue.recordKind, issue.recordId)}>
-                    {text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.ViewRecord', 'View record')}
+                    {issue.recordKind === 'hazard' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.ViewHazard', 'View hazard') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.ViewTask', 'View task')}
                   </button>
                 {/if}
               </li>

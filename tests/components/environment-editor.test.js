@@ -80,9 +80,11 @@ describe('environment editor localization', () => {
     const editor = lang.FABRICATE.Admin.Manager.EnvironmentEditor;
     const expected = [
       ['Composition.NonMatching', 'Non-matching'],
-      ['Composition.NoNonMatching', 'No non-matching or disabled records.'],
+      ['Composition.NoNonMatchingTasks', 'No non-matching or disabled tasks.'],
+      ['Composition.NoNonMatchingHazards', 'No non-matching or disabled hazards.'],
       ['Composition.AvailableToAdd', 'Available to add'],
-      ['Composition.NoAvailableToAdd', 'No matching or non-matching records to add.'],
+      ['Composition.NoAvailableTasksToAdd', 'No matching or non-matching tasks to add.'],
+      ['Composition.NoAvailableHazardsToAdd', 'No matching or non-matching hazards to add.'],
       ['Composition.ForceAdd', 'Force add'],
       ['Composition.LibraryDisabledNote', 'Enable in library first'],
       ['Composition.ForceIncluded', 'Force included'],
@@ -94,8 +96,9 @@ describe('environment editor localization', () => {
       ['Composition.ColHazard', 'Hazard'],
       ['Composition.QuickRemove', 'Remove'],
       ['Composition.Remove', 'Remove from environment'],
-      ['Composition.ManualHint', 'Only explicitly included records are available; GMs can force add enabled non-matching records.'],
-      ['Inspector.OverridesHint', 'Drop-rate adjustments apply only in this environment and do not modify the reusable source record.'],
+      ['Composition.ManualHint', 'Only explicitly included tasks and hazards are available; GMs can force add enabled non-matching tasks and hazards.'],
+      ['Inspector.OverridesHintTask', 'Drop-rate adjustments apply only in this environment and do not modify the reusable source task.'],
+      ['Inspector.OverridesHintHazard', 'Drop-rate adjustments apply only in this environment and do not modify the reusable source hazard.'],
       ['Inspector.DropRateAdjustment', 'Drop-rate adjustment'],
       ['Inspector.DropRateAdjustmentRange', 'Drop-rate adjustment (-100% to +100%)'],
       ['Inspector.ApplyDropRateAdjustmentsOn', 'On'],
@@ -137,7 +140,7 @@ describe('environment editor localization', () => {
       'CheckRegion dynamic fallback should match the English catalog'
     );
     assert.ok(
-      modeControlSource.includes("descFallback: 'Only explicitly included records are available; GMs can force add enabled non-matching records.'"),
+      modeControlSource.includes("descFallback: 'Only explicitly included tasks and hazards are available; GMs can force add enabled non-matching tasks and hazards.'"),
       'ManualHint dynamic fallback should match the English catalog'
     );
   });
@@ -342,7 +345,8 @@ describe('environment composition editor structure', () => {
     assert.ok(listSource.includes('const availableToAdd = $derived([...availableToAddMatching, ...availableToAddNonMatching, ...availableToAddLibraryDisabled])'), 'available-to-add orders matching records before non-matching and library-disabled records');
     assert.ok(listSource.includes('data-section="available-to-add"'), 'manual mode renders an Available to add section');
     assert.ok(listSource.includes('Composition.AvailableToAdd'), 'Available to add section uses localized copy');
-    assert.ok(listSource.includes('Composition.NoAvailableToAdd'), 'Available to add empty state uses localized copy');
+    assert.ok(listSource.includes('Composition.NoAvailableTasksToAdd'), 'Available to add empty state uses localized copy for the tasks tab');
+    assert.ok(listSource.includes('Composition.NoAvailableHazardsToAdd'), 'Available to add empty state uses localized copy for the hazards tab');
     assert.ok(!listSource.includes("entry.compositionState === 'excluded' && entry.matches === true && entry.libraryEnabled === true"), 'manual Available to add no longer treats excluded records as restorable');
     assert.ok(!listSource.includes("entry?.compositionState === 'excluded' && entry?.matches !== true"), 'manual Available to add no longer force-adds excluded records');
     assert.ok(!listSource.includes("entry?.compositionState === 'excluded' && entry?.libraryEnabled !== true"), 'manual Available to add no longer classifies excluded records');

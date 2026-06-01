@@ -264,7 +264,7 @@ describe('CompositionList mounted layout', () => {
     removeQuick.click();
     assert.deepEqual(calls.at(-1), ['exclude', 'hazard', 'included']);
     assert.equal(
-      target.querySelector('[data-record-id="included"] .manager-icon-button[aria-label="Open source record"]'),
+      target.querySelector('[data-record-id="included"] .manager-icon-button[aria-label="Open source hazard"]'),
       null,
       'included manual hazard rows do not render a standalone edit-source action'
     );
