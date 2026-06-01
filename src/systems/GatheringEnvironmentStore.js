@@ -309,6 +309,7 @@ export class GatheringEnvironmentStore {
       taskDropRateAdjustments: normalizeTaskDropRateAdjustments(data?.taskDropRateAdjustments),
       taskDropRateAdjustmentsEnabled: normalizeTaskDropRateAdjustmentsEnabled(data?.taskDropRateAdjustmentsEnabled),
       hazardDropRateAdjustments: normalizeDropRateAdjustmentMap(data?.hazardDropRateAdjustments),
+      hazardDropRateAdjustmentsEnabled: normalizeHazardDropRateAdjustmentsEnabled(data?.hazardDropRateAdjustmentsEnabled),
       hazardSelectionMode: ['highestRankedDrop', 'allDrops'].includes(data?.hazardSelectionMode) ? data.hazardSelectionMode : 'allDrops',
       hazardPolicy: ['successWithHazard', 'failureWithHazard'].includes(data?.hazardPolicy) ? data.hazardPolicy : 'successWithHazard',
       ...(blindSelection ? { blindSelection } : {}),
@@ -450,6 +451,7 @@ export class GatheringEnvironmentStore {
     errors.push(...validateTaskDropRateAdjustments(original?.taskDropRateAdjustments, `Environment "${label}" taskDropRateAdjustments`));
     errors.push(...validateTaskDropRateAdjustmentsEnabled(original?.taskDropRateAdjustmentsEnabled, `Environment "${label}" taskDropRateAdjustmentsEnabled`));
     errors.push(...validateDropRateAdjustmentMap(original?.hazardDropRateAdjustments, `Environment "${label}" hazardDropRateAdjustments`));
+    errors.push(...validateHazardDropRateAdjustmentsEnabled(original?.hazardDropRateAdjustmentsEnabled, `Environment "${label}" hazardDropRateAdjustmentsEnabled`));
 
     const hasTaskSource = normalized.tasks.length > 0 || normalized.enabledTaskIds.length > 0;
     if (normalized.selectionMode === 'targeted' && !hasTaskSource) {
@@ -1196,6 +1198,13 @@ function normalizeTaskDropRateAdjustmentsEnabled(value) {
     .filter(([taskId, enabled]) => taskId && enabled === false));
 }
 
+function normalizeHazardDropRateAdjustmentsEnabled(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value)
+    .map(([hazardId, enabled]) => [stringOrEmpty(hazardId), enabled])
+    .filter(([hazardId, enabled]) => hazardId && enabled === false));
+}
+
 function validateDropRateAdjustmentMap(value, label) {
   if (value === undefined || value === null) return [];
   if (typeof value !== 'object' || Array.isArray(value)) return [`${label} must be an object`];
@@ -1232,6 +1241,23 @@ function validateTaskDropRateAdjustmentsEnabled(value, label) {
     const key = stringOrEmpty(taskId);
     if (!key) {
       errors.push(`${label} keys must be non-empty task ids`);
+      continue;
+    }
+    if (typeof enabled !== 'boolean') {
+      errors.push(`${label}.${key} must be a boolean`);
+    }
+  }
+  return errors;
+}
+
+function validateHazardDropRateAdjustmentsEnabled(value, label) {
+  if (value === undefined || value === null) return [];
+  if (typeof value !== 'object' || Array.isArray(value)) return [`${label} must be an object`];
+  const errors = [];
+  for (const [hazardId, enabled] of Object.entries(value)) {
+    const key = stringOrEmpty(hazardId);
+    if (!key) {
+      errors.push(`${label} keys must be non-empty hazard ids`);
       continue;
     }
     if (typeof enabled !== 'boolean') {

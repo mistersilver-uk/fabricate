@@ -4553,8 +4553,25 @@ describe('CraftingSystemManager mounted behavior', () => {
     const hazardOverrides = target.querySelector('[data-record-inspector-section="overrides"]');
     assert.ok(hazardOverrides, 'hazard inspector should keep the overrides card');
     assert.ok(hazardOverrides.textContent.includes('Environment overrides'), 'hazard overrides card should keep its title');
-    assert.ok(hazardOverrides.textContent.includes('Hazard chance'), 'hazard overrides should keep the hazard chance row');
-    assert.ok(hazardOverrides.querySelector('[data-drop-rate-adjustment="hazard-thorns"] input[type="number"]'), 'hazard overrides should keep the drop-rate adjustment input');
+    assert.ok(hazardOverrides.textContent.includes('Base chance modifier'), 'hazard overrides should render the singular base-chance-modifier heading');
+    assert.ok(hazardOverrides.querySelector('[data-hazard-drop-rate-adjustments-toggle]'), 'hazard overrides should render the apply toggle');
+    const hazardAdjustmentRow = hazardOverrides.querySelector('[data-drop-rate-adjustment="hazard-thorns"]');
+    assert.ok(hazardAdjustmentRow, 'hazard override should render a single row card for the selected hazard');
+    assert.equal(hazardAdjustmentRow.classList.contains('is-task-drop'), true, 'hazard override row should reuse the task-drop card layout');
+    assert.equal(hazardAdjustmentRow.querySelector('.manager-environment-drop-adjustment-thumb')?.getAttribute('src'), 'icons/svg/hazard.svg', 'hazard override should render the hazard image');
+    assert.equal(hazardAdjustmentRow.querySelector('.manager-environment-drop-adjustment-drop strong')?.textContent.trim(), 'Thorn Snare', 'hazard override should render the hazard name');
+    assert.equal(hazardAdjustmentRow.querySelector('[data-drop-rate-adjustment-base]')?.textContent.trim(), 'Base 10%', 'hazard base rate should be its own one-row item');
+    assert.equal(hazardAdjustmentRow.querySelector('[data-drop-rate-adjustment-effective]')?.textContent.trim(), 'Effective 10%', 'hazard effective rate should be its own one-row item');
+    const hazardAdjustmentInput = hazardAdjustmentRow.querySelector('[data-drop-rate-adjustment-input]');
+    assert.ok(hazardAdjustmentInput, 'hazard override should render the custom percent input');
+    assert.equal(hazardAdjustmentInput.getAttribute('type'), 'text', 'hazard override input should use the text percentage input formatting');
+    assert.equal(hazardAdjustmentRow.querySelector('input[type="number"]'), null, 'hazard override should no longer use the plain number input');
+    assert.ok(hazardAdjustmentRow.querySelector('.manager-environment-drop-adjustment-clear'), 'hazard override should render the icon-only clear button');
+    hazardAdjustmentInput.value = '-5';
+    hazardAdjustmentInput.dispatchEvent(new Event('input', { bubbles: true }));
+    assert.deepEqual(updateCalls.at(-1), { hazardDropRateAdjustments: { 'hazard-thorns': -5 } }, 'hazard percent input should update the stored hazard adjustment');
+    hazardOverrides.querySelector('[data-hazard-drop-rate-adjustments-toggle]').click();
+    assert.deepEqual(updateCalls.at(-1), { hazardDropRateAdjustmentsEnabled: { 'hazard-thorns': false } }, 'turning the hazard toggle off should preserve stored values and only disable application');
   });
 
   // NOTE: previously covered tests for environment-edit input wiring and validation

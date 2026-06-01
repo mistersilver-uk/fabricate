@@ -902,6 +902,25 @@ describe('adminStore gathering environments tab state', () => {
     assert.equal(composition.tasks[0].hasDropRateAdjustment, true);
     assert.equal(composition.tasks[0].dropRateAdjustmentRows[0].effectiveDropRate, 65);
     assert.deepEqual(get(store.viewState).environmentDraft.taskDropRateAdjustmentsEnabled, {});
+
+    store.updateEnvironmentDraft({
+      hazardDropRateAdjustments: { 'hazard-cave-in': -10 },
+      hazardDropRateAdjustmentsEnabled: { 'hazard-cave-in': false }
+    });
+    composition = get(store.viewState).environmentComposition;
+    assert.equal(composition.hazards[0].dropRateAdjustmentsEnabled, false);
+    assert.equal(composition.hazards[0].hasDropRateAdjustment, true);
+    assert.equal(composition.hazards[0].dropRateAdjustment, -10);
+    assert.equal(composition.hazards[0].effectiveDropRate, 30);
+    assert.deepEqual(get(store.viewState).environmentDraft.hazardDropRateAdjustmentsEnabled, { 'hazard-cave-in': false });
+
+    store.updateEnvironmentDraft({
+      hazardDropRateAdjustmentsEnabled: { 'hazard-cave-in': true }
+    });
+    composition = get(store.viewState).environmentComposition;
+    assert.equal(composition.hazards[0].dropRateAdjustmentsEnabled, true);
+    assert.equal(composition.hazards[0].effectiveDropRate, 20);
+    assert.deepEqual(get(store.viewState).environmentDraft.hazardDropRateAdjustmentsEnabled, {});
   });
 
   it('create, duplicate, delete, and reorder use the environment store and refresh selection safely', async () => {

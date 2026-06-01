@@ -2083,13 +2083,16 @@ export function createAdminStore(services) {
     if (kind === 'hazard') {
       const adjustments = _normalizeDraftDropRateAdjustmentMap(environment?.hazardDropRateAdjustments);
       const adjustment = adjustments[id] || 0;
+      const hazardEnabledMap = _normalizeDraftHazardDropRateAdjustmentsEnabled(environment?.hazardDropRateAdjustmentsEnabled);
+      const dropRateAdjustmentsEnabled = hazardEnabledMap[id] !== false;
+      const appliedAdjustment = dropRateAdjustmentsEnabled ? adjustment : 0;
       const baseDropRate = Number.isFinite(Number(record?.dropRate)) ? Math.floor(Number(record.dropRate)) : 1;
       return {
         hasDropRateAdjustment: adjustment !== 0,
         dropRateAdjustment: adjustment,
-        dropRateAdjustmentsEnabled: true,
+        dropRateAdjustmentsEnabled,
         baseDropRate,
-        effectiveDropRate: _effectiveDropRate(baseDropRate, adjustment),
+        effectiveDropRate: _effectiveDropRate(baseDropRate, appliedAdjustment),
         dropRateAdjustmentRows: []
       };
     }
@@ -2821,6 +2824,13 @@ export function createAdminStore(services) {
       .filter(([taskId, enabled]) => taskId && enabled === false));
   }
 
+  function _normalizeDraftHazardDropRateAdjustmentsEnabled(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    return Object.fromEntries(Object.entries(value)
+      .map(([hazardId, enabled]) => [String(hazardId || '').trim(), enabled])
+      .filter(([hazardId, enabled]) => hazardId && enabled === false));
+  }
+
   function updateEnvironmentDraft(updates = {}) {
     const current = get(environmentDraft);
     if (!current || typeof updates !== 'object' || updates === null) return false;
@@ -2850,6 +2860,7 @@ export function createAdminStore(services) {
       'taskDropRateAdjustments',
       'taskDropRateAdjustmentsEnabled',
       'hazardDropRateAdjustments',
+      'hazardDropRateAdjustmentsEnabled',
       'blindSelection',
       'tasks'
     ]);
@@ -2877,6 +2888,8 @@ export function createAdminStore(services) {
           .filter(Boolean)));
       } else if (field === 'hazardDropRateAdjustments') {
         next.hazardDropRateAdjustments = _normalizeDraftDropRateAdjustmentMap(value);
+      } else if (field === 'hazardDropRateAdjustmentsEnabled') {
+        next.hazardDropRateAdjustmentsEnabled = _normalizeDraftHazardDropRateAdjustmentsEnabled(value);
       } else if (field === 'taskDropRateAdjustments') {
         next.taskDropRateAdjustments = _normalizeDraftTaskDropRateAdjustments(value);
       } else if (field === 'taskDropRateAdjustmentsEnabled') {

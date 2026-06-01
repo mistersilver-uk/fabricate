@@ -101,6 +101,7 @@ describe('environment editor localization', () => {
       ['Inspector.ApplyDropRateAdjustmentsOn', 'On'],
       ['Inspector.ApplyDropRateAdjustmentsOff', 'Off'],
       ['Inspector.BaseChanceModifiers', 'Base chance modifiers'],
+      ['Inspector.BaseChanceModifier', 'Base chance modifier'],
       ['Inspector.BaseRate', 'Base'],
       ['Inspector.EffectiveRate', 'Effective'],
       ['Inspector.ClearAdjustment', 'Clear'],
@@ -366,7 +367,9 @@ describe('environment composition editor structure', () => {
     assert.ok(inspectorSource.includes('data-record-inspector-section="overrides"'), 'inspector should render the override section');
     assert.ok(inspectorSource.includes('DropRateAdjustment'), 'override section should edit drop-rate adjustments');
     assert.ok(inspectorSource.includes('data-task-drop-rate-adjustments-toggle'), 'task overrides should expose an apply toggle');
+    assert.ok(inspectorSource.includes('data-hazard-drop-rate-adjustments-toggle'), 'hazard overrides should expose an apply toggle');
     assert.ok(inspectorSource.includes('taskDropRateAdjustmentsEnabled'), 'task overrides should preserve a separate enabled state');
+    assert.ok(inspectorSource.includes('hazardDropRateAdjustmentsEnabled'), 'hazard overrides should preserve a separate enabled state');
     assert.ok(inspectorSource.includes('data-drop-rate-adjustment-percent'), 'task override rows should use the custom percent input shell');
     assert.ok(inspectorSource.includes('type="text"'), 'task override rows should use text percentage input formatting');
     assert.ok(inspectorSource.includes('manager-environment-drop-adjustment-drop'), 'task override rows should render drop image/name above controls');
@@ -375,14 +378,15 @@ describe('environment composition editor structure', () => {
     assert.ok(inspectorSource.includes('data-drop-rate-adjustment-effective'), 'task override rows should expose effective chance as its own control-row item');
     assert.ok(inspectorSource.includes('manager-environment-drop-adjustment-clear'), 'task override clear action should be an icon-only button');
     assert.ok(inspectorSource.includes('aria-label={text(\'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ClearAdjustment\', \'Clear\')}'), 'icon-only clear action should keep accessible copy');
-    assert.ok(inspectorSource.includes('class={`manager-environment-drop-adjustment-row is-task-drop ${taskDropRateAdjustmentsEnabled ? \'\' : \'is-disabled\'} ${adjustmentValueClass(row.adjustment)}`}'), 'task override row card should carry positive/negative/zero state classes');
+    assert.ok(inspectorSource.includes('class={`manager-environment-drop-adjustment-row is-task-drop ${dropRateAdjustmentsEnabled ? \'\' : \'is-disabled\'} ${adjustmentValueClass(row.adjustment)}`}'), 'task override row card should carry positive/negative/zero state classes');
     assert.ok(inspectorSource.includes('class="manager-condition-modifier-value" data-drop-rate-adjustment-percent'), 'task override input shell should remain neutral while keeping the percent suffix');
     assert.ok(!inspectorSource.includes('class={`manager-condition-modifier-value ${adjustmentValueClass(row.adjustment)}`}'), 'task override input shell should not carry positive/negative/zero state classes');
     assert.ok(inspectorSource.includes('onTaskAdjustmentInput'), 'task override text input should preserve transient signed editing states');
     assert.ok(inspectorSource.includes('DropRateAdjustmentRange'), 'task override text input should expose its bounded range in accessible copy');
     assert.ok(!inspectorSource.includes('value={row.adjustment} aria-label={text(\'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.DropRateAdjustment\', \'Drop-rate adjustment\')} onchange={(event) => setTaskDropAdjustment(row.id, event.currentTarget.value)}'), 'task override rows should no longer use the plain numeric adjustment input');
-    assert.ok(inspectorSource.includes('Inspector.HazardChance'), 'hazard overrides should keep HazardChance copy');
+    assert.ok(inspectorSource.includes('Inspector.BaseChanceModifier'), 'hazard overrides should use the singular base-chance-modifier heading');
     assert.ok(inspectorSource.includes('setHazardAdjustment'), 'hazard adjustment edits should update the environment draft');
+    assert.ok(inspectorSource.includes('onHazardAdjustmentInput'), 'hazard override text input should preserve transient signed editing states');
     assert.ok(inspectorSource.includes('setTaskDropAdjustment'), 'task drop-row adjustment edits should update the environment draft');
     assert.ok(!inspectorSource.includes('is-disabled-overrides'), 'override section should no longer be phase-1 disabled');
   });
