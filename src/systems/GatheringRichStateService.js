@@ -1168,8 +1168,13 @@ function applyDropRateAdjustment(row, adjustment = 0) {
 }
 
 function applyHazardDropRateAdjustment(hazard, environment) {
+  const id = String(hazard?.id || '');
+  const enabledMap = environment?.hazardDropRateAdjustmentsEnabled;
+  if (enabledMap && typeof enabledMap === 'object' && !Array.isArray(enabledMap) && enabledMap[id] === false) {
+    return applyDropRateAdjustment(hazard, 0);
+  }
   const adjustments = dropRateAdjustmentMap(environment?.hazardDropRateAdjustments);
-  const adjustment = adjustments[String(hazard?.id || '')] || 0;
+  const adjustment = adjustments[id] || 0;
   return applyDropRateAdjustment(hazard, adjustment);
 }
 

@@ -6,6 +6,7 @@ import { GatheringEnvironmentStore } from '../src/systems/GatheringEnvironmentSt
 
 function makeMemoryStore({
   saved = [],
+  gatheringConfig = {},
   systems = [
     { id: 'system-a', features: { gathering: true }, components: [{ id: 'component-gem', difficulty: 1 }] },
     { id: 'system-disabled', features: { gathering: false } }
@@ -13,7 +14,10 @@ function makeMemoryStore({
   ids = ['env-new', 'task-new', 'env-copy', 'task-copy-1', 'task-copy-2'],
   runCleanup = null
 } = {}) {
-  const settings = new Map([[SETTING_KEYS.GATHERING_ENVIRONMENTS, saved]]);
+  const settings = new Map([
+    [SETTING_KEYS.GATHERING_ENVIRONMENTS, saved],
+    [SETTING_KEYS.GATHERING_CONFIG, gatheringConfig]
+  ]);
   const writes = [];
   const nextIds = [...ids];
   const store = new GatheringEnvironmentStore({
@@ -191,8 +195,8 @@ test('validation covers selection modes, providers, progressive requirements, gr
 
   const invalid = [
     environment({ craftingSystemId: 'missing-system' }),
-    environment({ selectionMode: 'targeted', tasks: [] }),
-    environment({ selectionMode: 'blind', tasks: [] }),
+    environment({ selectionMode: 'targeted', compositionMode: 'manual', tasks: [] }),
+    environment({ selectionMode: 'blind', compositionMode: 'manual', tasks: [] }),
     environment({ selectionMode: 'other' }),
     environment({
       tasks: [routedTask({ resultSelection: { provider: 'macroOutcome' } })]
@@ -291,6 +295,8 @@ test('validation covers selection modes, providers, progressive requirements, gr
   assert.equal(store.validate(environment({ tasks: [routedTask()] })).valid, true);
   assert.equal(store.validate(environment({ tasks: [progressiveTask()] })).valid, true);
   assert.equal(store.validate(environment({ selectionMode: 'blind', tasks: [routedTask({ id: 'a' }), routedTask({ id: 'b' })] })).valid, true);
+  assert.equal(store.validate(environment({ compositionMode: 'automatic', tasks: [] })).valid, false);
+  assert.equal(store.validate(environment({ compositionMode: 'manual', tasks: [], forcedTaskIds: ['task-library-a'] })).valid, true);
 });
 
 test('targeted environments may compose gathering task-library records by enabledTaskIds', async () => {
@@ -305,6 +311,50 @@ test('targeted environments may compose gathering task-library records by enable
 
   assert.deepEqual(created.tasks, []);
   assert.deepEqual(created.enabledTaskIds, ['task-library-a', 'task-library-b']);
+});
+
+test('validation permits composition-only environments backed by matching library tasks or forced task ids', async () => {
+  const { store } = makeMemoryStore({
+    gatheringConfig: {
+      systems: {
+        'system-a': {
+          tasks: [
+            { id: 'task-cave', name: 'Mine Ore', enabled: true, biomes: ['cave'], dropRows: [] },
+            { id: 'task-disabled', name: 'Disabled', enabled: false, biomes: ['cave'], dropRows: [] },
+            { id: 'task-desert', name: 'Dig Sand', enabled: true, biomes: ['desert'], dropRows: [] }
+          ]
+        }
+      }
+    }
+  });
+  store.load();
+
+  const automatic = await store.create(environment({
+    id: 'env-automatic-library',
+    tasks: [],
+    compositionMode: 'automatic',
+    biomes: ['cave']
+  }));
+  assert.deepEqual(automatic.tasks, []);
+  assert.deepEqual(automatic.enabledTaskIds, []);
+
+  const manualForced = await store.create(environment({
+    id: 'env-manual-forced',
+    tasks: [],
+    compositionMode: 'manual',
+    forcedTaskIds: ['task-desert']
+  }));
+  assert.deepEqual(manualForced.tasks, []);
+  assert.deepEqual(manualForced.forcedTaskIds, ['task-desert']);
+
+  const unmatched = store.validate(environment({
+    id: 'env-unmatched-library',
+    tasks: [],
+    compositionMode: 'automatic',
+    biomes: ['swamp']
+  }));
+  assert.equal(unmatched.valid, false);
+  assert.match(unmatched.errors.join('\n'), /targeted selection requires at least one task/);
 });
 
 test('drop-rate adjustments normalize to non-zero integer deltas and validate raw ranges', async () => {
@@ -330,6 +380,10 @@ test('drop-rate adjustments normalize to non-zero integer deltas and validate ra
     hazardDropRateAdjustments: {
       ' hazard-a ': -20,
       'hazard-zero': 0
+    },
+    hazardDropRateAdjustmentsEnabled: {
+      ' hazard-a ': false,
+      'hazard-default': true
     }
   }));
 
@@ -342,17 +396,22 @@ test('drop-rate adjustments normalize to non-zero integer deltas and validate ra
   assert.deepEqual(created.hazardDropRateAdjustments, {
     'hazard-a': -20
   });
+  assert.deepEqual(created.hazardDropRateAdjustmentsEnabled, {
+    'hazard-a': false
+  });
 
   const invalid = store.validate(environment({
     id: 'env-invalid-adjustments',
     taskDropRateAdjustments: { 'task-library-a': { 'drop-a': 101 } },
     taskDropRateAdjustmentsEnabled: { 'task-library-a': 'false' },
-    hazardDropRateAdjustments: { 'hazard-a': -101 }
+    hazardDropRateAdjustments: { 'hazard-a': -101 },
+    hazardDropRateAdjustmentsEnabled: { 'hazard-a': 'false' }
   }));
   assert.equal(invalid.valid, false);
   assert.match(invalid.errors.join('\n'), /taskDropRateAdjustments\.task-library-a\.drop-a must be an integer from -100 to 100/);
   assert.match(invalid.errors.join('\n'), /taskDropRateAdjustmentsEnabled\.task-library-a must be a boolean/);
   assert.match(invalid.errors.join('\n'), /hazardDropRateAdjustments\.hazard-a must be an integer from -100 to 100/);
+  assert.match(invalid.errors.join('\n'), /hazardDropRateAdjustmentsEnabled\.hazard-a must be a boolean/);
 });
 
 test('rich gathering metadata and task economy fields normalize and validate additively', async () => {

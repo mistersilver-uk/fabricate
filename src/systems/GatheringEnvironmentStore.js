@@ -1,6 +1,6 @@
 import { getSetting as defaultGetSetting, setSetting as defaultSetSetting, SETTING_KEYS } from '../config/settings.js';
 import { validateGatheringDropReferencesSync } from './GatheringDropReferenceValidator.js';
-import { DANGER_LEVELS, resolveEnvironmentDangerLevel } from './gatheringMatch.js';
+import { DANGER_LEVELS, evaluateEnvironmentMatch, resolveEnvironmentDangerLevel } from './gatheringMatch.js';
 
 const DEFAULT_TASK_IMG = 'icons/svg/item-bag.svg';
 const VALID_SELECTION_MODES = new Set(['targeted', 'blind']);
@@ -453,7 +453,7 @@ export class GatheringEnvironmentStore {
     errors.push(...validateDropRateAdjustmentMap(original?.hazardDropRateAdjustments, `Environment "${label}" hazardDropRateAdjustments`));
     errors.push(...validateHazardDropRateAdjustmentsEnabled(original?.hazardDropRateAdjustmentsEnabled, `Environment "${label}" hazardDropRateAdjustmentsEnabled`));
 
-    const hasTaskSource = normalized.tasks.length > 0 || normalized.enabledTaskIds.length > 0;
+    const hasTaskSource = this._environmentHasTaskSource(normalized);
     if (normalized.selectionMode === 'targeted' && !hasTaskSource) {
       errors.push(`Environment "${label}" targeted selection requires at least one task`);
     }
@@ -650,6 +650,27 @@ export class GatheringEnvironmentStore {
     if (this.systemManager?.getSystem) return this.systemManager.getSystem(systemId);
     const systems = this._getSystems();
     return systems.find(system => system?.id === systemId) || null;
+  }
+
+  _environmentHasTaskSource(environment) {
+    if (environment.tasks.length > 0) return true;
+    if (environment.enabledTaskIds.length > 0) return true;
+    if (environment.compositionMode === 'manual' && normalizeIdList(environment.forcedTaskIds).length > 0) return true;
+    if (environment.compositionMode !== 'automatic') return false;
+    return this._hasMatchingLibraryTask(environment);
+  }
+
+  _hasMatchingLibraryTask(environment) {
+    return this._getGatheringLibraryTasks(environment.craftingSystemId)
+      .some(task => task?.enabled !== false
+        && evaluateEnvironmentMatch(task, environment, {}, { includeDanger: false }).matches);
+  }
+
+  _getGatheringLibraryTasks(systemId) {
+    if (!systemId) return [];
+    const config = this.getSetting?.(SETTING_KEYS.GATHERING_CONFIG);
+    const tasks = config?.systems?.[systemId]?.tasks;
+    return Array.isArray(tasks) ? tasks : [];
   }
 
   _getSystems() {

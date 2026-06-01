@@ -2823,7 +2823,10 @@ describe('createAdminStore', () => {
               rewardLimit: 0,
               hazardSelectionMode: 'limitedDrops',
               hazardLimit: '3.8',
-              hazardPolicy: 'bad-policy'
+              hazardPolicy: 'bad-policy',
+              blindCandidateGate: 'not-a-gate',
+              revealPolicy: 'not-a-policy',
+              revealScope: 'not-a-scope'
             },
             tasks: [],
             hazards: []
@@ -2841,7 +2844,10 @@ describe('createAdminStore', () => {
         hazardLimit: 3,
         hazardPolicy: 'successWithHazard',
         toolBreakagePolicy: 'failureOnBreak',
-        biomeModifierAggregation: 'strongestOfEach'
+        biomeModifierAggregation: 'strongestOfEach',
+        blindCandidateGate: 'attemptableOnly',
+        revealPolicy: 'never',
+        revealScope: 'actor'
       });
 
       await store.updateGatheringRules('sys1', {
@@ -2849,7 +2855,10 @@ describe('createAdminStore', () => {
         rewardLimit: 2,
         hazardSelectionMode: 'highestRankedDrop',
         hazardLimit: -4,
-        hazardPolicy: 'failureWithHazard'
+        hazardPolicy: 'failureWithHazard',
+        blindCandidateGate: 'allMatching',
+        revealPolicy: 'onAttempt',
+        revealScope: 'global'
       });
 
       assert.deepEqual(services._store.gatheringConfig.systems.sys1.rules, {
@@ -2859,7 +2868,10 @@ describe('createAdminStore', () => {
         hazardLimit: 1,
         hazardPolicy: 'failureWithHazard',
         toolBreakagePolicy: 'failureOnBreak',
-        biomeModifierAggregation: 'strongestOfEach'
+        biomeModifierAggregation: 'strongestOfEach',
+        blindCandidateGate: 'allMatching',
+        revealPolicy: 'onAttempt',
+        revealScope: 'global'
       });
       assert.deepEqual(get(store.viewState).gatheringConfig.systems.sys1.rules, services._store.gatheringConfig.systems.sys1.rules);
     });

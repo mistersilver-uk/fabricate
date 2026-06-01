@@ -129,6 +129,9 @@ const GATHERING_DROP_SELECTION_MODES = new Set(['highestRankedDrop', 'allDrops',
 const GATHERING_HAZARD_POLICIES = new Set(['successWithHazard', 'failureWithHazard']);
 const GATHERING_TOOL_BREAKAGE_POLICIES = new Set(['failureOnBreak', 'successDespiteBreak']);
 const GATHERING_BIOME_MODIFIER_AGGREGATIONS = new Set(['cumulative', 'strongestOfEach', 'dominant']);
+const GATHERING_BLIND_CANDIDATE_GATES = new Set(['attemptableOnly', 'allMatching']);
+const GATHERING_REVEAL_POLICIES = new Set(['never', 'onSuccess', 'onAttempt']);
+const GATHERING_REVEAL_SCOPES = new Set(['actor', 'user', 'party', 'global']);
 const ENVIRONMENT_INCLUDED_COMPOSITION_STATES = new Set([
   'includedByMatch',
   'explicitlyIncluded',
@@ -142,7 +145,10 @@ const DEFAULT_GATHERING_RULES = Object.freeze({
   hazardLimit: 1,
   hazardPolicy: 'successWithHazard',
   toolBreakagePolicy: 'failureOnBreak',
-  biomeModifierAggregation: 'strongestOfEach'
+  biomeModifierAggregation: 'strongestOfEach',
+  blindCandidateGate: 'attemptableOnly',
+  revealPolicy: 'never',
+  revealScope: 'actor'
 });
 
 // ---------------------------------------------------------------------------
@@ -679,6 +685,15 @@ function _normalizeGatheringRules(rules = {}) {
   const biomeModifierAggregation = GATHERING_BIOME_MODIFIER_AGGREGATIONS.has(rules?.biomeModifierAggregation)
     ? rules.biomeModifierAggregation
     : DEFAULT_GATHERING_RULES.biomeModifierAggregation;
+  const blindCandidateGate = GATHERING_BLIND_CANDIDATE_GATES.has(rules?.blindCandidateGate)
+    ? rules.blindCandidateGate
+    : DEFAULT_GATHERING_RULES.blindCandidateGate;
+  const revealPolicy = GATHERING_REVEAL_POLICIES.has(rules?.revealPolicy)
+    ? rules.revealPolicy
+    : DEFAULT_GATHERING_RULES.revealPolicy;
+  const revealScope = GATHERING_REVEAL_SCOPES.has(rules?.revealScope)
+    ? rules.revealScope
+    : DEFAULT_GATHERING_RULES.revealScope;
   return {
     rewardSelectionMode,
     rewardLimit: _normalizePositiveInteger(rules?.rewardLimit, DEFAULT_GATHERING_RULES.rewardLimit),
@@ -686,7 +701,10 @@ function _normalizeGatheringRules(rules = {}) {
     hazardLimit: _normalizePositiveInteger(rules?.hazardLimit, DEFAULT_GATHERING_RULES.hazardLimit),
     hazardPolicy,
     toolBreakagePolicy,
-    biomeModifierAggregation
+    biomeModifierAggregation,
+    blindCandidateGate,
+    revealPolicy,
+    revealScope
   };
 }
 
