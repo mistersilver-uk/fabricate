@@ -1435,7 +1435,7 @@
             "RegionHint": "Where this environment is (optional). Records match a region if specified.",
             "AnyRegion": "Any region",
             "Biomes": "Biomes",
-            "BiomesHint": "The terrain here. Records match if they share a biome.",
+            "BiomesHint": "The terrain here. Records match if they share one or more biomes.",
             "AddBiome": "Add biome",
             "RemoveBiome": "Remove {name}",
             "NoBiomes": "No biomes selected",
