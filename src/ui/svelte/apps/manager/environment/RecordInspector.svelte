@@ -130,8 +130,30 @@
   </section>
 
   <section class="manager-inspector-card" data-record-inspector-section="overrides">
-    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Overrides', 'Environment overrides')}</h3>
-    <p class="manager-muted">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.OverridesHint', 'Drop-rate adjustments apply only in this environment and do not modify the reusable source record.')}</p>
+    <div class="manager-environment-overrides-header">
+      <div class="manager-environment-overrides-copy">
+        <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Overrides', 'Environment overrides')}</h3>
+        <p class="manager-muted">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.OverridesHint', 'Drop-rate adjustments apply only in this environment and do not modify the reusable source record.')}</p>
+      </div>
+      {#if kind !== 'hazard' && adjustmentRows.length > 0}
+        <button
+          type="button"
+          class={`manager-status-toggle manager-environment-override-toggle ${taskDropRateAdjustmentsEnabled ? 'is-on' : 'is-off'}`}
+          aria-pressed={taskDropRateAdjustmentsEnabled}
+          data-task-drop-rate-adjustments-toggle
+          onclick={() => setTaskDropAdjustmentsEnabled(!taskDropRateAdjustmentsEnabled)}
+        >
+          <span class="manager-status-toggle-track" aria-hidden="true">
+            <span class="manager-status-toggle-knob"></span>
+          </span>
+          <span class="manager-status-toggle-label">
+            {taskDropRateAdjustmentsEnabled
+              ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ApplyDropRateAdjustmentsOn', 'On')
+              : text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ApplyDropRateAdjustmentsOff', 'Off')}
+          </span>
+        </button>
+      {/if}
+    </div>
 
     {#if kind === 'hazard'}
       <div class="manager-environment-drop-adjustment-row" data-drop-rate-adjustment={entry.id}>
@@ -149,22 +171,6 @@
         </button>
       </div>
     {:else if adjustmentRows.length > 0}
-      <button
-        type="button"
-        class={`manager-status-toggle manager-environment-override-toggle ${taskDropRateAdjustmentsEnabled ? 'is-on' : 'is-off'}`}
-        aria-pressed={taskDropRateAdjustmentsEnabled}
-        data-task-drop-rate-adjustments-toggle
-        onclick={() => setTaskDropAdjustmentsEnabled(!taskDropRateAdjustmentsEnabled)}
-      >
-        <span class="manager-status-toggle-track" aria-hidden="true">
-          <span class="manager-status-toggle-knob"></span>
-        </span>
-        <span class="manager-status-toggle-label">
-          {taskDropRateAdjustmentsEnabled
-            ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ApplyDropRateAdjustmentsOn', 'Drop modifiers on')
-            : text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ApplyDropRateAdjustmentsOff', 'Drop modifiers off')}
-        </span>
-      </button>
       <h4 class="manager-environment-drop-adjustment-heading">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.BaseChanceModifiers', 'Base chance modifiers')}</h4>
       <div class="manager-environment-drop-adjustment-list">
         {#each adjustmentRows as row (row.id)}

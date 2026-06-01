@@ -13463,13 +13463,23 @@
 }
 
 /* Inspector override form */
-.fabricate-manager .manager-environment-override-toggle {
-  flex-direction: row;
+.fabricate-manager .manager-environment-overrides-header {
+  display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+}
+
+.fabricate-manager .manager-environment-overrides-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.fabricate-manager .manager-environment-override-toggle {
+  flex: 0 0 auto;
+  flex-direction: row;
+  align-items: center;
   gap: 8px;
-  width: 100%;
-  margin-top: 8px;
 }
 
 .fabricate-manager .manager-environment-drop-adjustment-heading {
@@ -13505,7 +13515,7 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 8px;
+  gap: 10px;
   padding: 8px;
 }
 
@@ -13558,7 +13568,7 @@
   grid-template-columns: max-content 56px max-content 28px;
   align-items: center;
   justify-content: start;
-  gap: 4px;
+  gap: 12px;
   min-width: 0;
 }
 
