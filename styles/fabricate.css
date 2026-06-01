@@ -13509,6 +13509,21 @@
   padding: 8px;
 }
 
+.fabricate-manager .manager-environment-drop-adjustment-row.is-task-drop.is-positive {
+  border-color: var(--fab-success-border);
+  background: color-mix(in srgb, var(--fab-success-soft) 40%, var(--fab-mv2-surface-1));
+}
+
+.fabricate-manager .manager-environment-drop-adjustment-row.is-task-drop.is-negative {
+  border-color: var(--fab-danger-border);
+  background: color-mix(in srgb, var(--fab-danger-soft) 40%, var(--fab-mv2-surface-1));
+}
+
+.fabricate-manager .manager-environment-drop-adjustment-row.is-task-drop.is-zero {
+  border-color: var(--fab-mv2-border);
+  background: var(--fab-overlay-dark-16);
+}
+
 .fabricate-manager .manager-environment-drop-adjustment-row > .manager-button {
   grid-column: 1 / -1;
   justify-self: end;
@@ -13540,9 +13555,10 @@
 
 .fabricate-manager .manager-environment-drop-adjustment-controls {
   display: grid;
-  grid-template-columns: minmax(42px, 0.62fr) auto minmax(64px, 0.82fr) 28px;
+  grid-template-columns: max-content 56px max-content 28px;
   align-items: center;
-  gap: 6px;
+  justify-content: start;
+  gap: 4px;
   min-width: 0;
 }
 
@@ -13552,6 +13568,14 @@
   flex-direction: column;
   gap: 1px;
   line-height: 1.1;
+}
+
+.fabricate-manager .manager-environment-drop-adjustment-rate[data-drop-rate-adjustment-base] {
+  text-align: right;
+}
+
+.fabricate-manager .manager-environment-drop-adjustment-rate[data-drop-rate-adjustment-effective] {
+  text-align: left;
 }
 
 .fabricate-manager .manager-environment-drop-adjustment-rate span {
@@ -13605,8 +13629,8 @@
 }
 
 .fabricate-manager .manager-environment-drop-adjustment-input .manager-condition-modifier-value input {
-  flex-basis: 72px;
-  width: 72px;
+  flex-basis: 56px;
+  width: 56px;
   height: 28px;
   min-height: 28px;
   padding: 3px 16px 3px 4px;
@@ -13620,30 +13644,12 @@
   font-variant-numeric: tabular-nums;
 }
 
-.fabricate-manager .manager-environment-drop-adjustment-input .manager-condition-modifier-value.is-positive input {
-  border-color: var(--fab-success-border);
-  color: var(--fab-success-text);
-  background: var(--fab-success-soft);
-}
-
-.fabricate-manager .manager-environment-drop-adjustment-input .manager-condition-modifier-value.is-negative input {
-  border-color: var(--fab-danger-border);
-  color: var(--fab-danger-text);
-  background: var(--fab-danger-soft);
-}
-
-.fabricate-manager .manager-environment-drop-adjustment-input .manager-condition-modifier-value.is-zero input {
-  border-color: var(--fab-mv2-border);
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-surface-1);
-}
-
 .fabricate-manager .manager-environment-drop-adjustment-clear {
   width: 28px;
   height: 28px;
   min-height: 28px;
   padding: 0;
-  justify-self: end;
+  justify-self: start;
 }
 
 @media (max-width: 960px) {

@@ -375,7 +375,9 @@ describe('environment composition editor structure', () => {
     assert.ok(inspectorSource.includes('data-drop-rate-adjustment-effective'), 'task override rows should expose effective chance as its own control-row item');
     assert.ok(inspectorSource.includes('manager-environment-drop-adjustment-clear'), 'task override clear action should be an icon-only button');
     assert.ok(inspectorSource.includes('aria-label={text(\'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ClearAdjustment\', \'Clear\')}'), 'icon-only clear action should keep accessible copy');
-    assert.ok(inspectorSource.includes('class={`manager-condition-modifier-value ${adjustmentValueClass(row.adjustment)}`}'), 'task override input shell should carry positive/negative/zero state classes');
+    assert.ok(inspectorSource.includes('class={`manager-environment-drop-adjustment-row is-task-drop ${taskDropRateAdjustmentsEnabled ? \'\' : \'is-disabled\'} ${adjustmentValueClass(row.adjustment)}`}'), 'task override row card should carry positive/negative/zero state classes');
+    assert.ok(inspectorSource.includes('class="manager-condition-modifier-value" data-drop-rate-adjustment-percent'), 'task override input shell should remain neutral while keeping the percent suffix');
+    assert.ok(!inspectorSource.includes('class={`manager-condition-modifier-value ${adjustmentValueClass(row.adjustment)}`}'), 'task override input shell should not carry positive/negative/zero state classes');
     assert.ok(inspectorSource.includes('onTaskAdjustmentInput'), 'task override text input should preserve transient signed editing states');
     assert.ok(inspectorSource.includes('DropRateAdjustmentRange'), 'task override text input should expose its bounded range in accessible copy');
     assert.ok(!inspectorSource.includes('value={row.adjustment} aria-label={text(\'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.DropRateAdjustment\', \'Drop-rate adjustment\')} onchange={(event) => setTaskDropAdjustment(row.id, event.currentTarget.value)}'), 'task override rows should no longer use the plain numeric adjustment input');

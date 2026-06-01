@@ -180,7 +180,7 @@
               </span>
               <label class="manager-environment-drop-adjustment-input">
                 <span class="visually-hidden">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.DropRateAdjustment', 'Drop-rate adjustment')}</span>
-                <span class={`manager-condition-modifier-value ${adjustmentValueClass(row.adjustment)}`} data-drop-rate-adjustment-percent>
+                <span class="manager-condition-modifier-value" data-drop-rate-adjustment-percent>
                   <input
                     type="text"
                     inputmode="numeric"
