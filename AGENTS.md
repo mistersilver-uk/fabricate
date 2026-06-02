@@ -20,7 +20,7 @@ Primary stack: JavaScript ES modules, Svelte 5, Vite, `node:test`, happy-dom, Pl
 
 Non-trivial work runs as a `plan → plan-review → implement → review → docs` state machine, with iteration until each gate accepts. Stages auto-spawn role-specific subagents based on the change signals below — agents do not need to be requested by name. Subagents not matched by the routing table only run when explicitly requested.
 
-The routing tokens below (`fabricate_orchestrator`, etc.) are provider-neutral role identifiers. Each resolves to a registered agent in **both** providers — `.codex/agents/*.toml` for Codex and `.claude/agents/*.md` for Claude (spawned via the Agent tool using the `subagent_type` in [Agent Roles & Bindings](#agent-roles--bindings)) — so the auto-spawn workflow behaves the same regardless of which assistant is driving.
+The routing tokens below (`fabricate_orchestrator`, etc.) are provider-neutral role identifiers. Each resolves to a registered agent in **both** providers — `.codex/agents/*.toml` for Codex and `.claude/agents/*.md` for Claude (spawned via the Agent tool using the `subagent_type` in [Agent Roles & Bindings](#agent-roles--bindings)) — so the auto-spawn workflow behaves the same regardless of which assistant is driving. The one exception is the read-only `fabricate_pr_explorer` mapping role: Claude uses its built-in `Explore` agent rather than a dedicated binding (see the table below).
 
 ### Auto-spawn routing
 

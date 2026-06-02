@@ -65,6 +65,28 @@ Shared reusable skills MUST live under the repository `skills/` directory.
 - **WHEN** a provider-specific skill root is needed
 - **THEN** it points back to the canonical `skills/` directory instead of carrying a divergent copy
 
+### Requirement: Role persona bindings
+
+Each agent role MUST be defined once in its canonical `skills/<role>/SKILL.md`. Provider agent definitions (`.codex/agents/*.toml` for Codex, `.claude/agents/*.md` for Claude) MUST be thin bindings that point at the canonical skill and MUST NOT carry divergent persona behavior.
+
+#### Scenario: resolving a routing token
+
+- **WHEN** the auto-spawn routing table in `AGENTS.md` names a role token such as `fabricate_orchestrator`
+- **THEN** it resolves to a registered agent in each active provider — `.codex/agents/<role>.toml` for Codex and the `.claude/agents/<role>.md` `subagent_type` for Claude
+- **AND** the read-only mapping role `fabricate_pr_explorer`, which has no shared skill, resolves to the provider's built-in explorer (Claude's `Explore`)
+
+#### Scenario: changing role behavior
+
+- **WHEN** a role's behavior must change
+- **THEN** the edit is made in `skills/<role>/SKILL.md`
+- **AND** the provider bindings remain thin pointers without duplicated instructions
+
+#### Scenario: orchestration ownership
+
+- **WHEN** role agents are spawned for a change
+- **THEN** the workflow driver (the orchestrator's top-level loop) owns routing and the plan, implementation, and docs iteration loops
+- **AND** scoped role agents execute their role and return without spawning or routing further agents
+
 ### Requirement: Product contracts stay in specs
 
 Agents and skills MUST keep durable product behavior in canonical specs or active OpenSpec design docs, not in role prompts.

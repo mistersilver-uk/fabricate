@@ -37,6 +37,7 @@ You may update:
 ## Documentation rules
 
 - Do not edit `README.md`.
+- Do not edit `docs/_config.yml` unless explicitly instructed.
 - Do not change runtime logic in `src/`.
 - Do not edit files under `tests/`.
 - Do not invent API behavior. If the source is ambiguous, leave a TODO note in the doc.

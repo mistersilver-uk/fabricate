@@ -13,7 +13,6 @@ This skill is the canonical definition of the Fabricate UX Designer persona. Bot
 - relevant files under `src/ui/`, `src/ui/svelte/`, `styles/`, and `lang/`
 - the active Vite dev URL when available, or a prompt to ask the user for it before using container-backed flows
 - existing screenshots in `test-results/` when no live dev session is available
-- `C:/Users/mjkpo/.codex/memories/manager-v2-gathering-ui-patterns.md` when work touches Manager V2 Gathering tabs, settings, rules, or focus behavior (Codex only)
 
 ## Workflow
 

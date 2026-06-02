@@ -37,8 +37,8 @@ The orchestrator drives a `plan → plan-review → implement → review → doc
    - acceptance criteria
    - the spec or design document that owns any durable product behavior
    - for UI work: screenshot acceptance criteria, representative fixtures, pointer hit-test needs, and a UX review gate
-   - the resolved agent roster from step 3, including which roles will review the plan and which will review the implementation and docs
-7. **Plan review loop.** Run the plan-review agents resolved in step 3 in parallel against the change docs. Each emits `APPROVED / NEEDS_CHANGES / BLOCKED`. Revise the change docs in response to `NEEDS_CHANGES` and re-run the affected reviewers. Treat any `BLOCKED` verdict as a stop condition. Hard cap: 3 plan revisions before escalating.
+   - the resolved agent roster from step 4, including which roles will review the plan and which will review the implementation and docs
+7. **Plan review loop.** Run the plan-review agents resolved in step 4 in parallel against the change docs. Each emits `APPROVED / NEEDS_CHANGES / BLOCKED`. Revise the change docs in response to `NEEDS_CHANGES` and re-run the affected reviewers. Treat any `BLOCKED` verdict as a stop condition. Hard cap: 3 plan revisions before escalating.
 8. Update the visible plan with `update_plan` once all plan reviewers approve.
 9. **Implementation review loop.** Hand off to the implementer with explicit file ownership. When the implementer reports done, run `fabricate_reviewer` plus any post-implementation reviewers from the resolved roster. Loop on `NEEDS_CHANGES` until every reviewer emits `APPROVED`. Hard cap: 3 implementation revisions.
 10. **Documentation iteration loop.** If the change touches behaviour, public API, hooks, settings, or any JSDoc/Jekyll-documented surface, run the paired `fabricate_domain_expert` + `fabricate_docs_writer` loop:
