@@ -2119,6 +2119,84 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('#manager-essence-edit-name').value, 'Rain');
   });
 
+  it('saves a dirty essence edit draft and completes navigation when the GM chooses Save', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { confirmDiscardEssenceResult: 'save', experimentalFeaturesEnabled: true }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Essences').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-essence-id="water"] [aria-label="Edit Water"]').click();
+    await tick();
+    flushSync();
+
+    const editName = target.querySelector('#manager-essence-edit-name');
+    editName.value = 'Rain';
+    editName.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+
+    navButton('Recipes').click();
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+    await tick();
+    flushSync();
+    await tick();
+    flushSync();
+
+    assert.ok(calls.some(call => call[0] === 'confirmDiscardDirtyEssenceDraft'));
+    const updateCall = calls.find(call => call[0] === 'updateEssence');
+    assert.ok(updateCall, 'choosing Save should persist the dirty essence draft');
+    assert.equal(updateCall[1], 'water');
+    assert.equal(updateCall[2].name, 'Rain');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes');
+  });
+
+  it('keeps a dirty essence edit draft open when the Save fails on route exit', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { confirmDiscardEssenceResult: 'save', updateEssenceResult: false, experimentalFeaturesEnabled: true }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Essences').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-essence-id="water"] [aria-label="Edit Water"]').click();
+    await tick();
+    flushSync();
+
+    const editName = target.querySelector('#manager-essence-edit-name');
+    editName.value = 'Rain';
+    editName.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+
+    navButton('Recipes').click();
+    await Promise.resolve();
+    await Promise.resolve();
+    await tick();
+    flushSync();
+
+    assert.ok(calls.some(call => call[0] === 'updateEssence'), 'Save should be attempted');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
+    assert.equal(target.querySelector('#manager-essence-edit-name').value, 'Rain');
+  });
+
   it('keeps essence edit drafts on failed and rejected saves', async () => {
     const failedCalls = [];
     target = document.createElement('div');

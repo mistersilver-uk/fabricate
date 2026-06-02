@@ -5,12 +5,37 @@ import {
   localize,
   confirmDialog,
   renderDialog,
+  choiceDialog,
   notifyInfo,
   notifyWarn,
   notifyError,
   getDragEventData,
   viewScene
 } from '../src/ui/svelte/util/foundryBridge.js';
+
+// deepClone that preserves functions (button callbacks), like foundry.utils.deepClone
+function preservingDeepClone(obj) {
+  if (Array.isArray(obj)) return obj.map(preservingDeepClone);
+  if (obj && typeof obj === 'object') {
+    const out = {};
+    for (const key of Object.keys(obj)) out[key] = preservingDeepClone(obj[key]);
+    return out;
+  }
+  return obj;
+}
+
+// Builds a DialogV2 stub that "clicks" the button with the given action on render,
+// or invokes close() when action is the literal 'close'.
+function dialogClicking(action) {
+  return class FakeDialogV2 {
+    constructor(opts) { this.opts = opts; }
+    render() {
+      if (action === 'close') this.opts.close?.();
+      else this.opts.buttons.find(b => b.action === action)?.callback?.();
+      return this;
+    }
+  };
+}
 
 // --- viewScene ---
 
@@ -115,6 +140,54 @@ test('renderDialog without DialogV2 returns null', () => {
   delete globalThis.foundry;
   const result = renderDialog({ title: 'Test' });
   assert.equal(result, null);
+});
+
+// --- choiceDialog ---
+
+const CHOICES = [
+  { action: 'save', label: 'Save' },
+  { action: 'discard', label: 'Discard' },
+  { action: 'cancel', label: 'Keep Editing' }
+];
+
+for (const action of ['save', 'discard', 'cancel']) {
+  test(`choiceDialog resolves '${action}' when that button is clicked`, async () => {
+    globalThis.foundry = {
+      applications: { api: { DialogV2: dialogClicking(action) } },
+      utils: { deepClone: preservingDeepClone }
+    };
+    const result = await choiceDialog({ title: 'T', content: '<p>C</p>', choices: CHOICES, defaultAction: 'save' });
+    assert.equal(result, action);
+    delete globalThis.foundry;
+  });
+}
+
+test('choiceDialog resolves \'cancel\' when the dialog is closed', async () => {
+  globalThis.foundry = {
+    applications: { api: { DialogV2: dialogClicking('close') } },
+    utils: { deepClone: preservingDeepClone }
+  };
+  const result = await choiceDialog({ title: 'T', content: '<p>C</p>', choices: CHOICES });
+  assert.equal(result, 'cancel');
+  delete globalThis.foundry;
+});
+
+test('choiceDialog resolves \'cancel\' when DialogV2 is unavailable', async () => {
+  delete globalThis.foundry;
+  const result = await choiceDialog({ title: 'T', content: '<p>C</p>', choices: CHOICES });
+  assert.equal(result, 'cancel');
+});
+
+test('choiceDialog marks the defaultAction button as default', async () => {
+  let captured = null;
+  globalThis.foundry = {
+    applications: { api: { DialogV2: class { constructor(opts) { this.opts = opts; captured = opts; } render() { this.opts.close?.(); return this; } } } },
+    utils: { deepClone: preservingDeepClone }
+  };
+  await choiceDialog({ title: 'T', content: '<p>C</p>', choices: CHOICES, defaultAction: 'discard' });
+  const defaults = captured.buttons.filter(b => b.default).map(b => b.action);
+  assert.deepEqual(defaults, ['discard']);
+  delete globalThis.foundry;
 });
 
 // --- notifyInfo ---
