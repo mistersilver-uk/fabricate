@@ -91,7 +91,7 @@
       },
       "ExperimentalFeatures": {
         "Name": "Experimental Features",
-        "Hint": "Enable experimental Fabricate features for this world. Disabled by default."
+        "Hint": "Reserved for future experimental Fabricate features in this world. No current features are gated by this switch. Disabled by default."
       }
     },
     "Search": {

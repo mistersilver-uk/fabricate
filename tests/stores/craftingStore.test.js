@@ -6,6 +6,12 @@ import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
 
+const REMOVED_MODULE_SETTING_KEYS = new Set([
+  'enabled',
+  'showSimpleRecipesOnly',
+  'autoCraft'
+]);
+
 // ---------------------------------------------------------------------------
 // Mock service helpers
 // ---------------------------------------------------------------------------
@@ -71,6 +77,7 @@ function emptyEvaluation() {
  * Override individual properties via the `overrides` map.
  */
 function createMockServices(overrides = {}) {
+  const settingReads = [];
   const store = {
     [/* LAST_CRAFTING_ACTOR */ 'lastCraftingActor']: '',
     [/* LAST_COMPONENT_SOURCES */ 'lastComponentSources']: [],
@@ -127,7 +134,10 @@ function createMockServices(overrides = {}) {
     getCraftingRunManager: () => defaultRunManager,
     getSalvageRunManager: () => defaultSalvageRunManager,
     getCraftingEngine: () => defaultEngine,
-    getSetting: (key) => store[key] ?? null,
+    getSetting: (key) => {
+      settingReads.push(key);
+      return store[key] ?? null;
+    },
     setSetting: async (key, value) => { store[key] = value; },
     getAvailableActors: () => [actorA, actorB],
     getOwnedActors: () => [actorA, actorB],
@@ -143,7 +153,15 @@ function createMockServices(overrides = {}) {
     getChatSpeaker: () => ({})
   };
 
-  return { ...base, ...overrides, _store: store, _actors: { actorA, actorB }, _recipes: { recipe1, recipe2 } };
+  return { ...base, ...overrides, _store: store, _settingReads: settingReads, _actors: { actorA, actorB }, _recipes: { recipe1, recipe2 } };
+}
+
+function assertNoRemovedModuleSettingReads(services) {
+  assert.deepEqual(
+    services._settingReads?.filter(key => REMOVED_MODULE_SETTING_KEYS.has(key)) ?? [],
+    [],
+    'crafting store should not read removed module setting keys'
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -672,6 +690,7 @@ describe('createCraftingStore', () => {
       const store = createCraftingStore(services);
       await store.craft('r1');
       assert.ok(confirmCalled);
+      assertNoRemovedModuleSettingReads(services);
     });
 
     it('skips confirmDialog when skipConfirm is true', async () => {
@@ -698,6 +717,7 @@ describe('createCraftingStore', () => {
       const store = createCraftingStore(services);
       await store.craft('r1');
       assert.ok(confirmCalled);
+      assertNoRemovedModuleSettingReads(services);
     });
 
     it('delegates to craftingEngine.craft with correct arguments', async () => {
@@ -886,6 +906,127 @@ describe('createCraftingStore', () => {
       assert.equal(salvageArgs[0], 'Actor.a1');
       assert.equal(salvageArgs[1], 'sys-1');
       assert.equal(salvageArgs[2], 'comp-1');
+    });
+
+    it('calls confirmDialog for normal salvage actions', async () => {
+      const actor = {
+        id: 'a1',
+        uuid: 'Actor.a1',
+        name: 'Alice',
+        isOwner: true,
+        items: [],
+        [Symbol.iterator]: function* iter() {}
+      };
+      let confirmCalled = false;
+      let salvageCalled = false;
+      const services = createMockServices({
+        getAvailableActors: () => [actor],
+        getOwnedActors: () => [actor],
+        getGameUser: () => ({ id: 'u1', character: actor }),
+        confirmDialog: async () => {
+          confirmCalled = true;
+          return true;
+        },
+        getCraftingSystemManager: () => ({
+          getSystems: () => [],
+          getSystem: () => ({
+            id: 'sys-1',
+            components: [{ id: 'comp-1', name: 'Broken Sword', salvage: { enabled: true, ingredientQuantity: 1 } }]
+          })
+        }),
+        getCraftingEngine: () => ({
+          salvage: async () => {
+            salvageCalled = true;
+            return { success: true, message: 'salvaged' };
+          }
+        })
+      });
+
+      const store = createCraftingStore(services);
+      await store.salvage('sys-1', 'comp-1');
+
+      assert.ok(confirmCalled);
+      assert.ok(salvageCalled);
+      assertNoRemovedModuleSettingReads(services);
+    });
+
+    it('does not salvage when the normal salvage confirmation is declined', async () => {
+      const actor = {
+        id: 'a1',
+        uuid: 'Actor.a1',
+        name: 'Alice',
+        isOwner: true,
+        items: [],
+        [Symbol.iterator]: function* iter() {}
+      };
+      let salvageCalled = false;
+      const services = createMockServices({
+        getAvailableActors: () => [actor],
+        getOwnedActors: () => [actor],
+        getGameUser: () => ({ id: 'u1', character: actor }),
+        confirmDialog: async () => false,
+        getCraftingSystemManager: () => ({
+          getSystems: () => [],
+          getSystem: () => ({
+            id: 'sys-1',
+            components: [{ id: 'comp-1', name: 'Broken Sword', salvage: { enabled: true, ingredientQuantity: 1 } }]
+          })
+        }),
+        getCraftingEngine: () => ({
+          salvage: async () => {
+            salvageCalled = true;
+            return { success: true, message: 'salvaged' };
+          }
+        })
+      });
+
+      const store = createCraftingStore(services);
+      await store.salvage('sys-1', 'comp-1');
+
+      assert.equal(salvageCalled, false);
+      assertNoRemovedModuleSettingReads(services);
+    });
+
+    it('skips confirmDialog when salvage skipConfirm is true', async () => {
+      const actor = {
+        id: 'a1',
+        uuid: 'Actor.a1',
+        name: 'Alice',
+        isOwner: true,
+        items: [],
+        [Symbol.iterator]: function* iter() {}
+      };
+      let confirmCalled = false;
+      let salvageCalled = false;
+      const services = createMockServices({
+        getAvailableActors: () => [actor],
+        getOwnedActors: () => [actor],
+        getGameUser: () => ({ id: 'u1', character: actor }),
+        confirmDialog: async () => {
+          confirmCalled = true;
+          return true;
+        },
+        getCraftingSystemManager: () => ({
+          getSystems: () => [],
+          getSystem: () => ({
+            id: 'sys-1',
+            components: [{ id: 'comp-1', name: 'Broken Sword', salvage: { enabled: true, ingredientQuantity: 1 } }]
+          })
+        }),
+        getCraftingEngine: () => ({
+          salvage: async () => {
+            salvageCalled = true;
+            return { success: true, message: 'salvaged' };
+          }
+        })
+      });
+
+      const store = createCraftingStore(services);
+      await store.salvage('sys-1', 'comp-1', { skipConfirm: true });
+
+      assert.equal(confirmCalled, false);
+      assert.ok(salvageCalled);
+      assertNoRemovedModuleSettingReads(services);
     });
 
     it('cancelSalvageRun delegates to salvageRunManager.cancelRun', async () => {

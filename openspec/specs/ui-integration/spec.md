@@ -763,7 +763,8 @@ World settings:
 - `fabricate.craftingSystems`
 - `fabricate.recipes`
 - `fabricate.gatheringEnvironments`
-- `fabricate.gatheringConditions`
+- `fabricate.gatheringConfig`
+- `fabricate.migrationVersion`
 - `fabricate.theme`
 - `fabricate.experimentalFeatures`
 
@@ -774,7 +775,9 @@ Client settings:
 - `fabricate.lastComponentSources`
 - `fabricate.lastManagedCraftingSystem`
 - `fabricate.lastAlchemySystem`
-- optional progressive order preferences
+- `fabricate.favouriteRecipes`
+- `fabricate.recentlyCrafted`
+- `fabricate.progressiveResultOrder`
 
 Flags:
 

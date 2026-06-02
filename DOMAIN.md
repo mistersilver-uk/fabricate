@@ -82,9 +82,11 @@ Module Configuration
 |- World settings
 |  |- recipes
 |  |- craftingSystems
-|  |- enabled
+|  |- gatheringConfig
 |  |- migrationVersion
-|  `- gatheringEnvironments
+|  |- gatheringEnvironments
+|  |- theme
+|  `- experimentalFeatures
 `- Client settings
    |- lastCraftingActor
    |- lastComponentSources

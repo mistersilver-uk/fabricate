@@ -105,13 +105,17 @@ Fabricate stores data in Foundry's settings and flags:
 | World setting | `fabricate.craftingSystems` | All crafting system configurations |
 | World setting | `fabricate.recipes` | All recipes |
 | World setting | `fabricate.gatheringEnvironments` | Gathering environment and task configurations |
+| World setting | `fabricate.gatheringConfig` | Gathering library, rules, condition vocabularies, and per-system gathering configuration |
+| World setting | `fabricate.migrationVersion` | Last completed Fabricate data migration version |
 | World setting | `fabricate.theme` | Active product UI theme (`Fabricate` by default; other presets are `Mythwright`, `Ironblood Forge`, `Hearth & Herb`, `Starglass Arcana`, and the fixed Foundry-inspired `Foundry Native` palette) |
-| World setting | `fabricate.experimentalFeatures` | Future experimental feature switch, disabled by default |
+| World setting | `fabricate.experimentalFeatures` | Reserved future experimental feature switch, disabled by default |
 | Client setting | `fabricate.lastCraftingActor` | Last selected crafting actor UUID |
 | Client setting | `fabricate.lastGatheringActor` | Last selected gathering actor ID |
 | Client setting | `fabricate.lastComponentSources` | Last selected source actor UUIDs |
 | Client setting | `fabricate.lastManagedCraftingSystem` | Last viewed system in GM admin |
 | Client setting | `fabricate.lastAlchemySystem` | Last selected alchemy system in the Alchemy tab |
+| Client setting | `fabricate.favouriteRecipes` | Favourite recipe IDs for the current client |
+| Client setting | `fabricate.recentlyCrafted` | Recently crafted recipe entries for the current client |
 | Client setting | `fabricate.progressiveResultOrder` | Per-recipe player reorder preferences for progressive mode results (Object, default `{}`) |
 | Actor flag | `fabricate.craftingRuns.active` | In-progress crafting runs |
 | Actor flag | `fabricate.craftingRuns.history` | Completed crafting runs |

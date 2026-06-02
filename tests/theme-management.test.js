@@ -25,6 +25,12 @@ const {
   normalizeFabricateTheme
 } = await import('../src/ui/theme.js');
 
+const REMOVED_MODULE_SETTING_KEYS = [
+  'enabled',
+  'showSimpleRecipesOnly',
+  'autoCraft'
+];
+
 describe('Fabricate theme management', () => {
   beforeEach(setupDOM);
   afterEach(teardownDOM);
@@ -36,6 +42,11 @@ describe('Fabricate theme management', () => {
     };
 
     registerFabricateSettings();
+
+    const registeredKeys = registrations.map(entry => entry.key);
+    for (const removedKey of REMOVED_MODULE_SETTING_KEYS) {
+      assert.ok(!registeredKeys.includes(removedKey), `${removedKey} should not be registered`);
+    }
 
     const configurableKeys = registrations
       .filter(entry => entry.definition.config === true)
