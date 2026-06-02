@@ -330,6 +330,7 @@ function createStore(calls = [], options = {}) {
     description: 'Herbs and roots under old trees.',
     enabled: true,
     selectionMode: 'targeted',
+    img: 'forest-custom.webp',
     sceneUuid: 'Scene.forest',
     region: 'north',
     biomes: ['forest'],
@@ -587,6 +588,7 @@ function createStore(calls = [], options = {}) {
                   dropRate: 80,
                   enabled: true,
                   conditionModifiers: {
+                    biome: [{ id: 'forest-penalty', conditionId: 'forest', value: -10 }],
                     timeOfDay: [
                       { id: 'night-bonus', conditionId: 'night', value: 20 },
                       { id: 'day-neutral', conditionId: 'day', value: 0 }
@@ -2511,7 +2513,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.equal(stepQuantityInput.value, '1');
     const modifierPills = populatedDropRow.querySelectorAll('.manager-drop-modifier-pill');
-    assert.equal(modifierPills.length, 3);
+    assert.equal(modifierPills.length, 4);
+    assert.ok(Array.from(modifierPills).some(pill => pill.classList.contains('is-negative') && pill.textContent.includes('Moon Forest') && pill.textContent.includes('-10%')), 'biome drop modifiers should render in the row');
     assert.ok(Array.from(modifierPills).some(pill => pill.classList.contains('is-positive') && pill.textContent.includes('Deep Night') && pill.textContent.includes('+20%')));
     assert.ok(Array.from(modifierPills).some(pill => pill.classList.contains('is-negative') && pill.textContent.includes('Clear Sky') && pill.textContent.includes('-15%')));
     assert.ok(Array.from(modifierPills).some(pill => pill.classList.contains('is-neutral') && pill.textContent.includes('High Day') && pill.textContent.includes('+0%')));
@@ -3290,7 +3293,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.deepEqual(importedDrops, [{ type: 'Item', uuid: 'Item.imported' }], 'non-managed drops should keep using the import flow');
   });
 
-  it('summarizes crowded gathering task drop modifiers at five or more labels', async () => {
+  it('renders all gathering task drop modifiers and scrolls the cell when crowded', async () => {
     const fourModifiers = Array.from({ length: 4 }, (_, index) => ({
       id: `four-${index}`,
       conditionId: `four-${index}`,
@@ -3345,9 +3348,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     const fiveModifierRow = target.querySelector('[data-gathering-task-drop-id="drop-five-modifiers"]');
     assert.equal(fourModifierRow.querySelectorAll('.manager-drop-modifier-pill').length, 4);
     assert.equal(fourModifierRow.textContent.includes('See selected rule for modifiers'), false);
-    assert.equal(fiveModifierRow.querySelectorAll('.manager-drop-modifier-pill').length, 0);
-    assert.ok(fiveModifierRow.querySelector('.manager-drop-modifier-overflow'));
-    assert.ok(fiveModifierRow.textContent.includes('See selected rule for modifiers'));
+    // All modifiers render and scroll within the cell instead of being hidden behind a hint.
+    assert.equal(fiveModifierRow.querySelectorAll('.manager-drop-modifier-pill').length, 5);
+    assert.equal(fiveModifierRow.querySelector('.manager-drop-modifier-overflow'), null);
+    assert.equal(fiveModifierRow.textContent.includes('See selected rule for modifiers'), false);
   });
 
   it('colours gathering task drop chance sliders by rarity threshold', async () => {
@@ -4396,6 +4400,58 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.querySelector('.manager-environment-inspector'), 'composition editor should render its own inspector rail');
     assert.ok(target.querySelector('[data-environment-summary-inspector]'), 'inspector should default to the environment summary with no selection');
     assert.ok(calls.some(call => call[0] === 'createEnvironmentDraft'));
+  });
+
+  it('shows the linked scene thumbnail in place of the environment image and locks the editor identity', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Environments').click();
+    await tick();
+    flushSync();
+
+    // Display precedence: the linked scene thumbnail replaces the environment's own image,
+    // even though the environment stores its own `img` ('forest-custom.webp').
+    const forestRow = target.querySelector('[data-environment-id="env-forest"]')
+      || Array.from(target.querySelectorAll('.manager-environment-row')).find(row => row.textContent.includes('Moonlit Forest'));
+    assert.equal(forestRow.querySelector('.manager-environment-thumb').getAttribute('src'), 'forest-medium.webp', 'a linked scene image should replace the environment image in browser rows');
+
+    // Open the editor on the forest draft (scene linked).
+    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environment-edit');
+
+    // Identity image is a locked, muted scene thumbnail — not an editable picker.
+    let picker = target.querySelector('[data-overview-section="identity"] .manager-task-image-picker');
+    assert.ok(picker.classList.contains('is-scene-linked'), 'identity image should be scene-locked while a scene is linked');
+    assert.equal(picker.tagName, 'SPAN', 'locked identity image should not be an editable button');
+    assert.ok(picker.querySelector('.fa-lock'), 'locked identity image should show a lock icon');
+    assert.equal(target.querySelector('[data-overview-section="identity"] .fa-pen'), null, 'locked identity image should not show the edit affordance');
+    assert.equal(picker.querySelector('img').getAttribute('src'), 'forest-medium.webp', 'locked identity image should show the scene thumbnail');
+
+    // Unlink the scene → the identity image returns to the editable stored value.
+    target.querySelector('[data-environment-summary-scene] .manager-icon-button.is-danger').click();
+    await tick();
+    flushSync();
+
+    picker = target.querySelector('[data-overview-section="identity"] .manager-task-image-picker');
+    assert.equal(picker.tagName, 'BUTTON', 'identity image should be editable again once the scene is unlinked');
+    assert.equal(picker.classList.contains('is-scene-linked'), false);
+    assert.ok(picker.querySelector('.fa-pen'), 'unlocked identity image should show the edit affordance');
+    assert.equal(picker.querySelector('img').getAttribute('src'), 'forest-custom.webp', 'unlinking should restore the stored environment image');
   });
 
   it('protects dirty environment edit drafts when leaving via the back button', async () => {

@@ -79,7 +79,6 @@
   ));
   const componentShowingStart = $derived(filteredComponentCards.length === 0 ? 0 : componentPageIndex * componentPageSize + 1);
   const componentShowingEnd = $derived(Math.min(filteredComponentCards.length, (componentPageIndex + 1) * componentPageSize));
-  const maxVisibleModifiers = 4;
 
   const libraryToolList = $derived(Array.isArray(libraryTools) ? libraryTools : []);
   const attachedToolIds = $derived(Array.isArray(task?.toolIds) ? task.toolIds : []);
@@ -343,36 +342,42 @@
     const modifiers = row?.conditionModifiers || {};
     const characterRefs = Array.isArray(row?.characterModifiers) ? row.characterModifiers : [];
     return [
+      ...(Array.isArray(modifiers.biome) ? modifiers.biome.map(entry => ({ ...entry, kind: 'biome' })) : []),
       ...(Array.isArray(modifiers.timeOfDay) ? modifiers.timeOfDay.map(entry => ({ ...entry, kind: 'timeOfDay' })) : []),
       ...(Array.isArray(modifiers.weather) ? modifiers.weather.map(entry => ({ ...entry, kind: 'weather' })) : []),
       ...characterRefs.map(ref => ({ ...ref, kind: 'character' }))
     ];
   }
 
-  function hasModifierOverflow(row) {
-    return modifierEntries(row).length >= maxVisibleModifiers + 1;
+  function modifierConditionOptions(kind) {
+    if (kind === 'weather') return weatherOptions;
+    if (kind === 'biome') return biomeOptions;
+    return timeOfDayOptions;
   }
 
-  function visibleModifierEntries(row) {
-    return hasModifierOverflow(row) ? [] : modifierEntries(row);
-  }
 
   function modifierLabel(entry) {
     if (entry.kind === 'character') {
       const libraryEntry = characterModifierLibraryEntry(entry.modifierId);
       return libraryEntry?.label || libraryEntry?.id || entry.modifierId || text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.UnknownModifierShort', 'Unknown');
     }
-    const options = entry.kind === 'weather' ? weatherOptions : timeOfDayOptions;
+    const options = modifierConditionOptions(entry.kind);
     return conditionLabel((options || []).find(option => conditionId(option) === entry.conditionId)) || entry.conditionId;
+  }
+
+  function modifierFallbackIcon(kind) {
+    if (kind === 'weather') return 'fas fa-cloud-sun';
+    if (kind === 'biome') return 'fas fa-mountain-sun';
+    return 'fas fa-clock';
   }
 
   function modifierIcon(entry) {
     if (entry.kind === 'character') {
       return characterModifierLibraryEntry(entry.modifierId)?.icon || 'fa-solid fa-user';
     }
-    const options = entry.kind === 'weather' ? weatherOptions : timeOfDayOptions;
+    const options = modifierConditionOptions(entry.kind);
     const option = (options || []).find(option => conditionId(option) === entry.conditionId);
-    return conditionIcon(option || { icon: entry.kind === 'weather' ? 'fas fa-cloud-sun' : 'fas fa-clock' });
+    return conditionIcon(option || { icon: modifierFallbackIcon(entry.kind) });
   }
 
   function modifierEffectiveOperator(entry) {
@@ -390,7 +395,7 @@
     if (entry && entry.kind === 'character') {
       return entry.operator === '-' ? 'is-negative' : 'is-positive';
     }
-    if (entry && (entry.kind === 'weather' || entry.kind === 'timeOfDay')) {
+    if (entry && (entry.kind === 'weather' || entry.kind === 'timeOfDay' || entry.kind === 'biome')) {
       const magnitude = Math.abs(Math.trunc(Number(entry.value || 0)));
       if (magnitude === 0) return 'is-neutral';
       return modifierEffectiveOperator(entry) === '-' ? 'is-negative' : 'is-positive';
@@ -978,10 +983,8 @@
                 </span>
                 <span role="cell" class="manager-drop-cell manager-chip-row">
                   <span class="manager-drop-modifier-list">
-                    {#if hasModifierOverflow(row)}
-                      <span class="manager-chip is-neutral manager-drop-modifier-overflow">{text('FABRICATE.Admin.Manager.Environment.Tasks.DropModifierOverflowHint', 'See selected rule for modifiers')}</span>
-                    {:else if visibleModifierEntries(row).length > 0}
-                      {#each visibleModifierEntries(row) as modifier (modifier.id)}
+                    {#if modifierEntries(row).length > 0}
+                      {#each modifierEntries(row) as modifier (modifier.id)}
                         <span class={`manager-chip manager-drop-modifier-pill ${modifierClass(modifier)}`}>
                           <i class={modifierIcon(modifier)} aria-hidden="true"></i>
                           <span>{modifierLabel(modifier)}</span>

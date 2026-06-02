@@ -27,6 +27,7 @@
     regionOptions = [],
     biomeOptions = [],
     dangerOptions = [],
+    linkedSceneImage = '',
     onPickImagePath = null,
     onUpdateEnvironment = () => {},
     onSetCompositionMode = () => {},
@@ -96,6 +97,7 @@
           {regionOptions}
           {biomeOptions}
           {dangerOptions}
+          {linkedSceneImage}
           {onPickImagePath}
           onUpdate={onUpdateEnvironment}
           {onSetCompositionMode}

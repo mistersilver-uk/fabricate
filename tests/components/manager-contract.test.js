@@ -694,7 +694,6 @@ describe('CraftingSystemManager source contract', () => {
       'manager-drop-quantity-cell',
       'manager-drop-modifier-pill',
       'manager-drop-modifier-list',
-      'manager-drop-modifier-overflow',
       'manager-drop-rate-value',
       'manager-drop-rate-percent',
       'manager-drop-rate-track',
@@ -721,7 +720,6 @@ describe('CraftingSystemManager source contract', () => {
       'DropChance',
       'ClearDropComponentHint',
       'DropQuantityColumn',
-      'DropModifierOverflowHint',
       'RewardRuleNotice'
     ]) {
       assert.ok(gatheringTaskEditSource.includes(snippet), `task editor should include ${snippet}`);
@@ -777,7 +775,6 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.Tasks.DropChancePercent, 'Drop chance percent');
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.Tasks.DropQuantityColumn, 'Count');
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.Tasks.ClearDropComponentHint, 'Right-click to clear component');
-    assert.equal(lang.FABRICATE.Admin.Manager.Environment.Tasks.DropModifierOverflowHint, 'See selected rule for modifiers');
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.Tasks.NoComponent, 'No Component');
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.Tasks.CreateOrAssign, 'Create or assign');
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.Tasks.TaskIdentity, 'Task Identity');

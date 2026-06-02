@@ -9,10 +9,13 @@
     regionOptions = [],
     biomeOptions = [],
     dangerOptions = [],
+    linkedSceneImage = '',
     onPickImagePath = null,
     onUpdate = () => {},
     onSetCompositionMode = () => {}
   } = $props();
+
+  const isSceneLinked = $derived(Boolean(String(environment?.sceneUuid || '').trim()));
 
   const DANGER_LEVELS = ['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme'];
   const DEFAULT_ENVIRONMENT_IMAGE_DIR = 'icons/environment/';
@@ -56,7 +59,7 @@
   function removeBiome(id) { onUpdate({ biomes: biomes.filter(value => value !== id) }); }
 
   async function chooseImage() {
-    if (typeof onPickImagePath !== 'function') return;
+    if (typeof onPickImagePath !== 'function' || isSceneLinked) return;
     const value = await onPickImagePath(environment?.img || DEFAULT_ENVIRONMENT_IMAGE_DIR);
     if (value) onUpdate({ img: value });
   }
@@ -90,10 +93,22 @@
         </div>
         <div class="manager-task-core-grid">
           <div class="manager-task-media-column">
-            <button type="button" class="manager-task-image-picker" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.ChooseImage', 'Choose environment image')} onclick={chooseImage} disabled={typeof onPickImagePath !== 'function'}>
-              <img src={environment.img || 'icons/svg/direction.svg'} alt="" />
-              <i class="fas fa-pen" aria-hidden="true"></i>
-            </button>
+            {#if isSceneLinked}
+              <span
+                class="manager-task-image-picker is-scene-linked"
+                data-scene-locked-image
+                title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SceneLockedImageTooltip', "This image comes from the linked scene and can't be edited. Unlink the scene to choose a custom image.")}
+                aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SceneLockedImage', 'Image provided by the linked scene')}
+              >
+                <img src={linkedSceneImage || environment.img || 'icons/svg/direction.svg'} alt="" />
+                <i class="fas fa-lock" aria-hidden="true"></i>
+              </span>
+            {:else}
+              <button type="button" class="manager-task-image-picker" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.ChooseImage', 'Choose environment image')} onclick={chooseImage} disabled={typeof onPickImagePath !== 'function'}>
+                <img src={environment.img || 'icons/svg/direction.svg'} alt="" />
+                <i class="fas fa-pen" aria-hidden="true"></i>
+              </button>
+            {/if}
             <div class="manager-task-core-status">
               <button
                 type="button"
