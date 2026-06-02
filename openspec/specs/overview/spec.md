@@ -106,6 +106,7 @@ World:
 - `fabricate.recipes`
 - `fabricate.gatheringEnvironments`
 - `fabricate.theme` for the active Fabricate UI theme preset (`Fabricate` by default, plus `Mythwright`, `Ironblood Forge`, `Hearth & Herb`, `Starglass Arcana`, and the fixed Foundry-inspired `Foundry Native` preset)
+- `fabricate.experimentalFeatures` for future experimental feature gates, disabled by default
 
 Client:
 

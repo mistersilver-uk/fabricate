@@ -93,8 +93,6 @@ function createMockServices(overrides = {}) {
     lastAlchemySystem: '',
     favouriteRecipes: [],
     recentlyCrafted: [],
-    autoCraft: true,
-    showSimpleRecipesOnly: false
   };
 
   const base = {

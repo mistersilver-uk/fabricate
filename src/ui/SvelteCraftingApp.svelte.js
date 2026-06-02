@@ -35,8 +35,6 @@ export class SvelteCraftingApp extends SvelteApplicationMixin(
       lastComponentSources: SETTING_KEYS.LAST_COMPONENT_SOURCES,
       favouriteRecipes: SETTING_KEYS.FAVOURITE_RECIPES,
       recentlyCrafted: SETTING_KEYS.RECENTLY_CRAFTED,
-      showSimpleRecipesOnly: SETTING_KEYS.SHOW_SIMPLE_RECIPES_ONLY,
-      autoCraft: SETTING_KEYS.AUTO_CRAFT,
       lastAlchemySystem: SETTING_KEYS.LAST_ALCHEMY_SYSTEM
     };
 

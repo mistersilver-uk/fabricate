@@ -44,7 +44,6 @@ function makeServices({ recipe, teaserState = null }) {
     getSetting: (key) => {
       if (key === 'lastCraftingActor') return 'actor-1';
       if (key === 'lastComponentSources') return ['actor-1'];
-      if (key === 'showSimpleRecipesOnly') return false;
       if (key === 'favouriteRecipes') return [];
       if (key === 'recentlyCrafted') return [];
       return null;

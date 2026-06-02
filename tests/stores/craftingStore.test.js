@@ -75,9 +75,7 @@ function createMockServices(overrides = {}) {
     [/* LAST_CRAFTING_ACTOR */ 'lastCraftingActor']: '',
     [/* LAST_COMPONENT_SOURCES */ 'lastComponentSources']: [],
     [/* FAVOURITE_RECIPES */ 'favouriteRecipes']: [],
-    [/* RECENTLY_CRAFTED */ 'recentlyCrafted']: [],
-    [/* AUTO_CRAFT */ 'autoCraft']: false,
-    [/* SHOW_SIMPLE_RECIPES_ONLY */ 'showSimpleRecipesOnly']: false
+    [/* RECENTLY_CRAFTED */ 'recentlyCrafted']: []
   };
 
   const actorA = makeActor('a1', 'Alice');
@@ -614,7 +612,6 @@ describe('createCraftingStore', () => {
       const services = createMockServices({
         getSetting: (key) => {
           if (key === 'recentlyCrafted') return recents;
-          if (key === 'autoCraft') return true; // skip confirm
           return null;
         },
         setSetting: async (key, value) => {
@@ -632,7 +629,6 @@ describe('createCraftingStore', () => {
       const services = createMockServices({
         getSetting: (key) => {
           if (key === 'recentlyCrafted') return recents;
-          if (key === 'autoCraft') return true;
           return null;
         },
         setSetting: async (key, value) => {
@@ -649,7 +645,6 @@ describe('createCraftingStore', () => {
       const services = createMockServices({
         getSetting: (key) => {
           if (key === 'recentlyCrafted') return recents;
-          if (key === 'autoCraft') return true;
           return null;
         },
         setSetting: async (key, value) => {
@@ -666,13 +661,9 @@ describe('createCraftingStore', () => {
   // --- craft action ---
 
   describe('craft', () => {
-    it('calls confirmDialog when autoCraft is false and skipConfirm is not set', async () => {
+    it('calls confirmDialog when skipConfirm is not set', async () => {
       let confirmCalled = false;
       const services = createMockServices({
-        getSetting: (key) => {
-          if (key === 'autoCraft') return false;
-          return null;
-        },
         confirmDialog: async () => {
           confirmCalled = true;
           return true;
@@ -686,10 +677,6 @@ describe('createCraftingStore', () => {
     it('skips confirmDialog when skipConfirm is true', async () => {
       let confirmCalled = false;
       const services = createMockServices({
-        getSetting: (key) => {
-          if (key === 'autoCraft') return false;
-          return null;
-        },
         confirmDialog: async () => {
           confirmCalled = true;
           return true;
@@ -700,13 +687,9 @@ describe('createCraftingStore', () => {
       assert.ok(!confirmCalled);
     });
 
-    it('skips confirmDialog when autoCraft setting is true', async () => {
+    it('uses confirmDialog for normal craft actions', async () => {
       let confirmCalled = false;
       const services = createMockServices({
-        getSetting: (key) => {
-          if (key === 'autoCraft') return true;
-          return null;
-        },
         confirmDialog: async () => {
           confirmCalled = true;
           return true;
@@ -714,13 +697,12 @@ describe('createCraftingStore', () => {
       });
       const store = createCraftingStore(services);
       await store.craft('r1');
-      assert.ok(!confirmCalled);
+      assert.ok(confirmCalled);
     });
 
     it('delegates to craftingEngine.craft with correct arguments', async () => {
       let craftArgs = null;
       const services = createMockServices({
-        getSetting: (key) => key === 'autoCraft' ? true : null,
         getCraftingEngine: () => ({
           craft: async (...args) => {
             craftArgs = args;
@@ -750,7 +732,6 @@ describe('createCraftingStore', () => {
     it('notifies error when confirm dialog is declined', async () => {
       let notified = false;
       const services = createMockServices({
-        getSetting: (key) => key === 'autoCraft' ? false : null,
         confirmDialog: async () => false,
         notify: { info: () => {}, warn: () => {}, error: () => { notified = true; } }
       });
@@ -766,7 +747,6 @@ describe('createCraftingStore', () => {
     it('does NOT call createChatMessage on successful craft (chat handled by CraftingEngine)', async () => {
       let chatMessageCount = 0;
       const services = createMockServices({
-        getSetting: (key) => key === 'autoCraft' ? true : null,
         createChatMessage: async () => { chatMessageCount++; return {}; }
       });
       const store = createCraftingStore(services);
@@ -883,7 +863,6 @@ describe('createCraftingStore', () => {
         getAvailableActors: () => [actor],
         getOwnedActors: () => [actor],
         getGameUser: () => ({ id: 'u1', character: actor }),
-        getSetting: (key) => key === 'autoCraft' ? true : null,
         getCraftingSystemManager: () => ({
           getSystems: () => [],
           getSystem: () => ({

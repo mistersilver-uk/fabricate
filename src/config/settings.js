@@ -11,9 +11,6 @@ export const SETTING_KEYS = Object.freeze({
   CRAFTING_SYSTEMS: 'craftingSystems',
   GATHERING_ENVIRONMENTS: 'gatheringEnvironments',
   GATHERING_CONFIG: 'gatheringConfig',
-  ENABLED: 'enabled',
-  SHOW_SIMPLE_RECIPES_ONLY: 'showSimpleRecipesOnly',
-  AUTO_CRAFT: 'autoCraft',
   LAST_CRAFTING_ACTOR: 'lastCraftingActor',
   LAST_GATHERING_ACTOR: 'lastGatheringActor',
   LAST_COMPONENT_SOURCES: 'lastComponentSources',
@@ -23,7 +20,8 @@ export const SETTING_KEYS = Object.freeze({
   FAVOURITE_RECIPES: 'favouriteRecipes',
   RECENTLY_CRAFTED: 'recentlyCrafted',
   LAST_ALCHEMY_SYSTEM: 'lastAlchemySystem',
-  THEME: 'theme'
+  THEME: 'theme',
+  EXPERIMENTAL_FEATURES: 'experimentalFeatures'
 });
 
 const BASE_DEFINITIONS = Object.freeze({
@@ -55,30 +53,6 @@ const BASE_DEFINITIONS = Object.freeze({
     type: Object,
     default: {}
   },
-  [SETTING_KEYS.ENABLED]: {
-    name: 'FABRICATE.Settings.Enabled.Name',
-    hint: 'FABRICATE.Settings.Enabled.Hint',
-    scope: 'world',
-    config: true,
-    type: Boolean,
-    default: true
-  },
-  [SETTING_KEYS.SHOW_SIMPLE_RECIPES_ONLY]: {
-    name: 'FABRICATE.Settings.SimpleOnly.Name',
-    hint: 'FABRICATE.Settings.SimpleOnly.Hint',
-    scope: 'client',
-    config: true,
-    type: Boolean,
-    default: false
-  },
-  [SETTING_KEYS.AUTO_CRAFT]: {
-    name: 'FABRICATE.Settings.AutoCraft.Name',
-    hint: 'FABRICATE.Settings.AutoCraft.Hint',
-    scope: 'client',
-    config: true,
-    type: Boolean,
-    default: false
-  },
   [SETTING_KEYS.THEME]: {
     name: 'FABRICATE.Settings.Theme.Name',
     hint: 'FABRICATE.Settings.Theme.Hint',
@@ -88,6 +62,14 @@ const BASE_DEFINITIONS = Object.freeze({
     choices: FABRICATE_THEME_CHOICES,
     default: DEFAULT_FABRICATE_THEME,
     onChange: applyFabricateTheme
+  },
+  [SETTING_KEYS.EXPERIMENTAL_FEATURES]: {
+    name: 'FABRICATE.Settings.ExperimentalFeatures.Name',
+    hint: 'FABRICATE.Settings.ExperimentalFeatures.Hint',
+    scope: 'world',
+    config: true,
+    type: Boolean,
+    default: false
   },
   [SETTING_KEYS.LAST_CRAFTING_ACTOR]: {
     name: 'Last Crafting Actor',

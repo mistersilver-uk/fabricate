@@ -64,8 +64,6 @@ function createMockServices(overrides = {}) {
     lastComponentSources: ['a1'],
     favouriteRecipes: [],
     recentlyCrafted: [],
-    autoCraft: true,
-    showSimpleRecipesOnly: false
   };
 
   const defaultRecipeManager = {

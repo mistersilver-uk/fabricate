@@ -77,18 +77,6 @@
       }
     },
     "Settings": {
-      "Enabled": {
-        "Name": "Enable Crafting System",
-        "Hint": "Enable or disable the Fabricate crafting system globally."
-      },
-      "SimpleOnly": {
-        "Name": "Show Simple Recipes Only",
-        "Hint": "Hide advanced recipe features and show only simple ingredient-to-result recipes."
-      },
-      "AutoCraft": {
-        "Name": "Auto-Craft",
-        "Hint": "Automatically craft items without showing a confirmation dialog when you have all required materials."
-      },
       "Theme": {
         "Name": "Fabricate Theme",
         "Hint": "Choose the colour theme for Fabricate's module UI.",
@@ -100,6 +88,10 @@
           "StarglassArcana": "Starglass Arcana",
           "FoundryNative": "Foundry Native"
         }
+      },
+      "ExperimentalFeatures": {
+        "Name": "Experimental Features",
+        "Hint": "Enable experimental Fabricate features for this world. Disabled by default."
       }
     },
     "Search": {

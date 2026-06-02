@@ -80,9 +80,7 @@ function createMockServices({ alchemySystem, simpleSystem, activeRuns = [], hist
     lastCraftingActor: '',
     lastComponentSources: ['a1'],
     favouriteRecipes: [],
-    recentlyCrafted: [],
-    autoCraft: true,
-    showSimpleRecipesOnly: false
+    recentlyCrafted: []
   };
 
   const alchemyRecipe = alchemySystem ? makeRecipe('alchemy-recipe', alchemySystem.id) : null;
