@@ -67,32 +67,44 @@
   .fabricate-app-nav {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    flex: 0 0 220px;
-    padding: var(--fab-space-3, 12px);
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 84px;
+    padding: 8px;
     border-right: 1px solid var(--fab-border);
     background: var(--fab-surface-soft);
     overflow-y: auto;
   }
 
   .fabricate-app-nav-item {
+    box-sizing: border-box;
+    flex: 0 0 auto;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    width: 100%;
-    font-size: 14px;
-    text-align: left;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px;
+    width: 64px;
+    height: 64px;
+    text-align: center;
     border: 1px solid transparent;
-    border-radius: 8px;
+    border-radius: 10px;
     background: transparent;
     color: var(--fab-text-muted);
     cursor: pointer;
   }
 
   .fabricate-app-nav-item i {
-    width: 18px;
-    text-align: center;
+    font-size: 20px;
+    line-height: 1;
+  }
+
+  .fabricate-app-nav-label {
+    max-width: 100%;
+    font-size: 11px;
+    line-height: 1.1;
+    white-space: nowrap;
   }
 
   .fabricate-app-nav-item:hover {
