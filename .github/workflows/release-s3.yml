@@ -66,6 +66,9 @@ jobs:
       - run: npm ci
 
       - name: Configure AWS credentials via OIDC
+        # Skipped on dry-run: the script neither imports the AWS SDK nor calls
+        # S3 when --dry-run is set, so a dry-run must not require OIDC/role setup.
+        if: ${{ !inputs.dry_run }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
