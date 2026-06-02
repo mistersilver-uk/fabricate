@@ -37,6 +37,14 @@ describe('Selected gathering task — drops summary lives in the inspector', () 
     );
   });
 
+  it('only shows the region/biome detail label when the value is user-defined (not "Any")', () => {
+    // The trailing "Region"/"Biome" label is guarded so "Any region"/"Any biome" is not shown
+    // redundantly as "Any region Region".
+    assert.ok(rootSource.includes('{#if recordRegions(selectedGatheringTask).length > 0}'), 'task region label should be conditional on a user-defined region');
+    assert.ok(rootSource.includes('{#if recordRegions(selectedGatheringHazard).length > 0}'), 'hazard region label should be conditional on a user-defined region');
+    assert.ok(/data-gathering-task-fact="biomes"[\s\S]*?\{#if Array\.isArray\(selectedGatheringTask\.biomes\) && selectedGatheringTask\.biomes\.length > 0\}/.test(rootSource), 'task biome label should be conditional on user-defined biomes');
+  });
+
   it('reads drop labels/images from existing task helpers and environment usage from enabledTaskIds', () => {
     assert.ok(rootSource.includes('gatheringDropImage(drop)'), 'inspector should reuse gatheringDropImage for the drop thumb');
     assert.ok(rootSource.includes('gatheringDropName(drop)'), 'inspector should reuse gatheringDropName for the drop label');

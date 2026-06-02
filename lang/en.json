@@ -1079,6 +1079,8 @@
             "Selected": "Selected gathering hazard",
             "Details": "Hazard details",
             "ActiveEnvironments": "Active environments",
+            "UsedInEnvironmentsCard": "Used in environments",
+            "NotUsedInEnvironments": "Not used in any environments yet.",
             "EditTitle": "Edit gathering hazard",
             "EditSubtitle": "Edit identity, availability, danger, and modifiers for the selected hazard.",
             "EditBreadcrumb": "Edit gathering hazard",

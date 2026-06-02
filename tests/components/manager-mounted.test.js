@@ -2303,6 +2303,12 @@ describe('CraftingSystemManager mounted behavior', () => {
       'drops summary should show the nightshade drop name + chance'
     );
     assert.equal(target.querySelector('[data-gathering-task-fact="environments"] strong').textContent.trim(), '1');
+    // A user-defined region/biome keeps its contextual label inline (e.g. "Northlands Region").
+    const taskRegionFact = target.querySelector('[data-gathering-task-fact="region"]');
+    assert.ok(taskRegionFact.querySelector('.manager-fact-label'), 'a user-defined region should keep its contextual label');
+    assert.match(taskRegionFact.textContent.replace(/\s+/g, ' ').trim(), /Northlands\s+Region/);
+    const taskBiomeFact = target.querySelector('[data-gathering-task-fact="biomes"]');
+    assert.ok(taskBiomeFact.querySelector('.manager-fact-label'), 'a user-defined biome count should keep its contextual label');
 
     const taskSearch = target.querySelector('[data-gathering-tasks-browser] input[type="search"]');
     taskSearch.value = 'crystal';
