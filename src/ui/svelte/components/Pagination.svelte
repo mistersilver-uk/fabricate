@@ -14,7 +14,13 @@
   const totalPages = $derived(Math.max(1, Math.ceil(totalCount / Math.max(1, pageSize))));
   const firstShown = $derived(totalCount === 0 ? 0 : pageIndex * pageSize + 1);
   const lastShown = $derived(Math.min((pageIndex + 1) * pageSize, totalCount));
-  const showPagination = $derived(totalCount > pageSize);
+  // Keep the footer (and its per-page selector) visible whenever a page-size choice is
+  // meaningful — i.e. there are more items than the smallest available option. Otherwise
+  // picking a size that fits everything on one page would hide the only control to change
+  // it back. The prev/next nav still only appears when there is more than one page.
+  const minPageSize = $derived(pageSizeOptions.length ? Math.min(pageSize, ...pageSizeOptions) : pageSize);
+  const showPagination = $derived(totalCount > minPageSize);
+  const showNav = $derived(totalPages > 1);
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -40,33 +46,35 @@
         .replace('{last}', lastShown)
         .replace('{total}', totalCount)}
     </span>
-    <nav class="manager-pagination-nav" aria-label={text('FABRICATE.Admin.Manager.Pagination.Navigation', 'Page navigation')}>
-      <button
-        type="button"
-        class="manager-icon-button"
-        data-pagination-prev
-        aria-label={text('FABRICATE.Admin.Manager.Pagination.Previous', 'Previous page')}
-        disabled={pageIndex === 0}
-        onclick={() => goToPage(pageIndex - 1)}
-      >
-        <i class="fas fa-chevron-left" aria-hidden="true"></i>
-      </button>
-      <span class="manager-pagination-page" data-pagination-page>
-        {text('FABRICATE.Admin.Manager.Pagination.PageOf', 'Page {page} of {total}')
-          .replace('{page}', pageIndex + 1)
-          .replace('{total}', totalPages)}
-      </span>
-      <button
-        type="button"
-        class="manager-icon-button"
-        data-pagination-next
-        aria-label={text('FABRICATE.Admin.Manager.Pagination.Next', 'Next page')}
-        disabled={pageIndex >= totalPages - 1}
-        onclick={() => goToPage(pageIndex + 1)}
-      >
-        <i class="fas fa-chevron-right" aria-hidden="true"></i>
-      </button>
-    </nav>
+    {#if showNav}
+      <nav class="manager-pagination-nav" aria-label={text('FABRICATE.Admin.Manager.Pagination.Navigation', 'Page navigation')}>
+        <button
+          type="button"
+          class="manager-icon-button"
+          data-pagination-prev
+          aria-label={text('FABRICATE.Admin.Manager.Pagination.Previous', 'Previous page')}
+          disabled={pageIndex === 0}
+          onclick={() => goToPage(pageIndex - 1)}
+        >
+          <i class="fas fa-chevron-left" aria-hidden="true"></i>
+        </button>
+        <span class="manager-pagination-page" data-pagination-page>
+          {text('FABRICATE.Admin.Manager.Pagination.PageOf', 'Page {page} of {total}')
+            .replace('{page}', pageIndex + 1)
+            .replace('{total}', totalPages)}
+        </span>
+        <button
+          type="button"
+          class="manager-icon-button"
+          data-pagination-next
+          aria-label={text('FABRICATE.Admin.Manager.Pagination.Next', 'Next page')}
+          disabled={pageIndex >= totalPages - 1}
+          onclick={() => goToPage(pageIndex + 1)}
+        >
+          <i class="fas fa-chevron-right" aria-hidden="true"></i>
+        </button>
+      </nav>
+    {/if}
     <label class="manager-pagination-size">
       <span>{text('FABRICATE.Admin.Manager.Pagination.PerPage', 'Per page')}</span>
       <select

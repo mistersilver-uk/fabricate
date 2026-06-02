@@ -3339,6 +3339,56 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.deepEqual(importedDrops, [{ type: 'Item', uuid: 'Item.imported' }], 'non-managed drops should keep using the import flow');
   });
 
+  it('keeps the component browser per-page selector after a page size fits everything on one page', async () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], { extendedComponentCards: true }),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Tasks').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]').click();
+    await tick();
+    flushSync();
+
+    const footer = target.querySelector('.manager-task-component-browser-footer');
+    const sizeSelect = () => footer.querySelector('[data-pagination-size]');
+    assert.equal(target.querySelectorAll('[data-gathering-component-card]').length, 6, 'component browser should default to six cards per page');
+    assert.ok(sizeSelect(), 'per-page selector should render while multiple pages exist');
+    assert.ok(footer.querySelector('[data-pagination-next]'), 'next-page control should render while multiple pages exist');
+
+    // Selecting 9 fits all seven components on a single page. The per-page selector must
+    // survive so the user can still switch back — the prev/next nav is the only part that
+    // should disappear once there is a single page.
+    const select = sizeSelect();
+    select.value = '9';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(target.querySelectorAll('[data-gathering-component-card]').length, 8, 'choosing nine per page should show every component on one page');
+    assert.ok(sizeSelect(), 'per-page selector must remain visible when the chosen size fits everything on one page');
+    assert.equal(sizeSelect().value, '9', 'per-page selector should reflect the chosen page size');
+    assert.equal(footer.querySelector('[data-pagination-next]'), null, 'prev/next nav should hide when there is only one page');
+
+    // Recoverability: the surviving selector still works to reduce the page size again.
+    const restore = sizeSelect();
+    restore.value = '6';
+    restore.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(target.querySelectorAll('[data-gathering-component-card]').length, 6, 'the per-page selector should switch back to six per page');
+  });
+
   it('caps gathering task drop modifiers at four labels and redirects to the selected rule beyond', async () => {
     const fourModifiers = Array.from({ length: 4 }, (_, index) => ({
       id: `four-${index}`,
