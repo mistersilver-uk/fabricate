@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-const { rewriteModuleJson, getRequiredFiles, validateDist } = await import('../scripts/release.js');
+const { rewriteModuleJson, getRequiredFiles, validateDist, getFlag, parseReleaseVersionOptions } = await import('../scripts/release.js');
 
 // ───────────────────────────────────────────────────────────────────────────
 // rewriteModuleJson() tests
@@ -148,6 +148,36 @@ test('rewriteModuleJson handles missing optional fields gracefully', () => {
   assert.deepEqual(result.languages, []);
   assert.deepEqual(result.packs, []);
   assert.equal(result.id, 'fabricate');
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// release version option tests
+// ───────────────────────────────────────────────────────────────────────────
+
+test('getFlag returns a flag value and ignores following flags', () => {
+  assert.equal(getFlag(['--dist-version', '0.2.0-rc.1'], '--dist-version'), '0.2.0-rc.1');
+  assert.equal(getFlag(['--dist-version', '--no-zip'], '--dist-version'), null);
+});
+
+test('parseReleaseVersionOptions preserves mutating source version intent', () => {
+  const result = parseReleaseVersionOptions(['--version', '0.2.0-rc.1']);
+  assert.equal(result.sourceVersion, '0.2.0-rc.1');
+  assert.equal(result.distVersion, null);
+  assert.equal(result.releaseVersion, '0.2.0-rc.1');
+});
+
+test('parseReleaseVersionOptions supports dist-only version intent', () => {
+  const result = parseReleaseVersionOptions(['--dist-version', '0.2.0-rc.1']);
+  assert.equal(result.sourceVersion, null);
+  assert.equal(result.distVersion, '0.2.0-rc.1');
+  assert.equal(result.releaseVersion, '0.2.0-rc.1');
+});
+
+test('parseReleaseVersionOptions rejects simultaneous source and dist version flags', () => {
+  assert.throws(
+    () => parseReleaseVersionOptions(['--version', '0.2.0-rc.1', '--dist-version', '0.2.0-rc.1']),
+    /mutually exclusive/
+  );
 });
 
 // ───────────────────────────────────────────────────────────────────────────

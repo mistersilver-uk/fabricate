@@ -187,24 +187,14 @@ async function main() {
   console.log(`release-s3: bucket=${bucket || '(unset)'} baseUrl=${baseUrl || '(unset)'}`);
   console.log(`release-s3: targets=channel + ${testerGroups.length} tester group(s)\n`);
 
-  // 2. Build dist/ at the requested version (reuse the canonical build path).
-  //    scripts/release.js --version writes the version into the tracked root
-  //    module.json (semantic-release / promote-release rely on that), but the
-  //    built dist/ is self-contained once the build finishes. Save and restore
-  //    the root manifest so this command never leaves a tracked file dirty —
-  //    important for local dry-runs, harmless for CI's ephemeral checkout.
-  const rootManifestPath = join(ROOT, 'module.json');
-  const originalRootManifest = await readFile(rootManifestPath, 'utf8');
+  // 2. Build dist/ at the requested version (reuse the canonical build path)
+  //    without touching the tracked root module.json.
   console.log('release-s3: building...');
-  let buildOk = true;
   try {
-    execSync(`node scripts/release.js --version "${version}" --no-zip`, { cwd: ROOT, stdio: 'inherit' });
+    execSync(`node scripts/release.js --dist-version "${version}" --no-zip`, { cwd: ROOT, stdio: 'inherit' });
   } catch {
-    buildOk = false;
-  } finally {
-    await writeFile(rootManifestPath, originalRootManifest);
+    fail('build failed');
   }
-  if (!buildOk) fail('build failed');
 
   // 3. Read + validate the built manifest
   const distDir = join(ROOT, 'dist');

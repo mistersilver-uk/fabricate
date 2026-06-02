@@ -7,6 +7,8 @@
 - [x] Add `scripts/release-s3.js` — build via `release.js`, `deriveS3Layout()` per-target,
       stage one zip per target baking that target's own manifest URL, fail-fast overwrite
       pre-flight, upload zip (immutable) + manifest (no-cache) per target, dry-run support.
+- [x] Add `scripts/release.js --dist-version <ver>` so S3 publishing injects a release
+      version only into generated `dist/module.json` and never writes source `module.json`.
 - [x] Add `.github/workflows/release-s3.yml` — manual `rc_tag` dispatch, RC-tag validation,
       checkout tag, OIDC auth (gated `if: ${{ !inputs.dry_run }}`), run the script.
 - [x] Add `@aws-sdk/client-s3` devDependency + `release:s3` / `release:s3:dry-run` scripts;
@@ -18,6 +20,8 @@
 - [x] `tests/release-s3.test.js` — `deriveS3Layout()` per-target keys/URLs, cohort feed
       self-references its own zip (distinct from channel), target ordering, trailing-slash
       strip, RC version preservation, channel override, labels; `getFlag()` cases.
+- [x] `tests/release-build.test.js` — release version option parsing, including
+      `--dist-version` and `--version` / `--dist-version` mutual exclusion.
 
 ## Verification
 
@@ -25,7 +29,7 @@
 - [x] `node scripts/release-s3.js --version 0.2.0-rc.1 --dry-run` — builds, stages a
       channel zip and a per-cohort zip, prints both install URLs, no AWS contact. Confirmed
       each zip's in-zip `module.json` bakes its own `manifest`/`download` URLs (channel vs
-      cohort). Restored root `module.json` afterward.
+      cohort). Confirmed the command leaves the tracked root `module.json` untouched.
 - [ ] (User, AWS-side) Extend IAM role `GitHubFoundryModulePublisherRole` trust policy to
       allow `repo:mistersilver-uk/fabricate-v2:*` OIDC subject; ensure its permissions policy
       allows `modules/fabricate/*` and `testers/*/fabricate/*` writes.

@@ -7,6 +7,7 @@
  *   node scripts/release.js --no-zip    # build without zip
  *   node scripts/release.js --validate-only  # validate existing dist/
  *   node scripts/release.js --version 1.2.3  # inject version into module.json, then build
+ *   node scripts/release.js --dist-version 1.2.3  # inject version into dist/module.json only
  *
  * Future GitHub Actions note:
  *   This script is designed to be usable directly in a GitHub Actions workflow:
@@ -18,6 +19,8 @@
  *   Semantic-release passes --version <tag> via release.config.js prepareCmd.
  *   The script updates module.json on disk before building so the dist/module.json
  *   contains the correct version string.
+ *   S3 publishing passes --dist-version <tag> so the generated dist/ manifest
+ *   gets the release version without touching source module.json.
  */
 
 import { readFile, writeFile, mkdir, rm, cp, access, stat } from 'node:fs/promises';
@@ -153,18 +156,40 @@ async function copyIfExists(src, dest) {
 }
 
 /**
- * Parse --version <value> from argv.
- * Returns the version string, or null if not provided.
+ * Parse `--flag <value>` from an argv slice. Returns the value or null.
  *
  * @param {string[]} args
+ * @param {string} flag
  * @returns {string|null}
  */
-function parseVersionFlag(args) {
-  const idx = args.indexOf('--version');
-  if (idx !== -1 && args[idx + 1]) {
+export function getFlag(args, flag) {
+  const idx = args.indexOf(flag);
+  if (idx !== -1 && args[idx + 1] && !args[idx + 1].startsWith('--')) {
     return args[idx + 1];
   }
   return null;
+}
+
+/**
+ * Resolve release-version flags. `--version` intentionally mutates source
+ * module.json; `--dist-version` only changes generated release output.
+ *
+ * @param {string[]} args
+ * @returns {{ sourceVersion: string|null, distVersion: string|null, releaseVersion: string|null }}
+ */
+export function parseReleaseVersionOptions(args) {
+  const sourceVersion = getFlag(args, '--version');
+  const distVersion = getFlag(args, '--dist-version');
+
+  if (sourceVersion && distVersion) {
+    throw new Error('--version and --dist-version are mutually exclusive');
+  }
+
+  return {
+    sourceVersion,
+    distVersion,
+    releaseVersion: sourceVersion || distVersion
+  };
 }
 
 async function main() {
@@ -172,7 +197,14 @@ async function main() {
   const flags = new Set(args);
   const noZip = flags.has('--no-zip');
   const validateOnly = flags.has('--validate-only');
-  const versionOverride = parseVersionFlag(args);
+  let versionOptions;
+  try {
+    versionOptions = parseReleaseVersionOptions(args);
+  } catch (err) {
+    console.error(err.message);
+    exit(1);
+  }
+  const { sourceVersion, distVersion, releaseVersion } = versionOptions;
 
   const distDir = join(ROOT, 'dist');
   const manifestPath = join(ROOT, 'module.json');
@@ -181,10 +213,13 @@ async function main() {
   let manifest = JSON.parse(manifestRaw);
 
   // --version: update module.json on disk before building
-  if (versionOverride) {
-    console.log(`Injecting version ${versionOverride} into module.json...`);
-    manifest = { ...manifest, version: versionOverride };
+  if (sourceVersion) {
+    console.log(`Injecting version ${sourceVersion} into module.json...`);
+    manifest = { ...manifest, version: sourceVersion };
     await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+  } else if (distVersion) {
+    console.log(`Injecting version ${distVersion} into dist/module.json only...`);
+    manifest = { ...manifest, version: distVersion };
   }
 
   const { version } = manifest;
@@ -234,8 +269,8 @@ async function main() {
   const distManifest = rewriteModuleJson(manifest);
 
   // Pin manifest and download URLs to the specific version tag
-  if (versionOverride) {
-    const tag = `v${versionOverride}`;
+  if (releaseVersion) {
+    const tag = `v${releaseVersion}`;
     const baseUrl = `https://github.com/misterpotts/fabricate/releases/download/${tag}`;
     distManifest.manifest = `${baseUrl}/module.json`;
     distManifest.download = `${baseUrl}/fabricate-${tag}.zip`;

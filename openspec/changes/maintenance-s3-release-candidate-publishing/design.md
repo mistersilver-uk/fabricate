@@ -47,9 +47,10 @@ version passed to the script.
   `bucket`, `baseUrl`, `channel`, `testerGroups`. `bucket`/`baseUrl` are
   overridable via `S3_RELEASE_BUCKET` / `RELEASE_BASE_URL` env (repo vars in CI).
 - **`scripts/release-s3.js`** — orchestrator. Reuses `scripts/release.js`
-  (`--version <ver> --no-zip`) for the build so there is a single build path,
-  then for each target rewrites `dist/module.json`, zips to a per-target staging
-  path under `build/s3/<label>/`, and uploads. Exports the pure
+  (`--dist-version <ver> --no-zip`) for the build so there is a single build
+  path without touching the source `module.json`, then for each target rewrites
+  `dist/module.json`, zips to a per-target staging path under
+  `build/s3/<label>/`, and uploads. Exports the pure
   `deriveS3Layout()` (unit-tested without AWS) and `getFlag()`.
 - **`scripts/lib/zip.js`** — Windows-safe `zipDirectory` (PowerShell
   `Compress-Archive` + Unix `zip`), ported from premium because the inline
@@ -80,10 +81,11 @@ version passed to the script.
   builds and stages per-target zips under `build/s3/` (git-ignored) using config
   defaults, imports no AWS SDK, and contacts no network (`--version` is required,
   so the `--` passthrough is mandatory). On Windows the zip is produced via
-  PowerShell `Compress-Archive`. The build's version injection into the tracked
-  root `module.json` is saved and restored, so the command leaves no dirty file.
-  A real local publish (`npm run release:s3 -- --version <v>`) requires resolvable
-  AWS credentials + bucket/baseUrl in the environment.
+  PowerShell `Compress-Archive`. S3 publishing passes the version through
+  `scripts/release.js --dist-version`, which writes only generated release
+  output and never writes the tracked root `module.json`. A real local publish
+  (`npm run release:s3 -- --version <v>`) requires resolvable AWS credentials +
+  bucket/baseUrl in the environment.
 
 ## Dependencies
 
