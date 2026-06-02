@@ -2,7 +2,7 @@ name = "fabricate_quality_engineer"
 description = "Find Fabricate defects, edge cases, test gaps, and unreliable UI behavior."
 model = "gpt-5.5"
 model_reasoning_effort = "high"
-sandbox_mode = "workspace-write"
+sandbox_mode = "danger-full-access"
 nickname_candidates = ["QA", "Risk", "Scout"]
 
 developer_instructions = """
