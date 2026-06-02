@@ -1,6 +1,6 @@
 # Foundry Smoke Harness
 
-The smoke harness boots a real Foundry VTT instance in Docker and walks the manager UI + gathering app end-to-end with Playwright. It catches regressions that the JS-level unit suite can't — actual layout, DOM events, real Foundry APIs.
+The smoke harness boots a real Foundry VTT instance in Docker and walks the Crafting System Manager UI and the unified Fabricate shell end-to-end with Playwright. It catches regressions that the JS-level unit suite can't — actual layout, DOM events, real Foundry APIs.
 
 ## Entrypoints
 
@@ -21,10 +21,10 @@ The run walks several phases in order. If an earlier phase fails, later phases a
 - **Phase B** — create test actors and items, screenshot sheets.
 - **Phase C** — create a crafting system + sample recipes.
 - **Phase D0** — open the Crafting System Manager, exercise its surfaces, screenshot (the `screenshot-manager` step). **This is where most drift shows up** when manager markup changes.
-- **Phase D2** — gathering app GM/player live states.
-- **Phase D3** — non-GM gathering app states.
-- **Phase E / E2** — crafting flow + no-selectable-actors edge case.
+- **Phase E** — API-driven crafting flow, then open the unified Fabricate shell (`#fabricate-app`) from the Craft Item and Gathering sidebar buttons and assert the four-tab left nav (`fabricate-app-shell` screenshot).
 - **Phase F** — cleanup.
+
+The player-facing Crafting and Gathering app phases (former D2/D3/E2) and the standalone Recipe Editor were removed when those surfaces were retired; both sidebar buttons now open the single empty-shell window.
 
 Phase-by-phase timing and pass/fail land in `test-results/summary.json` after each run.
 

@@ -1348,41 +1348,6 @@ describe('createAdminStore', () => {
       assert.equal(importSystemId, 'sys1', 'renderImportDialog should be called with the selected system id');
     });
 
-    it('createRecipe calls openRecipeEditor when a system is selected', async () => {
-      let editorArgs = null;
-      const services = createMockServices({
-        openRecipeEditor: (...args) => { editorArgs = args; }
-      });
-      const store = createAdminStore(services);
-      await store.selectSystem('sys1');
-      await store.createRecipe();
-      assert.ok(editorArgs !== null, 'openRecipeEditor should be called');
-      assert.equal(editorArgs[0], null, 'first arg should be null (new recipe)');
-      assert.equal(editorArgs[2], 'sys1', 'third arg should be the system id');
-    });
-
-    it('createRecipe warns and skips openRecipeEditor when no system is selected', async () => {
-      let warnMsg = null;
-      let editorCalled = false;
-      const services = createMockServices({
-        openRecipeEditor: () => { editorCalled = true; },
-        notify: {
-          info: () => {},
-          warn: (m) => { warnMsg = m; },
-          error: () => {}
-        }
-      });
-      const origManager = services.getCraftingSystemManager();
-      services.getCraftingSystemManager = () => ({
-        ...origManager,
-        getSystems: () => [],
-        getSystem: () => null
-      });
-      const store = createAdminStore(services);
-      await store.createRecipe();
-      assert.ok(warnMsg !== null, 'warn should be called when no system selected');
-      assert.ok(!editorCalled, 'openRecipeEditor should not be called when no system selected');
-    });
   });
 
   // -------------------------------------------------------------------------
@@ -1906,7 +1871,7 @@ describe('createAdminStore', () => {
         'addTag', 'removeTag',
         'addEssence', 'removeEssence',
         'saveCraftingCheckConfig', 'saveCurrencyConfig', 'saveVisibilityConfig', 'saveTeaserConfig',
-        'createRecipe', 'deleteRecipe', 'duplicateRecipe', 'toggleRecipeEnabled',
+        'deleteRecipe', 'duplicateRecipe', 'toggleRecipeEnabled',
         'importRecipes', 'exportRecipes',
         'exportSystem', 'importSystem',
         'deleteComponent', 'updateComponent',

@@ -61,11 +61,9 @@ const RUN_FULL_ONLY_GATHERING_STATES = SMOKE_PROFILE === 'full';
 // in the catch block, not via `screenshot()`, so it always survives.
 const RC_SCREENSHOT_BUDGET = new Set([
   'world-loaded',
-  'crafting-app-opened',
+  'fabricate-app-shell',
   'post-craft',
-  'alara-post-craft-inventory',
-  'gathering-targeted-ready',
-  'gathering-immediate-success'
+  'alara-post-craft-inventory'
 ]);
 
 const JOIN_BUTTON_SELECTOR = 'button:has-text("Join Game Session"), button[name="join"]';
@@ -894,7 +892,6 @@ async function exerciseManagerRecipePointerTargets(page) {
 
   await page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Import")').first().click({ trial: true });
   await page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Export")').first().click({ trial: true });
-  await page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Create Recipe")').first().click({ trial: true });
 }
 
 /**
@@ -982,7 +979,7 @@ async function closeOpenApplications(page) {
     '.app.window-app .close',
     '#fabricate-recipe-manager button[data-action="close"]',
     '#fabricate-crafting-system-manager button[data-action="close"]',
-    '#fabricate-gathering button[data-action="close"]'
+    '#fabricate-app button[data-action="close"]'
   ].join(', ');
 
   async function discardDirtyDraft() {
@@ -1014,7 +1011,7 @@ async function closeOpenApplications(page) {
       for (const app of applicationV2s) {
         const element = app?.element ?? app?._element ?? null;
         if (!element || element.id === 'sidebar') continue;
-        if (element.querySelector?.('.fabricate-manager, .fabricate-gathering-app') || element.id?.startsWith?.('fabricate-')) {
+        if (element.querySelector?.('.fabricate-manager, .fabricate-app') || element.id?.startsWith?.('fabricate-')) {
           try {
             closedApplicationV2 = true;
             app.close({ force: true });
@@ -1040,7 +1037,7 @@ async function closeOpenApplications(page) {
     await page.waitForTimeout(500);
     await discardDirtyDraft();
 
-    const remaining = await page.locator('.fabricate-manager, .fabricate-gathering-app, button:has-text("Discard Changes")').count();
+    const remaining = await page.locator('.fabricate-manager, .fabricate-app, button:has-text("Discard Changes")').count();
     if (remaining === 0) break;
   }
 }
@@ -1071,170 +1068,6 @@ function attachConsoleCapture(page, ignoredErrorPatterns = []) {
       consoleErrors.push(`pageerror: ${err.message}`);
     }
   });
-}
-
-/**
- * Open the player Gathering app from the Items Directory action and assert it rendered.
- * @param {import('playwright').Page} page
- */
-async function openGatheringAppFromDirectory(page) {
-  const itemsTab = page.locator('#sidebar [data-tab="items"]').first();
-  await itemsTab.click({ force: true });
-  const gatheringButton = page.locator('button[data-fabricate-action="gathering"]').first();
-  await gatheringButton.waitFor({ state: 'visible', timeout: 10_000 });
-  if (!await gatheringButton.isEnabled()) {
-    throw new Error('Gathering directory action is visible but disabled.');
-  }
-  await gatheringButton.evaluate(button => button.click());
-  const app = page.locator('.fabricate-gathering-app').first();
-  await app.waitFor({ state: 'visible', timeout: 10_000 });
-  return app;
-}
-
-/**
- * Resize the rendered Gathering application frame for container-query screenshots.
- * @param {import('playwright').Page} page
- * @param {{ width: number, height: number }} size
- */
-async function setGatheringWindowSize(page, { width, height }) {
-  await page.setViewportSize({
-    width: Math.max(1366, width + 120),
-    height: Math.max(768, height + 120)
-  });
-  await page.evaluate(({ width, height }) => {
-    const gathering = document.querySelector('.fabricate-gathering-app');
-    const app = gathering?.closest('.application, .app') || document.querySelector('#fabricate-gathering');
-    if (!app) return null;
-    Object.assign(app.style, {
-      width: `${width}px`,
-      height: `${height}px`,
-      left: '20px',
-      top: '20px'
-    });
-    return {
-      width: app.getBoundingClientRect().width,
-      height: app.getBoundingClientRect().height
-    };
-  }, { width, height });
-  await page.waitForTimeout(500);
-}
-
-/**
- * Select an actor in the Gathering app by visible actor name.
- * @param {import('playwright').Page} page
- * @param {string} actorName
- */
-async function selectGatheringActor(page, actorName) {
-  const actorSelect = page.locator('.fabricate-gathering-app .gathering-v2-actor-card select').first();
-  await actorSelect.waitFor({ state: 'visible', timeout: 10_000 });
-  await actorSelect.selectOption({ label: actorName });
-  await page.locator('.fabricate-gathering-app .gathering-v2-actor-card').filter({ hasText: actorName }).first()
-    .waitFor({ state: 'visible', timeout: 10_000 });
-}
-
-/**
- * Select an environment row in the Gathering app by visible name.
- * @param {import('playwright').Page} page
- * @param {string} environmentName
- */
-async function selectGatheringEnvironment(page, environmentName) {
-  const environmentTab = page.locator('.fabricate-gathering-app .gathering-v2-tabs button').first();
-  if (await environmentTab.count() > 0) {
-    await environmentTab.click();
-    await page.locator('.fabricate-gathering-app .gathering-v2-workspace').first()
-      .waitFor({ state: 'visible', timeout: 10_000 });
-  }
-  const search = page.locator('.fabricate-gathering-app input[type="search"]').first();
-  if (await search.count() > 0) {
-    await search.fill(environmentName);
-    await page.waitForTimeout(300);
-  }
-  const row = page.locator('.gathering-v2-environment-row').filter({ hasText: environmentName }).first();
-  await row.waitFor({ state: 'visible', timeout: 10_000 });
-  await row.click({ force: true });
-  await page.waitForTimeout(250);
-  const selected = await page.evaluate((name) => {
-    const applicationValues = [
-      ...Object.values(ui.windows || {}),
-      ...Array.from(foundry?.applications?.instances?.values?.() || [])
-    ];
-    let matched = false;
-    for (const app of applicationValues) {
-      const store = app?._gatheringStore;
-      if (!store?.viewState || !store?.selectEnvironment) continue;
-      let state = null;
-      const unsubscribe = store.viewState.subscribe(value => { state = value; });
-      unsubscribe();
-      const environment = (state?.filteredEnvironments || state?.systemFilteredEnvironments || state?.environments || [])
-        .find(candidate => candidate?.name === name);
-      if (!environment?.id) continue;
-      store.selectEnvironment(environment.id);
-      matched = true;
-    }
-    return matched;
-  }, environmentName);
-  if (!selected) {
-    await row.evaluate(element => element.click());
-  }
-  await page.locator('.gathering-v2-task-panel').filter({ hasText: environmentName }).first()
-    .waitFor({ state: 'visible', timeout: 10_000 });
-}
-
-/**
- * Show the Gathering app log tab.
- * @param {import('playwright').Page} page
- */
-async function showGatheringLog(page) {
-  const logTab = page.locator('.fabricate-gathering-app .gathering-v2-tabs button').nth(1);
-  await logTab.waitFor({ state: 'visible', timeout: 10_000 });
-  await logTab.click();
-  await page.locator('.fabricate-gathering-app .gathering-v2-log').first()
-    .waitFor({ state: 'visible', timeout: 10_000 });
-}
-
-/**
- * Click a visible Gathering app task button by task label.
- * @param {import('playwright').Page} page
- * @param {string} taskLabel
- */
-async function startGatheringTaskByLabel(page, taskLabel) {
-  const taskRow = page.locator('.gathering-task-row').filter({ hasText: taskLabel }).first();
-  await taskRow.waitFor({ state: 'visible', timeout: 10_000 });
-  // noWaitAfter: clicking an already-`is-selected` task row can trigger a
-  // same-document state change that Playwright treats as a pending navigation,
-  // hanging the click() for the full 30s navigation budget. See PR diagnosis
-  // for run 26031422155 / issue #149.
-  await taskRow.click({ noWaitAfter: true });
-  const startButton = page.locator('.fabricate-gathering-app .gathering-start-button').first();
-  await startButton.waitFor({ state: 'visible', timeout: 10_000 });
-  await startButton.click();
-}
-
-async function scrollGatheringAppTo(page, selector) {
-  await page.evaluate((selector) => {
-    const app = document.querySelector('.fabricate-gathering-app');
-    const target = document.querySelector(selector);
-    if (!app || !target) return;
-    const appRect = app.getBoundingClientRect();
-    const targetRect = target.getBoundingClientRect();
-    app.scrollTop += targetRect.top - appRect.top - 18;
-  }, selector);
-  await page.waitForTimeout(400);
-}
-
-async function scrollGatheringAppToText(page, text) {
-  await page.evaluate((text) => {
-    const app = document.querySelector('.fabricate-gathering-app');
-    const targets = Array.from(document.querySelectorAll(
-      '.gathering-v2-environment-row, .gathering-task-row, .gathering-run-section, .gathering-feedback-panel, .gathering-history-list'
-    ));
-    const target = targets.find(element => element.textContent?.includes(text));
-    if (!app || !target) return;
-    const appRect = app.getBoundingClientRect();
-    const targetRect = target.getBoundingClientRect();
-    app.scrollTop += targetRect.top - appRect.top - 18;
-  }, text);
-  await page.waitForTimeout(400);
 }
 
 async function assertNoScreenshotOverlays(page) {
@@ -2541,295 +2374,63 @@ async function main() {
       }
       }
 
-      // ── Phase D2: Screenshot Gathering app live states ─────────────────────
-      startPhase('phase-D2');
-      process.stdout.write('Phase D2: Exercising Gathering app live states...\n');
-      try {
-        await closeOpenApplications(page);
-        await page.setViewportSize({ width: 1920, height: 1080 });
-        const itemsTab = page.locator('#sidebar [data-tab="items"]').first();
-        await itemsTab.click({ force: true });
-        const gatheringButton = page.locator('button[data-fabricate-action="gathering"]').first();
-        await gatheringButton.waitFor({ state: 'visible', timeout: 10_000 });
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'items-sidebar-gathering-enabled');
-
-        await openGatheringAppFromDirectory(page);
-        await page.locator('.fabricate-gathering-app').first().waitFor({ state: 'visible', timeout: 10_000 });
-        await selectGatheringActor(page, 'Alara the Alchemist');
-        await selectGatheringEnvironment(page, 'Verdant Meadow');
-        await page.locator('.gathering-task-row').filter({ hasText: 'Gather Meadow Herbs' }).first()
-          .waitFor({ state: 'visible', timeout: 10_000 });
-        await page.locator('.gathering-task-row').filter({ hasText: 'Gather Meadow Herbs' }).first().click({ noWaitAfter: true });
-        await page.locator('.fabricate-gathering-app .gathering-start-button').first()
-          .waitFor({ state: 'visible', timeout: 10_000 });
-        await screenshot(page, 'gathering-targeted-ready');
-
-        if (RUN_FULL_ONLY_GATHERING_STATES) {
-        await page.evaluate(async () => {
-          if (!game.paused) {
-            await game.togglePause(true, { broadcast: true });
-          }
-          const applicationValues = [
-            ...Object.values(ui.windows || {}),
-            ...Array.from(foundry?.applications?.instances?.values?.() || [])
-          ];
-          const gatheringApps = applicationValues.filter(app => app?._gatheringStore?.refresh);
-          await Promise.all(gatheringApps.map(app => app._gatheringStore.refresh()));
-        });
-        await selectGatheringEnvironment(page, 'Verdant Meadow');
-        const pausedRow = page.locator('.gathering-task-row.is-blocked').filter({ hasText: /paused/i }).first();
-        await pausedRow.waitFor({ state: 'visible', timeout: 10_000 });
-        if (await pausedRow.locator('.gathering-start-button, .gathering-icon-action').first().isEnabled()) {
-          throw new Error('Paused gathering task start button should be disabled.');
-        }
-        await scrollGatheringAppToText(page, 'paused');
-        await screenshot(page, 'gathering-paused-blocker');
-        await page.evaluate(async () => {
-          if (game.paused) {
-            await game.togglePause(false, { broadcast: true });
-          }
-          const applicationValues = [
-            ...Object.values(ui.windows || {}),
-            ...Array.from(foundry?.applications?.instances?.values?.() || [])
-          ];
-          const gatheringApps = applicationValues.filter(app => app?._gatheringStore?.refresh);
-          await Promise.all(gatheringApps.map(app => app._gatheringStore.refresh()));
-        });
-        await selectGatheringEnvironment(page, 'Verdant Meadow');
-        await page.locator('.gathering-task-row').filter({ hasText: 'Gather Meadow Herbs' }).first().click({ noWaitAfter: true });
-        await page.locator('.fabricate-gathering-app .gathering-start-button').first()
-          .waitFor({ state: 'visible', timeout: 10_000 });
-
-        await selectGatheringEnvironment(page, 'Sunken Ruins');
-        const sceneBlockedCard = page.locator('.gathering-v2-environment-row.is-blocked').filter({ hasText: 'Sunken Ruins' }).first();
-        await sceneBlockedCard.waitFor({ state: 'visible', timeout: 15_000 });
-        // 15s here (not 5s): on hosted CI runners the chip-row inside an
-        // is-blocked card sometimes lands later than 5s after a fresh
-        // selectGatheringActor() re-renders the environment list.
-        await sceneBlockedCard.locator('.gathering-chip').first().waitFor({ state: 'visible', timeout: 15_000 });
-        const sceneBlockedTask = page.locator('.gathering-task-row.is-blocked').filter({ hasText: 'Survey Sunken Reagents' }).first();
-        await sceneBlockedTask.waitFor({ state: 'visible', timeout: 10_000 });
-        if (await sceneBlockedTask.locator('.gathering-icon-action').first().isEnabled()) {
-          throw new Error('Scene-blocked gathering task start button should be disabled.');
-        }
-        await scrollGatheringAppToText(page, 'Sunken Ruins');
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'gathering-scene-blocked');
-
-        await selectGatheringActor(page, 'Brom the Blacksmith');
-        await selectGatheringEnvironment(page, 'Crystal Thicket');
-        const catalystBlockedRow = page.locator('.gathering-task-row.is-blocked').filter({ hasText: 'Bottle Crystal Dew' }).first();
-        await catalystBlockedRow.waitFor({ state: 'visible', timeout: 10_000 });
-        if (await catalystBlockedRow.locator('.gathering-icon-action').first().isEnabled()) {
-          throw new Error('Catalyst-blocked gathering task start button should be disabled.');
-        }
-        const bromVialCountBefore = await page.evaluate((bromId) => {
-          const brom = game.actors.get(bromId);
-          return brom?.items?.contents?.filter(item => item.name === 'Empty Vial').length ?? 0;
-        }, cleanup.bromId);
-        await scrollGatheringAppToText(page, 'Bottle Crystal Dew');
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'gathering-catalyst-blocked');
-        const bromVialCountAfter = await page.evaluate((bromId) => {
-          const brom = game.actors.get(bromId);
-          return brom?.items?.contents?.filter(item => item.name === 'Empty Vial').length ?? 0;
-        }, cleanup.bromId);
-        if (bromVialCountAfter !== bromVialCountBefore) {
-          throw new Error('Blocked catalyst attempt changed the selected actor catalyst inventory.');
-        }
-        } else {
-          process.stdout.write(`Phase D2: skipping blocked gathering sub-states (profile=${SMOKE_PROFILE}).\n`);
-        }
-
-        await selectGatheringActor(page, 'Alara the Alchemist');
-        await selectGatheringEnvironment(page, 'Verdant Meadow');
-        await startGatheringTaskByLabel(page, 'Gather Meadow Herbs');
-        // 30s (not 10s) for post-task-start outcomes: on hosted Ubuntu CI
-        // runners the feedback panel + history row reliably take 10–20s
-        // longer than locally to render, since task resolution piggybacks
-        // on Foundry's tick rate which lags under headless load.
-        await page.locator('.gathering-feedback-panel.success').first().waitFor({ state: 'visible', timeout: 30_000 });
-        await showGatheringLog(page);
-        await page.locator('.gathering-history-row').filter({ hasText: 'Gather Meadow Herbs' }).first()
-          .waitFor({ state: 'visible', timeout: 30_000 });
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'gathering-immediate-success');
-
-        if (RUN_FULL_ONLY_GATHERING_STATES) {
-        await dismissFoundryNotifications(page);
-        const herbCountBeforeFailure = await page.evaluate((alaraId) => {
-          const alara = game.actors.get(alaraId);
-          return alara?.items?.contents?.filter(item => item.name === 'Mystic Herb').length ?? 0;
-        }, cleanup.alaraId);
-        await selectGatheringEnvironment(page, 'Withered Patch');
-        await startGatheringTaskByLabel(page, 'Search Withered Patch');
-        await page.locator('.gathering-feedback-panel.warning').first().waitFor({ state: 'visible', timeout: 30_000 });
-        await showGatheringLog(page);
-        await page.locator('.gathering-history-row').filter({ hasText: 'Search Withered Patch' }).first()
-          .waitFor({ state: 'visible', timeout: 30_000 });
-        const herbCountAfterFailure = await page.evaluate((alaraId) => {
-          const alara = game.actors.get(alaraId);
-          return alara?.items?.contents?.filter(item => item.name === 'Mystic Herb').length ?? 0;
-        }, cleanup.alaraId);
-        if (herbCountAfterFailure !== herbCountBeforeFailure) {
-          throw new Error('Failed gathering attempt created result items.');
-        }
-        await scrollGatheringAppToText(page, 'The patch yields only brittle stems.');
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'gathering-failure-feedback');
-
-        await selectGatheringEnvironment(page, 'Timed Orchard');
-        await startGatheringTaskByLabel(page, 'Tend Slow Bloom');
-        await showGatheringLog(page);
-        await page.locator('.gathering-run-row').filter({ hasText: 'Tend Slow Bloom' }).first()
-          .waitFor({ state: 'visible', timeout: 30_000 });
-        await scrollGatheringAppToText(page, 'Active Gathering');
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'gathering-timed-active');
-
-        await setGatheringWindowSize(page, { width: 500, height: 720 });
-        await scrollGatheringAppToText(page, 'Active Gathering');
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'gathering-narrow-active-history');
-
-        await page.evaluate(async () => {
-          await game.time.advance(120);
-        });
-        // Wait for the active timed run to resolve out of `waitingTime`
-        // status rather than sleep for a fixed window. The Phase D2 success
-        // path already reads this flag a few lines below; this just hoists
-        // the wait so the next step's UI has settled before we proceed.
-        await page.waitForFunction((alaraId) => {
-          const actor = game.actors.get(alaraId);
-          const runs = actor?.getFlag?.('fabricate', 'gatheringRuns') ?? {};
-          const activeRuns = Array.isArray(runs.active)
-            ? runs.active
-            : Object.values(runs.active || {});
-          return !activeRuns.some(run => run?.status === 'waitingTime');
-        }, cleanup.alaraId, { timeout: 30_000 });
-        await closeOpenApplications(page);
-        await openGatheringAppFromDirectory(page);
-        await selectGatheringActor(page, 'Alara the Alchemist');
-        await showGatheringLog(page);
-        await page.locator('.gathering-history-row').filter({ hasText: 'Tend Slow Bloom' }).first()
-          .waitFor({ state: 'visible', timeout: 30_000 });
-        const firstHistoryText = await page.locator('.gathering-history-row').first().textContent();
-        if (!String(firstHistoryText || '').includes('Tend Slow Bloom')) {
-          throw new Error('Completed timed gathering run was not prepended to history.');
-        }
-        const timedState = await page.evaluate((alaraId) => {
-          const actor = game.actors.get(alaraId);
-          const runs = actor?.getFlag?.('fabricate', 'gatheringRuns') ?? {};
-          const activeRuns = Array.isArray(runs.active)
-            ? runs.active
-            : Object.values(runs.active || {});
-          return {
-            active: activeRuns.filter(run => run?.taskId && run.taskId !== 'blind'),
-            firstHistoryTaskId: Array.isArray(runs.history) ? runs.history[0]?.taskId ?? null : null
-          };
-        }, cleanup.alaraId);
-        if (timedState.active.some(run => run.status === 'waitingTime')) {
-          throw new Error('Timed gathering run remained active after world-time advancement.');
-        }
-        await scrollGatheringAppToText(page, 'Recent History');
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'gathering-timed-complete');
-        } else {
-          process.stdout.write(`Phase D2: skipping failure + timed gathering sub-states (profile=${SMOKE_PROFILE}).\n`);
-        }
-
-        results.steps.push({ step: 'gathering-gm-live-states', passed: true });
-        process.stdout.write('Phase D2 complete: GM/player Gathering states screenshotted.\n');
-      } catch (err) {
-        results.steps.push({ step: 'gathering-gm-live-states', passed: false, error: err.message });
-        process.stderr.write(`Phase D2 failed: ${err.message}\n`);
-        await screenshot(page, 'gathering-gm-live-states-failure');
-      }
-
-      // ── Phase D3: Screenshot non-GM gathering redaction and empty states ───
-      // Gated behind RUN_SCREENSHOT_PHASES because this phase opens a fresh
-      // browser context as a player user. Cold-loading Foundry's UI a second
-      // time on a hosted Ubuntu runner reliably exceeds 30s; locally a warm
-      // dev machine clears it in 5–10s. CI just needs module load + crafting
-      // verification (Phase E); D3's player-secrecy assertions are visual
-      // verification for `full` profile runs.
-      if (!RUN_SCREENSHOT_PHASES) {
-        startPhase('phase-D3-skipped');
-        process.stdout.write(`Phase D3: skipped (profile=${SMOKE_PROFILE}).\n`);
-        results.steps.push({ step: 'gathering-non-gm-states', passed: true, skipped: true });
-      } else {
-      startPhase('phase-D3');
-      process.stdout.write('Phase D3: Exercising non-GM Gathering app states...\n');
-      try {
-        const playerContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-        const playerPage = await playerContext.newPage();
-        attachConsoleCapture(playerPage, ignoredErrorPatterns);
-        await playerPage.goto(`${FOUNDRY_URL}/join`, { waitUntil: 'domcontentloaded' });
-        await joinWorldSession(playerPage, results, { userLabel: 'Fabricate Gatherer', stepName: null });
-        await playerPage.waitForFunction(() => typeof game !== 'undefined' && game.ready, { timeout: 30_000 });
-        await playerPage.waitForFunction(() => game.fabricate?.ready === true, { timeout: 15_000 });
-        await openGatheringAppFromDirectory(playerPage);
-        await playerPage.locator('.fabricate-gathering-app').first().waitFor({ state: 'visible', timeout: 10_000 });
-        await playerPage.locator('.fabricate-gathering-app input[type="search"]').first().fill('Moonlit');
-        await playerPage.waitForTimeout(500);
-        await selectGatheringEnvironment(playerPage, 'Moonlit Blind Grove');
-        await playerPage.locator('.gathering-task-row').filter({ hasText: 'Gather' }).first()
-          .waitFor({ state: 'visible', timeout: 10_000 });
-        const blindLeaks = await playerPage.evaluate(() => {
-          const blindCard = Array.from(document.querySelectorAll('.gathering-v2-environment-row'))
-            .find(card => card.textContent?.includes('Moonlit Blind Grove'));
-          const appText = blindCard?.textContent || '';
-          return [
-            'Secret Moonpetal Harvest',
-            'This real task name should remain GM-only',
-            'Moonpetals',
-            'Mystic Herb',
-            'progressive',
-            'dnd5e',
-            'threshold',
-            'catalyst'
-          ].filter(secret => appText.includes(secret));
-        });
-        if (blindLeaks.length > 0) {
-          throw new Error(`Blind gathering leaked GM-only details: ${blindLeaks.join(', ')}`);
-        }
-        await scrollGatheringAppToText(playerPage, 'Moonlit Blind Grove');
-        await assertNoScreenshotOverlays(playerPage);
-        await screenshot(playerPage, 'gathering-blind-redacted');
-        await setGatheringWindowSize(playerPage, { width: 500, height: 720 });
-        await scrollGatheringAppToText(playerPage, 'Moonlit Blind Grove');
-        await assertNoScreenshotOverlays(playerPage);
-        await screenshot(playerPage, 'gathering-player-narrow');
-        await playerContext.close();
-
-        results.steps.push({ step: 'gathering-non-gm-states', passed: true });
-        process.stdout.write('Phase D3 complete: Non-GM Gathering states screenshotted.\n');
-      } catch (err) {
-        results.steps.push({ step: 'gathering-non-gm-states', passed: false, error: err.message });
-        process.stderr.write(`Phase D3 failed: ${err.message}\n`);
-        await screenshot(page, 'gathering-non-gm-states-failure');
-      }
-      }
-
       // ── Phase E: Craft an item ──────────────────────────────────────────────
       startPhase('phase-E');
       process.stdout.write('Phase E: Crafting a Healing Potion...\n');
       try {
-        // Open Crafting App programmatically (avoids viewport/overlay issues)
-        await page.evaluate(() => {
-          document.querySelector('[data-fabricate-action="craft"]')?.click();
-        });
+        // The "Craft Item" and "Gathering" sidebar actions both open ONE
+        // shared window (#fabricate-app); "Craft Item" lands on the Crafting
+        // tab and "Gathering" focuses the same window on the Gathering tab.
+        // Verify the shell, its four nav tabs, and the cross-tab focus
+        // behaviour, then close it. (Crafting itself runs via the API below,
+        // which does not require the window to be open.)
+        process.stdout.write('  Opening shared Fabricate app via "Craft Item"...\n');
+        await closeOpenApplications(page);
+        const sidebarItemsTab = page.locator('#sidebar [data-tab="items"]').first();
+        await sidebarItemsTab.click({ force: true });
+        const craftButton = page.locator('button[data-fabricate-action="craft"]').first();
+        await craftButton.waitFor({ state: 'visible', timeout: 10_000 });
+        await craftButton.evaluate(button => button.click());
 
-        // Verify the crafting app opened (this `waitFor` also serves as the
-        // post-click settle — replaces a 2 s fixed sleep).
-        process.stdout.write('  Waiting for Crafting App to render...\n');
-        const craftingApp = page.locator('.crafting-app, [data-appid] .window-title:has-text("Craft")').first();
-        await craftingApp.waitFor({ state: 'visible', timeout: 10_000 });
-        await screenshot(page, 'crafting-app-opened');
+        const appShell = page.locator('#fabricate-app').first();
+        await appShell.waitFor({ state: 'visible', timeout: 10_000 });
 
-        results.steps.push({ step: 'open-crafting-app', passed: true });
-        process.stdout.write('  Crafting App opened and screenshotted.\n');
+        const navItems = appShell.locator('.fabricate-app-nav-item');
+        await navItems.first().waitFor({ state: 'visible', timeout: 10_000 });
+        // Crafting/Gathering/Journal/Inventory are always present; the Alchemy
+        // tab is conditional (shown only when an enabled alchemy system has recipes).
+        for (const label of ['Crafting', 'Gathering', 'Journal', 'Inventory']) {
+          if (await appShell.locator(`.fabricate-app-nav-item:has-text("${label}")`).count() === 0) {
+            throw new Error(`Shared Fabricate app is missing the ${label} nav tab.`);
+          }
+        }
+        if (await navItems.count() < 4) {
+          throw new Error('Shared Fabricate app should expose at least the four base nav tabs.');
+        }
+        if (await appShell.locator('.fabricate-app-nav-item.active:has-text("Crafting")').count() === 0) {
+          throw new Error('Shared Fabricate app did not open on the Crafting tab after "Craft Item".');
+        }
+
+        // "Gathering" focuses the SAME window and switches to the Gathering tab.
+        const gatheringButton = page.locator('button[data-fabricate-action="gathering"]').first();
+        await gatheringButton.waitFor({ state: 'visible', timeout: 10_000 });
+        await gatheringButton.evaluate(button => button.click());
+
+        if (await page.locator('#fabricate-app').count() !== 1) {
+          throw new Error('"Gathering" opened a second window instead of focusing the shared Fabricate app.');
+        }
+        await appShell.locator('.fabricate-app-nav-item.active:has-text("Gathering")')
+          .first().waitFor({ state: 'visible', timeout: 10_000 });
+        if (await appShell.locator('.fabricate-app-nav-item.active:has-text("Crafting")').count() !== 0) {
+          throw new Error('Shared Fabricate app did not switch off the Crafting tab after "Gathering".');
+        }
+
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'fabricate-app-shell');
+
+        await closeOpenApplications(page);
+        results.steps.push({ step: 'open-fabricate-app-shell', passed: true });
+        process.stdout.write('  Shared Fabricate app shell verified and screenshotted.\n');
 
         // Attempt to craft via the API
         process.stdout.write('  Executing craft: Brew Healing Potion...\n');
@@ -2914,53 +2515,6 @@ async function main() {
         results.steps.push({ step: 'craft-item-phase', passed: false, error: err.message });
         process.stderr.write(`Phase E failed: ${err.message}\n`);
         await screenshot(page, 'craft-failure');
-      }
-
-      // ── Phase E2: No selectable actors player state after actor cleanup ───
-      // Gated behind RUN_SCREENSHOT_PHASES because this phase opens a third
-      // browser context as an observer user. Same CI cold-load cost as D3
-      // (page.goto /join + game.ready + fabricate ready, often >30s on a
-      // hosted Ubuntu runner). The empty-state assertion is a visual
-      // verification path for `full` profile runs.
-      if (!RUN_SCREENSHOT_PHASES) {
-        startPhase('phase-E2-skipped');
-        process.stdout.write(`Phase E2: skipped (profile=${SMOKE_PROFILE}).\n`);
-        results.steps.push({ step: 'gathering-no-selectable-actors-state', passed: true, skipped: true });
-      } else {
-      startPhase('phase-E2');
-      process.stdout.write('Phase E2: Exercising no-selectable-actors Gathering state...\n');
-      try {
-        await closeOpenApplications(page);
-        await page.evaluate(async (actorIds) => {
-          if (actorIds.length > 0) {
-            await Actor.deleteDocuments(actorIds);
-          }
-        }, cleanup.actorIds);
-        cleanup.actorIds = [];
-        cleanup.alaraId = null;
-        cleanup.bromId = null;
-
-        const observerContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-        const observerPage = await observerContext.newPage();
-        attachConsoleCapture(observerPage, ignoredErrorPatterns);
-        await observerPage.goto(`${FOUNDRY_URL}/join`, { waitUntil: 'domcontentloaded' });
-        await joinWorldSession(observerPage, results, { userLabel: 'Fabricate Observer', stepName: null });
-        await observerPage.waitForFunction(() => typeof game !== 'undefined' && game.ready, { timeout: 30_000 });
-        await observerPage.waitForFunction(() => game.fabricate?.ready === true, { timeout: 15_000 });
-        await openGatheringAppFromDirectory(observerPage);
-        await observerPage.locator('.gathering-empty-state').filter({ hasText: 'No Selectable Actors' }).first()
-          .waitFor({ state: 'visible', timeout: 10_000 });
-        await assertNoScreenshotOverlays(observerPage);
-        await screenshot(observerPage, 'gathering-no-selectable-actors');
-        await observerContext.close();
-
-        results.steps.push({ step: 'gathering-no-selectable-actors-state', passed: true });
-        process.stdout.write('Phase E2 complete: No-selectable-actors state screenshotted.\n');
-      } catch (err) {
-        results.steps.push({ step: 'gathering-no-selectable-actors-state', passed: false, error: err.message });
-        process.stderr.write(`Phase E2 failed: ${err.message}\n`);
-        await screenshot(page, 'gathering-no-selectable-actors-failure');
-      }
       }
 
     } catch (err) {

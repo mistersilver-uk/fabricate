@@ -31,15 +31,11 @@ test('Fabricate app shells suppress host click focus outlines while preserving k
   const managerFocusBlock = blockFor('.fabricate-manager button:focus,\n.fabricate-manager input:focus,\n.fabricate-manager select:focus,\n.fabricate-manager textarea:focus,\n.fabricate-manager [tabindex]:focus');
   const managerFocusVisibleBlock = blockFor('.fabricate-manager button:focus-visible,\n.fabricate-manager input:focus-visible,\n.fabricate-manager select:focus-visible,\n.fabricate-manager [tabindex]:focus-visible');
   const adminFocusBlock = blockFor('.fabricate-admin button:focus,\n.fabricate-admin input:focus,\n.fabricate-admin select:focus,\n.fabricate-admin textarea:focus,\n.fabricate-admin [tabindex]:focus');
-  const actorFocusBlock = blockFor('.fabricate-actor-app button:focus,\n.fabricate-actor-app input:focus,\n.fabricate-actor-app select:focus,\n.fabricate-actor-app textarea:focus,\n.fabricate-actor-app [tabindex]:focus');
+  const shellFocusBlock = blockFor('.fabricate.fabricate-app button:focus:not(:focus-visible),\n.fabricate.fabricate-app [tabindex]:focus:not(:focus-visible)');
 
   assert.ok(managerFocusBlock.includes('outline: none;') && managerFocusBlock.includes('box-shadow: none;'), 'manager controls should clear host click focus outlines');
   assert.ok(adminFocusBlock.includes('outline: none;') && adminFocusBlock.includes('box-shadow: none;'), 'legacy admin controls should clear host click focus outlines');
-  assert.ok(actorFocusBlock.includes('outline: none;') && actorFocusBlock.includes('box-shadow: none;'), 'actor app controls should clear host click focus outlines');
-  assert.ok(
-    css.includes('.fabricate.crafting-app button:focus:not(:focus-visible),\n.fabricate.crafting-app input:focus:not(:focus-visible),\n.fabricate.crafting-app select:focus:not(:focus-visible),\n.fabricate.crafting-app textarea:focus:not(:focus-visible),\n.fabricate.crafting-app [tabindex]:focus:not(:focus-visible) {\n  outline: none;\n  box-shadow: none;'),
-    'classic crafting app controls should clear host click focus outlines'
-  );
+  assert.ok(shellFocusBlock.includes('outline: none;') && shellFocusBlock.includes('box-shadow: none;'), 'unified Fabricate shell controls should clear host click focus outlines');
   assert.ok(managerFocusVisibleBlock.includes('outline: 2px solid var(--fab-mv2-accent);'), 'manager keyboard focus should remain visible');
 });
 

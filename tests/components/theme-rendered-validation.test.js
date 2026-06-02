@@ -16,11 +16,13 @@ const newThemeIds = new Set([
   FABRICATE_THEME_IDS.STARGLASS_ARCANA,
   FABRICATE_THEME_IDS.FOUNDRY_NATIVE
 ]);
+// The player Crafting/Gathering apps and the standalone Recipe Editor were
+// removed; the Crafting System Manager is the remaining themed surface. The new
+// unified Fabricate shell is an empty placeholder whose focus/contrast styling
+// is Svelte-scoped (not in fabricate.css), so it is intentionally not validated
+// here yet — re-add it once the shell has real, token-driven content.
 const surfaceMatrix = [
-  { id: 'manager', widths: [900, 560], height: 560, fixture: managerFixture },
-  { id: 'crafting', widths: [720, 520], height: 520, fixture: craftingFixture },
-  { id: 'gathering', widths: [720, 520], height: 560, fixture: gatheringFixture },
-  { id: 'recipe-editor', widths: [960, 620], height: 560, fixture: recipeEditorFixture }
+  { id: 'manager', widths: [900, 560], height: 560, fixture: managerFixture }
 ];
 
 function parseColor(value) {
@@ -161,105 +163,6 @@ function managerFixture(theme, width, height) {
           <button type="button" class="manager-button is-danger" data-hit data-contrast-solid data-boundary>Delete</button>
         </aside>
       </div>
-    </section>`);
-}
-
-function craftingFixture(theme, width, height) {
-  return themePage(theme, width, height, `
-    <section class="fabricate crafting-app surface-root" data-fabricate-theme="${theme}" data-surface-backdrop>
-      <div class="fabricate-actor-app">
-        <div class="run-summary-section" data-region data-boundary>
-          <h1 class="preview-title" data-contrast-surface>Player Crafting Workbench With A Long Localized Heading</h1>
-          <p class="preview-copy">Visible recipe selection, ingredient tags, and craft actions.</p>
-        </div>
-        <div class="fabricate-filters" data-boundary>
-          <button id="focus-target" type="button" class="fabricate-filter-btn active" data-hit data-contrast-soft data-boundary>Available Recipes</button>
-          <button type="button" class="fabricate-filter-btn" data-hit data-boundary>Known To Actor</button>
-          <select aria-label="Category"><option>Very Long Category Name</option></select>
-        </div>
-        <section class="fabricate-recipe-list" data-region data-boundary>
-          <article class="fabricate-recipe-item" data-boundary>
-            <div class="recipe-icon"><img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' fill='%239AB89C'/%3E%3C/svg%3E"></div>
-            <div class="recipe-info">
-              <h2 class="recipe-name" data-contrast-surface>Elixir of Extremely Verbose Crafting Confirmation</h2>
-              <p class="recipe-description">A long recipe description stays readable and wraps inside the actor app container.</p>
-              <div class="recipe-requirements">
-                <span class="ingredient-badge satisfied" data-contrast-soft data-boundary>Fresh Herb Bundle</span>
-                <span class="ingredient-badge unsatisfied" data-contrast-soft data-boundary>Rare Moonlit Catalyst</span>
-              </div>
-              <div class="recipe-result"><strong>Result:</strong> Fortified potion</div>
-            </div>
-            <div class="recipe-actions">
-              <button type="button" class="craft-btn" data-hit data-contrast-solid data-boundary>Craft</button>
-              <button type="button" class="details-btn" data-hit data-boundary>Details</button>
-            </div>
-          </article>
-        </section>
-      </div>
-    </section>`);
-}
-
-function gatheringFixture(theme, width, height) {
-  return themePage(theme, width, height, `
-    <section class="fabricate gathering-app surface-root" data-fabricate-theme="${theme}" data-surface-backdrop>
-      <div class="fabricate-gathering-app">
-        <header class="gathering-v2-header" data-region data-boundary>
-          <div class="gathering-v2-title">
-            <i aria-hidden="true">*</i>
-            <div><h2 data-contrast-surface>Gathering Expedition With Long Region Name</h2><p class="preview-copy">Choose an environment and task.</p></div>
-          </div>
-          <div class="gathering-v2-actor-card"><span>Actor</span><select aria-label="Actor"><option>Sir Longname The Careful</option></select></div>
-          <div class="gathering-v2-stamina"><span>Stamina</span><meter min="0" max="10" value="7"></meter></div>
-          <nav class="gathering-v2-tabs"><button id="focus-target" type="button" class="is-active" data-hit data-contrast-soft data-boundary>Active Gathering</button></nav>
-        </header>
-        <div class="gathering-v2-workspace">
-          <section class="gathering-v2-environment-browser" data-region data-boundary>
-            <div class="gathering-filter-bar"><input value="Ancient forest" aria-label="Search"><select aria-label="Risk"><option>All risk levels</option></select></div>
-            <div class="gathering-v2-environment-list">
-              <button type="button" class="gathering-v2-environment-row is-selected" data-boundary>
-                <span class="gathering-environment-placeholder">F</span>
-                <span class="gathering-v2-row-copy"><strong>Ancient Forest Edge With Long Localized Name</strong><span>3 tasks available</span></span>
-                <span class="gathering-chip is-risk-safe" data-contrast-soft>Safe</span>
-              </button>
-            </div>
-          </section>
-          <section class="gathering-v2-task-panel" data-region data-boundary>
-            <div class="gathering-v2-panel-heading"><h3 data-contrast-surface>Tasks</h3><span>Available now</span></div>
-            <div class="gathering-task-list">
-              <article class="gathering-task-row is-selected" data-boundary>
-                <span class="gathering-task-icon">H</span>
-                <span class="gathering-task-body"><strong>Harvest A Very Particular Bundle Of Herbs</strong><span class="gathering-task-economy">10 minutes, consumes stamina</span></span>
-                <button type="button" class="gathering-task-select" data-hit data-contrast-solid>Go</button>
-              </article>
-            </div>
-          </section>
-          <aside class="gathering-v2-detail-panel" data-region data-boundary>
-            <div class="gathering-v2-hero"><div class="gathering-v2-hero-placeholder">Image</div><div class="gathering-v2-hero-copy"><h3>Forest Edge</h3><p>Live readable overlay copy.</p></div></div>
-            <button type="button" class="gathering-start-button" data-hit data-contrast-solid data-boundary>Start Gathering</button>
-          </aside>
-        </div>
-      </div>
-    </section>`);
-}
-
-function recipeEditorFixture(theme, width, height) {
-  return themePage(theme, width, height, `
-    <section class="fabricate fabricate-actor-app surface-root" data-fabricate-theme="${theme}" data-surface-backdrop>
-      <form class="fabricate-recipe-editor" data-region data-boundary>
-        <h1 class="preview-title" data-contrast-surface>Recipe Editor With Long Localized Validation Text</h1>
-        <p class="preview-copy">Controls keep token contrast and focus treatment at editor widths.</p>
-        <label data-boundary>Name <input id="focus-target" value="Extremely Detailed Potion Recipe" data-contrast-surface></label>
-        <label data-boundary>Category <select><option>Alchemy Components With Long Name</option></select></label>
-        <label data-boundary>Description <textarea rows="4" placeholder="Describe the recipe">A rich description remains readable across themes.</textarea></label>
-        <label data-boundary><input type="checkbox" checked> Available to players</label>
-        <div class="ingredient-list" data-boundary>
-          <span class="ingredient-badge satisfied" data-contrast-soft>Herb bundle</span>
-          <span class="ingredient-badge unsatisfied" data-contrast-soft>Moonlit catalyst</span>
-          <span class="badge badge-advanced" data-contrast-soft>Progressive</span>
-        </div>
-        <button type="button" data-hit data-contrast-solid data-boundary>Save Recipe</button>
-        <button type="button" class="btn-danger" data-hit data-boundary>Delete Draft</button>
-      </form>
     </section>`);
 }
 

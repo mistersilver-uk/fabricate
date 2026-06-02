@@ -1402,9 +1402,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('[data-clear-filters="recipes"]'), null, 'Clear filters should hide after resetting filters');
     assert.equal(target.querySelector('[aria-label="Filter recipes by status"]').value, 'all');
 
-    const editAction = target.querySelector('[data-recipe-action="edit"]');
-    assert.ok(editAction, 'recipe inspector should expose an Edit action');
-    assert.ok(editAction.classList.contains('is-primary'), 'Edit recipe should be the primary inspector action');
+    // The standalone Recipe Editor was removed, so the inspector no longer
+    // offers Edit; duplicate/delete remain.
+    assert.equal(target.querySelector('[data-recipe-action="edit"]'), null, 'recipe inspector should no longer expose an Edit action');
     assert.ok(target.querySelector('[data-recipe-action="duplicate"]'), 'recipe inspector should expose a Duplicate action');
     assert.ok(target.querySelector('[data-recipe-action="delete"]'), 'recipe inspector should expose a Delete action');
     assert.ok(target.querySelector('[data-recipe-fact="structure"]'), 'recipe inspector should expose a Structure fact');
@@ -1419,20 +1419,19 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     target.querySelector('[data-recipe-id="r2"] .manager-status-toggle').click();
 
+    // Row actions are now Duplicate (1) and Delete (2) — the Edit icon is gone.
     target.querySelector('[data-recipe-id="r2"] .manager-icon-button').click();
     target.querySelector('[data-recipe-id="r2"] .manager-icon-button:nth-of-type(2)').click();
-    target.querySelector('[data-recipe-id="r2"] .manager-icon-button:nth-of-type(3)').click();
+    // Header actions are now Import (1) and Export (2) — the Create button is gone.
     target.querySelector('.manager-header-actions .manager-button:nth-child(1)').click();
     target.querySelector('.manager-header-actions .manager-button:nth-child(2)').click();
-    target.querySelector('.manager-header-actions .manager-button:nth-child(3)').click();
 
-    assert.deepEqual(edited, ['r2']);
-    assert.deepEqual(calls.slice(-5), [
+    assert.deepEqual(edited, [], 'recipe edit wiring should be removed');
+    assert.deepEqual(calls.slice(-4), [
       ['duplicateRecipe', 'r2'],
       ['deleteRecipe', 'r2'],
       ['importRecipes'],
-      ['exportRecipes'],
-      ['createRecipe']
+      ['exportRecipes']
     ]);
     assert.ok(calls.some(call => call[0] === 'setRecipeSearch' && call[1] === 'elixir'));
     assert.ok(calls.some(call => call[0] === 'toggleRecipeEnabled' && call[1] === 'r2' && call[2] === true));
@@ -4345,7 +4344,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.deepEqual(calls.find(call => call[0] === 'addGatheringLibraryTask'), ['addGatheringLibraryTask', 'alchemy']);
   });
 
-  it('shows setup guidance and keeps create routing when a system has no recipes', async () => {
+  it('shows setup guidance when a system has no recipes', async () => {
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -4378,8 +4377,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Recipe docs'));
     assert.equal(target.textContent.includes('Select a recipe'), false);
 
-    target.querySelector('.manager-table-scroll .manager-button.is-primary').click();
-    assert.ok(calls.some(call => call[0] === 'createRecipe'));
+    // The Recipe Editor was removed, so the empty state no longer offers a
+    // Create Recipe button.
+    assert.equal(target.querySelector('.manager-table-scroll .manager-button.is-primary'), null, 'empty recipe state should not offer a create button');
+    assert.ok(!calls.some(call => call[0] === 'createRecipe'), 'createRecipe should no longer be wired');
   });
 
   it('points empty recipe setup to Components when the system has no components', async () => {

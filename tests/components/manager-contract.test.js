@@ -476,17 +476,19 @@ describe('CraftingSystemManager source contract', () => {
 
   it('keeps the recipes browser browser-only and wired to existing callbacks', () => {
     for (const snippet of [
-      'store.createRecipe?.()',
       'store.setRecipeSearch?.',
       'store.toggleRecipeEnabled?.',
       'store.importRecipes?.()',
       'store.exportRecipes?.()',
       'store.duplicateRecipe?.(recipeId)',
-      'store.deleteRecipe?.(recipeId)',
-      'services?.onEditRecipe?.(recipeId)'
+      'store.deleteRecipe?.(recipeId)'
     ]) {
       assert.ok(rootSource.includes(snippet), `root should wire ${snippet}`);
     }
+    // The standalone Recipe Editor was removed, so recipe create/edit (which
+    // only opened that window) are no longer wired from the manager.
+    assert.ok(!rootSource.includes('store.createRecipe'), 'recipe creation wiring should be removed');
+    assert.ok(!rootSource.includes('onEditRecipe'), 'recipe edit wiring should be removed');
     assert.ok(!rootSource.includes('saveRecipe'), 'recipes browser should not introduce inline save behavior');
     assert.ok(!rootSource.includes('required station'), 'recipes browser should not introduce unsupported recipe fields');
   });

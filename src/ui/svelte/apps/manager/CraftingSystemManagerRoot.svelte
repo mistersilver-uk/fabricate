@@ -1242,21 +1242,12 @@
     store.deleteSystem?.(systemId);
   }
 
-  function createRecipe() {
-    store.createRecipe?.();
-  }
-
   function importRecipes() {
     store.importRecipes?.();
   }
 
   function exportRecipes() {
     store.exportRecipes?.();
-  }
-
-  function editRecipe(recipeId = selectedRecipe?.id) {
-    if (!recipeId) return;
-    services?.onEditRecipe?.(recipeId);
   }
 
   function duplicateRecipe(recipeId = selectedRecipe?.id) {
@@ -2779,10 +2770,6 @@
           <i class="fas fa-file-export" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Export', 'Export')}</span>
         </button>
-        <button type="button" class="manager-button is-primary" onclick={createRecipe} disabled={!selectedSystemId}>
-          <i class="fas fa-plus" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Recipe.Create', 'Create Recipe')}</span>
-        </button>
       {:else if currentView === 'components'}
       {:else if currentView === 'component-edit'}
         {#if componentEditDirty}
@@ -3250,8 +3237,6 @@
         selectedSystemName={selectedSystem?.name || ''}
         onSearchChange={(term) => store.setRecipeSearch?.(term)}
         onSelectRecipe={(id) => selectRecipe(id)}
-        onCreateRecipe={createRecipe}
-        onEditRecipe={(id) => editRecipe(id)}
         onDuplicateRecipe={(id) => duplicateRecipe(id)}
         onDeleteRecipe={(id) => deleteRecipe(id)}
         onToggleEnabled={(id, enabled) => store.toggleRecipeEnabled?.(id, enabled)}
@@ -4516,10 +4501,6 @@
           <section class="manager-inspector-card">
             <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Recipe.Actions', 'Recipe actions')}</h3>
             <div class="manager-inspector-actions">
-              <button type="button" class="manager-button is-primary" data-recipe-action="edit" onclick={() => editRecipe()}>
-                <i class="fas fa-edit" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.Manager.Recipe.Edit', 'Edit recipe')}</span>
-              </button>
               <button type="button" class="manager-button" data-recipe-action="duplicate" onclick={() => duplicateRecipe()}>
                 <i class="fas fa-copy" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.Manager.Recipe.Duplicate', 'Duplicate recipe')}</span>
