@@ -20,6 +20,10 @@ Primary stack: JavaScript ES modules, Svelte 5, Vite, `node:test`, happy-dom, Pl
 
 Non-trivial work runs as a `plan → plan-review → implement → review → docs` state machine, with iteration until each gate accepts. Stages auto-spawn role-specific subagents based on the change signals below — agents do not need to be requested by name. Subagents not matched by the routing table only run when explicitly requested.
 
+The routing tokens below (`fabricate_orchestrator`, etc.) are provider-neutral role identifiers. Each resolves to a registered agent in **both** providers — `.codex/agents/*.toml` for Codex and `.claude/agents/*.md` for Claude (spawned via the Agent tool using the `subagent_type` in [Agent Roles & Bindings](#agent-roles--bindings)) — so the auto-spawn workflow behaves the same regardless of which assistant is driving. The one exception is the read-only `fabricate_pr_explorer` mapping role: Claude uses its built-in `Explore` agent rather than a dedicated binding (see the table below).
+
+**Workflow driver.** The top-level loop — Codex's depth-0 prompt agent or Claude's main loop — is the *workflow driver*. It enacts the orchestrator role: it owns routing and the iteration loops and performs **all** agent spawning. The spawnable `fabricate_orchestrator` agent is a planning helper the driver may delegate to for resolving the roster and drafting the OpenSpec change docs; it returns its plan to the driver. Spawned role agents execute their scoped role and do not nest — no role agent spawns another.
+
 ### Auto-spawn routing
 
 Match the change against every signal that applies. All matching agents run in parallel within their stage; this is multi-select, not single-pick.
@@ -38,9 +42,9 @@ Match the change against every signal that applies. All matching agents run in p
 
 Three loops run until acceptance, each capped at 3 revisions before escalating to the user:
 
-1. **Plan review loop.** Orchestrator drafts the OpenSpec change docs, then runs the plan-review agents matched by the routing table. Each emits `APPROVED / NEEDS_CHANGES / BLOCKED` against the plan. Orchestrator revises the change docs until every plan reviewer approves.
-2. **Implementation review loop.** Implementer ships changes; `fabricate_reviewer` plus any post-implementation reviewers from the routing table emit verdicts. Implementer addresses `NEEDS_CHANGES` until every reviewer emits `APPROVED`.
-3. **Documentation iteration loop.** Triggered whenever the change touches behaviour or any documented API surface. `fabricate_domain_expert` updates `DOMAIN.md` and canonical specs against the diff; `fabricate_docs_writer` updates JSDoc and the Jekyll site. Each then reviews the other's output and emits `DOCS APPROVED / DOCS NEEDS_CHANGES`. Loop until both approve.
+1. **Plan review loop.** The driver drafts the OpenSpec change docs (delegating to a `fabricate_orchestrator` planning agent when useful), then spawns the plan-review agents matched by the routing table. Each emits `APPROVED / NEEDS_CHANGES / BLOCKED` against the plan. The driver revises the change docs until every plan reviewer approves.
+2. **Implementation review loop.** The driver spawns the implementer to ship changes, then spawns `fabricate_reviewer` plus any post-implementation reviewers from the routing table to emit verdicts. The implementer addresses `NEEDS_CHANGES` until every reviewer emits `APPROVED`.
+3. **Documentation iteration loop.** Triggered whenever the change touches behaviour or any documented API surface. The driver spawns the paired `fabricate_domain_expert` (updates `DOMAIN.md` and canonical specs against the diff) and `fabricate_docs_writer` (updates JSDoc and the Jekyll site). Each then reviews the other's output and emits `DOCS APPROVED / DOCS NEEDS_CHANGES`. Loop until both approve.
 
 ### Stop conditions
 
@@ -119,36 +123,37 @@ These deep-dive notes live under `docs/agents/` and explain layered patterns or 
 - Validate commit messages with `npx commitlint` before pushing when a commit is part of the task.
 - Prefer one logical change per commit; align commit boundaries with reviewable user-facing changes. Bundling is acceptable when changes overlap on the same files such that hunk-splitting would be fragile, but separate commits are the default.
 
-## Local Codex Agents And Skills
+## Agent Roles & Bindings
 
-Prefer the local Codex custom agents in `.codex/agents/` for role-specific work, and the shared skills in `skills/` for workflow instructions. The default workflow above auto-spawns these agents based on change signals; explicit requests are only required for agents and skills that the routing table does not cover.
+Each role is defined **once** in its shared `skills/<role>/SKILL.md` (the canonical persona).
+Both provider agents are **thin bindings** that point at that skill — change behavior in the
+skill, not in the bindings. The default workflow above auto-spawns these roles based on change
+signals; explicit requests are only required for roles the routing table does not cover.
 
-Custom agents:
+| Routing token                  | Canonical skill (persona)                  | Codex binding                                | Claude `subagent_type`        |
+|---------------------------------|--------------------------------------------|----------------------------------------------|-------------------------------|
+| `fabricate_orchestrator`        | `skills/fabricate-orchestrator/SKILL.md`   | `.codex/agents/fabricate-orchestrator.toml`  | `fabricate-orchestrator`      |
+| `fabricate_implementer`         | `skills/fabricate-implementer/SKILL.md`    | `.codex/agents/fabricate-implementer.toml`   | `fabricate-implementer`       |
+| `fabricate_reviewer`            | `skills/fabricate-reviewer/SKILL.md`       | `.codex/agents/fabricate-reviewer.toml`      | `fabricate-reviewer`          |
+| `fabricate_domain_expert`       | `skills/fabricate-domain-expert/SKILL.md`  | `.codex/agents/fabricate-domain-expert.toml` | `fabricate-domain-expert`     |
+| `fabricate_docs_writer`         | `skills/fabricate-docs-writer/SKILL.md`    | `.codex/agents/fabricate-docs-writer.toml`   | `fabricate-docs-writer`       |
+| `fabricate_ux_designer`         | `skills/fabricate-ux-designer/SKILL.md`    | `.codex/agents/fabricate-ux-designer.toml`   | `fabricate-ux-designer`       |
+| `fabricate_quality_engineer`    | `skills/fabricate-quality-engineer/SKILL.md` | `.codex/agents/fabricate-quality-engineer.toml` | `fabricate-quality-engineer` |
+| `fabricate_competitive_analyst` | `skills/fabricate-competitive-analyst/SKILL.md` | `.codex/agents/fabricate-competitive-analyst.toml` | `fabricate-competitive-analyst` |
+| `fabricate_pr_explorer`         | — (no shared skill; read-only mapping)     | `.codex/agents/fabricate-pr-explorer.toml`   | `Explore` (built-in)          |
 
-- `fabricate_orchestrator`
-- `fabricate_implementer`
-- `fabricate_reviewer`
-- `fabricate_docs_writer`
-- `fabricate_domain_expert`
-- `fabricate_ux_designer`
-- `fabricate_quality_engineer`
-- `fabricate_competitive_analyst`
-- `fabricate_pr_explorer`
+`fabricate_pr_explorer` is read-only codebase mapping; Claude uses its built-in `Explore` agent
+for the same role rather than a dedicated binding.
 
-Skills:
+### Shared skills with no persona binding
 
-- `fabricate-orchestrator`
-- `fabricate-implementer`
-- `fabricate-reviewer`
-- `fabricate-docs-writer`
-- `fabricate-domain-expert`
-- `fabricate-ux-designer`
-- `fabricate-quality-engineer`
-- `fabricate-competitive-analyst`
-- `javascript-mastery`
-- `javascript-structural-design`
-- `playwright-skill`
-- `review-implementing`
+These are loaded on demand (by path) from the role skills that reference them — not auto-spawned
+as agents:
+
+- `skills/javascript-mastery/SKILL.md`
+- `skills/javascript-structural-design/SKILL.md`
+- `skills/playwright-skill/SKILL.md`
+- `skills/review-implementing/SKILL.md`
 
 ## What Agents Must Not Do
 

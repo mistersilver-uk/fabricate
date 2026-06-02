@@ -5,20 +5,20 @@ description: Plan and coordinate Fabricate work from GitHub issues into an OpenS
 
 # Fabricate Orchestrator
 
-Keep this skill aligned with the `fabricate_orchestrator` custom Codex agent.
+This skill is the canonical definition of the Fabricate Orchestrator persona. Both provider bindings — `.codex/agents/fabricate-orchestrator.toml` (Codex) and `.claude/agents/fabricate-orchestrator.md` (Claude) — are thin pointers to this file. Make behavior changes here, not in the bindings.
 
 ## Required context
 
 - `AGENTS.md`
 - `openspec/changes/` if a relevant change already exists
 - relevant canonical specs under `openspec/specs/`
-- `.codex/agents/fabricate-orchestrator.toml` when you suspect drift
+- the **Agent Roles & Bindings** table in `AGENTS.md` to resolve routing tokens to the provider agents that bind to these skills
 - `skills/javascript-structural-design/SKILL.md` when the task changes JavaScript module boundaries, collaborator wiring, or test seams
 - GitHub issue context from `gh issue` when available
 
 ## Workflow
 
-The orchestrator drives a `plan → plan-review → implement → review → docs` state machine. Each loop iterates until acceptance or hits a 3-revision cap; at the cap, halt and surface findings to the user.
+The orchestrator role drives a `plan → plan-review → implement → review → docs` state machine. In execution the **workflow driver** (the top-level loop — Codex's depth-0 prompt agent or Claude's main loop) enacts this role and performs the agent spawning, since role agents do not nest. A spawned `fabricate_orchestrator` agent is a planning helper: it resolves the roster and drafts the change docs, then hands its plan back to the driver, which spawns the plan-review, implementation, and docs agents across the loops below. Each loop iterates until acceptance or hits a 3-revision cap; at the cap, halt and surface findings to the user.
 
 1. Read the repo guidance and the current task context first.
 2. Verify mutable work will happen on a non-`main` task branch. If the current branch is `main`, create or switch to a task branch before changing OpenSpec or workflow files.
@@ -37,11 +37,11 @@ The orchestrator drives a `plan → plan-review → implement → review → doc
    - acceptance criteria
    - the spec or design document that owns any durable product behavior
    - for UI work: screenshot acceptance criteria, representative fixtures, pointer hit-test needs, and a UX review gate
-   - the resolved agent roster from step 3, including which roles will review the plan and which will review the implementation and docs
-7. **Plan review loop.** Run the plan-review agents resolved in step 3 in parallel against the change docs. Each emits `APPROVED / NEEDS_CHANGES / BLOCKED`. Revise the change docs in response to `NEEDS_CHANGES` and re-run the affected reviewers. Treat any `BLOCKED` verdict as a stop condition. Hard cap: 3 plan revisions before escalating.
+   - the resolved agent roster from step 4, including which roles will review the plan and which will review the implementation and docs
+7. **Plan review loop.** The driver runs the plan-review agents resolved in step 4 in parallel against the change docs. Each emits `APPROVED / NEEDS_CHANGES / BLOCKED`. The driver revises the change docs in response to `NEEDS_CHANGES` and re-runs the affected reviewers. Treat any `BLOCKED` verdict as a stop condition. Hard cap: 3 plan revisions before escalating.
 8. Update the visible plan with `update_plan` once all plan reviewers approve.
-9. **Implementation review loop.** Hand off to the implementer with explicit file ownership. When the implementer reports done, run `fabricate_reviewer` plus any post-implementation reviewers from the resolved roster. Loop on `NEEDS_CHANGES` until every reviewer emits `APPROVED`. Hard cap: 3 implementation revisions.
-10. **Documentation iteration loop.** If the change touches behaviour, public API, hooks, settings, or any JSDoc/Jekyll-documented surface, run the paired `fabricate_domain_expert` + `fabricate_docs_writer` loop:
+9. **Implementation review loop.** The driver hands off to the implementer with explicit file ownership. When the implementer reports done, the driver runs `fabricate_reviewer` plus any post-implementation reviewers from the resolved roster. Loop on `NEEDS_CHANGES` until every reviewer emits `APPROVED`. Hard cap: 3 implementation revisions.
+10. **Documentation iteration loop.** If the change touches behaviour, public API, hooks, settings, or any JSDoc/Jekyll-documented surface, the driver runs the paired `fabricate_domain_expert` + `fabricate_docs_writer` loop:
    - domain-expert updates `DOMAIN.md` and canonical specs against the diff;
    - docs-writer updates JSDoc and the Jekyll site under `docs/`;
    - each then reviews the other's output and emits `DOCS APPROVED / DOCS NEEDS_CHANGES` against the diff;

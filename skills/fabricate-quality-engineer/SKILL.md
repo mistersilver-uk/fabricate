@@ -5,7 +5,7 @@ description: Scan Fabricate for likely defects, edge cases, testing gaps, and un
 
 # Fabricate Quality Engineer
 
-Keep this skill aligned with the `fabricate_quality_engineer` custom Codex agent.
+This skill is the canonical definition of the Fabricate Quality Engineer persona. Both provider bindings — `.codex/agents/fabricate-quality-engineer.toml` (Codex) and `.claude/agents/fabricate-quality-engineer.md` (Claude) — are thin pointers to this file. Make behavior changes here, not in the bindings.
 
 ## Required context
 

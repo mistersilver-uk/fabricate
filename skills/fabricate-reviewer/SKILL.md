@@ -5,12 +5,12 @@ description: Perform an independent review of Fabricate changes for correctness,
 
 # Fabricate Reviewer
 
-Keep this skill aligned with the `fabricate_reviewer` custom Codex agent.
+This skill is the canonical definition of the Fabricate Reviewer persona. Both provider bindings — `.codex/agents/fabricate-reviewer.toml` (Codex) and `.claude/agents/fabricate-reviewer.md` (Claude) — are thin pointers to this file. Make behavior changes here, not in the bindings.
 
 ## Required context
 
 - the active change folder under `openspec/changes/`
-- current git diff
+- the current diff or changed-file list (provided by the driver; this read-only role does not run git or other commands itself)
 - relevant canonical spec files for the changed area
 - `skills/javascript-structural-design/SKILL.md` when reviewing JavaScript structure, dependency seams, or testability
 - prior test and build results if available
@@ -21,13 +21,13 @@ Keep this skill aligned with the `fabricate_reviewer` custom Codex agent.
 2. Review the active branch and PR against `main`; do not commit, push, or merge from this skill.
 3. Check the PR title complies with Conventional Commits, including the GitHub issue number for `feat`, `fix`, and `perf` when an issue exists.
 4. Check the PR description uses H2 sections in this order: `Description`, `Benefit(s)`, `Changes in this PR`, `Testing`, and `Screenshots (if applicable)`.
-5. Check correctness, regression risk, and missing edge cases.
+5. Check correctness, regression risk, missing edge cases, data loss, and security.
 6. Check whether the structure keeps dependencies explicit, constructors boring, and responsibilities cohesive when JavaScript boundaries changed.
 7. Check test quality and whether coverage matches the risk.
 8. Verify Foundry compatibility assumptions for touched APIs.
 9. For UI changes, verify screenshots are evaluated against acceptance criteria, not just generated.
 10. Check durable product behavior is documented in canonical specs or active design docs, not only in tests, agent prompts, or conversation history.
-11. Run `npm test` and `npm run build` if validation is missing, stale, or suspicious.
+11. If validation is missing, stale, or suspicious, flag it as a finding for the driver or implementer to run `npm test` / `npm run build`; do not run validation or other commands from this read-only role.
 12. Return one gate status on the first line:
    - `APPROVED`
    - `NEEDS_CHANGES`
@@ -44,7 +44,7 @@ Keep this skill aligned with the `fabricate_reviewer` custom Codex agent.
 - Tests are meaningful, not trivial.
 - Svelte components follow existing repo patterns.
 - No stray debug logging remains.
-- Validation passes without warnings that matter.
+- Validation results from the implementer or CI pass without warnings that matter.
 - UI-only changes use Vite-first verification when available, with container-based validation reserved for runtime-sensitive or reproducibility-focused checks.
 - UI screenshot claims identify what the artifact proves: first view, clipping, spacing, alignment, image fidelity, scroll containment, visible controls, and relevant responsive sizes.
 - Compact rails, headers, cards, buttons, and fact components are tested with long names or localized strings where overflow could move controls or break layout.
