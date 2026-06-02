@@ -33,9 +33,11 @@
  *   - CI (Ubuntu): invoked by .github/workflows/release-s3.yml after `npm ci`;
  *     bucket/baseUrl come from repo vars, credentials from OIDC. The `zip`
  *     binary is present, so scripts/lib/zip.js takes its Unix path.
- *   - Local dev (Windows/macOS/Linux): run via `npm run release:s3:dry-run` to
- *     build + stage zips without AWS. On Windows, scripts/lib/zip.js uses
- *     PowerShell `Compress-Archive` so the staged zips install correctly.
+ *   - Local dev (Windows/macOS/Linux): run via
+ *     `npm run release:s3:dry-run -- --version <ver>` to build + stage zips
+ *     without AWS (--version is required, hence the `--` passthrough). On
+ *     Windows, scripts/lib/zip.js uses PowerShell `Compress-Archive` so the
+ *     staged zips install correctly.
  */
 import { execSync } from 'node:child_process';
 import { readFile, writeFile, rm, mkdir } from 'node:fs/promises';
@@ -185,13 +187,24 @@ async function main() {
   console.log(`release-s3: bucket=${bucket || '(unset)'} baseUrl=${baseUrl || '(unset)'}`);
   console.log(`release-s3: targets=channel + ${testerGroups.length} tester group(s)\n`);
 
-  // 2. Build dist/ at the requested version (reuse the canonical build path)
+  // 2. Build dist/ at the requested version (reuse the canonical build path).
+  //    scripts/release.js --version writes the version into the tracked root
+  //    module.json (semantic-release / promote-release rely on that), but the
+  //    built dist/ is self-contained once the build finishes. Save and restore
+  //    the root manifest so this command never leaves a tracked file dirty —
+  //    important for local dry-runs, harmless for CI's ephemeral checkout.
+  const rootManifestPath = join(ROOT, 'module.json');
+  const originalRootManifest = await readFile(rootManifestPath, 'utf8');
   console.log('release-s3: building...');
+  let buildOk = true;
   try {
     execSync(`node scripts/release.js --version "${version}" --no-zip`, { cwd: ROOT, stdio: 'inherit' });
   } catch {
-    fail('build failed');
+    buildOk = false;
+  } finally {
+    await writeFile(rootManifestPath, originalRootManifest);
   }
+  if (!buildOk) fail('build failed');
 
   // 3. Read + validate the built manifest
   const distDir = join(ROOT, 'dist');
