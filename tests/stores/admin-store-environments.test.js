@@ -2799,4 +2799,27 @@ describe('adminStore gathering library match-loss handling', () => {
     assert.equal(proceed, true);
     assert.equal(services._confirmCalls.length, 0);
   });
+
+  it('warns when disabling a task removes it from environments that currently compose it', async () => {
+    const services = createServices({
+      systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
+      environments: [
+        makeEnvironment({ id: 'auto', name: 'Auto Forest', compositionMode: 'automatic', biomes: ['forest'] }),
+        // Force-included into a non-matching environment: disabling still removes it here.
+        makeEnvironment({ id: 'forced', name: 'Forced Cave', compositionMode: 'manual', biomes: ['cavern'], forcedTaskIds: ['lib-task'] })
+      ],
+      gatheringConfig: gatheringConfigWithTask(),
+      confirmResult: true
+    });
+    const store = createAdminStore(services);
+
+    await store.selectSystem('system-a');
+    const proceed = await store.confirmGatheringLibraryTaskMatchLoss('system-a', 'lib-task', { enabled: false });
+
+    assert.equal(proceed, true);
+    assert.equal(services._confirmCalls.length, 1);
+    const { content } = services._confirmCalls[0];
+    assert.match(content, /Auto Forest/);
+    assert.match(content, /Forced Cave/);
+  });
 });

@@ -2272,23 +2272,11 @@ export function createAdminStore(services) {
 
   function _gatheringLibraryRecordUsages(systemId, record, kind) {
     if (!record?.id) return [];
-    // Tools are referenced by tasks (toolIds), not by environments, so keep the legacy
-    // allow-list lookup for them; tasks and hazards use full composition-aware surfacing.
-    if (kind === 'task' || kind === 'hazard') {
-      return _gatheringLibraryRecordSurfacingEnvironments(systemId, record, kind);
-    }
-    const recordId = String(record.id);
-    const usages = [];
-    for (const environment of _environmentList()) {
-      if (String(environment?.craftingSystemId || '') !== String(systemId || '')) continue;
-      const enabled = Array.isArray(environment?.enabledTaskIds) ? environment.enabledTaskIds.map(String) : [];
-      if (!enabled.includes(recordId)) continue;
-      usages.push({
-        id: String(environment.id || ''),
-        name: String(environment.name || environment.id || 'Unnamed environment')
-      });
-    }
-    return usages;
+    // Only tasks and hazards are surfaced into environments. Tools are referenced by tasks via
+    // their `toolIds`, not by environments, so an environment-level usage scan does not apply to
+    // them (the previous `enabledTaskIds` lookup could only ever match on an id collision).
+    if (kind !== 'task' && kind !== 'hazard') return [];
+    return _gatheringLibraryRecordSurfacingEnvironments(systemId, record, kind);
   }
 
   function _gatheringCurrentConditions(conditionSettings) {
@@ -2323,27 +2311,19 @@ export function createAdminStore(services) {
   }
 
   /**
-   * Enumerate the environments in `systemId` where `oldRecord` currently matches but `newRecord`
-   * would stop matching AND where the record is actually surfaced today, so editing its match
-   * criteria would silently drop it. An automatic-mode environment surfaces every matching record
-   * unless it is locally excluded; a manual-mode environment only surfaces records on its enabled
-   * allow-list (force-added records stay in regardless of match, so they are never affected).
+   * Enumerate the environments in `systemId` that compose `oldRecord` today but would no longer
+   * compose `newRecord` after the edit — i.e. where saving would silently remove the record. This
+   * covers any cause of removal the editors allow: losing a region/biome/danger match, or
+   * disabling the record outright (which drops it from every environment, including force-included
+   * rows). Records that remain composed after the edit are excluded.
    */
   function _gatheringLibraryRecordMatchLossEnvironments(systemId, oldRecord, newRecord, kind) {
-    // A library-disabled record is not composed anywhere, so editing its match criteria cannot
-    // remove it from an environment — there is nothing to warn about.
+    // A library-disabled record is not composed anywhere, so there is nothing to lose by editing it.
     if (!oldRecord?.id || oldRecord.enabled === false) return [];
-    const includeDanger = kind === 'hazard';
     const conditionSettings = _currentGatheringConfig().systems?.[String(systemId || '')]?.conditions || null;
     const affected = [];
     for (const environment of _environmentList()) {
       if (String(environment?.craftingSystemId || '') !== String(systemId || '')) continue;
-      const matchedBefore = _gatheringLibraryRecordMatchesEnvironment(oldRecord, environment, {}, includeDanger, conditionSettings);
-      const matchesAfter = _gatheringLibraryRecordMatchesEnvironment(newRecord, environment, {}, includeDanger, conditionSettings);
-      if (!(matchedBefore && !matchesAfter)) continue; // the match itself must be lost
-      // Only warn when the lost match actually changes whether the record is composed: it must
-      // compose today but not after the edit. Force-included records stay composed regardless of
-      // match, so they are correctly excluded here.
       const composedBefore = _environmentComposesGatheringRecord(environment, oldRecord, kind, conditionSettings);
       const composedAfter = _environmentComposesGatheringRecord(environment, newRecord, kind, conditionSettings);
       if (!(composedBefore && !composedAfter)) continue;
