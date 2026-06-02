@@ -76,12 +76,14 @@ version passed to the script.
   credentials step is gated `if: ${{ !inputs.dry_run }}`, so a dry-run dispatch
   needs no OIDC/role and cannot fail on missing AWS config. `scripts/lib/zip.js`
   takes its Unix `zip` path. A non-dry-run uploads to S3.
-- **Local dev (Windows/macOS/Linux).** `npm run release:s3:dry-run` builds and
-  stages per-target zips under `build/s3/` (git-ignored) using config defaults,
-  imports no AWS SDK, and contacts no network. On Windows the zip is produced via
-  PowerShell `Compress-Archive`. A real local publish (`npm run release:s3 --
-  --version <v>`) requires resolvable AWS credentials + bucket/baseUrl in the
-  environment.
+- **Local dev (Windows/macOS/Linux).** `npm run release:s3:dry-run -- --version <v>`
+  builds and stages per-target zips under `build/s3/` (git-ignored) using config
+  defaults, imports no AWS SDK, and contacts no network (`--version` is required,
+  so the `--` passthrough is mandatory). On Windows the zip is produced via
+  PowerShell `Compress-Archive`. The build's version injection into the tracked
+  root `module.json` is saved and restored, so the command leaves no dirty file.
+  A real local publish (`npm run release:s3 -- --version <v>`) requires resolvable
+  AWS credentials + bucket/baseUrl in the environment.
 
 ## Dependencies
 
