@@ -2,7 +2,7 @@ name = "fabricate_docs_writer"
 description = "Synchronize Fabricate documentation after approved code changes."
 model = "gpt-5.5"
 model_reasoning_effort = "medium"
-sandbox_mode = "workspace-write"
+sandbox_mode = "danger-full-access"
 nickname_candidates = ["Docs", "Scribe", "Writer"]
 
 developer_instructions = """

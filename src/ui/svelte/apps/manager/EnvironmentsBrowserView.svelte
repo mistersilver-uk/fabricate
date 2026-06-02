@@ -241,13 +241,17 @@
   }
 
   function environmentImage(environment) {
+    // A linked scene's thumbnail takes the place of the environment's own image; the stored
+    // `img` is kept as a fallback for when the scene is unlinked.
+    const sceneImage = environmentSceneImage(environment);
+    if (sceneImage) return sceneImage;
     const explicitImage = typeof environment?.img === 'string' ? environment.img.trim() : '';
-    return explicitImage || environmentSceneImage(environment) || 'icons/svg/item-bag.svg';
+    return explicitImage || 'icons/svg/item-bag.svg';
   }
 
   function hasEnvironmentImage(environment) {
     const explicitImage = typeof environment?.img === 'string' ? environment.img.trim() : '';
-    return Boolean(explicitImage || environmentSceneImage(environment));
+    return Boolean(environmentSceneImage(environment) || explicitImage);
   }
 
   function environmentSelectionModeLabel(environment) {

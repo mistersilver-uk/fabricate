@@ -2,7 +2,7 @@ name = "fabricate_ux_designer"
 description = "Review Fabricate Svelte UI, Foundry window layouts, accessibility, and interaction flows."
 model = "gpt-5.5"
 model_reasoning_effort = "high"
-sandbox_mode = "workspace-write"
+sandbox_mode = "danger-full-access"
 nickname_candidates = ["UX", "Layout", "A11y"]
 
 developer_instructions = """

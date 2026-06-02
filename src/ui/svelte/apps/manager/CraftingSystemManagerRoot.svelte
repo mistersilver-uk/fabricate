@@ -1739,7 +1739,7 @@
       itemUuid: '',
       quantity: 1,
       dropRate: 25,
-      conditionModifiers: { timeOfDay: [], weather: [] },
+      conditionModifiers: { biome: [], timeOfDay: [], weather: [] },
       enabled: false
     };
     selectedGatheringDropId = row.id;
@@ -2111,17 +2111,21 @@
     return text('FABRICATE.Admin.Environments.NewDraftTitle', 'New Gathering Environment');
   }
 
-  function environmentImage(environment) {
-    const ownImg = String(environment?.img || '').trim();
-    if (ownImg) return ownImg;
+  function environmentSceneImage(environment) {
     const linkedScene = linkedSceneForEnvironment(environment);
-    return linkedScene?.img || linkedScene?.thumbnail || linkedScene?.thumb || 'icons/svg/item-bag.svg';
+    return linkedScene?.img || linkedScene?.thumbnail || linkedScene?.thumb || '';
+  }
+
+  function environmentImage(environment) {
+    // A linked scene's thumbnail takes the place of the environment's own image; the stored
+    // `img` is kept as a fallback for when the scene is unlinked.
+    const sceneImage = environmentSceneImage(environment);
+    if (sceneImage) return sceneImage;
+    return String(environment?.img || '').trim() || 'icons/svg/item-bag.svg';
   }
 
   function hasEnvironmentImage(environment) {
-    if (String(environment?.img || '').trim()) return true;
-    const linkedScene = linkedSceneForEnvironment(environment);
-    return Boolean(linkedScene?.img || linkedScene?.thumbnail || linkedScene?.thumb);
+    return Boolean(environmentSceneImage(environment) || String(environment?.img || '').trim());
   }
 
   function linkedSceneForEnvironment(environment) {
@@ -3064,6 +3068,7 @@
             composition={$viewState.environmentComposition}
             hazardSelectionMode={selectedGatheringRules.hazardSelectionMode}
             isNew={$viewState.environmentDraftIsNew}
+            linkedSceneImage={environmentSceneImage($viewState.environmentDraft)}
             regionOptions={gatheringVocabularyOptions('regions')}
             biomeOptions={gatheringVocabularyOptions('biomes')}
             dangerOptions={gatheringVocabularyOptions('danger')}

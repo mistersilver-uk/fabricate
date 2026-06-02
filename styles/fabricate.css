@@ -9323,6 +9323,22 @@
   font-size: 0.72rem;
 }
 
+/* When a scene is linked, the identity image mirrors the (muted) scene thumbnail and is
+   locked — it can't be edited until the scene is unlinked. */
+.fabricate-manager .manager-task-image-picker.is-scene-linked {
+  cursor: default;
+}
+
+.fabricate-manager .manager-task-image-picker.is-scene-linked img {
+  object-fit: cover;
+  padding: 0;
+  filter: saturate(0.65) brightness(0.85);
+}
+
+.fabricate-manager .manager-task-image-picker.is-scene-linked i {
+  color: var(--fab-mv2-text-muted);
+}
+
 .fabricate-manager .manager-task-identity-fields {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -10717,12 +10733,14 @@
 .fabricate-manager .manager-drop-modifier-list {
   display: flex;
   align-items: center;
-  align-content: center;
+  align-content: flex-start;
   gap: 6px;
   flex-wrap: wrap;
   min-width: 0;
+  /* Two-line chip budget; extra modifier chips scroll within the cell. */
   max-height: 58px;
-  overflow: hidden;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .fabricate-manager .manager-chip.is-positive {
@@ -10769,13 +10787,6 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.fabricate-manager .manager-drop-modifier-overflow {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .fabricate-manager .manager-rank-chip {

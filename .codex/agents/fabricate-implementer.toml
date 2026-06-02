@@ -2,7 +2,7 @@ name = "fabricate_implementer"
 description = "Implement a scoped Fabricate change with tests and validation."
 model = "gpt-5.5"
 model_reasoning_effort = "high"
-sandbox_mode = "workspace-write"
+sandbox_mode = "danger-full-access"
 nickname_candidates = ["Builder", "Patch", "Forge"]
 
 developer_instructions = """
