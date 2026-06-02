@@ -33,6 +33,10 @@ describe('FabricateAppRoot shell', () => {
     );
   });
 
+  it('shows a "Coming soon" hint in each tab placeholder', () => {
+    assert.ok(rootSource.includes('FABRICATE.App.ComingSoon'), 'placeholder should localize a coming-soon hint');
+  });
+
   it('exposes an accessible tablist driven by host state', () => {
     assert.ok(rootSource.includes('role="tablist"'), 'left nav should be a tablist');
     assert.ok(rootSource.includes('activeTab === tab.id'), 'active state should derive from the activeTab prop');

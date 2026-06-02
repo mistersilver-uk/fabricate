@@ -6,6 +6,7 @@
     },
     "App": {
       "Title": "Fabricate",
+      "ComingSoon": "Coming soon",
       "Nav": {
         "Crafting": "Crafting",
         "Alchemy": "Alchemy",

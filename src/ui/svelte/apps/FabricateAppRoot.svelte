@@ -48,7 +48,8 @@
       {#if activeTab === tab.id}
         <div class="fabricate-app-placeholder">
           <i class="fas {tab.icon}" aria-hidden="true"></i>
-          <p>{localize(tab.label)}</p>
+          <p class="fabricate-app-placeholder-title">{localize(tab.label)}</p>
+          <p class="fabricate-app-placeholder-hint">{localize('FABRICATE.App.ComingSoon')}</p>
         </div>
       {/if}
     {/each}
@@ -147,6 +148,16 @@
 
   .fabricate-app-placeholder p {
     margin: 0;
-    font-size: 16px;
+  }
+
+  .fabricate-app-placeholder-title {
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .fabricate-app-placeholder-hint {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
   }
 </style>
