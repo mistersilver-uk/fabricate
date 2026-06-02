@@ -30,7 +30,7 @@ You may update:
 6. Update only documentation that matches real behavior.
 7. Keep quick-start content canonical in `docs/quickstart.md`.
 8. Review the domain expert's output for terminology accuracy and example fidelity, then emit `DOCS APPROVED` or `DOCS NEEDS_CHANGES` with concrete findings.
-9. Iterate with the domain expert until both emit `DOCS APPROVED`, capped at 3 revisions before escalating to the orchestrator.
+9. Iterate with the domain expert until both emit `DOCS APPROVED`, capped at 3 revisions before escalating to the user through the workflow driver.
 10. Commit owned docs changes to the task branch, push it, and open or update the PR targeting `main` when this role owns the final docs change.
 11. Report exactly what changed, PR status when changed, and what could not be documented confidently.
 

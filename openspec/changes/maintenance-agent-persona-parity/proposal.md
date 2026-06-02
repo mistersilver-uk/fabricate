@@ -22,12 +22,14 @@ existing routing table drives the same workflow without per-task prompting.
   pointers with no divergent behavior.
 - Structural enforcement where possible: Claude `tools:` allowlists block agent spawning and
   match each role's Codex sandbox mode; a validator + CI job keep the bindings consistent.
-- Progressive disclosure: bindings hold no scope and defer to the skill, which defers to
-  specs / `docs/agents/` notes / sibling skills on demand.
+- Progressive disclosure: bindings hold only provider-local metadata and guardrails, then defer
+  persona behavior to the skill, which defers to specs / `docs/agents/` notes / sibling skills
+  on demand.
 
 ## Out of scope
 
-- Rewriting the role playbooks themselves (the `SKILL.md` content is reused as-is).
+- Wholesale rewrites of the role playbooks; scoped edits are limited to canonical-source
+  statements and guidance moved out of provider bindings.
 - Changing the Codex GitHub Actions prompts under `.github/prompts/`.
 - The read-only `fabricate_pr_explorer` mapping role gains no Claude binding — Claude uses its
   built-in `Explore` agent.

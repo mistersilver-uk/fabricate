@@ -79,7 +79,8 @@ Each agent role MUST be defined once in its canonical `skills/<role>/SKILL.md`. 
 
 - **WHEN** a role's behavior must change
 - **THEN** the edit is made in `skills/<role>/SKILL.md`
-- **AND** the provider bindings remain thin pointers without duplicated instructions
+- **AND** the provider bindings remain thin pointers without divergent persona behavior
+- **AND** provider-local metadata, tool allowlists, and sandbox guardrails may live in bindings when needed
 
 #### Scenario: orchestration ownership
 

@@ -10,15 +10,17 @@
    to pointers (preserving `name`/`model`/`model_reasoning_effort`/`sandbox_mode`/
    `nickname_candidates`). Added 8 `.claude/agents/*.md` thin subagents registered as
    `subagent_type`s.
-3. **Driver owns orchestration.** Role agents do not nest in either provider (Codex
-   `max_depth = 1`; Claude subagents cannot spawn). The *workflow driver* (Codex depth-0
-   prompt agent / Claude main loop) enacts the orchestrator role and performs all spawning; a
-   spawned `fabricate_orchestrator` is a planning helper that returns its plan. Child bindings
-   state they execute their scoped role and do not spawn/route.
+3. **Driver owns orchestration.** Role agents do not nest in either provider. Codex is
+   constrained by `.codex/config.toml` `max_depth = 1`; Claude bindings omit `Agent`/`Task`
+   from their tool allowlists. The *workflow driver* (Codex depth-0 prompt agent / Claude main
+   loop) enacts the orchestrator role and performs all spawning; a spawned
+   `fabricate_orchestrator` is a planning helper that returns its plan. Child bindings state
+   they execute their scoped role and do not spawn/route.
 4. **Structural tool scope.** Each Claude binding declares an explicit `tools:` allowlist that
-   excludes `Agent`/`Task` (no spawning) and mirrors the role's Codex `sandbox_mode`
-   (read-only roles omit `Edit`/`Write`). Path-scoped edit limits (e.g. "no `src/` edits")
-   remain prose — tool allowlists cannot path-scope.
+   excludes `Agent`/`Task` (no spawning) and mirrors the role's Codex `sandbox_mode`.
+   Read-only roles omit mutation-capable tools (`Edit`/`Write`/`MultiEdit`/`NotebookEdit`/
+   `Bash`). Path-scoped edit limits (e.g. "no `src/` edits") remain prose — tool allowlists
+   cannot path-scope.
 5. **Consistency validator + CI.** `scripts/validate-agent-bindings.mjs` asserts skill ↔ Codex
    ↔ Claude ↔ `AGENTS.md` table consistency, tool/sandbox parity, spawn-tool exclusion, and
    orphan bindings. Wired into CI as the `validate-bindings` job and runnable locally via

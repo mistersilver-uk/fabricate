@@ -17,7 +17,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 // Tools that let a role mutate the workspace or spawn further agents. A Claude
 // binding that mirrors a Codex `sandbox_mode = "read-only"` must include none of
 // these (Bash can mutate files/git state, so it counts as write capability).
-const WRITE_TOOLS = ["Edit", "Write", "NotebookEdit", "Bash"];
+const WRITE_TOOLS = ["Edit", "Write", "MultiEdit", "NotebookEdit", "Bash"];
 // Tools that let a role spawn/route sub-agents. Role agents must never nest.
 const SPAWN_TOOLS = ["Agent", "Task"];
 
@@ -26,9 +26,18 @@ const read = (rel) => (existsSync(join(root, rel)) ? readFileSync(join(root, rel
 const exists = (rel) => existsSync(join(root, rel));
 const require_ = (cond, msg) => { if (!cond) errors.push(msg); };
 
+const normalizeToolsValue = (value) => value
+  .replace(/\s+#.*$/, "")
+  .trim()
+  .replace(/^\[/, "")
+  .replace(/\]$/, "")
+  .split(",")
+  .map((t) => t.trim().replace(/^["'`]|["'`]$/g, ""))
+  .filter(Boolean);
+
 const parseTools = (md) => {
   const m = md && md.match(/^tools:\s*(.+)$/m);
-  return m ? m[1].split(",").map((t) => t.trim()).filter(Boolean) : null;
+  return m ? normalizeToolsValue(m[1]) : null;
 };
 
 const agentsMd = read("AGENTS.md");
@@ -66,7 +75,11 @@ for (const { cells, token } of rows) {
   if (!skillCell) {
     mappingRoles++;
     expectedCodex.add(`fabricate-${role}.toml`);
-    require_(exists(codexPath), `${codexPath} (Codex binding for ${token}) is missing`);
+    const codex = read(codexPath);
+    require_(codex, `${codexPath} (Codex binding for ${token}) is missing`);
+    if (codex) {
+      require_(/sandbox_mode\s*=\s*"read-only"/.test(codex), `${codexPath} must remain sandbox_mode = "read-only" for mapping role ${token}`);
+    }
     require_(/Explore/.test(claudeCol), `AGENTS.md ${token} row Claude column must be the built-in Explore agent, got "${claudeCol}"`);
     continue;
   }

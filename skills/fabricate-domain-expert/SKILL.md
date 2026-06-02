@@ -27,7 +27,7 @@ This skill is the canonical definition of the Fabricate Domain Expert persona. B
 
 ## Plan-review duty
 
-When the orchestrator routes a plan for domain review (change touches `src/models/`, `src/systems/`, `src/integrations/`, `openspec/specs/`, `lang/`, or domain language), audit the OpenSpec change docs:
+When the workflow driver routes a plan for domain review (change touches `src/models/`, `src/systems/`, `src/integrations/`, `openspec/specs/`, `lang/`, or domain language), audit the OpenSpec change docs:
 
 - check naming, lifecycle, and aggregate boundaries are consistent with `DOMAIN.md` and canonical specs;
 - flag hidden concepts the change introduces but does not name;
@@ -37,12 +37,12 @@ Do not edit `src/`, `tests/`, or runtime docs while reviewing a plan; restrict e
 
 ## Documentation iteration loop
 
-When the orchestrator routes the change into the documentation loop (behaviour change, public API, hooks, settings, or any JSDoc/Jekyll-documented surface), pair with `fabricate_docs_writer`:
+When the workflow driver routes the change into the documentation loop (behaviour change, public API, hooks, settings, or any JSDoc/Jekyll-documented surface), pair with `fabricate_docs_writer`:
 
 1. Update `DOMAIN.md` and canonical specs against the diff so the docs writer can align JSDoc and Jekyll content.
 2. Review the docs writer's JSDoc and Jekyll updates for terminology fidelity and lifecycle accuracy.
 3. Emit `DOCS APPROVED` or `DOCS NEEDS_CHANGES` with concrete findings.
-4. Iterate with the docs writer until both emit `DOCS APPROVED`, capped at 3 revisions before escalating to the orchestrator.
+4. Iterate with the docs writer until both emit `DOCS APPROVED`, capped at 3 revisions before escalating to the user through the workflow driver.
 
 ## Audit focus
 
