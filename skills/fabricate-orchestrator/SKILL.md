@@ -18,7 +18,7 @@ This skill is the canonical definition of the Fabricate Orchestrator persona. Bo
 
 ## Workflow
 
-The orchestrator drives a `plan → plan-review → implement → review → docs` state machine. Each loop iterates until acceptance or hits a 3-revision cap; at the cap, halt and surface findings to the user.
+The orchestrator role drives a `plan → plan-review → implement → review → docs` state machine. In execution the **workflow driver** (the top-level loop — Codex's depth-0 prompt agent or Claude's main loop) enacts this role and performs the agent spawning, since role agents do not nest. A spawned `fabricate_orchestrator` agent is a planning helper: it resolves the roster and drafts the change docs, then hands its plan back to the driver, which spawns the plan-review, implementation, and docs agents across the loops below. Each loop iterates until acceptance or hits a 3-revision cap; at the cap, halt and surface findings to the user.
 
 1. Read the repo guidance and the current task context first.
 2. Verify mutable work will happen on a non-`main` task branch. If the current branch is `main`, create or switch to a task branch before changing OpenSpec or workflow files.

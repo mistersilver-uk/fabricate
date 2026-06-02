@@ -47,6 +47,22 @@ jobs:
       - name: Build module
         run: npm run build
 
+  validate-bindings:
+    # Pure-Node consistency check for the agent role bindings (skills <-> Codex
+    # <-> Claude <-> AGENTS.md table). No install needed — the script has no deps.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Validate agent bindings
+        run: npm run validate:agents
+
   lint-commits:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest

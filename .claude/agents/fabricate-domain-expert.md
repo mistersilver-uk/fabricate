@@ -1,6 +1,7 @@
 ---
 name: fabricate-domain-expert
 description: Audit and refine Fabricate's crafting domain model, ubiquitous language, and spec-to-code alignment. Use for naming decisions, DDD modelling, DOMAIN.md updates, spec or code audits, research into other crafting systems, or backlog tasks about domain fidelity.
+tools: Read, Grep, Glob, Edit, Write, Bash
 model: opus
 ---
 

@@ -22,6 +22,8 @@ Non-trivial work runs as a `plan → plan-review → implement → review → do
 
 The routing tokens below (`fabricate_orchestrator`, etc.) are provider-neutral role identifiers. Each resolves to a registered agent in **both** providers — `.codex/agents/*.toml` for Codex and `.claude/agents/*.md` for Claude (spawned via the Agent tool using the `subagent_type` in [Agent Roles & Bindings](#agent-roles--bindings)) — so the auto-spawn workflow behaves the same regardless of which assistant is driving. The one exception is the read-only `fabricate_pr_explorer` mapping role: Claude uses its built-in `Explore` agent rather than a dedicated binding (see the table below).
 
+**Workflow driver.** The top-level loop — Codex's depth-0 prompt agent or Claude's main loop — is the *workflow driver*. It enacts the orchestrator role: it owns routing and the iteration loops and performs **all** agent spawning. The spawnable `fabricate_orchestrator` agent is a planning helper the driver may delegate to for resolving the roster and drafting the OpenSpec change docs; it returns its plan to the driver. Spawned role agents execute their scoped role and do not nest — no role agent spawns another.
+
 ### Auto-spawn routing
 
 Match the change against every signal that applies. All matching agents run in parallel within their stage; this is multi-select, not single-pick.
@@ -40,9 +42,9 @@ Match the change against every signal that applies. All matching agents run in p
 
 Three loops run until acceptance, each capped at 3 revisions before escalating to the user:
 
-1. **Plan review loop.** Orchestrator drafts the OpenSpec change docs, then runs the plan-review agents matched by the routing table. Each emits `APPROVED / NEEDS_CHANGES / BLOCKED` against the plan. Orchestrator revises the change docs until every plan reviewer approves.
-2. **Implementation review loop.** Implementer ships changes; `fabricate_reviewer` plus any post-implementation reviewers from the routing table emit verdicts. Implementer addresses `NEEDS_CHANGES` until every reviewer emits `APPROVED`.
-3. **Documentation iteration loop.** Triggered whenever the change touches behaviour or any documented API surface. `fabricate_domain_expert` updates `DOMAIN.md` and canonical specs against the diff; `fabricate_docs_writer` updates JSDoc and the Jekyll site. Each then reviews the other's output and emits `DOCS APPROVED / DOCS NEEDS_CHANGES`. Loop until both approve.
+1. **Plan review loop.** The driver drafts the OpenSpec change docs (delegating to a `fabricate_orchestrator` planning agent when useful), then spawns the plan-review agents matched by the routing table. Each emits `APPROVED / NEEDS_CHANGES / BLOCKED` against the plan. The driver revises the change docs until every plan reviewer approves.
+2. **Implementation review loop.** The driver spawns the implementer to ship changes, then spawns `fabricate_reviewer` plus any post-implementation reviewers from the routing table to emit verdicts. The implementer addresses `NEEDS_CHANGES` until every reviewer emits `APPROVED`.
+3. **Documentation iteration loop.** Triggered whenever the change touches behaviour or any documented API surface. The driver spawns the paired `fabricate_domain_expert` (updates `DOMAIN.md` and canonical specs against the diff) and `fabricate_docs_writer` (updates JSDoc and the Jekyll site). Each then reviews the other's output and emits `DOCS APPROVED / DOCS NEEDS_CHANGES`. Loop until both approve.
 
 ### Stop conditions
 

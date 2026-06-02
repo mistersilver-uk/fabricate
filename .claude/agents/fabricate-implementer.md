@@ -1,6 +1,7 @@
 ---
 name: fabricate-implementer
 description: Implement a single planned Fabricate change in the JavaScript, Svelte, and Vite codebase with focused tests and validation gates. Use when an active OpenSpec change under `openspec/changes/` defines the task and code or test files need to change under `src/`, `tests/`, or related runtime files, with `npm test` and `npm run build` required before handoff.
+tools: Read, Grep, Glob, Edit, Write, Bash
 model: opus
 ---
 

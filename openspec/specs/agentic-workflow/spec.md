@@ -73,7 +73,7 @@ Each agent role MUST be defined once in its canonical `skills/<role>/SKILL.md`. 
 
 - **WHEN** the auto-spawn routing table in `AGENTS.md` names a role token such as `fabricate_orchestrator`
 - **THEN** it resolves to a registered agent in each active provider — `.codex/agents/<role>.toml` for Codex and the `.claude/agents/<role>.md` `subagent_type` for Claude
-- **AND** the read-only mapping role `fabricate_pr_explorer`, which has no shared skill, resolves to the provider's built-in explorer (Claude's `Explore`)
+- **AND** the read-only mapping role `fabricate_pr_explorer`, which has no shared skill, resolves to `.codex/agents/fabricate-pr-explorer.toml` for Codex and to Claude's built-in `Explore` agent (no dedicated Claude binding)
 
 #### Scenario: changing role behavior
 

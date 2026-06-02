@@ -1,6 +1,7 @@
 ---
 name: fabricate-quality-engineer
 description: Scan Fabricate for likely defects, edge cases, testing gaps, and unreliable UI behavior, then record actionable issues. Use for bug hunts, reliability audits, regression-risk analysis, or creating GitHub issues instead of directly implementing fixes.
+tools: Read, Grep, Glob, Edit, Write, Bash
 model: opus
 ---
 
