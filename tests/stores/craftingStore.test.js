@@ -6,6 +6,12 @@ import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
 
+const REMOVED_MODULE_SETTING_KEYS = new Set([
+  'enabled',
+  'showSimpleRecipesOnly',
+  'autoCraft'
+]);
+
 // ---------------------------------------------------------------------------
 // Mock service helpers
 // ---------------------------------------------------------------------------
@@ -71,13 +77,12 @@ function emptyEvaluation() {
  * Override individual properties via the `overrides` map.
  */
 function createMockServices(overrides = {}) {
+  const settingReads = [];
   const store = {
     [/* LAST_CRAFTING_ACTOR */ 'lastCraftingActor']: '',
     [/* LAST_COMPONENT_SOURCES */ 'lastComponentSources']: [],
     [/* FAVOURITE_RECIPES */ 'favouriteRecipes']: [],
-    [/* RECENTLY_CRAFTED */ 'recentlyCrafted']: [],
-    [/* AUTO_CRAFT */ 'autoCraft']: false,
-    [/* SHOW_SIMPLE_RECIPES_ONLY */ 'showSimpleRecipesOnly']: false
+    [/* RECENTLY_CRAFTED */ 'recentlyCrafted']: []
   };
 
   const actorA = makeActor('a1', 'Alice');
@@ -129,7 +134,10 @@ function createMockServices(overrides = {}) {
     getCraftingRunManager: () => defaultRunManager,
     getSalvageRunManager: () => defaultSalvageRunManager,
     getCraftingEngine: () => defaultEngine,
-    getSetting: (key) => store[key] ?? null,
+    getSetting: (key) => {
+      settingReads.push(key);
+      return store[key] ?? null;
+    },
     setSetting: async (key, value) => { store[key] = value; },
     getAvailableActors: () => [actorA, actorB],
     getOwnedActors: () => [actorA, actorB],
@@ -145,7 +153,15 @@ function createMockServices(overrides = {}) {
     getChatSpeaker: () => ({})
   };
 
-  return { ...base, ...overrides, _store: store, _actors: { actorA, actorB }, _recipes: { recipe1, recipe2 } };
+  return { ...base, ...overrides, _store: store, _settingReads: settingReads, _actors: { actorA, actorB }, _recipes: { recipe1, recipe2 } };
+}
+
+function assertNoRemovedModuleSettingReads(services) {
+  assert.deepEqual(
+    services._settingReads?.filter(key => REMOVED_MODULE_SETTING_KEYS.has(key)) ?? [],
+    [],
+    'crafting store should not read removed module setting keys'
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -614,7 +630,6 @@ describe('createCraftingStore', () => {
       const services = createMockServices({
         getSetting: (key) => {
           if (key === 'recentlyCrafted') return recents;
-          if (key === 'autoCraft') return true; // skip confirm
           return null;
         },
         setSetting: async (key, value) => {
@@ -632,7 +647,6 @@ describe('createCraftingStore', () => {
       const services = createMockServices({
         getSetting: (key) => {
           if (key === 'recentlyCrafted') return recents;
-          if (key === 'autoCraft') return true;
           return null;
         },
         setSetting: async (key, value) => {
@@ -649,7 +663,6 @@ describe('createCraftingStore', () => {
       const services = createMockServices({
         getSetting: (key) => {
           if (key === 'recentlyCrafted') return recents;
-          if (key === 'autoCraft') return true;
           return null;
         },
         setSetting: async (key, value) => {
@@ -666,13 +679,9 @@ describe('createCraftingStore', () => {
   // --- craft action ---
 
   describe('craft', () => {
-    it('calls confirmDialog when autoCraft is false and skipConfirm is not set', async () => {
+    it('calls confirmDialog when skipConfirm is not set', async () => {
       let confirmCalled = false;
       const services = createMockServices({
-        getSetting: (key) => {
-          if (key === 'autoCraft') return false;
-          return null;
-        },
         confirmDialog: async () => {
           confirmCalled = true;
           return true;
@@ -681,15 +690,12 @@ describe('createCraftingStore', () => {
       const store = createCraftingStore(services);
       await store.craft('r1');
       assert.ok(confirmCalled);
+      assertNoRemovedModuleSettingReads(services);
     });
 
     it('skips confirmDialog when skipConfirm is true', async () => {
       let confirmCalled = false;
       const services = createMockServices({
-        getSetting: (key) => {
-          if (key === 'autoCraft') return false;
-          return null;
-        },
         confirmDialog: async () => {
           confirmCalled = true;
           return true;
@@ -700,13 +706,9 @@ describe('createCraftingStore', () => {
       assert.ok(!confirmCalled);
     });
 
-    it('skips confirmDialog when autoCraft setting is true', async () => {
+    it('uses confirmDialog for normal craft actions', async () => {
       let confirmCalled = false;
       const services = createMockServices({
-        getSetting: (key) => {
-          if (key === 'autoCraft') return true;
-          return null;
-        },
         confirmDialog: async () => {
           confirmCalled = true;
           return true;
@@ -714,13 +716,13 @@ describe('createCraftingStore', () => {
       });
       const store = createCraftingStore(services);
       await store.craft('r1');
-      assert.ok(!confirmCalled);
+      assert.ok(confirmCalled);
+      assertNoRemovedModuleSettingReads(services);
     });
 
     it('delegates to craftingEngine.craft with correct arguments', async () => {
       let craftArgs = null;
       const services = createMockServices({
-        getSetting: (key) => key === 'autoCraft' ? true : null,
         getCraftingEngine: () => ({
           craft: async (...args) => {
             craftArgs = args;
@@ -750,7 +752,6 @@ describe('createCraftingStore', () => {
     it('notifies error when confirm dialog is declined', async () => {
       let notified = false;
       const services = createMockServices({
-        getSetting: (key) => key === 'autoCraft' ? false : null,
         confirmDialog: async () => false,
         notify: { info: () => {}, warn: () => {}, error: () => { notified = true; } }
       });
@@ -766,7 +767,6 @@ describe('createCraftingStore', () => {
     it('does NOT call createChatMessage on successful craft (chat handled by CraftingEngine)', async () => {
       let chatMessageCount = 0;
       const services = createMockServices({
-        getSetting: (key) => key === 'autoCraft' ? true : null,
         createChatMessage: async () => { chatMessageCount++; return {}; }
       });
       const store = createCraftingStore(services);
@@ -883,7 +883,6 @@ describe('createCraftingStore', () => {
         getAvailableActors: () => [actor],
         getOwnedActors: () => [actor],
         getGameUser: () => ({ id: 'u1', character: actor }),
-        getSetting: (key) => key === 'autoCraft' ? true : null,
         getCraftingSystemManager: () => ({
           getSystems: () => [],
           getSystem: () => ({
@@ -907,6 +906,127 @@ describe('createCraftingStore', () => {
       assert.equal(salvageArgs[0], 'Actor.a1');
       assert.equal(salvageArgs[1], 'sys-1');
       assert.equal(salvageArgs[2], 'comp-1');
+    });
+
+    it('calls confirmDialog for normal salvage actions', async () => {
+      const actor = {
+        id: 'a1',
+        uuid: 'Actor.a1',
+        name: 'Alice',
+        isOwner: true,
+        items: [],
+        [Symbol.iterator]: function* iter() {}
+      };
+      let confirmCalled = false;
+      let salvageCalled = false;
+      const services = createMockServices({
+        getAvailableActors: () => [actor],
+        getOwnedActors: () => [actor],
+        getGameUser: () => ({ id: 'u1', character: actor }),
+        confirmDialog: async () => {
+          confirmCalled = true;
+          return true;
+        },
+        getCraftingSystemManager: () => ({
+          getSystems: () => [],
+          getSystem: () => ({
+            id: 'sys-1',
+            components: [{ id: 'comp-1', name: 'Broken Sword', salvage: { enabled: true, ingredientQuantity: 1 } }]
+          })
+        }),
+        getCraftingEngine: () => ({
+          salvage: async () => {
+            salvageCalled = true;
+            return { success: true, message: 'salvaged' };
+          }
+        })
+      });
+
+      const store = createCraftingStore(services);
+      await store.salvage('sys-1', 'comp-1');
+
+      assert.ok(confirmCalled);
+      assert.ok(salvageCalled);
+      assertNoRemovedModuleSettingReads(services);
+    });
+
+    it('does not salvage when the normal salvage confirmation is declined', async () => {
+      const actor = {
+        id: 'a1',
+        uuid: 'Actor.a1',
+        name: 'Alice',
+        isOwner: true,
+        items: [],
+        [Symbol.iterator]: function* iter() {}
+      };
+      let salvageCalled = false;
+      const services = createMockServices({
+        getAvailableActors: () => [actor],
+        getOwnedActors: () => [actor],
+        getGameUser: () => ({ id: 'u1', character: actor }),
+        confirmDialog: async () => false,
+        getCraftingSystemManager: () => ({
+          getSystems: () => [],
+          getSystem: () => ({
+            id: 'sys-1',
+            components: [{ id: 'comp-1', name: 'Broken Sword', salvage: { enabled: true, ingredientQuantity: 1 } }]
+          })
+        }),
+        getCraftingEngine: () => ({
+          salvage: async () => {
+            salvageCalled = true;
+            return { success: true, message: 'salvaged' };
+          }
+        })
+      });
+
+      const store = createCraftingStore(services);
+      await store.salvage('sys-1', 'comp-1');
+
+      assert.equal(salvageCalled, false);
+      assertNoRemovedModuleSettingReads(services);
+    });
+
+    it('skips confirmDialog when salvage skipConfirm is true', async () => {
+      const actor = {
+        id: 'a1',
+        uuid: 'Actor.a1',
+        name: 'Alice',
+        isOwner: true,
+        items: [],
+        [Symbol.iterator]: function* iter() {}
+      };
+      let confirmCalled = false;
+      let salvageCalled = false;
+      const services = createMockServices({
+        getAvailableActors: () => [actor],
+        getOwnedActors: () => [actor],
+        getGameUser: () => ({ id: 'u1', character: actor }),
+        confirmDialog: async () => {
+          confirmCalled = true;
+          return true;
+        },
+        getCraftingSystemManager: () => ({
+          getSystems: () => [],
+          getSystem: () => ({
+            id: 'sys-1',
+            components: [{ id: 'comp-1', name: 'Broken Sword', salvage: { enabled: true, ingredientQuantity: 1 } }]
+          })
+        }),
+        getCraftingEngine: () => ({
+          salvage: async () => {
+            salvageCalled = true;
+            return { success: true, message: 'salvaged' };
+          }
+        })
+      });
+
+      const store = createCraftingStore(services);
+      await store.salvage('sys-1', 'comp-1', { skipConfirm: true });
+
+      assert.equal(confirmCalled, false);
+      assert.ok(salvageCalled);
+      assertNoRemovedModuleSettingReads(services);
     });
 
     it('cancelSalvageRun delegates to salvageRunManager.cancelRun', async () => {

@@ -23,6 +23,7 @@ Fabricate's Foundry-facing product UI must use a clean flat visual style.
 - Visual hierarchy should come from spacing, typography, borders, and restrained shadows rather than decorative gradients or blur-based glass effects.
 - Shared tokens in `styles/fabricate.css` and app-local editor tokens should be the source of truth for reusable surface treatments.
 - Fabricate exposes a global module setting, `fabricate.theme`, for choosing the active product UI colour theme.
+- Fabricate exposes a global module setting, `fabricate.experimentalFeatures`, for future experimental feature gates. It defaults to disabled.
 - `Fabricate` is the default theme.
 - `Mythwright` preserves the previous dark green product palette.
 - The supported preset catalog also includes `Ironblood Forge`, `Hearth & Herb`, `Starglass Arcana`, and `Foundry Native`.
@@ -80,6 +81,7 @@ Selected-system navigation:
 - When a crafting system is selected, `System settings` is the first left-nav item and stays in that position regardless of feature gates.
 - Feature-scoped left-nav items are visible only when their feature is enabled or otherwise available for the selected system.
 - Feature-scoped routes that have been implemented must be enabled navigation controls, not disabled placeholders. If a route is still planned only, it may remain in the placeholder/deferred-view set.
+- Manager V2 selected-system experimental routes are gated by `fabricate.experimentalFeatures`. When the setting is disabled, `Recipes`, `Rules`, and `Graph` render as disabled planned rail items with the `Soon` treatment and cannot become the active route. When the setting is enabled, `Recipes` is available as an implemented route for the selected system; `Rules` and `Graph` remain disabled planned rail items until their v2 route content is implemented.
 - The selected-system Gathering rail item shows an expand/collapse control instead of an environment count. Activating the parent item opens the Environments browser by default and expands the submenu; activating only the expand/collapse control toggles the submenu without navigation. The expanded submenu contains Environments, Tasks, Hazards, and Settings inside a soft grouped container that does not shift the parent Gathering row, icon, label, or expand/collapse control. The Gathering parent row remains visually neutral, and only the selected subsection uses the selected menu-item treatment. Gathering section navigation must not be duplicated as an in-page horizontal tab strip.
 - The selected-system `Tools` rail item is a top-level entry rendered between `Essences` and `Gathering`. It is always visible when a crafting system is selected and is not gated by the gathering or essences feature flags, because tools are a cross-cutting crafting concept that will be referenced by recipes, salvage, and gathering tasks alike.
 - The root `Crafting Systems` breadcrumb returns to the systems browser. The selected-system breadcrumb opens that system's in-manager System settings route.
@@ -762,8 +764,10 @@ World settings:
 - `fabricate.craftingSystems`
 - `fabricate.recipes`
 - `fabricate.gatheringEnvironments`
-- `fabricate.gatheringConditions`
+- `fabricate.gatheringConfig`
+- `fabricate.migrationVersion`
 - `fabricate.theme`
+- `fabricate.experimentalFeatures`
 
 Client settings:
 
@@ -772,7 +776,9 @@ Client settings:
 - `fabricate.lastComponentSources`
 - `fabricate.lastManagedCraftingSystem`
 - `fabricate.lastAlchemySystem`
-- optional progressive order preferences
+- `fabricate.favouriteRecipes`
+- `fabricate.recentlyCrafted`
+- `fabricate.progressiveResultOrder`
 
 Flags:
 

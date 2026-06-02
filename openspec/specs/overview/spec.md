@@ -105,7 +105,10 @@ World:
 - `fabricate.craftingSystems`
 - `fabricate.recipes`
 - `fabricate.gatheringEnvironments`
+- `fabricate.gatheringConfig`
+- `fabricate.migrationVersion`
 - `fabricate.theme` for the active Fabricate UI theme preset (`Fabricate` by default, plus `Mythwright`, `Ironblood Forge`, `Hearth & Herb`, `Starglass Arcana`, and the fixed Foundry-inspired `Foundry Native` preset)
+- `fabricate.experimentalFeatures` for future experimental feature gates, disabled by default
 
 Client:
 
@@ -113,7 +116,10 @@ Client:
 - `fabricate.lastGatheringActor`
 - `fabricate.lastComponentSources`
 - `fabricate.lastManagedCraftingSystem`
-- optional progressive order preferences
+- `fabricate.lastAlchemySystem`
+- `fabricate.favouriteRecipes`
+- `fabricate.recentlyCrafted`
+- `fabricate.progressiveResultOrder`
 
 ### Actor Flags
 

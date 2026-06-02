@@ -25,6 +25,12 @@ const {
   normalizeFabricateTheme
 } = await import('../src/ui/theme.js');
 
+const REMOVED_MODULE_SETTING_KEYS = [
+  'enabled',
+  'showSimpleRecipesOnly',
+  'autoCraft'
+];
+
 describe('Fabricate theme management', () => {
   beforeEach(setupDOM);
   afterEach(teardownDOM);
@@ -36,6 +42,20 @@ describe('Fabricate theme management', () => {
     };
 
     registerFabricateSettings();
+
+    const registeredKeys = registrations.map(entry => entry.key);
+    for (const removedKey of REMOVED_MODULE_SETTING_KEYS) {
+      assert.ok(!registeredKeys.includes(removedKey), `${removedKey} should not be registered`);
+    }
+
+    const configurableKeys = registrations
+      .filter(entry => entry.definition.config === true)
+      .map(entry => entry.key)
+      .sort();
+    assert.deepEqual(configurableKeys, [
+      SETTING_KEYS.EXPERIMENTAL_FEATURES,
+      SETTING_KEYS.THEME
+    ].sort());
 
     const theme = registrations.find(entry => entry.key === SETTING_KEYS.THEME);
     assert.ok(theme, 'theme setting should be registered');
@@ -61,6 +81,14 @@ describe('Fabricate theme management', () => {
       'foundry-native': 'Foundry Native'
     });
     assert.deepEqual(theme.definition.choices, FABRICATE_THEME_CHOICES);
+
+    const experimental = registrations.find(entry => entry.key === SETTING_KEYS.EXPERIMENTAL_FEATURES);
+    assert.ok(experimental, 'experimental features setting should be registered');
+    assert.equal(experimental.namespace, FABRICATE_SETTINGS_NAMESPACE);
+    assert.equal(experimental.definition.scope, 'world');
+    assert.equal(experimental.definition.config, true);
+    assert.equal(experimental.definition.type, Boolean);
+    assert.equal(experimental.definition.default, false);
   });
 
   it('applies theme changes through the registered setting onChange callback and stamps open Fabricate app roots', () => {

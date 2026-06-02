@@ -51,8 +51,6 @@ function createMockServices(overrides = {}) {
     lastComponentSources: [],
     favouriteRecipes: [],
     recentlyCrafted: [],
-    autoCraft: false,
-    showSimpleRecipesOnly: false
   };
 
   const actorA = makeActor('a1', 'Alice');

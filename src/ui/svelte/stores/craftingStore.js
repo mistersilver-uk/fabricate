@@ -444,11 +444,6 @@ function _buildPreparedRecipes(
     );
   }
 
-  const showSimpleRecipesOnly = services.getSetting('showSimpleRecipesOnly');
-  if (showSimpleRecipesOnly) {
-    recipes = recipes.filter(r => r.isSimpleRecipe());
-  }
-
   if (searchTerm) {
     const lower = searchTerm.toLowerCase();
     recipes = recipes.filter(r =>
@@ -588,10 +583,7 @@ function _buildPreparedRecipes(
 
   // --- Categories ---
   const allRecipes = recipeManager.getRecipes({ enabled: true });
-  const visibleRecipes = showSimpleRecipesOnly
-    ? allRecipes.filter(r => r.isSimpleRecipe())
-    : allRecipes;
-  const categories = [...new Set(visibleRecipes.map(r => normalizeRecipeCategory(r.category)))].sort();
+  const categories = [...new Set(allRecipes.map(r => normalizeRecipeCategory(r.category)))].sort();
   const salvageEntries = _buildSalvageEntries(
     services,
     craftingActor,
@@ -1860,8 +1852,7 @@ export function createCraftingStore(services) {
       return;
     }
 
-    const autoCraft = services.getSetting('autoCraft');
-    if (!autoCraft && !skipConfirm) {
+    if (!skipConfirm) {
       const confirmed = await services.confirmDialog({
         title: `Craft ${recipe.name}?`,
         content: `
@@ -1945,8 +1936,7 @@ export function createCraftingStore(services) {
       return;
     }
 
-    const autoCraft = services.getSetting('autoCraft');
-    if (!autoCraft && !skipConfirm) {
+    if (!skipConfirm) {
       const confirmed = await services.confirmDialog({
         title: `Salvage ${component.name}?`,
         content: `

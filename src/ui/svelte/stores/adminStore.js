@@ -1604,6 +1604,7 @@ export function createAdminStore(services) {
     itemSearchTerm: '',
     graphData: { nodes: [], edges: [], width: 0, height: 0 },
     graphSearchTerm: '',
+    experimentalFeaturesEnabled: services.getSetting?.('experimentalFeatures') === true,
     gatheringConfig: _normalizeGatheringConfig(services.getSetting?.(GATHERING_CONFIG_SETTING) || {}),
     foundrySystemId: typeof services.getFoundrySystemId === 'function' ? String(services.getFoundrySystemId() || '') : '',
     ..._emptyEnvironmentState(false)
@@ -2775,6 +2776,7 @@ export function createAdminStore(services) {
       selectedSystemName: selectedSystem?.name || '',
       selectedSystem: selectedSystemData,
       essenceCards,
+      experimentalFeaturesEnabled: services.getSetting?.('experimentalFeatures') === true,
       gatheringConfig: _clonePlain(_currentGatheringConfig()),
       recipes: recipeListData.recipes,
       recipeCategories: recipeListData.recipeCategories,
@@ -2822,6 +2824,7 @@ export function createAdminStore(services) {
       selectedSystem: selectedSystemData,
       itemCards,
       essenceCards,
+      experimentalFeaturesEnabled: services.getSetting?.('experimentalFeatures') === true,
       gatheringConfig: _clonePlain(_currentGatheringConfig()),
       recipes: recipeListData.recipes,
       recipeCategories: recipeListData.recipeCategories,
