@@ -2225,30 +2225,43 @@ export function createAdminStore(services) {
   }
 
   /**
-   * Environments in `systemId` that currently surface the task/hazard `record`: automatic-mode
-   * environments that match it (and do not locally exclude it), plus manual-mode environments
-   * that explicitly enable or force-add it. Mirrors runtime composition so callers see exactly
-   * the environments a record actually appears in today.
+   * Whether `environment` currently composes the library task/hazard `record`, mirroring the
+   * runtime `GatheringRichStateService.composeEnvironment` filter chain exactly:
+   *   library-enabled  AND  (matches OR force-included)  AND  the composition-mode include gate.
+   * In manual mode a record is composed only when force-added, or when it both matches and is on
+   * the enabled allow-list; a stale enabled entry for a non-matching record is NOT composed.
    */
-  function _gatheringLibraryRecordSurfacingEnvironments(systemId, record, kind) {
-    if (!record?.id) return [];
+  function _environmentComposesGatheringRecord(environment, record, kind, conditionSettings) {
+    if (!record?.id || record.enabled === false) return false;
+    const recordId = String(record.id);
     const includeDanger = kind === 'hazard';
+    const mode = environment?.compositionMode === 'manual' ? 'manual' : 'automatic';
     const enabledKey = kind === 'hazard' ? 'enabledHazardIds' : 'enabledTaskIds';
     const disabledKey = kind === 'hazard' ? 'disabledHazardIds' : 'disabledTaskIds';
     const forcedKey = kind === 'hazard' ? 'forcedHazardIds' : 'forcedTaskIds';
-    const recordId = String(record.id);
+    const enabled = Array.isArray(environment?.[enabledKey]) ? environment[enabledKey].map(String) : [];
+    const disabled = Array.isArray(environment?.[disabledKey]) ? environment[disabledKey].map(String) : [];
+    const forced = Array.isArray(environment?.[forcedKey]) ? environment[forcedKey].map(String) : [];
+    if (mode === 'manual') {
+      if (forced.includes(recordId)) return true;
+      return enabled.includes(recordId)
+        && _gatheringLibraryRecordMatchesEnvironment(record, environment, {}, includeDanger, conditionSettings);
+    }
+    return !disabled.includes(recordId)
+      && _gatheringLibraryRecordMatchesEnvironment(record, environment, {}, includeDanger, conditionSettings);
+  }
+
+  /**
+   * Environments in `systemId` that currently compose (surface) the task/hazard `record`. Mirrors
+   * runtime composition so callers see exactly the environments a record actually appears in today.
+   */
+  function _gatheringLibraryRecordSurfacingEnvironments(systemId, record, kind) {
+    if (!record?.id) return [];
     const conditionSettings = _currentGatheringConfig().systems?.[String(systemId || '')]?.conditions || null;
     const usages = [];
     for (const environment of _environmentList()) {
       if (String(environment?.craftingSystemId || '') !== String(systemId || '')) continue;
-      const mode = environment?.compositionMode === 'manual' ? 'manual' : 'automatic';
-      const enabled = Array.isArray(environment?.[enabledKey]) ? environment[enabledKey].map(String) : [];
-      const disabled = Array.isArray(environment?.[disabledKey]) ? environment[disabledKey].map(String) : [];
-      const forced = Array.isArray(environment?.[forcedKey]) ? environment[forcedKey].map(String) : [];
-      const surfaces = mode === 'manual'
-        ? (enabled.includes(recordId) || forced.includes(recordId))
-        : (!disabled.includes(recordId) && _gatheringLibraryRecordMatchesEnvironment(record, environment, {}, includeDanger, conditionSettings));
-      if (!surfaces) continue;
+      if (!_environmentComposesGatheringRecord(environment, record, kind, conditionSettings)) continue;
       usages.push({
         id: String(environment.id || ''),
         name: String(environment.name || environment.id || 'Unnamed environment')
@@ -2317,29 +2330,27 @@ export function createAdminStore(services) {
    * allow-list (force-added records stay in regardless of match, so they are never affected).
    */
   function _gatheringLibraryRecordMatchLossEnvironments(systemId, oldRecord, newRecord, kind) {
-    if (!oldRecord?.id) return [];
+    // A library-disabled record is not composed anywhere, so editing its match criteria cannot
+    // remove it from an environment — there is nothing to warn about.
+    if (!oldRecord?.id || oldRecord.enabled === false) return [];
     const includeDanger = kind === 'hazard';
-    const enabledKey = kind === 'hazard' ? 'enabledHazardIds' : 'enabledTaskIds';
-    const disabledKey = kind === 'hazard' ? 'disabledHazardIds' : 'disabledTaskIds';
-    const recordId = String(oldRecord.id);
     const conditionSettings = _currentGatheringConfig().systems?.[String(systemId || '')]?.conditions || null;
     const affected = [];
     for (const environment of _environmentList()) {
       if (String(environment?.craftingSystemId || '') !== String(systemId || '')) continue;
       const matchedBefore = _gatheringLibraryRecordMatchesEnvironment(oldRecord, environment, {}, includeDanger, conditionSettings);
       const matchesAfter = _gatheringLibraryRecordMatchesEnvironment(newRecord, environment, {}, includeDanger, conditionSettings);
-      if (!(matchedBefore && !matchesAfter)) continue;
-      const mode = environment?.compositionMode === 'manual' ? 'manual' : 'automatic';
-      const enabled = Array.isArray(environment?.[enabledKey]) ? environment[enabledKey].map(String) : [];
-      const disabled = Array.isArray(environment?.[disabledKey]) ? environment[disabledKey].map(String) : [];
-      const surfaced = mode === 'manual'
-        ? enabled.includes(recordId)
-        : !disabled.includes(recordId);
-      if (!surfaced) continue;
+      if (!(matchedBefore && !matchesAfter)) continue; // the match itself must be lost
+      // Only warn when the lost match actually changes whether the record is composed: it must
+      // compose today but not after the edit. Force-included records stay composed regardless of
+      // match, so they are correctly excluded here.
+      const composedBefore = _environmentComposesGatheringRecord(environment, oldRecord, kind, conditionSettings);
+      const composedAfter = _environmentComposesGatheringRecord(environment, newRecord, kind, conditionSettings);
+      if (!(composedBefore && !composedAfter)) continue;
       affected.push({
         id: String(environment.id || ''),
         name: String(environment.name || environment.id || 'Unnamed environment'),
-        mode
+        mode: environment?.compositionMode === 'manual' ? 'manual' : 'automatic'
       });
     }
     return affected;

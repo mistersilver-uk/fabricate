@@ -2746,4 +2746,57 @@ describe('adminStore gathering library match-loss handling', () => {
     assert.match(services._confirmCalls[0].content, /Forced Cave/);
     assert.match(services._confirmCalls[0].content, /currently used by/);
   });
+
+  it('does not list a manual environment whose stale enabled entry no longer matches when deleting', async () => {
+    const services = createServices({
+      systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
+      // Manual environment keeps a stale enabled entry, but the task no longer matches its biome,
+      // so runtime composition does not include it — the delete dialog must not claim it is used.
+      environments: [makeEnvironment({ id: 'manual', name: 'Manual Cavern', compositionMode: 'manual', biomes: ['cavern'], enabledTaskIds: ['lib-task'] })],
+      gatheringConfig: gatheringConfigWithTask(),
+      confirmResult: false
+    });
+    const store = createAdminStore(services);
+
+    await store.selectSystem('system-a');
+    const removed = await store.deleteGatheringLibraryTask('system-a', 'lib-task');
+
+    assert.equal(removed, false);
+    assert.equal(services._confirmCalls.length, 1);
+    assert.doesNotMatch(services._confirmCalls[0].content, /Manual Cavern/);
+    assert.doesNotMatch(services._confirmCalls[0].content, /currently used by/);
+  });
+
+  it('does not warn on match loss for a library-disabled task', async () => {
+    const services = createServices({
+      systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
+      environments: [makeEnvironment({ id: 'auto', name: 'Auto Forest', compositionMode: 'automatic', biomes: ['forest'] })],
+      gatheringConfig: { systems: { 'system-a': { tasks: [{ id: 'lib-task', name: 'Forage', enabled: false, biomes: ['forest'], regions: [], dropRows: [] }], hazards: [] } } },
+      confirmResult: true
+    });
+    const store = createAdminStore(services);
+
+    await store.selectSystem('system-a');
+    const proceed = await store.confirmGatheringLibraryTaskMatchLoss('system-a', 'lib-task', { biomes: ['cavern'] });
+
+    assert.equal(proceed, true);
+    assert.equal(services._confirmCalls.length, 0);
+  });
+
+  it('does not warn on match loss for a manual environment that also force-includes the task', async () => {
+    const services = createServices({
+      systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
+      // Both enabled and forced: force-inclusion keeps it composed after the match edit, so no loss.
+      environments: [makeEnvironment({ id: 'manual', name: 'Manual Forest', compositionMode: 'manual', biomes: ['forest'], enabledTaskIds: ['lib-task'], forcedTaskIds: ['lib-task'] })],
+      gatheringConfig: gatheringConfigWithTask(),
+      confirmResult: true
+    });
+    const store = createAdminStore(services);
+
+    await store.selectSystem('system-a');
+    const proceed = await store.confirmGatheringLibraryTaskMatchLoss('system-a', 'lib-task', { biomes: ['cavern'] });
+
+    assert.equal(proceed, true);
+    assert.equal(services._confirmCalls.length, 0);
+  });
 });
