@@ -2103,7 +2103,10 @@ export function createAdminStore(services) {
       if (!libraryEnabled) compositionState = 'libraryDisabled';
       else if (excluded) compositionState = 'excluded';
       else if (forceIncluded) compositionState = 'forceIncluded';
-      else if (!matches) compositionState = explicitlyIncluded ? 'includedButUnavailable' : 'notMatching';
+      // In automatic mode the enabled allow-list is ignored (matching the runtime composition
+      // service), so a non-matching record is always "not matching" — never a stale
+      // "included but unavailable". Only manual mode honors the explicit inclusion.
+      else if (!matches) compositionState = (compositionMode === 'manual' && explicitlyIncluded) ? 'includedButUnavailable' : 'notMatching';
       else if (compositionMode === 'manual') compositionState = explicitlyIncluded ? 'explicitlyIncluded' : 'candidate';
       else compositionState = 'includedByMatch';
 
@@ -2221,14 +2224,51 @@ export function createAdminStore(services) {
     };
   }
 
+  /**
+   * Environments in `systemId` that currently surface the task/hazard `record`: automatic-mode
+   * environments that match it (and do not locally exclude it), plus manual-mode environments
+   * that explicitly enable or force-add it. Mirrors runtime composition so callers see exactly
+   * the environments a record actually appears in today.
+   */
+  function _gatheringLibraryRecordSurfacingEnvironments(systemId, record, kind) {
+    if (!record?.id) return [];
+    const includeDanger = kind === 'hazard';
+    const enabledKey = kind === 'hazard' ? 'enabledHazardIds' : 'enabledTaskIds';
+    const disabledKey = kind === 'hazard' ? 'disabledHazardIds' : 'disabledTaskIds';
+    const forcedKey = kind === 'hazard' ? 'forcedHazardIds' : 'forcedTaskIds';
+    const recordId = String(record.id);
+    const conditionSettings = _currentGatheringConfig().systems?.[String(systemId || '')]?.conditions || null;
+    const usages = [];
+    for (const environment of _environmentList()) {
+      if (String(environment?.craftingSystemId || '') !== String(systemId || '')) continue;
+      const mode = environment?.compositionMode === 'manual' ? 'manual' : 'automatic';
+      const enabled = Array.isArray(environment?.[enabledKey]) ? environment[enabledKey].map(String) : [];
+      const disabled = Array.isArray(environment?.[disabledKey]) ? environment[disabledKey].map(String) : [];
+      const forced = Array.isArray(environment?.[forcedKey]) ? environment[forcedKey].map(String) : [];
+      const surfaces = mode === 'manual'
+        ? (enabled.includes(recordId) || forced.includes(recordId))
+        : (!disabled.includes(recordId) && _gatheringLibraryRecordMatchesEnvironment(record, environment, {}, includeDanger, conditionSettings));
+      if (!surfaces) continue;
+      usages.push({
+        id: String(environment.id || ''),
+        name: String(environment.name || environment.id || 'Unnamed environment')
+      });
+    }
+    return usages;
+  }
+
   function _gatheringLibraryRecordUsages(systemId, record, kind) {
     if (!record?.id) return [];
-    const enabledKey = kind === 'hazard' ? 'enabledHazardIds' : 'enabledTaskIds';
+    // Tools are referenced by tasks (toolIds), not by environments, so keep the legacy
+    // allow-list lookup for them; tasks and hazards use full composition-aware surfacing.
+    if (kind === 'task' || kind === 'hazard') {
+      return _gatheringLibraryRecordSurfacingEnvironments(systemId, record, kind);
+    }
     const recordId = String(record.id);
     const usages = [];
     for (const environment of _environmentList()) {
       if (String(environment?.craftingSystemId || '') !== String(systemId || '')) continue;
-      const enabled = Array.isArray(environment?.[enabledKey]) ? environment[enabledKey].map(String) : [];
+      const enabled = Array.isArray(environment?.enabledTaskIds) ? environment.enabledTaskIds.map(String) : [];
       if (!enabled.includes(recordId)) continue;
       usages.push({
         id: String(environment.id || ''),
@@ -2267,6 +2307,92 @@ export function createAdminStore(services) {
       yes: () => true,
       no: () => false
     }) === true;
+  }
+
+  /**
+   * Enumerate the environments in `systemId` where `oldRecord` currently matches but `newRecord`
+   * would stop matching AND where the record is actually surfaced today, so editing its match
+   * criteria would silently drop it. An automatic-mode environment surfaces every matching record
+   * unless it is locally excluded; a manual-mode environment only surfaces records on its enabled
+   * allow-list (force-added records stay in regardless of match, so they are never affected).
+   */
+  function _gatheringLibraryRecordMatchLossEnvironments(systemId, oldRecord, newRecord, kind) {
+    if (!oldRecord?.id) return [];
+    const includeDanger = kind === 'hazard';
+    const enabledKey = kind === 'hazard' ? 'enabledHazardIds' : 'enabledTaskIds';
+    const disabledKey = kind === 'hazard' ? 'disabledHazardIds' : 'disabledTaskIds';
+    const recordId = String(oldRecord.id);
+    const conditionSettings = _currentGatheringConfig().systems?.[String(systemId || '')]?.conditions || null;
+    const affected = [];
+    for (const environment of _environmentList()) {
+      if (String(environment?.craftingSystemId || '') !== String(systemId || '')) continue;
+      const matchedBefore = _gatheringLibraryRecordMatchesEnvironment(oldRecord, environment, {}, includeDanger, conditionSettings);
+      const matchesAfter = _gatheringLibraryRecordMatchesEnvironment(newRecord, environment, {}, includeDanger, conditionSettings);
+      if (!(matchedBefore && !matchesAfter)) continue;
+      const mode = environment?.compositionMode === 'manual' ? 'manual' : 'automatic';
+      const enabled = Array.isArray(environment?.[enabledKey]) ? environment[enabledKey].map(String) : [];
+      const disabled = Array.isArray(environment?.[disabledKey]) ? environment[disabledKey].map(String) : [];
+      const surfaced = mode === 'manual'
+        ? enabled.includes(recordId)
+        : !disabled.includes(recordId);
+      if (!surfaced) continue;
+      affected.push({
+        id: String(environment.id || ''),
+        name: String(environment.name || environment.id || 'Unnamed environment'),
+        mode
+      });
+    }
+    return affected;
+  }
+
+  async function _confirmGatheringLibraryRecordMatchLoss({ systemId, oldRecord, newRecord, kind }) {
+    const affected = _gatheringLibraryRecordMatchLossEnvironments(systemId, oldRecord, newRecord, kind);
+    if (affected.length === 0) return true;
+    const localizeFn = services.localize;
+    const base = kind === 'hazard'
+      ? 'FABRICATE.Admin.Manager.Environment.Hazards.MatchLossWarning'
+      : 'FABRICATE.Admin.Manager.Environment.Tasks.MatchLossWarning';
+    const recordWord = kind === 'hazard' ? 'hazard' : 'gathering task';
+    const title = localizeFn?.(`${base}.Title`) || `This ${recordWord} will leave some environments`;
+    const bodyTemplate = localizeFn?.(`${base}.Body`)
+      || `Saving these changes means this ${recordWord} will no longer be available in {count} environment(s) where it is currently active:`;
+    const body = bodyTemplate.replace('{count}', String(affected.length));
+    const usageList = affected
+      .slice(0, 6)
+      .map(usage => `<li>${_escapeHtml(usage.name)}</li>`)
+      .join('');
+    const overflow = affected.length > 6 ? `<li>${_escapeHtml(`and ${affected.length - 6} more`)}</li>` : '';
+    const content = `<p>${_escapeHtml(body)}</p><ul>${usageList}${overflow}</ul>`;
+    return await services.confirmDialog?.({
+      title,
+      content,
+      yes: {
+        label: localizeFn?.(`${base}.Confirm`) || 'Save Anyway',
+        callback: () => true
+      },
+      no: {
+        label: localizeFn?.(`${base}.Cancel`) || 'Keep Editing',
+        callback: () => false
+      }
+    }) === true;
+  }
+
+  async function confirmGatheringLibraryTaskMatchLoss(systemId = get(selectedSystemId), taskId, draft = {}) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    const existing = systemConfig?.tasks?.find(task => task.id === taskId);
+    if (!existing) return true;
+    const newRecord = _normalizeGatheringTask({ ...existing, ...draft }, _randomID);
+    return _confirmGatheringLibraryRecordMatchLoss({ systemId, oldRecord: existing, newRecord, kind: 'task' });
+  }
+
+  async function confirmGatheringLibraryHazardMatchLoss(systemId = get(selectedSystemId), hazardId, draft = {}) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    const existing = systemConfig?.hazards?.find(hazard => hazard.id === hazardId);
+    if (!existing) return true;
+    const newRecord = _normalizeGatheringHazard({ ...existing, ...draft }, _randomID);
+    return _confirmGatheringLibraryRecordMatchLoss({ systemId, oldRecord: existing, newRecord, kind: 'hazard' });
   }
 
   function _resolveEnvironmentTaskSelection(draft, preferredTaskId = '') {
@@ -5217,6 +5343,8 @@ export function createAdminStore(services) {
     confirmDiscardDirtyEssenceDraft,
     confirmDiscardDirtyGatheringTaskDraft,
     confirmDiscardDirtyGatheringHazardDraft,
+    confirmGatheringLibraryTaskMatchLoss,
+    confirmGatheringLibraryHazardMatchLoss,
     cancelEnvironmentDraft,
     saveEnvironmentDraft,
     duplicateEnvironmentDraft,

@@ -1526,6 +1526,8 @@
       gatheringTaskSaveError = errors[0] || '';
       return;
     }
+    const proceed = await store.confirmGatheringLibraryTaskMatchLoss?.(selectedSystemId, selectedGatheringTaskId, gatheringTaskDraft) ?? true;
+    if (!proceed) return; // GM cancelled the match-loss warning — keep editing, no save error
     gatheringTaskSaving = true;
     try {
       const ok = await store.updateGatheringLibraryTask?.(selectedSystemId, selectedGatheringTaskId, gatheringTaskDraft);
@@ -1637,6 +1639,8 @@
       gatheringHazardSaveError = errors[0] || '';
       return;
     }
+    const proceed = await store.confirmGatheringLibraryHazardMatchLoss?.(selectedSystemId, selectedGatheringHazardId, gatheringHazardDraft) ?? true;
+    if (!proceed) return; // GM cancelled the match-loss warning — keep editing, no save error
     gatheringHazardSaving = true;
     try {
       const ok = await store.updateGatheringLibraryHazard?.(selectedSystemId, selectedGatheringHazardId, gatheringHazardDraft);
