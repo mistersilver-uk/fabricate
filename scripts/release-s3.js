@@ -1,20 +1,25 @@
 /**
  * S3 release pipeline for the Fabricate Foundry module.
  *
- * Builds the module at a given version (reusing scripts/release.js), rewrites
- * its module.json with S3-hosted channel URLs, zips it, and uploads the zip +
- * the canonical channel manifest + per-tester-group manifests to the configured
- * bucket.
+ * Builds the module at a given version (reusing scripts/release.js), then
+ * publishes one self-contained feed per distribution target: the canonical
+ * channel ("sources") plus one per beta access group ("testers"). Each target
+ * gets its OWN versioned zip whose in-zip module.json bakes that target's own
+ * `manifest` URL, plus a "latest" manifest pointing at that zip.
  *
- * Layout (moduleId=fabricate, channel=beta, version=0.2.0-rc.1):
- *   modules/fabricate/beta/versions/0.2.0-rc.1/fabricate-0.2.0-rc.1.zip   (sources, immutable)
- *   modules/fabricate/beta/latest/module.json                            (sources, no-cache)
- *   testers/<group>/fabricate/module.json                                (beta access group, no-cache)
+ * Layout (moduleId=fabricate, channel=beta, version=0.2.0-rc.1, group=closed-beta-2026):
+ *   modules/fabricate/beta/versions/0.2.0-rc.1/fabricate-0.2.0-rc.1.zip      (sources, immutable)
+ *   modules/fabricate/beta/latest/module.json                               (sources, no-cache)
+ *   testers/closed-beta-2026/fabricate/versions/0.2.0-rc.1/fabricate-…​.zip   (access group, immutable)
+ *   testers/closed-beta-2026/fabricate/module.json                          (access group, no-cache)
  *
- * The versioned zip is the single source of truth. The channel manifest and
- * every tester-group manifest point their `download` at that one zip; only the
- * `manifest` URL differs, so different cohorts install/update from distinct
- * URLs without re-uploading the build.
+ * Why per-cohort zips: when Foundry installs from a manifest URL it extracts
+ * the zip's module.json to disk, and future "Check for Updates" calls use the
+ * `manifest` field from THAT on-disk module.json — not the URL it was installed
+ * from. A single shared zip can only bake one `manifest` URL, so it would route
+ * every cohort's updates through the channel feed. Giving each cohort its own
+ * zip (baking its own cohort manifest URL) makes each access group a genuinely
+ * independent update feed that can be advanced on its own cadence.
  *
  * Usage:
  *   node scripts/release-s3.js --version <ver> [--channel <name>] [--dry-run] [--overwrite] [--config <path>]
@@ -23,9 +28,17 @@
  * shared config, container/IMDS, or OIDC-injected creds in CI). Bucket and base
  * URL come from release.s3.config.json, overridable via S3_RELEASE_BUCKET /
  * RELEASE_BASE_URL env vars. AWS_REGION is passed through when set.
+ *
+ * Environments:
+ *   - CI (Ubuntu): invoked by .github/workflows/release-s3.yml after `npm ci`;
+ *     bucket/baseUrl come from repo vars, credentials from OIDC. The `zip`
+ *     binary is present, so scripts/lib/zip.js takes its Unix path.
+ *   - Local dev (Windows/macOS/Linux): run via `npm run release:s3:dry-run` to
+ *     build + stage zips without AWS. On Windows, scripts/lib/zip.js uses
+ *     PowerShell `Compress-Archive` so the staged zips install correctly.
  */
 import { execSync } from 'node:child_process';
-import { readFile, writeFile, rm } from 'node:fs/promises';
+import { readFile, writeFile, rm, mkdir } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { argv, env, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -33,6 +46,7 @@ import { zipDirectory } from './lib/zip.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
+const STAGING_DIR = join(ROOT, 'build', 's3');
 
 const CACHE_IMMUTABLE = 'public, max-age=31536000, immutable';
 const CACHE_NO_CACHE = 'no-cache, max-age=0, must-revalidate';
@@ -57,7 +71,20 @@ export function getFlag(args, flag) {
 }
 
 /**
- * Derive S3 keys + public URLs for a module release.
+ * @typedef {object} PublishTarget
+ * @property {'channel'|'tester'} kind
+ * @property {string} label        - stable id for logging / staging dirs
+ * @property {string|null} group   - access-group name (tester targets only)
+ * @property {string} zipKey       - S3 key for the immutable versioned zip
+ * @property {string} manifestKey  - S3 key for the "latest" manifest
+ * @property {string} manifestUrl  - public URL baked into this target's module.json `manifest`
+ * @property {string} downloadUrl  - public URL of this target's own versioned zip
+ */
+
+/**
+ * Derive the per-target S3 layout for a module release. Each target is a
+ * self-contained feed: its `downloadUrl` points at its OWN versioned zip and
+ * its `manifestUrl` is what gets baked into that zip's module.json.
  *
  * @param {object} opts
  * @param {string} opts.moduleId
@@ -66,35 +93,44 @@ export function getFlag(args, flag) {
  * @param {string} opts.baseUrl - public base URL (trailing slashes stripped)
  * @param {string[]} [opts.testerGroups]
  * @returns {{
- *   zipName: string, zipKey: string, channelKey: string,
- *   channelManifestUrl: string, channelDownloadUrl: string,
- *   testerManifests: Array<{ group: string, key: string, manifestUrl: string, downloadUrl: string }>
+ *   zipName: string, channel: string, version: string,
+ *   channelTarget: PublishTarget, testerTargets: PublishTarget[], targets: PublishTarget[]
  * }}
  */
 export function deriveS3Layout({ moduleId, channel, version, baseUrl, testerGroups = [] }) {
   const base = baseUrl.replace(/\/+$/, '');
   const zipName = `${moduleId}-${version}.zip`;
-  const versionPath = `modules/${moduleId}/${channel}/versions/${version}/${zipName}`;
-  const channelManifestPath = `modules/${moduleId}/${channel}/latest/module.json`;
 
-  const channelDownloadUrl = `${base}/${versionPath}`;
-  const channelManifestUrl = `${base}/${channelManifestPath}`;
+  /** @returns {PublishTarget} */
+  const makeTarget = (kind, group, prefix, manifestKey) => {
+    const zipKey = `${prefix}/versions/${version}/${zipName}`;
+    return {
+      kind,
+      group,
+      label: group ? `tester-${group}` : `channel-${channel}`,
+      zipKey,
+      manifestKey,
+      manifestUrl: `${base}/${manifestKey}`,
+      // Each feed references its OWN zip — cohorts never share a download.
+      downloadUrl: `${base}/${zipKey}`
+    };
+  };
 
-  const testerManifests = testerGroups.map((group) => ({
-    group,
-    key: `testers/${group}/${moduleId}/module.json`,
-    manifestUrl: `${base}/testers/${group}/${moduleId}/module.json`,
-    // All cohorts share the one canonical zip.
-    downloadUrl: channelDownloadUrl
-  }));
+  const channelPrefix = `modules/${moduleId}/${channel}`;
+  const channelTarget = makeTarget('channel', null, channelPrefix, `${channelPrefix}/latest/module.json`);
+
+  const testerTargets = testerGroups.map((group) => {
+    const prefix = `testers/${group}/${moduleId}`;
+    return makeTarget('tester', group, prefix, `${prefix}/module.json`);
+  });
 
   return {
     zipName,
-    zipKey: versionPath,
-    channelKey: channelManifestPath,
-    channelManifestUrl,
-    channelDownloadUrl,
-    testerManifests
+    channel,
+    version,
+    channelTarget,
+    testerTargets,
+    targets: [channelTarget, ...testerTargets]
   };
 }
 
@@ -146,7 +182,8 @@ async function main() {
   }
 
   console.log(`release-s3: module=${moduleId} channel=${channel} version=${version}${dryRun ? ' (dry-run)' : ''}`);
-  console.log(`release-s3: bucket=${bucket || '(unset)'} baseUrl=${baseUrl || '(unset)'}\n`);
+  console.log(`release-s3: bucket=${bucket || '(unset)'} baseUrl=${baseUrl || '(unset)'}`);
+  console.log(`release-s3: targets=channel + ${testerGroups.length} tester group(s)\n`);
 
   // 2. Build dist/ at the requested version (reuse the canonical build path)
   console.log('release-s3: building...');
@@ -173,25 +210,33 @@ async function main() {
   if (built.id !== moduleId) fail(`config moduleId "${moduleId}" does not match built module.json id "${built.id}"`);
   if (built.version !== version) fail(`version mismatch: requested ${version} built ${built.version}`);
 
-  // 4. Compute S3 layout + rewrite dist/module.json with channel URLs
-  const layout = deriveS3Layout({ moduleId, channel, version, baseUrl: baseUrl || 'https://example.invalid', testerGroups });
-  const channelManifestBody = { ...built, manifest: layout.channelManifestUrl, download: layout.channelDownloadUrl };
-  await writeFile(distManifestPath, JSON.stringify(channelManifestBody, null, 2) + '\n');
-  console.log('release-s3: rewrote dist/module.json with channel URLs');
+  // 4. Compute the per-target layout
+  const layout = deriveS3Layout({
+    moduleId,
+    channel,
+    version,
+    baseUrl: baseUrl || 'https://example.invalid',
+    testerGroups
+  });
 
-  // 5. Zip dist/ (channel-URL module.json now baked into the installed copy)
-  const zipPath = join(distDir, layout.zipName);
-  await rm(zipPath, { force: true });
-  zipDirectory(distDir, zipPath);
-  console.log(`release-s3: created ${layout.zipName}`);
+  // 5. Stage one zip per target: rewrite dist/module.json with that target's
+  //    feed URLs, then zip dist/ to a per-target staging path. Staged zips live
+  //    outside dist/ so they are not nested into the next target's archive.
+  await rm(STAGING_DIR, { recursive: true, force: true });
+  const staged = []; // { target, body, zipPath }
+  for (const target of layout.targets) {
+    const body = { ...built, manifest: target.manifestUrl, download: target.downloadUrl };
+    await writeFile(distManifestPath, JSON.stringify(body, null, 2) + '\n');
 
-  // 6. Tester-group manifest bodies (manifest URL differs; download stays canonical)
-  const testerBodies = layout.testerManifests.map((t) => ({
-    ...t,
-    body: { ...built, manifest: t.manifestUrl, download: t.downloadUrl }
-  }));
+    const outDir = join(STAGING_DIR, target.label);
+    await mkdir(outDir, { recursive: true });
+    const zipPath = join(outDir, layout.zipName);
+    zipDirectory(distDir, zipPath);
+    console.log(`release-s3: staged ${target.label} -> ${target.zipKey}`);
+    staged.push({ target, body, zipPath });
+  }
 
-  // 7. Upload (skipped on dry-run)
+  // 6. Upload (skipped on dry-run)
   if (!dryRun) {
     const { S3Client, HeadObjectCommand, PutObjectCommand } = await import('@aws-sdk/client-s3');
     const s3 = new S3Client(env.AWS_REGION ? { region: env.AWS_REGION } : {});
@@ -205,41 +250,40 @@ async function main() {
         throw err;
       }
     };
-    const s3Put = (key, body, contentType, cacheControl) =>
-      s3.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: body, ContentType: contentType, CacheControl: cacheControl }));
+    const s3Put = (key, bodyBytes, contentType, cacheControl) =>
+      s3.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: bodyBytes, ContentType: contentType, CacheControl: cacheControl }));
 
-    // Pre-flight: refuse to clobber an existing versioned zip unless --overwrite
-    if (await s3Exists(layout.zipKey)) {
-      if (!overwrite) fail(`s3://${bucket}/${layout.zipKey} already exists — pass --overwrite to replace it`);
-      console.log('release-s3: overwriting existing zip (--overwrite set)');
+    // Pre-flight ALL versioned zips before uploading anything (fail-fast so we
+    // never leave a half-published release behind).
+    for (const { target } of staged) {
+      if (await s3Exists(target.zipKey)) {
+        if (!overwrite) fail(`s3://${bucket}/${target.zipKey} already exists — pass --overwrite to replace it`);
+        console.log(`release-s3: will overwrite ${target.zipKey} (--overwrite set)`);
+      }
     }
 
-    const zipBytes = await readFile(zipPath);
-    console.log(`release-s3: upload zip      -> s3://${bucket}/${layout.zipKey}`);
-    await s3Put(layout.zipKey, zipBytes, 'application/zip', CACHE_IMMUTABLE);
-
-    console.log(`release-s3: upload manifest -> s3://${bucket}/${layout.channelKey}`);
-    await s3Put(layout.channelKey, JSON.stringify(channelManifestBody, null, 2), 'application/json', CACHE_NO_CACHE);
-
-    for (const t of testerBodies) {
-      console.log(`release-s3: upload tester   -> s3://${bucket}/${t.key}`);
-      await s3Put(t.key, JSON.stringify(t.body, null, 2), 'application/json', CACHE_NO_CACHE);
+    for (const { target, body, zipPath } of staged) {
+      const zipBytes = await readFile(zipPath);
+      console.log(`release-s3: upload zip      -> s3://${bucket}/${target.zipKey}`);
+      await s3Put(target.zipKey, zipBytes, 'application/zip', CACHE_IMMUTABLE);
+      console.log(`release-s3: upload manifest -> s3://${bucket}/${target.manifestKey}`);
+      await s3Put(target.manifestKey, JSON.stringify(body, null, 2), 'application/json', CACHE_NO_CACHE);
     }
   }
 
-  // 8. Install-URL summary
-  printSummary({ version, channel, channelManifestUrl: layout.channelManifestUrl, testerBodies, dryRun });
+  // 7. Install-URL summary
+  printSummary({ layout, dryRun });
 }
 
-function printSummary({ version, channel, channelManifestUrl, testerBodies, dryRun }) {
+function printSummary({ layout, dryRun }) {
   const header = dryRun ? 'DRY-RUN — install URLs that would be published:' : 'Published install URLs:';
   console.log('\n' + '═'.repeat(header.length));
   console.log(header);
   console.log('═'.repeat(header.length) + '\n');
-  console.log(`Channel "${channel}" (v${version})`);
-  console.log(`  ${channelManifestUrl}\n`);
-  for (const t of testerBodies) {
-    console.log(`Tester group: ${t.group}  (v${version})`);
+  console.log(`Channel "${layout.channel}" (v${layout.version})`);
+  console.log(`  ${layout.channelTarget.manifestUrl}\n`);
+  for (const t of layout.testerTargets) {
+    console.log(`Tester group: ${t.group}  (v${layout.version})`);
     console.log(`  ${t.manifestUrl}\n`);
   }
 }

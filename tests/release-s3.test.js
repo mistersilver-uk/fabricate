@@ -11,76 +11,82 @@ const baseOpts = {
   moduleId: 'fabricate',
   channel: 'beta',
   version: '0.2.0-rc.1',
-  baseUrl: 'https://releases.mrsilver.io',
+  baseUrl: 'https://releases.example.io',
   testerGroups: ['closed-beta-2026']
 };
 
-test('deriveS3Layout builds the immutable versioned zip key', () => {
-  const l = deriveS3Layout(baseOpts);
-  assert.equal(l.zipName, 'fabricate-0.2.0-rc.1.zip');
-  assert.equal(l.zipKey, 'modules/fabricate/beta/versions/0.2.0-rc.1/fabricate-0.2.0-rc.1.zip');
+test('deriveS3Layout channel target is the canonical source feed', () => {
+  const { channelTarget } = deriveS3Layout(baseOpts);
+  assert.equal(channelTarget.kind, 'channel');
+  assert.equal(channelTarget.group, null);
+  assert.equal(channelTarget.zipKey, 'modules/fabricate/beta/versions/0.2.0-rc.1/fabricate-0.2.0-rc.1.zip');
+  assert.equal(channelTarget.manifestKey, 'modules/fabricate/beta/latest/module.json');
+  assert.equal(channelTarget.manifestUrl, 'https://releases.example.io/modules/fabricate/beta/latest/module.json');
+  assert.equal(channelTarget.downloadUrl, 'https://releases.example.io/modules/fabricate/beta/versions/0.2.0-rc.1/fabricate-0.2.0-rc.1.zip');
 });
 
-test('deriveS3Layout builds the canonical channel manifest key', () => {
-  const l = deriveS3Layout(baseOpts);
-  assert.equal(l.channelKey, 'modules/fabricate/beta/latest/module.json');
+test('deriveS3Layout emits one tester target per access group', () => {
+  const { testerTargets } = deriveS3Layout({ ...baseOpts, testerGroups: ['closed-beta-2026', 'press'] });
+  assert.equal(testerTargets.length, 2);
+  assert.deepEqual(testerTargets.map((t) => t.group), ['closed-beta-2026', 'press']);
+  assert.ok(testerTargets.every((t) => t.kind === 'tester'));
 });
 
-test('deriveS3Layout builds channel manifest + download URLs', () => {
-  const l = deriveS3Layout(baseOpts);
-  assert.equal(
-    l.channelManifestUrl,
-    'https://releases.mrsilver.io/modules/fabricate/beta/latest/module.json'
-  );
-  assert.equal(
-    l.channelDownloadUrl,
-    'https://releases.mrsilver.io/modules/fabricate/beta/versions/0.2.0-rc.1/fabricate-0.2.0-rc.1.zip'
-  );
+test('deriveS3Layout tester target is a self-contained per-cohort feed', () => {
+  const { testerTargets } = deriveS3Layout(baseOpts);
+  const t = testerTargets[0];
+  assert.equal(t.zipKey, 'testers/closed-beta-2026/fabricate/versions/0.2.0-rc.1/fabricate-0.2.0-rc.1.zip');
+  assert.equal(t.manifestKey, 'testers/closed-beta-2026/fabricate/module.json');
+  assert.equal(t.manifestUrl, 'https://releases.example.io/testers/closed-beta-2026/fabricate/module.json');
+  // The cohort feed downloads its OWN zip — the baked manifest URL is the cohort URL.
+  assert.equal(t.downloadUrl, 'https://releases.example.io/testers/closed-beta-2026/fabricate/versions/0.2.0-rc.1/fabricate-0.2.0-rc.1.zip');
 });
 
-test('deriveS3Layout builds one tester manifest per access group', () => {
-  const l = deriveS3Layout({ ...baseOpts, testerGroups: ['closed-beta-2026', 'press'] });
-  assert.equal(l.testerManifests.length, 2);
-  assert.deepEqual(
-    l.testerManifests.map((t) => t.group),
-    ['closed-beta-2026', 'press']
-  );
+test('deriveS3Layout keeps cohort feeds independent of the channel (no shared zip)', () => {
+  const { channelTarget, testerTargets } = deriveS3Layout(baseOpts);
+  const t = testerTargets[0];
+  // Distinct zips + distinct baked manifest URLs => updates route per cohort.
+  assert.notEqual(t.zipKey, channelTarget.zipKey);
+  assert.notEqual(t.downloadUrl, channelTarget.downloadUrl);
+  assert.notEqual(t.manifestUrl, channelTarget.manifestUrl);
 });
 
-test('deriveS3Layout tester manifest separates sources from access groups', () => {
-  const l = deriveS3Layout(baseOpts);
-  const t = l.testerManifests[0];
-  assert.equal(t.key, 'testers/closed-beta-2026/fabricate/module.json');
-  assert.equal(t.manifestUrl, 'https://releases.mrsilver.io/testers/closed-beta-2026/fabricate/module.json');
-  // The download URL stays canonical — all cohorts share the one source zip.
-  assert.equal(t.downloadUrl, l.channelDownloadUrl);
+test('deriveS3Layout targets is channel followed by every tester target', () => {
+  const layout = deriveS3Layout(baseOpts);
+  assert.equal(layout.targets.length, 2);
+  assert.equal(layout.targets[0], layout.channelTarget);
+  assert.equal(layout.targets[1], layout.testerTargets[0]);
 });
 
 test('deriveS3Layout strips trailing slashes from baseUrl', () => {
-  const l = deriveS3Layout({ ...baseOpts, baseUrl: 'https://releases.mrsilver.io///' });
-  assert.equal(
-    l.channelManifestUrl,
-    'https://releases.mrsilver.io/modules/fabricate/beta/latest/module.json'
-  );
-  assert.equal(l.testerManifests[0].manifestUrl, 'https://releases.mrsilver.io/testers/closed-beta-2026/fabricate/module.json');
+  const { channelTarget, testerTargets } = deriveS3Layout({ ...baseOpts, baseUrl: 'https://releases.example.io///' });
+  assert.equal(channelTarget.manifestUrl, 'https://releases.example.io/modules/fabricate/beta/latest/module.json');
+  assert.equal(testerTargets[0].manifestUrl, 'https://releases.example.io/testers/closed-beta-2026/fabricate/module.json');
 });
 
-test('deriveS3Layout defaults to no tester groups', () => {
-  const l = deriveS3Layout({ moduleId: 'fabricate', channel: 'beta', version: '0.2.0-rc.1', baseUrl: 'https://x.io' });
-  assert.deepEqual(l.testerManifests, []);
+test('deriveS3Layout defaults to no tester targets', () => {
+  const layout = deriveS3Layout({ moduleId: 'fabricate', channel: 'beta', version: '0.2.0-rc.1', baseUrl: 'https://x.io' });
+  assert.deepEqual(layout.testerTargets, []);
+  assert.equal(layout.targets.length, 1);
 });
 
 test('deriveS3Layout preserves the full RC version string in keys and URLs', () => {
-  const l = deriveS3Layout({ ...baseOpts, version: '1.10.0-rc.12' });
-  assert.ok(l.zipKey.includes('versions/1.10.0-rc.12/'));
-  assert.ok(l.zipName.endsWith('1.10.0-rc.12.zip'));
-  assert.ok(l.channelDownloadUrl.endsWith('fabricate-1.10.0-rc.12.zip'));
+  const { channelTarget, zipName } = deriveS3Layout({ ...baseOpts, version: '1.10.0-rc.12' });
+  assert.equal(zipName, 'fabricate-1.10.0-rc.12.zip');
+  assert.ok(channelTarget.zipKey.includes('versions/1.10.0-rc.12/'));
+  assert.ok(channelTarget.downloadUrl.endsWith('fabricate-1.10.0-rc.12.zip'));
 });
 
 test('deriveS3Layout respects a non-default channel', () => {
-  const l = deriveS3Layout({ ...baseOpts, channel: 'rc' });
-  assert.equal(l.channelKey, 'modules/fabricate/rc/latest/module.json');
-  assert.equal(l.zipKey, 'modules/fabricate/rc/versions/0.2.0-rc.1/fabricate-0.2.0-rc.1.zip');
+  const { channelTarget } = deriveS3Layout({ ...baseOpts, channel: 'rc' });
+  assert.equal(channelTarget.manifestKey, 'modules/fabricate/rc/latest/module.json');
+  assert.equal(channelTarget.zipKey, 'modules/fabricate/rc/versions/0.2.0-rc.1/fabricate-0.2.0-rc.1.zip');
+});
+
+test('deriveS3Layout uses stable labels for staging/logging', () => {
+  const { channelTarget, testerTargets } = deriveS3Layout(baseOpts);
+  assert.equal(channelTarget.label, 'channel-beta');
+  assert.equal(testerTargets[0].label, 'tester-closed-beta-2026');
 });
 
 // ───────────────────────────────────────────────────────────────────────────
