@@ -1944,19 +1944,45 @@ export function createAdminStore(services) {
 
   async function _confirmDiscardDirtyDraft(contentKey, contentFallback) {
     const localizeFn = services.localize;
-    const result = await services.confirmDialog?.({
-      title: localizeFn?.('FABRICATE.Admin.Manager.DiscardDirtyTitle') || 'Discard unsaved changes?',
+    if (typeof services.choiceDialog !== 'function') {
+      // Fall back to the two-way confirm when no three-way dialog is available.
+      const confirmed = await services.confirmDialog?.({
+        title: localizeFn?.('FABRICATE.Admin.Manager.DiscardDirtyTitle') || 'Discard unsaved changes?',
+        content: `<p>${localizeFn?.(contentKey) || contentFallback}</p>`,
+        yes: {
+          label: localizeFn?.('FABRICATE.Admin.Manager.DiscardDirtyConfirm') || 'Discard Changes',
+          callback: () => true
+        },
+        no: {
+          label: localizeFn?.('FABRICATE.Admin.Manager.DiscardDirtyCancel') || 'Keep Editing',
+          callback: () => false
+        }
+      });
+      return confirmed === true ? 'discard' : 'cancel';
+    }
+    const action = await services.choiceDialog({
+      title: localizeFn?.('FABRICATE.Admin.Manager.NavigationDirty.Title') || 'Save unsaved changes?',
       content: `<p>${localizeFn?.(contentKey) || contentFallback}</p>`,
-      yes: {
-        label: localizeFn?.('FABRICATE.Admin.Manager.DiscardDirtyConfirm') || 'Discard Changes',
-        callback: () => true
-      },
-      no: {
-        label: localizeFn?.('FABRICATE.Admin.Manager.DiscardDirtyCancel') || 'Keep Editing',
-        callback: () => false
-      }
+      choices: [
+        {
+          action: 'save',
+          label: localizeFn?.('FABRICATE.Admin.Manager.NavigationDirty.Save') || 'Save',
+          icon: 'fas fa-save'
+        },
+        {
+          action: 'discard',
+          label: localizeFn?.('FABRICATE.Admin.Manager.NavigationDirty.Discard') || 'Discard Changes',
+          icon: 'fas fa-trash'
+        },
+        {
+          action: 'cancel',
+          label: localizeFn?.('FABRICATE.Admin.Manager.NavigationDirty.Cancel') || 'Keep Editing',
+          icon: 'fas fa-times'
+        }
+      ],
+      defaultAction: 'save'
     });
-    return result === true;
+    return action === 'save' || action === 'discard' ? action : 'cancel';
   }
 
   function confirmDiscardDirtyComponentDraft() {
@@ -2554,29 +2580,56 @@ export function createAdminStore(services) {
   }
 
   async function confirmDiscardDirtyEnvironmentDraft() {
-    if (!_hasDirtyEnvironmentDraft()) return true;
+    if (!_hasDirtyEnvironmentDraft()) return 'discard';
     if (dirtyEnvironmentDiscardConfirmation) return dirtyEnvironmentDiscardConfirmation;
 
     const localizeFn = services.localize;
     dirtyEnvironmentDiscardConfirmation = (async () => {
       try {
-        const confirmed = await services.confirmDialog?.({
-          title: localizeFn?.('FABRICATE.Admin.Environments.DiscardDirtyTitle')
-            || 'Discard unsaved environment changes?',
-          content: `<p>${
-            localizeFn?.('FABRICATE.Admin.Environments.DiscardDirtyContent')
-              || 'The current gathering environment has unsaved changes. Discard them and continue?'
-          }</p>`,
-          yes: {
-            label: localizeFn?.('FABRICATE.Admin.Environments.DiscardDirtyConfirm') || 'Discard Changes',
-            callback: () => true
-          },
-          no: {
-            label: localizeFn?.('FABRICATE.Admin.Environments.DiscardDirtyCancel') || 'Keep Editing',
-            callback: () => false
-          }
+        const content = `<p>${
+          localizeFn?.('FABRICATE.Admin.Environments.DiscardDirtyContent')
+            || 'The current gathering environment has unsaved changes. Save them and continue?'
+        }</p>`;
+        if (typeof services.choiceDialog !== 'function') {
+          // Fall back to the two-way confirm when no three-way dialog is available.
+          const confirmed = await services.confirmDialog?.({
+            title: localizeFn?.('FABRICATE.Admin.Environments.DiscardDirtyTitle')
+              || 'Discard unsaved environment changes?',
+            content,
+            yes: {
+              label: localizeFn?.('FABRICATE.Admin.Environments.DiscardDirtyConfirm') || 'Discard Changes',
+              callback: () => true
+            },
+            no: {
+              label: localizeFn?.('FABRICATE.Admin.Environments.DiscardDirtyCancel') || 'Keep Editing',
+              callback: () => false
+            }
+          });
+          return confirmed === true ? 'discard' : 'cancel';
+        }
+        const action = await services.choiceDialog({
+          title: localizeFn?.('FABRICATE.Admin.Manager.NavigationDirty.Title') || 'Save unsaved changes?',
+          content,
+          choices: [
+            {
+              action: 'save',
+              label: localizeFn?.('FABRICATE.Admin.Manager.NavigationDirty.Save') || 'Save',
+              icon: 'fas fa-save'
+            },
+            {
+              action: 'discard',
+              label: localizeFn?.('FABRICATE.Admin.Manager.NavigationDirty.Discard') || 'Discard Changes',
+              icon: 'fas fa-trash'
+            },
+            {
+              action: 'cancel',
+              label: localizeFn?.('FABRICATE.Admin.Manager.NavigationDirty.Cancel') || 'Keep Editing',
+              icon: 'fas fa-times'
+            }
+          ],
+          defaultAction: 'save'
         });
-        return confirmed === true;
+        return action === 'save' || action === 'discard' ? action : 'cancel';
       } finally {
         dirtyEnvironmentDiscardConfirmation = null;
       }
@@ -2585,10 +2638,27 @@ export function createAdminStore(services) {
     return dirtyEnvironmentDiscardConfirmation;
   }
 
+  // Resolve a dirty environment draft for an action that would leave it: returns
+  // true to proceed, false to abort. On 'save' the draft is persisted (abort if
+  // it fails validation); on 'discard' we proceed (callers replace draft state).
+  async function _proceedAfterDirtyEnvironmentConfirm() {
+    const action = await confirmDiscardDirtyEnvironmentDraft();
+    if (action === 'cancel') return false;
+    if (action === 'save') {
+      const result = await saveEnvironmentDraft();
+      return result?.ok !== false;
+    }
+    return true;
+  }
+
   async function _discardDirtyEnvironmentDraftForNavigation() {
     if (!_hasDirtyEnvironmentDraft()) return true;
-    const confirmed = await confirmDiscardDirtyEnvironmentDraft();
-    if (!confirmed) return false;
+    const action = await confirmDiscardDirtyEnvironmentDraft();
+    if (action === 'cancel') return false;
+    if (action === 'save') {
+      const result = await saveEnvironmentDraft();
+      return result?.ok !== false;
+    }
     await cancelEnvironmentDraft();
     return true;
   }
@@ -2848,7 +2918,7 @@ export function createAdminStore(services) {
       await refresh();
       return true;
     }
-    if (!await confirmDiscardDirtyEnvironmentDraft()) return false;
+    if (!await _proceedAfterDirtyEnvironmentConfirm()) return false;
 
     selectedSystemId.set(systemId);
     selectedEnvironmentId.set('');
@@ -2860,7 +2930,7 @@ export function createAdminStore(services) {
   }
 
   async function createSystem() {
-    if (!await confirmDiscardDirtyEnvironmentDraft()) return null;
+    if (!await _proceedAfterDirtyEnvironmentConfirm()) return null;
 
     const systemManager = services.getCraftingSystemManager();
     const name = _nextSystemName(systemManager);
@@ -2957,7 +3027,7 @@ export function createAdminStore(services) {
   async function selectEnvironment(environmentId) {
     const nextEnvironmentId = environmentId || '';
     if (nextEnvironmentId === get(selectedEnvironmentId)) return true;
-    if (!await confirmDiscardDirtyEnvironmentDraft()) return false;
+    if (!await _proceedAfterDirtyEnvironmentConfirm()) return false;
 
     selectedEnvironmentId.set(nextEnvironmentId);
     environmentDraftDirty.set(false);
@@ -2972,7 +3042,7 @@ export function createAdminStore(services) {
     const systemManager = services.getCraftingSystemManager();
     const system = systemManager?.getSystem?.(get(selectedSystemId)) || null;
     if (!_canShowEnvironmentsTab(system)) return null;
-    if (!await confirmDiscardDirtyEnvironmentDraft()) return null;
+    if (!await _proceedAfterDirtyEnvironmentConfirm()) return null;
 
     selectedEnvironmentId.set('');
     _setEnvironmentDraftState(_newEnvironmentDraft(system.id), {
@@ -3794,7 +3864,7 @@ export function createAdminStore(services) {
   async function duplicateEnvironmentDraft(environmentId = get(selectedEnvironmentId)) {
     const sourceId = environmentId || get(environmentDraft)?.id || '';
     if (!sourceId) return null;
-    if (!await confirmDiscardDirtyEnvironmentDraft()) return null;
+    if (!await _proceedAfterDirtyEnvironmentConfirm()) return null;
 
     const environmentStore = _getEnvironmentStore();
     if (!environmentStore?.duplicate) return null;
@@ -3822,7 +3892,7 @@ export function createAdminStore(services) {
   async function deleteEnvironmentDraft(environmentId = get(selectedEnvironmentId)) {
     const targetId = environmentId || get(environmentDraft)?.id || '';
     if (!targetId) {
-      if (!await confirmDiscardDirtyEnvironmentDraft()) return false;
+      if (!await _proceedAfterDirtyEnvironmentConfirm()) return false;
       await cancelEnvironmentDraft();
       return false;
     }
@@ -3976,7 +4046,7 @@ export function createAdminStore(services) {
     if (!sysId) return;
     const key = FEATURE_MAP[feature];
     if (!key) return;
-    if (key === 'gathering' && enabled !== true && !await confirmDiscardDirtyEnvironmentDraft()) return false;
+    if (key === 'gathering' && enabled !== true && !await _proceedAfterDirtyEnvironmentConfirm()) return false;
     await systemManager.updateSystem(sysId, { features: { [key]: enabled } });
     await refresh();
     return true;

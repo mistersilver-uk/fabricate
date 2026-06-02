@@ -85,6 +85,12 @@
         "DiscardDirtyTitle": "Discard unsaved changes?",
         "DiscardDirtyConfirm": "Discard Changes",
         "DiscardDirtyCancel": "Keep Editing",
+        "NavigationDirty": {
+          "Title": "Save unsaved changes?",
+          "Save": "Save",
+          "Discard": "Discard Changes",
+          "Cancel": "Keep Editing"
+        },
         "Kicker": "Systems View",
         "Title": "Crafting systems",
         "Subtitle": "Manage the system definitions that organize Fabricate components, recipes, gathering, and feature rules.",
@@ -393,7 +399,7 @@
           "SaveComponent": "Save Component",
           "Saving": "Saving...",
           "Dirty": "Unsaved",
-          "DiscardDirtyContent": "The current component has unsaved changes. Discard them and continue?",
+          "DiscardDirtyContent": "The current component has unsaved changes. Save them and continue, or discard them?",
           "SaveFailed": "Save failed. Try again or refresh the manager.",
           "NoEditableFields": "There are no editable tag or essence fields for this component in the selected system.",
           "Tabs": {
@@ -567,7 +573,7 @@
           "Cancel": "Cancel",
           "CancelEdit": "Cancel editing",
           "DiscardDirtyTitle": "Discard unsaved essence changes?",
-          "DiscardDirtyContent": "The current essence has unsaved changes. Discard them and continue?",
+          "DiscardDirtyContent": "The current essence has unsaved changes. Save them and continue, or discard them?",
           "DiscardDirtyConfirm": "Discard changes",
           "DiscardDirtyCancel": "Keep editing",
           "EditNamed": "Edit {name}",
@@ -707,7 +713,7 @@
             "Saving": "Saving…",
             "Dirty": "Unsaved",
             "SaveFailed": "Save failed. Try again.",
-            "DiscardChangesPrompt": "The current gathering task has unsaved changes. Discard them and continue?",
+            "DiscardChangesPrompt": "The current gathering task has unsaved changes. Save them and continue, or discard them?",
             "CompositionLossWarning": {
               "Title": "This task will leave some environments",
               "Body": "Saving removes this task from these environments:",
@@ -897,7 +903,7 @@
             "BackToLibrary": "Back to hazard library",
             "Save": "Save hazard",
             "Dirty": "Unsaved",
-            "DiscardChangesPrompt": "The current hazard has unsaved changes. Discard them and continue?",
+            "DiscardChangesPrompt": "The current hazard has unsaved changes. Save them and continue, or discard them?",
             "CompositionLossWarning": {
               "Title": "This hazard will leave some environments",
               "Body": "Saving removes this hazard from these environments:",
@@ -1963,7 +1969,7 @@
         "DeleteTitle": "Delete {name}?",
         "DeleteContent": "Delete gathering environment <strong>{name}</strong>? This also cleans active and historical gathering runs that reference it.",
         "DiscardDirtyTitle": "Discard unsaved environment changes?",
-        "DiscardDirtyContent": "The current gathering environment has unsaved changes. Discard them and continue?",
+        "DiscardDirtyContent": "The current gathering environment has unsaved changes. Save them and continue, or discard them?",
         "DiscardDirtyConfirm": "Discard Changes",
         "DiscardDirtyCancel": "Keep Editing",
         "MoveUp": "Move up",

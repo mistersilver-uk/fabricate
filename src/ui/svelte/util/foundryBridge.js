@@ -66,6 +66,43 @@ export function renderDialog(options) {
   return dialog;
 }
 
+/**
+ * Render a multi-choice dialog and resolve to the chosen action string.
+ * Each choice is `{ action, label, icon, default }`; the dialog closing
+ * (or DialogV2 being unavailable) resolves to `'cancel'`.
+ *
+ * @param {object} options
+ * @param {string} options.title
+ * @param {string} options.content - HTML content
+ * @param {Array<{action: string, label?: string, icon?: string, default?: boolean}>} options.choices
+ * @param {string} [options.defaultAction] - action whose button is the default
+ * @returns {Promise<string>} the chosen action, or 'cancel'
+ */
+export function choiceDialog({ title, content, choices = [], defaultAction } = {}) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const settle = (value) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    const buttons = choices.map((choice, index) => ({
+      action: choice.action,
+      label: choice.label ?? choice.action,
+      icon: choice.icon,
+      default: defaultAction ? choice.action === defaultAction : index === 0,
+      callback: () => settle(choice.action)
+    }));
+    const dialog = renderDialog({
+      window: { title },
+      content,
+      buttons,
+      close: () => settle('cancel')
+    });
+    if (!dialog) settle('cancel');
+  });
+}
+
 export async function viewScene(uuid) {
   const id = String(uuid || '').trim();
   if (!id || typeof globalThis.fromUuid !== 'function') return false;

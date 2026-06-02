@@ -4038,4 +4038,45 @@ describe('createAdminStore', () => {
     });
   });
 
+  // -------------------------------------------------------------------------
+  // Three-way dirty-navigation confirm
+  // -------------------------------------------------------------------------
+  describe('confirmDiscardDirty*Draft (three-way)', () => {
+    it('returns the choiceDialog action verbatim for save/discard/cancel', async () => {
+      for (const action of ['save', 'discard', 'cancel']) {
+        const services = createMockServices({ choiceDialog: async () => action });
+        const store = createAdminStore(services);
+        assert.equal(await store.confirmDiscardDirtyComponentDraft(), action);
+        assert.equal(await store.confirmDiscardDirtyEssenceDraft(), action);
+        assert.equal(await store.confirmDiscardDirtyGatheringTaskDraft(), action);
+        assert.equal(await store.confirmDiscardDirtyGatheringHazardDraft(), action);
+      }
+    });
+
+    it('passes Save as the default action to the choiceDialog', async () => {
+      let captured = null;
+      const services = createMockServices({ choiceDialog: async (opts) => { captured = opts; return 'cancel'; } });
+      const store = createAdminStore(services);
+      await store.confirmDiscardDirtyComponentDraft();
+      assert.equal(captured.defaultAction, 'save');
+      assert.deepEqual(captured.choices.map(c => c.action), ['save', 'discard', 'cancel']);
+    });
+
+    it('falls back to the two-way confirm when no choiceDialog is available', async () => {
+      const confirmTrue = createMockServices({ choiceDialog: undefined, confirmDialog: async () => true });
+      const storeTrue = createAdminStore(confirmTrue);
+      assert.equal(await storeTrue.confirmDiscardDirtyComponentDraft(), 'discard');
+
+      const confirmFalse = createMockServices({ choiceDialog: undefined, confirmDialog: async () => false });
+      const storeFalse = createAdminStore(confirmFalse);
+      assert.equal(await storeFalse.confirmDiscardDirtyComponentDraft(), 'cancel');
+    });
+
+    it('treats an unexpected choiceDialog result as cancel', async () => {
+      const services = createMockServices({ choiceDialog: async () => undefined });
+      const store = createAdminStore(services);
+      assert.equal(await store.confirmDiscardDirtyComponentDraft(), 'cancel');
+    });
+  });
+
 });

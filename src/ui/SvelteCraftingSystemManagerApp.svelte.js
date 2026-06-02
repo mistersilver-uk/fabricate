@@ -2,7 +2,7 @@ import SvelteApplicationMixin from './svelte/SvelteApplicationMixin.svelte.js';
 import CraftingSystemManagerRoot from './svelte/apps/manager/CraftingSystemManagerRoot.svelte';
 import { createAdminStore } from './svelte/stores/adminStore.js';
 import { getSetting, setSetting } from '../config/settings.js';
-import { confirmDialog, renderDialog } from './foundryCompat.js';
+import { confirmDialog, renderDialog, choiceDialog } from './foundryCompat.js';
 import { registerCraftingSystemManagerApp } from './appFactory.js';
 import { SvelteComponentEditorApp } from './SvelteComponentEditorApp.svelte.js';
 import { get } from 'svelte/store';
@@ -188,6 +188,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
       },
       localize: (key, data) => localize(key, data),
       confirmDialog: (options) => confirmDialog(options),
+      choiceDialog: (options) => choiceDialog(options),
       renderImportDialog: async (systemId) => {
         if (!systemId) {
           ui.notifications.warn('Create or select a crafting system first.');
@@ -515,41 +516,31 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
             callback: () => false
           }
         }),
-        confirmDirtyToolsNavigation: () => new Promise(resolve => {
-          let settled = false;
-          const settle = (value) => {
-            if (settled) return;
-            settled = true;
-            resolve(value);
-          };
-          const dialog = renderDialog({
-            window: { title: localize('FABRICATE.Admin.Manager.Tools.NavigationDirty.Title') },
+        confirmDirtyToolsNavigation: async () => {
+          const action = await choiceDialog({
+            title: localize('FABRICATE.Admin.Manager.Tools.NavigationDirty.Title'),
             content: `<p>${localize('FABRICATE.Admin.Manager.Tools.NavigationDirty.Content')}</p>`,
-            buttons: [
+            choices: [
               {
                 action: 'save',
                 label: localize('FABRICATE.Admin.Manager.Tools.NavigationDirty.SaveAll'),
-                icon: 'fas fa-save',
-                default: true,
-                callback: () => settle('save')
+                icon: 'fas fa-save'
               },
               {
                 action: 'discard',
                 label: localize('FABRICATE.Admin.Manager.Tools.NavigationDirty.Discard'),
-                icon: 'fas fa-trash',
-                callback: () => settle('discard')
+                icon: 'fas fa-trash'
               },
               {
                 action: 'cancel',
                 label: localize('FABRICATE.Admin.Manager.Tools.NavigationDirty.Cancel'),
-                icon: 'fas fa-times',
-                callback: () => settle(false)
+                icon: 'fas fa-times'
               }
             ],
-            close: () => settle(false)
+            defaultAction: 'save'
           });
-          if (!dialog) settle(false);
-        }),
+          return action === 'cancel' ? false : action;
+        },
         registerEssenceDirtyGuard: (guard) => {
           this._confirmDiscardDirtyEssenceDraft = typeof guard === 'function' ? guard : null;
         }
@@ -562,8 +553,12 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
     if (canCloseEssence === false) return this;
 
     if (this._adminStore) {
-      const canClose = await this._adminStore.confirmDiscardDirtyEnvironmentDraft?.();
-      if (!canClose) return this;
+      const action = await this._adminStore.confirmDiscardDirtyEnvironmentDraft?.();
+      if (action === 'cancel') return this;
+      if (action === 'save') {
+        const result = await this._adminStore.saveEnvironmentDraft?.();
+        if (result && result.ok === false) return this;
+      }
     }
 
     this._confirmDiscardDirtyEssenceDraft = null;

@@ -110,12 +110,29 @@
     return false;
   }
 
+  function buildUpdates() {
+    const updates = {};
+    if (showTags) {
+      updates.tags = tagDraft.filter(opt => opt.checked).map(opt => opt.tag);
+    }
+    if (showEssences) {
+      const essences = {};
+      for (const option of essenceDraft) {
+        const quantity = clampComponentEssenceQuantity(option.quantity);
+        if (quantity > 0 && option.id) essences[option.id] = quantity;
+      }
+      updates.essences = essences;
+    }
+    return updates;
+  }
+
   function buildDraftSummary() {
     return {
       id: component?.id || '',
       name: component?.name || '',
       tagCount: tagDraft.filter(opt => opt.checked).length,
       essenceCount: essenceDraft.filter(opt => clampComponentEssenceQuantity(opt.quantity) > 0).length,
+      updates: buildUpdates(),
       dirty
     };
   }
@@ -151,18 +168,7 @@
     event?.preventDefault();
     if (!component?.id || saving) return;
     saveFailed = false;
-    const updates = {};
-    if (showTags) {
-      updates.tags = tagDraft.filter(opt => opt.checked).map(opt => opt.tag);
-    }
-    if (showEssences) {
-      const essences = {};
-      for (const option of essenceDraft) {
-        const quantity = clampComponentEssenceQuantity(option.quantity);
-        if (quantity > 0 && option.id) essences[option.id] = quantity;
-      }
-      updates.essences = essences;
-    }
+    const updates = buildUpdates();
     let result = false;
     try {
       result = await onSave(component.id, updates);

@@ -971,35 +971,56 @@
     return text('FABRICATE.Admin.Manager.SelectedSystemInspector', 'Selected system inspector');
   }
 
-  function finishEnvironmentRouteExit(confirmed) {
-    if (confirmed === false) return false;
-    const cancelled = store.cancelEnvironmentDraft?.();
-    if (isPromise(cancelled)) return cancelled.then(() => true);
+  async function finishEnvironmentRouteExit(action) {
+    if (action === 'cancel' || action === false) return false;
+    if (action === 'save') {
+      const result = await store.saveEnvironmentDraft?.();
+      return !(result && result.ok === false);
+    }
+    await store.cancelEnvironmentDraft?.();
     return true;
   }
 
-  function finishEssenceRouteExit(confirmed) {
-    if (confirmed === false) return false;
+  async function finishEssenceRouteExit(action) {
+    if (action === 'cancel' || action === false) return false;
+    if (action === 'save') {
+      if (!essenceEditDraft || essenceEditDraft.validName !== true) return false;
+      const result = await saveEssenceEdit(essenceEditDraft.id || null, essenceEditDraft.updates);
+      return result !== false;
+    }
     essenceEditDirty = false;
     essenceEditDraft = null;
     return true;
   }
 
-  function finishComponentRouteExit(confirmed) {
-    if (confirmed === false) return false;
+  async function finishComponentRouteExit(action) {
+    if (action === 'cancel' || action === false) return false;
+    if (action === 'save') {
+      if (!componentEditDraft || !componentEditDraft.id) return false;
+      const result = await saveComponentEdit(componentEditDraft.id, componentEditDraft.updates);
+      return result !== false;
+    }
     componentEditDirty = false;
     componentEditDraft = null;
     return true;
   }
 
-  function finishGatheringTaskRouteExit(confirmed) {
-    if (confirmed === false) return false;
+  async function finishGatheringTaskRouteExit(action) {
+    if (action === 'cancel' || action === false) return false;
+    if (action === 'save') {
+      const saved = await saveGatheringTaskDraft();
+      if (saved === false) return false;
+    }
     clearGatheringTaskDraft();
     return true;
   }
 
-  function finishGatheringHazardRouteExit(confirmed) {
-    if (confirmed === false) return false;
+  async function finishGatheringHazardRouteExit(action) {
+    if (action === 'cancel' || action === false) return false;
+    if (action === 'save') {
+      const saved = await saveGatheringHazardDraft();
+      if (saved === false) return false;
+    }
     clearGatheringHazardDraft();
     return true;
   }
@@ -1516,26 +1537,28 @@
   }
 
   async function saveGatheringTaskDraft() {
-    if (!gatheringTaskDraft || !selectedSystemId || !selectedGatheringTaskId) return;
+    if (!gatheringTaskDraft || !selectedSystemId || !selectedGatheringTaskId) return false;
     const { valid, errors } = gatheringTaskValidation;
     if (!valid) {
       gatheringTaskSaveError = errors[0] || '';
-      return;
+      return false;
     }
     const proceed = await store.confirmGatheringLibraryTaskCompositionLoss?.(selectedSystemId, selectedGatheringTaskId, gatheringTaskDraft) ?? true;
-    if (!proceed) return; // GM cancelled the match-loss warning — keep editing, no save error
+    if (!proceed) return false; // GM cancelled the match-loss warning — keep editing, no save error
     gatheringTaskSaving = true;
     try {
       const ok = await store.updateGatheringLibraryTask?.(selectedSystemId, selectedGatheringTaskId, gatheringTaskDraft);
       if (ok) {
         gatheringTaskDraftBaseline = JSON.parse(JSON.stringify(gatheringTaskDraft));
         gatheringTaskSaveError = '';
-      } else {
-        gatheringTaskSaveError = text('FABRICATE.Admin.Manager.Environment.Tasks.SaveFailed', 'Save failed. Try again.');
+        return true;
       }
+      gatheringTaskSaveError = text('FABRICATE.Admin.Manager.Environment.Tasks.SaveFailed', 'Save failed. Try again.');
+      return false;
     } catch (error) {
       console.error('Failed to save gathering task draft', error);
       gatheringTaskSaveError = text('FABRICATE.Admin.Manager.Environment.Tasks.SaveFailed', 'Save failed. Try again.');
+      return false;
     } finally {
       gatheringTaskSaving = false;
     }
@@ -1629,21 +1652,23 @@
   }
 
   async function saveGatheringHazardDraft() {
-    if (!gatheringHazardDraft || !selectedSystemId || !selectedGatheringHazardId) return;
+    if (!gatheringHazardDraft || !selectedSystemId || !selectedGatheringHazardId) return false;
     const { valid, errors } = gatheringHazardValidation;
     if (!valid) {
       gatheringHazardSaveError = errors[0] || '';
-      return;
+      return false;
     }
     const proceed = await store.confirmGatheringLibraryHazardCompositionLoss?.(selectedSystemId, selectedGatheringHazardId, gatheringHazardDraft) ?? true;
-    if (!proceed) return; // GM cancelled the match-loss warning — keep editing, no save error
+    if (!proceed) return false; // GM cancelled the match-loss warning — keep editing, no save error
     gatheringHazardSaving = true;
     try {
       const ok = await store.updateGatheringLibraryHazard?.(selectedSystemId, selectedGatheringHazardId, gatheringHazardDraft);
       if (ok !== false) {
         gatheringHazardDraftBaseline = JSON.parse(JSON.stringify(gatheringHazardDraft));
         gatheringHazardSaveError = '';
+        return true;
       }
+      return false;
     } finally {
       gatheringHazardSaving = false;
     }

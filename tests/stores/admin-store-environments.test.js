@@ -691,9 +691,9 @@ describe('adminStore gathering environments tab state', () => {
     await store.selectSystem('system-a');
     store.updateEnvironmentDraft({ name: 'Unsaved Forest' });
 
-    const confirmed = await store.confirmDiscardDirtyEnvironmentDraft();
+    const action = await store.confirmDiscardDirtyEnvironmentDraft();
 
-    assert.equal(confirmed, false);
+    assert.equal(action, 'cancel');
     assert.equal(get(store.viewState).environmentDraft.name, 'Unsaved Forest');
     assert.equal(get(store.viewState).environmentDraftDirty, true);
     assert.equal(services._confirmCalls.length, 1);
