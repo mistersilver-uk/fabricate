@@ -10789,6 +10789,13 @@
   text-overflow: ellipsis;
 }
 
+.fabricate-manager .manager-drop-modifier-overflow {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .fabricate-manager .manager-rank-chip {
   display: inline-flex;
   align-items: center;

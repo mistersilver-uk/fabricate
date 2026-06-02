@@ -651,6 +651,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   const dropModifierPillBlock = blockFor('.fabricate-manager .manager-drop-modifier-pill');
   const positiveDropModifierPillBlock = blockFor('.fabricate-manager .manager-drop-modifier-pill.is-positive');
   const negativeDropModifierPillBlock = blockFor('.fabricate-manager .manager-drop-modifier-pill.is-negative');
+  const dropModifierOverflowBlock = blockFor('.fabricate-manager .manager-drop-modifier-overflow');
   const dropEditorInputBlock = blockFor('.fabricate-manager .manager-drop-editor-card :is(select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]))');
   const dropEditorValuesBlock = blockFor('.fabricate-manager .manager-drop-editor-values');
   const dropEditorRatePercentBlock = blockFor('.fabricate-manager .manager-drop-editor-card .manager-drop-rate-percent input[type="text"]');
@@ -995,6 +996,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   assert.ok(dropModifierListBlock.includes('max-height: 58px;') && dropModifierListBlock.includes('overflow-y: auto;'), 'drop modifiers should scroll after the two-line chip budget');
   assert.ok(dropModifierPillBlock.includes('background: var(--fab-overlay-light-06);'), 'drop modifier pills should use restrained neutral chip backgrounds');
   assert.ok(positiveDropModifierPillBlock.includes('color: var(--fab-mv2-text);') && negativeDropModifierPillBlock.includes('color: var(--fab-mv2-text);'), 'drop modifier chips should avoid saturated text across the whole pill');
+  assert.ok(dropModifierOverflowBlock.includes('text-overflow: ellipsis;') && dropModifierOverflowBlock.includes('white-space: nowrap;'), 'the modifier overflow hint should stay a single clipped table label');
   assert.ok(dropEditorInputBlock.includes(':not([type="range"])'), 'selected drop inspector generic input chrome should not override row-style range sliders');
   assert.ok(dropEditorInputBlock.includes('height: 28px;') && dropEditorInputBlock.includes('min-height: 28px;') && dropEditorInputBlock.includes('padding: 3px 8px;'), 'selected drop inspector generic inputs and selects should use compact 28px right-sidebar geometry');
   assert.ok(dropEditorValuesBlock.includes('grid-template-columns: minmax(0, 1fr) 72px;') && dropEditorValuesBlock.includes('align-items: end;'), 'selected drop inspector should place chance and count in a compact two-column grid');

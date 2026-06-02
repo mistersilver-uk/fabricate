@@ -79,6 +79,7 @@
   ));
   const componentShowingStart = $derived(filteredComponentCards.length === 0 ? 0 : componentPageIndex * componentPageSize + 1);
   const componentShowingEnd = $derived(Math.min(filteredComponentCards.length, (componentPageIndex + 1) * componentPageSize));
+  const maxVisibleModifiers = 4;
 
   const libraryToolList = $derived(Array.isArray(libraryTools) ? libraryTools : []);
   const attachedToolIds = $derived(Array.isArray(task?.toolIds) ? task.toolIds : []);
@@ -355,6 +356,15 @@
     return timeOfDayOptions;
   }
 
+  // Cap the number of modifier chips a drop row shows; beyond that, redirect to the selected
+  // rule's inspector. (Up to the cap, the chips still scroll if long names overflow the cell.)
+  function hasModifierOverflow(row) {
+    return modifierEntries(row).length >= maxVisibleModifiers + 1;
+  }
+
+  function visibleModifierEntries(row) {
+    return hasModifierOverflow(row) ? [] : modifierEntries(row);
+  }
 
   function modifierLabel(entry) {
     if (entry.kind === 'character') {
@@ -983,8 +993,10 @@
                 </span>
                 <span role="cell" class="manager-drop-cell manager-chip-row">
                   <span class="manager-drop-modifier-list">
-                    {#if modifierEntries(row).length > 0}
-                      {#each modifierEntries(row) as modifier (modifier.id)}
+                    {#if hasModifierOverflow(row)}
+                      <span class="manager-chip is-neutral manager-drop-modifier-overflow">{text('FABRICATE.Admin.Manager.Environment.Tasks.DropModifierOverflowHint', 'See selected rule for modifiers')}</span>
+                    {:else if visibleModifierEntries(row).length > 0}
+                      {#each visibleModifierEntries(row) as modifier (modifier.id)}
                         <span class={`manager-chip manager-drop-modifier-pill ${modifierClass(modifier)}`}>
                           <i class={modifierIcon(modifier)} aria-hidden="true"></i>
                           <span>{modifierLabel(modifier)}</span>
