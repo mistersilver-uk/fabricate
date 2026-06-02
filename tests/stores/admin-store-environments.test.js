@@ -2726,7 +2726,7 @@ describe('adminStore gathering library match-loss handling', () => {
     assert.equal(removed, false);
     assert.equal(services._confirmCalls.length, 1);
     assert.match(services._confirmCalls[0].content, /Auto Forest/);
-    assert.match(services._confirmCalls[0].content, /currently used by/);
+    assert.match(services._confirmCalls[0].content, /Used by/);
   });
 
   it('lists manual force-included environments when deleting a library hazard even without a match', async () => {
@@ -2744,7 +2744,7 @@ describe('adminStore gathering library match-loss handling', () => {
     assert.equal(removed, false);
     assert.equal(services._confirmCalls.length, 1);
     assert.match(services._confirmCalls[0].content, /Forced Cave/);
-    assert.match(services._confirmCalls[0].content, /currently used by/);
+    assert.match(services._confirmCalls[0].content, /Used by/);
   });
 
   it('does not list a manual environment whose stale enabled entry no longer matches when deleting', async () => {
@@ -2764,7 +2764,7 @@ describe('adminStore gathering library match-loss handling', () => {
     assert.equal(removed, false);
     assert.equal(services._confirmCalls.length, 1);
     assert.doesNotMatch(services._confirmCalls[0].content, /Manual Cavern/);
-    assert.doesNotMatch(services._confirmCalls[0].content, /currently used by/);
+    assert.doesNotMatch(services._confirmCalls[0].content, /Used by/);
   });
 
   it('does not warn on match loss for a library-disabled task', async () => {

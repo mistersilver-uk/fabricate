@@ -2288,19 +2288,15 @@ export function createAdminStore(services) {
 
   async function _confirmGatheringLibraryRecordDelete({ systemId, record, kind }) {
     const usages = _gatheringLibraryRecordUsages(systemId, record, kind);
-    const label = kind === 'hazard'
-      ? 'reusable gathering hazard'
-      : (kind === 'tool' ? 'reusable gathering tool' : 'gathering task');
+    const label = kind === 'hazard' ? 'hazard' : (kind === 'tool' ? 'tool' : 'task');
     const recordLabel = record?.label || record?.name || record?.id || label;
     const name = _escapeHtml(recordLabel);
-    let content = `<p>Delete ${label} <strong>${name}</strong>? This action cannot be undone.</p>`;
+    let content = `<p>Delete ${label} <strong>${name}</strong>? This cannot be undone.</p>`;
     if (usages.length > 0) {
-      const usageList = usages
-        .slice(0, 6)
-        .map(usage => `<li>${_escapeHtml(usage.name)}</li>`)
-        .join('');
-      const overflow = usages.length > 6 ? `<li>${_escapeHtml(`and ${usages.length - 6} more`)}</li>` : '';
-      content += `<p>This ${label} is currently used by ${usages.length} environment(s):</p><ul>${usageList}${overflow}</ul>`;
+      const names = usages.slice(0, 6).map(usage => _escapeHtml(usage.name));
+      if (usages.length > 6) names.push(_escapeHtml(`and ${usages.length - 6} more`));
+      const plural = usages.length === 1 ? 'environment' : 'environments';
+      content += `<p>Used by ${usages.length} ${plural}: ${names.join(', ')}.</p>`;
     }
     return await services.confirmDialog?.({
       title: `Delete ${label}?`,
@@ -2343,17 +2339,12 @@ export function createAdminStore(services) {
     const base = kind === 'hazard'
       ? 'FABRICATE.Admin.Manager.Environment.Hazards.CompositionLossWarning'
       : 'FABRICATE.Admin.Manager.Environment.Tasks.CompositionLossWarning';
-    const recordWord = kind === 'hazard' ? 'hazard' : 'gathering task';
+    const recordWord = kind === 'hazard' ? 'hazard' : 'task';
     const title = localizeFn?.(`${base}.Title`) || `This ${recordWord} will leave some environments`;
-    const bodyTemplate = localizeFn?.(`${base}.Body`)
-      || `Saving these changes means this ${recordWord} will no longer be available in {count} environment(s) where it is currently active:`;
-    const body = bodyTemplate.replace('{count}', String(affected.length));
-    const usageList = affected
-      .slice(0, 6)
-      .map(usage => `<li>${_escapeHtml(usage.name)}</li>`)
-      .join('');
-    const overflow = affected.length > 6 ? `<li>${_escapeHtml(`and ${affected.length - 6} more`)}</li>` : '';
-    const content = `<p>${_escapeHtml(body)}</p><ul>${usageList}${overflow}</ul>`;
+    const body = localizeFn?.(`${base}.Body`) || `Saving removes this ${recordWord} from these environments:`;
+    const names = affected.slice(0, 6).map(usage => _escapeHtml(usage.name));
+    if (affected.length > 6) names.push(_escapeHtml(`and ${affected.length - 6} more`));
+    const content = `<p>${_escapeHtml(body)} ${names.join(', ')}.</p>`;
     return await services.confirmDialog?.({
       title,
       content,
