@@ -5,7 +5,7 @@ description: Audit and refine Fabricate's crafting domain model, ubiquitous lang
 
 # Fabricate Domain Expert
 
-Keep this skill aligned with the `fabricate_domain_expert` custom Codex agent.
+This skill is the canonical definition of the Fabricate Domain Expert persona. Both provider bindings — `.codex/agents/fabricate-domain-expert.toml` (Codex) and `.claude/agents/fabricate-domain-expert.md` (Claude) — are thin pointers to this file. Make behavior changes here, not in the bindings.
 
 ## Required context
 

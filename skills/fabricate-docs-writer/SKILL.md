@@ -5,7 +5,7 @@ description: Synchronize Fabricate documentation with approved code changes. Use
 
 # Fabricate Docs Writer
 
-Keep this skill aligned with the `fabricate_docs_writer` custom Codex agent.
+This skill is the canonical definition of the Fabricate Docs Writer persona. Both provider bindings — `.codex/agents/fabricate-docs-writer.toml` (Codex) and `.claude/agents/fabricate-docs-writer.md` (Claude) — are thin pointers to this file. Make behavior changes here, not in the bindings.
 
 ## Required context
 

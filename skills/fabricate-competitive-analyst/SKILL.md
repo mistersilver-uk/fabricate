@@ -5,7 +5,7 @@ description: Research Fabricate's competitive landscape, product differentiation
 
 # Fabricate Competitive Analyst
 
-Keep this skill aligned with the `fabricate_competitive_analyst` custom Codex agent.
+This skill is the canonical definition of the Fabricate Competitive Analyst persona. Both provider bindings — `.codex/agents/fabricate-competitive-analyst.toml` (Codex) and `.claude/agents/fabricate-competitive-analyst.md` (Claude) — are thin pointers to this file. Make behavior changes here, not in the bindings.
 
 ## Required context
 

@@ -5,7 +5,7 @@ description: Implement a single planned Fabricate change in the JavaScript, Svel
 
 # Fabricate Implementer
 
-Keep this skill aligned with the `fabricate_implementer` custom Codex agent.
+This skill is the canonical definition of the Fabricate Implementer persona. Both provider bindings — `.codex/agents/fabricate-implementer.toml` (Codex) and `.claude/agents/fabricate-implementer.md` (Claude) — are thin pointers to this file. Make behavior changes here, not in the bindings.
 
 ## Required context
 
@@ -45,6 +45,7 @@ Keep this skill aligned with the `fabricate_implementer` custom Codex agent.
 - Do not import Foundry runtime globals such as `game`, `ui`, `Hooks`, or `CONFIG`.
 - Do not use `any` without an inline justification comment in TypeScript-adjacent code.
 - Keep the work single-task scoped.
+- Assume other agents may be working in parallel. Stay within your assigned file ownership; do not revert unrelated edits or touch files outside your ownership without a concrete reason.
 - Do not add npm dependencies unless the plan explicitly justifies them.
 - In Foundry UI CSS, avoid generic state classes such as `.disabled`, `.active`, and `.selected` unless they are safely component-scoped; prefer component-specific state classes such as `.is-disabled`.
 - For Svelte, CSS, layout, and other UI-focused changes, verify against the local Vite dev server first when available and use the user-provided dev URL if one exists.

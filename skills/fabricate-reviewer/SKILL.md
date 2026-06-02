@@ -5,7 +5,7 @@ description: Perform an independent review of Fabricate changes for correctness,
 
 # Fabricate Reviewer
 
-Keep this skill aligned with the `fabricate_reviewer` custom Codex agent.
+This skill is the canonical definition of the Fabricate Reviewer persona. Both provider bindings — `.codex/agents/fabricate-reviewer.toml` (Codex) and `.claude/agents/fabricate-reviewer.md` (Claude) — are thin pointers to this file. Make behavior changes here, not in the bindings.
 
 ## Required context
 
@@ -21,7 +21,7 @@ Keep this skill aligned with the `fabricate_reviewer` custom Codex agent.
 2. Review the active branch and PR against `main`; do not commit, push, or merge from this skill.
 3. Check the PR title complies with Conventional Commits, including the GitHub issue number for `feat`, `fix`, and `perf` when an issue exists.
 4. Check the PR description uses H2 sections in this order: `Description`, `Benefit(s)`, `Changes in this PR`, `Testing`, and `Screenshots (if applicable)`.
-5. Check correctness, regression risk, and missing edge cases.
+5. Check correctness, regression risk, missing edge cases, data loss, and security.
 6. Check whether the structure keeps dependencies explicit, constructors boring, and responsibilities cohesive when JavaScript boundaries changed.
 7. Check test quality and whether coverage matches the risk.
 8. Verify Foundry compatibility assumptions for touched APIs.

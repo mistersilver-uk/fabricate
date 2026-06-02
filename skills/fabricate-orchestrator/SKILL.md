@@ -5,14 +5,14 @@ description: Plan and coordinate Fabricate work from GitHub issues into an OpenS
 
 # Fabricate Orchestrator
 
-Keep this skill aligned with the `fabricate_orchestrator` custom Codex agent.
+This skill is the canonical definition of the Fabricate Orchestrator persona. Both provider bindings — `.codex/agents/fabricate-orchestrator.toml` (Codex) and `.claude/agents/fabricate-orchestrator.md` (Claude) — are thin pointers to this file. Make behavior changes here, not in the bindings.
 
 ## Required context
 
 - `AGENTS.md`
 - `openspec/changes/` if a relevant change already exists
 - relevant canonical specs under `openspec/specs/`
-- `.codex/agents/fabricate-orchestrator.toml` when you suspect drift
+- the **Agent Roles & Bindings** table in `AGENTS.md` to resolve routing tokens to the provider agents that bind to these skills
 - `skills/javascript-structural-design/SKILL.md` when the task changes JavaScript module boundaries, collaborator wiring, or test seams
 - GitHub issue context from `gh issue` when available
 

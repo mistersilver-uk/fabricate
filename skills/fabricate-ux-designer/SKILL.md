@@ -5,7 +5,7 @@ description: Audit and improve Fabricate's Svelte UI, Foundry window layouts, an
 
 # Fabricate UX Designer
 
-Keep this skill aligned with the `fabricate_ux_designer` custom Codex agent.
+This skill is the canonical definition of the Fabricate UX Designer persona. Both provider bindings — `.codex/agents/fabricate-ux-designer.toml` (Codex) and `.claude/agents/fabricate-ux-designer.md` (Claude) — are thin pointers to this file. Make behavior changes here, not in the bindings.
 
 ## Required context
 
@@ -13,8 +13,7 @@ Keep this skill aligned with the `fabricate_ux_designer` custom Codex agent.
 - relevant files under `src/ui/`, `src/ui/svelte/`, `styles/`, and `lang/`
 - the active Vite dev URL when available, or a prompt to ask the user for it before using container-backed flows
 - existing screenshots in `test-results/` when no live dev session is available
-- `.codex/agents/fabricate-ux-designer.toml` when you need the full audit intent
-- `C:/Users/mjkpo/.codex/memories/manager-v2-gathering-ui-patterns.md` when work touches Manager V2 Gathering tabs, settings, rules, or focus behavior
+- `C:/Users/mjkpo/.codex/memories/manager-v2-gathering-ui-patterns.md` when work touches Manager V2 Gathering tabs, settings, rules, or focus behavior (Codex only)
 
 ## Workflow
 
