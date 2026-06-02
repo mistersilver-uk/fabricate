@@ -2103,7 +2103,10 @@ export function createAdminStore(services) {
       if (!libraryEnabled) compositionState = 'libraryDisabled';
       else if (excluded) compositionState = 'excluded';
       else if (forceIncluded) compositionState = 'forceIncluded';
-      else if (!matches) compositionState = explicitlyIncluded ? 'includedButUnavailable' : 'notMatching';
+      // In automatic mode the enabled allow-list is ignored (matching the runtime composition
+      // service), so a non-matching record is always "not matching" — never a stale
+      // "included but unavailable". Only manual mode honors the explicit inclusion.
+      else if (!matches) compositionState = (compositionMode === 'manual' && explicitlyIncluded) ? 'includedButUnavailable' : 'notMatching';
       else if (compositionMode === 'manual') compositionState = explicitlyIncluded ? 'explicitlyIncluded' : 'candidate';
       else compositionState = 'includedByMatch';
 
@@ -2221,21 +2224,59 @@ export function createAdminStore(services) {
     };
   }
 
-  function _gatheringLibraryRecordUsages(systemId, record, kind) {
-    if (!record?.id) return [];
-    const enabledKey = kind === 'hazard' ? 'enabledHazardIds' : 'enabledTaskIds';
+  /**
+   * Whether `environment` currently composes the library task/hazard `record`, mirroring the
+   * runtime `GatheringRichStateService.composeEnvironment` filter chain exactly:
+   *   library-enabled  AND  (matches OR force-included)  AND  the composition-mode include gate.
+   * In manual mode a record is composed only when force-added, or when it both matches and is on
+   * the enabled allow-list; a stale enabled entry for a non-matching record is NOT composed.
+   */
+  function _environmentComposesGatheringRecord(environment, record, kind, conditionSettings) {
+    if (!record?.id || record.enabled === false) return false;
     const recordId = String(record.id);
+    const includeDanger = kind === 'hazard';
+    const mode = environment?.compositionMode === 'manual' ? 'manual' : 'automatic';
+    const enabledKey = kind === 'hazard' ? 'enabledHazardIds' : 'enabledTaskIds';
+    const disabledKey = kind === 'hazard' ? 'disabledHazardIds' : 'disabledTaskIds';
+    const forcedKey = kind === 'hazard' ? 'forcedHazardIds' : 'forcedTaskIds';
+    const enabled = Array.isArray(environment?.[enabledKey]) ? environment[enabledKey].map(String) : [];
+    const disabled = Array.isArray(environment?.[disabledKey]) ? environment[disabledKey].map(String) : [];
+    const forced = Array.isArray(environment?.[forcedKey]) ? environment[forcedKey].map(String) : [];
+    if (mode === 'manual') {
+      if (forced.includes(recordId)) return true;
+      return enabled.includes(recordId)
+        && _gatheringLibraryRecordMatchesEnvironment(record, environment, {}, includeDanger, conditionSettings);
+    }
+    return !disabled.includes(recordId)
+      && _gatheringLibraryRecordMatchesEnvironment(record, environment, {}, includeDanger, conditionSettings);
+  }
+
+  /**
+   * Environments in `systemId` that currently compose (surface) the task/hazard `record`. Mirrors
+   * runtime composition so callers see exactly the environments a record actually appears in today.
+   */
+  function _gatheringLibraryRecordSurfacingEnvironments(systemId, record, kind) {
+    if (!record?.id) return [];
+    const conditionSettings = _currentGatheringConfig().systems?.[String(systemId || '')]?.conditions || null;
     const usages = [];
     for (const environment of _environmentList()) {
       if (String(environment?.craftingSystemId || '') !== String(systemId || '')) continue;
-      const enabled = Array.isArray(environment?.[enabledKey]) ? environment[enabledKey].map(String) : [];
-      if (!enabled.includes(recordId)) continue;
+      if (!_environmentComposesGatheringRecord(environment, record, kind, conditionSettings)) continue;
       usages.push({
         id: String(environment.id || ''),
         name: String(environment.name || environment.id || 'Unnamed environment')
       });
     }
     return usages;
+  }
+
+  function _gatheringLibraryRecordUsages(systemId, record, kind) {
+    if (!record?.id) return [];
+    // Only tasks and hazards are surfaced into environments. Tools are referenced by tasks via
+    // their `toolIds`, not by environments, so an environment-level usage scan does not apply to
+    // them (the previous `enabledTaskIds` lookup could only ever match on an id collision).
+    if (kind !== 'task' && kind !== 'hazard') return [];
+    return _gatheringLibraryRecordSurfacingEnvironments(systemId, record, kind);
   }
 
   function _gatheringCurrentConditions(conditionSettings) {
@@ -2247,19 +2288,15 @@ export function createAdminStore(services) {
 
   async function _confirmGatheringLibraryRecordDelete({ systemId, record, kind }) {
     const usages = _gatheringLibraryRecordUsages(systemId, record, kind);
-    const label = kind === 'hazard'
-      ? 'reusable gathering hazard'
-      : (kind === 'tool' ? 'reusable gathering tool' : 'gathering task');
+    const label = kind === 'hazard' ? 'hazard' : (kind === 'tool' ? 'tool' : 'task');
     const recordLabel = record?.label || record?.name || record?.id || label;
     const name = _escapeHtml(recordLabel);
-    let content = `<p>Delete ${label} <strong>${name}</strong>? This action cannot be undone.</p>`;
+    let content = `<p>Delete ${label} <strong>${name}</strong>? This cannot be undone.</p>`;
     if (usages.length > 0) {
-      const usageList = usages
-        .slice(0, 6)
-        .map(usage => `<li>${_escapeHtml(usage.name)}</li>`)
-        .join('');
-      const overflow = usages.length > 6 ? `<li>${_escapeHtml(`and ${usages.length - 6} more`)}</li>` : '';
-      content += `<p>This ${label} is currently used by ${usages.length} environment(s):</p><ul>${usageList}${overflow}</ul>`;
+      const names = usages.slice(0, 6).map(usage => _escapeHtml(usage.name));
+      if (usages.length > 6) names.push(_escapeHtml(`and ${usages.length - 6} more`));
+      const plural = usages.length === 1 ? 'environment' : 'environments';
+      content += `<p>Used by ${usages.length} ${plural}: ${names.join(', ')}.</p>`;
     }
     return await services.confirmDialog?.({
       title: `Delete ${label}?`,
@@ -2267,6 +2304,101 @@ export function createAdminStore(services) {
       yes: () => true,
       no: () => false
     }) === true;
+  }
+
+  /**
+   * Enumerate the environments in `systemId` that compose `oldRecord` today but would no longer
+   * compose `newRecord` after the edit — i.e. where saving would silently remove the record. This
+   * covers any cause of removal the editors allow: losing a region/biome/danger match, or
+   * disabling the record outright (which drops it from every environment, including force-included
+   * rows). Records that remain composed after the edit are excluded.
+   */
+  function _gatheringLibraryRecordCompositionLossEnvironments(systemId, oldRecord, newRecord, kind) {
+    // A library-disabled record is not composed anywhere, so there is nothing to lose by editing it.
+    if (!oldRecord?.id || oldRecord.enabled === false) return [];
+    const conditionSettings = _currentGatheringConfig().systems?.[String(systemId || '')]?.conditions || null;
+    const affected = [];
+    for (const environment of _environmentList()) {
+      if (String(environment?.craftingSystemId || '') !== String(systemId || '')) continue;
+      const composedBefore = _environmentComposesGatheringRecord(environment, oldRecord, kind, conditionSettings);
+      const composedAfter = _environmentComposesGatheringRecord(environment, newRecord, kind, conditionSettings);
+      if (!(composedBefore && !composedAfter)) continue;
+      affected.push({
+        id: String(environment.id || ''),
+        name: String(environment.name || environment.id || 'Unnamed environment'),
+        mode: environment?.compositionMode === 'manual' ? 'manual' : 'automatic'
+      });
+    }
+    return affected;
+  }
+
+  async function _confirmGatheringLibraryRecordCompositionLoss({ systemId, oldRecord, newRecord, kind }) {
+    const affected = _gatheringLibraryRecordCompositionLossEnvironments(systemId, oldRecord, newRecord, kind);
+    if (affected.length === 0) return true;
+    const localizeFn = services.localize;
+    const base = kind === 'hazard'
+      ? 'FABRICATE.Admin.Manager.Environment.Hazards.CompositionLossWarning'
+      : 'FABRICATE.Admin.Manager.Environment.Tasks.CompositionLossWarning';
+    const recordWord = kind === 'hazard' ? 'hazard' : 'task';
+    const title = localizeFn?.(`${base}.Title`) || `This ${recordWord} will leave some environments`;
+    const body = localizeFn?.(`${base}.Body`) || `Saving removes this ${recordWord} from these environments:`;
+    const names = affected.slice(0, 6).map(usage => _escapeHtml(usage.name));
+    if (affected.length > 6) names.push(_escapeHtml(`and ${affected.length - 6} more`));
+    const content = `<p>${_escapeHtml(body)} ${names.join(', ')}.</p>`;
+    return await services.confirmDialog?.({
+      title,
+      content,
+      yes: {
+        label: localizeFn?.(`${base}.Confirm`) || 'Save Anyway',
+        callback: () => true
+      },
+      no: {
+        label: localizeFn?.(`${base}.Cancel`) || 'Keep Editing',
+        callback: () => false
+      }
+    }) === true;
+  }
+
+  /**
+   * Announce (non-blocking) that disabling a library task/hazard removed it from the environments
+   * that composed it. Fires only on a true enable→disable transition with at least one affected
+   * environment; covers both the library-list toggle and the editor save, since both flow through
+   * the `updateGatheringLibrary*` store methods.
+   */
+  function _notifyGatheringLibraryRecordDisabled({ systemId, oldRecord, nextRecord, kind }) {
+    if (!(oldRecord?.enabled !== false && nextRecord?.enabled === false)) return;
+    const affected = _gatheringLibraryRecordSurfacingEnvironments(systemId, oldRecord, kind);
+    if (affected.length === 0) return;
+    const names = affected.slice(0, 6).map(usage => usage.name);
+    if (affected.length > 6) names.push(`and ${affected.length - 6} more`);
+    const name = oldRecord?.label || oldRecord?.name || oldRecord?.id || (kind === 'hazard' ? 'hazard' : 'task');
+    const key = kind === 'hazard'
+      ? 'FABRICATE.Admin.Manager.Environment.Hazards.DisabledNotice'
+      : 'FABRICATE.Admin.Manager.Environment.Tasks.DisabledNotice';
+    const data = { name, count: affected.length, environments: names.join(', ') };
+    const fallback = `Disabled ${kind === 'hazard' ? 'hazard' : 'task'} “${name}” — no longer available in ${affected.length} environment(s): ${data.environments}.`;
+    const message = services.localize?.(key, data) || fallback;
+    services.notify?.warn?.(message);
+  }
+
+  async function confirmGatheringLibraryTaskCompositionLoss(systemId = get(selectedSystemId), taskId, draft = {}) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    const existing = systemConfig?.tasks?.find(task => task.id === taskId);
+    if (!existing) return true;
+    const newRecord = _normalizeGatheringTask({ ...existing, ...draft }, _randomID);
+    if (newRecord.enabled === false) return true; // disabling is announced via notification, not a dialog
+    return _confirmGatheringLibraryRecordCompositionLoss({ systemId, oldRecord: existing, newRecord, kind: 'task' });
+  }
+
+  async function confirmGatheringLibraryHazardCompositionLoss(systemId = get(selectedSystemId), hazardId, draft = {}) {
+    const config = _currentGatheringConfig();
+    const systemConfig = _gatheringSystemConfig(config, systemId);
+    const existing = systemConfig?.hazards?.find(hazard => hazard.id === hazardId);
+    if (!existing) return true;
+    const newRecord = _normalizeGatheringHazard({ ...existing, ...draft }, _randomID);
+    if (newRecord.enabled === false) return true; // disabling is announced via notification, not a dialog
+    return _confirmGatheringLibraryRecordCompositionLoss({ systemId, oldRecord: existing, newRecord, kind: 'hazard' });
   }
 
   function _resolveEnvironmentTaskSelection(draft, preferredTaskId = '') {
@@ -4393,6 +4525,7 @@ export function createAdminStore(services) {
       }
     }
     await _saveGatheringConfig(config);
+    _notifyGatheringLibraryRecordDisabled({ systemId, oldRecord: existing, nextRecord: systemConfig.tasks.find(task => task.id === taskId), kind: 'task' });
     await refresh();
     return true;
   }
@@ -4489,10 +4622,12 @@ export function createAdminStore(services) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !hazardId) return false;
+    const existing = systemConfig.hazards.find(hazard => hazard.id === hazardId);
     systemConfig.hazards = systemConfig.hazards.map(hazard => hazard.id === hazardId
       ? _normalizeGatheringHazard({ ...hazard, ...updates }, _randomID)
       : hazard);
     await _saveGatheringConfig(config);
+    _notifyGatheringLibraryRecordDisabled({ systemId, oldRecord: existing, nextRecord: systemConfig.hazards.find(hazard => hazard.id === hazardId), kind: 'hazard' });
     await refresh();
     return true;
   }
@@ -5217,6 +5352,8 @@ export function createAdminStore(services) {
     confirmDiscardDirtyEssenceDraft,
     confirmDiscardDirtyGatheringTaskDraft,
     confirmDiscardDirtyGatheringHazardDraft,
+    confirmGatheringLibraryTaskCompositionLoss,
+    confirmGatheringLibraryHazardCompositionLoss,
     cancelEnvironmentDraft,
     saveEnvironmentDraft,
     duplicateEnvironmentDraft,

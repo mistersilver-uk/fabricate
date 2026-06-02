@@ -195,6 +195,7 @@ function createServices({
   const settings = { lastManagedCraftingSystem: '', gatheringConfig };
   const listCalls = [];
   const confirmCalls = [];
+  const notifyCalls = { info: [], warn: [], error: [] };
   const calls = {
     create: [],
     update: [],
@@ -228,6 +229,7 @@ function createServices({
   };
   const records = environments;
   const gatheringEnvironmentStore = {
+    list: () => clone(records),
     listBySystem: async (systemId) => {
       listCalls.push(systemId);
       return clone(records.filter(environment => environment.craftingSystemId === systemId));
@@ -303,7 +305,11 @@ function createServices({
     getScriptMacros: () => [],
     getSceneOptions: () => sceneOptions,
     getRollTableOptions: () => rollTableOptions,
-    notify: { info: () => {}, warn: () => {}, error: () => {} },
+    notify: {
+      info: (msg) => { notifyCalls.info.push(msg); },
+      warn: (msg) => { notifyCalls.warn.push(msg); },
+      error: (msg) => { notifyCalls.error.push(msg); }
+    },
     confirmDialog: async (options) => {
       confirmCalls.push(clone(options));
       if (Array.isArray(confirmResult)) {
@@ -328,7 +334,9 @@ function createServices({
         'FABRICATE.Admin.Environments.NewResultName': 'Result',
         'FABRICATE.Admin.Environments.TaskCopySuffix': '{name} Copy',
         'FABRICATE.Admin.Environments.ValidationSummary': 'Resolve {count} validation issues before saving.',
-        'FABRICATE.Admin.Environments.ValidationSummaryOne': 'Resolve 1 validation issue before saving.'
+        'FABRICATE.Admin.Environments.ValidationSummaryOne': 'Resolve 1 validation issue before saving.',
+        'FABRICATE.Admin.Manager.Environment.Tasks.DisabledNotice': 'Disabled task “{name}” — no longer available in {count} environment(s): {environments}.',
+        'FABRICATE.Admin.Manager.Environment.Hazards.DisabledNotice': 'Disabled hazard “{name}” — no longer available in {count} environment(s): {environments}.'
       };
       return Object.entries(data).reduce(
         (message, [name, value]) => message.replaceAll(`{${name}}`, String(value)),
@@ -343,6 +351,7 @@ function createServices({
     renderSystemImportDialog: async () => {},
     _listCalls: listCalls,
     _confirmCalls: confirmCalls,
+    _notify: notifyCalls,
     _environmentCalls: calls,
     _environments: records
   };
@@ -2605,5 +2614,269 @@ describe('adminStore gathering environments tab state', () => {
     assert.match(result.error, /blind selection requires exactly one task/);
     assert.equal(services._environmentCalls.update.length, 1);
     assert.equal(services._environments[0].tasks.length, 1);
+  });
+});
+
+describe('adminStore gathering library match-loss handling', () => {
+  function gatheringConfigWithTask() {
+    return { systems: { 'system-a': { tasks: [{ id: 'lib-task', name: 'Forage', enabled: true, biomes: ['forest'], regions: [], dropRows: [] }], hazards: [] } } };
+  }
+
+  it('classifies a non-matching library task as notMatching in automatic mode even with a stale enabled entry', async () => {
+    const services = createServices({
+      systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
+      environments: [makeEnvironment({
+        id: 'environment-a',
+        name: 'Cavern',
+        compositionMode: 'automatic',
+        biomes: ['cavern'],
+        enabledTaskIds: ['lib-task'] // stale allow-list entry left over from a previous manual phase
+      })],
+      gatheringConfig: gatheringConfigWithTask()
+    });
+    const store = createAdminStore(services);
+
+    await store.selectSystem('system-a');
+    await store.setTab('environments');
+    await store.selectEnvironment('environment-a');
+
+    const entry = get(store.viewState).environmentComposition.tasks.find(task => task.id === 'lib-task');
+    assert.equal(entry.compositionState, 'notMatching');
+  });
+
+  it('warns and enumerates auto-mode and manually-enabled environments when an edit drops the match', async () => {
+    const services = createServices({
+      systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
+      environments: [
+        makeEnvironment({ id: 'auto', name: 'Auto Forest', compositionMode: 'automatic', biomes: ['forest'] }),
+        makeEnvironment({ id: 'manual-enabled', name: 'Manual Enabled', compositionMode: 'manual', biomes: ['forest'], enabledTaskIds: ['lib-task'] }),
+        makeEnvironment({ id: 'manual-forced', name: 'Manual Forced', compositionMode: 'manual', biomes: ['forest'], forcedTaskIds: ['lib-task'] }),
+        makeEnvironment({ id: 'auto-excluded', name: 'Auto Excluded', compositionMode: 'automatic', biomes: ['forest'], disabledTaskIds: ['lib-task'] })
+      ],
+      gatheringConfig: gatheringConfigWithTask(),
+      confirmResult: true
+    });
+    const store = createAdminStore(services);
+
+    await store.selectSystem('system-a');
+    const proceed = await store.confirmGatheringLibraryTaskCompositionLoss('system-a', 'lib-task', { biomes: ['cavern'] });
+
+    assert.equal(proceed, true);
+    assert.equal(services._confirmCalls.length, 1);
+    const { content } = services._confirmCalls[0];
+    assert.match(content, /Auto Forest/);
+    assert.match(content, /Manual Enabled/);
+    assert.doesNotMatch(content, /Manual Forced/); // force-included records stay regardless of match
+    assert.doesNotMatch(content, /Auto Excluded/); // locally excluded records are not surfaced today
+  });
+
+  it('returns false without proceeding when the GM cancels the match-loss warning', async () => {
+    const services = createServices({
+      systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
+      environments: [makeEnvironment({ id: 'auto', name: 'Auto Forest', compositionMode: 'automatic', biomes: ['forest'] })],
+      gatheringConfig: gatheringConfigWithTask(),
+      confirmResult: false
+    });
+    const store = createAdminStore(services);
+
+    await store.selectSystem('system-a');
+    const proceed = await store.confirmGatheringLibraryTaskCompositionLoss('system-a', 'lib-task', { biomes: ['cavern'] });
+
+    assert.equal(proceed, false);
+    assert.equal(services._confirmCalls.length, 1);
+  });
+
+  it('does not warn when the edit keeps the record matching its environments', async () => {
+    const services = createServices({
+      systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
+      environments: [makeEnvironment({ id: 'auto', name: 'Auto Forest', compositionMode: 'automatic', biomes: ['forest'] })],
+      gatheringConfig: gatheringConfigWithTask(),
+      confirmResult: true
+    });
+    const store = createAdminStore(services);
+
+    await store.selectSystem('system-a');
+    const proceed = await store.confirmGatheringLibraryTaskCompositionLoss('system-a', 'lib-task', { name: 'Renamed' });
+
+    assert.equal(proceed, true);
+    assert.equal(services._confirmCalls.length, 0);
+  });
+
+  it('warns when raising a hazard danger tag above an environment danger level drops the match', async () => {
+    const services = createServices({
+      systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
+      environments: [makeEnvironment({ id: 'auto', name: 'Auto Forest', compositionMode: 'automatic', biomes: ['forest'], dangerLevel: 'hazardous' })],
+      gatheringConfig: { systems: { 'system-a': { tasks: [], hazards: [{ id: 'lib-haz', name: 'Cave-in', enabled: true, biomes: ['forest'], regions: [], dangerTags: ['hazardous'], dropRate: 25 }] } } },
+      confirmResult: true
+    });
+    const store = createAdminStore(services);
+
+    await store.selectSystem('system-a');
+    const proceed = await store.confirmGatheringLibraryHazardCompositionLoss('system-a', 'lib-haz', { dangerTags: ['extreme'] });
+
+    assert.equal(proceed, true);
+    assert.equal(services._confirmCalls.length, 1);
+    assert.match(services._confirmCalls[0].content, /Auto Forest/);
+  });
+
+  it('lists auto-matched environments with no enabled entry when deleting a library task', async () => {
+    const services = createServices({
+      systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
+      environments: [makeEnvironment({ id: 'auto', name: 'Auto Forest', compositionMode: 'automatic', biomes: ['forest'] })],
+      gatheringConfig: gatheringConfigWithTask(),
+      confirmResult: false // decline so the record is not actually deleted
+    });
+    const store = createAdminStore(services);
+
+    await store.selectSystem('system-a');
+    const removed = await store.deleteGatheringLibraryTask('system-a', 'lib-task');
+
+    assert.equal(removed, false);
+    assert.equal(services._confirmCalls.length, 1);
+    assert.match(services._confirmCalls[0].content, /Auto Forest/);
+    assert.match(services._confirmCalls[0].content, /Used by/);
+  });
+
+  it('lists manual force-included environments when deleting a library hazard even without a match', async () => {
+    const services = createServices({
+      systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
+      environments: [makeEnvironment({ id: 'forced', name: 'Forced Cave', compositionMode: 'manual', biomes: ['cavern'], forcedHazardIds: ['lib-haz'] })],
+      gatheringConfig: { systems: { 'system-a': { tasks: [], hazards: [{ id: 'lib-haz', name: 'Cave-in', enabled: true, biomes: ['forest'], regions: [], dangerTags: ['hazardous'], dropRate: 25 }] } } },
+      confirmResult: false
+    });
+    const store = createAdminStore(services);
+
+    await store.selectSystem('system-a');
+    const removed = await store.deleteGatheringLibraryHazard('system-a', 'lib-haz');
+
+    assert.equal(removed, false);
+    assert.equal(services._confirmCalls.length, 1);
+    assert.match(services._confirmCalls[0].content, /Forced Cave/);
+    assert.match(services._confirmCalls[0].content, /Used by/);
+  });
+
+  it('does not list a manual environment whose stale enabled entry no longer matches when deleting', async () => {
+    const services = createServices({
+      systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
+      // Manual environment keeps a stale enabled entry, but the task no longer matches its biome,
+      // so runtime composition does not include it — the delete dialog must not claim it is used.
+      environments: [makeEnvironment({ id: 'manual', name: 'Manual Cavern', compositionMode: 'manual', biomes: ['cavern'], enabledTaskIds: ['lib-task'] })],
+      gatheringConfig: gatheringConfigWithTask(),
+      confirmResult: false
+    });
+    const store = createAdminStore(services);
+
+    await store.selectSystem('system-a');
+    const removed = await store.deleteGatheringLibraryTask('system-a', 'lib-task');
+
+    assert.equal(removed, false);
+    assert.equal(services._confirmCalls.length, 1);
+    assert.doesNotMatch(services._confirmCalls[0].content, /Manual Cavern/);
+    assert.doesNotMatch(services._confirmCalls[0].content, /Used by/);
+  });
+
+  it('does not warn on match loss for a library-disabled task', async () => {
+    const services = createServices({
+      systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
+      environments: [makeEnvironment({ id: 'auto', name: 'Auto Forest', compositionMode: 'automatic', biomes: ['forest'] })],
+      gatheringConfig: { systems: { 'system-a': { tasks: [{ id: 'lib-task', name: 'Forage', enabled: false, biomes: ['forest'], regions: [], dropRows: [] }], hazards: [] } } },
+      confirmResult: true
+    });
+    const store = createAdminStore(services);
+
+    await store.selectSystem('system-a');
+    const proceed = await store.confirmGatheringLibraryTaskCompositionLoss('system-a', 'lib-task', { biomes: ['cavern'] });
+
+    assert.equal(proceed, true);
+    assert.equal(services._confirmCalls.length, 0);
+  });
+
+  it('does not warn on match loss for a manual environment that also force-includes the task', async () => {
+    const services = createServices({
+      systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
+      // Both enabled and forced: force-inclusion keeps it composed after the match edit, so no loss.
+      environments: [makeEnvironment({ id: 'manual', name: 'Manual Forest', compositionMode: 'manual', biomes: ['forest'], enabledTaskIds: ['lib-task'], forcedTaskIds: ['lib-task'] })],
+      gatheringConfig: gatheringConfigWithTask(),
+      confirmResult: true
+    });
+    const store = createAdminStore(services);
+
+    await store.selectSystem('system-a');
+    const proceed = await store.confirmGatheringLibraryTaskCompositionLoss('system-a', 'lib-task', { biomes: ['cavern'] });
+
+    assert.equal(proceed, true);
+    assert.equal(services._confirmCalls.length, 0);
+  });
+
+  it('does not show the composition-loss dialog when an edit disables the record', async () => {
+    const services = createServices({
+      systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
+      environments: [makeEnvironment({ id: 'auto', name: 'Auto Forest', compositionMode: 'automatic', biomes: ['forest'] })],
+      gatheringConfig: gatheringConfigWithTask(),
+      confirmResult: true
+    });
+    const store = createAdminStore(services);
+
+    await store.selectSystem('system-a');
+    // Disabling is announced by a notification (see updateGatheringLibraryTask), not gated by a dialog.
+    const proceed = await store.confirmGatheringLibraryTaskCompositionLoss('system-a', 'lib-task', { enabled: false });
+
+    assert.equal(proceed, true);
+    assert.equal(services._confirmCalls.length, 0);
+  });
+
+  it('notifies (no dialog) and enumerates environments when a task is disabled from the library', async () => {
+    const services = createServices({
+      systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
+      environments: [
+        makeEnvironment({ id: 'auto', name: 'Auto Forest', compositionMode: 'automatic', biomes: ['forest'] }),
+        // Force-included into a non-matching environment: disabling still removes it here.
+        makeEnvironment({ id: 'forced', name: 'Forced Cave', compositionMode: 'manual', biomes: ['cavern'], forcedTaskIds: ['lib-task'] })
+      ],
+      gatheringConfig: gatheringConfigWithTask()
+    });
+    const store = createAdminStore(services);
+
+    await store.selectSystem('system-a');
+    const ok = await store.updateGatheringLibraryTask('system-a', 'lib-task', { enabled: false });
+
+    assert.equal(ok, true);
+    assert.equal(services._confirmCalls.length, 0);
+    assert.equal(services._notify.warn.length, 1);
+    const message = services._notify.warn[0];
+    assert.match(message, /Auto Forest/);
+    assert.match(message, /Forced Cave/);
+  });
+
+  it('notifies when a hazard is disabled and enumerates its environments', async () => {
+    const services = createServices({
+      systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
+      environments: [makeEnvironment({ id: 'auto', name: 'Auto Forest', compositionMode: 'automatic', biomes: ['forest'], dangerLevel: 'hazardous' })],
+      gatheringConfig: { systems: { 'system-a': { tasks: [], hazards: [{ id: 'lib-haz', name: 'Cave-in', enabled: true, biomes: ['forest'], regions: [], dangerTags: ['hazardous'], dropRate: 25 }] } } }
+    });
+    const store = createAdminStore(services);
+
+    await store.selectSystem('system-a');
+    const ok = await store.updateGatheringLibraryHazard('system-a', 'lib-haz', { enabled: false });
+
+    assert.equal(ok, true);
+    assert.equal(services._notify.warn.length, 1);
+    assert.match(services._notify.warn[0], /Auto Forest/);
+  });
+
+  it('does not notify when enabling a task or disabling one that composes no environments', async () => {
+    const services = createServices({
+      systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
+      // The only environment does not match the forest task, so nothing currently composes it.
+      environments: [makeEnvironment({ id: 'auto', name: 'Auto Cavern', compositionMode: 'automatic', biomes: ['cavern'] })],
+      gatheringConfig: gatheringConfigWithTask()
+    });
+    const store = createAdminStore(services);
+
+    await store.selectSystem('system-a');
+    await store.updateGatheringLibraryTask('system-a', 'lib-task', { enabled: false }); // disabled but unused → silent
+    await store.updateGatheringLibraryTask('system-a', 'lib-task', { enabled: true }); // re-enable → silent
+
+    assert.equal(services._notify.warn.length, 0);
   });
 });

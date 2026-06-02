@@ -3293,10 +3293,10 @@ describe('createAdminStore', () => {
       assert.equal(confirmations.length, 2);
       assert.ok(confirmations[0].content.includes('Lone Task'));
       assert.ok(confirmations[0].content.includes('cannot be undone'));
-      assert.ok(!confirmations[0].content.includes('currently used by'));
+      assert.ok(!confirmations[0].content.includes('Used by'));
       assert.ok(confirmations[1].content.includes('Lone Hazard'));
       assert.ok(confirmations[1].content.includes('cannot be undone'));
-      assert.ok(!confirmations[1].content.includes('currently used by'));
+      assert.ok(!confirmations[1].content.includes('Used by'));
       assert.equal(services._store.gatheringConfig.systems.sys1.tasks.length, 1);
       assert.equal(services._store.gatheringConfig.systems.sys1.hazards.length, 1);
     });

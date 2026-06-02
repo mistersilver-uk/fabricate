@@ -905,6 +905,13 @@
             "Dirty": "Unsaved",
             "SaveFailed": "Save failed. Try again.",
             "DiscardChangesPrompt": "The current gathering task has unsaved changes. Discard them and continue?",
+            "CompositionLossWarning": {
+              "Title": "This task will leave some environments",
+              "Body": "Saving removes this task from these environments:",
+              "Confirm": "Save Anyway",
+              "Cancel": "Keep Editing"
+            },
+            "DisabledNotice": "Disabled task “{name}” — no longer available in {count} environment(s): {environments}.",
             "PlaceholderKicker": "Gathering task",
             "PlaceholderHint": "Detailed authoring fields for gathering tasks are coming later. Use the task browser for selection, duplication, deletion, and status for now.",
             "CopySuffix": "Copy",
@@ -1088,6 +1095,13 @@
             "Save": "Save hazard",
             "Dirty": "Unsaved",
             "DiscardChangesPrompt": "The current hazard has unsaved changes. Discard them and continue?",
+            "CompositionLossWarning": {
+              "Title": "This hazard will leave some environments",
+              "Body": "Saving removes this hazard from these environments:",
+              "Confirm": "Save Anyway",
+              "Cancel": "Keep Editing"
+            },
+            "DisabledNotice": "Disabled hazard “{name}” — no longer available in {count} environment(s): {environments}.",
             "DeleteConfirm": "Delete this hazard? This cannot be undone.",
             "HazardIdentity": "Hazard Identity",
             "HazardIdentityHint": "Name the hazard, give it a description, choose an image, and toggle whether it is enabled.",
