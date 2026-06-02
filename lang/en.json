@@ -911,6 +911,7 @@
               "Confirm": "Save Anyway",
               "Cancel": "Keep Editing"
             },
+            "DisabledNotice": "Disabled task “{name}” — no longer available in {count} environment(s): {environments}.",
             "PlaceholderKicker": "Gathering task",
             "PlaceholderHint": "Detailed authoring fields for gathering tasks are coming later. Use the task browser for selection, duplication, deletion, and status for now.",
             "CopySuffix": "Copy",
@@ -1100,6 +1101,7 @@
               "Confirm": "Save Anyway",
               "Cancel": "Keep Editing"
             },
+            "DisabledNotice": "Disabled hazard “{name}” — no longer available in {count} environment(s): {environments}.",
             "DeleteConfirm": "Delete this hazard? This cannot be undone.",
             "HazardIdentity": "Hazard Identity",
             "HazardIdentityHint": "Name the hazard, give it a description, choose an image, and toggle whether it is enabled.",

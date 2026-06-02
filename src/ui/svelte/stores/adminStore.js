@@ -2359,12 +2359,35 @@ export function createAdminStore(services) {
     }) === true;
   }
 
+  /**
+   * Announce (non-blocking) that disabling a library task/hazard removed it from the environments
+   * that composed it. Fires only on a true enable→disable transition with at least one affected
+   * environment; covers both the library-list toggle and the editor save, since both flow through
+   * the `updateGatheringLibrary*` store methods.
+   */
+  function _notifyGatheringLibraryRecordDisabled({ systemId, oldRecord, nextRecord, kind }) {
+    if (!(oldRecord?.enabled !== false && nextRecord?.enabled === false)) return;
+    const affected = _gatheringLibraryRecordSurfacingEnvironments(systemId, oldRecord, kind);
+    if (affected.length === 0) return;
+    const names = affected.slice(0, 6).map(usage => usage.name);
+    if (affected.length > 6) names.push(`and ${affected.length - 6} more`);
+    const name = oldRecord?.label || oldRecord?.name || oldRecord?.id || (kind === 'hazard' ? 'hazard' : 'task');
+    const key = kind === 'hazard'
+      ? 'FABRICATE.Admin.Manager.Environment.Hazards.DisabledNotice'
+      : 'FABRICATE.Admin.Manager.Environment.Tasks.DisabledNotice';
+    const data = { name, count: affected.length, environments: names.join(', ') };
+    const fallback = `Disabled ${kind === 'hazard' ? 'hazard' : 'task'} “${name}” — no longer available in ${affected.length} environment(s): ${data.environments}.`;
+    const message = services.localize?.(key, data) || fallback;
+    services.notify?.warn?.(message);
+  }
+
   async function confirmGatheringLibraryTaskCompositionLoss(systemId = get(selectedSystemId), taskId, draft = {}) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     const existing = systemConfig?.tasks?.find(task => task.id === taskId);
     if (!existing) return true;
     const newRecord = _normalizeGatheringTask({ ...existing, ...draft }, _randomID);
+    if (newRecord.enabled === false) return true; // disabling is announced via notification, not a dialog
     return _confirmGatheringLibraryRecordCompositionLoss({ systemId, oldRecord: existing, newRecord, kind: 'task' });
   }
 
@@ -2374,6 +2397,7 @@ export function createAdminStore(services) {
     const existing = systemConfig?.hazards?.find(hazard => hazard.id === hazardId);
     if (!existing) return true;
     const newRecord = _normalizeGatheringHazard({ ...existing, ...draft }, _randomID);
+    if (newRecord.enabled === false) return true; // disabling is announced via notification, not a dialog
     return _confirmGatheringLibraryRecordCompositionLoss({ systemId, oldRecord: existing, newRecord, kind: 'hazard' });
   }
 
@@ -4501,6 +4525,7 @@ export function createAdminStore(services) {
       }
     }
     await _saveGatheringConfig(config);
+    _notifyGatheringLibraryRecordDisabled({ systemId, oldRecord: existing, nextRecord: systemConfig.tasks.find(task => task.id === taskId), kind: 'task' });
     await refresh();
     return true;
   }
@@ -4597,10 +4622,12 @@ export function createAdminStore(services) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !hazardId) return false;
+    const existing = systemConfig.hazards.find(hazard => hazard.id === hazardId);
     systemConfig.hazards = systemConfig.hazards.map(hazard => hazard.id === hazardId
       ? _normalizeGatheringHazard({ ...hazard, ...updates }, _randomID)
       : hazard);
     await _saveGatheringConfig(config);
+    _notifyGatheringLibraryRecordDisabled({ systemId, oldRecord: existing, nextRecord: systemConfig.hazards.find(hazard => hazard.id === hazardId), kind: 'hazard' });
     await refresh();
     return true;
   }
