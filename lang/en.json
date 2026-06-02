@@ -971,6 +971,7 @@
             "QuantityShortHint": "award",
             "Modifiers": "Modifiers",
             "NoModifiers": "Not specified",
+            "DropModifierOverflowHint": "See selected rule for modifiers",
             "NoComponent": "No Component",
             "CreateOrAssign": "Create or assign",
             "DropComponentHere": "Drop component here",

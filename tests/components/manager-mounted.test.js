@@ -3293,7 +3293,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.deepEqual(importedDrops, [{ type: 'Item', uuid: 'Item.imported' }], 'non-managed drops should keep using the import flow');
   });
 
-  it('renders all gathering task drop modifiers and scrolls the cell when crowded', async () => {
+  it('caps gathering task drop modifiers at four labels and redirects to the selected rule beyond', async () => {
     const fourModifiers = Array.from({ length: 4 }, (_, index) => ({
       id: `four-${index}`,
       conditionId: `four-${index}`,
@@ -3346,12 +3346,13 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     const fourModifierRow = target.querySelector('[data-gathering-task-drop-id="drop-four-modifiers"]');
     const fiveModifierRow = target.querySelector('[data-gathering-task-drop-id="drop-five-modifiers"]');
+    // Up to four modifiers render as chips (which scroll within the cell if long names wrap);
+    // five or more are capped and redirect to the selected rule's inspector.
     assert.equal(fourModifierRow.querySelectorAll('.manager-drop-modifier-pill').length, 4);
     assert.equal(fourModifierRow.textContent.includes('See selected rule for modifiers'), false);
-    // All modifiers render and scroll within the cell instead of being hidden behind a hint.
-    assert.equal(fiveModifierRow.querySelectorAll('.manager-drop-modifier-pill').length, 5);
-    assert.equal(fiveModifierRow.querySelector('.manager-drop-modifier-overflow'), null);
-    assert.equal(fiveModifierRow.textContent.includes('See selected rule for modifiers'), false);
+    assert.equal(fiveModifierRow.querySelectorAll('.manager-drop-modifier-pill').length, 0);
+    assert.ok(fiveModifierRow.querySelector('.manager-drop-modifier-overflow'));
+    assert.ok(fiveModifierRow.textContent.includes('See selected rule for modifiers'));
   });
 
   it('colours gathering task drop chance sliders by rarity threshold', async () => {
