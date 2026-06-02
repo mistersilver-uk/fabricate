@@ -124,11 +124,24 @@
     return 'missing';
   }
 
+  function buildUpdates() {
+    const updates = {
+      name: name.trim(),
+      description,
+      icon: normalizeEssenceIcon(icon)
+    };
+    if (showSourceUi && (isNew || sourceTouched)) {
+      updates.sourceComponentId = sourceComponentId || null;
+    }
+    return updates;
+  }
+
   function buildDraftSummary() {
     const normalizedIcon = normalizeEssenceIcon(icon);
     const sourceStateId = draftSourceState();
     return {
       id: draftId || '',
+      updates: buildUpdates(),
       name: name.trim() || text('FABRICATE.Admin.Manager.Essence.CreateInspectorTitle', 'New essence draft'),
       description,
       icon: normalizedIcon,
@@ -160,14 +173,7 @@
     event.preventDefault();
     if (!validName || saving) return;
     saveFailed = false;
-    const updates = {
-      name: name.trim(),
-      description,
-      icon: normalizeEssenceIcon(icon)
-    };
-    if (showSourceUi && (isNew || sourceTouched)) {
-      updates.sourceComponentId = sourceComponentId || null;
-    }
+    const updates = buildUpdates();
     let result = false;
     try {
       result = await onSave(draftId || null, updates);
