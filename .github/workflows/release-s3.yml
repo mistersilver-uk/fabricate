@@ -17,6 +17,22 @@ on:
         required: false
         type: boolean
         default: false
+  workflow_call:
+    inputs:
+      rc_tag:
+        description: "RC tag to publish (e.g. v1.0.0-rc.3)"
+        required: true
+        type: string
+      dry_run:
+        description: "Dry-run: build and stage but do not upload"
+        required: false
+        type: boolean
+        default: false
+      overwrite:
+        description: "Allow overwriting an existing versioned zip"
+        required: false
+        type: boolean
+        default: false
 
 # id-token: write lets the workflow request a GitHub OIDC token, which is
 # exchanged with AWS STS for short-lived role credentials. AWS access is

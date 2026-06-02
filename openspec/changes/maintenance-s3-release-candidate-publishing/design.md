@@ -56,8 +56,16 @@ version passed to the script.
   `Compress-Archive` + Unix `zip`), ported from premium because the inline
   `tar -a` in `release.js` produces archives Foundry's installer reads as empty
   on Windows.
-- **`.github/workflows/release-s3.yml`** — `workflow_dispatch` (`rc_tag`,
-  `dry_run`, `overwrite`); OIDC auth via `aws-actions/configure-aws-credentials`.
+- **`.github/workflows/release-s3.yml`** — `workflow_dispatch` and
+  `workflow_call` (`rc_tag`, `dry_run`, `overwrite`); OIDC auth via
+  `aws-actions/configure-aws-credentials`.
+- **`.github/workflows/release-candidate.yml`** — after `semantic-release`,
+  fetches tags again and compares RC tags pointing at `HEAD` against the
+  pre-release snapshot. Exactly one new
+  `^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$` tag is exposed as a job output for the
+  reusable S3 job. Zero new tags emits an empty output and skips S3 publishing.
+  More than one new tag fails the semantic-release job with a clear error,
+  because the publishing target would be ambiguous.
 
 ## Upload semantics
 
@@ -71,12 +79,19 @@ version passed to the script.
 `scripts/release-s3.js` is invoked from `package.json` (`release:s3`,
 `release:s3:dry-run`) and from CI, so both environments are specified:
 
-- **CI (Ubuntu, `release-s3.yml`).** After `npm ci`, the job resolves
+- **CI (Ubuntu, manual `release-s3.yml`).** After `npm ci`, the job resolves
   `bucket`/`baseUrl` from repo vars (`S3_RELEASE_BUCKET`, `RELEASE_BASE_URL`) and
   credentials from GitHub OIDC (`AWS_ROLE_TO_ASSUME`, `AWS_REGION`). The AWS
   credentials step is gated `if: ${{ !inputs.dry_run }}`, so a dry-run dispatch
   needs no OIDC/role and cannot fail on missing AWS config. `scripts/lib/zip.js`
   takes its Unix `zip` path. A non-dry-run uploads to S3.
+- **CI (Ubuntu, automatic `release-candidate.yml`).** The semantic-release job
+  keeps `contents: write` so it can create the RC tag and GitHub prerelease.
+  The follow-up `publish-s3` job calls `release-s3.yml` only when the detected
+  RC-tag output is non-empty, and grants the reusable workflow only
+  `contents: read` plus `id-token: write`. Automatic calls pass
+  `dry_run: false` and `overwrite: false`; operator dry-runs and recovery
+  reruns remain manual dispatch responsibilities.
 - **Local dev (Windows/macOS/Linux).** `npm run release:s3:dry-run -- --version <v>`
   builds and stages per-target zips under `build/s3/` (git-ignored) using config
   defaults, imports no AWS SDK, and contacts no network (`--version` is required,

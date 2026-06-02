@@ -176,16 +176,27 @@ If the smoke test fails, the workflow opens (or comments on an existing) GitHub 
 
 Requires two repository secrets: `FOUNDRY_USERNAME` and `FOUNDRY_PASSWORD`.
 
-### Release workflow
+### Release-candidate workflow
 
-File: `.github/workflows/release.yml`
+File: `.github/workflows/release-candidate.yml`
 
-Trigger: manual (`workflow_dispatch`) with an optional dry-run flag.
+Trigger: push to `main`.
 
 Steps:
 1. Run unit tests (`npm test`) and build.
 2. Run the Foundry integration smoke test (via the reusable workflow).
-3. Run `semantic-release` to determine the version bump, inject the release version into `module.json`, build and zip the module, and publish a GitHub Release.
+3. Run `semantic-release` to determine the version bump, inject the release version into `module.json`, build and zip the module, and publish a GitHub prerelease.
+4. Compare RC tags pointing at `HEAD` before and after `semantic-release`. If exactly one new `v<x.y.z>-rc.N` tag was created, call `.github/workflows/release-s3.yml` with `dry_run: false` and `overwrite: false`. If no RC tag was created, skip S3 publishing. If multiple new RC tags are detected at `HEAD`, fail the run because the S3 publish target is ambiguous.
+
+### S3 release-candidate workflow
+
+File: `.github/workflows/release-s3.yml`
+
+Triggers:
+- Manual `workflow_dispatch`, with `rc_tag`, `dry_run`, and `overwrite` inputs.
+- Reusable `workflow_call` from the release-candidate workflow, using the same inputs.
+
+Manual dispatch is the operator path for dry-runs, recovery reruns, and intentional overwrite attempts. Automatic calls from `release-candidate.yml` publish only a newly-created RC tag and do not overwrite an existing versioned zip.
 
 ### Codex workflows
 
@@ -225,6 +236,7 @@ Fabricate uses [semantic-release](https://semantic-release.gitbook.io/) to autom
 2. Generates release notes with `@semantic-release/release-notes-generator`.
 3. Calls `node scripts/release.js --version <new-version>` via `@semantic-release/exec`. This injects the version into `module.json`, runs `vite build`, copies static assets, and creates `dist/fabricate-v<version>.zip`.
 4. Creates a GitHub Release with the zip and the raw `module.json` as assets.
+5. On `main`, the release-candidate workflow detects the newly-created RC tag at `HEAD` and publishes that exact tag to S3 through the reusable S3 workflow.
 
 GitHub Releases are the canonical release history. The CI release flow does not commit a repository changelog back to `main`; branch protection requires pull requests and status checks on `main`, so release automation publishes tags and GitHub Releases without a protected-branch writeback step.
 
