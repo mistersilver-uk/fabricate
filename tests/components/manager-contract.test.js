@@ -283,6 +283,14 @@ describe('CraftingSystemManager source contract', () => {
       rootSource.includes('visiblePlaceholderViews'),
       'root should derive selected-system placeholder nav from selection and feature gates'
     );
+    assert.ok(rootSource.includes('recipesRouteEnabled'), 'root should derive the recipes route from the experimental feature gate');
+    assert.ok(rootSource.includes("view === 'recipes' && !recipesAvailable"), 'route normalization should reject recipes while the experimental gate is disabled');
+    assert.ok(rootSource.includes("if (view === 'recipes' && !recipesRouteEnabled) return;"), 'setView should refuse direct recipes navigation while disabled');
+    assert.ok(rootSource.includes("{#if recipesRouteEnabled}"), 'recipes should not be hard-wired as an always-active rail route');
+    assert.ok(
+      rootSource.includes("{ id: 'recipes', icon: 'fas fa-scroll'"),
+      'root should keep disabled Recipes in the planned placeholder list when experimental features are off'
+    );
     assert.ok(rootSource.includes('selectSystemAndShowBrowser'), 'root should keep an explicit systems-browser route');
     assert.ok(rootSource.includes('manager-scope-card'), 'root should render selected system scope as static rail text');
     assert.ok(rootSource.includes('manager-scope-return'), 'root should expose a return-to-system-library rail action');

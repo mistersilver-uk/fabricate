@@ -53,6 +53,7 @@
   let toolsComponentPageIndex = $state(0);
   let toolsComponentPageSize = $state(6);
   const placeholderViews = [
+    { id: 'recipes', icon: 'fas fa-scroll', labelKey: 'FABRICATE.Admin.Manager.Nav.Recipes', fallback: 'Recipes' },
     { id: 'rules', icon: 'fas fa-sliders-h', labelKey: 'FABRICATE.Admin.Manager.Nav.Rules', fallback: 'Rules' },
     { id: 'graph', icon: 'fas fa-project-diagram', labelKey: 'FABRICATE.Admin.Manager.Nav.Graph', fallback: 'Graph' }
   ];
@@ -62,8 +63,9 @@
   const systemsLoading = $derived($viewState.systemsLoading === true);
   const canShowEnvironments = $derived(selectedSystem?.features?.gathering === true);
   const canShowEssences = $derived(selectedSystem?.features?.essences === true);
+  const recipesRouteEnabled = $derived($viewState.experimentalFeaturesEnabled === true);
   const showEssenceSourceUi = $derived(selectedSystem?.features?.effectTransfer === true);
-  const currentView = $derived(normalizedActiveView(activeView, selectedSystem, canShowEnvironments, canShowEssences));
+  const currentView = $derived(normalizedActiveView(activeView, selectedSystem, canShowEnvironments, canShowEssences, recipesRouteEnabled));
   const selectedCounts = $derived({
     components: selectedSystem?.managedItemOptions?.length || 0,
     recipes: $viewState.recipes?.length || 0,
@@ -846,8 +848,9 @@
     return Array.isArray(setting?.values) ? setting.values : [];
   }
 
-  function normalizedActiveView(view, system, environmentsAvailable, essencesAvailable) {
+  function normalizedActiveView(view, system, environmentsAvailable, essencesAvailable, recipesAvailable) {
     if (!system) return 'systems';
+    if (view === 'recipes' && !recipesAvailable) return 'system-edit';
     if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit' || view === 'gathering-hazard-edit') && !environmentsAvailable) return 'systems';
     if ((view === 'essences' || view === 'essence-edit') && !essencesAvailable) return 'systems';
     return view;
@@ -920,6 +923,7 @@
   }
 
   function isViewAvailableForSystem(view, system) {
+    if (view.id === 'recipes') return !recipesRouteEnabled;
     if (!view.feature) return true;
     return system?.features?.[view.feature] === true;
   }
@@ -1120,6 +1124,7 @@
 
   function setView(view) {
     if ((view === 'recipes' || view === 'components' || view === 'component-edit' || view === 'tags' || view === 'system-edit' || view === 'tools') && !selectedSystem) return;
+    if (view === 'recipes' && !recipesRouteEnabled) return;
     if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit' || view === 'gathering-hazard-edit') && !canShowEnvironments) return;
     if ((view === 'essences' || view === 'essence-edit') && !canShowEssences) return;
     afterTruthyResult(confirmRouteExit(view), () => {
@@ -2948,11 +2953,13 @@
             <i class="fas fa-cog" aria-hidden="true"></i>
             <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.SystemEdit.Nav', 'System settings')}</span>
           </button>
-          <button type="button" class={`manager-nav-button ${currentView === 'recipes' ? 'is-active' : ''}`} aria-current={currentView === 'recipes' ? 'page' : undefined} onclick={() => setView('recipes')}>
-            <i class="fas fa-scroll" aria-hidden="true"></i>
-            <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Recipes', 'Recipes')}</span>
-            <span class="manager-nav-count">{$viewState.recipes?.length || 0}</span>
-          </button>
+          {#if recipesRouteEnabled}
+            <button type="button" class={`manager-nav-button ${currentView === 'recipes' ? 'is-active' : ''}`} aria-current={currentView === 'recipes' ? 'page' : undefined} onclick={() => setView('recipes')}>
+              <i class="fas fa-scroll" aria-hidden="true"></i>
+              <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Recipes', 'Recipes')}</span>
+              <span class="manager-nav-count">{$viewState.recipes?.length || 0}</span>
+            </button>
+          {/if}
           <button type="button" class={`manager-nav-button ${currentView === 'components' || currentView === 'component-edit' ? 'is-active' : ''}`} aria-current={currentView === 'components' || currentView === 'component-edit' ? 'page' : undefined} onclick={() => setView('components')}>
             <i class="fas fa-boxes" aria-hidden="true"></i>
             <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Components', 'Components')}</span>

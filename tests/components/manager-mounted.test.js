@@ -492,6 +492,7 @@ function createStore(calls = [], options = {}) {
     recipeCategories: [{ name: 'elixirs', count: 1 }, { name: 'potions', count: 1 }],
     recipeSearchTerm: '',
     itemSearchTerm: '',
+    experimentalFeaturesEnabled: options.experimentalFeaturesEnabled === true,
     itemCards: selectedSystem ? componentCardsFor(selectedSystem.id) : [],
     essenceCards: selectedSystem ? (options.emptyEssences ? [] : essenceCardsBySystem[selectedSystem.id]) : [],
     showVisibilitySummary: true,
@@ -987,7 +988,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.textContent.includes('Quick actions'), false);
     assert.deepEqual(
       Array.from(target.querySelectorAll('.manager-nav-label')).map(label => label.textContent.trim()),
-      ['System settings', 'Recipes', 'Components', 'Tags & Categories', 'Essences', 'Tools', 'Gathering', 'Rules', 'Graph']
+      ['System settings', 'Components', 'Tags & Categories', 'Essences', 'Tools', 'Gathering', 'Recipes', 'Rules', 'Graph']
     );
     assert.equal(
       Array.from(target.querySelectorAll('.manager-header-actions .manager-button'))
@@ -1015,6 +1016,36 @@ describe('CraftingSystemManager mounted behavior', () => {
     const systemHeroRow = target.querySelector('.manager-inspector .manager-inspector-title-row.is-hero-large');
     assert.ok(systemHeroRow, 'systems inspector should use the prominent hero title row');
     assert.ok(systemHeroRow.querySelector('.manager-inspector-icon.is-hero-large'), 'systems inspector hero should render the icon at hero-large size');
+  });
+
+  it('keeps experimental selected-system routes disabled by default', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls),
+        services: { openCurrentAdmin: () => {} }
+      }
+    });
+    flushSync();
+
+    const plannedButtons = ['Recipes', 'Rules', 'Graph'].map(label => navButton(label));
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'systems');
+    assert.deepEqual(plannedButtons.map(button => button?.disabled === true), [true, true, true]);
+    assert.deepEqual(
+      plannedButtons.map(button => button?.querySelector('.manager-nav-count')?.textContent.trim()),
+      ['Soon', 'Soon', 'Soon']
+    );
+
+    navButton('Recipes').click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'systems');
+    assert.equal(target.querySelector('.manager-recipes-table'), null);
+    assert.deepEqual(calls, []);
   });
 
   it('renders Systems Library current gathering condition shortcuts for enabled dimensions', () => {
@@ -1231,7 +1262,7 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     assert.deepEqual(
       Array.from(target.querySelectorAll('.manager-nav-label')).map(label => label.textContent.trim()),
-      ['System settings', 'Recipes', 'Components', 'Tags & Categories', 'Tools', 'Rules', 'Graph']
+      ['System settings', 'Components', 'Tags & Categories', 'Tools', 'Recipes', 'Rules', 'Graph']
     );
 
     const environmentFact = target.querySelector('[data-count-id="environments"]');
@@ -1247,11 +1278,20 @@ describe('CraftingSystemManager mounted behavior', () => {
     mounted = mount(Component, {
       target,
       props: {
-        store: createStore(calls),
+        store: createStore(calls, { experimentalFeaturesEnabled: true }),
         services: { openCurrentAdmin: () => {} }
       }
     });
     flushSync();
+
+    const recipesNav = navButton('Recipes');
+    assert.equal(recipesNav.disabled, false);
+    assert.equal(recipesNav.querySelector('.manager-nav-count')?.textContent.trim(), '2');
+    for (const label of ['Rules', 'Graph']) {
+      const plannedNav = navButton(label);
+      assert.equal(plannedNav.disabled, true);
+      assert.equal(plannedNav.querySelector('.manager-nav-count')?.textContent.trim(), 'Soon');
+    }
 
     navButton('Recipes').click();
     await tick();
@@ -1309,7 +1349,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     mounted = mount(Component, {
       target,
       props: {
-        store: createStore(calls),
+        store: createStore(calls, { experimentalFeaturesEnabled: true }),
         services: {
           openCurrentAdmin: () => {},
           onEditRecipe: (id) => edited.push(id)
@@ -2051,7 +2091,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     mounted = mount(Component, {
       target,
       props: {
-        store: createStore(calls, { confirmDiscardEssenceResult: false }),
+        store: createStore(calls, { confirmDiscardEssenceResult: false, experimentalFeaturesEnabled: true }),
         services: { openCurrentAdmin: () => {} }
       }
     });
@@ -4262,11 +4302,20 @@ describe('CraftingSystemManager mounted behavior', () => {
     mounted = mount(Component, {
       target,
       props: {
-        store: createStore(calls, { emptyRecipes: true }),
+        store: createStore(calls, { emptyRecipes: true, experimentalFeaturesEnabled: true }),
         services: { openCurrentAdmin: () => {} }
       }
     });
     flushSync();
+
+    const recipesNav = navButton('Recipes');
+    assert.equal(recipesNav.disabled, false);
+    assert.equal(recipesNav.querySelector('.manager-nav-count')?.textContent.trim(), '0');
+    for (const label of ['Rules', 'Graph']) {
+      const plannedNav = navButton(label);
+      assert.equal(plannedNav.disabled, true);
+      assert.equal(plannedNav.querySelector('.manager-nav-count')?.textContent.trim(), 'Soon');
+    }
 
     navButton('Recipes').click();
     await tick();
@@ -4290,7 +4339,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     mounted = mount(Component, {
       target,
       props: {
-        store: createStore(calls, { emptyRecipes: true, emptyComponents: true }),
+        store: createStore(calls, { emptyRecipes: true, emptyComponents: true, experimentalFeaturesEnabled: true }),
         services: { openCurrentAdmin: () => {} }
       }
     });

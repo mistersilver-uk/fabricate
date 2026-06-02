@@ -3568,6 +3568,18 @@ describe('createAdminStore', () => {
       }
     });
 
+    it('viewState.experimentalFeaturesEnabled mirrors the world setting', async () => {
+      const services = createMockServices({
+        getSetting: (key) => key === 'experimentalFeatures'
+          ? true
+          : ''
+      });
+      const store = createAdminStore(services);
+      await store.refresh();
+
+      assert.equal(get(store.viewState).experimentalFeaturesEnabled, true);
+    });
+
     it('viewState.recipes derives browser display counts from execution steps', async () => {
       const services = createMockServices();
       const origManager = services.getRecipeManager();
