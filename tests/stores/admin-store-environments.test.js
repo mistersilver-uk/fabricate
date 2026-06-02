@@ -2651,7 +2651,7 @@ describe('adminStore gathering library match-loss handling', () => {
     const store = createAdminStore(services);
 
     await store.selectSystem('system-a');
-    const proceed = await store.confirmGatheringLibraryTaskMatchLoss('system-a', 'lib-task', { biomes: ['cavern'] });
+    const proceed = await store.confirmGatheringLibraryTaskCompositionLoss('system-a', 'lib-task', { biomes: ['cavern'] });
 
     assert.equal(proceed, true);
     assert.equal(services._confirmCalls.length, 1);
@@ -2672,7 +2672,7 @@ describe('adminStore gathering library match-loss handling', () => {
     const store = createAdminStore(services);
 
     await store.selectSystem('system-a');
-    const proceed = await store.confirmGatheringLibraryTaskMatchLoss('system-a', 'lib-task', { biomes: ['cavern'] });
+    const proceed = await store.confirmGatheringLibraryTaskCompositionLoss('system-a', 'lib-task', { biomes: ['cavern'] });
 
     assert.equal(proceed, false);
     assert.equal(services._confirmCalls.length, 1);
@@ -2688,7 +2688,7 @@ describe('adminStore gathering library match-loss handling', () => {
     const store = createAdminStore(services);
 
     await store.selectSystem('system-a');
-    const proceed = await store.confirmGatheringLibraryTaskMatchLoss('system-a', 'lib-task', { name: 'Renamed' });
+    const proceed = await store.confirmGatheringLibraryTaskCompositionLoss('system-a', 'lib-task', { name: 'Renamed' });
 
     assert.equal(proceed, true);
     assert.equal(services._confirmCalls.length, 0);
@@ -2704,7 +2704,7 @@ describe('adminStore gathering library match-loss handling', () => {
     const store = createAdminStore(services);
 
     await store.selectSystem('system-a');
-    const proceed = await store.confirmGatheringLibraryHazardMatchLoss('system-a', 'lib-haz', { dangerTags: ['extreme'] });
+    const proceed = await store.confirmGatheringLibraryHazardCompositionLoss('system-a', 'lib-haz', { dangerTags: ['extreme'] });
 
     assert.equal(proceed, true);
     assert.equal(services._confirmCalls.length, 1);
@@ -2777,7 +2777,7 @@ describe('adminStore gathering library match-loss handling', () => {
     const store = createAdminStore(services);
 
     await store.selectSystem('system-a');
-    const proceed = await store.confirmGatheringLibraryTaskMatchLoss('system-a', 'lib-task', { biomes: ['cavern'] });
+    const proceed = await store.confirmGatheringLibraryTaskCompositionLoss('system-a', 'lib-task', { biomes: ['cavern'] });
 
     assert.equal(proceed, true);
     assert.equal(services._confirmCalls.length, 0);
@@ -2794,7 +2794,7 @@ describe('adminStore gathering library match-loss handling', () => {
     const store = createAdminStore(services);
 
     await store.selectSystem('system-a');
-    const proceed = await store.confirmGatheringLibraryTaskMatchLoss('system-a', 'lib-task', { biomes: ['cavern'] });
+    const proceed = await store.confirmGatheringLibraryTaskCompositionLoss('system-a', 'lib-task', { biomes: ['cavern'] });
 
     assert.equal(proceed, true);
     assert.equal(services._confirmCalls.length, 0);
@@ -2814,7 +2814,7 @@ describe('adminStore gathering library match-loss handling', () => {
     const store = createAdminStore(services);
 
     await store.selectSystem('system-a');
-    const proceed = await store.confirmGatheringLibraryTaskMatchLoss('system-a', 'lib-task', { enabled: false });
+    const proceed = await store.confirmGatheringLibraryTaskCompositionLoss('system-a', 'lib-task', { enabled: false });
 
     assert.equal(proceed, true);
     assert.equal(services._confirmCalls.length, 1);

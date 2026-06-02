@@ -905,7 +905,7 @@
             "Dirty": "Unsaved",
             "SaveFailed": "Save failed. Try again.",
             "DiscardChangesPrompt": "The current gathering task has unsaved changes. Discard them and continue?",
-            "MatchLossWarning": {
+            "CompositionLossWarning": {
               "Title": "This gathering task will leave some environments",
               "Body": "Saving these changes means this gathering task will no longer be available in {count} environment(s) where it is currently active:",
               "Confirm": "Save Anyway",
@@ -1094,7 +1094,7 @@
             "Save": "Save hazard",
             "Dirty": "Unsaved",
             "DiscardChangesPrompt": "The current hazard has unsaved changes. Discard them and continue?",
-            "MatchLossWarning": {
+            "CompositionLossWarning": {
               "Title": "This hazard will leave some environments",
               "Body": "Saving these changes means this hazard will no longer be available in {count} environment(s) where it is currently active:",
               "Confirm": "Save Anyway",

@@ -2317,7 +2317,7 @@ export function createAdminStore(services) {
    * disabling the record outright (which drops it from every environment, including force-included
    * rows). Records that remain composed after the edit are excluded.
    */
-  function _gatheringLibraryRecordMatchLossEnvironments(systemId, oldRecord, newRecord, kind) {
+  function _gatheringLibraryRecordCompositionLossEnvironments(systemId, oldRecord, newRecord, kind) {
     // A library-disabled record is not composed anywhere, so there is nothing to lose by editing it.
     if (!oldRecord?.id || oldRecord.enabled === false) return [];
     const conditionSettings = _currentGatheringConfig().systems?.[String(systemId || '')]?.conditions || null;
@@ -2336,13 +2336,13 @@ export function createAdminStore(services) {
     return affected;
   }
 
-  async function _confirmGatheringLibraryRecordMatchLoss({ systemId, oldRecord, newRecord, kind }) {
-    const affected = _gatheringLibraryRecordMatchLossEnvironments(systemId, oldRecord, newRecord, kind);
+  async function _confirmGatheringLibraryRecordCompositionLoss({ systemId, oldRecord, newRecord, kind }) {
+    const affected = _gatheringLibraryRecordCompositionLossEnvironments(systemId, oldRecord, newRecord, kind);
     if (affected.length === 0) return true;
     const localizeFn = services.localize;
     const base = kind === 'hazard'
-      ? 'FABRICATE.Admin.Manager.Environment.Hazards.MatchLossWarning'
-      : 'FABRICATE.Admin.Manager.Environment.Tasks.MatchLossWarning';
+      ? 'FABRICATE.Admin.Manager.Environment.Hazards.CompositionLossWarning'
+      : 'FABRICATE.Admin.Manager.Environment.Tasks.CompositionLossWarning';
     const recordWord = kind === 'hazard' ? 'hazard' : 'gathering task';
     const title = localizeFn?.(`${base}.Title`) || `This ${recordWord} will leave some environments`;
     const bodyTemplate = localizeFn?.(`${base}.Body`)
@@ -2368,22 +2368,22 @@ export function createAdminStore(services) {
     }) === true;
   }
 
-  async function confirmGatheringLibraryTaskMatchLoss(systemId = get(selectedSystemId), taskId, draft = {}) {
+  async function confirmGatheringLibraryTaskCompositionLoss(systemId = get(selectedSystemId), taskId, draft = {}) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     const existing = systemConfig?.tasks?.find(task => task.id === taskId);
     if (!existing) return true;
     const newRecord = _normalizeGatheringTask({ ...existing, ...draft }, _randomID);
-    return _confirmGatheringLibraryRecordMatchLoss({ systemId, oldRecord: existing, newRecord, kind: 'task' });
+    return _confirmGatheringLibraryRecordCompositionLoss({ systemId, oldRecord: existing, newRecord, kind: 'task' });
   }
 
-  async function confirmGatheringLibraryHazardMatchLoss(systemId = get(selectedSystemId), hazardId, draft = {}) {
+  async function confirmGatheringLibraryHazardCompositionLoss(systemId = get(selectedSystemId), hazardId, draft = {}) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     const existing = systemConfig?.hazards?.find(hazard => hazard.id === hazardId);
     if (!existing) return true;
     const newRecord = _normalizeGatheringHazard({ ...existing, ...draft }, _randomID);
-    return _confirmGatheringLibraryRecordMatchLoss({ systemId, oldRecord: existing, newRecord, kind: 'hazard' });
+    return _confirmGatheringLibraryRecordCompositionLoss({ systemId, oldRecord: existing, newRecord, kind: 'hazard' });
   }
 
   function _resolveEnvironmentTaskSelection(draft, preferredTaskId = '') {
@@ -5334,8 +5334,8 @@ export function createAdminStore(services) {
     confirmDiscardDirtyEssenceDraft,
     confirmDiscardDirtyGatheringTaskDraft,
     confirmDiscardDirtyGatheringHazardDraft,
-    confirmGatheringLibraryTaskMatchLoss,
-    confirmGatheringLibraryHazardMatchLoss,
+    confirmGatheringLibraryTaskCompositionLoss,
+    confirmGatheringLibraryHazardCompositionLoss,
     cancelEnvironmentDraft,
     saveEnvironmentDraft,
     duplicateEnvironmentDraft,
