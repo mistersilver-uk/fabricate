@@ -791,7 +791,6 @@ async function exerciseManagerPointerTargets(page) {
   await page.locator('.fabricate-manager .manager-filter select').first().selectOption('all');
 
   await page.locator('.fabricate-manager .manager-system-row:has-text("The Herbalist") .manager-system-identity').first().click();
-  await page.locator('.fabricate-manager .manager-nav-button:has-text("Recipes")').first().click();
   await page.locator('.fabricate-manager .manager-breadcrumbs button:has-text("The Herbalist")').first().click({ trial: true });
   await page.locator('.fabricate-manager .manager-breadcrumbs button:has-text("Crafting Systems")').first().click();
   await page.locator('.fabricate-manager .manager-scope-return').first().click({ trial: true });
@@ -849,49 +848,6 @@ async function exerciseManagerSystemEditPointerTargets(page) {
   await page.locator('.fabricate-manager [data-edit-control="advanced-options"] input').first().click({ trial: true });
   await page.locator('.fabricate-manager [data-feature-key="gathering"] input').first().click({ trial: true });
   await page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Back to systems")').first().click({ trial: true });
-}
-
-/**
- * Exercise manager recipe browser pointer targets without mutating recipes.
- * @param {import('playwright').Page} page
- */
-async function exerciseManagerRecipePointerTargets(page) {
-  await page.locator('.fabricate-manager .manager-nav-button:has-text("Recipes")').first().click();
-  await page.locator('.fabricate-manager .manager-recipe-row').first().waitFor({ state: 'visible', timeout: 5_000 });
-
-  const search = page.locator('.fabricate-manager input[aria-label="Search recipes"]').first();
-  await search.fill('Brew');
-  await page.waitForTimeout(250);
-  await search.fill('');
-  await page.waitForTimeout(250);
-
-  await page.locator('.fabricate-manager select[aria-label="Filter recipes by status"]').first().selectOption('active');
-  await page.waitForTimeout(250);
-  await page.locator('.fabricate-manager select[aria-label="Filter recipes by status"]').first().selectOption('all');
-
-  const categoryFilter = page.locator('.fabricate-manager select[aria-label="Filter recipes by category"]').first();
-  if (await categoryFilter.count() > 0) {
-    await categoryFilter.selectOption({ index: 1 });
-    await page.waitForTimeout(250);
-    await categoryFilter.selectOption('all');
-    await page.waitForTimeout(250);
-  }
-
-  await search.fill('');
-  await page.locator('.fabricate-manager select[aria-label="Filter recipes by status"]').first().selectOption('all');
-  await page.waitForTimeout(250);
-  const recipeRow = page.locator('.fabricate-manager .manager-recipe-row').first();
-  await recipeRow.waitFor({ state: 'visible', timeout: 5_000 });
-  await recipeRow.locator('.manager-recipe-identity').click();
-  const toggleInput = recipeRow.locator('.manager-toggle input').first();
-  if (await toggleInput.count() > 0) await toggleInput.click({ trial: true });
-  const recipeActions = recipeRow.locator('.manager-icon-button');
-  for (let index = 0; index < await recipeActions.count(); index += 1) {
-    await recipeActions.nth(index).click({ trial: true });
-  }
-
-  await page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Import")').first().click({ trial: true });
-  await page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Export")').first().click({ trial: true });
 }
 
 /**
@@ -2157,8 +2113,7 @@ async function main() {
         await screenshot(page, 'manager-selected-stacked');
 
         await setManagerWindowSize(page, { width: 1280, height: 820 });
-        await page.locator('.fabricate-manager .manager-nav-button:has-text("Recipes")').first().click();
-        await page.locator('.fabricate-manager .manager-breadcrumbs button:has-text("The Herbalist")').first().click();
+        await page.locator('.fabricate-manager .manager-nav-button:has-text("System settings")').first().click();
         await page.locator('.fabricate-manager[data-manager-view="system-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await exerciseManagerSystemEditPointerTargets(page);
         if (await page.locator('.fabricate-manager[data-manager-view="system-edit"]').count() === 0) {
@@ -2185,26 +2140,18 @@ async function main() {
         await screenshot(page, 'manager-system-edit-narrow');
 
         await setManagerWindowSize(page, { width: 1280, height: 820 });
-        await exerciseManagerRecipePointerTargets(page);
-        if (await page.locator('.fabricate-manager .manager-recipe-row').count() < 2) {
-          throw new Error('Manager recipes browser rendered fewer than two recipe rows.');
+        // The Recipes manager view is gated behind experimental features and is
+        // not in place for normal worlds yet (the nav button renders as
+        // "planned for a future release"). Until the new recipe UI exists,
+        // verify recipe data through the Foundry API rather than driving the
+        // disabled view.
+        const recipeApiCount = await page.evaluate((sysId) => {
+          const rm = game.fabricate?.getRecipeManager?.();
+          return rm?.getRecipesForSystem?.(sysId)?.length ?? 0;
+        }, craftingSetup.systemId);
+        if (recipeApiCount < 2) {
+          throw new Error(`Expected the smoke system to expose at least 2 recipes via the API; saw ${recipeApiCount}.`);
         }
-        if (await page.locator('.fabricate-manager .manager-recipe-row.is-selected').count() === 0) {
-          throw new Error('Manager recipes browser did not show selected recipe row state.');
-        }
-        if (await page.locator('.fabricate-manager .manager-inspector:has-text("Requirements")').count() === 0) {
-          throw new Error('Manager recipes inspector did not show requirements preview.');
-        }
-        await assertManagerLayoutStable(page, 'recipes normal');
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-recipes-normal');
-
-        await setManagerWindowSize(page, { width: 1000, height: 700 });
-        await page.locator('.fabricate-manager .manager-recipe-row:has-text("Brew Healing Potion")').first().scrollIntoViewIfNeeded();
-        await page.waitForTimeout(250);
-        await assertManagerLayoutStable(page, 'recipes stacked');
-        await assertNoScreenshotOverlays(page);
-        await screenshot(page, 'manager-recipes-stacked');
 
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         await page.locator('.fabricate-manager .manager-nav-button:has-text("Components")').first().click();
@@ -2279,8 +2226,6 @@ async function main() {
         }
 
         await setManagerWindowSize(page, { width: 1280, height: 820 });
-        await page.locator('.fabricate-manager .manager-nav-button:has-text("Recipes")').first().click();
-        await page.waitForTimeout(250);
         await exerciseManagerEnvironmentPointerTargets(page);
         if (await page.locator('.fabricate-manager .manager-environment-row').count() < 1) {
           throw new Error('Manager environments browser rendered no environment rows.');
