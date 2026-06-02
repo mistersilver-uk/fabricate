@@ -20,7 +20,7 @@
     { id: 'alchemy', icon: 'fa-flask', label: 'FABRICATE.App.Nav.Alchemy', requires: 'alchemy' },
     { id: 'gathering', icon: 'fa-leaf', label: 'FABRICATE.App.Nav.Gathering' },
     { id: 'journal', icon: 'fa-book-open', label: 'FABRICATE.App.Nav.Journal' },
-    { id: 'inventory', icon: 'fa-box', label: 'FABRICATE.App.Nav.Inventory' }
+    { id: 'inventory', icon: 'fa-boxes-stacked', label: 'FABRICATE.App.Nav.Inventory' }
   ];
 
   const tabs = $derived(ALL_TABS.filter(tab => tab.requires !== 'alchemy' || showAlchemy));
