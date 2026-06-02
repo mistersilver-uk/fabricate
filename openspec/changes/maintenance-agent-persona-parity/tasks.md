@@ -4,7 +4,8 @@
       "keep aligned" lines with canonical-source statements).
 - [x] Slim 8 `.codex/agents/fabricate-*.toml` to thin pointers, preserving structured fields.
 - [x] Add 8 `.claude/agents/fabricate-*.md` thin subagents with explicit `tools:` allowlists
-      (exclude `Agent`/`Task`) and `model:` per role; sandbox parity with Codex.
+      (exclude `Agent`/`Task`) and `model: opus` on the high-effort roles; sandbox parity with
+      Codex (the read-only reviewer omits `Edit`/`Write`/`Bash`).
 - [x] Make `AGENTS.md` routing provider-neutral; add the workflow-driver definition and the
       Agent Roles & Bindings table; de-orchestrate child roles.
 - [x] Update `CLAUDE.md` to run the Default Agentic Workflow and spawn matching

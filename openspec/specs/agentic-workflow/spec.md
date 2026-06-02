@@ -84,7 +84,7 @@ Each agent role MUST be defined once in its canonical `skills/<role>/SKILL.md`. 
 #### Scenario: orchestration ownership
 
 - **WHEN** role agents are spawned for a change
-- **THEN** the workflow driver (the orchestrator's top-level loop) owns routing and the plan, implementation, and docs iteration loops
+- **THEN** the workflow driver (the provider's top-level loop — Codex's depth-0 prompt agent or Claude's main loop) owns routing and the plan, implementation, and docs iteration loops
 - **AND** scoped role agents execute their role and return without spawning or routing further agents
 
 ### Requirement: Product contracts stay in specs

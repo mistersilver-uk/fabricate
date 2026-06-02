@@ -2,6 +2,9 @@
 // Validates that every agent role stays consistent across its canonical skill,
 // both provider bindings, and the AGENTS.md "Agent Roles & Bindings" table.
 //
+// The role list is DERIVED from the AGENTS.md table (the single source of truth),
+// not hard-coded — a new routed role or a stale binding on either side is caught.
+//
 // Pure Node, no dependencies, no Docker/network — behaves identically in CI and
 // local dev. Run with `npm run validate:agents`. Exits non-zero on any mismatch.
 
@@ -11,54 +14,69 @@ import { dirname, join } from "node:path";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-// Roles backed by a shared skill + both provider bindings.
-const ROLES = [
-  "orchestrator",
-  "implementer",
-  "reviewer",
-  "domain-expert",
-  "docs-writer",
-  "ux-designer",
-  "quality-engineer",
-  "competitive-analyst",
-];
-
-// Read-only mapping role: Codex toml only, Claude uses the built-in Explore agent.
-const MAPPING_ROLE = "pr-explorer";
-
-// Tools that would let a role spawn/route further agents. Role agents must not
-// nest — only the top-level workflow driver spawns.
+// Tools that let a role mutate the workspace or spawn further agents. A Claude
+// binding that mirrors a Codex `sandbox_mode = "read-only"` must include none of
+// these (Bash can mutate files/git state, so it counts as write capability).
+const WRITE_TOOLS = ["Edit", "Write", "NotebookEdit", "Bash"];
+// Tools that let a role spawn/route sub-agents. Role agents must never nest.
 const SPAWN_TOOLS = ["Agent", "Task"];
 
 const errors = [];
 const read = (rel) => (existsSync(join(root, rel)) ? readFileSync(join(root, rel), "utf8") : null);
+const exists = (rel) => existsSync(join(root, rel));
 const require_ = (cond, msg) => { if (!cond) errors.push(msg); };
 
-// Parse a Claude agent's `tools:` frontmatter line into an array, or null if absent.
 const parseTools = (md) => {
   const m = md && md.match(/^tools:\s*(.+)$/m);
   return m ? m[1].split(",").map((t) => t.trim()).filter(Boolean) : null;
 };
 
-// Return the inner cells of the bindings-table row for `token`. Disambiguated
-// from the signals routing table by requiring a `.codex/agents/` binding cell.
-const tableRow = (md, token) => {
-  const line = (md || "")
-    .split("\n")
-    .find((l) => l.trim().startsWith("|") && l.includes("`" + token + "`") && l.includes(".codex/agents/"));
-  // slice(1, -1) drops the empty cells before the leading `|` and after the trailing `|`.
-  return line ? line.split("|").slice(1, -1).map((c) => c.trim()) : null;
-};
-
 const agentsMd = read("AGENTS.md");
 require_(agentsMd, "AGENTS.md is missing");
 
-for (const role of ROLES) {
-  const token = `fabricate_${role.replace(/-/g, "_")}`;
-  const skillPath = `skills/fabricate-${role}/SKILL.md`;
-  const codexPath = `.codex/agents/fabricate-${role}.toml`;
-  const claudePath = `.claude/agents/fabricate-${role}.md`;
+// --- Parse the bindings table out of AGENTS.md ----------------------------
+const lines = (agentsMd || "").split("\n");
+const headerIdx = lines.findIndex((l) => l.includes("Routing token") && l.includes("Claude"));
+require_(headerIdx >= 0, "AGENTS.md is missing the Agent Roles & Bindings table (header with 'Routing token' and 'Claude')");
 
+const rows = [];
+for (let i = headerIdx + 1; headerIdx >= 0 && i < lines.length; i++) {
+  const l = lines[i];
+  if (!l.trim().startsWith("|")) break; // table ended
+  if (l.includes("---")) continue; // separator row
+  const cells = l.split("|").slice(1, -1).map((c) => c.trim());
+  const tokenCell = cells.find((c) => /^`fabricate_\w+`$/.test(c));
+  if (!tokenCell) continue;
+  rows.push({ cells, token: tokenCell.replace(/`/g, "") });
+}
+require_(rows.length > 0, "AGENTS.md bindings table has no role rows");
+
+const expectedCodex = new Set();
+const expectedClaude = new Set();
+let fullRoles = 0;
+let mappingRoles = 0;
+
+for (const { cells, token } of rows) {
+  const role = token.replace(/^fabricate_/, "").replace(/_/g, "-");
+  const codexPath = `.codex/agents/fabricate-${role}.toml`;
+  const claudeCol = cells[cells.length - 1];
+  const skillCell = cells.find((c) => c.includes("SKILL.md"));
+
+  // Mapping role: no shared skill, no Claude binding — Claude uses Explore.
+  if (!skillCell) {
+    mappingRoles++;
+    expectedCodex.add(`fabricate-${role}.toml`);
+    require_(exists(codexPath), `${codexPath} (Codex binding for ${token}) is missing`);
+    require_(/Explore/.test(claudeCol), `AGENTS.md ${token} row Claude column must be the built-in Explore agent, got "${claudeCol}"`);
+    continue;
+  }
+
+  fullRoles++;
+  expectedCodex.add(`fabricate-${role}.toml`);
+  expectedClaude.add(`fabricate-${role}.md`);
+
+  const skillPath = `skills/fabricate-${role}/SKILL.md`;
+  const claudePath = `.claude/agents/fabricate-${role}.md`;
   const skill = read(skillPath);
   const codex = read(codexPath);
   const claude = read(claudePath);
@@ -67,23 +85,21 @@ for (const role of ROLES) {
   require_(codex, `${codexPath} (Codex binding) is missing`);
   require_(claude, `${claudePath} (Claude binding) is missing`);
 
-  // Codex binding: correct name token + points at the canonical skill.
+  // Table cells cite the right skill + Codex paths, and the Claude column names the subagent.
+  require_(skillCell.includes(skillPath), `AGENTS.md ${token} row must cite ${skillPath}, got "${skillCell}"`);
+  require_(cells.some((c) => c.includes(codexPath)), `AGENTS.md ${token} row must cite ${codexPath}`);
+  require_(claudeCol.includes(`fabricate-${role}`), `AGENTS.md ${token} row Claude column must be \`fabricate-${role}\`, got "${claudeCol}"`);
+
   if (codex) {
     require_(codex.includes(`name = "${token}"`), `${codexPath} must declare name = "${token}"`);
     require_(codex.includes(skillPath), `${codexPath} must reference ${skillPath}`);
   }
-
-  // Claude binding: frontmatter name matches the file + points at the canonical skill.
   if (claude) {
-    require_(
-      new RegExp(`^name:\\s*fabricate-${role}\\s*$`, "m").test(claude),
-      `${claudePath} frontmatter must declare name: fabricate-${role}`,
-    );
+    require_(new RegExp(`^name:\\s*fabricate-${role}\\s*$`, "m").test(claude), `${claudePath} frontmatter must declare name: fabricate-${role}`);
     require_(claude.includes(skillPath), `${claudePath} must reference ${skillPath}`);
   }
 
-  // Tool allowlist + sandbox parity: every Claude binding must declare an
-  // explicit tools list, exclude spawn tools, and match the Codex sandbox mode.
+  // Tool allowlist + sandbox parity.
   if (claude && codex) {
     const tools = parseTools(claude);
     require_(tools, `${claudePath} must declare an explicit tools: allowlist (no default inheritance)`);
@@ -91,57 +107,35 @@ for (const role of ROLES) {
       for (const banned of SPAWN_TOOLS) {
         require_(!tools.includes(banned), `${claudePath} must not include ${banned} — role agents must not spawn or route`);
       }
-      const hasWrite = tools.includes("Edit") || tools.includes("Write");
+      const writeTools = tools.filter((t) => WRITE_TOOLS.includes(t));
       const codexReadOnly = /sandbox_mode\s*=\s*"read-only"/.test(codex);
       if (codexReadOnly) {
-        require_(!hasWrite, `${claudePath} must omit Edit/Write to match ${codexPath} sandbox_mode = "read-only"`);
+        require_(
+          writeTools.length === 0,
+          `${claudePath} must omit all mutation tools (${WRITE_TOOLS.join("/")}) to match ${codexPath} sandbox_mode = "read-only"; found ${writeTools.join(", ") || "none"}`,
+        );
       } else {
-        require_(hasWrite, `${claudePath} must allow Edit/Write to match ${codexPath} full-access sandbox`);
+        require_(
+          tools.includes("Edit") && tools.includes("Write"),
+          `${claudePath} must allow Edit and Write to match ${codexPath} full-access sandbox`,
+        );
       }
     }
   }
+}
 
-  // AGENTS.md bindings table: row exists and its cells name skill, codex, and the Claude subagent_type.
-  if (agentsMd) {
-    require_(agentsMd.includes(token), `AGENTS.md must reference routing token ${token}`);
-    const row = tableRow(agentsMd, token);
-    require_(row, `AGENTS.md bindings table is missing a row for ${token}`);
-    if (row) {
-      require_(row.some((c) => c.includes(skillPath)), `AGENTS.md ${token} row must cite ${skillPath}`);
-      require_(row.some((c) => c.includes(codexPath)), `AGENTS.md ${token} row must cite ${codexPath}`);
-      // Claude column is the last populated cell; assert it names this role's subagent.
-      const claudeCol = row[row.length - 1];
-      require_(
-        claudeCol.includes(`fabricate-${role}`),
-        `AGENTS.md ${token} row Claude column must be \`fabricate-${role}\`, got "${claudeCol}"`,
-      );
+// --- Orphan detection on BOTH provider directories ------------------------
+const scanOrphans = (dir, ext, expected, label) => {
+  const abs = join(root, dir);
+  if (!existsSync(abs)) return;
+  for (const file of readdirSync(abs)) {
+    if (file.startsWith("fabricate-") && file.endsWith(ext)) {
+      require_(expected.has(file), `${dir}/${file} (${label}) has no matching role row in the AGENTS.md bindings table`);
     }
   }
-}
-
-// Mapping role: Codex toml present; AGENTS.md row maps the Claude column to Explore.
-const mapToken = `fabricate_${MAPPING_ROLE.replace(/-/g, "_")}`;
-require_(read(`.codex/agents/fabricate-${MAPPING_ROLE}.toml`), `.codex/agents/fabricate-${MAPPING_ROLE}.toml is missing`);
-if (agentsMd) {
-  require_(agentsMd.includes(mapToken), `AGENTS.md must reference routing token ${mapToken}`);
-  const row = tableRow(agentsMd, mapToken);
-  require_(row, `AGENTS.md bindings table is missing a row for ${mapToken}`);
-  if (row) {
-    const claudeCol = row[row.length - 1];
-    require_(/Explore/.test(claudeCol), `AGENTS.md ${mapToken} row Claude column must be the built-in Explore agent, got "${claudeCol}"`);
-  }
-}
-
-// No orphan Claude bindings beyond the known roles.
-const claudeDir = join(root, ".claude/agents");
-if (existsSync(claudeDir)) {
-  const known = new Set(ROLES.map((r) => `fabricate-${r}.md`));
-  for (const file of readdirSync(claudeDir)) {
-    if (file.startsWith("fabricate-") && file.endsWith(".md")) {
-      require_(known.has(file), `.claude/agents/${file} has no matching role in the bindings table`);
-    }
-  }
-}
+};
+scanOrphans(".claude/agents", ".md", expectedClaude, "Claude binding");
+scanOrphans(".codex/agents", ".toml", expectedCodex, "Codex binding");
 
 if (errors.length) {
   console.error(`Agent binding validation failed (${errors.length}):`);
@@ -149,4 +143,4 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log(`Agent bindings OK: ${ROLES.length} roles + ${MAPPING_ROLE} mapping consistent across skills, both providers, tool/sandbox parity, and AGENTS.md.`);
+console.log(`Agent bindings OK: ${fullRoles} skill-backed roles + ${mappingRoles} mapping role(s) derived from AGENTS.md, consistent across skills, both providers, tool/sandbox parity, and no orphan bindings.`);

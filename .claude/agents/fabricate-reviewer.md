@@ -1,7 +1,7 @@
 ---
 name: fabricate-reviewer
 description: Perform an independent review of Fabricate changes for correctness, regression risk, test quality, and Foundry V13 compatibility. Use after implementation is complete, when the user asks for a review, or before docs and issue closure.
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob
 model: opus
 ---
 
