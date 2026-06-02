@@ -131,4 +131,23 @@ describe('GatheringHazardsBrowserView source contract', () => {
       'placeholder title key should be removed once hazard authoring lands'
     );
   });
+
+  it('renders a "Used in environments" inspector card identical to the task one', () => {
+    assert.ok(rootSource.includes('data-hazard-environment-usage'), 'hazard inspector should expose the usage card data attribute');
+    assert.ok(rootSource.includes('manager-hazard-environment-usage-grid'), 'hazard usage tiles should sit in a grid container');
+    assert.ok(rootSource.includes('manager-hazard-environment-usage-card'), 'hazard usage should render tiled cards');
+    assert.ok(rootSource.includes('manager-hazard-environment-usage-thumb'), 'hazard usage tile should include a thumbnail image');
+    assert.ok(rootSource.includes('gatheringHazardReferencingEnvironments'), 'inspector should filter environments referencing the hazard');
+    assert.ok(rootSource.includes('enabledHazardIds'), 'usage should be derived from enabledHazardIds');
+    const hazards = lang.FABRICATE.Admin.Manager.Environment.Hazards;
+    assert.equal(hazards.UsedInEnvironmentsCard, 'Used in environments');
+    assert.equal(hazards.NotUsedInEnvironments, 'Not used in any environments yet.');
+  });
+
+  it('shows usage tiles as squares in a three-column grid (shared with the task card)', () => {
+    const gridBlock = css.match(/\.manager-task-environment-usage-grid,[\s\S]*?\{[^}]*\}/);
+    assert.ok(gridBlock && /grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/.test(gridBlock[0]), 'usage grid should be three equal columns');
+    const thumbBlock = css.match(/\.manager-task-environment-usage-thumb,[\s\S]*?\{[^}]*\}/);
+    assert.ok(thumbBlock && /aspect-ratio:\s*1\s*\/\s*1/.test(thumbBlock[0]), 'usage thumbnails should be square');
+  });
 });

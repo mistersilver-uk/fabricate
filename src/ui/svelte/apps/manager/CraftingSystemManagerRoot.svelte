@@ -2424,6 +2424,22 @@
     });
   }
 
+  function gatheringHazardReferencingEnvironments(hazard) {
+    if (!hazard?.id) return [];
+    const hazardId = String(hazard.id);
+    return environmentList.filter(environment => {
+      if (String(environment?.craftingSystemId || '') !== String(selectedSystemId || '')) return false;
+      const enabledIds = Array.isArray(environment?.enabledHazardIds) ? environment.enabledHazardIds.map(String) : [];
+      return enabledIds.includes(hazardId);
+    });
+  }
+
+  // Region selections may be stored as a `regions` array or a legacy single `region`.
+  function recordRegions(record) {
+    if (Array.isArray(record?.regions)) return record.regions;
+    return record?.region ? [record.region] : [];
+  }
+
   function activeGatheringTaskEnvironmentCount(task) {
     if (!task || task.enabled === false) return 0;
     const weatherSetting = selectedGatheringSystemConfig.conditions?.weather || {};
@@ -3365,28 +3381,19 @@
               <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Tasks.Details', 'Gathering task details')}</h3>
               <div class="manager-fact-grid">
                 <div class="manager-fact" data-gathering-task-fact="region">
-                  <strong>{
-                    (() => {
-                      const regions = Array.isArray(selectedGatheringTask.regions)
-                        ? selectedGatheringTask.regions
-                        : (selectedGatheringTask.region ? [selectedGatheringTask.region] : []);
-                      if (regions.length === 0) return text('FABRICATE.Admin.Manager.Environment.Tasks.AnyRegion', 'Any region');
-                      return regions.map(id => gatheringOptionLabel('region', id) || id).join(', ');
-                    })()
-                  }</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Region', 'Region')}</span>
+                  <span class="manager-fact-line"><strong>{recordRegions(selectedGatheringTask).length === 0
+                    ? text('FABRICATE.Admin.Manager.Environment.Tasks.AnyRegion', 'Any region')
+                    : recordRegions(selectedGatheringTask).map(id => gatheringOptionLabel('region', id) || id).join(', ')
+                  }</strong>{#if recordRegions(selectedGatheringTask).length > 0}{' '}<span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Region', 'Region')}</span>{/if}</span>
                 </div>
                 <div class="manager-fact" data-gathering-task-fact="biomes">
-                  <strong>{Array.isArray(selectedGatheringTask.biomes) && selectedGatheringTask.biomes.length > 0 ? selectedGatheringTask.biomes.length : text('FABRICATE.Admin.Manager.Environment.Tasks.AnyBiome', 'Any biome')}</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>
+                  <span class="manager-fact-line"><strong>{Array.isArray(selectedGatheringTask.biomes) && selectedGatheringTask.biomes.length > 0 ? selectedGatheringTask.biomes.length : text('FABRICATE.Admin.Manager.Environment.Tasks.AnyBiome', 'Any biome')}</strong>{#if Array.isArray(selectedGatheringTask.biomes) && selectedGatheringTask.biomes.length > 0}{' '}<span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>{/if}</span>
                 </div>
                 <div class="manager-fact" data-gathering-task-fact="drops">
-                  <strong>{gatheringTaskDropRows(selectedGatheringTask).length}</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Drops', 'Drops')}</span>
+                  <span class="manager-fact-line"><strong>{gatheringTaskDropRows(selectedGatheringTask).length}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Tasks.Drops', 'Drops')}</span></span>
                 </div>
                 <div class="manager-fact" data-gathering-task-fact="environments">
-                  <strong>{activeGatheringTaskEnvironmentCount(selectedGatheringTask)}</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.ActiveEnvironments', 'Active environments')}</span>
+                  <span class="manager-fact-line"><strong>{activeGatheringTaskEnvironmentCount(selectedGatheringTask)}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Tasks.ActiveEnvironments', 'Active environments')}</span></span>
                 </div>
               </div>
             </section>
@@ -3889,31 +3896,23 @@
               <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Hazards.Details', 'Hazard details')}</h3>
               <div class="manager-fact-grid">
                 <div class="manager-fact" data-gathering-hazard-fact="region">
-                  <strong>{
-                    (() => {
-                      const regions = Array.isArray(selectedGatheringHazard.regions)
-                        ? selectedGatheringHazard.regions
-                        : (selectedGatheringHazard.region ? [selectedGatheringHazard.region] : []);
-                      if (regions.length === 0) return text('FABRICATE.Admin.Manager.Environment.Hazards.AnyRegion', 'Any region');
-                      return regions.map(id => gatheringOptionLabel('region', id) || id).join(', ');
-                    })()
-                  }</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Region', 'Region')}</span>
+                  <span class="manager-fact-line"><strong>{recordRegions(selectedGatheringHazard).length === 0
+                    ? text('FABRICATE.Admin.Manager.Environment.Hazards.AnyRegion', 'Any region')
+                    : recordRegions(selectedGatheringHazard).map(id => gatheringOptionLabel('region', id) || id).join(', ')
+                  }</strong>{#if recordRegions(selectedGatheringHazard).length > 0}{' '}<span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Region', 'Region')}</span>{/if}</span>
                 </div>
                 <div class="manager-fact" data-gathering-hazard-fact="biomes">
-                  <strong>{Array.isArray(selectedGatheringHazard.biomes) && selectedGatheringHazard.biomes.length > 0 ? selectedGatheringHazard.biomes.length : text('FABRICATE.Admin.Manager.Environment.Hazards.AnyBiome', 'Any biome')}</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>
+                  <span class="manager-fact-line"><strong>{Array.isArray(selectedGatheringHazard.biomes) && selectedGatheringHazard.biomes.length > 0 ? selectedGatheringHazard.biomes.length : text('FABRICATE.Admin.Manager.Environment.Hazards.AnyBiome', 'Any biome')}</strong>{#if Array.isArray(selectedGatheringHazard.biomes) && selectedGatheringHazard.biomes.length > 0}{' '}<span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>{/if}</span>
                 </div>
                 <div class="manager-fact" data-gathering-hazard-fact="drop-rate">
-                  <strong>{(() => {
+                  <span class="manager-fact-line"><strong>{(() => {
                     const rate = Number(selectedGatheringHazard.dropRate);
                     if (!Number.isFinite(rate)) return '—';
                     return `${Math.max(1, Math.min(100, Math.floor(rate)))}%`;
-                  })()}</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Hazards.DropRate', 'Drop rate')}</span>
+                  })()}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Hazards.DropRate', 'Drop rate')}</span></span>
                 </div>
                 <div class="manager-fact" data-gathering-hazard-fact="environments">
-                  <strong>{(() => {
+                  <span class="manager-fact-line"><strong>{(() => {
                     if (!selectedGatheringHazard?.id) return 0;
                     const hazardId = String(selectedGatheringHazard.id);
                     return environmentList.filter(env => {
@@ -3921,10 +3920,25 @@
                       const ids = Array.isArray(env?.enabledHazardIds) ? env.enabledHazardIds.map(String) : [];
                       return ids.includes(hazardId);
                     }).length;
-                  })()}</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Hazards.ActiveEnvironments', 'Active environments')}</span>
+                  })()}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Hazards.ActiveEnvironments', 'Active environments')}</span></span>
                 </div>
               </div>
+            </section>
+
+            <section class="manager-inspector-card manager-hazard-environment-usage-card" data-hazard-environment-usage>
+              <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Hazards.UsedInEnvironmentsCard', 'Used in environments')}</h3>
+              {#if gatheringHazardReferencingEnvironments(selectedGatheringHazard).length === 0}
+                <p class="manager-muted" data-hazard-environment-usage-empty>{text('FABRICATE.Admin.Manager.Environment.Hazards.NotUsedInEnvironments', 'Not used in any environments yet.')}</p>
+              {:else}
+                <div class="manager-hazard-environment-usage-grid" data-hazard-environment-usage-chips>
+                  {#each gatheringHazardReferencingEnvironments(selectedGatheringHazard) as environment (environment.id)}
+                    <article class="manager-hazard-environment-usage-card">
+                      <img class="manager-hazard-environment-usage-thumb" src={environmentImage(environment)} alt="" />
+                      <span class="manager-hazard-environment-usage-name" title={environmentName(environment)}>{environmentName(environment)}</span>
+                    </article>
+                  {/each}
+                </div>
+              {/if}
             </section>
           {:else if currentView !== 'gathering-hazard-edit'}
             <div class="manager-empty">
@@ -4121,17 +4135,15 @@
             <div class="manager-fact-grid">
               {#each selectedEnvironmentFacts as fact}
                 <div class="manager-fact" data-environment-fact={fact.id}>
-                  <strong>{fact.value}</strong>
-                  <span>{fact.label}</span>
+                  <span class="manager-fact-line"><strong>{fact.value}</strong> <span class="manager-fact-label">{fact.label}</span></span>
                 </div>
               {/each}
+              {#if selectedEnvironment.sceneUuid}
+                <div class="manager-fact" data-environment-fact="scene">
+                  <span class="manager-fact-line"><strong>{selectedEnvironmentSceneState.name || selectedEnvironment.sceneUuid}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Scene', 'Scene')}</span></span>
+                </div>
+              {/if}
             </div>
-            {#if selectedEnvironment.sceneUuid}
-              <p class="manager-muted">
-                <strong>{text('FABRICATE.Admin.Manager.Environment.Scene', 'Scene')}:</strong>
-                {selectedEnvironmentSceneState.name || selectedEnvironment.sceneUuid}
-              </p>
-            {/if}
           </section>
 
           {#if environmentDirtyFor(selectedEnvironment) || environmentInvalidFor(selectedEnvironment) || $viewState.environmentSaveError}

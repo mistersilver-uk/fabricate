@@ -9580,27 +9580,31 @@
   color: var(--fab-mv2-text-muted);
 }
 
-.fabricate-manager .manager-task-environment-usage-grid {
+.fabricate-manager .manager-task-environment-usage-grid,
+.fabricate-manager .manager-hazard-environment-usage-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   margin-top: 10px;
 }
 
-.fabricate-manager [data-task-environment-usage] > [data-task-environment-usage-empty] {
+.fabricate-manager [data-task-environment-usage] > [data-task-environment-usage-empty],
+.fabricate-manager [data-hazard-environment-usage] > [data-hazard-environment-usage-empty] {
   margin-top: 10px;
 }
 
-.fabricate-manager .manager-task-environment-usage-card {
+.fabricate-manager .manager-task-environment-usage-card,
+.fabricate-manager .manager-hazard-environment-usage-card {
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
 }
 
-.fabricate-manager .manager-task-environment-usage-thumb {
+.fabricate-manager .manager-task-environment-usage-thumb,
+.fabricate-manager .manager-hazard-environment-usage-thumb {
   width: 100%;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 1 / 1;
   height: auto;
   border-radius: 6px;
   object-fit: cover;
@@ -9608,7 +9612,8 @@
   border: 1px solid var(--fab-mv2-border);
 }
 
-.fabricate-manager .manager-task-environment-usage-name {
+.fabricate-manager .manager-task-environment-usage-name,
+.fabricate-manager .manager-hazard-environment-usage-name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
