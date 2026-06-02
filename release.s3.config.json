@@ -1,0 +1,7 @@
+{
+  "moduleId": "fabricate",
+  "bucket": "mistersilver-foundry-releases",
+  "baseUrl": "https://releases.mrsilver.io",
+  "channel": "beta",
+  "testerGroups": ["closed-beta-2026"]
+}

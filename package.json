@@ -18,6 +18,8 @@
     "test:foundry:ci": "node scripts/foundry-test.mjs --profile=ci",
     "release:build": "node scripts/release.js",
     "release:validate": "node scripts/release.js --validate-only",
+    "release:s3": "node scripts/release-s3.js",
+    "release:s3:dry-run": "node scripts/release-s3.js --dry-run",
     "docs": "cd docs && bundle exec jekyll serve --livereload",
     "docs:install": "cd docs && bundle install"
   },
@@ -25,6 +27,7 @@
     "node": ">=22"
   },
   "devDependencies": {
+    "@aws-sdk/client-s3": "^3.717.0",
     "@commitlint/cli": "^20.4.3",
     "@commitlint/config-conventional": "^20.4.3",
     "@league-of-foundry-developers/foundry-vtt-types": "^12.0.0",

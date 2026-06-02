@@ -1,0 +1,82 @@
+name: "Release Candidate to S3"
+
+on:
+  workflow_dispatch:
+    inputs:
+      rc_tag:
+        description: "RC tag to publish (e.g. v1.0.0-rc.3)"
+        required: true
+        type: string
+      dry_run:
+        description: "Dry-run: build and stage but do not upload"
+        required: false
+        type: boolean
+        default: false
+      overwrite:
+        description: "Allow overwriting an existing versioned zip"
+        required: false
+        type: boolean
+        default: false
+
+# id-token: write lets the workflow request a GitHub OIDC token, which is
+# exchanged with AWS STS for short-lived role credentials. AWS access is
+# controlled entirely by the IAM role's trust + permissions policies.
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  release-s3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Validate RC tag
+        run: |
+          if ! echo "${{ inputs.rc_tag }}" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$'; then
+            echo "::error::Tag '${{ inputs.rc_tag }}' does not match RC pattern v*.*.*-rc.*"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Validate tag exists
+        run: |
+          if ! git tag -l "${{ inputs.rc_tag }}" | grep -q .; then
+            echo "::error::Tag '${{ inputs.rc_tag }}' does not exist"
+            exit 1
+          fi
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(echo "${{ inputs.rc_tag }}" | sed 's/^v//')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Publishing ${{ inputs.rc_tag }} → version $VERSION"
+
+      - name: Checkout RC tag
+        run: git checkout "${{ inputs.rc_tag }}"
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Publish to S3
+        env:
+          S3_RELEASE_BUCKET: ${{ vars.S3_RELEASE_BUCKET }}
+          RELEASE_BASE_URL: ${{ vars.RELEASE_BASE_URL }}
+        run: |
+          node scripts/release-s3.js \
+            --version "${{ steps.version.outputs.version }}" \
+            ${{ inputs.dry_run == true && '--dry-run' || '' }} \
+            ${{ inputs.overwrite == true && '--overwrite' || '' }}
