@@ -27,7 +27,8 @@ describe('UI PR screenshot evidence', () => {
     ]);
 
     assert.deepEqual(views.map(view => view.id), ['manager-environments']);
-    assert.ok(views[0].smokeLabels.includes('manager-environment-edit-placeholder'));
+    assert.ok(views[0].focusedScreenshots.includes('manager-environments'));
+    assert.ok(views[0].focusedScreenshots.includes('manager-environment-editor'));
   });
 
   it('accepts generated PR screenshot paths and rejects unrelated image markdown', () => {
@@ -59,7 +60,7 @@ describe('UI PR screenshot evidence', () => {
     assert.match(failure, /docs\/assets\/pr-screenshots\/pr-321/);
   });
 
-  it('collects generated smoke screenshots into PR asset evidence', () => {
+  it('keeps smoke screenshot collection available as an explicit fallback', () => {
     const root = mkdtempSync(join(tmpdir(), 'fabricate-ui-screenshots-'));
     try {
       const sourceDir = join(root, 'test-results');

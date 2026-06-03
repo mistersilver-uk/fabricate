@@ -19,27 +19,29 @@ The rule applies when a PR changes any file under:
    npm run screenshots:ui:plan -- --base main
    ```
 
-2. Generate screenshots with the relevant renderer:
-
-   - Prefer a focused Vite/Playwright capture for a narrow view change.
-   - Use `npm run test:foundry` when the view depends on live Foundry APIs or when Phase D0 already screenshots the changed Manager route.
-   - Keep raw generated screenshots in `test-results/`.
-
-3. Collect generated screenshots into PR-ready committed assets:
+2. Generate focused screenshots for the mapped views:
 
    ```sh
    npm run screenshots:ui -- --base main --pr <number>
    ```
 
-   This copies matching screenshots into `docs/assets/pr-screenshots/pr-<number>/`. If a changed view has no known smoke-harness screenshot, capture a focused screenshot and place it in that directory manually using the same naming style.
+   This writes only the mapped focused views into `docs/assets/pr-screenshots/pr-<number>/`. The focused generator uses deterministic representative fixtures and copied Foundry core/dnd5e raster assets from `tests/fixtures/ui-assets/manifest.js`; it does not boot Foundry and does not run the smoke harness.
 
-4. Embed committed images in the PR `Screenshots (if applicable)` section:
+3. Commit the generated screenshot assets and embed them in the PR `Screenshots (if applicable)` section:
 
    ```md
-   ![Manager environment editor](https://github.com/<owner>/<repo>/blob/<branch>/docs/assets/pr-screenshots/pr-123/manager-environments.png?raw=1)
+   ![Manager environment editor](https://github.com/<owner>/<repo>/blob/<branch>/docs/assets/pr-screenshots/pr-123/manager-environment-editor.png?raw=1)
    ```
 
-5. If screenshot capture is genuinely blocked, add exactly one handoff line with a specific reason:
+4. Optional fallback: collect screenshots from an explicit smoke-harness run:
+
+   ```sh
+   npm run screenshots:ui:collect -- --base main --pr <number>
+   ```
+
+   Use this only when live Foundry behavior is the evidence being requested. The full smoke harness is intentionally not part of the normal UI screenshot path because it is slower and produces many unrelated images.
+
+5. If focused screenshot capture is genuinely blocked, add exactly one handoff line with a specific reason:
 
    ```md
    SCREENSHOTS_NEEDED: Playwright could not launch locally; changed Manager tools browser row spacing.
@@ -60,7 +62,7 @@ Validate the manifest with:
 npm run screenshots:ui:assets
 ```
 
-Focused Vite/Playwright previews that need images should use these copied manifest entries. Live Foundry smoke-harness data may continue to use direct Foundry core/dnd5e raster paths because those screenshots run inside a real Foundry installation.
+Focused Playwright previews must use these copied manifest entries. Live Foundry smoke-harness data may continue to use direct Foundry core/dnd5e raster paths because those screenshots run inside a real Foundry installation, but smoke output is not the default PR evidence path.
 
 ## CI Behavior
 
