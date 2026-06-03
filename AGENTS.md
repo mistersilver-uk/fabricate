@@ -120,7 +120,7 @@ These deep-dive notes live under `docs/agents/` and explain layered patterns or 
 - Review-only agents inspect the active branch and PR, and must not merge to `main`.
 - PR titles must comply with Conventional Commits, using the same `<type>(#<issue>): <short description>` format for `feat`, `fix`, and `perf`.
 - PR descriptions must use H2 sections in this order: `Description`, `Benefit(s)`, `Changes in this PR`, `Testing`, and `Screenshots (if applicable)`.
-- For UI-touching PRs, `Screenshots (if applicable)` must embed uploaded GitHub attachment image markdown with `pr-<number>` in the alt text (normally produced by `npm run screenshots:ui:publish -- --pr <number>`). There is no `SCREENSHOTS_NEEDED:` bypass; if capture is genuinely impossible, a maintainer applies the `screenshots-exempt` label. Do not commit PR-scoped screenshots under docs or other asset directories.
+- For UI-touching PRs, `Screenshots (if applicable)` must embed the screenshot image markdown with `pr-<number>` in the alt text, produced by `npm run screenshots:ui:publish -- --pr <number>` (S3-hosted under `pr-screenshots/<number>/`). There is no `SCREENSHOTS_NEEDED:` bypass; if capture is genuinely impossible, a maintainer applies the `screenshots-exempt` label. Do not commit PR-scoped screenshots under docs or other asset directories.
 - Never commit directly to `main`.
 - Use Conventional Commits.
 - For `feat`, `fix`, and `perf`, use the format `<type>(#<issue>): <short description>`.
