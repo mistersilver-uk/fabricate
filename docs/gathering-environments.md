@@ -251,6 +251,12 @@ The player app opens from the Items Directory **Gathering** action and uses its 
 
 The app lists gathering options through `game.fabricate.listGatheringForActor({ actor })` and starts attempts through `game.fabricate.startGatheringAttempt({ actor, environmentId, taskId })`. Those public runtime methods enforce the current Foundry user as the viewer before delegating to the internal gathering engine.
 
+### Environments Column
+
+The player app's left column lists environments as cards. **Available** environments (enabled, with at least one visible task) sort first and are selectable; **locked** environments sort after them and are shown only as non-interactive teasers. A locked card is a disabled environment surfaced to non-GM players: it carries the environment identity (name, image, biome chips) and a visible lock indicator, but no tasks, weights, or composition internals leak through it.
+
+Blind environments show a mask **blind** chip. When the system's effective reveal policy is not `never`, a blind card also shows a `(discovered/total)` discovered count: the numerator is the distinct tasks the selected actor has revealed at the system's reveal scope, and the denominator is the full composed task pool the actor could discover. Locked and `never`-policy cards show no discovered count. Biome chips on a card resolve to the same labels, icons, and colours used in the GM Environments editor.
+
 Visible environments and tasks remain listed even when they are blocked by attemptability gates. Scene-linked entries stay visible when the selected actor is not on the linked scene or has no active token there, and the app shows the localized blocked reason returned by the runtime. Active timed runs, last-attempt feedback, and recent terminal history remain visible for the selected actor even when browsing is empty or blocked.
 
 Targeted task rows can show task labels, task descriptions, active-run timing, terminal status, result counts, catalyst counts, and check-derived history metadata returned by the runtime. For non-GM users, blind rows and missing-environment history remain redacted: the app uses a generic localized label and does not expose task IDs, result details, catalyst details, diagnostics, or check internals. GMs can inspect real blind task names through GM-facing surfaces.

@@ -13,7 +13,21 @@ Library references — the environment composes content from `gatheringConfig.sy
 
 The actual composed-task set is `enabled ∪ forced − disabled`, then filtered by environment matching rules (biome / region / danger / library-enabled).
 
-**Canonical composition counts** for the row table and inspector live at `$viewState.environmentTaskCounts[envId]` (shape: `{ availableTaskCount, availableHazardCount }`), computed inside `adminStore.js` via `_buildEnvironmentCompositionViewModel(environment)?.counts`. This is the authoritative read for "how many tasks / hazards does this environment surface to players".
+**Canonical GM-admin composition counts** for the row table and inspector live at `$viewState.environmentTaskCounts[envId]` (shape: `{ availableTaskCount, availableHazardCount }`), computed inside `adminStore.js` via `_buildEnvironmentCompositionViewModel(environment)?.counts` (`src/ui/svelte/stores/adminStore.js:2692`). `availableTaskCount` counts only records whose `runtimeState === 'available'` — i.e. composed **and** with current conditions met (`adminStore.js:2145`, `:2239`). It is the authoritative GM-runtime "ready right now" count for the manager surface; it is **not** what a player blind-reveal `(x/y)` suffix divides by.
+
+### Player listing counts are a separate, engine-owned surface
+
+The player-facing environment listing is produced by `GatheringEngine.listForActor` / `_buildEnvironmentListing` (`src/systems/GatheringEngine.js:486`, `:776`), not by the admin store. Each player environment listing carries its own count and policy fields via `_playerListingFields` (`GatheringEngine.js:888`):
+
+- `composedTaskCount` — the size of the **total composed task pool** for the environment (`normalizeList(environment.tasks).length`; `0` when the listing is locked). This is the **blind-reveal denominator** — the `y` in a `(x/y)` "tasks discovered" suffix. It is a pool size, distinct from the admin `availableTaskCount` (which subtracts condition-blocked records).
+- `discoveredTaskCount` — the `x`: how many tasks this actor has revealed at the effective reveal scope (`GatheringRichStateService.countRevealedTasks`). It is `0` when the listing is locked or when the effective `revealPolicy === 'never'`.
+- `revealPolicy` — the **effective system-level** policy (`never` | `onSuccess` | `onAttempt`), resolved by `GatheringEngine._resolveRevealPolicy` (`GatheringEngine.js:2043`) from the composed system Gathering Rules. Reveal is system-level only; environments do **not** override it.
+- `locked` — `true` for a disabled environment, surfaced as a locked identity-only listing to all viewers (players and GMs alike).
+- `biomeTags` — resolved biome display metadata (`{ id, label, icon, colorToken, customColor }`) from `GatheringRichStateService.resolveBiomeTags`, so player biome chips render identically to the GM editor.
+
+**Disabled environments are surfaced as locked identity-only listings to all viewers** (players and GMs alike) in the player listing (`_lockedEnvironmentListing`, `GatheringEngine.js:854`): `locked: true`, `attemptable: false`, an `ENVIRONMENT_DISABLED` blocked reason, and identity fields only — no `tasks`, weights, or composition internals leak. They were previously filtered out entirely for non-GMs and (earlier still) shown as the full listing to GMs.
+
+Use the admin `environmentTaskCounts` only for GM manager surfaces. Use the engine listing fields (`composedTaskCount` / `discoveredTaskCount`) for anything a player sees.
 
 ## Legacy (still normalized, almost always empty)
 
@@ -33,8 +47,12 @@ UI strings that say "Catalysts" at the environment scope are a sign of stale cod
 
 | Question | Read from |
 | --- | --- |
-| How many tasks does this env compose? | `$viewState.environmentTaskCounts[id]?.availableTaskCount` |
-| How many hazards? | `$viewState.environmentTaskCounts[id]?.availableHazardCount` |
+| GM manager: how many tasks are available *right now* (composed + conditions met)? | `$viewState.environmentTaskCounts[id]?.availableTaskCount` |
+| GM manager: how many hazards? | `$viewState.environmentTaskCounts[id]?.availableHazardCount` |
+| Player listing: total composed task pool (blind-reveal denominator `y`) | `listing.composedTaskCount` (from `GatheringEngine.listForActor`) |
+| Player listing: tasks this actor has discovered (`x`) | `listing.discoveredTaskCount` |
+| Player listing: effective reveal policy (system-level) | `listing.revealPolicy` |
+| Player listing: is this a locked (disabled) teaser? | `listing.locked` |
 | Which task ids? | `enabled ∪ forced − disabled` from the env object |
 | Which tools are required? | Look up composed task ids in `gatheringTaskDefinitions`, union the `toolIds` |
 | What catalysts does the env require? | None — catalysts are per-task. Ask "what tools" instead. |
